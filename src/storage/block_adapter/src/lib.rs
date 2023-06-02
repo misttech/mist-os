@@ -21,6 +21,7 @@ use {
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
         file::{FidlIoConnection, File, FileIo, FileOptions},
+        node::Node,
         path::Path,
         pseudo_directory, ToObjectRequest,
     },
@@ -62,12 +63,31 @@ impl DirectoryEntry for BlockFile {
 }
 
 #[async_trait]
+impl Node for BlockFile {
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+        let block_size = self.block_client.block_size();
+        let block_count = self.block_client.block_count();
+        let device_size = block_count.checked_mul(block_size.into()).unwrap();
+        Ok(fio::NodeAttributes {
+            mode: fio::MODE_TYPE_FILE
+                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ true, /*x*/ false),
+            id: 0,
+            content_size: device_size,
+            storage_size: device_size,
+            link_count: 1,
+            creation_time: 0,
+            modification_time: 0,
+        })
+    }
+}
+
+#[async_trait]
 impl File for BlockFile {
     fn writable(&self) -> bool {
         true
     }
 
-    async fn open(&self, _options: &FileOptions) -> Result<(), zx::Status> {
+    async fn open_file(&self, _options: &FileOptions) -> Result<(), zx::Status> {
         Ok(())
     }
 
@@ -85,32 +105,12 @@ impl File for BlockFile {
         Ok(block_count.checked_mul(block_size.into()).unwrap())
     }
 
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-        let block_size = self.block_client.block_size();
-        let block_count = self.block_client.block_count();
-        let device_size = block_count.checked_mul(block_size.into()).unwrap();
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_FILE
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ true, /*x*/ false),
-            id: 0,
-            content_size: device_size,
-            storage_size: device_size,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
     async fn set_attrs(
         &self,
         _flags: fio::NodeAttributeFlags,
         _attrs: fio::NodeAttributes,
     ) -> Result<(), zx::Status> {
         Err(zx::Status::NOT_SUPPORTED)
-    }
-
-    async fn close(&self) -> Result<(), zx::Status> {
-        Ok(())
     }
 
     async fn sync(&self) -> Result<(), zx::Status> {

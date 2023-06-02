@@ -8,6 +8,7 @@
 use crate::{
     directory::{dirents_sink, entry::DirectoryEntry, traversal_position::TraversalPosition},
     execution_scope::ExecutionScope,
+    node::Node,
     path::Path,
 };
 
@@ -53,7 +54,7 @@ pub use private::DirectoryWatcher;
 /// All directories implement this trait.  If a directory can be modified it should
 /// also implement the `MutableDirectory` trait.
 #[async_trait]
-pub trait Directory: DirectoryEntry {
+pub trait Directory: DirectoryEntry + Node {
     /// Reads directory entries starting from `pos` by adding them to `sink`.
     /// Once finished, should return a sealed sink.
     // The lifetimes here are because of https://github.com/rust-lang/rust/issues/63033.
@@ -75,21 +76,6 @@ pub trait Directory: DirectoryEntry {
     /// Unregister a watcher from this directory. The watcher should no longer
     /// receive events.
     fn unregister_watcher(self: Arc<Self>, key: usize);
-
-    /// Get this directory's attributes.
-    /// The "mode" field will be filled in by the connection.
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status>;
-
-    /// Returns node attributes (io2).
-    async fn get_attributes(
-        &self,
-        _requested_attributes: fio::NodeAttributesQuery,
-    ) -> Result<fio::NodeAttributes2, Status> {
-        Err(Status::NOT_SUPPORTED)
-    }
-
-    /// Called when the directory is closed.
-    fn close(&self) -> Result<(), Status>;
 
     /// Returns information about the filesystem.
     fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {

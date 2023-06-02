@@ -348,19 +348,20 @@ zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
     }
     switch (protocol) {
       case VnodeProtocol::kFile: {
-        zx::stream stream;
-        zx_status_t status = vnode->CreateStream(ToStreamOptions(*options), &stream);
-        if (status == ZX_OK) {
-          connection = std::make_unique<internal::StreamFileConnection>(
-              this, std::move(vnode), std::move(stream), protocol, *options, info.koid);
-          return ZX_OK;
+        if (!options->flags.node_reference) {
+          zx::stream stream;
+          if (zx_status_t status = vnode->CreateStream(ToStreamOptions(*options), &stream);
+              status == ZX_OK) {
+            connection = std::make_unique<internal::StreamFileConnection>(
+                this, std::move(vnode), std::move(stream), protocol, *options, info.koid);
+            return ZX_OK;
+          } else if (status != ZX_ERR_NOT_SUPPORTED) {
+            return status;
+          }
         }
-        if (status == ZX_ERR_NOT_SUPPORTED) {
-          connection = std::make_unique<internal::RemoteFileConnection>(
-              this, std::move(vnode), protocol, *options, info.koid);
-          return ZX_OK;
-        }
-        return status;
+        connection = std::make_unique<internal::RemoteFileConnection>(
+            this, std::move(vnode), protocol, *options, info.koid);
+        return ZX_OK;
       }
       case VnodeProtocol::kDirectory:
         connection = std::make_unique<internal::DirectoryConnection>(this, std::move(vnode),

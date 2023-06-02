@@ -19,6 +19,7 @@ pub mod path;
 
 pub mod directory;
 pub mod file;
+pub mod node;
 pub mod object_request;
 pub mod protocols;
 pub mod remote;

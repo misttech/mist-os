@@ -14,6 +14,7 @@ use {
             common::{get_backing_memory_validate_flags, new_connection_validate_options},
             File, FileIo, FileOptions, RawFileIoConnection,
         },
+        node::OpenNode,
         object_request::Representation,
         path::Path,
         ObjectRequestRef, ProtocolsExt,
@@ -39,28 +40,8 @@ use {
     },
 };
 
-/// Initializes a node reference file connection running in the context of the specified execution
-/// `scope`.
-pub fn create_node_reference_connection<U: 'static + File + DirectoryEntry>(
-    scope: ExecutionScope,
-    file: Arc<U>,
-    protocols: impl ProtocolsExt,
-    object_request: ObjectRequestRef,
-) -> Result<impl Future<Output = ()>, zx::Status> {
-    let file = OpenFile::new(file, scope.clone());
-    create_connection(
-        scope,
-        NodeReferenceIoFile { file },
-        protocols.to_file_options()?,
-        object_request,
-    )
-}
-
 /// Initializes a file connection and returns a future which will process the connection.
-fn create_connection<
-    T: 'static + File,
-    U: Deref<Target = OpenFile<T>> + DerefMut + IoOpHandler + CloneFile,
->(
+fn create_connection<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>(
     scope: ExecutionScope,
     file: U,
     options: FileOptions,
@@ -71,7 +52,7 @@ fn create_connection<
     let object_request = object_request.take();
     Ok(async move {
         if let Err(s) = (|| async {
-            file.open(&options).await?;
+            file.open_file(&options).await?;
 
             if object_request.truncate {
                 file.truncate(0).await?;
@@ -121,19 +102,11 @@ trait IoOpHandler: Send + Sync {
     fn duplicate_stream(&self) -> Result<Option<zx::Stream>, zx::Status>;
 }
 
-/// On a fuchsia.io/Node.Clone request, the `FileConnection` needs to clone the `Arc` of the
-/// underlying file object that implements `DirectoryEntry` so a new connection can be opened. This
-/// trait gives `FileConnection` a way of cloning the `file` contained in the `FidlIoConnection` and
-/// `StreamIoConnection` wrappers.
-trait CloneFile {
-    fn clone_file(&self) -> Arc<dyn DirectoryEntry>;
-}
-
 /// Wrapper around a file that manages the seek offset of the connection and transforms `IoOpHandler`
 /// requests into `FileIo` requests. All `File` requests are forwarded to `file`.
 pub struct FidlIoConnection<T: 'static + File> {
     /// File that requests will be forwarded to.
-    file: OpenFile<T>,
+    file: OpenNode<T>,
 
     /// Seek position. Next byte to be read or written within the buffer. This might be beyond the
     /// current size of buffer, matching POSIX:
@@ -153,7 +126,7 @@ pub struct FidlIoConnection<T: 'static + File> {
 }
 
 impl<T: 'static + File> Deref for FidlIoConnection<T> {
-    type Target = OpenFile<T>;
+    type Target = OpenNode<T>;
 
     fn deref(&self) -> &Self::Target {
         &self.file
@@ -174,7 +147,7 @@ impl<T: 'static + DirectoryEntry + File + FileIo> FidlIoConnection<T> {
         protocols: impl ProtocolsExt,
         object_request: ObjectRequestRef,
     ) -> Result<impl Future<Output = ()>, zx::Status> {
-        let file = OpenFile::new(file, scope.clone());
+        let file = OpenNode::new(file);
         let options = protocols.to_file_options()?;
         create_connection(
             scope,
@@ -253,14 +226,8 @@ impl<T: 'static + File + FileIo> IoOpHandler for FidlIoConnection<T> {
     }
 }
 
-impl<T: 'static + DirectoryEntry + File> CloneFile for FidlIoConnection<T> {
-    fn clone_file(&self) -> Arc<dyn DirectoryEntry> {
-        self.file.clone()
-    }
-}
-
 pub struct RawIoConnection<T: 'static + File> {
-    file: OpenFile<T>,
+    file: OpenNode<T>,
 }
 
 impl<T: 'static + File + RawFileIoConnection + DirectoryEntry> RawIoConnection<T> {
@@ -270,7 +237,7 @@ impl<T: 'static + File + RawFileIoConnection + DirectoryEntry> RawIoConnection<T
         protocols: impl ProtocolsExt,
         object_request: ObjectRequestRef,
     ) -> Result<impl Future<Output = ()>, zx::Status> {
-        let file = OpenFile::new(file, scope.clone());
+        let file = OpenNode::new(file);
         create_connection(
             scope,
             RawIoConnection { file },
@@ -281,7 +248,7 @@ impl<T: 'static + File + RawFileIoConnection + DirectoryEntry> RawIoConnection<T
 }
 
 impl<T: 'static + File> Deref for RawIoConnection<T> {
-    type Target = OpenFile<T>;
+    type Target = OpenNode<T>;
 
     fn deref(&self) -> &Self::Target {
         &self.file
@@ -325,12 +292,6 @@ impl<T: 'static + File + RawFileIoConnection + DirectoryEntry> IoOpHandler for R
     }
 }
 
-impl<T: 'static + File + RawFileIoConnection + DirectoryEntry> CloneFile for RawIoConnection<T> {
-    fn clone_file(&self) -> Arc<dyn DirectoryEntry> {
-        self.file.clone()
-    }
-}
-
 pub trait GetVmo {
     /// Returns the underlying VMO for the node.
     fn get_vmo(&self) -> &zx::Vmo;
@@ -339,14 +300,14 @@ pub trait GetVmo {
 /// Wrapper around a file that forwards `File` requests to `file` and `FileIo` requests to `stream`.
 pub struct StreamIoConnection<T: 'static + File> {
     /// File that requests will be forwarded to.
-    file: OpenFile<T>,
+    file: OpenNode<T>,
 
     /// The stream backing the connection that all read, write, and seek calls are forwarded to.
     stream: zx::Stream,
 }
 
 impl<T: 'static + File> Deref for StreamIoConnection<T> {
-    type Target = OpenFile<T>;
+    type Target = OpenNode<T>;
 
     fn deref(&self) -> &Self::Target {
         &self.file
@@ -364,11 +325,6 @@ impl<T: 'static + File + DirectoryEntry> StreamIoConnection<T> {
     /// clients that can be used for issuing read, write, and seek calls. Any read, write, and seek
     /// calls that continue to come in over FIDL will be forwarded to `stream` instead of being sent
     /// to `file`.
-    ///
-    /// This should only be used for files. For node connections to services then
-    /// `create_node_reference_connection` should be used instead. Reading, writing, or seeking on a
-    /// node reference should return ZX_ERR_BAD_HANDLE. If a client attempts those operations on a
-    /// zx::stream then ZX_ERR_ACCESS_DENIED will be returned.
     pub fn create(
         scope: ExecutionScope,
         file: Arc<T>,
@@ -378,12 +334,9 @@ impl<T: 'static + File + DirectoryEntry> StreamIoConnection<T> {
     where
         T: GetVmo,
     {
-        let file = OpenFile::new(file, scope.clone());
+        let file = OpenNode::new(file);
         let options = protocols.to_file_options()?;
-        let stream_options = options
-            .to_stream_options()
-            .unwrap_or_else(|| panic!("Invalid options for stream connection: {:?}", options));
-        let stream = zx::Stream::create(stream_options, file.get_vmo(), 0)?;
+        let stream = zx::Stream::create(options.to_stream_options(), file.get_vmo(), 0)?;
         create_connection(scope, StreamIoConnection { file, stream }, options, object_request)
     }
 }
@@ -441,118 +394,6 @@ impl<T: 'static + File> IoOpHandler for StreamIoConnection<T> {
     }
 }
 
-impl<T: 'static + File + DirectoryEntry> CloneFile for StreamIoConnection<T> {
-    fn clone_file(&self) -> Arc<dyn DirectoryEntry> {
-        self.file.clone()
-    }
-}
-
-/// Wrapper around a file that forwards `File` requests to `file` and doesn't expect any `FileIo`
-/// requests.
-struct NodeReferenceIoFile<T: 'static + File + DirectoryEntry> {
-    /// File that requests will be forwarded to.
-    file: OpenFile<T>,
-}
-
-impl<T: 'static + File + DirectoryEntry> Deref for NodeReferenceIoFile<T> {
-    type Target = OpenFile<T>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.file
-    }
-}
-
-impl<T: 'static + File + DirectoryEntry> DerefMut for NodeReferenceIoFile<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.file
-    }
-}
-
-#[async_trait]
-impl<T: 'static + File + DirectoryEntry> IoOpHandler for NodeReferenceIoFile<T> {
-    async fn read(&mut self, _count: u64) -> Result<Vec<u8>, zx::Status> {
-        unreachable!();
-    }
-
-    async fn read_at(&self, _offset: u64, _count: u64) -> Result<Vec<u8>, zx::Status> {
-        unreachable!();
-    }
-
-    async fn write(&mut self, _data: &[u8]) -> Result<u64, zx::Status> {
-        unreachable!();
-    }
-
-    async fn write_at(&self, _offset: u64, _data: &[u8]) -> Result<u64, zx::Status> {
-        unreachable!();
-    }
-
-    async fn seek(&mut self, _offset: i64, _origin: fio::SeekOrigin) -> Result<u64, zx::Status> {
-        unreachable!();
-    }
-
-    fn update_flags(&mut self, _flags: fio::OpenFlags) -> zx::Status {
-        zx::Status::OK
-    }
-
-    fn duplicate_stream(&self) -> Result<Option<zx::Stream>, zx::Status> {
-        Ok(None)
-    }
-}
-
-impl<T: 'static + File + DirectoryEntry> CloneFile for NodeReferenceIoFile<T> {
-    fn clone_file(&self) -> Arc<dyn DirectoryEntry> {
-        self.file.clone()
-    }
-}
-
-/// This struct is a RAII wrapper around a file that will call close() on it unless the `close`
-/// function is called.
-pub struct OpenFile<T: 'static + File> {
-    file: Option<Arc<T>>,
-    scope: ExecutionScope,
-}
-
-impl<T: 'static + File> OpenFile<T> {
-    fn new(file: Arc<T>, scope: ExecutionScope) -> Self {
-        Self { file: Some(file), scope }
-    }
-
-    /// Explicitly close the file.
-    pub async fn close(&mut self) -> Result<(), Status> {
-        // Hold a guard to make sure close completes.
-        let _guard = self.scope.active_guard();
-        let file = self.file.take().ok_or(Status::BAD_HANDLE)?;
-        file.close().await
-    }
-}
-
-impl<T: 'static + File> Drop for OpenFile<T> {
-    fn drop(&mut self) {
-        if let Some(file) = self.file.take() {
-            let guard = self.scope.active_guard();
-            fuchsia_async::Task::spawn(async move {
-                let _ = file.close().await;
-                std::mem::drop(guard);
-            })
-            .detach();
-        }
-    }
-}
-
-impl<T: 'static + File> Deref for OpenFile<T> {
-    type Target = Arc<T>;
-
-    fn deref(&self) -> &Self::Target {
-        self.file.as_ref().unwrap()
-    }
-}
-
-impl<T: 'static + File> DerefMut for OpenFile<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.file.as_mut().unwrap()
-    }
-}
-
 /// Return type for [`handle_request()`] functions.
 enum ConnectionState {
     /// Connection is still alive.
@@ -578,9 +419,7 @@ struct FileConnection<U> {
     options: FileOptions,
 }
 
-impl<T: 'static + File, U: Deref<Target = OpenFile<T>> + DerefMut + IoOpHandler + CloneFile>
-    FileConnection<U>
-{
+impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler> FileConnection<U> {
     async fn handle_requests(mut self, mut requests: fio::FileRequestStream) {
         while let Some(request) = requests.next().await {
             let Some(_guard) = self.scope.try_active_guard() else { break };
@@ -603,16 +442,17 @@ impl<T: 'static + File, U: Deref<Target = OpenFile<T>> + DerefMut + IoOpHandler 
 
             match state {
                 ConnectionState::Alive => (),
-                ConnectionState::Closed => break,
+                ConnectionState::Closed => return,
                 ConnectionState::Dropped => break,
             }
         }
 
-        // When `file` is dropped at the end of this function it makes sure that `close` gets
-        // called. `close` is async and `Drop::drop` is sync so the implementation has to spawn a
-        // new task in order to call `close` if it hadn't been already. Calling `close` here while
-        // still in an async context avoids spawning the new task.
-        let _ = self.file.close().await;
+        // If the file was opened with write permissions, sync the file as we're closing.  The file
+        // will subsequently get closed and this reduces the chance that it has to spawn a new task
+        // to perform the close since close is not async.
+        if self.options.rights.contains(fio::Operations::WRITE_BYTES) {
+            let _ = self.file.sync().await;
+        }
     }
 
     /// Handle a [`FileRequest`]. This function is responsible for handing all the file operations
@@ -631,7 +471,11 @@ impl<T: 'static + File, U: Deref<Target = OpenFile<T>> + DerefMut + IoOpHandler 
             }
             fio::FileRequest::Close { responder } => {
                 fuchsia_trace::duration!("storage", "File::Close");
-                responder.send(self.file.close().await.map_err(|status| status.into_raw()))?;
+                responder.send(if self.options.rights.contains(fio::Operations::WRITE_BYTES) {
+                    self.file.sync().await.map_err(|status| status.into_raw())
+                } else {
+                    Ok(())
+                })?;
                 return Ok(ConnectionState::Closed);
             }
             fio::FileRequest::Describe { responder } => {
@@ -646,12 +490,10 @@ impl<T: 'static + File, U: Deref<Target = OpenFile<T>> + DerefMut + IoOpHandler 
             fio::FileRequest::GetConnectionInfo { responder } => {
                 fuchsia_trace::duration!("storage", "File::GetConnectionInfo");
                 // TODO(https://fxbug.dev/77623): Restrict GET_ATTRIBUTES.
-                let mut rights = fio::Operations::GET_ATTRIBUTES;
-                if !self.options.is_node {
-                    rights |= self.options.rights;
-                }
-                responder
-                    .send(fio::ConnectionInfo { rights: Some(rights), ..Default::default() })?;
+                responder.send(fio::ConnectionInfo {
+                    rights: Some(self.options.rights),
+                    ..Default::default()
+                })?;
             }
             fio::FileRequest::Sync { responder } => {
                 fuchsia_trace::duration!("storage", "File::Sync");
@@ -757,14 +599,7 @@ impl<T: 'static + File, U: Deref<Target = OpenFile<T>> + DerefMut + IoOpHandler 
                 responder.send(Err(ZX_ERR_NOT_SUPPORTED))?;
             }
             fio::FileRequest::Query { responder } => {
-                responder.send(
-                    if self.options.is_node {
-                        fio::NODE_PROTOCOL_NAME
-                    } else {
-                        fio::FILE_PROTOCOL_NAME
-                    }
-                    .as_bytes(),
-                )?;
+                responder.send(fio::FILE_PROTOCOL_NAME.as_bytes())?;
             }
             fio::FileRequest::QueryFilesystem { responder } => {
                 fuchsia_trace::duration!("storage", "File::QueryFilesystem");
@@ -787,8 +622,7 @@ impl<T: 'static + File, U: Deref<Target = OpenFile<T>> + DerefMut + IoOpHandler 
             }
         };
 
-        let file = self.file.clone_file();
-        file.open(self.scope.clone(), flags, Path::dot(), server_end);
+        self.file.clone().open(self.scope.clone(), flags, Path::dot(), server_end);
     }
 
     async fn handle_get_attr(&mut self) -> (zx::Status, fio::NodeAttributes) {
@@ -854,9 +688,6 @@ impl<T: 'static + File, U: Deref<Target = OpenFile<T>> + DerefMut + IoOpHandler 
         offset: i64,
         origin: fio::SeekOrigin,
     ) -> Result<u64, zx::Status> {
-        if self.options.is_node {
-            return Err(zx::Status::BAD_HANDLE);
-        }
         self.file.seek(offset, origin).await
     }
 
@@ -934,7 +765,7 @@ impl<T: 'static + File, U: Deref<Target = OpenFile<T>> + DerefMut + IoOpHandler 
 }
 
 #[async_trait]
-impl<T: 'static + File, U: Deref<Target = OpenFile<T>> + IoOpHandler + CloneFile> Representation
+impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + IoOpHandler> Representation
     for FileConnection<U>
 {
     type Protocol = fio::FileMarker;
@@ -958,12 +789,8 @@ impl<T: 'static + File, U: Deref<Target = OpenFile<T>> + IoOpHandler + CloneFile
     }
 
     async fn node_info(&self) -> Result<fio::NodeInfoDeprecated, Status> {
-        if self.options.is_node {
-            Ok(fio::NodeInfoDeprecated::Service(fio::Service))
-        } else {
-            let stream = self.file.duplicate_stream()?;
-            Ok(fio::NodeInfoDeprecated::File(fio::FileObject { event: self.file.event()?, stream }))
-        }
+        let stream = self.file.duplicate_stream()?;
+        Ok(fio::NodeInfoDeprecated::File(fio::FileObject { event: self.file.event()?, stream }))
     }
 }
 
@@ -971,7 +798,7 @@ impl<T: 'static + File, U: Deref<Target = OpenFile<T>> + IoOpHandler + CloneFile
 mod tests {
     use {
         super::*,
-        crate::{file::FileOptions, ToObjectRequest},
+        crate::{file::FileOptions, node::Node, ToObjectRequest},
         assert_matches::assert_matches,
         async_trait::async_trait,
         fuchsia_zircon::{self as zx, HandleBased},
@@ -1047,12 +874,32 @@ mod tests {
     }
 
     #[async_trait]
+    impl Node for MockFile {
+        async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+            self.handle_operation(FileOperation::GetAttrs)?;
+            Ok(fio::NodeAttributes {
+                mode: fio::MODE_TYPE_FILE,
+                id: MOCK_FILE_ID,
+                content_size: self.file_size,
+                storage_size: 2 * self.file_size,
+                link_count: MOCK_FILE_LINKS,
+                creation_time: MOCK_FILE_CREATION_TIME,
+                modification_time: MOCK_FILE_MODIFICATION_TIME,
+            })
+        }
+
+        fn close(self: Arc<Self>) {
+            let _ = self.handle_operation(FileOperation::Close);
+        }
+    }
+
+    #[async_trait]
     impl File for MockFile {
         fn writable(&self) -> bool {
             true
         }
 
-        async fn open(&self, options: &FileOptions) -> Result<(), zx::Status> {
+        async fn open_file(&self, options: &FileOptions) -> Result<(), zx::Status> {
             self.handle_operation(FileOperation::Init { options: *options })?;
             Ok(())
         }
@@ -1071,30 +918,12 @@ mod tests {
             Ok(self.file_size)
         }
 
-        async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-            self.handle_operation(FileOperation::GetAttrs)?;
-            Ok(fio::NodeAttributes {
-                mode: fio::MODE_TYPE_FILE,
-                id: MOCK_FILE_ID,
-                content_size: self.file_size,
-                storage_size: 2 * self.file_size,
-                link_count: MOCK_FILE_LINKS,
-                creation_time: MOCK_FILE_CREATION_TIME,
-                modification_time: MOCK_FILE_MODIFICATION_TIME,
-            })
-        }
-
         async fn set_attrs(
             &self,
             flags: fio::NodeAttributeFlags,
             attrs: fio::NodeAttributes,
         ) -> Result<(), zx::Status> {
             self.handle_operation(FileOperation::SetAttrs { flags, attrs })?;
-            Ok(())
-        }
-
-        async fn close(&self) -> Result<(), zx::Status> {
-            self.handle_operation(FileOperation::Close)?;
             Ok(())
         }
 
@@ -1211,9 +1040,7 @@ mod tests {
         assert_eq!(
             *events,
             vec![
-                FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_W, is_node: false, is_append: false },
-                },
+                FileOperation::Init { options: FileOptions { rights: RIGHTS_W, is_append: false } },
                 FileOperation::Truncate { length: 0 },
                 FileOperation::Sync,
             ]
@@ -1248,11 +1075,11 @@ mod tests {
             *events,
             vec![
                 FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_RW, is_node: false, is_append: false }
+                    options: FileOptions { rights: RIGHTS_RW, is_append: false }
                 },
                 FileOperation::ReadAt { offset: 0, count: 6 },
                 FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_RW, is_node: false, is_append: false }
+                    options: FileOptions { rights: RIGHTS_RW, is_append: false }
                 },
                 FileOperation::ReadAt { offset: 100, count: 5 },
                 FileOperation::ReadAt { offset: 6, count: 5 },
@@ -1269,9 +1096,7 @@ mod tests {
         assert_eq!(
             *events,
             vec![
-                FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_R, is_node: false, is_append: false }
-                },
+                FileOperation::Init { options: FileOptions { rights: RIGHTS_R, is_append: false } },
                 FileOperation::Close {},
             ]
         );
@@ -1279,7 +1104,10 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_close_fails() {
-        let env = init_mock_file(Box::new(only_allow_init), fio::OpenFlags::RIGHT_READABLE);
+        let env = init_mock_file(
+            Box::new(only_allow_init),
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        );
         let status = env.proxy.close().await.unwrap().map_err(zx::Status::from_raw);
         assert_eq!(status, Err(zx::Status::IO));
 
@@ -1288,9 +1116,10 @@ mod tests {
             *events,
             vec![
                 FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_R, is_node: false, is_append: false }
+                    options: FileOptions { rights: RIGHTS_RW, is_append: false }
                 },
-                FileOperation::Close {},
+                FileOperation::Sync,
+                FileOperation::Close,
             ]
         );
     }
@@ -1306,9 +1135,7 @@ mod tests {
         assert_eq!(
             *events,
             vec![
-                FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_R, is_node: false, is_append: false },
-                },
+                FileOperation::Init { options: FileOptions { rights: RIGHTS_R, is_append: false } },
                 FileOperation::Sync,
                 FileOperation::Close,
             ]
@@ -1346,7 +1173,6 @@ mod tests {
                 FileOperation::Init {
                     options: FileOptions {
                         rights: fio::Operations::GET_ATTRIBUTES,
-                        is_node: false,
                         is_append: false
                     }
                 },
@@ -1369,9 +1195,7 @@ mod tests {
         assert_eq!(
             *events,
             vec![
-                FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_R, is_node: false, is_append: false }
-                },
+                FileOperation::Init { options: FileOptions { rights: RIGHTS_R, is_append: false } },
                 FileOperation::GetBackingMemory { flags: fio::VmoFlags::READ },
             ]
         );
@@ -1391,11 +1215,7 @@ mod tests {
         assert_eq!(
             *events,
             vec![FileOperation::Init {
-                options: FileOptions {
-                    rights: fio::Operations::GET_ATTRIBUTES,
-                    is_node: false,
-                    is_append: false
-                }
+                options: FileOptions { rights: fio::Operations::GET_ATTRIBUTES, is_append: false }
             },]
         );
     }
@@ -1414,7 +1234,7 @@ mod tests {
         assert_eq!(
             *events,
             vec![FileOperation::Init {
-                options: FileOptions { rights: RIGHTS_R, is_node: false, is_append: false }
+                options: FileOptions { rights: RIGHTS_R, is_append: false }
             },]
         );
     }
@@ -1436,7 +1256,7 @@ mod tests {
             *events,
             vec![
                 FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_RW, is_node: false, is_append: false }
+                    options: FileOptions { rights: RIGHTS_RW, is_append: false }
                 },
                 FileOperation::Truncate { length: 0 }
             ]
@@ -1469,7 +1289,7 @@ mod tests {
         assert_eq!(
             *events,
             vec![FileOperation::Init {
-                options: FileOptions { rights: RIGHTS_RW, is_node: false, is_append: false },
+                options: FileOptions { rights: RIGHTS_RW, is_append: false },
             }]
         );
     }
@@ -1484,9 +1304,7 @@ mod tests {
         assert_eq!(
             *events,
             vec![
-                FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_R, is_node: false, is_append: false }
-                },
+                FileOperation::Init { options: FileOptions { rights: RIGHTS_R, is_append: false } },
                 FileOperation::ReadAt { offset: 0, count: 10 },
             ]
         );
@@ -1517,9 +1335,7 @@ mod tests {
         assert_eq!(
             *events,
             vec![
-                FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_R, is_node: false, is_append: false }
-                },
+                FileOperation::Init { options: FileOptions { rights: RIGHTS_R, is_append: false } },
                 FileOperation::ReadAt { offset: 10, count: 5 },
             ]
         );
@@ -1555,9 +1371,7 @@ mod tests {
         assert_eq!(
             *events,
             vec![
-                FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_R, is_node: false, is_append: false }
-                },
+                FileOperation::Init { options: FileOptions { rights: RIGHTS_R, is_append: false } },
                 FileOperation::ReadAt { offset: 10, count: 1 },
             ]
         );
@@ -1590,9 +1404,7 @@ mod tests {
         assert_eq!(
             *events,
             vec![
-                FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_R, is_node: false, is_append: false }
-                },
+                FileOperation::Init { options: FileOptions { rights: RIGHTS_R, is_append: false } },
                 FileOperation::ReadAt { offset: 8, count: 1 },
             ]
         );
@@ -1628,9 +1440,7 @@ mod tests {
         assert_eq!(
             *events,
             vec![
-                FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_R, is_node: false, is_append: false }
-                },
+                FileOperation::Init { options: FileOptions { rights: RIGHTS_R, is_append: false } },
                 FileOperation::GetSize, // for the seek
                 FileOperation::ReadAt { offset, count: 1 },
             ]
@@ -1662,9 +1472,7 @@ mod tests {
         assert_eq!(
             *events,
             vec![
-                FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_W, is_node: false, is_append: false }
-                },
+                FileOperation::Init { options: FileOptions { rights: RIGHTS_W, is_append: false } },
                 FileOperation::SetAttrs {
                     flags: fio::NodeAttributeFlags::CREATION_TIME
                         | fio::NodeAttributeFlags::MODIFICATION_TIME,
@@ -1695,7 +1503,6 @@ mod tests {
                 FileOperation::Init {
                     options: FileOptions {
                         rights: fio::Operations::GET_ATTRIBUTES,
-                        is_node: false,
                         is_append: false
                     }
                 },
@@ -1712,9 +1519,7 @@ mod tests {
         assert_matches!(
             &events[..],
             [
-                FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_W, is_node: false, is_append: false }
-                },
+                FileOperation::Init { options: FileOptions { rights: RIGHTS_W, is_append: false } },
                 FileOperation::Truncate { length: 10 },
             ]
         );
@@ -1729,7 +1534,7 @@ mod tests {
         assert_eq!(
             *events,
             vec![FileOperation::Init {
-                options: FileOptions { rights: RIGHTS_R, is_node: false, is_append: false }
+                options: FileOptions { rights: RIGHTS_R, is_append: false }
             },]
         );
     }
@@ -1744,9 +1549,7 @@ mod tests {
         assert_matches!(
             &events[..],
             [
-                FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_W, is_node: false, is_append: false }
-                },
+                FileOperation::Init { options: FileOptions { rights: RIGHTS_W, is_append: false } },
                 FileOperation::WriteAt { offset: 0, .. },
             ]
         );
@@ -1767,7 +1570,7 @@ mod tests {
         assert_eq!(
             *events,
             vec![FileOperation::Init {
-                options: FileOptions { rights: RIGHTS_R, is_node: false, is_append: false }
+                options: FileOptions { rights: RIGHTS_R, is_append: false }
             },]
         );
     }
@@ -1783,9 +1586,7 @@ mod tests {
         assert_matches!(
             &events[..],
             [
-                FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_W, is_node: false, is_append: false }
-                },
+                FileOperation::Init { options: FileOptions { rights: RIGHTS_W, is_append: false } },
                 FileOperation::WriteAt { offset: 10, .. },
             ]
         );
@@ -1818,7 +1619,7 @@ mod tests {
             &events[..],
             [
                 FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_W, is_node: false, is_append: true, .. }
+                    options: FileOptions { rights: RIGHTS_W, is_append: true, .. }
                 },
                 FileOperation::Append { .. }
             ]
@@ -1888,9 +1689,7 @@ mod tests {
         let events = env.file.operations.lock().unwrap();
         assert_eq!(
             *events,
-            [FileOperation::Init {
-                options: FileOptions { rights: RIGHTS_R, is_node: false, is_append: false }
-            },]
+            [FileOperation::Init { options: FileOptions { rights: RIGHTS_R, is_append: false } },]
         );
     }
 
@@ -1915,9 +1714,7 @@ mod tests {
         let events = env.file.operations.lock().unwrap();
         assert_eq!(
             *events,
-            [FileOperation::Init {
-                options: FileOptions { rights: RIGHTS_R, is_node: false, is_append: false }
-            },]
+            [FileOperation::Init { options: FileOptions { rights: RIGHTS_R, is_append: false } },]
         );
     }
 
@@ -1939,9 +1736,7 @@ mod tests {
         let events = env.file.operations.lock().unwrap();
         assert_eq!(
             *events,
-            [FileOperation::Init {
-                options: FileOptions { rights: RIGHTS_W, is_node: false, is_append: false }
-            },]
+            [FileOperation::Init { options: FileOptions { rights: RIGHTS_W, is_append: false } },]
         );
     }
 
@@ -1965,9 +1760,7 @@ mod tests {
         let events = env.file.operations.lock().unwrap();
         assert_eq!(
             *events,
-            [FileOperation::Init {
-                options: FileOptions { rights: RIGHTS_W, is_node: false, is_append: false }
-            }]
+            [FileOperation::Init { options: FileOptions { rights: RIGHTS_W, is_append: false } }]
         );
     }
 

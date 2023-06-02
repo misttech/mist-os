@@ -270,14 +270,18 @@ impl FileIo for XattrFile {
 }
 
 #[async_trait]
+impl vfs::node::Node for XattrFile {
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
+        unimplemented!()
+    }
+}
+
+#[async_trait]
 impl File for XattrFile {
     fn writable(&self) -> bool {
         true
     }
-    async fn open(&self, _options: &FileOptions) -> Result<(), Status> {
-        Ok(())
-    }
-    async fn close(&self) -> Result<(), Status> {
+    async fn open_file(&self, _options: &FileOptions) -> Result<(), Status> {
         Ok(())
     }
     async fn truncate(&self, _length: u64) -> Result<(), Status> {
@@ -289,9 +293,6 @@ impl File for XattrFile {
     async fn get_size(&self) -> Result<u64, Status> {
         unimplemented!()
     }
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        unimplemented!()
-    }
     async fn set_attrs(
         &self,
         _flags: fio::NodeAttributeFlags,
@@ -300,7 +301,7 @@ impl File for XattrFile {
         unimplemented!()
     }
     async fn sync(&self) -> Result<(), Status> {
-        unimplemented!()
+        Ok(())
     }
     async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, Status> {
         let map = self.extended_attributes.lock().await;

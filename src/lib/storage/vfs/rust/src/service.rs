@@ -4,31 +4,32 @@
 
 //! Implementations of a service endpoint.
 
-pub(crate) mod common;
-pub(crate) mod connection;
+mod common;
 
 #[cfg(test)]
 mod tests;
 
 use crate::{
-    common::send_on_open_with_error,
     directory::entry::{DirectoryEntry, EntryInfo},
     execution_scope::ExecutionScope,
+    node::{self, Node},
+    object_request::ObjectRequestSend,
     path::Path,
-    service::{common::new_connection_validate_flags, connection::io1::Connection},
+    service::common::new_connection_validate_flags,
+    ProtocolsExt, ToObjectRequest,
 };
 
 use {
-    anyhow::Error,
+    async_trait::async_trait,
     fidl::{
         self,
         endpoints::{RequestStream, ServerEnd},
-        epitaph::ChannelEpitaphExt as _,
     },
     fidl_fuchsia_io as fio,
     fuchsia_async::Channel,
-    fuchsia_zircon::Status,
+    fuchsia_zircon as zx,
     futures::future::Future,
+    libc::{S_IRUSR, S_IWUSR},
     std::sync::Arc,
 };
 
@@ -83,65 +84,7 @@ pub struct Service {
     open: Box<dyn Fn(ExecutionScope, Channel) + Send + Sync>,
 }
 
-impl Service {
-    fn open_as_node(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        Connection::create_connection(scope, flags, server_end);
-    }
-
-    fn open_as_service(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        let channel = match Channel::from_channel(server_end.into_channel()) {
-            Ok(channel) => channel,
-            Err(_) => {
-                // We were unable to convert the channel into an async channel, which most likely
-                // means the channel was invalid in some way, so there's nothing we can do.
-                return;
-            }
-        };
-
-        // If this returns an error, it will be because it failed to send the OnOpen event, in which
-        // case there's nothing we can do.
-        let describe = |channel, status: Result<(), Status>| -> Result<Channel, Error> {
-            if !flags.contains(fio::OpenFlags::DESCRIBE) {
-                return Ok(channel);
-            }
-            // TODO(https://fxbug.dev/104708): This is a bit crude but there seems to be no other
-            // way of sending on_open_ using FIDL and then getting the channel back.
-            let request_stream = fio::NodeRequestStream::from_channel(channel);
-            let (status, node_info) = match status {
-                Ok(()) => (Status::OK, Some(fio::NodeInfoDeprecated::Service(fio::Service))),
-                Err(status) => (status, None),
-            };
-            request_stream.control_handle().send_on_open_(status.into_raw(), node_info)?;
-            let (inner, _is_terminated) = request_stream.into_inner();
-            // It's safe to unwrap here because inner is clearly the only Arc reference left.
-            Ok(Arc::try_unwrap(inner).unwrap().into_channel())
-        };
-
-        match new_connection_validate_flags(flags) {
-            Ok(_updated) => {
-                if let Ok(channel) = describe(channel, Ok(())) {
-                    (self.open)(scope, channel)
-                }
-            }
-            Err(status) => {
-                if let Ok(channel) = describe(channel, Err(status)) {
-                    let _: Result<(), _> = channel.close_with_epitaph(status);
-                }
-            }
-        }
-    }
-}
-
+#[async_trait]
 impl DirectoryEntry for Service {
     fn open(
         self: Arc<Self>,
@@ -150,23 +93,51 @@ impl DirectoryEntry for Service {
         path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        if !path.is_empty() {
-            // See comment at the beginning of [`Service::open_as_service`].
-            if flags.intersects(fio::OpenFlags::NODE_REFERENCE) {
-                let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
-                send_on_open_with_error(describe, server_end, Status::NOT_DIR);
+        flags.to_object_request(server_end).handle(|object_request| {
+            if !path.is_empty() {
+                return Err(zx::Status::NOT_DIR);
             }
-            return;
-        }
-
-        if flags.intersects(fio::OpenFlags::NODE_REFERENCE) {
-            self.open_as_node(scope, flags, server_end);
-        } else {
-            self.open_as_service(scope, flags, server_end);
-        }
+            if flags.is_node() {
+                scope.spawn(node::Connection::create(scope.clone(), self, flags, object_request)?);
+            } else {
+                new_connection_validate_flags(flags)?;
+                if object_request.what_to_send() == ObjectRequestSend::OnOpen {
+                    if let Ok(channel) = object_request
+                        .take()
+                        .into_channel_after_sending_on_open(fio::NodeInfoDeprecated::Service(
+                            fio::Service,
+                        ))
+                        .and_then(Channel::from_channel)
+                    {
+                        (self.open)(scope, channel);
+                    }
+                } else {
+                    if let Ok(channel) = Channel::from_channel(object_request.take().into_channel())
+                    {
+                        (self.open)(scope, channel);
+                    }
+                }
+            }
+            Ok(())
+        });
     }
 
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Service)
+    }
+}
+
+#[async_trait]
+impl Node for Service {
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+        Ok(fio::NodeAttributes {
+            mode: fio::MODE_TYPE_SERVICE | S_IRUSR | S_IWUSR,
+            id: fio::INO_UNKNOWN,
+            content_size: 0,
+            storage_size: 0,
+            link_count: 1,
+            creation_time: 0,
+            modification_time: 0,
+        })
     }
 }

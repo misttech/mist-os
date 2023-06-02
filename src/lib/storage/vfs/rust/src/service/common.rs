@@ -4,14 +4,7 @@
 
 //! Code shared between several modules of the service implementation.
 
-use {
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon::Status,
-    libc::{S_IRUSR, S_IWUSR},
-};
-
-/// POSIX emulation layer access attributes for all services created with service().
-pub const POSIX_READ_WRITE_PROTECTION_ATTRIBUTES: u32 = S_IRUSR | S_IWUSR;
+use {fidl_fuchsia_io as fio, fuchsia_zircon::Status};
 
 /// Validate that the requested flags for a new connection are valid.  It is a bit tricky as
 /// depending on the presence of the `OPEN_FLAG_NODE_REFERENCE` flag we are effectively validating

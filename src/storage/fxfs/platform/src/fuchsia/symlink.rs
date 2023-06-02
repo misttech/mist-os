@@ -72,7 +72,7 @@ impl FxNode for FxSymlink {
 
     fn set_parent(&self, _parent: Arc<FxDirectory>) {}
     fn open_count_add_one(&self) {}
-    fn open_count_sub_one(&self) {}
+    fn open_count_sub_one(self: Arc<Self>) {}
 
     async fn get_properties(&self) -> Result<ObjectProperties, Error> {
         let store = self.volume.store();

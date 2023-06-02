@@ -4,7 +4,10 @@
 
 use {
     crate::{
-        common::io2_conversions, directory::DirectoryOptions, file::FileOptions,
+        common::io2_conversions,
+        directory::{entry::EntryInfo, DirectoryOptions},
+        file::FileOptions,
+        node::NodeOptions,
         symlink::SymlinkOptions,
     },
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
@@ -40,6 +43,9 @@ pub trait ProtocolsExt: Sync + 'static {
 
     /// Convert to symlink options.  Returns an error if the request does not permit a symlink.
     fn to_symlink_options(&self) -> Result<SymlinkOptions, zx::Status>;
+
+    /// Convert to node options.  Returns an error if the request does not permit a node.
+    fn to_node_options(&self, entry_info: &EntryInfo) -> Result<NodeOptions, zx::Status>;
 
     /// True if REPRESENTATION is desired.
     fn get_representation(&self) -> bool;
@@ -135,7 +141,7 @@ impl ProtocolsExt for fio::ConnectionProtocols {
             _ => fio::Operations::empty(),
         };
         // If is_dir_allowed() returned true, there must be rights.
-        Ok(DirectoryOptions { node: false, rights: self.rights().unwrap() | optional_rights })
+        Ok(DirectoryOptions { rights: self.rights().unwrap() | optional_rights })
     }
 
     fn to_file_options(&self) -> Result<FileOptions, zx::Status> {
@@ -149,7 +155,6 @@ impl ProtocolsExt for fio::ConnectionProtocols {
         Ok(FileOptions {
             // If is_file_allowed() returned true, there must be rights.
             rights: self.rights().unwrap(),
-            is_node: false,
             is_append: self.is_append(),
         })
     }
@@ -163,6 +168,11 @@ impl ProtocolsExt for fio::ConnectionProtocols {
             return Err(zx::Status::INVALID_ARGS);
         }
         Ok(SymlinkOptions)
+    }
+
+    fn to_node_options(&self, _entry_info: &EntryInfo) -> Result<NodeOptions, zx::Status> {
+        // TODO(fxbug.dev/77623): Implement this
+        Err(zx::Status::NOT_SUPPORTED)
     }
 
     fn get_representation(&self) -> bool {
@@ -291,13 +301,9 @@ impl ProtocolsExt for fio::OpenFlags {
     ///
     /// Changing this function can be dangerous!  Flags operations may have security implications.
     fn to_directory_options(&self) -> Result<DirectoryOptions, zx::Status> {
+        assert!(!self.intersects(fio::OpenFlags::NODE_REFERENCE));
+
         let mut flags = *self;
-
-        let node = flags.intersects(fio::OpenFlags::NODE_REFERENCE);
-
-        if node {
-            flags &= fio::OPEN_FLAGS_ALLOWED_WITH_NODE_REFERENCE;
-        }
 
         if flags.intersects(fio::OpenFlags::DIRECTORY) {
             flags &= !fio::OpenFlags::DIRECTORY;
@@ -317,8 +323,7 @@ impl ProtocolsExt for fio::OpenFlags {
         }
         flags &= !(fio::OpenFlags::POSIX_WRITABLE | fio::OpenFlags::POSIX_EXECUTABLE);
 
-        let allowed_flags = fio::OpenFlags::NODE_REFERENCE
-            | fio::OpenFlags::DESCRIBE
+        let allowed_flags = fio::OpenFlags::DESCRIBE
             | fio::OpenFlags::CREATE
             | fio::OpenFlags::CREATE_IF_ABSENT
             | fio::OpenFlags::DIRECTORY
@@ -336,10 +341,12 @@ impl ProtocolsExt for fio::OpenFlags {
             return Err(zx::Status::NOT_SUPPORTED);
         }
 
-        Ok(DirectoryOptions { node, rights: io2_conversions::io1_to_io2(flags) })
+        Ok(DirectoryOptions { rights: io2_conversions::io1_to_io2(flags) })
     }
 
     fn to_file_options(&self) -> Result<FileOptions, zx::Status> {
+        assert!(!self.intersects(fio::OpenFlags::NODE_REFERENCE));
+
         if self.contains(fio::OpenFlags::DIRECTORY) {
             return Err(zx::Status::NOT_DIR);
         }
@@ -389,7 +396,6 @@ impl ProtocolsExt for fio::OpenFlags {
                 }
                 rights
             },
-            is_node: self.contains(fio::OpenFlags::NODE_REFERENCE),
             is_append: self.contains(fio::OpenFlags::APPEND),
         })
     }
@@ -413,6 +419,23 @@ impl ProtocolsExt for fio::OpenFlags {
         }
 
         Ok(SymlinkOptions)
+    }
+
+    fn to_node_options(&self, entry_info: &EntryInfo) -> Result<NodeOptions, zx::Status> {
+        // Strictly, we shouldn't allow rights to be specified with NODE_REFERENCE, but there's a
+        // CTS pkgdir test that asserts these flags work and fixing that is painful so we preserve
+        // old behaviour (which permitted these flags).
+        let allowed_rights =
+            fio::OPEN_RIGHTS | fio::OpenFlags::POSIX_WRITABLE | fio::OpenFlags::POSIX_EXECUTABLE;
+        if self.intersects(!(fio::OPEN_FLAGS_ALLOWED_WITH_NODE_REFERENCE | allowed_rights)) {
+            Err(zx::Status::INVALID_ARGS)
+        } else if self.contains(fio::OpenFlags::DIRECTORY)
+            && entry_info.type_() != fio::DirentType::Directory
+        {
+            Err(zx::Status::NOT_DIR)
+        } else {
+            Ok(NodeOptions)
+        }
     }
 
     fn get_representation(&self) -> bool {

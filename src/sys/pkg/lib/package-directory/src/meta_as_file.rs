@@ -62,23 +62,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaAsF
 }
 
 #[async_trait]
-impl<S: crate::NonMetaStorage> vfs::file::File for MetaAsFile<S> {
-    async fn open(&self, _options: &vfs::file::FileOptions) -> Result<(), zx::Status> {
-        Ok(())
-    }
-
-    async fn truncate(&self, _length: u64) -> Result<(), zx::Status> {
-        Err(zx::Status::NOT_SUPPORTED)
-    }
-
-    async fn get_backing_memory(&self, _flags: fio::VmoFlags) -> Result<zx::Vmo, zx::Status> {
-        Err(zx::Status::NOT_SUPPORTED)
-    }
-
-    async fn get_size(&self) -> Result<u64, zx::Status> {
-        Ok(self.file_size())
-    }
-
+impl<S: crate::NonMetaStorage> vfs::node::Node for MetaAsFile<S> {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
         Ok(fio::NodeAttributes {
             mode: fio::MODE_TYPE_FILE
@@ -95,6 +79,25 @@ impl<S: crate::NonMetaStorage> vfs::file::File for MetaAsFile<S> {
             modification_time: 0,
         })
     }
+}
+
+#[async_trait]
+impl<S: crate::NonMetaStorage> vfs::file::File for MetaAsFile<S> {
+    async fn open_file(&self, _options: &vfs::file::FileOptions) -> Result<(), zx::Status> {
+        Ok(())
+    }
+
+    async fn truncate(&self, _length: u64) -> Result<(), zx::Status> {
+        Err(zx::Status::NOT_SUPPORTED)
+    }
+
+    async fn get_backing_memory(&self, _flags: fio::VmoFlags) -> Result<zx::Vmo, zx::Status> {
+        Err(zx::Status::NOT_SUPPORTED)
+    }
+
+    async fn get_size(&self) -> Result<u64, zx::Status> {
+        Ok(self.file_size())
+    }
 
     async fn set_attrs(
         &self,
@@ -102,10 +105,6 @@ impl<S: crate::NonMetaStorage> vfs::file::File for MetaAsFile<S> {
         _attrs: fio::NodeAttributes,
     ) -> Result<(), zx::Status> {
         Err(zx::Status::NOT_SUPPORTED)
-    }
-
-    async fn close(&self) -> Result<(), zx::Status> {
-        Ok(())
     }
 
     async fn sync(&self) -> Result<(), zx::Status> {
@@ -143,6 +142,7 @@ mod tests {
         vfs::{
             directory::entry::DirectoryEntry,
             file::{File, FileIo},
+            node::Node,
             ProtocolsExt,
         },
     };
@@ -251,7 +251,8 @@ mod tests {
         let (_env, meta_as_file) = TestEnv::new().await;
 
         assert_eq!(
-            File::open(&meta_as_file, &fio::OpenFlags::empty().to_file_options().unwrap()).await,
+            File::open_file(&meta_as_file, &fio::OpenFlags::empty().to_file_options().unwrap())
+                .await,
             Ok(())
         );
     }
@@ -353,7 +354,7 @@ mod tests {
         let (_env, meta_as_file) = TestEnv::new().await;
 
         assert_eq!(
-            File::get_attrs(&meta_as_file).await,
+            meta_as_file.get_attrs().await,
             Ok(fio::NodeAttributes {
                 mode: fio::MODE_TYPE_FILE | 0o600,
                 id: 1,
@@ -387,13 +388,6 @@ mod tests {
             .await,
             Err(zx::Status::NOT_SUPPORTED)
         );
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn file_close() {
-        let (_env, meta_as_file) = TestEnv::new().await;
-
-        assert_eq!(File::close(&meta_as_file).await, Ok(()));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

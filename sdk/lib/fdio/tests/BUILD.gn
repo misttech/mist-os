@@ -140,6 +140,7 @@ test("fdio-gtest") {
   configs += [ "//build/config:all_source" ]
 
   sources = [
+    "opath.cc",
     "socketpair.cc",
     "socketpair_test_helpers.h",
   ]
@@ -154,6 +155,7 @@ test("fdio-gtest") {
     sources += [ "fdio_socketpair.cc" ]
     deps += [
       "//sdk/lib/fdio",
+      "//src/sys/test_runners:tmp_storage",
       "//zircon/system/ulib/zx",
     ]
   }

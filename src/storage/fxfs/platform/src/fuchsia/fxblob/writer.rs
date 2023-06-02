@@ -200,7 +200,7 @@ impl FxNode for FxUnsealedBlob {
         assert!(old != PURGED && old != PURGED - 1);
     }
 
-    fn open_count_sub_one(&self) {
+    fn open_count_sub_one(self: Arc<Self>) {
         let old = self.open_count.fetch_sub(1, Ordering::Relaxed);
         assert!(old & !PURGED > 0);
         if old == PURGED + 1 {
@@ -214,12 +214,29 @@ impl FxNode for FxUnsealedBlob {
 }
 
 #[async_trait]
+impl vfs::node::Node for FxUnsealedBlob {
+    async fn get_attrs(&self) -> Result<NodeAttributes, Status> {
+        let props = self.handle.get_properties().await.map_err(map_to_status)?;
+        Ok(NodeAttributes {
+            mode: fio::MODE_TYPE_FILE
+                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ true, /*x*/ false),
+            id: self.handle.object_id(),
+            content_size: props.data_attribute_size,
+            storage_size: props.allocated_size,
+            link_count: props.refs,
+            creation_time: props.creation_time.as_nanos(),
+            modification_time: props.modification_time.as_nanos(),
+        })
+    }
+}
+
+#[async_trait]
 impl File for FxUnsealedBlob {
     fn writable(&self) -> bool {
         true
     }
 
-    async fn open(&self, _optionss: &FileOptions) -> Result<(), Status> {
+    async fn open_file(&self, _optionss: &FileOptions) -> Result<(), Status> {
         Ok(())
     }
 
@@ -251,30 +268,12 @@ impl File for FxUnsealedBlob {
         Ok(self.handle.get_size())
     }
 
-    async fn get_attrs(&self) -> Result<NodeAttributes, Status> {
-        let props = self.handle.get_properties().await.map_err(map_to_status)?;
-        Ok(NodeAttributes {
-            mode: fio::MODE_TYPE_FILE
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ true, /*x*/ false),
-            id: self.handle.object_id(),
-            content_size: props.data_attribute_size,
-            storage_size: props.allocated_size,
-            link_count: props.refs,
-            creation_time: props.creation_time.as_nanos(),
-            modification_time: props.modification_time.as_nanos(),
-        })
-    }
-
     async fn set_attrs(
         &self,
         _flags: NodeAttributeFlags,
         _attrs: NodeAttributes,
     ) -> Result<(), Status> {
         Err(Status::ACCESS_DENIED)
-    }
-
-    async fn close(&self) -> Result<(), Status> {
-        Ok(())
     }
 
     async fn sync(&self) -> Result<(), Status> {

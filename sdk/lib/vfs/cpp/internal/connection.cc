@@ -68,8 +68,12 @@ void Connection::GetAttr(Node* vn, fuchsia::io::Node::GetAttrCallback callback) 
 void Connection::SetAttr(Node* vn, fuchsia::io::NodeAttributeFlags flags,
                          fuchsia::io::NodeAttributes attributes,
                          fuchsia::io::Node::SetAttrCallback callback) {
-  // TODO: Check flags.
-  callback(vn->SetAttr(flags, attributes));
+  if (Flags::IsNodeReference(flags_)) {
+    callback(ZX_ERR_BAD_HANDLE);
+  } else {
+    // TODO: Check flags.
+    callback(vn->SetAttr(flags, attributes));
+  }
 }
 
 std::unique_ptr<fuchsia::io::NodeInfoDeprecated> Connection::NodeInfoIfStatusOk(

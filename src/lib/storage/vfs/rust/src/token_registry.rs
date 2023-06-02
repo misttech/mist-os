@@ -257,6 +257,7 @@ mod tests {
                 traversal_position::TraversalPosition,
             },
             execution_scope::ExecutionScope,
+            node::Node,
             path::Path,
             token_registry::{TokenInterface, TokenRegistry},
         };
@@ -302,6 +303,13 @@ mod tests {
         }
 
         #[async_trait]
+        impl Node for MockDirectory {
+            async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
+                panic!("Not implemented!")
+            }
+        }
+
+        #[async_trait]
         impl Directory for MockDirectory {
             async fn read_dirents<'a>(
                 &'a self,
@@ -320,16 +328,8 @@ mod tests {
                 panic!("Not implemented!")
             }
 
-            async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-                panic!("Not implemented!")
-            }
-
             fn unregister_watcher(self: Arc<Self>, _key: usize) {
                 panic!("Not implemented!")
-            }
-
-            fn close(&self) -> Result<(), Status> {
-                panic!("Not implemented!");
             }
         }
 

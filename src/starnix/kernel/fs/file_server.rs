@@ -296,6 +296,13 @@ impl StarnixNodeConnection {
 }
 
 #[async_trait]
+impl vfs::node::Node for StarnixNodeConnection {
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+        Ok(StarnixNodeConnection::get_attrs(self))
+    }
+}
+
+#[async_trait]
 impl directory::entry_container::Directory for StarnixNodeConnection {
     async fn read_dirents<'a>(
         &'a self,
@@ -320,12 +327,6 @@ impl directory::entry_container::Directory for StarnixNodeConnection {
         Ok(())
     }
     fn unregister_watcher(self: Arc<Self>, _key: usize) {}
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-        Ok(StarnixNodeConnection::get_attrs(self))
-    }
-    fn close(&self) -> Result<(), zx::Status> {
-        Ok(())
-    }
 }
 
 #[async_trait]
@@ -379,7 +380,7 @@ impl file::File for StarnixNodeConnection {
     fn writable(&self) -> bool {
         true
     }
-    async fn open(&self, _optionss: &file::FileOptions) -> Result<(), zx::Status> {
+    async fn open_file(&self, _optionss: &file::FileOptions) -> Result<(), zx::Status> {
         Ok(())
     }
     async fn truncate(&self, length: u64) -> Result<(), zx::Status> {
@@ -409,18 +410,12 @@ impl file::File for StarnixNodeConnection {
     async fn get_size(&self) -> Result<u64, zx::Status> {
         Ok(self.file.node().info().size as u64)
     }
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-        Ok(StarnixNodeConnection::get_attrs(self))
-    }
     async fn set_attrs(
         &self,
         flags: fio::NodeAttributeFlags,
         attributes: fio::NodeAttributes,
     ) -> Result<(), zx::Status> {
         StarnixNodeConnection::set_attrs(self, flags, attributes)?;
-        Ok(())
-    }
-    async fn close(&self) -> Result<(), zx::Status> {
         Ok(())
     }
     async fn sync(&self) -> Result<(), zx::Status> {

@@ -24,7 +24,7 @@ use {
         option::Option,
         sync::Mutex,
     },
-    vfs::{execution_scope::ExecutionScope, file::File},
+    vfs::{execution_scope::ExecutionScope, file::File, node::Node},
 };
 
 // Multiple Block I/O request may be sent as a group.

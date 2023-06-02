@@ -21,6 +21,7 @@ use {
             traversal_position::TraversalPosition,
         },
         file::{File, FileIo},
+        node::Node as _,
     },
 };
 
@@ -105,7 +106,7 @@ async fn do_fuzz(disk: Cursor<Vec<u8>>) -> Result<(), Error> {
 
     root.open_ref(&fs.filesystem().lock().unwrap()).unwrap();
     let _ = fuzz_node(&fs, FatNode::Dir(root.clone()), 0).await;
-    defer! { root.close().unwrap() };
+    defer! { root.close() };
 
     Ok(())
 }

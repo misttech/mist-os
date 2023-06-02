@@ -101,6 +101,26 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for NonMeta
 }
 
 #[async_trait]
+impl<S: crate::NonMetaStorage> vfs::node::Node for NonMetaSubdir<S> {
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+        Ok(fio::NodeAttributes {
+            mode: fio::MODE_TYPE_DIRECTORY
+                | vfs::common::rights_to_posix_mode_bits(
+                    true, // read
+                    true, // write
+                    true, // execute
+                ),
+            id: 1,
+            content_size: 0,
+            storage_size: 0,
+            link_count: 1,
+            creation_time: 0,
+            modification_time: 0,
+        })
+    }
+}
+
+#[async_trait]
 impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for NonMetaSubdir<S> {
     async fn read_dirents<'a>(
         &'a self,
@@ -132,27 +152,6 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for No
 
     // `register_watcher` is unsupported so no need to do anything here.
     fn unregister_watcher(self: Arc<Self>, _: usize) {}
-
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_DIRECTORY
-                | vfs::common::rights_to_posix_mode_bits(
-                    true, // read
-                    true, // write
-                    true, // execute
-                ),
-            id: 1,
-            content_size: 0,
-            storage_size: 0,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
-    fn close(&self) -> Result<(), zx::Status> {
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -163,7 +162,10 @@ mod tests {
         fuchsia_pkg_testing::{blobfs::Fake as FakeBlobfs, PackageBuilder},
         futures::stream::StreamExt as _,
         std::convert::TryInto as _,
-        vfs::directory::{entry::DirectoryEntry, entry_container::Directory},
+        vfs::{
+            directory::{entry::DirectoryEntry, entry_container::Directory},
+            node::Node,
+        },
     };
 
     struct TestEnv {
@@ -232,13 +234,6 @@ mod tests {
             ),
             Err(zx::Status::NOT_SUPPORTED)
         );
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_close() {
-        let (_env, sub_dir) = TestEnv::new().await;
-
-        assert_eq!(Directory::close(&sub_dir), Ok(()));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

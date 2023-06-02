@@ -110,6 +110,10 @@ impl DirtyTimestamp {
             DirtyTimestamp::PendingFlush(t) => Some(*t),
         }
     }
+
+    fn needs_flush(&self) -> bool {
+        !matches!(self, DirtyTimestamp::None)
+    }
 }
 
 impl std::convert::From<Option<Timestamp>> for DirtyTimestamp {
@@ -751,6 +755,14 @@ impl PagedObjectHandle {
             props.modification_time = t;
         }
         Ok(props)
+    }
+
+    /// Returns true if the handle needs flushing.
+    pub fn needs_flush(&self) -> bool {
+        let inner = self.inner.lock().unwrap();
+        inner.dirty_crtime.needs_flush()
+            || inner.dirty_mtime.needs_flush()
+            || inner.dirty_page_count > 0
     }
 }
 

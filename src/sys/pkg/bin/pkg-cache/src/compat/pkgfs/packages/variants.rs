@@ -103,6 +103,21 @@ impl DirectoryEntry for PkgfsPackagesVariants {
 }
 
 #[async_trait]
+impl vfs::node::Node for PkgfsPackagesVariants {
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+        Ok(fio::NodeAttributes {
+            mode: fio::MODE_TYPE_DIRECTORY,
+            id: 1,
+            content_size: 0,
+            storage_size: 0,
+            link_count: 1,
+            creation_time: 0,
+            modification_time: 0,
+        })
+    }
+}
+
+#[async_trait]
 impl Directory for PkgfsPackagesVariants {
     async fn read_dirents<'a>(
         &'a self,
@@ -172,22 +187,6 @@ impl Directory for PkgfsPackagesVariants {
 
     // `register_watcher` is unsupported so this is a no-op.
     fn unregister_watcher(self: Arc<Self>, _: usize) {}
-
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_DIRECTORY,
-            id: 1,
-            content_size: 0,
-            storage_size: 0,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
-    fn close(&self) -> Result<(), zx::Status> {
-        Ok(())
-    }
 }
 
 #[cfg(test)]

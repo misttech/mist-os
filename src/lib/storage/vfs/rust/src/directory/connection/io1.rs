@@ -6,7 +6,6 @@ use crate::{
     common::{inherit_rights_for_clone, send_on_open_with_error, IntoAny as _},
     directory::{
         common::check_child_connection_flags,
-        connection::util::OpenDirectory,
         entry::DirectoryEntry,
         entry_container::{Directory, DirectoryWatcher},
         mutable::entry_constructor::NewEntryType,
@@ -15,6 +14,7 @@ use crate::{
         DirectoryOptions,
     },
     execution_scope::ExecutionScope,
+    node::{Node as _, OpenNode},
     object_request::Representation,
     path::Path,
     ObjectRequestRef, ProtocolsExt, ToObjectRequest,
@@ -55,7 +55,7 @@ pub trait DerivedConnection: Send + Sync {
 
     fn new(
         scope: ExecutionScope,
-        directory: OpenDirectory<Self::Directory>,
+        directory: OpenNode<Self::Directory>,
         options: DirectoryOptions,
     ) -> Self;
 
@@ -81,7 +81,7 @@ where
     /// use.
     pub(in crate::directory) scope: ExecutionScope,
 
-    pub(in crate::directory) directory: OpenDirectory<Connection::Directory>,
+    pub(in crate::directory) directory: OpenNode<Connection::Directory>,
 
     /// Flags set on this connection when it was opened or cloned.
     pub(in crate::directory) options: DirectoryOptions,
@@ -140,7 +140,7 @@ where
     /// `create_connection`, derived connections should use the [`create_connection`] call.
     pub(in crate::directory) fn new(
         scope: ExecutionScope,
-        directory: OpenDirectory<Connection::Directory>,
+        directory: OpenNode<Connection::Directory>,
         options: DirectoryOptions,
     ) -> Self {
         BaseConnection { scope, directory, options, seek: Default::default() }
@@ -169,7 +169,7 @@ where
             }
             fio::DirectoryRequest::Close { responder } => {
                 fuchsia_trace::duration!("storage", "Directory::Close");
-                responder.send(self.directory.close().map_err(|status| status.into_raw()))?;
+                responder.send(Ok(()))?;
                 return Ok(ConnectionState::Closed);
             }
             fio::DirectoryRequest::GetConnectionInfo { responder } => {
@@ -334,14 +334,7 @@ where
                 responder.send(status.into_raw())?;
             }
             fio::DirectoryRequest::Query { responder } => {
-                let () = responder.send(
-                    if self.options.node {
-                        fio::NODE_PROTOCOL_NAME
-                    } else {
-                        fio::DIRECTORY_PROTOCOL_NAME
-                    }
-                    .as_bytes(),
-                )?;
+                let () = responder.send(fio::DIRECTORY_PROTOCOL_NAME.as_bytes())?;
             }
             fio::DirectoryRequest::QueryFilesystem { responder } => {
                 fuchsia_trace::duration!("storage", "Directory::QueryFilesystem");
@@ -392,10 +385,6 @@ where
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
-        if self.options.node {
-            send_on_open_with_error(describe, server_end, zx::Status::BAD_HANDLE);
-            return;
-        }
 
         let path = match Path::validate_and_split(path) {
             Ok(path) => path,
@@ -474,10 +463,6 @@ where
 
     async fn handle_read_dirents(&mut self, max_bytes: u64) -> (zx::Status, Vec<u8>) {
         async {
-            if self.options.node {
-                return Err(zx::Status::BAD_HANDLE);
-            }
-
             let (new_pos, sealed) =
                 self.directory.read_dirents(&self.seek, read_dirents::Sink::new(max_bytes)).await?;
             self.seek = new_pos;
@@ -510,12 +495,7 @@ where
             return Err(zx::Status::INVALID_ARGS);
         }
 
-        let DirectoryOptions { node, rights } = self.options;
-        if node {
-            // TODO(https://fxbug.dev/77623): should this be an error?
-            // return Err(zx::Status::NOT_SUPPORTED);
-        }
-        if !rights.contains(fio::W_STAR_DIR) {
+        if !self.options.rights.contains(fio::W_STAR_DIR) {
             return Err(zx::Status::BAD_HANDLE);
         }
 
@@ -553,11 +533,7 @@ impl<T: DerivedConnection + 'static> Representation for BaseConnection<T> {
     }
 
     async fn node_info(&self) -> Result<fio::NodeInfoDeprecated, zx::Status> {
-        Ok(if self.options.node {
-            fio::NodeInfoDeprecated::Service(fio::Service)
-        } else {
-            fio::NodeInfoDeprecated::Directory(fio::DirectoryObject)
-        })
+        Ok(fio::NodeInfoDeprecated::Directory(fio::DirectoryObject))
     }
 }
 

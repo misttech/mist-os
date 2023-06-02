@@ -94,8 +94,28 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaFil
 }
 
 #[async_trait]
+impl<S: crate::NonMetaStorage> vfs::node::Node for MetaFile<S> {
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+        Ok(fio::NodeAttributes {
+            mode: fio::MODE_TYPE_FILE
+                | vfs::common::rights_to_posix_mode_bits(
+                    true,  // read
+                    true,  // write
+                    false, // execute
+                ),
+            id: 1,
+            content_size: self.location.length,
+            storage_size: self.location.length,
+            link_count: 1,
+            creation_time: 0,
+            modification_time: 0,
+        })
+    }
+}
+
+#[async_trait]
 impl<S: crate::NonMetaStorage> vfs::file::File for MetaFile<S> {
-    async fn open(&self, _options: &vfs::file::FileOptions) -> Result<(), zx::Status> {
+    async fn open_file(&self, _options: &vfs::file::FileOptions) -> Result<(), zx::Status> {
         Ok(())
     }
 
@@ -148,33 +168,12 @@ impl<S: crate::NonMetaStorage> vfs::file::File for MetaFile<S> {
         Ok(self.location.length)
     }
 
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_FILE
-                | vfs::common::rights_to_posix_mode_bits(
-                    true,  // read
-                    true,  // write
-                    false, // execute
-                ),
-            id: 1,
-            content_size: self.location.length,
-            storage_size: self.location.length,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
     async fn set_attrs(
         &self,
         _flags: fio::NodeAttributeFlags,
         _attrs: fio::NodeAttributes,
     ) -> Result<(), zx::Status> {
         Err(zx::Status::NOT_SUPPORTED)
-    }
-
-    async fn close(&self) -> Result<(), zx::Status> {
-        Ok(())
     }
 
     async fn sync(&self) -> Result<(), zx::Status> {
@@ -230,6 +229,7 @@ mod tests {
         vfs::{
             directory::entry::DirectoryEntry,
             file::{File, FileIo},
+            node::Node,
             ProtocolsExt,
         },
     };
@@ -377,7 +377,7 @@ mod tests {
         let (_env, meta_file) = TestEnv::new().await;
 
         assert_eq!(
-            File::open(&meta_file, &fio::OpenFlags::empty().to_file_options().unwrap()).await,
+            meta_file.open_file(&fio::OpenFlags::empty().to_file_options().unwrap()).await,
             Ok(())
         );
     }
@@ -524,7 +524,7 @@ mod tests {
         let (_env, meta_file) = TestEnv::new().await;
 
         assert_eq!(
-            File::get_attrs(&meta_file).await,
+            meta_file.get_attrs().await,
             Ok(fio::NodeAttributes {
                 mode: fio::MODE_TYPE_FILE | 0o600,
                 id: 1,
@@ -558,13 +558,6 @@ mod tests {
             .await,
             Err(zx::Status::NOT_SUPPORTED)
         );
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn file_close() {
-        let (_env, meta_file) = TestEnv::new().await;
-
-        assert_eq!(File::close(&meta_file).await, Ok(()));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

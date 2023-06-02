@@ -401,11 +401,10 @@ TEST_P(AccessTest, TestAccessOpath) {
   ASSERT_EQ(flags & O_ACCMODE, O_PATH);
   ASSERT_EQ(flags & ~O_ACCMODE, 0);
 
-  // We can toggle some flags, even if they don't make much sense
-  ASSERT_EQ(fcntl(fd.get(), F_SETFL, flags | O_APPEND), 0);
-  flags = fcntl(fd.get(), F_GETFL);
-  ASSERT_EQ(flags & O_ACCMODE, O_PATH);
-  ASSERT_EQ(flags & ~O_ACCMODE, O_APPEND);
+  // Trying to set O_APPEND should result in EBADFD.
+  EXPECT_EQ(fcntl(fd.get(), F_SETFL, flags | O_APPEND), -1);
+  EXPECT_EQ(errno, EBADF);
+
   // We still can't write though
   ASSERT_LT(write(fd.get(), data, datalen), 0);
   ASSERT_EQ(errno, EOPNOTSUPP);

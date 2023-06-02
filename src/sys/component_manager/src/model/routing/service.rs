@@ -178,6 +178,23 @@ impl DirectoryEntry for FilteredServiceDirectory {
 }
 
 #[async_trait]
+impl vfs::node::Node for FilteredServiceDirectory {
+    /// Get this directory's attributes.
+    /// The "mode" field will be filled in by the connection.
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+        Ok(fio::NodeAttributes {
+            mode: fio::MODE_TYPE_DIRECTORY,
+            id: fio::INO_UNKNOWN,
+            content_size: 0,
+            storage_size: 0,
+            link_count: 1,
+            creation_time: 0,
+            modification_time: 0,
+        })
+    }
+}
+
+#[async_trait]
 impl Directory for FilteredServiceDirectory {
     async fn read_dirents<'a>(
         &'a self,
@@ -261,25 +278,6 @@ impl Directory for FilteredServiceDirectory {
 
     fn unregister_watcher(self: Arc<Self>, _key: usize) {
         // TODO(fxb/96023) implement watcher behavior.
-    }
-
-    /// Get this directory's attributes.
-    /// The "mode" field will be filled in by the connection.
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_DIRECTORY,
-            id: fio::INO_UNKNOWN,
-            content_size: 0,
-            storage_size: 0,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
-    /// Called when the directory is closed.
-    fn close(&self) -> Result<(), zx::Status> {
-        Ok(())
     }
 }
 

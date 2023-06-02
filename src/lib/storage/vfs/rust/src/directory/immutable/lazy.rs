@@ -19,6 +19,7 @@ use crate::{
         traversal_position::TraversalPosition,
     },
     execution_scope::ExecutionScope,
+    node::Node,
     path::Path,
     ToObjectRequest,
 };
@@ -117,7 +118,7 @@ where
 /// watchers.  They are values of type [`WatcherEvent`].  If this stream reaches it's end existing
 /// watcher connections will be closed and any new watchers will not be able to connect to the node
 /// - they will receive a NOT_SUPPORTED error.
-pub struct Lazy<T: LazyDirectory> {
+pub struct Lazy<T> {
     inner: T,
 
     watchers: UnboundedSender<WatcherCommand>,
@@ -242,7 +243,10 @@ impl<T: LazyDirectory> Directory for Lazy<T> {
         // that the executor shutdown is in progress.  In any case the error can be ignored.
         let _ = self.watchers.unbounded_send(WatcherCommand::UnregisterWatcher { key });
     }
+}
 
+#[async_trait]
+impl<T: LazyDirectory> Node for Lazy<T> {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         Ok(fio::NodeAttributes {
             mode: fio::MODE_TYPE_DIRECTORY
@@ -254,9 +258,5 @@ impl<T: LazyDirectory> Directory for Lazy<T> {
             creation_time: 0,
             modification_time: 0,
         })
-    }
-
-    fn close(&self) -> Result<(), Status> {
-        Ok(())
     }
 }

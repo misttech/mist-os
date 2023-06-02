@@ -810,19 +810,14 @@ fn clone_can_not_remove_node_reference() {
             assert_write_fidl_err_closed!(second_proxy, "Write attempt");
             let third_proxy =
                 clone_get_vmo_file_proxy_assert_err!(&first_proxy, fio::OpenFlags::DESCRIBE);
-            assert_seek!(third_proxy, 0, Current, Err(Status::BAD_HANDLE));
+            assert_eq!(
+                third_proxy.query().await.expect("query failed"),
+                fio::NODE_PROTOCOL_NAME.as_bytes()
+            );
             assert_close!(third_proxy);
             assert_close!(first_proxy);
         },
     );
-}
-
-#[test]
-fn node_reference_can_not_seek() {
-    run_server_client(fio::OpenFlags::NODE_REFERENCE, read_only(b"Content"), |proxy| async move {
-        assert_seek!(proxy, 0, Current, Err(Status::BAD_HANDLE));
-        assert_close!(proxy);
-    });
 }
 
 /// This test checks a somewhat non-trivial case. Two clients are connected to the same file, and

@@ -147,30 +147,6 @@ mod tests {
     }
 
     #[test]
-    fn new_connection_validate_flags_node_reference() {
-        // OPEN_FLAG_NODE_REFERENCE and OPEN_FLAG_DESCRIBE should be preserved.
-        const PRESERVED_FLAGS: fio::OpenFlags = fio::OpenFlags::empty()
-            .union(fio::OpenFlags::NODE_REFERENCE)
-            .union(fio::OpenFlags::DESCRIBE);
-        for open_flags in build_flag_combinations(
-            fio::OpenFlags::NODE_REFERENCE.bits(),
-            (fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DESCRIBE
-                | fio::OpenFlags::DIRECTORY)
-                .bits(),
-        ) {
-            let open_flags = fio::OpenFlags::from_bits_truncate(open_flags);
-            ncvf_ok(open_flags, open_flags & PRESERVED_FLAGS);
-        }
-
-        ncvf_err(
-            fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::NOT_DIRECTORY,
-            zx::Status::NOT_FILE,
-        );
-    }
-
-    #[test]
     fn new_connection_validate_flags_posix() {
         for open_flags in build_flag_combinations(
             0,

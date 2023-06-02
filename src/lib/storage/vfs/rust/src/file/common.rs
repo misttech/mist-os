@@ -20,22 +20,14 @@ pub fn new_connection_validate_options(
     debug_assert!(!(writable && executable));
 
     // Validate permissions.
-    if options.is_node {
-        if options.rights.intersects(
-            fio::Operations::READ_BYTES | fio::Operations::WRITE_BYTES | fio::Operations::EXECUTE,
-        ) {
-            return Err(zx::Status::ACCESS_DENIED);
-        }
-    } else {
-        if !readable && options.rights.contains(fio::Operations::READ_BYTES) {
-            return Err(zx::Status::ACCESS_DENIED);
-        }
-        if !writable && options.rights.contains(fio::Operations::WRITE_BYTES) {
-            return Err(zx::Status::ACCESS_DENIED);
-        }
-        if !executable && options.rights.contains(fio::Operations::EXECUTE) {
-            return Err(zx::Status::ACCESS_DENIED);
-        }
+    if !readable && options.rights.contains(fio::Operations::READ_BYTES) {
+        return Err(zx::Status::ACCESS_DENIED);
+    }
+    if !writable && options.rights.contains(fio::Operations::WRITE_BYTES) {
+        return Err(zx::Status::ACCESS_DENIED);
+    }
+    if !executable && options.rights.contains(fio::Operations::EXECUTE) {
+        return Err(zx::Status::ACCESS_DENIED);
     }
 
     Ok(())
@@ -133,19 +125,6 @@ mod tests {
         let options = flags.to_file_options()?;
         new_connection_validate_options(&options, readable, writable, executable)?;
         Ok(options)
-    }
-
-    #[test]
-    fn new_connection_validate_flags_node_reference() {
-        assert_matches!(
-            ncvf(fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DIRECTORY, true, true, false),
-            Err(zx::Status::NOT_DIR)
-        );
-
-        assert_matches!(
-            ncvf(fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::NOT_DIRECTORY, true, true, false),
-            Ok(FileOptions { is_node: true, .. })
-        );
     }
 
     #[test]

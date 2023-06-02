@@ -53,7 +53,7 @@ use {
             traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,
-        file::{FidlIoConnection, File as _},
+        file::FidlIoConnection,
         path::Path,
         ToObjectRequest,
     },
@@ -339,7 +339,6 @@ impl BlobDirectory {
                 }
             }
         }
-        let _ = blob.close().await;
         Ok(())
     }
 }
@@ -363,13 +362,8 @@ impl FxNode for BlobDirectory {
         self.directory.get_properties().await
     }
 
-    fn open_count_add_one(&self) {
-        self.directory.open_count_add_one()
-    }
-
-    fn open_count_sub_one(&self) {
-        self.directory.open_count_sub_one()
-    }
+    fn open_count_add_one(&self) {}
+    fn open_count_sub_one(self: Arc<Self>) {}
 }
 
 #[async_trait]
@@ -450,6 +444,13 @@ impl DirectoryEntry for BlobDirectory {
     }
 }
 
+#[async_trait]
+impl vfs::node::Node for BlobDirectory {
+    async fn get_attrs(&self) -> Result<NodeAttributes, Status> {
+        self.directory.get_attrs().await
+    }
+}
+
 /// Implements VFS entry container trait for directories, allowing manipulation of their contents.
 #[async_trait]
 impl vfs::directory::entry_container::Directory for BlobDirectory {
@@ -472,14 +473,6 @@ impl vfs::directory::entry_container::Directory for BlobDirectory {
 
     fn unregister_watcher(self: Arc<Self>, key: usize) {
         self.directory.clone().unregister_watcher(key)
-    }
-
-    async fn get_attrs(&self) -> Result<NodeAttributes, Status> {
-        self.directory.get_attrs().await
-    }
-
-    fn close(&self) -> Result<(), Status> {
-        self.directory.close()
     }
 
     fn query_filesystem(&self) -> Result<FilesystemInfo, Status> {

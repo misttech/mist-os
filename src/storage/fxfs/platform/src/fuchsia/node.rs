@@ -26,7 +26,7 @@ pub trait FxNode: IntoAny + Send + Sync + 'static {
     fn parent(&self) -> Option<Arc<FxDirectory>>;
     fn set_parent(&self, parent: Arc<FxDirectory>);
     fn open_count_add_one(&self);
-    fn open_count_sub_one(&self);
+    fn open_count_sub_one(self: Arc<Self>);
     async fn get_properties(&self) -> Result<ObjectProperties, Error>;
 }
 
@@ -50,7 +50,7 @@ impl FxNode for Placeholder {
         unreachable!();
     }
     fn open_count_add_one(&self) {}
-    fn open_count_sub_one(&self) {}
+    fn open_count_sub_one(self: Arc<Self>) {}
     async fn get_properties(&self) -> Result<ObjectProperties, Error> {
         unreachable!();
     }
@@ -257,7 +257,7 @@ impl<N: FxNode + ?Sized> OpenedNode<N> {
 
 impl<N: FxNode + ?Sized> Drop for OpenedNode<N> {
     fn drop(&mut self) {
-        self.0.open_count_sub_one();
+        self.0.clone().open_count_sub_one();
     }
 }
 
@@ -303,7 +303,7 @@ mod tests {
             unreachable!();
         }
         fn open_count_add_one(&self) {}
-        fn open_count_sub_one(&self) {}
+        fn open_count_sub_one(self: Arc<Self>) {}
         async fn get_properties(&self) -> Result<ObjectProperties, Error> {
             unreachable!();
         }

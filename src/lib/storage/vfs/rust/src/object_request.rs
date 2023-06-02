@@ -3,7 +3,11 @@
 // found in the LICENSE file.
 
 use {
-    crate::{execution_scope::ExecutionScope, ProtocolsExt},
+    crate::{
+        execution_scope::ExecutionScope,
+        node::{self, Node},
+        ProtocolsExt,
+    },
     async_trait::async_trait,
     fidl::{
         endpoints::{ControlHandle, ProtocolMarker, RequestStream, ServerEnd},
@@ -14,6 +18,7 @@ use {
     std::{
         future::Future,
         ops::{Deref, DerefMut},
+        sync::Arc,
     },
 };
 
@@ -25,7 +30,7 @@ pub struct ObjectRequest {
     object_request: zx::Channel,
 
     // What should be sent first.
-    send: ObjectRequestSend,
+    what_to_send: ObjectRequestSend,
 
     // Attributes requested in the open method.
     attributes: fio::NodeAttributesQuery,
@@ -37,11 +42,15 @@ pub struct ObjectRequest {
 impl ObjectRequest {
     pub(crate) fn new(
         object_request: zx::Channel,
-        send: ObjectRequestSend,
+        what_to_send: ObjectRequestSend,
         attributes: fio::NodeAttributesQuery,
         truncate: bool,
     ) -> Self {
-        Self { object_request, send, attributes, truncate }
+        Self { object_request, what_to_send, attributes, truncate }
+    }
+
+    pub(crate) fn what_to_send(&self) -> ObjectRequestSend {
+        self.what_to_send
     }
 
     /// Returns the request stream after sending requested information.
@@ -49,19 +58,17 @@ impl ObjectRequest {
         self,
         connection: &T,
     ) -> Result<<T::Protocol as ProtocolMarker>::RequestStream, zx::Status> {
-        let stream = <fio::NodeMarker as ProtocolMarker>::RequestStream::from_channel(
-            fasync::Channel::from_channel(self.object_request)?,
-        );
-        match self.send {
+        let stream = fio::NodeRequestStream::from_channel(fasync::Channel::from_channel(
+            self.object_request,
+        )?);
+        match self.what_to_send {
             ObjectRequestSend::OnOpen => {
                 let control_handle = stream.control_handle();
                 let node_info = connection.node_info().await.map_err(|s| {
                     control_handle.shutdown_with_epitaph(s);
                     s
                 })?;
-                control_handle
-                    .send_on_open_(zx::Status::OK.into_raw(), Some(node_info))
-                    .map_err(|_| zx::Status::PEER_CLOSED)?;
+                send_on_open(&stream.control_handle(), node_info)?;
             }
             ObjectRequestSend::OnRepresentation => {
                 let control_handle = stream.control_handle();
@@ -84,14 +91,28 @@ impl ObjectRequest {
         ServerEnd::new(self.object_request)
     }
 
-    /// Extracts the channel.
+    /// Extracts the channel (without sending on_open).
     pub fn into_channel(self) -> zx::Channel {
         self.object_request
     }
 
+    /// Extracts the channel after sending on_open.
+    pub fn into_channel_after_sending_on_open(
+        self,
+        node_info: fio::NodeInfoDeprecated,
+    ) -> Result<zx::Channel, zx::Status> {
+        let stream = fio::NodeRequestStream::from_channel(fasync::Channel::from_channel(
+            self.object_request,
+        )?);
+        send_on_open(&stream.control_handle(), node_info)?;
+        let (inner, _is_terminated) = stream.into_inner();
+        // It's safe to unwrap here because inner is clearly the only Arc reference left.
+        Ok(Arc::try_unwrap(inner).unwrap().into_channel().into())
+    }
+
     /// Terminates the object request with the given status.
     pub fn shutdown(self, status: zx::Status) {
-        if let ObjectRequestSend::OnOpen = self.send {
+        if let ObjectRequestSend::OnOpen = self.what_to_send {
             if let Ok((_, control_handle)) = ServerEnd::<fio::NodeMarker>::new(self.object_request)
                 .into_stream_and_control_handle()
             {
@@ -122,7 +143,8 @@ impl ObjectRequest {
     /// For example:
     ///
     ///   object_request.spawn(
-    ///       move |object_request| async move {
+    ///       scope,
+    ///       move |object_request| Box::pin(async move {
     ///           // Perform checks on the new connection
     ///           if !valid(...) {
     ///               return Err(zx::Status::INVALID_ARGS);
@@ -134,7 +156,7 @@ impl ObjectRequest {
     ///                      ...
     ///                  }
     ///              })
-    ///       });
+    ///       }));
     ///
     pub fn spawn<F, Fut>(self, scope: &ExecutionScope, f: F)
     where
@@ -173,26 +195,35 @@ impl ObjectRequestRef<'_> {
     }
 
     /// Returns a future that will run the connection. `f` is a callback that returns a future
-    /// that will run the connection.
-    pub fn create_connection<N, F: Future<Output = ()> + Send + 'static, P: ProtocolsExt>(
+    /// that will run the connection but it will not be called if the connection is supposed
+    /// to be a node connection.
+    pub fn create_connection<N: Node, F: Future<Output = ()> + Send + 'static, P: ProtocolsExt>(
         self,
         scope: ExecutionScope,
-        node: N,
+        node: Arc<N>,
         protocols: P,
-        f: impl FnOnce(ExecutionScope, N, P, Self) -> Result<F, zx::Status>,
+        f: impl FnOnce(ExecutionScope, Arc<N>, P, Self) -> Result<F, zx::Status>,
     ) -> Result<BoxFuture<'static, ()>, zx::Status> {
-        Ok(Box::pin(f(scope, node, protocols, self)?))
+        if protocols.is_node() {
+            Ok(Box::pin(node::Connection::create(scope.clone(), node, protocols, self)?))
+        } else {
+            Ok(Box::pin(f(scope, node, protocols, self)?))
+        }
     }
 
     /// Spawns a new connection for this request. `f` is similar to `create_connection` above.
-    pub fn spawn_connection<N, F: Future<Output = ()> + Send + 'static, P: ProtocolsExt>(
+    pub fn spawn_connection<N: Node, F: Future<Output = ()> + Send + 'static, P: ProtocolsExt>(
         self,
         scope: ExecutionScope,
-        node: N,
+        node: Arc<N>,
         protocols: P,
-        f: impl FnOnce(ExecutionScope, N, P, Self) -> Result<F, zx::Status>,
+        f: impl FnOnce(ExecutionScope, Arc<N>, P, Self) -> Result<F, zx::Status>,
     ) -> Result<(), zx::Status> {
-        scope.spawn(f(scope.clone(), node, protocols, self)?);
+        if protocols.is_node() {
+            scope.spawn(node::Connection::create(scope.clone(), node, protocols, self)?);
+        } else {
+            scope.spawn(f(scope.clone(), node, protocols, self)?);
+        }
         Ok(())
     }
 }
@@ -211,6 +242,7 @@ impl DerefMut for ObjectRequestRef<'_> {
     }
 }
 
+#[derive(Clone, Copy, PartialEq)]
 pub(crate) enum ObjectRequestSend {
     OnOpen,
     OnRepresentation,
@@ -267,4 +299,13 @@ impl ToObjectRequest for fio::OpenFlags {
             self.is_truncate(),
         )
     }
+}
+
+fn send_on_open(
+    control_handle: &fio::NodeControlHandle,
+    node_info: fio::NodeInfoDeprecated,
+) -> Result<(), zx::Status> {
+    control_handle
+        .send_on_open_(zx::Status::OK.into_raw(), Some(node_info))
+        .map_err(|_| zx::Status::PEER_CLOSED)
 }

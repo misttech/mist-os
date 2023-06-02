@@ -7,16 +7,14 @@
 
 use crate::{
     directory::{
-        connection::{
-            io1::{BaseConnection, ConnectionState, DerivedConnection},
-            util::OpenDirectory,
-        },
+        connection::io1::{BaseConnection, ConnectionState, DerivedConnection},
         entry::DirectoryEntry,
         entry_container,
         mutable::entry_constructor::NewEntryType,
         DirectoryOptions,
     },
     execution_scope::ExecutionScope,
+    node::OpenNode,
     path::Path,
     ObjectRequestRef, ProtocolsExt,
 };
@@ -49,7 +47,7 @@ impl ImmutableConnection {
         object_request: ObjectRequestRef,
     ) -> Result<impl Future<Output = ()>, Status> {
         // Ensure we close the directory if we fail to create the connection.
-        let directory = OpenDirectory::new(directory as Arc<dyn entry_container::Directory>);
+        let directory = OpenNode::new(directory as Arc<dyn entry_container::Directory>);
 
         let connection = Self::new(scope.clone(), directory, protocols.to_directory_options()?);
 
@@ -72,7 +70,7 @@ impl DerivedConnection for ImmutableConnection {
 
     fn new(
         scope: ExecutionScope,
-        directory: OpenDirectory<Self::Directory>,
+        directory: OpenNode<Self::Directory>,
         options: DirectoryOptions,
     ) -> Self {
         ImmutableConnection { base: BaseConnection::<Self>::new(scope, directory, options) }

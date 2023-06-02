@@ -784,6 +784,30 @@ impl DirectoryEntry for FatDirectory {
 }
 
 #[async_trait]
+impl vfs::node::Node for FatDirectory {
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
+        let fs_lock = self.filesystem.lock().unwrap();
+        let dir = self.borrow_dir(&fs_lock)?;
+
+        let creation_time = dos_to_unix_time(dir.created());
+        let modification_time = dos_to_unix_time(dir.modified());
+        Ok(fio::NodeAttributes {
+            mode: fio::MODE_TYPE_DIRECTORY | S_IRUSR | S_IWUSR,
+            id: fio::INO_UNKNOWN,
+            content_size: 0,
+            storage_size: 0,
+            link_count: 1,
+            creation_time,
+            modification_time,
+        })
+    }
+
+    fn close(self: Arc<Self>) {
+        self.close_ref(&self.filesystem.lock().unwrap());
+    }
+}
+
+#[async_trait]
 impl Directory for FatDirectory {
     async fn read_dirents<'a>(
         &'a self,
@@ -903,28 +927,6 @@ impl Directory for FatDirectory {
         self.data.write().unwrap().watchers.remove(key);
     }
 
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        let fs_lock = self.filesystem.lock().unwrap();
-        let dir = self.borrow_dir(&fs_lock)?;
-
-        let creation_time = dos_to_unix_time(dir.created());
-        let modification_time = dos_to_unix_time(dir.modified());
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_DIRECTORY | S_IRUSR | S_IWUSR,
-            id: fio::INO_UNKNOWN,
-            content_size: 0,
-            storage_size: 0,
-            link_count: 1,
-            creation_time,
-            modification_time,
-        })
-    }
-
-    fn close(&self) -> Result<(), Status> {
-        self.close_ref(&self.filesystem.lock().unwrap());
-        Ok(())
-    }
-
     fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {
         self.filesystem.query_filesystem()
     }
@@ -937,7 +939,10 @@ mod tests {
         super::*,
         crate::tests::{TestDiskContents, TestFatDisk},
         scopeguard::defer,
-        vfs::directory::dirents_sink::{AppendResult, Sealed},
+        vfs::{
+            directory::dirents_sink::{AppendResult, Sealed},
+            node::Node as _,
+        },
     };
 
     const TEST_DISK_SIZE: u64 = 2048 << 10; // 2048K
@@ -1147,6 +1152,6 @@ mod tests {
             .expect("Send request OK")
             .map_err(Status::from_raw)
             .expect("Second close OK");
-        dir.close().expect("Close OK");
+        dir.close();
     }
 }

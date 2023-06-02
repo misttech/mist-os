@@ -14,9 +14,9 @@ use {
     anyhow::Error,
     async_trait::async_trait,
     fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, HandleBased, Status},
-    futures::{future::BoxFuture, join, FutureExt},
+    futures::{future::BoxFuture, join},
     fxfs::{
         async_enter,
         filesystem::SyncOptions,
@@ -38,10 +38,7 @@ use {
         common::rights_to_posix_mode_bits,
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
-        file::{
-            connection::io1::create_node_reference_connection, File, FileOptions, GetVmo,
-            StreamIoConnection,
-        },
+        file::{File, FileOptions, GetVmo, StreamIoConnection},
         path::Path,
         ObjectRequestRef, ProtocolsExt, ToObjectRequest,
     },
@@ -81,16 +78,12 @@ impl FxFile {
         flags: impl ProtocolsExt,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<BoxFuture<'static, ()>, zx::Status> {
-        if flags.is_node() {
-            Ok(create_node_reference_connection(scope, this.take(), flags, object_request)?.boxed())
-        } else {
-            object_request.create_connection(
-                scope.clone(),
-                this.take(),
-                flags,
-                StreamIoConnection::create,
-            )
-        }
+        object_request.create_connection(
+            scope.clone(),
+            this.take(),
+            flags,
+            StreamIoConnection::create,
+        )
     }
 
     /// Marks the file as being purged.  Returns true if there are no open references.
@@ -155,6 +148,48 @@ impl FxFile {
     pub async fn get_size_uncached(&self) -> u64 {
         self.handle.uncached_handle().get_size()
     }
+
+    fn open_count_sub_one_and_maybe_flush(self: Arc<Self>, flush_on_last: bool) {
+        let old = if flush_on_last {
+            let mut old = self.open_count.load(Ordering::Relaxed);
+            loop {
+                assert!(old & !PURGED > 0);
+                if old == 1 && self.handle.needs_flush() {
+                    // Spawn a task to do the flush.
+                    let guard = self.handle.owner().scope().active_guard();
+                    fasync::Task::spawn(async move {
+                        // Avoid infinite loops for errors.
+                        let can_flush_again = matches!(self.handle.flush().await, Ok(()));
+                        self.open_count_sub_one_and_maybe_flush(can_flush_again);
+                        std::mem::drop(guard);
+                    })
+                    .detach();
+                    return;
+                }
+                match self.open_count.compare_exchange_weak(
+                    old,
+                    old - 1,
+                    Ordering::Relaxed,
+                    Ordering::Relaxed,
+                ) {
+                    Ok(_) => break,
+                    Err(x) => old = x,
+                }
+            }
+            old
+        } else {
+            let old = self.open_count.fetch_sub(1, Ordering::Relaxed);
+            assert!(old & !PURGED > 0);
+            old
+        };
+        if old == PURGED + 1 {
+            let store = self.handle.store();
+            store
+                .filesystem()
+                .graveyard()
+                .queue_tombstone(store.store_object_id(), self.object_id());
+        }
+    }
 }
 
 impl Drop for FxFile {
@@ -184,16 +219,8 @@ impl FxNode for FxFile {
         assert!(old != PURGED && old != PURGED - 1);
     }
 
-    fn open_count_sub_one(&self) {
-        let old = self.open_count.fetch_sub(1, Ordering::Relaxed);
-        assert!(old & !PURGED > 0);
-        if old == PURGED + 1 {
-            let store = self.handle.store();
-            store
-                .filesystem()
-                .graveyard()
-                .queue_tombstone(store.store_object_id(), self.object_id());
-        }
+    fn open_count_sub_one(self: Arc<Self>) {
+        self.open_count_sub_one_and_maybe_flush(true);
     }
 
     async fn get_properties(&self) -> Result<ObjectProperties, Error> {
@@ -225,12 +252,62 @@ impl DirectoryEntry for FxFile {
 }
 
 #[async_trait]
+impl vfs::node::Node for FxFile {
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
+        let props = self.get_properties().await.map_err(map_to_status)?;
+        Ok(fio::NodeAttributes {
+            mode: fio::MODE_TYPE_FILE
+                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ true, /*x*/ false),
+            id: self.handle.object_id(),
+            content_size: props.data_attribute_size,
+            storage_size: props.allocated_size,
+            link_count: props.refs,
+            creation_time: props.creation_time.as_nanos(),
+            modification_time: props.modification_time.as_nanos(),
+        })
+    }
+
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, zx::Status> {
+        let props = self.get_properties().await.map_err(map_to_status)?;
+        Ok(attributes!(
+            requested_attributes,
+            Mutable {
+                creation_time: props.creation_time.as_nanos(),
+                modification_time: props.modification_time.as_nanos(),
+                mode: props.posix_attributes.map(|a| a.mode).unwrap_or(0),
+                uid: props.posix_attributes.map(|a| a.uid).unwrap_or(0),
+                gid: props.posix_attributes.map(|a| a.gid).unwrap_or(0),
+                rdev: props.posix_attributes.map(|a| a.rdev).unwrap_or(0),
+            },
+            Immutable {
+                protocols: fio::NodeProtocolKinds::FILE,
+                abilities: fio::Operations::GET_ATTRIBUTES
+                    | fio::Operations::UPDATE_ATTRIBUTES
+                    | fio::Operations::READ_BYTES
+                    | fio::Operations::WRITE_BYTES,
+                content_size: props.data_attribute_size,
+                storage_size: props.allocated_size,
+                link_count: props.refs,
+                id: self.handle.object_id(),
+            }
+        ))
+    }
+
+    fn close(self: Arc<Self>) {
+        self.open_count_sub_one();
+    }
+}
+
+#[async_trait]
 impl File for FxFile {
     fn writable(&self) -> bool {
         true
     }
 
-    async fn open(&self, _options: &FileOptions) -> Result<(), Status> {
+    async fn open_file(&self, _options: &FileOptions) -> Result<(), Status> {
         Ok(())
     }
 
@@ -282,49 +359,6 @@ impl File for FxFile {
         Ok(self.handle.get_size())
     }
 
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        let props = self.get_properties().await.map_err(map_to_status)?;
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_FILE
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ true, /*x*/ false),
-            id: self.handle.object_id(),
-            content_size: props.data_attribute_size,
-            storage_size: props.allocated_size,
-            link_count: props.refs,
-            creation_time: props.creation_time.as_nanos(),
-            modification_time: props.modification_time.as_nanos(),
-        })
-    }
-
-    async fn get_attributes(
-        &self,
-        requested_attributes: fio::NodeAttributesQuery,
-    ) -> Result<fio::NodeAttributes2, zx::Status> {
-        let props = self.get_properties().await.map_err(map_to_status)?;
-        Ok(attributes!(
-            requested_attributes,
-            Mutable {
-                creation_time: props.creation_time.as_nanos(),
-                modification_time: props.modification_time.as_nanos(),
-                mode: props.posix_attributes.map(|a| a.mode).unwrap_or(0),
-                uid: props.posix_attributes.map(|a| a.uid).unwrap_or(0),
-                gid: props.posix_attributes.map(|a| a.gid).unwrap_or(0),
-                rdev: props.posix_attributes.map(|a| a.rdev).unwrap_or(0),
-            },
-            Immutable {
-                protocols: fio::NodeProtocolKinds::FILE,
-                abilities: fio::Operations::GET_ATTRIBUTES
-                    | fio::Operations::UPDATE_ATTRIBUTES
-                    | fio::Operations::READ_BYTES
-                    | fio::Operations::WRITE_BYTES,
-                content_size: props.data_attribute_size,
-                storage_size: props.allocated_size,
-                link_count: props.refs,
-                id: self.handle.object_id(),
-            }
-        ))
-    }
-
     async fn set_attrs(
         &self,
         flags: fio::NodeAttributeFlags,
@@ -362,14 +396,6 @@ impl File for FxFile {
     async fn remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), Status> {
         let basic = self.handle.basic_handle();
         basic.remove_extended_attribute(name).await.map_err(map_to_status)
-    }
-
-    async fn close(&self) -> Result<(), Status> {
-        if self.has_written.load(Ordering::Relaxed) {
-            self.handle.flush().await.map_err(map_to_status)?;
-        }
-        self.open_count_sub_one();
-        Ok(())
     }
 
     async fn sync(&self) -> Result<(), Status> {
@@ -485,7 +511,7 @@ impl PagerBackedVmo for FxFile {
         self.handle.mark_dirty(range).await;
     }
 
-    fn on_zero_children(&self) {
+    fn on_zero_children(self: Arc<Self>) {
         // Drop the open count that we took in `get_backing_memory`.
         self.open_count_sub_one();
     }

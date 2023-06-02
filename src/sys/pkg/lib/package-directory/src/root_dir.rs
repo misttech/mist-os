@@ -323,6 +323,26 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for RootDir
 }
 
 #[async_trait]
+impl<S: crate::NonMetaStorage> vfs::node::Node for RootDir<S> {
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+        Ok(fio::NodeAttributes {
+            mode: fio::MODE_TYPE_DIRECTORY
+                | vfs::common::rights_to_posix_mode_bits(
+                    true, // read
+                    true, // write
+                    true, // execute
+                ),
+            id: 1,
+            content_size: 0,
+            storage_size: 0,
+            link_count: 1,
+            creation_time: 0,
+            modification_time: 0,
+        })
+    }
+}
+
+#[async_trait]
 impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for RootDir<S> {
     async fn read_dirents<'a>(
         &'a self,
@@ -355,27 +375,6 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
 
     // `register_watcher` is unsupported so no need to do anything here.
     fn unregister_watcher(self: Arc<Self>, _: usize) {}
-
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_DIRECTORY
-                | vfs::common::rights_to_posix_mode_bits(
-                    true, // read
-                    true, // write
-                    true, // execute
-                ),
-            id: 1,
-            content_size: 0,
-            storage_size: 0,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
-    fn close(&self) -> Result<(), zx::Status> {
-        Ok(())
-    }
 }
 
 // Behavior copied from pkgfs.
@@ -410,7 +409,10 @@ mod tests {
         fuchsia_pkg_testing::{blobfs::Fake as FakeBlobfs, PackageBuilder},
         pretty_assertions::assert_eq,
         std::convert::TryInto as _,
-        vfs::directory::{entry::DirectoryEntry, entry_container::Directory},
+        vfs::{
+            directory::{entry::DirectoryEntry, entry_container::Directory},
+            node::Node,
+        },
     };
 
     struct TestEnv {
@@ -612,7 +614,7 @@ mod tests {
         let (_env, root_dir) = TestEnv::new().await;
 
         assert_eq!(
-            Directory::get_attrs(&root_dir).await.unwrap(),
+            root_dir.get_attrs().await.unwrap(),
             fio::NodeAttributes {
                 mode: fio::MODE_TYPE_DIRECTORY | 0o700,
                 id: 1,
@@ -674,13 +676,6 @@ mod tests {
             ),
             Err(zx::Status::NOT_SUPPORTED)
         );
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_close() {
-        let (_env, root_dir) = TestEnv::new().await;
-
-        assert_eq!(Directory::close(&root_dir), Ok(()));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

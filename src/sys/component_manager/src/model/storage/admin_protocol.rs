@@ -1400,6 +1400,13 @@ mod tests {
     }
 
     #[async_trait]
+    impl vfs::node::Node for FakeDir {
+        async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+            Err(zx::Status::INTERNAL)
+        }
+    }
+
+    #[async_trait]
     impl Directory for FakeDir {
         async fn read_dirents<'a>(
             &'a self,
@@ -1422,10 +1429,6 @@ mod tests {
             panic!("not implemented!");
         }
 
-        fn close(&self) -> Result<(), zx::Status> {
-            Err(zx::Status::INTERNAL)
-        }
-
         fn query_filesystem(&self) -> Result<fio::FilesystemInfo, zx::Status> {
             Ok(fio::FilesystemInfo {
                 total_bytes: self.total.into(),
@@ -1440,9 +1443,6 @@ mod tests {
                 padding: 0,
                 name: [0; 32],
             })
-        }
-        async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-            Err(zx::Status::INTERNAL)
         }
     }
 

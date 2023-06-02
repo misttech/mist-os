@@ -633,7 +633,7 @@ impl ServingMultiVolumeFilesystem {
         fuchsia_fs::directory::open_node(
             self.exposed_dir.as_ref().unwrap(),
             &path,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NODE_REFERENCE,
+            fio::OpenFlags::NODE_REFERENCE,
         )
         .await
         .map(|_| true)

@@ -125,7 +125,7 @@ mod tests {
         fuchsia_zircon::Status,
         futures::{future::BoxFuture, prelude::*},
         std::{collections::HashMap, io::Write, ops::Deref},
-        vfs::{execution_scope::ExecutionScope, path::Path},
+        vfs::{execution_scope::ExecutionScope, node::Node, path::Path},
     };
 
     #[derive(Debug, PartialEq)]
@@ -305,7 +305,7 @@ mod tests {
         let (proxy, remote) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
         let root = fatfs.get_root().expect("get_root OK");
         root.clone().open(scope, fio::OpenFlags::RIGHT_READABLE, Path::dot(), remote);
-        root.close().expect("Close OK");
+        root.close();
 
         structure.verify(proxy).await.expect("Verify succeeds");
     }

@@ -25,7 +25,7 @@ use {
     fuchsia_merkle::{hash_block, MerkleTree},
     fuchsia_zircon::Status,
     fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::{future::BoxFuture, join, FutureExt as _},
+    futures::{future::BoxFuture, join},
     fxfs::{
         async_enter,
         errors::FxfsError,
@@ -48,10 +48,7 @@ use {
         common::rights_to_posix_mode_bits,
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
-        file::{
-            connection::io1::create_node_reference_connection, File, FileOptions, GetVmo,
-            StreamIoConnection,
-        },
+        file::{File, FileOptions, GetVmo, StreamIoConnection},
         path::Path,
         ObjectRequestRef, ProtocolsExt, ToObjectRequest,
     },
@@ -114,17 +111,7 @@ impl FxBlob {
         protocols: impl ProtocolsExt,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<BoxFuture<'static, ()>, zx::Status> {
-        if protocols.is_node() {
-            Ok(create_node_reference_connection(scope, this.take(), protocols, object_request)?
-                .boxed())
-        } else {
-            object_request.create_connection(
-                scope,
-                this.take(),
-                protocols,
-                StreamIoConnection::create,
-            )
-        }
+        object_request.create_connection(scope, this.take(), protocols, StreamIoConnection::create)
     }
 }
 
@@ -264,7 +251,7 @@ impl FxNode for FxBlob {
         assert!(old != PURGED && old != PURGED - 1);
     }
 
-    fn open_count_sub_one(&self) {
+    fn open_count_sub_one(self: Arc<Self>) {
         let old = self.open_count.fetch_sub(1, Ordering::Relaxed);
         assert!(old & !PURGED > 0);
         if old == PURGED + 1 {
@@ -277,6 +264,27 @@ impl FxNode for FxBlob {
     }
 }
 
+#[async_trait]
+impl vfs::node::Node for FxBlob {
+    async fn get_attrs(&self) -> Result<NodeAttributes, Status> {
+        let props = self.handle.get_properties().await.map_err(map_to_status)?;
+        Ok(NodeAttributes {
+            mode: fio::MODE_TYPE_FILE
+                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ true),
+            id: self.handle.object_id(),
+            content_size: self.uncompressed_size,
+            storage_size: props.allocated_size,
+            link_count: props.refs,
+            creation_time: props.creation_time.as_nanos(),
+            modification_time: props.modification_time.as_nanos(),
+        })
+    }
+
+    fn close(self: Arc<Self>) {
+        self.open_count_sub_one();
+    }
+}
+
 /// Implement VFS trait so blobs can be accessed as files.
 #[async_trait]
 impl File for FxBlob {
@@ -284,7 +292,7 @@ impl File for FxBlob {
         true
     }
 
-    async fn open(&self, _options: &FileOptions) -> Result<(), Status> {
+    async fn open_file(&self, _options: &FileOptions) -> Result<(), Status> {
         Ok(())
     }
 
@@ -335,31 +343,12 @@ impl File for FxBlob {
         Ok(self.uncompressed_size)
     }
 
-    async fn get_attrs(&self) -> Result<NodeAttributes, Status> {
-        let props = self.handle.get_properties().await.map_err(map_to_status)?;
-        Ok(NodeAttributes {
-            mode: fio::MODE_TYPE_FILE
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ true),
-            id: self.handle.object_id(),
-            content_size: self.uncompressed_size,
-            storage_size: props.allocated_size,
-            link_count: props.refs,
-            creation_time: props.creation_time.as_nanos(),
-            modification_time: props.modification_time.as_nanos(),
-        })
-    }
-
     async fn set_attrs(
         &self,
         _flags: NodeAttributeFlags,
         _attrs: NodeAttributes,
     ) -> Result<(), Status> {
         Err(Status::ACCESS_DENIED)
-    }
-
-    async fn close(&self) -> Result<(), Status> {
-        self.open_count_sub_one();
-        Ok(())
     }
 
     async fn sync(&self) -> Result<(), Status> {
@@ -494,7 +483,7 @@ impl PagerBackedVmo for FxBlob {
         unreachable!();
     }
 
-    fn on_zero_children(&self) {
+    fn on_zero_children(self: Arc<Self>) {
         self.open_count_sub_one();
     }
 }

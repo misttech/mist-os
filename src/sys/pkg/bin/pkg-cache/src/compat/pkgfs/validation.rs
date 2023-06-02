@@ -110,6 +110,21 @@ impl vfs::directory::entry::DirectoryEntry for Validation {
 }
 
 #[async_trait]
+impl vfs::node::Node for Validation {
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+        Ok(fio::NodeAttributes {
+            mode: fio::MODE_TYPE_DIRECTORY,
+            id: 1,
+            content_size: 1,
+            storage_size: 1,
+            link_count: 1,
+            creation_time: 0,
+            modification_time: 0,
+        })
+    }
+}
+
+#[async_trait]
 impl vfs::directory::entry_container::Directory for Validation {
     async fn read_dirents<'a>(
         &'a self,
@@ -138,22 +153,6 @@ impl vfs::directory::entry_container::Directory for Validation {
 
     // `register_watcher` is unsupported so no need to do anything here.
     fn unregister_watcher(self: Arc<Self>, _: usize) {}
-
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_DIRECTORY,
-            id: 1,
-            content_size: 1,
-            storage_size: 1,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
-    fn close(&self) -> Result<(), zx::Status> {
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -164,7 +163,10 @@ mod tests {
         blobfs_ramdisk::BlobfsRamdisk,
         futures::stream::StreamExt as _,
         std::convert::TryInto as _,
-        vfs::directory::{entry::DirectoryEntry, entry_container::Directory},
+        vfs::{
+            directory::{entry::DirectoryEntry, entry_container::Directory},
+            node::Node,
+        },
     };
 
     struct TestEnv {
@@ -336,7 +338,7 @@ mod tests {
         let (_env, validation) = TestEnv::new().await;
 
         assert_eq!(
-            Directory::get_attrs(&validation).await.unwrap(),
+            validation.get_attrs().await.unwrap(),
             fio::NodeAttributes {
                 mode: fio::MODE_TYPE_DIRECTORY,
                 id: 1,
@@ -347,13 +349,6 @@ mod tests {
                 modification_time: 0,
             }
         );
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_close() {
-        let (_env, validation) = TestEnv::new().await;
-
-        assert_eq!(Directory::close(&validation), Ok(()));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

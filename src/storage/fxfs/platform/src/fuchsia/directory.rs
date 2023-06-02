@@ -276,9 +276,9 @@ impl FxNode for FxDirectory {
         }
     }
 
+    // If these ever do anything, BlobDirectory might need to be fixed.
     fn open_count_add_one(&self) {}
-
-    fn open_count_sub_one(&self) {}
+    fn open_count_sub_one(self: Arc<Self>) {}
 
     async fn get_properties(&self) -> Result<ObjectProperties, Error> {
         self.directory.get_properties().await
@@ -709,6 +709,54 @@ impl DirectoryEntry for FxDirectory {
 }
 
 #[async_trait]
+impl vfs::node::Node for FxDirectory {
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+        let props = self.get_properties().await.map_err(map_to_status)?;
+        Ok(fio::NodeAttributes {
+            mode: fio::MODE_TYPE_DIRECTORY
+                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ true, /*x*/ false),
+            id: self.directory.object_id(),
+            content_size: props.data_attribute_size,
+            storage_size: props.allocated_size,
+            // +1 for the '.' reference, and 1 for each sub-directory.
+            link_count: props.refs + 1 + props.sub_dirs,
+            creation_time: props.creation_time.as_nanos(),
+            modification_time: props.modification_time.as_nanos(),
+        })
+    }
+
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, zx::Status> {
+        let props = self.get_properties().await.map_err(map_to_status)?;
+        Ok(attributes!(
+            requested_attributes,
+            Mutable {
+                creation_time: props.creation_time.as_nanos(),
+                modification_time: props.modification_time.as_nanos(),
+                mode: props.posix_attributes.map(|a| a.mode).unwrap_or(0),
+                uid: props.posix_attributes.map(|a| a.uid).unwrap_or(0),
+                gid: props.posix_attributes.map(|a| a.gid).unwrap_or(0),
+                rdev: props.posix_attributes.map(|a| a.rdev).unwrap_or(0),
+            },
+            Immutable {
+                protocols: fio::NodeProtocolKinds::DIRECTORY,
+                abilities: fio::Operations::GET_ATTRIBUTES
+                    | fio::Operations::UPDATE_ATTRIBUTES
+                    | fio::Operations::ENUMERATE
+                    | fio::Operations::TRAVERSE
+                    | fio::Operations::MODIFY_DIRECTORY,
+                content_size: props.data_attribute_size,
+                storage_size: props.allocated_size,
+                link_count: props.refs + 1 + props.sub_dirs,
+                id: self.directory.object_id(),
+            }
+        ))
+    }
+}
+
+#[async_trait]
 impl vfs::directory::entry_container::Directory for FxDirectory {
     async fn read_dirents<'a>(
         &'a self,
@@ -820,55 +868,6 @@ impl vfs::directory::entry_container::Directory for FxDirectory {
         self.watchers.lock().unwrap().remove(key);
     }
 
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-        let props = self.get_properties().await.map_err(map_to_status)?;
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_DIRECTORY
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ true, /*x*/ false),
-            id: self.directory.object_id(),
-            content_size: props.data_attribute_size,
-            storage_size: props.allocated_size,
-            // +1 for the '.' reference, and 1 for each sub-directory.
-            link_count: props.refs + 1 + props.sub_dirs,
-            creation_time: props.creation_time.as_nanos(),
-            modification_time: props.modification_time.as_nanos(),
-        })
-    }
-
-    async fn get_attributes(
-        &self,
-        requested_attributes: fio::NodeAttributesQuery,
-    ) -> Result<fio::NodeAttributes2, zx::Status> {
-        let props = self.get_properties().await.map_err(map_to_status)?;
-        Ok(attributes!(
-            requested_attributes,
-            Mutable {
-                creation_time: props.creation_time.as_nanos(),
-                modification_time: props.modification_time.as_nanos(),
-                mode: props.posix_attributes.map(|a| a.mode).unwrap_or(0),
-                uid: props.posix_attributes.map(|a| a.uid).unwrap_or(0),
-                gid: props.posix_attributes.map(|a| a.gid).unwrap_or(0),
-                rdev: props.posix_attributes.map(|a| a.rdev).unwrap_or(0),
-            },
-            Immutable {
-                protocols: fio::NodeProtocolKinds::DIRECTORY,
-                abilities: fio::Operations::GET_ATTRIBUTES
-                    | fio::Operations::UPDATE_ATTRIBUTES
-                    | fio::Operations::ENUMERATE
-                    | fio::Operations::TRAVERSE
-                    | fio::Operations::MODIFY_DIRECTORY,
-                content_size: props.data_attribute_size,
-                storage_size: props.allocated_size,
-                link_count: props.refs + 1 + props.sub_dirs,
-                id: self.directory.object_id(),
-            }
-        ))
-    }
-
-    fn close(&self) -> Result<(), zx::Status> {
-        Ok(())
-    }
-
     fn query_filesystem(&self) -> Result<fio::FilesystemInfo, zx::Status> {
         let store = self.directory.store();
         Ok(info_to_filesystem_info(
@@ -908,10 +907,7 @@ mod tests {
         rand::Rng,
         std::{sync::Arc, time::Duration},
         storage_device::{fake_device::FakeDevice, DeviceHolder},
-        vfs::{
-            common::rights_to_posix_mode_bits, directory::entry_container::Directory, file::File,
-            path::Path,
-        },
+        vfs::{common::rights_to_posix_mode_bits, node::Node, path::Path},
     };
 
     #[fuchsia::test]

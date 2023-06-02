@@ -33,10 +33,7 @@ use {
     fidl::endpoints::{create_proxy, Proxy},
     fidl_fuchsia_io as fio,
     fuchsia_async::TestExecutor,
-    fuchsia_zircon::{
-        sys::{self, ZX_OK},
-        Status,
-    },
+    fuchsia_zircon::{sys::ZX_OK, Status},
     libc::{S_IRUSR, S_IXUSR},
     static_assertions::assert_eq_size,
     std::sync::{Arc, Mutex},
@@ -1030,83 +1027,6 @@ fn add_entry_too_long_error() {
         let mut expected = DirentsSameInodeBuilder::new(fio::INO_UNKNOWN);
         expected.add(fio::DirentType::Directory, b".");
         assert_read_dirents!(root, 1000, expected.into_vec());
-        assert_close!(root);
-    });
-}
-
-#[test]
-fn node_reference_ignores_read_access() {
-    let root = pseudo_directory! {
-        "file" => read_only(b"Content"),
-    };
-
-    run_server_client(
-        fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::RIGHT_READABLE,
-        root,
-        |root| async move {
-            open_as_file_assert_err!(
-                &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                "file",
-                Status::BAD_HANDLE
-            );
-
-            clone_as_directory_assert_err!(
-                &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                Status::ACCESS_DENIED
-            );
-
-            assert_close!(root);
-        },
-    );
-}
-
-#[test]
-fn node_reference_ignores_write_access() {
-    let root = pseudo_directory! {
-        "file" => read_only(b"Content"),
-    };
-
-    run_server_client(
-        fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::RIGHT_WRITABLE,
-        root,
-        |root| async move {
-            open_as_file_assert_err!(
-                &root,
-                fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DESCRIBE,
-                "file",
-                Status::BAD_HANDLE
-            );
-
-            clone_as_directory_assert_err!(
-                &root,
-                fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DESCRIBE,
-                Status::ACCESS_DENIED
-            );
-
-            assert_close!(root);
-        },
-    );
-}
-
-#[test]
-fn node_reference_disallows_read_dirents() {
-    let root = pseudo_directory! {
-        "etc" => pseudo_directory! {
-            "fstab" => read_only(b"/dev/fs /"),
-            "ssh" => pseudo_directory! {
-                "sshd_config" => read_only(b"# Empty"),
-            },
-        },
-        "files" => read_only(b"Content"),
-    };
-
-    run_server_client(fio::OpenFlags::NODE_REFERENCE, root, |root| async move {
-        assert_eq!(
-            root.read_dirents(100).await.expect("read_dirents failed").0,
-            sys::ZX_ERR_BAD_HANDLE
-        );
         assert_close!(root);
     });
 }

@@ -23,6 +23,7 @@ use crate::{
         },
     },
     execution_scope::ExecutionScope,
+    node::Node,
     path::Path,
     ToObjectRequest,
 };
@@ -54,10 +55,7 @@ use {
 /// connection been used (see [`ImmutableConnection`] or [`MutableConnection`])
 /// it may also allow the clients to modify the entries as well.  This is a common implementation
 /// for [`mod@crate::directory::immutable::simple`] and [`mod@crate::directory::mutable::simple`].
-pub struct Simple<Connection>
-where
-    Connection: DerivedConnection + 'static,
-{
+pub struct Simple<Connection> {
     inner: Mutex<Inner>,
 
     // The inode for this directory. This should either be unique within this VFS, or INO_UNKNOWN.
@@ -249,6 +247,26 @@ where
 }
 
 #[async_trait]
+impl<Connection: DerivedConnection + 'static> Node for Simple<Connection> {
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
+        Ok(fio::NodeAttributes {
+            mode: fio::MODE_TYPE_DIRECTORY
+                | rights_to_posix_mode_bits(
+                    /*r*/ true,
+                    /*w*/ Connection::MUTABLE,
+                    /*x*/ true,
+                ),
+            id: self.inode,
+            content_size: 0,
+            storage_size: 0,
+            link_count: 1,
+            creation_time: 0,
+            modification_time: 0,
+        })
+    }
+}
+
+#[async_trait]
 impl<Connection> Directory for Simple<Connection>
 where
     Connection: DerivedConnection + 'static,
@@ -336,27 +354,6 @@ where
     fn unregister_watcher(self: Arc<Self>, key: usize) {
         let mut this = self.inner.lock().unwrap();
         this.watchers.remove(key);
-    }
-
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_DIRECTORY
-                | rights_to_posix_mode_bits(
-                    /*r*/ true,
-                    /*w*/ Connection::MUTABLE,
-                    /*x*/ true,
-                ),
-            id: self.inode,
-            content_size: 0,
-            storage_size: 0,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
-    fn close(&self) -> Result<(), Status> {
-        Ok(())
     }
 }
 

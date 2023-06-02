@@ -10,16 +10,14 @@ use crate::{
         extended_attributes_sender,
     },
     directory::{
-        connection::{
-            io1::{BaseConnection, ConnectionState, DerivedConnection},
-            util::OpenDirectory,
-        },
+        connection::io1::{BaseConnection, ConnectionState, DerivedConnection},
         entry::DirectoryEntry,
         entry_container::MutableDirectory,
         mutable::entry_constructor::NewEntryType,
         DirectoryOptions,
     },
     execution_scope::ExecutionScope,
+    node::OpenNode,
     path::{validate_name, Path},
     token_registry::{TokenInterface, TokenRegistry, Tokenizable},
     ObjectRequestRef, ProtocolsExt,
@@ -45,7 +43,7 @@ impl DerivedConnection for MutableConnection {
 
     fn new(
         scope: ExecutionScope,
-        directory: OpenDirectory<Self::Directory>,
+        directory: OpenNode<Self::Directory>,
         options: DirectoryOptions,
     ) -> Self {
         MutableConnection { base: BaseConnection::<Self>::new(scope, directory, options) }
@@ -78,7 +76,7 @@ impl MutableConnection {
         object_request: ObjectRequestRef,
     ) -> Result<impl Future<Output = ()>, zx::Status> {
         // Ensure we close the directory if we fail to prepare the connection.
-        let directory = OpenDirectory::new(directory as Arc<dyn MutableDirectory>);
+        let directory = OpenNode::new(directory as Arc<dyn MutableDirectory>);
 
         let connection = Self::new(scope, directory, protocols.to_directory_options()?);
 
@@ -190,12 +188,7 @@ impl MutableConnection {
         flags: fio::NodeAttributeFlags,
         attributes: fio::NodeAttributes,
     ) -> Result<(), zx::Status> {
-        let DirectoryOptions { node, rights } = self.base.options;
-        if node {
-            // TODO(https://fxbug.dev/77623): should this be an error?
-            // return Err(zx::Status::NOT_SUPPORTED);
-        }
-        if !rights.contains(fio::W_STAR_DIR) {
+        if !self.base.options.rights.contains(fio::W_STAR_DIR) {
             return Err(zx::Status::BAD_HANDLE);
         }
 
@@ -209,12 +202,7 @@ impl MutableConnection {
         name: String,
         options: fio::UnlinkOptions,
     ) -> Result<(), zx::Status> {
-        let DirectoryOptions { node, rights } = self.base.options;
-        if node {
-            // TODO(https://fxbug.dev/77623): should this be an error?
-            // return Err(zx::Status::NOT_SUPPORTED);
-        }
-        if !rights.contains(fio::W_STAR_DIR) {
+        if !self.base.options.rights.contains(fio::W_STAR_DIR) {
             return Err(zx::Status::BAD_HANDLE);
         }
 
@@ -236,12 +224,7 @@ impl MutableConnection {
     }
 
     fn handle_get_token(this: Pin<&Tokenizable<Self>>) -> Result<Handle, zx::Status> {
-        let DirectoryOptions { node, rights } = this.base.options;
-        if node {
-            // TODO(https://fxbug.dev/77623): should this be an error?
-            // return Err(zx::Status::NOT_SUPPORTED);
-        }
-        if !rights.contains(fio::W_STAR_DIR) {
+        if !this.base.options.rights.contains(fio::W_STAR_DIR) {
             return Err(zx::Status::BAD_HANDLE);
         }
         Ok(TokenRegistry::get_token(this)?)
@@ -253,12 +236,7 @@ impl MutableConnection {
         dst_parent_token: Handle,
         dst: String,
     ) -> Result<(), zx::Status> {
-        let DirectoryOptions { node, rights } = self.base.options;
-        if node {
-            // TODO(https://fxbug.dev/77623): should this be an error?
-            // return Err(zx::Status::NOT_SUPPORTED);
-        }
-        if !rights.contains(fio::W_STAR_DIR) {
+        if !self.base.options.rights.contains(fio::W_STAR_DIR) {
             return Err(zx::Status::BAD_HANDLE);
         }
 
@@ -355,6 +333,7 @@ mod tests {
                 entry_container::{Directory, DirectoryWatcher},
                 traversal_position::TraversalPosition,
             },
+            node::Node,
             path::Path,
             ToObjectRequest,
         },
@@ -411,6 +390,17 @@ mod tests {
     }
 
     #[async_trait]
+    impl Node for MockDirectory {
+        async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
+            panic!("Not implemented");
+        }
+
+        fn close(self: Arc<Self>) {
+            let _ = self.fs.handle_event(MutableDirectoryAction::Close);
+        }
+    }
+
+    #[async_trait]
     impl Directory for MockDirectory {
         async fn read_dirents<'a>(
             &'a self,
@@ -429,16 +419,8 @@ mod tests {
             panic!("Not implemented");
         }
 
-        async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-            panic!("Not implemented");
-        }
-
         fn unregister_watcher(self: Arc<Self>, _key: usize) {
             panic!("Not implemented");
-        }
-
-        fn close(&self) -> Result<(), zx::Status> {
-            self.fs.handle_event(MutableDirectoryAction::Close)
         }
     }
 

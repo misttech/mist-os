@@ -66,6 +66,41 @@ struct Inner {
     files: HashMap<u64, FileHolder>,
 }
 
+impl Inner {
+    // Checks to see if there really are no children (which is necessary to avoid races) and, if so,
+    // replaces the strong reference with a weak one and returns the node. The caller is responsible
+    // for calling the node's on_zero_children function. If the file does have children, this
+    // asks the kernel to send us the ON_ZERO_CHILDREN notification for the file.
+    fn on_zero_children(&mut self, key: u64, port: &zx::Port) -> Option<Arc<dyn PagerBackedVmo>> {
+        if let Some(holder) = self.files.get_mut(&key) {
+            if let FileHolder::Strong(file) = holder {
+                match file.vmo().info() {
+                    Ok(info) => {
+                        if info.num_children == 0 {
+                            // Downgrade to a weak reference. Keep a strong reference until we
+                            // drop the lock because otherwise there's the potential to deadlock
+                            // (when the file is dropped, it will call unregister_file which
+                            // needs to take the lock).
+                            let weak = Arc::downgrade(&file);
+                            let FileHolder::Strong(file)
+                                = std::mem::replace(holder, FileHolder::Weak(weak))
+                            else {
+                                unreachable!()
+                            };
+                            return Some(file);
+                        } else {
+                            // There's not much we can do here if this fails, so we panic.
+                            watch_for_zero_children(port, file.as_ref()).unwrap();
+                        }
+                    }
+                    Err(e) => error!(error = e.as_value(), "Vmo::info failed"),
+                }
+            }
+        }
+        None
+    }
+}
+
 // FileHolder is used to retain either a strong or a weak reference to a file.  If there are any
 // child VMOs that have been shared, then we will have a strong reference which is required to keep
 // the file alive.  When we detect that there are no more children, we can downgrade to a weak
@@ -284,32 +319,9 @@ impl PortThread {
     ) {
         assert!(signals.observed().contains(zx::Signals::VMO_ZERO_CHILDREN));
 
-        // To workaround races, we must check to see if the vmo really does have no
-        // children.
-        let _strong;
-        let mut inner = inner.lock().unwrap();
-        if let Some(holder) = inner.files.get_mut(&key) {
-            if let FileHolder::Strong(file) = holder {
-                match file.vmo().info() {
-                    Ok(info) => {
-                        if info.num_children == 0 {
-                            file.on_zero_children();
-                            // Downgrade to a weak reference. Keep a strong reference until
-                            // we drop the lock because otherwise there's the potential to
-                            // deadlock (when the file is dropped, it will call
-                            // unregister_file which needs to take the lock).
-                            let weak = Arc::downgrade(&file);
-                            _strong = std::mem::replace(holder, FileHolder::Weak(weak));
-                        } else {
-                            // There's not much we can do here if this fails, so we panic.
-                            watch_for_zero_children(&port, file.as_ref()).unwrap();
-                        }
-                    }
-                    Err(e) => {
-                        error!(error = e.as_value(), "Vmo::info failed");
-                    }
-                }
-            }
+        let file = inner.lock().unwrap().on_zero_children(key, &port);
+        if let Some(file) = file {
+            file.on_zero_children();
         }
     }
 
@@ -369,7 +381,7 @@ impl Pager {
         let mut inner = self.inner.lock().unwrap();
         if let Entry::Occupied(o) = inner.files.entry(file.pager_key()) {
             if std::ptr::eq(file as *const _ as *const (), o.get().as_ptr()) {
-                if let FileHolder::Strong(_) = o.remove() {
+                if let FileHolder::Strong(file) = o.remove() {
                     file.on_zero_children();
                 }
             }
@@ -555,7 +567,7 @@ pub trait PagerBackedVmo: Sync + Send + 'static {
     async fn mark_dirty(self: Arc<Self>, range: Range<u64>);
 
     /// Called by the pager to indicate there are no more VMO children.
-    fn on_zero_children(&self);
+    fn on_zero_children(self: Arc<Self>);
 }
 
 /// Represents a dirty range of page aligned bytes within a pager backed VMO.
@@ -714,7 +726,7 @@ mod tests {
             self.pager.dirty_pages(&self.vmo, range);
         }
 
-        fn on_zero_children(&self) {}
+        fn on_zero_children(self: Arc<Self>) {}
     }
 
     #[fuchsia::test(threads = 10)]
@@ -777,7 +789,7 @@ mod tests {
                 self.pager.dirty_pages(&self.vmo, range);
             }
 
-            fn on_zero_children(&self) {}
+            fn on_zero_children(self: Arc<Self>) {}
         }
 
         const PAGER_KEY: u64 = 1234;
@@ -832,7 +844,7 @@ mod tests {
             unreachable!();
         }
 
-        fn on_zero_children(&self) {
+        fn on_zero_children(self: Arc<Self>) {
             self.sender.lock().unwrap().unbounded_send(()).unwrap();
         }
     }
@@ -920,7 +932,7 @@ mod tests {
                 unreachable!();
             }
 
-            fn on_zero_children(&self) {
+            fn on_zero_children(self: Arc<Self>) {
                 unreachable!();
             }
         }

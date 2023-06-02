@@ -214,35 +214,8 @@ impl Node for FatFile {
     }
 }
 
-impl Debug for FatFile {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("FatFile").field("name", &self.data.read().unwrap().name).finish()
-    }
-}
-
 #[async_trait]
-impl VfsFile for FatFile {
-    fn writable(&self) -> bool {
-        return true;
-    }
-
-    async fn open(&self, _options: &FileOptions) -> Result<(), Status> {
-        Ok(())
-    }
-
-    async fn truncate(&self, length: u64) -> Result<(), Status> {
-        let fs_lock = self.filesystem.lock().unwrap();
-        let file = self.borrow_file_mut(&fs_lock).ok_or(Status::BAD_HANDLE)?;
-        seek_for_write(file, length)?;
-        file.truncate().map_err(fatfs_error_to_status)?;
-        self.filesystem.mark_dirty();
-        Ok(())
-    }
-
-    async fn get_backing_memory(&self, _flags: fio::VmoFlags) -> Result<zx::Vmo, Status> {
-        Err(Status::NOT_SUPPORTED)
-    }
-
+impl vfs::node::Node for FatFile {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         let fs_lock = self.filesystem.lock().unwrap();
         let file = self.borrow_file(&fs_lock)?;
@@ -264,6 +237,40 @@ impl VfsFile for FatFile {
             creation_time,
             modification_time,
         })
+    }
+
+    fn close(self: Arc<Self>) {
+        self.close_ref(&self.filesystem.lock().unwrap());
+    }
+}
+
+impl Debug for FatFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FatFile").field("name", &self.data.read().unwrap().name).finish()
+    }
+}
+
+#[async_trait]
+impl VfsFile for FatFile {
+    fn writable(&self) -> bool {
+        return true;
+    }
+
+    async fn open_file(&self, _options: &FileOptions) -> Result<(), Status> {
+        Ok(())
+    }
+
+    async fn truncate(&self, length: u64) -> Result<(), Status> {
+        let fs_lock = self.filesystem.lock().unwrap();
+        let file = self.borrow_file_mut(&fs_lock).ok_or(Status::BAD_HANDLE)?;
+        seek_for_write(file, length)?;
+        file.truncate().map_err(fatfs_error_to_status)?;
+        self.filesystem.mark_dirty();
+        Ok(())
+    }
+
+    async fn get_backing_memory(&self, _flags: fio::VmoFlags) -> Result<zx::Vmo, Status> {
+        Err(Status::NOT_SUPPORTED)
     }
 
     // Unfortunately, fatfs has deprecated the "set_created" and "set_modified" methods,
@@ -300,11 +307,6 @@ impl VfsFile for FatFile {
         let fs_lock = self.filesystem.lock().unwrap();
         let file = self.borrow_file(&fs_lock)?;
         Ok(file.len() as u64)
-    }
-
-    async fn close(&self) -> Result<(), Status> {
-        self.close_ref(&self.filesystem.lock().unwrap());
-        Ok(())
     }
 
     async fn sync(&self) -> Result<(), Status> {
@@ -445,7 +447,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_get_attrs() {
         let file = TestFile::new();
-        let attrs = file.get_attrs().await.expect("get_attrs succeeds");
+        let attrs = vfs::node::Node::get_attrs(&**file).await.expect("get_attrs succeeds");
         assert_eq!(attrs.mode, fio::MODE_TYPE_FILE | S_IRUSR | S_IWUSR);
         assert_eq!(attrs.id, fio::INO_UNKNOWN);
         assert_eq!(attrs.content_size, TEST_FILE_CONTENT.len() as u64);

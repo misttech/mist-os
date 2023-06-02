@@ -27,17 +27,11 @@ pub mod watchers;
 
 /// A directory can be open either as a directory or a node.
 pub struct DirectoryOptions {
-    pub(crate) node: bool,
     pub(crate) rights: fio::Operations,
 }
 
 impl DirectoryOptions {
     pub(crate) fn to_io1(&self) -> fio::OpenFlags {
-        let Self { node, rights } = self;
-        let mut flags = io2_conversions::io2_to_io1(*rights);
-        if *node {
-            flags |= fio::OpenFlags::NODE_REFERENCE;
-        }
-        flags
+        io2_conversions::io2_to_io1(self.rights)
     }
 }

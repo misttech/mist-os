@@ -13,6 +13,7 @@ use crate::{
     directory::entry::{DirectoryEntry, EntryInfo},
     execution_scope::ExecutionScope,
     file::{common::vmo_flags_to_rights, FidlIoConnection, File, FileIo, FileOptions},
+    node::Node,
     path::Path,
     ToObjectRequest,
 };
@@ -241,12 +242,40 @@ impl DirectoryEntry for VmoFile {
                 return Err(Status::NOT_SUPPORTED);
             }
 
-            object_request.spawn_connection(scope, self, flags, FidlIoConnection::create)
+            object_request.take().spawn(&scope.clone(), move |object_request| {
+                Box::pin(async move {
+                    {
+                        let mut vmo_state = self.vmo.lock().await;
+                        if vmo_state.is_none() {
+                            *vmo_state = Some(self.init_vmo.as_ref().unwrap().init_vmo().await?);
+                        }
+                    }
+                    object_request.create_connection(scope, self, flags, FidlIoConnection::create)
+                })
+            });
+            Ok(())
         });
     }
 
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(self.inode, fio::DirentType::File)
+    }
+}
+
+#[async_trait]
+impl Node for VmoFile {
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
+        let content_size = self.get_size().await?;
+        Ok(fio::NodeAttributes {
+            mode: fio::MODE_TYPE_FILE
+                | rights_to_posix_mode_bits(self.readable, self.writable, self.executable),
+            id: self.inode,
+            content_size,
+            storage_size: content_size,
+            link_count: 1,
+            creation_time: 0,
+            modification_time: 0,
+        })
     }
 }
 
@@ -304,12 +333,7 @@ impl File for VmoFile {
         self.executable
     }
 
-    async fn open(&self, _options: &FileOptions) -> Result<(), Status> {
-        let mut vmo_state = self.vmo.lock().await;
-        if vmo_state.is_some() {
-            return Ok(());
-        }
-        *vmo_state = Some(self.init_vmo.as_ref().unwrap().init_vmo().await?);
+    async fn open_file(&self, _options: &FileOptions) -> Result<(), Status> {
         Ok(())
     }
 
@@ -372,30 +396,12 @@ impl File for VmoFile {
         Ok(vmo.get_content_size()?)
     }
 
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        let content_size = self.get_size().await?;
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_FILE
-                | rights_to_posix_mode_bits(self.readable, self.writable, self.executable),
-            id: self.inode,
-            content_size,
-            storage_size: content_size,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
     async fn set_attrs(
         &self,
         _flags: fio::NodeAttributeFlags,
         _attrs: fio::NodeAttributes,
     ) -> Result<(), Status> {
         Err(Status::NOT_SUPPORTED)
-    }
-
-    async fn close(&self) -> Result<(), Status> {
-        Ok(())
     }
 
     async fn sync(&self) -> Result<(), Status> {

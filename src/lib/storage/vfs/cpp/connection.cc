@@ -258,6 +258,9 @@ zx::result<fio::wire::OpenFlags> Connection::NodeGetFlags() {
 }
 
 zx::result<> Connection::NodeSetFlags(fio::wire::OpenFlags flags) {
+  if (options().flags.node_reference) {
+    return zx::error(ZX_ERR_BAD_HANDLE);
+  }
   auto options = VnodeConnectionOptions::FromIoV1Flags(flags);
   set_append(options.flags.append);
   return zx::ok();
