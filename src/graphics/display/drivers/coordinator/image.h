@@ -21,7 +21,6 @@
 #include "src/graphics/display/drivers/coordinator/config-stamp.h"
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
-#include "src/graphics/display/drivers/coordinator/util.h"
 
 namespace display {
 

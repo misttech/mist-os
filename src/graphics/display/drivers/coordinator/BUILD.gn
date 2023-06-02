@@ -49,7 +49,6 @@ source_set("shared") {
     "image.cc",
     "layer.cc",
     "migration-util.cc",
-    "util.cc",
   ]
   public_deps = [
     ":coordinator_bind",

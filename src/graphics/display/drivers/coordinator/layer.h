@@ -16,7 +16,6 @@
 
 #include "src/graphics/display/drivers/coordinator/config-stamp.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
-#include "src/graphics/display/drivers/coordinator/util.h"
 
 namespace display {
 

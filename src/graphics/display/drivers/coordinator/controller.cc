@@ -36,7 +36,6 @@
 #include "src/graphics/display/drivers/coordinator/config-stamp.h"
 #include "src/graphics/display/drivers/coordinator/eld.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
-#include "src/graphics/display/drivers/coordinator/util.h"
 
 namespace fidl_display = fuchsia_hardware_display;
 
@@ -988,14 +987,14 @@ Controller::Controller(zx_device_t* parent)
   last_vsync_ns_property_ = root_.CreateUint("last_vsync_timestamp_ns", 0);
   last_vsync_interval_ns_property_ = root_.CreateUint("last_vsync_interval_ns", 0);
   last_vsync_config_stamp_property_ =
-      root_.CreateUint("last_vsync_config_stamp", kInvalidConfigStampBanjo.value);
+      root_.CreateUint("last_vsync_config_stamp", kInvalidConfigStamp.value());
 
   last_valid_apply_config_timestamp_ns_property_ =
       root_.CreateUint("last_valid_apply_config_timestamp_ns", 0);
   last_valid_apply_config_interval_ns_property_ =
       root_.CreateUint("last_valid_apply_config_interval_ns", 0);
   last_valid_apply_config_config_stamp_property_ =
-      root_.CreateUint("last_valid_apply_config_stamp", kInvalidConfigStampBanjo.value);
+      root_.CreateUint("last_valid_apply_config_stamp", kInvalidConfigStamp.value());
 
   vsync_stalls_detected_ = root_.CreateUint("vsync_stalls", 0);
 }

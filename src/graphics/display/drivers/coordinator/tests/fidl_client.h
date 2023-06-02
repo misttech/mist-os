@@ -20,6 +20,8 @@
 #include <fbl/string.h>
 #include <fbl/vector.h>
 
+#include "src/graphics/display/drivers/coordinator/config-stamp.h"
+
 namespace display {
 
 class TestFidlClient {
@@ -87,9 +89,9 @@ class TestFidlClient {
     return vsync_count_;
   }
 
-  fuchsia_hardware_display::wire::ConfigStamp recent_presented_config_stamp() const {
+  ConfigStamp recent_presented_config_stamp() const {
     fbl::AutoLock lock(mtx());
-    return recent_presented_config_stamp_;
+    return ToConfigStamp(recent_presented_config_stamp_);
   }
 
   uint64_t get_cookie() const { return cookie_; }

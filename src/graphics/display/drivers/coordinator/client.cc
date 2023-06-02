@@ -40,7 +40,6 @@
 
 #include "src/graphics/display/drivers/coordinator/config-stamp.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
-#include "src/graphics/display/drivers/coordinator/util.h"
 #include "src/graphics/display/lib/edid/edid.h"
 #include "src/lib/fsl/handles/object_info.h"
 

@@ -34,7 +34,6 @@
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
-#include "src/graphics/display/drivers/coordinator/util.h"
 #include "src/graphics/display/lib/edid/edid.h"
 #include "src/lib/async-watchdog/watchdog.h"
 

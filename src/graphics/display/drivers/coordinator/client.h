@@ -48,7 +48,6 @@
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/layer.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
-#include "src/graphics/display/drivers/coordinator/util.h"
 
 namespace display {
 

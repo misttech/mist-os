@@ -18,7 +18,6 @@
 #include "config-stamp.h"
 #include "src/graphics/display/drivers/coordinator/client.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
-#include "src/graphics/display/drivers/coordinator/util.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace display {
