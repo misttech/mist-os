@@ -100,6 +100,28 @@ TEST(LocalhostTest, RawSocketsNotAvailable) {
   ASSERT_EQ(errno, EPERM) << strerror(errno);
 }
 
+TEST(LocalhostTest, Accept4CloexecFlag) {
+  int listenfd = socket(AF_INET6, SOCK_STREAM, 0);
+  ASSERT_GE(listenfd, 0) << "socket failed: " << strerror(errno);
+
+  auto [addr, addrlen] = InitLoopbackAddr(SocketDomain::IPv6());
+  ASSERT_EQ(bind(listenfd, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)), 0)
+      << "bind failed: " << strerror(errno);
+  ASSERT_EQ(listen(listenfd, 0 /* backlog */), 0) << "listen failed: " << strerror(errno);
+  socklen_t found_len = sizeof(addr);
+  EXPECT_EQ(getsockname(listenfd, reinterpret_cast<sockaddr*>(&addr), &found_len), 0)
+      << "getsockname failed: " << strerror(errno);
+
+  int connfd = socket(AF_INET6, SOCK_STREAM, 0);
+  ASSERT_EQ(connect(connfd, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)), 0)
+      << "connect failed: " << strerror(errno);
+
+  int acptfd = accept4(listenfd, nullptr /* addr */, nullptr /* addrlen */, SOCK_CLOEXEC);
+  ASSERT_GE(acptfd, 0) << "accept4 failed: " << strerror(errno);
+
+  ASSERT_EQ(fcntl(acptfd, F_GETFD), FD_CLOEXEC);
+}
+
 // TODO(https://fxbug.dev/90038): Delete once SockOptsTest is gone.
 struct SockOption {
   int level;

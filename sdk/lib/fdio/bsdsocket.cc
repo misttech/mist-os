@@ -35,7 +35,7 @@ namespace fsocket = fuchsia_posix_socket;
 namespace frawsocket = fuchsia_posix_socket_raw;
 namespace fpacketsocket = fuchsia_posix_socket_packet;
 
-constexpr int kSockTypesMask = ~(SOCK_CLOEXEC | SOCK_NONBLOCK);
+constexpr int kSockFlagsMask = SOCK_CLOEXEC | SOCK_NONBLOCK;
 
 template <typename T>
 zx_status_t get_socket_provider(zx_handle_t* provider_handle) {
@@ -65,7 +65,7 @@ int socket(int domain, int type, int protocol) {
 
   int16_t out_code;
   zx::result result = fdio::create([&](zxio_storage_alloc allocator, void** out_context) {
-    return zxio_socket(service_connector, domain, type & kSockTypesMask, protocol, allocator,
+    return zxio_socket(service_connector, domain, type & (~kSockFlagsMask), protocol, allocator,
                        out_context, &out_code);
   });
   if (result.is_error()) {
@@ -88,8 +88,9 @@ int socket(int domain, int type, int protocol) {
   }
 
   // TODO(https://fxbug.dev/30920): Implement CLOEXEC.
-  // if (type & SOCK_CLOEXEC) {
-  // }
+  if (type & SOCK_CLOEXEC) {
+    io->ioflag() |= IOFLAG_CLOEXEC;
+  }
 
   std::optional fd = bind_to_fd(io);
   if (fd.has_value()) {
@@ -165,7 +166,7 @@ int listen(int fd, int backlog) {
 
 __EXPORT
 int accept4(int fd, struct sockaddr* __restrict addr, socklen_t* __restrict addrlen, int flags) {
-  if (flags & ~SOCK_NONBLOCK) {
+  if (flags & (~kSockFlagsMask)) {
     return ERRNO(EINVAL);
   }
   if ((addr == nullptr) != (addrlen == nullptr)) {
@@ -240,6 +241,10 @@ int accept4(int fd, struct sockaddr* __restrict addr, socklen_t* __restrict addr
 
   if (flags & SOCK_NONBLOCK) {
     accepted_io->ioflag() |= IOFLAG_NONBLOCK;
+  }
+  // TODO(https://fxbug.dev/30920): Implement CLOEXEC.
+  if (flags & SOCK_CLOEXEC) {
+    accepted_io->ioflag() |= IOFLAG_CLOEXEC;
   }
 
   const fbl::AutoLock lock(&fdio_lock);
