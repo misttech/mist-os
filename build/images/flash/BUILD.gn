@@ -158,7 +158,10 @@ flash_script_outputs = [ "$root_out_dir/flash.sh" ]
 host_out_dir = get_label_info(":anything($host_toolchain)", "root_out_dir")
 flash_script_args = [
   "--image=" + rebase_path(files.final_zbi, root_build_dir),
+  "--vbmeta=" + rebase_path(files.final_vbmeta, root_build_dir),
   "--recovery-image=" + rebase_path(files.final_recovery_zbi, root_build_dir),
+  "--recovery-vbmeta=" +
+      rebase_path(files.final_recovery_vbmeta, root_build_dir),
   "--output=" + rebase_path(flash_script_outputs[0], root_build_dir),
   "--zircon-a=${zircon_a_partition}",
   "--zircon-b=${zircon_b_partition}",
@@ -369,7 +372,9 @@ generated_file("fastboot_manifest") {
 archive_outputs = [ "$root_out_dir/flash-archive.sh" ]
 archive_args = [
   "--image=${archive_image}",
+  "--vbmeta=${archive_vbmeta}",
   "--recovery-image=${archive_recovery_image}",
+  "--recovery-vbmeta=${archive_recovery_vbmeta}",
   "--output=" + rebase_path(archive_outputs[0], root_build_dir),
   "--zircon-a=${zircon_a_partition}",
   "--zircon-b=${zircon_b_partition}",

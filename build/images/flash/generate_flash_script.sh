@@ -53,8 +53,16 @@ case $i in
     ZIRCON_IMAGE="${i#*=}"
     shift
     ;;
+    --vbmeta=*)
+    ZIRCON_VBMETA="${i#*=}"
+    shift
+    ;;
     --recovery-image=*)
     RECOVERY_IMAGE="${i#*=}"
+    shift
+    ;;
+    --recovery-vbmeta=*)
+    RECOVERY_VBMETA="${i#*=}"
     shift
     ;;
     --fvm-image=*)
@@ -120,9 +128,6 @@ done
 if [[ -z "${FVM_PARTITION}" ]]; then
   ZIRCON_IMAGE="${RECOVERY_IMAGE}"
 fi
-
-ZIRCON_VBMETA="${ZIRCON_IMAGE%%.*}.vbmeta"
-RECOVERY_VBMETA="${RECOVERY_IMAGE%%.*}.vbmeta"
 
 # Support a single --recovery flag which flashes recovery to all slots even
 # if the full image is available.
