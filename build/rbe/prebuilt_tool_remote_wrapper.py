@@ -113,6 +113,13 @@ class PrebuiltToolAction(object):
         ]
 
     @property
+    def command_line_inputs_lists(self) -> Sequence[Path]:
+        return [
+            Path(p)
+            for p in cl_utils.flatten_comma_list(self._main_args.input_list_paths)
+        ]
+
+    @property
     def command_line_output_files(self) -> Sequence[Path]:
         return [
             Path(p)
@@ -151,25 +158,22 @@ class PrebuiltToolAction(object):
             "--canonicalize_working_dir=true",
         ] + self._main_remote_options  # allow forwarded options to override defaults
 
-        remote_inputs = [self.remote_tool] + self.command_line_inputs
-        remote_output_dirs = self.command_line_output_dirs
-        remote_output_files = self.command_line_output_files
+        # Automatically add the tool.
+        remote_inputs = [self.remote_tool]
 
-        self.vprintlist('remote inputs', remote_inputs)
-        self.vprintlist('remote output files', remote_output_files)
-        self.vprintlist('remote output dirs', remote_output_dirs)
-        self.vprintlist('rewrapper options', remote_options)
-
-        return remote_action.remote_action_from_args(
-            main_args=self._main_args,
+        action = remote_action.remote_action_from_args(
+            main_args=self._main_args,  # includes inputs and outputs already
             remote_options=remote_options,
             command=self.remote_command,
             inputs=remote_inputs,
-            output_files=remote_output_files,
-            output_dirs=remote_output_dirs,
             working_dir=self.working_dir,
             exec_root=self.exec_root,
         )
+        self.vprintlist('remote inputs', action.inputs_relative_to_project_root)
+        self.vprintlist('remote output files', action.output_files_relative_to_project_root)
+        self.vprintlist('remote output dirs', action.output_dirs_relative_to_project_root)
+        self.vprintlist('rewrapper options', remote_options)
+        return action
 
     @property
     def remote_action(self) -> remote_action.RemoteAction:

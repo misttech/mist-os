@@ -836,6 +836,7 @@ class RemoteAction(object):
         cfg: Optional[Path] = None,
         exec_strategy: Optional[str] = None,
         inputs: Sequence[Path] = None,
+        input_list_paths: Sequence[Path] = None,
         output_files: Sequence[Path] = None,
         output_dirs: Sequence[Path] = None,
         disable: bool = False,
@@ -865,6 +866,8 @@ class RemoteAction(object):
           working_dir: directory from which command is to be executed.
             This must be a sub-directory of 'exec_root'.
           inputs: inputs needed for remote execution, relative to the current working dir.
+          input_list_paths: files that list additional inputs to remote actions,
+            where paths are relative to the current working dir.
           output_files: files to be fetched after remote execution, relative to the
             current working dir.
           output_dirs: directories to be fetched after remote execution, relative to the
@@ -931,6 +934,7 @@ class RemoteAction(object):
         # It is more natural to copy input/output paths that are relative to the
         # current working directory.
         self._inputs = inputs or []
+        self._input_list_paths = input_list_paths or []
         self._output_files = output_files or []
         self._output_dirs = output_dirs or []
 
@@ -1128,8 +1132,22 @@ class RemoteAction(object):
         return self.build_subdir
 
     @property
+    def input_list_paths(self) -> Sequence[Path]:
+        return self._input_list_paths
+
+    @property
     def inputs_relative_to_working_dir(self) -> Sequence[Path]:
-        return self._inputs
+        """Combines files from --inputs and --input_list_paths."""
+        return self._inputs + list(
+            self._inputs_from_path_list_relative_to_working_dir())
+
+    def _inputs_from_path_list_relative_to_working_dir(self) -> Iterable[Path]:
+        for path_list in self.input_list_paths:
+            with open(path_list) as f:
+                for line in f:
+                    stripped = line.strip()
+                    if stripped:
+                        yield Path(stripped)
 
     @property
     def output_files_relative_to_working_dir(self) -> Sequence[Path]:
@@ -1154,7 +1172,8 @@ class RemoteAction(object):
         return self._relativize_paths_to_exec_root(
             self.output_dirs_relative_to_working_dir)
 
-    def _inputs_list_file(self) -> Path:
+    def _generated_inputs_list_file(self) -> Path:
+        """This file is generated with a complete list of inputs."""
         inputs_list_file = Path(
             self._default_auxiliary_file_basename + '.inputs')
         _write_lines_to_file(
@@ -1176,11 +1195,12 @@ class RemoteAction(object):
 
         yield from self.options
 
-        if self._inputs:
-            # TODO(http://fxbug.dev/124186): use --input_list_paths only if list is sufficiently long
-            inputs_list_file = self._inputs_list_file()
-            self._cleanup_files.append(inputs_list_file)
-            yield f"--input_list_paths={inputs_list_file}"
+        if self._inputs or self.input_list_paths:
+            # TODO(http://fxbug.dev/124186): use --input_list_paths only if
+            # list is sufficiently long, and save writing an extra file.
+            generated_inputs_list_file = self._generated_inputs_list_file()
+            self._cleanup_files.append(generated_inputs_list_file)
+            yield f"--input_list_paths={generated_inputs_list_file}"
 
         # outputs (files and dirs) need to be relative to the exec_root,
         # even as we run from inside the build_dir under exec_root.
@@ -1789,6 +1809,15 @@ def inherit_main_arg_parser_flags(
         "Specify additional remote inputs, comma-separated, relative to the current working dir (repeatable, cumulative).  Note: This is different than `rewrapper --inputs`, which expects exec_root-relative paths.",
     )
     rewrapper_group.add_argument(
+        "--input_list_paths",
+        action='append',
+        # leave the type as [str], so commas can be processed downstream
+        default=[],
+        metavar="PATHS",
+        help=
+        "Specify additional remote inputs file lists, whose elements are relative to the current working dir (repeatable, cumulative).  Note: This is different than `rewrapper --input_list_paths`, which expects elements to be relative to the exec_root.",
+    )
+    rewrapper_group.add_argument(
         "--output_files",
         action='append',
         # leave the type as [str], so commas can be processed downstream
@@ -1931,6 +1960,7 @@ def remote_action_from_args(
         command: Sequence[str] = None,
         # These inputs and outputs can come from application-specific logic.
         inputs: Sequence[Path] = None,
+        input_list_paths: Sequence[Path] = None,
         output_files: Sequence[Path] = None,
         output_dirs: Sequence[Path] = None,
         downloads: Sequence[Path] = None,
@@ -1939,6 +1969,10 @@ def remote_action_from_args(
     """Construct a remote action based on argparse parameters."""
     inputs = (inputs or []) + [
         Path(p) for p in cl_utils.flatten_comma_list(main_args.inputs)
+    ]
+    input_list_paths = (input_list_paths or []) + [
+        Path(p)
+        for p in cl_utils.flatten_comma_list(main_args.input_list_paths)
     ]
     output_files = (output_files or []) + [
         Path(p) for p in cl_utils.flatten_comma_list(main_args.output_files)
@@ -1957,6 +1991,7 @@ def remote_action_from_args(
         cfg=main_args.cfg,
         exec_strategy=main_args.exec_strategy,
         inputs=inputs,
+        input_list_paths=input_list_paths,
         output_files=output_files,
         output_dirs=output_dirs,
         disable=main_args.local,

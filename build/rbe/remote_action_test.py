@@ -541,6 +541,37 @@ class RemoteActionMainParserTests(unittest.TestCase):
         action = remote_action.remote_action_from_args(main_args)
         self.assertTrue(action.diagnose_nonzero)
 
+    def test_input_list_paths(self):
+        exec_root = Path('/home/project')
+        build_dir = Path('build-out')
+        working_dir = exec_root / build_dir
+        input1 = Path('hello.txt')
+        input2 = Path('goodbye.txt')
+        with tempfile.TemporaryDirectory() as td:
+            rspfile1 = Path(td) / 'inputs.rsp'
+            _write_file_contents(rspfile1, f'{input1}\n')
+            rspfile2 = Path(td) / 'more-inputs.rsp'
+            _write_file_contents(rspfile2, f'{input2}\n')
+
+            p = self._make_main_parser()
+            main_args, other = p.parse_known_args(
+                _strs(
+                    [
+                        f'--input_list_paths={rspfile1},{rspfile2}', '--',
+                        'cat', input1, input2
+                    ]))
+            action = remote_action.remote_action_from_args(
+                main_args,
+                exec_root=exec_root,
+                working_dir=working_dir,
+            )
+
+            self.assertEqual(
+                set(action.inputs_relative_to_project_root),
+                {build_dir / input1, build_dir / input2
+                },  # relative to exec_root
+            )
+
     def test_remote_debug_command(self):
         exec_root = Path('/home/project')
         build_dir = Path('build-out')
@@ -1436,7 +1467,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
             action.output_dirs_relative_to_project_root,
             _paths(['build_dir/.debug']))
         with mock.patch.object(
-                remote_action.RemoteAction, '_inputs_list_file',
+                remote_action.RemoteAction, '_generated_inputs_list_file',
                 return_value=Path(
                     'obj/woof.txt.inputs')) as mock_input_list_file:
             self.assertEqual(
