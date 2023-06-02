@@ -4,6 +4,9 @@
 
 use fidl::endpoints::{create_endpoints, ClientEnd, ProtocolMarker, Proxy};
 use fidl_fuchsia_io as fio;
+use fidl_fuchsia_math as fmath;
+use fidl_fuchsia_ui_display_singleton as fuidisplay;
+use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
 use std::collections::{BTreeMap, HashSet};
@@ -22,6 +25,12 @@ use crate::task::*;
 use crate::types::*;
 use crate::types::{DeviceType, Errno, OpenFlags};
 use crate::vdso::vdso_loader::Vdso;
+
+/// The width of the display by default.
+pub const DISPLAY_WIDTH: u32 = 720;
+
+/// The height of the display by default.
+pub const DISPLAY_HEIGHT: u32 = 1200;
 
 pub struct Kernel {
     /// The Zircon job object that holds the processes running in this kernel.
@@ -120,6 +129,8 @@ impl Kernel {
         let vsock_address_maker = Box::new(|x: u32| -> SocketAddress { SocketAddress::Vsock(x) });
         let job = fuchsia_runtime::job_default().create_child_job()?;
         set_zx_name(&job, name);
+        let display_size = Self::get_display_size()
+            .unwrap_or(fmath::SizeU { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT });
 
         Ok(Arc::new(Kernel {
             job,
@@ -141,8 +152,9 @@ impl Kernel {
             device_registry: RwLock::new(DeviceRegistry::new_with_common_devices()),
             features: HashSet::from_iter(features.iter().cloned()),
             container_svc,
-            framebuffer: Framebuffer::new().expect("Failed to create framebuffer"),
-            input_file: InputFile::new(),
+            framebuffer: Framebuffer::new(display_size.width, display_size.height)
+                .expect("Failed to create framebuffer"),
+            input_file: InputFile::new(display_size.width, display_size.height),
             binders: Default::default(),
             iptables: RwLock::new(IpTables::new()),
             shared_futexes: Default::default(),
@@ -179,5 +191,17 @@ impl Kernel {
 
     pub fn selinux_enabled(&self) -> bool {
         self.features.contains("selinux_enabled")
+    }
+
+    fn get_display_size() -> Result<fmath::SizeU, Errno> {
+        let (server_end, client_end) = zx::Channel::create();
+        connect_channel_to_protocol::<fuidisplay::InfoMarker>(server_end)
+            .map_err(|_| errno!(ENOENT))?;
+        let singleton_display_info = fuidisplay::InfoSynchronousProxy::new(client_end);
+        let metrics =
+            singleton_display_info.get_metrics(zx::Time::INFINITE).map_err(|_| errno!(EINVAL))?;
+        let extent_in_px =
+            metrics.extent_in_px.ok_or("Failed to get extent_in_px").map_err(|_| errno!(EINVAL))?;
+        Ok(extent_in_px)
     }
 }

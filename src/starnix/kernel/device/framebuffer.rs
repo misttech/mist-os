@@ -2,9 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::framebuffer_server::{
-    spawn_view_provider, FramebufferServer, IMAGE_HEIGHT, IMAGE_WIDTH,
-};
+use super::framebuffer_server::{spawn_view_provider, FramebufferServer};
 use crate::device::DeviceOps;
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
@@ -28,12 +26,11 @@ pub struct Framebuffer {
 }
 
 impl Framebuffer {
-    pub fn new() -> Result<Arc<Self>, Errno> {
+    pub fn new(width: u32, height: u32) -> Result<Arc<Self>, Errno> {
         let mut info = fb_var_screeninfo::default();
 
-        // Hardcode a phone-sized screen with the pixel format Android expects
-        info.xres = IMAGE_WIDTH;
-        info.yres = IMAGE_HEIGHT;
+        info.xres = width;
+        info.yres = height;
         info.xres_virtual = info.xres;
         info.yres_virtual = info.yres;
         info.bits_per_pixel = 32;
@@ -42,7 +39,7 @@ impl Framebuffer {
         info.blue = fb_bitfield { offset: 16, length: 8, msb_right: 0 };
         info.transp = fb_bitfield { offset: 24, length: 8, msb_right: 0 };
 
-        if let Ok(server) = FramebufferServer::new() {
+        if let Ok(server) = FramebufferServer::new(width, height) {
             let server = Arc::new(server);
             let vmo = Arc::new(server.get_vmo()?);
             let vmo_len = vmo.info().map_err(|_| errno!(EINVAL))?.size_bytes as u32;

@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::{
-    framebuffer_server::{IMAGE_HEIGHT, IMAGE_WIDTH},
-    DeviceOps,
-};
+use crate::device::DeviceOps;
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::lock::Mutex;
@@ -82,11 +79,11 @@ impl InputFile {
         uapi::input_id { bustype: BUS_VIRTUAL as u16, product: 0, vendor: 0, version: 0 };
 
     /// Creates an `InputFile` instance suitable for emulating a touchscreen.
-    pub fn new() -> Arc<Self> {
+    pub fn new(width: u32, height: u32) -> Arc<Self> {
         // Fuchsia scales the position reported by the touch sensor to fit view coordinates.
         // Hence, the range of touch positions is exactly the same as the range of view
         // coordinates.
-        Self::new_with_dimensions(IMAGE_WIDTH as u16, IMAGE_HEIGHT as u16)
+        Self::new_with_dimensions(width as u16, height as u16)
     }
 
     // Create an `InputFile` with sensor axes having ranges of `(0, x_max)`, and `(0, y_max)`.
@@ -581,7 +578,7 @@ mod test {
 
     fn start_input(
     ) -> (Arc<InputFile>, fuipointer::TouchSourceRequestStream, std::thread::JoinHandle<()>) {
-        let input_file = InputFile::new();
+        let input_file = InputFile::new(720, 1200);
         let (touch_source_proxy, touch_source_stream) =
             fidl::endpoints::create_proxy_and_stream::<TouchSourceMarker>()
                 .expect("failed to create TouchSource channel");

@@ -31,12 +31,6 @@ use std::sync::{mpsc::channel, Arc};
 use crate::logging::log_warn;
 use crate::types::*;
 
-/// The width of the framebuffer image.
-pub const IMAGE_WIDTH: u32 = 720;
-
-/// The height of the framebuffer image.
-pub const IMAGE_HEIGHT: u32 = 1200;
-
 /// The offset at which the framebuffer will be placed.
 pub const TRANSLATION_X: i32 = 0;
 
@@ -59,12 +53,18 @@ pub struct FramebufferServer {
 
     /// The buffer collection that is registered with Flatland.
     collection: fsysmem::BufferCollectionInfo2,
+
+    /// The width of the display and framebuffer image.
+    image_width: u32,
+
+    /// The height of the display and framebuffer image.
+    image_height: u32,
 }
 
 impl FramebufferServer {
     /// Returns a `FramebufferServer` that has created a scene and registered a buffer with
     /// Flatland.
-    pub fn new() -> Result<Self, Errno> {
+    pub fn new(width: u32, height: u32) -> Result<Self, Errno> {
         let (server_end, client_end) = zx::Channel::create();
         connect_channel_to_protocol::<fuicomposition::AllocatorMarker>(server_end)
             .map_err(|_| errno!(ENOENT))?;
@@ -76,9 +76,10 @@ impl FramebufferServer {
         let flatland = fuicomposition::FlatlandSynchronousProxy::new(client_end);
         flatland.set_debug_name("Starnix").map_err(|_| errno!(EINVAL))?;
 
-        let collection = init_scene(&flatland, &allocator).map_err(|_| errno!(EINVAL))?;
+        let collection =
+            init_scene(&flatland, &allocator, width, height).map_err(|_| errno!(EINVAL))?;
 
-        Ok(Self { flatland, collection })
+        Ok(Self { flatland, collection, image_width: width, image_height: height })
     }
 
     /// Returns a clone of the VMO that is shared with Flatland.
@@ -99,6 +100,8 @@ impl FramebufferServer {
 fn init_scene(
     flatland: &fuicomposition::FlatlandSynchronousProxy,
     allocator: &fuicomposition::AllocatorSynchronousProxy,
+    width: u32,
+    height: u32,
 ) -> Result<fsysmem::BufferCollectionInfo2, anyhow::Error> {
     let (collection_sender, collection_receiver) = channel();
     let (allocation_sender, allocation_receiver) = channel();
@@ -112,8 +115,8 @@ fn init_scene(
         let mut executor = fasync::LocalExecutor::new();
 
         let mut buffer_allocator = BufferCollectionAllocator::new(
-            IMAGE_WIDTH,
-            IMAGE_HEIGHT,
+            width,
+            height,
             fidl_fuchsia_sysmem::PixelFormatType::R8G8B8A8,
             FrameUsage::Cpu,
             1,
@@ -154,7 +157,7 @@ fn init_scene(
         allocation_receiver.recv().map_err(|_| anyhow!("Error receiving buffer allocation"))?;
 
     let image_props = fuicomposition::ImageProperties {
-        size: Some(fmath::SizeU { width: IMAGE_WIDTH, height: IMAGE_HEIGHT }),
+        size: Some(fmath::SizeU { width, height }),
         ..Default::default()
     };
     flatland
@@ -217,7 +220,7 @@ pub fn spawn_view_provider(
                                 .flatland
                                 .set_image_destination_size(
                                     &IMAGE_ID,
-                                    &fmath::SizeU { width: IMAGE_WIDTH, height: IMAGE_HEIGHT },
+                                    &fmath::SizeU { width: server.image_width, height: server.image_height },
                                 )
                                 .expect("fidl error");
 

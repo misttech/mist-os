@@ -53,6 +53,7 @@
                 "fuchsia.power.battery.BatteryManager",
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
+                "fuchsia.ui.display.singleton.Info",
                 "fuchsia.ui.input3.Keyboard",
                 "fuchsia.ui.scenic.Scenic",
             ],
