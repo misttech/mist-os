@@ -210,8 +210,18 @@ zx_status_t ForEachModule(const zx::process& process, ModuleAction action) {
   // 'maps' should be sorted in ascending order of base address so we should be able to use that to
   // quickly find the mapping associated with any given PT_LOAD.
 
+  // When `-z noseparate-code` is enabled, multiple ELF segments could live on the same page and
+  // the same ELF header gets mapped multiple times with different flags.  end_of_last_module tracks
+  // the end of last module and regions overlapping with the last module will be skipped.
+  zx_vaddr_t end_of_last_module = 0;
+
   for (size_t i = 0; i < actual; ++i) {
     const auto& map = maps[i];
+
+    // Skip regions overlapping with the last module to avoid parsing the same ELF header twice.
+    if (map.base < end_of_last_module) {
+      continue;
+    }
 
     // Skip any writable maps since the RODATA segment containing the
     // headers will not be writable.
@@ -258,11 +268,22 @@ zx_status_t ForEachModule(const zx::process& process, ModuleAction action) {
     // Read the PT_DYNAMIC.
     uintptr_t dynamic = 0;
     size_t dynamic_count = 0;
+    uintptr_t vaddr_start = -1ul;
     for (const auto& phdr : phdrs) {
       if (phdr.p_type == PT_DYNAMIC) {
         dynamic = map.base + phdr.p_vaddr;
         dynamic_count = phdr.p_filesz / sizeof(Elf64_Dyn);
         break;
+      }
+      // Update end_of_last_module.
+      if (phdr.p_type == PT_LOAD) {
+        if (vaddr_start == -1ul) {
+          // The first p_vaddr may not be 0.
+          vaddr_start = phdr.p_vaddr & -PAGESIZE;
+        }
+        end_of_last_module = map.base - vaddr_start + phdr.p_vaddr + phdr.p_memsz;
+        // Round up to pages.
+        end_of_last_module = (end_of_last_module + PAGESIZE - 1) & -PAGESIZE;
       }
     }
 

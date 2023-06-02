@@ -116,12 +116,12 @@ void MakeELF(Module* mod) {
   }
 }
 
-constexpr Elf64_Phdr MakePhdr(uint32_t type, uint64_t size, uint64_t addr, uint32_t flags,
-                              uint32_t align) {
+constexpr Elf64_Phdr MakePhdr(uint32_t type, uint64_t size, uint64_t offset, uint64_t addr,
+                              uint32_t flags, uint32_t align) {
   return Elf64_Phdr{
       .p_type = type,
       .p_flags = flags,
-      .p_offset = addr,
+      .p_offset = offset,
       .p_vaddr = addr,
       .p_paddr = addr,
       .p_filesz = size,
@@ -180,29 +180,35 @@ zx_status_t LoadElf(const zx::vmar& vmar, const zx::vmo& vmo, uintptr_t& base, u
 // sussed out by looking at coverage results.
 TEST(ElfSearchTest, ForEachModule) {
   // Define some dummy modules.
-  constexpr Elf64_Phdr mod0_phdrs[] = {MakePhdr(PT_LOAD, 0x2000, 0, PF_R, 0x1000),
-                                       MakePhdr(PT_NOTE, 20, 0x1000, PF_R, 4),
-                                       MakePhdr(PT_LOAD, 0x1000, 0x2000, PF_R | PF_W, 0x1000),
-                                       MakePhdr(PT_LOAD, 0x1000, 0x3000, PF_R | PF_X, 0x1000)};
+  constexpr Elf64_Phdr mod0_phdrs[] = {
+      MakePhdr(PT_LOAD, 0x2000, 0, 0, PF_R, 0x1000), MakePhdr(PT_NOTE, 20, 0x1000, 0x1000, PF_R, 4),
+      MakePhdr(PT_LOAD, 0x1000, 0x2000, 0x2000, PF_R | PF_W, 0x1000),
+      MakePhdr(PT_LOAD, 0x1000, 0x3000, 0x3000, PF_R | PF_X, 0x1000)};
   constexpr uint8_t mod0_build_id[] = {0xde, 0xad, 0xbe, 0xef};
-  constexpr Elf64_Phdr mod1_phdrs[] = {MakePhdr(PT_LOAD, 0x2000, 0x0000, PF_R, 0x1000),
-                                       MakePhdr(PT_NOTE, 20, 0x1000, PF_R, 4),
-                                       MakePhdr(PT_LOAD, 0x1000, 0x2000, PF_R | PF_X, 0x1000)};
+  constexpr Elf64_Phdr mod1_phdrs[] = {
+      MakePhdr(PT_LOAD, 0x2000, 0x0000, 0x0000, PF_R, 0x1000),
+      MakePhdr(PT_NOTE, 20, 0x1000, 0x1000, PF_R, 4),
+      MakePhdr(PT_LOAD, 0x1000, 0x2000, 0x2000, PF_R | PF_X, 0x1000)};
   constexpr uint8_t mod1_build_id[] = {0xff, 0xff, 0xff, 0xff};
-  constexpr Elf64_Phdr mod2_phdrs[] = {MakePhdr(PT_LOAD, 0x2000, 0x0000, PF_R, 0x1000),
-                                       MakePhdr(PT_NOTE, 20, 0x1000, PF_R, 4)};
+  constexpr Elf64_Phdr mod2_phdrs[] = {MakePhdr(PT_LOAD, 0x2000, 0x0000, 0x0000, PF_R, 0x1000),
+                                       MakePhdr(PT_NOTE, 20, 0x1000, 0x1000, PF_R, 4)};
   constexpr uint8_t mod2_build_id[] = {0x00, 0x00, 0x00, 0x00};
-  constexpr Elf64_Phdr mod3_phdrs[] = {MakePhdr(PT_LOAD, 0x2000, 0, PF_R, 0x1000),
-                                       MakePhdr(PT_NOTE, 20, 0x1000, PF_R, 4),
-                                       MakePhdr(PT_DYNAMIC, 0x800, 0x1800, PF_R, 4)};
+  constexpr Elf64_Phdr mod3_phdrs[] = {MakePhdr(PT_LOAD, 0x2000, 0, 0, PF_R, 0x1000),
+                                       MakePhdr(PT_NOTE, 20, 0x1000, 0x1000, PF_R, 4),
+                                       MakePhdr(PT_DYNAMIC, 0x800, 0x1800, 0x1800, PF_R, 4)};
   constexpr uint8_t mod3_build_id[] = {0x12, 0x34, 0x56, 0x78};
   constexpr Elf64_Dyn mod3_dyns[] = {{DT_STRTAB, {0x1900}}, {DT_SONAME, {1}}, {DT_NULL, {}}};
   constexpr const char* mod3_soname = "soname";
+  // mod4 has `-z noseparate-code`, i.e., multiple PT_LOAD segments live on the same page.
+  constexpr Elf64_Phdr mod4_phdrs[] = {MakePhdr(PT_LOAD, 0x950, 0, 0, PF_R, 0x1000),
+                                       MakePhdr(PT_LOAD, 0x2b0, 0x950, 0x1950, PF_R | PF_X, 0x1000),
+                                       MakePhdr(PT_LOAD, 0x258, 0xc00, 0x2c00, PF_R | PF_W, 0x1000),
+                                       MakePhdr(PT_NOTE, 20, 0x270, 0x270, PF_R, 4)};
+  constexpr uint8_t mod4_build_id[] = {0x44, 0x33, 0x22, 0x11};
   Module mods[] = {
-      {"mod0", mod0_phdrs, mod0_build_id, {}},
-      {"mod1", mod1_phdrs, mod1_build_id, {}},
-      {"mod2", mod2_phdrs, mod2_build_id, {}},
-      {"mod3", mod3_phdrs, mod3_build_id, {}},
+      {"mod0", mod0_phdrs, mod0_build_id, {}}, {"mod1", mod1_phdrs, mod1_build_id, {}},
+      {"mod2", mod2_phdrs, mod2_build_id, {}}, {"mod3", mod3_phdrs, mod3_build_id, {}},
+      {"mod4", mod4_phdrs, mod4_build_id, {}},
   };
 
   // Create the test process using the Launcher service, which has the proper clearance to spawn new
