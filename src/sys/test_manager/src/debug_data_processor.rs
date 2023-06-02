@@ -228,7 +228,7 @@ async fn serve_publisher(
                 // Wait for the token handle to close before sending the VMO for processing.
                 // This allows the client to continue modifying the VMO after it has sent it.
                 // See |fuchsia.debugdata.Publisher| protocol for details.
-                fasync::OnSignals::new(&vmo_token, zx::Signals::EVENTPAIR_CLOSED).await?;
+                fasync::OnSignals::new(&vmo_token, zx::Signals::EVENTPAIR_PEER_CLOSED).await?;
                 let _ = sender_clone
                     .sender
                     .send(ftest_debug::DebugVmo { test_url, data_sink, vmo: data })

@@ -425,7 +425,7 @@ impl RunningSuite {
 
         // before destroying the realm, wait for any clients to finish accessing storage.
         let tokens_closed_signals = self.custom_artifact_tokens.iter().map(|token| {
-            fasync::OnSignals::new(token, zx::Signals::EVENTPAIR_CLOSED)
+            fasync::OnSignals::new(token, zx::Signals::EVENTPAIR_PEER_CLOSED)
                 .unwrap_or_else(|_| zx::Signals::empty())
         });
         // Before destroying the realm, ensure archivist has responded to a query. This ensures

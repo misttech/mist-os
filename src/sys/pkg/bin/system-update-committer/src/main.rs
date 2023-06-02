@@ -83,7 +83,7 @@ async fn main_inner_async() -> Result<(), Error> {
     let futures = FuturesUnordered::new();
     let (p_internal, p_external) = zx::EventPair::create();
 
-    // Keep a copy of the internal pair so that external consumers don't observe EVENTPAIR_CLOSED.
+    // Keep a copy of the internal pair so that external consumers don't observe EVENTPAIR_PEER_CLOSED.
     let _p_internal_clone =
         p_internal.duplicate_handle(zx::Rights::NONE).context("while duplicating p_internal")?;
 

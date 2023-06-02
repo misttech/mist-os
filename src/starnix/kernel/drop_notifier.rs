@@ -51,7 +51,7 @@ mod tests {
         std::mem::drop(notifier);
         let on_closed2 = waiter.on_closed();
         assert!(waiter.is_closed());
-        assert_eq!(on_closed.await.expect("await"), zx::Signals::EVENTPAIR_CLOSED);
-        assert_eq!(on_closed2.await.expect("await"), zx::Signals::EVENTPAIR_CLOSED);
+        assert_eq!(on_closed.await.expect("await"), zx::Signals::EVENTPAIR_PEER_CLOSED);
+        assert_eq!(on_closed2.await.expect("await"), zx::Signals::EVENTPAIR_PEER_CLOSED);
     }
 }

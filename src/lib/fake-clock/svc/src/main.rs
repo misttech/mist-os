@@ -224,7 +224,7 @@ impl<T: FakeClockObserver> FakeClock<T> {
             return;
         }
 
-        let closed_fut = fasync::OnSignals::new(&event, zx::Signals::EVENTPAIR_CLOSED)
+        let closed_fut = fasync::OnSignals::new(&event, zx::Signals::EVENTPAIR_PEER_CLOSED)
             .extend_lifetime()
             .map(move |_| {
                 let mut mc = arc_self.lock().unwrap();
@@ -303,7 +303,8 @@ impl<T: FakeClockObserver> FakeClock<T> {
     ) -> Result<(), zx::Status> {
         match self.registered_stop_points.entry(stop_point) {
             hash_map::Entry::Occupied(mut occupied) => {
-                match occupied.get().wait_handle(zx::Signals::EVENTPAIR_CLOSED, zx::Time::ZERO) {
+                match occupied.get().wait_handle(zx::Signals::EVENTPAIR_PEER_CLOSED, zx::Time::ZERO)
+                {
                     Ok(_) => {
                         // Okay to replace an eventpair if the other end is already closed.
                         let _previous = occupied.insert(eventpair);
@@ -785,7 +786,7 @@ mod tests {
         );
         assert_eq!(
             fasync::OnSignals::new(&client_event, zx::Signals::EVENTPAIR_SIGNALED).await.unwrap()
-                & !zx::Signals::EVENTPAIR_CLOSED,
+                & !zx::Signals::EVENTPAIR_PEER_CLOSED,
             zx::Signals::EVENTPAIR_SIGNALED
         );
         assert!(!clock_handle.lock().unwrap().is_free_running());
@@ -874,7 +875,7 @@ mod tests {
         );
         assert_eq!(
             fasync::OnSignals::new(&client_event_2, zx::Signals::EVENTPAIR_SIGNALED).await.unwrap()
-                & !zx::Signals::EVENTPAIR_CLOSED,
+                & !zx::Signals::EVENTPAIR_PEER_CLOSED,
             zx::Signals::EVENTPAIR_SIGNALED
         );
         assert!(!clock_handle.lock().unwrap().is_free_running());

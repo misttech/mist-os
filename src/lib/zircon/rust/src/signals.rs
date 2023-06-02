@@ -62,8 +62,8 @@ bitflags! {
         const EVENT_SIGNALED = ZX_EVENT_SIGNALED;
 
         // EventPair
-        const EVENTPAIR_SIGNALED = ZX_EVENTPAIR_SIGNALED;
-        const EVENTPAIR_CLOSED   = ZX_EVENTPAIR_CLOSED;
+        const EVENTPAIR_SIGNALED    = ZX_EVENTPAIR_SIGNALED;
+        const EVENTPAIR_PEER_CLOSED = ZX_EVENTPAIR_PEER_CLOSED;
 
         // Task signals (process, thread, job)
         const TASK_TERMINATED = ZX_TASK_TERMINATED;

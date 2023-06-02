@@ -557,7 +557,7 @@ impl<T: ServiceDependencies> Service<T> {
         // ("deadline: infinite past"). If the wait times out and we haven't gotten a signal, that
         // means that the `ViewRef` is still open.
         let view_ref_printer = ViewRefPrinter::from(view_ref);
-        match handle.wait_handle(zx::Signals::EVENTPAIR_CLOSED, zx::Time::INFINITE_PAST) {
+        match handle.wait_handle(zx::Signals::EVENTPAIR_PEER_CLOSED, zx::Time::INFINITE_PAST) {
             Ok(_) => {
                 warn!("{view_ref:?} was already closed", view_ref = &view_ref_printer);
                 return Err(ClipboardError::InvalidViewRef);
@@ -653,7 +653,7 @@ impl<T: ServiceDependencies> Service<T> {
         let weak_this = Rc::downgrade(self);
         let task = Task::local(async move {
             let handle = view_ref.reference.as_handle_ref();
-            fasync::OnSignals::new(&handle, zx::Signals::EVENTPAIR_CLOSED).await.map_err(
+            fasync::OnSignals::new(&handle, zx::Signals::EVENTPAIR_PEER_CLOSED).await.map_err(
                 move |status| {
                     error!("OnSignals for {view_ref_koid:?}: {status:?}");
                     ClipboardError::internal_from_status(status)

@@ -2722,7 +2722,7 @@ mod tests {
 
         assert_eq!(
             fasync::OnSignals::new(&e2, ZXSIO_SIGNAL_INCOMING).await,
-            Ok(ZXSIO_SIGNAL_INCOMING | zx::Signals::EVENTPAIR_CLOSED)
+            Ok(ZXSIO_SIGNAL_INCOMING | zx::Signals::EVENTPAIR_PEER_CLOSED)
         );
 
         let () = socket

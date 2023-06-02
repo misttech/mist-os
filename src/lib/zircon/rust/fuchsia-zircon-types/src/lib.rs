@@ -269,7 +269,7 @@ multiconst!(zx_signals_t, [
 
     // EventPair
     ZX_EVENTPAIR_SIGNALED       = ZX_OBJECT_SIGNAL_3;
-    ZX_EVENTPAIR_CLOSED         = ZX_OBJECT_SIGNAL_2;
+    ZX_EVENTPAIR_PEER_CLOSED    = ZX_OBJECT_SIGNAL_2;
 
     // Task signals (process, thread, job)
     ZX_TASK_TERMINATED          = ZX_OBJECT_SIGNAL_3;

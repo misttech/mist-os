@@ -65,7 +65,7 @@ async fn test_pause_advance() {
         fasync::OnSignals::new(&deadline_set_event, zx::Signals::EVENTPAIR_SIGNALED)
             .await
             .expect("waiting for timer set failed")
-            & !zx::Signals::EVENTPAIR_CLOSED,
+            & !zx::Signals::EVENTPAIR_PEER_CLOSED,
         zx::Signals::EVENTPAIR_SIGNALED
     );
 
@@ -95,7 +95,7 @@ async fn test_pause_advance() {
         fasync::OnSignals::new(&deadline_expire_event, zx::Signals::EVENTPAIR_SIGNALED)
             .await
             .expect("waiting for timer expired failed")
-            & !zx::Signals::EVENTPAIR_CLOSED,
+            & !zx::Signals::EVENTPAIR_PEER_CLOSED,
         zx::Signals::EVENTPAIR_SIGNALED
     );
     let () = long_wait_fut.await.expect("wait_for failed");

@@ -368,9 +368,9 @@ async fn system_already_committed() {
 }
 
 /// When the system-update-committer terminates, all clients with handles to the EventPair
-/// should observe `EVENTPAIR_CLOSED`.
+/// should observe `EVENTPAIR_PEER_CLOSED`.
 #[fasync::run_singlethreaded(test)]
-async fn eventpair_closed() {
+async fn eventpair_peer_closed() {
     let env = TestEnv::builder().build().await;
     let event_pair =
         env.commit_status_provider_proxy().is_current_system_committed().await.unwrap();
@@ -378,8 +378,8 @@ async fn eventpair_closed() {
     drop(env);
 
     assert_eq!(
-        OnSignals::new(&event_pair, zx::Signals::EVENTPAIR_CLOSED).await,
-        Ok(zx::Signals::EVENTPAIR_CLOSED | zx::Signals::USER_0)
+        OnSignals::new(&event_pair, zx::Signals::EVENTPAIR_PEER_CLOSED).await,
+        Ok(zx::Signals::EVENTPAIR_PEER_CLOSED | zx::Signals::USER_0)
     );
 }
 
