@@ -52,13 +52,18 @@ static _Noreturn void start_main(const struct start_params*) __asm__("start_main
     __attribute__((used));
 
 // Do not instrument this function with checks for function-type-mismatches.
-// UBSan will report errors on the entry to main via *p->main if the application
+// UBSan will report errors on the entry to main via p->main if the application
 // happens to define main with a signiature different from int(*)(int, char**,
 // char**). It's not uncommon for users to instead use const char** for argv
 // where this can be reported.
 #if __has_feature(undefined_behavior_sanitizer)
 __attribute__((no_sanitize("function")))
 #endif
+static inline int
+call_main(int argc, char** argv, char** environ, int (*main_func)(int, char**, char**)) {
+  return main_func(argc, argv, environ);
+}
+
 static void start_main(const struct start_params* p) {
 #if defined(SHADOW_CALL_STACK_INIT) && !__has_feature(shadow_call_stack)
   __asm__ volatile(
@@ -177,7 +182,7 @@ static void start_main(const struct start_params* p) {
   __libc_start_init();
 
   // Pass control to the application.
-  exit((*p->main)(argc, argv, __environ));
+  exit(call_main(argc, argv, __environ, p->main));
 }
 
 __EXPORT NO_ASAN LIBC_NO_SAFESTACK _Noreturn void __libc_start_main(zx_handle_t bootstrap,

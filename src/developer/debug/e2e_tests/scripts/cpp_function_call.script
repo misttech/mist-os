@@ -31,7 +31,7 @@ Breakpoint 1 now matching 1 addrs for cpp_functions.cc:25
 # Should be at the same location as before.
 [zxdb] f
 ▶ 0 main() • cpp_functions.cc:??
-  1…3 «libc startup» (-r expands)
+  1…4 «libc startup» (-r expands)
 
 # Let the program finish.
 [zxdb] c

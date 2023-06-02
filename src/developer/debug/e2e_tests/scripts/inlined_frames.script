@@ -10,9 +10,10 @@ Launched Process 1 state=Running koid=?? name=inlined_crasher.cm component=inlin
   2 f2() • inlined_crasher.cc:9 (inline)
   3 f3() • inlined_crasher.cc:11
   4 main() • inlined_crasher.cc:13
-  5 start_main(…)
-  6 __libc_start_main(…)
-  7 _start(…)
+  5 call_main(…) • __libc_start_main.c:64 (inline)
+  6 start_main(…)
+  7 __libc_start_main(…)
+  8 _start(…)
 
 [zxdb] kill
 Process 1 killed.
