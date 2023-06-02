@@ -289,7 +289,8 @@
                     "tools/check-licenses/directory/testdata",
                     "tools/check-licenses/result/templates",
                     "tools/check-licenses/golden",
-                    "tools/check-licenses/license/patterns"
+                    "tools/check-licenses/license/patterns",
+                    "tools/check-licenses/assets"
                 ],
                 "notes": [
                     "Don't check the check-licenses test directories for licenses."
