@@ -239,8 +239,11 @@ impl Pipe {
 /// sys_pipe2().
 pub fn new_pipe(current_task: &CurrentTask) -> Result<(FileHandle, FileHandle), Errno> {
     let fs = pipe_fs(current_task.kernel());
-    let node = fs.create_node(SpecialNode, mode!(IFIFO, 0o600), current_task.as_fscred());
-    node.info_write().blksize = ATOMIC_IO_BYTES;
+    let node = fs.create_node(SpecialNode, |id| {
+        let mut info = FsNodeInfo::new(id, mode!(IFIFO, 0o600), current_task.as_fscred());
+        info.blksize = ATOMIC_IO_BYTES;
+        info
+    });
 
     let open = |flags: OpenFlags| {
         Ok(FileObject::new_anonymous(

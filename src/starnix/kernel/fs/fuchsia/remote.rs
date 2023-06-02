@@ -15,7 +15,7 @@ use crate::arch::uapi::{blksize_t, nlink_t};
 use crate::auth::FsCred;
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
-use crate::lock::{Mutex, RwLockReadGuard, RwLockWriteGuard};
+use crate::lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use crate::logging::*;
 use crate::mm::ProtectionFlags;
 use crate::task::*;
@@ -112,8 +112,11 @@ pub fn new_remote_file(
         zx::ObjectType::SOCKET => Box::new(RemotePipeObject::new(Arc::new(zxio))),
         _ => return error!(ENOSYS),
     };
-    let file_handle = Anon::new_file_extended(kernel, ops, mode, FsCred::root(), flags);
-    update_into_from_attrs(&mut file_handle.name.entry.node.info_write(), &attrs);
+    let file_handle = Anon::new_file_extended(kernel, ops, flags, |id| {
+        let mut info = FsNodeInfo::new(id, mode, FsCred::root());
+        update_into_from_attrs(&mut info, &attrs);
+        info
+    });
     Ok(file_handle)
 }
 
@@ -128,8 +131,8 @@ pub fn create_fuchsia_pipe(
 pub fn update_into_from_attrs(info: &mut FsNodeInfo, attrs: &zxio_node_attributes_t) {
     /// st_blksize is measured in units of 512 bytes.
     const BYTES_PER_BLOCK: blksize_t = 512;
-
     // TODO - store these in FsNodeState and convert on fstat
+    info.ino = attrs.id;
     info.size = attrs.content_size as usize;
     info.storage_size = attrs.storage_size as usize;
     info.blksize = BYTES_PER_BLOCK;
@@ -238,8 +241,8 @@ impl FsNodeOps for RemoteNode {
         let attrs = zxio.attr_get().map_err(|status| from_status_like_fdio!(status, name))?;
         let ops = Box::new(RemoteNode { zxio, rights: self.rights });
         let mode = get_mode(&attrs)?;
-        let child = node.fs().create_node_with_id(ops, attrs.id, mode, owner);
-        update_into_from_attrs(&mut child.info_write(), &attrs);
+        let child =
+            node.fs().create_node_with_id(ops, attrs.id, FsNodeInfo::new(attrs.id, mode, owner));
         Ok(child)
     }
 
@@ -272,8 +275,11 @@ impl FsNodeOps for RemoteNode {
         } else {
             Box::new(RemoteNode { zxio, rights: self.rights }) as Box<dyn FsNodeOps>
         };
-        let child = node.fs().create_node_with_id(ops, attrs.id, mode, FsCred::root());
-        update_into_from_attrs(&mut child.info_write(), &attrs);
+        let child = node.fs().create_node_with_id(
+            ops,
+            attrs.id,
+            FsNodeInfo::new(attrs.id, mode, FsCred::root()),
+        );
         Ok(child)
     }
 
@@ -281,9 +287,13 @@ impl FsNodeOps for RemoteNode {
         self.zxio.truncate(length).map_err(|status| from_status_like_fdio!(status))
     }
 
-    fn update_info<'a>(&self, node: &'a FsNode) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
+    fn update_info<'a>(
+        &self,
+        _node: &'a FsNode,
+        info: &'a RwLock<FsNodeInfo>,
+    ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
         let attrs = self.zxio.attr_get().map_err(|status| from_status_like_fdio!(status))?;
-        let mut info = node.info_write();
+        let mut info = info.write();
         update_into_from_attrs(&mut info, &attrs);
         Ok(RwLockWriteGuard::downgrade(info))
     }
@@ -308,10 +318,8 @@ impl FsNodeOps for RemoteNode {
         let symlink = node.fs().create_node_with_id(
             Box::new(RemoteSymlink { zxio }),
             attrs.id,
-            get_mode(&attrs)?,
-            owner,
+            FsNodeInfo::new(attrs.id, get_mode(&attrs)?, owner),
         );
-        update_into_from_attrs(&mut symlink.info_write(), &attrs);
         Ok(symlink)
     }
 }

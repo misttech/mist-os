@@ -19,24 +19,21 @@ pub fn sysctl_directory(fs: &FileSystemHandle) -> FsNodeHandle {
             b"overflowuid",
             fs.create_node(
                 BytesFile::new_node(b"65534".to_vec()),
-                mode!(IFREG, 0o644),
-                FsCred::root(),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
             ),
         );
         dir.node(
             b"overflowgid",
             fs.create_node(
                 BytesFile::new_node(b"65534".to_vec()),
-                mode!(IFREG, 0o644),
-                FsCred::root(),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
             ),
         );
         dir.node(
             b"pid_max",
             fs.create_node(
                 BytesFile::new_node(b"4194304".to_vec()),
-                mode!(IFREG, 0o644),
-                FsCred::root(),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
             ),
         );
     });

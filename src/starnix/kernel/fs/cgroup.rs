@@ -13,7 +13,7 @@ use crate::auth::FsCred;
 use crate::fs::buffers::InputBuffer;
 use crate::fs::{
     fileops_impl_delegate_read_and_seek, DynamicFile, DynamicFileBuf, DynamicFileSource,
-    FileObject, FileOps, FsNode, FsNodeHandle, FsNodeOps, FsStr, MemoryDirectoryFile,
+    FileObject, FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, MemoryDirectoryFile,
 };
 use crate::lock::Mutex;
 use crate::task::{CurrentTask, Task};
@@ -71,8 +71,11 @@ impl FsNodeOps for CgroupDirectoryNode {
         mode: FileMode,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        node.info_write().link_count += 1;
-        Ok(node.fs().create_node(CgroupDirectoryNode::new(), mode, owner))
+        node.update_info(|info| {
+            info.link_count += 1;
+            Ok(())
+        })?;
+        Ok(node.fs().create_node(CgroupDirectoryNode::new(), FsNodeInfo::new_factory(mode, owner)))
     }
 
     fn mknod(
@@ -88,8 +91,11 @@ impl FsNodeOps for CgroupDirectoryNode {
             FileMode::IFREG => Box::new(ControlGroupNode::new(self.control_group.clone())),
             _ => return error!(EACCES),
         };
-        let node = node.fs().create_node_box(ops, mode, owner);
-        node.info_write().rdev = dev;
+        let node = node.fs().create_node_box(ops, |id| {
+            let mut info = FsNodeInfo::new(id, mode, owner);
+            info.rdev = dev;
+            info
+        });
         Ok(node)
     }
 }

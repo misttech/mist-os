@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use super::*;
-use crate::auth::FsCred;
 use crate::task::{CurrentTask, Kernel};
 use crate::types::*;
 
@@ -23,12 +22,11 @@ impl Anon {
     pub fn new_file_extended(
         kernel: &Kernel,
         ops: Box<dyn FileOps>,
-        mode: FileMode,
-        creds: FsCred,
         flags: OpenFlags,
+        info: impl FnOnce(ino_t) -> FsNodeInfo,
     ) -> FileHandle {
         let fs = anon_fs(kernel);
-        FileObject::new_anonymous(ops, fs.create_node(Anon, mode, creds), flags)
+        FileObject::new_anonymous(ops, fs.create_node(Anon, info), flags)
     }
 
     pub fn new_file(
@@ -39,9 +37,8 @@ impl Anon {
         Self::new_file_extended(
             current_task.kernel(),
             ops,
-            FileMode::from_bits(0o600),
-            current_task.as_fscred(),
             flags,
+            FsNodeInfo::new_factory(FileMode::from_bits(0o600), current_task.as_fscred()),
         )
     }
 }

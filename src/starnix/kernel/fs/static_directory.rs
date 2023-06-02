@@ -6,7 +6,7 @@ use crate::auth::FsCred;
 use crate::fs::{
     emit_dotdot, fileops_impl_directory, fs_node_impl_dir_readonly, unbounded_seek,
     DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle, FsNode,
-    FsNodeOps, FsStr, SeekOrigin,
+    FsNodeInfo, FsNodeOps, FsStr, SeekOrigin,
 };
 use crate::task::CurrentTask;
 use crate::types::*;
@@ -53,11 +53,11 @@ impl<'a> StaticDirectoryBuilder<'a> {
         mode: FileMode,
         dev: DeviceType,
     ) {
-        let node = self.fs.create_node(ops, mode, self.entry_creds.clone());
-        {
-            let mut info = node.info_write();
+        let node = self.fs.create_node(ops, |id| {
+            let mut info = FsNodeInfo::new(id, mode, self.entry_creds.clone());
             info.rdev = dev;
-        }
+            info
+        });
         self.node(name, node);
     }
 
@@ -88,25 +88,24 @@ impl<'a> StaticDirectoryBuilder<'a> {
     }
 
     /// Builds an [`FsNode`] that serves as a directory of the entries added to this builder.
-    /// The resulting directory has mode `0o777` (`rwxrwxrwx`).
     pub fn build(self) -> Arc<FsNode> {
         self.fs.create_node(
             Arc::new(StaticDirectory { entries: self.entries }),
-            self.mode,
-            self.creds,
+            FsNodeInfo::new_factory(self.mode, self.creds),
         )
     }
 
     /// Build the node associated with the static directory and makes it the root of the
     /// filesystem.
     pub fn build_root(self) {
-        let node = FsNode::new_root(Arc::new(StaticDirectory { entries: self.entries }));
-        {
-            let mut info = node.info_write();
-            info.uid = self.creds.uid;
-            info.gid = self.creds.gid;
-            info.mode = self.mode;
-        }
+        let node = FsNode::new_root_with_properties(
+            Arc::new(StaticDirectory { entries: self.entries }),
+            |info| {
+                info.uid = self.creds.uid;
+                info.gid = self.creds.gid;
+                info.mode = self.mode;
+            },
+        );
         self.fs.set_root_node(node);
     }
 }

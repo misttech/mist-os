@@ -61,14 +61,23 @@ impl FileSystemOps for Arc<TmpFs> {
         *child_count(old_parent) -= 1;
         *child_count(new_parent) += 1;
         if renamed.is_dir() {
-            old_parent.info_write().link_count -= 1;
-            new_parent.info_write().link_count += 1;
+            old_parent.update_info(|info| {
+                info.link_count -= 1;
+                Ok(())
+            })?;
+            new_parent.update_info(|info| {
+                info.link_count += 1;
+                Ok(())
+            })?;
         }
         // Fix the wrong changes to new_parent due to the fact that the target element has
         // been replaced instead of added.
         if let Some(replaced) = replaced {
             if replaced.is_dir() {
-                new_parent.info_write().link_count -= 1;
+                new_parent.update_info(|info| {
+                    info.link_count -= 1;
+                    Ok(())
+                })?;
             }
             *child_count(new_parent) -= 1;
         }
@@ -86,21 +95,29 @@ impl TmpFs {
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let fs = FileSystem::new(kernel, CacheMode::Permanent, Arc::new(TmpFs(())), options);
-        fs.set_root(TmpfsDirectory::new());
-        let root_node = &fs.root().node;
         let mut mount_options = fs_args::generic_parse_mount_options(&fs.options.params);
-        if let Some(mode) = mount_options.remove(b"mode" as &FsStr) {
-            let mode = FileMode::from_string(mode)?;
-            root_node.info_write().chmod(mode);
-        }
-        if let Some(uid) = mount_options.remove(b"uid" as &FsStr) {
-            let uid = fs_args::parse::<uid_t>(uid)?;
-            root_node.info_write().uid = uid;
-        }
-        if let Some(gid) = mount_options.remove(b"gid" as &FsStr) {
-            let gid = fs_args::parse::<uid_t>(gid)?;
-            root_node.info_write().gid = gid;
-        }
+        let mode = if let Some(mode) = mount_options.remove(b"mode" as &FsStr) {
+            FileMode::from_string(mode)?
+        } else {
+            mode!(IFDIR, 0o777)
+        };
+        let uid = if let Some(uid) = mount_options.remove(b"uid" as &FsStr) {
+            fs_args::parse::<uid_t>(uid)?
+        } else {
+            0
+        };
+        let gid = if let Some(gid) = mount_options.remove(b"gid" as &FsStr) {
+            fs_args::parse::<gid_t>(gid)?
+        } else {
+            0
+        };
+        let root_node = FsNode::new_root_with_properties(TmpfsDirectory::new(), |info| {
+            info.chmod(mode);
+            info.uid = uid;
+            info.gid = gid;
+        });
+        fs.set_root_node(root_node);
+
         if !mount_options.is_empty() {
             not_implemented!(
                 "Unknown tmpfs option: {:?}",
@@ -114,6 +131,7 @@ impl TmpFs {
                 )
             );
         }
+
         Ok(fs)
     }
 }
@@ -156,9 +174,12 @@ impl FsNodeOps for TmpfsDirectory {
         mode: FileMode,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        node.info_write().link_count += 1;
+        node.update_info(|info| {
+            info.link_count += 1;
+            Ok(())
+        })?;
         *self.child_count.lock() += 1;
-        Ok(node.fs().create_node(TmpfsDirectory::new(), mode, owner))
+        Ok(node.fs().create_node(TmpfsDirectory::new(), FsNodeInfo::new_factory(mode, owner)))
     }
 
     fn mknod(
@@ -178,14 +199,13 @@ impl FsNodeOps for TmpfsDirectory {
             _ => return error!(EACCES),
         };
         *self.child_count.lock() += 1;
-        let node = node.fs().create_node_box(ops, mode, owner);
-        {
-            let mut node_info = node.info_write();
-            node_info.rdev = dev;
+        let node = node.fs().create_node_box(ops, move |id| {
+            let mut info = FsNodeInfo::new(id, mode, owner);
+            info.rdev = dev;
             // blksize is PAGE_SIZE for in memory node.
-            node_info.blksize = *PAGE_SIZE as blksize_t;
-        }
-
+            info.blksize = *PAGE_SIZE as blksize_t;
+            info
+        });
         Ok(node)
     }
 
@@ -197,20 +217,32 @@ impl FsNodeOps for TmpfsDirectory {
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         *self.child_count.lock() += 1;
-        Ok(node.fs().create_node(SymlinkNode::new(target), mode!(IFLNK, 0o777), owner))
+        Ok(node.fs().create_node(
+            SymlinkNode::new(target),
+            FsNodeInfo::new_factory(mode!(IFLNK, 0o777), owner),
+        ))
     }
 
     fn link(&self, _node: &FsNode, _name: &FsStr, child: &FsNodeHandle) -> Result<(), Errno> {
-        child.info_write().link_count += 1;
+        child.update_info(|info| {
+            info.link_count += 1;
+            Ok(())
+        })?;
         *self.child_count.lock() += 1;
         Ok(())
     }
 
     fn unlink(&self, node: &FsNode, _name: &FsStr, child: &FsNodeHandle) -> Result<(), Errno> {
         if child.is_dir() {
-            node.info_write().link_count -= 1;
+            node.update_info(|info| {
+                info.link_count -= 1;
+                Ok(())
+            })?;
         }
-        child.info_write().link_count -= 1;
+        child.update_info(|info| {
+            info.link_count -= 1;
+            Ok(())
+        })?;
         *self.child_count.lock() -= 1;
         Ok(())
     }

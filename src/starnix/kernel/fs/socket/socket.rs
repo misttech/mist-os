@@ -258,7 +258,7 @@ impl Socket {
     ) -> FileHandle {
         let fs = socket_fs(current_task.kernel());
         let mode = mode!(IFSOCK, 0o777);
-        let node = fs.create_node(Anon, mode, current_task.as_fscred());
+        let node = fs.create_node(Anon, FsNodeInfo::new_factory(mode, current_task.as_fscred()));
         node.set_socket(socket.clone());
         FileObject::new_anonymous(SocketFile::new(socket), node, open_flags)
     }

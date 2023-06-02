@@ -12,7 +12,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 
 use super::*;
-use crate::auth::FsCred;
 use crate::lock::Mutex;
 use crate::task::Kernel;
 use crate::types::{as_any::AsAny, *};
@@ -134,7 +133,7 @@ impl FileSystem {
     /// Set up the root of the filesystem. Must not be called more than once.
     pub fn set_root_node(self: &FileSystemHandle, mut root: FsNode) {
         if root.node_id == 0 {
-            root.node_id = self.next_node_id();
+            root.set_id(self.next_node_id());
         }
         root.set_fs(self);
         let root_node = Arc::new(root);
@@ -200,10 +199,9 @@ impl FileSystem {
         self: &Arc<Self>,
         ops: Box<dyn FsNodeOps>,
         id: ino_t,
-        mode: FileMode,
-        owner: FsCred,
+        info: FsNodeInfo,
     ) -> FsNodeHandle {
-        let node = FsNode::new_uncached(ops, self, id, mode, owner);
+        let node = FsNode::new_uncached(ops, self, id, info);
         if let Some(label) = self.selinux_context.get() {
             let _ = node.ops().set_xattr(&node, b"security.selinux", label, XattrOp::Create);
         }
@@ -214,20 +212,18 @@ impl FileSystem {
     pub fn create_node_box(
         self: &Arc<Self>,
         ops: Box<dyn FsNodeOps>,
-        mode: FileMode,
-        owner: FsCred,
+        info: impl FnOnce(ino_t) -> FsNodeInfo,
     ) -> FsNodeHandle {
         let node_id = self.next_node_id();
-        self.create_node_with_id(ops, node_id, mode, owner)
+        self.create_node_with_id(ops, node_id, info(node_id))
     }
 
     pub fn create_node(
         self: &Arc<Self>,
         ops: impl FsNodeOps,
-        mode: FileMode,
-        owner: FsCred,
+        info: impl FnOnce(ino_t) -> FsNodeInfo,
     ) -> FsNodeHandle {
-        self.create_node_box(Box::new(ops), mode, owner)
+        self.create_node_box(Box::new(ops), info)
     }
 
     /// Remove the given FsNode from the node cache.

@@ -284,14 +284,15 @@ impl StarnixNodeConnection {
         flags: fio::NodeAttributeFlags,
         attributes: fio::NodeAttributes,
     ) -> Result<(), Errno> {
-        let mut info = self.file.node().info_write();
-        if flags.contains(fio::NodeAttributeFlags::CREATION_TIME) {
-            info.time_status_change = zx::Time::from_nanos(attributes.creation_time as i64);
-        }
-        if flags.contains(fio::NodeAttributeFlags::MODIFICATION_TIME) {
-            info.time_modify = zx::Time::from_nanos(attributes.modification_time as i64);
-        }
-        Ok(())
+        self.file.node().update_info(|info| {
+            if flags.contains(fio::NodeAttributeFlags::CREATION_TIME) {
+                info.time_status_change = zx::Time::from_nanos(attributes.creation_time as i64);
+            }
+            if flags.contains(fio::NodeAttributeFlags::MODIFICATION_TIME) {
+                info.time_modify = zx::Time::from_nanos(attributes.modification_time as i64);
+            }
+            Ok(())
+        })
     }
 }
 

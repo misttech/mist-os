@@ -20,9 +20,8 @@ pub fn new_null_file(kernel: &Kernel, flags: OpenFlags) -> FileHandle {
     Anon::new_file_extended(
         kernel,
         Box::new(DevNull),
-        FileMode::from_bits(0o666),
-        FsCred::root(),
         flags,
+        FsNodeInfo::new_factory(FileMode::from_bits(0o666), FsCred::root()),
     )
 }
 

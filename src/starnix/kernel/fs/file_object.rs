@@ -704,7 +704,7 @@ impl FileObject {
         let bytes_read = read()?;
         // TODO(steveaustin) - omit updating time_access to allow info to be immutable
         // and thus allow simultaneous reads.
-        self.name.update_atime();
+        self.name.update_atime()?;
         Ok(bytes_read)
     }
 
@@ -756,9 +756,9 @@ impl FileObject {
         if !self.can_write() {
             return error!(EBADF);
         }
-        self.node().clear_suid_and_sgid_bits(current_task);
+        self.node().clear_suid_and_sgid_bits(current_task)?;
         let bytes_written = write()?;
-        self.node().update_ctime_mtime();
+        self.node().update_ctime_mtime()?;
         Ok(bytes_written)
     }
 
@@ -891,7 +891,7 @@ impl FileObject {
             result => result,
         }?;
 
-        self.name.update_atime();
+        self.name.update_atime()?;
         Ok(())
     }
 

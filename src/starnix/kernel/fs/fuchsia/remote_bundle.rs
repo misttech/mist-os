@@ -9,7 +9,7 @@ use {
             fuchsia::{update_into_from_attrs, RemoteFileObject},
             *,
         },
-        lock::{RwLockReadGuard, RwLockWriteGuard},
+        lock::{RwLock, RwLockReadGuard, RwLockWriteGuard},
         logging::log_warn,
         task::{CurrentTask, Kernel},
         types::*,
@@ -64,7 +64,6 @@ impl RemoteBundle {
         );
         let mut root_node = FsNode::new_root(DirectoryObject);
         root_node.node_id = ext4_metadata::ROOT_INODE_NUM;
-        root_node.info_write().ino = ext4_metadata::ROOT_INODE_NUM;
         let fs = FileSystem::new(
             kernel,
             CacheMode::Cached,
@@ -125,9 +124,13 @@ impl FsNodeOps for File {
         Ok(Box::new(RemoteFileObject::new(zxio)))
     }
 
-    fn update_info<'a>(&self, node: &'a FsNode) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
+    fn update_info<'a>(
+        &self,
+        _node: &'a FsNode,
+        info: &'a RwLock<FsNodeInfo>,
+    ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
         let attrs = self.zxio.attr_get().map_err(|status| from_status_like_fdio!(status))?;
-        let mut info = node.info_write();
+        let mut info = info.write();
         update_into_from_attrs(&mut info, &attrs);
         Ok(RwLockWriteGuard::downgrade(info))
     }
@@ -226,34 +229,14 @@ impl FsNodeOps for DirectoryObject {
         let metadata = &bundle.metadata;
         let inode_num = metadata.lookup(node.node_id, name).map_err(|_| errno!(ENOENT))?;
         let metadata_node = metadata.get(inode_num).ok_or(errno!(EIO))?;
-        let mode = FileMode::from_bits(metadata_node.mode.into());
-        let owner = FsCred { uid: metadata_node.uid.into(), gid: metadata_node.gid.into() };
+        let info = to_fs_node_info(inode_num, metadata_node);
 
         match metadata_node.info() {
             NodeInfo::Symlink(_) => {
-                let child = fs.create_node_with_id(Box::new(SymlinkObject), inode_num, mode, owner);
-                {
-                    let mut info = child.info_write();
-                    // For now, we just use some made up values. We might need to revisit this.
-                    info.size = 1;
-                    info.storage_size = 1;
-                    info.blksize = 512;
-                    info.link_count = 1;
-                }
-                Ok(child)
+                Ok(fs.create_node_with_id(Box::new(SymlinkObject), inode_num, info))
             }
             NodeInfo::Directory(_) => {
-                let child =
-                    fs.create_node_with_id(Box::new(DirectoryObject), inode_num, mode, owner);
-                {
-                    let mut info = child.info_write();
-                    // For now, we just use some made up values. We might need to revisit this.
-                    info.size = 1;
-                    info.storage_size = 1;
-                    info.blksize = 512;
-                    info.link_count = 1;
-                }
-                Ok(child)
+                Ok(fs.create_node_with_id(Box::new(DirectoryObject), inode_num, info))
             }
             NodeInfo::File(_) => {
                 let zxio = Arc::new(
@@ -262,21 +245,9 @@ impl FsNodeOps for DirectoryObject {
                         .open(bundle.rights, &format!("{inode_num}"))
                         .map_err(|status| from_status_like_fdio!(status, name))?,
                 );
-
-                // TODO: It's unfortunate to have another round-trip. We should be able
-                // to set the mode based on the information we get during open.
-                let attrs = zxio.attr_get().map_err(|status| from_status_like_fdio!(status))?;
-
-                let child = fs.create_node_with_id(Box::new(File { zxio }), inode_num, mode, owner);
-
-                update_into_from_attrs(&mut child.info_write(), &attrs);
-                Ok(child)
+                Ok(fs.create_node_with_id(Box::new(File { zxio }), inode_num, info))
             }
         }
-    }
-
-    fn update_info<'a>(&self, node: &'a FsNode) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
-        Ok(node.info())
     }
 
     fn get_xattr(
@@ -318,6 +289,20 @@ impl FsNodeOps for SymlinkObject {
         let target = bundle.get_node(node.node_id).symlink().ok_or(errno!(EIO))?.target.clone();
         Ok(SymlinkTarget::Path(target.into_bytes()))
     }
+}
+
+fn to_fs_node_info(inode_num: ino_t, metadata_node: &ext4_metadata::Node) -> FsNodeInfo {
+    let mode = FileMode::from_bits(metadata_node.mode.into());
+    let owner = FsCred { uid: metadata_node.uid.into(), gid: metadata_node.gid.into() };
+    let mut info = FsNodeInfo::new(inode_num, mode, owner);
+    // Set the information for directory and links. For file, they will be overwritten
+    // by the FsNodeOps on first access.
+    // For now, we just use some made up values. We might need to revisit this.
+    info.size = 1;
+    info.storage_size = 1;
+    info.blksize = 512;
+    info.link_count = 1;
+    info
 }
 
 #[cfg(test)]

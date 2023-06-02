@@ -238,7 +238,7 @@ impl DirEntry {
             }
         } else {
             // An entry was created. Update the ctime and mtime of this directory.
-            self.node.update_ctime_mtime();
+            self.node.update_ctime_mtime()?;
             Ok(entry)
         }
     }
@@ -264,11 +264,11 @@ impl DirEntry {
         ops: impl FsNodeOps,
     ) -> Result<DirEntryHandle, Errno> {
         self.create_entry(current_task, name, ExistsOption::DoNotReturnExisting, || {
-            let node = self.node.fs().create_node(ops, mode, FsCred::root());
-            {
-                let mut info = node.info_write();
+            let node = self.node.fs().create_node(ops, |id| {
+                let mut info = FsNodeInfo::new(id, mode, FsCred::root());
                 info.rdev = dev;
-            }
+                info
+            });
             Ok(node)
         })
     }
@@ -661,7 +661,7 @@ impl DirEntry {
         }
 
         // Renaming a file updates its ctime.
-        renamed.node.update_ctime();
+        renamed.node.update_ctime()?;
 
         Ok(())
     }

@@ -1072,20 +1072,23 @@ impl NamespaceNode {
         ArcKey::ref_cast(&self.entry)
     }
 
-    pub fn update_atime(&self) {
+    pub fn update_atime(&self) -> Result<(), Errno> {
         // Do not update the atime of this node if it is not mounted
         // or is mounted with the NOATIME flag.
         if let Some(mount) = &self.mount {
             if !mount.flags.contains(MountFlags::NOATIME) {
-                let mut info = self.entry.node.info_write();
-                let now = fuchsia_runtime::utc_time();
-                info.time_access = now;
+                self.entry.node.update_info(|info| {
+                    let now = fuchsia_runtime::utc_time();
+                    info.time_access = now;
+                    Ok(())
+                })?;
             }
         }
+        Ok(())
     }
 
     pub fn readlink(&self, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
-        self.update_atime();
+        self.update_atime()?;
         self.entry.node.readlink(current_task)
     }
 }

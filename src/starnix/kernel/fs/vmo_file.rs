@@ -82,62 +82,63 @@ impl FsNodeOps for VmoFileNode {
     }
 
     fn truncate(&self, node: &FsNode, length: u64) -> Result<(), Errno> {
-        let mut info = node.info_write();
-        if info.size == length as usize {
-            // The file size remains unaffected.
-            return Ok(());
-        }
-
-        // We must hold the lock till the end of the operation to guarantee that
-        // there is no change to the seals.
-        let seals = self.seals.as_ref().map(|s| s.lock());
-
-        if let Some(seals) = &seals {
-            if info.size > length as usize {
-                // A decrease in file size must pass the shrink seal check.
-                seals.check_not_present(SealFlags::SHRINK)?;
-            } else {
-                // An increase in file size must pass the grow seal check.
-                seals.check_not_present(SealFlags::GROW)?;
+        node.update_info(|info| {
+            if info.size == length as usize {
+                // The file size remains unaffected.
+                return Ok(());
             }
-        }
 
-        self.vmo.set_size(length).map_err(|status| match status {
-            zx::Status::NO_MEMORY => errno!(ENOMEM),
-            zx::Status::OUT_OF_RANGE => errno!(ENOMEM),
-            _ => impossible_error(status),
-        })?;
-        info.size = length as usize;
-        info.storage_size = self.vmo.get_size().map_err(impossible_error)? as usize;
-        Ok(())
+            // We must hold the lock till the end of the operation to guarantee that
+            // there is no change to the seals.
+            let seals = self.seals.as_ref().map(|s| s.lock());
+
+            if let Some(seals) = &seals {
+                if info.size > length as usize {
+                    // A decrease in file size must pass the shrink seal check.
+                    seals.check_not_present(SealFlags::SHRINK)?;
+                } else {
+                    // An increase in file size must pass the grow seal check.
+                    seals.check_not_present(SealFlags::GROW)?;
+                }
+            }
+
+            self.vmo.set_size(length).map_err(|status| match status {
+                zx::Status::NO_MEMORY => errno!(ENOMEM),
+                zx::Status::OUT_OF_RANGE => errno!(ENOMEM),
+                _ => impossible_error(status),
+            })?;
+            info.size = length as usize;
+            info.storage_size = self.vmo.get_size().map_err(impossible_error)? as usize;
+            Ok(())
+        })
     }
 
     fn allocate(&self, node: &FsNode, offset: u64, length: u64) -> Result<(), Errno> {
-        let new_size = offset + length;
+        node.update_info(|info| {
+            let new_size = offset + length;
+            if info.size >= new_size as usize {
+                // The file size remains unaffected.
+                return Ok(());
+            }
 
-        let mut info = node.info_write();
-        if info.size >= new_size as usize {
-            // The file size remains unaffected.
-            return Ok(());
-        }
+            // We must hold the lock till the end of the operation to guarantee that
+            // there is no change to the seals.
+            let seals = self.seals.as_ref().map(|s| s.lock());
 
-        // We must hold the lock till the end of the operation to guarantee that
-        // there is no change to the seals.
-        let seals = self.seals.as_ref().map(|s| s.lock());
+            if let Some(seals) = &seals {
+                // An increase in file size must pass the grow seal check.
+                seals.check_not_present(SealFlags::GROW)?;
+            }
 
-        if let Some(seals) = &seals {
-            // An increase in file size must pass the grow seal check.
-            seals.check_not_present(SealFlags::GROW)?;
-        }
-
-        self.vmo.set_size(new_size).map_err(|status| match status {
-            zx::Status::NO_MEMORY => errno!(ENOMEM),
-            zx::Status::OUT_OF_RANGE => errno!(ENOMEM),
-            _ => impossible_error(status),
-        })?;
-        info.size = new_size as usize;
-        info.storage_size = self.vmo.get_size().map_err(impossible_error)? as usize;
-        Ok(())
+            self.vmo.set_size(new_size).map_err(|status| match status {
+                zx::Status::NO_MEMORY => errno!(ENOMEM),
+                zx::Status::OUT_OF_RANGE => errno!(ENOMEM),
+                _ => impossible_error(status),
+            })?;
+            info.size = new_size as usize;
+            info.storage_size = self.vmo.get_size().map_err(impossible_error)? as usize;
+            Ok(())
+        })
     }
 }
 
@@ -200,68 +201,69 @@ impl VmoFileObject {
 
         let buf = data.peek_all()?;
 
-        let mut info = file.node().info_write();
-        let mut write_end = offset + want_write;
-        let mut update_content_size = false;
+        file.node().update_info(|info| {
+            let mut write_end = offset + want_write;
+            let mut update_content_size = false;
 
-        // We must hold the lock till the end of the operation to guarantee that
-        // there is no change to the seals.
-        let seals = seals.map(|s| s.lock());
+            // We must hold the lock till the end of the operation to guarantee that
+            // there is no change to the seals.
+            let seals = seals.map(|s| s.lock());
 
-        // Non-zero writes must pass the write seal check.
-        if want_write != 0 {
-            if let Some(seals) = &seals {
-                seals.check_not_present(SealFlags::WRITE | SealFlags::FUTURE_WRITE)?;
+            // Non-zero writes must pass the write seal check.
+            if want_write != 0 {
+                if let Some(seals) = &seals {
+                    seals.check_not_present(SealFlags::WRITE | SealFlags::FUTURE_WRITE)?;
+                }
             }
-        }
 
-        // Writing past the file size
-        if write_end > info.size {
-            if let Some(seals) = &seals {
-                // The grow seal check failed.
-                if let Err(e) = seals.check_not_present(SealFlags::GROW) {
-                    if offset >= info.size {
-                        // Write starts outside the file.
-                        // Forbid because nothing can be written without growing.
-                        return Err(e);
-                    } else if info.size == info.storage_size {
-                        // Write starts inside file and EOF page does not need to grow.
-                        // End write at EOF.
-                        write_end = info.size;
-                        want_write = write_end - offset;
-                    } else {
-                        // Write starts inside file and EOF page needs to grow.
-                        let eof_page_start = info.storage_size - (*PAGE_SIZE as usize);
-
-                        if offset >= eof_page_start {
-                            // Write starts in EOF page.
-                            // Forbid because EOF page cannot grow.
+            // Writing past the file size
+            if write_end > info.size {
+                if let Some(seals) = &seals {
+                    // The grow seal check failed.
+                    if let Err(e) = seals.check_not_present(SealFlags::GROW) {
+                        if offset >= info.size {
+                            // Write starts outside the file.
+                            // Forbid because nothing can be written without growing.
                             return Err(e);
-                        }
+                        } else if info.size == info.storage_size {
+                            // Write starts inside file and EOF page does not need to grow.
+                            // End write at EOF.
+                            write_end = info.size;
+                            want_write = write_end - offset;
+                        } else {
+                            // Write starts inside file and EOF page needs to grow.
+                            let eof_page_start = info.storage_size - (*PAGE_SIZE as usize);
 
-                        // End write at page before EOF.
-                        write_end = eof_page_start;
-                        want_write = write_end - offset;
+                            if offset >= eof_page_start {
+                                // Write starts in EOF page.
+                                // Forbid because EOF page cannot grow.
+                                return Err(e);
+                            }
+
+                            // End write at page before EOF.
+                            write_end = eof_page_start;
+                            want_write = write_end - offset;
+                        }
                     }
                 }
             }
-        }
 
-        if write_end > info.size {
-            if write_end > info.storage_size {
-                let new_size = round_up_to_system_page_size(write_end)?;
-                vmo.set_size(new_size as u64).map_err(|_| errno!(ENOMEM))?;
-                info.storage_size = new_size;
+            if write_end > info.size {
+                if write_end > info.storage_size {
+                    let new_size = round_up_to_system_page_size(write_end)?;
+                    vmo.set_size(new_size as u64).map_err(|_| errno!(ENOMEM))?;
+                    info.storage_size = new_size;
+                }
+                update_content_size = true;
             }
-            update_content_size = true;
-        }
-        vmo.write(&buf[..want_write], offset as u64).map_err(|_| errno!(EIO))?;
+            vmo.write(&buf[..want_write], offset as u64).map_err(|_| errno!(EIO))?;
 
-        if update_content_size {
-            info.size = write_end;
-        }
-        data.advance(want_write)?;
-        Ok(want_write)
+            if update_content_size {
+                info.size = write_end;
+            }
+            data.advance(want_write)?;
+            Ok(want_write)
+        })
     }
 
     pub fn get_vmo(
@@ -355,8 +357,10 @@ pub fn new_memfd(
     flags: OpenFlags,
 ) -> Result<FileHandle, Errno> {
     let fs = anon_fs(current_task.kernel());
-    let node =
-        fs.create_node(VmoFileNode::new(seals)?, mode!(IFREG, 0o600), current_task.as_fscred());
+    let node = fs.create_node(
+        VmoFileNode::new(seals)?,
+        FsNodeInfo::new_factory(mode!(IFREG, 0o600), current_task.as_fscred()),
+    );
 
     let ops = node.open(current_task, flags, false)?;
 

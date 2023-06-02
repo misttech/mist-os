@@ -30,7 +30,10 @@ impl SysFs {
             dir.subdir(b"bpf", 0o755, |_| ());
             dir.node(
                 b"cgroup",
-                fs.create_node(CgroupDirectoryNode::new(), mode!(IFDIR, 0o755), FsCred::root()),
+                fs.create_node(
+                    CgroupDirectoryNode::new(),
+                    FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
+                ),
             );
             dir.subdir(b"fuse", 0o755, |dir| dir.subdir(b"connections", 0o755, |_| ()));
         });
@@ -97,18 +100,15 @@ impl FsNodeOps for SysFsDirectory {
             Some(child_kobject) => match child_kobject.ktype() {
                 KType::Device { .. } => Ok(node.fs().create_node(
                     DeviceDirectory::new(child_kobject),
-                    mode!(IFDIR, 0o755),
-                    FsCred::root(),
+                    FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
                 )),
                 KType::Class if name == b"cpu" => Ok(node.fs().create_node(
                     ClassDirectory::new(),
-                    mode!(IFDIR, 0o755),
-                    FsCred::root(),
+                    FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
                 )),
                 _ => Ok(node.fs().create_node(
                     SysFsDirectory::new(child_kobject),
-                    mode!(IFDIR, 0o755),
-                    FsCred::root(),
+                    FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
                 )),
             },
             None => error!(ENOENT),
@@ -168,13 +168,11 @@ impl FsNodeOps for DeviceDirectory {
                     format!("{}:{}\n", self.device_type()?.major(), self.device_type()?.minor())
                         .into_bytes(),
                 ),
-                mode!(IFREG, 0o444),
-                FsCred::root(),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             )),
             b"uevent" => Ok(node.fs().create_node(
                 UEventFsNode::new(self.kobject.clone()),
-                mode!(IFREG, 0o644),
-                FsCred::root(),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
             )),
             _ => error!(ENOENT),
         }
@@ -214,8 +212,7 @@ impl FsNodeOps for ClassDirectory {
         match name {
             b"online" => Ok(node.fs().create_node(
                 BytesFile::new_node(format!("{}\n", 1).into_bytes()),
-                mode!(IFREG, 0o444),
-                FsCred::root(),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             )),
             _ => error!(ENOENT),
         }

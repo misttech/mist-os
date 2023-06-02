@@ -133,8 +133,7 @@ impl FsNodeOps for FdDirectory {
                 let file = local_task.files.get(fd).map_err(|_| errno!(ENOENT))?;
                 Ok(SymlinkTarget::Node(file.name.clone()))
             }),
-            mode!(IFLNK, 0o777),
-            self.task.as_fscred(),
+            FsNodeInfo::new_factory(mode!(IFLNK, 0o777), self.task.as_fscred()),
         ))
     }
 }
@@ -205,8 +204,7 @@ impl FsNodeOps for NsDirectory {
                 // reference to to correct namespace, and ensures it keeps it alive.
                 Ok(node.fs().create_node(
                     BytesFile::new_node(vec![]),
-                    mode!(IFREG, 0o444),
-                    self.task.as_fscred(),
+                    FsNodeInfo::new_factory(mode!(IFREG, 0o444), self.task.as_fscred()),
                 ))
             } else {
                 error!(ENOENT)
@@ -218,8 +216,7 @@ impl FsNodeOps for NsDirectory {
                     // For now, all namespace have the identifier 1.
                     Ok(SymlinkTarget::Path(format!("{}:[1]", name).as_bytes().to_vec()))
                 }),
-                mode!(IFLNK, 0o7777),
-                self.task.as_fscred(),
+                FsNodeInfo::new_factory(mode!(IFLNK, 0o7777), self.task.as_fscred()),
             ))
         }
     }
@@ -262,8 +259,7 @@ impl FsNodeOps for FdInfoDirectory {
         let data = format!("pos:\t{}flags:\t0{:o}\n", pos, flags.bits()).into_bytes();
         Ok(node.fs().create_node(
             BytesFile::new_node(data),
-            mode!(IFREG, 0o444),
-            self.task.as_fscred(),
+            FsNodeInfo::new_factory(mode!(IFREG, 0o444), self.task.as_fscred()),
         ))
     }
 }

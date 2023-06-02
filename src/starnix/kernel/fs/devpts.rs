@@ -72,8 +72,11 @@ fn init_devpts(kernel: &Kernel, options: FileSystemOptions) -> FileSystemHandle 
         registry.register_chrdev_major(device, TTY_ALT_MAJOR).unwrap();
     }
     let fs = FileSystem::new(kernel, CacheMode::Uncached, DevPtsFs, options);
-    fs.set_root(DevPtsRootDir { state });
-    debug_assert!(fs.root().node.node_id == ROOT_NODE_ID);
+    let mut root = FsNode::new_root_with_properties(DevPtsRootDir { state }, |info| {
+        info.ino = ROOT_NODE_ID;
+    });
+    root.node_id = ROOT_NODE_ID;
+    fs.set_root_node(root);
     fs
 }
 
@@ -136,36 +139,26 @@ impl FsNodeOps for DevPtsRootDir {
     ) -> Result<FsNodeHandle, Errno> {
         let name = std::str::from_utf8(name).map_err(|_| errno!(ENOENT))?;
         if name == "ptmx" {
-            let node = node.fs().create_node_with_id(
-                Box::new(SpecialNode),
-                PTMX_NODE_ID,
-                mode!(IFCHR, 0o666),
-                FsCred::root(),
-            );
-            {
-                let mut info = node.info_write();
-                info.rdev = DeviceType::PTMX;
-                info.blksize = BLOCK_SIZE;
-            }
+            let mut info = FsNodeInfo::new(PTMX_NODE_ID, mode!(IFCHR, 0o666), FsCred::root());
+            info.rdev = DeviceType::PTMX;
+            info.blksize = BLOCK_SIZE;
+            let node = node.fs().create_node_with_id(Box::new(SpecialNode), info.ino, info);
             return Ok(node);
         }
         if let Ok(id) = name.parse::<u32>() {
             let terminal = self.state.terminals.read().get(&id).and_then(Weak::upgrade);
             if let Some(terminal) = terminal {
                 if !terminal.read().is_main_closed() {
-                    let node = node.fs().create_node_with_id(
-                        Box::new(SpecialNode),
+                    let mut info = FsNodeInfo::new(
                         (id as ino_t) + FIRST_PTS_NODE_ID,
                         mode!(IFCHR, 0o620),
                         terminal.fscred.clone(),
                     );
-                    {
-                        let mut info = node.info_write();
-                        info.rdev = get_device_type_for_pts(id);
-                        info.blksize = BLOCK_SIZE;
-                        // TODO(qsr): set gid to the tty group
-                        info.gid = 0;
-                    }
+                    info.rdev = get_device_type_for_pts(id);
+                    info.blksize = BLOCK_SIZE;
+                    // TODO(qsr): set gid to the tty group
+                    info.gid = 0;
+                    let node = node.fs().create_node_with_id(Box::new(SpecialNode), info.ino, info);
                     return Ok(node);
                 }
             }
@@ -674,7 +667,7 @@ mod tests {
         set_controlling_terminal(&task, &ptmx, false).expect("set_controlling_terminal");
         let tty = open_file_with_flags(&task, devfs, b"tty", OpenFlags::RDWR).expect("tty");
         // Check that tty is the main terminal by calling the ioctl TIOCGPTN and checking it is
-        // has the same result has on ptmx.
+        // has the same result as on ptmx.
         assert_eq!(
             ioctl::<i32>(&task, &tty, TIOCGPTN, &0),
             ioctl::<i32>(&task, &ptmx, TIOCGPTN, &0)

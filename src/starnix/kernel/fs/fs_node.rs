@@ -12,7 +12,7 @@ use crate::device::DeviceMode;
 use crate::fs::pipe::Pipe;
 use crate::fs::socket::*;
 use crate::fs::*;
-use crate::lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use crate::lock::{Mutex, RwLock, RwLockReadGuard};
 use crate::signals::*;
 use crate::task::*;
 use crate::types::as_any::AsAny;
@@ -87,6 +87,26 @@ pub struct FsNodeInfo {
 }
 
 impl FsNodeInfo {
+    pub fn new(ino: ino_t, mode: FileMode, owner: FsCred) -> Self {
+        let now = fuchsia_runtime::utc_time();
+        Self {
+            ino,
+            mode,
+            blksize: DEFAULT_BYTES_PER_BLOCK,
+            uid: owner.uid,
+            gid: owner.gid,
+            link_count: if mode.is_dir() { 2 } else { 1 },
+            time_status_change: now,
+            time_access: now,
+            time_modify: now,
+            ..Default::default()
+        }
+    }
+
+    pub fn new_factory(mode: FileMode, owner: FsCred) -> impl FnOnce(ino_t) -> Self {
+        move |ino| Self::new(ino, mode, owner)
+    }
+
     pub fn chmod(&mut self, mode: FileMode) {
         self.mode = (self.mode & !FileMode::PERMISSIONS) | (mode & FileMode::PERMISSIONS);
         self.time_status_change = fuchsia_runtime::utc_time();
@@ -386,8 +406,12 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// override this function.
     ///
     /// Return a reader lock on the updated information.
-    fn update_info<'a>(&self, node: &'a FsNode) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
-        Ok(node.info())
+    fn update_info<'a>(
+        &self,
+        _node: &'a FsNode,
+        info: &'a RwLock<FsNodeInfo>,
+    ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
+        Ok(info.read())
     }
 
     /// Get an extended attribute on the node.
@@ -547,8 +571,26 @@ impl FsNodeOps for SpecialNode {
 }
 
 impl FsNode {
-    pub fn new_root(ops: impl FsNodeOps) -> FsNode {
-        Self::new_internal(Box::new(ops), Weak::new(), 1, mode!(IFDIR, 0o777), FsCred::root())
+    /// Create a new node with default value for the root of a filesystem.
+    ///
+    /// The node identifier and ino will be set by the filesystem on insertion. It will be owned by
+    /// root and have a 777 permission.
+    pub fn new_root(ops: impl FsNodeOps) -> Self {
+        Self::new_root_with_properties(ops, |_| {})
+    }
+
+    /// Create a new node for the root of a filesystem.
+    ///
+    /// The provided callback allows the caller to set the properties of the node.
+    /// The default value will provided a node owned by root, with permission 0777.
+    /// The ino will be 0. If left as is, it will be set by the filesystem on insertion.
+    pub fn new_root_with_properties<F>(ops: impl FsNodeOps, info_updater: F) -> Self
+    where
+        F: FnOnce(&mut FsNodeInfo),
+    {
+        let mut info = FsNodeInfo::new(0, mode!(IFDIR, 0o777), FsCred::root());
+        info_updater(&mut info);
+        Self::new_internal(Box::new(ops), Weak::new(), 0, info)
     }
 
     /// Create a node without inserting it into the FileSystem node cache. This is usually not what
@@ -557,32 +599,18 @@ impl FsNode {
         ops: Box<dyn FsNodeOps>,
         fs: &FileSystemHandle,
         node_id: ino_t,
-        mode: FileMode,
-        owner: FsCred,
+        info: FsNodeInfo,
     ) -> FsNodeHandle {
-        Arc::new(Self::new_internal(ops, Arc::downgrade(fs), node_id, mode, owner))
+        Arc::new(Self::new_internal(ops, Arc::downgrade(fs), node_id, info))
     }
 
     fn new_internal(
         ops: Box<dyn FsNodeOps>,
         fs: Weak<FileSystem>,
         node_id: ino_t,
-        mode: FileMode,
-        owner: FsCred,
+        info: FsNodeInfo,
     ) -> Self {
-        let now = fuchsia_runtime::utc_time();
-        let info = FsNodeInfo {
-            ino: node_id,
-            mode,
-            blksize: DEFAULT_BYTES_PER_BLOCK,
-            uid: owner.uid,
-            gid: owner.gid,
-            link_count: if mode.is_dir() { 2 } else { 1 },
-            time_status_change: now,
-            time_access: now,
-            time_modify: now,
-            ..Default::default()
-        };
+        let fifo = if info.mode.is_fifo() { Some(Pipe::new()) } else { None };
         // The linter will fail in non test mode as it will not see the lock check.
         #[allow(clippy::let_and_return)]
         {
@@ -590,8 +618,8 @@ impl FsNode {
                 ops,
                 fs,
                 node_id,
-                fifo: if mode.is_fifo() { Some(Pipe::new()) } else { None },
-                socket: OnceCell::new(),
+                fifo,
+                socket: Default::default(),
                 info: RwLock::new(info),
                 append_lock: Default::default(),
                 flock_info: Default::default(),
@@ -604,6 +632,14 @@ impl FsNode {
                 let _l3 = result.flock_info.lock();
             }
             result
+        }
+    }
+
+    pub fn set_id(&mut self, node_id: ino_t) {
+        debug_assert!(self.node_id == 0);
+        self.node_id = node_id;
+        if self.info.get_mut().ino == 0 {
+            self.info.get_mut().ino = node_id;
         }
     }
 
@@ -767,7 +803,7 @@ impl FsNode {
         self.check_access(current_task, Access::WRITE)?;
         self.check_sticky_bit(current_task, child)?;
         self.ops().unlink(self, name, child)?;
-        self.update_ctime_mtime();
+        self.update_ctime_mtime()?;
         Ok(())
     }
 
@@ -781,9 +817,9 @@ impl FsNode {
             send_signal(current_task, SignalInfo::default(SIGXFSZ));
             return error!(EFBIG);
         }
-        self.clear_suid_and_sgid_bits(current_task);
+        self.clear_suid_and_sgid_bits(current_task)?;
         self.ops().truncate(self, length)?;
-        self.update_ctime_mtime();
+        self.update_ctime_mtime()?;
         Ok(())
     }
 
@@ -817,9 +853,9 @@ impl FsNode {
             send_signal(current_task, SignalInfo::default(SIGXFSZ));
             return error!(EFBIG);
         }
-        self.clear_suid_and_sgid_bits(current_task);
+        self.clear_suid_and_sgid_bits(current_task)?;
         self.ops().truncate(self, length)?;
-        self.update_ctime_mtime();
+        self.update_ctime_mtime()?;
         Ok(())
     }
 
@@ -827,7 +863,7 @@ impl FsNode {
     /// which will also perform additional verifications.
     pub fn fallocate(&self, offset: u64, length: u64) -> Result<(), Errno> {
         self.ops().allocate(self, offset, length)?;
-        self.update_ctime_mtime();
+        self.update_ctime_mtime()?;
         Ok(())
     }
 
@@ -897,19 +933,20 @@ impl FsNode {
     ///
     /// Does not change the IFMT of the node.
     pub fn chmod(&self, current_task: &CurrentTask, mut mode: FileMode) -> Result<(), Errno> {
-        let mut info = self.info_write();
-        let creds = current_task.creds();
-        if !creds.has_capability(CAP_FOWNER) {
+        self.update_info(|info| {
             let creds = current_task.creds();
-            if info.uid != creds.euid {
-                return error!(EPERM);
+            if !creds.has_capability(CAP_FOWNER) {
+                let creds = current_task.creds();
+                if info.uid != creds.euid {
+                    return error!(EPERM);
+                }
+                if info.gid != creds.egid && !creds.is_in_group(info.gid) {
+                    mode &= !FileMode::ISGID;
+                }
             }
-            if info.gid != creds.egid && !creds.is_in_group(info.gid) {
-                mode &= !FileMode::ISGID;
-            }
-        }
-        info.chmod(mode);
-        Ok(())
+            info.chmod(mode);
+            Ok(())
+        })
     }
 
     /// Sets the owner and/or group on this FsNode.
@@ -919,25 +956,26 @@ impl FsNode {
         owner: Option<uid_t>,
         group: Option<gid_t>,
     ) -> Result<(), Errno> {
-        let mut info = self.info_write();
-        if !current_task.creds().has_capability(CAP_CHOWN) {
-            let creds = current_task.creds();
-            if info.uid != creds.euid {
-                return error!(EPERM);
-            }
-            if let Some(uid) = owner {
-                if info.uid != uid {
+        self.update_info(|info| {
+            if !current_task.creds().has_capability(CAP_CHOWN) {
+                let creds = current_task.creds();
+                if info.uid != creds.euid {
                     return error!(EPERM);
                 }
-            }
-            if let Some(gid) = group {
-                if !creds.is_in_group(gid) {
-                    return error!(EPERM);
+                if let Some(uid) = owner {
+                    if info.uid != uid {
+                        return error!(EPERM);
+                    }
+                }
+                if let Some(gid) = group {
+                    if !creds.is_in_group(gid) {
+                        return error!(EPERM);
+                    }
                 }
             }
-        }
-        info.chown(owner, group);
-        Ok(())
+            info.chown(owner, group);
+            Ok(())
+        })
     }
 
     /// Whether this node is a regular file.
@@ -966,7 +1004,7 @@ impl FsNode {
     }
 
     pub fn stat(&self) -> Result<stat_t, Errno> {
-        let info = self.ops().update_info(self)?;
+        let info = self.ops().update_info(self, &self.info)?;
 
         // The blksize cast is necessary depending on the architecture.
         #[allow(clippy::unnecessary_cast)]
@@ -1001,7 +1039,7 @@ impl FsNode {
 
     pub fn statx(&self, mask: u32) -> Result<statx, Errno> {
         // Ignore mask for now and fill in all of the fields.
-        let info = self.ops().update_info(self)?;
+        let info = self.ops().update_info(self, &self.info)?;
         if mask & STATX__RESERVED == STATX__RESERVED {
             return error!(EINVAL);
         }
@@ -1112,31 +1150,42 @@ impl FsNode {
     pub fn info(&self) -> RwLockReadGuard<'_, FsNodeInfo> {
         self.info.read()
     }
-    pub fn info_write(&self) -> RwLockWriteGuard<'_, FsNodeInfo> {
-        self.info.write()
+    pub fn update_info<F, T>(&self, mutator: F) -> Result<T, Errno>
+    where
+        F: FnOnce(&mut FsNodeInfo) -> Result<T, Errno>,
+    {
+        let mut info = self.info.write();
+        mutator(&mut info)
     }
 
     /// Clear the SUID and SGID bits unless the `current_task` has `CAP_FSETID`
-    pub fn clear_suid_and_sgid_bits(&self, current_task: &CurrentTask) {
+    pub fn clear_suid_and_sgid_bits(&self, current_task: &CurrentTask) -> Result<(), Errno> {
         if !current_task.creds().has_capability(CAP_FSETID) {
-            let mut info = self.info_write();
-            info.clear_suid_and_sgid_bits();
+            self.update_info(|info| {
+                info.clear_suid_and_sgid_bits();
+                Ok(())
+            })?;
         }
+        Ok(())
     }
 
     /// Update the ctime and mtime of a file to now.
-    pub fn update_ctime_mtime(&self) {
-        let mut info = self.info_write();
-        let now = fuchsia_runtime::utc_time();
-        info.time_status_change = now;
-        info.time_modify = now;
+    pub fn update_ctime_mtime(&self) -> Result<(), Errno> {
+        self.update_info(|info| {
+            let now = fuchsia_runtime::utc_time();
+            info.time_status_change = now;
+            info.time_modify = now;
+            Ok(())
+        })
     }
 
     /// Update the ctime of a file to now.
-    pub fn update_ctime(&self) {
-        let mut info = self.info_write();
-        let now = fuchsia_runtime::utc_time();
-        info.time_status_change = now;
+    pub fn update_ctime(&self) -> Result<(), Errno> {
+        self.update_info(|info| {
+            let now = fuchsia_runtime::utc_time();
+            info.time_status_change = now;
+            Ok(())
+        })
     }
 
     /// Update the atime and mtime if the `current_task` has write access, is the file owner, or
@@ -1164,20 +1213,22 @@ impl FsNode {
         }
 
         if !matches!((atime, mtime), (TimeUpdateType::Omit, TimeUpdateType::Omit)) {
-            let mut info = self.info_write();
-            let now = fuchsia_runtime::utc_time();
-            info.time_status_change = now;
-            let get_time = |time: TimeUpdateType| match time {
-                TimeUpdateType::Now => Some(now),
-                TimeUpdateType::Time(t) => Some(t),
-                TimeUpdateType::Omit => None,
-            };
-            if let Some(time) = get_time(atime) {
-                info.time_access = time;
-            }
-            if let Some(time) = get_time(mtime) {
-                info.time_modify = time;
-            }
+            self.update_info(|info| {
+                let now = fuchsia_runtime::utc_time();
+                info.time_status_change = now;
+                let get_time = |time: TimeUpdateType| match time {
+                    TimeUpdateType::Now => Some(now),
+                    TimeUpdateType::Time(t) => Some(t),
+                    TimeUpdateType::Omit => None,
+                };
+                if let Some(time) = get_time(atime) {
+                    info.time_access = time;
+                }
+                if let Some(time) = get_time(mtime) {
+                    info.time_modify = time;
+                }
+                Ok(())
+            })?;
         }
         Ok(())
     }
@@ -1234,8 +1285,7 @@ mod tests {
             .expect("create_node")
             .entry
             .node;
-        {
-            let mut info = node.info_write();
+        node.update_info(|info| {
             info.mode = FileMode::IFSOCK;
             info.size = 1;
             info.storage_size = 8;
@@ -1247,7 +1297,9 @@ mod tests {
             info.time_access = zx::Time::from_nanos(2);
             info.time_modify = zx::Time::from_nanos(3);
             info.rdev = DeviceType::new(13, 13);
-        }
+            Ok(())
+        })
+        .expect("update_info");
         let stat = node.stat().expect("stat");
 
         assert_eq!(stat.st_mode, FileMode::IFSOCK.bits());
@@ -1300,12 +1352,12 @@ mod tests {
             .entry
             .node;
         let check_access = |uid: uid_t, gid: gid_t, perm: u32, access: Access| {
-            {
-                let mut info = node.info_write();
+            node.update_info(|info| {
                 info.mode = mode!(IFREG, perm);
                 info.uid = uid;
                 info.gid = gid;
-            }
+                Ok(())
+            })?;
             node.check_access(&current_task, access)
         };
 

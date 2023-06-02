@@ -50,14 +50,17 @@ impl ImageFile {
     pub fn new_file(current_task: &CurrentTask, info: ImageInfo, vmo: zx::Vmo) -> FileHandle {
         let vmo_size = vmo.get_size().unwrap();
 
-        let file = Anon::new_file(
-            current_task,
+        let file = Anon::new_file_extended(
+            current_task.kernel(),
             Box::new(ImageFile { info, vmo: Arc::new(vmo) }),
             OpenFlags::RDWR,
+            |id| {
+                let mut info =
+                    FsNodeInfo::new(id, FileMode::from_bits(0o600), current_task.as_fscred());
+                info.size = vmo_size as usize;
+                info
+            },
         );
-
-        // Enable seek for file size discovery.
-        file.node().info_write().size = vmo_size as usize;
 
         file
     }

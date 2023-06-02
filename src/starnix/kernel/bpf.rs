@@ -378,11 +378,10 @@ pub struct BpfFs;
 impl BpfFs {
     pub fn new_fs(kernel: &Kernel, options: FileSystemOptions) -> Result<FileSystemHandle, Errno> {
         let fs = FileSystem::new(kernel, CacheMode::Permanent, BpfFs, options);
-        let node = FsNode::new_root(BpfFsDir::new(DEFAULT_BPF_SELINUX_CONTEXT));
-        {
-            let mut info = node.info_write();
-            info.mode |= FileMode::ISVTX;
-        }
+        let node =
+            FsNode::new_root_with_properties(BpfFsDir::new(DEFAULT_BPF_SELINUX_CONTEXT), |info| {
+                info.mode |= FileMode::ISVTX;
+            });
         fs.set_root_node(node);
         Ok(fs)
     }
@@ -452,7 +451,10 @@ impl FsNodeOps for BpfFsDir {
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         let selinux_context = get_selinux_context(name);
-        Ok(node.fs().create_node(BpfFsDir::new(&selinux_context), mode | FileMode::ISVTX, owner))
+        Ok(node.fs().create_node(
+            BpfFsDir::new(&selinux_context),
+            FsNodeInfo::new_factory(mode | FileMode::ISVTX, owner),
+        ))
     }
 
     fn mknod(
