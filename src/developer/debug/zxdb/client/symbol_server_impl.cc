@@ -19,19 +19,34 @@
 #include "rapidjson/istreamwrapper.h"
 #include "rapidjson/writer.h"
 #include "src/developer/debug/shared/message_loop.h"
+#include "src/developer/debug/shared/string_util.h"
 #include "src/developer/debug/zxdb/client/session.h"
 #include "src/developer/debug/zxdb/client/setting_schema_definition.h"
 #include "src/developer/debug/zxdb/common/err_or.h"
 #include "src/developer/debug/zxdb/common/string_util.h"
+#include "src/lib/fxl/strings/string_printf.h"
 
 namespace zxdb {
 
 namespace {
 
-constexpr char kTokenServer[] = "https://www.googleapis.com/oauth2/v4/token";
+constexpr const char* kTokenServer = "https://www.googleapis.com/oauth2/v4/token";
+constexpr const char* kCloudServer = "https://storage.googleapis.com/";
 
 bool DocIsAuthInfo(const rapidjson::Document& document) {
   return !document.HasParseError() && document.IsObject() && document.HasMember("access_token");
+}
+
+std::string ToDebugInfoDFilePath(const std::string& name, DebugSymbolFileType file_type) {
+  std::string ret = "buildid/" + name;
+
+  if (file_type == DebugSymbolFileType::kDebugInfo) {
+    ret += "/debuginfo";
+  } else if (file_type == DebugSymbolFileType::kBinary) {
+    ret += "/executable";
+  }
+
+  return ret;
 }
 
 std::string ToDebugFileName(const std::string& name, DebugSymbolFileType file_type) {
@@ -46,14 +61,14 @@ std::string ToDebugFileName(const std::string& name, DebugSymbolFileType file_ty
 
 SymbolServerImpl::SymbolServerImpl(Session* session, const std::string& url,
                                    bool require_authentication)
-    : SymbolServer(session, url), weak_factory_(this) {
-  if (url.size() >= 6) {
-    // Strip off the protocol identifier.
-    path_ = url.substr(5);
+    : SymbolServer(session, url), base_url_(url), weak_factory_(this) {
+  // gs:// is a shortcut for fuchsia's symbol server buckets.
+  if (debug::StringStartsWith(url, "gs://")) {
+    base_url_ = kCloudServer + url.substr(5);
+  }
 
-    if (path_.back() != '/') {
-      path_ += "/";
-    }
+  if (base_url_.back() != '/') {
+    base_url_ += "/";
   }
 
   if (require_authentication) {
@@ -70,19 +85,22 @@ Err SymbolServerImpl::HandleRequestResult(Curl::Error result, uint64_t response_
   }
 
   if (state() != SymbolServer::State::kReady || previous_ready_count != ready_count_) {
-    return Err("Internal error.");
+    return Err(fxl::StringPrintf("%s: Internal error. (%d)", base_url_.c_str(),
+                                 static_cast<int>(state())));
   }
 
   Err out_err;
   if (result) {
     out_err = Err("Could not contact server: " + result.ToString());
     // Fall through to retry.
+  } else if (response_code == 400) {
+    return Err(ErrType::kUnsupported);
   } else if (response_code == 401) {
-    return Err("Authentication expired.");
+    return Err(base_url_ + ": Authentication expired.");
   } else if (response_code == 404) {
-    return Err(ErrType::kNotFound);
+    return Err(ErrType::kNotFound, base_url_);
   } else {
-    out_err = Err("Unexpected response: " + std::to_string(response_code));
+    out_err = Err("Unexpected response: " + std::to_string(response_code) + "  " + base_url_);
     // Fall through to retry.
   }
 
@@ -170,13 +188,18 @@ fxl::RefPtr<Curl> SymbolServerImpl::PrepareCurl(const std::string& build_id,
     return nullptr;
   }
 
-  std::string url = "https://storage.googleapis.com/";
-  url += path_ + ToDebugFileName(build_id, file_type);
+  std::string full_url = base_url_;
+  if (debug::StringEndsWith(base_url_, "debug/")) {
+    // Still support the the gcs_flat endpoint for fetching symbols.
+    full_url += ToDebugFileName(build_id, file_type);
+  } else {
+    full_url += ToDebugInfoDFilePath(build_id, file_type);
+  }
 
   auto curl = fxl::MakeRefCounted<Curl>();
   FX_DCHECK(curl);
 
-  curl->SetURL(url);
+  curl->SetURL(full_url);
 
   // When require_authentication is true.
   if (!access_token().empty()) {
@@ -208,7 +231,10 @@ void SymbolServerImpl::CheckFetch(const std::string& build_id, DebugSymbolFileTy
     auto code = curl->ResponseCode();
 
     Err err = weak_this->HandleRequestResult(result, code, previous_ready_count);
-    if (err.ok()) {
+    // Some debuginfod servers do not support GETs without body, instead of retrying the check, just
+    // try to actually download the file. If the server really doesn't know about the file, it will
+    // return a 404.
+    if (err.ok() || err.type() == ErrType::kUnsupported) {
       curl->get_body() = true;
       cb(Err(), [weak_this, build_id, file_type, curl](SymbolServer::FetchCallback fcb) {
         if (weak_this)

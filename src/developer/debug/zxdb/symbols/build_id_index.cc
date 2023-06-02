@@ -358,6 +358,20 @@ void BuildIDIndex::LoadSymbolIndexFileJSON(const std::string& file_name) {
         }
       }
     }
+
+    if (document.HasMember("debuginfod") && document["debuginfod"].IsArray()) {
+      for (auto& value : document["debuginfod"].GetArray()) {
+        if (value.IsObject() && value.HasMember("url") && value["url"].IsString() &&
+            strlen(value["url"].GetString())) {
+          bool require_authentication = false;
+          if (value.HasMember("require_authentication") &&
+              value["require_authentication"].IsBool()) {
+            require_authentication = value["require_authentication"].GetBool();
+          }
+          AddSymbolServer(value["url"].GetString(), require_authentication);
+        }
+      }
+    }
   }
 }
 

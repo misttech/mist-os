@@ -747,9 +747,8 @@ void System::AddSymbolServer(std::unique_ptr<SymbolServer> unique_server) {
     }
   });
 
-  if (server->state() == SymbolServer::State::kReady) {
+  if (server->state() == SymbolServer::State::kReady)
     download_manager_.OnSymbolServerBecomesReady(server);
-  }
 }
 
 }  // namespace zxdb
