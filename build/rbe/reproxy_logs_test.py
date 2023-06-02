@@ -26,18 +26,25 @@ class ReproxyLogTests(unittest.TestCase):
 
     def test_construction(self):
         record1 = log_pb2.LogRecord()
-        record1.command.output.output_files.extend(['obj/foo.o'])
+        record1.command.output.output_files.extend(['obj/foo.o', 'obj/foo2.o'])
+        record1.remote_metadata.action_digest = 'ffff0000/13'
         record2 = log_pb2.LogRecord()
         record2.command.output.output_files.extend(['obj/bar.o'])
+        record2.remote_metadata.action_digest = 'bbbbaaaa/9'
         log_dump = log_pb2.LogDump(records=[record1, record2])
         log = reproxy_logs.ReproxyLog(log_dump)
         self.assertEqual(log.proto, log_dump)
         self.assertEqual(
             log.records_by_output_file, {
                 Path('obj/foo.o'): record1,
+                Path('obj/foo2.o'): record1,
                 Path('obj/bar.o'): record2,
             })
-
+        self.assertEqual(
+            log.records_by_action_digest, {
+                'ffff0000/13': record1,
+                'bbbbaaaa/9': record2,
+            })
 
 class SetupLogdirForLogDumpTest(unittest.TestCase):
 

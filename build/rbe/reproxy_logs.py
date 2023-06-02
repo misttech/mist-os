@@ -32,15 +32,29 @@ class ReproxyLog(object):
     def __init__(self, log_dump: log_pb2.LogDump):
         self._proto: log_pb2.LogDump = log_dump
 
+        # Index in a few ways for easy lookup.
         self._records_by_output_file = self._index_records_by_output_file()
+        self._records_by_action_digest = self._index_records_by_action_digest()
 
     def _index_records_by_output_file(self) -> Dict[Path, log_pb2.LogRecord]:
         """Map files to the records of the actions that created them."""
-        records: Dict[Path, log_pb2.LogRecord] = {}
+        records: Dict[Path, log_pb2.LogRecord] = dict()
         for record in self.proto.records:
             for output_file in record.command.output.output_files:
                 records[Path(output_file)] = record
         return records
+
+    def _index_records_by_action_digest(self) -> Dict[str, log_pb2.LogRecord]:
+        """Map action records by their action digest (hash/size)."""
+        return {
+            record.remote_metadata.action_digest: record
+            for record in self.proto.records
+            # Not all actions have remote_metadata, due to local/racing.
+            # If there happens to be duplicates (due to retries),
+            # just keep the last one.
+            if record.HasField('remote_metadata') and
+            record.remote_metadata.action_digest
+        }
 
     @property
     def proto(self) -> log_pb2.LogDump:
@@ -49,6 +63,10 @@ class ReproxyLog(object):
     @property
     def records_by_output_file(self) -> Dict[Path, log_pb2.LogRecord]:
         return self._records_by_output_file
+
+    @property
+    def records_by_action_digest(self) -> Dict[str, log_pb2.LogRecord]:
+        return self._records_by_action_digest
 
 
 def setup_logdir_for_logdump(path: Path, verbose: bool = False) -> Path:

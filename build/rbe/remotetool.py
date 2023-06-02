@@ -149,12 +149,10 @@ def parse_show_action_output(lines: Iterable[str]) -> ShowActionResult:
     preamble, remainder = _must_partition_sequence(stripped_lines, 'Command')
     command_section, remainder = _must_partition_sequence(remainder, 'Platform')
     platform_section, remainder = _must_partition_sequence(remainder, 'Inputs')
-    inputs_section, remainder = _must_partition_sequence(
-        remainder, 'Action Result')
-    result_section, remainder = _must_partition_sequence(
-        remainder, 'Output Files')
-    output_files_section, remainder = _must_partition_sequence(
-        remainder, 'Output Files From Directories')
+
+    # Could see 'Action Result' or 'No action result in cache.'.
+    inputs_section, result_sep, remainder = cl_utils.partition_sequence(remainder, 'Action Result')
+
     # command_section has:
     # [0] '======='
     # [1] 'Command Digest: ...'
@@ -186,16 +184,24 @@ def parse_show_action_output(lines: Iterable[str]) -> ShowActionResult:
 
     # result_section:
     # (not used)
+    # This could also be absent with: 'No action result in cache.'
 
-    # output_files_section has:
-    # [0] '======='
-    # [1:] <path>: [File digest: <digest>]
-    # [-1] <blank line>
-    # Output file paths are relative to the working_dir (not exec_root).
-    output_files = {
-        k: v for k, v in (
-            _parse_output_digest(line) for line in output_files_section[1:-1])
-    }
+    output_files = dict()
+    if result_sep:
+        result_section, remainder = _must_partition_sequence(
+            remainder, 'Output Files')
+        output_files_section, remainder = _must_partition_sequence(
+            remainder, 'Output Files From Directories')
+
+        # output_files_section has:
+        # [0] '======='
+        # [1:] <path>: [File digest: <digest>]
+        # [-1] <blank line>
+        # Output file paths are relative to the working_dir (not exec_root).
+        output_files = {
+            k: v for k, v in (
+                _parse_output_digest(line) for line in output_files_section[1:-1])
+        }
 
     return ShowActionResult(
         command=command,
