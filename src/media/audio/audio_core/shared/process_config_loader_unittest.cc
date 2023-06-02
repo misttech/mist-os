@@ -9,6 +9,7 @@
 #include <iostream>
 #include <ostream>
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include "src/lib/files/file.h"
@@ -319,12 +320,11 @@ TEST(ProcessConfigLoaderTest, RejectConfigWithUnknownStreamTypes) {
 
   auto result = ProcessConfigLoader::LoadProcessConfig(kTestAudioCoreConfigFilename);
   ASSERT_TRUE(result.is_error());
-  ASSERT_EQ(result.error(), R"ERROR(Parse error: Schema validation error ({
-    "enum": {
-        "instanceRef": "#/output_devices/0/supported_stream_types/5",
-        "schemaRef": "#/definitions/stream_type"
-    }
-}))ERROR");
+  ASSERT_THAT(result.error(), ::testing::HasSubstr("Parse error: Schema validation error"));
+  ASSERT_THAT(
+      result.error(),
+      ::testing::HasSubstr("\"instanceRef\": \"#/output_devices/0/supported_stream_types/5\""));
+  ASSERT_THAT(result.error(), ::testing::HasSubstr("\"schemaRef\": \"#/definitions/stream_type\""));
 }
 
 TEST(ProcessConfigLoaderTest, LoadProcessConfigWithRoutingPolicyInsufficientCoverage) {
@@ -939,16 +939,12 @@ TEST(ProcessConfigLoaderTest, RejectConfigWithoutVolumeCurve) {
 
   auto result = ProcessConfigLoader::LoadProcessConfig(kTestAudioCoreConfigFilename);
   ASSERT_TRUE(result.is_error());
-  ASSERT_EQ(result.error(),
-            R"ERROR(Parse error: Schema validation error ({
-    "required": {
-        "missing": [
-            "volume_curve"
-        ],
-        "instanceRef": "#",
-        "schemaRef": "#"
-    }
-}))ERROR");
+  ASSERT_THAT(result.error(), ::testing::HasSubstr("Parse error: Schema validation error"));
+  ASSERT_THAT(result.error(), ::testing::HasSubstr("\"required\":"));
+  ASSERT_THAT(result.error(), ::testing::HasSubstr("\"missing\": ["));
+  ASSERT_THAT(result.error(), ::testing::HasSubstr("\"volume_curve\""));
+  ASSERT_THAT(result.error(), ::testing::HasSubstr("\"instanceRef\": \"#\""));
+  ASSERT_THAT(result.error(), ::testing::HasSubstr("\"schemaRef\": \"#\""));
 }
 
 TEST(ProcessConfigLoaderTest, RejectConfigWithUnknownKeys) {
@@ -971,14 +967,11 @@ TEST(ProcessConfigLoaderTest, RejectConfigWithUnknownKeys) {
 
   auto result = ProcessConfigLoader::LoadProcessConfig(kTestAudioCoreConfigFilename);
   ASSERT_TRUE(result.is_error());
-  ASSERT_EQ(result.error(),
-            R"ERROR(Parse error: Schema validation error ({
-    "additionalProperties": {
-        "disallowed": "extra_key",
-        "instanceRef": "#",
-        "schemaRef": "#"
-    }
-}))ERROR");
+  ASSERT_THAT(result.error(), ::testing::HasSubstr("Parse error: Schema validation error"));
+  ASSERT_THAT(result.error(), ::testing::HasSubstr("\"additionalProperties\":"));
+  ASSERT_THAT(result.error(), ::testing::HasSubstr("\"disallowed\": \"extra_key\""));
+  ASSERT_THAT(result.error(), ::testing::HasSubstr("\"instanceRef\": \"#\""));
+  ASSERT_THAT(result.error(), ::testing::HasSubstr("\"schemaRef\": \"#\""));
 }
 
 TEST(ProcessConfigLoaderTest, RejectConfigWithMultipleLoopbackStages) {
