@@ -67,22 +67,12 @@ impl UserMemoryCursor {
     }
 }
 
-#[derive(Debug, Default)]
-struct ContextManagerAndQueue {
-    /// The "name server" process that is addressed via the special handle 0 and is responsible
-    /// for implementing the binder protocol `IServiceManager`.
-    context_manager: Option<Arc<BinderObject>>,
-
-    /// Notification allowing remote binder process to wait for a service manager to be registered.
-    wait_queue: WaitQueue,
-}
-
 /// Android's binder kernel driver implementation.
 #[derive(Derivative, Debug)]
 #[derivative(Default)]
 pub struct BinderDriver {
-    /// The context manager and the associate wait queue.
-    context_manager_and_queue: Mutex<ContextManagerAndQueue>,
+    /// The context manager, the object represented by the zero handle.
+    context_manager: Mutex<Option<Arc<BinderObject>>>,
 
     /// Manages the internal state of each process interacting with the binder driver.
     ///
@@ -2479,7 +2469,7 @@ impl BinderDriver {
         let driver = Arc::new(Self::default());
         #[cfg(any(test, debug_assertions))]
         {
-            let _l1 = driver.context_manager_and_queue.lock();
+            let _l1 = driver.context_manager.lock();
             let _l2 = driver.procs.read();
         }
         driver
@@ -2563,27 +2553,25 @@ impl BinderDriver {
     fn get_context_manager(
         &self,
         current_task: &CurrentTask,
-        binder_proc: &Arc<BinderProcess>,
     ) -> Result<(Arc<BinderObject>, Arc<BinderProcess>), Errno> {
-        let context_manager = loop {
-            let state = self.context_manager_and_queue.lock();
-            if let Some(context_manager) = state.context_manager.as_ref().cloned() {
-                break context_manager;
+        let mut context_manager = self.context_manager.lock();
+        if let Some(context_manager_object) = context_manager.as_ref().cloned() {
+            match context_manager_object.owner.upgrade() {
+                Some(owner) => {
+                    return Ok((context_manager_object, owner));
+                }
+                None => {
+                    *context_manager = None;
+                }
             }
-            let waiter = Waiter::new();
-            state.wait_queue.wait_async(&waiter);
-            std::mem::drop(state);
+        }
 
-            // Ensure the file descriptor has not been closed, after registering for the waiters
-            // but before waiting.
-            if binder_proc.lock().closed {
-                return error!(EBADF);
-            }
-
-            waiter.wait(current_task)?;
-        };
-        let proc = context_manager.owner.upgrade().ok_or_else(|| errno!(ENOENT))?;
-        Ok((context_manager, proc))
+        log_trace!(
+            "Task {} tried to get context manager but one is not registered or dead. \
+            Avoid the race condition by waiting until the context manager is ready.",
+            current_task.task.id
+        );
+        error!(ENOENT)
     }
 
     fn ioctl(
@@ -2629,10 +2617,8 @@ impl BinderDriver {
 
                 log_trace!("binder setting context manager with flags {:x}", flags);
 
-                let mut state = self.context_manager_and_queue.lock();
-                state.context_manager =
+                *self.context_manager.lock() =
                     Some(BinderObject::new_context_manager_marker(binder_proc, flags));
-                state.wait_queue.notify_all();
                 Ok(SUCCESS)
             }
             uapi::BINDER_WRITE_READ => {
@@ -2870,7 +2856,7 @@ impl BinderDriver {
         let handle = unsafe { data.transaction_data.target.handle }.into();
 
         let (object, target_proc) = match handle {
-            Handle::SpecialServiceManager => self.get_context_manager(current_task, binder_proc)?,
+            Handle::SpecialServiceManager => self.get_context_manager(current_task)?,
             Handle::Object { index } => {
                 let object =
                     binder_proc.lock().handles.get(index).ok_or(TransactionError::Failure)?;
@@ -3961,10 +3947,9 @@ pub mod tests {
         let (_kernel, current_task) = create_kernel_and_task();
         let context_manager_proc = driver.create_local_process(1);
         let context_manager = BinderObject::new_context_manager_marker(&context_manager_proc, 0);
-        driver.context_manager_and_queue.lock().context_manager = Some(context_manager.clone());
-        let (object, owner) = driver
-            .get_context_manager(&current_task, &context_manager_proc)
-            .expect("failed to find handle 0");
+        *driver.context_manager.lock() = Some(context_manager.clone());
+        let (object, owner) =
+            driver.get_context_manager(&current_task).expect("failed to find handle 0");
         assert!(Arc::ptr_eq(&context_manager_proc, &owner));
         assert!(Arc::ptr_eq(&context_manager, &object));
     }
