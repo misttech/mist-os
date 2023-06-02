@@ -28,7 +28,7 @@ ffx_action("run_product_size_checker") {
     "$target_out_dir/visualization/d3_v3/d3.js",
   ]
   testonly = true
-  ffx_tool = "//src/developer/ffx/plugins/assembly:ffx_assembly_tool_versioned"
+  ffx_tool = "//src/developer/ffx/plugins/assembly:ffx_assembly_tool"
   ffx_tool_output_name = "ffx-assembly"
   args = [
     "--config",
@@ -187,8 +187,7 @@ if (blobfs_capacity != false && max_blob_contents_size != false &&
       "$target_out_dir/verbose_output_blobfs.json",
     ]
     testonly = true
-    ffx_tool =
-        "//src/developer/ffx/plugins/assembly:ffx_assembly_tool_versioned"
+    ffx_tool = "//src/developer/ffx/plugins/assembly:ffx_assembly_tool"
     ffx_tool_output_name = "ffx-assembly"
     args = [
       "--config",
@@ -248,8 +247,7 @@ if (blobfs_capacity != false && max_blob_contents_size != false &&
       "$target_out_dir/verbose_output_non_blobfs.json",
     ]
     testonly = true
-    ffx_tool =
-        "//src/developer/ffx/plugins/assembly:ffx_assembly_tool_versioned"
+    ffx_tool = "//src/developer/ffx/plugins/assembly:ffx_assembly_tool"
     ffx_tool_output_name = "ffx-assembly"
     args = [
       "--config",

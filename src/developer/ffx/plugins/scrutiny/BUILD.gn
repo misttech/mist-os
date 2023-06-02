@@ -28,7 +28,7 @@ ffx_plugin("ffx_scrutiny") {
 # you need to tell it to use the versioned executable target as follows:
 #
 #   ffx_tool =
-#       "//src/developer/ffx/plugins/scrutiny:ffx_scrutiny_tool_versioned"
+#       "//src/developer/ffx/plugins/scrutiny:ffx_scrutiny_tool"
 #   ffx_tool_output_name = "ffx-scrutiny"
 ffx_tool("ffx_scrutiny_tool") {
   edition = "2021"

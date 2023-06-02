@@ -117,8 +117,7 @@ template("update_package") {
     hermetic_inputs_target = ":${labels.hermetic_inputs}"
     hermetic_inputs_file = files.hermetic_inputs
 
-    ffx_tool =
-        "//src/developer/ffx/plugins/assembly:ffx_assembly_tool_versioned"
+    ffx_tool = "//src/developer/ffx/plugins/assembly:ffx_assembly_tool"
     ffx_tool_output_name = "ffx-assembly"
 
     args = [

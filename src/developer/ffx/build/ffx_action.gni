@@ -52,6 +52,22 @@ sdk_host_tools_manifest = get_label_info(sdk_host_tools_label, "root_out_dir") +
 #       For eg. `ffx-product`.
 #       See compiled_action()'s tool_output_name argument.
 #
+#   use_versioned_binary (optional; default='false')
+#       If true, the version-stamped binary is used (either `ffx` or the subtool
+#       specified with 'ffx_tool_output_name'), and '_versioned' is appended to
+#       the GN label provided in 'ffx_tool'.  When false, the
+#       '${ffx_tool_output_name}_unversioned' binary will be used, and the GN
+#       GN label for 'ffx_tool' is used without modification.
+#
+#       NOTE: The opposite is true when using the main ffx binary, both its
+#       target and binary are suffixed with "_unversioned" when this is false,
+#       and nothing is added when true.
+#
+#       NOTE:  Most build actions should not be sensitive the version-stamp
+#       within the ffx binaries, and should rely on the non-stamped binaries to
+#       reduce incremental build churn caused by the integration commit date
+#       being stamped into the tools.
+#
 #   args (all optional)
 #   depfile
 #   deps
@@ -71,7 +87,7 @@ sdk_host_tools_manifest = get_label_info(sdk_host_tools_label, "root_out_dir") +
 #     # The tool takes this input.
 #     inputs = [ "my_input_file" ]
 #
-#     ffx_tool = "//src/developer/ffx/tools/echo:ffx_echo_versioned"
+#     ffx_tool = "//src/developer/ffx/tools/echo:ffx_echo"
 #     ffx_tool_output_name = "ffx-echo"
 #
 #     # In this case, the plugin takes as arguments the input file and the output
@@ -95,6 +111,21 @@ template("ffx_action") {
          "ffx_tool must be specified for $target_name")
   assert(defined(invoker.ffx_tool_output_name),
          "ffx_tool_output_name must be specified for $target_name")
+
+  # use the versioned version of the binary (and dep on the versioned target),
+  # instead of the unversioned binary.  Most build actions do not depend on
+  # the version-stamped binaries.
+  _use_versioned_binary =
+      defined(invoker.use_versioned_binary) && invoker.use_versioned_binary
+
+  assert(
+      string_replace(invoker.ffx_tool, "_versioned", "") == invoker.ffx_tool,
+      "This template will automatically append '_versioned' to the 'ffx_tool' label when 'use_versioned_binary' is true, use the base label without the '_versioned' suffix.")
+
+  assert(
+      string_replace(invoker.ffx_tool_output_name, "_unversioned", "") ==
+          invoker.ffx_tool_output_name,
+      "This template will automatically append '_unversioned' to the 'ffx_tool_output_name' label when 'use_versioned_binary' is false, use base name for the tool.")
 
   # Only generate our own hermetic inputs file if a depfile is not specified
   # OR hermetic_deps is not turned off.
@@ -228,17 +259,19 @@ template("ffx_action") {
       hermetic_inputs_file = hermetic_inputs_path
     }
 
-    if (defined(invoker.ffx_tool)) {
-      tool = invoker.ffx_tool
-      if (defined(invoker.ffx_tool_output_name)) {
-        tool_output_name = invoker.ffx_tool_output_name
-      }
-    } else {
-      tool = "//src/developer/ffx:ffx_bin"
-      tool_output_name = "ffx"
-      assert(
-          !defined(invoker.ffx_tool_output_name),
-          "Can only specify a custom output name if not using the default ffx binary.")
+    tool = invoker.ffx_tool
+    if (_use_versioned_binary) {
+      # ffx_tool defines a separate "${target_name}_versioned" target, with
+      # the unversioned binary at the base "target_name"
+      tool += "_versioned"
+    }
+
+    tool_output_name = invoker.ffx_tool_output_name
+
+    if (!_use_versioned_binary) {
+      # ffx_tool creates the unversioned binary with the suffix
+      # "_unversioned", this is the opposite of the target that is defined.
+      tool_output_name += "_unversioned"
     }
   }
 }

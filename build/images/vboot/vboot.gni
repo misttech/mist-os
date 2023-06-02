@@ -151,7 +151,7 @@ template("esp") {
                              "visibility",
                            ])
 
-    ffx_tool = "//src/developer/ffx/plugins/efi:ffx_efi_tool_versioned"
+    ffx_tool = "//src/developer/ffx/plugins/efi:ffx_efi_tool"
     ffx_tool_output_name = "ffx-efi"
 
     outputs = [ output_file ]

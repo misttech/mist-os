@@ -101,8 +101,15 @@ template("ffx_tool") {
 
   # Create the metadata file for in-tree discovery
   ffx_action(target_metadata) {
+    # Use the unversion-stamped binary to generate the metadata file.  The
+    # ffx_action() template will convert these names to the correct ones by
+    # adding the '_unversioned' suffix to the 'output_name'.
+    #
+    # This is the default, but it's set here for extra clarity.
+    use_versioned_binary = false
     ffx_tool = ":$target_unversioned"
-    ffx_tool_output_name = output_unversioned
+    ffx_tool_output_name = output_versioned  # without _unversioned suffix
+
     needs_sdk = false
     inputs = []
     outputs = [ "$root_out_dir/$output_metadata" ]

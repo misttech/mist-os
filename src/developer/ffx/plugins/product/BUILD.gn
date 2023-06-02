@@ -26,7 +26,7 @@ ffx_plugin("ffx_product") {
 # you need to tell it to use the versioned executable target as follows:
 #
 #   ffx_tool =
-#       "//src/developer/ffx/plugins/product:ffx_product_tool_versioned"
+#       "//src/developer/ffx/plugins/product:ffx_product_tool"
 #   ffx_tool_output_name = "ffx-product"
 ffx_tool("ffx_product_tool") {
   edition = "2021"
