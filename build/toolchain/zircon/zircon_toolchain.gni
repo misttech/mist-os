@@ -25,10 +25,6 @@ _buildidtool =
 #
 #  - clang_toolchain() does not support GCC builds.
 #
-#  - The 'alink' command differs slightly between the build systems:
-#      GN: .../llvm-ar ${arflags} rcsD ${out} @"${out}.rsp"
-#      ZN: .../llvm-ar ${arflags} cqsD ${out} '@${out}.rsp'
-#
 #  - The response file paths slightly differ:
 #      GN: ${output_dir}/${target_output_name}${output_extension}.rsp
 #      ZN: ${output_dir}/${target_output_name}.rsp
@@ -575,7 +571,7 @@ template("zircon_toolchain") {
       description = "AR {{output}}"
       rspfile = "{{output}}.rsp"
       command =
-          "rm -f {{output}} && $ar {{arflags}} cqsD {{output}} '@$rspfile'"
+          "rm -f {{output}} && $ar {{arflags}} rcsD {{output}} \"@$rspfile\""
       rspfile_content = "{{inputs}}"
       default_output_dir = "{{target_out_dir}}"
       default_output_extension = ".a"
