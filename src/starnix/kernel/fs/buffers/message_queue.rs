@@ -281,12 +281,14 @@ impl MessageQueue {
     /// Writes a message to the front of the message queue.
     pub fn write_front(&mut self, message: Message) {
         self.length += message.len();
+        debug_assert!(self.length <= self.capacity);
         self.messages.push_front(message);
     }
 
     /// Writes a message to the back of the message queue.
     pub fn write_message(&mut self, message: Message) {
         self.length += message.len();
+        debug_assert!(self.length <= self.capacity);
         self.messages.push_back(message);
     }
 
