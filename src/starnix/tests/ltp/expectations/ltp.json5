@@ -830,6 +830,9 @@
                 // TODO(fxbug.dev/128184) Re-enable once flake is resolved.
                 "*/ltp_linkat01.cm",
 
+                // TODO(fxbug.dev/128408) Re-enable once flake is resolved.
+                "*/ltp_mmap11.cm",
+
                 // Times out because getrusage is not implemented yet.
                 "*/ltp_getrusage04.cm",
 
