@@ -827,6 +827,9 @@
                 // TODO(fxbug.dev/127726) Re-enable once flake is resolved.
                 "*/ltp_waitid08.cm",
 
+                // TODO(fxbug.dev/128426) Re-enable once flake is resolved.
+                "*/ltp_poll02.cm",
+
                 // TODO(fxbug.dev/128184) Re-enable once flake is resolved.
                 "*/ltp_linkat01.cm",
 
