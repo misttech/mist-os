@@ -40,11 +40,13 @@ source_set("portable_ui_test") {
   ]
 
   public_deps = [
+    ":screenshot_helper",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_hlcpp",
     "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_hlcpp",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
     "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_hlcpp",
     "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_hlcpp",

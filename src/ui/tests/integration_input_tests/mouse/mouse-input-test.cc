@@ -171,17 +171,6 @@ class MouseInputBase : public ui_testing::PortableUITest {
 
     // Register fake mouse device.
     RegisterMouse();
-
-    // Get the display dimensions.
-    FX_LOGS(INFO) << "Waiting for scenic display info";
-    auto scenic = realm_root()->component().Connect<fuchsia::ui::scenic::Scenic>();
-    scenic->GetDisplayInfo([this](fuchsia::ui::gfx::DisplayInfo display_info) {
-      display_width_ = display_info.width_in_px;
-      display_height_ = display_info.height_in_px;
-      FX_LOGS(INFO) << "Got display_width = " << display_width_
-                    << " and display_height = " << display_height_;
-    });
-    RunLoopUntil([this] { return display_width_ != 0 && display_height_ != 0; });
   }
 
   void TearDown() override {
@@ -250,11 +239,6 @@ class MouseInputBase : public ui_testing::PortableUITest {
       return std::make_unique<MouseInputListenerServer>(d, s);
     });
 
-    // Expose scenic to the test fixture.
-    realm_builder().AddRoute({.capabilities = {Protocol{fuchsia::ui::scenic::Scenic::Name_}},
-                              .source = kTestUIStackRef,
-                              .targets = {ParentRef()}});
-
     for (const auto& [name, component] : GetTestComponents()) {
       realm_builder().AddChild(name, component);
     }
@@ -264,10 +248,6 @@ class MouseInputBase : public ui_testing::PortableUITest {
       realm_builder().AddRoute(route);
     }
   }
-
-  // Guaranteed to be initialized after SetUp().
-  uint32_t display_width() const { return display_width_; }
-  uint32_t display_height() const { return display_height_; }
 
   std::shared_ptr<MouseInputState> mouse_state_;
 
@@ -280,10 +260,6 @@ class MouseInputBase : public ui_testing::PortableUITest {
 
   static constexpr auto kFontsProvider = "fonts_provider";
   static constexpr auto kFontsProviderUrl = "#meta/font_provider_hermetic_for_test.cm";
-
- private:
-  uint32_t display_width_ = 0;
-  uint32_t display_height_ = 0;
 };
 
 class ChromiumInputTest : public MouseInputBase {

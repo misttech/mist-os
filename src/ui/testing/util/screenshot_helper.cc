@@ -70,6 +70,20 @@ std::map<Pixel, uint32_t> Screenshot::Histogram() const {
   return histogram;
 }
 
+float Screenshot::ComputeSimilarity(const Screenshot& other) const {
+  if (width() != other.width() || height() != other.height())
+    return 0;
+
+  uint64_t num_matching_pixels = 0;
+  for (uint64_t x = 0; x < width(); ++x) {
+    for (uint64_t y = 0; y < height(); ++y) {
+      if (GetPixelAt(x, y) == other.GetPixelAt(x, y))
+        ++num_matching_pixels;
+    }
+  }
+  return 100.f * static_cast<float>(num_matching_pixels) / static_cast<float>((width() * height()));
+}
+
 void Screenshot::ExtractScreenshotFromVMO(uint8_t* screenshot_vmo) {
   FX_CHECK(screenshot_vmo);
 

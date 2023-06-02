@@ -40,6 +40,9 @@ bool CheckViewExistsInSnapshot(const fuchsia::ui::observation::geometry::ViewTre
   return snapshot_count > 0;
 }
 
+// Timeout for taking a screenshot.
+constexpr zx::duration kScreenshotTimeout = zx::sec(10);
+
 }  // namespace
 
 void PortableUITest::SetUpRealmBase() {
@@ -61,7 +64,8 @@ void PortableUITest::SetUpRealmBase() {
 
   // Route UI capabilities from test-ui-stack to test driver.
   realm_builder_.AddRoute(
-      Route{.capabilities = {Protocol{fuchsia::ui::display::singleton::Info::Name_},
+      Route{.capabilities = {Protocol{fuchsia::ui::composition::Screenshot::Name_},
+                             Protocol{fuchsia::ui::display::singleton::Info::Name_},
                              Protocol{fuchsia::ui::test::input::Registry::Name_},
                              Protocol{fuchsia::ui::test::scene::Controller::Name_}},
             .source = kTestUIStackRef,
@@ -189,6 +193,50 @@ void PortableUITest::LaunchClientWithEmbeddedView() {
   });
 
   FX_LOGS(INFO) << "Embedded view has rendered";
+}
+
+Screenshot PortableUITest::TakeScreenshot() {
+  if (!screenshotter_.has_value()) {
+    screenshotter_ = realm_root()->component().Connect<fuchsia::ui::composition::Screenshot>();
+  }
+  FX_LOGS(INFO) << "Taking screenshot... ";
+
+  fuchsia::ui::composition::ScreenshotTakeRequest request;
+  request.set_format(fuchsia::ui::composition::ScreenshotFormat::BGRA_RAW);
+
+  std::optional<fuchsia::ui::composition::ScreenshotTakeResponse> response;
+  screenshotter_.value()->Take(std::move(request), [this, &response](auto screenshot) {
+    response = std::move(screenshot);
+    QuitLoop();
+  });
+
+  FX_LOGS(INFO) << "Screenshot captured.";
+
+  EXPECT_FALSE(RunLoopWithTimeout(kScreenshotTimeout)) << "Timed out waiting for screenshot.";
+
+  return ui_testing::Screenshot(response->vmo(), display_size().width, display_size().height,
+                                display_rotation());
+}
+
+bool PortableUITest::TakeScreenshotUntil(
+    fit::function<bool(const ui_testing::Screenshot&)> screenshot_predicate,
+    zx::duration predicate_timeout, zx::duration step) {
+  return RunLoopWithTimeoutOrUntil(
+      [this, &screenshot_predicate] { return screenshot_predicate(TakeScreenshot()); },
+      predicate_timeout, step);
+}
+
+fuchsia::math::SizeU PortableUITest::display_size() {
+  if (display_size_)
+    return display_size_.value();
+
+  fuchsia::ui::display::singleton::InfoPtr display_info =
+      realm_root()->component().Connect<fuchsia::ui::display::singleton::Info>();
+  fuchsia::math::SizeU size;
+  display_info->GetMetrics([&size](auto info) { size = info.extent_in_px(); });
+  RunLoopUntil([&size] { return size.width > 0 && size.height > 0; });
+  display_size_ = size;
+  return size;
 }
 
 void PortableUITest::RegisterTouchScreen() {

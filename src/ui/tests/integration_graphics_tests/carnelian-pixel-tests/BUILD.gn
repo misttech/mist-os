@@ -20,7 +20,6 @@ executable("carnelian_pixel_test_bin") {
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_hlcpp",
     "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_hlcpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
-    "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
     "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_hlcpp",
     "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",

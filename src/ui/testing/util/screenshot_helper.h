@@ -67,7 +67,7 @@ class Screenshot {
 
   // Params:-
   // |screenshot_vmo| - The VMO returned by |fuchsia.ui.composition.Screenshot.Take| representing
-  //                    the screenshot data.
+  //                    the screenshot data in BGRA.
   // |width|, |height| - Width and height of the physical display in pixels as
   //                     returned by |fuchsia.ui.display.singleton.Info|.
   // |rotation| - The display rotation value in degrees. The width and the height of the screenshot
@@ -94,6 +94,10 @@ class Screenshot {
 
   // Counts the frequencies of each color in a screenshot.
   std::map<Pixel, uint32_t> Histogram() const;
+
+  // Returns percentage of pixels that match by comparing two screenshots. Returns 0 if the sizes of
+  // the screenshots do not match.
+  float ComputeSimilarity(const Screenshot& other) const;
 
   // Returns a 2D vector of size |height_ * width_|. Each value in the vector corresponds to a pixel
   // in the screenshot.

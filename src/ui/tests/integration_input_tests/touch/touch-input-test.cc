@@ -427,17 +427,6 @@ class TouchInputBase : public ui_testing::PortableUITest,
         [] { FX_LOGS(FATAL) << "\n\n>> Test did not complete in time, terminating.  <<\n\n"; },
         kTimeout);
 
-    // Get the display dimensions.
-    FX_LOGS(INFO) << "Waiting for scenic display info";
-    scenic_ = realm_root()->component().template Connect<fuchsia::ui::scenic::Scenic>();
-    scenic_->GetDisplayInfo([this](fuchsia::ui::gfx::DisplayInfo display_info) {
-      display_width_ = display_info.width_in_px;
-      display_height_ = display_info.height_in_px;
-      FX_LOGS(INFO) << "Got display_width = " << display_width_
-                    << " and display_height = " << display_height_;
-    });
-    RunLoopUntil([this] { return display_width_ != 0 && display_height_ != 0; });
-
     // Register input injection device.
     FX_LOGS(INFO) << "Registering input injection device";
     RegisterTouchScreen();
@@ -506,11 +495,11 @@ class TouchInputBase : public ui_testing::PortableUITest,
     switch (tap_location) {
       case TapLocation::kTopLeft:
         // center of top right quadrant -> ends up as center of top left quadrant
-        InjectTap(/* x = */ 3 * display_width_ / 4, /* y = */ display_height_ / 4);
+        InjectTap(/* x = */ 3 * display_size().width / 4, /* y = */ display_size().height / 4);
         break;
       case TapLocation::kTopRight:
         // center of bottom right quadrant -> ends up as center of top right quadrant
-        InjectTap(/* x = */ 3 * display_width_ / 4, /* y = */ 3 * display_height_ / 4);
+        InjectTap(/* x = */ 3 * display_size().width / 4, /* y = */ 3 * display_size().height / 4);
         break;
       default:
         FX_NOTREACHED();
@@ -554,9 +543,8 @@ class TouchInputBase : public ui_testing::PortableUITest,
                 /* move_event_count = */ kMoveEventCount);
   }
 
-  // Guaranteed to be initialized after SetUp().
-  uint32_t display_width() const { return display_width_; }
-  uint32_t display_height() const { return display_height_; }
+  uint32_t display_width() { return display_size().width; }
+  uint32_t display_height() { return display_size().height; }
 
   fuchsia::sys::ComponentControllerPtr& client_component() { return client_component_; }
 
@@ -577,10 +565,6 @@ class TouchInputBase : public ui_testing::PortableUITest,
       return std::make_unique<ResponseListenerServer>(d, s);
     });
 
-    realm_builder().AddRoute({.capabilities = {Protocol{fuchsia::ui::scenic::Scenic::Name_}},
-                              .source = kTestUIStackRef,
-                              .targets = {ParentRef()}});
-
     // Add components specific for this test case to the realm.
     for (const auto& [name, component] : GetTestComponents()) {
       realm_builder().AddChild(name, component);
@@ -593,10 +577,6 @@ class TouchInputBase : public ui_testing::PortableUITest,
   }
 
   std::shared_ptr<ResponseState> response_state_ = std::make_shared<ResponseState>();
-
-  fuchsia::ui::scenic::ScenicPtr scenic_;
-  uint32_t display_width_ = 0;
-  uint32_t display_height_ = 0;
 
   fuchsia::sys::ComponentControllerPtr client_component_;
 };

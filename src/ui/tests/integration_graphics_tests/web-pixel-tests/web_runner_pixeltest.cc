@@ -19,7 +19,6 @@
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
-#include <fuchsia/ui/display/singleton/cpp/fidl.h>
 #include <fuchsia/ui/input/cpp/fidl.h>
 #include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <fuchsia/ui/test/input/cpp/fidl.h>
@@ -51,7 +50,7 @@ using component_testing::ParentRef;
 using component_testing::Protocol;
 using component_testing::Route;
 
-constexpr zx::duration kScreenshotTimeout = zx::sec(10);
+constexpr zx::duration kPredicateTimeout = zx::sec(10);
 
 enum class TapLocation { kTopLeft, kTopRight };
 
@@ -90,61 +89,8 @@ double MaxSumProject(const ui_testing::Pixel& v,
 class WebRunnerPixelTest : public ui_testing::PortableUITest,
                            public ::testing::WithParamInterface<bool> {
  public:
-  void SetUp() override {
-    ui_testing::PortableUITest::SetUp();
-    EXPECT_TRUE(realm_root().has_value());
-    screenshotter_ = realm_root()->component().Connect<fuchsia::ui::composition::Screenshot>();
-
-    // Get display information.
-    info_ = realm_root()->component().Connect<fuchsia::ui::display::singleton::Info>();
-    bool has_completed = false;
-    info_->GetMetrics([this, &has_completed](auto info) {
-      display_width_ = info.extent_in_px().width;
-      display_height_ = info.extent_in_px().height;
-      has_completed = true;
-    });
-
-    RunLoopUntil([&has_completed] { return has_completed; });
-  }
-
-  bool TakeScreenshotUntil(
-      fit::function<bool(std::map<ui_testing::Pixel, uint32_t>)> histogram_predicate,
-      zx::duration timeout = kScreenshotTimeout) {
-    return RunLoopWithTimeoutOrUntil(
-        [this, &histogram_predicate] {
-          auto screenshot = TakeScreenshot();
-          auto histogram = screenshot.Histogram();
-
-          return histogram_predicate(std::move(histogram));
-        },
-        timeout);
-  }
-
-  ui_testing::Screenshot TakeScreenshot() {
-    FX_LOGS(INFO) << "Taking screenshot... ";
-
-    fuchsia::ui::composition::ScreenshotTakeRequest request;
-    request.set_format(fuchsia::ui::composition::ScreenshotFormat::BGRA_RAW);
-
-    std::optional<fuchsia::ui::composition::ScreenshotTakeResponse> response;
-    screenshotter_->Take(std::move(request), [this, &response](auto screenshot) {
-      response = std::move(screenshot);
-      QuitLoop();
-    });
-
-    FX_LOGS(INFO) << "Screenshot captured.";
-
-    EXPECT_FALSE(RunLoopWithTimeout(kScreenshotTimeout)) << "Timed out waiting for screenshot.";
-
-    return ui_testing::Screenshot(response->vmo(), display_width_, display_height_,
-                                  0 /*display_rotation*/);
-  }
-
   bool use_flatland() override { return true; }
   std::string GetTestUIStackUrl() override { return "#meta/test-ui-stack.cm"; }
-
-  uint32_t display_width_ = 0;
-  uint32_t display_height_ = 0;
 
  private:
   void ExtendRealm() override {
@@ -183,11 +129,7 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest,
   }
 
   static std::vector<Route> GetWebEngineRoutes(ChildRef target) {
-    return {{.capabilities = {Protocol{fuchsia::ui::composition::Screenshot::Name_},
-                              Protocol{fuchsia::ui::display::singleton::Info::Name_}},
-             .source = kTestUIStackRef,
-             .targets = {ParentRef{}}},
-            {.capabilities = {Protocol{fuchsia::fonts::Provider::Name_}},
+    return {{.capabilities = {Protocol{fuchsia::fonts::Provider::Name_}},
              .source = ChildRef{kFontsProvider},
              .targets = {target}},
             {.capabilities = {Protocol{fuchsia::ui::input::ImeService::Name_}},
@@ -300,9 +242,6 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest,
 
   static constexpr auto kHttpServer = "http_server";
   static constexpr auto kHttpServerUrl = "#meta/http_server.cm";
-
-  fuchsia::ui::composition::ScreenshotPtr screenshotter_;
-  fuchsia::ui::display::singleton::InfoPtr info_;
 };
 
 // Displays a non interactive HTML page with a solid red background.
@@ -318,13 +257,15 @@ INSTANTIATE_TEST_SUITE_P(ParameterizedStaticHtmlPixelTests, StaticHtmlPixelTests
 
 TEST_P(StaticHtmlPixelTests, ValidPixelTest) {
   LaunchClient();
-  const auto num_pixels = display_width_ * display_height_;
+  const auto num_pixels = display_size().width * display_size().height;
 
   // TODO(fxb/116631): Find a better replacement for screenshot loops to verify that content has
   // been rendered on the display. Take screenshot until we see the web page's background color.
-  ASSERT_TRUE(TakeScreenshotUntil([num_pixels](std::map<ui_testing::Pixel, uint32_t> histogram) {
-    return histogram[ui_testing::Screenshot::kRed] == num_pixels;
-  }));
+  ASSERT_TRUE(TakeScreenshotUntil(
+      [num_pixels](const ui_testing::Screenshot& screenshot) {
+        return screenshot.Histogram()[ui_testing::Screenshot::kRed] == num_pixels;
+      },
+      kPredicateTimeout));
 }
 
 // Displays a HTML web page with a solid magenta color. The color of the web page changes to blue
@@ -340,10 +281,11 @@ class DynamicHtmlPixelTests : public WebRunnerPixelTest {
     auto touch = std::make_unique<fuchsia::ui::input::TouchscreenReport>();
     switch (tap_location) {
       case TapLocation::kTopLeft:
-        InjectTapWithRetry(/* x = */ display_width_ / 4, /* y = */ display_height_ / 4);
+        InjectTapWithRetry(/* x = */ display_size().width / 4, /* y = */ display_size().height / 4);
         break;
       case TapLocation::kTopRight:
-        InjectTapWithRetry(/* x = */ 3 * display_width_ / 4, /* y = */ display_height_ / 4);
+        InjectTapWithRetry(/* x = */ 3 * display_size().width / 4,
+                           /* y = */ display_size().height / 4);
         break;
       default:
         FX_NOTREACHED();
@@ -361,22 +303,26 @@ INSTANTIATE_TEST_SUITE_P(ParameterizedDynamicHtmlPixelTests, DynamicHtmlPixelTes
 
 TEST_P(DynamicHtmlPixelTests, ValidPixelTest) {
   LaunchClient();
-  const auto num_pixels = display_width_ * display_height_;
+  const auto num_pixels = display_size().width * display_size().height;
 
   // The web page should have a magenta background color.
   {
-    ASSERT_TRUE(TakeScreenshotUntil([num_pixels](std::map<ui_testing::Pixel, uint32_t> histogram) {
-      return histogram[ui_testing::Screenshot::kMagenta] == num_pixels;
-    }));
+    ASSERT_TRUE(TakeScreenshotUntil(
+        [num_pixels](const ui_testing::Screenshot& screenshot) {
+          return screenshot.Histogram()[ui_testing::Screenshot::kMagenta] == num_pixels;
+        },
+        kPredicateTimeout));
   }
 
   InjectInput(TapLocation::kTopLeft);
 
   // The background color of the web page should change to blue after receiving a tap event.
   {
-    ASSERT_TRUE(TakeScreenshotUntil([num_pixels](std::map<ui_testing::Pixel, uint32_t> histogram) {
-      return histogram[ui_testing::Screenshot::kBlue] == num_pixels;
-    }));
+    ASSERT_TRUE(TakeScreenshotUntil(
+        [num_pixels](const ui_testing::Screenshot& screenshot) {
+          return screenshot.Histogram()[ui_testing::Screenshot::kBlue] == num_pixels;
+        },
+        kPredicateTimeout));
   }
 }
 
@@ -429,35 +375,38 @@ TEST_P(VideoHtmlPixelTests, ValidPixelTest) {
   // The web page should render the scene as shown above.
   // TODO(fxb/116631): Find a better replacement for screenshot loops to verify that content has
   // been rendered on the display.
-  ASSERT_TRUE(TakeScreenshotUntil([&](std::map<ui_testing::Pixel, uint32_t> histogram) {
-    // Have at least some visual feedback about the examined histogram.
-    auto top = TopPixels(histogram);
-    std::cout << "Histogram top:" << std::endl;
-    for (const auto& elems : top) {
-      std::cout << "{ " << elems.second << " value: " << elems.first << " }" << std::endl;
-    }
-    std::cout << "--------------" << std::endl;
+  ASSERT_TRUE(TakeScreenshotUntil(
+      [&](const ui_testing::Screenshot& screenshot) {
+        auto histogram = screenshot.Histogram();
+        // Have at least some visual feedback about the examined histogram.
+        auto top = TopPixels(histogram);
+        std::cout << "Histogram top:" << std::endl;
+        for (const auto& elems : top) {
+          std::cout << "{ " << elems.second << " value: " << elems.first << " }" << std::endl;
+        }
+        std::cout << "--------------" << std::endl;
 
-    // Fail the predicate check until at least some pixels are kinda blue. This will
-    // cause a re-attempt of a screenshot.
-    if (MaxSumProject(kBlue, top) < 60000) {
-      return false;
-    }
+        // Fail the predicate check until at least some pixels are kinda blue. This will
+        // cause a re-attempt of a screenshot.
+        if (MaxSumProject(kBlue, top) < 60000) {
+          return false;
+        }
 
-    // Video's background color should not be visible.
-    EXPECT_LT(histogram[kBackground], 10u);
+        // Video's background color should not be visible.
+        EXPECT_LT(histogram[kBackground], 10u);
 
-    // Note that we do not see pure colors in the video but a shade of the colors shown in the
-    // diagram. Since it is hard to assert on the exact number of pixels for each shade of the
-    // color, the test asserts on whether the shade that's most like the given color is
-    // prominent enough.
-    EXPECT_GT(MaxSumProject(kYellow, top), 100000);
-    EXPECT_GT(MaxSumProject(kRed, top), 100000);
-    EXPECT_GT(MaxSumProject(kBlue, top), 100000);
-    EXPECT_GT(MaxSumProject(kGreen, top), 100000);
+        // Note that we do not see pure colors in the video but a shade of the colors shown in the
+        // diagram. Since it is hard to assert on the exact number of pixels for each shade of the
+        // color, the test asserts on whether the shade that's most like the given color is
+        // prominent enough.
+        EXPECT_GT(MaxSumProject(kYellow, top), 100000);
+        EXPECT_GT(MaxSumProject(kRed, top), 100000);
+        EXPECT_GT(MaxSumProject(kBlue, top), 100000);
+        EXPECT_GT(MaxSumProject(kGreen, top), 100000);
 
-    return true;
-  }));
+        return true;
+      },
+      kPredicateTimeout));
 }
 
 }  // namespace integration_tests

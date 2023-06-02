@@ -6,6 +6,7 @@
 #define SRC_UI_TESTING_UTIL_PORTABLE_UI_TEST_H_
 
 #include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/test/input/cpp/fidl.h>
 #include <fuchsia/ui/test/scene/cpp/fidl.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
@@ -15,6 +16,7 @@
 #include <vector>
 
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
+#include "src/ui/testing/util/screenshot_helper.h"
 
 namespace ui_testing {
 
@@ -36,6 +38,17 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
   // Returns true when the specified view is fully connected to the scene AND
   // has presented at least one frame of content.
   bool HasViewConnected(zx_koid_t view_ref_koid);
+
+  // Helper method to take a screenshot.
+  Screenshot TakeScreenshot();
+
+  // Helper method to take a screenshot until predicate is true. Returns false if
+  // |predicate_timeout| is reached.
+  bool TakeScreenshotUntil(fit::function<bool(const ui_testing::Screenshot&)> predicate,
+                           zx::duration predicate_timeout, zx::duration step = zx::msec(10));
+
+  // Return display size by connecting to |fuchsia::ui::display::singleton::Info| protocol.
+  fuchsia::math::SizeU display_size();
 
   // Registers a fake touch screen device with an injection coordinate space
   // spanning [-1000, 1000] on both axes.
@@ -116,6 +129,7 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
   fuchsia::ui::test::input::MousePtr fake_mouse_;
   fuchsia::ui::test::scene::ControllerPtr scene_provider_;
   fuchsia::ui::observation::geometry::ViewTreeWatcherPtr view_tree_watcher_;
+  std::optional<fuchsia::ui::composition::ScreenshotPtr> screenshotter_;
 
   component_testing::RealmBuilder realm_builder_ = component_testing::RealmBuilder::Create();
   std::optional<component_testing::RealmRoot> realm_;
@@ -126,6 +140,9 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
 
   // The KOID of the client root view's `ViewRef`.
   std::optional<zx_koid_t> client_root_view_ref_koid_;
+
+  // Holds the display size.
+  std::optional<fuchsia::math::SizeU> display_size_;
 
   // Holds the most recent view tree snapshot received from the view tree
   // watcher.
