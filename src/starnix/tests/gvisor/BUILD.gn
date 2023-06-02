@@ -55,7 +55,6 @@ gvisor_tests = [
   "fpsig_fork_test",
   "fpsig_nested_test",
   "fsync_test",
-  "futex_test",
   "getcpu_host_test",
   "getcpu_test",
   "getdents_test",
@@ -237,6 +236,7 @@ gvisor_tests_run_as_root = [
 
 gvisor_tests_custom_manifest = [
   "exec_test",
+  "futex_test",
   "setgid_test",
 ]
 

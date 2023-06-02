@@ -1086,7 +1086,7 @@
                 "RlimitTest.SetRlimitHigher",
 
                 // Require robust pthread mutexes.
-                "RobustFutexTest.*",
+                "RobustFutexTest.PthreadMutexAttr",
 
                 // uidgid_test - https://fxbug.dev/79438
                 "UidGidRootTest.SetgidNotFromThreadGroupLeader",

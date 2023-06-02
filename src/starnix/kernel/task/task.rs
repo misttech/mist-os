@@ -233,6 +233,9 @@ pub struct TaskMutableState {
 
     /// List of currently installed seccomp_filters
     pub seccomp_filters: SeccompFilterContainer,
+
+    /// A pointer to the head of the robust futex list of this thread.
+    pub robust_list_head: UserAddress,
 }
 
 impl TaskMutableState {
@@ -418,6 +421,7 @@ impl Task {
                 restricted_state_addr_and_size: None,
                 no_new_privs,
                 seccomp_filters,
+                robust_list_head: UserAddress::NULL,
             }),
             ignore_exceptions: std::sync::atomic::AtomicBool::new(false),
             seccomp_filter_state,

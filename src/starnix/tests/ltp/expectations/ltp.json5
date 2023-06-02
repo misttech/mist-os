@@ -338,7 +338,6 @@
                 "*/ltp_get_ifname.cm",
                 "*/ltp_get_mempolicy01.cm",
                 "*/ltp_get_mempolicy02.cm",
-                "*/ltp_get_robust_list01.cm",
                 "*/ltp_getaddrinfo_01.cm",
                 "*/ltp_getcpu01.cm",
                 "*/ltp_getcwd04.cm",

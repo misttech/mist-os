@@ -329,6 +329,45 @@ pub fn sys_futex(
     }
 }
 
+pub fn sys_get_robust_list(
+    current_task: &CurrentTask,
+    pid: pid_t,
+    user_head_ptr: UserRef<UserAddress>,
+    user_len_ptr: UserRef<usize>,
+) -> Result<(), Errno> {
+    if pid < 0 {
+        return error!(EINVAL);
+    }
+    if user_head_ptr.is_null() || user_len_ptr.is_null() {
+        return error!(EFAULT);
+    }
+    if pid != 0 && !current_task.creds().has_capability(CAP_SYS_PTRACE) {
+        return error!(EPERM);
+    }
+    let task = if pid == 0 { Some(current_task.task.clone()) } else { current_task.get_task(pid) };
+
+    match task {
+        Some(t) => {
+            current_task.mm.write_object(user_head_ptr, &t.read().robust_list_head)?;
+            current_task.mm.write_object(user_len_ptr, &std::mem::size_of::<robust_list_head>())?;
+            Ok(())
+        }
+        None => error!(ESRCH),
+    }
+}
+
+pub fn sys_set_robust_list(
+    current_task: &CurrentTask,
+    user_head: UserRef<robust_list_head>,
+    len: usize,
+) -> Result<(), Errno> {
+    if len != std::mem::size_of::<robust_list_head>() {
+        return error!(EINVAL);
+    }
+    current_task.write().robust_list_head = user_head.addr();
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
