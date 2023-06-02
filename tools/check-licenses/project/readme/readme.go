@@ -112,6 +112,9 @@ func NewReadmeFromFileCustomLocation(readmePath, projectRoot string) (*Readme, e
 	if _, err := os.Stat(readmePath); os.IsNotExist(err) {
 		return nil, err
 	}
+	if _, err := os.Stat(filepath.Dir(projectRoot)); os.IsNotExist(err) {
+		return nil, err
+	}
 	f, err := os.Open(readmePath)
 	if err != nil {
 		return nil, fmt.Errorf("newReadme(%s): %w\n", readmePath, err)
