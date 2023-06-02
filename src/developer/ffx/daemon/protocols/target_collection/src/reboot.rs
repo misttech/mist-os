@@ -34,7 +34,7 @@ use tasks::TaskManager;
 /// when it is in product mode
 const USE_SSH_FOR_REBOOT_FROM_PRODUCT: &'static str = "product.reboot.use_dm";
 
-const ADMIN_MONIKER: &'static str = "/bootstrap/power_manager";
+const ADMIN_MONIKER: &'static str = "/bootstrap/shutdown_shim";
 
 pub(crate) struct RebootController {
     target: Rc<Target>,

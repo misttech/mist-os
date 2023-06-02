@@ -9,7 +9,7 @@ use fidl::Error as FidlError;
 use fidl_fuchsia_hardware_power_statecontrol::AdminProxy;
 
 #[ffx_plugin(
-    AdminProxy = "bootstrap/power_manager:expose:fuchsia.hardware.power.statecontrol.Admin"
+    AdminProxy = "bootstrap/shutdown_shim:expose:fuchsia.hardware.power.statecontrol.Admin"
 )]
 pub async fn off(admin_proxy: AdminProxy, _cmd: OffCommand) -> Result<()> {
     let res = admin_proxy.poweroff().await;

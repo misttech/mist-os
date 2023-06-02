@@ -34,7 +34,7 @@ use std::{net::SocketAddr, rc::Rc, time::Duration, time::Instant};
 /// Timeout in seconds to wait for target after a reboot to fastboot mode
 const FASTBOOT_REBOOT_RECONNECT_TIMEOUT: &str = "fastboot.reboot.reconnect_timeout";
 
-const ADMIN_MONIKER: &str = "/bootstrap/power_manager";
+const ADMIN_MONIKER: &str = "/bootstrap/shutdown_shim";
 const FASTBOOT_PORT: u16 = 5554;
 
 #[async_trait(?Send)]
