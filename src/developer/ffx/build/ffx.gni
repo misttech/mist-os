@@ -87,7 +87,7 @@ template("ffx") {
   # Replace the special linker sections containing the version information with the real values
   ffx_apply_version(ffx_name + "_bin") {
     output_name = ffx_name
-
+    ffx_unversioned_binary_path = "${root_out_dir}/${ffx_name}_unversioned"
     deps = [ ":${ffx_name}_bin_unversioned" ]
   }
 
