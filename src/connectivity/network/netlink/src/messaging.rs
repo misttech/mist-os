@@ -8,7 +8,7 @@ use futures::Stream;
 use netlink_packet_utils::Emitable;
 
 /// A type capable of sending messages, `M`, from Netlink to a client.
-pub trait Sender<M>: Clone + Send + 'static {
+pub trait Sender<M>: Clone + Send + Sync + 'static {
     /// Sends the given message to the client.
     ///
     /// Implementors must ensure this call does not block.

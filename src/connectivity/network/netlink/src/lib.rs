@@ -242,11 +242,7 @@ fn spawn_client_request_handler<
                 FoldState { client, handler },
                 |FoldState { mut client, mut handler }, req| async {
                     debug!(tag = NETLINK_LOG_TAG, "{} Received request: {:?}", client, req);
-                    let responses = handler.handle_request(req).await;
-                    for response in responses {
-                        debug!(tag = NETLINK_LOG_TAG, "{} Responding with {:?}", client, response);
-                        client.send(response);
-                    }
+                    handler.handle_request(req, &mut client).await;
                     FoldState { client, handler }
                 },
             )

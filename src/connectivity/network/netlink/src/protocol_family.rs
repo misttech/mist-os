@@ -16,7 +16,7 @@ use async_trait::async_trait;
 use tracing::warn;
 
 use crate::{
-    client::ExternalClient,
+    client::{ExternalClient, InternalClient},
     messaging::Sender,
     multicast_groups::{
         InvalidLegacyGroupsError, InvalidModernGroupError, LegacyGroups, ModernGroup,
@@ -25,20 +25,24 @@ use crate::{
 };
 
 /// A type representing a Netlink Protocol Family.
-pub(crate) trait ProtocolFamily: MulticastCapableNetlinkFamily + Send + 'static {
+pub(crate) trait ProtocolFamily:
+    MulticastCapableNetlinkFamily + Send + Sized + 'static
+{
     /// The message type associated with the protocol family.
     type Message: Clone + Debug + Emitable + Send + 'static;
     /// The implementation for handling requests from this protocol family.
-    type RequestHandler<S: Sender<Self::Message>>: NetlinkFamilyRequestHandler<Self::Message>;
+    type RequestHandler<S: Sender<Self::Message>>: NetlinkFamilyRequestHandler<Self, S>;
 
     const NAME: &'static str;
 }
 
 #[async_trait]
 /// A request handler implementation for a particular Netlink protocol family.
-pub(crate) trait NetlinkFamilyRequestHandler<M>: Clone + Send + 'static {
+pub(crate) trait NetlinkFamilyRequestHandler<F: ProtocolFamily, S: Sender<F::Message>>:
+    Clone + Send + 'static
+{
     /// Handles the given request and generates the associated response(s).
-    async fn handle_request(&mut self, req: M) -> Vec<M>;
+    async fn handle_request(&mut self, req: F::Message, client: &mut InternalClient<F, S>);
 }
 
 pub mod route {
@@ -165,12 +169,13 @@ pub mod route {
 
     #[async_trait]
     impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>>
-        NetlinkFamilyRequestHandler<NetlinkMessage<RtnlMessage>> for NetlinkRouteRequestHandler<S>
+        NetlinkFamilyRequestHandler<NetlinkRoute, S> for NetlinkRouteRequestHandler<S>
     {
         async fn handle_request(
             &mut self,
             req: NetlinkMessage<RtnlMessage>,
-        ) -> Vec<NetlinkMessage<RtnlMessage>> {
+            client: &mut InternalClient<NetlinkRoute, S>,
+        ) {
             let (req_header, payload) = req.into_parts();
             let req = match payload {
                 NetlinkPayload::InnerMessage(p) => p,
@@ -218,7 +223,7 @@ pub mod route {
                         "Received unsupported NETLINK_ROUTE request; responding with an Ack: {:?}",
                         req
                     );
-                    vec![crate::netlink_packet::new_ack(req_header)]
+                    client.send(crate::netlink_packet::new_ack(req_header));
                 }
                 GetNeighbourTable(_)
                 | GetTrafficClass(_)
@@ -241,7 +246,7 @@ pub mod route {
                         "Received unsupported NETLINK_ROUTE request; responding with Done: {:?}",
                         req
                     );
-                    vec![crate::netlink_packet::new_done()]
+                    client.send(crate::netlink_packet::new_done())
                 },
                 req => panic!("unexpected RtnlMessage: {:?}", req),
             }
@@ -328,9 +333,15 @@ pub(crate) mod testutil {
     pub(crate) struct FakeNetlinkRequestHandler;
 
     #[async_trait]
-    impl<M: Send + 'static> NetlinkFamilyRequestHandler<M> for FakeNetlinkRequestHandler {
-        async fn handle_request(&mut self, req: M) -> Vec<M> {
-            vec![req]
+    impl<S: Sender<FakeNetlinkMessage>> NetlinkFamilyRequestHandler<FakeProtocolFamily, S>
+        for FakeNetlinkRequestHandler
+    {
+        async fn handle_request(
+            &mut self,
+            req: FakeNetlinkMessage,
+            client: &mut InternalClient<FakeProtocolFamily, S>,
+        ) {
+            client.send(req)
         }
     }
 
