@@ -3,30 +3,51 @@
 // found in the LICENSE file.
 library fuchsia.hardware.display;
 
+/// The result of checking a draft display config.
+///
+/// Values are produced by [`fuchsia.hardware.display/Coordinator.CheckConfig`].
 type ConfigResult = strict enum : uint32 {
+    /// The config is compatible with the current hardware.
     OK = 0;
-    // The requested layer configuration is invalid.
+
+    /// The config is not compatible with any hardware.
     INVALID_CONFIG = 1;
-    // The requested layer configuration cannot be supported by the hardware. See
-    // CheckConfig struct for mode details.
+
+    /// The config layer assignment is not supported by the current hardware.
     UNSUPPORTED_CONFIG = 2;
-    // The number of requested displays cannot be supported.
+
+    /// The config uses more than the number of connected displays.
     TOO_MANY_DISPLAYS = 3;
-    // The hardware cannot support the requested modes for the displays. The client
-    // should try a different set of displays or display modes.
+
+    /// The config display modes are not supported by the current hardware.
+    ///
+    /// The client should try a different set of displays or display modes.
     UNSUPPORTED_DISPLAY_MODES = 4;
 };
 
-/// Maximum number of fences supported by ApplyConfig2().
+/// Maximum number of fences supported by
+/// [`fuchsia.hardware.display/Coordinator.ApplyConfig2`].
 const APPLY_CONFIG_MAX_SIGNAL_FENCES uint64 = 32;
 
-/// Each set of configurations in ApplyConfig() call corresponds to a
-/// |ConfigStamp| value; the value will be referred in Vsync events to indicate
-/// that a configuration is fully applied.
+/// Identifies an accepted display config.
+///
+/// This is a type-safe wrapper for a
+/// [`fuchsia.hardware.display/ConfigStampValue`], which is a raw numeric value.
+///
+/// Each successful call to [`fuchsia.hardware.display/Coordinator.ApplyConfig`]
+/// generates a valid value. Values are reported in
+/// [`fuchsia.hardware.display/Coordinator.Vsync`] events.
+///
+/// Generated values are strictly increasing (unique, strictly monotonic) within
+/// the lifetime of a [`fuchsia.display/Coordinator`] connection.
+///
+/// [`fuchsia.hardware.display/INVALID_CONFIG_STAMP_VALUE`] represents an
+/// invalid value.
 type ConfigStamp = struct {
-    /// The value of config stamp. Valid configurations should have a stamp
-    /// not equal to `INVALID_CONFIG_STAMP_VALUE`.
-    value uint64;
+    value ConfigStampValue;
 };
 
-const INVALID_CONFIG_STAMP_VALUE uint64 = 0;
+/// See [`fuchsia.hardware.display/ConfigStamp`].
+alias ConfigStampValue = uint64;
+
+const INVALID_CONFIG_STAMP_VALUE ConfigStampValue = 0;
