@@ -6460,6 +6460,22 @@ b/266298474
 
 From //third_party/pigweed/src/pw_protobuf_compiler/toolchain.gni:28
 
+### pw_protobuf_compiler_PROTOC_BINARY
+
+To override the protobuf compiler used set this to the path, relative to the root_build_dir, to the protoc binary.
+
+**Current value (from the default):** `""`
+
+From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:39
+
+### pw_protobuf_compiler_PROTOC_TARGET
+
+To override the protobuf compiler used set this to the GN target that builds the protobuf compiler.
+
+**Current value (from the default):** `""`
+
+From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:36
+
 ### pw_protobuf_compiler_TOOLCHAIN
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_protobuf_compiler/toolchain:protocol_buffer"`
