@@ -199,6 +199,7 @@ async fn main() -> Result<()> {
                 "/sys:sysfs",
                 "/tmp:tmpfs",
             ],
+            &cmd.features,
         ),
         temp_dir.path(),
     )?;

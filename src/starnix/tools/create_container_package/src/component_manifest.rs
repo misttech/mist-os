@@ -14,12 +14,16 @@ fn compile_from_json(contents: serde_json::Value) -> Vec<u8> {
     persist(&compiled).expect("failed to persist FIDL manifest")
 }
 
-pub fn compile_container_manifest(container_name: &str, mounts: &[&str]) -> Vec<u8> {
+pub fn compile_container_manifest(
+    container_name: &str,
+    mounts: &[&str],
+    features: &[String],
+) -> Vec<u8> {
     compile_from_json(json!({
         "program": {
             "runner": "starnix",
             "apex_hack": [],
-            "features": [],
+            "features": features,
             "init": [],
             "init_user": "root:x:0:0",
             "kernel_cmdline": "",

@@ -51,6 +51,10 @@ pub struct Command {
     #[argh(option)]
     pub arch: Option<ContainerArchitecture>,
 
+    /// container features
+    #[argh(option)]
+    pub features: Vec<String>,
+
     /// input format; available formats: "tarball", "docker-archive"
     #[argh(option)]
     pub input_format: InputFormat,
