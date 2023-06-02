@@ -18,6 +18,8 @@
 #include <zircon/time.h>
 #include <zircon/types.h>
 
+#include <algorithm>
+#include <cstdint>
 #include <iterator>
 #include <memory>
 #include <optional>
@@ -30,10 +32,13 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>
 #include <fbl/auto_lock.h>
+#include <fbl/ref_ptr.h>
 #include <fbl/string_printf.h>
+#include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/coordinator/client.h"
 #include "src/graphics/display/drivers/coordinator/config-stamp.h"
+#include "src/graphics/display/drivers/coordinator/display-info.h"
 #include "src/graphics/display/drivers/coordinator/eld.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 
@@ -137,30 +142,31 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
     size_t* display_info_actual) {
   ZX_DEBUG_ASSERT(!out_display_info_list || added_count == display_info_count);
 
-  std::unique_ptr<fbl::RefPtr<DisplayInfo>[]> added_success;
-  std::unique_ptr<uint64_t[]> removed;
+  fbl::Vector<fbl::RefPtr<DisplayInfo>> added_display_infos;
+  fbl::Vector<uint64_t> removed_display_ids;
   std::unique_ptr<async::Task> task;
   uint32_t added_success_count = 0;
 
-  fbl::AllocChecker ac;
+  fbl::AllocChecker alloc_checker;
   if (added_count) {
-    added_success = std::unique_ptr<fbl::RefPtr<DisplayInfo>[]>(
-        new (&ac) fbl::RefPtr<DisplayInfo>[added_count]);
-    if (!ac.check()) {
+    added_display_infos.reserve(added_count, &alloc_checker);
+    if (!alloc_checker.check()) {
       zxlogf(ERROR, "No memory when processing hotplug");
       return;
     }
   }
   if (removed_count) {
-    removed = std::unique_ptr<uint64_t[]>(new (&ac) uint64_t[removed_count]);
-    if (!ac.check()) {
+    removed_display_ids.reserve(removed_count, &alloc_checker);
+    if (!alloc_checker.check()) {
       zxlogf(ERROR, "No memory when processing hotplug");
       return;
     }
-    memcpy(removed.get(), displays_removed, removed_count * sizeof(uint64_t));
+    for (size_t i = 0; i < removed_count; ++i) {
+      removed_display_ids.push_back(displays_removed[i]);
+    }
   }
-  task = fbl::make_unique_checked<async::Task>(&ac);
-  if (!ac.check()) {
+  task = fbl::make_unique_checked<async::Task>(&alloc_checker);
+  if (!alloc_checker.check()) {
     zxlogf(ERROR, "No memory when processing hotplug");
     return;
   }
@@ -181,14 +187,13 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
   }
 
   for (unsigned i = 0; i < added_count; i++) {
-    fbl::AllocChecker ac;
-    auto info_or_status = DisplayInfo::Create(displays_added[i]);
-    if (info_or_status.is_error()) {
+    zx::result<fbl::RefPtr<DisplayInfo>> info_result = DisplayInfo::Create(displays_added[i]);
+    if (info_result.is_error()) {
       zxlogf(INFO, "failed to add display %ld: %s", displays_added[i].display_id,
-             info_or_status.status_string());
+             info_result.status_string());
       continue;
     }
-    auto info = std::move(info_or_status.value());
+    fbl::RefPtr<DisplayInfo> info = std::move(info_result).value();
     if (info->edid.has_value()) {
       fbl::Array<uint8_t> eld;
       ComputeEld(info->edid->base, eld);
@@ -216,7 +221,7 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
     }
 
     if (displays_.insert_or_find(info)) {
-      added_success[added_success_count++] = std::move(info);
+      added_display_infos.push_back(std::move(info));
     } else {
       zxlogf(INFO, "Ignoring duplicate display");
     }
@@ -224,46 +229,45 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
   if (display_info_actual)
     *display_info_actual = added_success_count;
 
-  task->set_handler([this, added_ptr = added_success.release(), removed_ptr = removed.release(),
-                     added_success_count, removed_count](async_dispatcher_t* dispatcher,
-                                                         async::Task* task, zx_status_t status) {
+  task->set_handler([this, added_display_infos = std::move(added_display_infos),
+                     removed_display_ids = std::move(removed_display_ids)](
+                        async_dispatcher_t* dispatcher, async::Task* task, zx_status_t status) {
     if (status == ZX_OK) {
-      for (unsigned i = 0; i < added_success_count; i++) {
-        if (added_ptr[i]->edid.has_value()) {
-          PopulateDisplayTimings(added_ptr[i]);
+      for (fbl::RefPtr<DisplayInfo>& added_display_info : added_display_infos) {
+        if (added_display_info->edid.has_value()) {
+          PopulateDisplayTimings(added_display_info);
         }
       }
       fbl::AutoLock lock(mtx());
 
-      std::vector<uint64_t> added_ids(added_success_count);
-      uint32_t final_added_success_count = 0;
-      for (unsigned i = 0; i < added_success_count; i++) {
+      fbl::Vector<uint64_t> added_ids;
+      added_ids.reserve(added_display_infos.size());
+      for (fbl::RefPtr<DisplayInfo>& added_display_info : added_display_infos) {
         // Dropping some add events can result in spurious removes, but
         // those are filtered out in the clients.
-        if (!added_ptr[i]->edid.has_value() || !added_ptr[i]->edid->timings.is_empty()) {
-          added_ids[final_added_success_count++] = added_ptr[i]->id;
-          added_ptr[i]->init_done = true;
-          added_ptr[i]->InitializeInspect(&root_);
+        if (!added_display_info->edid.has_value() ||
+            !added_display_info->edid->timings.is_empty()) {
+          added_ids.push_back(added_display_info->id);
+          added_display_info->init_done = true;
+          added_display_info->InitializeInspect(&root_);
         } else {
           zxlogf(WARNING, "Ignoring display with no compatible edid timings");
         }
       }
 
       if (vc_client_ && vc_ready_) {
-        vc_client_->OnDisplaysChanged(added_ids.data(), final_added_success_count, removed_ptr,
-                                      removed_count);
+        vc_client_->OnDisplaysChanged(added_ids.data(), added_ids.size(),
+                                      removed_display_ids.data(), removed_display_ids.size());
       }
       if (primary_client_ && primary_ready_) {
-        primary_client_->OnDisplaysChanged(added_ids.data(), final_added_success_count, removed_ptr,
-                                           removed_count);
+        primary_client_->OnDisplaysChanged(added_ids.data(), added_ids.size(),
+                                           removed_display_ids.data(), removed_display_ids.size());
       }
 
     } else {
       zxlogf(ERROR, "Failed to dispatch display change task %d", status);
     }
 
-    delete[] added_ptr;
-    delete[] removed_ptr;
     delete task;
   });
   task.release()->Post(loop_.dispatcher());
