@@ -8,8 +8,9 @@
 #include <lib/zx/vmo.h>
 
 #include <map>
+#include <memory>
+#include <mutex>
 
-#include <fbl/auto_lock.h>
 #include <zxtest/zxtest.h>
 
 namespace {
@@ -26,7 +27,7 @@ struct VmoMetadata {
   bool contiguous = false;
 };
 
-static bool unpinned = false;
+bool unpinned = false;
 
 class VmoWrapper : public fake_object::Object {
  public:
@@ -48,7 +49,7 @@ zx_status_t zx_vmo_create_contiguous(zx_handle_t bti_handle, size_t size, uint32
     return status;
   }
 
-  auto vmo_wrapper = fbl::AdoptRef(new VmoWrapper(std::move(vmo)));
+  auto vmo_wrapper = std::make_shared<VmoWrapper>(std::move(vmo));
   vmo_wrapper->metadata().alignment_log2 = alignment_log2;
   vmo_wrapper->metadata().bti_handle = bti_handle;
   vmo_wrapper->metadata().size = size;
@@ -66,7 +67,7 @@ zx_status_t zx_vmo_create(uint64_t size, uint32_t options, zx_handle_t* out) {
     return status;
   }
 
-  auto vmo_wrapper = fbl::AdoptRef(new VmoWrapper(std::move(vmo)));
+  auto vmo_wrapper = std::make_shared<VmoWrapper>(std::move(vmo));
   vmo_wrapper->metadata().size = size;
   zx::result add_res = fake_object::FakeHandleTable().Add(std::move(vmo_wrapper));
   if (add_res.is_ok()) {
@@ -82,7 +83,7 @@ zx_status_t zx_vmar_map(zx_handle_t vmar_handle, zx_vm_option_t options, uint64_
   if (!get_res.is_ok()) {
     return get_res.status_value();
   }
-  auto vmo = fbl::RefPtr<VmoWrapper>::Downcast(std::move(get_res.value()));
+  std::shared_ptr<VmoWrapper> vmo = std::static_pointer_cast<VmoWrapper>(get_res.value());
 
   zx_status_t status = _zx_vmar_map(vmar_handle, options, vmar_offset, vmo->vmo()->get(),
                                     vmo_offset, len, mapped_addr);
@@ -97,7 +98,7 @@ zx_status_t zx_vmo_set_cache_policy(zx_handle_t handle, uint32_t cache_policy) {
   if (!get_res.is_ok()) {
     return get_res.status_value();
   }
-  auto vmo = fbl::RefPtr<VmoWrapper>::Downcast(std::move(get_res.value()));
+  std::shared_ptr<VmoWrapper> vmo = std::static_pointer_cast<VmoWrapper>(get_res.value());
   vmo->metadata().cache_policy = cache_policy;
   return ZX_OK;
 }
@@ -106,7 +107,7 @@ zx_status_t zx_bti_pin(zx_handle_t bti_handle, uint32_t options, zx_handle_t vmo
                        uint64_t offset, uint64_t size, zx_paddr_t* addrs, size_t addrs_count,
                        zx_handle_t* out) {
   static uint64_t current_phys = 0;
-  static fbl::Mutex phys_lock;
+  static std::mutex phys_lock;
 
   if (bti_handle != kFakeBti.get()) {
     return ZX_ERR_BAD_HANDLE;
@@ -128,9 +129,9 @@ zx_status_t zx_bti_pin(zx_handle_t bti_handle, uint32_t options, zx_handle_t vmo
   if (!get_res.is_ok()) {
     return get_res.status_value();
   }
-  auto vmo = fbl::RefPtr<VmoWrapper>::Downcast(std::move(get_res.value()));
+  std::shared_ptr<VmoWrapper> vmo = std::static_pointer_cast<VmoWrapper>(get_res.value());
 
-  fbl::AutoLock lock(&phys_lock);
+  std::lock_guard lock(phys_lock);
   vmo->metadata().start_phys = current_phys;
   *addrs = current_phys;
   current_phys += vmo->metadata().size;

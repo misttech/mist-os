@@ -8,10 +8,13 @@
 #include <lib/fake-object/object.h>
 #include <lib/zx/interrupt.h>
 #include <limits.h>
+#include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
 #include <atomic>
+#include <memory>
+#include <mutex>
 
 namespace fake_object {
 
@@ -21,7 +24,7 @@ class Msi final : public fake_object::Object {
 
   explicit Msi(uint32_t irq_cnt) : fake_object::Object(ZX_OBJ_TYPE_MSI), irq_count_(irq_cnt) {}
   ~Msi() override {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard guard(lock_);
     ClearClosedHandles();
     if (!ids_in_use_.empty()) {
       if (!ids_in_use_assert_disabled_) {
@@ -37,7 +40,7 @@ class Msi final : public fake_object::Object {
                        size_t* actual_count, size_t* avail_count) final;
 
   zx_status_t ReserveId(const zx::unowned_interrupt& interrupt, MsiId msi_id) __TA_EXCLUDES(lock_) {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard guard(lock_);
     ClearClosedHandles();
     if (msi_id >= irq_count_) {
       return ZX_ERR_INVALID_ARGS;
@@ -93,7 +96,7 @@ class Msi final : public fake_object::Object {
   // to verify handles are still valid when reservations are made to free up any child
   // interrupts that were freed in the interim.
   std::unordered_map<zx_handle_t, MsiId> ids_in_use_ __TA_GUARDED(lock_) = {};
-  mutable fbl::Mutex lock_;
+  mutable std::mutex lock_;
 };  // namespace
 
 }  // namespace fake_object

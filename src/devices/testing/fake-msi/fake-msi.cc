@@ -17,15 +17,13 @@
 #include <zircon/types.h>
 
 #include <atomic>
+#include <memory>
+#include <mutex>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include <fbl/algorithm.h>
-#include <fbl/auto_lock.h>
-#include <fbl/mutex.h>
-#include <fbl/ref_counted.h>
-#include <fbl/ref_ptr.h>
 
 namespace fake_object {
 std::atomic_uint64_t Msi::out_of_scope_while_holding_reservations_count_ = 0;
@@ -38,7 +36,7 @@ zx_status_t Msi::get_info(zx_handle_t /*handle*/, uint32_t topic, void* buffer, 
     return ZX_ERR_INVALID_ARGS;
   }
 
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard guard(lock_);
   ClearClosedHandles();
   auto* info = static_cast<zx_info_msi_t*>(buffer);
   info->target_addr = 0xCAFE;
@@ -61,8 +59,8 @@ zx_status_t zx_msi_allocate(zx_handle_t /*root*/, uint32_t count, zx_handle_t* m
   if (!count || !msi_out || !cpp20::has_single_bit(count)) {
     return ZX_ERR_INVALID_ARGS;
   }
-  auto new_msi = fbl::AdoptRef(new fake_object::Msi(count));
-  if (auto res = fake_object::FakeHandleTable().Add(std::move(new_msi)); res.is_ok()) {
+  std::shared_ptr<fake_object::Object> new_msi = std::make_shared<fake_object::Msi>(count);
+  if (auto res = fake_object::FakeHandleTable().Add(new_msi); res.is_ok()) {
     *msi_out = res.value();
     return ZX_OK;
   } else {
@@ -81,7 +79,8 @@ zx_status_t zx_msi_create(zx_handle_t msi_handle, uint32_t options, uint32_t msi
   if (get_res->type() != ZX_OBJ_TYPE_MSI) {
     return ZX_ERR_WRONG_TYPE;
   }
-  auto msi = fbl::RefPtr<fake_object::Msi>::Downcast(std::move(get_res.value()));
+  std::shared_ptr<fake_object::Msi> msi =
+      std::static_pointer_cast<fake_object::Msi>(get_res.value());
   if (msi_id >= msi->irq_count()) {
     return ZX_ERR_INVALID_ARGS;
   }

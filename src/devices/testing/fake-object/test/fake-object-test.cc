@@ -16,10 +16,10 @@
 
 #include <array>
 #include <climits>  // PAGE_SIZE
+#include <memory>
 #include <utility>
 
 #include <fbl/algorithm.h>
-#include <fbl/ref_ptr.h>
 #include <zxtest/zxtest.h>
 
 #include "src/devices/testing/fake-object/internal.h"
@@ -110,7 +110,7 @@ TEST_F(FakeObject, Get) {
   zx::result<zx_handle_t> obj = fake_object_create();
   EXPECT_OK(obj.status_value());
 
-  zx::result<fbl::RefPtr<Object>> getter = FakeHandleTable().Get(obj.value());
+  zx::result<std::shared_ptr<Object>> getter = FakeHandleTable().Get(obj.value());
   EXPECT_TRUE(getter.is_ok());
 
   EXPECT_EQ(FakeHandleTable().size(), 1);

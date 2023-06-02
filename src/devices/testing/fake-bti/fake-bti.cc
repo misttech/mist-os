@@ -13,13 +13,10 @@
 #include <zircon/syscalls.h>
 
 #include <cstdint>
+#include <memory>
 #include <utility>
 #include <vector>
 
-#include <fbl/auto_lock.h>
-#include <fbl/mutex.h>
-#include <fbl/ref_counted.h>
-#include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
 
 // Normally just defined in the kernel:
@@ -28,11 +25,13 @@
 namespace {
 class Bti final : public fake_object::Object {
  public:
+  Bti() : Object(ZX_OBJ_TYPE_BTI) {}
+  explicit Bti(cpp20::span<const zx_paddr_t> paddrs) : Object(ZX_OBJ_TYPE_BTI), paddrs_(paddrs) {}
   ~Bti() final = default;
 
   static zx_status_t Create(cpp20::span<const zx_paddr_t> paddrs,
-                            fbl::RefPtr<fake_object::Object>* out) {
-    *out = fbl::AdoptRef(new Bti(paddrs));
+                            std::shared_ptr<fake_object::Object>* out) {
+    *out = std::make_shared<Bti>(paddrs);
     return ZX_OK;
   }
 
@@ -69,8 +68,8 @@ class Bti final : public fake_object::Object {
       return status;
     }
 
-    fbl::AutoLock lock(&lock_);
-    pinned_vmos_.push_back({std::move(vmo_dup), size, offset, info.koid, std::move(paddrs)});
+    std::lock_guard guard(lock_);
+    pinned_vmos_.emplace_back(std::move(vmo_dup), size, offset, info.koid, paddrs);
     return ZX_OK;
   }
 
@@ -79,11 +78,10 @@ class Bti final : public fake_object::Object {
     zx_status_t status = vmo.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
     ZX_DEBUG_ASSERT(status == ZX_OK);
 
-    fbl::AutoLock lock(&lock_);
-    for (size_t i = 0; i < pinned_vmos_.size(); ++i) {
-      if (pinned_vmos_[i].size == size && pinned_vmos_[i].offset == offset &&
-          pinned_vmos_[i].koid == info.koid) {
-        pinned_vmos_.erase(i);
+    std::lock_guard guard(lock_);
+    for (auto iter = pinned_vmos_.begin(); iter != pinned_vmos_.end(); iter++) {
+      if (iter->size == size && iter->offset == offset && iter->koid == info.koid) {
+        pinned_vmos_.erase(iter);
         return;
       }
     }
@@ -94,9 +92,6 @@ class Bti final : public fake_object::Object {
   const auto& pinned_vmos() const { return pinned_vmos_; }
 
  private:
-  Bti() : Object(ZX_OBJ_TYPE_BTI) {}
-  explicit Bti(cpp20::span<const zx_paddr_t> paddrs) : Object(ZX_OBJ_TYPE_BTI), paddrs_(paddrs) {}
-
   struct PinnedVmoInfo {
     zx::vmo vmo;
     uint64_t size;
@@ -110,8 +105,8 @@ class Bti final : public fake_object::Object {
     }
   };
 
-  fbl::Mutex lock_;
-  fbl::Vector<PinnedVmoInfo> pinned_vmos_ TA_GUARDED(lock_);
+  std::mutex lock_;
+  std::vector<PinnedVmoInfo> pinned_vmos_ TA_GUARDED(lock_);
   cpp20::span<const zx_paddr_t> paddrs_ = {};
   size_t paddrs_index_ = 0;
   uint64_t pmo_count_ = 0;
@@ -119,11 +114,17 @@ class Bti final : public fake_object::Object {
 
 class Pmt final : public fake_object::Object {
  public:
-  virtual ~Pmt() = default;
+  Pmt(zx::vmo vmo, uint64_t offset, uint64_t size, std::shared_ptr<Bti> bti)
+      : Object(ZX_OBJ_TYPE_PMT),
+        vmo_(std::move(vmo)),
+        offset_(offset),
+        size_(size),
+        bti_(std::move(bti)) {}
+  ~Pmt() final = default;
 
-  static zx_status_t Create(zx::vmo vmo, uint64_t offset, uint64_t size, fbl::RefPtr<Bti> bti,
-                            fbl::RefPtr<fake_object::Object>* out) {
-    fbl::RefPtr<Pmt> pmt(fbl::AdoptRef(new Pmt(std::move(vmo), offset, size, std::move(bti))));
+  static zx_status_t Create(zx::vmo vmo, uint64_t offset, uint64_t size, std::shared_ptr<Bti> bti,
+                            std::shared_ptr<fake_object::Object>* out) {
+    std::shared_ptr<Pmt> pmt = std::make_shared<Pmt>(std::move(vmo), offset, size, std::move(bti));
     // These lines exist because currently offset_ and size_ are unused, and
     // GCC and Clang disagree about whether or not marking them as unused is acceptable.
     (void)pmt->offset_;
@@ -137,17 +138,10 @@ class Pmt final : public fake_object::Object {
   Bti& bti() { return *bti_; }
 
  private:
-  Pmt(zx::vmo vmo, uint64_t offset, uint64_t size, fbl::RefPtr<Bti> bti)
-      : Object(ZX_OBJ_TYPE_PMT),
-        vmo_(std::move(vmo)),
-        offset_(offset),
-        size_(size),
-        bti_(std::move(bti)) {}
-
   zx::vmo vmo_;
   uint64_t offset_;
   uint64_t size_;
-  fbl::RefPtr<Bti> bti_;
+  std::shared_ptr<Bti> bti_;
 };
 }  // namespace
 // Fake BTI API
@@ -160,9 +154,9 @@ zx_status_t Bti::get_info(zx_handle_t handle, uint32_t topic, void* buffer, size
     printf("fake_bti_get_info: Failed to find handle %u\n", handle);
     return status.status_value();
   }
-  fbl::RefPtr<fake_object::Object> obj = std::move(status.value());
+  std::shared_ptr<fake_object::Object> obj = std::move(status.value());
   if (obj->type() == ZX_OBJ_TYPE_BTI) {
-    auto bti_obj = fbl::RefPtr<Bti>::Downcast(std::move(obj));
+    std::shared_ptr<Bti> bti_obj = std::static_pointer_cast<Bti>(obj);
     switch (topic) {
       case ZX_INFO_BTI: {
         if (avail_count) {
@@ -199,7 +193,7 @@ zx_status_t fake_bti_create(zx_handle_t* out) {
 
 zx_status_t fake_bti_create_with_paddrs(const zx_paddr_t* paddrs, size_t paddr_count,
                                         zx_handle_t* out) {
-  fbl::RefPtr<fake_object::Object> new_bti;
+  std::shared_ptr<fake_object::Object> new_bti;
   zx_status_t status = Bti::Create(cpp20::span(paddrs, paddr_count), &new_bti);
   if (status != ZX_OK) {
     return status;
@@ -219,7 +213,7 @@ zx_status_t fake_bti_get_pinned_vmos(zx_handle_t bti, fake_bti_pinned_vmo_info_t
   zx::result get_status = fake_object::FakeHandleTable().Get(bti);
   ZX_ASSERT_MSG(get_status.is_ok() && get_status.value()->type() == ZX_OBJ_TYPE_BTI,
                 "fake_bti_get_pinned_vmos: Bad handle %u\n", bti);
-  fbl::RefPtr<Bti> bti_obj = fbl::RefPtr<Bti>::Downcast(std::move(get_status.value()));
+  std::shared_ptr<Bti> bti_obj = std::static_pointer_cast<Bti>(get_status.value());
 
   const auto& vmos = bti_obj->pinned_vmos();
   if (actual_num_vmos != nullptr) {
@@ -254,7 +248,7 @@ zx_status_t fake_bti_get_phys_from_pinned_vmo(zx_handle_t bti, fake_bti_pinned_v
   zx::result get_status = fake_object::FakeHandleTable().Get(bti);
   ZX_ASSERT_MSG(get_status.is_ok() && get_status.value()->type() == ZX_OBJ_TYPE_BTI,
                 "fake_bti_get_phys_from_pinned_vmo: Bad handle %u\n", bti);
-  fbl::RefPtr<Bti> bti_obj = fbl::RefPtr<Bti>::Downcast(std::move(get_status.value()));
+  auto* bti_obj = static_cast<Bti*>(get_status.value().get());
 
   zx_info_handle_basic_t target_info;
   if (zx_status_t status = zx_object_get_info(vmo_info.vmo, ZX_INFO_HANDLE_BASIC, &target_info,
@@ -283,10 +277,10 @@ zx_status_t fake_bti_get_phys_from_pinned_vmo(zx_handle_t bti, fake_bti_pinned_v
 __EXPORT
 zx_status_t zx_bti_pin(zx_handle_t bti_handle, uint32_t options, zx_handle_t vmo, uint64_t offset,
                        uint64_t size, zx_paddr_t* addrs, size_t addrs_count, zx_handle_t* out) {
-  zx::result status = fake_object::FakeHandleTable().Get(bti_handle);
-  ZX_ASSERT_MSG(status.is_ok() && status.value()->type() == ZX_OBJ_TYPE_BTI,
+  zx::result get_status = fake_object::FakeHandleTable().Get(bti_handle);
+  ZX_ASSERT_MSG(get_status.is_ok() && get_status.value()->type() == ZX_OBJ_TYPE_BTI,
                 "fake bti_pin: Bad handle %u\n", bti_handle);
-  fbl::RefPtr<Bti> bti_obj = fbl::RefPtr<Bti>::Downcast(std::move(status.value()));
+  std::shared_ptr<Bti> bti_obj = std::static_pointer_cast<Bti>(get_status.value());
 
   zx::vmo vmo_clone;
   zx_status_t vmo_status = zx::unowned_vmo(vmo)->duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo_clone);
@@ -365,7 +359,7 @@ zx_status_t zx_bti_pin(zx_handle_t bti_handle, uint32_t options, zx_handle_t vmo
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  fbl::RefPtr<fake_object::Object> new_pmt;
+  std::shared_ptr<fake_object::Object> new_pmt;
   zx_status_t pmt_status = Pmt::Create(std::move(vmo_clone), offset, size, bti_obj, &new_pmt);
   if (pmt_status != ZX_OK) {
     return pmt_status;
@@ -397,7 +391,7 @@ zx_status_t zx_pmt_unpin(zx_handle_t handle) {
   zx::result get_status = fake_object::FakeHandleTable().Get(handle);
   ZX_ASSERT_MSG(get_status.is_ok() && get_status.value()->type() == ZX_OBJ_TYPE_PMT,
                 "fake pmt_unpin: Bad handle %u\n", handle);
-  fbl::RefPtr<Pmt> pmt = fbl::RefPtr<Pmt>::Downcast(std::move(get_status.value()));
+  std::shared_ptr<Pmt> pmt = std::static_pointer_cast<Pmt>(get_status.value());
   pmt->Unpin();
   --pmt->bti().pmo_count();
   zx::result remove_status = fake_object::FakeHandleTable().Remove(handle);

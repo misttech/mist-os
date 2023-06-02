@@ -4,14 +4,14 @@
 
 #include <dlfcn.h>
 #include <lib/fake-object/object.h>
+#include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
+#include <memory>
 #include <vector>
-
-#include <fbl/ref_ptr.h>
 
 #include "src/devices/testing/fake-object/internal.h"
 
@@ -30,7 +30,7 @@ __EXPORT void* FindRealSyscall(const char* name) {
 
 __EXPORT
 zx::result<zx_handle_t> fake_object_create_typed(zx_obj_type_t type) {
-  auto obj = fbl::MakeRefCounted<Object>(type);
+  auto obj = std::make_shared<Object>(type);
   if (auto res = FakeHandleTable().Add(std::move(obj)); res.is_ok()) {
     return zx::success(res.value());
   } else {

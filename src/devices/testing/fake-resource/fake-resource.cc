@@ -7,21 +7,16 @@
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
+#include <zircon/errors.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
+#include <zircon/syscalls/object.h>
 #include <zircon/syscalls/resource.h>
 
 #include <array>
 #include <utility>
 
-#include <fbl/auto_lock.h>
-#include <fbl/mutex.h>
-#include <fbl/ref_counted.h>
-#include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
-
-#include "zircon/errors.h"
-#include "zircon/syscalls/object.h"
 
 namespace {
 
@@ -32,12 +27,23 @@ namespace {
 // to create a |root| resource through this interface.
 class Resource final : public fake_object::Object {
  public:
-  virtual ~Resource() = default;
+  Resource(zx_paddr_t base, size_t size, zx_rsrc_kind_t kind, zx_rsrc_flags_t flags,
+           const char* name, size_t name_len)
+      : fake_object::Object(ZX_OBJ_TYPE_RESOURCE),
+        base_(base),
+        size_(size),
+        kind_(kind),
+        is_exclusive_(flags & ZX_RSRC_FLAG_EXCLUSIVE) {
+    ZX_ASSERT_MSG(kind_ != ZX_RSRC_KIND_IRQ && kind_ != ZX_RSRC_KIND_SMC,
+                  "fake-resource: unsupported kind: %u\n", kind);
+    memcpy(name_.data(), name, name_len);
+  }
+  ~Resource() final = default;
 
   static zx_status_t Create(zx_paddr_t base, size_t size, zx_rsrc_kind_t kind,
                             zx_rsrc_flags_t flags, const char* name, size_t name_len,
-                            fbl::RefPtr<Object>* out) {
-    *out = fbl::AdoptRef(new Resource(base, size, kind, flags, name, name_len));
+                            std::shared_ptr<Object>* out) {
+    *out = std::make_shared<Resource>(base, size, kind, flags, name, name_len);
     return ZX_OK;
   }
 
@@ -55,18 +61,6 @@ class Resource final : public fake_object::Object {
   zx_rsrc_kind_t kind_;
   const bool is_exclusive_;
   std::array<char, ZX_MAX_NAME_LEN> name_;
-
-  Resource(zx_paddr_t base, size_t size, zx_rsrc_kind_t kind, zx_rsrc_flags_t flags,
-           const char* name, size_t name_len)
-      : fake_object::Object(ZX_OBJ_TYPE_RESOURCE),
-        base_(base),
-        size_(size),
-        kind_(kind),
-        is_exclusive_(flags & ZX_RSRC_FLAG_EXCLUSIVE) {
-    ZX_ASSERT_MSG(kind_ != ZX_RSRC_KIND_IRQ && kind_ != ZX_RSRC_KIND_SMC,
-                  "fake-resource: unsupported kind: %u\n", kind);
-    memcpy(name_.data(), name, name_len);
-  }
 };
 
 // Returns true if r2 is valid within r1
@@ -138,7 +132,7 @@ zx_status_t zx_resource_create(zx_handle_t parent_rsrc, uint32_t options, uint64
   if (!get_res.is_ok()) {
     return get_res.status_value();
   }
-  fbl::RefPtr<Resource> parent = fbl::RefPtr<Resource>::Downcast(std::move(get_res.value()));
+  auto* parent = static_cast<Resource*>(get_res.value().get());
 
   // Fake root resources have no range or kind verification necessary.
   zx_rsrc_kind_t kind = ZX_RSRC_EXTRACT_KIND(options);
@@ -158,7 +152,7 @@ zx_status_t zx_resource_create(zx_handle_t parent_rsrc, uint32_t options, uint64
     return ZX_ERR_ACCESS_DENIED;
   }
 
-  fbl::RefPtr<fake_object::Object> new_res;
+  std::shared_ptr<fake_object::Object> new_res;
   ZX_ASSERT(Resource::Create(base, size, kind, flags, name, name_size, &new_res) == ZX_OK);
   zx::result add_res = fake_object::FakeHandleTable().Add(std::move(new_res));
   if (add_res.is_ok()) {
@@ -177,8 +171,8 @@ zx_status_t zx_vmo_create_physical(zx_handle_t handle, zx_paddr_t paddr, size_t 
   if (!get_res.is_ok()) {
     return get_res.status_value();
   }
-  fbl::RefPtr<Resource> resource = fbl::RefPtr<Resource>::Downcast(std::move(get_res.value()));
 
+  auto* resource = static_cast<Resource*>(get_res.value().get());
   if (!is_valid_range(resource->base(), resource->size(), paddr, size)) {
     return ZX_ERR_ACCESS_DENIED;
   }
@@ -194,8 +188,7 @@ zx_status_t ioport_syscall_common(zx_handle_t handle, uint16_t io_addr, uint32_t
   if (!get_res.is_ok()) {
     return get_res.status_value();
   }
-  fbl::RefPtr<Resource> resource = fbl::RefPtr<Resource>::Downcast(std::move(get_res.value()));
-
+  auto* resource = static_cast<Resource*>(get_res.value().get());
   if (resource->kind() != ZX_RSRC_KIND_IOPORT) {
     return ZX_ERR_WRONG_TYPE;
   }
@@ -224,7 +217,7 @@ zx_status_t zx_ioports_release(zx_handle_t resource, uint16_t io_addr, uint32_t 
 __EXPORT
 zx_status_t fake_root_resource_create(zx_handle_t* out) {
   std::array<char, ZX_MAX_NAME_LEN> name = {"FAKE ROOT"};
-  fbl::RefPtr<fake_object::Object> new_res;
+  std::shared_ptr<fake_object::Object> new_res;
   ZX_ASSERT(Resource::Create(0, 0, ZX_RSRC_KIND_ROOT, 0, name.data(), name.size(), &new_res) ==
             ZX_OK);
   zx::result add_res = fake_object::FakeHandleTable().Add(std::move(new_res));

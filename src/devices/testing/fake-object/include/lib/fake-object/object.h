@@ -12,12 +12,9 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
+#include <memory>
+#include <mutex>
 #include <unordered_map>
-
-#include <fbl/auto_lock.h>
-#include <fbl/canary.h>
-#include <fbl/ref_counted.h>
-#include <fbl/ref_ptr.h>
 
 #define FAKE_OBJECT_TRACE 0
 #if FAKE_OBJECT_TRACE
@@ -32,7 +29,7 @@
 
 namespace fake_object {
 
-class Object : public fbl::RefCounted<Object> {
+class Object {
  public:
   Object() = delete;
   explicit Object(zx_obj_type_t type) : type_(type) {}
@@ -112,9 +109,9 @@ class HandleTable {
 
   static bool IsValidFakeHandle(zx_handle_t handle);
 
-  zx::result<fbl::RefPtr<Object>> Get(zx_handle_t handle) __TA_EXCLUDES(lock_);
+  zx::result<std::shared_ptr<Object>> Get(zx_handle_t handle) __TA_EXCLUDES(lock_);
   zx::result<> Remove(zx_handle_t handle) __TA_EXCLUDES(lock_);
-  zx::result<zx_handle_t> Add(fbl::RefPtr<Object> obj) __TA_EXCLUDES(lock_);
+  zx::result<zx_handle_t> Add(std::shared_ptr<Object> obj) __TA_EXCLUDES(lock_);
   void Clear() __TA_EXCLUDES(lock_);
 
   // Walks the handle table and calls |cb| on each handle that matches the
@@ -124,7 +121,7 @@ class HandleTable {
   // for internal methods.
   template <typename ObjectCallback>
   void ForEach(zx_obj_type_t type, const ObjectCallback cb) __TA_EXCLUDES(lock_) {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard lock(lock_);
     for (const auto& e : handles_) {
       if (e.second->type() == type) {
         if (!std::forward<const ObjectCallback>(cb)(e.second.get())) {
@@ -138,16 +135,15 @@ class HandleTable {
   // We use the overall size of the vector to calculate new indices
   // so to determine the occupied size we have to verify each element.
   size_t size() __TA_EXCLUDES(lock_) {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard lock(lock_);
     return handles_.size();
   }
 
  private:
   static constexpr const char kFakeObjectPropName[ZX_MAX_NAME_LEN] = "FAKEOBJECT";
 
-  fbl::Mutex lock_;
-  std::unordered_map<zx_handle_t, fbl::RefPtr<Object>> handles_ __TA_GUARDED(lock_);
-  fbl::Canary<fbl::magic("FAKE")> canary_;
+  std::mutex lock_;
+  std::unordered_map<zx_handle_t, std::shared_ptr<Object>> handles_ __TA_GUARDED(lock_);
 };
 
 // Singleton accessor for tests and any derived fake object type.

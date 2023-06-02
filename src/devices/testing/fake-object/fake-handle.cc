@@ -8,8 +8,8 @@
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
-#include <fbl/auto_lock.h>
-#include <fbl/ref_ptr.h>
+#include <memory>
+#include <mutex>
 
 #include "src/devices/testing/fake-object/internal.h"
 
@@ -35,9 +35,8 @@ bool HandleTable::IsValidFakeHandle(zx_handle_t handle) {
 }
 
 __EXPORT
-zx::result<fbl::RefPtr<Object>> HandleTable::Get(zx_handle_t handle) __TA_EXCLUDES(lock_) {
-  canary_.Assert();
-  fbl::AutoLock lock(&lock_);
+zx::result<std::shared_ptr<Object>> HandleTable::Get(zx_handle_t handle) __TA_EXCLUDES(lock_) {
+  std::lock_guard guard(lock_);
   auto iter = handles_.find(handle);
   if (iter == handles_.end()) {
     ftracef("handle = 0x%x, not found\n", handle);
@@ -50,8 +49,7 @@ zx::result<fbl::RefPtr<Object>> HandleTable::Get(zx_handle_t handle) __TA_EXCLUD
 }
 
 __EXPORT
-zx::result<zx_handle_t> HandleTable::Add(fbl::RefPtr<Object> obj) {
-  canary_.Assert();
+zx::result<zx_handle_t> HandleTable::Add(std::shared_ptr<Object> obj) {
   // Fake objects are represented as empty VMOs because:
   // 1. We need a simple object that will have minimal effect on the test environment
   // 2. We need a valid handle that can be by default transferred over a channel
@@ -71,7 +69,7 @@ zx::result<zx_handle_t> HandleTable::Add(fbl::RefPtr<Object> obj) {
     return zx::error(status);
   }
 
-  fbl::AutoLock guard(&lock_);
+  std::lock_guard guard(lock_);
   [[maybe_unused]] void* obj_ptr = obj.get();
   [[maybe_unused]] zx_obj_type_t type = obj->type();
   handles_[handle] = std::move(obj);
@@ -81,13 +79,12 @@ zx::result<zx_handle_t> HandleTable::Add(fbl::RefPtr<Object> obj) {
 
 __EXPORT
 zx::result<> HandleTable::Remove(zx_handle_t handle) {
-  canary_.Assert();
   // Pull the object out of the handle table so that we can release the handle
   // table lock before running the object's dtor. This prevents issues like
   // deadlocks if the object asserts in its dtor as a test object may do.
-  fbl::RefPtr<Object> obj;
+  std::shared_ptr<Object> obj;
   {
-    fbl::AutoLock guard(&lock_);
+    std::lock_guard guard(lock_);
     ftracef("handle = 0x%x, obj = %p, type = %u\n", handle, handles_[handle].get(),
             handles_[handle]->type());
     handles_.erase(handle);
@@ -98,14 +95,13 @@ zx::result<> HandleTable::Remove(zx_handle_t handle) {
 
 __EXPORT
 void HandleTable::Clear() {
-  canary_.Assert();
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard guard(lock_);
   handles_.clear();
 }
 
 __EXPORT
 void HandleTable::Dump() {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard guard(lock_);
   printf("Fake Handle Table [size: %zu]:\n", handles_.size());
   for (auto& e : handles_) {
     printf("handle %#x (type: %u)", e.first, static_cast<uint32_t>(e.second->type()));
