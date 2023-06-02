@@ -6363,6 +6363,22 @@ glog adapter portion of this module.
 
 From //third_party/pigweed/src/pw_log/BUILD.gn:33
 
+### pw_log_string_CONFIG
+
+**Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
+
+From //third_party/pigweed/src/pw_log_string/BUILD.gn:26
+
+### pw_log_string_HANDLER_BACKEND
+
+The pw_log_string:message_handler backend implements the pw_Log C API
+which is also used by the pw_log_string module's implementation of the
+pw_log facade.
+
+**Current value (from the default):** `""`
+
+From //third_party/pigweed/src/pw_log_string/backend.gni:21
+
 ### pw_log_tokenized_CONFIG
 
 The build target that overrides the default configuration options for this
