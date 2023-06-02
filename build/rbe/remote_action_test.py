@@ -1737,8 +1737,11 @@ remote_metadata: {{
             _write_file_contents(rrpl, rrpl_contents)
             build_id = 'xyzzy'
             log_record = remote_action.ReproxyLogEntry.parse_action_log(rrpl)
-            log_record.make_download_stubs(
-                files=[p], dirs=[], working_dir_abs=tdp, build_id=build_id)
+            stub_infos = log_record.make_download_stubs(
+                files=[p], dirs=[], build_id=build_id)
+
+            self.assertEqual(len(stub_infos), 1)
+            stub_infos[p].create(tdp)
 
             destination = tdp / p
             self.assertTrue(remote_action.is_download_stub_file(destination))
@@ -1780,8 +1783,10 @@ remote_metadata: {{
             _write_file_contents(rrpl, rrpl_contents)
             build_id = 'yzzyx'
             log_record = remote_action.ReproxyLogEntry.parse_action_log(rrpl)
-            log_record.make_download_stubs(
-                files=[], dirs=[p], working_dir_abs=tdp, build_id=build_id)
+            stub_infos = log_record.make_download_stubs(
+                files=[], dirs=[p], build_id=build_id)
+            self.assertEqual(len(stub_infos), 1)
+            stub_infos[p].create(tdp)
 
             destination = tdp / p
             self.assertTrue(remote_action.is_download_stub_file(destination))
@@ -1904,7 +1909,6 @@ remote_metadata: {{
         mock_stub.assert_called_with(
             files=[Path(output)],
             dirs=[],
-            working_dir_abs=working_dir,
             build_id=logdir,
         )
         mock_downloader.assert_called_with()
@@ -1955,7 +1959,6 @@ remote_metadata: {{
         mock_stub.assert_called_with(
             files=[Path(output)],
             dirs=[],
-            working_dir_abs=working_dir,
             build_id=logdir,
         )
         mock_downloader.assert_called_with()

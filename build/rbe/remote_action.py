@@ -421,63 +421,35 @@ class ReproxyLogEntry(object):
             build_id=build_id,
         )
 
-    def _write_download_stub(
-        self,
-        path: Path,
-        build_id: str,
-        working_dir_abs: Path,
-    ):
-        """Write a single stub file that can be used to fetch a blob later.
-
-        Args:
-          path: the full path of the output file or dir, absolute.
-          build_id: a unique identifier for a particular build (reproxy) session.
-          working_dir_abs: working dir.
-
-        Returns:
-          download stub information (that was written to file)
-        """
-        stub_info = self.make_download_stub_info(path, build_id)
-        stub_info.create(working_dir_abs)
-        return stub_info
-
     def make_download_stubs(
         self,
         files: Iterable[Path],
         dirs: Iterable[Path],
-        working_dir_abs: Path,
         build_id: str,
     ) -> Dict[Path, 'DownloadStubInfo']:
-        """Establish placeholders from which real artifacts can be retrieved later.
-
-        Writes stub information to file and returns objects of them.
+        """Construct a map of paths to DownloadStubInfo.
 
         Args:
           files: files to create download stubs for.
           dirs: directories to create download stubs for.
-          working_dir_abs: absolute path to current working dir, relative to which
-              files are created.
           build_id: any string that corresponds to a unique build.
 
         Returns:
           Dictionary of paths to their stubs objects.
         """
         stubs = dict()
-        # TODO: the following could be parallelized
         stubs.update(
             {
-                f: self._write_download_stub(
+                f: self.make_download_stub_info(
                     path=f,
                     build_id=build_id,
-                    working_dir_abs=working_dir_abs,
                 ) for f in files
             })
         stubs.update(
             {
-                d: self._write_download_stub(
+                d: self.make_download_stub_info(
                     path=d,
                     build_id=build_id,
-                    working_dir_abs=working_dir_abs,
                 ) for d in dirs
             })
         return stubs
@@ -697,7 +669,7 @@ class DownloadStubInfo(object):
     def create(self, working_dir_abs: Path):
         """Create a download stub file.
 
-        The stub file will be backed-up to PATH.dl-stub it is 'downloaded'.
+        The stub file will be backed-up to PATH.dl-stub when it is 'downloaded'.
 
         Args:
           working_dir_abs: absolute path to the working dir, to which
@@ -1329,15 +1301,22 @@ class RemoteAction(object):
         stub_infos = log_record.make_download_stubs(
             files=self.output_files_relative_to_working_dir,
             dirs=self.output_dirs_relative_to_working_dir,
-            working_dir_abs=self.working_dir,
             build_id=build_id,
         )
+
+        # Write download stubs out.
+        # What if download was skipped due to preserving mtime???
+        for stub_info in stub_infos.values():
+            self.vmsg(f"  {stub_info.path}: {stub_info.blob_digest}")
+            stub_info.create(self.working_dir)
+
         # Download outputs that were explicitly requested.
         # With 'log_record', we can just go directly to stub info without
         # having to read the stub file we just wrote.
         downloader = self.downloader()
-        for path in self.always_download:
+        for path in self.always_download:  # TODO: parallelize
             stub_info = stub_infos[path]
+            self.vmsg(f"Downloading {path}")
             status = stub_info.download(
                 downloader=downloader, working_dir_abs=self.working_dir)
             if status.returncode != 0:  # alert, but do not fail
