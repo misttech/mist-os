@@ -198,7 +198,7 @@ func (t *Device) SSHClient() (*sshutil.Client, error) {
 }
 
 func (t *Device) mustLoadThroughZedboot() bool {
-	return mustLoadThroughZedboot || t.config.FastbootSernum == "" || !t.UseFFXExperimental(1)
+	return mustLoadThroughZedboot || t.config.FastbootSernum == "" || !t.UseFFX()
 }
 
 // Start starts the device target.
@@ -261,7 +261,7 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 		}
 		var imgs []bootserver.Image
 		var ffxFlashDeps []string
-		if t.UseFFXExperimental(1) && !t.opts.Netboot && !t.mustLoadThroughZedboot() {
+		if t.UseFFX() && !t.opts.Netboot && !t.mustLoadThroughZedboot() {
 			ffxFlashDeps, err = ffxutil.GetFlashDeps(wd, "fuchsia")
 			if err != nil {
 				return err
@@ -402,8 +402,7 @@ func (t *Device) bootZedboot(ctx context.Context, images []bootserver.Image) err
 }
 
 func (t *Device) ramBoot(ctx context.Context, images []bootserver.Image) error {
-	// TODO(fxbug.dev/91352): Remove experimental condition once stable.
-	if t.UseFFXExperimental(1) {
+	if t.UseFFX() {
 		var zbi *bootserver.Image
 		if t.imageOverrides.ZBI == "" {
 			zbi = getImageByName(images, "zbi_zircon-a")
@@ -471,8 +470,7 @@ func (t *Device) flash(ctx context.Context, images []bootserver.Image) error {
 		}
 	}()
 
-	// TODO(fxbug.dev/91040): Remove experimental condition once stable.
-	if pubkey != "" && t.UseFFXExperimental(1) {
+	if pubkey != "" && t.UseFFX() {
 		flashManifest := getImageByName(images, "manifest_flash-manifest")
 		if flashManifest == nil {
 			return errors.New("flash manifest not found")
