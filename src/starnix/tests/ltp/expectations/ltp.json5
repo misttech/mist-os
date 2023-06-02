@@ -818,6 +818,12 @@
                 // TODO(fxbug.dev/128185) Re-enable once flake is resolved.
                 "*/ltp_ht_affinity.cm",
 
+                // TODO(fxbug.dev/128437) Re-enable once flake is resolved.
+                "*/ltp_pth_str01.cm",
+
+                // TODO(fxbug.dev/128414) Re-enable once flake is resolved.
+                "*/ltp_nanosleep01.cm",
+
                 // TODO(fxbug.dev/128404) Re-enable once flake is resolved.
                 "*/ltp_kill03.cm",
 
