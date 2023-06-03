@@ -96,7 +96,7 @@ class VirtualLayer {
   custom_layer_t* CreateLayer(const fidl::WireSyncClient<Coordinator>& dc);
   void SetLayerImages(const fidl::WireSyncClient<Coordinator>& dc, bool alt_image);
 
-  fbl::Vector<Display*> displays_;
+  fbl::Vector<const Display*> displays_;
   fbl::Vector<custom_layer_t> layers_;
 
   uint32_t width_;

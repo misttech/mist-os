@@ -83,7 +83,7 @@ VirtualLayer::VirtualLayer(Display* display) {
 }
 
 VirtualLayer::VirtualLayer(const fbl::Vector<Display>& displays, bool tiled) {
-  for (auto& d : displays) {
+  for (const Display& d : displays) {
     displays_.push_back(&d);
   }
 

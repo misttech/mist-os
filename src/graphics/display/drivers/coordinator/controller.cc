@@ -233,7 +233,7 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
                      removed_display_ids = std::move(removed_display_ids)](
                         async_dispatcher_t* dispatcher, async::Task* task, zx_status_t status) {
     if (status == ZX_OK) {
-      for (fbl::RefPtr<DisplayInfo>& added_display_info : added_display_infos) {
+      for (const fbl::RefPtr<DisplayInfo>& added_display_info : added_display_infos) {
         if (added_display_info->edid.has_value()) {
           PopulateDisplayTimings(added_display_info);
         }
@@ -242,7 +242,7 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
 
       fbl::Vector<uint64_t> added_ids;
       added_ids.reserve(added_display_infos.size());
-      for (fbl::RefPtr<DisplayInfo>& added_display_info : added_display_infos) {
+      for (const fbl::RefPtr<DisplayInfo>& added_display_info : added_display_infos) {
         // Dropping some add events can result in spurious removes, but
         // those are filtered out in the clients.
         if (!added_display_info->edid.has_value() ||
@@ -254,7 +254,6 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
           zxlogf(WARNING, "Ignoring display with no compatible edid timings");
         }
       }
-
       if (vc_client_ && vc_ready_) {
         vc_client_->OnDisplaysChanged(added_ids.data(), added_ids.size(),
                                       removed_display_ids.data(), removed_display_ids.size());
