@@ -46,7 +46,7 @@ async fn main() {
                         assert_eq!(pkg_server_host, hostname);
                         info!(%hostname, localhost = ?localhost(), "LooupIp");
                         responder
-                            .send(&mut Ok(LookupResult {
+                            .send(Ok(&LookupResult {
                                 addresses: Some(vec![localhost()]),
                                 ..Default::default()
                             }))
@@ -55,7 +55,7 @@ async fn main() {
                     LookupRequest::LookupHostname { addr, responder } => {
                         assert_eq!(addr, localhost());
                         info!(?addr, %pkg_server_host, "LookupHostname");
-                        responder.send(&mut Ok(pkg_server_host.clone())).unwrap();
+                        responder.send(Ok(&pkg_server_host)).unwrap();
                     }
                 }
             }

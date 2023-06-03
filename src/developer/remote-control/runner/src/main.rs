@@ -139,7 +139,7 @@ mod test {
                 match req {
                     Some(RemoteControlRequest::IdentifyHost { responder }) => {
                         let _ = responder
-                            .send(&mut Ok(IdentifyHostResponse {
+                            .send(Ok(&IdentifyHostResponse {
                                 nodename: Some("".to_string()),
                                 addresses: Some(vec![]),
                                 ids: Some(vec![last_id.borrow().clone()]),

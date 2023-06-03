@@ -155,26 +155,25 @@ impl Cr50 {
                     let request = match PinweaverInsertLeaf::new(params) {
                         Ok(req) => req,
                         Err(e) => {
-                            responder.send(&mut Err(e)).context("Replying to request")?;
+                            responder.send(Err(e)).context("Replying to request")?;
                             continue;
                         }
                     };
 
                     let result =
                         request.execute(&self.proxy).await.context("Executing TPM command")?;
-                    let mut fidl_result = result.ok().map(|response| {
-                        let mut table = InsertLeafResponse::default();
+                    let mut table = InsertLeafResponse::default();
+                    let fidl_result = result.ok().map(|response| {
                         table.root_hash = Some(response.root);
                         let data = response.data.as_ref().unwrap();
-                        table.mac = Some(data.leaf_data.hmac);
                         // cred metadata is just the whole unimported_leaf_data.
                         let mut serializer = Serializer::new();
                         data.leaf_data.serialize(&mut serializer);
                         table.cred_metadata = Some(serializer.into_vec());
-                        table
+                        &table
                     });
 
-                    responder.send(&mut fidl_result).context("Replying to request")?;
+                    responder.send(fidl_result).context("Replying to request")?;
                 }
                 PinWeaverRequest::RemoveLeaf { params, responder } => {
                     let request = match PinweaverRemoveLeaf::new(params) {
@@ -298,16 +297,16 @@ impl Cr50 {
                     let request = match PinweaverLogReplay::new(params) {
                         Ok(req) => req,
                         Err(e) => {
-                            responder.send(&mut Err(e)).context("Replying to request")?;
+                            responder.send(Err(e)).context("Replying to request")?;
                             continue;
                         }
                     };
 
                     let exec_result = request.execute(&self.proxy).await?;
 
-                    let mut fidl_result = match exec_result.ok() {
+                    let mut success = LogReplayResponse::default();
+                    let fidl_result = match exec_result.ok() {
                         Ok(_) => {
-                            let mut success = LogReplayResponse::default();
                             let data = exec_result.data.as_ref().unwrap();
                             // cred metadata is just the whole unimported_leaf_data.
                             let mut serializer = Serializer::new();
@@ -315,12 +314,12 @@ impl Cr50 {
                             success.cred_metadata = Some(serializer.into_vec());
 
                             success.leaf_hash = Some(data.unimported_leaf_data.hmac);
-                            Ok(success)
+                            Ok(&success)
                         }
                         Err(e) => Err(e),
                     };
 
-                    responder.send(&mut fidl_result).context("Replying to request")?;
+                    responder.send(fidl_result).context("Replying to request")?;
                 }
             }
         }

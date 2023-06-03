@@ -995,14 +995,14 @@ mod test {
                         responder.send(Err(TargetAvcError::RejectedInternalError))
                     }
                     TargetHandlerRequest::GetMediaAttributes { responder } => {
-                        responder.send(&mut Ok(MediaAttributes {
+                        responder.send(Ok(&MediaAttributes {
                             title: Some("Foo".to_string()),
                             artist_name: Some("Bar".to_string()),
                             ..Default::default()
                         }))
                     }
                     TargetHandlerRequest::GetPlayStatus { responder } => {
-                        responder.send(&mut Err(TargetAvcError::RejectedInternalError))
+                        responder.send(Err(TargetAvcError::RejectedInternalError))
                     }
                     TargetHandlerRequest::SendCommand { command, pressed: _, responder } => {
                         if command == AvcPanelCommand::Play {
@@ -1018,16 +1018,16 @@ mod test {
                     TargetHandlerRequest::GetPlayerApplicationSettings {
                         attribute_ids: _,
                         responder,
-                    } => responder.send(&mut Ok(fidl_avrcp::PlayerApplicationSettings {
+                    } => responder.send(Ok(&fidl_avrcp::PlayerApplicationSettings {
                         shuffle_mode: Some(fidl_avrcp::ShuffleMode::Off),
                         ..Default::default()
                     })),
                     TargetHandlerRequest::SetPlayerApplicationSettings {
                         requested_settings: _,
                         responder,
-                    } => responder.send(&mut Ok(fidl_avrcp::PlayerApplicationSettings::default())),
+                    } => responder.send(Ok(&fidl_avrcp::PlayerApplicationSettings::default())),
                     TargetHandlerRequest::GetNotification { event_id: _, responder } => responder
-                        .send(&mut Ok(Notification {
+                        .send(Ok(&Notification {
                             status: Some(fidl_fuchsia_bluetooth_avrcp::PlaybackStatus::Playing),
                             ..Default::default()
                         })),
@@ -1036,7 +1036,7 @@ mod test {
                         current: _,
                         pos_change_interval: _,
                         responder,
-                    } => responder.send(&mut Ok(Notification {
+                    } => responder.send(Ok(&Notification {
                         status: Some(fidl_fuchsia_bluetooth_avrcp::PlaybackStatus::Stopped),
                         ..Default::default()
                     })),
@@ -1177,7 +1177,7 @@ mod test {
             while let Some(Ok(event)) = target_stream.next().await {
                 let _result = match event {
                     TargetHandlerRequest::GetMediaAttributes { responder } => {
-                        responder.send(&mut Ok(MediaAttributes {
+                        responder.send(Ok(&MediaAttributes {
                             title: Some(String::from(
                                 "Lorem ipsum dolor sit amet,\
                  consectetur adipiscing elit. Nunc eget elit cursus ipsum \

@@ -114,7 +114,7 @@ pub mod test {
                     match state.variables.get_mut(&name) {
                         Some(var) => {
                             var.1 += 1;
-                            responder.send(&mut Ok(var.0.to_owned())).unwrap();
+                            responder.send(Ok(&var.0)).unwrap();
                         }
                         None => {
                             panic!("Warning: requested variable: {}, which was not set", name)

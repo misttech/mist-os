@@ -50,10 +50,10 @@ impl RewriteService {
                 }
                 EngineRequest::TestApply { url, responder } => {
                     responder.send(
-                        &mut self
-                            .handle_test_apply(url.as_str())
+                        self.handle_test_apply(url.as_str())
                             .await
                             .map(|url| url.to_string())
+                            .as_deref()
                             .map_err(|e| e.into_raw()),
                     )?;
                 }

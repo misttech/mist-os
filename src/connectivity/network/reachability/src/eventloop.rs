@@ -771,10 +771,11 @@ mod tests {
         let _ = assert_matches!(exec.run_until_stalled(&mut server_end_fut),
             Poll::Ready(Ok(Some(fnet_name::LookupRequest::LookupIp { responder, hostname, .. }))) => {
                 if DNS_DOMAIN == hostname {
-                    responder.send(&mut Ok(fnet_name::LookupResult
-                    { addresses: Some(vec![fidl_ip!("1.2.3.1")]), ..Default::default() }) )
+                    responder.send(Ok(&fnet_name::LookupResult {
+                        addresses: Some(vec![fidl_ip!("1.2.3.1")]), ..Default::default()
+                    }))
                 } else {
-                    responder.send(&mut Err(fnet_name::LookupError::NotFound))
+                    responder.send(Err(fnet_name::LookupError::NotFound))
                 }
             }
         );
@@ -798,7 +799,7 @@ mod tests {
         let _ = assert_matches!(exec.run_until_stalled(&mut server_end_fut),
             Poll::Ready(Ok(Some(fnet_name::LookupRequest::LookupIp { responder, .. }))) => {
                 // Send a not found error regardless of the hostname
-                responder.send(&mut Err(fnet_name::LookupError::NotFound))
+                responder.send(Err(fnet_name::LookupError::NotFound))
             }
         );
 

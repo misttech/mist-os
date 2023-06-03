@@ -1356,7 +1356,7 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetBindToDevice { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetTimestamp { value: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
@@ -1659,7 +1659,7 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetTcpInfo { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetTcpQuickAck { value, responder } => {
                 self.with_socket_options_mut(|so| so.delayed_ack = !value);

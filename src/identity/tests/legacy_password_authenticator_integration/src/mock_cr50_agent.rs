@@ -177,8 +177,7 @@ async fn handle_request(
                     // TryAuth responses.
                     let mut secret = he_secret.lock();
                     *secret = params.he_secret.expect("expected he_secret provided in params");
-                    resp.send(&mut std::result::Result::Ok(response))
-                        .expect("failed to send response");
+                    resp.send(Ok(&response)).expect("failed to send response");
                 }
                 _ => {
                     panic!("Next mock response type was {next_response:?} but expected InsertLeaf.")

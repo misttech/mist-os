@@ -901,7 +901,7 @@ mod test {
         Some(fho::testing::fake_proxy(move |req| match req {
             RemoteControlRequest::IdentifyHost { responder } => {
                 responder
-                    .send(&mut Ok(IdentifyHostResponse {
+                    .send(Ok(&IdentifyHostResponse {
                         boot_timestamp_nanos: Some(BOOT_TS),
                         nodename: Some(NODENAME.to_string()),
                         ..Default::default()
@@ -935,7 +935,7 @@ mod test {
                 )
                 .unwrap();
                 responder
-                    .send(&mut Ok(LogSession {
+                    .send(Ok(&LogSession {
                         target_identifier: t,
                         session_timestamp_nanos: Some(BOOT_TS),
                         ..Default::default()

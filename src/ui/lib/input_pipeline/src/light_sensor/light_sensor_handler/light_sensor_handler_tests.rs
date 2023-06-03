@@ -131,7 +131,7 @@ fn get_mock_device_proxy(
 }
 
 fn get_mock_device_proxy_with_response(
-    mut get_response: Option<InputDeviceGetFeatureReportResult>,
+    get_response: Option<InputDeviceGetFeatureReportResult>,
     response: InputDeviceSetFeatureReportResult,
 ) -> (InputDeviceProxy, Rc<RefCell<Option<FeatureReport>>>, fasync::Task<()>) {
     let (device_proxy, mut stream) =
@@ -142,33 +142,26 @@ fn get_mock_device_proxy_with_response(
         async move {
             while let Some(Ok(request)) = stream.next().await {
                 match request {
-                    InputDeviceRequest::GetFeatureReport { responder } => {
-                        let mut response;
-                        let response_ref = match get_response {
-                            Some(ref mut response) => response,
-                            None => {
-                                response = Ok(match called.borrow().as_ref() {
-                                    Some(report) => report.clone(),
-                                    None => FeatureReport {
-                                        sensor: Some(SensorFeatureReport {
-                                            report_interval: Some(1),
-                                            sensitivity: Some(vec![16]),
-                                            reporting_state: Some(
-                                                SensorReportingState::ReportAllEvents,
-                                            ),
-                                            threshold_high: Some(vec![1]),
-                                            threshold_low: Some(vec![1]),
-                                            sampling_rate: Some(100),
-                                            ..Default::default()
-                                        }),
-                                        ..Default::default()
-                                    },
-                                });
-                                &mut response
-                            }
-                        };
-                        responder.send(response_ref).expect("sending get response to test")
+                    InputDeviceRequest::GetFeatureReport { responder } => match get_response {
+                        Some(Ok(ref report)) => responder.send(Ok(report)),
+                        Some(Err(e)) => responder.send(Err(e)),
+                        None => match called.borrow().as_ref() {
+                            Some(report) => responder.send(Ok(report)),
+                            None => responder.send(Ok(&FeatureReport {
+                                sensor: Some(SensorFeatureReport {
+                                    report_interval: Some(1),
+                                    sensitivity: Some(vec![16]),
+                                    reporting_state: Some(SensorReportingState::ReportAllEvents),
+                                    threshold_high: Some(vec![1]),
+                                    threshold_low: Some(vec![1]),
+                                    sampling_rate: Some(100),
+                                    ..Default::default()
+                                }),
+                                ..Default::default()
+                            })),
+                        },
                     }
+                    .expect("sending get response to test"),
                     InputDeviceRequest::SetFeatureReport { report, responder } => {
                         *called.borrow_mut() = Some(report);
                         responder.send(response).expect("sending set response to test");

@@ -564,7 +564,7 @@ impl BlockServer {
                 responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }
             VolumeAndNodeRequest::GetTopologicalPath { responder } => {
-                responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
+                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }
             VolumeAndNodeRequest::GetMinDriverLogSeverity { responder } => {
                 responder.send(

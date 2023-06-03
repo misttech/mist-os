@@ -995,37 +995,7 @@ func convertResultToEncodeExpr(v string, t Type, p Payload) string {
 	}
 }
 
-// convertMutRefResultToEncodeExpr returns an expression that converts a
-// variable v from &mut Result<p.TupleType, _> to to Result<T, _>, where p is
-// payloadForType(t) and T implements fidl::encoding::Encode<p.FidlType>.
-//
-// TODO(fxbug.dev/122199): Remove this once the transition to the new types is
-// complete. This is only needed for Result types, which always contained owned
-// types for the Ok value in the old types.
-func convertMutRefResultToEncodeExpr(v string, t Type, p Payload) string {
-	switch t.DeclType {
-	case fidlgen.StructDeclType:
-		if len(p.Parameters) == 0 {
-			return "*" + v
-		}
-		var names []string
-		var exprs []string
-		for _, param := range p.Parameters {
-			names = append(names, param.Name)
-			exprs = append(exprs, convertMutRefOwnedToEncodeExpr(param.Name, *param.StructMemberType))
-		}
-		return fmt.Sprintf("%s.as_mut().map_err(|e| *e).map(|%s| %s)", v, fmtOneOrTuple(names), fmtTuple(exprs))
-	case fidlgen.TableDeclType, fidlgen.UnionDeclType:
-		if t.IsResourceType() {
-			return v + ".as_mut().map_err(|e| *e)"
-		}
-		return v + ".as_ref().map_err(|e| *e)"
-	default:
-		panic(fmt.Sprintf("unexpected decl type %s", t.DeclType))
-	}
-}
-
-// convertMutRefOwnedToEncodeExpr returns an expression that converts a variable
+// convertMutRefParamToEncodeExpr returns an expression that converts a variable
 // v from &mut t.Param to a type implementing fidl::encoding::Encode<t.Fidl>.
 //
 // TODO(fxbug.dev/122199): Remove this once the transition to the new types is
@@ -1331,43 +1301,20 @@ func (c *compiler) compileResponse(m fidlgen.Method) Payload {
 		paramName := "result"
 		p.TupleType = c.compileCamelCompoundIdentifier(m.ResultType.Identifier)
 		p.TupleTypeAliasRhs = fmt.Sprintf("Result<%s, %s>", inner.TupleType, errType.Owned)
-		// TODO(fxbug.dev/54368): Complete migration from `&mut Result<Owned, Err>` to `Result<Param, Err>`.
-		migrate := innerType.DeclType == fidlgen.TableDeclType ||
-			innerType.DeclType == fidlgen.UnionDeclType ||
-			innerType.IsResourceType() ||
-			len(c.structs[innerType.Identifier].Members) == 0 ||
-			len(c.structs[innerType.Identifier].Members) > 1 ||
-			c.structs[innerType.Identifier].Members[0].Type.Kind == fidlgen.PrimitiveType ||
-			c.structs[innerType.Identifier].Members[0].Type.Kind == fidlgen.ArrayType ||
-			c.structs[innerType.Identifier].Members[0].Type.Kind == fidlgen.VectorType ||
-			(c.structs[innerType.Identifier].Members[0].Type.Kind == fidlgen.IdentifierType &&
-				(c.decls[c.structs[innerType.Identifier].Members[0].Type.Identifier].Type == fidlgen.EnumDeclType ||
-					c.decls[c.structs[innerType.Identifier].Members[0].Type.Identifier].Type == fidlgen.BitsDeclType ||
-					c.decls[c.structs[innerType.Identifier].Members[0].Type.Identifier].Type == fidlgen.StructDeclType ||
-					c.decls[c.structs[innerType.Identifier].Members[0].Type.Identifier].Type == fidlgen.UnionDeclType))
-		if migrate {
-			okParamType := "()"
-			if len(inner.Parameters) > 0 {
-				var paramTypes []string
-				for _, param := range inner.Parameters {
-					paramTypes = append(paramTypes, param.Type)
-				}
-				okParamType = fmtOneOrTuple(paramTypes)
+		okParamType := "()"
+		if len(inner.Parameters) > 0 {
+			var paramTypes []string
+			for _, param := range inner.Parameters {
+				paramTypes = append(paramTypes, param.Type)
 			}
-			p.Parameters = []Parameter{{
-				Name:      paramName,
-				Type:      fmt.Sprintf("Result<%s, %s>", okParamType, errType.Param),
-				OwnedType: p.TupleType,
-			}}
-			p.EncodeExpr = convertResultToEncodeExpr(paramName, innerType, inner)
-		} else {
-			p.Parameters = []Parameter{{
-				Name:      paramName,
-				Type:      "&mut " + p.TupleType,
-				OwnedType: p.TupleType,
-			}}
-			p.EncodeExpr = convertMutRefResultToEncodeExpr(paramName, innerType, inner)
+			okParamType = fmtOneOrTuple(paramTypes)
 		}
+		p.Parameters = []Parameter{{
+			Name:      paramName,
+			Type:      fmt.Sprintf("Result<%s, %s>", okParamType, errType.Param),
+			OwnedType: p.TupleType,
+		}}
+		p.EncodeExpr = convertResultToEncodeExpr(paramName, innerType, inner)
 		p.ConvertToTuple = func(owned string) string {
 			return fmt.Sprintf("%s.map(|x| %s)", owned, inner.ConvertToTuple("x"))
 		}

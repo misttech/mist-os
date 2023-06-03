@@ -1402,9 +1402,7 @@ async fn starts_device_in_multicast_promiscuous(name: &str) {
                 } => netdevice.clone(device).expect("clonet"),
                 fnetemul_internal::NetworkDeviceInstanceRequest::GetTopologicalPath {
                     responder,
-                } => responder
-                    .send(&mut Ok("some_topopath".to_string()))
-                    .expect("send topopath response"),
+                } => responder.send(Ok("some_topopath")).expect("send topopath response"),
                 req => panic!("unexpected request {:?}", req),
             }
         })

@@ -36,7 +36,7 @@ impl FidlProtocol for Diagnostics {
                 } else {
                     tracing::info!("StreamDiagnostics failed: stream mode is required");
                     return responder
-                        .send(&mut Err(ffx::DiagnosticsStreamError::MissingParameter))
+                        .send(Err(ffx::DiagnosticsStreamError::MissingParameter))
                         .context("sending missing parameter response");
                 };
 
@@ -48,7 +48,7 @@ impl FidlProtocol for Diagnostics {
                             "StreamDiagnostics failed: Missing target string in SnapshotAll mode."
                         );
                         return responder
-                            .send(&mut Err(ffx::DiagnosticsStreamError::MissingParameter))
+                            .send(Err(ffx::DiagnosticsStreamError::MissingParameter))
                             .context("sending missing parameter response");
                     };
 
@@ -59,16 +59,15 @@ impl FidlProtocol for Diagnostics {
                             "StreamDiagnostics failed: Missing session in SnapshotAll mode."
                         );
                         return responder
-                            .send(&mut Err(ffx::DiagnosticsStreamError::MissingParameter))
+                            .send(Err(ffx::DiagnosticsStreamError::MissingParameter))
                             .context("sending missing parameter response");
                     };
 
                     let mut streams =
                         DiagnosticsStreamer::list_sessions(Some(target_str.clone())).await?;
                     if streams.is_empty() {
-                        responder.send(&mut Err(
-                            ffx::DiagnosticsStreamError::NoMatchingOfflineTargets,
-                        ))?;
+                        responder
+                            .send(Err(ffx::DiagnosticsStreamError::NoMatchingOfflineTargets))?;
                         return Ok(());
                     }
 
@@ -77,9 +76,8 @@ impl FidlProtocol for Diagnostics {
                         .context("getting stream by target name. should be infallible")?;
 
                     if streams.is_empty() {
-                        responder.send(&mut Err(
-                            ffx::DiagnosticsStreamError::NoMatchingOfflineTargets,
-                        ))?;
+                        responder
+                            .send(Err(ffx::DiagnosticsStreamError::NoMatchingOfflineTargets))?;
                         return Ok(());
                     }
 
@@ -98,7 +96,7 @@ impl FidlProtocol for Diagnostics {
                             if let Some(stream) = result_stream {
                                 (target_str, stream)
                             } else {
-                                responder.send(&mut Err(
+                                responder.send(Err(
                                     ffx::DiagnosticsStreamError::NoMatchingOfflineSessions,
                                 ))?;
                                 return Ok(());
@@ -119,7 +117,7 @@ impl FidlProtocol for Diagnostics {
                                 (target_str, Arc::new(stream))
                             } else {
                                 return responder
-                                    .send(&mut Err(
+                                    .send(Err(
                                         ffx::DiagnosticsStreamError::NoMatchingOfflineSessions,
                                     ))
                                     .context("sending no offline sessions response");
@@ -140,21 +138,21 @@ impl FidlProtocol for Diagnostics {
                         Err(e) => {
                             // TODO(jwing): we should be able to interact with inactive targets here for
                             // stream modes that don't involve subscription.
-                            return responder.send(&mut Err(e)).context("sending error response");
+                            return responder.send(Err(e)).context("sending error response");
                         }
                     }
                     let min_timestamp =
                         match get_streaming_min_timestamp(&parameters, &stream).await {
                             Ok(n) => n,
                             Err(e) => {
-                                responder.send(&mut Err(e))?;
+                                responder.send(Err(e))?;
                                 return Ok(());
                             }
                         };
                     let log_iterator = stream
                         .stream_entries(parameters.stream_mode.unwrap(), min_timestamp)
                         .await?;
-                    responder.send(&mut Ok(ffx::LogSession {
+                    responder.send(Ok(&ffx::LogSession {
                         target_identifier: Some(target_str),
                         session_timestamp_nanos: stream
                             .session_timestamp_nanos()
@@ -192,16 +190,15 @@ impl FidlProtocol for Diagnostics {
                                 e
                             );
                             responder
-                                .send(&mut Err(ffx::DiagnosticsStreamError::NoMatchingTargets))
+                                .send(Err(ffx::DiagnosticsStreamError::NoMatchingTargets))
                                 .map_err(Into::into)
                         }
-                        Ok(()) => responder
-                            .send(
-                                &mut target_handle
-                                    .stream_active_diagnostics(&parameters, iterator)
-                                    .await?,
-                            )
-                            .map_err(Into::into),
+                        Ok(()) => {
+                            let result = target_handle
+                                .stream_active_diagnostics(&parameters, iterator)
+                                .await?;
+                            responder.send(result.as_ref().map_err(|e| *e)).map_err(Into::into)
+                        }
                     }
                 }
             }
@@ -322,7 +319,7 @@ mod test {
                                     ffx::TargetRequest::StreamActiveDiagnostics {
                                         responder,
                                         ..
-                                    } => responder.send(&mut Ok(ffx::LogSession::default())).unwrap(),
+                                    } => responder.send(Ok(&ffx::LogSession::default())).unwrap(),
                                     e => panic!("unsupported request for this target handle related test: {:?}", e),
                                 }
                             }

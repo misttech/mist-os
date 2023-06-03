@@ -228,8 +228,8 @@ mod tests {
             match realm_query_request {
                 fsys::RealmQueryRequest::GetInstance { moniker, responder } => {
                     assert_eq!(moniker, SESSION_MONIKER.to_string());
-                    let mut result = if is_basemgr_running {
-                        Ok(fsys::Instance {
+                    let instance = if is_basemgr_running {
+                        fsys::Instance {
                             moniker: Some(SESSION_MONIKER.to_string()),
                             url: Some("fake".to_string()),
                             instance_id: None,
@@ -242,17 +242,17 @@ mod tests {
                                 ..Default::default()
                             }),
                             ..Default::default()
-                        })
+                        }
                     } else {
-                        Ok(fsys::Instance {
+                        fsys::Instance {
                             moniker: Some(SESSION_MONIKER.to_string()),
                             url: Some("fake".to_string()),
                             instance_id: None,
                             resolved_info: None,
                             ..Default::default()
-                        })
+                        }
                     };
-                    let _ = responder.send(&mut result);
+                    let _ = responder.send(Ok(&instance));
                 }
                 r => {
                     panic!("didn't expect request: {:?}", r)

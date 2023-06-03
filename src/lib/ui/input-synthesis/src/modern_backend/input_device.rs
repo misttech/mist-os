@@ -4,8 +4,6 @@
 
 #![warn(missing_docs)]
 
-use fidl_fuchsia_input_report::InputDeviceGetFeatureReportResult;
-
 use {
     crate::{
         modern_backend::input_reports_reader::InputReportsReader, synthesizer,
@@ -309,8 +307,7 @@ impl InputDevice {
                 }
             }
             Ok(InputDeviceRequest::GetFeatureReport { responder }) => {
-                let mut result: InputDeviceGetFeatureReportResult = Ok(FeatureReport::default());
-                match responder.send(&mut result) {
+                match responder.send(Ok(&FeatureReport::default())) {
                     Ok(()) => None,
                     Err(e) => Some(Err(
                         anyhow::Error::from(e).context("sending GetFeatureReport response")

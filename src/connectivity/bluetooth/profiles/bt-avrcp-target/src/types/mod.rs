@@ -57,7 +57,7 @@ impl NotificationData {
         value: Result<Notification, fidl_avrcp::TargetAvcError>,
     ) -> Result<(), fidl::Error> {
         if let Some(responder) = self.responder.take() {
-            responder.send(&mut value.map(Into::into))
+            responder.send(value.map(Into::into).as_ref().map_err(|e| *e))
         } else {
             Err(fidl::Error::NotNullable)
         }

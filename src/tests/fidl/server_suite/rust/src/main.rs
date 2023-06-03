@@ -173,10 +173,10 @@ async fn run_closed_target_server(
             }
             ClosedTargetRequest::TwoWayResult { payload, responder } => match payload {
                 ClosedTargetTwoWayResultRequest::Payload(value) => {
-                    responder.send(&mut Ok(value)).unwrap();
+                    responder.send(Ok(&value)).unwrap();
                 }
                 ClosedTargetTwoWayResultRequest::Error(value) => {
-                    responder.send(&mut Err(value)).unwrap();
+                    responder.send(Err(value)).unwrap();
                 }
             },
             ClosedTargetRequest::GetHandleRights { handle, responder } => {

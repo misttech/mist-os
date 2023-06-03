@@ -953,8 +953,11 @@ where
             fposix_socket::SynchronousDatagramSocketRequest::GetBindToDevice { responder } => {
                 responder_send!(
                     responder,
-                    &mut self.get_bound_device().map(|d| d.unwrap_or("".to_string()))
-                );
+                    match self.get_bound_device() {
+                        Ok(ref d) => Ok(d.as_deref().unwrap_or("")),
+                        Err(e) => Err(e),
+                    }
+                )
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetBroadcast { value, responder } => {
                 // We allow a no-op since the core does not yet support limiting

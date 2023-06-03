@@ -292,7 +292,7 @@ mod tests {
             stream.try_next().await
         {
             // Send a reply to allow the node to process the next crash report
-            let _ = responder.send(&mut Ok(fidl_feedback::FileReportResults::default()));
+            let _ = responder.send(Ok(&fidl_feedback::FileReportResults::default()));
             assert_eq!(
                 report,
                 fidl_feedback::CrashReport {
@@ -311,7 +311,7 @@ mod tests {
             stream.try_next().await
         {
             // Send a reply to allow the node to process the next crash report
-            let _ = responder.send(&mut Ok(fidl_feedback::FileReportResults::default()));
+            let _ = responder.send(Ok(&fidl_feedback::FileReportResults::default()));
             assert_eq!(
                 report,
                 fidl_feedback::CrashReport {

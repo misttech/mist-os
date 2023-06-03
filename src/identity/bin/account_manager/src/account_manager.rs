@@ -76,8 +76,8 @@ impl<AHC: AccountHandlerConnection> AccountManager<AHC> {
                 responder.send(&response)?;
             }
             AccountManagerRequest::GetAccountMetadata { id, responder } => {
-                let mut response = self.get_account_metadata(id).await;
-                responder.send(&mut response)?;
+                let response = self.get_account_metadata(id).await;
+                responder.send(response.as_ref().map_err(|e| *e))?;
             }
             AccountManagerRequest::GetAccount { payload, responder } => {
                 let response = self.get_account(payload).await;

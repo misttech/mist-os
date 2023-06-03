@@ -607,9 +607,7 @@ mod tests {
                     assert_matches!(reboot_controller, Some(_));
                     assert!(should_write_recovery);
                     assert!(allow_attach_to_existing_attempt);
-                    responder
-                        .send(&mut Ok("00000000-0000-0000-0000-000000000001".to_owned()))
-                        .unwrap();
+                    responder.send(Ok("00000000-0000-0000-0000-000000000001")).unwrap();
                     let monitor = monitor.into_proxy().unwrap();
                     let () = monitor
                         .on_state(&State::Stage(fidl_fuchsia_update_installer::StageData {
@@ -708,9 +706,7 @@ mod tests {
                     assert_eq!(initiator, Initiator::User);
                     assert!(should_write_recovery);
                     assert!(allow_attach_to_existing_attempt);
-                    responder
-                        .send(&mut Ok("00000000-0000-0000-0000-000000000001".to_owned()))
-                        .unwrap();
+                    responder.send(Ok("00000000-0000-0000-0000-000000000001")).unwrap();
                     let monitor = monitor.into_proxy().unwrap();
                     let () = monitor
                         .on_state(&State::Stage(fidl_fuchsia_update_installer::StageData {
@@ -847,9 +843,7 @@ mod tests {
         let stream_fut = async move {
             match stream.next().await.unwrap() {
                 Ok(InstallerRequest::StartUpdate { monitor, responder, .. }) => {
-                    responder
-                        .send(&mut Ok("00000000-0000-0000-0000-000000000002".to_owned()))
-                        .unwrap();
+                    responder.send(Ok("00000000-0000-0000-0000-000000000002")).unwrap();
 
                     let monitor = monitor.into_proxy().unwrap();
                     let () = monitor
@@ -884,9 +878,7 @@ mod tests {
         let stream_fut = async move {
             match stream.next().await.unwrap() {
                 Ok(InstallerRequest::StartUpdate { monitor, responder, .. }) => {
-                    responder
-                        .send(&mut Ok("00000000-0000-0000-0000-000000000003".to_owned()))
-                        .unwrap();
+                    responder.send(Ok("00000000-0000-0000-0000-000000000003")).unwrap();
 
                     let monitor = monitor.into_proxy().unwrap();
                     let () = monitor

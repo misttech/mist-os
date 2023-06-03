@@ -146,7 +146,7 @@ fn publish_border_agent_service(
 
     // Prepare our static response for all queries.
     let publication =
-        Ok(ServiceInstancePublication { port: Some(port), text: Some(txt), ..Default::default() });
+        ServiceInstancePublication { port: Some(port), text: Some(txt), ..Default::default() };
 
     let publish_responder_future = server.into_stream().unwrap().map_err(Into::into).try_for_each(
         move |ServiceInstancePublicationResponder_Request::OnPublication {
@@ -165,10 +165,8 @@ fn publish_border_agent_service(
             );
             debug!(
                 tag = "meshcop",
-                "publish_border_agent_service: publication: {:?}",
-                publication.as_ref().unwrap()
+                "publish_border_agent_service: publication: {:?}", &publication
             );
-            let mut publication = publication.clone();
 
             // Due to fxbug.dev/99755, the publication responder channel will close
             // if the publisher that created it is closed.
@@ -176,7 +174,7 @@ fn publish_border_agent_service(
             let _ = publisher.clone();
 
             futures::future::ready(
-                responder.send(&mut publication).context("Unable to call publication responder"),
+                responder.send(Ok(&publication)).context("Unable to call publication responder"),
             )
         },
     );

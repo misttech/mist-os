@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_input_report::InputDeviceGetFeatureReportResult;
-
 use {
     crate::input_reports_reader::InputReportsReader,
     anyhow::{Context as _, Error},
@@ -172,8 +170,7 @@ impl InputDevice {
                 }
             }
             Ok(InputDeviceRequest::GetFeatureReport { responder }) => {
-                let mut result: InputDeviceGetFeatureReportResult = Ok(FeatureReport::default());
-                match responder.send(&mut result) {
+                match responder.send(Ok(&FeatureReport::default())) {
                     Ok(()) => None,
                     Err(e) => panic!("failed to send GetFeatureReport response: {e}"),
                 }

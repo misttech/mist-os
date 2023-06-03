@@ -583,7 +583,7 @@ pub mod test {
                         // fuchsia.device.Controller methods
                         VolumeAndNodeRequest::GetTopologicalPath { responder } => {
                             responder
-                                .send(&mut Ok(format!("/dev/mocks/{id}")))
+                                .send(Ok(&format!("/dev/mocks/{id}")))
                                 .expect("failed to send Controller.GetTopologicalPath response");
                         }
 

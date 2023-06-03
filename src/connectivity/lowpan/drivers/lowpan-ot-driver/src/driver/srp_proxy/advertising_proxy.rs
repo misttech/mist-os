@@ -494,7 +494,7 @@ impl AdvertisingProxyInner {
                     );
 
                     let info = service_info.into_service_instance_publication();
-                    async move { responder.send(&mut Ok(info)).map_err(Into::into) }
+                    async move { responder.send(Ok(&info)).map_err(Into::into) }
                 },
             );
 

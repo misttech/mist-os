@@ -335,7 +335,7 @@ impl MediaSessionsInner {
     ) -> Result<Option<fasync::Time>, fidl::Error> {
         // If the `event_id` is not supported, reject the registration.
         if !self.get_supported_notification_events().contains(&event_id) {
-            responder.send(&mut Err(fidl_avrcp::TargetAvcError::RejectedInvalidParameter))?;
+            responder.send(Err(fidl_avrcp::TargetAvcError::RejectedInvalidParameter))?;
             return Ok(None);
         }
 
@@ -352,12 +352,12 @@ impl MediaSessionsInner {
         // For all other event_ids, use the provided `current` parameter, and the `response_timeout`
         // is not needed.
         let Some(active_session) = self.get_active_session() else {
-                responder.send(&mut Err(fidl_avrcp::TargetAvcError::RejectedNoAvailablePlayers))?;
-                return Ok(None);
+            responder.send(Err(fidl_avrcp::TargetAvcError::RejectedNoAvailablePlayers))?;
+            return Ok(None);
         };
         let (current_values, response_timeout) = match (event_id, pos_change_interval) {
             (fidl_avrcp::NotificationEvent::TrackPosChanged, 0) => {
-                responder.send(&mut Err(fidl_avrcp::TargetAvcError::RejectedInvalidParameter))?;
+                responder.send(Err(fidl_avrcp::TargetAvcError::RejectedInvalidParameter))?;
                 return Ok(None);
             }
             (fidl_avrcp::NotificationEvent::TrackPosChanged, interval) => {

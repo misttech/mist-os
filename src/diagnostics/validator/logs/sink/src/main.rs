@@ -101,7 +101,7 @@ async fn demux_fidl(
                     interest_listener = Some(responder);
                 } else {
                     info!("Unblocking component by sending an empty interest.");
-                    responder.send(&mut Ok(Interest::default()))?;
+                    responder.send(Ok(&Interest::default()))?;
                     got_initial_interest_request = true;
                 }
             }
@@ -438,7 +438,7 @@ where
         };
     }
     let interest = Interest { min_severity: Some(Severity::Warn), ..Default::default() };
-    listener.send(&mut Ok(interest))?;
+    listener.send(Ok(&interest))?;
     info!("Waiting for interest....");
     assert_eq!(
         puppet.read_record_no_tid(puppet.info.tid).await?.unwrap(),
@@ -457,7 +457,7 @@ where
     info!("Got interest");
     let interest = Interest { min_severity: Some(Severity::Trace), ..Default::default() };
     let listener = wait_for_severity(stream).await?;
-    listener.send(&mut Ok(interest))?;
+    listener.send(Ok(&interest))?;
     assert_eq!(
         puppet.read_record_no_tid(puppet.info.tid).await?.unwrap(),
         RecordAssertion::new(&puppet.info, Severity::Trace, new_file_line_rules)
@@ -480,7 +480,7 @@ where
 
     let interest = Interest::default();
     let listener = wait_for_severity(stream).await?;
-    listener.send(&mut Ok(interest))?;
+    listener.send(Ok(&interest))?;
     info!("Waiting for reset interest....");
     assert_eq!(
         puppet.read_record_no_tid(puppet.info.tid).await?.unwrap(),
@@ -516,7 +516,7 @@ where
         // in later tests.
         let interest = Interest { min_severity: Some(Severity::Trace), ..Default::default() };
         let listener = wait_for_severity(stream).await?;
-        listener.send(&mut Ok(interest))?;
+        listener.send(Ok(&interest))?;
         info!("Waiting for interest to change back....");
         assert_eq!(
             puppet.read_record_no_tid(puppet.info.tid).await?.unwrap(),

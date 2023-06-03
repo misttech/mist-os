@@ -281,9 +281,9 @@ impl LogsArtifactsContainer {
                     }
                     if needs_interest_broadcast {
                         // Send interest if not yet received
-                        let _ = responder.send(&mut Ok(min_interest.clone()));
+                        let _ = responder.send(Ok(&min_interest));
                         let mut previous_interest = previous_interest_sent.lock().await;
-                        *previous_interest = Some(min_interest.clone());
+                        *previous_interest = Some(min_interest);
                     } else {
                         // Wait for broadcast event asynchronously
                         self.wait_for_interest_change_async(
@@ -347,12 +347,12 @@ impl LogsArtifactsContainer {
             if let Ok(value) = res {
                 match value {
                     Ok(value) => {
-                        let _ = responder.send(&mut Ok(value.clone()));
+                        let _ = responder.send(Ok(&value));
                         let mut write_lock = prev_interest_clone.lock().await;
                         *write_lock = Some(value);
                     }
                     Err(error) => {
-                        let _ = responder.send(&mut Err(error));
+                        let _ = responder.send(Err(error));
                     }
                 }
             }

@@ -233,7 +233,7 @@ impl MockRealmQuery {
                     assert!(moniker.starts_with("./"));
                     let query_moniker = &moniker[2..];
                     let res = self.mapping.get(query_moniker).unwrap();
-                    responder.send(&mut Ok(res.to_instance())).unwrap();
+                    responder.send(Ok(&res.to_instance())).unwrap();
                 }
                 fsys2::RealmQueryRequest::Open { moniker, dir_type, object, responder, .. } => {
                     assert!(moniker.starts_with("./"));

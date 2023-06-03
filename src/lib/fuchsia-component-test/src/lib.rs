@@ -2724,7 +2724,7 @@ mod tests {
                             .send(ServerRequest::GetComponentDecl { name })
                             .await
                             .unwrap();
-                        responder.send(&mut Ok(fdecl::Component::default())).unwrap();
+                        responder.send(Ok(&fdecl::Component::default())).unwrap();
                     }
                     ftest::RealmRequest::ReplaceComponentDecl {
                         responder,
@@ -2739,7 +2739,7 @@ mod tests {
                     }
                     ftest::RealmRequest::GetRealmDecl { responder } => {
                         report_requests.send(ServerRequest::GetRealmDecl).await.unwrap();
-                        responder.send(&mut Ok(fdecl::Component::default())).unwrap();
+                        responder.send(Ok(&fdecl::Component::default())).unwrap();
                     }
                     ftest::RealmRequest::ReplaceRealmDecl { responder, component_decl } => {
                         report_requests
@@ -2800,7 +2800,7 @@ mod tests {
                 match req {
                     ftest::BuilderRequest::Build { runner, responder } => {
                         drop(runner);
-                        responder.send(&mut Ok("test://hippo".to_string())).unwrap();
+                        responder.send(Ok("test://hippo")).unwrap();
                     }
                 }
             }

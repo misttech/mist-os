@@ -1689,9 +1689,7 @@ mod tests {
         assert_eq!(extract_config(configuration), expected_config);
         // net-cli does not check the returned configuration so we do not
         // return a populated one.
-        let () = responder
-            .send(&mut Ok(finterfaces_admin::Configuration::default()))
-            .expect("responder.send should succeed");
+        let () = responder.send(Ok(&Default::default())).expect("responder.send should succeed");
     }
 
     async fn get_configuration_request(
@@ -1717,7 +1715,7 @@ mod tests {
             .expect("control request stream not error")
             .into_get_configuration()
             .expect("get configuration request");
-        let () = responder.send(&mut Ok(config)).expect("responder.send should succeed");
+        let () = responder.send(Ok(&config)).expect("responder.send should succeed");
     }
 
     #[test_case(finterfaces_admin::IgmpVersion::V1)]
@@ -3078,9 +3076,8 @@ mac             -
                 .expect("request should be of type GetUnreachabilityConfig");
             assert_eq!(got_interface_id, INTERFACE_ID);
             assert_eq!(got_ip_version, IP_VERSION);
-            let () = responder
-                .send(&mut Ok(fneighbor::UnreachabilityConfig::default()))
-                .expect("responder.send should succeed");
+            let () =
+                responder.send(Ok(&Default::default())).expect("responder.send should succeed");
             Ok(())
         };
         let ((), ()) = futures::future::try_join(neigh, neigh_succeeds)
@@ -3327,7 +3324,7 @@ mac             -
             assert_eq!(options, want_options, "received unexpected IP lookup options");
 
             responder
-                .send(&mut Ok(fname::LookupResult {
+                .send(Ok(&fname::LookupResult {
                     addresses: Some(vec![fidl_ip!("203.0.113.1"), fidl_ip!("2001:db8::1")]),
                     ..Default::default()
                 }))

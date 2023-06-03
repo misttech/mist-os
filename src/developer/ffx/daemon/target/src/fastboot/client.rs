@@ -230,11 +230,11 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
                     .and_then(|interface| async { get_var(interface, &name).await })
                     .await;
                 match res {
-                    Ok(value) => responder.send(&mut Ok(value))?,
+                    Ok(value) => responder.send(Ok(&value))?,
                     Err(e) => {
                         tracing::error!("Error getting variable '{}': {:?}", name, e);
                         responder
-                            .send(&mut Err(FastbootError::ProtocolError))
+                            .send(Err(FastbootError::ProtocolError))
                             .context("sending error response")?;
                     }
                 }

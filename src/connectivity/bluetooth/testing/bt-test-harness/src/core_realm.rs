@@ -78,7 +78,7 @@ impl CoreRealm {
                         let responder = req
                             .into_get_device_name()
                             .ok_or(format_err!("got unexpected NameProviderRequest"))?;
-                        Ok(responder.send(&mut Ok(DEFAULT_TEST_DEVICE_NAME.to_string()))?)
+                        Ok(responder.send(Ok(DEFAULT_TEST_DEVICE_NAME))?)
                     })
                     .boxed()
                 },

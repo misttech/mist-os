@@ -394,7 +394,7 @@ mod tests {
         fn expect_get_play_status(self, result: CustomPlayStatus) -> Self {
             self.push(move |req| match req {
                 ControllerRequest::GetPlayStatus { responder } => {
-                    responder.send(&mut Ok(PlayStatus::from(result))).unwrap();
+                    responder.send(Ok(&PlayStatus::from(result))).unwrap();
                 }
                 _ => {}
             })
@@ -408,7 +408,7 @@ mod tests {
             self.push(move |req| match req {
                 ControllerRequest::GetPlayerApplicationSettings { attribute_ids, responder } => {
                     assert_eq!(attribute_ids, input.to_vec());
-                    responder.send(&mut Ok(result.into())).unwrap();
+                    responder.send(Ok(&result.into())).unwrap();
                 }
                 _ => {}
             })
@@ -427,7 +427,7 @@ mod tests {
                     let player_application_settings: CustomPlayerApplicationSettings =
                         requested_settings.into();
                     assert_eq!(player_application_settings, *input);
-                    responder.send(&mut Ok(result.into())).unwrap();
+                    responder.send(Ok(&result.into())).unwrap();
                 }
                 _ => {}
             })

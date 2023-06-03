@@ -180,7 +180,7 @@ mod tests {
                         Err(anyhow!("Received GetAccountMetadata for {}, expected {}", id, self.id))
                     } else {
                         responder
-                            .send(&mut Ok(AccountMetadata {
+                            .send(Ok(&AccountMetadata {
                                 name: Some(self.response_name.to_string()),
                                 ..Default::default()
                             }))

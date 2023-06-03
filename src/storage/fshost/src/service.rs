@@ -420,14 +420,14 @@ pub fn fshost_admin(
                     }
                     Ok(fshost::AdminRequest::GetDevicePath { responder, .. }) => {
                         tracing::info!("admin get device path called");
-                        responder
-                            .send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))
-                            .unwrap_or_else(|e| {
+                        responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw())).unwrap_or_else(
+                            |e| {
                                 tracing::error!(
                                     "failed to send GetDevicePath response. error: {:?}",
                                     e
                                 );
-                            });
+                            },
+                        );
                     }
                     Ok(fshost::AdminRequest::WriteDataFile { responder, payload, filename }) => {
                         tracing::info!(?filename, "admin write data file called");

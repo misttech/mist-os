@@ -121,8 +121,8 @@ impl RealmQuery {
             };
             let result = match request {
                 fsys::RealmQueryRequest::GetInstance { moniker, responder } => {
-                    let mut result = get_instance(&self.model, &scope_moniker, &moniker).await;
-                    responder.send(&mut result)
+                    let result = get_instance(&self.model, &scope_moniker, &moniker).await;
+                    responder.send(result.as_ref().map_err(|e| *e))
                 }
                 fsys::RealmQueryRequest::GetManifest { moniker, responder } => {
                     let result = get_manifest(&self.model, &scope_moniker, &moniker).await;

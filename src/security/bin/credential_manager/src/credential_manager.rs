@@ -182,8 +182,11 @@ where
                 } else {
                     info!("CheckCredential: Succeeded");
                 }
-                let mut response = result.map_err(ServiceError::into);
-                responder.send(&mut response).context("sending CheckCredential response")?;
+                let response = match result {
+                    Ok(ref result) => Ok(result),
+                    Err(e) => Err(e.into()),
+                };
+                responder.send(response).context("sending CheckCredential response")?;
                 self.diagnostics.incoming_manager_outcome(
                     IncomingManagerMethod::CheckCredential,
                     response.map(|_| ()),

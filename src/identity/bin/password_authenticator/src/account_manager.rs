@@ -216,8 +216,10 @@ where
                 responder.send(resp).context("sending DeprecatedProvisionNewAccount response")?;
             }
             AccountManagerRequest::GetAccountMetadata { id, responder } => {
-                let mut resp = self.get_account_metadata(id).await;
-                responder.send(&mut resp).context("sending GetAccountMetadata response")?;
+                let resp = self.get_account_metadata(id).await;
+                responder
+                    .send(resp.as_ref().map_err(|e| *e))
+                    .context("sending GetAccountMetadata response")?;
             }
             AccountManagerRequest::GetAccount { payload: _, responder } => {
                 let resp = Err(faccount::Error::UnsupportedOperation);

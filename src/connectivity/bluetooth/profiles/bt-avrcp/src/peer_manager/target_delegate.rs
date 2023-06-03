@@ -324,7 +324,7 @@ mod tests {
         pin_utils::pin_mut!(select_next_some_fut);
         match exec.run_until_stalled(&mut select_next_some_fut) {
             Poll::Ready(Ok(TargetHandlerRequest::GetMediaAttributes { responder })) => {
-                assert!(responder.send(&mut Ok(MediaAttributes::default())).is_ok());
+                assert!(responder.send(Ok(&MediaAttributes::default())).is_ok());
             }
             _ => assert!(false, "unexpected stream state"),
         };
@@ -394,7 +394,7 @@ mod tests {
                 ..
             })) => {
                 assert!(responder
-                    .send(&mut Ok(PlayerApplicationSettings {
+                    .send(Ok(&PlayerApplicationSettings {
                         shuffle_mode: Some(ShuffleMode::Off),
                         ..Default::default()
                     }))
@@ -441,7 +441,7 @@ mod tests {
                 responder,
                 ..
             })) => {
-                assert!(responder.send(&mut Ok(PlayerApplicationSettings::default())).is_ok());
+                assert!(responder.send(Ok(&PlayerApplicationSettings::default())).is_ok());
             }
             _ => assert!(false, "unexpected stream state"),
         };

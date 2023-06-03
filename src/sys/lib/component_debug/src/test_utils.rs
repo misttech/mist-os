@@ -83,9 +83,9 @@ pub fn serve_realm_query(
                 fsys::RealmQueryRequest::GetInstance { moniker, responder } => {
                     eprintln!("GetInstance call for {}", moniker);
                     if let Some(instance) = instance_map.get(&moniker) {
-                        responder.send(&mut Ok(instance.clone())).unwrap();
+                        responder.send(Ok(instance)).unwrap();
                     } else {
-                        responder.send(&mut Err(fsys::GetInstanceError::InstanceNotFound)).unwrap();
+                        responder.send(Err(fsys::GetInstanceError::InstanceNotFound)).unwrap();
                     }
                 }
                 fsys::RealmQueryRequest::GetManifest { moniker, responder } => {

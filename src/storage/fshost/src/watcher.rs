@@ -258,27 +258,24 @@ mod tests {
         },
     };
 
-    pub fn fshost_controller(path: String) -> Arc<service::Service> {
-        service::host(move |mut stream: ControllerRequestStream| {
-            let cloned_path = path.clone();
-            async move {
-                while let Some(request) = stream.next().await {
-                    match request {
-                        Ok(ControllerRequest::GetTopologicalPath { responder, .. }) => {
-                            responder.send(&mut Ok(cloned_path.clone())).unwrap_or_else(|e| {
-                                tracing::error!(
-                                    "failed to send GetTopologicalPath response. error: {:?}",
-                                    e
-                                );
-                            });
-                        }
-                        Ok(ControllerRequest::ConnectToDeviceFidl { .. }) => {}
-                        Ok(controller_request) => {
-                            panic!("unexpected request: {:?}", controller_request);
-                        }
-                        Err(error) => {
-                            panic!("controller server failed: {}", error);
-                        }
+    pub fn fshost_controller(path: &'static str) -> Arc<service::Service> {
+        service::host(move |mut stream: ControllerRequestStream| async move {
+            while let Some(request) = stream.next().await {
+                match request {
+                    Ok(ControllerRequest::GetTopologicalPath { responder, .. }) => {
+                        responder.send(Ok(path)).unwrap_or_else(|e| {
+                            tracing::error!(
+                                "failed to send GetTopologicalPath response. error: {:?}",
+                                e
+                            );
+                        });
+                    }
+                    Ok(ControllerRequest::ConnectToDeviceFidl { .. }) => {}
+                    Ok(controller_request) => {
+                        panic!("unexpected request: {:?}", controller_request);
+                    }
+                    Err(error) => {
+                        panic!("controller server failed: {}", error);
                     }
                 }
             }
@@ -289,13 +286,13 @@ mod tests {
     async fn watcher_populates_device_stream() {
         // Start with a couple of devices
         let block = vfs::mut_pseudo_directory! {
-            "000" => fshost_controller("block-000".to_string()),
-            "001" => fshost_controller("block-001".to_string()),
+            "000" => fshost_controller("block-000"),
+            "001" => fshost_controller("block-001"),
         };
 
         let nand = vfs::mut_pseudo_directory! {
-            "000" => fshost_controller("nand-000".to_string()),
-            "001" => fshost_controller("nand-001".to_string()),
+            "000" => fshost_controller("nand-000"),
+            "001" => fshost_controller("nand-001"),
         };
 
         let class_block_and_nand = vfs::pseudo_directory! {
@@ -344,7 +341,7 @@ mod tests {
 
         // Adding an entry generates a new block device.
         block
-            .add_entry("002", fshost_controller("block-002".to_string()))
+            .add_entry("002", fshost_controller("block-002"))
             .expect("failed to add dir entry 002");
 
         assert_eq!(device_stream.next().await.unwrap().topological_path(), "block-002");
@@ -352,15 +349,14 @@ mod tests {
         // Pausing stops events from being generated.
         watcher.pause().await.expect("failed to pause");
 
-        nand.add_entry("002", fshost_controller("nand-002".to_string()))
-            .expect("failed to add dir entry 002");
+        nand.add_entry("002", fshost_controller("nand-002")).expect("failed to add dir entry 002");
 
         // When we resume, events start flowing again. We don't see any devices which were added
         // while we were paused (or before).
         watcher.resume().await.expect("failed to resume");
 
         block
-            .add_entry("003", fshost_controller("block-003".to_string()))
+            .add_entry("003", fshost_controller("block-003"))
             .expect("failed to add dir entry 003");
 
         assert_eq!(device_stream.next().await.unwrap().topological_path(), "block-003");

@@ -660,10 +660,10 @@ async fn dispatch_control_request(
         }
         fnet_interfaces_admin::ControlRequest::GetId { responder } => responder.send(id.get()),
         fnet_interfaces_admin::ControlRequest::SetConfiguration { config, responder } => {
-            responder.send(&mut set_configuration(ctx, id, config))
+            responder.send(set_configuration(ctx, id, config).as_ref().map_err(|e| *e))
         }
         fnet_interfaces_admin::ControlRequest::GetConfiguration { responder } => {
-            responder.send(&mut Ok(get_configuration(ctx, id)))
+            responder.send(Ok(&get_configuration(ctx, id)))
         }
         fnet_interfaces_admin::ControlRequest::Enable { responder } => {
             responder.send(Ok(set_interface_enabled(ctx, true, id).await))

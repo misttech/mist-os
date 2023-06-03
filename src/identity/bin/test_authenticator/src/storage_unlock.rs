@@ -70,8 +70,8 @@ impl StorageUnlockMechanism {
     ) -> Result<(), fidl::Error> {
         match request {
             StorageUnlockMechanismRequest::Authenticate { interaction, enrollments, responder } => {
-                let mut response = self.authenticate(interaction, enrollments).await;
-                responder.send(&mut response)
+                let response = self.authenticate(interaction, enrollments).await;
+                responder.send(response.as_ref().map_err(|e| *e))
             }
             StorageUnlockMechanismRequest::Enroll { interaction, responder } => {
                 responder.send(self.enroll(interaction).await)

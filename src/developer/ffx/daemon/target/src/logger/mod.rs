@@ -687,7 +687,7 @@ mod test {
                     }
                     RemoteControlRequest::IdentifyHost { responder } => {
                         responder
-                            .send(&mut Ok(IdentifyHostResponse {
+                            .send(Ok(&IdentifyHostResponse {
                                 nodename: Some(NODENAME.to_string()),
                                 addresses: None,
                                 boot_timestamp_nanos: Some(BOOT_TIME.try_into().unwrap()),

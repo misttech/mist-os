@@ -75,13 +75,11 @@ where
             StorageUnlockMechanismRequest::Authenticate { interaction, enrollments, responder } => {
                 let stream = match Self::stream_from_ipse(interaction) {
                     Ok(stream) => stream,
-                    Err(e) => {
-                        return responder.send(&mut Err(e));
-                    }
+                    Err(e) => return responder.send(Err(e)),
                 };
                 match self.authenticate(stream, enrollments).await {
-                    Ok(attempted_event) => responder.send(&mut Ok(attempted_event)),
-                    Err(e) => responder.send(&mut Err(e)),
+                    Ok(attempted_event) => responder.send(Ok(&attempted_event)),
+                    Err(e) => responder.send(Err(e)),
                 }
             }
             StorageUnlockMechanismRequest::Enroll { interaction, responder } => {

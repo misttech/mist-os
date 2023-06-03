@@ -333,7 +333,7 @@ impl Builder {
                 ftest::BuilderRequest::Build { runner, responder } => {
                     if self.realm_has_been_built.swap(true, Ordering::Relaxed) {
                         warn!(method = "Builder.Build", message = %RealmBuilderError::BuildAlreadyCalled);
-                        responder.send(&mut Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
+                        responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
                         continue;
                     }
 
@@ -352,7 +352,7 @@ impl Builder {
                         .await;
                     match res {
                         Ok(url) => {
-                            responder.send(&mut Ok(url))?;
+                            responder.send(Ok(&url))?;
                             *build_called_successfully = true;
                             ManagedRealmContents::watch_channel_and_delete_on_peer_closed(
                                 self.realm_contents.clone(),
@@ -363,7 +363,7 @@ impl Builder {
                         }
                         Err(err) => {
                             warn!(method = "Builder.Build", message = %err);
-                            responder.send(&mut Err(err.into()))?;
+                            responder.send(Err(err.into()))?;
                         }
                     }
                 }
@@ -446,14 +446,14 @@ impl Realm {
                 }
                 ftest::RealmRequest::GetComponentDecl { name, responder } => {
                     if self.realm_has_been_built.load(Ordering::Relaxed) {
-                        responder.send(&mut Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
+                        responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
                         continue;
                     }
                     match self.get_component_decl(name.clone()).await {
-                        Ok(decl) => responder.send(&mut Ok(decl))?,
+                        Ok(decl) => responder.send(Ok(&decl))?,
                         Err(err) => {
                             warn!(method = "Realm.GetComponentDecl", message = %err);
-                            responder.send(&mut Err(err.into()))?;
+                            responder.send(Err(err.into()))?;
                         }
                     }
                 }
@@ -472,10 +472,10 @@ impl Realm {
                 }
                 ftest::RealmRequest::GetRealmDecl { responder } => {
                     if self.realm_has_been_built.load(Ordering::Relaxed) {
-                        responder.send(&mut Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
+                        responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
                         continue;
                     }
-                    responder.send(&mut Ok(self.get_realm_decl().await))?;
+                    responder.send(Ok(&self.get_realm_decl().await))?;
                 }
                 ftest::RealmRequest::ReplaceRealmDecl { component_decl, responder } => {
                     if self.realm_has_been_built.load(Ordering::Relaxed) {

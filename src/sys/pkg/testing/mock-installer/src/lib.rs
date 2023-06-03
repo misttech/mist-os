@@ -145,7 +145,8 @@ impl MockUpdateInstallerService {
                         })
                         .detach();
                     }
-                    responder.send(&mut self.start_update_response.lock()).unwrap();
+                    let response = self.start_update_response.lock();
+                    responder.send(response.as_deref().map_err(|e| *e)).unwrap();
                 }
                 InstallerRequest::GetLastUpdateResult { .. }
                 | InstallerRequest::GetUpdateResult { .. }

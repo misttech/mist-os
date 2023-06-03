@@ -1074,7 +1074,7 @@ mod tests {
                         ));
                     }
                     fidl_input_report::InputDeviceRequest::GetFeatureReport { responder } => {
-                        let _ = responder.send(&mut Ok(fidl_input_report::FeatureReport {
+                        let _ = responder.send(Ok(&fidl_input_report::FeatureReport {
                             touch: Some(fidl_input_report::TouchFeatureReport {
                                 input_mode: Some(
                                     fidl_input_report::TouchConfigurationInputMode::MouseCollection,
@@ -1146,7 +1146,7 @@ mod tests {
                     let _ = responder.send(&get_touchpad_device_descriptor(has_mouse_descriptor));
                 }
                 fidl_input_report::InputDeviceRequest::GetFeatureReport { responder } => {
-                    let _ = responder.send(&mut Ok(fidl_input_report::FeatureReport {
+                    let _ = responder.send(Ok(&fidl_input_report::FeatureReport {
                         touch: Some(fidl_input_report::TouchFeatureReport {
                             input_mode: touch_input_mode,
                             ..Default::default()
@@ -1190,7 +1190,7 @@ mod tests {
                         let _ = responder.send(&get_touchpad_device_descriptor(true));
                     }
                     fidl_input_report::InputDeviceRequest::GetFeatureReport { responder } => {
-                        let _ = responder.send(&mut Ok(fidl_input_report::FeatureReport {
+                        let _ = responder.send(Ok(&fidl_input_report::FeatureReport {
                             touch: Some(fidl_input_report::TouchFeatureReport {
                                 input_mode: Some(
                                     fidl_input_report::TouchConfigurationInputMode::MouseCollection,

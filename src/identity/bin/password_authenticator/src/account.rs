@@ -193,7 +193,7 @@ impl<SM: StorageManager + 'static> Account<SM> {
             }
             AccountRequest::GetAuthState { responder } => {
                 responder
-                    .send(&mut Err(faccount::Error::UnsupportedOperation))
+                    .send(Err(faccount::Error::UnsupportedOperation))
                     .context("sending GetAuthState response")?;
             }
             AccountRequest::GetLifetime { responder } => {

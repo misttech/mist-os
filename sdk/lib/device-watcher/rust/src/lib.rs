@@ -207,16 +207,13 @@ mod tests {
         },
     };
 
-    fn create_controller_service(topo_path: String) -> Arc<vfs::service::Service> {
-        vfs::service::host(move |mut stream: fdev::ControllerRequestStream| {
-            let topo_path = topo_path.clone();
-            async move {
-                match stream.try_next().await.unwrap() {
-                    Some(fdev::ControllerRequest::GetTopologicalPath { responder }) => {
-                        let _ = responder.send(&mut Ok(topo_path));
-                    }
-                    e => panic!("Unexpected request: {:?}", e),
+    fn create_controller_service(topo_path: &'static str) -> Arc<vfs::service::Service> {
+        vfs::service::host(move |mut stream: fdev::ControllerRequestStream| async move {
+            match stream.try_next().await.unwrap() {
+                Some(fdev::ControllerRequest::GetTopologicalPath { responder }) => {
+                    let _ = responder.send(Ok(topo_path));
                 }
+                e => panic!("Unexpected request: {:?}", e),
             }
         })
     }
@@ -225,16 +222,16 @@ mod tests {
     async fn wait_for_device_by_topological_path() {
         let dir = vfs::pseudo_directory! {
           "a" => vfs::pseudo_directory! {
-            "device_controller" => create_controller_service("/dev/test2/a/dev".to_string()),
+            "device_controller" => create_controller_service("/dev/test2/a/dev"),
           },
           "1" => vfs::pseudo_directory! {
-            "device_controller" => create_controller_service("/dev/test2/1/dev".to_string()),
+            "device_controller" => create_controller_service("/dev/test2/1/dev"),
           },
           "x" => vfs::pseudo_directory! {
-            "device_controller" => create_controller_service("/dev/test2/x/dev".to_string()),
+            "device_controller" => create_controller_service("/dev/test2/x/dev"),
           },
           "y" => vfs::pseudo_directory! {
-            "device_controller" => create_controller_service("/dev/test2/y/dev".to_string()),
+            "device_controller" => create_controller_service("/dev/test2/y/dev"),
           },
         };
 
@@ -293,7 +290,7 @@ mod tests {
           },
           "2" => read_only("file 2"),
           "x" => vfs::pseudo_directory! {
-            "device_controller" => create_controller_service("/dev/test2/x/dev".to_string()),
+            "device_controller" => create_controller_service("/dev/test2/x/dev"),
           },
           "3" => read_only("file 3"),
         };

@@ -38,8 +38,8 @@ impl BuiltinCapability for CrashIntrospectSvc {
                     thread_koid,
                     responder,
                 } => match self.0.take_report(&zx::Koid::from_raw(thread_koid)).await {
-                    Some(report) => responder.send(&mut Ok(report.into()))?,
-                    None => responder.send(&mut Err(fcomponent::Error::ResourceNotFound))?,
+                    Some(report) => responder.send(Ok(&report.into()))?,
+                    None => responder.send(Err(fcomponent::Error::ResourceNotFound))?,
                 },
             }
         }

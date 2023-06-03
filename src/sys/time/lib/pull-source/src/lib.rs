@@ -96,9 +96,8 @@ impl<UA: UpdateAlgorithm> PullSource<UA> {
         while let Some(request) = request_stream.try_next().await? {
             match request {
                 PullSourceRequest::Sample { urgency, responder } => {
-                    let mut sample =
-                        self.update_algorithm.sample(urgency).await.map_err(Into::into);
-                    responder.send(&mut sample)?;
+                    let sample = self.update_algorithm.sample(urgency).await;
+                    responder.send(sample.as_ref().map_err(|e| (*e).into()))?;
                 }
                 PullSourceRequest::NextPossibleSampleTime { responder, .. } => {
                     responder.send(

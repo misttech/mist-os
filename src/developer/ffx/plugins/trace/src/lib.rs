@@ -629,13 +629,13 @@ mod tests {
     fn setup_fake_service() -> TracingProxy {
         fho::testing::fake_proxy(|req| match req {
             ffx::TracingRequest::StartRecording { responder, .. } => responder
-                .send(&mut Ok(ffx::TargetInfo {
+                .send(Ok(&ffx::TargetInfo {
                     nodename: Some("foo".to_owned()),
                     ..Default::default()
                 }))
                 .expect("responder err"),
             ffx::TracingRequest::StopRecording { responder, .. } => responder
-                .send(&mut Ok(ffx::TargetInfo {
+                .send(Ok(&ffx::TargetInfo {
                     nodename: Some("foo".to_owned()),
                     ..Default::default()
                 }))

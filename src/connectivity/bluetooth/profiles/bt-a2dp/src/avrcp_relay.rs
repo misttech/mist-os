@@ -505,7 +505,7 @@ mod tests {
         match exec.run_until_stalled(&mut controller_requests.next()).expect("should be ready") {
             Some(Ok(avrcp::ControllerRequest::GetMediaAttributes { responder })) => {
                 responder
-                    .send(&mut Ok(avrcp::MediaAttributes {
+                    .send(Ok(&avrcp::MediaAttributes {
                         title: Some("Might Be Right".to_string()),
                         artist_name: Some("White Reaper".to_string()),
                         album_name: Some("You Deserve Love".to_string()),
@@ -529,7 +529,7 @@ mod tests {
         match exec.run_until_stalled(&mut controller_requests.next()).expect("should be ready") {
             Some(Ok(avrcp::ControllerRequest::GetPlayStatus { responder })) => {
                 responder
-                    .send(&mut Ok(avrcp::PlayStatus {
+                    .send(Ok(&avrcp::PlayStatus {
                         song_length: Some(237000),
                         song_position: Some(1000),
                         playback_status: Some(avrcp::PlaybackStatus::Playing),
@@ -794,7 +794,7 @@ mod tests {
         match exec.run_until_stalled(&mut controller_requests.next()) {
             Poll::Ready(Some(Ok(avrcp::ControllerRequest::GetMediaAttributes { responder }))) => {
                 responder
-                    .send(&mut Ok(avrcp::MediaAttributes {
+                    .send(Ok(&avrcp::MediaAttributes {
                         title: Some("Moneygrabber".to_string()),
                         artist_name: Some("Fitz and the Tantrums".to_string()),
                         album_name: Some("Pickin' Up the Pieces".to_string()),
@@ -813,7 +813,7 @@ mod tests {
         match exec.run_until_stalled(&mut controller_requests.next()) {
             Poll::Ready(Some(Ok(avrcp::ControllerRequest::GetPlayStatus { responder }))) => {
                 responder
-                    .send(&mut Ok(avrcp::PlayStatus {
+                    .send(Ok(&avrcp::PlayStatus {
                         song_length: Some(189000),
                         song_position: Some(1000),
                         playback_status: Some(avrcp::PlaybackStatus::Paused),
@@ -873,7 +873,7 @@ mod tests {
         match exec.run_until_stalled(&mut controller_requests.next()) {
             Poll::Ready(Some(Ok(avrcp::ControllerRequest::GetMediaAttributes { responder }))) => {
                 responder
-                    .send(&mut Ok(avrcp::MediaAttributes {
+                    .send(Ok(&avrcp::MediaAttributes {
                         title: Some("some track".to_string()),
                         ..Default::default()
                     }))

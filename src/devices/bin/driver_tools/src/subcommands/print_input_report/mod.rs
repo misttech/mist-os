@@ -147,7 +147,7 @@ mod tests {
             |request: fir::InputDeviceRequest| async move {
                 match request {
                     fir::InputDeviceRequest::GetFeatureReport { responder } => {
-                        let mut feature_report = Ok(fir::FeatureReport {
+                        let feature_report = fir::FeatureReport {
                             sensor: Some(fir::SensorFeatureReport {
                                 report_interval: Some(294),
                                 sensitivity: Some(vec![8539, 912, 2]),
@@ -167,9 +167,9 @@ mod tests {
                                 ..Default::default()
                             }),
                             ..Default::default()
-                        });
+                        };
                         responder
-                            .send(&mut feature_report)
+                            .send(Ok(&feature_report))
                             .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
                             .context("Failed to respond to GetFeatureReport request")?;
                     }
@@ -806,7 +806,7 @@ mod tests {
                 fir::InputDeviceRequest::GetInputReport { device_type, responder } => {
                     match device_type {
                         fir::DeviceType::Mouse => {
-                            let mut input_report = Ok(fir::InputReport {
+                            let input_report = fir::InputReport {
                                 event_time: Some(123),
                                 mouse: Some(fir::MouseInputReport {
                                     pressed_buttons: Some(vec![]),
@@ -817,9 +817,9 @@ mod tests {
                                 keyboard: Some(fir::KeyboardInputReport::default()),
                                 consumer_control: Some(fir::ConsumerControlInputReport::default()),
                                 ..Default::default()
-                            });
+                            };
                             responder
-                                .send(&mut input_report)
+                                .send(Ok(&input_report))
                                 .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
                                 .context("Failed to respond to GetInputReport request")?;
                         }

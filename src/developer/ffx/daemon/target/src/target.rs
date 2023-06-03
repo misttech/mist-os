@@ -965,7 +965,8 @@ impl Target {
             }
 
             let modes = ffx_config::get_connection_modes().await;
-            let watchdogs: bool = ffx_config::get("watchdogs.host_pipe.enabled").await.unwrap_or(false);
+            let watchdogs: bool =
+                ffx_config::get("watchdogs.host_pipe.enabled").await.unwrap_or(false);
             let legacy = async {
                 if modes.use_legacy() {
                     let nr = spawn(weak_target.clone(), watchdogs).await;
@@ -1266,7 +1267,7 @@ mod test {
                     rcs::RemoteControlRequest::IdentifyHost { responder } => {
                         if send_internal_error {
                             let _ = responder
-                                .send(&mut Err(rcs::IdentifyHostError::ListInterfacesFailed))
+                                .send(Err(rcs::IdentifyHostError::ListInterfacesFailed))
                                 .context("sending testing error response")
                                 .unwrap();
                         } else {
@@ -1281,7 +1282,7 @@ mod test {
                                 Some(nodename_response.clone())
                             };
                             responder
-                                .send(&mut Ok(rcs::IdentifyHostResponse {
+                                .send(Ok(&rcs::IdentifyHostResponse {
                                     nodename,
                                     serial_number: Some(serial),
                                     addresses: Some(result),

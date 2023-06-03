@@ -504,8 +504,8 @@ where
                 Ok(responder.send(response)?)
             }
             GetTypefacesByFamily { family, responder } => {
-                let mut response = self.get_typefaces_by_family(family);
-                Ok(responder.send(&mut response)?)
+                let response = self.get_typefaces_by_family(family);
+                Ok(responder.send(response.as_ref().map_err(|e| *e))?)
             }
             ListTypefaces { request, iterator, responder } => {
                 let response = self.list_typefaces(request, iterator);

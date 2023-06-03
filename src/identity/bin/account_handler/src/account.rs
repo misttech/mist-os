@@ -226,8 +226,8 @@ where
                 responder.send(response)?;
             }
             AccountRequest::GetAuthState { responder } => {
-                let mut response = self.get_auth_state().await;
-                responder.send(&mut response)?;
+                let response = self.get_auth_state().await;
+                responder.send(response.as_ref().map_err(|e| *e))?;
             }
             AccountRequest::RegisterAuthListener { payload, responder } => {
                 let response = self.register_auth_listener(payload);

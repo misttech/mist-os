@@ -73,8 +73,8 @@ impl MockCrashReporterService {
                 fidl_fuchsia_feedback::CrashReporterRequest::FileReport { report, responder } => {
                     let res = self.call_hook.file(report).await;
                     match res {
-                        Err(_) => responder.send(&mut Err(FilingError::InvalidArgsError)).unwrap(),
-                        Ok(_) => responder.send(&mut Ok(FileReportResults::default())).unwrap(),
+                        Err(_) => responder.send(Err(FilingError::InvalidArgsError)).unwrap(),
+                        Ok(_) => responder.send(Ok(&FileReportResults::default())).unwrap(),
                     }
                 }
             }

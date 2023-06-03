@@ -418,7 +418,7 @@ impl RemoteControlService {
             Err(e) => {
                 error!(%e, "Allocating host identifier");
                 return responder
-                    .send(&mut Err(rcs::IdentifyHostError::ProxyConnectionFailed))
+                    .send(Err(rcs::IdentifyHostError::ProxyConnectionFailed))
                     .context("responding to client");
             }
         };
@@ -442,11 +442,11 @@ impl RemoteControlService {
                 .clone()
             })
             .collect();
-        let mut target_identity = identifier.identify().await.map(move |mut i| {
+        let target_identity = identifier.identify().await.map(move |mut i| {
             i.ids = Some(ids);
             i
         });
-        responder.send(&mut target_identity).context("responding to client")?;
+        responder.send(target_identity.as_ref().map_err(|e| *e)).context("responding to client")?;
         Ok(())
     }
 
@@ -821,7 +821,7 @@ mod tests {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
                     fdevice::NameProviderRequest::GetDeviceName { responder } => {
-                        let _ = responder.send(&mut Ok(String::from(NODENAME)));
+                        let _ = responder.send(Ok(NODENAME));
                     }
                 }
             }

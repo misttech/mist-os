@@ -420,11 +420,12 @@ mod test {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_resolve_ip_addr() {
-        let (sender, receiver) = futures::channel::mpsc::unbounded();
+        let (sender, receiver) =
+            futures::channel::mpsc::unbounded::<Result<LookupResult, LookupError>>();
         let (proxy, stream) = create_proxy_and_stream::<LookupMarker>()
             .expect("failed to create Lookup proxy and stream");
         const TEST_HOSTNAME: &'static str = "foobar.com";
-        let name_lookup_fut = stream.zip(receiver).for_each(|(req, mut rsp)| match req {
+        let name_lookup_fut = stream.zip(receiver).for_each(|(req, rsp)| match req {
             Ok(LookupRequest::LookupIp { hostname, options, responder }) => {
                 assert_eq!(hostname.as_str(), TEST_HOSTNAME);
                 assert_eq!(
@@ -436,9 +437,8 @@ mod test {
                         ..Default::default()
                     }
                 );
-                futures::future::ready(
-                    responder.send(&mut rsp).expect("failed to send FIDL response"),
-                )
+                let rsp = rsp.as_ref().map_err(|e| *e);
+                futures::future::ready(responder.send(rsp).expect("failed to send FIDL response"))
             }
             req => panic!("unexpected item in request stream {:?}", req),
         });
@@ -472,9 +472,7 @@ mod test {
                         addrs.into_iter().map(|addr| SocketAddr::new(addr, port)).collect()
                     })
                     .map_err(|(_fidl_err, io_err)| io_err);
-                let () = sender
-                    .unbounded_send(fidl_response.clone())
-                    .expect("failed to send expectation");
+                let () = sender.unbounded_send(fidl_response).expect("failed to send expectation");
                 resolve_ip_addr(&connector, TEST_HOSTNAME, port)
                     .map_ok(Iterator::collect::<Vec<_>>)
                     // Map IO error to kind so we can do equality.

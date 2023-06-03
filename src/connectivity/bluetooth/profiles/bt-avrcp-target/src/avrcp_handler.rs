@@ -31,24 +31,18 @@ async fn handle_target_request(
             responder.send(Ok(media_sessions.get_supported_notification_events()))?;
         }
         TargetHandlerRequest::GetPlayStatus { responder } => {
-            let mut response = media_sessions.get_active_session().map_or(
-                Err(TargetAvcError::RejectedNoAvailablePlayers),
-                |state| {
-                    let play_status = state.session_info().get_play_status().clone();
-                    Ok(play_status.into())
-                },
-            );
-            responder.send(&mut response)?;
+            if let Ok(state) = media_sessions.get_active_session() {
+                responder.send(Ok(&state.session_info().get_play_status().clone().into()))?;
+            } else {
+                responder.send(Err(TargetAvcError::RejectedNoAvailablePlayers))?;
+            }
         }
         TargetHandlerRequest::GetMediaAttributes { responder } => {
-            let mut response = media_sessions.get_active_session().map_or(
-                Err(TargetAvcError::RejectedNoAvailablePlayers),
-                |state| {
-                    let media_attributes = state.session_info().get_media_info().clone();
-                    Ok(media_attributes.into())
-                },
-            );
-            responder.send(&mut response)?;
+            if let Ok(state) = media_sessions.get_active_session() {
+                responder.send(Ok(&state.session_info().get_media_info().clone().into()))?;
+            } else {
+                responder.send(Err(TargetAvcError::RejectedNoAvailablePlayers))?;
+            }
         }
         TargetHandlerRequest::SendCommand { command, pressed, responder } => {
             if let Ok(state) = media_sessions.get_active_session() {
@@ -66,35 +60,29 @@ async fn handle_target_request(
             }
         }
         TargetHandlerRequest::GetPlayerApplicationSettings { attribute_ids, responder } => {
-            let mut response = media_sessions.get_active_session().map_or(
-                Err(TargetAvcError::RejectedNoAvailablePlayers),
-                |state| {
-                    state
-                        .session_info()
-                        .get_player_application_settings(attribute_ids)
-                        .map(Into::into)
-                },
-            );
-            responder.send(&mut response)?;
+            if let Ok(state) = media_sessions.get_active_session() {
+                let result = state.session_info().get_player_application_settings(attribute_ids);
+                responder.send(result.map(Into::into).as_ref().map_err(|e| *e))?;
+            } else {
+                responder.send(Err(TargetAvcError::RejectedNoAvailablePlayers))?;
+            }
         }
         TargetHandlerRequest::SetPlayerApplicationSettings { requested_settings, responder } => {
             if let Ok(state) = media_sessions.get_active_session() {
-                let set_settings =
+                let result =
                     state.handle_set_player_application_settings(requested_settings.into()).await;
-                responder.send(&mut set_settings.map(Into::into))?;
+                responder.send(result.map(Into::into).as_ref().map_err(|e| *e))?;
             } else {
-                responder.send(&mut Err(TargetAvcError::RejectedNoAvailablePlayers))?;
+                responder.send(Err(TargetAvcError::RejectedNoAvailablePlayers))?;
             }
         }
         TargetHandlerRequest::GetNotification { event_id, responder } => {
-            let mut response = media_sessions.get_active_session().map_or(
-                Err(TargetAvcError::RejectedNoAvailablePlayers),
-                |state| {
-                    let notification = state.session_info().get_notification_value(&event_id);
-                    notification.map(Into::into)
-                },
-            );
-            responder.send(&mut response)?;
+            if let Ok(state) = media_sessions.get_active_session() {
+                let result = state.session_info().get_notification_value(&event_id).map(Into::into);
+                responder.send(result.as_ref().map_err(|e| *e))?;
+            } else {
+                responder.send(Err(TargetAvcError::RejectedNoAvailablePlayers))?;
+            }
         }
         TargetHandlerRequest::WatchNotification {
             event_id,

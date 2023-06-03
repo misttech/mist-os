@@ -143,13 +143,13 @@ impl TargetHandleInner {
                 {
                     Ok(_) => {}
                     Err(e) => {
-                        return responder.send(&mut Err(e)).context("sending error response");
+                        return responder.send(Err(e)).context("sending error response");
                     }
                 }
                 let min_timestamp = match get_streaming_min_timestamp(&parameters, &stream).await {
                     Ok(n) => n,
                     Err(e) => {
-                        responder.send(&mut Err(e))?;
+                        responder.send(Err(e))?;
                         return Ok(());
                     }
                 };
@@ -161,7 +161,7 @@ impl TargetHandleInner {
                     });
                 });
                 responder
-                    .send(&mut Ok(ffx::LogSession {
+                    .send(Ok(&ffx::LogSession {
                         target_identifier,
                         session_timestamp_nanos: stream
                             .session_timestamp_nanos()
@@ -349,7 +349,7 @@ mod tests {
                                         }];
                                         let nodename = Some(nodename.clone());
                                         responder
-                                            .send(&mut Ok(fidl_rcs::IdentifyHostResponse {
+                                            .send(Ok(&fidl_rcs::IdentifyHostResponse {
                                                 nodename,
                                                 addresses: Some(addrs),
                                                 ..Default::default()

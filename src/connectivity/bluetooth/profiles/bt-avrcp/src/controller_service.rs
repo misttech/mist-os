@@ -85,42 +85,30 @@ impl ControllerService {
     async fn handle_fidl_request(&mut self, request: ControllerRequest) -> Result<(), Error> {
         match request {
             ControllerRequest::GetPlayerApplicationSettings { attribute_ids, responder } => {
-                responder.send(
-                    &mut self
-                        .controller
-                        .get_player_application_settings(
-                            attribute_ids.into_iter().map(Into::into).collect(),
-                        )
-                        .await
-                        .map(Into::into)
-                        .map_err(ControllerError::from),
-                )?;
+                let ids = attribute_ids.into_iter().map(Into::into).collect();
+                match self.controller.get_player_application_settings(ids).await {
+                    Ok(response) => responder.send(Ok(&response.into())),
+                    Err(e) => responder.send(Err(e.into())),
+                }?;
             }
             ControllerRequest::SetPlayerApplicationSettings { requested_settings, responder } => {
-                responder.send(
-                    &mut self
-                        .controller
-                        .set_player_application_settings(
-                            crate::packets::PlayerApplicationSettings::from(&requested_settings),
-                        )
-                        .await
-                        .map(Into::into)
-                        .map_err(ControllerError::from),
-                )?;
+                let settings = crate::packets::PlayerApplicationSettings::from(&requested_settings);
+                match self.controller.set_player_application_settings(settings).await {
+                    Ok(response) => responder.send(Ok(&response.into())),
+                    Err(e) => responder.send(Err(e.into())),
+                }?;
             }
             ControllerRequest::GetMediaAttributes { responder } => {
-                responder.send(
-                    &mut self
-                        .controller
-                        .get_media_attributes()
-                        .await
-                        .map_err(ControllerError::from),
-                )?;
+                match self.controller.get_media_attributes().await {
+                    Ok(response) => responder.send(Ok(&response)),
+                    Err(e) => responder.send(Err(e.into())),
+                }?;
             }
             ControllerRequest::GetPlayStatus { responder } => {
-                responder.send(
-                    &mut self.controller.get_play_status().await.map_err(ControllerError::from),
-                )?;
+                match self.controller.get_play_status().await {
+                    Ok(response) => responder.send(Ok(&response)),
+                    Err(e) => responder.send(Err(e.into())),
+                }?;
             }
             ControllerRequest::InformBatteryStatus { battery_status, responder } => {
                 responder.send(

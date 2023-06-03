@@ -158,7 +158,7 @@ async fn run_crash_reporter(
             }
             ffeedback::CrashReporterRequest::FileReport { report, responder } => {
                 crash_reports_sink.send(report).await.unwrap();
-                responder.send(&mut Ok(FileReportResults::default())).unwrap();
+                responder.send(Ok(&FileReportResults::default())).unwrap();
             }
         }
     }

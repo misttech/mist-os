@@ -63,7 +63,7 @@ pub(crate) async fn serve(
         .try_fold(ctx, |ctx, req| async {
             match req {
                 psocket::ProviderRequest::InterfaceIndexToName { index, responder } => {
-                    let mut response = {
+                    let response = {
                         let ctx = ctx.clone();
                         let Ctx { sync_ctx: _, non_sync_ctx } = &ctx;
                         BindingId::new(index)
@@ -74,7 +74,7 @@ pub(crate) async fn serve(
                             })
                             .map_err(|DeviceNotFoundError| zx::Status::NOT_FOUND.into_raw())
                     };
-                    responder_send!(responder, &mut response);
+                    responder_send!(responder, response.as_deref().map_err(|e| *e));
                 }
                 psocket::ProviderRequest::InterfaceNameToIndex { name, responder } => {
                     let response = {

@@ -100,8 +100,8 @@ impl Persona {
                 responder.send(response)?;
             }
             PersonaRequest::GetAuthState { responder } => {
-                let mut response = self.get_auth_state();
-                responder.send(&mut response)?;
+                let response = self.get_auth_state();
+                responder.send(response.as_ref().map_err(|e| *e))?;
             }
             PersonaRequest::RegisterAuthListener { payload, responder } => {
                 let response = self.register_auth_listener(payload);

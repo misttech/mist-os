@@ -362,7 +362,7 @@ impl FidlProtocol for TracingProtocol {
                         Err(e) => {
                             tracing::warn!("getting target controller proxy: {:?}", e);
                             return responder
-                                .send(&mut Err(ffx::RecordingError::TargetProxyOpen))
+                                .send(Err(ffx::RecordingError::TargetProxyOpen))
                                 .map_err(Into::into);
                         }
                     };
@@ -377,14 +377,14 @@ impl FidlProtocol for TracingProtocol {
                             target_query
                         );
                         return responder
-                            .send(&mut Err(ffx::RecordingError::TargetProxyOpen))
+                            .send(Err(ffx::RecordingError::TargetProxyOpen))
                             .map_err(Into::into);
                     }
                 };
                 match tasks.output_file_to_nodename.entry(output_file.clone()) {
                     Entry::Occupied(_) => {
                         return responder
-                            .send(&mut Err(ffx::RecordingError::DuplicateTraceFile))
+                            .send(Err(ffx::RecordingError::DuplicateTraceFile))
                             .map_err(Into::into);
                     }
                     Entry::Vacant(e) => {
@@ -401,7 +401,7 @@ impl FidlProtocol for TracingProtocol {
                             Ok(t) => t,
                             Err(e) => {
                                 tracing::warn!("unable to start trace: {:?}", e);
-                                let mut res = match e {
+                                let res = match e {
                                     TraceTaskStartError::TracingStartError(t) => match t {
                                         trace::StartErrorCode::AlreadyStarted => {
                                             Err(ffx::RecordingError::RecordingAlreadyStarted)
@@ -416,14 +416,14 @@ impl FidlProtocol for TracingProtocol {
                                         Err(ffx::RecordingError::RecordingStart)
                                     }
                                 };
-                                return responder.send(&mut res).map_err(Into::into);
+                                return responder.send(res).map_err(Into::into);
                             }
                         };
                         e.insert(nodename.clone());
                         tasks.nodename_to_task.insert(nodename, task);
                     }
                 }
-                responder.send(&mut Ok(target_info)).map_err(Into::into)
+                responder.send(Ok(&target_info)).map_err(Into::into)
             }
             ffx::TracingRequest::StopRecording { name, responder } => {
                 let task = {
@@ -433,7 +433,7 @@ impl FidlProtocol for TracingProtocol {
                         .await
                     {
                         Ok(n) => n,
-                        Err(e) => return responder.send(&mut Err(e)).map_err(Into::into),
+                        Err(e) => return responder.send(Err(e)).map_err(Into::into),
                     };
                     if let Some(task) = tasks.nodename_to_task.remove(&nodename) {
                         task
@@ -441,13 +441,13 @@ impl FidlProtocol for TracingProtocol {
                         // TODO(fxbug.dev/86410)
                         tracing::warn!("no task associated with trace file '{}'", name);
                         return responder
-                            .send(&mut Err(ffx::RecordingError::NoSuchTraceFile))
+                            .send(Err(ffx::RecordingError::NoSuchTraceFile))
                             .map_err(Into::into);
                     }
                 };
                 let target_info = task.target_info.clone();
-                let mut res = task.shutdown().await.map(|_| target_info);
-                responder.send(&mut res).map_err(Into::into)
+                let res = task.shutdown().await.map(|_| &target_info);
+                responder.send(res).map_err(Into::into)
             }
             ffx::TracingRequest::Status { iterator, responder } => {
                 let mut stream = iterator.into_stream()?;

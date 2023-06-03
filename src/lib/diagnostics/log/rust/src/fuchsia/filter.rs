@@ -179,7 +179,7 @@ mod tests {
         match stream.try_next().await {
             Ok(Some(LogSinkRequest::WaitForInterestChange { responder })) => {
                 responder
-                    .send(&mut Ok(Interest { min_severity: severity, ..Default::default() }))
+                    .send(Ok(&Interest { min_severity: severity, ..Default::default() }))
                     .expect("send response");
             }
             other => panic!("Expected WaitForInterestChange but got {:?}", other),
@@ -262,7 +262,7 @@ mod tests {
             match request {
                 LogSinkRequest::WaitForInterestChange { responder } => {
                     responder
-                        .send(&mut Ok(Interest {
+                        .send(Ok(&Interest {
                             min_severity: Some(Severity::Trace),
                             ..Default::default()
                         }))

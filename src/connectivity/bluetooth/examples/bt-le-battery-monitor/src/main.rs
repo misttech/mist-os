@@ -399,7 +399,7 @@ mod tests {
         let read_fut = remote_service_server.select_next_some();
         let (read_result, connect_fut) = run_while(&mut exec, connect_fut, read_fut);
         let (_, _, responder) = read_result.unwrap().into_read_characteristic().unwrap();
-        let _ = responder.send(&mut Ok(example_battery_level()));
+        let _ = responder.send(Ok(&example_battery_level()));
 
         // Because notifications are supported on the example characteristic, we expect a request
         // to subscribe to notifications.

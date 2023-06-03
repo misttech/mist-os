@@ -316,7 +316,7 @@ mod tests {
             while let Some(request) = stream.next().await {
                 match request {
                     Ok(ControllerRequest::GetTopologicalPath { responder }) => {
-                        responder.send(&mut Ok(DEFAULT_PATH.to_string())).unwrap();
+                        responder.send(Ok(DEFAULT_PATH)).unwrap();
                     }
                     Ok(ControllerRequest::ConnectToDeviceFidl { server, .. }) => {
                         fasync::Task::spawn(mock_partition(PartitionRequestStream::from_channel(

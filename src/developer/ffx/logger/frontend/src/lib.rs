@@ -980,7 +980,7 @@ mod test {
                         )
                         .unwrap();
                         responder
-                            .send(&mut Ok(LogSession {
+                            .send(Ok(&LogSession {
                                 target_identifier: target,
                                 session_timestamp_nanos: Some(BOOT_TS),
                                 ..Default::default()
@@ -1081,7 +1081,7 @@ mod test {
             remote_control_stream.next().await
         {
             responder
-                .send(&mut Ok(IdentifyHostResponse {
+                .send(Ok(&IdentifyHostResponse {
                     nodename: Some(TARGET_NAME.to_string()),
                     boot_timestamp_nanos: Some(BOOT_TS + time_offset),
                     ..Default::default()

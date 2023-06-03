@@ -1725,7 +1725,7 @@ mod test {
             move |req| async move {
                 match req {
                     RemoteControlRequest::IdentifyHost { responder } => responder
-                        .send(&mut Ok(IdentifyHostResponse {
+                        .send(Ok(&IdentifyHostResponse {
                             addresses: Some(vec![]),
                             nodename: Some(NODENAME.to_string()),
                             ..Default::default()

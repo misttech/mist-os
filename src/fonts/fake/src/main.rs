@@ -89,7 +89,7 @@ async fn handle_stream_experimental(
             }
             GetTypefacesByFamily { family: _, responder } => {
                 responder
-                    .send(&mut Err(fonts_exp::Error::NotFound))
+                    .send(Err(fonts_exp::Error::NotFound))
                     .context("send GetTypefacesByFamily")?;
             }
         }

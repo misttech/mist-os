@@ -166,7 +166,7 @@ impl TrelInstance {
                     let _publisher = publisher.clone();
                     async move {
                         responder
-                            .send(&mut Ok(ServiceInstancePublication {
+                            .send(Ok(&ServiceInstancePublication {
                                 port: Some(port),
                                 text: Some(txt),
                                 ..Default::default()

@@ -756,9 +756,8 @@ async fn run_lookup<T: ResolverLookup>(
                         .expect("receiver should not be closed");
                     Ok(())
                 }
-                LookupRequest::LookupHostname { addr, responder } => {
-                    responder.send(&mut handle_lookup_hostname(&resolver, addr).await)
-                }
+                LookupRequest::LookupHostname { addr, responder } => responder
+                    .send(handle_lookup_hostname(&resolver, addr).await.as_deref().map_err(|e| *e)),
             }
         })
         .await;
@@ -796,7 +795,7 @@ fn create_ip_lookup_fut<T: ResolverLookup>(
                 let ipv6_lookup = ipv6_lookup.unwrap_or(false);
                 let sort_addresses = sort_addresses.unwrap_or(false);
                 let canonical_name_lookup = canonical_name_lookup.unwrap_or(false);
-                let mut lookup_result = (|| async {
+                let lookup_result = (|| async {
                     let hostname = hostname.as_str();
                     // The [`IntoName`] implementation for &str does not
                     // properly reject IPv4 addresses in accordance with RFC
@@ -938,7 +937,7 @@ fn create_ip_lookup_fut<T: ResolverLookup>(
                     })
                 })()
                 .await;
-                responder.send(&mut lookup_result).unwrap_or_else(|e| match e {
+                responder.send(lookup_result.as_ref().map_err(|e| *e)).unwrap_or_else(|e| match e {
                     // Some clients will drop the channel when timing out
                     // requests. Mute those errors to prevent log spamming.
                     fidl::Error::ServerResponseWrite(zx::Status::PEER_CLOSED) => {}
