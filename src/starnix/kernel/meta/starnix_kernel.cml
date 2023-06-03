@@ -128,6 +128,16 @@
             max_count: 100,
         },
 
+        //  The resource limits for the container.
+        rlimits: {
+            type: "vector",
+            element: {
+                type: "string",
+                max_size: 256,
+            },
+            max_count: 100,
+        },
+
         // The name of the container.
         name: {
             type: "string",

@@ -88,6 +88,7 @@ fn get_config_from_component_start_info(
     let init = get_strvec("init");
     let kernel_cmdline = get_string("kernel_cmdline");
     let mounts = get_strvec("mounts");
+    let rlimits = get_strvec("rlimits");
     let name = get_string("name");
     let startup_file_path = get_string("startup_file_path");
 
@@ -103,6 +104,7 @@ fn get_config_from_component_start_info(
             init,
             kernel_cmdline,
             mounts,
+            rlimits,
             name,
             startup_file_path,
         },
@@ -374,6 +376,29 @@ fn mount_apexes(init_task: &CurrentTask, config: &ConfigWrapper) -> Result<(), E
     Ok(())
 }
 
+pub fn set_rlimits(current_task: &CurrentTask, rlimits: &[String]) -> Result<(), Error> {
+    let set_rlimit = |resource, value| {
+        current_task
+            .thread_group
+            .write()
+            .limits
+            .set(resource, rlimit { rlim_cur: value, rlim_max: value });
+    };
+
+    for rlimit in rlimits.iter() {
+        let (key, value) =
+            rlimit.split_once('=').ok_or_else(|| anyhow!("Invalid rlimit: {rlimit}"))?;
+        let value = value.parse::<u64>()?;
+        match key {
+            "RLIMIT_NOFILE" => set_rlimit(Resource::NOFILE, value),
+            _ => {
+                bail!("Unknown rlimit: {key}");
+            }
+        }
+    }
+    Ok(())
+}
+
 fn create_init_task(kernel: &Arc<Kernel>, config: &ConfigWrapper) -> Result<CurrentTask, Error> {
     let credentials = Credentials::root();
     let initial_name = if config.init.is_empty() {
@@ -383,6 +408,7 @@ fn create_init_task(kernel: &Arc<Kernel>, config: &ConfigWrapper) -> Result<Curr
     };
     let task = Task::create_process_without_parent(kernel, initial_name, None)?;
     task.set_creds(credentials);
+    set_rlimits(&task, &config.rlimits)?;
     Ok(task)
 }
 

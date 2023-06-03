@@ -19,6 +19,7 @@
             "/sys/fs/bpf:bpf",
             "/tmp:tmpfs",
         ],
+        rlimits: [ "RLIMIT_NOFILE=131072" ],
         name: "debian",
         startup_file_path: "",
     },

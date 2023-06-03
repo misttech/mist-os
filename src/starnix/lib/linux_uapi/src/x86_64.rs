@@ -3053,6 +3053,12 @@ pub const MAP_HUGE_512MB: u32 = 1946157056;
 pub const MAP_HUGE_1GB: u32 = 2013265920;
 pub const MAP_HUGE_2GB: u32 = 2080374784;
 pub const MAP_HUGE_16GB: u32 = 2281701376;
+pub const MQ_PRIO_MAX: u32 = 32768;
+pub const MQ_BYTES_MAX: u32 = 819200;
+pub const NOTIFY_NONE: u32 = 0;
+pub const NOTIFY_WOKENUP: u32 = 1;
+pub const NOTIFY_REMOVED: u32 = 2;
+pub const NOTIFY_COOKIE_LEN: u32 = 32;
 pub const IFNAMSIZ: u32 = 16;
 pub const IFALIASZ: u32 = 256;
 pub const ALTIFNAMSIZ: u32 = 128;
@@ -9855,6 +9861,15 @@ pub const membarrier_cmd_MEMBARRIER_CMD_SHARED: membarrier_cmd = 1;
 pub type membarrier_cmd = crate::types::c_uint;
 pub const membarrier_cmd_flag_MEMBARRIER_CMD_FLAG_CPU: membarrier_cmd_flag = 1;
 pub type membarrier_cmd_flag = crate::types::c_uint;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct mq_attr {
+    pub mq_flags: __kernel_long_t,
+    pub mq_maxmsg: __kernel_long_t,
+    pub mq_msgsize: __kernel_long_t,
+    pub mq_curmsgs: __kernel_long_t,
+    pub __reserved: [__kernel_long_t; 4usize],
+}
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct sync_serial_settings {

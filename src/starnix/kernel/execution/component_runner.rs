@@ -25,6 +25,7 @@ use std::sync::{Arc, Weak};
 use crate::auth::Credentials;
 use crate::execution::{
     container::Container, create_filesystem_from_spec, execute_task, parse_numbered_handles,
+    set_rlimits,
 };
 use crate::fs::fuchsia::RemoteFs;
 use crate::fs::*;
@@ -109,7 +110,10 @@ pub async fn start_component(
         .ok_or_else(|| anyhow!("Missing \"binary\" in manifest"))?;
     let binary_path = CString::new(binary_path.to_owned())?;
 
+    let rlimits = get_program_strvec(&start_info, "rlimits").cloned().unwrap_or_default();
+
     let mut current_task = Task::create_init_child_process(&container.kernel, &binary_path)?;
+    set_rlimits(&current_task, &rlimits)?;
 
     let cwd = current_task
         .lookup_path(&mut LookupContext::default(), current_task.fs().root(), pkg_path.as_bytes())

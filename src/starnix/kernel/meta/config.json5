@@ -6,6 +6,7 @@
     mounts: [
         "/:remotefs",
     ],
+    rlimits: [],
     name: "empty_container",
     startup_file_path: "",
 }

@@ -23,6 +23,7 @@
             "/sys:sysfs",
             "/sys/fs/selinux:selinuxfs",
         ],
+        rlimits: [ "RLIMIT_NOFILE=131072" ],
         name: "bionic_test",
         startup_file_path: "",
     },

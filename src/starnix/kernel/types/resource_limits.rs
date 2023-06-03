@@ -106,13 +106,48 @@ impl Resource {
     }
 }
 
-#[derive(Default)]
 pub struct ResourceLimits {
     values: HashMap<Resource, rlimit>,
 }
 
 const INFINITE_LIMIT: rlimit =
     rlimit { rlim_cur: RLIM_INFINITY as u64, rlim_max: RLIM_INFINITY as u64 };
+
+// See <https://github.com/google/gvisor/blob/master/pkg/abi/linux/limits.go>.
+const DEFAULT_LIMITS: [(Resource, rlimit); 6] = [
+    (Resource::STACK, rlimit { rlim_cur: uapi::_STK_LIM as u64, rlim_max: RLIM_INFINITY as u64 }),
+    (Resource::CORE, rlimit { rlim_cur: 0, rlim_max: uapi::RLIM_INFINITY as u64 }),
+    // TODO: Resource::NPROC has a default limit, but we need to find a source for the value.
+    (
+        Resource::NOFILE,
+        rlimit { rlim_cur: uapi::INR_OPEN_CUR as u64, rlim_max: uapi::INR_OPEN_MAX as u64 },
+    ),
+    (
+        Resource::MEMLOCK,
+        rlimit { rlim_cur: uapi::MLOCK_LIMIT as u64, rlim_max: uapi::MLOCK_LIMIT as u64 },
+    ),
+    (Resource::SIGPENDING, rlimit { rlim_cur: 0, rlim_max: 0 }),
+    (
+        Resource::MSGQUEUE,
+        rlimit { rlim_cur: uapi::MQ_BYTES_MAX as u64, rlim_max: uapi::MQ_BYTES_MAX as u64 },
+    ),
+    // TODO: Figure out what's going on with Resource::NICE and Resource::RTPRIO.
+    // The gVisor code makes it seem like we should use this default, but that causes
+    // some LTP tests to fail. There's likely some issue with -19...20 range versus the
+    // 1...40 range representations of priorities.
+    // (Resource::NICE, rlimit { rlim_cur: 0, rlim_max: 0 }),
+    // (Resource::RTPRIO, rlimit { rlim_cur: 0, rlim_max: 0 }),
+];
+
+impl Default for ResourceLimits {
+    fn default() -> Self {
+        let mut limits = Self { values: Default::default() };
+        for (resource, value) in DEFAULT_LIMITS.iter() {
+            limits.set(*resource, *value);
+        }
+        limits
+    }
+}
 
 impl ResourceLimits {
     pub fn get(&self, resource: Resource) -> rlimit {
