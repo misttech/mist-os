@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use {
-    crate::io::{Directory, RemoteDirectory},
+    crate::io::{Directory, LocalDirectory, RemoteDirectory},
     crate::path::{add_source_filename_to_path_if_absent, HostOrRemotePath, REMOTE_PATH_HELP},
     anyhow::{anyhow, bail, Result},
     fidl::endpoints::create_proxy,
     fidl_fuchsia_io as fio,
     fidl_fuchsia_sys2::StorageAdminProxy,
-    std::fs::{read, write},
+    std::path::PathBuf,
 };
 
 /// Transfer a file between the host machine and the Fuchsia device.
@@ -29,50 +29,44 @@ pub async fn copy(
     let storage_dir = RemoteDirectory::from_proxy(dir_proxy);
 
     match (HostOrRemotePath::parse(&source_path), HostOrRemotePath::parse(&destination_path)) {
-        (HostOrRemotePath::Remote(source), HostOrRemotePath::Host(destination)) => {
+        (HostOrRemotePath::Remote(source), HostOrRemotePath::Host(destination_path)) => {
             // Copying from remote to host
             storage_admin
                 .open_component_storage_by_id(&source.remote_id, server.into())
                 .await?
                 .map_err(|e| anyhow!("Could not open component storage: {:?}", e))?;
 
-            let remote_source_path = source.relative_path.clone();
-            let host_destination_path = add_source_filename_to_path_if_absent(
-                &storage_dir,
-                HostOrRemotePath::Remote(source),
-                HostOrRemotePath::Host(destination),
-            )
-            .await?;
-
-            let data = storage_dir.read_file_bytes(remote_source_path).await?;
-            write(host_destination_path, data)
-                .map_err(|e| anyhow!("Could not write file to host: {:?}", e))?;
-            Ok(())
+            let destination_dir = LocalDirectory::new();
+            do_copy(&storage_dir, &source.relative_path, &destination_dir, &destination_path).await
         }
-        (HostOrRemotePath::Host(source), HostOrRemotePath::Remote(destination)) => {
+        (HostOrRemotePath::Host(source_path), HostOrRemotePath::Remote(destination)) => {
             // Copying from host to remote
             storage_admin
                 .open_component_storage_by_id(&destination.remote_id, server.into())
                 .await?
                 .map_err(|e| anyhow!("Could not open component storage: {:?}", e))?;
 
-            let host_source_path = source.clone();
-            let remote_destination_path = add_source_filename_to_path_if_absent(
-                &storage_dir,
-                HostOrRemotePath::Host(source),
-                HostOrRemotePath::Remote(destination),
-            )
-            .await?;
-
-            let data = read(host_source_path)
-                .map_err(|e| anyhow!("Could not read file from host: {:?}", e))?;
-            storage_dir.write_file(remote_destination_path, data.as_slice()).await?;
-            Ok(())
+            let source_dir = LocalDirectory::new();
+            do_copy(&source_dir, &source_path, &storage_dir, &destination.relative_path).await
         }
         _ => {
             bail!("One path must be remote and the other must be host. {}", REMOTE_PATH_HELP)
         }
     }
+}
+
+async fn do_copy<S: Directory, D: Directory>(
+    source_dir: &S,
+    source_path: &PathBuf,
+    destination_dir: &D,
+    destination_path: &PathBuf,
+) -> Result<()> {
+    let destination_path_path =
+        add_source_filename_to_path_if_absent(destination_dir, source_path, destination_path)
+            .await?;
+
+    let data = source_dir.read_file_bytes(source_path).await?;
+    destination_dir.write_file(destination_path_path, &data).await
 }
 
 ////////////////////////////////////////////////////////////////////////////////

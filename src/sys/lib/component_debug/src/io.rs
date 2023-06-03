@@ -13,14 +13,15 @@ use {
     fuchsia_fs::directory::readdir,
     fuchsia_fs::directory::DirEntry,
     fuchsia_fs::{
-        directory::{
-            clone_no_describe, open_directory, open_directory_no_describe, open_file_no_describe,
-        },
+        directory::{clone_no_describe, open_directory_no_describe, open_file_no_describe},
         file::{close, read, read_to_string, write},
     },
     fuchsia_zircon_status::Status,
     futures::lock::Mutex,
-    std::path::{Path, PathBuf},
+    std::{
+        env, fs,
+        path::{Path, PathBuf},
+    },
 };
 
 pub enum DirentKind {
@@ -41,12 +42,6 @@ pub trait Directory: Sized {
 
     /// Return a copy of self.
     fn clone(&self) -> Result<Self>;
-
-    /// Returns an error if the directory at `relative_path` is not read/write.
-    async fn verify_directory_is_read_write<P: AsRef<Path> + Send>(
-        &self,
-        relative_path: P,
-    ) -> Result<()>;
 
     /// Returns the contents of the file at `relative_path` as a string.
     async fn read_file<P: AsRef<Path> + Send>(&self, relative_path: P) -> Result<String>;
@@ -76,7 +71,114 @@ pub trait Directory: Sized {
     async fn entry_names(&self) -> Result<Vec<String>>;
 }
 
-// A convenience wrapper over a FIDL DirectoryProxy.
+/// A convenience wrapper over a local directory.
+#[derive(Debug)]
+pub struct LocalDirectory {
+    path: PathBuf,
+}
+
+impl LocalDirectory {
+    /// Returns a new local directory wrapper with no base path component. All operations will
+    /// be on paths relative to the environment used by std::fs.
+    pub fn new() -> Self {
+        LocalDirectory { path: PathBuf::new() }
+    }
+
+    /// Returns a new local directory such that the methods on `Self` will
+    /// operate as expected on `path`:
+    ///
+    ///     - if `path` is absolute, returns a directory at "/"
+    ///     - if `path` is relative, returns a directory at `cwd`
+    pub fn for_path(path: &PathBuf) -> Self {
+        if path.is_absolute() {
+            LocalDirectory { path: "/".into() }
+        } else {
+            LocalDirectory { path: env::current_dir().unwrap() }
+        }
+    }
+}
+
+#[async_trait]
+impl Directory for LocalDirectory {
+    fn open_dir_readonly<P: AsRef<Path> + Send>(&self, relative_path: P) -> Result<Self> {
+        let full_path = self.path.join(relative_path);
+        Ok(LocalDirectory { path: full_path })
+    }
+
+    fn open_dir_readwrite<P: AsRef<Path> + Send>(&self, relative_path: P) -> Result<Self> {
+        self.open_dir_readonly(relative_path)
+    }
+
+    fn create_dir<P: AsRef<Path> + Send>(
+        &self,
+        relative_path: P,
+        _readwrite: bool,
+    ) -> Result<Self> {
+        let full_path = self.path.join(relative_path);
+        fs::create_dir(full_path.clone())?;
+        Ok(LocalDirectory { path: full_path })
+    }
+
+    fn clone(&self) -> Result<Self> {
+        Ok(LocalDirectory { path: self.path.clone() })
+    }
+
+    async fn read_file<P: AsRef<Path> + Send>(&self, relative_path: P) -> Result<String> {
+        let full_path = self.path.join(relative_path);
+        fs::read_to_string(full_path).map_err(Into::into)
+    }
+
+    async fn read_file_bytes<P: AsRef<Path> + Send>(&self, relative_path: P) -> Result<Vec<u8>> {
+        let full_path = self.path.join(relative_path);
+        fs::read(full_path).map_err(Into::into)
+    }
+
+    async fn exists(&self, filename: &str) -> Result<bool> {
+        Ok(self.path.join(filename).exists())
+    }
+
+    async fn entry_type(&self, filename: &str) -> Result<Option<DirentKind>> {
+        let full_path = self.path.join(filename);
+        if !full_path.exists() {
+            return Ok(None);
+        }
+        let metadata = fs::metadata(full_path)?;
+        if metadata.is_file() {
+            Ok(Some(DirentKind::File))
+        } else if metadata.is_dir() {
+            Ok(Some(DirentKind::Directory))
+        } else {
+            Err(anyhow!("Unsupported entry type: {:?}", metadata.file_type()))
+        }
+    }
+
+    async fn remove(&self, relative_path: &str) -> Result<()> {
+        let full_path = self.path.join(relative_path);
+        fs::remove_file(full_path).map_err(Into::into)
+    }
+
+    async fn write_file<P: AsRef<Path> + Send>(&self, relative_path: P, data: &[u8]) -> Result<()> {
+        let full_path = self.path.join(relative_path);
+        fs::write(full_path, data).map_err(Into::into)
+    }
+
+    async fn get_file_size<P: AsRef<Path> + Send>(&self, relative_path: P) -> Result<u64> {
+        let full_path = self.path.join(relative_path);
+        let metadata = fs::metadata(full_path)?;
+        if metadata.is_file() {
+            Ok(metadata.len())
+        } else {
+            Err(anyhow!("Cannot get size of non-file"))
+        }
+    }
+
+    async fn entry_names(&self) -> Result<Vec<String>> {
+        let paths = fs::read_dir(self.path.clone())?;
+        Ok(paths.into_iter().map(|p| p.unwrap().file_name().into_string().unwrap()).collect())
+    }
+}
+
+/// A convenience wrapper over a FIDL DirectoryProxy.
 #[derive(Debug)]
 pub struct RemoteDirectory {
     path: PathBuf,
@@ -167,30 +269,6 @@ impl Directory for RemoteDirectory {
         self.open_dir(relative_path, flags)
     }
 
-    async fn verify_directory_is_read_write<P: AsRef<Path> + Send>(
-        &self,
-        relative_path: P,
-    ) -> Result<()> {
-        let path = self.path.join(relative_path.as_ref());
-        let relative_path = match relative_path.as_ref().to_str() {
-            Some(relative_path) => relative_path,
-            None => return Err(format_err!("relative path is not valid unicode")),
-        };
-
-        let directory = self.clone_proxy()?;
-
-        match open_directory(&directory, relative_path, fio::OpenFlags::RIGHT_WRITABLE).await {
-            Ok(_) => Ok(()),
-            Err(e) => {
-                return Err(format_err!(
-                    "Not read write directory! {}, {}",
-                    path.as_path().display(),
-                    e
-                ))
-            }
-        }
-    }
-
     async fn read_file<P: AsRef<Path> + Send>(&self, relative_path: P) -> Result<String> {
         let path = self.path.join(relative_path.as_ref());
         let relative_path = match relative_path.as_ref().to_str() {
@@ -260,10 +338,8 @@ impl Directory for RemoteDirectory {
     }
 
     async fn entry_type(&self, filename: &str) -> Result<Option<DirentKind>> {
-        let entries = self.entries().await.map_err(|e| {
-            format_err!("could not get entry names of `{}`: {}", self.path.as_path().display(), e)
-        })?;
-        
+        let entries = self.entries().await?;
+
         entries
             .into_iter()
             .find(|e| e.name == filename)

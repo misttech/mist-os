@@ -6,9 +6,9 @@ use fidl::endpoints::create_proxy;
 
 use {
     crate::{
-        io::{Directory, DirentKind, RemoteDirectory},
+        io::{Directory, DirentKind, LocalDirectory, RemoteDirectory},
         path::{
-            add_source_filename_to_path_if_absent, HostOrRemotePath, NamespacedPath, RemotePath,
+            add_source_filename_to_path_if_absent, open_parent_subdir_readable, HostOrRemotePath,
             REMOTE_PATH_HELP,
         },
     },
@@ -16,11 +16,7 @@ use {
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     regex::Regex,
-    std::{
-        collections::HashMap,
-        fs::{read, write},
-        path::PathBuf,
-    },
+    std::{collections::HashMap, path::PathBuf},
     thiserror::Error,
 };
 
@@ -92,116 +88,78 @@ pub async fn copy_cmd<W: std::io::Write>(
             HostOrRemotePath::parse(&source_path),
             HostOrRemotePath::parse(&destination_path),
         ) {
-            (HostOrRemotePath::Remote(source), HostOrRemotePath::Host(destination)) => {
-                let source_dir = get_or_cache_namespace_dir_for_moniker(
-                    &realm_query,
-                    source.clone().remote_id,
-                    &mut namespace_dir_cache,
+            (HostOrRemotePath::Remote(source), HostOrRemotePath::Host(destination_path)) => {
+                let source_dir = RemoteDirectory::from_proxy(
+                    get_or_cache_namespace_dir_for_moniker(
+                        &realm_query,
+                        &source.remote_id,
+                        &mut namespace_dir_cache,
+                    )
+                    .await?,
+                );
+                let destination_dir = LocalDirectory::new();
+
+                do_copy(
+                    &source_dir,
+                    &source.relative_path,
+                    &destination_dir,
+                    &destination_path,
+                    verbose,
+                    &mut writer,
                 )
-                .await?;
+                .await
+            }
 
-                let dir = RemoteDirectory::from_proxy(source_dir.to_owned());
-                let paths = maybe_expand_wildcards_remote(source.clone(), &dir).await?;
+            (HostOrRemotePath::Host(source_path), HostOrRemotePath::Remote(destination)) => {
+                let source_dir = LocalDirectory::new();
+                let destination_dir = RemoteDirectory::from_proxy(
+                    get_or_cache_namespace_dir_for_moniker(
+                        &realm_query,
+                        &destination.remote_id,
+                        &mut namespace_dir_cache,
+                    )
+                    .await?,
+                );
 
-                for remote_path in paths {
-                    if is_remote_file(remote_path.clone(), &dir).await? {
-                        copy_remote_file_to_host(
-                            NamespacedPath { path: remote_path, ns: source_dir.to_owned() },
-                            destination.clone(),
-                        )
-                        .await?;
-
-                        if verbose {
-                            writeln!(
-                                writer,
-                                "Successfully copied {} to {}",
-                                &source_path, &destination_path
-                            )?;
-                        }
-                    } else if verbose {
-                        // TODO(https://fxbug.dev/116065): add recursive flag for wildcards.
-                        writeln!(
-                            writer,
-                            "Subdirectory \"{}\" ignored as recursive copying is currently not supported.",
-                            remote_path.to_string()
-                        )?;
-                    }
-                }
-                Ok(())
+                do_copy(
+                    &source_dir,
+                    &source_path,
+                    &destination_dir,
+                    &destination.relative_path,
+                    verbose,
+                    &mut writer,
+                )
+                .await
             }
 
             (HostOrRemotePath::Remote(source), HostOrRemotePath::Remote(destination)) => {
-                let source_dir = get_or_cache_namespace_dir_for_moniker(
-                    &realm_query,
-                    source.clone().remote_id,
-                    &mut namespace_dir_cache,
+                let source_dir = RemoteDirectory::from_proxy(
+                    get_or_cache_namespace_dir_for_moniker(
+                        &realm_query,
+                        &source.remote_id,
+                        &mut namespace_dir_cache,
+                    )
+                    .await?,
+                );
+
+                let destination_dir = RemoteDirectory::from_proxy(
+                    get_or_cache_namespace_dir_for_moniker(
+                        &realm_query,
+                        &destination.remote_id,
+                        &mut namespace_dir_cache,
+                    )
+                    .await?,
+                );
+
+                do_copy(
+                    &source_dir,
+                    &source.relative_path,
+                    &destination_dir,
+                    &destination.relative_path,
+                    verbose,
+                    &mut writer,
                 )
-                .await?;
-
-                let destination_dir = get_or_cache_namespace_dir_for_moniker(
-                    &realm_query,
-                    destination.clone().remote_id,
-                    &mut namespace_dir_cache,
-                )
-                .await?;
-
-                let dir = RemoteDirectory::from_proxy(source_dir.to_owned());
-                let paths = maybe_expand_wildcards_remote(source.clone(), &dir).await?;
-
-                for remote_path in paths {
-                    if is_remote_file(remote_path.clone(), &dir).await? {
-                        copy_remote_file_to_remote(
-                            NamespacedPath { path: remote_path, ns: source_dir.to_owned() },
-                            NamespacedPath {
-                                path: destination.clone(),
-                                ns: destination_dir.to_owned(),
-                            },
-                        )
-                        .await?;
-
-                        if verbose {
-                            writeln!(
-                                writer,
-                                "Successfully copied {} to {}",
-                                &source_path, &destination_path
-                            )?;
-                        }
-                    } else if verbose {
-                        //TODO(https://fxrev.dev/116065): add recursive flag for wildcards.
-                        writeln!(
-                            writer,
-                            "Subdirectory \"{}\" ignored as recursive copying is currently not supported.",
-                            remote_path.to_string()
-                        )?;
-                    }
-                }
-
-                Ok(())
-            }
-
-            (HostOrRemotePath::Host(source), HostOrRemotePath::Remote(destination)) => {
-                let destination_dir = get_or_cache_namespace_dir_for_moniker(
-                    &realm_query,
-                    destination.clone().remote_id,
-                    &mut namespace_dir_cache,
-                )
-                .await?;
-
-                copy_host_file_to_remote(
-                    source,
-                    NamespacedPath { path: destination, ns: destination_dir.to_owned() },
-                )
-                .await?;
-
-                if verbose {
-                    writeln!(
-                        writer,
-                        "Successfully copied {} to {}",
-                        &source_path, &destination_path
-                    )?;
-                }
-
-                Ok(())
+                .await
             }
 
             (HostOrRemotePath::Host(_), HostOrRemotePath::Host(_)) => {
@@ -211,27 +169,60 @@ pub async fn copy_cmd<W: std::io::Write>(
 
         match result {
             Ok(_) => continue,
-            Err(e) => bail!(
-                "Copy failed for source path: {} and destination path: {}. {}",
-                &source_path,
-                &destination_path,
-                e
-            ),
+            Err(e) => bail!("Copy from {} to {} failed: {}", &source_path, &destination_path, e),
         };
     }
 
     Ok(())
 }
 
-pub async fn is_remote_file(path: RemotePath, dir: &RemoteDirectory) -> Result<bool> {
-    let parent_dir = open_parent_subdir_readable(&path, dir)?;
+async fn do_copy<S: Directory, D: Directory, W: std::io::Write>(
+    source_dir: &S,
+    source_path: &PathBuf,
+    destination_dir: &D,
+    destination_path: &PathBuf,
+    verbose: bool,
+    writer: &mut W,
+) -> Result<()> {
+    let source_paths = maybe_expand_wildcards(source_path, source_dir).await?;
+    for path in source_paths {
+        if is_file(source_dir, &path).await? {
+            let destination_path_path =
+                add_source_filename_to_path_if_absent(destination_dir, &path, &destination_path)
+                    .await?;
 
-    let source_file = path.relative_path.file_name().map_or_else(
+            let data = source_dir.read_file_bytes(path).await?;
+            destination_dir.write_file(destination_path_path.clone(), &data).await?;
+
+            if verbose {
+                writeln!(
+                    writer,
+                    "Copied {} -> {}",
+                    source_path.display(),
+                    destination_path_path.display()
+                )?;
+            }
+        } else {
+            // TODO(https://fxbug.dev/116065): add recursive copy support.
+            writeln!(
+                writer,
+                "Directory \"{}\" ignored as recursive copying is unsupported. (See fxbug.dev/116065)",
+                path.display()
+            )?;
+        }
+    }
+
+    Ok(())
+}
+
+async fn is_file<D: Directory>(dir: &D, path: &PathBuf) -> Result<bool> {
+    let parent_dir = open_parent_subdir_readable(path, dir)?;
+    let source_file = path.file_name().map_or_else(
         || Err(CopyError::EmptyFileName),
         |file| Ok(file.to_string_lossy().to_string()),
     )?;
-    let remote_type = parent_dir.entry_type(&source_file).await?;
 
+    let remote_type = parent_dir.entry_type(&source_file).await?;
     match remote_type {
         Some(kind) => match kind {
             DirentKind::File => Ok(true),
@@ -241,39 +232,20 @@ pub async fn is_remote_file(path: RemotePath, dir: &RemoteDirectory) -> Result<b
     }
 }
 
-/// Returns a readable `RemoteDirectory` by opening the parent dir of `path`.
-///
-/// * `path`: The path from which to derive the parent
-/// * `dir`: RemoteDirectory to on which to open a subdir.
-pub fn open_parent_subdir_readable(
-    path: &RemotePath,
-    dir: &RemoteDirectory,
-) -> Result<RemoteDirectory> {
-    let parent_dir_path = match path.relative_path.parent() {
-        Some(parent) => PathBuf::from(parent),
-        None => return Err(CopyError::NoParentFolder { path: path.relative_path_string() }.into()),
-    };
-    dir.open_dir_readonly(&parent_dir_path)
-}
-
 /// If `path` contains a wildcard, returns the expanded list of files. Otherwise,
 /// returns a list with a single entry.
 ///
 /// # Arguments
 ///
 /// * `path`: A path that may contain a wildcard.
-/// * `dir`: RemoteDirectory proxy to query to expand wildcards.
-pub async fn maybe_expand_wildcards_remote(
-    path: RemotePath,
-    dir: &RemoteDirectory,
-) -> Result<Vec<RemotePath>> {
-    if !&path.contains_wildcard() {
-        return Ok(vec![path]);
+/// * `dir`: Directory proxy to query to expand wildcards.
+async fn maybe_expand_wildcards<D: Directory>(path: &PathBuf, dir: &D) -> Result<Vec<PathBuf>> {
+    if !&path.to_string_lossy().contains("*") {
+        return Ok(vec![path.clone()]);
     }
-    let parent_dir = open_parent_subdir_readable(&path, dir)?;
+    let parent_dir = open_parent_subdir_readable(path, dir)?;
 
     let file_pattern = &path
-        .relative_path
         .file_name()
         .map_or_else(
             || Err(CopyError::EmptyFileName),
@@ -281,25 +253,21 @@ pub async fn maybe_expand_wildcards_remote(
         )?
         .replace("*", ".*"); // Regex syntax requires a . before wildcard.
 
-    let entries = get_dirents_matching_pattern(parent_dir.clone()?, file_pattern.clone()).await?;
+    let entries = get_dirents_matching_pattern(&parent_dir, file_pattern.clone()).await?;
 
     if entries.len() == 0 {
         return Err(CopyError::NoWildCardMatches { pattern: file_pattern.to_string() }.into());
     }
 
-    let parent_dir_path = path.relative_path.parent().unwrap();
-    let paths = entries
-        .iter()
-        .map(|file| {
-            RemotePath::parse(&format!(
-                "{}::/{}",
-                &path.remote_id,
-                parent_dir_path.join(file).as_path().display().to_string()
-            ))
-        })
-        .collect::<Result<Vec<RemotePath>>>()?;
-
-    Ok(paths)
+    let parent_dir_path = match path.parent() {
+        Some(parent) => PathBuf::from(parent),
+        None => {
+            return Err(
+                CopyError::NoParentFolder { path: path.to_string_lossy().to_string() }.into()
+            )
+        }
+    };
+    Ok(entries.iter().map(|file| parent_dir_path.join(file)).collect::<Vec<_>>())
 }
 
 /// Checks whether the hashmap contains the existing moniker and creates a new (moniker, DirectoryProxy) pair if it doesn't exist.
@@ -309,28 +277,28 @@ pub async fn maybe_expand_wildcards_remote(
 /// * `realm_query`: |RealmQueryProxy| to fetch the component's namespace.
 /// * `moniker`: A moniker used to retrieve a namespace directory.
 /// * `namespace_dir_cache`: A table of monikers that map to namespace directories.
-pub async fn get_or_cache_namespace_dir_for_moniker(
+async fn get_or_cache_namespace_dir_for_moniker(
     realm_query: &fsys::RealmQueryProxy,
-    moniker: String,
+    moniker: &String,
     namespace_dir_cache: &mut HashMap<String, fio::DirectoryProxy>,
 ) -> Result<fio::DirectoryProxy> {
-    if !namespace_dir_cache.contains_key(&moniker) {
-        let namespace = open_namespace_dir_for_moniker(&realm_query, &moniker).await?;
+    if !namespace_dir_cache.contains_key(moniker) {
+        let namespace = open_namespace_dir_for_moniker(&realm_query, moniker).await?;
         namespace_dir_cache.insert(moniker.clone(), namespace);
     }
 
-    Ok(namespace_dir_cache.get(&moniker).unwrap().to_owned())
+    Ok(namespace_dir_cache.get(moniker).unwrap().to_owned())
 }
 
 /// Checks that the paths meet the following conditions:
 ///
 /// * Destination path does not contain a wildcard.
-/// * At least two path segments are are provided.
+/// * At least two path arguments are provided.
 ///
 /// # Arguments
 ///
 /// *`paths`: list of filepaths to be processed.
-pub fn validate_paths(paths: &Vec<String>) -> Result<()> {
+fn validate_paths(paths: &Vec<String>) -> Result<()> {
     if paths.len() < 2 {
         Err(CopyError::NotEnoughPaths.into())
     } else if paths.last().unwrap().contains("*") {
@@ -344,7 +312,7 @@ pub fn validate_paths(paths: &Vec<String>) -> Result<()> {
 /// # Arguments
 /// * `realm_query`: |RealmQueryProxy| to retrieve a component instance.
 /// * `moniker`: Absolute moniker of a component instance.
-pub async fn open_namespace_dir_for_moniker(
+async fn open_namespace_dir_for_moniker(
     realm_query: &fsys::RealmQueryProxy,
     moniker: &str,
 ) -> Result<fio::DirectoryProxy> {
@@ -374,103 +342,13 @@ pub async fn open_namespace_dir_for_moniker(
     }
 }
 
-/// Returns a `RemoteDirectory` within the directory backed by `dir` that is the parent
-/// of the last path component. If:
-///
-///   * `path` is "/", returns a `RemoteDirectory` at the root of `dir`
-///   * `path` is "/foo", returns a `RemoteDirectory` at "/foo"
-///   * `path` is "/foo/bar/baz", returns a `RemoteDirectory` at "/foo/bar"
-///
-/// # Arguments
-/// * `dir`: A proxy to a directory.
-/// * `path`: A path within the directory backed by `dir`.
-pub fn open_parent_subdir_writable(
-    dir: fio::DirectoryProxy,
-    path: RemotePath,
-) -> Result<RemoteDirectory> {
-    if path.relative_path.components().count() >= 2 {
-        let parent_path = path.relative_path.parent().unwrap();
-        RemoteDirectory::from_proxy(dir).open_dir_readwrite(&parent_path)
-    } else {
-        Ok(RemoteDirectory::from_proxy(dir))
-    }
-}
-
-/// Writes file contents from a local directory to a remote directory.
-///
-/// # Arguments
-/// * `source`: The host filepath.
-/// * `destination`: The remote directory and path within it.
-pub async fn copy_host_file_to_remote(source: PathBuf, destination: NamespacedPath) -> Result<()> {
-    let destination_dir = RemoteDirectory::from_proxy(destination.ns.to_owned());
-    let destination_path = add_source_filename_to_path_if_absent(
-        &open_parent_subdir_writable(destination.ns, destination.path.clone())?,
-        HostOrRemotePath::Host(source.clone()),
-        HostOrRemotePath::Remote(destination.path.clone()),
-    )
-    .await?;
-
-    let data = read(&source)?;
-    destination_dir.verify_directory_is_read_write(&destination_path.parent().unwrap()).await?;
-    destination_dir.write_file(destination_path, data.as_slice()).await?;
-
-    Ok(())
-}
-
-/// Writes file contents from a remote directory to a local directory.
-///
-/// # Arguments
-/// * `source`: The remote directory and path within it.
-/// * `destination`: The host filepath.
-pub async fn copy_remote_file_to_host(source: NamespacedPath, destination: PathBuf) -> Result<()> {
-    let file_path = &source.path.relative_path.clone();
-    let source_dir = RemoteDirectory::from_proxy(source.ns.to_owned());
-    let destination_path = add_source_filename_to_path_if_absent(
-        &source_dir,
-        HostOrRemotePath::Remote(source.path),
-        HostOrRemotePath::Host(destination),
-    )
-    .await?;
-
-    eprintln!("Normalized destination: {}", destination_path.display());
-
-    let data = source_dir.read_file_bytes(file_path).await?;
-    write(destination_path, data).map_err(|e| CopyError::FailedToWriteToHost { error: e })?;
-
-    Ok(())
-}
-
-/// Writes file contents between two remote directories.
-///
-/// # Arguments
-/// * `source`: The source remote directory and path within it.
-/// * `destination`: The target remote directory and path within it.
-pub async fn copy_remote_file_to_remote(
-    source: NamespacedPath,
-    destination: NamespacedPath,
-) -> Result<()> {
-    let source_dir = RemoteDirectory::from_proxy(source.ns.to_owned());
-    let destination_dir = RemoteDirectory::from_proxy(destination.ns.to_owned());
-    let destination_path = add_source_filename_to_path_if_absent(
-        &open_parent_subdir_writable(destination.ns, destination.path.clone())?,
-        HostOrRemotePath::Remote(source.path.clone()),
-        HostOrRemotePath::Remote(destination.path),
-    )
-    .await?;
-
-    let data = source_dir.read_file_bytes(&source.path.relative_path).await?;
-    destination_dir.verify_directory_is_read_write(&destination_path.parent().unwrap()).await?;
-    destination_dir.write_file(destination_path, data.as_slice()).await?;
-    Ok(())
-}
-
 // Retrieves all entries within a remote directory containing a file pattern.
 ///
 /// # Arguments
 /// * `dir`: A directory.
 /// * `file_pattern`: A file pattern to match.
-pub async fn get_dirents_matching_pattern(
-    dir: RemoteDirectory,
+async fn get_dirents_matching_pattern<D: Directory>(
+    dir: &D,
     file_pattern: String,
 ) -> Result<Vec<String>> {
     let mut entries = dir.entry_names().await?;
@@ -492,6 +370,7 @@ mod tests {
             create_tmp_dir, generate_directory_paths, generate_file_paths, serve_realm_query, File,
             SeedPath,
         },
+        std::fs::{read, write},
         std::iter::zip,
         test_case::test_case,
     };
@@ -782,10 +661,8 @@ mod tests {
         }
     }
 
-    #[test_case(Input{source: "/foo/bar::/data/", destination: "/bar/foo::/data/foo.txt"}; "no_source_file")]
     #[test_case(Input{source: "/foo/bar::/data/cat.txt", destination: "/bar/foo::/data/foo.txt"}; "bad_file")]
     #[test_case(Input{source: "/foo/bar::/foo.txt", destination: "/bar/foo::/data/foo.txt"}; "bad_source_folder")]
-    #[test_case(Input{source: "/foo/bar::/data/foo.txt", destination: "/bar/foo::/file.txt"}; "bad_destination_folder")]
     #[test_case(Input{source: "/hello/world::/data/foo.txt", destination: "/bar/foo::/data/file.txt"}; "bad_source_moniker")]
     #[test_case(Input{source: "/foo/bar::/data/foo.txt", destination: "/hello/world::/data/file.txt"}; "bad_destination_moniker")]
     #[fuchsia::test]
@@ -853,9 +730,6 @@ mod tests {
         }
     }
 
-    #[test_case(Input{source: "foo.txt", destination: "/foo/bar::/foo.txt"}; "root_dir")]
-    #[test_case(Input{source: "foo.txt", destination: "/foo/bar::"}; "root_dir_infer_path")]
-    #[test_case(Input{source: "foo.txt", destination: "/foo/bar::/"}; "root_dir_infer_path_slash")]
     #[test_case(Input{source: "foo.txt", destination: "wrong_moniker/foo/bar::/data/foo.txt"}; "bad_moniker")]
     #[test_case(Input{source: "foo.txt", destination: "/foo/bar:://bar/foo.txt"}; "bad_directory")]
     #[fuchsia::test]

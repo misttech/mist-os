@@ -3,88 +3,63 @@
 // found in the LICENSE file.
 
 use {
-    crate::io::{Directory, DirentKind, RemoteDirectory},
+    crate::io::{Directory, DirentKind},
     anyhow::{anyhow, bail, Error, Result},
     fidl_fuchsia_io as fio,
     std::path::{Component, PathBuf},
 };
 
-/// Returns a valid file path to write to given a source and destination path.
+/// Returns a readable `Directory` by opening the parent dir of `path`.
+///
+/// * `path`: The path from which to derive the parent
+/// * `dir`: RemoteDirectory to on which to open a subdir.
+pub fn open_parent_subdir_readable<D: Directory>(path: &PathBuf, dir: &D) -> Result<D> {
+    if path.components().count() < 2 {
+        // The path is something like "/foo" which, as a relative path from `dir`, would make `dir`
+        // the parent.
+        return dir.clone();
+    }
+
+    dir.open_dir_readonly(path.parent().unwrap())
+}
+
+/// If `destination_path` in `destination_dir` is itself a directory, returns
+/// a path with the filename portion of `source_path` appended. Otherwise, returns
+/// a copy of the input `destination_path`.
 ///
 /// The purpose of this function is to help infer a path in cases which an ending file name for the destination path is not provided.
 /// For example, the command "ffx component storage copy ~/alarm.wav [instance-id]::/" does not know what name to give the new file copied.
 /// [instance-id]::/. Thus it is necessary to infer this new file name and generate the new path "[instance-id]::/alarm.wav".
 ///
-/// This function will check the current destination path and return a new path if the final component in the path is a directory.
-/// The new path will have the filename of the source path appended to the destination path.
-/// Otherwise, the destination path passed in will be returned.
-///
 /// # Arguments
 ///
-/// * `destination_dir`: RemoteDirectory proxy to help retrieve directory entries on device
-/// * `source_path`:  source path from which to
-/// * `path`: source path of either a host filepath or a component namespace entry
+/// * `destination_dir`: Directory to query for the type of `destination_path`
+/// * `source_path`: path from which to read a filename, if needed
+/// * `destination_path`: destination path
 ///
 /// # Error Conditions:
 ///
 /// * File name for `source_path` is empty
 /// * Communications error talking to remote endpoint
-pub async fn add_source_filename_to_path_if_absent(
-    destination_dir: &RemoteDirectory,
-    source_path: HostOrRemotePath,
-    path: HostOrRemotePath,
+pub async fn add_source_filename_to_path_if_absent<D: Directory>(
+    destination_dir: &D,
+    source_path: &PathBuf,
+    destination_path: &PathBuf,
 ) -> Result<PathBuf, Error> {
-    let source_file = match source_path {
-        HostOrRemotePath::Host(path) => path
-            .file_name()
-            .map_or_else(|| Err(anyhow!("Source path is empty")), |file| Ok(PathBuf::from(file)))?,
-        HostOrRemotePath::Remote(path) => path
-            .relative_path
-            .file_name()
-            .map_or_else(|| Err(anyhow!("Source path is empty")), |file| Ok(PathBuf::from(file)))?,
-    };
-
+    let source_file = source_path
+        .file_name()
+        .map_or_else(|| Err(anyhow!("Source path is empty")), |file| Ok(PathBuf::from(file)))?;
     let source_file_str = source_file.display().to_string();
+
     // If the destination is a directory, append `source_file_str`.
-    match path {
-        HostOrRemotePath::Host(mut path) => {
-            let destination_file = path.file_name();
-
-            if destination_file.is_none() || path.is_dir() {
-                path.push(&source_file_str);
-            }
-
-            Ok(path)
+    if let Some(destination_file) = destination_path.file_name() {
+        let parent_dir = open_parent_subdir_readable(destination_path, destination_dir)?;
+        match parent_dir.entry_type(&destination_file.to_string_lossy().to_string()).await? {
+            Some(DirentKind::File) | None => Ok(destination_path.clone()),
+            Some(DirentKind::Directory) => Ok(destination_path.join(source_file_str)),
         }
-        HostOrRemotePath::Remote(remote_path) => {
-            let mut path = remote_path.relative_path;
-            let destination_file = path.file_name();
-            let remote_destination_type = if destination_file.is_some() {
-                destination_dir
-                    .entry_type(destination_file.unwrap_or_default().to_str().unwrap_or_default())
-                    .await?
-            } else {
-                destination_dir.entry_type(&source_file_str).await?
-            };
-
-            match (&remote_destination_type, &destination_file) {
-                (Some(kind), _) => {
-                    match kind {
-                        DirentKind::File => {}
-                        // TODO(https://fxbug.dev/127335): Update component_manager vfs to assign proper DirentKinds when installing the directory tree.
-                        DirentKind::Directory => {
-                            path.push(&source_file_str);
-                        }
-                    }
-                    Ok(path)
-                }
-                (None, Some(_)) => Ok(path),
-                (None, None) => {
-                    path.push(&source_file_str);
-                    Ok(path)
-                }
-            }
-        }
+    } else {
+        Ok(destination_path.join(source_file_str))
     }
 }
 
