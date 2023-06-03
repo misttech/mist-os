@@ -1239,6 +1239,7 @@ mod tests {
             'o' as u8, 'k' as u8, 'a' as u8, 'y' as u8,
         ];
 
+        #[allow(unknown_lints, invalid_from_utf8)]
         let expected_err = std::str::from_utf8(&[0x80]).unwrap_err();
 
         assert_eq!(
