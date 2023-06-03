@@ -27,8 +27,6 @@ template("fuchsia_package_archive") {
   if (current_toolchain == target_toolchain) {
     package_tool_archive_create(target_name) {
       forward_variables_from(invoker, "*")
-
-      manifest = "${package}_manifest"
     }
   } else {
     # Hack. See this target's documentation.

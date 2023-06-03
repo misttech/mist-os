@@ -453,10 +453,6 @@ template("package_tool_repository_publish") {
 #
 # Parameters
 #
-#   manifest (required)
-#     [label] A generate_manifest() target defined earlier in the same file.
-#     This provides the contents for the package.
-#
 #   package (required)
 #     [label] A pm_build() target defined earlier in the same file.
 #
@@ -464,13 +460,10 @@ template("package_tool_repository_publish") {
 #     [string] The name of the far file to output.
 template("package_tool_archive_create") {
   assert(defined(invoker.package), "package is required")
-  assert(defined(invoker.manifest), "manifest is required")
 
   package_name = get_label_info(invoker.package, "name")
   pkg_out_dir =
       get_label_info(invoker.package, "target_out_dir") + "/${package_name}"
-  pkg_manifest_outputs = get_target_outputs(invoker.manifest)
-  pkg_manifest_file = pkg_manifest_outputs[0]
 
   if (defined(invoker.archive_name)) {
     archive_name = invoker.archive_name
@@ -492,20 +485,9 @@ template("package_tool_archive_create") {
                              "no_output_dir_leaks",
                            ])
 
-    deps = [
-      invoker.manifest,
-      invoker.package,
-    ]
+    deps = [ invoker.package ]
     depfile = archive_depfile
-    inputs = [
-      pkg_manifest_file,
-
-      # The output package manifest from pm_build(). This is a hack due to
-      # pm archive's lack of support for depfiles, and ensures that this
-      # target is rebuilt if any of the files in the dependent package change
-      # since that would modify package_manifest.json.
-      "${pkg_out_dir}/package_manifest.json",
-    ]
+    inputs = [ "${pkg_out_dir}/package_manifest.json" ]
     outputs = [ archive_out ]
     args = [
       "package",
