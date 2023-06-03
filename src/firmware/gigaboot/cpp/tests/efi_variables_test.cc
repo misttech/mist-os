@@ -194,8 +194,8 @@ TEST_F(EfiVariablesStubTest, GetVariableNotThere) {
 
 // Helper function to work around matching `fbl::Vector`
 // Alternative is to add `using value_type = T;` to `fbl::Vector` class;
-cpp20::span<uint8_t> ToSpan(const efi::VariableValue& value) {
-  return cpp20::span<uint8_t>(value.begin(), value.end());
+cpp20::span<const uint8_t> ToSpan(const efi::VariableValue& value) {
+  return cpp20::span<const uint8_t>(value.begin(), value.end());
 }
 
 TEST_F(EfiVariablesStubTest, GetVariableGood) {

@@ -387,7 +387,8 @@ fit::result<efi_status> EfiGptBlockDevice::WritePartition(std::string_view name,
   return fit::ok();
 }
 
-cpp20::span<std::array<char, GPT_NAME_LEN / 2>> EfiGptBlockDevice::ListPartitionNames() const {
+cpp20::span<const std::array<char, GPT_NAME_LEN / 2>> EfiGptBlockDevice::ListPartitionNames()
+    const {
   auto last_partition = std::find_if(utf8_names_.begin(), utf8_names_.end(),
                                      [](const auto &p) { return p.front() == '\0'; });
   return cpp20::span(utf8_names_.begin(), last_partition);
