@@ -4033,7 +4033,7 @@ Contains the major version number of the ICU library, for dependencies that
 need different configuration based on the library version. Currently this
 is only useful in Fuchsia.
 
-**Current value (from the default):** `"73"`
+**Current value (from the default):** `"72"`
 
 From //third_party/icu/default/version.gni:13
 
