@@ -5,15 +5,15 @@
             "tools/bazel build third_party/iwlwifi/platform:iwlwifi_pkg"
         ],
         "triggered_events": [
-            "BUILD_BEGONIA",
+            "BUILD_CORE",
             "UNDEFINED"
         ]
     },
-    "BUILD_BEGONIA" : {
+    "BUILD_CORE" : {
         "repo": "~/fuchsia",
         "commands": [
             "fx clean",
-            "fx set begonia_eng.x64",
+            "fx set core.x64",
             "fx build"
         ],
         "triggered_events": []
