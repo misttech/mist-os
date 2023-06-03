@@ -1440,6 +1440,13 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sched_setscheduler() {
         let (_kernel, current_task) = create_kernel_and_task();
+
+        current_task
+            .thread_group
+            .write()
+            .limits
+            .set(Resource::RTPRIO, rlimit { rlim_cur: 255, rlim_max: 255 });
+
         let scheduler = sys_sched_getscheduler(&current_task, 0).unwrap();
         assert_eq!(scheduler, SCHED_NORMAL, "tasks should have normal scheduler by default");
 

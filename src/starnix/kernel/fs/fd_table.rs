@@ -70,15 +70,19 @@ impl Default for FdMap {
 impl FdMap {
     fn insert_entry(
         &mut self,
-        task: &Task,
         fd: FdNumber,
+        rlimit: u64,
         entry: FdTableEntry,
     ) -> Result<(), Errno> {
-        if fd.raw() as u64 >= task.thread_group.get_rlimit(Resource::NOFILE) {
+        let raw_fd = fd.raw();
+        if raw_fd < 0 {
+            return error!(EBADF);
+        }
+        if raw_fd as u64 >= rlimit {
             return error!(EMFILE);
         }
-        if fd.raw() == self.next_fd.raw() {
-            self.next_fd = self.calculate_lowest_available_fd(&FdNumber::from_raw(fd.raw() + 1));
+        if raw_fd == self.next_fd.raw() {
+            self.next_fd = self.calculate_lowest_available_fd(&FdNumber::from_raw(raw_fd + 1));
         }
         self.map.insert(fd, entry);
         Ok(())
@@ -191,10 +195,11 @@ impl FdTable {
         file: FileHandle,
         flags: FdFlags,
     ) -> Result<(), Errno> {
+        let rlimit = task.thread_group.get_rlimit(Resource::NOFILE);
         let id = self.id();
         let inner = self.table.lock();
         let mut state = inner.map_handle.lock();
-        state.insert_entry(task, fd, FdTableEntry::new(file, id, flags))
+        state.insert_entry(fd, rlimit, FdTableEntry::new(file, id, flags))
     }
 
     pub fn add_with_flags(
@@ -203,11 +208,12 @@ impl FdTable {
         file: FileHandle,
         flags: FdFlags,
     ) -> Result<FdNumber, Errno> {
+        let rlimit = task.thread_group.get_rlimit(Resource::NOFILE);
         let id = self.id();
         let inner = self.table.lock();
         let mut state = inner.map_handle.lock();
         let fd = state.next_fd;
-        state.insert_entry(task, fd, FdTableEntry::new(file, id, flags))?;
+        state.insert_entry(fd, rlimit, FdTableEntry::new(file, id, flags))?;
         Ok(fd)
     }
 
@@ -224,6 +230,7 @@ impl FdTable {
         // the close() function on the FileOps calls back into the FdTable.
         let _removed_file;
         let result = {
+            let rlimit = task.thread_group.get_rlimit(Resource::NOFILE);
             let id = self.id();
             let inner = self.table.lock();
             let mut state = inner.map_handle.lock();
@@ -235,13 +242,21 @@ impl FdTable {
 
             let fd = match target {
                 TargetFdNumber::Specific(fd) => {
+                    // We need to check the rlimit before we remove the entry from state
+                    // because we cannot error out after removing the entry.
+                    if fd.raw() as u64 >= rlimit {
+                        // ltp_dup201 shows that we're supposed to return EBADF in this
+                        // situtation, instead of EMFILE, which is what we normally return
+                        // when we're past the rlimit.
+                        return error!(EBADF);
+                    }
                     _removed_file = state.remove_entry(&fd);
                     fd
                 }
                 TargetFdNumber::Minimum(fd) => state.get_lowest_available_fd(fd),
                 TargetFdNumber::Default => state.get_lowest_available_fd(FdNumber::from_raw(0)),
             };
-            state.insert_entry(task, fd, FdTableEntry::new(file, id, flags))?;
+            state.insert_entry(fd, rlimit, FdTableEntry::new(file, id, flags))?;
             Ok(fd)
         };
         result

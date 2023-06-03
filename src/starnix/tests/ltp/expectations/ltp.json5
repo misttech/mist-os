@@ -161,7 +161,6 @@
                 "*/ltp_dirtyc0w_child.cm",
                 "*/ltp_dirtyc0w_shmem.cm",
                 "*/ltp_dirtyc0w_shmem_child.cm",
-                "*/ltp_dup201.cm",
                 "*/ltp_eas_big_to_small.cm",
                 "*/ltp_eas_one_big_task.cm",
                 "*/ltp_eas_one_small_task.cm",
