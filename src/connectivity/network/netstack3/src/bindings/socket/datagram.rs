@@ -848,10 +848,10 @@ where
                 );
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetSockName { responder } => {
-                responder_send!(responder, &mut self.get_sock_name());
+                responder_send!(responder, self.get_sock_name().as_ref().map_err(|e| *e));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetPeerName { responder } => {
-                responder_send!(responder, &mut self.get_peer_name());
+                responder_send!(responder, self.get_peer_name().as_ref().map_err(|e| *e));
             }
             fposix_socket::SynchronousDatagramSocketRequest::Shutdown { mode, responder } => {
                 responder_send!(responder, self.shutdown(mode))
@@ -885,7 +885,7 @@ where
                 responder_send!(responder, self.get_sock_info())
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetTimestamp { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetTimestamp {
                 value: _,
@@ -1100,7 +1100,7 @@ where
             fposix_socket::SynchronousDatagramSocketRequest::GetIpMulticastInterface {
                 responder,
             } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpMulticastLoopback {
                 value: _,

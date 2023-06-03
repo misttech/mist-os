@@ -2353,10 +2353,9 @@ mac             -
                 let (id, responder) = req.into_get_mac().expect("get_mac request");
                 let () = responder
                     .send(
-                        &mut mac_addresses
+                        mac_addresses
                             .get(&id.try_into().unwrap())
-                            .copied()
-                            .map(|option| option.map(Box::new))
+                            .map(Option::as_ref)
                             .ok_or(fdebug::InterfacesGetMacError::NotFound),
                     )
                     .expect("send get_mac response");
@@ -3185,10 +3184,9 @@ mac             -
                         );
                         // We don't care what the value is here, we just need something to give as
                         // an argument to responder.send().
-                        let mut dummy_result =
-                            Ok(fdhcp::Option_::SubnetMask(fidl_ip_v4!("255.255.255.0")));
+                        let dummy_result = fdhcp::Option_::SubnetMask(fidl_ip_v4!("255.255.255.0"));
                         let () = responder
-                            .send(&mut dummy_result)
+                            .send(Ok(&dummy_result))
                             .expect("responder.send should succeed");
                         Ok(())
                     }
@@ -3202,10 +3200,9 @@ mac             -
                         );
                         // We don't care what the value is here, we just need something to give as
                         // an argument to responder.send().
-                        let mut dummy_result =
-                            Ok(fdhcp::Parameter::Lease(fdhcp::LeaseLength::default()));
+                        let dummy_result = fdhcp::Parameter::Lease(fdhcp::LeaseLength::default());
                         let () = responder
-                            .send(&mut dummy_result)
+                            .send(Ok(&dummy_result))
                             .expect("responder.send should succeed");
                         Ok(())
                     }

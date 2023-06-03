@@ -294,10 +294,10 @@ impl MockResolverService {
         ) {
             Expectation::ImmediateConstant(Ok(package)) => {
                 package.serve_on(dir);
-                responder.send(&mut Ok(fpkg::ResolutionContext { bytes: vec![] }))?;
+                responder.send(Ok(&fpkg::ResolutionContext { bytes: vec![] }))?;
             }
             Expectation::ImmediateConstant(Err(error)) => {
-                responder.send(&mut Err(*error))?;
+                responder.send(Err(*error))?;
             }
             Expectation::BlockOnce(handler) => {
                 let handler = handler.take().unwrap();
@@ -310,10 +310,10 @@ impl MockResolverService {
                 match expected_results.remove(0) {
                     Ok(package) => {
                         package.serve_on(dir);
-                        responder.send(&mut Ok(fpkg::ResolutionContext { bytes: vec![] }))?;
+                        responder.send(Ok(&fpkg::ResolutionContext { bytes: vec![] }))?;
                     }
                     Err(e) => {
-                        responder.send(&mut Err(e))?;
+                        responder.send(Err(e))?;
                     }
                 };
             }
@@ -399,7 +399,7 @@ impl ResolveHandler {
 
     /// Wait for the request and fail the resolve with the given status.
     pub async fn fail(self, error: fidl_fuchsia_pkg::ResolveError) {
-        self.into_pending().await.responder.send(&mut Err(error)).unwrap();
+        self.into_pending().await.responder.send(Err(error)).unwrap();
     }
 
     /// Wait for the request and succeed the resolve by serving the given package.
@@ -407,7 +407,7 @@ impl ResolveHandler {
         let PendingResolve { responder, dir_request } = self.into_pending().await;
 
         pkg.serve_on(dir_request);
-        responder.send(&mut Ok(fpkg::ResolutionContext { bytes: vec![] })).unwrap();
+        responder.send(Ok(&fpkg::ResolutionContext { bytes: vec![] })).unwrap();
     }
 }
 

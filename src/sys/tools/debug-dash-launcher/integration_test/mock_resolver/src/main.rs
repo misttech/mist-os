@@ -46,12 +46,10 @@ async fn main() {
                                     .clone(fuchsia_fs::OpenFlags::CLONE_SAME_RIGHTS, dir)
                                     .unwrap();
 
-                                responder
-                                    .send(&mut Ok(ResolutionContext { bytes: vec![] }))
-                                    .unwrap();
+                                responder.send(Ok(&ResolutionContext { bytes: vec![] })).unwrap();
                             } else {
                                 // The package doesn't exist.
-                                responder.send(&mut Err(ResolveError::PackageNotFound)).unwrap()
+                                responder.send(Err(ResolveError::PackageNotFound)).unwrap()
                             }
                         }
                         r => panic!("Unexpected request: {:?}", r),

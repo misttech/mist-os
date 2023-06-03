@@ -476,7 +476,7 @@ mod tests {
                 responder,
             }) => {
                 let response = backlight_command;
-                let _ = responder.send(&mut Ok(response));
+                let _ = responder.send(Ok(&response));
             }
             Ok(fidl_fuchsia_hardware_backlight::DeviceRequest::GetMaxAbsoluteBrightness {
                 responder,
@@ -625,8 +625,10 @@ mod dual_state_tests {
                 tracing::debug!("FakeBacklightService: {}", req.method_name());
                 match req {
                     GetStateNormalized { responder } => {
-                        let mut result = self.get_state_normalized_response.get().await;
-                        responder.send(&mut result).expect("send GetStateNormalized");
+                        let result = self.get_state_normalized_response.get().await;
+                        responder
+                            .send(result.as_ref().map_err(|e| *e))
+                            .expect("send GetStateNormalized");
                     }
                     SetStateNormalized { state, responder } => {
                         let result = self.set_state_normalized_response.lock().await.clone();

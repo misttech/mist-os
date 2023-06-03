@@ -301,7 +301,7 @@ impl BlockServer {
                 let block_size = self.file.get_block_size();
                 let block_count =
                     (self.file.get_size().await.unwrap() + block_size - 1) / block_size;
-                responder.send(&mut Ok(block::BlockInfo {
+                responder.send(Ok(&block::BlockInfo {
                     block_count,
                     block_size: block_size as u32,
                     max_transfer_size: 1024 * 1024,
@@ -310,7 +310,7 @@ impl BlockServer {
             }
             // TODO(fxbug.dev/89873)
             VolumeAndNodeRequest::GetStats { clear: _, responder } => {
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             VolumeAndNodeRequest::OpenSession { session, control_handle: _ } => {
                 let stream = session.into_stream()?;
@@ -328,10 +328,11 @@ impl BlockServer {
                             block::SessionRequest::AttachVmo { vmo, responder } => {
                                 match self.get_vmo_id(vmo) {
                                     Some(vmo_id) => {
-                                        responder.send(&mut Ok(block::VmoId { id: vmo_id }))?
+                                        responder.send(Ok(&block::VmoId { id: vmo_id }))?
                                     }
-                                    None => responder
-                                        .send(&mut Err(zx::Status::NO_RESOURCES.into_raw()))?,
+                                    None => {
+                                        responder.send(Err(zx::Status::NO_RESOURCES.into_raw()))?
+                                    }
                                 }
                             }
                             // TODO(fxbug.dev/89873): close fifo

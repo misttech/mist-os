@@ -382,14 +382,14 @@ impl MockPackageResolverService {
                         .lock()
                         .push(CapturedPackageResolverRequest::Resolve { package_url });
 
-                    let (dir_server, mut res) = self.resolve_response.lock().take().unwrap();
+                    let (dir_server, res) = self.resolve_response.lock().take().unwrap();
                     let () = dir_server.open(
                         vfs::execution_scope::ExecutionScope::new(),
                         fio::OpenFlags::RIGHT_READABLE,
                         vfs::path::Path::dot(),
                         dir.into_channel().into(),
                     );
-                    responder.send(&mut res).unwrap()
+                    responder.send(res.as_ref().map_err(|e| *e)).unwrap()
                 }
                 PackageResolverRequest::ResolveWithContext {
                     package_url: _,
@@ -398,15 +398,14 @@ impl MockPackageResolverService {
                     responder,
                 } => {
                     // not implemented
-                    responder.send(&mut Err(ResolveError::Internal)).unwrap()
+                    responder.send(Err(ResolveError::Internal)).unwrap()
                 }
                 PackageResolverRequest::GetHash { package_url, responder } => {
                     self.captured_args.lock().push(CapturedPackageResolverRequest::GetHash {
                         package_url: package_url.url,
                     });
-                    responder
-                        .send(&mut self.get_hash_response.lock().unwrap().map_err(|s| s.into_raw()))
-                        .unwrap()
+                    let response = self.get_hash_response.lock().unwrap();
+                    responder.send(response.as_ref().map_err(|s| s.into_raw())).unwrap()
                 }
             }
         }

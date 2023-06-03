@@ -446,7 +446,7 @@ async fn serve_fake_rtc(
             DeviceRequest::Get { responder } => {
                 // Since timekeeper only pulls a time off of the RTC device once on startup, we
                 // don't attempt to update the sent time.
-                responder.send(&mut Ok(zx_time_to_rtc_time(initial_time))).unwrap();
+                responder.send(Ok(&zx_time_to_rtc_time(initial_time))).unwrap();
             }
             DeviceRequest::Set { rtc, responder } => {
                 rtc_updates.0.lock().push(rtc);

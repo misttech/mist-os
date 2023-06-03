@@ -6,12 +6,11 @@ use {
     anyhow::{format_err, Context as _, Error},
     fidl_fidl_test_compatibility::{
         EchoEchoArraysWithErrorResult, EchoEchoMinimalWithErrorResult,
-        EchoEchoNamedStructWithErrorResult, EchoEchoStructWithErrorResult,
-        EchoEchoTableWithErrorResult, EchoEchoUnionPayloadWithErrorRequest,
-        EchoEchoUnionPayloadWithErrorRequestUnknown, EchoEchoVectorsWithErrorResult,
-        EchoEchoXunionsWithErrorResult, EchoEvent, EchoMarker, EchoProxy, EchoRequest,
-        EchoRequestStream, RequestUnion, RequestUnionUnknown, RespondWith, ResponseTable,
-        ResponseUnion,
+        EchoEchoStructWithErrorResult, EchoEchoTableWithErrorResult,
+        EchoEchoUnionPayloadWithErrorRequest, EchoEchoUnionPayloadWithErrorRequestUnknown,
+        EchoEchoVectorsWithErrorResult, EchoEchoXunionsWithErrorResult, EchoEvent, EchoMarker,
+        EchoProxy, EchoRequest, EchoRequestStream, RequestUnion, RequestUnionUnknown, RespondWith,
+        ResponseTable, ResponseUnion,
     },
     fidl_fidl_test_imported::{
         ComposedEchoUnionResponseWithErrorComposedResponse, SimpleStruct, WantResponse,
@@ -289,18 +288,20 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                 } => {
                     if !forward_to_server.is_empty() {
                         let echo = connect_to_echo().context("Error connecting to proxy")?;
-                        let mut result = echo
+                        let result = echo
                             .echo_named_struct_with_error(&value, result_err, "", result_variant)
                             .await
                             .context("Error calling echo_named_struct_with_error on proxy")?;
-                        responder.send(&mut result).context("Error responding")?;
+                        responder
+                            .send(result.as_ref().map_err(|e| *e))
+                            .context("Error responding")?;
                     } else {
-                        let mut result = if let WantResponse::Err = result_variant {
-                            EchoEchoNamedStructWithErrorResult::Err(result_err)
+                        let result = if let WantResponse::Err = result_variant {
+                            Err(result_err)
                         } else {
-                            EchoEchoNamedStructWithErrorResult::Ok(value)
+                            Ok(&value)
                         };
-                        responder.send(&mut result).context("Error responding")?;
+                        responder.send(result).context("Error responding")?;
                     }
                 }
                 EchoRequest::EchoNamedStructNoRetVal {

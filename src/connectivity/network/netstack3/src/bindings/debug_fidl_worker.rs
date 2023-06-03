@@ -35,7 +35,10 @@ pub(crate) async fn serve_interfaces(
                 handle_get_admin(&ns, id, control).await;
             }
             fnet_debug::InterfacesRequest::GetMac { id, responder } => {
-                responder_send!(responder, &mut handle_get_mac(&ns, id));
+                responder_send!(
+                    responder,
+                    handle_get_mac(&ns, id).as_ref().map(Option::as_deref).map_err(|e| *e)
+                );
             }
             fnet_debug::InterfacesRequest::GetPort { id, port, control_handle: _ } => {
                 handle_get_port(&ns, id, port);

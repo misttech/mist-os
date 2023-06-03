@@ -99,25 +99,25 @@ async fn handle_telemetry_fidl_request(
     match request {
         TelemetryRequest::GetCounterStats { responder, .. } => {
             let counter_stats_fut = sme.lock().unwrap().counter_stats();
-            let mut counter_stats = counter_stats_fut
+            let counter_stats = counter_stats_fut
                 .await
                 .map_err(|_| zx::Status::CONNECTION_ABORTED.into_raw())
                 .and_then(|stats| match stats {
                     fidl_mlme::GetIfaceCounterStatsResponse::Stats(stats) => Ok(stats),
                     fidl_mlme::GetIfaceCounterStatsResponse::ErrorStatus(err) => Err(err),
                 });
-            responder.send(&mut counter_stats)
+            responder.send(counter_stats.as_ref().map_err(|e| *e))
         }
         TelemetryRequest::GetHistogramStats { responder, .. } => {
             let histogram_stats_fut = sme.lock().unwrap().histogram_stats();
-            let mut histogram_stats = histogram_stats_fut
+            let histogram_stats = histogram_stats_fut
                 .await
                 .map_err(|_| zx::Status::CONNECTION_ABORTED.into_raw())
                 .and_then(|stats| match stats {
                     fidl_mlme::GetIfaceHistogramStatsResponse::Stats(stats) => Ok(stats),
                     fidl_mlme::GetIfaceHistogramStatsResponse::ErrorStatus(err) => Err(err),
                 });
-            responder.send(&mut histogram_stats)
+            responder.send(histogram_stats.as_ref().map_err(|e| *e))
         }
     }
 }
@@ -233,11 +233,11 @@ async fn wmm_status(
     responder: fidl_sme::ClientSmeWmmStatusResponder,
 ) -> Result<(), fidl::Error> {
     let receiver = sme.lock().unwrap().wmm_status();
-    let mut wmm_status = match receiver.await {
+    let wmm_status = match receiver.await {
         Ok(result) => result,
         Err(_) => Err(zx::sys::ZX_ERR_CANCELED),
     };
-    responder.send(&mut wmm_status)
+    responder.send(wmm_status.as_ref().map_err(|e| *e))
 }
 
 fn convert_connect_result(result: &ConnectResult, is_reconnect: bool) -> fidl_sme::ConnectResult {

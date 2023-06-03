@@ -148,7 +148,7 @@ mod tests {
                 Some(Ok(DeviceMonitorRequest::QueryIface{iface_id, responder})) => (iface_id, responder));
             assert_eq!(id, query_resp.id);
             // The fake response is sent.
-            responder.send(&mut Ok(query_resp)).expect("sending query iface response");
+            responder.send(Ok(&query_resp)).expect("sending query iface response");
         }
 
         match expected_id {

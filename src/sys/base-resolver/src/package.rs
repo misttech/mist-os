@@ -22,26 +22,16 @@ pub(crate) async fn serve_request_stream(
     {
         match request {
             fpkg::PackageResolverRequest::Resolve { package_url, dir, responder } => {
-                let () = responder
-                    .send(
-                        &mut resolve(
-                            &package_url,
-                            dir,
-                            base_packages,
-                            authenticator.clone(),
-                            blobfs,
-                        )
+                match resolve(&package_url, dir, base_packages, authenticator.clone(), blobfs)
                         .await
-                        .map_err(|e| {
-                            let fidl_err = (&e).into();
-                            error!(
-                                "failed to resolve package {}: {:#}",
-                                package_url,
-                                anyhow::anyhow!(e)
-                            );
-                            fidl_err
-                        }),
-                    )
+                    {
+                        Ok(context) => responder.send(Ok(&context)),
+                        Err(e) => {
+                            let fidl_error = (&e).into();
+                            error!("failed to resolve package {}: {:#}", package_url, anyhow::anyhow!(e));
+                            responder.send(Err(fidl_error))
+                        }
+                    }
                     .context("sending fuchsia.pkg/PackageResolver.Resolve response")?;
             }
             fpkg::PackageResolverRequest::ResolveWithContext {
@@ -50,28 +40,28 @@ pub(crate) async fn serve_request_stream(
                 dir,
                 responder,
             } => {
-                let () = responder
-                    .send(
-                        &mut resolve_with_context(
-                            &package_url,
-                            context,
-                            dir,
-                            base_packages,
-                            authenticator.clone(),
-                            blobfs,
-                        )
-                        .await
-                        .map_err(|e| {
-                            let fidl_err = (&e).into();
-                            error!(
-                                "failed to resolve with context package {}: {:#}",
-                                package_url,
-                                anyhow::anyhow!(e)
-                            );
-                            fidl_err
-                        }),
-                    )
-                    .context("sending fuchsia.pkg/PackageResolver.ResolveWithContext response")?;
+                match resolve_with_context(
+                    &package_url,
+                    context,
+                    dir,
+                    base_packages,
+                    authenticator.clone(),
+                    blobfs,
+                )
+                .await
+                {
+                    Ok(context) => responder.send(Ok(&context)),
+                    Err(e) => {
+                        let fidl_error = (&e).into();
+                        error!(
+                            "failed to resolve with context package {}: {:#}",
+                            package_url,
+                            anyhow::anyhow!(e)
+                        );
+                        responder.send(Err(fidl_error))
+                    }
+                }
+                .context("sending fuchsia.pkg/PackageResolver.ResolveWithContext response")?;
             }
             fpkg::PackageResolverRequest::GetHash { package_url, responder } => {
                 error!(
@@ -79,7 +69,7 @@ pub(crate) async fn serve_request_stream(
                     package_url
                 );
                 let () = responder
-                    .send(&mut Err(fuchsia_zircon::Status::NOT_SUPPORTED.into_raw()))
+                    .send(Err(fuchsia_zircon::Status::NOT_SUPPORTED.into_raw()))
                     .context("sending fuchsia.pkg/PackageResolver.GetHash response")?;
             }
         }

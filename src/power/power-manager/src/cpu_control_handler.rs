@@ -655,7 +655,7 @@ pub mod tests {
                 match req {
                     Some(fcpuctrl::DeviceRequest::GetPerformanceStateInfo { state, responder }) => {
                         let index = state as usize;
-                        let mut result = if index < p_states.len() {
+                        let result = if index < p_states.len() {
                             Ok(fcpuctrl::CpuPerformanceStateInfo {
                                 frequency_hz: p_states[index].frequency.0 as i64,
                                 voltage_uv: (p_states[index].voltage.0 * 1e6) as i64,
@@ -663,7 +663,7 @@ pub mod tests {
                         } else {
                             Err(zx::Status::NOT_SUPPORTED.into_raw())
                         };
-                        let _ = responder.send(&mut result);
+                        let _ = responder.send(result.as_ref().map_err(|e| *e));
                     }
                     _ => assert!(false),
                 }

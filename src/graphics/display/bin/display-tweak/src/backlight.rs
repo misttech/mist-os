@@ -102,7 +102,7 @@ mod tests {
             match backlight_request_stream.next().await.unwrap() {
                 Ok(backlight::DeviceRequest::GetStateNormalized { responder }) => {
                     responder
-                        .send(&mut Ok(backlight::State { backlight_on: true, brightness: 0.5 }))
+                        .send(Ok(&backlight::State { backlight_on: true, brightness: 0.5 }))
                         .unwrap();
                 }
                 request => panic!("Unexpected request: {:?}", request),
@@ -125,7 +125,7 @@ mod tests {
             match backlight_request_stream.next().await.unwrap() {
                 Ok(backlight::DeviceRequest::GetStateNormalized { responder }) => {
                     responder
-                        .send(&mut Ok(backlight::State { backlight_on: true, brightness: 0.5 }))
+                        .send(Ok(&backlight::State { backlight_on: true, brightness: 0.5 }))
                         .unwrap();
                 }
                 request => panic!("Unexpected request: {:?}", request),
@@ -156,7 +156,7 @@ mod tests {
             match backlight_request_stream.next().await.unwrap() {
                 Ok(backlight::DeviceRequest::GetStateNormalized { responder }) => {
                     responder
-                        .send(&mut Ok(backlight::State { backlight_on: true, brightness: 0.5 }))
+                        .send(Ok(&backlight::State { backlight_on: true, brightness: 0.5 }))
                         .unwrap();
                 }
                 request => panic!("Unexpected request: {:?}", request),
@@ -188,7 +188,7 @@ mod tests {
         let service_future = async move {
             match backlight_request_stream.next().await.unwrap() {
                 Ok(backlight::DeviceRequest::GetStateNormalized { responder }) => {
-                    responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED)).unwrap();
+                    responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED)).unwrap();
                 }
                 request => panic!("Unexpected request: {:?}", request),
             }
@@ -212,7 +212,7 @@ mod tests {
             match backlight_request_stream.next().await.unwrap() {
                 Ok(backlight::DeviceRequest::GetStateNormalized { responder }) => {
                     responder
-                        .send(&mut Ok(backlight::State { backlight_on: true, brightness: 0.5 }))
+                        .send(Ok(&backlight::State { backlight_on: true, brightness: 0.5 }))
                         .unwrap();
                 }
                 request => panic!("Unexpected request: {:?}", request),

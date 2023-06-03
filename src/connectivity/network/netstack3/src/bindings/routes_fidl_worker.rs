@@ -48,7 +48,8 @@ const MAX_PENDING_EVENTS: usize = (fnet_routes::MAX_EVENTS * 5) as usize;
 pub(crate) async fn serve_state(rs: fnet_routes::StateRequestStream, ns: Netstack) {
     rs.try_for_each_concurrent(None, |req| match req {
         fnet_routes::StateRequest::Resolve { destination, responder } => futures::future::ready(
-            responder.send(&mut resolve(destination, ns.clone()).ok_or(ZX_ERR_ADDRESS_UNREACHABLE)),
+            responder
+                .send(resolve(destination, ns.clone()).as_ref().ok_or(ZX_ERR_ADDRESS_UNREACHABLE)),
         ),
     })
     .await

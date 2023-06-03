@@ -151,8 +151,7 @@ mod tests {
             let repos = setup_fake_repos(move |req| match req {
                 RepositoryRegistryRequest::ServerStart { responder, address: None } => {
                     sender.take().unwrap().send(()).unwrap();
-                    let address = SocketAddress(address).into();
-                    responder.send(&mut Ok(address)).unwrap()
+                    responder.send(Ok(&SocketAddress(address).into())).unwrap()
                 }
                 other => panic!("Unexpected request: {:?}", other),
             });
@@ -180,8 +179,7 @@ mod tests {
             let repos = setup_fake_repos(move |req| match req {
                 RepositoryRegistryRequest::ServerStart { responder, address: Some(_test) } => {
                     sender.take().unwrap().send(()).unwrap();
-                    let address = SocketAddress(address).into();
-                    responder.send(&mut Ok(address)).unwrap()
+                    responder.send(Ok(&SocketAddress(address).into())).unwrap()
                 }
                 other => panic!("Unexpected request: {:?}", other),
             });
@@ -215,8 +213,7 @@ mod tests {
             let repos = setup_fake_repos(move |req| match req {
                 RepositoryRegistryRequest::ServerStart { responder, address: None } => {
                     sender.take().unwrap().send(()).unwrap();
-                    let address = SocketAddress(address).into();
-                    responder.send(&mut Ok(address)).unwrap()
+                    responder.send(Ok(&SocketAddress(address).into())).unwrap()
                 }
                 other => panic!("Unexpected request: {:?}", other),
             });
@@ -240,7 +237,7 @@ mod tests {
             let repos = setup_fake_repos(move |req| match req {
                 RepositoryRegistryRequest::ServerStart { responder, address: None } => {
                     sender.take().unwrap().send(()).unwrap();
-                    responder.send(&mut Err(RepositoryError::ServerNotRunning)).unwrap()
+                    responder.send(Err(RepositoryError::ServerNotRunning)).unwrap()
                 }
                 other => panic!("Unexpected request: {:?}", other),
             });
@@ -268,8 +265,7 @@ mod tests {
             let repos = setup_fake_repos(move |req| match req {
                 RepositoryRegistryRequest::ServerStart { responder, address: None } => {
                     sender.take().unwrap().send(()).unwrap();
-                    let address = SocketAddress(address).into();
-                    responder.send(&mut Ok(address)).unwrap()
+                    responder.send(Ok(&SocketAddress(address).into())).unwrap()
                 }
                 other => panic!("Unexpected request: {:?}", other),
             });

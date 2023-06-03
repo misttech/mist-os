@@ -515,7 +515,7 @@ async fn run_index_server(
             match request {
                 DriverIndexRequest::MatchDriver { args, responder } => {
                     responder
-                        .send(&mut indexer.match_driver(args))
+                        .send(indexer.match_driver(args).as_ref().map_err(|e| *e))
                         .or_else(ignore_peer_closed)
                         .context("error responding to MatchDriver")?;
                 }
@@ -789,7 +789,7 @@ mod tests {
                         fuchsia_fs::directory::open_channel_in_namespace("/pkg", flags, dir)
                             .unwrap();
                         responder
-                            .send(&mut Ok(fidl_fuchsia_pkg::ResolutionContext { bytes: vec![] }))
+                            .send(Ok(&fidl_fuchsia_pkg::ResolutionContext { bytes: vec![] }))
                             .context("error sending response")?;
                     }
                     fidl_fuchsia_pkg::PackageResolverRequest::ResolveWithContext {
@@ -802,7 +802,7 @@ mod tests {
                             "ResolveWithContext is not currently implemented in driver-index"
                         );
                         responder
-                            .send(&mut Err(fidl_fuchsia_pkg::ResolveError::Internal))
+                            .send(Err(fidl_fuchsia_pkg::ResolveError::Internal))
                             .context("error sending response")?;
                     }
                     fidl_fuchsia_pkg::PackageResolverRequest::GetHash {
@@ -814,7 +814,7 @@ mod tests {
                         // something in order to avoid failing to load
                         // driver packages.
                         responder
-                            .send(&mut Ok(fpkg::BlobId {
+                            .send(Ok(&fpkg::BlobId {
                                 merkle_root: [
                                     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
                                     19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,

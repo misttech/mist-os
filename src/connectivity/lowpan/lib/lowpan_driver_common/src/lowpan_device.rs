@@ -588,7 +588,9 @@ impl<T: Driver> ServeTo<ExperimentalDeviceExtraRequestStream> for T {
                         let ret = responder_stream
                             .zip(result_stream)
                             .map(move |x| match x {
-                                (Ok(responder), Ok(mut result)) => Ok(responder.send(&mut result)?),
+                                (Ok(responder), Ok(result)) => {
+                                    Ok(responder.send(result.as_ref().map_err(|e| *e))?)
+                                }
                                 (Err(err), _) => Err(Error::from(err)
                                     .context("DeviceExtraRequest::JoinNetwork:responder_stream")),
                                 (_, Err(status)) => {
@@ -627,7 +629,9 @@ impl<T: Driver> ServeTo<ExperimentalDeviceExtraRequestStream> for T {
                         let ret = responder_stream
                             .zip(result_stream)
                             .map(move |x| match x {
-                                (Ok(responder), Ok(mut result)) => Ok(responder.send(&mut result)?),
+                                (Ok(responder), Ok(result)) => {
+                                    Ok(responder.send(result.as_ref().map_err(|e| *e))?)
+                                }
                                 (Err(err), _) => Err(Error::from(err)
                                     .context("DeviceExtraRequest::FormNetwork:responder_stream")),
                                 (_, Err(status)) => {

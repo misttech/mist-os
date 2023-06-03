@@ -157,9 +157,11 @@ mod tests {
             self
         }
 
-        fn expect_get_qr_code(self, mut result: StackGetQrCodeResult) -> Self {
+        fn expect_get_qr_code(self, result: StackGetQrCodeResult) -> Self {
             self.push_stack(move |req| match req {
-                StackRequest::GetQrCode { responder } => responder.send(&mut result).unwrap(),
+                StackRequest::GetQrCode { responder } => {
+                    responder.send(result.as_ref().map_err(|e| *e)).unwrap()
+                }
                 req => panic!("unexpected request: {:?}", req),
             })
         }

@@ -7237,7 +7237,7 @@ mod tests {
         {
             match request {
                 fidl_fuchsia_wlan_sme::TelemetryRequest::GetCounterStats { responder } => {
-                    let mut resp = match &counter_stats_resp {
+                    let resp = match &counter_stats_resp {
                         Some(get_resp) => get_resp(),
                         None => {
                             let seed = fasync::Time::now().into_nanos() as u64;
@@ -7245,7 +7245,7 @@ mod tests {
                         }
                     };
                     responder
-                        .send(&mut resp)
+                        .send(resp.as_ref().map_err(|e| *e))
                         .expect("expect sending GetCounterStats response to succeed");
                 }
                 _ => {
@@ -7266,9 +7266,8 @@ mod tests {
         {
             match request {
                 fidl_fuchsia_wlan_sme::TelemetryRequest::GetHistogramStats { responder } => {
-                    let stats = fake_iface_histogram_stats();
                     responder
-                        .send(&mut Ok(stats))
+                        .send(Ok(&fake_iface_histogram_stats()))
                         .expect("expect sending GetHistogramStats response to succeed");
                 }
                 _ => {

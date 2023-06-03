@@ -164,14 +164,14 @@ async fn process_location_queries<C: BssCache, R: BssResolver>(
                             &mut cobalt_api,
                         );
                         responder
-                            .send(&mut Ok(position))
+                            .send(Ok(&position))
                             .context("failed to send position to caller")?;
                     }
                     Err(e) => {
                         info!("lookup failed: {:?}", e);
                         report_lookup_failure_metrics(e, &mut cobalt_api);
                         responder
-                            .send(&mut Err(LocationError::GeneralError))
+                            .send(Err(LocationError::GeneralError))
                             .context("failed to send error to client")?
                     }
                 }

@@ -145,9 +145,8 @@ impl RealmQuery {
                     responder.send(result)
                 }
                 fsys::RealmQueryRequest::GetStructuredConfig { moniker, responder } => {
-                    let mut result =
-                        get_structured_config(&self.model, &scope_moniker, &moniker).await;
-                    responder.send(&mut result)
+                    let result = get_structured_config(&self.model, &scope_moniker, &moniker).await;
+                    responder.send(result.as_ref().map_err(|e| *e))
                 }
                 fsys::RealmQueryRequest::GetAllInstances { responder } => {
                     let result = get_all_instances(&self.model, &scope_moniker).await;

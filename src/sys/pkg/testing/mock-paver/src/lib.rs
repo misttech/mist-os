@@ -175,17 +175,17 @@ pub mod hooks {
                 // Ignore errors from peers closing the channel early
                 let _ = match request {
                     paver::BootManagerRequest::QueryActiveConfiguration { responder, .. } => {
-                        responder.send(&mut Err(status.into_raw()))
+                        responder.send(Err(status.into_raw()))
                     }
                     paver::BootManagerRequest::QueryConfigurationLastSetActive {
                         responder,
                         ..
-                    } => responder.send(&mut Err(status.into_raw())),
+                    } => responder.send(Err(status.into_raw())),
                     paver::BootManagerRequest::QueryCurrentConfiguration { responder, .. } => {
-                        responder.send(&mut Err(status.into_raw()))
+                        responder.send(Err(status.into_raw()))
                     }
                     paver::BootManagerRequest::QueryConfigurationStatus { responder, .. } => {
-                        responder.send(&mut Err(status.into_raw()))
+                        responder.send(Err(status.into_raw()))
                     }
                     paver::BootManagerRequest::SetConfigurationHealthy { responder, .. } => {
                         responder.send(status.into_raw())
@@ -260,9 +260,9 @@ pub mod hooks {
                     configuration,
                     responder,
                 } => {
-                    let mut result = (self.0)(configuration).map_err(Status::into_raw);
+                    let result = (self.0)(configuration).map_err(Status::into_raw);
                     // Ignore errors from peers closing the channel early
-                    let _ = responder.send(&mut result);
+                    let _ = responder.send(result);
                     None
                 }
                 request => Some(request),
@@ -631,22 +631,22 @@ impl MockPaverService {
             // Ignore errors from peers closing the channel early
             let _ = match request {
                 paver::BootManagerRequest::QueryActiveConfiguration { responder } => {
-                    let mut result = if self.active_config == paver::Configuration::Recovery {
+                    let result = if self.active_config == paver::Configuration::Recovery {
                         Err(Status::NOT_SUPPORTED.into_raw())
                     } else {
                         Ok(self.active_config)
                     };
-                    responder.send(&mut result)
+                    responder.send(result)
                 }
                 paver::BootManagerRequest::QueryConfigurationLastSetActive { responder } => {
                     // TODO(zyecheng): Implement the mock logic for this API and add tests.
-                    responder.send(&mut Err(Status::NOT_SUPPORTED.into_raw()))
+                    responder.send(Err(Status::NOT_SUPPORTED.into_raw()))
                 }
                 paver::BootManagerRequest::QueryCurrentConfiguration { responder } => {
-                    responder.send(&mut Ok(self.current_config))
+                    responder.send(Ok(self.current_config))
                 }
                 paver::BootManagerRequest::QueryConfigurationStatus { responder, .. } => {
-                    responder.send(&mut Ok(paver::ConfigurationStatus::Healthy))
+                    responder.send(Ok(paver::ConfigurationStatus::Healthy))
                 }
                 paver::BootManagerRequest::SetConfigurationHealthy {
                     configuration,

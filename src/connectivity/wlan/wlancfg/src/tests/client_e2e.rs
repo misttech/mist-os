@@ -390,14 +390,9 @@ fn prepare_client_interface(
                 Some(Ok(fidl_sme::FeatureSupportRequest::QuerySecuritySupport {
                     responder
                 })) => {
-                    assert!(responder.send(
-                        &mut fidl_sme::FeatureSupportQuerySecuritySupportResult::Ok(
-                            security_support_with_wpa3()
-                        )
-                    ).is_ok());
+                    assert!(responder.send(Ok(&security_support_with_wpa3())).is_ok());
                 }
             );
-
         }
     );
 
@@ -420,7 +415,7 @@ fn prepare_client_interface(
                 sta_addr: [0; 6],
             };
             responder
-                .send(&mut Ok(response))
+                .send(Ok(&response))
                 .expect("Sending iface response");
         }
     );
@@ -470,14 +465,9 @@ fn prepare_client_interface(
                 Some(Ok(fidl_sme::FeatureSupportRequest::QuerySecuritySupport {
                     responder
                 })) => {
-                    assert!(responder.send(
-                        &mut fidl_sme::FeatureSupportQuerySecuritySupportResult::Ok(
-                            security_support_with_wpa3()
-                        )
-                    ).is_ok());
+                    assert!(responder.send(Ok(&security_support_with_wpa3())).is_ok());
                 }
             );
-
         }
     );
 

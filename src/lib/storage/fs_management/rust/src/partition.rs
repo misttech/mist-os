@@ -284,7 +284,7 @@ mod tests {
                     }
                     Ok(PartitionRequest::GetInfo { responder }) => {
                         responder
-                            .send(&mut Ok(BlockInfo {
+                            .send(Ok(&BlockInfo {
                                 block_count: 1000,
                                 block_size: 512,
                                 max_transfer_size: 1024 * 1024,

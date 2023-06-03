@@ -68,37 +68,40 @@ impl Cr50 {
     pub async fn handle_cr50_stream(&self, mut stream: Cr50RequestStream) -> Result<(), Error> {
         while let Some(request) = stream.try_next().await.context("Reading from stream")? {
             match request {
-                Cr50Request::CcdGetInfo { responder } => {
-                    let response =
-                        Self::make_response("CcdGetInfo", self.get_info().await.map(Some), None);
-                    responder
-                        .send(match response {
+                Cr50Request::CcdGetInfo { responder } => responder
+                    .send(
+                        match Self::make_response(
+                            "CcdGetInfo",
+                            self.get_info().await.map(Some),
+                            None,
+                        ) {
                             Ok((ref rc, ref info)) => Ok((rc, info.as_ref())),
                             Err(e) => Err(e),
-                        })
-                        .context("Replying to request")?;
-                }
-                Cr50Request::WpGetState { responder } => {
-                    let response = Self::make_response(
-                        "WpGetState",
-                        self.wp_get_state().await,
-                        WpState::empty(),
-                    );
-                    responder
-                        .send(match response {
+                        },
+                    )
+                    .context("Replying to request")?,
+                Cr50Request::WpGetState { responder } => responder
+                    .send(
+                        match Self::make_response(
+                            "WpGetState",
+                            self.wp_get_state().await,
+                            WpState::empty(),
+                        ) {
                             Ok((ref rc, state)) => Ok((rc, state)),
                             Err(e) => Err(e),
-                        })
-                        .context("Replying to request")?;
-                }
+                        },
+                    )
+                    .context("Replying to request")?,
                 Cr50Request::CcdLock { responder } => responder
                     .send(
-                        &mut Self::make_response(
+                        match Self::make_response(
                             "CcdLock",
                             self.ccd_command(CcdCommand::Lock, None).await,
                             (),
-                        )
-                        .map(|(rc, _)| rc),
+                        ) {
+                            Ok((ref rc, _)) => Ok(rc),
+                            Err(e) => Err(e),
+                        },
                     )
                     .context("Replying to request")?,
                 Cr50Request::CcdOpen { password, responder } => responder
@@ -190,7 +193,7 @@ impl Cr50 {
                     let request = match PinweaverTryAuth::new(params) {
                         Ok(req) => req,
                         Err(e) => {
-                            responder.send(&mut Err(e)).context("Replying to request")?;
+                            responder.send(Err(e)).context("Replying to request")?;
                             continue;
                         }
                     };
@@ -198,7 +201,7 @@ impl Cr50 {
                     let result =
                         request.execute(&self.proxy).await.context("Executing TPM command")?;
 
-                    let mut fidl_result = match result.ok() {
+                    let fidl_result = match result.ok() {
                         Ok(_) => {
                             let mut success = TryAuthSuccess::default();
                             let data = result.data.as_ref().unwrap();
@@ -234,7 +237,9 @@ impl Cr50 {
                         Err(e) => Err(e),
                     };
 
-                    responder.send(&mut fidl_result).context("Replying to request")?;
+                    responder
+                        .send(fidl_result.as_ref().map_err(|e| *e))
+                        .context("Replying to request")?;
                 }
                 PinWeaverRequest::GetLog { root_hash, responder } => {
                     let request = match PinweaverGetLog::new(root_hash) {

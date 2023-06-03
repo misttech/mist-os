@@ -360,7 +360,7 @@ mod tests {
                         responder,
                     }) => {
                         let index = state as usize;
-                        let mut result = if index < pstates.len() {
+                        let result = if index < pstates.len() {
                             Ok(fcpu_ctrl::CpuPerformanceStateInfo {
                                 frequency_hz: pstates[index].frequency.0 as i64,
                                 voltage_uv: (pstates[index].voltage.0 * 1e6) as i64,
@@ -368,7 +368,7 @@ mod tests {
                         } else {
                             Err(zx::Status::NOT_SUPPORTED.into_raw())
                         };
-                        let _ = responder.send(&mut result);
+                        let _ = responder.send(result.as_ref().map_err(|e| *e));
                     }
                     Some(other) => panic!("Unexpected request: {:?}", other),
                     None => break, // Stream terminates when client is dropped

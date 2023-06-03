@@ -2698,7 +2698,7 @@ mod tests {
                 .expect("failed to create routes.StateProxy");
         let routes_fut = routes_stream.map(|r| r.context("stream FIDL error")).try_for_each(
             |fnet_routes::StateRequest::Resolve { destination, responder }| {
-                let mut result = TEST_IPS
+                let result = TEST_IPS
                     .iter()
                     .enumerate()
                     .find_map(|(i, (dst, src))| {
@@ -2721,7 +2721,9 @@ mod tests {
                     })
                     .ok_or(zx::Status::ADDRESS_UNREACHABLE.into_raw());
                 futures::future::ready(
-                    responder.send(&mut result).context("failed to send Resolve response"),
+                    responder
+                        .send(result.as_ref().map_err(|e| *e))
+                        .context("failed to send Resolve response"),
                 )
             },
         );
@@ -2749,16 +2751,18 @@ mod tests {
     async fn test_lookupip() {
         // Routes handler will say that only IPV6_HOST is reachable.
         let routes_handler = |fnet_routes::StateRequest::Resolve { destination, responder }| {
-            let mut response = if destination == map_ip(IPV6_HOST) {
-                Ok(fnet_routes::Resolved::Direct(fnet_routes::Destination {
+            let resolved;
+            let response = if destination == map_ip(IPV6_HOST) {
+                resolved = fnet_routes::Resolved::Direct(fnet_routes::Destination {
                     address: Some(destination),
                     source_address: Some(destination),
                     ..Default::default()
-                }))
+                });
+                Ok(&resolved)
             } else {
                 Err(zx::Status::ADDRESS_UNREACHABLE.into_raw())
             };
-            let () = responder.send(&mut response).expect("failed to send Resolve FIDL response");
+            let () = responder.send(response).expect("failed to send Resolve FIDL response");
         };
         TestEnvironment::new()
             .run_lookup_with_routes_handler(

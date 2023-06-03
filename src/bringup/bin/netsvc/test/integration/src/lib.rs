@@ -227,7 +227,7 @@ where
                             } => {
                                 // Return an error so netsvc thinks there's no
                                 // active configuration.
-                                responder.send(&mut Err(zx::Status::NOT_FOUND.into_raw()))
+                                responder.send(Err(zx::Status::NOT_FOUND.into_raw()))
                             }
                             fidl_fuchsia_paver::BootManagerRequest::Flush { responder } => {
                                 responder.send(zx::Status::OK.into_raw())

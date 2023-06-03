@@ -474,7 +474,7 @@ impl<'a> RequestHandler<'a> {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::GetTimestamp { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::Describe { responder } => {
                 responder_send!(responder, self.describe());

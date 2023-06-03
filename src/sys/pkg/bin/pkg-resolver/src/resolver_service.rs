@@ -428,7 +428,7 @@ pub async fn run_resolver_service(
                     )
                     .await;
                     let () =
-                        responder.send(&mut response.map_err(Into::into)).with_context(|| {
+                        responder.send(response.as_ref().map_err(|e| e.clone().into())).with_context(|| {
                             format!(
                                 "sending fuchsia.pkg/PackageResolver.Resolve response for {package_url:?}"
                             )
@@ -452,7 +452,7 @@ pub async fn run_resolver_service(
                     )
                     .await;
                     let () =
-                        responder.send(&mut response.map_err(Into::into)).with_context(|| {
+                        responder.send(response.as_ref().map_err(|e| e.clone().into())).with_context(|| {
                             format!(
                                 "sending fuchsia.pkg/PackageResolver.ResolveWithContext response \
                                  for {package_url:?}"
@@ -473,7 +473,7 @@ pub async fn run_resolver_service(
                     .await
                     {
                         Ok(blob_id) => {
-                            responder.send(&mut Ok(blob_id.into())).with_context(|| {
+                            responder.send(Ok(&blob_id.into())).with_context(|| {
                                 format!(
                                     "sending fuchsia.pkg/PackageResolver.GetHash success \
                                          response for {:?}",
@@ -482,7 +482,7 @@ pub async fn run_resolver_service(
                             })?;
                         }
                         Err(status) => {
-                            responder.send(&mut Err(status.into_raw())).with_context(|| {
+                            responder.send(Err(status.into_raw())).with_context(|| {
                                 format!(
                                     "sending fuchsia.pkg/PackageResolver.GetHash failure \
                                          response for {:?}",

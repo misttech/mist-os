@@ -953,7 +953,7 @@ mod tests {
             }))) => {
                 assert_eq!(phy_id, 45);
                 responder.send(
-                    &mut Ok(fidl_fuchsia_wlan_device_service::GetCountryResponse {
+                     Ok(&fidl_fuchsia_wlan_device_service::GetCountryResponse {
                         alpha2: [40u8, 40u8],
                     })).expect("failed to send response");
             }
@@ -1026,7 +1026,7 @@ mod tests {
             }))) => {
                 assert_eq!(phy_id, 45);
                 responder.send(
-                    &mut Ok(fidl_fuchsia_wlan_device_service::GetPowerSaveModeResponse {
+                     Ok(&fidl_fuchsia_wlan_device_service::GetPowerSaveModeResponse {
                         ps_mode: PowerSaveType::PsModePerformance,
                     })).expect("failed to send response");
             }
@@ -1164,7 +1164,7 @@ mod tests {
             assert_variant!(
                 exec.run_until_stalled(&mut fake_sme_server_stream.next()),
                 Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::WmmStatus { responder }))) => {
-                    let mut wmm_status_resp = Ok(fidl_internal::WmmStatusResponse {
+                    let wmm_status_resp = fidl_internal::WmmStatusResponse {
                         apsd: true,
                         ac_be_params: fidl_internal::WmmAcParams {
                             aifsn: 1,
@@ -1194,8 +1194,8 @@ mod tests {
                             ecw_max: 15,
                             txop_limit: 16,
                         },
-                    });
-                    responder.send(&mut wmm_status_resp).expect("failed to send WMM status response");
+                    };
+                    responder.send(Ok(&wmm_status_resp)).expect("failed to send WMM status response");
                 }
             );
 

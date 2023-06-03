@@ -1339,7 +1339,12 @@ func (c *compiler) compileResponse(m fidlgen.Method) Payload {
 			len(c.structs[innerType.Identifier].Members) > 1 ||
 			c.structs[innerType.Identifier].Members[0].Type.Kind == fidlgen.PrimitiveType ||
 			c.structs[innerType.Identifier].Members[0].Type.Kind == fidlgen.ArrayType ||
-			c.structs[innerType.Identifier].Members[0].Type.Kind == fidlgen.VectorType
+			c.structs[innerType.Identifier].Members[0].Type.Kind == fidlgen.VectorType ||
+			(c.structs[innerType.Identifier].Members[0].Type.Kind == fidlgen.IdentifierType &&
+				(c.decls[c.structs[innerType.Identifier].Members[0].Type.Identifier].Type == fidlgen.EnumDeclType ||
+					c.decls[c.structs[innerType.Identifier].Members[0].Type.Identifier].Type == fidlgen.BitsDeclType ||
+					c.decls[c.structs[innerType.Identifier].Members[0].Type.Identifier].Type == fidlgen.StructDeclType ||
+					c.decls[c.structs[innerType.Identifier].Members[0].Type.Identifier].Type == fidlgen.UnionDeclType))
 		if migrate {
 			okParamType := "()"
 			if len(inner.Parameters) > 0 {

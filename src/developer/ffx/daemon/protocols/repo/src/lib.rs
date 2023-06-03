@@ -942,7 +942,7 @@ impl<
     ) -> Result<(), anyhow::Error> {
         match req {
             ffx::RepositoryRegistryRequest::ServerStart { address, responder } => {
-                let mut res = async {
+                let res = async {
                     let mut inner = self.inner.write().await;
 
                     if matches!(inner.server, ServerState::Disabled) {
@@ -979,7 +979,7 @@ impl<
                     .detach();
                 }
 
-                responder.send(&mut res)?;
+                responder.send(res.as_ref().map_err(|e| *e))?;
 
                 Ok(())
             }

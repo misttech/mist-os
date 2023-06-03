@@ -223,26 +223,26 @@ async fn handle_feature_support_query(
         fidl_sme::FeatureSupportRequest::QueryDiscoverySupport { responder } => {
             let (mlme_responder, mlme_receiver) = crate::responder::Responder::new();
             mlme_sink.send(crate::MlmeRequest::QueryDiscoverySupport(mlme_responder));
-            let mut query_result = mlme_receiver.await.map_err(|_| zx::Status::CANCELED.into_raw());
-            responder.send(&mut query_result)
+            responder
+                .send(mlme_receiver.await.as_ref().map_err(|_| zx::Status::CANCELED.into_raw()))
         }
         fidl_sme::FeatureSupportRequest::QueryMacSublayerSupport { responder } => {
             let (mlme_responder, mlme_receiver) = crate::responder::Responder::new();
             mlme_sink.send(crate::MlmeRequest::QueryMacSublayerSupport(mlme_responder));
-            let mut query_result = mlme_receiver.await.map_err(|_| zx::Status::CANCELED.into_raw());
-            responder.send(&mut query_result)
+            responder
+                .send(mlme_receiver.await.as_ref().map_err(|_| zx::Status::CANCELED.into_raw()))
         }
         fidl_sme::FeatureSupportRequest::QuerySecuritySupport { responder } => {
             let (mlme_responder, mlme_receiver) = crate::responder::Responder::new();
             mlme_sink.send(crate::MlmeRequest::QuerySecuritySupport(mlme_responder));
-            let mut query_result = mlme_receiver.await.map_err(|_| zx::Status::CANCELED.into_raw());
-            responder.send(&mut query_result)
+            responder
+                .send(mlme_receiver.await.as_ref().map_err(|_| zx::Status::CANCELED.into_raw()))
         }
         fidl_sme::FeatureSupportRequest::QuerySpectrumManagementSupport { responder } => {
             let (mlme_responder, mlme_receiver) = crate::responder::Responder::new();
             mlme_sink.send(crate::MlmeRequest::QuerySpectrumManagementSupport(mlme_responder));
-            let mut query_result = mlme_receiver.await.map_err(|_| zx::Status::CANCELED.into_raw());
-            responder.send(&mut query_result)
+            responder
+                .send(mlme_receiver.await.as_ref().map_err(|_| zx::Status::CANCELED.into_raw()))
         }
     }
 }

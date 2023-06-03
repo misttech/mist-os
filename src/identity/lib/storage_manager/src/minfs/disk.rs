@@ -571,7 +571,7 @@ pub mod test {
                         // fuchsia.hardware.block.Block methods
                         VolumeAndNodeRequest::GetInfo { responder } => {
                             responder
-                                .send(&mut Ok(BlockInfo {
+                                .send(Ok(&BlockInfo {
                                     block_count: 1,
                                     block_size: BLOCK_SIZE as u32,
                                     max_transfer_size: MAX_TRANSFER_UNBOUNDED,

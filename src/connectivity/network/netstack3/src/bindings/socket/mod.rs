@@ -90,7 +90,7 @@ pub(crate) async fn serve(
                     responder_send!(responder, response);
                 }
                 psocket::ProviderRequest::InterfaceNameToFlags { name, responder } => {
-                    responder_send!(responder, &mut get_interface_flags(&ctx, &name));
+                    responder_send!(responder, get_interface_flags(&ctx, &name));
                 }
                 psocket::ProviderRequest::StreamSocket { domain, proto, responder } => {
                     let (client, request_stream) = create_request_stream();

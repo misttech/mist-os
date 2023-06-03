@@ -117,7 +117,7 @@ mod test {
                     assert_eq!(index, 7);
                     let light_info =
                         Info { name: "Fake Light".into(), capability: Capability::Brightness };
-                    responder.send(&mut Ok(light_info)).unwrap();
+                    responder.send(Ok(&light_info)).unwrap();
                 }
                 request => panic!("Unexpected request: {:?}", request),
             }

@@ -1362,16 +1362,16 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetTimestamp { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::Disconnect { responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetSockName { responder } => {
-                responder_send!(responder, &mut self.get_sock_name());
+                responder_send!(responder, self.get_sock_name().as_ref().map_err(|e| *e));
             }
             fposix_socket::StreamSocketRequest::GetPeerName { responder } => {
-                responder_send!(responder, &mut self.get_peer_name());
+                responder_send!(responder, self.get_peer_name().as_ref().map_err(|e| *e));
             }
             fposix_socket::StreamSocketRequest::Shutdown { mode, responder } => {
                 responder_send!(responder, self.shutdown(mode));
@@ -1417,7 +1417,7 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetIpMulticastInterface { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetIpMulticastTtl { value: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
@@ -1644,7 +1644,7 @@ where
                 let linger_secs =
                     self.with_socket_options(|so| so.fin_wait2_timeout.map(|d| d.as_secs()));
                 let respond_value = linger_secs.map(|x| u32::try_from(x).unwrap()).into_fidl();
-                responder_send!(responder, &mut Ok(respond_value));
+                responder_send!(responder, Ok(&respond_value));
             }
             fposix_socket::StreamSocketRequest::SetTcpDeferAccept { value_secs: _, responder } => {
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
@@ -1673,7 +1673,7 @@ where
                 responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetTcpCongestion { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetTcpUserTimeout { value_millis, responder } => {
                 let user_timeout =

@@ -965,7 +965,7 @@ mod tests {
         server: &mut fidl_service::DeviceMonitorRequestStream,
         iface_info: Option<fidl_service::QueryIfaceResponse>,
     ) {
-        let mut response = iface_info.ok_or(zx::sys::ZX_ERR_NOT_FOUND);
+        let response = iface_info.as_ref().ok_or(zx::sys::ZX_ERR_NOT_FOUND);
         assert_variant!(
             exec.run_until_stalled(&mut server.next()),
             Poll::Ready(Some(Ok(
@@ -974,7 +974,7 @@ mod tests {
                     responder,
                 }
             ))) => {
-                responder.send(&mut response).expect("sending fake iface info");
+                responder.send(response).expect("sending fake iface info");
             }
         );
     }

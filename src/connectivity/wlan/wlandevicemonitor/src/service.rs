@@ -61,8 +61,9 @@ pub(crate) async fn serve_monitor_requests(
                     .unwrap_or_else(|e| error!("error registering a device watcher: {}", e));
                 Ok(())
             }
-            DeviceMonitorRequest::GetCountry { phy_id, responder } => responder
-                .send(&mut get_country(&phys, phy_id).await.map_err(|status| status.into_raw())),
+            DeviceMonitorRequest::GetCountry { phy_id, responder } => {
+                responder.send(get_country(&phys, phy_id).await.as_ref().map_err(|s| s.into_raw()))
+            }
             DeviceMonitorRequest::SetCountry { req, responder } => {
                 let status = set_country(&phys, req).await;
                 responder.send(status.into_raw())
@@ -75,9 +76,8 @@ pub(crate) async fn serve_monitor_requests(
                 let status = set_power_save_mode(&phys, req).await;
                 responder.send(status.into_raw())
             }
-            DeviceMonitorRequest::GetPowerSaveMode { phy_id, responder } => responder.send(
-                &mut get_power_save_mode(&phys, phy_id).await.map_err(|status| status.into_raw()),
-            ),
+            DeviceMonitorRequest::GetPowerSaveMode { phy_id, responder } => responder
+                .send(get_power_save_mode(&phys, phy_id).await.as_ref().map_err(|s| s.into_raw())),
             DeviceMonitorRequest::CreateIface { req, responder } => {
                 match create_iface(
                     &new_iface_sink,
@@ -109,7 +109,7 @@ pub(crate) async fn serve_monitor_requests(
             }
             DeviceMonitorRequest::QueryIface { iface_id, responder } => {
                 let result = query_iface(&ifaces, iface_id).await;
-                responder.send(&mut result.map_err(|e| e.into_raw()))
+                responder.send(result.as_ref().map_err(|e| e.into_raw()))
             }
             DeviceMonitorRequest::DestroyIface { req, responder } => {
                 let result =
@@ -1218,7 +1218,7 @@ mod tests {
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::GetCountry { responder }))) => {
                 // Pretend to be a WLAN PHY to return the result.
                 responder.send(
-                    &mut Ok(fidl_dev::CountryCode { alpha2 })
+                    Ok(&fidl_dev::CountryCode { alpha2 })
                 ).expect("failed to send the response to GetCountry");
             }
         );
@@ -1249,7 +1249,7 @@ mod tests {
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::GetCountry { responder }))) => {
                 // Pretend to be a WLAN PHY to return the result.
                 // Right now the returned country code is not optional, so we just return garbage.
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))
                     .expect("failed to send the response to GetCountry");
             }
         );
@@ -1406,7 +1406,7 @@ mod tests {
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::GetPowerSaveMode { responder }))) => {
                 // Pretend to be a WLAN PHY to return the result.
                 responder.send(
-                    &mut Ok(fidl_wlan_common::PowerSaveType::PsModePerformance)
+                    Ok(fidl_wlan_common::PowerSaveType::PsModePerformance)
                 ).expect("failed to send the response to SetPowerSaveMode");
             }
         );
@@ -1439,7 +1439,7 @@ mod tests {
             Poll::Ready(Some(Ok(fidl_dev::PhyRequest::GetPowerSaveMode { responder }))) => {
                 // Pretend to be a WLAN PHY to return the result.
                 // Right now the returned country code is not optional, so we just return garbage.
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))
+                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))
                     .expect("failed to send the response to GetPowerSaveMode");
             }
         );

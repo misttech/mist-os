@@ -97,7 +97,7 @@ mod tests {
             )
             .unwrap();
 
-            responder.send(&mut Ok(fpkg::ResolutionContext { bytes: vec![] })).unwrap();
+            responder.send(Ok(&fpkg::ResolutionContext { bytes: vec![] })).unwrap();
         })
         .detach();
         proxy
@@ -117,7 +117,7 @@ mod tests {
                     panic!("Unexpected call to PackageResolver");
                 };
             assert_eq!(package_url, "fuchsia-pkg://fuchsia.com/foo");
-            responder.send(&mut Err(error)).unwrap();
+            responder.send(Err(error)).unwrap();
         })
         .detach();
         proxy

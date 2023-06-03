@@ -1068,7 +1068,7 @@ mod tests {
                         match request {
                             block::BlockRequest::GetInfo { responder } => {
                                 responder
-                                    .send(&mut Ok(block::BlockInfo {
+                                    .send(Ok(&block::BlockInfo {
                                         block_count: 1024,
                                         block_size: 512,
                                         max_transfer_size: 1024 * 1024,
@@ -1100,7 +1100,7 @@ mod tests {
                                                 vmo: _,
                                                 responder,
                                             } => responder
-                                                .send(&mut Ok(block::VmoId { id: 1 }))
+                                                .send(Ok(&block::VmoId { id: 1 }))
                                                 .expect("send failed"),
                                             block::SessionRequest::Close { responder } => {
                                                 fifo_future_abort.abort();

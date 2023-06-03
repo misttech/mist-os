@@ -211,11 +211,10 @@ impl LightRealm {
                         .expect("get num lights"),
                     LightRequest::GetInfo { index, responder } => responder
                         .send(
-                            &mut light_info
+                            light_info
                                 .lock()
                                 .await
                                 .get(index as usize)
-                                .cloned()
                                 .ok_or(LightError::InvalidIndex),
                         )
                         .expect("get info"),
@@ -241,11 +240,10 @@ impl LightRealm {
                         .expect("get simple value"),
                     LightRequest::GetCurrentRgbValue { index, responder } => responder
                         .send(
-                            &mut rgb_values
+                            rgb_values
                                 .lock()
                                 .await
                                 .get(&(index as usize))
-                                .copied()
                                 .ok_or(LightError::InvalidIndex),
                         )
                         .expect("get rgb value"),

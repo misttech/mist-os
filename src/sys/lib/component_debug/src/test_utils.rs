@@ -100,10 +100,10 @@ pub fn serve_realm_query(
                 fsys::RealmQueryRequest::GetStructuredConfig { moniker, responder } => {
                     eprintln!("GetStructuredConfig call for {}", moniker);
                     if let Some(config) = configs.get(&moniker) {
-                        responder.send(&mut Ok(config.clone())).unwrap();
+                        responder.send(Ok(config)).unwrap();
                     } else {
                         responder
-                            .send(&mut Err(fsys::GetStructuredConfigError::InstanceNotFound))
+                            .send(Err(fsys::GetStructuredConfigError::InstanceNotFound))
                             .unwrap();
                     }
                 }

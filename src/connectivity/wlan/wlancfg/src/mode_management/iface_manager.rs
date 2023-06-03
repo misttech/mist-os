@@ -3105,7 +3105,7 @@ mod tests {
                         sta_addr: [0; 6],
                     };
                     responder
-                        .send(&mut Ok(response))
+                        .send(Ok(&response))
                         .expect("Failed to send iface response");
                 }
             );
@@ -3143,7 +3143,7 @@ mod tests {
                 Poll::Ready(fidl_fuchsia_wlan_sme::FeatureSupportRequest::QuerySecuritySupport {
                     responder
                 }) => {
-                    responder.send(&mut Ok(fake_security_support())).expect("Failed to send security support response");
+                    responder.send(Ok(&fake_security_support())).expect("Failed to send security support response");
                 }
             );
 
@@ -3637,7 +3637,7 @@ mod tests {
                 Poll::Ready(fidl_fuchsia_wlan_sme::FeatureSupportRequest::QuerySecuritySupport {
                     responder
                 }) => {
-                    responder.send(&mut Ok(fake_security_support())).expect("Failed to send security support response");
+                    responder.send(Ok(&fake_security_support())).expect("Failed to send security support response");
                 }
             );
 
@@ -3845,7 +3845,7 @@ mod tests {
                         sta_addr: [0; 6],
                     };
                     responder
-                        .send(&mut Ok(response))
+                        .send(Ok(&response))
                         .expect("Sending iface response");
                 }
             );
@@ -3882,7 +3882,7 @@ mod tests {
                 Poll::Ready(fidl_fuchsia_wlan_sme::FeatureSupportRequest::QuerySecuritySupport {
                     responder
                 }) => {
-                    responder.send(&mut Ok(fake_security_support())).expect("Failed to send security support response");
+                    responder.send(Ok(&fake_security_support())).expect("Failed to send security support response");
                 }
             );
 
@@ -3952,7 +3952,7 @@ mod tests {
                         sta_addr: [0; 6],
                     };
                     responder
-                        .send(&mut Ok(response))
+                        .send(Ok(&response))
                         .expect("Sending iface response");
                 }
             );
@@ -4016,7 +4016,7 @@ mod tests {
                     iface_id: TEST_AP_IFACE_ID, responder
                 }) => {
                     responder
-                        .send(&mut Err(fuchsia_zircon::sys::ZX_ERR_NOT_FOUND))
+                        .send(Err(fuchsia_zircon::sys::ZX_ERR_NOT_FOUND))
                         .expect("Sending iface response");
                 }
             );
@@ -4060,7 +4060,7 @@ mod tests {
                         sta_addr: [0; 6],
                     };
                     responder
-                        .send(&mut Ok(response))
+                        .send(Ok(&response))
                         .expect("Sending iface response");
                 }
             );
@@ -4104,7 +4104,7 @@ mod tests {
                         sta_addr: [0; 6],
                     };
                     responder
-                        .send(&mut Ok(response))
+                        .send(Ok(&response))
                         .expect("Sending iface response");
                 }
             );
@@ -4659,7 +4659,7 @@ mod tests {
                     sta_addr: [0; 6],
                 };
                 responder
-                    .send(&mut Ok(response))
+                    .send(Ok(&response))
                     .expect("Sending iface response");
             }
         );
@@ -4697,7 +4697,7 @@ mod tests {
             Poll::Ready(fidl_fuchsia_wlan_sme::FeatureSupportRequest::QuerySecuritySupport {
                 responder
             }) => {
-                responder.send(&mut Ok(fake_security_support())).expect("Failed to send security support response");
+                responder.send(Ok(&fake_security_support())).expect("Failed to send security support response");
             }
         );
 

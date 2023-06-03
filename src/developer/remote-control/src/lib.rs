@@ -167,8 +167,8 @@ impl RemoteControlService {
                 Ok(())
             }
             rcs::RemoteControlRequest::Connect { selector, service_chan, responder } => {
-                responder
-                    .send(&mut self.clone().connect_to_service(selector, service_chan).await)?;
+                let response = self.clone().connect_to_service(selector, service_chan).await;
+                responder.send(response.as_ref().map_err(|e| *e))?;
                 Ok(())
             }
             rcs::RemoteControlRequest::RootRealmExplorer { server, responder } => {

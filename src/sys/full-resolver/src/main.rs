@@ -266,7 +266,7 @@ mod tests {
                         req_stream.try_next().await.expect("Serving package resolver stream failed")
                     {
                         responder
-                            .send(&mut Err(fpkg::ResolveError::PackageNotFound))
+                            .send(Err(fpkg::ResolveError::PackageNotFound))
                             .expect("failed sending package resolver response to client");
 
                         {
@@ -401,9 +401,7 @@ mod tests {
                         dir.into_channel().into(),
                     );
                     responder
-                        .send(&mut Ok(fpkg::ResolutionContext {
-                            bytes: b"context-contents".to_vec(),
-                        }))
+                        .send(Ok(&fpkg::ResolutionContext { bytes: b"context-contents".to_vec() }))
                         .unwrap();
                 }
                 _ => panic!("unexpected API call"),
@@ -458,9 +456,7 @@ mod tests {
                         dir.into_channel().into(),
                     );
                     responder
-                        .send(&mut Ok(fpkg::ResolutionContext {
-                            bytes: b"outgoing-context".to_vec(),
-                        }))
+                        .send(Ok(&fpkg::ResolutionContext { bytes: b"outgoing-context".to_vec() }))
                         .unwrap();
                 }
                 _ => panic!("unexpected API call"),
@@ -522,7 +518,7 @@ mod tests {
         let server = async move {
             match server.try_next().await.unwrap().expect("client makes one request") {
                 fpkg::PackageResolverRequest::Resolve { responder, .. } => {
-                    responder.send(&mut Err(fpkg::ResolveError::NoSpace)).unwrap();
+                    responder.send(Err(fpkg::ResolveError::NoSpace)).unwrap();
                 }
                 _ => panic!("unexpected API call"),
             }
@@ -548,7 +544,7 @@ mod tests {
         let server = async move {
             match server.try_next().await.unwrap().expect("client makes one request") {
                 fpkg::PackageResolverRequest::ResolveWithContext { responder, .. } => {
-                    responder.send(&mut Err(fpkg::ResolveError::NoSpace)).unwrap();
+                    responder.send(Err(fpkg::ResolveError::NoSpace)).unwrap();
                 }
                 _ => panic!("unexpected API call"),
             }

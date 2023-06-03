@@ -87,12 +87,7 @@ impl Service for HardwareLightService {
                         .send(light_info.lock().await.len() as u32)
                         .expect("get num lights"),
                     LightRequest::GetInfo { index, responder } => responder
-                        .send(&mut Ok(light_info
-                            .lock()
-                            .await
-                            .get(&index)
-                            .expect("unknown light")
-                            .clone()))
+                        .send(Ok(light_info.lock().await.get(&index).expect("unknown light")))
                         .expect("get num lights"),
                     LightRequest::GetCurrentBrightnessValue { index, responder } => responder
                         .send(Ok(*brightness_values
@@ -105,7 +100,7 @@ impl Service for HardwareLightService {
                         .send(Ok(*simple_values.lock().await.get(&index).expect("unknown light")))
                         .expect("get simple value"),
                     LightRequest::GetCurrentRgbValue { index, responder } => responder
-                        .send(&mut Ok(*rgb_values.lock().await.get(&index).expect("unknown light")))
+                        .send(Ok(rgb_values.lock().await.get(&index).expect("unknown light")))
                         .expect("get rgb value"),
                     LightRequest::SetBrightnessValue { index, value, responder } => {
                         let _ = brightness_values

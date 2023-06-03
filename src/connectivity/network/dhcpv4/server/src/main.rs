@@ -608,11 +608,13 @@ where
                 fidl_fuchsia_net_dhcp::Server_Request::IsServing { responder } => {
                     responder.send(server.borrow().enabled())
                 }
-                fidl_fuchsia_net_dhcp::Server_Request::GetOption { code: c, responder: r } => {
-                    r.send(&mut server.borrow().dispatch_get_option(c).map_err(|e| e.into_raw()))
-                }
+                fidl_fuchsia_net_dhcp::Server_Request::GetOption { code: c, responder: r } => r
+                    .send(
+                        server.borrow().dispatch_get_option(c).as_ref().map_err(|e| e.into_raw()),
+                    ),
                 fidl_fuchsia_net_dhcp::Server_Request::GetParameter { name: n, responder: r } => {
-                    r.send(&mut server.borrow().dispatch_get_parameter(n).map_err(|e| e.into_raw()))
+                    let response = server.borrow().dispatch_get_parameter(n);
+                    r.send(response.as_ref().map_err(|e| e.into_raw()))
                 }
                 fidl_fuchsia_net_dhcp::Server_Request::SetOption { value: v, responder: r } => {
                     r.send(server.borrow_mut().dispatch_set_option(v).map_err(|e| e.into_raw()))

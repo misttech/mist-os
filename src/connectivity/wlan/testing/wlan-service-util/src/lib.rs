@@ -134,10 +134,10 @@ mod tests {
             => responder);
         if let Some(mac) = fake_mac_addr {
             let response = fake_iface_query_response(mac, role);
-            responder.send(&mut Ok(response)).expect("sending fake response with mac address");
+            responder.send(Ok(&response)).expect("sending fake response with mac address");
         } else {
             responder
-                .send(&mut Err(fuchsia_zircon::sys::ZX_ERR_NOT_FOUND))
+                .send(Err(fuchsia_zircon::sys::ZX_ERR_NOT_FOUND))
                 .expect("sending fake response with none")
         }
     }

@@ -920,7 +920,7 @@ mod tests {
         server: &mut fidl_service::DeviceMonitorRequestStream,
         iface_info: Option<fidl_service::QueryIfaceResponse>,
     ) {
-        let mut response = iface_info.ok_or(ZX_ERR_NOT_FOUND);
+        let response = iface_info.as_ref().ok_or(ZX_ERR_NOT_FOUND);
         assert_variant!(
             exec.run_until_stalled(&mut server.next()),
             Poll::Ready(Some(Ok(
@@ -929,7 +929,7 @@ mod tests {
                     responder,
                 }
             ))) => {
-                responder.send(&mut response).expect("sending fake iface info");
+                responder.send(response).expect("sending fake iface info");
             }
         );
     }
@@ -963,7 +963,7 @@ mod tests {
         stream: &mut fidl_sme::FeatureSupportRequestStream,
         security_support: Option<fidl_common::SecuritySupport>,
     ) {
-        let mut response = security_support.ok_or(ZX_ERR_NOT_FOUND);
+        let response = security_support.as_ref().ok_or(ZX_ERR_NOT_FOUND);
         assert_variant!(
             exec.run_until_stalled(&mut stream.next()),
             Poll::Ready(Some(Ok(
@@ -971,7 +971,7 @@ mod tests {
                     responder,
                 }
             ))) => {
-                responder.send(&mut response).expect("sending fake security support");
+                responder.send(response).expect("sending fake security support");
             }
         );
     }

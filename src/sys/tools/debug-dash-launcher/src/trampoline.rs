@@ -370,7 +370,7 @@ mod tests {
                 match request {
                     fpkg::PackageResolverRequest::Resolve { responder, package_url: _, dir: _ } => {
                         responder
-                            .send(&mut Ok(fidl_fuchsia_pkg::ResolutionContext { bytes: vec![] }))
+                            .send(Ok(&fidl_fuchsia_pkg::ResolutionContext { bytes: vec![] }))
                             .unwrap();
                     }
                     _ => {}

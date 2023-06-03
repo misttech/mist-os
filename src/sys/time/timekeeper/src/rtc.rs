@@ -239,8 +239,7 @@ mod test {
         let rtc_impl = RtcImpl { proxy };
         let _responder = fasync::Task::spawn(async move {
             if let Some(Ok(frtc::DeviceRequest::Get { responder })) = stream.next().await {
-                let fidl_time = TEST_FIDL_TIME;
-                responder.send(&mut Ok(fidl_time)).expect("Failed response");
+                responder.send(Ok(&TEST_FIDL_TIME)).expect("Failed response");
             }
         });
         assert_eq!(rtc_impl.get().await.unwrap(), TEST_ZX_TIME);
@@ -253,8 +252,7 @@ mod test {
         let rtc_impl = RtcImpl { proxy };
         let _responder = fasync::Task::spawn(async move {
             if let Some(Ok(frtc::DeviceRequest::Get { responder })) = stream.next().await {
-                let fidl_time = INVALID_FIDL_TIME_1;
-                responder.send(&mut Ok(fidl_time)).expect("Failed response");
+                responder.send(Ok(&INVALID_FIDL_TIME_1)).expect("Failed response");
             }
         });
         assert_eq!(rtc_impl.get().await.is_err(), true);

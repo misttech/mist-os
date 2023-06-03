@@ -535,10 +535,10 @@ async fn handle_datagram_request(
         }
         fposix_socket::SynchronousDatagramSocketRequest::GetSockName { responder } => {
             if let Some(addr) = socket.borrow().bound {
-                responder.send(&mut Ok(addr)).context("send GetSockName response")?
+                responder.send(Ok(&addr)).context("send GetSockName response")?
             } else {
                 responder
-                    .send(&mut Err(fposix::Errno::Enotsock))
+                    .send(Err(fposix::Errno::Enotsock))
                     .context("send GetSockName response")?;
             }
         }
@@ -752,7 +752,7 @@ async fn handle_stream_request(
         }
         fposix_socket::StreamSocketRequest::GetSockName { responder } => {
             responder
-                .send(&mut socket.borrow().get_sock_name())
+                .send(socket.borrow().get_sock_name().as_ref().map_err(|e| *e))
                 .context("send GetSockName response")?;
         }
         fposix_socket::StreamSocketRequest::SetTcpNoDelay { value: _, responder } => {

@@ -248,7 +248,7 @@ mod tests {
         fn expect_query_active_configuration(self, res: Result<Configuration, Status>) -> Self {
             self.push(move |req| match req {
                 BootManagerRequest::QueryActiveConfiguration { responder } => {
-                    responder.send(&mut res.map(Into::into).map_err(|e| e.into_raw())).unwrap()
+                    responder.send(res.map(Into::into).map_err(|e| e.into_raw())).unwrap()
                 }
                 req => panic!("unexpected request: {:?}", req),
             })
@@ -257,7 +257,7 @@ mod tests {
         fn expect_query_current_configuration(self, res: Result<Configuration, Status>) -> Self {
             self.push(move |req| match req {
                 BootManagerRequest::QueryCurrentConfiguration { responder } => {
-                    responder.send(&mut res.map(Into::into).map_err(|e| e.into_raw())).unwrap()
+                    responder.send(res.map(Into::into).map_err(|e| e.into_raw())).unwrap()
                 }
                 req => panic!("unexpected request: {:?}", req),
             })
@@ -271,7 +271,7 @@ mod tests {
             self.push(move |req| match req {
                 BootManagerRequest::QueryConfigurationStatus { configuration, responder } => {
                     assert_eq!(Configuration::from(configuration), config);
-                    responder.send(&mut res.map(Into::into).map_err(|e| e.into_raw())).unwrap()
+                    responder.send(res.map(Into::into).map_err(|e| e.into_raw())).unwrap()
                 }
                 req => panic!("unexpected request: {:?}", req),
             })

@@ -181,34 +181,33 @@ impl KmsAsymmetricKey {
 
     pub fn handle_asym_request(&self, req: AsymmetricPrivateKeyRequest) -> Result<(), fidl::Error> {
         match req {
-            AsymmetricPrivateKeyRequest::Sign { data, responder } => {
-                responder.send(&mut self.sign(data).map(|signature| Signature { bytes: signature }))
-            }
+            AsymmetricPrivateKeyRequest::Sign { data, responder } => responder
+                .send(self.sign(data).map(|bytes| Signature { bytes }).as_ref().map_err(|e| *e)),
             AsymmetricPrivateKeyRequest::GetPublicKey { responder } => responder.send(
-                &mut self.get_der_public_key().map(|public_key| PublicKey { bytes: public_key }),
+                self.get_der_public_key().map(|bytes| PublicKey { bytes }).as_ref().map_err(|e| *e),
             ),
             AsymmetricPrivateKeyRequest::GetKeyAlgorithm { responder } => {
                 let key_algorithm = self.get_key_algorithm();
                 if self.is_deleted() {
-                    responder.send(&mut Err(Error::KeyNotFound))
+                    responder.send(Err(Error::KeyNotFound))
                 } else {
-                    responder.send(&mut Ok(key_algorithm))
+                    responder.send(Ok(key_algorithm))
                 }
             }
             AsymmetricPrivateKeyRequest::GetKeyOrigin { responder } => {
                 let origin = self.get_key_origin();
                 if self.is_deleted() {
-                    responder.send(&mut Err(Error::KeyNotFound))
+                    responder.send(Err(Error::KeyNotFound))
                 } else {
-                    responder.send(&mut Ok(origin))
+                    responder.send(Ok(origin))
                 }
             }
             AsymmetricPrivateKeyRequest::GetKeyProvider { responder } => {
                 let provider_name = self.get_key_provider();
                 if self.is_deleted() {
-                    responder.send(&mut Err(Error::KeyNotFound))
+                    responder.send(Err(Error::KeyNotFound))
                 } else {
-                    responder.send(&mut Ok(provider_name))
+                    responder.send(Ok(provider_name))
                 }
             }
         }

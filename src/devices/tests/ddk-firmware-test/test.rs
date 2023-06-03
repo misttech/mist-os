@@ -101,7 +101,7 @@ impl FakeBasePackageResolver {
                         dir.into_channel().into(),
                     );
                     let () = responder
-                        .send(&mut Ok(fpkg::ResolutionContext { bytes: vec![] }))
+                        .send(Ok(&fpkg::ResolutionContext { bytes: vec![] }))
                         .expect("send resolve response");
                 }
                 req => panic!("unexpected fuchsia.pkg/PackageResolver request {req:?}"),

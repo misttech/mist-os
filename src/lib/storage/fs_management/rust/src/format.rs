@@ -209,7 +209,7 @@ mod tests {
                 match request {
                     BlockRequest::GetInfo { responder } => {
                         responder
-                            .send(&mut Ok(BlockInfo {
+                            .send(Ok(&BlockInfo {
                                 block_count: block_count,
                                 block_size: block_size as u32,
                                 max_transfer_size: 1024 * 1024,

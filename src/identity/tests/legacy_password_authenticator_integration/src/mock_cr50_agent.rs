@@ -201,13 +201,13 @@ async fn handle_request(
                     if let TryAuthResponse::Success(success) = response {
                         // If it's a success, grab the last he_secret provided via InsertLeaf.
                         let secret = he_secret.lock();
-                        resp.send(&mut std::result::Result::Ok(TryAuthResponse::Success(
-                            TryAuthSuccess { he_secret: Some((*secret).clone()), ..success },
-                        )))
+                        resp.send(Ok(&TryAuthResponse::Success(TryAuthSuccess {
+                            he_secret: Some((*secret).clone()),
+                            ..success
+                        })))
                         .expect("failed to send response");
                     } else {
-                        resp.send(&mut std::result::Result::Ok(response))
-                            .expect("failed to send response");
+                        resp.send(Ok(&response)).expect("failed to send response");
                     }
                 }
                 _ => {
