@@ -4,7 +4,7 @@
   },
   "product": {
     "bar": "fuchsia/assembly/test_data/bar.txt",
-    "drivers": [],
+    "base_drivers": [],
     "packages": {
       "base": [],
       "cache": []

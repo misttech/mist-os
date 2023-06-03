@@ -163,7 +163,7 @@ impl ImageAssemblyConfigBuilder {
             let driver_package_path = &bundle_path.join(&driver_details.package);
             self.add_unique_package_from_path(driver_package_path, &PackageSets::BASE)?;
 
-            let package_url = DriverManifestBuilder::get_base_package_url(driver_package_path)?;
+            let package_url = DriverManifestBuilder::get_package_url(driver_package_path)?;
             self.base_drivers.try_insert_unique(package_url, driver_details)?;
         }
 
@@ -325,13 +325,13 @@ impl ImageAssemblyConfigBuilder {
         Ok(())
     }
 
-    /// Add the product-provided drivers to the assembly configuration.
+    /// Add the product-provided base-drivers to the assembly configuration.
     ///
     /// This should be performed after all the platform bundles have
     /// been added as it is for packages. Packages specified as
     /// base driver packages should not be in the base package set and
     /// are added automatically.
-    pub fn add_product_drivers(&mut self, drivers: Vec<DriverDetails>) -> Result<()> {
+    pub fn add_product_base_drivers(&mut self, drivers: Vec<DriverDetails>) -> Result<()> {
         // Base drivers are added to the base packages
         // Config data is not supported for driver packages since it is deprecated.
         for driver_details in drivers {
@@ -342,7 +342,7 @@ impl ImageAssemblyConfigBuilder {
             self.base
                 .add_package(PackageEntry { path: driver_details.package.clone(), manifest })
                 .context(format!("Adding driver {}", &driver_details.package))?;
-            let package_url = DriverManifestBuilder::get_base_package_url(&driver_details.package)?;
+            let package_url = DriverManifestBuilder::get_package_url(&driver_details.package)?;
             self.base_drivers.try_insert_unique(package_url, driver_details)?;
         }
         Ok(())
@@ -1189,7 +1189,7 @@ mod tests {
         let base_driver_1 = make_test_driver("driver1", outdir)?;
         let base_driver_2 = make_test_driver("driver2", outdir)?;
 
-        builder.add_product_drivers(vec![base_driver_1, base_driver_2])?;
+        builder.add_product_base_drivers(vec![base_driver_1, base_driver_2])?;
         let result: assembly_config_schema::ImageAssemblyConfig =
             builder.build(outdir, &tools).unwrap();
 
@@ -1357,7 +1357,7 @@ mod tests {
         let base_driver_1 = make_test_driver("driver1", outdir)?;
         let mut builder = get_minimum_config_builder(outdir, vec!["driver1".to_owned()]);
 
-        let result = builder.add_product_drivers(vec![base_driver_1]);
+        let result = builder.add_product_base_drivers(vec![base_driver_1]);
 
         assert!(result.is_err());
         Ok(())

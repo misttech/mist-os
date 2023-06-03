@@ -498,9 +498,9 @@ template("assembly_input_bundle") {
       }
     }
 
-    drivers = []
+    base_drivers = []
     if (defined(invoker.base_driver_packages)) {
-      drivers = invoker.base_driver_packages
+      base_drivers = invoker.base_driver_packages
     }
   }
 
@@ -509,11 +509,11 @@ template("assembly_input_bundle") {
           [
             "base",
             "cache",
-            "drivers",
+            "base-drivers",
             "bootfs",
           ]) {
     _package_target_details = []
-    _package_target_details = package_sets[set_name]
+    _package_target_details = package_sets[string_replace(set_name, "-", "_")]
     _package_targets = []
     _manifest_entries = []
 
@@ -532,7 +532,7 @@ template("assembly_input_bundle") {
             "${_package_out_dir}/${_package_name}/package_manifest.json"
         _manifest_path_rebased = rebase_path(_manifest_path, root_build_dir)
 
-        if (set_name == "drivers") {
+        if (set_name == "base-drivers") {
           assert(defined(details.driver_components),
                  "driver_components must be specified for driver targets")
           _manifest_entries += [

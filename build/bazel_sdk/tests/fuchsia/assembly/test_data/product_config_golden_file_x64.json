@@ -41,7 +41,7 @@
         }
     },
     "product": {
-        "drivers": [
+        "base_drivers": [
             {
                 "components": [
                     "meta/backlight_driver.cm"

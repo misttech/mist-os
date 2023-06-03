@@ -84,8 +84,8 @@ impl DriverManifestBuilder {
         Ok(package_manifest_path)
     }
 
-    /// Helper function to determine a base driver's package url
-    pub fn get_base_package_url(path: impl AsRef<Utf8Path>) -> Result<String> {
+    /// Helper function to determine a driver's package url
+    pub fn get_package_url(path: impl AsRef<Utf8Path>) -> Result<String> {
         // Load the PackageManifest from the given path
         let manifest = PackageManifest::try_load_from(&path).with_context(|| {
             format!("parsing driver package {} as a package manifest", path.as_ref())
@@ -129,7 +129,7 @@ mod tests {
         let mut driver_manifest_builder = DriverManifestBuilder::default();
         driver_manifest_builder.add_driver(
             driver_details,
-            &DriverManifestBuilder::get_base_package_url(driver_package_manifest_file_path)?,
+            &DriverManifestBuilder::get_package_url(driver_package_manifest_file_path)?,
         )?;
         driver_manifest_builder.build_driver_manifest_package(outdir)?;
 

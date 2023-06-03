@@ -76,8 +76,8 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         .context("Adding product-provided packages")?;
 
     builder
-        .add_product_drivers(config.product.drivers)
-        .context("Adding product-provided drivers")?;
+        .add_product_base_drivers(config.product.base_drivers)
+        .context("Adding product-provided base-drivers")?;
 
     if let Some(package_config_path) = additional_packages_path {
         let additional_packages =

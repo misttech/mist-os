@@ -44,8 +44,8 @@ def create_bundle(args: argparse.Namespace) -> None:
     if args.compiled_packages:
         add_compiled_packages_from_file(aib_creator, args.compiled_packages)
 
-    if args.drivers_pkg_list:
-        add_driver_list_from_file(aib_creator, args.drivers_pkg_list)
+    if args.base_drivers_pkg_list:
+        add_driver_list_from_file(aib_creator, args.base_drivers_pkg_list)
 
     if args.config_data_list:
         for config_data_entry_file in args.config_data_list:
@@ -98,10 +98,10 @@ def add_kernel_cmdline_from_file(aib_creator: AIBCreator, kernel_cmdline_file):
         aib_creator.kernel.args.add(cmd)
 
 
-def add_driver_list_from_file(aib_creator: AIBCreator, driver_list_file):
+def add_driver_list_from_file(aib_creator: AIBCreator, base_driver_list_file):
     pkg_set: Set = getattr(aib_creator, "base")
-    driver_details_list = _read_json_file(driver_list_file)
-    for driver_details in driver_details_list:
+    base_driver_details_list = _read_json_file(base_driver_list_file)
+    for driver_details in base_driver_details_list:
         if driver_details["package_target"] in pkg_set:
             raise ValueError(
                 f"duplicate pkg manifest found: {driver_details['package_target']}"
@@ -422,7 +422,7 @@ def main():
         help=
         "Path to a json list of package manifests for the 'bootfs' package set")
     bundle_creation_parser.add_argument(
-        "--drivers-pkg-list",
+        "--base-drivers-pkg-list",
         type=argparse.FileType('r'),
         help="Path to a json list of driver details for the 'base' package set")
     bundle_creation_parser.add_argument(

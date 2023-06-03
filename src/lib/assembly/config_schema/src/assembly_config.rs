@@ -247,7 +247,7 @@ mod tests {
                       { manifest: "path/to/cache/package_manifest.json" }
                   ]
               },
-              drivers: [
+              base_drivers: [
                 {
                   package: "path/to/base/driver/package_manifest.json",
                   components: [ "meta/path/to/component.cml" ]
@@ -276,7 +276,7 @@ mod tests {
         );
         assert_eq!(config.platform.identity.password_pinweaver, FeatureControl::Allowed);
         assert_eq!(
-            config.product.drivers,
+            config.product.base_drivers,
             vec![DriverDetails {
                 package: "path/to/base/driver/package_manifest.json".into(),
                 components: vec!["meta/path/to/component.cml".into()]

@@ -16,7 +16,7 @@ pub struct ProductConfig {
 
     /// List of base drivers to include in the product.
     #[serde(default)]
-    pub drivers: Vec<DriverDetails>,
+    pub base_drivers: Vec<DriverDetails>,
 
     /// Start URL to pass to `session_manager`.
     ///

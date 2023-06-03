@@ -89,7 +89,7 @@ def _fuchsia_product_configuration_impl(ctx):
             },
         )
         pkg_files.append(dep[FuchsiaPackageInfo].package_manifest)
-    product["drivers"] = driver_details
+    product["base_drivers"] = driver_details
     product_config["product"] = product
 
     product_config_file = ctx.actions.declare_file(ctx.label.name + "_product_config.json")
@@ -206,7 +206,7 @@ def fuchsia_product_configuration(
             ```
 
             All assembly json inputs are supported, except for product.packages
-            and product.drivers, which must be specified through the
+            and product.base_drivers, which must be specified through the
             following args.
         base_packages: Fuchsia packages to be included in base.
         cache_packages: Fuchsia packages to be included in cache.

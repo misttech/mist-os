@@ -107,7 +107,8 @@ template("legacy_assembly_input_bundle") {
     # The assembly bundle package and archive labels
     assembly_input_bundle_package = "${target_name}.pkg"
     assembly_input_bundle_archive = "${target_name}.tgz"
-    base_driver_package_list = "${target_name}.package_manifest_list.drivers"
+    base_driver_package_list =
+        "${target_name}.package_manifest_list.base_drivers"
     driver_package_component_files =
         "${target_name}_driver_package_component_files"
     shell_commands_manifest_list = "${target_name}.shell_commands_manifest_list"

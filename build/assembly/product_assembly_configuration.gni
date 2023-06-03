@@ -251,7 +251,7 @@ template("product_assembly_configuration") {
       }
     }
 
-    driver_packages = []
+    base_driver_packages = []
     driver_package_manifests = []
     if (defined(invoker.base_driver_packages)) {
       foreach(driver_package, invoker.base_driver_packages) {
@@ -265,7 +265,7 @@ template("product_assembly_configuration") {
         _manifest_path_rebased = rebase_path(_manifest_path, root_build_dir)
 
         driver_package_manifests += [ _manifest_path ]
-        driver_packages += [
+        base_driver_packages += [
           # This scope needs to serialize to json and deserialize
           # to a DriverDetails Assembly config struct
           {
@@ -348,10 +348,10 @@ template("product_assembly_configuration") {
         cache = files.cache_packages
       }
 
-      # Pass both product- and board- provided drivers together in the config,
+      # Pass both the board-provided and the product-provided base drivers in the config
       # until we have support for the board input to product assembly to provide
       # drivers.
-      drivers = files.driver_packages + files.board_driver_packages
+      base_drivers = files.base_driver_packages + files.board_driver_packages
     }
   }
 

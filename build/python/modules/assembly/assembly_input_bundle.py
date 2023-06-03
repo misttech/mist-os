@@ -606,7 +606,7 @@ class AIBCreator:
         # The deps touched by this function.
         deps: DepSet = set()
 
-        # Associate the set of driver component files with their packages
+        # Associate the set of base driver component files with their packages
         component_files: Dict[str, List[str]] = dict()
         for component_manifest in self.base_driver_component_files:
             with open(component_manifest["distribution_manifest"],
