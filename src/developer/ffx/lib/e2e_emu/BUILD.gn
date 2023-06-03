@@ -104,7 +104,14 @@ if (is_host) {
   generated_file("package_manifests.list") {
     testonly = true
     outputs = [ _package_manifests_list ]
-    contents = rebase_path(_package_for_test_manifest_path, root_build_dir)
+    output_conversion = "json"
+    contents = {
+      version = "1"
+      content = {
+        manifests =
+            [ rebase_path(_package_for_test_manifest_path, root_build_dir) ]
+      }
+    }
 
     # Prevent packages in this list from making it into the overall system image via our deps.
     metadata = {

@@ -38,18 +38,24 @@ def main():
     images_manifest = json.load(args.images_manifest)
     manifest_path = os.path.dirname(args.images_manifest.name)
 
-    lines = []
+    manifest_paths = []
     for image in images_manifest:
         contents = image.get("contents", dict())
         if "packages" in contents:
             for package in contents["packages"][args.package_set]:
                 # Paths in the manifest are relative to the manifest file itself
-                lines.append(
+                manifest_paths.append(
                     os.path.join(manifest_path, package[args.contents]))
 
-    for l in lines:
-        args.output.write(l)
-        args.output.write("\n")
+    out_package_manifest_list = {
+        'content': {
+            'manifests': manifest_paths
+        },
+        'version': '1'
+    }
+
+    args.output.write(
+        json.dumps(out_package_manifest_list, indent=2, sort_keys=True))
 
     return 0
 

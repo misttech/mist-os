@@ -5,6 +5,7 @@
 
 import argparse
 import os.path
+import json
 import sys
 import tempfile
 
@@ -18,11 +19,21 @@ def main():
     out = tempfile.NamedTemporaryFile(
         'w', dir=os.path.dirname(args.output), delete=False)
     try:
-        for path in args.paths:
-            with open(path) as f:
-                for line in f:
-                    out.write(line)
+        manifest_paths = []
+        for package_manifest_list_path in args.paths:
+            with open(package_manifest_list_path, 'r') as f:
+                package_manifest_list = json.load(f)
+                manifest_paths.extend(
+                    package_manifest_list['content']['manifests'])
+        out_package_manifest_list = {
+            'content': {
+                'manifests': manifest_paths
+            },
+            'version': '1'
+        }
 
+        out.write(
+            json.dumps(out_package_manifest_list, indent=2, sort_keys=True))
         out.close()
 
         os.replace(out.name, args.output)

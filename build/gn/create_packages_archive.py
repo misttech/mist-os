@@ -105,7 +105,9 @@ def main():
     # populate the blobs directory in the archive.
     blobs_dst_dir = args.tuf_repo_name + '/repository/blobs'
     with open(args.package_manifests_list) as f:
-        package_manifest_paths = f.read().splitlines()
+        package_manifest_list_json = json.load(f)
+        package_manifest_paths = package_manifest_list_json['content'][
+            'manifests']
 
     for package_manifest_path in package_manifest_paths:
         depfile_inputs.add(package_manifest_path)
