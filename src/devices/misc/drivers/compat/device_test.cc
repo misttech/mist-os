@@ -289,6 +289,47 @@ TEST_F(DeviceTest, AddChildDeviceWithInit) {
   ASSERT_TRUE(init_is_finished);
 }
 
+TEST_F(DeviceTest, AddChildDeviceWithInitFailure) {
+  fdf_testing::TestNode node("root", dispatcher());
+  zx::result node_client = node.CreateNodeChannel();
+  ASSERT_EQ(ZX_OK, node_client.status_value());
+
+  // Create a device.
+  zx_protocol_device_t parent_ops{};
+  compat::Device parent(compat::kDefaultDevice, &parent_ops, nullptr, std::nullopt, logger(),
+                        dispatcher());
+  parent.Bind({std::move(node_client.value()), dispatcher()});
+
+  // Add a child device.
+  bool child_ctx = false;
+  static zx_protocol_device_t child_ops{
+      .init = [](void* ctx) { *static_cast<bool*>(ctx) = true; },
+  };
+  device_add_args_t args{
+      .name = "child",
+      .ctx = &child_ctx,
+      .ops = &child_ops,
+  };
+  zx_device_t* child = nullptr;
+  ASSERT_EQ(ZX_OK, parent.Add(&args, &child));
+  EXPECT_STREQ("child", child->Name());
+  EXPECT_TRUE(parent.HasChildren());
+
+  // Run the loop which should call the init op.
+  ASSERT_TRUE(RunLoopUntilIdle());
+
+  // Reply to init with error.
+  device_init_reply(child, ZX_ERR_BAD_STATE, nullptr);
+  EXPECT_TRUE(RunLoopUntilIdle());
+
+  // Parent init finishes.
+  parent.InitReply(ZX_OK);
+  EXPECT_TRUE(RunLoopUntilIdle());
+
+  // Should not have a child since the init failed on the child.
+  ASSERT_FALSE(parent.HasChildren());
+}
+
 TEST_F(DeviceTest, ParentInitFails) {
   fdf_testing::TestNode node("root", dispatcher());
   zx::result node_client = node.CreateNodeChannel();

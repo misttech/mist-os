@@ -792,25 +792,33 @@ void Device::InitReply(zx_status_t status) {
 
   executor().schedule_task(promise.then(
       [this, init_status = status](fpromise::result<void, zx_status_t>& result) mutable {
-        // We want to export ourselves now that we're initialized.
-        // We can only do this if we have a parent, if we don't have a parent we've already been
-        // exported.
-        if (init_status == ZX_OK && parent_.has_value() && driver()) {
+        zx_status_t status = init_status;
+        if (parent_.has_value() && driver()) {
+          if (status == ZX_OK) {
+            // We want to export ourselves now that we're initialized.
+            // We can only do this if we have a parent, if we don't have a parent we've already been
+            // exported.
+            status = ExportAfterInit();
+            if (status != ZX_OK) {
+              FDF_LOG(ERROR, "Device %s failed to create node: %s", topological_path_.c_str(),
+                      zx_status_get_string(status));
+            }
+          }
+
           // We need to complete start after the first device the driver added completes it's init
           // hook.
           constexpr uint32_t kFirstDeviceId = 1;
-          if (zx_status_t status = ExportAfterInit(); status != ZX_OK) {
-            FDF_LOG(ERROR, "Device %s failed to create node: %s", topological_path_.c_str(),
-                    zx_status_get_string(status));
-            if (device_id_ == kFirstDeviceId) {
+          if (device_id_ == kFirstDeviceId) {
+            if (status == ZX_OK) {
+              driver()->CompleteStart(zx::ok());
+            } else {
               driver()->CompleteStart(zx::error(status));
             }
-            Remove();
-          } else {
-            if (device_id_ == kFirstDeviceId) {
-              driver()->CompleteStart(zx::ok());
-            }
           }
+        }
+
+        if (status != ZX_OK) {
+          Remove();
         }
 
         // Finish the init by alerting any waiters.
@@ -826,10 +834,6 @@ void Device::InitReply(zx_status_t status) {
             }
           }
           init_waiters_.clear();
-        }
-
-        if (init_status != ZX_OK) {
-          Remove();
         }
       }));
 }
