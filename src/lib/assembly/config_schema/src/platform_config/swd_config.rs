@@ -75,6 +75,8 @@ pub struct PolicyConfig {
     pub allow_reboot_when_idle: bool,
     pub startup_delay_seconds: u32,
     pub periodic_interval_minutes: u32,
+    pub fuzz_percentage_range: u32,
+    pub retry_delay_seconds: u32,
 }
 
 impl Default for PolicyConfig {
@@ -83,6 +85,8 @@ impl Default for PolicyConfig {
             allow_reboot_when_idle: true,
             startup_delay_seconds: 60,
             periodic_interval_minutes: 60,
+            fuzz_percentage_range: 25,
+            retry_delay_seconds: 300,
         }
     }
 }
@@ -145,7 +149,8 @@ mod tests {
                     policy_config: PolicyConfig {
                         allow_reboot_when_idle: false,
                         startup_delay_seconds: 42,
-                        periodic_interval_minutes: 55
+                        periodic_interval_minutes: 55,
+                        ..Default::default()
                     }
                 })),
                 on_verification_failure: VerificationFailureAction::Reboot,
@@ -281,7 +286,8 @@ mod tests {
                 policy_config: PolicyConfig {
                     allow_reboot_when_idle: false,
                     startup_delay_seconds: 42,
-                    periodic_interval_minutes: 55
+                    periodic_interval_minutes: 55,
+                    ..Default::default()
                 }
             }))
         );
@@ -335,7 +341,8 @@ mod tests {
             PolicyConfig {
                 allow_reboot_when_idle: true,
                 startup_delay_seconds: 60,
-                periodic_interval_minutes: 60
+                periodic_interval_minutes: 60,
+                ..Default::default()
             }
         )
     }
