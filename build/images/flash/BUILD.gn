@@ -195,7 +195,7 @@ if (supports_flashing_fxfs) {
     "--fvm-image=" + rebase_path(files.fxfs, root_build_dir),
     "--fvm=${fxfs_partition}",
   ]
-  flash_script_deps += [ "//build/images/fuchsia" ]
+  flash_script_deps += [ labels.images ]
 
   parts += [
     {
@@ -208,7 +208,7 @@ if (supports_flashing_fxfs) {
     "--fvm-image=" + rebase_path(files.fvm_fastboot, root_build_dir),
     "--fvm=${fvm_partition}",
   ]
-  flash_script_deps += [ "//build/images/fuchsia" ]
+  flash_script_deps += [ labels.images ]
 
   parts += [
     {

@@ -264,12 +264,6 @@ group("default-images") {
   #    accidentally become load-bearing.
   #
   if (!use_bazel_images_only) {
-    # Bazel assembly uses product bundle to flash.
-    deps += [
-      "//build/images/flash:flash_script",
-      "//build/images/tools:fastboot($host_toolchain)",
-    ]
-
     # Paving is not supported in Bazel assembly.
     if (recovery_is_zedboot) {
       deps += [
@@ -297,8 +291,12 @@ group("default-images") {
   }
 
   # Even if Bazel assembly uses product bundle to flash, downstream tools can
-  # still expect flash.json to exist for flashing.
-  deps += [ "//build/images/flash:fastboot_manifest" ]
+  # still expect flash.json and flash.sh to exist for flashing.
+  deps += [
+    "//build/images/flash:fastboot_manifest",
+    "//build/images/flash:flash_script",
+    "//build/images/tools:fastboot($host_toolchain)",
+  ]
 
   if (size_checker_input != {
       }) {
