@@ -452,3 +452,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0217_open_package_tracking.md
   - title: "RFC-0218: IOBuffer: A Peered Shared Memory Object for Efficient IO"
     path: /docs/contribute/governance/rfcs/0218_io_buffer.md
+  - title: "RFC-0219: Zircon Page Compression"
+    path: /docs/contribute/governance/rfcs/0219_zircon_page_compression.md
