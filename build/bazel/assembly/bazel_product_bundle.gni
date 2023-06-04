@@ -4,6 +4,7 @@
 
 import("//build/bazel/bazel_action.gni")
 import("//build/images/args.gni")
+import("//build/images/supports_fastboot_fvm.gni")
 import("//build/images/vbmeta.gni")
 import("//build/info/info.gni")
 import("//build/sdk/product_bundle_transfer_manifest.gni")
@@ -309,6 +310,21 @@ template("bazel_product_bundle") {
             bootserver_pave = []
           },
         ]
+
+        if (supports_fastboot_fvm) {
+          images += [
+            {
+              name = "fvm.fastboot"
+              cpu = current_cpu
+              type = "blk"
+              label = _full_label
+              path = "${_system_a_root}/fvm.fastboot.blk"
+
+              archive = true
+              fastboot_flash = [ fvm_partition ]
+            },
+          ]
+        }
 
         if (use_vbmeta) {
           images += [

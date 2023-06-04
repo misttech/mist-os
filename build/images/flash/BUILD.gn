@@ -407,7 +407,7 @@ foreach(info, firmware_info) {
 }
 
 if (supports_fastboot_fvm) {
-  archive_deps += [ "//build/images/fuchsia" ]
+  archive_deps += [ labels.images ]
   archive_args += [
     "--fvm-image=" + get_path_info(files.fvm_fastboot, "file"),
     "--fvm=${fvm_partition}",
