@@ -17,6 +17,7 @@ ffx_plugin("ffx_product_create") {
   deps = [
     "//build/sdk/meta:rust",
     "//src/developer/ffx/config:lib",
+    "//src/developer/ffx/lib/fastboot:lib",
     "//src/lib/assembly/assembly_manifest",
     "//src/lib/assembly/partitions_config",
     "//src/lib/assembly/tool",

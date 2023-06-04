@@ -427,6 +427,7 @@ def _fuchsia_product_bundle_impl(ctx):
         "--partitions $PARTITIONS_PATH",
         "--system-a $SYSTEM_A_MANIFEST",
         "--out-dir $OUTDIR",
+        "--with-deprecated-flash-manifest",
     ]
 
     # Gather the environment variables needed in the script.

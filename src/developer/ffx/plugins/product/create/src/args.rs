@@ -67,4 +67,8 @@ pub struct CreateCommand {
     /// the type of delivery blob the product needs.
     #[argh(option)]
     pub delivery_blob_type: Option<u32>,
+
+    /// create a deprecated flash manifest for backward compatibility.
+    #[argh(switch)]
+    pub with_deprecated_flash_manifest: bool,
 }

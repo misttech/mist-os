@@ -15,6 +15,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use epoch::EpochFile;
 use ffx_config::sdk::{in_tree_sdk_version, SdkVersion};
 use ffx_core::ffx_plugin;
+use ffx_fastboot::manifest::FlashManifestVersion;
 use ffx_product_create_args::CreateCommand;
 use fuchsia_pkg::PackageManifest;
 use fuchsia_repo::{
@@ -233,6 +234,14 @@ pub async fn pb_create_with_tools(
     };
     let product_bundle = ProductBundle::V2(product_bundle);
     product_bundle.write(&cmd.out_dir).context("writing product bundle")?;
+
+    if cmd.with_deprecated_flash_manifest {
+        let manifest_path = cmd.out_dir.join("flash.json");
+        let flash_manifest_file = File::create(&manifest_path)
+            .with_context(|| format!("Couldn't create flash.json '{}'", manifest_path))?;
+        FlashManifestVersion::from_product_bundle(&product_bundle)?.write(flash_manifest_file)?
+    }
+
     Ok(())
 }
 
@@ -434,6 +443,7 @@ mod test {
                 recommended_device: None,
                 out_dir: pb_dir.clone(),
                 delivery_blob_type: None,
+                with_deprecated_flash_manifest: false,
             },
             /*sdk_version=*/ "",
             Box::new(tools),
@@ -488,6 +498,7 @@ mod test {
                 recommended_device: None,
                 out_dir: pb_dir.clone(),
                 delivery_blob_type: None,
+                with_deprecated_flash_manifest: false,
             },
             /*sdk_version=*/ "",
             Box::new(tools),
@@ -545,6 +556,7 @@ mod test {
                 recommended_device: None,
                 out_dir: pb_dir.clone(),
                 delivery_blob_type: Some(1),
+                with_deprecated_flash_manifest: false,
             },
             /*sdk_version=*/ "",
             Box::new(tools),
@@ -612,6 +624,7 @@ mod test {
                 recommended_device: None,
                 out_dir: pb_dir.clone(),
                 delivery_blob_type: None,
+                with_deprecated_flash_manifest: false,
             },
             /*sdk_version=*/ "",
             Box::new(tools),
@@ -684,6 +697,7 @@ mod test {
                 recommended_device: Some("device_2".to_string()),
                 out_dir: pb_dir.clone(),
                 delivery_blob_type: None,
+                with_deprecated_flash_manifest: true,
             },
             /*sdk_version=*/ "",
             Box::new(tools),
