@@ -229,9 +229,11 @@ class __OWNER(T) Vector {
     return ptr_[i];
   }
 
-  T* begin() const { return ptr_; }
+  T* begin() { return ptr_; }
+  const T* begin() const { return ptr_; }
 
-  T* end() const { return &ptr_[size_]; }
+  T* end() { return &ptr_[size_]; }
+  const T* end() const { return &ptr_[size_]; }
 
  private:
   // TODO(smklein): In the future, if we want to be able to push back
