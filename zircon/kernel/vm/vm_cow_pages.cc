@@ -5907,6 +5907,10 @@ bool VmCowPages::RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset
     // To avoid claiming that |page| got reclaimed when it didn't, separately free it.
     FreePageLocked(page, true);
     page = nullptr;
+    // If the slot is allocated, but empty, then make sure we properly return it.
+    if (slot && slot->IsEmpty()) {
+      page_list_.ReturnEmptySlot(offset);
+    }
   }
   // One way or another the temporary reference has been returned, and so we can finalize.
   compressor->Finalize();
