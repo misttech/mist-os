@@ -1928,12 +1928,14 @@ class PaverServiceBlockTest : public PaverServiceTest {
     static_cast<paver::Paver*>(provider_ctx_)->set_svc_root(std::move(fake_svc_.svc_chan()));
   }
 
-  void UseBlockDevice(fidl::ClientEnd<fuchsia_hardware_block::Block> block_device) {
+  void UseBlockDevice(DeviceAndController block_device) {
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_paver::DynamicDataSink>();
     ASSERT_OK(endpoints.status_value());
     auto& [local, remote] = endpoints.value();
 
-    auto result = client_->UseBlockDevice(std::move(block_device), std::move(remote));
+    auto result = client_->UseBlockDevice(
+        fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(block_device.device)),
+        std::move(block_device.controller), std::move(remote));
     ASSERT_OK(result.status());
     data_sink_ = fidl::WireSyncClient(std::move(local));
   }
@@ -1949,11 +1951,9 @@ TEST_F(PaverServiceBlockTest, DISABLED_InitializePartitionTables) {
   ASSERT_NO_FATAL_FAILURE(
       BlockDevice::Create(devmgr_.devfs_root(), kEmptyType, block_count, &gpt_dev));
 
-  fidl::UnownedClientEnd block_interface = gpt_dev->block_interface();
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-  zx::result gpt_chan = component::Clone(block_interface, component::AssumeProtocolComposesNode);
-  ASSERT_OK(gpt_chan.status_value());
-  ASSERT_NO_FATAL_FAILURE(UseBlockDevice(std::move(gpt_chan.value())));
+  zx::result connections = GetNewConnectionsMultiplexed(gpt_dev->block_interface());
+  ASSERT_OK(connections);
+  ASSERT_NO_FATAL_FAILURE(UseBlockDevice(std::move(connections.value())));
 
   auto result = data_sink_->InitializePartitionTables();
   ASSERT_OK(result.status());
@@ -1969,11 +1969,9 @@ TEST_F(PaverServiceBlockTest, DISABLED_InitializePartitionTablesMultipleDevices)
   ASSERT_NO_FATAL_FAILURE(
       BlockDevice::Create(devmgr_.devfs_root(), kEmptyType, block_count, &gpt_dev2));
 
-  fidl::UnownedClientEnd block_interface = gpt_dev1->block_interface();
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-  zx::result gpt_chan = component::Clone(block_interface, component::AssumeProtocolComposesNode);
-  ASSERT_OK(gpt_chan.status_value());
-  ASSERT_NO_FATAL_FAILURE(UseBlockDevice(std::move(gpt_chan.value())));
+  zx::result connections = GetNewConnectionsMultiplexed(gpt_dev1->block_interface());
+  ASSERT_OK(connections);
+  ASSERT_NO_FATAL_FAILURE(UseBlockDevice(std::move(connections.value())));
 
   auto result = data_sink_->InitializePartitionTables();
   ASSERT_OK(result.status());
@@ -1987,12 +1985,9 @@ TEST_F(PaverServiceBlockTest, DISABLED_WipePartitionTables) {
   ASSERT_NO_FATAL_FAILURE(
       BlockDevice::Create(devmgr_.devfs_root(), kEmptyType, block_count, &gpt_dev));
 
-  fidl::UnownedClientEnd block_interface = gpt_dev->block_interface();
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-  zx::result gpt_chan = component::Clone(block_interface, component::AssumeProtocolComposesNode);
-  ASSERT_OK(gpt_chan.status_value());
-  ASSERT_NO_FATAL_FAILURE(UseBlockDevice(std::move(gpt_chan.value())));
-
+  zx::result connections = GetNewConnectionsMultiplexed(gpt_dev->block_interface());
+  ASSERT_OK(connections);
+  ASSERT_NO_FATAL_FAILURE(UseBlockDevice(std::move(connections.value())));
   auto result = data_sink_->InitializePartitionTables();
   ASSERT_OK(result.status());
   ASSERT_OK(result.value().status);
@@ -2009,11 +2004,9 @@ TEST_F(PaverServiceBlockTest, DISABLED_WipeVolume) {
   ASSERT_NO_FATAL_FAILURE(
       BlockDevice::Create(devmgr_.devfs_root(), kEmptyType, block_count, &gpt_dev));
 
-  fidl::UnownedClientEnd block_interface = gpt_dev->block_interface();
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-  zx::result gpt_chan = component::Clone(block_interface, component::AssumeProtocolComposesNode);
-  ASSERT_OK(gpt_chan.status_value());
-  ASSERT_NO_FATAL_FAILURE(UseBlockDevice(std::move(gpt_chan.value())));
+  zx::result connections = GetNewConnectionsMultiplexed(gpt_dev->block_interface());
+  ASSERT_OK(connections);
+  ASSERT_NO_FATAL_FAILURE(UseBlockDevice(std::move(connections.value())));
 
   auto result = data_sink_->InitializePartitionTables();
   ASSERT_OK(result.status());
@@ -2079,7 +2072,7 @@ class PaverServiceGptDeviceTest : public PaverServiceTest {
     auto pauser = paver::BlockWatcherPauser::Create(GetSvcRoot());
     ASSERT_OK(pauser);
 
-    zx::result new_connection = GetNewConnections(gpt_dev->block_controller_interface());
+    zx::result new_connection = GetNewConnectionsMultiplexed(gpt_dev->block_interface());
     ASSERT_OK(new_connection);
     std::unique_ptr<gpt::GptDevice> gpt;
     ASSERT_OK(gpt::GptDevice::Create(
@@ -2186,11 +2179,11 @@ TEST_F(PaverServiceLuisTest, WriteOpaqueVolume) {
   auto& [local, remote] = endpoints.value();
 
   {
-    fidl::UnownedClientEnd block_interface = gpt_dev_->block_interface();
-    // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-    zx::result gpt_chan = component::Clone(block_interface, component::AssumeProtocolComposesNode);
-    ASSERT_OK(gpt_chan.status_value());
-    ASSERT_OK(client_->UseBlockDevice(std::move(gpt_chan.value()), std::move(remote)));
+    zx::result connections = GetNewConnectionsMultiplexed(gpt_dev_->block_interface());
+    ASSERT_OK(connections);
+    ASSERT_OK(client_->UseBlockDevice(
+        fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(connections->device)),
+        std::move(connections->controller), std::move(remote)));
   }
   fidl::WireSyncClient data_sink{std::move(local)};
 

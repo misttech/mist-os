@@ -182,6 +182,17 @@ impl RamdiskClient {
         Ok(block_client_end)
     }
 
+    /// Get an open channel to the underlying ramdevice's controller.
+    pub async fn open_controller(
+        &self,
+    ) -> Result<fidl::endpoints::ClientEnd<fidl_fuchsia_device::ControllerMarker>, Error> {
+        let block_dir = self.as_dir().ok_or_else(|| anyhow!("directory is invalid"))?;
+        let controller_proxy = connect_to_named_protocol_at_dir_root::<
+            fidl_fuchsia_device::ControllerMarker,
+        >(block_dir, "device_controller")?;
+        Ok(ClientEnd::new(controller_proxy.into_channel().unwrap().into()))
+    }
+
     /// Starts unbinding the underlying ramdisk and returns before the device is removed. This
     /// deallocates all resources for this ramdisk, which will remove all data written to the
     /// associated ramdisk.

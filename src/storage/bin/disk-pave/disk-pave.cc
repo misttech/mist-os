@@ -247,11 +247,17 @@ fit::result<UseBlockDeviceError<Protocol>> UseBlockDevice(
   static_assert(std::is_same_v<Protocol, fuchsia_paver::DataSink> ||
                 std::is_same_v<Protocol, fuchsia_paver::DynamicDataSink>);
 
-  auto block_device = component::Connect<fuchsia_hardware_block::Block>(block_device_path);
+  zx::result block_device = component::Connect<fuchsia_hardware_block::Block>(block_device_path);
   if (block_device.is_ok()) {
+    std::string controller_path = std::string(block_device_path) + "/device_controller";
+    zx::result controller = component::Connect<fuchsia_device::Controller>(controller_path);
+    if (controller.is_error()) {
+      ERROR("Unable to open block device controller: %s (%s)\n", controller_path.c_str(),
+            controller.status_string());
+    }
     // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
     (void)paver_client->UseBlockDevice(
-        std::move(*block_device),
+        std::move(block_device.value()), std::move(controller.value()),
         // Note: manually converting any DataSink protocol into a DynamicDataSink.
         fidl::ServerEnd<fuchsia_paver::DynamicDataSink>(data_sink_remote.TakeChannel()));
     return fit::ok();

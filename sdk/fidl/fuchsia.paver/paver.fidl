@@ -4,6 +4,7 @@
 library fuchsia.paver;
 
 using fuchsia.hardware.block;
+using fuchsia.device;
 using fuchsia.hardware.block.volume;
 using fuchsia.mem;
 using zx;
@@ -103,6 +104,7 @@ protocol Paver {
     /// `data_sink` will be closed on error, with an epitaph provided on failure reason.
     UseBlockDevice(resource struct {
         block_device client_end:fuchsia.hardware.block.Block;
+        block_controller client_end:fuchsia.device.Controller;
         data_sink server_end:DynamicDataSink;
     });
 

@@ -690,8 +690,14 @@ zx::result<fidl::WireSyncClient<fuchsia_paver::DynamicDataSink>> Fastboot::Conne
   }
   fidl::ClientEnd<fuchsia_hardware_block::Block> block_device(std::move(*channel));
 
+  // TODO(fxbug.dev/127870): Plumb the controller through.
+  zx::result controller_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
+  if (controller_endpoints.is_error()) {
+    return controller_endpoints.take_error();
+  }
+
   auto res = paver_client_res.value()->UseBlockDevice(
-      std::move(block_device),
+      std::move(block_device), std::move(controller_endpoints->client),
       fidl::ServerEnd<fuchsia_paver::DynamicDataSink>(data_sink_remote.TakeChannel()));
 
   if (!res.ok()) {

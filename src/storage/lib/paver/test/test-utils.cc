@@ -41,6 +41,22 @@ void CreateBadBlockMap(void* buffer) {
 
 }  // namespace
 
+zx::result<DeviceAndController> GetNewConnectionsMultiplexed(
+    fidl::UnownedClientEnd<fuchsia_hardware_block::Block> block) {
+  zx::result new_block = component::Clone(block, component::AssumeProtocolComposesNode);
+  if (new_block.is_error()) {
+    return new_block.take_error();
+  }
+  zx::result new_controller = component::Clone(block, component::AssumeProtocolComposesNode);
+  if (new_controller.is_error()) {
+    return new_controller.take_error();
+  }
+  return zx::ok(DeviceAndController{
+      .device = new_block->TakeChannel(),
+      .controller = fidl::ClientEnd<fuchsia_device::Controller>(new_controller->TakeChannel()),
+  });
+}
+
 zx::result<DeviceAndController> GetNewConnections(
     fidl::UnownedClientEnd<fuchsia_device::Controller> controller) {
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();

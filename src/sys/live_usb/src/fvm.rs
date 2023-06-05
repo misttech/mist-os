@@ -112,7 +112,11 @@ impl FvmRamdisk {
             fuchsia_component::client::connect_to_protocol::<fidl_fuchsia_paver::PaverMarker>()?;
         let (data_sink, remote) =
             fidl::endpoints::create_proxy::<fidl_fuchsia_paver::DynamicDataSinkMarker>()?;
-        let () = paver.use_block_device(client_end, remote)?;
+        let () = paver.use_block_device(
+            client_end,
+            self.ramdisk.open_controller().await.context("Opening ramdisk controller")?,
+            remote,
+        )?;
 
         // Set up a PayloadStream to serve the data sink.
         let fvm_block = fuchsia_component::client::connect_to_protocol_at_path::<BlockMarker>(

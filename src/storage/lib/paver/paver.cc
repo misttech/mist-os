@@ -473,11 +473,10 @@ void Paver::FindDataSink(FindDataSinkRequestView request, FindDataSinkCompleter:
 
 void Paver::UseBlockDevice(UseBlockDeviceRequestView request,
                            UseBlockDeviceCompleter::Sync& _completer) {
-  // TODO(fxbug.dev/127870): The controller needs to be filled in here.
   UseBlockDevice(
       BlockAndController{
           .device = std::move(request->block_device),
-          .controller = {},
+          .controller = std::move(request->block_controller),
       },
       std::move(request->data_sink));
 }

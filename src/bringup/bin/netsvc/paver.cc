@@ -28,6 +28,26 @@
 
 namespace netsvc {
 
+namespace {
+
+template <typename T>
+zx::result<fidl::ClientEnd<T>> ConnectToDevfs(fidl::ClientEnd<fuchsia_io::Directory>& dev,
+                                              std::string_view full_path) {
+  // `dev` allows dependency injection in tests. However "/dev" is not guaranteed to be
+  // backed by a channel in the local namespace, preventing `dev_root` from always being provided.
+  // In particular, it may be that a subdirectory of "/dev" is installed in the namespace - this
+  // would result in "/dev" itself being a local node in the namespace, and not backed by a
+  // channel. We handle both cases by using `dev` only when it has been provided and
+  // otherwise connecting through the namespace.
+  if (!dev.is_valid()) {
+    return component::Connect<T>(full_path);
+  }
+  constexpr std::string_view kDevfsPrefix = "/dev/";
+  return component::ConnectAt<T>(dev, full_path.substr(kDevfsPrefix.size()));
+}
+
+}  // namespace
+
 std::optional<Paver> Paver::instance_ = std::nullopt;
 
 Paver& Paver::Get() {
@@ -342,22 +362,18 @@ zx_status_t Paver::OpenDataSink(fuchsia_mem::wire::Buffer buffer,
             partition_info.block_device_path);
     return ZX_ERR_INVALID_ARGS;
   }
-  zx::result client_end = [&]() {
-    // `dev_root_` allows dependency injection in tests. However "/dev" is not guaranteed to be
-    // backed by a channel in the local namespace, preventing `dev_root` from always being provided.
-    // In particular, it may be that a subdirectory of "/dev" is installed in the namespace - this
-    // would result in "/dev" itself being a local node in the namespace, and not backed by a
-    // channel. We handle both cases by using `dev_root_` only when it has been provided and
-    // otherwise connecting through the namespace.
-    if (dev_root_.is_valid()) {
-      return component::ConnectAt<fuchsia_hardware_block::Block>(
-          dev_root_, block_device_path.substr(kDevfsPrefix.size()));
-    }
-    return component::Connect<fuchsia_hardware_block::Block>(block_device_path);
-  }();
+  zx::result client_end =
+      ConnectToDevfs<fuchsia_hardware_block::Block>(dev_root_, block_device_path);
   if (client_end.is_error()) {
     fprintf(stderr, "netsvc: Unable to open %s.\n", partition_info.block_device_path);
     return client_end.status_value();
+  }
+
+  std::string controller_path = std::string(block_device_path) + "/device_controller";
+  zx::result controller = ConnectToDevfs<fuchsia_device::Controller>(dev_root_, controller_path);
+  if (client_end.is_error()) {
+    fprintf(stderr, "netsvc: Unable to open controller %s\n", controller_path.c_str());
+    return controller.status_value();
   }
 
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_paver::DynamicDataSink>();
@@ -366,8 +382,8 @@ zx_status_t Paver::OpenDataSink(fuchsia_mem::wire::Buffer buffer,
     return endpoints.status_value();
   }
 
-  fidl::Status res =
-      paver_svc_->UseBlockDevice(std::move(client_end.value()), std::move(endpoints->server));
+  fidl::Status res = paver_svc_->UseBlockDevice(
+      std::move(client_end.value()), std::move(controller.value()), std::move(endpoints->server));
   if (!res.ok()) {
     fprintf(stderr, "netsvc: unable to use block device.\n");
     return res.status();
