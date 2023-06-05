@@ -35,6 +35,15 @@ if (support_rust) {
 #     Required: Whether to strip binaries, leaving unstripped ones
 #     in lib.unstripped and exe.unstripped subdirectories.
 #
+#   strip_cxx_bin_args
+#     Optional: When use_strip is true, can be used to override
+#     the arguments to the tool used to strip C++ executables.
+#     For example, when targeting Fuchsia, using --strip-sections
+#     generates smaller binaries than the default. Does not affect
+#     shared libraries, or Rust executables.
+#     Type: string
+#     Default: "--strip-all" except on macOS where it is "-Sx"
+#
 #   prefix
 #     Optional: The path from which "cc", "cxx", "ar", "ld" and
 #     "strip" will be found (unless overridden).  If not given,
@@ -724,7 +733,7 @@ template("clang_toolchain") {
       output_prefix = "lib"
     }
 
-    # The _link_common captures common computations used by the "solink", "solink_module"
+    # The _cxx_link_common captures common computations used by the "solink", "solink_module"
     # and "link" tool() definitions below. In particular it may contain the following
     # important keys:
     #
@@ -765,7 +774,7 @@ template("clang_toolchain") {
     # mistake the parameters are not properly expanded inside the tool() definitions, GN
     # will complain loudly about it!
     #
-    _link_common = {
+    _cxx_link_common = {
       forward_variables_from(concurrent_jobs.local, "*")
       outname = "{{target_output_name}}{{output_extension}}"
       outfile = "{{output_dir}}/$outname"
@@ -817,10 +826,10 @@ template("clang_toolchain") {
       }
     }
 
-    # Expand _link_common into a scope that can be used for "solink" and "solink_module" tools
+    # Expand _cxx_link_common into a scope that can be used for "solink" and "solink_module" tools
     # below directly. All template parameters will be expanded, except BREAKPAD_NAME.
-    _link_solink = {
-      forward_variables_from(_link_common, "*")
+    _cxx_link_solink = {
+      forward_variables_from(_cxx_link_common, "*")
       if (invoker.toolchain_os == "mac") {
         command = string_replace(
                 command,
@@ -843,22 +852,22 @@ template("clang_toolchain") {
       _unstripped_dir = "lib.unstripped"
       command = string_replace(command, "{{UNSTRIPPED_DIR}}", _unstripped_dir)
       outputs = []
-      foreach(output, _link_common.outputs) {
+      foreach(output, _cxx_link_common.outputs) {
         outputs +=
             [ string_replace(output, "{{UNSTRIPPED_DIR}}", _unstripped_dir) ]
       }
     }
 
-    # Expand _link_common into a scope that can be used for the "link" tool below.
+    # Expand _cxx_link_common into a scope that can be used for the "link" tool below.
     # All template parameters will be expanded.
-    _link_bin = {
-      forward_variables_from(_link_common, "*")
+    _cxx_link_bin = {
+      forward_variables_from(_cxx_link_common, "*")
 
       # Expand {{UNSTRIPPED_DIR}}
       _unstripped_dir = "exe.unstripped"
       command = string_replace(command, "{{UNSTRIPPED_DIR}}", _unstripped_dir)
       outputs = []
-      foreach(output, _link_common.outputs) {
+      foreach(output, _cxx_link_common.outputs) {
         outputs +=
             [ string_replace(output, "{{UNSTRIPPED_DIR}}", _unstripped_dir) ]
       }
@@ -867,14 +876,14 @@ template("clang_toolchain") {
       command = string_replace(command, "{{SOLINK_FLAGS}}", "")
 
       # Expand STRIP_ARGS
-      if (invoker.toolchain_os == "fuchsia") {
-        # As a special case, on Fuchsia, replace --strip-all with --strip-sections.
-        # It is stronger, and thus generates smaller binaries, but also creates
-        # crashes for host binaries (e.g. https://fxbug.dev/49945).
-        command = string_replace(command, "{{STRIP_ARGS}}", "--strip-sections")
+      if (defined(invoker.strip_cxx_bin_args)) {
+        _strip_args = invoker.strip_cxx_bin_args
+      } else if (invoker.toolchain_os == "mac") {
+        _strip_args = "-Sx"
       } else {
-        command = string_replace(command, "{{STRIP_ARGS}}", "--strip-all")
+        _strip_args = "--strip-all"
       }
+      command = string_replace(command, "{{STRIP_ARGS}}", _strip_args)
 
       # Use --start-group and --eng-group for binaries, except on Mac.
       # IMPORTANT: The trailing spaces in the replacement strings are critical!
@@ -896,7 +905,7 @@ template("clang_toolchain") {
     }
 
     tool("solink") {
-      forward_variables_from(_link_solink, "*")
+      forward_variables_from(_cxx_link_solink, "*")
 
       description = "SOLINK $outfile"
       default_output_dir = "{{root_out_dir}}"
@@ -931,7 +940,7 @@ template("clang_toolchain") {
     }
 
     tool("solink_module") {
-      forward_variables_from(_link_solink, "*")
+      forward_variables_from(_cxx_link_solink, "*")
 
       description = "SOLINK $outfile"
       default_output_dir = "{{root_out_dir}}"
@@ -948,7 +957,7 @@ template("clang_toolchain") {
     }
 
     tool("link") {
-      forward_variables_from(_link_bin, "*")
+      forward_variables_from(_cxx_link_bin, "*")
 
       description = "LINK $outfile"
       default_output_dir = "{{root_out_dir}}"

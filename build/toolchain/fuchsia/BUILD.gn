@@ -9,4 +9,9 @@ clang_toolchain_suite(target_cpu) {
   toolchain_os = target_os
 
   use_strip = true
+
+  # As a special case, on Fuchsia, replace --strip-all with --strip-sections.
+  # It is stronger, and thus generates smaller binaries, but also creates
+  # crashes for host binaries (e.g. https://fxbug.dev/49945).
+  strip_cxx_bin_args = "--strip-sections"
 }
