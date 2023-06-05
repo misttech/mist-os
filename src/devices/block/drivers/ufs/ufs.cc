@@ -145,12 +145,44 @@ void Ufs::HandleBlockOp(IoCommand *io_cmd) {
 
 zx::result<> Ufs::Isr() {
   auto interrupt_status = InterruptStatusReg::Get().ReadFrom(&mmio_);
+  auto enabled_interrupts = InterruptEnableReg::Get().ReadFrom(&mmio_);
   interrupt_status.WriteTo(&mmio_);
 
-  if (interrupt_status.utp_transfer_request_completion_status()) {
+  // TODO(fxbug.dev/124835): implement error handlers
+  if (enabled_interrupts.uic_error_enable() && interrupt_status.uic_error()) {
+    zxlogf(ERROR, "UFS: UIC error on ISR");
+  }
+  if (enabled_interrupts.device_fatal_error_enable() &&
+      interrupt_status.device_fatal_error_status()) {
+    zxlogf(ERROR, "UFS: Device fatal error on ISR");
+  }
+  if (enabled_interrupts.host_controller_fatal_error_enable() &&
+      interrupt_status.host_controller_fatal_error_status()) {
+    zxlogf(ERROR, "UFS: Host controller fatal error on ISR");
+  }
+  if (enabled_interrupts.system_bus_fatal_error_enable() &&
+      interrupt_status.system_bus_fatal_error_status()) {
+    zxlogf(ERROR, "UFS: System bus fatal error on ISR");
+  }
+  if (enabled_interrupts.crypto_engine_fatal_error_enable() &&
+      interrupt_status.crypto_engine_fatal_error_status()) {
+    zxlogf(ERROR, "UFS: Crypto engine fatal error on ISR");
+  }
+
+  if (enabled_interrupts.utp_transfer_request_completion_enable() &&
+      interrupt_status.utp_transfer_request_completion_status()) {
     transfer_request_processor_->RequestCompletion();
   }
-  // TODO(fxbug.dev/124835): Handle UTMR completion
+  if (enabled_interrupts.utp_task_management_request_completion_enable() &&
+      interrupt_status.utp_task_management_request_completion_status()) {
+    // TODO(fxbug.dev/124835): Handle UTMR completion
+    zxlogf(INFO, "UFS: UTMR completion not yet implemented");
+  }
+  if (enabled_interrupts.uic_command_completion_enable() &&
+      interrupt_status.uic_command_completion_status()) {
+    // TODO(fxbug.dev/124835): Handle UIC completion
+    zxlogf(INFO, "UFS: UIC completion not yet implemented");
+  }
 
   return zx::ok();
 }

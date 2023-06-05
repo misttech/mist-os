@@ -267,6 +267,12 @@ uint32_t TransferRequestProcessor::RequestCompletion() {
                 request_list_.GetRequestDescriptor<TransferRequestDescriptor>(slot_num);
             ScsiCompletion(slot_num, request_slot, descriptor);
           }
+
+          UtrListCompletionNotificationReg::Get()
+              .FromValue(0)
+              .set_notification(1 << slot_num)
+              .WriteTo(&register_);
+
           request_slot.state = SlotState::kFree;
           sync_completion_signal(&request_slot.complete);
           ++completion_count;

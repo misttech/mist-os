@@ -206,6 +206,18 @@ class UtrListRunStopReg : public hwreg::RegisterBase<UtrListRunStopReg, uint32_t
   static auto Get() { return hwreg::RegisterAddr<UtrListRunStopReg>(RegisterMap::kUTRLRSR); }
 };
 
+// UFSHCI Specification Version 3.0, section 5.4.6
+// "Offset 64h: UTRLCNR – UTP Transfer Request List Completion Notification Register".
+class UtrListCompletionNotificationReg
+    : public hwreg::RegisterBase<UtrListCompletionNotificationReg, uint32_t> {
+ public:
+  DEF_FIELD(31, 0, notification);
+
+  static auto Get() {
+    return hwreg::RegisterAddr<UtrListCompletionNotificationReg>(RegisterMap::kUTRLCNR);
+  }
+};
+
 // UFSHCI Specification Version 3.0, section 5.5.1
 // "Offset 70h: UTMRLBA – UTP Task Management Request List Base Address".
 class UtmrListBaseAddressReg : public hwreg::RegisterBase<UtmrListBaseAddressReg, uint32_t> {
