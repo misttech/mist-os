@@ -47,6 +47,7 @@ sdk://fidl/fuchsia.component.test
 sdk://fidl/fuchsia.component.types
 sdk://fidl/fuchsia.data
 sdk://fidl/fuchsia.developer.tiles
+sdk://fidl/fuchsia.device.fs
 sdk://fidl/fuchsia.diagnostics
 sdk://fidl/fuchsia.diagnostics.types
 sdk://fidl/fuchsia.driver.test
@@ -173,6 +174,7 @@ sdk://pkg/async-loop-default
 sdk://pkg/async-loop-testing
 sdk://pkg/component_incoming_cpp
 sdk://pkg/component_outgoing_cpp
+sdk://pkg/driver_devfs_cpp
 sdk://pkg/fdio
 sdk://pkg/fidl
 sdk://pkg/fidl_base

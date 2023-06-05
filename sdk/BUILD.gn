@@ -323,6 +323,7 @@ sdk_molecule("core_lib") {
     "//sdk/lib/async-loop-testing/cpp:cpp_sdk",
     "//sdk/lib/component/incoming/cpp:cpp_sdk",
     "//sdk/lib/component/outgoing/cpp:cpp_sdk",
+    "//sdk/lib/driver/devfs/cpp:cpp_sdk",
     "//sdk/lib/fdio:fdio_sdk",
     "//sdk/lib/fidl/cpp:cpp_sdk",
     "//sdk/lib/fidl/cpp/wire:wire_sdk",

@@ -5,7 +5,8 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.device.fs") {
-  sdk_category = "experimental"
+  sdk_category = "partner"
+  api = "fuchsia.device.fs.api"
 
   sources = [
     "connector.fidl",

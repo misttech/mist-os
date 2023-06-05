@@ -1,4 +1,4 @@
-// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -13,7 +13,7 @@ namespace driver_devfs {
 // This class provides type-safety over the protocol that is being connected to,
 // as the parent will get back a `fidl::ServerEnd<MyProtocol>`.
 template <typename Protocol>
-class Connector : public fidl::WireServer<fuchsia_device_fs::Connector> {
+class Connector final : public fidl::WireServer<fuchsia_device_fs::Connector> {
  public:
   // Create the Connector. This callback will be called whenever a client attempts to
   // connect.

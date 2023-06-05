@@ -11,7 +11,7 @@ group("tests") {
 }
 
 sdk_source_set("cpp") {
-  category = "experimental"
+  category = "partner"
   sdk_name = "driver_devfs_cpp"
 
   include_base = "//sdk"
