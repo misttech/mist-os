@@ -1,2 +1,4 @@
+include /src/devices/OWNERS
+
 dgilhooley@google.com
 surajmalhotra@google.com
