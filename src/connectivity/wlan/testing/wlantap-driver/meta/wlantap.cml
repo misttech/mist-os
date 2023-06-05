@@ -3,17 +3,14 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: "driver",
+        binary: "driver/wlantap.so",
         bind: "meta/bind/wlantapctl.bindbc",
         colocate: "true",
-        compat: "driver/wlantap.so",
-        default_dispatcher_opts: [ "allow_sync_calls" ],
-        fallback: "false",
     },
     capabilities: [
         { service: "fuchsia.wlan.softmac.Service" },

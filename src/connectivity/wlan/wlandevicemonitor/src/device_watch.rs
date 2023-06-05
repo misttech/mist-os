@@ -104,7 +104,7 @@ mod tests {
             .expect("Failed to connect to driver test realm");
 
         let _ = driver_test_realm_proxy
-            .start(fdt::RealmArgs::default())
+            .start(fdt::RealmArgs { use_driver_framework_v2: Some(true), ..Default::default() })
             .await
             .expect("FIDL error when starting driver test realm");
 

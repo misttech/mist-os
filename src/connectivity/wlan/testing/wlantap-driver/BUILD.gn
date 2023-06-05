@@ -25,8 +25,12 @@ fuchsia_driver("wlantap_driver-driver") {
     "utils.cc",
     "utils.h",
     "wlantap-ctl.cc",
+    "wlantap-driver-context.h",
+    "wlantap-driver.cc",
     "wlantap-mac.cc",
     "wlantap-mac.h",
+    "wlantap-phy-impl.cc",
+    "wlantap-phy-impl.h",
     "wlantap-phy.cc",
     "wlantap-phy.h",
   ]
@@ -41,21 +45,14 @@ fuchsia_driver("wlantap_driver-driver") {
     "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp_driver",
     "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp_wire",
     "//sdk/fidl/fuchsia.wlan.tap:fuchsia.wlan.tap_cpp_driver",
-    "//sdk/fidl/fuchsia.wlan.tap:fuchsia.wlan.tap_cpp_hlcpp_conversion",
-    "//sdk/fidl/fuchsia.wlan.tap:fuchsia.wlan.tap_cpp_wire",
-    "//sdk/fidl/fuchsia.wlan.tap:fuchsia.wlan.tap_hlcpp",
+
+    # ddk is still needed for ZX_PROTOCOL* definitions
     "//sdk/lib/driver/component/cpp:cpp",
-    "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//src/connectivity/wlan/drivers/wlansoftmac:wlansoftmac_convert",
+    "//sdk/lib/driver/devfs/cpp",
     "//src/connectivity/wlan/lib/common/cpp:common",
-    "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/sync:sync-cpp",
+    "//zircon/system/public:public",
     "//zircon/system/ulib/zx",
   ]
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
