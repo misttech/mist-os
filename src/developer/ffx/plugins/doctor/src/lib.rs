@@ -12,10 +12,10 @@ use ffx_config::{
     environment::EnvironmentContext, get, global_env_context, keys::TARGET_DEFAULT_KEY,
     print_config,
 };
-use ffx_core::ffx_plugin;
 use ffx_daemon::DaemonConfig;
 use ffx_doctor_args::DoctorCommand;
 use ffx_ssh::{SshKeyErrorKind, SshKeyFiles};
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl::{endpoints::create_proxy, prelude::*};
 use fidl_fuchsia_developer_ffx::{
     TargetCollectionMarker, TargetCollectionProxy, TargetCollectionReaderMarker,
@@ -207,9 +207,24 @@ struct DoctorRecorderParameters {
     recorder: Arc<Mutex<dyn Recorder>>,
 }
 
-#[ffx_plugin()]
-pub async fn doctor_cmd(version_info: VersionInfo, cmd: DoctorCommand) -> Result<()> {
-    doctor_cmd_impl(version_info, cmd, stdout()).await
+#[derive(FfxTool)]
+pub struct DoctorTool {
+    #[command]
+    cmd: DoctorCommand,
+    version_info: VersionInfo,
+}
+
+fho::embedded_plugin!(DoctorTool);
+
+#[async_trait(?Send)]
+impl FfxMain for DoctorTool {
+    type Writer = SimpleWriter;
+
+    // TODO(fxbug.dev/127955): use the writer instead of directly using std::io::stdout.
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        doctor_cmd_impl(self.version_info, self.cmd, stdout()).await?;
+        Ok(())
+    }
 }
 
 pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(

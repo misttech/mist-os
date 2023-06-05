@@ -17,6 +17,7 @@ ffx_plugin("ffx_doctor") {
     "//src/developer/ffx/daemon:lib",
     "//src/developer/ffx/lib/doctor_utils:lib",
     "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/ssh:lib",
     "//src/developer/ffx/lib/timeout:lib",
     "//src/lib/fidl/rust/fidl",

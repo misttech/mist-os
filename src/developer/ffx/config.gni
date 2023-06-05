@@ -39,8 +39,12 @@ included_ffx_plugins = [
   "//src/connectivity/network/net-cli/ffx:ffx_net",
   "//src/developer/ffx/plugins/cts:ffx_cts",
   "//src/developer/ffx/plugins/debug:ffx_debug_plugin",
-  "//src/developer/ffx/plugins/doctor:ffx_doctor",
   "//src/developer/ffx/plugins/test:ffx_test",
+
+  # This is deliberately not included in the dual mode set as a policy decision
+  # to keep doctor with the main binary. We might re-evaluate that but for now
+  # this is intended to be here.
+  "//src/developer/ffx/plugins/doctor:ffx_doctor",
 ]
 
 # The list of plugins that can be built either as plugins or subtools,
