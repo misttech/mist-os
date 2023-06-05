@@ -34,7 +34,12 @@ impl SeLinuxFs {
         let fs = FileSystem::new(kernel, CacheMode::Permanent, SeLinuxFs, options);
         let mut dir = StaticDirectoryBuilder::new(&fs);
         dir.entry(b"load", BytesFile::new_node(SeLoad), mode!(IFREG, 0o600));
-        dir.entry(b"enforce", BytesFile::new_node(SeEnforce), mode!(IFREG, 0o644));
+        // TODO(https://fxbug.dev/84041) get mode from the container
+        dir.entry(
+            b"enforce",
+            BytesFile::new_node(SeEnforce { enforce: Mutex::new(false) }),
+            mode!(IFREG, 0o644),
+        );
         dir.entry(b"checkreqprot", BytesFile::new_node(SeCheckReqProt), mode!(IFREG, 0o644));
         dir.entry(b"access", AccessFileNode::new(), mode!(IFREG, 0o666));
         dir.entry(b"create", SeCreate::new_node(), mode!(IFREG, 0o644));
@@ -59,6 +64,15 @@ impl SeLinuxFs {
         dir.entry(b"class", SeLinuxClassDirectory::new(), mode!(IFDIR, 0o777));
         dir.entry(b"context", BytesFile::new_node(SeContext), mode!(IFREG, 0o666));
         dir.entry_dev(b"null", DeviceFileNode, mode!(IFCHR, 0o666), DeviceType::NULL);
+        dir.entry(b"policyvers", BytesFile::new_node(b"33".to_vec()), mode!(IFREG, 0o444));
+        dir.entry(b"mls", BytesFile::new_node(b"1".to_vec()), mode!(IFREG, 0o444));
+        dir.subdir(b"initial_contexts", 0o555, |dir| {
+            dir.entry(
+                b"kernel",
+                BytesFile::new_node(b"system_u:system_r:kernel_t:s0".to_vec()),
+                mode!(IFREG, 0o444),
+            );
+        });
         dir.build_root();
 
         Ok(fs)
@@ -91,16 +105,26 @@ impl BytesFileOps for SeLoad {
     }
 }
 
-struct SeEnforce;
+struct SeEnforce {
+    enforce: Mutex<bool>,
+}
 impl BytesFileOps for SeEnforce {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        let enforce = parse_int(&data)?;
-        not_implemented!("selinux setenforce: {}", enforce);
+        let enforce_data = parse_int(&data)?;
+        let enforce_opt = match enforce_data {
+            0 => Some(false),
+            1 => Some(true),
+            _ => None,
+        };
+        if let Some(enforce) = enforce_opt {
+            *self.enforce.lock() = enforce;
+        }
         Ok(())
     }
 
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        Ok(b"0\n"[..].into())
+        let enforce = format!("{}", *self.enforce.lock() as u8);
+        Ok(enforce.as_bytes().to_vec().into())
     }
 }
 
@@ -271,7 +295,9 @@ impl FsNodeOps for Arc<SeLinuxClassDirectory> {
 #[derive(Derivative)]
 #[derivative(Default)]
 pub struct SeLinuxThreadGroupState {
-    #[derivative(Default(value = "b\"user:role:type:level\".to_vec()"))]
+    #[derivative(Default(
+        value = "b\"unconfined_u:unconfined_r:unconfined_t:s0-s0:c0-c1023\".to_vec()"
+    ))]
     pub current_context: FsString,
     pub fscreate_context: FsString,
     pub exec_context: FsString,
