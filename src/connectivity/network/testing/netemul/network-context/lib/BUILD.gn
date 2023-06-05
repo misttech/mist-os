@@ -39,7 +39,6 @@ source_set("network_service") {
     "//sdk/fidl/fuchsia.net.tun:fuchsia.net.tun_hlcpp",
     "//sdk/lib/stdcompat",
     "//src/connectivity/lib/network-device/cpp",
-    "//src/connectivity/network/testing/netemul/network-context/fidl:internal_hlcpp",
     "//src/connectivity/network/testing/netemul/network-context/fidl:network_hlcpp",
   ]
 }

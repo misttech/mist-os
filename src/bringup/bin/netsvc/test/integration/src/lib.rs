@@ -5,7 +5,6 @@
 use fidl::prelude::*;
 use fidl_fuchsia_hardware_network as fhardware_network;
 use fidl_fuchsia_net_tun as fnet_tun;
-use fidl_fuchsia_netemul_internal as fnetemul_internal;
 use fidl_fuchsia_netemul_network as fnetemul_network;
 use fuchsia_zircon::{self as zx, HandleBased as _};
 use futures::{Future, FutureExt as _, StreamExt as _, TryStreamExt as _};
@@ -1383,30 +1382,32 @@ async fn starts_device_in_multicast_promiscuous(name: &str) {
     let netdevice = netdevice.into_proxy().expect("netdevice proxy");
     let netdevice = &netdevice;
     let connector_fut = connector_stream.for_each_concurrent(None, |r| async move {
-        let req = match r.expect("connector error") {
+        match r.expect("connector error") {
             fnetemul_network::DeviceProxy_Request::ServeDevice { req, control_handle: _ } => {
-                req.into_channel()
+                let rs = req.into_stream().expect("into request stream");
+                rs.for_each(|req| async move {
+                    match req.expect("request error") {
+                        fidl_fuchsia_hardware_network::DeviceInstanceRequest::GetDevice {
+                            device,
+                            control_handle: _,
+                        } => netdevice.clone(device).expect("clone failed"),
+                    }
+                })
+                .await
             }
             fnetemul_network::DeviceProxy_Request::ServeController { req, control_handle: _ } => {
-                req.into_channel()
+                let rs = req.into_stream().expect("into request stream");
+                rs.for_each(|req| async move {
+                    match req.expect("request error") {
+                        fidl_fuchsia_device::ControllerRequest::GetTopologicalPath {
+                            responder,
+                        } => responder.send(Ok("some_topopath")).expect("send topopath response"),
+                        req => panic!("unexpected request {:?}", req),
+                    }
+                })
+                .await
             }
         };
-        let server: fidl::endpoints::ServerEnd<fnetemul_internal::NetworkDeviceInstanceMarker> =
-            req.into();
-        let rs = server.into_stream().expect("into request stream");
-        rs.for_each(|req| async move {
-            match req.expect("request error") {
-                fnetemul_internal::NetworkDeviceInstanceRequest::GetDevice {
-                    device,
-                    control_handle: _,
-                } => netdevice.clone(device).expect("clonet"),
-                fnetemul_internal::NetworkDeviceInstanceRequest::GetTopologicalPath {
-                    responder,
-                } => responder.send(Ok("some_topopath")).expect("send topopath response"),
-                req => panic!("unexpected request {:?}", req),
-            }
-        })
-        .await
     });
 
     let new_state = futures::select! {
