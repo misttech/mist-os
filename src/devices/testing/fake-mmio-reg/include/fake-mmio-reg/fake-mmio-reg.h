@@ -68,7 +68,14 @@ class FakeMmioRegRegion {
 
   // Accesses the FakeMmioReg at the given offset. Note that this is the _offset_, not the
   // _index_.
-  FakeMmioReg& operator[](size_t offset) const {
+  const FakeMmioReg& operator[](size_t offset) const {
+    ZX_ASSERT(offset / reg_size_ < reg_count_);
+    return regs_[offset / reg_size_];
+  }
+
+  // Accesses the FakeMmioReg at the given offset. Note that this is the _offset_, not the
+  // _index_.
+  FakeMmioReg& operator[](size_t offset) {
     ZX_ASSERT(offset / reg_size_ < reg_count_);
     return regs_[offset / reg_size_];
   }
@@ -87,22 +94,22 @@ class FakeMmioRegRegion {
 
  private:
   static uint8_t Read8(const void* ctx, const mmio_buffer_t& mmio, zx_off_t offs) {
-    const auto& reg_region = *reinterpret_cast<const FakeMmioRegRegion*>(ctx);
+    auto& reg_region = *reinterpret_cast<FakeMmioRegRegion*>(const_cast<void*>(ctx));
     return static_cast<uint8_t>(reg_region[offs + mmio.offset].Read());
   }
 
   static uint16_t Read16(const void* ctx, const mmio_buffer_t& mmio, zx_off_t offs) {
-    const auto& reg_region = *reinterpret_cast<const FakeMmioRegRegion*>(ctx);
+    auto& reg_region = *reinterpret_cast<FakeMmioRegRegion*>(const_cast<void*>(ctx));
     return static_cast<uint16_t>(reg_region[offs + mmio.offset].Read());
   }
 
   static uint32_t Read32(const void* ctx, const mmio_buffer_t& mmio, zx_off_t offs) {
-    const auto& reg_region = *reinterpret_cast<const FakeMmioRegRegion*>(ctx);
+    auto& reg_region = *reinterpret_cast<FakeMmioRegRegion*>(const_cast<void*>(ctx));
     return static_cast<uint32_t>(reg_region[offs + mmio.offset].Read());
   }
 
   static uint64_t Read64(const void* ctx, const mmio_buffer_t& mmio, zx_off_t offs) {
-    const auto& reg_region = *reinterpret_cast<const FakeMmioRegRegion*>(ctx);
+    auto& reg_region = *reinterpret_cast<FakeMmioRegRegion*>(const_cast<void*>(ctx));
     return reg_region[offs + mmio.offset].Read();
   }
 
@@ -119,7 +126,7 @@ class FakeMmioRegRegion {
   }
 
   static void Write64(const void* ctx, const mmio_buffer_t& mmio, uint64_t val, zx_off_t offs) {
-    const auto& reg_region = *reinterpret_cast<const FakeMmioRegRegion*>(ctx);
+    auto& reg_region = *reinterpret_cast<FakeMmioRegRegion*>(const_cast<void*>(ctx));
     reg_region[offs + mmio.offset].Write(val);
   }
 
