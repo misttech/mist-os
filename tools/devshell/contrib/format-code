@@ -64,12 +64,16 @@ function zap-commas() {
 function get-diff-base() {
   local upstream=$(git rev-parse --abbrev-ref --symbolic-full-name "@{u}" 2>/dev/null)
   if [[ -z "${upstream}" ]]; then
-    # Make sure upstream is always an ancestor commit.  Prefer origin/main, because it
-    # is always newer than JIRI_HEAD.
+    # Make sure upstream is always an ancestor commit.
     if git merge-base --is-ancestor origin/main HEAD; then
       upstream="origin/main"
     elif git merge-base --is-ancestor JIRI_HEAD HEAD; then
-      upstream="JIRI_HEAD"
+      if git merge-base --is-ancestor JIRI_HEAD origin/main; then
+        # You may have some merged CLs in your checkout between JIRI_HEAD and origin/main
+        upstream=$(git merge-base HEAD origin/main)
+      else
+        upstream="JIRI_HEAD"
+      fi
     else
       upstream="HEAD"
     fi
