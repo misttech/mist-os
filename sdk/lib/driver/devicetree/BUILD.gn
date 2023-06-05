@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/devicetree/devicetree.gni")
 import("//build/test.gni")
 
 group("tests") {
@@ -49,20 +50,20 @@ test("devicetree-manager-test") {
   sources = [ "manager-test.cc" ]
 }
 
-action("create-simple-dtb") {
-  script = "test-data/create-dtb.sh"
-  inputs = [
-    "//prebuilt/third_party/dtc/${host_platform}/dtc",
-    "test-data/simple.dts",
-  ]
-  outputs = [ "$target_out_dir/simple.dtb" ]
-  args = rebase_path(inputs + outputs, root_build_dir)
+devicetree_fragment("simple-include") {
+  sources = [ "test-data/simple.dtsi" ]
+}
+
+devicetree("simple") {
+  sources = [ "test-data/simple.dts" ]
+  golden = "test-data/simple.golden.dts"
+  deps = [ ":simple-include" ]
 }
 
 resource("simple-dtb") {
-  sources = get_target_outputs(":create-simple-dtb")
+  sources = get_target_outputs(":simple_dtb")
   outputs = [ "test-data/{{source_file_part}}" ]
-  deps = [ ":create-simple-dtb" ]
+  deps = [ ":simple" ]
 }
 
 fuchsia_unittest_component("devicetree-manager-test-component") {

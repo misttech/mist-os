@@ -4,17 +4,14 @@
 
 /dts-v1/;
 
+/include/ "sdk/lib/driver/devicetree/test-data/simple.dtsi"
+
 / {
     compatible = "fuchsia,sample-dt";
     #address-cells = <2>;
     #size-cells = <2>;
 
-    label: example-device {
-        compatible = "fuchsia,sample-device";
-    };
-
     another-device {
         reference = <&label>;
     };
-
 };
