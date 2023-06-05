@@ -150,7 +150,7 @@ void handle_event(pwrdev_t& interface) {
   interface.state = info.state;
 }
 
-void poll_events(const fbl::Vector<pwrdev_t>& interfaces) {
+void poll_events(fbl::Vector<pwrdev_t>& interfaces) {
   zx_wait_item_t* items = new zx_wait_item_t[interfaces.size()];
   for (size_t i = 0; i < interfaces.size(); i++) {
     items[i].handle = interfaces[i].events.get();
