@@ -13,7 +13,6 @@
 #include <fuchsia/session/cpp/fidl.h>
 #include <fuchsia/session/scene/cpp/fidl.h>
 #include <fuchsia/sys/cpp/fidl.h>
-#include <fuchsia/ui/policy/cpp/fidl.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fidl/cpp/binding_set.h>

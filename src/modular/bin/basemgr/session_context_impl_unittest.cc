@@ -5,7 +5,6 @@
 #include "src/modular/bin/basemgr/session_context_impl.h"
 
 #include <fuchsia/sys/cpp/fidl.h>
-#include <fuchsia/ui/policy/cpp/fidl.h>
 #include <lib/sys/cpp/testing/fake_launcher.h>
 #include <lib/ui/scenic/cpp/view_ref_pair.h>
 #include <lib/ui/scenic/cpp/view_token_pair.h>
