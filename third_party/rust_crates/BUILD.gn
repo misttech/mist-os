@@ -87,7 +87,7 @@ group("async-stream") {
 }
 
 group("async-trait") {
-  public_deps = [ ":async-trait-v0_1_56($host_toolchain)" ]
+  public_deps = [ ":async-trait-v0_1_68($host_toolchain)" ]
 }
 
 group("atty") {
@@ -1675,24 +1675,24 @@ rust_library("async-task-v4_0_3") {
   visibility = [ ":*" ]
 }
 
-rust_proc_macro("async-trait-v0_1_56") {
+rust_proc_macro("async-trait-v0_1_68") {
   crate_name = "async_trait"
-  crate_root = "//third_party/rust_crates/vendor/async-trait-0.1.56/src/lib.rs"
-  output_name = "async_trait-289dc1161e322d79"
+  crate_root = "//third_party/rust_crates/vendor/async-trait-0.1.68/src/lib.rs"
+  output_name = "async_trait-a643072d402bca81"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":proc-macro2-v1_0_58" ]
   deps += [ ":quote-v1_0_27" ]
-  deps += [ ":syn-v1_0_98" ]
+  deps += [ ":syn-v2_0_16" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=289dc1161e322d79",
-    "-Cextra-filename=-289dc1161e322d79",
+    "-Cmetadata=a643072d402bca81",
+    "-Cextra-filename=-a643072d402bca81",
   ]
 
   visibility = [ ":*" ]
@@ -4082,7 +4082,7 @@ rust_library("fuse3-v0_6_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":async-trait-v0_1_56($host_toolchain)" ]
+  deps += [ ":async-trait-v0_1_68($host_toolchain)" ]
   deps += [ ":bincode-v1_3_3" ]
   deps += [ ":bytes-v1_0_1" ]
   deps += [ ":cstr-v0_2_11($host_toolchain)" ]
@@ -10634,11 +10634,13 @@ rust_library("syn-v2_0_16") {
     "--cfg=feature=\"clone-impls\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"derive\"",
+    "--cfg=feature=\"full\"",
     "--cfg=feature=\"parsing\"",
     "--cfg=feature=\"printing\"",
     "--cfg=feature=\"proc-macro\"",
     "--cfg=feature=\"quote\"",
     "--cfg=feature=\"visit\"",
+    "--cfg=feature=\"visit-mut\"",
   ]
 
   visibility = [ ":*" ]
@@ -11436,7 +11438,7 @@ rust_library("trust-dns-proto-v0_22_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":async-trait-v0_1_56($host_toolchain)" ]
+  deps += [ ":async-trait-v0_1_68($host_toolchain)" ]
   deps += [ ":cfg-if-v1_0_0" ]
   deps += [ ":data-encoding-v2_3_2" ]
   deps += [ ":enum-as-inner-v0_5_1($host_toolchain)" ]

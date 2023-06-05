@@ -107,6 +107,11 @@ criteria = ["ub-risk-2", "safe-to-deploy"]
 version = "0.3.4"
 notes = "Reviewed on https://fxrev.dev/761470"
 
+[[audits.async-trait]]
+who = "David Koloski <dkoloski@google.com>"
+criteria = "safe-to-deploy"
+delta = "0.1.56 -> 0.1.68"
+
 [[audits.http-body]]
 who = "Erick Tryzelaar <etryzelaar@google.com>"
 criteria = ["ub-risk-2", "safe-to-run"]
@@ -132,21 +137,21 @@ Issues:
 - https://github.com/nix-rust/nix/pull/1993
 """
 
+[[audits.rayon]]
+who = [
+    "Adam Perry <adamperry@google.com>",
+    "Dan Johnson <computerdruid@google.com>",
+    "David Koloski <dkoloski@google.com>",
+    "Joseph Ryan <josephry@google.com>",
+    "Manish Goregaokar <manishearth@google.com>",
+    "Tyler Mandry <tmandry@google.com>",
+]
+criteria = ["ub-risk-2", "safe-to-deploy"]
+delta = "1.3.0 -> 1.5.3"
+notes = "Reviewed on https://fxrev.dev/753625"
+
 [[audits.tokio-stream]]
 who = "David Koloski <dkoloski@google.com>"
 criteria = ["ub-risk-1", "safe-to-deploy"]
 version = "0.1.11"
 notes = "Reviewed on https://fxrev.dev/804724"
-
-[[audits.rayon]]
-who = [
-  "Adam Perry <adamperry@google.com>",
-  "Dan Johnson <computerdruid@google.com>",
-  "David Koloski <dkoloski@google.com>",
-  "Joseph Ryan <josephry@google.com>",
-  "Manish Goregaokar <manishearth@google.com>",
-  "Tyler Mandry <tmandry@google.com>",
-]
-criteria = ["ub-risk-2", "safe-to-deploy"]
-delta = "1.3.0 -> 1.5.3"
-notes = "Reviewed on https://fxrev.dev/753625"

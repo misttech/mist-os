@@ -1,6 +1,9 @@
 
 # cargo-vet config file
 
+[cargo-vet]
+version = "0.5"
+
 [policy.aho-corasick]
 audit-as-crates-io = true
 
@@ -2435,4 +2438,3 @@ notes = "Needs re-audit"
 version = "5.0.2+zstd.1.5.2"
 criteria = ["safe-to-deploy", "ub-risk-2"]
 notes = "Needs re-audit"
-
