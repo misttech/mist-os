@@ -41,6 +41,7 @@ template("clippy") {
     if (defined(invoker.non_rust_deps)) {
       deps += invoker.non_rust_deps
     }
+    mnemonic = "CLIPPY"
 
     inputs = [
       "$_output.deps",
