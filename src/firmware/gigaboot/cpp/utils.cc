@@ -6,6 +6,7 @@
 
 #include <bootbyte.h>
 #include <ctype.h>
+#include <lib/abr/abr.h>
 #include <lib/zbi-format/memory.h>
 #include <lib/zbi/zbi.h>
 #include <stdio.h>
@@ -216,12 +217,21 @@ std::string_view MaybeMapPartitionName(const EfiGptBlockDevice& device,
   return partition;
 }
 
+// TODO(b/285053546) 'BootByte' usage should be removed in favour of ABR Metadata
 bool SetRebootMode(RebootMode mode) {
   return gEfiSystemTable != nullptr &&
          set_bootbyte(gEfiSystemTable->RuntimeServices, RebootModeToByte(mode)) == EFI_SUCCESS;
 }
 
-std::optional<RebootMode> GetRebootMode() {
+std::optional<RebootMode> GetRebootMode(AbrDataOneShotFlags one_shot_flags) {
+  if (AbrIsOneShotRecoveryBootSet(one_shot_flags)) {
+    return RebootMode::kRecovery;
+  }
+  if (AbrIsOneShotBootloaderBootSet(one_shot_flags)) {
+    return RebootMode::kBootloader;
+  }
+
+  // TODO(b/285053546) 'BootByte' usage should be removed in favour of ABR Metadata
   uint8_t bootbyte;
   efi_status status = get_bootbyte(gEfiSystemTable->RuntimeServices, &bootbyte);
   if (status != EFI_SUCCESS) {

@@ -127,8 +127,7 @@ static AbrResult save_metadata(const AbrOps* abr_ops, AbrData* abr_data) {
   ABR_DEBUG("Writing A/B metadata to disk.\n");
   if (abr_ops->write_abr_metadata_custom) {
     if (!abr_ops->write_abr_metadata_custom(abr_ops->context, &abr_data->slot_data[0],
-                                            &abr_data->slot_data[1],
-                                            abr_data->one_shot_recovery_boot)) {
+                                            &abr_data->slot_data[1], abr_data->one_shot_flags)) {
       ABR_ERROR("Failed to write metadata.\n");
       return kAbrResultErrorIo;
     }
@@ -189,7 +188,7 @@ static AbrResult load_metadata(const AbrOps* abr_ops, AbrData* abr_data, AbrData
     abr_data_init(abr_data);
     if (!abr_ops->read_abr_metadata_custom(abr_ops->context, &abr_data->slot_data[kAbrSlotIndexA],
                                            &abr_data->slot_data[kAbrSlotIndexB],
-                                           &abr_data->one_shot_recovery_boot)) {
+                                           &abr_data->one_shot_flags)) {
       ABR_ERROR("Failed to read metadata.\n");
       return kAbrResultErrorIo;
     }
@@ -248,14 +247,14 @@ AbrSlotIndex AbrGetBootSlot(const AbrOps* abr_ops, bool update_metadata,
   }
 
   /* One-shot recovery boot has the highest priority if metadata can be updated. */
-  if (abr_data.one_shot_recovery_boot && update_metadata) {
-    abr_data.one_shot_recovery_boot = 0;
+  if (AbrIsOneShotRecoveryBoot(&abr_data) && update_metadata) {
+    AbrSetOneShotRecoveryBoot(&abr_data, /*enable=*/false);
     if (save_metadata(abr_ops, &abr_data) == kAbrResultOk) {
       return kAbrSlotIndexR;
     }
     ABR_ERROR("Failed to update one-shot state. Ignoring one-shot request.\n");
     /* Put it back how it was, maybe a later boot stage will be able to handle it. */
-    abr_data.one_shot_recovery_boot = 1;
+    AbrSetOneShotRecoveryBoot(&abr_data, /*enable=*/true);
   }
 
   /* Choose the highest priority and bootable slot, if there is one, otherwise R slot*/
@@ -449,7 +448,42 @@ AbrResult AbrSetOneShotRecovery(const AbrOps* abr_ops, bool enable) {
     return result;
   }
 
-  abr_data.one_shot_recovery_boot = enable ? 1 : 0;
+  AbrSetOneShotRecoveryBoot(&abr_data, enable);
 
   return save_metadata_if_changed(abr_ops, &abr_data, &abr_data_orig);
+}
+
+AbrResult AbrSetOneShotBootloader(const AbrOps* abr_ops, bool enable) {
+  AbrData abr_data, abr_data_orig;
+  AbrResult result;
+
+  result = load_metadata(abr_ops, &abr_data, &abr_data_orig);
+  if (result != kAbrResultOk) {
+    return result;
+  }
+
+  AbrSetOneShotBootloaderBoot(&abr_data, enable);
+
+  return save_metadata_if_changed(abr_ops, &abr_data, &abr_data_orig);
+}
+
+AbrResult AbrGetAndClearOneShotFlags(const AbrOps* abr_ops, AbrDataOneShotFlags* flags) {
+  AbrData abr_data, abr_data_orig;
+  AbrResult result;
+
+  result = load_metadata(abr_ops, &abr_data, &abr_data_orig);
+  if (result != kAbrResultOk) {
+    return result;
+  }
+
+  *flags = abr_data.one_shot_flags;
+
+  // clear flags
+  abr_data.one_shot_flags = kAbrDataOneShotFlagNone;
+  result = save_metadata_if_changed(abr_ops, &abr_data, &abr_data_orig);
+  if (result != kAbrResultOk) {
+    return result;
+  }
+
+  return kAbrResultOk;
 }

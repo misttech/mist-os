@@ -958,6 +958,7 @@ TEST_F(FastbootFlashTest, RebootNormal) {
 
   Fastboot fastboot(download_buffer, mock_zb_ops().GetZirconBootOps());
   fastboot::TestTransport transport;
+  mock_zb_ops().AddPartition(GPT_DURABLE_BOOT_NAME, sizeof(AbrData));
 
   // Set to a different initial boot mode.
   ASSERT_TRUE(SetRebootMode(RebootMode::kBootloader));
@@ -968,7 +969,10 @@ TEST_F(FastbootFlashTest, RebootNormal) {
   std::vector<std::string> expected_packets = {"OKAY"};
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
 
-  std::optional<RebootMode> mode_option = GetRebootMode();
+  AbrOps abr_ops = mock_zb_ops().GetAbrOps();
+  AbrDataOneShotFlags one_shot_flags;
+  ASSERT_EQ(AbrGetAndClearOneShotFlags(&abr_ops, &one_shot_flags), kAbrResultOk);
+  std::optional<RebootMode> mode_option = GetRebootMode(one_shot_flags);
   ASSERT_TRUE(mode_option);
   ASSERT_EQ(*mode_option, RebootMode::kNormal);
 }
@@ -985,6 +989,7 @@ TEST_F(FastbootFlashTest, RebootBootloader) {
 
   Fastboot fastboot(download_buffer, mock_zb_ops().GetZirconBootOps());
   fastboot::TestTransport transport;
+  mock_zb_ops().AddPartition(GPT_DURABLE_BOOT_NAME, sizeof(AbrData));
 
   // Set to a different initial boot mode.
   ASSERT_TRUE(SetRebootMode(RebootMode::kNormal));
@@ -995,7 +1000,10 @@ TEST_F(FastbootFlashTest, RebootBootloader) {
   std::vector<std::string> expected_packets = {"OKAY"};
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
 
-  std::optional<RebootMode> mode_option = GetRebootMode();
+  AbrOps abr_ops = mock_zb_ops().GetAbrOps();
+  AbrDataOneShotFlags one_shot_flags;
+  ASSERT_EQ(AbrGetAndClearOneShotFlags(&abr_ops, &one_shot_flags), kAbrResultOk);
+  std::optional<RebootMode> mode_option = GetRebootMode(one_shot_flags);
   ASSERT_TRUE(mode_option);
   ASSERT_EQ(*mode_option, RebootMode::kBootloader);
 }
@@ -1012,6 +1020,7 @@ TEST_F(FastbootFlashTest, RebootRecovery) {
 
   Fastboot fastboot(download_buffer, mock_zb_ops().GetZirconBootOps());
   fastboot::TestTransport transport;
+  mock_zb_ops().AddPartition(GPT_DURABLE_BOOT_NAME, sizeof(AbrData));
 
   // Set to a different initial boot mode.
   ASSERT_TRUE(SetRebootMode(RebootMode::kNormal));
@@ -1022,7 +1031,10 @@ TEST_F(FastbootFlashTest, RebootRecovery) {
   std::vector<std::string> expected_packets = {"OKAY"};
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
 
-  std::optional<RebootMode> mode_option = GetRebootMode();
+  AbrOps abr_ops = mock_zb_ops().GetAbrOps();
+  AbrDataOneShotFlags one_shot_flags;
+  ASSERT_EQ(AbrGetAndClearOneShotFlags(&abr_ops, &one_shot_flags), kAbrResultOk);
+  std::optional<RebootMode> mode_option = GetRebootMode(one_shot_flags);
   ASSERT_TRUE(mode_option);
   ASSERT_EQ(*mode_option, RebootMode::kRecovery);
 }

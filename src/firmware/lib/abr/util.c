@@ -43,3 +43,33 @@ int AbrSafeMemcmp(const void* s1, const void* s2, size_t n) {
 
   return result != 0;
 }
+
+bool AbrIsOneShotRecoveryBootSet(uint8_t flags) { return flags & kAbrDataOneShotFlagRecoveryBoot; }
+
+bool AbrIsOneShotRecoveryBoot(const AbrData* abr_data) {
+  return AbrIsOneShotRecoveryBootSet(abr_data->one_shot_flags);
+}
+
+bool AbrIsOneShotBootloaderBootSet(uint8_t flags) {
+  return flags & kAbrDataOneShotFlagBootloaderBoot;
+}
+
+bool AbrIsOneShotBootloaderBoot(const AbrData* abr_data) {
+  return AbrIsOneShotBootloaderBootSet(abr_data->one_shot_flags);
+}
+
+void AbrSetOneShotRecoveryBoot(AbrData* abr_data, bool enable) {
+  if (enable) {
+    abr_data->one_shot_flags |= kAbrDataOneShotFlagRecoveryBoot;
+  } else {
+    abr_data->one_shot_flags &= ~kAbrDataOneShotFlagRecoveryBoot;
+  }
+}
+
+void AbrSetOneShotBootloaderBoot(AbrData* abr_data, bool enable) {
+  if (enable) {
+    abr_data->one_shot_flags |= kAbrDataOneShotFlagBootloaderBoot;
+  } else {
+    abr_data->one_shot_flags &= ~kAbrDataOneShotFlagBootloaderBoot;
+  }
+}

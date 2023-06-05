@@ -12,6 +12,7 @@
 
 #include "ops.h"
 #include "sysdeps.h"
+#include "util.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -161,6 +162,18 @@ AbrResult AbrGetSlotInfo(const AbrOps* abr_ops, AbrSlotIndex slot_index, AbrSlot
  * or is otherwise unable to reset the setting, the setting will be ignored.
  */
 AbrResult AbrSetOneShotRecovery(const AbrOps* abr_ops, bool enable);
+
+/* Updates metadata to enable or disable one-shot bootloader.
+ *
+ * This function is typically used by an OS to force reboot to bootloader even when another bootable
+ * slot exists. When AbrGetBootSlot responds to this setting, it also resets the setting so recovery
+ * will only be triggered once. If AbrGetBootSlot is called with |update_metadata| set to false,
+ * or is otherwise unable to reset the setting, the setting will be ignored.
+ */
+AbrResult AbrSetOneShotBootloader(const AbrOps* abr_ops, bool enable);
+
+/* Retrieves current 'one_shot_flags' value from 'abr_ops', and resets it in 'abr_ops' */
+AbrResult AbrGetAndClearOneShotFlags(const AbrOps* abr_ops, AbrDataOneShotFlags* flags);
 
 #ifdef __cplusplus
 }

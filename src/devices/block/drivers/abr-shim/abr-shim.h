@@ -28,14 +28,13 @@ class AbrShim : public AbrShimType,
 
   AbrShim(zx_device_t* parent, const ddk::BlockImplProtocolClient& block_impl_client,
           const ddk::BlockPartitionProtocolClient& block_partition_client, zx::vmo block_data,
-          uint32_t block_size, uint32_t block_op_size, AbrSlotIndex current_slot)
+          uint32_t block_size, uint32_t block_op_size)
       : AbrShimType(parent),
         block_impl_client_(block_impl_client),
         block_partition_client_(block_partition_client),
         block_data_(std::move(block_data)),
         block_size_(block_size),
-        block_op_size_(block_op_size),
-        current_slot_(current_slot) {}
+        block_op_size_(block_op_size) {}
 
   virtual ~AbrShim() = default;
 
@@ -60,8 +59,6 @@ class AbrShim : public AbrShimType,
     return reinterpret_cast<AbrShim*>(context)->WriteAbrMetadata(buffer, size);
   }
 
-  static AbrSlotIndex GetCurrentSlot(zx_device_t* dev);
-
   static void BlockOpCallback(void* ctx, zx_status_t status, block_op_t* op);
   zx_status_t DoBlockOp(uint32_t command) const TA_REQ(io_lock_);
 
@@ -69,13 +66,12 @@ class AbrShim : public AbrShimType,
   bool WriteAbrMetadata(const uint8_t* buffer, size_t size);
 
   fbl::Mutex io_lock_;
-  bool rebooting_to_recovery_ TA_GUARDED(io_lock_) = false;
+  bool rebooting_to_recovery_or_bl_ TA_GUARDED(io_lock_) = false;
   const ddk::BlockImplProtocolClient block_impl_client_ TA_GUARDED(io_lock_);
   const ddk::BlockPartitionProtocolClient block_partition_client_;
   const zx::vmo block_data_ TA_GUARDED(io_lock_);
   const uint32_t block_size_;
   const uint32_t block_op_size_;
-  const AbrSlotIndex current_slot_;
 };
 
 }  // namespace block

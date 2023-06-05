@@ -23,9 +23,9 @@ uint32_t AbrCrc32(const void* buf, size_t buf_size) {
 bool FakeReadAbrMetadata(void* context, size_t size, uint8_t* buffer);
 bool FakeWriteAbrMetadata(void* context, const uint8_t* buffer, size_t size);
 bool FakeReadAbrMetadataCustom(void* context, AbrSlotData* a, AbrSlotData* b,
-                               uint8_t* one_shot_recovery);
+                               uint8_t* one_shot_flags);
 bool FakeWriteAbrMetadataCustom(void* context, const AbrSlotData* a, const AbrSlotData* b,
-                                uint8_t one_shot_recovery);
+                                uint8_t one_shot_flags);
 }  // extern "C"
 
 // Call this after messing with metadata (if you want the CRC to match).
@@ -39,6 +39,7 @@ void InitializeMetadata(AbrData* metadata) {
   memcpy(metadata->magic, kAbrMagic, kAbrMagicLen);
   metadata->version_major = kAbrMajorVersion;
   metadata->version_minor = kAbrMinorVersion;
+  metadata->one_shot_flags = kAbrDataOneShotFlagNone;
   UpdateMetadataCRC(metadata);
 }
 
@@ -83,18 +84,18 @@ struct FakeOps {
     return write_metadata_result_;
   }
 
-  bool ReadMetadataCustom(AbrSlotData* a, AbrSlotData* b, uint8_t* one_shot_recovery) {
+  bool ReadMetadataCustom(AbrSlotData* a, AbrSlotData* b, uint8_t* one_shot_flags) {
     *a = metadata_.slot_data[0];
     *b = metadata_.slot_data[1];
-    *one_shot_recovery = metadata_.one_shot_recovery_boot;
+    *one_shot_flags = metadata_.one_shot_flags;
     read_metadata_custom_count_++;
     return read_metadata_result_;
   }
 
-  bool WriteMetadataCustom(const AbrSlotData* a, const AbrSlotData* b, uint8_t one_shot_recovery) {
+  bool WriteMetadataCustom(const AbrSlotData* a, const AbrSlotData* b, uint8_t one_shot_flags) {
     metadata_.slot_data[0] = *a;
     metadata_.slot_data[1] = *b;
-    metadata_.one_shot_recovery_boot = one_shot_recovery;
+    metadata_.one_shot_flags = one_shot_flags;
     write_metadata_custom_count_++;
     return write_metadata_result_;
   }
@@ -143,13 +144,13 @@ bool FakeWriteAbrMetadata(void* context, const uint8_t* buffer, size_t size) {
 }
 
 bool FakeReadAbrMetadataCustom(void* context, AbrSlotData* a, AbrSlotData* b,
-                               uint8_t* one_shot_recovery) {
-  return reinterpret_cast<FakeOps*>(context)->ReadMetadataCustom(a, b, one_shot_recovery);
+                               uint8_t* one_shot_flags) {
+  return reinterpret_cast<FakeOps*>(context)->ReadMetadataCustom(a, b, one_shot_flags);
 }
 
 bool FakeWriteAbrMetadataCustom(void* context, const AbrSlotData* a, const AbrSlotData* b,
-                                uint8_t one_shot_recovery) {
-  return reinterpret_cast<FakeOps*>(context)->WriteMetadataCustom(a, b, one_shot_recovery);
+                                uint8_t one_shot_flags) {
+  return reinterpret_cast<FakeOps*>(context)->WriteMetadataCustom(a, b, one_shot_flags);
 }
 
 TEST(LibabrTest, GetBootSlotNotInitialized) {
@@ -515,7 +516,9 @@ TEST(LibabrTest, GetBootSlotOneShotRecovery) {
   EXPECT_EQ(kAbrSlotIndexR, AbrGetBootSlot(ops, true, nullptr));
   ValidateMetadata(ops.metadata_);
   // The setting should be automatically reset.
-  EXPECT_FALSE(ops.metadata_.one_shot_recovery_boot);
+  AbrDataOneShotFlags one_shot_flags;
+  ASSERT_EQ(AbrGetAndClearOneShotFlags(ops, &one_shot_flags), kAbrResultOk);
+  EXPECT_FALSE(AbrIsOneShotRecoveryBootSet(one_shot_flags));
 }
 
 TEST(LibabrTest, GetBootSlotOneShotRecoveryNoUpdate) {
@@ -525,7 +528,9 @@ TEST(LibabrTest, GetBootSlotOneShotRecoveryNoUpdate) {
   EXPECT_EQ(kAbrSlotIndexB, AbrGetBootSlot(ops, false, nullptr));
   ValidateMetadata(ops.metadata_);
   // The setting was ignored so should persist.
-  EXPECT_TRUE(ops.metadata_.one_shot_recovery_boot);
+  AbrDataOneShotFlags one_shot_flags;
+  ASSERT_EQ(AbrGetAndClearOneShotFlags(ops, &one_shot_flags), kAbrResultOk);
+  EXPECT_TRUE(AbrIsOneShotRecoveryBootSet(one_shot_flags));
 }
 
 TEST(LibabrTest, GetBootSlotUpdateTryCount) {
@@ -926,10 +931,10 @@ TEST(LibabrTest, GetSlotInfoNoWrites) {
 TEST(LibabrTest, SetOneShotRecovery) {
   FakeOps ops = FakeOpsWithInitializedMetadata();
   EXPECT_EQ(kAbrResultOk, AbrSetOneShotRecovery(ops, true));
-  EXPECT_EQ(1, ops.metadata_.one_shot_recovery_boot);
+  EXPECT_EQ(kAbrDataOneShotFlagRecoveryBoot, ops.metadata_.one_shot_flags);
   ValidateMetadata(ops.metadata_);
   EXPECT_EQ(kAbrResultOk, AbrSetOneShotRecovery(ops, false));
-  EXPECT_EQ(0, ops.metadata_.one_shot_recovery_boot);
+  EXPECT_EQ(kAbrDataOneShotFlagNone, ops.metadata_.one_shot_flags);
   ValidateMetadata(ops.metadata_);
 }
 
@@ -1025,5 +1030,185 @@ void GetSlotLastMarkedActiveTest(AbrSlotIndex slot_index) {
 TEST(LibabrTest, GetSlotLastMarkedActiveTestA) { GetSlotLastMarkedActiveTest(kAbrSlotIndexA); }
 
 TEST(LibabrTest, GetSlotLastMarkedActiveTestB) { GetSlotLastMarkedActiveTest(kAbrSlotIndexB); }
+
+TEST(LibabrTest, IsOneShotRecoveryBootSetTrue) {
+  EXPECT_TRUE(AbrIsOneShotRecoveryBootSet(kAbrDataOneShotFlagRecoveryBoot));
+}
+TEST(LibabrTest, IsOneShotRecoveryBootSetFalse) {
+  EXPECT_FALSE(AbrIsOneShotRecoveryBootSet(kAbrDataOneShotFlagNone));
+  EXPECT_FALSE(AbrIsOneShotRecoveryBootSet(kAbrDataOneShotFlagBootloaderBoot));
+}
+
+TEST(LibabrTest, IsOneShotBootloaderBootSetTrue) {
+  EXPECT_TRUE(AbrIsOneShotBootloaderBootSet(kAbrDataOneShotFlagBootloaderBoot));
+}
+
+TEST(LibabrTest, IsOneShotBootloaderBootSetFalse) {
+  EXPECT_FALSE(AbrIsOneShotBootloaderBootSet(kAbrDataOneShotFlagNone));
+  EXPECT_FALSE(AbrIsOneShotBootloaderBootSet(kAbrDataOneShotFlagRecoveryBoot));
+}
+
+TEST(LibabrTest, IsOneShotRecoveryBootTrue) {
+  AbrData abr_data{};
+  abr_data.one_shot_flags = kAbrDataOneShotFlagRecoveryBoot;
+  EXPECT_TRUE(AbrIsOneShotRecoveryBoot(&abr_data));
+}
+
+TEST(LibabrTest, IsOneShotRecoveryBootFalse) {
+  AbrData abr_data{};
+  abr_data.one_shot_flags = kAbrDataOneShotFlagNone;
+  EXPECT_FALSE(AbrIsOneShotRecoveryBoot(&abr_data));
+  abr_data.one_shot_flags = kAbrDataOneShotFlagBootloaderBoot;
+  EXPECT_FALSE(AbrIsOneShotRecoveryBoot(&abr_data));
+}
+
+TEST(LibabrTest, IsOneShotBootloaderBootTrue) {
+  AbrData abr_data{};
+  abr_data.one_shot_flags = kAbrDataOneShotFlagBootloaderBoot;
+  EXPECT_TRUE(AbrIsOneShotBootloaderBoot(&abr_data));
+}
+
+TEST(LibabrTest, IsOneShotBootloaderBootFalse) {
+  AbrData abr_data{};
+  abr_data.one_shot_flags = kAbrDataOneShotFlagNone;
+  EXPECT_FALSE(AbrIsOneShotBootloaderBoot(&abr_data));
+  abr_data.one_shot_flags = kAbrDataOneShotFlagRecoveryBoot;
+  EXPECT_FALSE(AbrIsOneShotBootloaderBoot(&abr_data));
+}
+
+TEST(LibabrTest, SetOneShotRecoveryBoot) {
+  AbrData abr_data{};
+  abr_data.one_shot_flags = kAbrDataOneShotFlagNone;
+  EXPECT_FALSE(AbrIsOneShotRecoveryBoot(&abr_data));
+
+  AbrSetOneShotRecoveryBoot(&abr_data, true);
+  EXPECT_TRUE(AbrIsOneShotRecoveryBoot(&abr_data));
+
+  AbrSetOneShotRecoveryBoot(&abr_data, false);
+  EXPECT_FALSE(AbrIsOneShotRecoveryBoot(&abr_data));
+}
+
+TEST(LibabrTest, SetOneShotRecoveryBootDontChangeOther) {
+  AbrData abr_data{};
+
+  abr_data.one_shot_flags = static_cast<uint8_t>(~kAbrDataOneShotFlagRecoveryBoot);
+  EXPECT_EQ(abr_data.one_shot_flags, static_cast<uint8_t>(~kAbrDataOneShotFlagRecoveryBoot));
+
+  AbrSetOneShotRecoveryBoot(&abr_data, true);
+  EXPECT_EQ(abr_data.one_shot_flags, static_cast<uint8_t>(~kAbrDataOneShotFlagRecoveryBoot |
+                                                          kAbrDataOneShotFlagRecoveryBoot));
+
+  AbrSetOneShotRecoveryBoot(&abr_data, false);
+  EXPECT_EQ(abr_data.one_shot_flags, static_cast<uint8_t>(~kAbrDataOneShotFlagRecoveryBoot));
+}
+
+TEST(LibabrTest, SetOneShotBootloaderBoot) {
+  AbrData abr_data{};
+  abr_data.one_shot_flags = kAbrDataOneShotFlagNone;
+  EXPECT_FALSE(AbrIsOneShotBootloaderBoot(&abr_data));
+
+  AbrSetOneShotBootloaderBoot(&abr_data, true);
+  EXPECT_TRUE(AbrIsOneShotBootloaderBoot(&abr_data));
+
+  AbrSetOneShotBootloaderBoot(&abr_data, false);
+  EXPECT_FALSE(AbrIsOneShotBootloaderBoot(&abr_data));
+}
+
+TEST(LibabrTest, SetOneShotBootloaderBootDontChangeOther) {
+  AbrData abr_data{};
+
+  abr_data.one_shot_flags = static_cast<uint8_t>(~kAbrDataOneShotFlagBootloaderBoot);
+  EXPECT_EQ(abr_data.one_shot_flags, static_cast<uint8_t>(~kAbrDataOneShotFlagBootloaderBoot));
+
+  AbrSetOneShotBootloaderBoot(&abr_data, true);
+  EXPECT_EQ(abr_data.one_shot_flags, static_cast<uint8_t>(~kAbrDataOneShotFlagBootloaderBoot |
+                                                          kAbrDataOneShotFlagBootloaderBoot));
+
+  AbrSetOneShotBootloaderBoot(&abr_data, false);
+  EXPECT_EQ(abr_data.one_shot_flags, static_cast<uint8_t>(~kAbrDataOneShotFlagBootloaderBoot));
+}
+
+TEST(LibabrTest, AbrSetOneShotRecovery) {
+  FakeOps ops = FakeOpsWithInitializedMetadata();
+
+  ASSERT_EQ(kAbrResultOk, AbrSetOneShotRecovery(ops, true));
+  EXPECT_TRUE(AbrIsOneShotRecoveryBoot(&ops.metadata_));
+
+  ASSERT_EQ(kAbrResultOk, AbrSetOneShotRecovery(ops, false));
+  EXPECT_FALSE(AbrIsOneShotRecoveryBoot(&ops.metadata_));
+}
+
+TEST(LibabrTest, AbrSetOneShotRecoveryDontChangeOther) {
+  FakeOps ops = FakeOpsWithInitializedMetadata();
+  ops.metadata_.one_shot_flags = static_cast<uint8_t>(~kAbrDataOneShotFlagRecoveryBoot);
+  UpdateMetadataCRC(&ops.metadata_);
+
+  ASSERT_EQ(kAbrResultOk, AbrSetOneShotRecovery(ops, true));
+  EXPECT_EQ(ops.metadata_.one_shot_flags, static_cast<uint8_t>(~kAbrDataOneShotFlagRecoveryBoot) |
+                                              kAbrDataOneShotFlagRecoveryBoot);
+
+  ASSERT_EQ(kAbrResultOk, AbrSetOneShotRecovery(ops, false));
+  EXPECT_EQ(ops.metadata_.one_shot_flags, static_cast<uint8_t>(~kAbrDataOneShotFlagRecoveryBoot));
+}
+
+TEST(LibabrTest, AbrSetOneShotBootloader) {
+  FakeOps ops = FakeOpsWithInitializedMetadata();
+
+  ASSERT_EQ(kAbrResultOk, AbrSetOneShotBootloader(ops, true));
+  EXPECT_TRUE(AbrIsOneShotBootloaderBoot(&ops.metadata_));
+
+  ASSERT_EQ(kAbrResultOk, AbrSetOneShotBootloader(ops, false));
+  EXPECT_FALSE(AbrIsOneShotBootloaderBoot(&ops.metadata_));
+}
+
+TEST(LibabrTest, AbrSetOneShotBootloaderDontChangeOther) {
+  FakeOps ops = FakeOpsWithInitializedMetadata();
+  ops.metadata_.one_shot_flags = static_cast<uint8_t>(~kAbrDataOneShotFlagBootloaderBoot);
+  UpdateMetadataCRC(&ops.metadata_);
+
+  ASSERT_EQ(kAbrResultOk, AbrSetOneShotBootloader(ops, true));
+  EXPECT_EQ(ops.metadata_.one_shot_flags, static_cast<uint8_t>(~kAbrDataOneShotFlagBootloaderBoot) |
+                                              kAbrDataOneShotFlagBootloaderBoot);
+
+  ASSERT_EQ(kAbrResultOk, AbrSetOneShotBootloader(ops, false));
+  EXPECT_EQ(ops.metadata_.one_shot_flags, static_cast<uint8_t>(~kAbrDataOneShotFlagBootloaderBoot));
+}
+
+class LibabrTestOneShotFlagsFixture : public ::zxtest::TestWithParam<uint8_t> {};
+
+#if defined(__clang__)
+// Disabling UB sanitizer because we test values not defined in the enumeration.
+[[clang::no_sanitize("undefined")]]
+#endif
+bool IsEqual(const AbrDataOneShotFlags &flags, uint8_t input_flags) {
+  return static_cast<uint8_t>(flags) == input_flags;
+}
+
+TEST_P(LibabrTestOneShotFlagsFixture, AbrGetAndClearOneShotFlags) {
+  FakeOps ops = FakeOpsWithInitializedMetadata();
+  const uint8_t input_flags = GetParam();
+  AbrDataOneShotFlags flags;
+
+  // Check initial state
+  ASSERT_EQ(kAbrResultOk, AbrGetAndClearOneShotFlags(ops, &flags));
+  EXPECT_EQ(flags, kAbrDataOneShotFlagNone);
+  EXPECT_EQ(ops.metadata_.one_shot_flags, kAbrDataOneShotFlagNone);
+
+  // Check if correct flags retrieved
+  ops.metadata_.one_shot_flags = input_flags;
+  UpdateMetadataCRC(&ops.metadata_);
+  ASSERT_EQ(kAbrResultOk, AbrGetAndClearOneShotFlags(ops, &flags));
+  EXPECT_TRUE(IsEqual(flags, input_flags));
+
+  // Check if flags were cleared
+  EXPECT_EQ(ops.metadata_.one_shot_flags, kAbrDataOneShotFlagNone);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    AbrGetOneShotFlags, LibabrTestOneShotFlagsFixture,
+    ::zxtest::Values(0, kAbrDataOneShotFlagNone, kAbrDataOneShotFlagRecoveryBoot,
+                     ~kAbrDataOneShotFlagRecoveryBoot, kAbrDataOneShotFlagBootloaderBoot,
+                     kAbrDataOneShotFlagBootloaderBoot | kAbrDataOneShotFlagRecoveryBoot,
+                     ~kAbrDataOneShotFlagBootloaderBoot, 0xff));
 
 }  // namespace

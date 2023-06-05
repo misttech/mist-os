@@ -4,6 +4,7 @@
 
 #include "phys/efi/main.h"
 
+#include <lib/abr/abr.h>
 #include <stdio.h>
 
 #include <phys/stdio.h>
@@ -68,6 +69,17 @@ void SetSerial() {
 }
 }  // namespace
 
+// TODO(b/285053546) 'BootByte' usage should be removed in favour of ABR Metadata
+bool ResetRebootMode(gigaboot::RebootMode reboot_mode, const AbrOps& abr_ops) {
+  if (reboot_mode != gigaboot::RebootMode::kNormal &&
+      !SetRebootMode(gigaboot::RebootMode::kNormal)) {
+    printf("Failed to reset reboot mode\n");
+    return false;
+  }
+
+  return true;
+}
+
 int main(int argc, char** argv) {
   SetSerial();
   printf("Gigaboot main\n");
@@ -96,19 +108,31 @@ int main(int argc, char** argv) {
            gigaboot::EfiStatusToString(res));
   }
 
-  gigaboot::RebootMode reboot_mode =
-      gigaboot::GetRebootMode().value_or(gigaboot::RebootMode::kNormal);
+  // Print OneShotFlags from ABR
+  AbrDataOneShotFlags one_shot_flags;
+  ZirconBootOps zb_ops = gigaboot::GetZirconBootOps();
+  AbrOps abr_ops = GetAbrOpsFromZirconBootOps(&zb_ops);
+  AbrResult abr_res = AbrGetAndClearOneShotFlags(&abr_ops, &one_shot_flags);
+  if (abr_res != kAbrResultOk) {
+    printf("Failed to get one shot flags from ABR\n");
+    return 1;
+  }
+  printf("abr.one_shot_flags = 0x%02x\n", one_shot_flags);
 
+  gigaboot::RebootMode reboot_mode =
+      gigaboot::GetRebootMode(one_shot_flags).value_or(gigaboot::RebootMode::kNormal);
+
+  // TODO(b/285053546) 'BootByte' usage should be removed in favour of ABR Metadata
   // Reset previous reboot mode immediately to prevent it from being sticky.
-  if (reboot_mode != gigaboot::RebootMode::kNormal &&
-      !SetRebootMode(gigaboot::RebootMode::kNormal)) {
+  if (!ResetRebootMode(reboot_mode, abr_ops)) {
     printf("Failed to reset reboot mode\n");
     return 1;
   }
 
   bool enter_fastboot = reboot_mode == gigaboot::RebootMode::kBootloader;
   if (enter_fastboot) {
-    printf("Your BIOS instructed Gigaboot to enter fastboot directly and skip normal boot.\n");
+    printf(
+        "Your BIOS or ABR instructed Gigaboot to enter fastboot directly and skip normal boot.\n");
   } else {
     constexpr zx::duration timeout = zx::sec(2);
     gigaboot::InputReceiver receiver(gEfiSystemTable);

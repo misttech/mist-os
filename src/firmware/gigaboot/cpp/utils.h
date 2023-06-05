@@ -5,6 +5,7 @@
 #ifndef SRC_FIRMWARE_GIGABOOT_CPP_UTILS_H_
 #define SRC_FIRMWARE_GIGABOOT_CPP_UTILS_H_
 
+#include <lib/abr/ops.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/time.h>
 #include <xefi.h>
@@ -138,7 +139,7 @@ bool SetRebootMode(RebootMode mode);
 
 // Get reboot mode.
 // Returns std::nullopt on failure
-std::optional<RebootMode> GetRebootMode();
+std::optional<RebootMode> GetRebootMode(AbrDataOneShotFlags one_shot_flags);
 
 // Convert hex string to `efi_guid`
 // Input string should be in RFC4122 "registry format"

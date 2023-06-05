@@ -55,9 +55,9 @@ zx_status_t AbrShim::Bind(void* ctx, zx_device_t* dev) {
     return status;
   }
 
-  auto device = std::make_unique<AbrShim>(dev, block_impl_client, block_partition_client,
-                                          std::move(block_data), block_info.block_size,
-                                          block_op_size, GetCurrentSlot(dev));
+  auto device =
+      std::make_unique<AbrShim>(dev, block_impl_client, block_partition_client,
+                                std::move(block_data), block_info.block_size, block_op_size);
   if (zx_status_t status = device->DdkAdd("abr-shim"); status != ZX_OK) {
     zxlogf(ERROR, "DdkAdd failed: %s", zx_status_get_string(status));
     return status;
@@ -68,12 +68,11 @@ zx_status_t AbrShim::Bind(void* ctx, zx_device_t* dev) {
 }
 
 void AbrShim::DdkSuspend(ddk::SuspendTxn txn) {
-  // Pinecrest has no bootloader mode to reboot into, just reboot to recovery for that case as well.
   if (txn.suspend_reason() == DEVICE_SUSPEND_REASON_REBOOT_RECOVERY ||
       txn.suspend_reason() == DEVICE_SUSPEND_REASON_REBOOT_BOOTLOADER) {
     {
       fbl::AutoLock lock(&io_lock_);
-      rebooting_to_recovery_ = true;
+      rebooting_to_recovery_or_bl_ = true;
     }
 
     // No more client txns can be queued after this point, so we should have the final say on the
@@ -83,12 +82,22 @@ void AbrShim::DdkSuspend(ddk::SuspendTxn txn) {
         .read_abr_metadata = ReadAbrMetadata,
         .write_abr_metadata = WriteAbrMetadata,
     };
-    if (auto result = AbrSetOneShotRecovery(&ops, /*enable=*/true); result == kAbrResultOk) {
-      zxlogf(INFO, "Set ABR one-shot recovery flag");
-    } else {
-      zxlogf(ERROR, "Failed to set ABR one-shot recovery flag: %d", result);
-      txn.Reply(ZX_ERR_INTERNAL, txn.requested_state());
-      return;
+    if (txn.suspend_reason() == DEVICE_SUSPEND_REASON_REBOOT_RECOVERY) {
+      if (auto result = AbrSetOneShotRecovery(&ops, /*enable=*/true); result == kAbrResultOk) {
+        zxlogf(INFO, "Set ABR one-shot recovery flag");
+      } else {
+        zxlogf(ERROR, "Failed to set ABR one-shot recovery flag: %d", result);
+        txn.Reply(ZX_ERR_INTERNAL, txn.requested_state());
+        return;
+      }
+    } else if (txn.suspend_reason() == DEVICE_SUSPEND_REASON_REBOOT_BOOTLOADER) {
+      if (auto result = AbrSetOneShotBootloader(&ops, /*enable=*/true); result == kAbrResultOk) {
+        zxlogf(INFO, "Set ABR one-shot bootloader flag");
+      } else {
+        zxlogf(ERROR, "Failed to set ABR one-shot bootloader flag: %d", result);
+        txn.Reply(ZX_ERR_INTERNAL, txn.requested_state());
+        return;
+      }
     }
   }
 
@@ -121,7 +130,7 @@ void AbrShim::BlockImplQuery(block_info_t* out_info, uint64_t* out_block_op_size
 void AbrShim::BlockImplQueue(block_op_t* txn, block_impl_queue_callback callback, void* cookie) {
   {
     fbl::AutoLock lock(&io_lock_);
-    if (!rebooting_to_recovery_) {
+    if (!rebooting_to_recovery_or_bl_) {
       block_impl_client_.Queue(txn, callback, cookie);
       return;
     }
@@ -138,32 +147,6 @@ zx_status_t AbrShim::BlockPartitionGetGuid(guidtype_t guid_type, guid_t* out_gui
 
 zx_status_t AbrShim::BlockPartitionGetName(char* out_name, size_t name_capacity) {
   return block_partition_client_.GetName(out_name, name_capacity);
-}
-
-AbrSlotIndex AbrShim::GetCurrentSlot(zx_device_t* dev) {
-  char slot_str[4]{};
-  size_t actual = 0;
-  zx_status_t status =
-      device_get_variable(dev, "zvb.current_slot", slot_str, sizeof(actual), &actual);
-  // `zvb.current_slot` should be "a" "b" or "r", and may optionally have a "_" or "-" prefix.
-  if (status == ZX_OK) {
-    std::string_view slot(slot_str);
-    slot.remove_prefix(std::min(slot.find_first_not_of("_-"), slot.size()));
-    if (slot == "a") {
-      return kAbrSlotIndexA;
-    }
-    if (slot == "b") {
-      return kAbrSlotIndexB;
-    }
-    if (slot != "r") {
-      zxlogf(WARNING, "zvb.current_slot is invalid, using slot R instead: %s", slot_str);
-    }
-  } else {
-    zxlogf(WARNING, "Could not read zvb.current_slot, using slot R instead: %s",
-           zx_status_get_string(status));
-  }
-
-  return kAbrSlotIndexR;
 }
 
 void AbrShim::BlockOpCallback(void* ctx, zx_status_t status, block_op_t* op) {
@@ -238,7 +221,6 @@ bool AbrShim::ReadAbrMetadata(size_t size, uint8_t* buffer) {
     }
   }
 
-  avbab_to_abr(&data);
   memcpy(buffer, &data, sizeof(data));
   return true;
 }
@@ -249,9 +231,6 @@ bool AbrShim::WriteAbrMetadata(const uint8_t* buffer, size_t size) {
 
   AbrData data;
   memcpy(&data, buffer, sizeof(data));
-  if (!abr_to_avbab(&data, current_slot_)) {
-    return false;
-  }
 
   fbl::AutoLock lock(&io_lock_);
 

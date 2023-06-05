@@ -30,6 +30,9 @@ _bootfs_deps = [
 
   # Use legacy serial for bootfs.
   "//boards/kernel_cmdline:serial-legacy",
+
+  # Driver to handle oneshot reboot flags for bootloader
+  "//src/devices/block/drivers/abr-shim",
 ]
 
 # Additional drivers to support running as a virtualization guest.

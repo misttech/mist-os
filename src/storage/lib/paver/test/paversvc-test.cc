@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.hardware.block.partition/cpp/wire.h>
 #include <fidl/fuchsia.paver/cpp/wire.h>
 #include <lib/abr/data.h>
+#include <lib/abr/util.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/cksum.h>
@@ -460,7 +461,7 @@ constexpr AbrData kAbrData = {
                 .reserved = {},
             },
         },
-    .one_shot_recovery_boot = 0,
+    .one_shot_flags = kAbrDataOneShotFlagNone,
     .reserved2 = {},
     .crc32 = {},
 };
@@ -2259,7 +2260,7 @@ TEST_F(PaverServiceLuisTest, OneShotRecovery) {
 
   AbrData disk_abr_data;
   memcpy(&disk_abr_data, block_read_vmo_mapper.start(), sizeof(disk_abr_data));
-  ASSERT_EQ(disk_abr_data.one_shot_recovery_boot, 1);
+  ASSERT_TRUE(AbrIsOneShotRecoveryBoot(&disk_abr_data));
 }
 
 class PaverServicePinecrestTest : public PaverServiceGptDeviceTest {

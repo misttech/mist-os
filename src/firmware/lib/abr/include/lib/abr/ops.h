@@ -49,7 +49,7 @@ typedef struct AbrOps {
    * NULL.
    */
   bool (*read_abr_metadata_custom)(void* context, AbrSlotData* a_slot_data,
-                                   AbrSlotData* b_slot_data, uint8_t* one_shot_recovery);
+                                   AbrSlotData* b_slot_data, uint8_t* one_shot_flags);
 
   /* Writes ABR data from |a_slot_data|, |b_slot_data|, and |one_shot_recovery| to disk.
    *
@@ -60,7 +60,7 @@ typedef struct AbrOps {
    * read-only environments, they may both be NULL.
    */
   bool (*write_abr_metadata_custom)(void* context, const AbrSlotData* a_slot_data,
-                                    const AbrSlotData* b_slot_data, uint8_t one_shot_recovery);
+                                    const AbrSlotData* b_slot_data, uint8_t one_shot_flags);
 } AbrOps;
 
 #ifdef __cplusplus

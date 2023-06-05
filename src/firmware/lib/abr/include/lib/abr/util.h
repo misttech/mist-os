@@ -6,6 +6,8 @@
 #ifndef SRC_FIRMWARE_LIB_ABR_INCLUDE_LIB_ABR_UTIL_H_
 #define SRC_FIRMWARE_LIB_ABR_INCLUDE_LIB_ABR_UTIL_H_
 
+#include "data.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -68,6 +70,20 @@ uint32_t AbrHostToBigEndian(uint32_t in);
  * greater than |s2|.
  */
 int AbrSafeMemcmp(const void* s1, const void* s2, size_t n);
+
+/* Checks if OneShotFlag boot to Recovery flag is set */
+bool AbrIsOneShotRecoveryBootSet(uint8_t flags);
+bool AbrIsOneShotRecoveryBoot(const AbrData* abr_data);
+
+/* Checks if OneShotFlag boot to Bootloader flag is set */
+bool AbrIsOneShotBootloaderBootSet(uint8_t flags);
+bool AbrIsOneShotBootloaderBoot(const AbrData* abr_data);
+
+/* Set/Reset boot to Recovery bit in OneShotFlags field */
+void AbrSetOneShotRecoveryBoot(AbrData* abr_data, bool enable);
+
+/* Set/Reset boot to Bootloader bit in OneShotFlags field */
+void AbrSetOneShotBootloaderBoot(AbrData* abr_data, bool enable);
 
 #ifdef __cplusplus
 }

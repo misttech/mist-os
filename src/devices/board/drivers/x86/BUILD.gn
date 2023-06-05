@@ -92,6 +92,7 @@ fuchsia_driver("platform-bus-x86-driver") {
     "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
     "//sdk/fidl/fuchsia.acpi.tables:fuchsia.acpi.tables_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.gpt.metadata:fuchsia.hardware.gpt.metadata_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
     "//sdk/fidl/fuchsia.hardware.powersource:fuchsia.hardware.powersource_cpp_wire",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",

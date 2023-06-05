@@ -22,7 +22,7 @@ extern "C" {
 
 /* Versioning for the on-disk A/B metadata. */
 static const uint8_t kAbrMajorVersion = 2;
-static const uint8_t kAbrMinorVersion = 1;
+static const uint8_t kAbrMinorVersion = 2;
 
 /* Maximum values for slot data. */
 static const uint8_t kAbrMaxPriority = 15;
@@ -67,7 +67,7 @@ typedef struct AbrData {
   AbrSlotData slot_data[2];
 
   /* One-shot force recovery boot. Non-zero if one-shot recovery requested. */
-  uint8_t one_shot_recovery_boot;
+  uint8_t one_shot_flags;
 
   /* Reserved for future use. */
   uint8_t reserved2[11];
@@ -75,6 +75,12 @@ typedef struct AbrData {
   /* CRC32 of all 28 bytes preceding this field. */
   uint32_t crc32;
 } ABR_ATTR_PACKED AbrData;
+
+typedef enum {
+  kAbrDataOneShotFlagNone = (0),
+  kAbrDataOneShotFlagRecoveryBoot = (1 << 0),
+  kAbrDataOneShotFlagBootloaderBoot = (1 << 1),
+} AbrDataOneShotFlags;
 
 #ifdef __cplusplus
 }
