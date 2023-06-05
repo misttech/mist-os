@@ -499,88 +499,101 @@ where
     )
 }
 
-pub(crate) fn remove_unbound<
+pub(crate) enum SocketInfo<A: SocketMapAddrSpec> {
+    Unbound,
+    Listener(ListenerAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier>),
+    Connected(ConnAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier, A::RemoteIdentifier>),
+}
+
+pub(crate) fn remove<
+    A: SocketMapAddrSpec,
+    S: DatagramSocketSpec<A>,
+    C: DatagramStateNonSyncContext<A, S>,
+    SC: DatagramStateContext<A, C, S>,
+>(
+    sync_ctx: &mut SC,
+    ctx: &mut C,
+    id: impl Into<DatagramSocketId<S>>,
+) -> SocketInfo<A>
+where
+    Bound<S>: Tagged<AddrVec<A>>,
+    S::ListenerAddrState:
+        SocketMapAddrStateSpec<Id = S::ListenerId, SharingState = S::ListenerSharingState>,
+    S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
+    A::IpVersion: IpExt,
+{
+    sync_ctx.with_sockets_mut(|sync_ctx, state, _allocator| {
+        let DatagramSockets { bound_state, unbound, bound } = state;
+        let (ip_options, info) = match id.into() {
+            DatagramSocketId::Unbound(id) => {
+                let UnboundSocketState { device: _, sharing: _, ip_options } =
+                    unbound.remove(id.get_key_index()).expect("invalid UDP unbound ID");
+
+                (ip_options, SocketInfo::Unbound)
+            }
+            DatagramSocketId::Bound(DatagramBoundId::Listener(id)) => {
+                let (state, _sharing, addr) = Listener::from_socket_state(
+                    bound_state
+                        .remove(&Listener::to_socket_id(id.clone()))
+                        .expect("invalid UDP listener ID"),
+                );
+                bound.listeners_mut().remove(&id, &addr).expect("Invalid UDP listener ID");
+
+                let ListenerState { ip_options } = state;
+                (ip_options, SocketInfo::Listener(addr))
+            }
+            DatagramSocketId::Bound(DatagramBoundId::Connection(id)) => {
+                let (state, _sharing, addr) = Connection::from_socket_state(
+                    bound_state
+                        .remove(&Connection::to_socket_id(id.clone()))
+                        .expect("invalid UDP connection ID"),
+                );
+                bound.conns_mut().remove(&id, &addr).expect("UDP connection not found");
+                let ConnState { socket, clear_device_on_disconnect: _, shutdown: _ } = state;
+                (socket.into_options(), SocketInfo::Connected(addr))
+            }
+        };
+
+        let IpOptions { multicast_memberships, hop_limits: _ } = ip_options;
+        leave_all_joined_groups(sync_ctx, ctx, multicast_memberships);
+        info
+    })
+}
+
+pub(crate) fn get_info<
     A: SocketMapAddrSpec,
     S: DatagramSocketStateSpec,
     C: DatagramStateNonSyncContext<A, S>,
     SC: DatagramStateContext<A, C, S>,
 >(
     sync_ctx: &mut SC,
-    ctx: &mut C,
-    id: S::UnboundId,
-) where
-    Bound<S>: Tagged<AddrVec<A>>,
-{
-    sync_ctx.with_sockets_mut(|sync_ctx, state, _allocator| {
-        let DatagramSockets { bound_state: _, unbound, bound: _ } = state;
-        let UnboundSocketState { device: _, sharing: _, ip_options } =
-            unbound.remove(id.get_key_index()).expect("invalid UDP unbound ID");
-
-        let IpOptions { multicast_memberships, hop_limits: _ } = ip_options;
-        leave_all_joined_groups(sync_ctx, ctx, multicast_memberships);
-    })
-}
-
-pub(crate) fn remove_listener<
-    A: SocketMapAddrSpec,
-    C: DatagramStateNonSyncContext<A, S>,
-    SC: DatagramStateContext<A, C, S>,
-    S: DatagramSocketSpec<A>,
->(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
-    id: S::ListenerId,
-) -> ListenerAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier>
+    _ctx: &mut C,
+    id: impl Into<DatagramSocketId<S>>,
+) -> SocketInfo<A>
 where
     Bound<S>: Tagged<AddrVec<A>>,
-    S::ListenerAddrState:
-        SocketMapAddrStateSpec<Id = S::ListenerId, SharingState = S::ListenerSharingState>,
 {
-    sync_ctx.with_sockets_mut(|sync_ctx, state, _allocator| {
-        let DatagramSockets { bound_state, bound, unbound: _ } = state;
-        let (state, _sharing, addr) = Listener::from_socket_state(
-            bound_state
-                .remove(&Listener::to_socket_id(id.clone()))
-                .expect("invalid UDP listener ID"),
-        );
-        bound.listeners_mut().remove(&id, &addr).expect("Invalid UDP listener ID");
-
-        let ListenerState { ip_options } = state;
-        let IpOptions { multicast_memberships, hop_limits: _ } = ip_options;
-
-        leave_all_joined_groups(sync_ctx, ctx, multicast_memberships);
-        addr
-    })
-}
-
-pub(crate) fn remove_conn<
-    A: SocketMapAddrSpec,
-    C: DatagramStateNonSyncContext<A, S>,
-    SC: DatagramStateContext<A, C, S>,
-    S: DatagramSocketSpec<A>,
->(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
-    id: S::ConnId,
-) -> ConnAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier, A::RemoteIdentifier>
-where
-    Bound<S>: Tagged<AddrVec<A>>,
-    S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
-    A::IpVersion: IpExt,
-{
-    sync_ctx.with_sockets_mut(|sync_ctx, state, _allocator| {
-        let DatagramSockets { bound_state, bound, unbound: _ } = state;
-        let (state, _sharing, addr) = Connection::from_socket_state(
-            bound_state
-                .remove(&Connection::to_socket_id(id.clone()))
-                .expect("invalid UDP connection ID"),
-        );
-        bound.conns_mut().remove(&id, &addr).expect("UDP connection not found");
-        let ConnState { socket, clear_device_on_disconnect: _, shutdown: _ } = state;
-
-        let IpOptions { multicast_memberships, hop_limits: _ } = socket.into_options();
-        leave_all_joined_groups(sync_ctx, ctx, multicast_memberships);
-        addr
+    sync_ctx.with_sockets(|_sync_ctx, state| {
+        let DatagramSockets { bound_state, unbound: _, bound: _ } = state;
+        match id.into() {
+            DatagramSocketId::Unbound(_) => SocketInfo::Unbound,
+            DatagramSocketId::Bound(DatagramBoundId::Listener(id)) => {
+                let (_state, _sharing, addr) = Listener::from_socket_state_ref(
+                    bound_state
+                        .get(&Listener::to_socket_id(id.clone()))
+                        .expect("invalid UDP listener ID"),
+                );
+                SocketInfo::Listener(addr.clone())
+            }
+            DatagramSocketId::Bound(DatagramBoundId::Connection(id)) => {
+                let (_state, _sharing, addr) = Connection::from_socket_state_ref(
+                    bound_state
+                        .get(&Connection::to_socket_id(id.clone()))
+                        .expect("invalid UDP connection ID"),
+                );
+                SocketInfo::Connected(addr.clone())
+            }
+        }
     })
 }
 

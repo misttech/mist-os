@@ -56,7 +56,8 @@ use crate::{
             DatagramStateContext, DatagramStateNonSyncContext, FoundSockets, InUseError,
             ListenerState, LocalIdentifierAllocator, MulticastMembershipInterfaceSelector,
             SendError as DatagramSendError, SetMulticastMembershipError, Shutdown, ShutdownType,
-            SockCreationError, SocketHopLimits, UnboundSocketState,
+            SockCreationError, SocketHopLimits, SocketInfo as DatagramSocketInfo,
+            UnboundSocketState,
         },
         posix::{PosixAddrState, PosixAddrVecTag, PosixSharingOptions, ToPosixSharingOptions},
         AddrVec, Bound, BoundSocketMap, Connection, ConvertSocketTypeState, InsertError, Listener,
@@ -1142,8 +1143,6 @@ pub enum SendToError {
 pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
     fn create_udp_unbound(&mut self) -> UnboundId<I>;
 
-    fn remove_udp_unbound(&mut self, ctx: &mut C, id: UnboundId<I>);
-
     fn connect_udp(
         &mut self,
         ctx: &mut C,
@@ -1228,17 +1227,17 @@ pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
         remote_port: NonZeroU16,
     ) -> Result<(), ConnectListenerError>;
 
-    fn remove_udp_conn(
+    fn remove_udp(
         &mut self,
         ctx: &mut C,
-        id: ConnId<I>,
-    ) -> ConnInfo<I::Addr, Self::WeakDeviceId>;
+        id: SocketId<I>,
+    ) -> SocketInfo<I::Addr, Self::WeakDeviceId>;
 
-    fn get_udp_conn_info(
+    fn get_udp_info(
         &mut self,
         ctx: &mut C,
-        id: ConnId<I>,
-    ) -> ConnInfo<I::Addr, Self::WeakDeviceId>;
+        id: SocketId<I>,
+    ) -> SocketInfo<I::Addr, Self::WeakDeviceId>;
 
     fn listen_udp(
         &mut self,
@@ -1247,27 +1246,11 @@ pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
         addr: Option<ZonedAddr<I::Addr, Self::DeviceId>>,
         port: Option<NonZeroU16>,
     ) -> Result<ListenerId<I>, LocalAddressError>;
-
-    fn remove_udp_listener(
-        &mut self,
-        ctx: &mut C,
-        id: ListenerId<I>,
-    ) -> ListenerInfo<I::Addr, Self::WeakDeviceId>;
-
-    fn get_udp_listener_info(
-        &mut self,
-        ctx: &mut C,
-        id: ListenerId<I>,
-    ) -> ListenerInfo<I::Addr, Self::WeakDeviceId>;
 }
 
 impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<I, C> for SC {
     fn create_udp_unbound(&mut self) -> UnboundId<I> {
         datagram::create_unbound(self)
-    }
-
-    fn remove_udp_unbound(&mut self, ctx: &mut C, id: UnboundId<I>) {
-        datagram::remove_unbound(self, ctx, id)
     }
 
     fn connect_udp(
@@ -1463,29 +1446,20 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         crate::socket::datagram::reconnect(self, ctx, id, remote_ip, remote_port)
     }
 
-    fn remove_udp_conn(
+    fn remove_udp(
         &mut self,
         ctx: &mut C,
-        id: ConnId<I>,
-    ) -> ConnInfo<I::Addr, Self::WeakDeviceId> {
-        let addr = datagram::remove_conn(self, ctx, id);
-        addr.into()
+        id: SocketId<I>,
+    ) -> SocketInfo<I::Addr, Self::WeakDeviceId> {
+        datagram::remove(self, ctx, id).into()
     }
 
-    fn get_udp_conn_info(
+    fn get_udp_info(
         &mut self,
-        _ctx: &mut C,
-        id: ConnId<I>,
-    ) -> ConnInfo<I::Addr, Self::WeakDeviceId> {
-        self.with_sockets(|_sync_ctx, state| {
-            let Sockets {
-                sockets: DatagramSockets { bound_state, bound: _, unbound: _ },
-                lazy_port_alloc: _,
-            } = state;
-            let state = bound_state.get(&id.into()).expect("UDP connection not found");
-            let (_state, _sharing, addr) = Connection::from_socket_state_ref(state);
-            addr.clone().into()
-        })
+        ctx: &mut C,
+        id: SocketId<I>,
+    ) -> SocketInfo<I::Addr, Self::WeakDeviceId> {
+        datagram::get_info(self, ctx, id).into()
     }
 
     fn listen_udp(
@@ -1496,31 +1470,6 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         port: Option<NonZeroU16>,
     ) -> Result<ListenerId<I>, LocalAddressError> {
         datagram::listen(self, ctx, id, addr, port)
-    }
-
-    fn remove_udp_listener(
-        &mut self,
-        ctx: &mut C,
-        id: ListenerId<I>,
-    ) -> ListenerInfo<I::Addr, Self::WeakDeviceId> {
-        datagram::remove_listener(self, ctx, id).into()
-    }
-
-    fn get_udp_listener_info(
-        &mut self,
-        _ctx: &mut C,
-        id: ListenerId<I>,
-    ) -> ListenerInfo<I::Addr, Self::WeakDeviceId> {
-        self.with_sockets(|_sync_ctx, state| {
-            let Sockets {
-                sockets: DatagramSockets { bound_state, bound: _, unbound: _ },
-                lazy_port_alloc: _,
-            } = state;
-            let state = bound_state.get(&id.into()).expect("UDP listener not found");
-            let (_, _sharing, addr): &(ListenerState<_, _>, PosixSharingOptions, _) =
-                Listener::from_socket_state_ref(state);
-            addr.clone().into()
-        })
     }
 }
 
@@ -2318,6 +2267,8 @@ pub fn get_shutdown<I: IpExt, C: crate::NonSyncContext>(
 }
 
 /// Information about the addresses for a socket.
+#[derive(GenericOverIp)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 pub enum SocketInfo<A: IpAddress, D> {
     /// The socket was not bound.
     Unbound,
@@ -2325,6 +2276,16 @@ pub enum SocketInfo<A: IpAddress, D> {
     Listener(ListenerInfo<A, D>),
     /// The socket was connected.
     Connected(ConnInfo<A, D>),
+}
+
+impl<I: IpExt, D: WeakId> From<DatagramSocketInfo<IpPortSpec<I, D>>> for SocketInfo<I::Addr, D> {
+    fn from(value: DatagramSocketInfo<IpPortSpec<I, D>>) -> Self {
+        match value {
+            DatagramSocketInfo::Unbound => Self::Unbound,
+            DatagramSocketInfo::Listener(addr) => Self::Listener(addr.into()),
+            DatagramSocketInfo::Connected(addr) => Self::Connected(addr.into()),
+        }
+    }
 }
 
 /// Gets the [`SocketInfo`] associated with the UDP socket referenced by `id`.
@@ -2338,28 +2299,15 @@ pub fn get_udp_info<I: IpExt, C: crate::NonSyncContext>(
     id: &SocketId<I>,
 ) -> SocketInfo<I::Addr, WeakDeviceId<C>> {
     let mut sync_ctx = Locked::new(sync_ctx);
-    let SocketId(id) = id.clone();
-    match id {
-        SocketIdInner::Unbound(_) => SocketInfo::Unbound,
-        SocketIdInner::Bound(BoundId::Connected(id)) => SocketInfo::Connected(I::map_ip(
-            (IpInvariant((&mut sync_ctx, ctx)), id),
-            |(IpInvariant((sync_ctx, ctx)), id)| {
-                SocketHandler::<Ipv4, _>::get_udp_conn_info(sync_ctx, ctx, id)
-            },
-            |(IpInvariant((sync_ctx, ctx)), id)| {
-                SocketHandler::<Ipv6, _>::get_udp_conn_info(sync_ctx, ctx, id)
-            },
-        )),
-        SocketIdInner::Bound(BoundId::Listening(id)) => SocketInfo::Listener(I::map_ip(
-            (IpInvariant((&mut sync_ctx, ctx)), id),
-            |(IpInvariant((sync_ctx, ctx)), id)| {
-                SocketHandler::<Ipv4, _>::get_udp_listener_info(sync_ctx, ctx, id)
-            },
-            |(IpInvariant((sync_ctx, ctx)), id)| {
-                SocketHandler::<Ipv6, _>::get_udp_listener_info(sync_ctx, ctx, id)
-            },
-        )),
-    }
+    I::map_ip(
+        (IpInvariant((&mut sync_ctx, ctx)), id.clone()),
+        |(IpInvariant((sync_ctx, ctx)), id)| {
+            SocketHandler::<Ipv4, _>::get_udp_info(sync_ctx, ctx, id)
+        },
+        |(IpInvariant((sync_ctx, ctx)), id)| {
+            SocketHandler::<Ipv6, _>::get_udp_info(sync_ctx, ctx, id)
+        },
+    )
 }
 
 /// Removes a socket that was previously created.
@@ -2373,39 +2321,15 @@ pub fn remove_udp<I: IpExt, C: crate::NonSyncContext>(
     id: SocketId<I>,
 ) -> SocketInfo<I::Addr, WeakDeviceId<C>> {
     let mut sync_ctx = Locked::new(sync_ctx);
-    let SocketId(id) = id.clone();
-    match id {
-        SocketIdInner::Unbound(id) => {
-            let () = I::map_ip(
-                (IpInvariant((&mut sync_ctx, ctx)), id),
-                |(IpInvariant((sync_ctx, ctx)), id)| {
-                    SocketHandler::<Ipv4, _>::remove_udp_unbound(sync_ctx, ctx, id)
-                },
-                |(IpInvariant((sync_ctx, ctx)), id)| {
-                    SocketHandler::<Ipv6, _>::remove_udp_unbound(sync_ctx, ctx, id)
-                },
-            );
-            SocketInfo::Unbound
-        }
-        SocketIdInner::Bound(BoundId::Listening(id)) => SocketInfo::Listener(I::map_ip(
-            (IpInvariant((&mut sync_ctx, ctx)), id),
-            |(IpInvariant((sync_ctx, ctx)), id)| {
-                SocketHandler::<Ipv4, _>::remove_udp_listener(sync_ctx, ctx, id)
-            },
-            |(IpInvariant((sync_ctx, ctx)), id)| {
-                SocketHandler::<Ipv6, _>::remove_udp_listener(sync_ctx, ctx, id)
-            },
-        )),
-        SocketIdInner::Bound(BoundId::Connected(id)) => SocketInfo::Connected(I::map_ip(
-            (IpInvariant((&mut sync_ctx, ctx)), id),
-            |(IpInvariant((sync_ctx, ctx)), id)| {
-                SocketHandler::<Ipv4, _>::remove_udp_conn(sync_ctx, ctx, id)
-            },
-            |(IpInvariant((sync_ctx, ctx)), id)| {
-                SocketHandler::<Ipv6, _>::remove_udp_conn(sync_ctx, ctx, id)
-            },
-        )),
-    }
+    I::map_ip(
+        (IpInvariant((&mut sync_ctx, ctx)), id.clone()),
+        |(IpInvariant((sync_ctx, ctx)), id)| {
+            SocketHandler::<Ipv4, _>::remove_udp(sync_ctx, ctx, id)
+        },
+        |(IpInvariant((sync_ctx, ctx)), id)| {
+            SocketHandler::<Ipv6, _>::remove_udp(sync_ctx, ctx, id)
+        },
+    )
 }
 
 /// Use an existing socket to listen for incoming UDP packets.
@@ -3065,15 +2989,15 @@ mod tests {
         )
         .expect("can connect");
 
-        let info = SocketHandler::get_udp_conn_info(&mut sync_ctx, &mut non_sync_ctx, conn);
+        let info = SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, conn.into());
         let (conn_local_ip, conn_remote_ip) = assert_matches!(
             info,
-            ConnInfo {
+            SocketInfo::Connected(ConnInfo {
                 local_ip: ZonedAddr::Zoned(conn_local_ip),
                 remote_ip: ZonedAddr::Unzoned(conn_remote_ip),
                 local_port: _,
                 remote_port: REMOTE_PORT
-            } => (conn_local_ip, conn_remote_ip)
+            }) => (conn_local_ip, conn_remote_ip)
         );
         assert_eq!(
             conn_local_ip,
@@ -3365,13 +3289,13 @@ mod tests {
         )
         .expect("reconnect_udp should succeed");
         assert_eq!(
-            SocketHandler::get_udp_conn_info(&mut sync_ctx, &mut non_sync_ctx, socket),
-            ConnInfo {
+            SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, socket.into()),
+            SocketInfo::Connected(ConnInfo {
                 local_ip: local_ip.map_zone(FakeWeakDeviceId),
                 local_port,
                 remote_ip: other_remote_ip.map_zone(FakeWeakDeviceId),
                 remote_port: other_remote_port
-            }
+            })
         );
     }
 
@@ -3417,13 +3341,13 @@ mod tests {
         );
 
         assert_eq!(
-            SocketHandler::get_udp_conn_info(&mut sync_ctx, &mut non_sync_ctx, socket),
-            ConnInfo {
+            SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, socket.into()),
+            SocketInfo::Connected(ConnInfo {
                 local_ip: local_ip.map_zone(FakeWeakDeviceId),
                 local_port: LOCAL_PORT,
                 remote_ip: remote_ip.map_zone(FakeWeakDeviceId),
                 remote_port: REMOTE_PORT
-            }
+            })
         );
     }
 
@@ -3472,7 +3396,8 @@ mod tests {
         .expect("send_udp_conn_to failed");
 
         // The socket should not have been affected.
-        let info = SocketHandler::get_udp_conn_info(&mut sync_ctx, &mut non_sync_ctx, conn);
+        let info = SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, conn.into());
+        let info = assert_matches!(info, SocketInfo::Connected(info) => info);
         assert_eq!(info.local_ip, ZonedAddr::Unzoned(local_ip));
         assert_eq!(info.remote_ip, ZonedAddr::Unzoned(remote_ip));
         assert_eq!(info.remote_port, REMOTE_PORT);
@@ -4013,8 +3938,12 @@ mod tests {
         let result =
             SocketHandler::listen_udp(&mut sync_ctx, &mut non_sync_ctx, unbound, None, None).map(
                 |listener| {
-                    SocketHandler::get_udp_listener_info(&mut sync_ctx, &mut non_sync_ctx, listener)
-                        .local_port
+                    let info = SocketHandler::get_udp_info(
+                        &mut sync_ctx,
+                        &mut non_sync_ctx,
+                        listener.into(),
+                    );
+                    assert_matches!(info, SocketInfo::Listener(info) => info.local_port)
                 },
             );
         assert_eq!(result, expected_result);
@@ -4650,8 +4579,8 @@ mod tests {
 
         // Once the first listener is removed, the second socket can be
         // connected.
-        let _: ListenerInfo<_, _> =
-            SocketHandler::remove_udp_listener(&mut sync_ctx, &mut non_sync_ctx, listener);
+        let _: SocketInfo<_, _> =
+            SocketHandler::remove_udp(&mut sync_ctx, &mut non_sync_ctx, listener.into());
 
         let _: ListenerId<_> = listen_unbound(&mut sync_ctx, &mut non_sync_ctx, unbound)
             .expect("listen should succeed");
@@ -4794,7 +4723,7 @@ mod tests {
         );
     }
 
-    /// Tests [`remove_udp_conn`]
+    /// Tests [`remove_udp`]
     #[ip_test]
     fn test_remove_udp_conn<I: Ip + TestIpExt>() {
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
@@ -4820,7 +4749,8 @@ mod tests {
             remote_port,
         )
         .expect("connect_udp failed");
-        let info = SocketHandler::remove_udp_conn(&mut sync_ctx, &mut non_sync_ctx, conn);
+        let info = SocketHandler::remove_udp(&mut sync_ctx, &mut non_sync_ctx, conn.into());
+        let info = assert_matches!(info, SocketInfo::Connected(info) => info);
         // Assert that the info gotten back matches what was expected.
         assert_eq!(info.local_ip, local_ip.map_zone(FakeWeakDeviceId));
         assert_eq!(info.local_port, local_port);
@@ -4836,7 +4766,7 @@ mod tests {
         assert_matches!(bound_state.get(&DatagramBoundId::Listener(listener)), None);
     }
 
-    /// Tests [`remove_udp_listener`]
+    /// Tests [`remove_udp`]
     #[ip_test]
     fn test_remove_udp_listener<I: Ip + TestIpExt>() {
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
@@ -4854,7 +4784,8 @@ mod tests {
             Some(local_port),
         )
         .expect("listen_udp failed");
-        let info = SocketHandler::remove_udp_listener(&mut sync_ctx, &mut non_sync_ctx, list);
+        let info = SocketHandler::remove_udp(&mut sync_ctx, &mut non_sync_ctx, list.into());
+        let info = assert_matches!(info, SocketInfo::Listener(info) => info);
         assert_eq!(info.local_ip.unwrap(), local_ip.map_zone(FakeWeakDeviceId));
         assert_eq!(info.local_port, local_port);
         let Sockets {
@@ -4873,7 +4804,8 @@ mod tests {
             Some(local_port),
         )
         .expect("listen_udp failed");
-        let info = SocketHandler::remove_udp_listener(&mut sync_ctx, &mut non_sync_ctx, list);
+        let info = SocketHandler::remove_udp(&mut sync_ctx, &mut non_sync_ctx, list.into());
+        let info = assert_matches!(info, SocketInfo::Listener(info) => info);
         assert_eq!(info.local_ip, None);
         assert_eq!(info.local_port, local_port);
         let Sockets {
@@ -5121,7 +5053,8 @@ where {
             HashMap::from([((MultipleDevicesId::A, group), nonzero!(1usize))])
         );
 
-        SocketHandler::remove_udp_unbound(&mut sync_ctx, &mut non_sync_ctx, unbound);
+        let _: SocketInfo<_, _> =
+            SocketHandler::remove_udp(&mut sync_ctx, &mut non_sync_ctx, unbound.into());
         assert_eq!(
             AsRef::<FakeIpSocketCtx<_, _>>::as_ref(sync_ctx.inner.get_ref())
                 .multicast_memberships(),
@@ -5176,8 +5109,8 @@ where {
             ])
         );
 
-        let _: ListenerInfo<_, _> =
-            SocketHandler::remove_udp_listener(&mut sync_ctx, &mut non_sync_ctx, list);
+        let _: SocketInfo<_, _> =
+            SocketHandler::remove_udp(&mut sync_ctx, &mut non_sync_ctx, list.into());
         assert_eq!(
             AsRef::<FakeIpSocketCtx<_, _>>::as_ref(sync_ctx.inner.get_ref())
                 .multicast_memberships(),
@@ -5232,8 +5165,8 @@ where {
             ])
         );
 
-        let _: ConnInfo<_, _> =
-            SocketHandler::remove_udp_conn(&mut sync_ctx, &mut non_sync_ctx, conn);
+        let _: SocketInfo<_, _> =
+            SocketHandler::remove_udp(&mut sync_ctx, &mut non_sync_ctx, conn.into());
         assert_eq!(
             AsRef::<FakeIpSocketCtx<_, _>>::as_ref(sync_ctx.inner.get_ref())
                 .multicast_memberships(),
@@ -5294,7 +5227,8 @@ where {
             NonZeroU16::new(200).unwrap(),
         )
         .expect("connect_udp_listener failed");
-        let info = SocketHandler::get_udp_conn_info(&mut sync_ctx, &mut non_sync_ctx, conn);
+        let info = SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, conn.into());
+        let info = assert_matches!(info, SocketInfo::Connected(info) => info);
         assert_eq!(info.local_ip, local_ip.map_zone(FakeWeakDeviceId));
         assert_eq!(info.local_port.get(), 100);
         assert_eq!(info.remote_ip, remote_ip.map_zone(FakeWeakDeviceId));
@@ -5317,7 +5251,8 @@ where {
             NonZeroU16::new(100),
         )
         .expect("listen_udp failed");
-        let info = SocketHandler::get_udp_listener_info(&mut sync_ctx, &mut non_sync_ctx, list);
+        let info = SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, list.into());
+        let info = assert_matches!(info, SocketInfo::Listener(info) => info);
         assert_eq!(info.local_ip.unwrap(), local_ip.map_zone(FakeWeakDeviceId));
         assert_eq!(info.local_port.get(), 100);
 
@@ -5331,7 +5266,8 @@ where {
             NonZeroU16::new(200),
         )
         .expect("listen_udp failed");
-        let info = SocketHandler::get_udp_listener_info(&mut sync_ctx, &mut non_sync_ctx, list);
+        let info = SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, list.into());
+        let info = assert_matches!(info, SocketInfo::Listener(info) => info);
         assert_eq!(info.local_ip, None);
         assert_eq!(info.local_port.get(), 200);
     }
@@ -5365,8 +5301,8 @@ where {
             SocketHandler::get_udp_posix_reuse_port(&mut sync_ctx, &non_sync_ctx, listen.into()),
             true
         );
-        let _: ListenerInfo<_, _> =
-            SocketHandler::remove_udp_listener(&mut sync_ctx, &mut non_sync_ctx, listen);
+        let _: SocketInfo<_, _> =
+            SocketHandler::remove_udp(&mut sync_ctx, &mut non_sync_ctx, listen.into());
 
         let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
         SocketHandler::set_udp_posix_reuse_port(&mut sync_ctx, &mut non_sync_ctx, unbound, true);
@@ -5779,13 +5715,13 @@ where {
         .expect("connect should succeed");
 
         assert_eq!(
-            SocketHandler::get_udp_conn_info(&mut sync_ctx, &mut non_sync_ctx, conn),
-            ConnInfo {
+            SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, conn.into()),
+            SocketInfo::Connected(ConnInfo {
                 local_ip: zoned_local_addr.map_zone(FakeWeakDeviceId),
                 local_port: LOCAL_PORT,
                 remote_ip: ZonedAddr::Unzoned(remote_ip::<Ipv6>()),
                 remote_port: REMOTE_PORT,
-            }
+            })
         );
     }
 
@@ -6198,7 +6134,8 @@ where {
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
             UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
         let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
-        SocketHandler::remove_udp_unbound(&mut sync_ctx, &mut non_sync_ctx, unbound);
+        let _: SocketInfo<_, _> =
+            SocketHandler::remove_udp(&mut sync_ctx, &mut non_sync_ctx, unbound.into());
 
         let Sockets {
             sockets: DatagramSockets { bound_state: _, bound: _, unbound: unbound_sockets },
