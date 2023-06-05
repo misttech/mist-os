@@ -35,7 +35,9 @@ where
             Err(e) => match e.downcast_ref::<GcsError>() {
                 Some(GcsError::NeedNewAccessToken) => {
                     tracing::debug!("exists_in_gcs got NeedNewRefreshToken");
-                    let access_token = handle_new_access_token(auth_flow, ui).await?;
+                    let access_token = handle_new_access_token(auth_flow, ui)
+                        .await
+                        .context("Getting new access token.")?;
                     client.set_access_token(access_token).await;
                 }
                 Some(GcsError::NotFound(_, _)) => {
@@ -83,7 +85,9 @@ where
             Err(e) => match e.downcast_ref::<GcsError>() {
                 Some(GcsError::NeedNewAccessToken) => {
                     tracing::debug!("fetch_from_gcs got NeedNewAccessToken");
-                    let access_token = handle_new_access_token(auth_flow, ui).await?;
+                    let access_token = handle_new_access_token(auth_flow, ui)
+                        .await
+                        .context("Getting new access token.")?;
                     client.set_access_token(access_token).await;
                 }
                 Some(GcsError::NotFound(b, p)) => {
@@ -131,14 +135,22 @@ where
             access_token
         }
         AuthFlowChoice::Exec(exec) => {
-            let output = std::process::Command::new(exec).output()?;
+            let output = std::process::Command::new(&exec)
+                .output()
+                .with_context(|| format!("Executing {:?}", exec))?;
             if !output.status.success() {
                 tracing::error!(
-                    "The {:?} process to get an access token returned {:?}.",
+                    "The {:?} process to get an access token returned {} with stderr:\n{}",
                     exec,
-                    output.status.code()
+                    output.status,
+                    String::from_utf8_lossy(&output.stderr).to_string()
                 );
-                return Err(GcsError::ExecForAccessFailed.into());
+                return Err(GcsError::ExecForAccessFailed(
+                    exec.into(),
+                    output.status,
+                    String::from_utf8_lossy(&output.stderr).to_string(),
+                )
+                .into());
             }
             String::from_utf8_lossy(&output.stdout).trim().to_string()
         }
@@ -179,7 +191,9 @@ where
             Err(e) => match e.downcast_ref::<GcsError>() {
                 Some(GcsError::NeedNewAccessToken) => {
                     tracing::debug!("string_from_gcs got NeedNewAccessToken");
-                    let access_token = handle_new_access_token(auth_flow, ui).await?;
+                    let access_token = handle_new_access_token(auth_flow, ui)
+                        .await
+                        .context("Getting new access token.")?;
                     client.set_access_token(access_token).await;
                 }
                 Some(GcsError::NotFound(b, p)) => {

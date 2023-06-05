@@ -42,12 +42,11 @@ pub enum GcsError {
     )]
     MissingRefreshToken,
 
-    /// Likely an incorrect path to the tool.
+    /// The auth tool encountered a runtime error.
     #[error(
-        "The tool passed to --auth failed. Check the path to that tool or \
-        report bug to maker of that tool."
+        "Executing {0:?} failed ({1}) with output: {2:?}"
     )]
-    ExecForAccessFailed,
+    ExecForAccessFailed(std::path::PathBuf, std::process::ExitStatus, String),
 
     /// The user should check that the path passed in is a file that can be
     /// executed.
