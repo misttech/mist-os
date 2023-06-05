@@ -16,7 +16,7 @@ rustc_library("linux_uapi") {
   } else if (current_cpu == "arm64") {
     sources += [ "src/arm64.rs" ]
   } else if (current_cpu == "riscv64") {
-    # TODO(fxbug.dev/124695) - stub out riscv64 support for now
+    sources += [ "src/riscv64.rs" ]
   } else {
     assert(false, "Need uapi definition for the '$current_cpu` architecture")
   }

@@ -132,6 +132,9 @@ ARCH_INFO = [
     ArchInfo(
         'arm64', 'aarch64-linux-gnu',
         'third_party/android/platform/bionic/libc/kernel/uapi/asm-arm64'),
+    ArchInfo(
+        'riscv64', 'riscv64-linux-gnu',
+        'third_party/android/platform/bionic/libc/kernel/uapi/asm-riscv'),
 ]
 
 bindgen = Bindgen()
