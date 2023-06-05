@@ -200,6 +200,13 @@ fn get_events_from_zxio_signals(signals: zxio::zxio_signals_t) -> FdEvents {
     events
 }
 
+fn get_name_str(name_bytes: &FsStr) -> Result<&str, Errno> {
+    std::str::from_utf8(name_bytes).map_err(|_| {
+        log_warn!("bad utf8 in pathname! remote filesystems can't handle this");
+        errno!(EINVAL)
+    })
+}
+
 impl FsNodeOps for RemoteNode {
     fn create_file_ops(&self, node: &FsNode, _flags: OpenFlags) -> Result<Box<dyn FileOps>, Errno> {
         let zxio = (*self.zxio).clone().map_err(|status| from_status_like_fdio!(status))?;
@@ -218,10 +225,7 @@ impl FsNodeOps for RemoteNode {
         _dev: DeviceType,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        let name = std::str::from_utf8(name).map_err(|_| {
-            log_warn!("bad utf8 in pathname! remote filesystems can't handle this");
-            errno!(EINVAL)
-        })?;
+        let name = get_name_str(name)?;
         if !mode.is_reg() {
             log_warn!("Can only create regular files in remotefs.");
             return error!(EINVAL, name);
@@ -246,16 +250,40 @@ impl FsNodeOps for RemoteNode {
         Ok(child)
     }
 
+    fn mkdir(
+        &self,
+        node: &FsNode,
+        name: &FsStr,
+        mode: FileMode,
+        owner: FsCred,
+    ) -> Result<FsNodeHandle, Errno> {
+        let name = get_name_str(name)?;
+        let open_flags = fio::OpenFlags::CREATE
+            | fio::OpenFlags::RIGHT_WRITABLE
+            | fio::OpenFlags::RIGHT_READABLE
+            | fio::OpenFlags::DIRECTORY;
+        let zxio = Arc::new(
+            self.zxio
+                .open(open_flags, name)
+                .map_err(|status| from_status_like_fdio!(status, name))?,
+        );
+
+        // TODO: It's unfortunate to have another round-trip. We should be able
+        // to set the mode based on the information we get during open.
+        let attrs = zxio.attr_get().map_err(|status| from_status_like_fdio!(status, name))?;
+        let ops = Box::new(RemoteNode { zxio, rights: self.rights });
+        let child =
+            node.fs().create_node_with_id(ops, attrs.id, FsNodeInfo::new(attrs.id, mode, owner));
+        Ok(child)
+    }
+
     fn lookup(
         &self,
         node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        let name = std::str::from_utf8(name).map_err(|_| {
-            log_warn!("bad utf8 in pathname! remote filesystems can't handle this");
-            errno!(EINVAL)
-        })?;
+        let name = get_name_str(name)?;
         let zxio = Arc::new(self.zxio.open(self.rights, name).map_err(|status| match status {
             // TODO: When the file is not found `PEER_CLOSED` is returned. In this case the peer
             // closed should be translated into ENOENT, so that the file may be created. This
@@ -303,10 +331,7 @@ impl FsNodeOps for RemoteNode {
         // We don't care about the _child argument because 1. unlinking already takes the parent's
         // children lock, so we don't have to worry about conflicts on this path, and 2. the remote
         // filesystem tracks the link counts so we don't need to update them here.
-        let name = std::str::from_utf8(name).map_err(|_| {
-            log_warn!("bad utf8 in pathname! remote filesystems can't handle this");
-            errno!(EINVAL)
-        })?;
+        let name = get_name_str(name)?;
         self.zxio
             .unlink(name, fio::UnlinkFlags::empty())
             .map_err(|status| from_status_like_fdio!(status))
@@ -319,10 +344,7 @@ impl FsNodeOps for RemoteNode {
         target: &FsStr,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        let name = std::str::from_utf8(name).map_err(|_| {
-            log_warn!("bad utf8 in pathname! remote filesystems can't handle this");
-            errno!(EINVAL)
-        })?;
+        let name = get_name_str(name)?;
         let zxio = Arc::new(
             self.zxio
                 .create_symlink(name, target)

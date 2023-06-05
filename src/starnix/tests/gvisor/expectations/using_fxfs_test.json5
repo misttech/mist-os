@@ -13,45 +13,12 @@
             type: "expect_failure",
             matchers: [
                 // access_test
-                "AccessTest.RelativeFile",
-                "AccessTest.RelativeDir",
-                "AccessTest.AbsFile",
-                "AccessTest.AbsDir",
-                "AccessTest.RelDoesNotExist",
-                "AccessTest.AbsDoesNotExist",
-                "AccessTest.InvalidMode",
-                "AccessTest.NoPerms",
-                "AccessTest.InvalidName",
                 "AccessTest.UsrReadOnly",
                 "AccessTest.UsrReadExec",
-                "AccessTest.UsrReadWrite",
                 "AccessTest.UsrReadWriteExec",
-
-                // chdir_test
-                "ChdirTest.PermissionDenied",
-                "ChdirTest.Success",
-
-                // chmod_test
-                "ChmodTest.ChmodDirSucceeds",
-                "ChmodTest.FchmodatDir",
-                "ChmodTest.FchmodatDirAbsolutePath",
-                "ChmodTest.FchmodDirSucceeds",
-                "ChmodTest.FchmodDirWithOpath",
 
                 // chown_test
                 "ChownKinds/ChownParamTest.ChownFileSucceedsAsRoot/*",
-                "ChownTest.FchownDirWithOpath",
-                "ChownTest.FchownatWithOpath",
-                "ChownTest.FchownatEmptyPath",
-
-                // chroot_test
-                "ChrootTest.ProcFdLinkResolutionInChroot",
-                "ChrootTest.ProcMemSelfFdsNoEscapeProcOpen",
-                "ChrootTest.ProcMountsMountinfoNoEscape",
-                "ChrootTest.DotDotFromOpenFD",
-                "ChrootTest.CreatesNewRoot",
-                "ChrootTest.WithoutCapability",
-                "ChrootTest.PermissionDenied",
 
                 // exec_test
                 "ExecTest.SymlinkLimitRefreshedForInterpreter",
@@ -59,15 +26,8 @@
                 // fallocate_test
                 "AllocateTest.Fallocate",
 
-                // fchdir_test
-                "FchdirTest.FchdirWithOpath",
-                "FchdirTest.PermissionDenied",
-                "FchdirTest.Success",
-
                 // fcntl_test
                 "FcntlLockTest.SetLockAcrossRename",
-                "FcntlLockTest.SetLockDir",
-                "FcntlTest.GetOpathFlag",
 
                 // fifo_test
                 "FifoTest.Fifo",
@@ -76,42 +36,25 @@
                 "FifoTest.FifoTruncNoOp",
                 "FifoTest.MknodAtFIFO",
 
-                // flock_test
-                "FlockTestNoFixture.FlockDir",
-
-                // fsync_test
-                "FsyncTest.TempDirSucceeds",
-
                 // fuse_test
                 "FuseTest.RejectBadInit",
 
                 // getdents_test
-                "GetdentsTest/*.Issue128ProcSeekEnd",
                 "GetdentsTest/*.LargeDir",
-                "GetdentsTest/*.NotDir",
-                "GetdentsTest/*.OpathDirectory",
-                "GetdentsTest/*.OpathFile",
                 "GetdentsTest/*.PartialBuffer",
-                "GetdentsTest/*.ProcSelfFd",
                 "GetdentsTest/*.SeekResetsCursor",
                 "GetdentsTest/*.SmallDir",
                 "GetdentsTest/*.VerifyEntries",
                 "GetdentsTest/*.VerifyPadding",
-                "GetdentsTest/*.ZeroLengthOutBuffer",
-                "ReaddirTest.GoneAfterRemoveCache",
                 "ReaddirTest.GoneAfterRenameCache",
 
                 // inotify_test
-                "Inotify.CanDeleteFileAfterRemovingWatch",
-                "Inotify.ClosingInotifyFdWithoutRemovingWatchesWorks",
-                "Inotify.ConcurrentFileDeletionAndWatchRemoval",
                 "InotifyTest.NotifyNoDeadlock",
 
                 // link_test
                 "LinkTest.AbsPathsNonDirFDsWithOpath",
                 "LinkTest.AbsPathsWithNonDirFDs",
                 "LinkTest.CanCreateLinkFile",
-                "LinkTest.CannotLinkDirectory",
                 "LinkTest.LinkDoesNotFollowSymlinks",
                 "LinkTest.LinkatDoesNotFollowSymlinkByDefault",
                 "LinkTest.LinkatWithSymlinkFollow",
@@ -119,158 +62,51 @@
                 "LinkTest.WithNewDirFD",
                 "LinkTest.WithOldDirFD",
 
-                // mkdir_test
-                "MkdirTest.CanCreateWritableDir",
-                "MkdirTest.DirAlreadyExists",
-                "MkdirTest.FailsOnDirWithoutWritePerms",
-                "MkdirTest.HonorsUmask",
-                "MkdirTest.HonorsUmask2",
-                "MkdirTest.MkdirAtEmptyPath",
-                "MkdirTest.TrailingSlash",
-
                 // mknod_test
-                "MknodTest.MknodAtEmptyPath",
                 "MknodTest.MknodAtFIFO",
                 "MknodTest.RegularFilePermissions",
                 "MknodTest.Socket",
 
-                // mount_test
-                "MountTest.ArgumentsAreIgnored",
-                "MountTest.BindParentToChild",
-                "MountTest.BindPeerGroupsWithChildren",
-                "MountTest.BindSharedOnPrivate",
-                "MountTest.BindSharedOnShared",
-                "MountTest.DeadMountsAreDecRefd",
-                "MountTest.InerheritPropagation",
-                "MountTest.MakeMultipleShared",
-                "MountTest.MakePeer",
-                "MountTest.MakePrivate",
-                "MountTest.MakeShared",
-                "MountTest.MountBadFilesystem",
-                "MountTest.MountInfoHasRoot",
-                "MountTest.MountNoAtime",
-                "MountTest.MountOverBusy",
-                "MountTest.MountPermDenied",
-                "MountTest.MountTmpfs",
-                "MountTest.MultiplePropagationFlagsFails",
-                "MountTest.NullData",
-                "MountTest.PropagateMountEvent",
-                "MountTest.RenameRemoveMountPoint",
-                "MountTest.SetMountPropagationOfStackedMounts",
-                "MountTest.SimpleBind",
-                "MountTest.TmpfsSizeFtruncate",
-                "MountTest.TmpfsUnlinkRegularFileAllocCheck",
-                "MountTest.UmountDetach",
-                "MountTest.UmountIgnoresPeersWithChildren",
-                "MountTest.UmountMountsStackedOnDot",
-                "MountTest.UmountNoFollow",
-                "MountTest.UmountPermDenied",
-
                 // open_create_test
-                "CreateTest.CreatDirWithOTruncAndReadOnly",
-                "CreateTest.CreatFileWithOTruncAndReadOnly",
-                "CreateTest.CreatWithOTrunc",
-                "CreateTest.CreateAtFile",
-                "CreateTest.CreateExclusively",
-                "CreateTest.CreateFailsOnDirWithoutWritePerms",
                 "CreateTest.CreateWithReadFlagNotAllowedByMode",
                 "CreateTest.CreateWithWriteFlagNotAllowedByMode",
-                "CreateTest.ExistingFile",
                 "CreateTest.HonorsUmask",
-                "CreateTest.TmpFile",
 
                 // open_test
                 "OpenTest.CanTruncateWithStrangePermissions",
-                "OpenTest.MustCreateExisting",
-                "OpenTest.OCreateDirectory",
-                "OpenTest.OpenNoFollowStillFollowsLinksInPath",
-                "OpenTest.OpenNoFollowSymlink",
                 "OpenTest.OpenWithOpath",
-                "OpenTest.OTrunc",
-                "OpenTest.OTruncAndReadOnlyDir",
-                "OpenTest.OTruncAndReadOnlyFile",
-                "OpenTest.SymlinkDirectory",
-                "OpenTest.SymlinkRecurse",
                 "OpenTest.Truncate",
 
                 // read_test
                 "ReadTest.PartialReadSIGSEGV",
 
                 // rename_test
-                "RenameTest.DirectoryDoesNotOverwriteFile",
                 "RenameTest.DirectoryDoesNotOverwriteNonemptyDirectory",
                 "RenameTest.DirectoryOverwritesDirectoryLinkCount",
                 "RenameTest.DirectoryOverwritesEmptyDirectory",
                 "RenameTest.DirectoryToChildDirectory",
-                "RenameTest.DirectoryToOwnChildDirectory",
                 "RenameTest.DirectoryToParentDirectory",
                 "RenameTest.DirectoryToSameDirectory",
-                "RenameTest.DirectoryToSelf",
                 "RenameTest.DirectoryWithOpenFdOverwritesEmptyDirectory",
-                "RenameTest.FailsWhenNewParentNotWritable",
-                "RenameTest.FailsWhenOldParentNotWritable",
-                "RenameTest.FailsWithDots",
-                "RenameTest.FileDoesNotExist",
-                "RenameTest.FileDoesNotExistWhenNewParentNotExecutable",
                 "RenameTest.FileDoesNotOverwriteDirectory",
                 "RenameTest.FileOverwritesFile",
                 "RenameTest.FileToChildDirectory",
                 "RenameTest.FileToParentDirectory",
                 "RenameTest.FileToSameDirectory",
                 "RenameTest.FileWithOpenFd",
-                "RenameTest.OverwriteFailsWhenNewParentNotWritable",
-                "RenameTest.PathEndingWithDots",
                 "RenameTest.RenameAfterWritableFDAndChmod",
-                "RenameTest.SourceIsAncestorOfTarget",
                 "RenameTest.TargetIsAncestorOfSource",
-                "Renameat2Test.NoReplaceDot",
 
                 // stat_test
-                "StatTest.FstatDirWithOpath",
-                "StatTest.FstatatDirWithOpath",
                 "StatTest.FstatatSymlinkDir",
                 "StatTest.FstatatSymlinkDirWithTrailingSlash",
                 "StatTest.FstatatSymlinkDirWithTrailingSlashSameInode",
-                "StatTest.LinkCountsWithDirChild",
-                "StatTest.LinkCountsWithRegularFileChild",
-                "StatTest.LstatELOOPPath",
                 "StatTest.LstatSymlinkDir",
-                "StatTest.Nlinks",
-                "StatTest.PathCanContainDotDot",
-                "StatTest.PathCanContainEmptyComponent",
-                "StatTest.PathNotCleaned",
                 "StatTest.StatDoesntChangeAfterRename",
-                "StatTest.TrailingSlashNotCleanedReturnsENOTDIR",
-                "StatTest.ZeroLinksOpenFdRegularFileChild_NoSave",
 
                 // stat_times_test
-                "StatTimesTest.DirCreateDir",
-                "StatTimesTest.DirCreateFile",
-                "StatTimesTest.DirList",
-                "StatTimesTest.DirRemoveFile",
                 "StatTimesTest.FileRename",
                 "StatTimesTest.FileRenameOpenFD",
-
-                // sticky_test
-                "StickyTest.StickyBitCapFOWNER",
-                "StickyTest.StickyBitPermDenied",
-                "StickyTest.StickyBitSameUID",
-
-                // truncate_test
-                "TruncateTest.FtruncateDir",
-                "TruncateTest.TruncateDir",
-
-                // unlink_test
-                "RmdirTest.CanRemoveWithTrailingSlashes",
-                "RmdirTest.CannotRemoveDots",
-                "UnlinkTest.AtBad",
-                "UnlinkTest.AtDir",
-                "UnlinkTest.AtDirDegradedPermissions",
-                "UnlinkTest.DirNotEmpty",
-                "UnlinkTest.IsDir",
-                "UnlinkTest.ParentDegradedPermissions",
-                "UnlinkTest.Rmdir",
-                "UnlinkTest.UnlinkAtEmptyPath",
 
                 // xattr_test
                 "XattrTest.GetXattr",
@@ -282,7 +118,6 @@
                 "XattrTest.GetXattrSizeTooLarge",
                 "XattrTest.GetXattrZeroSize",
                 "XattrTest.LXattrOnNonsymlink",
-                "XattrTest.LXattrOnSymlink",
                 "XattrTest.ListXattr",
                 "XattrTest.ListXattrNoXattrs",
                 "XattrTest.ListXattrNullBuffer",
@@ -303,7 +138,6 @@
                 "XattrTest.TrustedNamespaceWithCapSysAdmin",
                 "XattrTest.TrustedNamespaceWithoutCapSysAdmin",
                 "XattrTest.XattrOnDirectory",
-                "XattrTest.XattrOnSymlink",
                 "XattrTest.XattrReadOnly",
                 "XattrTest.XattrTrustedWithNonadmin",
                 "XattrTest.XattrWithFD",
@@ -394,6 +228,9 @@
                 "EpollTest.UnblockWithNewFD",
                 "EpollTest.WaitThenUnblock",
 
+                // inotify_test - these tests hang
+                "Inotify.SymlinkGeneratesCreateEvent",
+
                 // msync_test
                 // Test 1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23 fails
                 // sometimes. Skip all tests for now.
@@ -477,6 +314,13 @@
                 "ReadWriteSharedPrivate/MMapFileParamTest.NoSigBusOnPageContainingEOF/*",
                 "ReadWriteSharedPrivate/MMapFileParamTest.NoSigBusOnPagesBeforeEOF/*",
                 "ReadWriteSharedPrivate/MMapFileParamTest.WriteOnlyFd/*",
+
+                // mount_test - these tests hang
+                "MountTest.UmountNoFollow",
+
+                // open_test - these tests hang
+                "OpenTest.OpenNoFollowSymlink",
+                "OpenTest.SymlinkRecurse",
 
                 // pty_test - flaky
                 // Specifically, the following tests were identified as flaky when running on Fxfs.
@@ -617,6 +461,14 @@
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.NonCoalescedDifferingCreds1/*",
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.NonCoalescedDifferingCreds2/*",
 
+                // stat_test - these tests hang
+                "StatTest.LstatELOOPPath",
+
+                // sticky_test - these tests hang
+                "StickyTest.StickyBitCapFOWNER",
+                "StickyTest.StickyBitPermDenied",
+                "StickyTest.StickyBitSameUID",
+
                 // symlink_test - gave fatal signals
                 "AbsAndRelTarget/ParamSymlinkTest.OpenLinkNoFollowFails/*",
                 "AbsAndRelTarget/ParamSymlinkTest.OpenLinkExclFails/*",
@@ -635,6 +487,10 @@
                 "UtimensatTest.OnRelPath",
                 "UtimeTest.ZeroAtimeandMtime",
                 "UtimesTest.OnDir",
+
+                // xattr_test - these tests hang
+                "XattrTest.LXattrOnSymlink",
+                "XattrTest.XattrOnSymlink",
             ],
         },
     ],
