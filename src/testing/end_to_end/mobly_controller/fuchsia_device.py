@@ -5,13 +5,14 @@
 """Mobly Controller for Fuchsia Device"""
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import honeydew
 from honeydew import custom_types
 from honeydew import transports
 from honeydew.interfaces.device_classes import \
     fuchsia_device as fuchsia_device_interface
+from honeydew.transports import ffx
 from honeydew.utils import properties
 
 MOBLY_CONTROLLER_CONFIG_NAME = "FuchsiaDevice"
@@ -45,6 +46,13 @@ def create(
         "FuchsiaDevice controller configs received in testbed yml file is '%s'",
         configs)
 
+    test_logs_dir: Optional[str] = _get_log_directory()
+    if test_logs_dir:
+        # Call `ffx.setup` before calling `create_device` as
+        # `create_device` results in calling an FFX command and we
+        # don't want to miss those FFX logs
+        ffx.setup(logs_dir=f"{test_logs_dir}/ffx/")
+
     fuchsia_devices: List[fuchsia_device_interface.FuchsiaDevice] = []
     for config in configs:
         device_config: Dict[str, Any] = _get_device_config(config)
@@ -69,6 +77,9 @@ def destroy(
     """
     for fuchsia_device in fuchsia_devices:
         fuchsia_device.close()
+
+    # Call `ffx.close` in the end only after closing all the HoneyDew devices
+    ffx.close()
 
 
 def get_info(
@@ -194,3 +205,16 @@ def _get_device_config(config: Dict[str, str]) -> Dict[str, Any]:
         config)
 
     return device_config
+
+
+def _get_log_directory() -> Optional[str]:
+    """Returns the path to the directory where logs should be stored.
+
+    Returns:
+        Directory path, or None.
+    """
+    # TODO(fxbug.dev/128450): Read log path from config once this issue is fixed
+    return getattr(
+        logging,
+        "log_path",  # Set by Mobly in base_test.BaseTestClass.run.
+        None)
