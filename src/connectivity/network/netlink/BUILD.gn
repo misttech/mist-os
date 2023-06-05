@@ -31,6 +31,7 @@ rustc_library("netlink") {
     "//third_party/rust_crates:netlink-packet-core",
     "//third_party/rust_crates:netlink-packet-route",
     "//third_party/rust_crates:netlink-packet-utils",
+    "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
   ]
 
@@ -47,6 +48,7 @@ rustc_library("netlink") {
 
   sources = [
     "src/client.rs",
+    "src/errors.rs",
     "src/interfaces.rs",
     "src/lib.rs",
     "src/messaging.rs",

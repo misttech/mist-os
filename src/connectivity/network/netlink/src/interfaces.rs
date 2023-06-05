@@ -17,7 +17,6 @@ use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_ext::{self as fnet_interfaces_ext, Update as _};
 
-use anyhow::anyhow;
 use futures::{
     channel::{mpsc, oneshot},
     pin_mut, StreamExt as _, TryStreamExt as _,
@@ -32,6 +31,7 @@ use tracing::{debug, warn};
 
 use crate::{
     client::{ClientTable, InternalClient},
+    errors::EventLoopError,
     messaging::Sender,
     multicast_groups::ModernGroup,
     protocol_family::{route::NetlinkRoute, ProtocolFamily},
@@ -85,53 +85,44 @@ pub(crate) struct EventLoop<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>
     request_stream: mpsc::Receiver<Request<S>>,
 }
 
-/// RTM_LINK and RTM_ADDR related event loop errors.
-#[derive(Debug)]
-pub(crate) enum InterfacesEventLoopError {
-    /// Errors at the FIDL layer.
-    ///
-    /// Such as: cannot connect to protocol or watcher, loaded FIDL error
-    /// from stream.
-    Fidl(FidlError),
-    /// Errors at the Netstack layer.
-    ///
-    /// Such as: interface watcher event stream ended, or a struct from
-    /// Netstack failed conversion.
-    Netstack(NetstackError),
-}
-
-#[derive(Debug)]
-pub(crate) enum FidlError {
+/// FIDL errors from the interfaces worker.
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum InterfacesFidlError {
     /// Error in the FIDL event stream.
+    #[error("event stream: {0}")]
     EventStream(fidl::Error),
-    /// Error that could not cleanly be wrapped with an error type.
-    Unspecified(anyhow::Error),
-    /// Error in getting event stream from state.
+    /// Error connecting to state marker.
+    #[error("connecting to state marker: {0}")]
+    State(anyhow::Error),
+    /// Error in getting interface event stream from state.
+    #[error("watcher creation: {0}")]
     WatcherCreation(fnet_interfaces_ext::WatcherCreationError),
 }
 
-#[derive(Debug)]
-pub(crate) enum NetstackError {
+/// Netstack errors from the interfaces worker.
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum InterfacesNetstackError {
     /// Event stream ended unexpectedly.
+    #[error("event stream ended")]
     EventStreamEnded,
-    /// An existing event was received while handling interface events.
-    ExistingEventReceived(fnet_interfaces_ext::Properties),
-    /// Error that could not cleanly be wrapped with an error type.
-    Unspecified(anyhow::Error),
+    /// Unexpected event was received from interface watcher.
+    #[error("unexpected event: {0:?}")]
+    UnexpectedEvent(fnet_interfaces::Event),
     /// Inconsistent state between Netstack and interface properties.
+    #[error("update: {0}")]
     Update(fnet_interfaces_ext::UpdateError),
 }
 
 impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
-    /// `new` returns a `Result<EventLoop, InterfacesEventLoopError>` instance.
+    /// `new` returns a `Result<EventLoop, EventLoopError>` instance.
     /// This is fallible iff it is not possible to obtain the `StateProxy`.
     pub(crate) fn new(
         route_clients: ClientTable<NetlinkRoute, S>,
         request_stream: mpsc::Receiver<Request<S>>,
-    ) -> Result<Self, InterfacesEventLoopError> {
+    ) -> Result<Self, EventLoopError<InterfacesFidlError, InterfacesNetstackError>> {
         use fuchsia_component::client::connect_to_protocol;
         let state_proxy = connect_to_protocol::<fnet_interfaces::StateMarker>()
-            .map_err(|e| InterfacesEventLoopError::Fidl(FidlError::Unspecified(e)))?;
+            .map_err(|e| EventLoopError::Fidl(InterfacesFidlError::State(e)))?;
 
         Ok(EventLoop { state_proxy, route_clients, request_stream })
     }
@@ -143,16 +134,15 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
     /// Returns: `InterfacesEventLoopError` that requires restarting the
     /// event loop task, for example, if the watcher stream ends or if
     /// the FIDL protocol cannot be connected.
-    pub(crate) async fn run(self) -> InterfacesEventLoopError {
+    pub(crate) async fn run(self) -> EventLoopError<InterfacesFidlError, InterfacesNetstackError> {
         let EventLoop { state_proxy, route_clients, request_stream } = self;
         let if_event_stream = {
             let stream_res = fnet_interfaces_ext::event_stream_from_state(&state_proxy);
 
             match stream_res {
                 Ok(stream) => stream.fuse(),
-
                 Err(e) => {
-                    return InterfacesEventLoopError::Fidl(FidlError::WatcherCreation(e));
+                    return EventLoopError::Fidl(InterfacesFidlError::WatcherCreation(e));
                 }
             }
         };
@@ -169,9 +159,18 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
                 match fnet_interfaces_ext::existing(if_event_stream.by_ref(), HashMap::new()).await
                 {
                     Ok(interfaces) => interfaces,
-                    Err(e) => {
-                        return InterfacesEventLoopError::Netstack(NetstackError::Unspecified(
-                            anyhow!("could not fetch existing interface events: {:?}", e),
+                    Err(fnet_interfaces_ext::WatcherOperationError::UnexpectedEnd { .. }) => {
+                        return EventLoopError::Netstack(InterfacesNetstackError::EventStreamEnded);
+                    }
+                    Err(fnet_interfaces_ext::WatcherOperationError::EventStream(e)) => {
+                        return EventLoopError::Fidl(InterfacesFidlError::EventStream(e));
+                    }
+                    Err(fnet_interfaces_ext::WatcherOperationError::Update(e)) => {
+                        return EventLoopError::Netstack(InterfacesNetstackError::Update(e));
+                    }
+                    Err(fnet_interfaces_ext::WatcherOperationError::UnexpectedEvent(event)) => {
+                        return EventLoopError::Netstack(InterfacesNetstackError::UnexpectedEvent(
+                            event,
                         ));
                     }
                 };
@@ -205,10 +204,10 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
                     let event = match stream_res {
                         Ok(Some(event)) => event,
                         Ok(None) => {
-                            return InterfacesEventLoopError::Netstack(NetstackError::EventStreamEnded);
+                            return EventLoopError::Netstack(InterfacesNetstackError::EventStreamEnded);
                         }
                         Err(e) => {
-                            return InterfacesEventLoopError::Fidl(FidlError::EventStream(e));
+                            return EventLoopError::Fidl(InterfacesFidlError::EventStream(e));
                         }
                     };
 
@@ -222,13 +221,13 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
                         Err(InterfaceEventHandlerError::ExistingEventReceived(properties)) => {
                             // This error indicates there is an inconsistent interface state shared
                             // between Netlink and Netstack.
-                            return InterfacesEventLoopError::Netstack(
-                                NetstackError::ExistingEventReceived(properties),
-                            );
+                            return EventLoopError::Netstack(InterfacesNetstackError::UnexpectedEvent(
+                                fnet_interfaces::Event::Existing(properties.into()),
+                            ));
                         }
                         Err(InterfaceEventHandlerError::Update(e)) => {
                             // This error is severe enough to indicate a larger problem in Netstack.
-                            return InterfacesEventLoopError::Netstack(NetstackError::Update(e));
+                            return EventLoopError::Netstack(InterfacesNetstackError::Update(e));
                         }
                     }
                 }
@@ -1068,7 +1067,7 @@ mod tests {
         let (err, ()) = futures::join!(event_loop_fut, watcher_fut);
         assert_matches!(
             err,
-            InterfacesEventLoopError::Fidl(FidlError::EventStream(
+            EventLoopError::Fidl(InterfacesFidlError::EventStream(
                 fidl::Error::ClientChannelClosed { .. }
             ))
         );
@@ -1084,7 +1083,14 @@ mod tests {
             respond_to_watcher_with_interfaces(watcher_stream, interfaces, None::<(Option<_>, _)>);
 
         let (err, ()) = futures::join!(event_loop_fut, watcher_fut);
-        assert_matches!(err, InterfacesEventLoopError::Netstack(NetstackError::Unspecified(_)));
+        // The event being sent again as existing has interface id 1.
+        assert_matches!(err,
+            EventLoopError::Netstack(
+                InterfacesNetstackError::Update(
+                    fnet_interfaces_ext::UpdateError::DuplicateExisting(properties)
+                )
+            )
+            if properties.id.unwrap() == 1);
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -1102,11 +1108,11 @@ mod tests {
         let (err, ()) = futures::join!(event_loop_fut, watcher_fut);
         // The properties that are being added again has interface id 1.
         assert_matches!(err,
-            InterfacesEventLoopError::Netstack(
-                NetstackError::Update(
+            EventLoopError::Netstack(
+                InterfacesNetstackError::Update(
                     fnet_interfaces_ext::UpdateError::DuplicateAdded(properties)
-                    )
                 )
+            )
             if properties.id.unwrap() == 1);
     }
 
@@ -1127,10 +1133,12 @@ mod tests {
         // The second existing properties has interface id 3.
         assert_matches!(
             err,
-            InterfacesEventLoopError::Netstack(
-                NetstackError::ExistingEventReceived(properties)
-            ) if properties.id.get() == 3
-        );
+            EventLoopError::Netstack(
+                InterfacesNetstackError::UnexpectedEvent(
+                    fnet_interfaces::Event::Existing(properties)
+                )
+            )
+            if properties.id.unwrap() == 3);
     }
 
     #[test_case(ETHERNET, false, 0)]
@@ -1347,7 +1355,7 @@ mod tests {
         let ((), err) = futures::future::join(watcher_stream_fut, event_loop_fut).await;
         assert_matches!(
             err,
-            InterfacesEventLoopError::Fidl(FidlError::EventStream(
+            EventLoopError::Fidl(InterfacesFidlError::EventStream(
                 fidl::Error::ClientChannelClosed { .. },
             ))
         );

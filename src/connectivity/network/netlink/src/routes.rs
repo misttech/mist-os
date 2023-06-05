@@ -10,9 +10,8 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use anyhow::{anyhow, Context as _};
 use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
-use futures::{pin_mut, select, StreamExt as _, TryStreamExt as _};
+use futures::{pin_mut, StreamExt as _, TryStreamExt as _};
 use net_types::ip::{Ip, IpAddress, IpVersion};
 use netlink_packet_core::NetlinkMessage;
 use netlink_packet_route::{
@@ -20,10 +19,11 @@ use netlink_packet_route::{
     RTNLGRP_IPV6_ROUTE, RTN_UNICAST, RTPROT_UNSPEC, RT_SCOPE_UNIVERSE, RT_TABLE_UNSPEC,
 };
 use netlink_packet_utils::nla::Nla;
-use tracing::{error, warn};
+use tracing::warn;
 
 use crate::{
     client::ClientTable,
+    errors::EventLoopError,
     messaging::Sender,
     multicast_groups::ModernGroup,
     protocol_family::{route::NetlinkRoute, ProtocolFamily},
@@ -35,60 +35,77 @@ use crate::NETLINK_LOG_TAG;
 ///
 /// Connects to the route watcher and can respond to RTM_ROUTE
 /// message requests.
-pub(crate) struct EventLoop<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> {
-    /// Represents the current route state as observed by Netstack, converted into
-    /// Netlink messages to send when requested.
-    route_messages: HashSet<NetlinkRouteMessage>,
+pub(crate) struct EventLoop<
+    S: Sender<<NetlinkRoute as ProtocolFamily>::Message>,
+    I: Ip + fnet_routes_ext::FidlRouteIpExt,
+> {
+    /// A 'StateProxy` to connect to the routes watcher.
+    state_proxy: <I::StateMarker as fidl::endpoints::ProtocolMarker>::Proxy,
     /// The current set of clients of NETLINK_ROUTE protocol family.
     route_clients: ClientTable<NetlinkRoute, S>,
 }
 
-/// RTM_ROUTE related event loop errors.
-#[derive(Debug)]
-pub(crate) enum RoutesEventLoopError {
-    /// Errors at the FIDL layer.
-    ///
-    /// Such as: cannot connect to protocol or watcher, loaded FIDL error from stream.
-    Fidl(anyhow::Error),
-    /// Errors at the Netstack layer.
-    ///
-    /// Such as: route watcher event stream ended, unexpected event type, or struct from Netstack
-    /// failed conversion.
-    Netstack(anyhow::Error),
+/// FIDL errors from the routes worker.
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum RoutesFidlError {
+    /// Error connecting to state marker.
+    #[error("connecting to state marker: {0}")]
+    State(anyhow::Error),
+    /// Error in getting route event stream from state.
+    #[error("watcher creation: {0}")]
+    WatcherCreation(fnet_routes_ext::WatcherCreationError),
+    /// Error in route watcher stream.
+    #[error("watch: {0}")]
+    Watch(fnet_routes_ext::WatchError),
 }
 
-impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
+/// Netstack errors from the routes worker.
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum RoutesNetstackError<I: Ip> {
+    /// Event stream ended unexpectedly.
+    #[error("event stream ended")]
+    EventStreamEnded,
+    /// Unexpected route was received from routes watcher.
+    #[error("unexpected route: {0:?}")]
+    UnexpectedRoute(fnet_routes_ext::InstalledRoute<I>),
+    /// Unexpected event was received from routes watcher.
+    #[error("unexpected event: {0:?}")]
+    UnexpectedEvent(fnet_routes_ext::Event<I>),
+}
+
+impl<
+        S: Sender<<NetlinkRoute as ProtocolFamily>::Message>,
+        I: Ip + fnet_routes_ext::FidlRouteIpExt,
+    > EventLoop<S, I>
+{
     /// `new` returns an `EventLoop` instance.
-    pub(crate) fn new(route_clients: ClientTable<NetlinkRoute, S>) -> Self {
-        EventLoop { route_messages: Default::default(), route_clients }
+    pub(crate) fn new(
+        route_clients: ClientTable<NetlinkRoute, S>,
+    ) -> Result<Self, EventLoopError<RoutesFidlError, RoutesNetstackError<I>>> {
+        use fuchsia_component::client::connect_to_protocol;
+        let state_proxy = connect_to_protocol::<I::StateMarker>()
+            .map_err(|e| EventLoopError::Fidl(RoutesFidlError::State(e)))?;
+
+        Ok(EventLoop { state_proxy, route_clients })
     }
 
     /// Run the asynchronous work related to RTM_ROUTE messages.
     ///
     /// The event loop can track Ipv4 or Ipv6 routes, and is
     /// never expected to complete.
-    /// Returns: `RoutesEventLoopError` that cannot be resolved from within the event loop.
-    pub(crate) async fn run<I: Ip + fnet_routes_ext::FidlRouteIpExt>(
-        &mut self,
-    ) -> RoutesEventLoopError {
-        use fuchsia_component::client::connect_to_protocol;
+    /// Returns: `EventLoopError` that requires restarting the event
+    /// loop task, for example, if the watcher stream ends or if the
+    /// FIDL protocol cannot be connected.
+    pub(crate) async fn run(self) -> EventLoopError<RoutesFidlError, RoutesNetstackError<I>> {
+        let EventLoop { state_proxy, route_clients } = self;
 
         let route_event_stream = {
-            let state_res = connect_to_protocol::<I::StateMarker>().context(format!(
-                "failed to connect to fuchsia.net.routes/StateV{}",
-                I::VERSION.version_number(),
-            ));
-            let state = match state_res {
-                Ok(state) => state,
-                Err(e) => return RoutesEventLoopError::Fidl(e),
-            };
+            let stream_res = fnet_routes_ext::event_stream_from_state(&state_proxy)
+                .map_err(|e| EventLoopError::Fidl(RoutesFidlError::WatcherCreation(e)));
 
-            let stream_res = fnet_routes_ext::event_stream_from_state::<I>(&state).context(
-                format!("failed to initialize a `WatcherV{}` client", I::VERSION.version_number()),
-            );
             match stream_res {
                 Ok(stream) => stream.fuse(),
-                Err(e) => return RoutesEventLoopError::Fidl(e),
+                Err(e) => return e,
             }
         };
         pin_mut!(route_event_stream);
@@ -98,89 +115,40 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
         )
         .await;
 
-        let mut ctx =
-            format!("while collecting existing IPv{} routes", I::VERSION.version_number());
         let routes = match routes_res {
             Ok(routes) => routes,
             Err(fnet_routes_ext::CollectRoutesUntilIdleError::ErrorInStream(e)) => {
-                return RoutesEventLoopError::Fidl(anyhow!("stream error {}: {:?}", ctx, e));
+                return EventLoopError::Fidl(RoutesFidlError::Watch(e));
             }
             Err(fnet_routes_ext::CollectRoutesUntilIdleError::StreamEnded) => {
-                return RoutesEventLoopError::Fidl(anyhow!("stream ended {}", ctx))
+                return EventLoopError::Netstack(RoutesNetstackError::EventStreamEnded);
             }
             Err(fnet_routes_ext::CollectRoutesUntilIdleError::UnexpectedEvent(event)) => {
-                return RoutesEventLoopError::Netstack(anyhow!(
-                    "unexpected event {}: {:?}",
-                    ctx,
-                    event
-                ))
+                return EventLoopError::Netstack(RoutesNetstackError::UnexpectedEvent(event));
             }
         };
 
-        let EventLoop { route_messages, route_clients } = self;
+        let mut route_messages = new_set_with_existing_routes(routes);
 
-        *route_messages = new_set_with_existing_routes(routes);
-
-        ctx = format!("in IPv{} route event stream", I::VERSION.version_number());
         loop {
-            select! {
-                stream_res = route_event_stream.try_next() => {
-                    let event_opt = match stream_res {
-                        Ok(event_res) => event_res,
-                        Err(fnet_routes_ext::WatchError::Fidl(e)) => {
-                            return RoutesEventLoopError::Fidl(anyhow!("fidl error {}: {:?}", ctx, e))
-                        }
-                        // Recoverable errors that should not crash the event loop.
-                        Err(fnet_routes_ext::WatchError::EmptyEventBatch) => {
-                            error!(
-                                tag = NETLINK_LOG_TAG,
-                                "{:?}",
-                                RoutesEventLoopError::Fidl(anyhow!("empty batch error {}", ctx))
-                            );
-                            continue;
-                        }
-                        Err(fnet_routes_ext::WatchError::Conversion(e)) => {
-                            error!(
-                                tag = NETLINK_LOG_TAG,
-                                "{:?}",
-                                RoutesEventLoopError::Netstack(anyhow!(
-                                    "type conversion error {}: {:?}",
-                                    ctx,
-                                    e
-                                ))
-                            );
-                            continue;
-                        }
-                    };
+            let stream_res = route_event_stream.try_next().await;
+            let event = match stream_res {
+                Ok(Some(event)) => event,
+                Ok(None) => return EventLoopError::Netstack(RoutesNetstackError::EventStreamEnded),
+                Err(e) => {
+                    return EventLoopError::Fidl(RoutesFidlError::Watch(e));
+                }
+            };
 
-                    let event = match event_opt {
-                        Some(event) => event,
-                        None => return RoutesEventLoopError::Fidl(anyhow!("route event stream ended")),
-                    };
-
-                    match handle_route_watcher_event(
-                        route_messages,
-                        route_clients,
-                        event
-                    ) {
-                        Ok(()) => {}
-                        // Recoverable errors that do not affect the processing of further events.
-                        Err(RouteEventHandlerError::AlreadyExistingRouteAddition(route))
-                        | Err(RouteEventHandlerError::NonExistentRouteDeletion(route)) => {
-                            error!(
-                                tag = NETLINK_LOG_TAG,
-                                "observed no-op route modification: {:?}",
-                                route
-                            );
-                        }
-                        Err(RouteEventHandlerError::NonAddOrRemoveEventReceived(event)) => {
-                            error!(
-                                tag = NETLINK_LOG_TAG,
-                                "observed no-op route event: {:?}",
-                                event
-                            );
-                        }
-                    }
+            match handle_route_watcher_event(&mut route_messages, &route_clients, event) {
+                Ok(()) => {}
+                // These errors are severe enough to indicate a larger problem in Netstack.
+                Err(RouteEventHandlerError::AlreadyExistingRouteAddition(route))
+                | Err(RouteEventHandlerError::NonExistentRouteDeletion(route)) => {
+                    return EventLoopError::Netstack(RoutesNetstackError::UnexpectedRoute(route));
+                }
+                Err(RouteEventHandlerError::NonAddOrRemoveEventReceived(event)) => {
+                    return EventLoopError::Netstack(RoutesNetstackError::UnexpectedEvent(event));
                 }
             }
         }
@@ -349,7 +317,9 @@ impl<I: Ip> TryFrom<fnet_routes_ext::InstalledRoute<I>> for NetlinkRouteMessage 
         route_header.address_family = match I::VERSION {
             IpVersion::V4 => AF_INET,
             IpVersion::V6 => AF_INET6,
-        } as u8;
+        }
+        .try_into()
+        .expect("should fit into u8");
         route_header.destination_prefix_length = destination.prefix();
 
         // The following fields are used in the header, but they do not have any
@@ -399,7 +369,7 @@ impl<I: Ip> TryFrom<fnet_routes_ext::InstalledRoute<I>> for NetlinkRouteMessage 
 
         // We expect interface ids to safely fit in the range of u32 values.
         let outbound_id: u32 = match outbound_interface.try_into() {
-            Err(_) => {
+            Err(std::num::TryFromIntError { .. }) => {
                 return Err(NetlinkRouteMessageConversionError::InvalidInterfaceId(
                     outbound_interface,
                 ))
@@ -656,7 +626,9 @@ mod tests {
         let address_family = match I::VERSION {
             IpVersion::V4 => AF_INET,
             IpVersion::V6 => AF_INET6,
-        } as u8;
+        }
+        .try_into()
+        .expect("should fit into u8");
         let expected = create_netlink_route_message(address_family, prefix_length, nlas);
 
         let actual: NetlinkRouteMessage = installed_route.try_into().unwrap();
@@ -757,7 +729,9 @@ mod tests {
         let address_family = match I::VERSION {
             IpVersion::V4 => AF_INET,
             IpVersion::V6 => AF_INET6,
-        } as u8;
+        }
+        .try_into()
+        .expect("should fit into u8");
         let netlink_route_message =
             create_netlink_route_message(address_family, subnet.prefix(), nlas);
         let expected: HashSet<NetlinkRouteMessage> =
