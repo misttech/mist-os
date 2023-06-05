@@ -16,8 +16,6 @@
 #include <array>
 #include <utility>
 
-#include <fbl/vector.h>
-
 namespace {
 
 // Implement a basic fake Resource object to use with accompanying syscalls.

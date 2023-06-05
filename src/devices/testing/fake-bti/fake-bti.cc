@@ -17,8 +17,6 @@
 #include <utility>
 #include <vector>
 
-#include <fbl/vector.h>
-
 // Normally just defined in the kernel:
 #define PAGE_SIZE_SHIFT 12
 
