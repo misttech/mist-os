@@ -495,6 +495,7 @@
                 "*/ltp_keyctl08.cm",
                 "*/ltp_keyctl09.cm",
                 "*/ltp_kill10.cm",
+                "*/ltp_kill11.cm",
                 "*/ltp_kill13.cm",
                 "*/ltp_killall_icmp_traffic.cm",
                 "*/ltp_killall_tcp_traffic.cm",
@@ -787,6 +788,7 @@
                 "*/ltp_umip_basic_test.cm",
                 "*/ltp_unshare01.cm",
                 "*/ltp_userfaultfd01.cm",
+                "*/ltp_waitpid02.cm",
             ],
         },
         {
