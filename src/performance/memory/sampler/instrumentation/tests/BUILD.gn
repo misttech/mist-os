@@ -8,9 +8,13 @@ executable("tests_bin") {
   testonly = true
   output_name = "memory_sampler_instrumentation_tests"
 
-  sources = [ "recorder_tests.cc" ]
+  sources = [
+    "recorder_tests.cc",
+    "scoped_reentrancy_guard_tests.cc",
+  ]
   deps = [
     "..:recorder",
+    "..:scoped_reentrancy_guard",
     "//sdk/fidl/fuchsia.memory.sampler:fuchsia.memory.sampler_cpp",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/sys/cpp",

@@ -17,8 +17,16 @@ source_set("recorder") {
   ]
 }
 
+source_set("scoped_reentrancy_guard") {
+  sources = [ "scoped_reentrancy_guard.h" ]
+  public = [ "scoped_reentrancy_guard.h" ]
+}
+
 shared_library("lib") {
   output_name = "sampler_instrumentation"
   sources = [ "instrumentation.cc" ]
-  deps = [ ":recorder" ]
+  deps = [
+    ":recorder",
+    ":scoped_reentrancy_guard",
+  ]
 }
