@@ -291,13 +291,17 @@ impl NetlinkRouteMessage {
     /// Wrap the inner [`RouteMessage`] in an [`RtnlMessage::NewRoute`].
     fn into_rtnl_new_route(self) -> NetlinkMessage<RtnlMessage> {
         let NetlinkRouteMessage(message) = self;
-        RtnlMessage::NewRoute(message).into()
+        let mut msg: NetlinkMessage<RtnlMessage> = RtnlMessage::NewRoute(message).into();
+        msg.finalize();
+        msg
     }
 
     /// Wrap the inner [`RouteMessage`] in an [`RtnlMessage::DelRoute`].
     fn into_rtnl_del_route(self) -> NetlinkMessage<RtnlMessage> {
         let NetlinkRouteMessage(message) = self;
-        RtnlMessage::DelRoute(message).into()
+        let mut msg: NetlinkMessage<RtnlMessage> = RtnlMessage::DelRoute(message).into();
+        msg.finalize();
+        msg
     }
 }
 
@@ -697,6 +701,24 @@ mod tests {
             actual,
             Err(NetlinkRouteMessageConversionError::InvalidInterfaceId(invalid_interface_id))
         );
+    }
+
+    #[test]
+    fn test_into_rtnl_new_route_is_serializable() {
+        let route = create_netlink_route_message(0, 0, vec![]);
+        let new_route_message = route.into_rtnl_new_route();
+        let mut buf = vec![0; new_route_message.buffer_len()];
+        // Serialize will panic if `new_route_message` is malformed.
+        new_route_message.serialize(&mut buf);
+    }
+
+    #[test]
+    fn test_into_rtnl_del_route_is_serializable() {
+        let route = create_netlink_route_message(0, 0, vec![]);
+        let del_route_message = route.into_rtnl_del_route();
+        let mut buf = vec![0; del_route_message.buffer_len()];
+        // Serialize will panic if `del_route_message` is malformed.
+        del_route_message.serialize(&mut buf);
     }
 
     #[fuchsia::test]

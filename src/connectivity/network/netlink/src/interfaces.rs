@@ -484,12 +484,16 @@ impl NetlinkLinkMessage {
 
     fn into_rtnl_new_link(self) -> NetlinkMessage<RtnlMessage> {
         let Self(message) = self;
-        RtnlMessage::NewLink(message).into()
+        let mut msg: NetlinkMessage<RtnlMessage> = RtnlMessage::NewLink(message).into();
+        msg.finalize();
+        msg
     }
 
     fn into_rtnl_del_link(self) -> NetlinkMessage<RtnlMessage> {
         let Self(message) = self;
-        RtnlMessage::DelLink(message).into()
+        let mut msg: NetlinkMessage<RtnlMessage> = RtnlMessage::DelLink(message).into();
+        msg.finalize();
+        msg
     }
 }
 
@@ -1188,6 +1192,24 @@ mod tests {
         let expected =
             create_default_address_messages(interface_id, interface_name, IFA_F_PERMANENT);
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_into_rtnl_new_link_is_serializable() {
+        let link = create_netlink_link_message(0, 0, 0, vec![]);
+        let new_link_message = link.into_rtnl_new_link();
+        let mut buf = vec![0; new_link_message.buffer_len()];
+        // Serialize will panic if `new_route_message` is malformed.
+        new_link_message.serialize(&mut buf);
+    }
+
+    #[test]
+    fn test_into_rtnl_del_link_is_serializable() {
+        let link = create_netlink_link_message(0, 0, 0, vec![]);
+        let del_link_message = link.into_rtnl_del_link();
+        let mut buf = vec![0; del_link_message.buffer_len()];
+        // Serialize will panic if `del_route_message` is malformed.
+        del_link_message.serialize(&mut buf);
     }
 
     const LO_INTERFACE_ID: u64 = 1;
