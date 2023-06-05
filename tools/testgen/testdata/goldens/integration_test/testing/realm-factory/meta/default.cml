@@ -14,20 +14,6 @@
     capabilities: [
         { protocol: "test.examplecomponent.RealmFactory" },
     ],
-    use: [
-        {
-            protocol: [
-                "fuchsia.component.Realm",
-                "fuchsia.sys2.RealmQuery",
-            ],
-            from: "framework",
-        },
-        {
-            protocol: [
-                "fuchsia.process.Launcher",
-            ],
-        },
-    ],
     offer: [
         {
             protocol: [
