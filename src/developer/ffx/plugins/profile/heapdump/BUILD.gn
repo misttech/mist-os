@@ -7,7 +7,11 @@ import("//src/developer/ffx/build/ffx_plugin.gni")
 ffx_plugin("ffx_profile_heapdump") {
   version = "0.1.0"
   edition = "2021"
-  plugin_deps = [ "snapshot:ffx_profile_heapdump_snapshot" ]
+  plugin_deps = [
+    "download:ffx_profile_heapdump_download",
+    "list:ffx_profile_heapdump_list",
+    "snapshot:ffx_profile_heapdump_snapshot",
+  ]
   args_sources = [ "src/args.rs" ]
   test_deps = [ "common:ffx_profile_heapdump_common_test" ]
 }

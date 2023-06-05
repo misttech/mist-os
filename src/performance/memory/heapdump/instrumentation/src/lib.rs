@@ -5,6 +5,7 @@
 use fuchsia_zircon::{self as zx, sys::zx_handle_t, AsHandleRef};
 use lazy_static::lazy_static;
 use std::cell::RefCell;
+use std::ffi::c_char;
 
 mod allocations_table;
 mod profiler;
@@ -72,4 +73,15 @@ pub unsafe extern "C" fn heapdump_get_stats(
             }
         });
     });
+}
+
+/// # Safety
+/// The caller must pass a nul-terminated string whose length is not greater than ZX_MAX_NAME_LEN.
+#[no_mangle]
+pub unsafe extern "C" fn heapdump_take_named_snapshot(name: *const c_char) {
+    let name_cstr = std::ffi::CStr::from_ptr(name);
+    let name_str = name_cstr.to_str().expect("name contains invalid characters");
+    assert!(name_str.len() <= zx::sys::ZX_MAX_NAME_LEN, "name is too long");
+
+    PROFILER.publish_named_snapshot(name_str);
 }

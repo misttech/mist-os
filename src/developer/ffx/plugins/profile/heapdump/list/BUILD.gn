@@ -1,0 +1,25 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//src/developer/ffx/build/ffx_plugin.gni")
+
+ffx_plugin("ffx_profile_heapdump_list") {
+  version = "0.1.0"
+  edition = "2021"
+
+  deps = [
+    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
+    "//sdk/fidl/fuchsia.memory.heapdump:fuchsia.memory.heapdump.client_rust",
+    "//src/developer/ffx/lib/writer:lib",
+    "//src/developer/ffx/plugins/profile/heapdump/common:ffx_profile_heapdump_common",
+    "//src/lib/fidl/rust/fidl",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:prettytable-rs",
+    "//third_party/rust_crates:serde",
+  ]
+
+  args_sources = [ "src/args.rs" ]
+
+  sources = [ "src/lib.rs" ]
+}

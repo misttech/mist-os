@@ -12,8 +12,16 @@ const VMO_MAP_READONLY_RIGHTS zx.Rights
 /// Instrumented processes send application-initiated snapshots over this channel.
 ///
 /// This channel is also used by the server to detect when an instrumented process exits.
-// TODO(fxbug.dev/122389): Application-initiated snapshots are not implemented yet.
-protocol SnapshotSinkV1 {};
+protocol SnapshotSinkV1 {
+    /// Asks the server to store a snapshot with the given name and the given allocations VMO.
+    ///
+    /// All the resources referenced by the given allocations VMO will be resolved using the
+    /// resources VMO that was shared by the process at registration time.
+    StoreNamedSnapshot(resource struct {
+        snapshot_name string:zx.MAX_NAME_LEN;
+        allocations_vmo_snapshot zx.Handle:<VMO, VMO_MAP_READONLY_RIGHTS>;
+    });
+};
 
 /// The Registry keeps track of all the instrumented processes that are running in the system.
 @discoverable

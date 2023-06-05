@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include "heapdump/bind_with_fdio.h"
+#include "heapdump/snapshot.h"
 
 struct LinkedListNode {
   uint64_t value;
@@ -40,6 +41,13 @@ int main(int argc, char **argv) {
 
   // Do some tasks that allocate memory at each step.
   for (int i = 0; i < 8; i++) {
+    // Take a named snapshot. You can run:
+    // - "ffx profile heapdump list" to show the list of all the taken named snapshots
+    // - "ffx profile heapdump download" to export one
+    char namebuf[20];
+    sprintf(namebuf, "fib-%d", i);
+    heapdump_take_named_snapshot(namebuf);
+
     fprintf(stderr, "Iteration #%d...\n", i);
     fibonacci(i, &list);
     sleep(1);

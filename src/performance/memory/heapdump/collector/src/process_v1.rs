@@ -14,9 +14,10 @@ use heapdump_vmo::{
 };
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use tracing::warn;
+use tracing::{info, warn};
 
 use crate::process::{Process, Snapshot};
+use crate::snapshot_storage::SnapshotStorage;
 use crate::utils::{find_executable_regions, read_process_memory};
 
 fn get_process_name(process: &zx::Process) -> Result<String, anyhow::Error> {
@@ -35,6 +36,7 @@ pub struct ProcessV1 {
     allocations_vmo: zx::Vmo,
     resources_vmo: Arc<zx::Vmo>,
     snapshot_stream: Mutex<fheapdump_process::SnapshotSinkV1RequestStream>,
+    snapshot_storage: Arc<Mutex<SnapshotStorage>>,
 }
 
 impl ProcessV1 {
@@ -43,6 +45,7 @@ impl ProcessV1 {
         allocations_vmo: zx::Vmo,
         resources_vmo: zx::Vmo,
         snapshot_sink: ServerEnd<fheapdump_process::SnapshotSinkV1Marker>,
+        snapshot_storage: Arc<Mutex<SnapshotStorage>>,
     ) -> Result<ProcessV1, anyhow::Error> {
         let name = get_process_name(&process)?;
         let koid = process.get_koid()?;
@@ -53,7 +56,22 @@ impl ProcessV1 {
             allocations_vmo,
             resources_vmo: Arc::new(resources_vmo),
             snapshot_stream: Mutex::new(snapshot_sink.into_stream()?),
+            snapshot_storage,
         })
+    }
+
+    fn finalize_snapshot(
+        &self,
+        allocations_vmo_snapshot: zx::Vmo,
+        block_contents: HashMap<u64, Vec<u8>>,
+    ) -> Result<Box<dyn Snapshot>, zx::Status> {
+        let executable_regions = find_executable_regions(&self.process)?;
+        Ok(Box::new(SnapshotV1::new(
+            allocations_vmo_snapshot,
+            self.resources_vmo.clone(),
+            executable_regions,
+            block_contents,
+        )))
     }
 }
 
@@ -71,7 +89,36 @@ impl Process for ProcessV1 {
         let mut stream = self.snapshot_stream.lock().await;
         while let Some(request) = stream.next().await.transpose()? {
             match request {
-                // TODO(fxbug.dev/122389): Application-initiated snapshots are not implemented yet.
+                fheapdump_process::SnapshotSinkV1Request::StoreNamedSnapshot {
+                    snapshot_name,
+                    allocations_vmo_snapshot,
+                    ..
+                } => match self.finalize_snapshot(allocations_vmo_snapshot, HashMap::new()) {
+                    Ok(snapshot) => {
+                        let mut snapshot_storage = self.snapshot_storage.lock().await;
+                        let snapshot_id = snapshot_storage.add_snapshot(
+                            self.name.clone(),
+                            self.koid,
+                            snapshot_name.clone(),
+                            snapshot,
+                        );
+                        info!(
+                            snapshot_id,
+                            snapshot_name = snapshot_name.as_str(),
+                            process_koid = self.koid.raw_koid(),
+                            process_name = self.name.as_str(),
+                            "Stored snapshot"
+                        );
+                    }
+                    Err(status) => {
+                        warn!(
+                            koid = self.koid.raw_koid(),
+                            name = self.name.as_str(),
+                            ?status,
+                            "Failed to process snapshot"
+                        );
+                    }
+                },
             }
         }
 
@@ -106,13 +153,7 @@ impl Process for ProcessV1 {
             }
         }
 
-        let executable_regions = find_executable_regions(&self.process)?;
-        Ok(Box::new(SnapshotV1::new(
-            snapshot,
-            self.resources_vmo.clone(),
-            executable_regions,
-            block_contents,
-        )))
+        Ok(self.finalize_snapshot(snapshot, block_contents)?)
     }
 }
 
@@ -218,6 +259,7 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream};
     use fuchsia_async as fasync;
+    use fuchsia_zircon::HandleBased;
     use futures::pin_mut;
     use heapdump_vmo::{
         allocations_table_v1::AllocationsTableWriter, resources_table_v1::ResourcesTableWriter,
@@ -230,18 +272,25 @@ mod tests {
 
     use crate::registry::Registry;
 
-    /// Creates empty allocation and resource VMOs and ties them to the current process in the given
-    /// registry.
+    /// Creates empty allocation and resource VMOs and builds a Registry channel that ties them to
+    /// the current process.
     ///
     /// By reusing the current process, instead of creating a new one, we avoid requiring the
     /// ZX_POL_NEW_PROCESS capability and we can easily control the contents of the "fake" process'
     /// memory.
+    ///
+    /// The returned tuple consists of:
+    /// - the server end of the channel, to be connected a Registry instance
+    /// - the koid of the fake (== current) process
+    /// - two writers, that can used to manipulate the corresponding VMOs
+    /// - a function that, given a string, sends a named snapshot of the current contents of the
+    ///   allocations VMO over the SnapshotSink channel
     fn setup_fake_process_from_self() -> (
         fheapdump_process::RegistryRequestStream,
-        fheapdump_process::SnapshotSinkV1Proxy,
         Koid,
         AllocationsTableWriter,
         ResourcesTableWriter,
+        impl Fn(&str),
     ) {
         // Create and initialize the VMOs.
         const VMO_SIZE: u64 = 1 << 31;
@@ -259,10 +308,27 @@ mod tests {
         let (snapshot_proxy, snapshot_server) =
             create_proxy::<fheapdump_process::SnapshotSinkV1Marker>().unwrap();
         registry_proxy
-            .register_v1(process, allocations_vmo, resources_vmo, snapshot_server)
+            .register_v1(
+                process,
+                allocations_vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
+                resources_vmo,
+                snapshot_server,
+            )
             .unwrap();
 
-        (registry_stream, snapshot_proxy, koid, allocations_writer, resources_writer)
+        // Create a function that sends a named snapshot of the current allocation VMO contents.
+        let snapshot_sink_fn = move |snapshot_name: &str| {
+            let allocations_vmo_snapshot = allocations_vmo
+                .create_child(
+                    zx::VmoChildOptions::SNAPSHOT | zx::VmoChildOptions::NO_WRITE,
+                    0,
+                    VMO_SIZE,
+                )
+                .unwrap();
+            snapshot_proxy.store_named_snapshot(snapshot_name, allocations_vmo_snapshot).unwrap()
+        };
+
+        (registry_stream, koid, allocations_writer, resources_writer, snapshot_sink_fn)
     }
 
     // Asserts that the given list of executable regions correctly describes the fake process.
@@ -301,7 +367,7 @@ mod tests {
         let registry = Registry::new();
 
         // Setup fake process.
-        let (registry_stream, snapshot_sink, koid, _, _) = setup_fake_process_from_self();
+        let (registry_stream, koid, _, _, snapshot_sink_fn) = setup_fake_process_from_self();
         let name = get_process_name(&fuchsia_runtime::process_self()).unwrap();
 
         // Register it.
@@ -313,7 +379,7 @@ mod tests {
         assert_eq!(ex.run_singlethreaded(registry.list_processes()), [(koid, name)]);
 
         // Simulate process exit by dropping the snapshot sink channel.
-        std::mem::drop(snapshot_sink);
+        std::mem::drop(snapshot_sink_fn);
         assert!(ex.run_until_stalled(&mut serve_fut).is_ready());
 
         // Verify that the registry no longer contains the process.
@@ -341,8 +407,13 @@ mod tests {
         let registry = std::rc::Rc::new(Registry::new());
 
         // Setup fake process.
-        let (registry_stream, _snapshot_sink, koid, mut allocations_writer, mut resources_writer) =
-            setup_fake_process_from_self();
+        let (
+            registry_stream,
+            koid,
+            mut allocations_writer,
+            mut resources_writer,
+            _snapshot_sink_fn,
+        ) = setup_fake_process_from_self();
 
         // Register it.
         let serve_fut = registry.serve_process_stream(registry_stream);
@@ -397,5 +468,84 @@ mod tests {
 
         // Verify that it contains the expected executable regions.
         assert_executable_regions_valid_for_fake_process(&received_snapshot.executable_regions);
+    }
+
+    #[test]
+    fn test_stored_snapshots() {
+        let mut ex = fasync::TestExecutor::new();
+        let registry = std::rc::Rc::new(Registry::new());
+
+        // Setup fake process.
+        let (
+            registry_stream,
+            _koid,
+            mut allocations_writer,
+            mut resources_writer,
+            snapshot_sink_fn,
+        ) = setup_fake_process_from_self();
+
+        // Register it.
+        let serve_fut = registry.serve_process_stream(registry_stream);
+        pin_mut!(serve_fut);
+        assert!(ex.run_until_stalled(&mut serve_fut).is_pending());
+
+        // Send a stored snapshot called "snapshot-one" containing only a fake allocation.
+        const FAKE_ALLOCATION_ADDRESS: u64 = 8888;
+        const FAKE_ALLOCATION_SIZE: u64 = 120;
+        const FAKE_ALLOCATION_STACK_TRACE: [u64; 2] = [12345, 67890];
+        const FAKE_ALLOCATION_TIMESTAMP: i64 = 1122334455;
+        let (stack_trace_key, _) = resources_writer
+            .intern_compressed_stack_trace(&stack_trace_compression::compress(
+                &FAKE_ALLOCATION_STACK_TRACE,
+            ))
+            .unwrap();
+        allocations_writer
+            .insert_allocation(
+                FAKE_ALLOCATION_ADDRESS,
+                FAKE_ALLOCATION_SIZE,
+                stack_trace_key,
+                FAKE_ALLOCATION_TIMESTAMP,
+            )
+            .unwrap();
+        snapshot_sink_fn("snapshot-one");
+
+        // Remove the allocation and send a new stored snapshot called "snapshot-two".
+        allocations_writer.erase_allocation(FAKE_ALLOCATION_ADDRESS).unwrap();
+        snapshot_sink_fn("snapshot-two");
+
+        // Let the registry process our requests to store the named snapshots.
+        assert!(ex.run_until_stalled(&mut serve_fut).is_pending());
+
+        // Verify that "snapshot-one" is present in the registry and that it only contains our
+        // fake allocation.
+        let mut receive_named_snapshot_fn = |snapshot_name| {
+            ex.run_singlethreaded(async {
+                let (receiver_proxy, receiver_stream) =
+                    create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+                let receive_worker =
+                    fasync::Task::local(heapdump_snapshot::Snapshot::receive_from(receiver_stream));
+                let snapshot = registry
+                    .with_snapshot_storage(|snapshot_storage| {
+                        snapshot_storage
+                            .get_snapshot_by_name(snapshot_name)
+                            .expect("snapshot not found")
+                    })
+                    .await;
+                snapshot.write_to(receiver_proxy).await.expect("failed to write snapshot");
+                receive_worker.await.expect("failed to receive snapshot")
+            })
+        };
+        let mut snapshot_one = receive_named_snapshot_fn("snapshot-one");
+        let allocation = snapshot_one.allocations.remove(&FAKE_ALLOCATION_ADDRESS).unwrap();
+        assert_eq!(allocation.size, FAKE_ALLOCATION_SIZE);
+        assert_eq!(allocation.stack_trace.program_addresses, FAKE_ALLOCATION_STACK_TRACE);
+        assert_eq!(allocation.timestamp, FAKE_ALLOCATION_TIMESTAMP);
+        assert!(snapshot_one.allocations.is_empty(), "no other allocations should exist");
+        assert_executable_regions_valid_for_fake_process(&snapshot_one.executable_regions);
+
+        // Verify that "snapshot-two" is present too and that it does not contain any allocation.
+        let snapshot_two = receive_named_snapshot_fn("snapshot-two");
+        assert!(snapshot_two.allocations.is_empty(), "snapshot should be empty");
+        assert_executable_regions_valid_for_fake_process(&snapshot_two.executable_regions);
     }
 }

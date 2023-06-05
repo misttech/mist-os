@@ -35,6 +35,17 @@ impl AllocationsTable {
         self.vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("failed to share allocations VMO")
     }
 
+    // Take a snapshot of the underlying VMO.
+    pub fn snapshot_vmo(&self) -> zx::Vmo {
+        self.vmo
+            .create_child(
+                zx::VmoChildOptions::SNAPSHOT | zx::VmoChildOptions::NO_WRITE,
+                0,
+                VMO_SIZE as u64,
+            )
+            .expect("failed to snapshot allocations VMO")
+    }
+
     pub fn record_allocation(
         &mut self,
         address: u64,

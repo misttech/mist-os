@@ -19,7 +19,7 @@ use crate::{
 /// This is the root of all the instrumentation's data structures except for per-thread data, which
 /// is stored separately.
 pub struct Profiler {
-    _snapshot_sink: fheapdump_process::SnapshotSinkV1SynchronousProxy,
+    snapshot_sink: fheapdump_process::SnapshotSinkV1SynchronousProxy,
     inner: Mutex<ProfilerInner>,
 }
 
@@ -43,7 +43,7 @@ impl Default for Profiler {
         let proxy = fheapdump_process::SnapshotSinkV1SynchronousProxy::new(client.into_channel());
 
         let inner = ProfilerInner { snapshot_sink_server: Some(server), ..Default::default() };
-        Profiler { _snapshot_sink: proxy, inner: Mutex::new(inner) }
+        Profiler { snapshot_sink: proxy, inner: Mutex::new(inner) }
     }
 }
 
@@ -102,6 +102,16 @@ impl Profiler {
 
         inner.global_stats.total_deallocated_bytes += size;
         thread_data.local_stats.total_deallocated_bytes += size;
+    }
+
+    pub fn publish_named_snapshot(&self, name: &str) {
+        let allocations_table_snapshot = {
+            let inner = self.inner.lock().unwrap();
+            inner.allocations_table.snapshot_vmo()
+        };
+
+        // Ignore outcome.
+        let _ = self.snapshot_sink.store_named_snapshot(name, allocations_table_snapshot);
     }
 }
 

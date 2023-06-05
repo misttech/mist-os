@@ -21,6 +21,9 @@ type CollectorError = flexible enum {
 
     /// Failed to take a live snapshot.
     LIVE_SNAPSHOT_FAILED = 4;
+
+    /// The requested StoredSnapshot does not exist.
+    STORED_SNAPSHOT_NOT_FOUND = 5;
 };
 
 /// Filter to restrict an operation to a subset of the available processes.
@@ -116,6 +119,33 @@ protocol SnapshotReceiver {
     }) -> ();
 };
 
+/// A snapshot that is stored on the device and that can be downloaded.
+///
+/// Application-initiated snapshots belong to this category.
+type StoredSnapshot = table {
+    /// A number that uniquely identifies this snapshot within a Collector.
+    1: snapshot_id uint32;
+
+    /// The name given to this snapshot.
+    2: snapshot_name string:zx.MAX_NAME_LEN;
+
+    /// The koid of the process that this snapshot refers to.
+    3: process_koid zx.Koid;
+
+    /// The name of the process that this snapshot refers to.
+    4: process_name string:zx.MAX_NAME_LEN;
+};
+
+/// Protocol to retrieve a list of StoredSnapshots.
+protocol StoredSnapshotIterator {
+    /// Retrieves the next batch of StoredSnapshots elements.
+    ///
+    /// An empty response signals the end of the list.
+    GetNext() -> (struct {
+        batch vector<StoredSnapshot>:MAX;
+    });
+};
+
 /// Protocol to request and retrieve memory profiles.
 @discoverable
 protocol Collector {
@@ -130,6 +160,27 @@ protocol Collector {
         ///
         /// If not set, false is assumed.
         2: with_contents bool;
+    }) -> (resource struct {
+        receiver server_end:SnapshotReceiver;
+    }) error CollectorError;
+
+    /// Retrieves the list of all the available stored snapshots.
+    ListStoredSnapshots(resource table {
+        /// The server_end of the StoredSnapshotIterator that will be used to retrieve the results.
+        ///
+        /// Required.
+        1: iterator server_end:StoredSnapshotIterator;
+
+        /// If present, only retrieve snapshots that refer to matching processes.
+        2: process_selector ProcessSelector;
+    }) -> () error CollectorError;
+
+    /// Retrieves a stored snapshot.
+    DownloadStoredSnapshot(struct {
+        /// The identifier of the snapshot to be downloaded.
+        ///
+        /// The list of the available snapshots can be retrieved with ListStoredSnapshots.
+        snapshot_id uint32;
     }) -> (resource struct {
         receiver server_end:SnapshotReceiver;
     }) error CollectorError;

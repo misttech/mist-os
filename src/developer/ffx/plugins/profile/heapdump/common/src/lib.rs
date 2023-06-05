@@ -46,6 +46,9 @@ pub fn check_collector_error<T>(
         Err(fheapdump_client::CollectorError::LiveSnapshotFailed) => {
             ffx_bail!("Failed to take a snapshot of the current live allocations in the process")
         }
+        Err(fheapdump_client::CollectorError::StoredSnapshotNotFound) => {
+            ffx_bail!("The requested snapshot ID does not exist")
+        }
         Err(other) => {
             anyhow::bail!("Unrecognized CollectorError: {:?}", other)
         }

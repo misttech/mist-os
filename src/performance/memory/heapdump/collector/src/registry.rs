@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Context;
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_memory_heapdump_client::{self as fheapdump_client, CollectorError};
 use fidl_fuchsia_memory_heapdump_process as fheapdump_process;
@@ -14,16 +15,23 @@ use tracing::{info, warn};
 
 use crate::process::Process;
 use crate::process_v1::ProcessV1;
+use crate::snapshot_storage::SnapshotStorage;
 
 /// The "root" data structure, containing the state of the collector process.
 pub struct Registry {
     // Registered live processes.
     processes: Mutex<HashMap<Koid, Arc<dyn Process>>>,
+
+    // Stored snapshots.
+    snapshot_storage: Arc<Mutex<SnapshotStorage>>,
 }
 
 impl Registry {
     pub fn new() -> Registry {
-        Registry { processes: Mutex::new(HashMap::new()) }
+        Registry {
+            processes: Mutex::new(HashMap::new()),
+            snapshot_storage: Arc::new(Mutex::new(SnapshotStorage::new())),
+        }
     }
 
     async fn find_process_by_name(&self, name: &str) -> Result<Arc<dyn Process>, CollectorError> {
@@ -39,6 +47,28 @@ impl Registry {
     async fn find_process_by_koid(&self, koid: &Koid) -> Result<Arc<dyn Process>, CollectorError> {
         let result = self.processes.lock().await.get(koid).cloned();
         result.ok_or(CollectorError::ProcessSelectorNoMatch)
+    }
+
+    async fn send_stored_snapshots(
+        mut stream: fheapdump_client::StoredSnapshotIteratorRequestStream,
+        snapshots: &[fheapdump_client::StoredSnapshot],
+    ) -> Result<(), anyhow::Error> {
+        // TODO(fxbug.dev/128512): Batch multiple entries in the same message with measure-tape.
+        let mut index = 0;
+        while let Some(request) = stream.next().await.transpose()? {
+            match request {
+                fheapdump_client::StoredSnapshotIteratorRequest::GetNext { responder } => {
+                    if let Some(elem) = snapshots.get(index) {
+                        responder.send(std::slice::from_ref(elem))?;
+                        index += 1;
+                    } else {
+                        responder.send(&[])?;
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 
     pub async fn serve_client_stream(
@@ -71,9 +101,8 @@ impl Registry {
                     match process {
                         Ok(process) => match process.take_live_snapshot(with_contents) {
                             Ok(snapshot) => {
-                                let (proxy, stream) =
-                                    create_proxy::<fheapdump_client::SnapshotReceiverMarker>()
-                                        .expect("failed to create snapshot receiver channel");
+                                let (proxy, stream) = create_proxy()
+                                    .expect("failed to create snapshot receiver channel");
                                 responder.send(Ok(stream))?;
 
                                 if let Err(error) = snapshot.write_to(proxy).await {
@@ -87,6 +116,58 @@ impl Registry {
                         },
                         Err(e) => responder.send(Err(e))?,
                     };
+                }
+                fheapdump_client::CollectorRequest::ListStoredSnapshots { payload, responder } => {
+                    let iterator = payload.iterator.context("missing required iterator")?;
+                    let process_selector = payload.process_selector.as_ref();
+
+                    let filter: Result<Box<dyn Fn(Koid, &str) -> bool>, _> = match process_selector
+                    {
+                        None => Ok(Box::new(|_koid, _name| true)),
+                        Some(fheapdump_client::ProcessSelector::ByName(desired_name)) => {
+                            Ok(Box::new(|_koid, name| name == *desired_name))
+                        }
+                        Some(fheapdump_client::ProcessSelector::ByKoid(desired_koid)) => {
+                            Ok(Box::new(|koid, _name| koid.raw_koid() == *desired_koid))
+                        }
+                        Some(process_selector @ fheapdump_client::ProcessSelectorUnknown!()) => {
+                            warn!(ordinal = process_selector.ordinal(), "Unknown process selector");
+                            Err(CollectorError::ProcessSelectorUnsupported)
+                        }
+                    };
+
+                    match filter {
+                        Ok(filter) => {
+                            let snapshots =
+                                self.snapshot_storage.lock().await.list_snapshots(filter);
+                            responder.send(Ok(()))?;
+
+                            if let Err(error) =
+                                Registry::send_stored_snapshots(iterator.into_stream()?, &snapshots)
+                                    .await
+                            {
+                                warn!(?error, "Error while streaming list of stored snapshots");
+                            }
+                        }
+                        Err(error) => responder.send(Err(error))?,
+                    }
+                }
+                fheapdump_client::CollectorRequest::DownloadStoredSnapshot {
+                    snapshot_id,
+                    responder,
+                } => {
+                    let snapshot = self.snapshot_storage.lock().await.get_snapshot(snapshot_id);
+                    if let Some(snapshot) = snapshot {
+                        let (proxy, stream) =
+                            create_proxy().expect("failed to create snapshot receiver channel");
+                        responder.send(Ok(stream))?;
+
+                        if let Err(error) = snapshot.write_to(proxy).await {
+                            warn!(?error, "Error while streaming snapshot");
+                        }
+                    } else {
+                        responder.send(Err(CollectorError::StoredSnapshotNotFound))?;
+                    }
                 }
             }
         }
@@ -110,8 +191,13 @@ impl Registry {
                 snapshot_sink,
                 ..
             } => {
-                let process =
-                    ProcessV1::new(process, allocations_vmo, resources_vmo, snapshot_sink)?;
+                let process = ProcessV1::new(
+                    process,
+                    allocations_vmo,
+                    resources_vmo,
+                    snapshot_sink,
+                    self.snapshot_storage.clone(),
+                )?;
                 Arc::new(process)
             }
         };
@@ -153,6 +239,11 @@ impl Registry {
     pub async fn get_process(&self, koid: &Koid) -> Option<Arc<dyn Process>> {
         self.processes.lock().await.get(koid).cloned()
     }
+
+    #[cfg(test)]
+    pub async fn with_snapshot_storage<T>(&self, f: impl FnOnce(&SnapshotStorage) -> T) -> T {
+        f(&*self.snapshot_storage.lock().await)
+    }
 }
 
 #[cfg(test)]
@@ -162,7 +253,9 @@ mod tests {
     use async_trait::async_trait;
     use fidl::endpoints::create_proxy_and_stream;
     use fuchsia_async as fasync;
+    use fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES;
     use futures::{channel::oneshot, pin_mut};
+    use itertools::{assert_equal, Itertools};
     use test_case::test_case;
 
     use crate::process::Snapshot;
@@ -436,5 +529,150 @@ mod tests {
             FakeSnapshot::receive_and_assert_match(result.into_stream().unwrap(), expect_contents)
                 .await;
         }
+    }
+
+    async fn receive_list_of_snapshots(
+        iterator: fheapdump_client::StoredSnapshotIteratorProxy,
+    ) -> Vec<fheapdump_client::StoredSnapshot> {
+        let mut result = Vec::new();
+        loop {
+            let batch = iterator.get_next().await.unwrap();
+            if batch.is_empty() {
+                return result;
+            } else {
+                result.extend(batch);
+            }
+        }
+    }
+
+    #[test_case(0 ; "empty response")]
+    #[test_case(1 ; "one-entry response")]
+    #[test_case(ZX_CHANNEL_MAX_MSG_BYTES /* this number of _entries_ will cause pagination */ ;
+        "paginated response")]
+    #[fasync::run_singlethreaded(test)]
+    async fn test_list_stored_snapshots_without_filters(num_entries: u32) {
+        // Create a Registry and a client connected to it.
+        let (registry, proxy) = create_registry_and_proxy([]);
+
+        // Fill it with fake snapshots.
+        let mut expected_snapshots = Vec::new();
+        for seq in 0..num_entries {
+            // Generate placeholder values.
+            let snapshot_name = format!("snapshot-{}", seq);
+            let process_koid = (seq % 1234) as u64;
+            let process_name = format!("process-{}", seq);
+
+            let snapshot_id = registry.snapshot_storage.lock().await.add_snapshot(
+                process_name.clone(),
+                Koid::from_raw(process_koid),
+                snapshot_name.clone(),
+                Box::new(FakeSnapshot { with_contents: false }),
+            );
+
+            expected_snapshots.push(fheapdump_client::StoredSnapshot {
+                snapshot_id: Some(snapshot_id),
+                snapshot_name: Some(snapshot_name),
+                process_koid: Some(process_koid),
+                process_name: Some(process_name),
+                ..Default::default()
+            });
+        }
+
+        // Get the unfiltered list of snapshots.
+        let (iterator, server_end) = create_proxy().unwrap();
+        proxy
+            .list_stored_snapshots(fheapdump_client::CollectorListStoredSnapshotsRequest {
+                iterator: Some(server_end),
+                ..Default::default()
+            })
+            .await
+            .unwrap()
+            .unwrap();
+        let actual_snapshots = receive_list_of_snapshots(iterator).await;
+
+        // Verify the resulting list.
+        assert_equal(
+            actual_snapshots.iter().sorted_by_key(|e| e.snapshot_id),
+            expected_snapshots.iter().sorted_by_key(|e| e.snapshot_id),
+        );
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_list_stored_snapshots_with_filters() {
+        // Create a Registry and a client connected to it.
+        let (registry, proxy) = create_registry_and_proxy([]);
+
+        // Insert two fake snapshots.
+        let snapshot_id_koid_1234 = registry.snapshot_storage.lock().await.add_snapshot(
+            "process_1234".to_string(),
+            Koid::from_raw(1234),
+            "test_snapshot_1".to_string(),
+            Box::new(FakeSnapshot { with_contents: false }),
+        );
+        let snapshot_id_name_foobar = registry.snapshot_storage.lock().await.add_snapshot(
+            "process_foobar".to_string(),
+            Koid::from_raw(4321),
+            "test_snapshot_2".to_string(),
+            Box::new(FakeSnapshot { with_contents: false }),
+        );
+
+        // Verify filtering by koid.
+        let (iterator, server_end) = create_proxy().unwrap();
+        proxy
+            .list_stored_snapshots(fheapdump_client::CollectorListStoredSnapshotsRequest {
+                iterator: Some(server_end),
+                process_selector: Some(fheapdump_client::ProcessSelector::ByKoid(1234)),
+                ..Default::default()
+            })
+            .await
+            .unwrap()
+            .unwrap();
+        let returned_snapshots = receive_list_of_snapshots(iterator).await;
+        assert_eq!(
+            returned_snapshots.iter().at_most_one().unwrap().unwrap().snapshot_id,
+            Some(snapshot_id_koid_1234)
+        );
+
+        // Verify filtering by name.
+        let (iterator, server_end) = create_proxy().unwrap();
+        proxy
+            .list_stored_snapshots(fheapdump_client::CollectorListStoredSnapshotsRequest {
+                iterator: Some(server_end),
+                process_selector: Some(fheapdump_client::ProcessSelector::ByName(
+                    "process_foobar".to_string(),
+                )),
+                ..Default::default()
+            })
+            .await
+            .unwrap()
+            .unwrap();
+        let returned_snapshots = receive_list_of_snapshots(iterator).await;
+        assert_eq!(
+            returned_snapshots.iter().at_most_one().unwrap().unwrap().snapshot_id,
+            Some(snapshot_id_name_foobar)
+        );
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_download_stored_snapshot() {
+        // Create a Registry and a client connected to it.
+        let (registry, proxy) = create_registry_and_proxy([]);
+
+        // Insert a fake snapshot and verify that it can be downloaded.
+        let snapshot_id = registry.snapshot_storage.lock().await.add_snapshot(
+            "foobar".to_string(),
+            Koid::from_raw(1234),
+            "foobaz".to_string(),
+            Box::new(FakeSnapshot { with_contents: false }),
+        );
+        let result = proxy.download_stored_snapshot(snapshot_id).await.unwrap().unwrap();
+        FakeSnapshot::receive_and_assert_match(result.into_stream().unwrap(), false).await;
+
+        // Attempt to request a non-existing snapshot and verify the returned error.
+        let bad_snapshot_id = snapshot_id + 1;
+        assert_eq!(
+            proxy.download_stored_snapshot(bad_snapshot_id).await.unwrap(),
+            Err(CollectorError::StoredSnapshotNotFound)
+        );
     }
 }

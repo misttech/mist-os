@@ -3,3 +3,4 @@ __scudo_deallocate_hook
 heapdump_bind_with_channel
 heapdump_bind_with_fdio
 heapdump_get_stats
+heapdump_take_named_snapshot
