@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//sdk/lib/syslog/client.shard.cml" ],
+    include: [ "syslog/client.shard.cml" ],
     program: {
         runner: "elf",
         binary: "bin/audio_device_registry",
@@ -10,16 +10,13 @@
     capabilities: [
         {
             protocol: [
-                "fuchsia.audio.device.Controller",
+                "fuchsia.audio.device.ControlCreator",
                 "fuchsia.audio.device.Provider",
                 "fuchsia.audio.device.Registry",
             ],
         },
     ],
     use: [
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-        },
         {
             directory: "dev-audio-input",
             rights: [ "r*" ],
@@ -34,7 +31,7 @@
     expose: [
         {
             protocol: [
-                "fuchsia.audio.device.Controller",
+                "fuchsia.audio.device.ControlCreator",
                 "fuchsia.audio.device.Provider",
                 "fuchsia.audio.device.Registry",
             ],

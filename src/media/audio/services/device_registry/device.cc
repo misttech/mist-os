@@ -90,14 +90,13 @@ Device::~Device() {
 
 // Invoked when the underlying driver disconnects its StreamConfig.
 void Device::on_fidl_error(fidl::UnbindInfo info) {
-  ADR_LOG_OBJECT(kLogStreamConfigFidlResponses || kLogDeviceState) << "(StreamConfig)";
   if (!info.is_peer_closed() && !info.is_user_initiated()) {
     ADR_WARN_OBJECT() << "StreamConfig disconnected:" << info;
     OnError(info.status());
+  } else {
+    ADR_LOG_OBJECT(kLogStreamConfigFidlResponses || kLogDeviceState || kLogObjectLifetimes)
+        << "StreamConfig disconnected:" << info.FormatDescription();
   }
-
-  ADR_LOG_OBJECT(kLogStreamConfigFidlResponses || kLogObjectLifetimes)
-      << "StreamConfig disconnected:" << info.FormatDescription();
 
   OnRemoval();
 }
