@@ -9,15 +9,20 @@ use {{ fidl_rust_crate_name }} as ftest;
 use realm_proxy::client::RealmProxyClient;
 use tracing::info;
 
+async fn create_realm(options: ftest::RealmOptions) -> Result<RealmProxyClient> {
+    let realm_factory = connect_to_protocol::<ftest::RealmFactoryMarker>()?;
+    let (client, server) = create_endpoints();
+
+    realm_factory.set_realm_options(options).await?.map_err(realm_proxy::Error::OperationError)?;
+    realm_factory.create_realm(server).await?.map_err(realm_proxy::Error::OperationError)?;
+
+    Ok(RealmProxyClient::from(client))
+}
+
 #[fuchsia::test]
 async fn test_example() -> Result<()> {
     let realm_options = ftest::RealmOptions{ ..Default::default() };
-    let realm_factory = connect_to_protocol::<ftest::RealmFactoryMarker>()?;
-    let (realm_client, realm_server) = create_endpoints();
-
-    realm_factory.set_realm_options(realm_options).await?.map_err(realm_proxy::Error::OperationError)?;
-    realm_factory.create_realm(realm_server).await?.map_err(realm_proxy::Error::OperationError)?;
-    let _realm = RealmProxyClient::from(realm_client);
+    let _realm = create_realm(realm_options).await?;
 
     info!("connected to the test realm!");
 
