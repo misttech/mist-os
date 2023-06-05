@@ -84,6 +84,10 @@ pub(crate) enum RequestArgs {
     Address(AddressRequestArgs),
 }
 
+/// An error encountered while handling a [`Request`].
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum RequestError {}
+
 /// A request associated with links or addresses.
 pub(crate) struct Request<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> {
     /// The resource and operation-specific argument(s) for this request.
@@ -91,7 +95,7 @@ pub(crate) struct Request<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> 
     /// The client that made the request.
     pub client: InternalClient<NetlinkRoute, S>,
     /// A completer that will have the result of the request sent over.
-    pub completer: oneshot::Sender<()>,
+    pub completer: oneshot::Sender<Result<(), RequestError>>,
 }
 
 /// Contains the asynchronous work related to RTM_LINK and RTM_ADDR messages.
@@ -271,15 +275,16 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
         all_addresses: &BTreeMap<InterfaceAndAddr, NetlinkAddressMessage>,
         Request { args, mut client, completer }: Request<S>,
     ) {
-        debug!("got request {args:?} from {client}");
+        debug!("handling request {args:?} from {client}");
 
-        match &args {
+        let result = match &args {
             RequestArgs::Link(LinkRequestArgs::Get(args)) => match args {
                 GetLinkArgs::Dump => {
                     interface_properties
                         .values()
                         .filter_map(NetlinkLinkMessage::optionally_from)
                         .for_each(|message| client.send(message.into_rtnl_new_link()));
+                    Ok(())
                 }
             },
             RequestArgs::Address(AddressRequestArgs::Get(args)) => match args {
@@ -299,18 +304,23 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
                             })
                         })
                         .for_each(|message| client.send(message.to_rtnl_new_addr()));
+
+                    Ok(())
                 }
             },
-        }
+        };
 
-        debug!("handled request {args:?} from {client}");
+        debug!("handled request {args:?} from {client} with result = {result:?}");
 
-        match completer.send(()) {
+        match completer.send(result) {
             Ok(()) => (),
-            Err(()) => {
-                // Not treated as a hard error because the socket
-                // may have been closed.
-                warn!("failed to send completion event to socket ({client}) handler")
+            Err(result) => {
+                // Not treated as a hard error because the socket may have been
+                // closed.
+                warn!(
+                    "failed to send result ({:?}) to {} after handling request {:?}",
+                    result, client, args,
+                )
             }
         }
     }
@@ -1570,7 +1580,7 @@ mod tests {
                 waiter
             });
         futures::select! {
-            res = fut.fuse() => assert_eq!(res, Ok(())),
+            res = fut.fuse() => assert_eq!(res, Ok(Ok(()))),
             err = event_loop_fut => unreachable!("eventloop should not return: {err:?}"),
         }
         assert_eq!(&other_sink.take_messages()[..], &[]);
