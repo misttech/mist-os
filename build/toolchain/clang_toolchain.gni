@@ -770,20 +770,22 @@ template("clang_toolchain") {
       outname = "{{target_output_name}}{{output_extension}}"
       outfile = "{{output_dir}}/$outname"
       rspfile = "$outfile.rsp"
+      command = ""
 
       use_llvm_ifs =
           invoker.toolchain_os != "mac" && invoker.toolchain_os != "win"
       unstripped_outfile = outfile
       if (use_strip) {
+        command += "mkdir -p {{output_dir}}/{{UNSTRIPPED_DIR}} && "
         unstripped_outfile = "{{output_dir}}/{{UNSTRIPPED_DIR}}/{{target_output_name}}{{output_extension}}"
       }
       if (invoker.toolchain_os == "mac") {
-        command = "$ld {{SOLINK_FLAGS}}{{ldflags}} -o \"$unstripped_outfile\" -Wl,-filelist,\"$rspfile\" {{solibs}} {{libs}} {{frameworks}}"
+        command += "$ld {{SOLINK_FLAGS}}{{ldflags}} -o \"$unstripped_outfile\" -Wl,-filelist,\"$rspfile\" {{solibs}} {{libs}} {{frameworks}}"
         rspfile_content = "{{inputs_newline}}"
       } else {
         depfile = "$outfile.d"
         depsformat = "gcc"
-        command = "$ld {{SOLINK_FLAGS}}{{ldflags}} -o \"$unstripped_outfile\" -Wl,--dependency-file=\"$depfile\" -Wl,--Map=\"$unstripped_outfile.map\""
+        command += "$ld {{SOLINK_FLAGS}}{{ldflags}} -o \"$unstripped_outfile\" -Wl,--dependency-file=\"$depfile\" -Wl,--Map=\"$unstripped_outfile.map\""
         command +=
             " {{START_GROUP}}\"@$rspfile\" {{solibs}} {{END_GROUP}}{{libs}}"
         rspfile_content = "{{inputs}}"
