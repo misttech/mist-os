@@ -17,6 +17,8 @@ import cl_utils
 import remote_action
 import remotetool
 
+from typing import Tuple
+
 
 class MainArgParserTests(unittest.TestCase):
 
@@ -93,6 +95,26 @@ _fake_downloader = remotetool.RemoteTool(
     })
 
 
+def _fake_download(
+    packed_args: Tuple[remote_action.DownloadStubInfo, remotetool.RemoteTool,
+                       Path]
+) -> Tuple[Path, cl_utils.SubprocessResult]:
+    # For mocking dlwrap._download_for_mp.
+    # defined because multiprocessing cannot serialize mocks
+    stub_info, downloader, working_dir_abs = packed_args
+    return (stub_info.path, cl_utils.SubprocessResult(0))
+
+
+def _fake_download_fail(
+    packed_args: Tuple[remote_action.DownloadStubInfo, remotetool.RemoteTool,
+                       Path]
+) -> Tuple[Path, cl_utils.SubprocessResult]:
+    # For mocking dlwrap._download_for_mp.
+    # defined because multiprocessing cannot serialize mocks
+    stub_info, downloader, working_dir_abs = packed_args
+    return (stub_info.path, cl_utils.SubprocessResult(1))
+
+
 class DownloadArtifactsTests(unittest.TestCase):
 
     def _stub_info(self, path: Path) -> remote_action.DownloadStubInfo:
@@ -112,17 +134,14 @@ class DownloadArtifactsTests(unittest.TestCase):
         with mock.patch.object(dlwrap, 'read_download_stub_infos',
                                return_value=iter([self._stub_info(path)
                                                  ])) as mock_read_stubs:
-            with mock.patch.object(remote_action.DownloadStubInfo, 'download',
-                                   return_value=cl_utils.SubprocessResult(
-                                       download_status)) as mock_download:
+            with mock.patch.object(dlwrap, '_download_for_mp',
+                                   new=_fake_download) as mock_download:
                 status = dlwrap.download_artifacts(
                     [path],
                     downloader=_fake_downloader,
                     working_dir_abs=working_dir)
         self.assertEqual(status, download_status)
         mock_read_stubs.assert_called_once()
-        mock_download.assert_called_with(
-            downloader=_fake_downloader, working_dir_abs=working_dir)
 
     def test_failure(self):
         path = 'highway/to/hell.obj'
@@ -132,17 +151,14 @@ class DownloadArtifactsTests(unittest.TestCase):
         with mock.patch.object(dlwrap, 'read_download_stub_infos',
                                return_value=iter([self._stub_info(path)
                                                  ])) as mock_read_stubs:
-            with mock.patch.object(remote_action.DownloadStubInfo, 'download',
-                                   return_value=cl_utils.SubprocessResult(
-                                       download_status)) as mock_download:
+            with mock.patch.object(dlwrap, '_download_for_mp',
+                                   new=_fake_download_fail) as mock_download:
                 status = dlwrap.download_artifacts(
                     [path],
                     downloader=_fake_downloader,
                     working_dir_abs=working_dir)
         self.assertEqual(status, download_status)
         mock_read_stubs.assert_called_once()
-        mock_download.assert_called_with(
-            downloader=_fake_downloader, working_dir_abs=working_dir)
 
 
 class MainTests(unittest.TestCase):

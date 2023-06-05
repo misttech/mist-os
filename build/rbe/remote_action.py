@@ -14,6 +14,7 @@ Usage:
 import argparse
 import difflib
 import filecmp
+import multiprocessing
 import os
 import re
 import subprocess
@@ -1298,6 +1299,7 @@ class RemoteAction(object):
         return self.remote_launch_command
 
     def _process_download_stubs(self):
+        """Create download stubs so artifacts can be retrieved later."""
         self.vmsg(f"Reading remote action log from {self._action_log}.")
         log_record = ReproxyLogEntry.parse_action_log(self._action_log)
 
@@ -1322,17 +1324,24 @@ class RemoteAction(object):
             self.vmsg(f"  {stub_info.path}: {stub_info.blob_digest}")
             stub_info.create(self.working_dir)
 
+        if not self.always_download:
+            return
+
         # Download outputs that were explicitly requested.
-        # With 'log_record', we can just go directly to stub info without
-        # having to read the stub file we just wrote.
         downloader = self.downloader()
-        for path in self.always_download:  # TODO: parallelize
-            stub_info = stub_infos[path]
-            self.vmsg(f"Downloading {path}")
-            status = stub_info.download(
-                downloader=downloader, working_dir_abs=self.working_dir)
-            if status.returncode != 0:  # alert, but do not fail
-                msg(f"Unable to download {path}.")
+        download_args = [
+            (self, stub_infos[path], downloader)  # for _download_for_mp
+            for path in self.always_download
+        ]
+        try:
+            with multiprocessing.Pool() as pool:
+                statuses = pool.map(_download_for_mp, download_args)
+        except OSError:  # in case /dev/shm is not writeable (required)
+            if len(self.always_download) > 1:
+                msg("Warning: downloading sequentially instead of in parallel.")
+            statuses = map(_download_for_mp, download_args)
+
+        return {path: status for path, status in statuses}
 
     def downloader(self) -> remotetool.RemoteTool:
         with open(self.exec_root / _REPROXY_CFG) as cfg:
@@ -1722,6 +1731,19 @@ class RemoteAction(object):
 
         # No output content differences: success.
         return 0
+
+
+def _download_for_mp(
+    packed_args: Tuple[RemoteAction, DownloadStubInfo, remotetool.RemoteTool]
+) -> Tuple[Path, cl_utils.SubprocessResult]:
+    action, stub_info, downloader = packed_args
+    path = stub_info.path
+    action.vmsg(f"Downloading {path}")
+    status = stub_info.download(
+        downloader=downloader, working_dir_abs=action.working_dir)
+    if status.returncode != 0:  # alert, but do not fail
+        msg(f"Unable to download {path}.")
+    return path, status
 
 
 def _rewrapper_arg_parser() -> argparse.ArgumentParser:

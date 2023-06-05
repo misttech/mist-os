@@ -20,7 +20,7 @@ import cl_utils
 import output_leak_scanner
 import remotetool
 
-from typing import Any, Dict, Sequence
+from typing import Any, Dict, Sequence, Tuple
 
 _HAVE_XATTR = hasattr(os, 'setxattr')
 
@@ -54,6 +54,16 @@ def _paths(items: Sequence[Any]) -> Sequence[Path]:
 
     t = type(items)
     raise TypeError(f"Unhandled sequence type: {t}")
+
+
+def _fake_download(
+    packed_args: Tuple[remote_action.RemoteAction,
+                       remote_action.DownloadStubInfo, remotetool.RemoteTool]
+) -> Tuple[Path, cl_utils.SubprocessResult]:
+    # For mocking remote_action._download_for_mp.
+    # defined because multiprocessing cannot serialize mocks
+    action, stub_info, downloader = packed_args
+    return (stub_info.path, cl_utils.SubprocessResult(0))
 
 
 class FakeReproxyLogEntry(remote_action.ReproxyLogEntry):
@@ -1942,10 +1952,7 @@ remote_metadata: {{
                             remote_action.RemoteAction, '_run_maybe_remotely',
                             return_value=cl_utils.SubprocessResult(
                                 0)) as mock_run:
-                        with mock.patch.object(remote_action.RemoteAction,
-                                               'downloader', return_value=self.
-                                               downloader) as mock_downloader:
-                            exit_code = action.run()
+                        exit_code = action.run()
             self.assertEqual(exit_code, 0)
         mock_run.assert_called()
         mock_log_dir.assert_called_once()
@@ -1955,7 +1962,6 @@ remote_metadata: {{
             dirs=[],
             build_id=logdir,
         )
-        mock_downloader.assert_called_with()
 
     def test_made_download_stubs_for_racing_remote_win(self):
         exec_root = Path('/home/project')
@@ -1992,10 +1998,7 @@ remote_metadata: {{
                             remote_action.RemoteAction, '_run_maybe_remotely',
                             return_value=cl_utils.SubprocessResult(
                                 0)) as mock_run:
-                        with mock.patch.object(remote_action.RemoteAction,
-                                               'downloader', return_value=self.
-                                               downloader) as mock_downloader:
-                            exit_code = action.run()
+                        exit_code = action.run()
             self.assertEqual(exit_code, 0)
         mock_run.assert_called()
         mock_log_dir.assert_called_once()
@@ -2005,7 +2008,6 @@ remote_metadata: {{
             dirs=[],
             build_id=logdir,
         )
-        mock_downloader.assert_called_with()
 
     def test_no_download_stubs_for_local_execution(self):
         exec_root = Path('/home/project')
@@ -2161,8 +2163,8 @@ remote_metadata: {{
                                    return_value=log_record) as mock_parse_log:
                 with mock.patch.object(remote_action.DownloadStubInfo,
                                        'create') as mock_write_stub:
-                    with mock.patch.object(remote_action.DownloadStubInfo,
-                                           'download') as mock_download:
+                    with mock.patch.object(remote_action, '_download_for_mp',
+                                           new=_fake_download) as mock_download:
                         with mock.patch.object(
                                 remote_action.RemoteAction,
                                 '_run_maybe_remotely',
@@ -2179,10 +2181,6 @@ remote_metadata: {{
         mock_write_stub.assert_called_with(working_dir)
         mock_parse_log.assert_called_with(Path(str(output) + '.rrpl'))
         mock_downloader.assert_called_with()
-        mock_download.assert_called_with(
-            downloader=self.downloader,
-            working_dir_abs=working_dir,
-        )
 
     def test_explicit_always_download_with_real_proxy_logdir(self):
         with tempfile.TemporaryDirectory() as td:
@@ -2243,8 +2241,8 @@ completion_status: STATUS_CACHE_HIT
 
             with mock.patch.object(remote_action, '_reproxy_log_dir',
                                    return_value=logdir) as mock_log_dir:
-                with mock.patch.object(remote_action.DownloadStubInfo,
-                                       'download') as mock_download:
+                with mock.patch.object(remote_action, '_download_for_mp',
+                                       new=_fake_download) as mock_download:
                     with mock.patch(
                             'remote_action.RemoteAction._run_maybe_remotely',
                             new=fake_run_remote) as mock_run:
@@ -2255,10 +2253,6 @@ completion_status: STATUS_CACHE_HIT
             self.assertEqual(exit_code, 0)
             mock_log_dir.assert_called_once()
             mock_downloader.assert_called_with()
-            mock_download.assert_called_with(
-                downloader=self.downloader,
-                working_dir_abs=working_dir,
-            )
 
 
 class RbeDiagnosticsTests(unittest.TestCase):

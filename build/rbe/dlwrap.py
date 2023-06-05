@@ -10,6 +10,7 @@ Usage:
 """
 
 import argparse
+import multiprocessing
 import os
 import subprocess
 import sys
@@ -20,7 +21,7 @@ import remote_action
 import remotetool
 
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Iterable, Sequence, Tuple
 
 _SCRIPT_BASENAME = Path(__file__).name
 
@@ -102,6 +103,19 @@ def read_download_stub_infos(
             vmsg(verbose, f"{p} is not a download stub, skipping.")
 
 
+def _download_for_mp(
+    packed_args: Tuple[remote_action.DownloadStubInfo, remotetool.RemoteTool,
+                       Path]
+) -> Tuple[Path, cl_utils.SubprocessResult]:
+    """multiprocessing requires functions to be pickle-able,
+    thus this function must exist at the module-level scope.
+    """
+    stub, downloader, working_dir_abs = packed_args
+    return (
+        stub.path,
+        stub.download(downloader=downloader, working_dir_abs=working_dir_abs))
+
+
 def download_artifacts(
     stub_paths: Iterable[Path],
     downloader: remotetool.RemoteTool,
@@ -116,16 +130,19 @@ def download_artifacts(
         Real artifacts are ignored automatically.
     """
     stub_infos = read_download_stub_infos(
-        stub_paths, verbose=verbose, dry_run=dry_run)
-    # TODO: download in parallel
-    download_statuses = [
-        (
-            stub.path,
-            stub.download(
-                downloader=downloader,
-                working_dir_abs=working_dir_abs,
-            )) for stub in stub_infos
+        set(stub_paths), verbose=verbose, dry_run=dry_run)
+
+    download_args = [
+        (stub_info, downloader, working_dir_abs) for stub_info in stub_infos
     ]
+    try:
+        with multiprocessing.Pool() as pool:
+            download_statuses = pool.map(_download_for_mp, download_args)
+    except OSError:  # in case /dev/shm is not write-able (required)
+        if len(download_args) > 1:
+            msg("Warning: downloading sequentially instead of in parallel.")
+        download_statuses = map(_download_for_mp, download_args)
+
     final_status = 0
     for path, status in download_statuses:
         if status.returncode != 0:
