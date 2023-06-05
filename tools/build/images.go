@@ -10,6 +10,7 @@ const (
 	ImageTypeQEMUKernel string = "kernel"
 	ImageTypeZBI        string = "zbi"
 	ImageTypeVBMeta     string = "vbmeta"
+	ImageTypeBlk        string = "blk"
 )
 
 // Image represents an entry in an image manifest.

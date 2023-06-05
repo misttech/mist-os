@@ -334,7 +334,9 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 				if img.Label == t.imageOverrides.ZBI {
 					img.Args = append(img.Args, "--boot")
 					imgs = append(imgs, img)
-					break
+				} else if img.Label == t.imageOverrides.FVM && filepath.Ext(img.Name) == ".fvm" {
+					img.Args = append(img.Args, "--fvm")
+					imgs = append(imgs, img)
 				}
 			}
 		}
@@ -470,6 +472,7 @@ func (t *Device) flash(ctx context.Context, images []bootserver.Image) error {
 		}
 	}()
 
+	// TODO(fxbug.dev/87634): Need support for ffx target flash for cuckoo tests.
 	if pubkey != "" && t.UseFFX() {
 		flashManifest := getImageByName(images, "manifest_flash-manifest")
 		if flashManifest == nil {

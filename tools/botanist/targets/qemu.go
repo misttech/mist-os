@@ -285,8 +285,23 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 		}
 	}()
 
-	fvmImage := getImageByName(images, "blk_storage-full")
-	fxfsImage := getImageByName(images, "fxfs-blk_storage-full")
+	var fvmImage *bootserver.Image
+	var fxfsImage *bootserver.Image
+	if t.imageOverrides.IsEmpty() {
+		fvmImage = getImageByName(images, "blk_storage-full")
+		fxfsImage = getImageByName(images, "fxfs-blk_storage-full")
+	} else if t.imageOverrides.FVM != "" {
+		// TODO(ihuh): Figure out proper way to identify fvm instead of
+		// hardcoding the name extension.
+		for _, img := range images {
+			if img.Label == t.imageOverrides.FVM &&
+				img.Type == build.ImageTypeBlk &&
+				filepath.Ext(img.Name) == ".fvm" {
+				fvmImage = &img
+				break
+			}
+		}
+	}
 
 	if err := copyImagesToDir(ctx, workdir, false, qemuKernel, zbi, efiDisk, fvmImage, fxfsImage); err != nil {
 		return err
