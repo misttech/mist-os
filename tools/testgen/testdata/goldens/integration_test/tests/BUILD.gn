@@ -30,7 +30,7 @@ rustc_test("bin") {
 
 fuchsia_component("test-suite-component") {
   testonly = true
-  component_name = "default"
+  component_name = "test-suite"
   manifest = "meta/test-suite.cml"
   deps = [ ":bin" ]
 }

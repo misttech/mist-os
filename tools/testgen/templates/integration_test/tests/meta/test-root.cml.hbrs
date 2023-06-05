@@ -13,7 +13,7 @@
         },
         {
             name: "test_suite",
-            url: "test-suite#meta/default.cm",
+            url: "test-suite#meta/test-suite.cm",
         },
     ],
     offer: [
