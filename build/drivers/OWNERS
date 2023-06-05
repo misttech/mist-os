@@ -1,4 +1,5 @@
-abdulla@google.com
+include /src/devices/OWNERS
+
 andresoportus@google.com
 dgilhooley@google.com
 surajmalhotra@google.com
