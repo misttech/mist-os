@@ -286,17 +286,14 @@ magma::Status MagmaSystemConnection::ImportObject(zx::handle handle,
       platform_sem->set_local_id(client_id);
 
       auto iter = semaphore_map_.find(client_id);
-      if (iter != semaphore_map_.end()) {
-        iter->second.refcount++;
-        return MAGMA_STATUS_OK;
-      }
+      if (iter != semaphore_map_.end())
+        return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "semaphore id %lu already imported",
+                              client_id);
 
       auto semaphore = MagmaSystemSemaphore::Create(device->driver(), std::move(platform_sem));
       MAGMA_DASSERT(semaphore);
 
-      SemaphoreReference ref;
-      ref.semaphore = std::move(semaphore);
-      semaphore_map_.insert(std::make_pair(client_id, ref));
+      semaphore_map_.insert(std::make_pair(client_id, std::move(semaphore)));
     } break;
     default:
       return MAGMA_DRET(MAGMA_STATUS_INVALID_ARGS);
@@ -316,9 +313,6 @@ magma::Status MagmaSystemConnection::ReleaseObject(
       if (iter == semaphore_map_.end())
         return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS,
                               "Attempting to release invalid semaphore id 0x%" PRIx64, object_id);
-
-      if (--iter->second.refcount > 0)
-        return MAGMA_STATUS_OK;
 
       semaphore_map_.erase(iter);
     } break;
@@ -446,7 +440,7 @@ std::shared_ptr<MagmaSystemSemaphore> MagmaSystemConnection::LookupSemaphore(uin
   auto iter = semaphore_map_.find(id);
   if (iter == semaphore_map_.end())
     return nullptr;
-  return iter->second.semaphore;
+  return iter->second;
 }
 
 msd::PerfCountPool* MagmaSystemConnection::LookupPerfCountPool(uint64_t id) {

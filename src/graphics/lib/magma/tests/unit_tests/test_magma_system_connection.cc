@@ -134,13 +134,12 @@ TEST(MagmaSystemConnection, Semaphores) {
   auto dev =
       std::shared_ptr<MagmaSystemDevice>(MagmaSystemDevice::Create(MsdDeviceUniquePtr(msd_dev)));
   auto msd_connection = msd_device_open(msd_dev, 0);
-  ASSERT_NE(msd_connection, nullptr);
+  ASSERT_TRUE(msd_connection);
+
   MagmaSystemConnection connection(dev, MsdConnectionUniquePtr(msd_connection));
 
   auto semaphore = magma::PlatformSemaphore::Create();
-
-  // assert because if this fails the rest of this is gonna be bogus anyway
-  ASSERT_NE(semaphore, nullptr);
+  ASSERT_TRUE(semaphore);
 
   uint32_t duplicate_handle1;
   ASSERT_TRUE(semaphore->duplicate_handle(&duplicate_handle1));
@@ -149,20 +148,16 @@ TEST(MagmaSystemConnection, Semaphores) {
                                       semaphore->id()));
 
   auto system_semaphore = connection.LookupSemaphore(semaphore->id());
-  EXPECT_NE(system_semaphore, nullptr);
+  EXPECT_TRUE(system_semaphore);
   EXPECT_EQ(system_semaphore->platform_semaphore()->id(), semaphore->id());
 
   uint32_t duplicate_handle2;
   ASSERT_TRUE(semaphore->duplicate_handle(&duplicate_handle2));
 
-  EXPECT_TRUE(connection.ImportObject(duplicate_handle2, magma::PlatformObject::SEMAPHORE,
-                                      semaphore->id()));
+  // Can't import the same id twice
+  EXPECT_FALSE(connection.ImportObject(duplicate_handle2, magma::PlatformObject::SEMAPHORE,
+                                       semaphore->id()));
 
-  // freeing the allocated semaphore should decrease refcount to 1
-  EXPECT_TRUE(connection.ReleaseObject(semaphore->id(), magma::PlatformObject::SEMAPHORE));
-  EXPECT_NE(connection.LookupSemaphore(semaphore->id()), nullptr);
-
-  // freeing the allocated buffer should work
   EXPECT_TRUE(connection.ReleaseObject(semaphore->id(), magma::PlatformObject::SEMAPHORE));
 
   // should no longer be able to get it from the map

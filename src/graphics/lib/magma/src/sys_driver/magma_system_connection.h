@@ -97,10 +97,6 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
     uint64_t refcount = 1;
     std::shared_ptr<MagmaSystemBuffer> buffer;
   };
-  struct SemaphoreReference {
-    uint64_t refcount = 1;
-    std::shared_ptr<MagmaSystemSemaphore> semaphore;
-  };
   struct PoolReference {
     msd_perf_count_pool* msd_pool;
     std::unique_ptr<magma::PlatformPerfCountPool> platform_pool;
@@ -125,7 +121,7 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
   msd_connection_unique_ptr_t msd_connection_;
   std::unordered_map<uint32_t, std::unique_ptr<MagmaSystemContext>> context_map_;
   std::unordered_map<uint64_t, BufferReference> buffer_map_;
-  std::unordered_map<uint64_t, SemaphoreReference> semaphore_map_;
+  std::unordered_map<uint64_t, std::shared_ptr<MagmaSystemSemaphore>> semaphore_map_;
 
   msd_connection_notification_callback_t platform_callback_{};
   void* platform_token_{};

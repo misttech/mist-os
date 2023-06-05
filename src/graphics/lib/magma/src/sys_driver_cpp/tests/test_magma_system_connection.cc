@@ -139,13 +139,11 @@ TEST(MagmaSystemConnection, Semaphores) {
   auto msd_connection = msd_dev->Open(0);
   auto dev = std::shared_ptr<MagmaSystemDevice>(
       MagmaSystemDevice::Create(msd_drv.get(), std::move(msd_dev)));
-  ASSERT_NE(msd_connection, nullptr);
+  ASSERT_TRUE(msd_connection);
   MagmaSystemConnection connection(dev, std::move(msd_connection));
 
   auto semaphore = magma::PlatformSemaphore::Create();
-
-  // assert because if this fails the rest of this is gonna be bogus anyway
-  ASSERT_NE(semaphore, nullptr);
+  ASSERT_TRUE(semaphore);
 
   zx::handle duplicate_handle1;
   ASSERT_TRUE(semaphore->duplicate_handle(&duplicate_handle1));
@@ -154,22 +152,17 @@ TEST(MagmaSystemConnection, Semaphores) {
       std::move(duplicate_handle1), fuchsia_gpu_magma::wire::ObjectType::kEvent, semaphore->id()));
 
   auto system_semaphore = connection.LookupSemaphore(semaphore->id());
-  EXPECT_NE(system_semaphore, nullptr);
+  EXPECT_TRUE(system_semaphore);
   EXPECT_EQ(static_cast<MsdMockSemaphore*>(system_semaphore->msd_semaphore())->GetKoid(),
             semaphore->id());
 
   zx::handle duplicate_handle2;
   ASSERT_TRUE(semaphore->duplicate_handle(&duplicate_handle2));
 
-  EXPECT_TRUE(connection.ImportObject(
+  // Can't import the same id twice
+  EXPECT_FALSE(connection.ImportObject(
       std::move(duplicate_handle2), fuchsia_gpu_magma::wire::ObjectType::kEvent, semaphore->id()));
 
-  // freeing the allocated semaphore should decrease refcount to 1
-  EXPECT_TRUE(
-      connection.ReleaseObject(semaphore->id(), fuchsia_gpu_magma::wire::ObjectType::kEvent));
-  EXPECT_NE(connection.LookupSemaphore(semaphore->id()), nullptr);
-
-  // freeing the allocated buffer should work
   EXPECT_TRUE(
       connection.ReleaseObject(semaphore->id(), fuchsia_gpu_magma::wire::ObjectType::kEvent));
 
