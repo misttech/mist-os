@@ -633,7 +633,7 @@ impl BinderProcess {
         cookie: binder_uintptr_t,
     ) -> Result<(), Errno> {
         let proxy = match handle {
-            Handle::SpecialServiceManager => {
+            Handle::ContextManager => {
                 not_implemented!("death notification for service manager");
                 return Ok(());
             }
@@ -663,7 +663,7 @@ impl BinderProcess {
         cookie: binder_uintptr_t,
     ) -> Result<(), Errno> {
         let proxy = match handle {
-            Handle::SpecialServiceManager => {
+            Handle::ContextManager => {
                 not_implemented!("clear death notification for service manager");
                 self.enqueue_command(Command::ClearDeathNotificationDone(cookie));
                 return Ok(());
@@ -768,7 +768,7 @@ impl<'a> BinderProcessGuard<'a> {
         handle: Handle,
     ) -> Result<Vec<RefCountAction>, Errno> {
         let idx = match handle {
-            Handle::SpecialServiceManager => {
+            Handle::ContextManager => {
                 // TODO: Figure out how to acquire/release refs for the context manager
                 // object.
                 not_implemented!("acquire/release refs for context manager object");
@@ -2178,9 +2178,9 @@ enum FlatBinderObject {
 /// A handle to a binder object.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Handle {
-    /// Special handle `0` to the binder `IServiceManager` object within the context manager
-    /// process.
-    SpecialServiceManager,
+    /// Special handle 0 to an object representing the process which has become the context manager.
+    /// Processes may rendezvous at this handle to perform service discovery.
+    ContextManager,
     /// A handle to a binder object in another process.
     Object {
         /// The index of the binder object in a process' handle table.
@@ -2192,7 +2192,7 @@ enum Handle {
 impl Handle {
     pub const fn from_raw(handle: u32) -> Handle {
         if handle == 0 {
-            Handle::SpecialServiceManager
+            Handle::ContextManager
         } else {
             Handle::Object { index: handle as usize - 1 }
         }
@@ -2202,7 +2202,7 @@ impl Handle {
     /// special `0` handle.
     pub fn object_index(&self) -> usize {
         match self {
-            Handle::SpecialServiceManager => {
+            Handle::ContextManager => {
                 panic!("handle does not have an object index")
             }
             Handle::Object { index } => *index,
@@ -2211,7 +2211,7 @@ impl Handle {
 
     pub fn is_handle_0(&self) -> bool {
         match self {
-            Handle::SpecialServiceManager => true,
+            Handle::ContextManager => true,
             Handle::Object { .. } => false,
         }
     }
@@ -2226,7 +2226,7 @@ impl From<u32> for Handle {
 impl From<Handle> for u32 {
     fn from(handle: Handle) -> Self {
         match handle {
-            Handle::SpecialServiceManager => 0,
+            Handle::ContextManager => 0,
             Handle::Object { index } => (index as u32) + 1,
         }
     }
@@ -2235,7 +2235,7 @@ impl From<Handle> for u32 {
 impl std::fmt::Display for Handle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Handle::SpecialServiceManager => f.write_str("0"),
+            Handle::ContextManager => f.write_str("0"),
             Handle::Object { index } => f.write_fmt(format_args!("{}", index + 1)),
         }
     }
@@ -2856,7 +2856,7 @@ impl BinderDriver {
         let handle = unsafe { data.transaction_data.target.handle }.into();
 
         let (object, target_proc) = match handle {
-            Handle::SpecialServiceManager => self.get_context_manager(current_task)?,
+            Handle::ContextManager => self.get_context_manager(current_task)?,
             Handle::Object { index } => {
                 let object =
                     binder_proc.lock().handles.get(index).ok_or(TransactionError::Failure)?;
@@ -3022,7 +3022,7 @@ impl BinderDriver {
             peer_tid: binder_thread.tid,
             peer_euid: current_task.creds().euid,
 
-            object: FlatBinderObject::Remote { handle: Handle::SpecialServiceManager },
+            object: FlatBinderObject::Remote { handle: Handle::ContextManager },
             code: data.transaction_data.code,
             flags: data.transaction_data.flags,
 
@@ -3248,7 +3248,7 @@ impl BinderDriver {
             let translated_object = match serialized_object {
                 SerializedBinderObject::Handle { handle, flags, cookie } => {
                     match handle {
-                        Handle::SpecialServiceManager => {
+                        Handle::ContextManager => {
                             // The special handle 0 does not need to be translated. It is universal.
                             serialized_object
                         }
@@ -3935,7 +3935,7 @@ pub mod tests {
 
     #[fuchsia::test]
     fn handle_tests() {
-        assert_matches!(Handle::from(0), Handle::SpecialServiceManager);
+        assert_matches!(Handle::from(0), Handle::ContextManager);
         assert_matches!(Handle::from(1), Handle::Object { index: 0 });
         assert_matches!(Handle::from(2), Handle::Object { index: 1 });
         assert_matches!(Handle::from(99), Handle::Object { index: 98 });
