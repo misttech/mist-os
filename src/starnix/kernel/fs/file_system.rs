@@ -153,6 +153,17 @@ impl FileSystem {
         self.root.get().unwrap()
     }
 
+    /// Prepare a node for insertion in the node cache.
+    ///
+    /// Currently, apply the required selinux context if the selinux workaround is enabled on this
+    /// filesystem.
+    fn prepare_node_for_insertion(&self, node: &Arc<FsNode>) -> Weak<FsNode> {
+        if let Some(label) = self.selinux_context.get() {
+            let _ = node.ops().set_xattr(node, b"security.selinux", label, XattrOp::Create);
+        }
+        Arc::downgrade(node)
+    }
+
     /// Get or create an FsNode for this file system.
     ///
     /// If node_id is Some, then this function checks the node cache to
@@ -178,7 +189,7 @@ impl FileSystem {
         match nodes.entry(node_id) {
             Entry::Vacant(entry) => {
                 let node = create_fn(node_id)?;
-                entry.insert(Arc::downgrade(&node));
+                entry.insert(self.prepare_node_for_insertion(&node));
                 Ok(node)
             }
             Entry::Occupied(mut entry) => {
@@ -186,7 +197,7 @@ impl FileSystem {
                     return Ok(node);
                 }
                 let node = create_fn(node_id)?;
-                entry.insert(Arc::downgrade(&node));
+                entry.insert(self.prepare_node_for_insertion(&node));
                 Ok(node)
             }
         }
@@ -202,10 +213,7 @@ impl FileSystem {
         info: FsNodeInfo,
     ) -> FsNodeHandle {
         let node = FsNode::new_uncached(ops, self, id, info);
-        if let Some(label) = self.selinux_context.get() {
-            let _ = node.ops().set_xattr(&node, b"security.selinux", label, XattrOp::Create);
-        }
-        self.nodes.lock().insert(node.node_id, Arc::downgrade(&node));
+        self.nodes.lock().insert(node.node_id, self.prepare_node_for_insertion(&node));
         node
     }
 
