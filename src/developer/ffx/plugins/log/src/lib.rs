@@ -7,8 +7,11 @@ pub mod error;
 use anyhow::{anyhow, Context, Error, Result};
 use async_trait::async_trait;
 use blocking::Unblock;
-use chrono::{Local, TimeZone, Utc};
-use diagnostics_data::{LogsData, Severity, Timestamp};
+use chrono::{Local, TimeZone};
+use diagnostics_data::{
+    LogTextColor, LogTextDisplayOptions, LogTextPresenter, LogTimeDisplayFormat, LogsData,
+    Severity, Timestamp, Timezone,
+};
 use error::LogError;
 use errors::{ffx_bail, ffx_error};
 use ffx_config::{get, keys::TARGET_DEFAULT_KEY};
@@ -23,9 +26,7 @@ use fidl_fuchsia_developer_ffx::{
 use fidl_fuchsia_developer_remotecontrol::{ArchiveIteratorError, RemoteControlProxy};
 use fidl_fuchsia_diagnostics::LogSettingsProxy;
 use futures::{AsyncWrite, AsyncWriteExt};
-use moniker::{AbsoluteMoniker, AbsoluteMonikerBase};
 use std::{fs, iter::Iterator, sync::Arc, time::SystemTime};
-use termion::{color, style};
 
 use ffx_log_frontend::{RemoteDiagnosticsBridgeProxyWrapper, StreamDiagnostics};
 mod spam_filter;
@@ -63,30 +64,6 @@ fn get_timestamp() -> Result<Timestamp> {
             .context("system time before Unix epoch")?
             .as_nanos() as i64,
     ))
-}
-
-fn timestamp_to_partial_secs(ts: i64) -> f64 {
-    ts as f64 / NANOS_IN_SECOND as f64
-}
-
-fn log_data_color(s: Severity, color_override: Option<ColorOverride>) -> String {
-    match color_override {
-        Some(c) => match c {
-            ColorOverride::SpamHighlight => color::Fg(color::LightYellow).to_string(),
-        },
-        _ => severity_to_color_str(s),
-    }
-}
-
-fn severity_to_color_str(s: Severity) -> String {
-    match s {
-        Severity::Fatal => format!("{}{}", color::Bg(color::Red), color::Fg(color::White)),
-        Severity::Error => color::Fg(color::Red).to_string(),
-        Severity::Warn => color::Fg(color::Yellow).to_string(),
-        Severity::Info => String::new(),
-        Severity::Debug => color::Fg(color::LightBlue).to_string(),
-        Severity::Trace => color::Fg(color::LightMagenta).to_string(),
-    }
 }
 
 fn format_ffx_event(msg: &str, timestamp: Option<Timestamp>) -> String {
@@ -273,21 +250,10 @@ impl LogFilterCriteria {
     }
 }
 
-/// text display options
-#[derive(Clone)]
-pub struct TextDisplayOptions {
-    color: bool,
-    time_format: TimeFormat,
-    show_metadata: bool,
-    show_full_moniker: bool,
-    show_tags: bool,
-    show_file: bool,
-}
-
 /// display options
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum DisplayOption {
-    Text(TextDisplayOptions),
+    Text(LogTextDisplayOptions),
     Json,
 }
 
@@ -298,7 +264,7 @@ pub struct LogOpts {
     is_machine: bool,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LogFormatterOptions {
     display: DisplayOption,
     raw: bool,
@@ -309,14 +275,21 @@ pub struct DefaultLogFormatter<'a> {
     writer: Box<dyn AsyncWrite + Unpin + 'a>,
     has_previous_log: bool,
     filters: LogFilterCriteria,
-    boot_ts_nanos: Option<i64>,
     options: LogFormatterOptions,
 }
 
 #[async_trait(?Send)]
 impl<'a> LogFormatter for DefaultLogFormatter<'_> {
     fn set_boot_timestamp(&mut self, boot_ts_nanos: i64) {
-        self.boot_ts_nanos.replace(boot_ts_nanos);
+        match &mut self.options.display {
+            DisplayOption::Text(LogTextDisplayOptions {
+                time_format: LogTimeDisplayFormat::WallTime { ref mut offset, .. },
+                ..
+            }) => {
+                *offset = boot_ts_nanos;
+            }
+            _ => (),
+        }
     }
     async fn push_log(&mut self, log_entry_result: ArchiveIteratorResult) -> Result<()> {
         let mut s = match log_entry_result {
@@ -329,14 +302,21 @@ impl<'a> LogFormatter for DefaultLogFormatter<'_> {
                     return Ok(());
                 }
 
-                let color_override = if self.options.highlight_spam && is_spam {
-                    Some(ColorOverride::SpamHighlight)
-                } else {
-                    None
-                };
-                match &self.options.display {
-                    DisplayOption::Text(options) => {
-                        match self.format_text_log(&options, log_entry, color_override)? {
+                match self.options.display.clone() {
+                    // If spam highlighting is required we'll need to update these options but only
+                    // for this particular message. Make a copy of the options to use in local
+                    // formatting calls.
+                    DisplayOption::Text(mut text_options) => {
+                        if self.options.highlight_spam && is_spam {
+                            text_options.color = LogTextColor::Highlight;
+                        }
+                        let mut options_for_this_line_only = self.options.clone();
+                        options_for_this_line_only.display = DisplayOption::Text(text_options);
+                        match Self::format_text_log(
+                            options_for_this_line_only,
+                            log_entry,
+                            self.has_previous_log,
+                        )? {
                             Some(s) => s,
                             None => return Ok(()),
                         }
@@ -375,31 +355,37 @@ impl<'a> DefaultLogFormatter<'a> {
         writer: impl AsyncWrite + Unpin + 'a,
         options: LogFormatterOptions,
     ) -> Self {
-        Self {
-            filters,
-            writer: Box::new(writer),
-            has_previous_log: false,
-            boot_ts_nanos: None,
-            options,
-        }
+        Self { filters, writer: Box::new(writer), has_previous_log: false, options }
     }
 
+    // This function's arguments are copied to make lifetimes in push_log easier since borrowing
+    // &self would complicate spam highlighting.
     fn format_text_log(
-        &self,
-        options: &TextDisplayOptions,
+        options: LogFormatterOptions,
         log_entry: LogEntry,
-        color_override: Option<ColorOverride>,
+        has_previous_log: bool,
     ) -> Result<Option<String>, Error> {
+        let text_options = match options.display {
+            DisplayOption::Text(o) => o,
+            DisplayOption::Json => {
+                anyhow::bail!("format_text_log called with a json configuration")
+            }
+        };
         Ok(match log_entry {
             LogEntry { data: LogData::TargetLog(data), .. } => {
-                Some(self.format_target_log_data(options, data, None, color_override))
+                Some(format!("{}", LogTextPresenter::new(&data, text_options)))
             }
-            LogEntry { data: LogData::SymbolizedTargetLog(data, symbolized), .. } => {
-                if !self.options.raw && symbolized.is_empty() {
+            LogEntry { data: LogData::SymbolizedTargetLog(mut data, symbolized), .. } => {
+                if !options.raw && symbolized.is_empty() {
                     return Ok(None);
                 }
+                if !options.raw {
+                    *data.msg_mut().expect(
+                        "if a symbolized message is provided then the payload has a message",
+                    ) = symbolized;
+                }
 
-                Some(self.format_target_log_data(options, data, Some(symbolized), color_override))
+                Some(format!("{}", LogTextPresenter::new(&data, text_options)))
             }
             LogEntry { data: LogData::MalformedTargetLog(raw), .. } => {
                 Some(format!("malformed target log: {}", raw))
@@ -407,7 +393,7 @@ impl<'a> DefaultLogFormatter<'a> {
             LogEntry { data: LogData::FfxEvent(etype), timestamp, .. } => match etype {
                 EventType::LoggingStarted => {
                     let mut s = String::from("logger started.");
-                    if self.has_previous_log {
+                    if has_previous_log {
                         s.push_str(" Logs before this may have been dropped if they were not cached on the target. There may be a brief delay while we catch up...");
                     }
                     Some(format_ffx_event(&s, Some(timestamp)))
@@ -418,118 +404,6 @@ impl<'a> DefaultLogFormatter<'a> {
                 )),
             },
         })
-    }
-
-    fn format_target_timestamp(&self, options: &TextDisplayOptions, ts: i64) -> String {
-        let mut abs_ts = 0;
-        let time_format = match self.boot_ts_nanos {
-            Some(boot_ts) => {
-                abs_ts = boot_ts + ts;
-                &options.time_format
-            }
-            None => &TimeFormat::Monotonic,
-        };
-
-        match time_format {
-            TimeFormat::Monotonic => format!("{:05.3}", timestamp_to_partial_secs(ts)),
-            TimeFormat::Local => Local
-                .timestamp(abs_ts / NANOS_IN_SECOND, (abs_ts % NANOS_IN_SECOND) as u32)
-                .format(TIMESTAMP_FORMAT)
-                .to_string(),
-            TimeFormat::Utc => Utc
-                .timestamp(abs_ts / NANOS_IN_SECOND, (abs_ts % NANOS_IN_SECOND) as u32)
-                .format(TIMESTAMP_FORMAT)
-                .to_string(),
-        }
-    }
-
-    pub fn format_target_log_data(
-        &self,
-        options: &TextDisplayOptions,
-        data: LogsData,
-        symbolized_msg: Option<String>,
-        color_override: Option<ColorOverride>,
-    ) -> String {
-        let symbolized_msg = if self.options.raw { None } else { symbolized_msg };
-
-        let ts = self.format_target_timestamp(&options, data.metadata.timestamp);
-        let color_str = if options.color {
-            log_data_color(data.metadata.severity, color_override)
-        } else {
-            String::default()
-        };
-
-        let reset_str = if options.color { format!("{}", style::Reset) } else { String::default() };
-
-        let mut msg =
-            symbolized_msg.unwrap_or(data.msg().unwrap_or("<missing message>").to_string());
-        let mut kvps = data.payload_keys_strings().collect::<Vec<_>>();
-        kvps.sort();
-        let kvps = kvps.join(" ");
-        if !kvps.is_empty() {
-            msg.push_str(" ");
-        }
-
-        let process_info_str = if options.show_metadata {
-            format!("[{}][{}]", data.pid().unwrap_or(0), data.tid().unwrap_or(0))
-        } else {
-            String::default()
-        };
-
-        let tags_str = if options.show_tags {
-            match data.tags() {
-                Some(tags) if tags.len() == 0 => String::default(),
-                Some(tags) => format!("[{}]", tags.join(",")),
-                None => String::default(),
-            }
-        } else {
-            String::default()
-        };
-
-        let dropped = data.dropped_logs().unwrap_or_default();
-        let rolled = data.rolled_out_logs().unwrap_or_default();
-        let dropped_info = if dropped != 0 || rolled != 0 {
-            let dropped =
-                if dropped != 0 { format!(" [dropped={dropped}]") } else { String::default() };
-            let rolled =
-                if rolled != 0 { format!(" [rolled={rolled}]") } else { String::default() };
-            let color = if options.color {
-                color::Fg(color::Yellow).to_string()
-            } else {
-                String::default()
-            };
-            format!("{color}{dropped}{rolled}")
-        } else {
-            String::default()
-        };
-
-        let file_info_str = if options.show_file {
-            match (data.metadata.file, data.metadata.line) {
-                (Some(filename), Some(line)) => {
-                    format!(": [{}:{}]", filename, line)
-                }
-                (Some(filename), None) => {
-                    format!(": [{}]", filename)
-                }
-                _ => String::default(),
-            }
-        } else {
-            String::default()
-        };
-
-        let moniker = if options.show_full_moniker {
-            data.moniker
-        } else {
-            AbsoluteMoniker::parse_str(&format!("/{}", data.moniker))
-                .ok()
-                .and_then(|moniker| moniker.path().last().map(|s| s.to_string()))
-                .unwrap_or(data.moniker)
-        };
-
-        let severity_str = &format!("{}", data.metadata.severity)[..1];
-        format!(
-            "{color_str}[{ts}]{process_info_str}[{moniker}]{tags_str}[{severity_str}]{file_info_str} {msg}{kvps}{dropped_info}{reset_str}",
-        )
     }
 }
 
@@ -670,11 +544,31 @@ pub async fn log_impl<W: std::io::Write>(
             display: if opts.is_machine {
                 DisplayOption::Json
             } else {
-                DisplayOption::Text(TextDisplayOptions {
+                DisplayOption::Text(LogTextDisplayOptions {
                     show_tags: !cmd.hide_tags,
                     show_file: !cmd.hide_file,
-                    color: should_color(config_color, cmd.no_color),
-                    time_format: cmd.clock.clone(),
+                    color: if should_color(config_color, cmd.no_color) {
+                        LogTextColor::BySeverity
+                    } else {
+                        LogTextColor::None
+                    },
+                    time_format: match cmd.clock {
+                        TimeFormat::Monotonic => LogTimeDisplayFormat::Original,
+                        TimeFormat::Local => LogTimeDisplayFormat::WallTime {
+                            tz: Timezone::Local,
+
+                            // This will receive a correct value when logging actually starts,
+                            // see `set_boot_timestamp()` method on the log formatter.
+                            offset: 0,
+                        },
+                        TimeFormat::Utc => LogTimeDisplayFormat::WallTime {
+                            tz: Timezone::Utc,
+
+                            // This will receive a correct value when logging actually starts,
+                            // see `set_boot_timestamp()` method on the log formatter.
+                            offset: 0,
+                        },
+                    },
                     show_metadata: cmd.show_metadata,
                     show_full_moniker: cmd.show_full_moniker,
                 })
@@ -809,6 +703,7 @@ async fn log_cmd<W: std::io::Write>(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::spam_filter::LogSpamFilter;
     use diagnostics_data::{LogsDataBuilder, LogsField, LogsProperty, Timestamp};
     use errors::ResultExt as _;
     use ffx_log_args::{parse_time, DumpCommand};
@@ -825,7 +720,7 @@ mod test {
         Interest, LogInterestSelector, LogSettingsRequest, Severity as FidlSeverity,
     };
     use selectors::{parse_component_selector, VerboseError};
-    use std::{io::Write, sync::Arc, time::Duration};
+    use std::{cell::Cell, io::Write, sync::Arc, time::Duration};
     use tempfile::NamedTempFile;
 
     const DEFAULT_TS_NANOS: u64 = 1615535969000000000;
@@ -974,29 +869,22 @@ mod test {
         .set_tid(2)
     }
 
-    fn logs_data() -> LogsData {
-        logs_data_builder().add_tag("tag1").add_tag("tag2").set_message("message").build()
+    fn log_entry() -> LogEntry {
+        LogEntry {
+            timestamp: 0.into(),
+            version: 1,
+            data: LogData::TargetLog(
+                logs_data_builder().add_tag("tag1").add_tag("tag2").set_message("message").build(),
+            ),
+        }
     }
 
     impl Default for LogFormatterOptions {
         fn default() -> Self {
             LogFormatterOptions {
                 raw: false,
-                display: DisplayOption::Text(TextDisplayOptions::default()),
+                display: DisplayOption::Text(Default::default()),
                 highlight_spam: false,
-            }
-        }
-    }
-
-    impl Default for TextDisplayOptions {
-        fn default() -> Self {
-            Self {
-                color: Default::default(),
-                show_file: Default::default(),
-                show_full_moniker: Default::default(),
-                show_metadata: Default::default(),
-                show_tags: Default::default(),
-                time_format: TimeFormat::Monotonic,
             }
         }
     }
@@ -1889,6 +1777,44 @@ mod test {
     }
 
     #[fuchsia::test]
+    async fn test_spam_list_applies_highlighting_only_to_spam_line() {
+        struct AlternatingSpamFilter {
+            last_message_was_spam: Cell<bool>,
+        }
+        impl LogSpamFilter for AlternatingSpamFilter {
+            fn is_spam(&self, _file: Option<&String>, _line: Option<u64>, _msg: &str) -> bool {
+                let prev = self.last_message_was_spam.get();
+                self.last_message_was_spam.set(!prev);
+                prev
+            }
+        }
+
+        let options = LogFormatterOptions {
+            display: DisplayOption::Text(Default::default()),
+            raw: false,
+            highlight_spam: true,
+        };
+
+        let mut filter = LogFilterCriteria::default();
+        filter.spam_filter =
+            Some(Box::new(AlternatingSpamFilter { last_message_was_spam: Cell::new(false) }));
+        let mut output = vec![];
+        {
+            let mut formatter = DefaultLogFormatter::new(filter, &mut output, options.clone());
+            formatter.push_log(ArchiveIteratorResult::Ok(log_entry())).await.unwrap();
+            formatter.push_log(ArchiveIteratorResult::Ok(log_entry())).await.unwrap();
+            formatter.push_log(ArchiveIteratorResult::Ok(log_entry())).await.unwrap();
+        }
+        assert_eq!(
+            String::from_utf8(output).unwrap(),
+            "[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: message
+\u{1b}[38;5;11m[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: message\u{1b}[m
+[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: message\n",
+            "first message should be uncolored, second should be yellow, third should be uncolored"
+        );
+    }
+
+    #[fuchsia::test]
     async fn test_from_time_passed_to_daemon() {
         let mut formatter = FakeLogFormatter::new();
         let cmd = LogCommand {
@@ -2026,20 +1952,16 @@ mod test {
         let options = LogFormatterOptions::default();
         let formatter =
             DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options.clone());
-        match &options.display {
-            DisplayOption::Text(options) => {
-                assert_eq!(
-                    formatter.format_target_log_data(
-                        &options,
-                        logs_data(),
-                        /*  symbolized_msg = */ None,
-                        /*  color_override= */ None
-                    ),
-                    "[1615535969.000][moniker][W] message"
-                );
-            }
-            DisplayOption::Json => unreachable!("The default display option must be Text"),
-        }
+        assert_eq!(
+            DefaultLogFormatter::format_text_log(
+                formatter.options,
+                log_entry(),
+                formatter.has_previous_log
+            )
+            .unwrap()
+            .unwrap(),
+            "[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: message"
+        );
     }
 
     #[fuchsia::test]
@@ -2053,9 +1975,7 @@ mod test {
                 &mut output,
                 options.clone(),
             );
-            let mut entry = LogEntry::new(LogData::TargetLog(logs_data())).unwrap();
-            entry.timestamp = Timestamp::from(0);
-            formatter.push_log(ArchiveIteratorResult::Ok(entry)).await.unwrap();
+            formatter.push_log(ArchiveIteratorResult::Ok(log_entry())).await.unwrap();
         }
         assert_eq!(
             String::from_utf8(output).unwrap(),
@@ -2068,9 +1988,9 @@ mod test {
     async fn test_default_formatter_local_time() {
         let mut stdout = Unblock::new(std::io::stdout());
         let options = LogFormatterOptions {
-            display: DisplayOption::Text(TextDisplayOptions {
-                time_format: TimeFormat::Utc,
-                ..TextDisplayOptions::default()
+            display: DisplayOption::Text(LogTextDisplayOptions {
+                time_format: LogTimeDisplayFormat::WallTime { tz: Timezone::Utc, offset: 0 },
+                ..Default::default()
             }),
             raw: false,
             highlight_spam: false,
@@ -2078,136 +1998,121 @@ mod test {
         let mut formatter =
             DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options.clone());
 
-        match &options.display {
-            DisplayOption::Text(options) => {
-                // Before setting the boot timestamp, it should use monotonic time.
-                assert_eq!(
-                    formatter.format_target_log_data(
-                        &options,
-                        logs_data(),
-                        /* symbolized_msg */ None,
-                        /*color_override */ None
-                    ),
-                    "[1615535969.000][moniker][W] message"
-                );
+        assert_eq!(
+            DefaultLogFormatter::format_text_log(
+                formatter.options.clone(),
+                log_entry(),
+                formatter.has_previous_log
+            )
+            .unwrap()
+            .unwrap(),
+            "[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: message",
+            "Before setting the boot timestamp, it should use monotonic time."
+        );
 
-                formatter.set_boot_timestamp(1);
-
-                // In order to avoid flakey tests due to timezone differences, we just verify that
-                // the output *did* change.
-                assert_ne!(
-                    formatter.format_target_log_data(
-                        &options,
-                        logs_data(),
-                        /* symbolized_msg */ None,
-                        /*color_override */ None
-                    ),
-                    "[1615535969.000][moniker][W] message"
-                );
-            }
-            DisplayOption::Json => unreachable!("The default display option must be Text"),
-        }
+        formatter.set_boot_timestamp(1);
+        // NB: We can't assert on a specific time here because local timezones will vary between
+        // devices used for this test.
+        assert_ne!(
+            DefaultLogFormatter::format_text_log(
+                formatter.options,
+                log_entry(),
+                formatter.has_previous_log
+            )
+            .unwrap()
+            .unwrap(),
+            "[1615535969.000000][moniker] WARN: message",
+            "Local time should not be equal to monotonic",
+        );
     }
 
     #[fuchsia::test]
     async fn test_default_formatter_utc_time() {
         let mut stdout = Unblock::new(std::io::stdout());
         let options = LogFormatterOptions {
-            display: DisplayOption::Text(TextDisplayOptions {
-                time_format: TimeFormat::Utc,
-                ..TextDisplayOptions::default()
+            display: DisplayOption::Text(LogTextDisplayOptions {
+                time_format: LogTimeDisplayFormat::WallTime { tz: Timezone::Utc, offset: 0 },
+                ..Default::default()
             }),
             raw: false,
             highlight_spam: false,
         };
         let mut formatter =
-            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options.clone());
+            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options);
 
-        match &options.display {
-            DisplayOption::Text(options) => {
-                // Before setting the boot timestamp, it should use monotonic time.
-                assert_eq!(
-                    formatter.format_target_log_data(
-                        &options,
-                        logs_data(),
-                        /* symbolized_msg */ None,
-                        /*color_override */ None
-                    ),
-                    "[1615535969.000][moniker][W] message"
-                );
+        assert_eq!(
+            DefaultLogFormatter::format_text_log(
+                formatter.options.clone(),
+                log_entry(),
+                formatter.has_previous_log
+            )
+            .unwrap()
+            .unwrap(),
+            "[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: message"
+        );
 
-                formatter.set_boot_timestamp(1);
-                assert_eq!(
-                    formatter.format_target_log_data(
-                        &options,
-                        logs_data(),
-                        /* symbolized_msg */ None,
-                        /*color_override */ None
-                    ),
-                    "[2021-03-12 07:59:29.000][moniker][W] message"
-                );
-            }
-            DisplayOption::Json => unreachable!("The default display option must be Text"),
-        }
+        formatter.set_boot_timestamp(1);
+        assert_eq!(
+            DefaultLogFormatter::format_text_log(
+                formatter.options,
+                log_entry(),
+                formatter.has_previous_log
+            )
+            .unwrap()
+            .unwrap(),
+            "[2021-03-12 07:59:29.000][1][2][some/moniker][tag1,tag2] WARN: message"
+        );
     }
 
     #[fuchsia::test]
     async fn test_default_formatter_colored_output() {
         let mut stdout = Unblock::new(std::io::stdout());
         let options = LogFormatterOptions {
-            display: DisplayOption::Text(TextDisplayOptions {
-                color: true,
-                ..TextDisplayOptions::default()
+            display: DisplayOption::Text(LogTextDisplayOptions {
+                color: LogTextColor::BySeverity,
+                ..Default::default()
             }),
             raw: false,
             highlight_spam: false,
         };
         let formatter =
-            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options.clone());
-        match &options.display {
-            DisplayOption::Text(options) => {
-                assert_eq!(
-                    formatter.format_target_log_data(
-                        &options,
-                        logs_data(),
-                        /* symbolized_msg */ None,
-                        /*color_override */ None
-                    ),
-                    "\u{1b}[38;5;3m[1615535969.000][moniker][W] message\u{1b}[m"
-                );
-            }
-            DisplayOption::Json => unreachable!("The default display option must be Text"),
-        }
+            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options);
+        assert_eq!(
+            DefaultLogFormatter::format_text_log(
+                formatter.options,
+                log_entry(),
+                formatter.has_previous_log
+            )
+            .unwrap()
+            .unwrap(),
+            "\u{1b}[38;5;3m[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: message\u{1b}[m"
+        );
     }
 
     #[fuchsia::test]
-    async fn test_default_formatter_show_metadata() {
+    async fn test_default_formatter_hide_metadata() {
         let mut stdout = Unblock::new(std::io::stdout());
         let options = LogFormatterOptions {
-            display: DisplayOption::Text(TextDisplayOptions {
-                show_metadata: true,
-                ..TextDisplayOptions::default()
+            display: DisplayOption::Text(LogTextDisplayOptions {
+                show_metadata: false,
+                ..Default::default()
             }),
             raw: false,
             highlight_spam: false,
         };
 
         let formatter =
-            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options.clone());
-        match &options.display {
-            DisplayOption::Text(options) => {
-                assert_eq!(
-                    formatter.format_target_log_data(
-                        &options,
-                        logs_data(),
-                        /* symbolized_msg */ None,
-                        /*color_override */ None
-                    ),
-                    "[1615535969.000][1][2][moniker][W] message"
-                );
-            }
-            DisplayOption::Json => unreachable!("The default display option must be Text"),
-        }
+            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options);
+        assert_eq!(
+            DefaultLogFormatter::format_text_log(
+                formatter.options,
+                log_entry(),
+                formatter.has_previous_log
+            )
+            .unwrap()
+            .unwrap(),
+            "[1615535969.000000][some/moniker][tag1,tag2] WARN: message"
+        );
     }
 
     #[fuchsia::test]
@@ -2215,21 +2120,22 @@ mod test {
         let mut stdout = Unblock::new(std::io::stdout());
         let options = LogFormatterOptions::default();
         let formatter =
-            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options.clone());
-        match &options.display {
-            DisplayOption::Text(options) => {
-                assert_eq!(
-                    formatter.format_target_log_data(
-                        &options,
-                        logs_data(),
-                        Some("symbolized".to_string()),
-                        /*color_override */ None
-                    ),
-                    "[1615535969.000][moniker][W] symbolized"
-                );
-            }
-            DisplayOption::Json => unreachable!("The default display option must be Text"),
-        }
+            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options);
+        let mut entry = log_entry();
+        entry.data = match entry.data.clone() {
+            LogData::TargetLog(d) => LogData::SymbolizedTargetLog(d, "symbolized".to_string()),
+            _ => panic!(),
+        };
+        assert_eq!(
+            DefaultLogFormatter::format_text_log(
+                formatter.options,
+                entry,
+                formatter.has_previous_log
+            )
+            .unwrap()
+            .unwrap(),
+            "[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: symbolized"
+        );
     }
 
     #[fuchsia::test]
@@ -2237,130 +2143,118 @@ mod test {
         let mut stdout = Unblock::new(std::io::stdout());
         let options = LogFormatterOptions { raw: true, ..LogFormatterOptions::default() };
         let formatter =
-            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options.clone());
-        match &options.display {
-            DisplayOption::Text(options) => {
-                assert_eq!(
-                    formatter.format_target_log_data(
-                        &options,
-                        logs_data(),
-                        Some("symbolized".to_string()),
-                        /*color_override */ None
-                    ),
-                    "[1615535969.000][moniker][W] message"
-                );
-            }
-            DisplayOption::Json => unreachable!("The default display option must be Text"),
-        }
+            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options);
+        assert_eq!(
+            DefaultLogFormatter::format_text_log(
+                formatter.options,
+                log_entry(),
+                formatter.has_previous_log
+            )
+            .unwrap()
+            .unwrap(),
+            "[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: message"
+        );
     }
 
     #[fuchsia::test]
     async fn test_default_formatter_show_tags() {
         let mut stdout = Unblock::new(std::io::stdout());
         let options = LogFormatterOptions {
-            display: DisplayOption::Text(TextDisplayOptions {
+            display: DisplayOption::Text(LogTextDisplayOptions {
                 show_tags: true,
-                ..TextDisplayOptions::default()
+                ..Default::default()
             }),
             raw: false,
             highlight_spam: false,
         };
         let formatter =
-            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options.clone());
-        match &options.display {
-            DisplayOption::Text(options) => {
-                assert_eq!(
-                    formatter.format_target_log_data(
-                        options,
-                        logs_data(),
-                        /* symbolized_msg */ None,
-                        /*color_override */ None
-                    ),
-                    "[1615535969.000][moniker][tag1,tag2][W] message"
-                );
-            }
-            DisplayOption::Json => unreachable!("The default display option must be Text"),
-        }
+            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options);
+        assert_eq!(
+            DefaultLogFormatter::format_text_log(
+                formatter.options,
+                log_entry(),
+                formatter.has_previous_log
+            )
+            .unwrap()
+            .unwrap(),
+            "[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: message"
+        );
     }
 
     #[fuchsia::test]
     async fn test_default_formatter_hides_tags_if_empty() {
         let mut stdout = Unblock::new(std::io::stdout());
         let options = LogFormatterOptions {
-            display: DisplayOption::Text(TextDisplayOptions {
+            display: DisplayOption::Text(LogTextDisplayOptions {
                 show_tags: true,
-                ..TextDisplayOptions::default()
+                ..Default::default()
             }),
             raw: false,
             highlight_spam: false,
         };
 
         let formatter =
-            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options.clone());
-        match &options.display {
-            DisplayOption::Text(options) => {
-                assert_eq!(
-                    formatter.format_target_log_data(
-                        &options,
-                        logs_data_builder().build(),
-                        /* symbolized_msg */ None,
-                        /*color_override */ None
-                    ),
-                    "[1615535969.000][moniker][W] <missing message>"
-                );
-            }
-            DisplayOption::Json => unreachable!("The default display option must be Text"),
-        }
+            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options);
+        assert_eq!(
+            DefaultLogFormatter::format_text_log(
+                formatter.options,
+                LogEntry {
+                    data: LogData::TargetLog(logs_data_builder().build()),
+                    timestamp: 0.into(),
+                    version: 0,
+                },
+                formatter.has_previous_log
+            )
+            .unwrap()
+            .unwrap(),
+            "[1615535969.000000][1][2][some/moniker] WARN: <missing message>"
+        );
     }
 
     #[fuchsia::test]
     async fn test_default_formatter_multiline_message() {
         let mut stdout = Unblock::new(std::io::stdout());
         let options = LogFormatterOptions {
-            display: DisplayOption::Text(TextDisplayOptions {
-                show_tags: true,
-                ..TextDisplayOptions::default()
-            }),
+            display: DisplayOption::Text(Default::default()),
             raw: false,
             highlight_spam: false,
         };
         let formatter =
-            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options.clone());
-        match &options.display {
-            DisplayOption::Text(options) => {
-                assert_eq!(
-                    formatter.format_target_log_data(
-                        &options,
-                        logs_data_builder().set_message("multi\nline\nmessage").build(),
-                        /* symbolized_msg */ None,
-                        /*color_override */ None
+            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options);
+        assert_eq!(
+            DefaultLogFormatter::format_text_log(
+                formatter.options,
+                LogEntry {
+                    data: LogData::TargetLog(
+                        logs_data_builder().set_message("multi\nline\nmessage").build()
                     ),
-                    "[1615535969.000][moniker][W] multi\nline\nmessage"
-                );
-            }
-            DisplayOption::Json => unreachable!("The default display option must be Text"),
-        }
+                    timestamp: 0.into(),
+                    version: 0
+                },
+                formatter.has_previous_log,
+            )
+            .unwrap()
+            .unwrap(),
+            "[1615535969.000000][1][2][some/moniker] WARN: multi\nline\nmessage"
+        );
     }
 
     #[fuchsia::test]
     fn display_for_structured_fields() {
         let mut stdout = Unblock::new(std::io::stdout());
         let options = LogFormatterOptions {
-            display: DisplayOption::Text(TextDisplayOptions {
-                show_metadata: true,
-                ..TextDisplayOptions::default()
-            }),
+            display: DisplayOption::Text(Default::default()),
             raw: false,
             highlight_spam: false,
         };
 
         let formatter =
-            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options.clone());
-        match &options.display {
-            DisplayOption::Text(options) => {
-                assert_eq!(
-                    formatter.format_target_log_data(
-                        &options,
+            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options);
+        assert_eq!(
+            DefaultLogFormatter::format_text_log(
+                formatter.options,
+                LogEntry {
+                    data: LogData::TargetLog(
                         logs_data_builder()
                             .set_message("my message")
                             .add_key(LogsProperty::String(
@@ -2368,29 +2262,30 @@ mod test {
                                 "baz".to_string()
                             ))
                             .add_key(LogsProperty::Int(LogsField::Other("foo".to_string()), 2i64))
-                            .build(),
-                        /* symbolized_msg */ None,
-                        /*color_override */ None
+                            .build()
                     ),
-                    "[1615535969.000][1][2][moniker][W] my message bar=baz foo=2"
-                );
-            }
-            DisplayOption::Json => unreachable!("The default display option must be Text"),
-        }
+                    timestamp: 0.into(),
+                    version: 0,
+                },
+                formatter.has_previous_log,
+            )
+            .unwrap()
+            .unwrap(),
+            "[1615535969.000000][1][2][some/moniker] WARN: my message bar=baz foo=2"
+        );
     }
 
     #[fuchsia::test]
     fn display_for_file_and_line() {
         let mut stdout = Unblock::new(std::io::stdout());
-        let mut display_options =
-            TextDisplayOptions { show_file: true, ..TextDisplayOptions::default() };
+        let display_options = LogTextDisplayOptions { show_file: true, ..Default::default() };
         let options = LogFormatterOptions {
-            display: DisplayOption::Text(display_options.clone()),
+            display: DisplayOption::Text(display_options),
             raw: false,
             highlight_spam: false,
         };
 
-        let formatter =
+        let mut formatter =
             DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options);
         let message_with_file_and_line = logs_data_builder()
             .set_line(123u64)
@@ -2398,76 +2293,93 @@ mod test {
             .set_message("my message")
             .build();
         assert_eq!(
-            formatter.format_target_log_data(
-                &display_options,
-                message_with_file_and_line.clone(),
-                /* symbolized_msg */ None,
-                /*color_override */ None
-            ),
-            "[1615535969.000][moniker][W]: [path/to/file.cc:123] my message"
+            DefaultLogFormatter::format_text_log(
+                formatter.options.clone(),
+                LogEntry {
+                    data: LogData::TargetLog(message_with_file_and_line.clone()),
+                    timestamp: 0.into(),
+                    version: 0
+                },
+                formatter.has_previous_log,
+            )
+            .unwrap()
+            .unwrap(),
+            "[1615535969.000000][1][2][some/moniker] WARN: [path/to/file.cc(123)] my message"
         );
 
         assert_eq!(
-            formatter.format_target_log_data(
-                &display_options,
-                logs_data_builder()
-                    .set_file("path/to/file.cc".to_string())
-                    .set_message("my message")
-                    .build(),
-                /* symbolized_msg */ None,
-                /*color_override */ None
-            ),
-            "[1615535969.000][moniker][W]: [path/to/file.cc] my message"
+            DefaultLogFormatter::format_text_log(
+                formatter.options.clone(),
+                LogEntry {
+                    data: LogData::TargetLog(
+                        logs_data_builder()
+                            .set_file("path/to/file.cc".to_string())
+                            .set_message("my message")
+                            .build()
+                    ),
+                    timestamp: 0.into(),
+                    version: 0,
+                },
+                formatter.has_previous_log,
+            )
+            .unwrap()
+            .unwrap(),
+            "[1615535969.000000][1][2][some/moniker] WARN: [path/to/file.cc] my message"
         );
 
-        display_options.show_file = false;
+        // Disable file printing for the last assertion.
+        match &mut formatter.options.display {
+            DisplayOption::Text(ref mut text_options) => {
+                text_options.show_file = false;
+            }
+            _ => unreachable!(),
+        }
         assert_eq!(
-            formatter.format_target_log_data(
-                &display_options,
-                message_with_file_and_line,
-                /* symbolized_msg */ None,
-                /*color_override */ None
-            ),
-            "[1615535969.000][moniker][W] my message"
+            DefaultLogFormatter::format_text_log(
+                formatter.options,
+                LogEntry {
+                    data: LogData::TargetLog(message_with_file_and_line),
+                    timestamp: 0.into(),
+                    version: 0
+                },
+                formatter.has_previous_log,
+            )
+            .unwrap()
+            .unwrap(),
+            "[1615535969.000000][1][2][some/moniker] WARN: my message"
         );
     }
 
     #[fuchsia::test]
-    fn display_full_moniker() {
+    fn display_short_moniker() {
         let mut stdout = Unblock::new(std::io::stdout());
         let options = LogFormatterOptions {
-            display: DisplayOption::Text(TextDisplayOptions {
-                show_full_moniker: true,
-                ..TextDisplayOptions::default()
+            display: DisplayOption::Text(LogTextDisplayOptions {
+                show_full_moniker: false,
+                ..Default::default()
             }),
             raw: false,
             highlight_spam: false,
         };
         let formatter =
-            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options.clone());
-        match &options.display {
-            DisplayOption::Text(options) => {
-                assert_eq!(
-                    formatter.format_target_log_data(
-                        options,
-                        logs_data(),
-                        /* symbolized_msg */ None,
-                        /*color_override */ None
-                    ),
-                    "[1615535969.000][some/moniker][W] message"
-                );
-            }
-            DisplayOption::Json => unreachable!("The default display option must be Text"),
-        }
+            DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options);
+        assert_eq!(
+            DefaultLogFormatter::format_text_log(
+                formatter.options,
+                log_entry(),
+                formatter.has_previous_log
+            )
+            .unwrap()
+            .unwrap(),
+            "[1615535969.000000][1][2][moniker][tag1,tag2] WARN: message"
+        );
     }
 
     #[fuchsia::test]
     fn display_dropped_and_rolled_out_info() {
         let mut stdout = Unblock::new(std::io::stdout());
-        let display_options =
-            TextDisplayOptions { show_file: true, ..TextDisplayOptions::default() };
         let options = LogFormatterOptions {
-            display: DisplayOption::Text(display_options.clone()),
+            display: DisplayOption::Text(Default::default()),
             raw: false,
             highlight_spam: false,
         };
@@ -2478,13 +2390,18 @@ mod test {
             logs_data_builder().set_dropped(3).set_rolled_out(5).set_message("my message").build();
 
         assert_eq!(
-            formatter.format_target_log_data(
-                &display_options,
-                message_with_file_and_line,
-                /* symbolized_msg */ None,
-                /*color_override */ None
-            ),
-            "[1615535969.000][moniker][W] my message [dropped=3] [rolled=5]"
+            DefaultLogFormatter::format_text_log(
+                formatter.options,
+                LogEntry {
+                    data: LogData::TargetLog(message_with_file_and_line),
+                    timestamp: 0.into(),
+                    version: 0
+                },
+                formatter.has_previous_log
+            )
+            .unwrap()
+            .unwrap(),
+            "[1615535969.000000][1][2][some/moniker] WARN: my message [dropped=3] [rolled=5]"
         );
     }
 }

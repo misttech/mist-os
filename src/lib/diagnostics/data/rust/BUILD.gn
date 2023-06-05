@@ -26,7 +26,9 @@ rustc_library("lib") {
     "//src/lib/diagnostics/hierarchy/rust",
     "//src/lib/flyweights",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:chrono",
     "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:termion",
   ]
 
   test_deps = [

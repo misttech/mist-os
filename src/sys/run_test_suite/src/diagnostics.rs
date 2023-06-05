@@ -16,11 +16,11 @@ use {
 /// logs.
 #[derive(Clone, Default)]
 pub(crate) struct LogDisplayConfiguration {
-    /// Whether or not to show the full moniker
-    pub show_full_moniker: bool,
-
     /// The minimum severity log to display.
     pub interest: Vec<LogInterestSelector>,
+
+    /// How to format messages as text.
+    pub text_options: LogTextDisplayOptions,
 }
 
 // TODO(fxbug.dev/54198, fxbug.dev/70581): deprecate this when implementing metadata selectors for
@@ -104,13 +104,7 @@ where
             continue;
         }
 
-        let log_repr = format!(
-            "{}",
-            LogTextPresenter::new(
-                &log,
-                LogTextDisplayOptions { show_full_moniker: options.format.show_full_moniker }
-            )
-        );
+        let log_repr = format!("{}", LogTextPresenter::new(&log, options.format.text_options));
 
         if should_display {
             writeln!(log_artifact, "{}", log_repr)?;
@@ -177,7 +171,10 @@ mod test {
                 LogCollectionOptions {
                     max_severity: None,
                     format: LogDisplayConfiguration {
-                        show_full_moniker: true,
+                        text_options: LogTextDisplayOptions {
+                            show_full_moniker: true,
+                            ..Default::default()
+                        },
                         interest: vec![
                             selectors::parse_log_interest_selector_or_severity("WARN").unwrap()
                         ],
@@ -254,7 +251,10 @@ mod test {
                 LogCollectionOptions {
                     max_severity: None,
                     format: LogDisplayConfiguration {
-                        show_full_moniker: true,
+                        text_options: LogTextDisplayOptions {
+                            show_full_moniker: true,
+                            ..Default::default()
+                        },
                         interest: vec![
                             selectors::parse_log_interest_selector_or_severity("a#WARN").unwrap(),
                             selectors::parse_log_interest_selector_or_severity("b#WARN").unwrap(),
@@ -318,7 +318,10 @@ mod test {
                 LogCollectionOptions {
                     max_severity: None,
                     format: LogDisplayConfiguration {
-                        show_full_moniker: true,
+                        text_options: LogTextDisplayOptions {
+                            show_full_moniker: true,
+                            ..Default::default()
+                        },
                         interest: vec![
                             selectors::parse_log_interest_selector_or_severity("**#FATAL").unwrap(),
                             selectors::parse_log_interest_selector_or_severity("a#WARN").unwrap(),
@@ -382,7 +385,13 @@ mod test {
                 &mut log_artifact,
                 LogCollectionOptions {
                     max_severity: None,
-                    format: LogDisplayConfiguration { show_full_moniker: false, interest: vec![] }
+                    format: LogDisplayConfiguration {
+                        text_options: LogTextDisplayOptions {
+                            show_full_moniker: false,
+                            ..Default::default()
+                        },
+                        interest: vec![]
+                    }
                 }
             )
             .await
@@ -393,10 +402,7 @@ mod test {
             String::from_utf8(log_artifact).unwrap(),
             altered_moniker_logs
                 .iter()
-                .map(|log| format!(
-                    "{}\n",
-                    LogTextPresenter::new(log, LogTextDisplayOptions { show_full_moniker: false })
-                ))
+                .map(|log| format!("{}\n", LogTextPresenter::new(log, Default::default())))
                 .collect::<Vec<_>>()
                 .concat()
         );
@@ -448,7 +454,13 @@ mod test {
                 &mut log_artifact,
                 LogCollectionOptions {
                     max_severity: None,
-                    format: LogDisplayConfiguration { show_full_moniker: true, interest: vec![] }
+                    format: LogDisplayConfiguration {
+                        text_options: LogTextDisplayOptions {
+                            show_full_moniker: true,
+                            ..Default::default()
+                        },
+                        interest: vec![],
+                    }
                 }
             )
             .await
@@ -511,7 +523,13 @@ mod test {
                 &mut log_artifact,
                 LogCollectionOptions {
                     max_severity: Severity::Warn.into(),
-                    format: LogDisplayConfiguration { show_full_moniker: true, interest: vec![] }
+                    format: LogDisplayConfiguration {
+                        text_options: LogTextDisplayOptions {
+                            show_full_moniker: true,
+                            ..Default::default()
+                        },
+                        interest: vec![]
+                    }
                 }
             )
             .await

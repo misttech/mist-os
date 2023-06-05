@@ -14,6 +14,7 @@ use {
         running_suite::{run_suite_and_collect_logs, RunningSuite},
         trace::duration,
     },
+    diagnostics_data::LogTextDisplayOptions,
     fidl_fuchsia_test_manager::{self as ftest_manager, RunBuilderProxy},
     fuchsia_async as fasync,
     futures::{future::Either, prelude::*, stream::FuturesUnordered, StreamExt},
@@ -198,8 +199,11 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
             let suite_reporter = suite_reporters.remove(&suite_id).unwrap();
 
             let log_display = LogDisplayConfiguration {
-                show_full_moniker: run_params.show_full_moniker,
                 interest: run_params.min_severity_logs.clone(),
+                text_options: LogTextDisplayOptions {
+                    show_full_moniker: run_params.show_full_moniker,
+                    ..Default::default()
+                },
             };
 
             let result = run_suite_and_collect_logs(
@@ -251,8 +255,11 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
                             diagnostics::LogCollectionOptions {
                                 max_severity: None,
                                 format: LogDisplayConfiguration {
-                                    show_full_moniker: run_params.show_full_moniker,
                                     interest: run_params.min_severity_logs.clone(),
+                                    text_options: LogTextDisplayOptions {
+                                        show_full_moniker: run_params.show_full_moniker,
+                                        ..Default::default()
+                                    },
                                 },
                             },
                         )

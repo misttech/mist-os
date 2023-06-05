@@ -8,6 +8,7 @@
 //! the data that the Archive returns on `fuchsia.diagnostics.ArchiveAccessor` reads.
 
 use anyhow::format_err;
+use chrono::{Local, TimeZone, Utc};
 use fidl_fuchsia_diagnostics::{DataType, Severity as FidlSeverity};
 use flyweights::FlyStr;
 use serde::{
@@ -25,6 +26,7 @@ use std::{
     str::FromStr,
     time::Duration,
 };
+use termion::{color, style};
 
 pub use diagnostics_hierarchy::{
     assert_data_tree, hierarchy, tree_assertion, DiagnosticsHierarchy, Property,
@@ -1048,9 +1050,138 @@ impl Data<Logs> {
 }
 
 /// Display options for unstructured logs.
+#[derive(Clone, Copy, Debug)]
 pub struct LogTextDisplayOptions {
     /// Whether or not to display the full moniker.
     pub show_full_moniker: bool,
+
+    /// Whether or not to display metadata like PID & TID.
+    pub show_metadata: bool,
+
+    /// Whether or not to display tags provided by the log producer.
+    pub show_tags: bool,
+
+    /// Whether or not to display the source location which produced the log.
+    pub show_file: bool,
+
+    /// Whether to include ANSI color codes in the output.
+    pub color: LogTextColor,
+
+    /// How to print timestamps for this log message.
+    pub time_format: LogTimeDisplayFormat,
+}
+
+impl Default for LogTextDisplayOptions {
+    fn default() -> Self {
+        Self {
+            show_full_moniker: true,
+            show_metadata: true,
+            show_tags: true,
+            show_file: true,
+            color: Default::default(),
+            time_format: Default::default(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub enum LogTextColor {
+    /// Do not print this log with ANSI colors.
+    #[default]
+    None,
+
+    /// Display color codes according to log severity and presence of dropped or rolled out logs.
+    BySeverity,
+
+    /// Highlight this message as noteworthy regardless of severity, e.g. for known spam messages.
+    Highlight,
+}
+
+impl LogTextColor {
+    fn begin_record(&self, f: &mut fmt::Formatter<'_>, severity: Severity) -> fmt::Result {
+        Ok(match self {
+            LogTextColor::BySeverity => match severity {
+                Severity::Fatal => {
+                    write!(f, "{}{}", color::Bg(color::Red), color::Fg(color::White))?
+                }
+                Severity::Error => write!(f, "{}", color::Fg(color::Red))?,
+                Severity::Warn => write!(f, "{}", color::Fg(color::Yellow))?,
+                Severity::Info => (),
+                Severity::Debug => write!(f, "{}", color::Fg(color::LightBlue))?,
+                Severity::Trace => write!(f, "{}", color::Fg(color::LightMagenta))?,
+            },
+            LogTextColor::Highlight => write!(f, "{}", color::Fg(color::LightYellow))?,
+            LogTextColor::None => (),
+        })
+    }
+
+    fn begin_lost_message_counts(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let LogTextColor::BySeverity = self {
+            // This will be reset below before the next line.
+            write!(f, "{}", color::Fg(color::Yellow))?;
+        }
+        Ok(())
+    }
+
+    fn end_record(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Ok(match self {
+            LogTextColor::BySeverity | LogTextColor::Highlight => write!(f, "{}", style::Reset)?,
+            LogTextColor::None => (),
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum Timezone {
+    /// Display a timestamp in terms of the local timezone as reported by the operating system.
+    Local,
+
+    /// Display a timestamp in terms of UTC.
+    Utc,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub enum LogTimeDisplayFormat {
+    /// Display the log message's timestamp as monotonic nanoseconds since boot.
+    #[default]
+    Original,
+
+    /// Display the log's timestamp as a human-readable string in ISO 8601 format.
+    WallTime {
+        /// The format for displaying a timestamp as a string.
+        tz: Timezone,
+
+        /// The offset to apply to the original device-monotonic time before printing it as a
+        /// human-readable timestamp.
+        offset: i64,
+    },
+}
+
+impl LogTimeDisplayFormat {
+    fn write_timestamp(&self, f: &mut fmt::Formatter<'_>, time: i64) -> fmt::Result {
+        const NANOS_IN_SECOND: i64 = 1_000_000_000;
+        const TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S.%3f";
+
+        match self {
+            // Don't try to print a human readable string if it's going to be in 1970, fall back
+            // to monotonic.
+            Self::Original | Self::WallTime { offset: 0, .. } => {
+                let time: Duration = Duration::from_nanos(time as u64);
+                write!(f, "[{:05}.{:06}]", time.as_secs(), time.as_micros() % MICROS_IN_SEC)?;
+            }
+            Self::WallTime { tz, offset } => {
+                let adjusted = time + offset;
+                let seconds = adjusted / NANOS_IN_SECOND;
+                let rem_nanos = (adjusted % NANOS_IN_SECOND) as u32;
+                let formatted = match tz {
+                    Timezone::Local => Local.timestamp(seconds, rem_nanos).format(TIMESTAMP_FORMAT),
+                    Timezone::Utc => Utc.timestamp(seconds, rem_nanos).format(TIMESTAMP_FORMAT),
+                };
+                write!(f, "[{}]", formatted)?;
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Used to control stringification options of Data<Logs>
@@ -1073,7 +1204,7 @@ impl<'a> LogTextPresenter<'a> {
 
 impl fmt::Display for Data<Logs> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        LogTextPresenter::new(self, LogTextDisplayOptions { show_full_moniker: true }).fmt(f)
+        LogTextPresenter::new(self, Default::default()).fmt(f)
     }
 }
 
@@ -1094,49 +1225,68 @@ fn strip_moniker(moniker: &str) -> &str {
 
 impl fmt::Display for LogTextPresenter<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Multiple tags are supported for the `LogMessage` format and are represented
-        // as multiple instances of LogsField::Tag arguments.
-        let kvps = self.payload_keys_strings();
-        let time: Duration = Duration::from_nanos(self.metadata.timestamp as u64);
+        self.options.color.begin_record(f, self.log.severity())?;
+
+        self.options.time_format.write_timestamp(f, self.metadata.timestamp)?;
+
+        if self.options.show_metadata {
+            write!(
+                f,
+                "[{}][{}]",
+                self.pid().map(|s| s.to_string()).unwrap_or("".to_string()),
+                self.tid().map(|s| s.to_string()).unwrap_or("".to_string()),
+            )?;
+        }
+
         let moniker = if self.options.show_full_moniker {
             self.moniker.as_str()
         } else {
             strip_moniker(self.moniker.as_str())
         };
-        if self.options.show_full_moniker {
-            write!(
-                f,
-                "[{:05}.{:06}][{}][{}][{}]",
-                time.as_secs(),
-                time.as_micros() % MICROS_IN_SEC,
-                self.pid().map(|s| s.to_string()).unwrap_or("".to_string()),
-                self.tid().map(|s| s.to_string()).unwrap_or("".to_string()),
-                moniker,
-            )?;
-        } else {
-            write!(
-                f,
-                "[{:05}.{:06}][{}]",
-                time.as_secs(),
-                time.as_micros() % MICROS_IN_SEC,
-                moniker,
-            )?;
-        }
-        match &self.metadata.tags {
-            Some(tags) if !tags.is_empty() => {
-                write!(f, "[{}]", tags.join(","))?;
+        write!(f, "[{moniker}]")?;
+
+        if self.options.show_tags {
+            match &self.metadata.tags {
+                Some(tags) if !tags.is_empty() => {
+                    write!(f, "[{}]", tags.join(","))?;
+                }
+                _ => {}
             }
-            _ => {}
-        }
-        write!(f, " {}:", self.metadata.severity)?;
-        if let (Some(file), Some(line)) = (&self.metadata.file, &self.metadata.line) {
-            write!(f, " [{}({})]", file, line)?;
         }
 
-        write!(f, " {}", self.msg().unwrap_or(""))?;
-        for kvp in kvps {
+        write!(f, " {}:", self.metadata.severity)?;
+
+        if self.options.show_file {
+            match (&self.metadata.file, &self.metadata.line) {
+                (Some(file), Some(line)) => write!(f, " [{file}({line})]")?,
+                (Some(file), None) => write!(f, " [{file}]")?,
+                _ => (),
+            }
+        }
+
+        if let Some(msg) = self.msg() {
+            write!(f, " {msg}")?;
+        } else {
+            write!(f, " <missing message>")?;
+        }
+        for kvp in self.payload_keys_strings() {
             write!(f, " {}", kvp)?;
         }
+
+        let dropped = self.log.dropped_logs().unwrap_or_default();
+        let rolled = self.log.rolled_out_logs().unwrap_or_default();
+        if dropped != 0 || rolled != 0 {
+            self.options.color.begin_lost_message_counts(f)?;
+            if dropped != 0 {
+                write!(f, " [dropped={dropped}]")?;
+            }
+            if rolled != 0 {
+                write!(f, " [rolled={rolled}]")?;
+            }
+        }
+
+        self.options.color.end_record(f)?;
+
         Ok(())
     }
 }
@@ -1598,9 +1748,292 @@ mod tests {
         .build();
 
         assert_eq!(
-            "[00012.345678][moniker][foo,bar] INFO: [some_file.cc(420)] some message test=property value=test",
-            format!("{}", LogTextPresenter::new(&data, LogTextDisplayOptions{show_full_moniker:false}))
+            "[00012.345678][123][456][moniker][foo,bar] INFO: [some_file.cc(420)] some message test=property value=test",
+            format!("{}", LogTextPresenter::new(&data, LogTextDisplayOptions {
+                show_full_moniker: false,
+                ..Default::default()
+            }))
         )
+    }
+
+    #[fuchsia::test]
+    fn display_for_logs_exclude_metadata() {
+        let data = LogsDataBuilder::new(BuilderArgs {
+            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            component_url: Some(String::from("fake-url")),
+            moniker: String::from("moniker"),
+            severity: Severity::Info,
+        })
+        .set_pid(123)
+        .set_tid(456)
+        .set_message("some message".to_string())
+        .set_file("some_file.cc".to_string())
+        .set_line(420)
+        .add_tag("foo")
+        .add_tag("bar")
+        .add_key(LogsProperty::String(LogsField::Other("test".to_string()), "property".to_string()))
+        .add_key(LogsProperty::String(LogsField::MsgStructured, "test".to_string()))
+        .build();
+
+        assert_eq!(
+            "[00012.345678][moniker][foo,bar] INFO: [some_file.cc(420)] some message test=property value=test",
+            format!("{}", LogTextPresenter::new(&data, LogTextDisplayOptions {
+                show_metadata: false,
+                ..Default::default()
+            }))
+        )
+    }
+
+    #[fuchsia::test]
+    fn display_for_logs_exclude_tags() {
+        let data = LogsDataBuilder::new(BuilderArgs {
+            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            component_url: Some(String::from("fake-url")),
+            moniker: String::from("moniker"),
+            severity: Severity::Info,
+        })
+        .set_pid(123)
+        .set_tid(456)
+        .set_message("some message".to_string())
+        .set_file("some_file.cc".to_string())
+        .set_line(420)
+        .add_tag("foo")
+        .add_tag("bar")
+        .add_key(LogsProperty::String(LogsField::Other("test".to_string()), "property".to_string()))
+        .add_key(LogsProperty::String(LogsField::MsgStructured, "test".to_string()))
+        .build();
+
+        assert_eq!(
+            "[00012.345678][123][456][moniker] INFO: [some_file.cc(420)] some message test=property value=test",
+            format!("{}", LogTextPresenter::new(&data, LogTextDisplayOptions {
+                show_tags: false,
+                ..Default::default()
+            }))
+        )
+    }
+
+    #[fuchsia::test]
+    fn display_for_logs_exclude_file() {
+        let data = LogsDataBuilder::new(BuilderArgs {
+            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            component_url: Some(String::from("fake-url")),
+            moniker: String::from("moniker"),
+            severity: Severity::Info,
+        })
+        .set_pid(123)
+        .set_tid(456)
+        .set_message("some message".to_string())
+        .set_file("some_file.cc".to_string())
+        .set_line(420)
+        .add_tag("foo")
+        .add_tag("bar")
+        .add_key(LogsProperty::String(LogsField::Other("test".to_string()), "property".to_string()))
+        .add_key(LogsProperty::String(LogsField::MsgStructured, "test".to_string()))
+        .build();
+
+        assert_eq!(
+            "[00012.345678][123][456][moniker][foo,bar] INFO: some message test=property value=test",
+            format!("{}", LogTextPresenter::new(&data, LogTextDisplayOptions {
+                show_file: false,
+                ..Default::default()
+            }))
+        )
+    }
+
+    #[fuchsia::test]
+    fn display_for_logs_include_color_by_severity() {
+        let data = LogsDataBuilder::new(BuilderArgs {
+            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            component_url: Some(String::from("fake-url")),
+            moniker: String::from("moniker"),
+            severity: Severity::Error,
+        })
+        .set_pid(123)
+        .set_tid(456)
+        .set_message("some message".to_string())
+        .set_file("some_file.cc".to_string())
+        .set_line(420)
+        .add_tag("foo")
+        .add_tag("bar")
+        .add_key(LogsProperty::String(LogsField::Other("test".to_string()), "property".to_string()))
+        .add_key(LogsProperty::String(LogsField::MsgStructured, "test".to_string()))
+        .build();
+
+        assert_eq!(
+            format!("{}[00012.345678][123][456][moniker][foo,bar] ERROR: [some_file.cc(420)] some message test=property value=test{}", color::Fg(color::Red), style::Reset),
+            format!("{}", LogTextPresenter::new(&data, LogTextDisplayOptions {
+                color: LogTextColor::BySeverity,
+                ..Default::default()
+            }))
+        )
+    }
+
+    #[fuchsia::test]
+    fn display_for_logs_highlight_line() {
+        let data = LogsDataBuilder::new(BuilderArgs {
+            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            component_url: Some(String::from("fake-url")),
+            moniker: String::from("moniker"),
+            severity: Severity::Info,
+        })
+        .set_pid(123)
+        .set_tid(456)
+        .set_message("some message".to_string())
+        .set_file("some_file.cc".to_string())
+        .set_line(420)
+        .add_tag("foo")
+        .add_tag("bar")
+        .add_key(LogsProperty::String(LogsField::Other("test".to_string()), "property".to_string()))
+        .add_key(LogsProperty::String(LogsField::MsgStructured, "test".to_string()))
+        .build();
+
+        assert_eq!(
+            format!("{}[00012.345678][123][456][moniker][foo,bar] INFO: [some_file.cc(420)] some message test=property value=test{}", color::Fg(color::LightYellow), style::Reset),
+            format!("{}", LogTextPresenter::new(&data, LogTextDisplayOptions {
+                color: LogTextColor::Highlight,
+                ..Default::default()
+            }))
+        )
+    }
+
+    #[fuchsia::test]
+    fn display_for_logs_with_wall_time() {
+        let data = LogsDataBuilder::new(BuilderArgs {
+            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            component_url: Some(String::from("fake-url")),
+            moniker: String::from("moniker"),
+            severity: Severity::Info,
+        })
+        .set_pid(123)
+        .set_tid(456)
+        .set_message("some message".to_string())
+        .set_file("some_file.cc".to_string())
+        .set_line(420)
+        .add_tag("foo")
+        .add_tag("bar")
+        .add_key(LogsProperty::String(LogsField::Other("test".to_string()), "property".to_string()))
+        .add_key(LogsProperty::String(LogsField::MsgStructured, "test".to_string()))
+        .build();
+
+        assert_eq!(
+            "[1970-01-01 00:00:12.345][123][456][moniker][foo,bar] INFO: [some_file.cc(420)] some message test=property value=test",
+            format!("{}", LogTextPresenter::new(&data, LogTextDisplayOptions {
+                time_format: LogTimeDisplayFormat::WallTime { tz: Timezone::Utc, offset: 1 },
+                ..Default::default()
+            }))
+        );
+
+        assert_eq!(
+            "[00012.345678][123][456][moniker][foo,bar] INFO: [some_file.cc(420)] some message test=property value=test",
+            format!("{}", LogTextPresenter::new(&data, LogTextDisplayOptions {
+                time_format: LogTimeDisplayFormat::WallTime { tz: Timezone::Utc, offset: 0 },
+                ..Default::default()
+            })),
+            "should fall back to monotonic if offset is 0"
+        );
+    }
+
+    #[fuchsia::test]
+    fn display_for_logs_with_dropped_count() {
+        let data = LogsDataBuilder::new(BuilderArgs {
+            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            component_url: Some(String::from("fake-url")),
+            moniker: String::from("moniker"),
+            severity: Severity::Info,
+        })
+        .set_dropped(5)
+        .set_pid(123)
+        .set_tid(456)
+        .set_message("some message".to_string())
+        .set_file("some_file.cc".to_string())
+        .set_line(420)
+        .add_tag("foo")
+        .add_tag("bar")
+        .add_key(LogsProperty::String(LogsField::Other("test".to_string()), "property".to_string()))
+        .add_key(LogsProperty::String(LogsField::MsgStructured, "test".to_string()))
+        .build();
+
+        assert_eq!(
+            "[00012.345678][123][456][moniker][foo,bar] INFO: [some_file.cc(420)] some message test=property value=test [dropped=5]",
+            format!("{}", LogTextPresenter::new(&data, LogTextDisplayOptions::default())),
+        );
+
+        assert_eq!(
+            format!("[00012.345678][123][456][moniker][foo,bar] INFO: [some_file.cc(420)] some message test=property value=test{} [dropped=5]{}", color::Fg(color::Yellow), style::Reset),
+            format!("{}", LogTextPresenter::new(&data, LogTextDisplayOptions {
+                color: LogTextColor::BySeverity,
+                ..Default::default()
+            })),
+        );
+    }
+
+    #[fuchsia::test]
+    fn display_for_logs_with_rolled_count() {
+        let data = LogsDataBuilder::new(BuilderArgs {
+            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            component_url: Some(String::from("fake-url")),
+            moniker: String::from("moniker"),
+            severity: Severity::Info,
+        })
+        .set_rolled_out(10)
+        .set_pid(123)
+        .set_tid(456)
+        .set_message("some message".to_string())
+        .set_file("some_file.cc".to_string())
+        .set_line(420)
+        .add_tag("foo")
+        .add_tag("bar")
+        .add_key(LogsProperty::String(LogsField::Other("test".to_string()), "property".to_string()))
+        .add_key(LogsProperty::String(LogsField::MsgStructured, "test".to_string()))
+        .build();
+
+        assert_eq!(
+            "[00012.345678][123][456][moniker][foo,bar] INFO: [some_file.cc(420)] some message test=property value=test [rolled=10]",
+            format!("{}", LogTextPresenter::new(&data, LogTextDisplayOptions::default())),
+        );
+
+        assert_eq!(
+            format!("[00012.345678][123][456][moniker][foo,bar] INFO: [some_file.cc(420)] some message test=property value=test{} [rolled=10]{}", color::Fg(color::Yellow), style::Reset),
+            format!("{}", LogTextPresenter::new(&data, LogTextDisplayOptions {
+                color: LogTextColor::BySeverity,
+                ..Default::default()
+            })),
+        );
+    }
+
+    #[fuchsia::test]
+    fn display_for_logs_with_dropped_and_rolled_counts() {
+        let data = LogsDataBuilder::new(BuilderArgs {
+            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            component_url: Some(String::from("fake-url")),
+            moniker: String::from("moniker"),
+            severity: Severity::Info,
+        })
+        .set_dropped(5)
+        .set_rolled_out(10)
+        .set_pid(123)
+        .set_tid(456)
+        .set_message("some message".to_string())
+        .set_file("some_file.cc".to_string())
+        .set_line(420)
+        .add_tag("foo")
+        .add_tag("bar")
+        .add_key(LogsProperty::String(LogsField::Other("test".to_string()), "property".to_string()))
+        .add_key(LogsProperty::String(LogsField::MsgStructured, "test".to_string()))
+        .build();
+
+        assert_eq!(
+            "[00012.345678][123][456][moniker][foo,bar] INFO: [some_file.cc(420)] some message test=property value=test [dropped=5] [rolled=10]",
+            format!("{}", LogTextPresenter::new(&data, LogTextDisplayOptions::default())),
+        );
+
+        assert_eq!(
+            format!("[00012.345678][123][456][moniker][foo,bar] INFO: [some_file.cc(420)] some message test=property value=test{} [dropped=5] [rolled=10]{}", color::Fg(color::Yellow), style::Reset),
+            format!("{}", LogTextPresenter::new(&data, LogTextDisplayOptions {
+                color: LogTextColor::BySeverity,
+                ..Default::default()
+            })),
+        );
     }
 
     #[fuchsia::test]
