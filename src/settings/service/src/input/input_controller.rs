@@ -155,9 +155,6 @@ struct InputControllerInner {
     input_device_config: InputConfiguration,
 }
 
-// TODO(fxbug.dev/67153): Rename mic "muted" to "disabled".
-// This should apply across all SetUI-controlled usages of
-// "mute".
 impl InputControllerInner {
     // Wrapper around client.read() that fills in the config
     // as the default value if the read value is empty. It may be empty
