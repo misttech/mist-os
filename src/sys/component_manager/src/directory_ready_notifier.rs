@@ -24,6 +24,7 @@ use {
         sync::{Arc, Mutex, Weak},
         time::Duration,
     },
+    thiserror::Error,
 };
 
 // TODO(fxbug.dev/49198): The out/diagnostics directory propagation for runners includes a retry.
@@ -205,7 +206,7 @@ impl DirectoryReadyNotifier {
             loop {
                 match self.try_opening(&outgoing_dir, &source_path, &rights).await {
                     Ok(node) => return Ok(node),
-                    Err(TryOpenError::Fidl(_)) => {
+                    Err(TryOpenError::Fidl(_)) | Err(TryOpenError::Enumerate(_)) => {
                         break Err(ModelError::open_directory_error(
                             target.abs_moniker.clone(),
                             source_path.clone(),
@@ -248,21 +249,23 @@ impl DirectoryReadyNotifier {
         source_path: &str,
         rights: &Rights,
     ) -> Result<fio::NodeProxy, TryOpenError> {
+        // Check that the directory is present first.
         let canonicalized_path = fuchsia_fs::canonicalize_path(&source_path);
+        if !fuchsia_fs::directory::dir_contains(&outgoing_dir, canonicalized_path).await? {
+            return Err(TryOpenError::Status(zx::Status::NOT_FOUND));
+        }
         let (node, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-        outgoing_dir
-            .open(
-                // TODO(fxbug.dev/118292): we might be able to remove READABLE from here, but at the
-                // moment driver_manager fails to expose inspect if we remove it.
-                rights.into_legacy()
-                    | fio::OpenFlags::DESCRIBE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::DIRECTORY,
-                fio::ModeType::empty(),
-                &canonicalized_path,
-                ServerEnd::new(server_end.into_channel()),
-            )
-            .map_err(TryOpenError::Fidl)?;
+        outgoing_dir.open(
+            // TODO(fxbug.dev/118292): we might be able to remove READABLE from here, but at the
+            // moment driver_manager fails to expose inspect if we remove it.
+            rights.into_legacy()
+                | fio::OpenFlags::DESCRIBE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::DIRECTORY,
+            fio::ModeType::empty(),
+            &canonicalized_path,
+            ServerEnd::new(server_end.into_channel()),
+        )?;
         let mut events = node.take_event_stream();
         match events.next().await {
             Some(Ok(fio::NodeEvent::OnOpen_ { s: status, .. })) => {
@@ -368,9 +371,14 @@ impl EventSynthesisProvider for DirectoryReadyNotifier {
     }
 }
 
+#[derive(Error, Debug)]
 enum TryOpenError {
-    Fidl(fidl::Error),
-    Status(zx::Status),
+    #[error(transparent)]
+    Fidl(#[from] fidl::Error),
+    #[error(transparent)]
+    Status(#[from] zx::Status),
+    #[error(transparent)]
+    Enumerate(#[from] fuchsia_fs::directory::EnumerateError),
 }
 
 #[async_trait]
@@ -413,6 +421,7 @@ mod tests {
     use cm_rust_testing::ComponentDeclBuilder;
     use moniker::AbsoluteMonikerBase;
     use std::convert::TryFrom;
+    use zerocopy::AsBytes;
 
     #[fuchsia::test]
     async fn verify_get_event_retry() {
@@ -460,9 +469,39 @@ mod tests {
     /// Serves a fake directory that returns NOT_FOUND for the given path until the third request.
     async fn serve_fake_dir(mut request_stream: fio::DirectoryRequestStream) {
         let mut requests = 0;
-        while let Some(req) = request_stream.next().await {
+        let mut at_end = true;
+        while let Some(Ok(req)) = request_stream.next().await {
             match req {
-                Ok(fio::DirectoryRequest::Open { path, object, .. }) => {
+                fio::DirectoryRequest::Rewind { responder, .. } => {
+                    at_end = false;
+                    responder.send(zx::Status::OK.into_raw()).unwrap();
+                }
+                fio::DirectoryRequest::ReadDirents { responder, .. } => {
+                    const SIZE: usize = 3;
+                    #[derive(AsBytes)]
+                    #[repr(C, packed)]
+                    struct Dirent {
+                        ino: u64,
+                        size: u8,
+                        kind: u8,
+                        name: [u8; SIZE],
+                    }
+
+                    if at_end {
+                        responder.send(zx::Status::OK.into_raw(), &[]).unwrap();
+                        continue;
+                    }
+                    let dirent = Dirent {
+                        ino: fio::INO_UNKNOWN,
+                        size: SIZE as u8,
+                        kind: fio::DirentType::Directory.into_primitive(),
+                        name: "foo".as_bytes().try_into().unwrap(),
+                    };
+                    let buf = dirent.as_bytes();
+                    at_end = true;
+                    responder.send(zx::Status::OK.into_raw(), &buf).unwrap();
+                }
+                fio::DirectoryRequest::Open { path, object, .. } => {
                     assert_eq!("foo", path);
                     let (_stream, control_handle) =
                         object.into_stream_and_control_handle().unwrap();
