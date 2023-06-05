@@ -315,7 +315,7 @@ void UsbAudioStream::GetSupportedFormats(
     fbl::Vector<uint8_t> bytes_per_sample;
   };
   fbl::Vector<FidlCompatibleFormats> fidl_compatible_formats;
-  for (UsbAudioStreamInterface::FormatMapEntry& i : formats) {
+  for (const UsbAudioStreamInterface::FormatMapEntry& i : formats) {
     std::vector<utils::Format> formats = audio::utils::GetAllFormats(i.range_.sample_formats);
     ZX_ASSERT(formats.size() >= 1);
     for (utils::Format& j : formats) {
