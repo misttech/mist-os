@@ -39,7 +39,7 @@ template("ext4_to_pkg") {
                              "testonly",
                            ])
     depfile = "$target_gen_dir/$target_name.d"
-    tool = "//src/storage/ext4:ext4_to_pkg"
+    tool = "//src/storage/ext4/bin:ext4_to_pkg"
     sources = [ invoker.input ]
     outputs = [ _fini_manifest ]
     args = [

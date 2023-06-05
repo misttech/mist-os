@@ -1,0 +1,18 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/host.gni")
+import("//build/rust/rustc_library.gni")
+
+assert(is_host, "ext4_extract is host-only")
+
+rustc_library("ext4_extract") {
+  edition = "2021"
+  sources = [ "src/lib.rs" ]
+  deps = [
+    "//src/storage/ext4/lib/metadata",
+    "//src/storage/ext4/read-only:ext4-read-only",
+    "//third_party/rust_crates:anyhow",
+  ]
+}

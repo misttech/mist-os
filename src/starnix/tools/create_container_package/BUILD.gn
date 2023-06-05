@@ -34,7 +34,7 @@ if (is_host) {
     deps = [
       "//src/lib/fidl/rust/fidl",
       "//src/lib/fuchsia-async",
-      "//src/storage/ext4:ext4_metadata",
+      "//src/storage/ext4/lib/metadata",
       "//src/sys/pkg/lib/fuchsia-pkg",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:argh",
