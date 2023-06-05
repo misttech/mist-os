@@ -13,6 +13,27 @@
 
 namespace media::audio::drivers::test {
 
+// Requests on protocols that are composesd into StreamConfig/Dai/Codec/Composite.
+//
+// fuchsia.hardware.audio.Health
+// We expect a response, and we allow 'healthy' to be either unspecified or TRUE.
+void BasicTest::RequestHealthState() {
+  GetHealthState(AddCallback("GetHealthState", [](fuchsia::hardware::audio::HealthState state) {
+    EXPECT_TRUE(!state.has_healthy() || state.healthy());
+  }));
+  ExpectCallbacks();
+}
+
+void BasicTest::GetHealthState(fuchsia::hardware::audio::Health::GetHealthStateCallback cb) {
+  if (device_entry().isStreamConfig()) {
+    stream_config()->GetHealthState(std::move(cb));
+  } else if (device_entry().isDai()) {
+    dai()->GetHealthState(std::move(cb));
+  } else if (device_entry().isComposite()) {
+    composite()->GetHealthState(std::move(cb));
+  }
+}
+
 // Stream channel requests
 //
 // Request stream properties including unique ID (which must be unique between input and output).
@@ -325,6 +346,9 @@ void BasicTest::WatchPlugStateAndExpectNoUpdate() {
 
 // Test cases that target each of the various Stream channel commands
 
+// Verify the driver responds to the GetHealthState query.
+DEFINE_BASIC_TEST_CLASS(Health, { RequestHealthState(); });
+
 // Verify a valid unique_id, manufacturer, product and gain capabilities is successfully received.
 DEFINE_BASIC_TEST_CLASS(StreamProperties, { RequestStreamProperties(); });
 
@@ -408,6 +432,7 @@ DEFINE_BASIC_TEST_CLASS(Topology, { RequestTopologies(); });
 
 void RegisterBasicTestsForDevice(const DeviceEntry& device_entry) {
   if (device_entry.isStreamConfig()) {
+    REGISTER_BASIC_TEST(Health, device_entry);
     REGISTER_BASIC_TEST(StreamProperties, device_entry);
     REGISTER_BASIC_TEST(GetInitialGainState, device_entry);
     REGISTER_BASIC_TEST(WatchGainSecondTimeNoResponse, device_entry);
@@ -417,13 +442,16 @@ void RegisterBasicTestsForDevice(const DeviceEntry& device_entry) {
     REGISTER_BASIC_TEST(GetInitialPlugState, device_entry);
     REGISTER_BASIC_TEST(WatchPlugSecondTimeNoResponse, device_entry);
   }
+  if (device_entry.isDai()) {
+    REGISTER_BASIC_TEST(Health, device_entry);
+  }
   if (device_entry.isComposite()) {
+    REGISTER_BASIC_TEST(Health, device_entry);
     REGISTER_BASIC_TEST(Topology, device_entry);
   }
   // TODO(fxbug.dev/124865): Add testing for Dai protocol methods (specifically Reset,
   // GetProperties, GetDaiFormats, and GetRingBufferFormats).
   // TODO(fxbug.dev/126734): Add testing for SignalProcessing methods.
-  // TODO(fxbug.dev/126733): Add testing for Health methods.
   // TODO(fxbug.dev/124865): Add testing for Composite protocol methods.
 }
 

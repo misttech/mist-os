@@ -19,6 +19,9 @@ class BasicTest : public TestBase {
   explicit BasicTest(const DeviceEntry& dev_entry) : TestBase(dev_entry) {}
 
  protected:
+  void RequestHealthState();
+  void GetHealthState(fuchsia::hardware::audio::Health::GetHealthStateCallback cb);
+
   void RequestStreamProperties();
 
   void WatchGainStateAndExpectUpdate();
