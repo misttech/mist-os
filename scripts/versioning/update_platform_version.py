@@ -1,4 +1,4 @@
-#!/usr/bin/env fuchsia-vendored-python
+#!/usr/bin/env python3
 # Copyright 2021 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -19,33 +19,6 @@ from pathlib import Path
 # The length of the API compatibility window, in API levels. This is the number
 # of stable API levels that will be supported in addition to the one in development.
 _API_COMPATIBILITY_WINDOW_SIZE = 2
-
-
-def update_platform_version(fuchsia_api_level, platform_version_path):
-    """Updates platform_version.json to set the in_development_api_level to the given
-    Fuchsia API level.
-    """
-    try:
-        with open(platform_version_path, "r+") as f:
-            platform_version = json.load(f)
-            platform_version["in_development_api_level"] = fuchsia_api_level
-            # Generates a list of supported API levels that contains at most
-            # _API_COMPATIBILITY_WINDOW_SIZE elements.
-            platform_version["supported_fuchsia_api_levels"] = list(
-                range(
-                    max(fuchsia_api_level - _API_COMPATIBILITY_WINDOW_SIZE, 1),
-                    fuchsia_api_level))
-            f.seek(0)
-            json.dump(platform_version, f)
-            f.truncate()
-        return True
-    except FileNotFoundError:
-        print(
-            """error: Unable to open '{path}'.
-Did you run this script from the root of the source tree?""".format(
-                path=platform_version_path),
-            file=sys.stderr)
-        return False
 
 
 def update_fidl_compatibility_doc(
@@ -195,10 +168,6 @@ def main():
 
     if not update_version_history(args.fuchsia_api_level,
                                   args.sdk_version_history):
-        return 1
-
-    if not update_platform_version(args.fuchsia_api_level,
-                                   args.platform_version_json):
         return 1
 
     if not update_fidl_compatibility_doc(args.fuchsia_api_level,

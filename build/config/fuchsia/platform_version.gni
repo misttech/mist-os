@@ -1,7 +1,18 @@
 # Copyright 2021 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-platform_version = read_file("platform_version.json", "json")
+
+version_history_path = "//sdk/version_history.json"
+
+_script = "get_platform_version.py"
+_process_versions_args = [
+  "-S",  # https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=62771
+  rebase_path(_script, root_build_dir),
+  "--version-history-path",
+  rebase_path(version_history_path, root_build_dir),
+]
+
+platform_version = exec_script(python_exe_src, _process_versions_args, "json")
 
 declare_args() {
   # If true, build for N+1 api level, where N is platform_version.in_development_api_level

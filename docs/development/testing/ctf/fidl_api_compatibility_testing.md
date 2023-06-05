@@ -27,13 +27,7 @@ There are two API levels that are useful to keep in mind:
 Usually active == current, except during API freezes when active == current + 1.
 
 The current implementation of platform versioning does not yet reflect this:
-In the Fuchsia source tree we track the "current" API level and the set of
-"supported" levels at [//build/config/fuchsia/platform_version.json](/build/config/fuchsia/platform_version.json).
-Supported levels are levels that cannot be changed, and we do not explicitly record
-the "active" level in this file.
-
-The above file is not to be confused with [//sdk/version_history.json](/sdk/version_history.json)
-which records API and ABI version history.
+In the Fuchsia source tree, we record API and ABI version history, as well as level status ("current" and "supported") at [//sdk/version_history.json](/sdk/version_history.json).
 
 ### API level evolution
 

@@ -34,7 +34,7 @@ library fuchsia.examples.docs;
 ```
 
 Stable APIs should be `added` at the
-[in-development API level](/build/config/fuchsia/platform_version.json).
+[in-development API level](/sdk/version_history.json).
 This means that starting at the current in-development API
 level, this API is available and will not change without
 the appropriate deprecation flows.
