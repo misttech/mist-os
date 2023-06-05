@@ -16,5 +16,8 @@ pub mod header;
 /// Types and interfaces associated with the supported OBEX operations.
 mod operation;
 
+/// Helpers for interacting with the `fuchsia.bluetooth.bredr.Profile` resource.
+pub mod profile;
+
 /// Defines the `ObexTransport` which is a wrapper around the underlying L2CAP or RFCOMM channel.
 mod transport;

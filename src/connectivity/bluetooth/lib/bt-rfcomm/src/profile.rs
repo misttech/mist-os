@@ -47,6 +47,14 @@ pub fn server_channel_from_protocol(protocol: &Vec<ProtocolDescriptor>) -> Optio
     None
 }
 
+/// Returns the connect parameters for the provided RFCOMM `server_channel`.
+pub fn rfcomm_connect_parameters(server_channel: ServerChannel) -> bredr::ConnectParameters {
+    bredr::ConnectParameters::Rfcomm(bredr::RfcommParameters {
+        channel: Some(server_channel.into()),
+        ..bredr::RfcommParameters::default()
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

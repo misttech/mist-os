@@ -368,6 +368,13 @@ impl From<&ProtocolDescriptor> for fidl_bredr::ProtocolDescriptor {
     }
 }
 
+pub fn l2cap_connect_parameters(psm: Psm) -> fidl_bredr::ConnectParameters {
+    fidl_bredr::ConnectParameters::L2cap(fidl_bredr::L2capParameters {
+        psm: Some(psm.into()),
+        ..fidl_bredr::L2capParameters::default()
+    })
+}
+
 /// A generic attribute used for protocol information.
 /// Corresponds directly to the FIDL `Attribute` definition - with the extra
 /// properties of Clone and PartialEq.
