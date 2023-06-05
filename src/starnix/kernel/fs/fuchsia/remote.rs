@@ -299,6 +299,19 @@ impl FsNodeOps for RemoteNode {
         Ok(RwLockWriteGuard::downgrade(info))
     }
 
+    fn unlink(&self, _node: &FsNode, name: &FsStr, _child: &FsNodeHandle) -> Result<(), Errno> {
+        // We don't care about the _child argument because 1. unlinking already takes the parent's
+        // children lock, so we don't have to worry about conflicts on this path, and 2. the remote
+        // filesystem tracks the link counts so we don't need to update them here.
+        let name = std::str::from_utf8(name).map_err(|_| {
+            log_warn!("bad utf8 in pathname! remote filesystems can't handle this");
+            errno!(EINVAL)
+        })?;
+        self.zxio
+            .unlink(name, fio::UnlinkFlags::empty())
+            .map_err(|status| from_status_like_fdio!(status))
+    }
+
     fn create_symlink(
         &self,
         node: &FsNode,

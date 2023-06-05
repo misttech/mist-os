@@ -573,6 +573,14 @@ impl Zxio {
         Ok(zxio)
     }
 
+    pub fn unlink(&self, name: &str, flags: fio::UnlinkFlags) -> Result<(), zx::Status> {
+        let flags_bits = flags.bits().try_into().map_err(|_| zx::Status::INVALID_ARGS)?;
+        let status = unsafe {
+            zxio::zxio_unlink(self.as_ptr(), name.as_ptr() as *const c_char, name.len(), flags_bits)
+        };
+        zx::ok(status)
+    }
+
     pub fn read(&self, data: &mut [u8]) -> Result<usize, zx::Status> {
         let flags = zxio::zxio_flags_t::default();
         let mut actual = 0usize;
