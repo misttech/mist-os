@@ -166,7 +166,14 @@ class MockMmioRegRegion {
 
   // Accesses the MockMmioReg at the given offset. Note that this is the _offset_, not the
   // _index_.
-  MockMmioReg& operator[](size_t offset) const {
+  const MockMmioReg& operator[](size_t offset) const {
+    CheckOffset(offset);
+    return regs_[(offset / reg_size_) - reg_offset_];
+  }
+
+  // Accesses the MockMmioReg at the given offset. Note that this is the _offset_, not the
+  // _index_.
+  MockMmioReg& operator[](size_t offset) {
     CheckOffset(offset);
     return regs_[(offset / reg_size_) - reg_offset_];
   }
@@ -191,22 +198,22 @@ class MockMmioRegRegion {
 
  private:
   static uint8_t Read8(const void* ctx, const mmio_buffer_t& mmio, zx_off_t offs) {
-    const auto& reg_region = *reinterpret_cast<const MockMmioRegRegion*>(ctx);
+    auto& reg_region = *reinterpret_cast<MockMmioRegRegion*>(const_cast<void*>(ctx));
     return static_cast<uint8_t>(reg_region[offs + mmio.offset].Read());
   }
 
   static uint16_t Read16(const void* ctx, const mmio_buffer_t& mmio, zx_off_t offs) {
-    const auto& reg_region = *reinterpret_cast<const MockMmioRegRegion*>(ctx);
+    auto& reg_region = *reinterpret_cast<MockMmioRegRegion*>(const_cast<void*>(ctx));
     return static_cast<uint16_t>(reg_region[offs + mmio.offset].Read());
   }
 
   static uint32_t Read32(const void* ctx, const mmio_buffer_t& mmio, zx_off_t offs) {
-    const auto& reg_region = *reinterpret_cast<const MockMmioRegRegion*>(ctx);
+    auto& reg_region = *reinterpret_cast<MockMmioRegRegion*>(const_cast<void*>(ctx));
     return static_cast<uint32_t>(reg_region[offs + mmio.offset].Read());
   }
 
   static uint64_t Read64(const void* ctx, const mmio_buffer_t& mmio, zx_off_t offs) {
-    const auto& reg_region = *reinterpret_cast<const MockMmioRegRegion*>(ctx);
+    auto& reg_region = *reinterpret_cast<MockMmioRegRegion*>(const_cast<void*>(ctx));
     return reg_region[offs + mmio.offset].Read();
   }
 
@@ -223,7 +230,7 @@ class MockMmioRegRegion {
   }
 
   static void Write64(const void* ctx, const mmio_buffer_t& mmio, uint64_t val, zx_off_t offs) {
-    const auto& reg_region = *reinterpret_cast<const MockMmioRegRegion*>(ctx);
+    auto& reg_region = *reinterpret_cast<MockMmioRegRegion*>(const_cast<void*>(ctx));
     reg_region[offs + mmio.offset].Write(val);
   }
 
