@@ -200,6 +200,17 @@ def fuse_expanded_flags(command: Iterable[str],
         yield tok
 
 
+def expand_paths_from_files(files: Iterable[Path]) -> Iterable[Path]:
+    """Expand paths from files that list other paths.
+    """
+    for path_list in files:
+        with open(path_list) as f:
+            for line in f:
+                stripped = line.strip()
+                if stripped:
+                    yield Path(stripped)
+
+
 def keyed_flags_to_values_dict(
         flags: Iterable[str],
         convert_type: Callable[[str], Any] = None) -> Dict[str, Sequence[str]]:

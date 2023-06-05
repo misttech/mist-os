@@ -726,6 +726,7 @@ class DownloadStubInfo(object):
         Downloads to a temporarily location, and then moves it
         into place when completed.
         The stub file is backed up to "<name>.dl-stub".
+        Permissions on the stub file are applied to the downloaded result.
 
         Args:
           downloader: 'remotetool' instance to use to download.
@@ -752,6 +753,8 @@ class DownloadStubInfo(object):
         )
 
         if status.returncode == 0:  # download complete, success
+            # Reflect the mode/permissions from stub to the real file.
+            temp_dl.chmod(dest.stat().st_mode)
             # Backup the download stub.  This preserves the xattr.
             dest.rename(Path(str(dest) + _RBE_DOWNLOAD_STUB_SUFFIX))
             temp_dl.rename(dest)
@@ -765,12 +768,29 @@ def _file_starts_with(path: Path, text: str) -> bool:
         return os.pread(f.fileno(), len(text), 0) == text.encode()
 
 
-def is_download_stub_file(path: Path) -> Optional[Path]:
+def is_download_stub_file(path: Path) -> bool:
     """Returns true if the path points to a download stub."""
     if _HAVE_XATTR:
         return _RBE_XATTR_NAME in os.listxattr(path)
     else:
         return _file_starts_with(path, _RBE_DOWNLOAD_STUB_IDENTIFIER)
+
+
+def undownload(path: Path) -> bool:
+    """If a backup download stub exists, restore it (for debugging).
+
+    Args:
+      path: path to an artifact that might have a backup download stub.
+        The file at this location is not required to exist before calling.
+
+    Returns:
+      True if a stub was moved back.
+    """
+    stub_path = Path(str(path) + _RBE_DOWNLOAD_STUB_SUFFIX)
+    if stub_path.exists() and is_download_stub_file(stub_path):
+        stub_path.rename(path)
+        return True
+    return False
 
 
 def download_from_stub(
@@ -1111,15 +1131,7 @@ class RemoteAction(object):
     def inputs_relative_to_working_dir(self) -> Sequence[Path]:
         """Combines files from --inputs and --input_list_paths."""
         return self._inputs + list(
-            self._inputs_from_path_list_relative_to_working_dir())
-
-    def _inputs_from_path_list_relative_to_working_dir(self) -> Iterable[Path]:
-        for path_list in self.input_list_paths:
-            with open(path_list) as f:
-                for line in f:
-                    stripped = line.strip()
-                    if stripped:
-                        yield Path(stripped)
+            cl_utils.expand_paths_from_files(self.input_list_paths))
 
     @property
     def output_files_relative_to_working_dir(self) -> Sequence[Path]:

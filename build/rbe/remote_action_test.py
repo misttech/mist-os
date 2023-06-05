@@ -1744,23 +1744,24 @@ remote_metadata: {{
             stub_infos[p].create(tdp)
 
             destination = tdp / p
+            mode = destination.stat().st_mode
             self.assertTrue(remote_action.is_download_stub_file(destination))
 
-            exec_root = '/exec/root'
-            with mock.patch.object(
-                    remotetool.RemoteTool, 'download_blob',
-                    return_value=cl_utils.SubprocessResult(0)) as mock_download:
+            def fake_download_file(
+                    downloader_self, path: Path, digest: str, **kwargs):
+                (tdp / path).write_text("hello\n")
+                return cl_utils.SubprocessResult(0)
+
+            with mock.patch.object(remotetool.RemoteTool, 'download_blob',
+                                   new=fake_download_file) as mock_download:
                 with mock.patch.object(Path, 'rename') as mock_rename:
                     remote_action.download_from_stub(
                         destination,
                         downloader=self.downloader,
                         working_dir_abs=tdp)
-            mock_download.assert_called_with(
-                path=Path(str(destination) + '.download-tmp'),
-                digest=digest,
-                cwd=tdp,
-            )
+
             mock_rename.assert_called_with(destination)
+            self.assertEqual(destination.stat().st_mode, mode)
 
     def test_create_directory_stub_and_download(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1791,20 +1792,19 @@ remote_metadata: {{
             destination = tdp / p
             self.assertTrue(remote_action.is_download_stub_file(destination))
 
-            exec_root = '/exec/root'
-            with mock.patch.object(
-                    remotetool.RemoteTool, 'download_dir',
-                    return_value=cl_utils.SubprocessResult(0)) as mock_download:
+            def fake_download_dir(
+                    downloader_self, path: Path, digest: str, **kwargs):
+                (tdp / path).mkdir()
+                (tdp / path / "readme.txt").write_text("hello\n")
+                return cl_utils.SubprocessResult(0)
+
+            with mock.patch.object(remotetool.RemoteTool, 'download_dir',
+                                   new=fake_download_dir) as mock_download:
                 with mock.patch.object(Path, 'rename') as mock_rename:
                     remote_action.download_from_stub(
                         destination,
                         downloader=self.downloader,
                         working_dir_abs=tdp)
-            mock_download.assert_called_with(
-                path=Path(str(destination) + '.download-tmp'),
-                digest=digest,
-                cwd=tdp,
-            )
             mock_rename.assert_called_with(destination)
 
     def test_read_fail(self):
@@ -1864,6 +1864,50 @@ remote_metadata: {{
         self.assertEqual(status.returncode, download_status)
         mock_download.assert_called_once()
         mock_rename.assert_not_called()
+
+    def test_undownload_non_stub_ignored(self):
+        path = Path('foo/barf.baz')
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            (tdp / path.parent).mkdir(parents=True)
+            (tdp / path).write_text("bye\n")
+            # path points to a non-stub
+            self.assertFalse(remote_action.is_download_stub_file(tdp / path))
+            remote_action.undownload(tdp / path)
+            # nothing changes
+            self.assertFalse(remote_action.is_download_stub_file(tdp / path))
+
+    def test_undownload_restored(self):
+        path = Path('foo/barf.baz')
+        stub = remote_action.DownloadStubInfo(
+            path=path,
+            type="file",
+            blob_digest="82828abf872/453",
+            action_digest="2332df093d1/98",
+            build_id="random-id777",
+        )
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            stub.create(tdp)
+            # Pretend to download first.
+            download_status = 0
+
+            def fake_download_file(
+                    downloader_self, path: Path, digest: str, **kwargs):
+                path.write_text("greetings\n")
+                return cl_utils.SubprocessResult(download_status)
+
+            with mock.patch.object(remotetool.RemoteTool, 'download_blob',
+                                   new=fake_download_file) as mock_download:
+                status = stub.download(
+                    downloader=self.downloader, working_dir_abs=tdp)
+
+            # path points to a non-stub
+            self.assertFalse(remote_action.is_download_stub_file(tdp / path))
+
+            remote_action.undownload(tdp / path)
+            # now path points to a restored stub
+            self.assertTrue(remote_action.is_download_stub_file(tdp / path))
 
     def test_made_download_stubs_for_remote_execution(self):
         exec_root = Path('/home/project')

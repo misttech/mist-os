@@ -58,12 +58,27 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         help="Do not download or run the command.",
     )
     parser.add_argument(
+        "--undownload",
+        action="store_true",
+        default=False,
+        help=
+        "Restore download stubs, if they exist, and do not run the command.",
+    )
+    parser.add_argument(
         "--download",
         default=[],
         type=Path,
         nargs="*",
         help=
         "Download these files from their stubs.  Arguments are download stub files produced from 'remote_action.py', relative to the working dir.",
+    )
+    parser.add_argument(
+        "--download_list",
+        default=[],
+        type=Path,
+        nargs="*",
+        help=
+        "Download these files named in these list files.  Arguments are download stub files produced from 'remote_action.py', relative to the working dir.",
     )
     # Positional args are the command and arguments to run.
     parser.add_argument(
@@ -94,6 +109,12 @@ def download_artifacts(
     verbose: bool = False,
     dry_run: bool = False,
 ) -> int:
+    """Download remotely stored artifacts.
+
+    Args:
+      stub_paths: path that point to either download stubs or real artifacts.
+        Real artifacts are ignored automatically.
+    """
     stub_infos = read_download_stub_infos(
         stub_paths, verbose=verbose, dry_run=dry_run)
     # TODO: download in parallel
@@ -109,9 +130,12 @@ def download_artifacts(
     for path, status in download_statuses:
         if status.returncode != 0:
             final_status = status.returncode
-            print(f"Error downloading {path}.  stderr was:")
+            msg(f"Error downloading {path}.  stderr was:")
             for line in status.stderr:
                 print(line, file=sys.stderr)
+
+    if final_status != 0:
+        msg("At least one download failed.")
 
     return final_status
 
@@ -123,22 +147,37 @@ def _main(
 ) -> int:
     main_args = _MAIN_ARG_PARSER.parse_args(argv)
 
+    paths = main_args.download + list(
+        cl_utils.expand_paths_from_files(main_args.download_list))
+
+    if main_args.undownload:
+        vmsg(main_args.verbose, f"Restoring download stubs.")
+        for p in paths:
+            remote_action.undownload(p)
+
+        if main_args.command:
+            msg("Not running command, due to --undownload.")
+            return 0
+
+        return 0
+
+    # Download artifacts from their stubs.
     status = download_artifacts(
-        stub_paths=main_args.download,
+        stub_paths=paths,
         downloader=downloader,
         working_dir_abs=working_dir_abs,
         verbose=main_args.verbose,
         dry_run=main_args.dry_run,
     )
+
     if status != 0:
-        msg("At least one download failed.")
         return status
 
-    if main_args.dry_run:
-        msg("Stopping, due to --dry-run")
-        return 0
-
     if main_args.command:
+        if main_args.dry_run:
+            msg("Stopping, due to --dry-run.")
+            return 0
+
         return subprocess.call(main_args.command)
 
     return 0
