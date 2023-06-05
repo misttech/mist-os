@@ -39,6 +39,10 @@ pub(crate) struct IntegrationTestCmd {
 /// The full set of variables available to each template are derived from the user's input
 /// and are as follows:
 ///
+///   component_name
+///       The name of the component, derived from the name of the input component manifest.
+///       Example: /path/to/my-component.cml -> my-component
+///
 ///   test_binary_name
 ///       The name of the generated test binary.
 ///
@@ -73,6 +77,7 @@ impl IntegrationTestCmd {
         // Initialize template variables and source code.
         let component_name = path_file_stem(&self.component_manifest);
         let mut template_vars = std::collections::BTreeMap::new();
+        template_vars.insert("component_name", component_name.clone());
         template_vars.insert("test_binary_name", var_test_binary_name(&component_name));
         template_vars.insert("test_package_name", var_test_package_name(&component_name));
         // TODO(127973): Add back support for C++

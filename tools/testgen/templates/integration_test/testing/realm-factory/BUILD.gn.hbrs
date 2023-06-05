@@ -31,12 +31,13 @@ rustc_binary("bin") {
 
 fuchsia_component("realm-factory-component") {
   testonly = true
-  component_name = "default"
+  component_name = "realm-factory"
   manifest = "meta/default.cml"
   deps = [ ":bin" ]
 }
 
 fuchsia_package("realm-factory") {
+  package_name = "{{ component_name }}-realm-factory"
   testonly = true
   deps = [ ":realm-factory-component" ]
 }

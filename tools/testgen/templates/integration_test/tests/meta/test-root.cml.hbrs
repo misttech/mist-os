@@ -9,7 +9,7 @@
     children: [
         {
             name: "test_realm_factory",
-            url: "realm-factory#meta/default.cm",
+            url: "{{ component_name }}-realm-factory#meta/realm-factory.cm",
         },
         {
             name: "test_suite",
