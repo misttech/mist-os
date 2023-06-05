@@ -107,8 +107,8 @@ protocol Directory2 {
                 /// * If the caller expected a file but the node cannot be
                 /// accessed as a file, the error is `ZX_ERR_NOT_FILE`.
                 ///
-                /// * In other mismatched cases, the error is
-                /// `ZX_ERR_WRONG_TYPE`.
+                /// * In other mismatched cases, and for an empty table, the error
+                /// is `ZX_ERR_WRONG_TYPE`.
                 ///
                 /// If more than one protocol is present, the resultant protocol
                 /// may become any one of them. Callers should specify
@@ -164,6 +164,20 @@ protocol Directory2 {
                     };
                     @available(added=HEAD)
                     3: symlink @generated_name("SymlinkProtocolFlags") flexible bits : uint64 {};
+                    /// Asks for the node protocol. The only right supported is
+                    /// GET_ATTRIBUTES. Calling `SetFlags` on the resulting
+                    /// connection will result in `ZX_ERR_BAD_HANDLE`. If
+                    /// [`NodeFlags.GET_REPRESENTATION`] is specified, the
+                    /// `connector` variant will be returned (even if the object
+                    /// supports a different representation).
+                    @available(added=HEAD)
+                    4: node @generated_name("NodeProtocolFlags") flexible bits : uint64 {
+                        /// Only allow the connection if the underlying object
+                        /// is a directory. An attempt to open something other
+                        /// than a directory will result in a `ZX_ERR_NOT_DIR`
+                        /// epitaph.
+                        MUST_BE_DIRECTORY = 0x01;
+                    };
                 };
 
                 /// Specifies behavior with respect to existence. If an object
