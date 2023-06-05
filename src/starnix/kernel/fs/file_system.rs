@@ -259,6 +259,11 @@ impl FileSystem {
         self.ops.rename(self, old_parent, old_name, new_parent, new_name, renamed, replaced)
     }
 
+    /// Called each time the filesystem is unmounted.
+    pub fn unmount(&self) {
+        self.ops.unmount();
+    }
+
     /// Returns the `statfs` for this filesystem.
     ///
     /// Each `FileSystemOps` impl is expected to override this to return the specific statfs for
@@ -382,6 +387,9 @@ pub trait FileSystemOps: AsAny + Send + Sync + 'static {
     ) -> Result<(), Errno> {
         error!(EROFS)
     }
+
+    /// Called each time the filesystem is unmounted.
+    fn unmount(&self) {}
 }
 
 pub type FileSystemHandle = Arc<FileSystem>;
