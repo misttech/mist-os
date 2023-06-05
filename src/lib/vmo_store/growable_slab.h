@@ -126,9 +126,11 @@ class GrowableSlab {
     }
   }
 
-  Iterator begin() const { return Iterator(this); }
+  // TODO(fxbug.dev/128530): Create a separate ConstIterator class for const
+  // begin() and end() iterators.
+  Iterator begin() { return Iterator(this); }
 
-  Iterator end() const { return Iterator(); }
+  Iterator end() { return Iterator(); }
 
   struct Slot {
     Slot() : next(kSentinel), prev(kSentinel) {}
@@ -144,8 +146,7 @@ class GrowableSlab {
    public:
     Iterator() = default;
 
-    explicit Iterator(const GrowableSlab* parent)
-        : parent_(parent), index_(parent->used_list_.head) {}
+    explicit Iterator(GrowableSlab* parent) : parent_(parent), index_(parent->used_list_.head) {}
 
     Iterator(const Iterator& other) : parent_(other.parent_), index_(other.index_) {}
 
@@ -177,12 +178,12 @@ class GrowableSlab {
       return ret;
     }
 
-    T& operator*() const {
+    T& operator*() {
       ZX_DEBUG_ASSERT(IsValid());
       return parent_->slots_[index_].value.value();
     }
 
-    T* operator->() const {
+    T* operator->() {
       ZX_DEBUG_ASSERT(IsValid());
       return &parent_->slots_[index_].value.value();
     }
@@ -193,7 +194,7 @@ class GrowableSlab {
     Iterator(GrowableSlab* parent, size_t index) : parent_(parent), index_(index) {}
 
     // Pointer to parent slab, not owned.
-    const GrowableSlab<T, KeyType>* parent_ = nullptr;
+    GrowableSlab<T, KeyType>* const parent_ = nullptr;
     KeyType index_ = kSentinel;
   };
 
