@@ -462,7 +462,7 @@ mod tests {
         {
             let mut input_buffer = UserBuffersInputBuffer::new(mm, input_iovec.clone())
                 .expect("UserBuffersInputBuffer");
-            assert!(matches!(input_buffer.peek_each(&mut |data| Ok(data.len() + 1)), Err(_)));
+            assert!(input_buffer.peek_each(&mut |data| Ok(data.len() + 1)).is_err());
         }
 
         // Test drain
@@ -501,7 +501,7 @@ mod tests {
             assert_eq!(input_buffer.available(), 17);
             assert_eq!(input_buffer.bytes_read(), 20);
             assert_eq!(input_buffer.read_exact(&mut buffer[20..37]).expect("read"), 17);
-            assert!(matches!(input_buffer.read_exact(&mut buffer[37..]), Err(_)));
+            assert!(input_buffer.read_exact(&mut buffer[37..]).is_err());
             assert_eq!(input_buffer.available(), 0);
             assert_eq!(input_buffer.bytes_read(), 37);
             assert_eq!(&data[..25], &buffer[..25]);
@@ -528,7 +528,7 @@ mod tests {
         {
             let mut output_buffer = UserBuffersOutputBuffer::new(mm, output_iovec.clone())
                 .expect("UserBuffersOutputBuffer");
-            assert!(matches!(output_buffer.write_each(&mut |data| Ok(data.len() + 1)), Err(_)));
+            assert!(output_buffer.write_each(&mut |data| Ok(data.len() + 1)).is_err());
         }
 
         // Test write
@@ -543,7 +543,7 @@ mod tests {
             assert_eq!(output_buffer.write_all(&data[20..37]).expect("write"), 17);
             assert_eq!(output_buffer.available(), 0);
             assert_eq!(output_buffer.bytes_written(), 37);
-            assert!(matches!(output_buffer.write_all(&data[37..50]), Err(_)));
+            assert!(output_buffer.write_all(&data[37..50]).is_err());
 
             let mut buffer = [0; 128];
             mm.read_memory(addr, &mut buffer).expect("failed to write test data");
@@ -555,7 +555,7 @@ mod tests {
     #[::fuchsia::test]
     fn test_vec_input_buffer() {
         let mut input_buffer = VecInputBuffer::new(b"helloworld");
-        assert!(matches!(input_buffer.peek_each(&mut |data| Ok(data.len() + 1)), Err(_)));
+        assert!(input_buffer.peek_each(&mut |data| Ok(data.len() + 1)).is_err());
 
         let mut input_buffer = VecInputBuffer::new(b"helloworld");
         assert_eq!(input_buffer.bytes_read(), 0);
@@ -581,7 +581,7 @@ mod tests {
         assert_eq!(input_buffer.bytes_read(), 10);
         assert_eq!(input_buffer.available(), 0);
         assert_eq!(&buffer, b"world");
-        assert!(matches!(input_buffer.read_exact(&mut buffer), Err(_)));
+        assert!(input_buffer.read_exact(&mut buffer).is_err());
 
         // Test read_object
         let mut input_buffer = VecInputBuffer::new(b"hello");
@@ -592,19 +592,19 @@ mod tests {
         let buffer: [u8; 2] = input_buffer.read_object().expect("read_object");
         assert_eq!(&buffer, b"lo");
         assert_eq!(input_buffer.bytes_read(), 5);
-        assert!(matches!(input_buffer.read_object::<[u8; 1]>(), Err(_)));
+        assert!(input_buffer.read_object::<[u8; 1]>().is_err());
         assert_eq!(input_buffer.bytes_read(), 5);
 
         let mut input_buffer = VecInputBuffer::new(b"hello");
         assert_eq!(input_buffer.bytes_read(), 0);
-        assert!(matches!(input_buffer.read_object::<[u8; 100]>(), Err(_)));
+        assert!(input_buffer.read_object::<[u8; 100]>().is_err());
         assert_eq!(input_buffer.bytes_read(), 0);
     }
 
     #[::fuchsia::test]
     fn test_vec_output_buffer() {
         let mut output_buffer = VecOutputBuffer::new(10);
-        assert!(matches!(output_buffer.write_each(&mut |data| Ok(data.len() + 1)), Err(_)));
+        assert!(output_buffer.write_each(&mut |data| Ok(data.len() + 1)).is_err());
         assert_eq!(output_buffer.bytes_written(), 0);
         assert_eq!(output_buffer.available(), 10);
         assert_eq!(output_buffer.write_all(b"hello").expect("write"), 5);
@@ -615,7 +615,7 @@ mod tests {
         assert_eq!(output_buffer.bytes_written(), 10);
         assert_eq!(output_buffer.available(), 0);
         assert_eq!(output_buffer.data(), b"helloworld");
-        assert!(matches!(output_buffer.write_all(b"foo"), Err(_)));
+        assert!(output_buffer.write_all(b"foo").is_err());
         let data: Vec<u8> = output_buffer.into();
         assert_eq!(data, b"helloworld".to_vec());
     }
