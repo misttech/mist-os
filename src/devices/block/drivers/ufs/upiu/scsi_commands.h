@@ -56,6 +56,25 @@ enum ScsiCommandSetStatus {
   kTaskAborted = 0x40,
 };
 
+enum ScsiCommandSenseKey {
+  kNoSense = 0x00,
+  kRecoveredError = 0x01,
+  kNotReady = 0x02,
+  kMediumError = 0x03,
+  kHardwareError = 0x04,
+  kIllegalRequest = 0x05,
+  kUnitAttention = 0x06,
+  kDataProtect = 0x07,
+  kBlankCheck = 0x08,
+  kVendorSpecific = 0x09,
+  kCopyAborted = 0x0a,
+  kAbortedCommand = 0x0b,
+  kReserved_1 = 0x0c,
+  kVolumeOverflow = 0x0d,
+  kMiscompare = 0x0E,
+  kReserved_2 = 0x0F,
+};
+
 struct ScsiStartStopData {
   uint8_t pwr_cond;
   uint8_t start;
@@ -203,7 +222,7 @@ class ScsiCommandUpiu : public CommandUpiu {
 // UFS Specification Version 3.1, section 11.3.6 "READ (10) Command".
 class ScsiRead10Upiu : public ScsiCommandUpiu {
  public:
-  DEF_SUBFIELD(data_.cdb[1], 7, 5, wr_protect);
+  DEF_SUBFIELD(data_.cdb[1], 7, 5, rd_protect);
   DEF_SUBBIT(data_.cdb[1], 4, dpo);
   DEF_SUBBIT(data_.cdb[1], 3, fua);
   DEF_SUBBIT(data_.cdb[1], 1, fua_nv);
@@ -276,6 +295,22 @@ class ScsiStartStopUnitUpiu : public ScsiCommandUpiu {
   // for test
   friend class ScsiCommandUpiu;
   ScsiStartStopUnitUpiu() = default;
+};
+
+// UFS Specification Version 3.1, section 11.3.11 "TEST UNIT READY Command".
+class ScsiTestUnitReadyUpiu : public ScsiCommandUpiu {
+ public:
+  DEF_SUBFIELD(data_.cdb[5], 7, 0, control);
+
+  explicit ScsiTestUnitReadyUpiu() : ScsiCommandUpiu(ScsiOpcode::kTestUnitReady) { set_control(0); }
+
+  TransferRequestDescriptorDataDirection GetDataDirection() const override {
+    return TransferRequestDescriptorDataDirection::kNone;
+  }
+
+ private:
+  // for test
+  friend class ScsiCommandUpiu;
 };
 
 // UFS Specification Version 3.1, section 11.3.15 "WRITE (10) Command".

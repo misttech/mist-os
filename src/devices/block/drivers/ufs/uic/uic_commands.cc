@@ -30,8 +30,8 @@ zx::result<> UicCommand::SendUicCommand() {
 
   // Clear 'UIC command completion status' if set
   if (InterruptStatusReg::Get().ReadFrom(&mmio).uic_command_completion_status()) {
-    // 'UIC command completion status' is write and clear field.
-    InterruptStatusReg::Get().FromValue(0).set_uic_command_completion_status(true).WriteTo(&mmio);
+    zxlogf(ERROR, "The previously set uic_command_completion_state was not cleared. \n");
+    return zx::error(ZX_ERR_BAD_STATE);
   }
 
   const auto [argument_1, argument_2, argument_3] = Arguments();
@@ -67,6 +67,8 @@ zx::result<> UicCommand::SendUicCommand() {
       status != ZX_OK) {
     return zx::error(status);
   }
+  // Clear 'UIC command completion status'
+  InterruptStatusReg::Get().FromValue(0).set_uic_command_completion_status(true).WriteTo(&mmio);
 
   return zx::ok();
 }
@@ -140,11 +142,11 @@ zx::result<> DmeHibernateCommand::UicPostProcess() {
 }
 
 uint32_t DmeHibernateEnterCommand::GetFlag() {
-  return InterruptStatusReg::Get().FromValue(0).set_uic_hibernate_enter_status(1).reg_value();
+  return InterruptStatusReg::Get().FromValue(0).set_uic_hibernate_enter_status(true).reg_value();
 }
 
 uint32_t DmeHibernateExitCommand::GetFlag() {
-  return InterruptStatusReg::Get().FromValue(0).set_uic_hibernate_exit_status(1).reg_value();
+  return InterruptStatusReg::Get().FromValue(0).set_uic_hibernate_exit_status(true).reg_value();
 }
 
 }  // namespace ufs

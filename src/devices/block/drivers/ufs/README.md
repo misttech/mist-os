@@ -65,4 +65,59 @@ and provides reliable data transfer through the M-PHY physical layer.
 ### Test on real device
 Currently, the only device that supports a PCI-based UFS host controller is the Samsung Galaxy Book
 S(NT767XCL) with an Intel Lakefield CPU(i5-L16G7). The Galaxy Book S has 512GB of eUFS 3.0 storage.
-Unfortunately, we can't run Fuchsia OS on that laptop yet, but we'll find a way.
+Fuchsia has not been ported to the Galaxy Book S yet, so we are running Fuchsia on QEMU (which works
+on the Galaxy Book S) as an alternative. We are using KVM I/O Passthrough to bind a real UFS device
+(eUFS) to QEMU Fuchsia.
+
+```
+------------------------
+| Fushsia + UFS driver |
+|--------------|   :   |
+|     QEMU     |   :   |
+|--------------|   : ---- I/O Passthrough
+|    Linux     |   :   |
+|--------------|   :   |
+| Galaxy Book S + eUFS |
+------------------------
+```
+
+To use eUFS I/O passthrough, you need to proceed as follows
+
+1. Install Ubuntu 22.04.2 on the Galaxy book S.
+2. Enable VT-d in the BIOS.
+3. Verify that VT-d is enabled with the command `dmesg | grep DMAR`.
+4. Modify the /etc/default/grub file to enable iommu.
+```
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash intel_iommu=on iommu=pt"
+```
+5. Perform a grub update.
+```
+sudo update-grub
+```
+
+6. Check the Vendor id (Intel) and Device id (UFS controller).
+```
+$ cat /sys/bus/pci/devices/0000:00:12.5/vendor
+0x8086
+$ cat /sys/bus/pci/devices/0000:00:12.5/device
+0x98fa
+```
+
+7. Check the address of ufshcd.
+```
+$ ls /sys/bus/pci/drivers/ufshcd
+0000:00:12.5 bind module new_id remove_id uevent unbind
+```
+
+8. Remove the ufs attached to host and register it as a vfio device.
+```
+$ echo 0000:00:12.5 | sudo tee /sys/bus/pci/drivers/ufshcd/unbind
+0000:00:12.5
+$ echo 8086 98fa | sudo tee /sys/bus/pci/drivers/vfio-pci/new_id
+8086 98fa
+```
+
+9. Use vfio to run qemu.
+```
+sudo fx qemu -N -k -m 4096 -- -device vfio-pci,host=00:12.5,x-no-kvm-intx=on
+```

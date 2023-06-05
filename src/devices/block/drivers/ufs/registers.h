@@ -197,6 +197,16 @@ class UtrListDoorBellReg : public hwreg::RegisterBase<UtrListDoorBellReg, uint32
 
   static auto Get() { return hwreg::RegisterAddr<UtrListDoorBellReg>(RegisterMap::kUTRLDBR); }
 };
+
+// UFSHCI Specification Version 3.0, section 5.4.4
+// "Offset 5Ch: UTRLCLR – UTP Transfer Request List Clear Register".
+class UtrListClearReg : public hwreg::RegisterBase<UtrListClearReg, uint32_t> {
+ public:
+  DEF_FIELD(31, 0, clear);
+
+  static auto Get() { return hwreg::RegisterAddr<UtrListClearReg>(RegisterMap::kUTRLCLR); }
+};
+
 // UFSHCI Specification Version 3.0, section 5.4.5
 // "Offset 60h: UTRLRSR – UTP Transfer Request List Run Stop Register".
 class UtrListRunStopReg : public hwreg::RegisterBase<UtrListRunStopReg, uint32_t> {

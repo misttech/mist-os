@@ -76,6 +76,33 @@ TEST_F(UicTest, DmeHibernate) {
 TEST_F(UicTest, SendUicCommandException) {
   ASSERT_NO_FATAL_FAILURE(RunInit());
 
+  // uic_command_completion_state is not cleared.
+  {
+    // Hook InterruptStatus handler to set interrupt status.
+    mock_device_->GetRegisterMmioProcessor().SetHook(
+        RegisterMap::kIS, [](ufs_mock_device::UfsMockDevice& mock_device, uint32_t value) {
+          InterruptStatusReg::Get().FromValue(value).WriteTo(mock_device.GetRegisters());
+        });
+
+    InterruptStatusReg::Get()
+        .ReadFrom(mock_device_->GetRegisters())
+        .set_uic_command_completion_status(true)
+        .WriteTo(mock_device_->GetRegisters());
+
+    DmeGetUicCommand dme_get_command(*ufs_, PA_MaxRxHSGear, 0);
+    auto value = dme_get_command.SendCommand();
+    EXPECT_EQ(value.status_value(), ZX_ERR_BAD_STATE);
+
+    InterruptStatusReg::Get()
+        .ReadFrom(mock_device_->GetRegisters())
+        .set_uic_command_completion_status(false)
+        .WriteTo(mock_device_->GetRegisters());
+
+    // Restore the default handler.
+    mock_device_->GetRegisterMmioProcessor().SetHook(
+        RegisterMap::kIS, ufs_mock_device::RegisterMmioProcessor::DefaultISHandler);
+  }
+
   // uic_command_ready timed out.
   {
     HostControllerStatusReg::Get()
@@ -96,11 +123,6 @@ TEST_F(UicTest, SendUicCommandException) {
 
   // uic_command_completion_status timed out.
   {
-    InterruptStatusReg::Get()
-        .ReadFrom(mock_device_->GetRegisters())
-        .set_uic_command_completion_status(0)
-        .WriteTo(mock_device_->GetRegisters());
-
     mock_device_->GetRegisterMmioProcessor().SetHook(
         RegisterMap::kUICCMD, [](ufs_mock_device::UfsMockDevice& mock_device, uint32_t value) {});
 
@@ -112,10 +134,6 @@ TEST_F(UicTest, SendUicCommandException) {
     // Restore the default handler.
     mock_device_->GetRegisterMmioProcessor().SetHook(
         RegisterMap::kUICCMD, ufs_mock_device::RegisterMmioProcessor::DefaultUICCMDHandler);
-    InterruptStatusReg::Get()
-        .ReadFrom(mock_device_->GetRegisters())
-        .set_uic_command_completion_status(1)
-        .WriteTo(mock_device_->GetRegisters());
   }
 
   // GenericErrorCode is kFailure.

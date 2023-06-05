@@ -51,7 +51,7 @@ zx_status_t Ufs::WaitWithTimeout(fit::function<zx_status_t()> wait_for, uint32_t
       return ZX_OK;
     }
     if (time_left == 0) {
-      zxlogf(ERROR, "%s  after %u usecs", timeout_message.begin(), timeout_us);
+      zxlogf(ERROR, "%s after %u usecs", timeout_message.begin(), timeout_us);
       return ZX_ERR_TIMED_OUT;
     }
     usleep(1);
@@ -146,42 +146,56 @@ void Ufs::HandleBlockOp(IoCommand *io_cmd) {
 zx::result<> Ufs::Isr() {
   auto interrupt_status = InterruptStatusReg::Get().ReadFrom(&mmio_);
   auto enabled_interrupts = InterruptEnableReg::Get().ReadFrom(&mmio_);
-  interrupt_status.WriteTo(&mmio_);
 
   // TODO(fxbug.dev/124835): implement error handlers
   if (enabled_interrupts.uic_error_enable() && interrupt_status.uic_error()) {
     zxlogf(ERROR, "UFS: UIC error on ISR");
+    InterruptStatusReg::Get().FromValue(0).set_uic_error(true).WriteTo(&mmio_);
   }
   if (enabled_interrupts.device_fatal_error_enable() &&
       interrupt_status.device_fatal_error_status()) {
     zxlogf(ERROR, "UFS: Device fatal error on ISR");
+    InterruptStatusReg::Get().FromValue(0).set_device_fatal_error_status(true).WriteTo(&mmio_);
   }
   if (enabled_interrupts.host_controller_fatal_error_enable() &&
       interrupt_status.host_controller_fatal_error_status()) {
     zxlogf(ERROR, "UFS: Host controller fatal error on ISR");
+    InterruptStatusReg::Get().FromValue(0).set_host_controller_fatal_error_status(true).WriteTo(
+        &mmio_);
   }
   if (enabled_interrupts.system_bus_fatal_error_enable() &&
       interrupt_status.system_bus_fatal_error_status()) {
     zxlogf(ERROR, "UFS: System bus fatal error on ISR");
+    InterruptStatusReg::Get().FromValue(0).set_system_bus_fatal_error_status(true).WriteTo(&mmio_);
   }
   if (enabled_interrupts.crypto_engine_fatal_error_enable() &&
       interrupt_status.crypto_engine_fatal_error_status()) {
     zxlogf(ERROR, "UFS: Crypto engine fatal error on ISR");
+    InterruptStatusReg::Get().FromValue(0).set_crypto_engine_fatal_error_status(true).WriteTo(
+        &mmio_);
   }
 
+  // Handle command completion interrupts.
   if (enabled_interrupts.utp_transfer_request_completion_enable() &&
       interrupt_status.utp_transfer_request_completion_status()) {
+    InterruptStatusReg::Get().FromValue(0).set_utp_transfer_request_completion_status(true).WriteTo(
+        &mmio_);
     transfer_request_processor_->RequestCompletion();
   }
   if (enabled_interrupts.utp_task_management_request_completion_enable() &&
       interrupt_status.utp_task_management_request_completion_status()) {
     // TODO(fxbug.dev/124835): Handle UTMR completion
-    zxlogf(INFO, "UFS: UTMR completion not yet implemented");
+    zxlogf(ERROR, "UFS: UTMR completion not yet implemented");
+    InterruptStatusReg::Get()
+        .FromValue(0)
+        .set_utp_task_management_request_completion_status(true)
+        .WriteTo(&mmio_);
   }
   if (enabled_interrupts.uic_command_completion_enable() &&
       interrupt_status.uic_command_completion_status()) {
     // TODO(fxbug.dev/124835): Handle UIC completion
-    zxlogf(INFO, "UFS: UIC completion not yet implemented");
+    zxlogf(ERROR, "UFS: UIC completion not yet implemented");
+    InterruptStatusReg::Get().FromValue(0).set_uic_command_completion_status(true).WriteTo(&mmio_);
   }
 
   return zx::ok();
@@ -307,16 +321,6 @@ zx::result<> Ufs::QueueScsiCommand(std::unique_ptr<ScsiCommandUpiu> upiu, uint8_
 }
 
 zx_status_t Ufs::Init() {
-  if (int thrd_status = thrd_create_with_name(
-          &irq_thread_, [](void *ctx) { return static_cast<Ufs *>(ctx)->IrqLoop(); }, this,
-          "ufs-irq-thread");
-      thrd_status) {
-    zx_status_t status = thrd_status_to_zx_status(thrd_status);
-    zxlogf(ERROR, " Failed to create IRQ thread: %s", zx_status_get_string(status));
-    return status;
-  }
-  irq_thread_started_ = true;
-
   if (zx::result<> result = InitController(); result.is_error()) {
     zxlogf(ERROR, "Failed to init UFS controller: %s", result.status_string());
     return result.error_value();
@@ -362,6 +366,31 @@ zx_status_t Ufs::Init() {
 }
 
 zx::result<> Ufs::InitController() {
+  // Disable all interrupts.
+  InterruptEnableReg::Get().FromValue(0).WriteTo(&mmio_);
+
+  if (zx::result<> result = Notify(NotifyEvent::kReset, 0); result.is_error()) {
+    return result.take_error();
+  }
+  // If UFS host controller is already enabled, disable it.
+  if (HostControllerEnableReg::Get().ReadFrom(&mmio_).host_controller_enable()) {
+    DisableHostController();
+  }
+  if (zx_status_t status = EnableHostController(); status != ZX_OK) {
+    zxlogf(ERROR, "Failed to enable host controller %d", status);
+    return zx::error(status);
+  }
+
+  if (int thrd_status = thrd_create_with_name(
+          &irq_thread_, [](void *ctx) { return static_cast<Ufs *>(ctx)->IrqLoop(); }, this,
+          "ufs-irq-thread");
+      thrd_status) {
+    zx_status_t status = thrd_status_to_zx_status(thrd_status);
+    zxlogf(ERROR, " Failed to create IRQ thread: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+  irq_thread_started_ = true;
+
   // Notify platform UFS that we are going to init the UFS host controller.
   if (zx::result<> result = Notify(NotifyEvent::kInit, 0); result.is_error()) {
     return result.take_error();
@@ -412,25 +441,31 @@ zx::result<> Ufs::InitController() {
 }
 
 zx::result<> Ufs::InitDeviceInterface() {
-  if (zx::result<> result = Notify(NotifyEvent::kReset, 0); result.is_error()) {
-    return result.take_error();
-  }
-
-  // If UFS host controller is already enabled, disable it.
-  if (HostControllerEnableReg::Get().ReadFrom(&mmio_).host_controller_enable()) {
-    DisableHostController();
-  }
-  if (zx_status_t status = EnableHostController(); status != ZX_OK) {
-    zxlogf(ERROR, "Failed to enable host controller %d", status);
-    return zx::error(status);
-  }
-
-  // Enable UIC related interrupts.
+  // Enable error and UIC/UTP related interrupts.
   InterruptEnableReg::Get()
       .FromValue(0)
-      .set_utp_transfer_request_completion_enable(true)
+      .set_crypto_engine_fatal_error_enable(true)
+      .set_system_bus_fatal_error_enable(true)
+      .set_host_controller_fatal_error_enable(true)
+      .set_utp_error_enable(true)
+      .set_device_fatal_error_enable(true)
+      .set_uic_command_completion_enable(false)  // The UIC command uses polling mode.
       .set_utp_task_management_request_completion_enable(true)
+      .set_uic_link_startup_status_enable(false)  // Ignore link startup interrupt.
+      .set_uic_link_lost_status_enable(true)
+      .set_uic_hibernate_enter_status_enable(false)  // The hibernate commands use polling mode.
+      .set_uic_hibernate_exit_status_enable(false)   // The hibernate commands use polling mode.
+      .set_uic_power_mode_status_enable(true)
+      .set_uic_test_mode_status_enable(true)
+      .set_uic_error_enable(true)
+      .set_uic_dme_endpointreset(true)
+      .set_utp_transfer_request_completion_enable(true)
       .WriteTo(&mmio_);
+
+  if (!HostControllerStatusReg::Get().ReadFrom(&mmio_).uic_command_ready()) {
+    zxlogf(ERROR, "UIC command is not ready\n");
+    return zx::error(ZX_ERR_INTERNAL);
+  }
 
   // Send Link Startup UIC command to start the link startup procedure.
   DmeLinkStartUpUicCommand link_startup_command(*this);
@@ -444,7 +479,7 @@ zx::result<> Ufs::InitDeviceInterface() {
 
   // The |device_present| bit becomes true if the host controller has successfully received a Link
   // Startup UIC command response and the UFS device has found a physical link to the controller.
-  if (!(HostControllerStatusReg::Get().ReadFrom(&mmio_).device_present())) {
+  if (!HostControllerStatusReg::Get().ReadFrom(&mmio_).device_present()) {
     zxlogf(ERROR, "UFS device not found");
     return zx::error(ZX_ERR_NOT_FOUND);
   }
@@ -456,6 +491,8 @@ zx::result<> Ufs::InitDeviceInterface() {
     zxlogf(ERROR, "Failed to initialize transfer request processor %s", result.status_string());
     return result.take_error();
   }
+
+  // TODO(fxbug.dev/124835): Configure interrupt aggregation. (default 0)
 
   NopOutUpiu nop_upiu;
   auto nop_response = transfer_request_processor_->SendUpiu<NopInUpiu>(nop_upiu);
@@ -607,9 +644,15 @@ zx::result<> Ufs::ScanLogicalUnits() {
   }
 
   zx::unowned_vmo unowned_vmo(sense_data_vmo);
+  fzl::VmoMapper mapper;
   zx::pmt pmt;
 
   // Allocates a buffer for SCSI fixed format sense data.
+  if (zx_status_t status = mapper.Map(*unowned_vmo, 0, kPageSize); status != ZX_OK) {
+    zxlogf(ERROR, "Failed to map IO buffer: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+  auto *sense_data = reinterpret_cast<ScsiSenseData *>(mapper.start());
   std::array<zx_paddr_t, 2> sense_data_paddr = {0};
   if (zx_status_t status =
           bti_.pin(ZX_BTI_PERM_WRITE, *unowned_vmo, 0, kPageSize, sense_data_paddr.data(), 1, &pmt);
@@ -654,12 +697,32 @@ zx::result<> Ufs::ScanLogicalUnits() {
     zxlogf(INFO, "LUN-%d block_size=%zu, block_count=%ld", i, block_device.block_size,
            block_device.block_count);
 
+    // Verify that the Lun is ready. This command expects a unit attention error.
+    auto unit_ready_upiu = std::make_unique<ScsiTestUnitReadyUpiu>();
+    if (auto result = QueueScsiCommand(std::move(unit_ready_upiu), i, sense_data_paddr, nullptr);
+        result.is_error()) {
+      if (sense_data->sense_key == ScsiCommandSenseKey::kUnitAttention) {
+        zxlogf(DEBUG, "Expected Unit Attention error: %s", result.status_string());
+      } else {
+        zxlogf(ERROR, "Failed to send SCSI command: %s", result.status_string());
+        return result.take_error();
+      }
+    }
+
     // Send request sense commands to clear the Unit Attention Condition(UAC) of LUs. UAC is a
     // condition which needs to be serviced before the logical unit can process commands.
     // This command will get sense data, but ignore it for now because our goal is to clear the
     // UAC.
-    auto upiu = std::make_unique<ScsiRequestSenseUpiu>();
-    if (zx::result<> result = QueueScsiCommand(std::move(upiu), i, sense_data_paddr, nullptr);
+    auto request_sense_upiu = std::make_unique<ScsiRequestSenseUpiu>();
+    if (auto result = QueueScsiCommand(std::move(request_sense_upiu), i, sense_data_paddr, nullptr);
+        result.is_error()) {
+      zxlogf(ERROR, "Failed to send SCSI command: %s", result.status_string());
+      return result.take_error();
+    }
+
+    // Verify that the Lun is ready. This command expects a success.
+    unit_ready_upiu = std::make_unique<ScsiTestUnitReadyUpiu>();
+    if (auto result = QueueScsiCommand(std::move(unit_ready_upiu), i, sense_data_paddr, nullptr);
         result.is_error()) {
       zxlogf(ERROR, "Failed to send SCSI command: %s", result.status_string());
       return result.take_error();

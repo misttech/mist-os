@@ -54,11 +54,17 @@ class ScsiCommandProcessor {
       ResponseUpiu::Data &response_upiu,
       cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius);
 
+  static zx::result<std::vector<uint8_t>> DefaultTestUnitReadyHandler(
+      UfsMockDevice &mock_device, CommandUpiu::Data &command_upiu,
+      ResponseUpiu::Data &response_upiu,
+      cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius);
+
   DEF_DEFAULT_HANDLER_BEGIN(ScsiOpcode, ScsiCommandHandler)
   DEF_DEFAULT_HANDLER(ScsiOpcode::kRequestSense, DefaultRequestSenseHandler)
   DEF_DEFAULT_HANDLER(ScsiOpcode::kRead10, DefaultRead10Handler)
   DEF_DEFAULT_HANDLER(ScsiOpcode::kWrite10, DefaultWrite10Handler)
   DEF_DEFAULT_HANDLER(ScsiOpcode::kSynchronizeCache10, DefaultSynchronizeCache10Handler)
+  DEF_DEFAULT_HANDLER(ScsiOpcode::kTestUnitReady, DefaultTestUnitReadyHandler)
   DEF_DEFAULT_HANDLER_END()
 
  private:

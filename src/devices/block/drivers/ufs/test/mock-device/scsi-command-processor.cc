@@ -196,5 +196,13 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultSynchronizeCache10
   return zx::ok(std::move(data_buffer));
 }
 
+zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultTestUnitReadyHandler(
+    UfsMockDevice &mock_device, CommandUpiu::Data &command_upiu, ResponseUpiu::Data &response_upiu,
+    cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius) {
+  std::vector<uint8_t> data_buffer;
+
+  return zx::ok(std::move(data_buffer));
+}
+
 }  // namespace ufs_mock_device
 }  // namespace ufs

@@ -52,25 +52,64 @@ TEST_F(RegisterTest, InterruptStatus) {
   // Send UIC command to set |uic_command_completion_status|
   DmeLinkStartUpUicCommand link_startup_command(*ufs_);
   EXPECT_TRUE(link_startup_command.SendCommand().is_ok());
-  EXPECT_TRUE(InterruptStatusReg::Get().ReadFrom(&ufs_->GetMmio()).uic_command_completion_status());
 
-  // InterruptStatus is a RWC(Read/write '1' to clear) register
-  InterruptStatusReg::Get().FromValue(0).set_uic_command_completion_status(true).WriteTo(
-      &ufs_->GetMmio());
+  // InterruptStatus is cleared by SendUicCommand().
   EXPECT_FALSE(
       InterruptStatusReg::Get().ReadFrom(&ufs_->GetMmio()).uic_command_completion_status());
+
+  // Send UPIU command to set |utp_transfer_request_completion_status|
+  auto unit_ready_upiu = std::make_unique<ScsiTestUnitReadyUpiu>();
+  EXPECT_TRUE(ufs_->QueueScsiCommand(std::move(unit_ready_upiu), 0, {0, 0}, nullptr).is_ok());
+
+  // InterruptStatus is cleared by Isr().
+  EXPECT_FALSE(InterruptStatusReg::Get()
+                   .ReadFrom(&ufs_->GetMmio())
+                   .utp_transfer_request_completion_status());
+
+  // Hook InterruptStatus handler to set interrupt status.
+  mock_device_->GetRegisterMmioProcessor().SetHook(
+      RegisterMap::kIS, [](ufs_mock_device::UfsMockDevice& mock_device, uint32_t value) {
+        InterruptStatusReg::Get().FromValue(value).WriteTo(mock_device.GetRegisters());
+      });
+
+  auto register_value = InterruptStatusReg::Get().FromValue(0);
+  // Set error in InterruptStatus
+  register_value.set_uic_error(true)
+      .set_device_fatal_error_status(true)
+      .set_host_controller_fatal_error_status(true)
+      .set_system_bus_fatal_error_status(true)
+      .set_crypto_engine_fatal_error_status(true);
+  // Set unused command completion
+  register_value.set_utp_task_management_request_completion_status(true);
+  register_value.WriteTo(&ufs_->GetMmio());
+
+  // Restore the default handler.
+  mock_device_->GetRegisterMmioProcessor().SetHook(
+      RegisterMap::kIS, ufs_mock_device::RegisterMmioProcessor::DefaultISHandler);
+
+  mock_device_->TriggerInterrupt();
+
+  // Wait for the interrupt to complete.
+  auto wait_for = [&]() -> bool {
+    return InterruptStatusReg::Get().ReadFrom(&ufs_->GetMmio()).reg_value() == 0;
+  };
+  fbl::String timeout_message = "Timeout waiting for ISR()";
+  constexpr uint32_t kTimeoutUs = 1000000;
+  ASSERT_OK(ufs_->WaitWithTimeout(wait_for, kTimeoutUs, timeout_message));
+
+  // Verify that the ISR has processed all interruptStatus
+  EXPECT_EQ(InterruptStatusReg::Get().ReadFrom(&ufs_->GetMmio()).reg_value(), 0);
 }
 
 TEST_F(RegisterTest, InterruptEnable) {
   ASSERT_NO_FATAL_FAILURE(RunInit());
-  EXPECT_FALSE(
+  EXPECT_TRUE(
       InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).crypto_engine_fatal_error_enable());
-  EXPECT_FALSE(
-      InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).system_bus_fatal_error_enable());
-  EXPECT_FALSE(
+  EXPECT_TRUE(InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).system_bus_fatal_error_enable());
+  EXPECT_TRUE(
       InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).host_controller_fatal_error_enable());
-  EXPECT_FALSE(InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).utp_error_enable());
-  EXPECT_FALSE(InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).device_fatal_error_enable());
+  EXPECT_TRUE(InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).utp_error_enable());
+  EXPECT_TRUE(InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).device_fatal_error_enable());
   EXPECT_FALSE(
       InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).uic_command_completion_enable());
   EXPECT_TRUE(InterruptEnableReg::Get()
@@ -78,15 +117,15 @@ TEST_F(RegisterTest, InterruptEnable) {
                   .utp_transfer_request_completion_enable());
   EXPECT_FALSE(
       InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).uic_link_startup_status_enable());
-  EXPECT_FALSE(InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).uic_link_lost_status_enable());
+  EXPECT_TRUE(InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).uic_link_lost_status_enable());
   EXPECT_FALSE(
       InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).uic_hibernate_enter_status_enable());
   EXPECT_FALSE(
       InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).uic_hibernate_exit_status_enable());
-  EXPECT_FALSE(InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).uic_power_mode_status_enable());
-  EXPECT_FALSE(InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).uic_test_mode_status_enable());
-  EXPECT_FALSE(InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).uic_error_enable());
-  EXPECT_FALSE(InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).uic_dme_endpointreset());
+  EXPECT_TRUE(InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).uic_power_mode_status_enable());
+  EXPECT_TRUE(InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).uic_test_mode_status_enable());
+  EXPECT_TRUE(InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).uic_error_enable());
+  EXPECT_TRUE(InterruptEnableReg::Get().ReadFrom(&ufs_->GetMmio()).uic_dme_endpointreset());
   EXPECT_TRUE(InterruptEnableReg::Get()
                   .ReadFrom(&ufs_->GetMmio())
                   .utp_task_management_request_completion_enable());

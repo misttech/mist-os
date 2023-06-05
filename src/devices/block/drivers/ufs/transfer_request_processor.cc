@@ -64,6 +64,21 @@ zx::result<> TransferRequestProcessor::Init() {
 
   slot_mask_ = static_cast<uint32_t>(1UL << request_list_.GetSlotCount()) - 1;
 
+  if (!HostControllerStatusReg::Get().ReadFrom(&register_).utp_transfer_request_list_ready()) {
+    zxlogf(ERROR, "UTP transfer request list is not ready\n");
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  if (UtrListDoorBellReg::Get().ReadFrom(&register_).door_bell() != 0) {
+    zxlogf(ERROR, "UTP transfer request list door bell is not ready\n");
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  if (UtrListCompletionNotificationReg::Get().ReadFrom(&register_).notification() != 0) {
+    zxlogf(ERROR, "UTP transfer request list notification is not ready\n");
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
   // Start Utp Transfer Request list.
   UtrListRunStopReg::Get().FromValue(0).set_value(true).WriteTo(&register_);
 
@@ -98,6 +113,9 @@ zx::result<void *> TransferRequestProcessor::SendUpiu(RequestUpiu &request) {
 
   const size_t total_length = static_cast<size_t>(response_offset) + response_length;
 
+  // Record the slot number to |task_tag| for debugging.
+  request.GetHeader().task_tag = slot.value();
+
   // Copy request and prepare response.
   void *response;
   {
@@ -109,9 +127,6 @@ zx::result<void *> TransferRequestProcessor::SendUpiu(RequestUpiu &request) {
            response_length);
     response = request_list_.GetDescriptorBuffer(slot.value(), response_offset);
   }
-
-  // Record the slot number to |task_tag| for debugging.
-  request.GetHeader().task_tag = slot.value();
 
   if (zx::result<> result = SendCommand(slot.value(), request.GetDataDirection(), response_offset,
                                         response_length, 0, 0, /*sync=*/true);
@@ -129,6 +144,11 @@ zx::result<ResponseUpiu> TransferRequestProcessor::SendScsiUpiu(std::unique_ptr<
 
   const uint16_t response_offset = request->GetResponseOffset();
   const uint16_t response_length = request->GetResponseLength();
+  const uint32_t data_transfer_length = std::min(request->GetTransferBytes(), kMaxPrdtDataLength);
+
+  request->GetHeader().lun = xfer->lun;
+  request->GetHeader().task_tag = slot;  // Record the slot number to |task_tag| for debugging.
+  request->SetExpectedDataTransferLength(data_transfer_length);
 
   // Copy request and prepare response.
   ResponseUpiu *response;
@@ -140,7 +160,6 @@ zx::result<ResponseUpiu> TransferRequestProcessor::SendScsiUpiu(std::unique_ptr<
   }
 
   // Prepare PRDT(physical region description table).
-  const uint32_t data_transfer_length = std::min(request->GetTransferBytes(), kMaxPrdtDataLength);
   const uint32_t prdt_entry_count =
       fbl::round_up(data_transfer_length, kPrdtEntryDataLength) / kPrdtEntryDataLength;
   ZX_DEBUG_ASSERT(prdt_entry_count <= kMaxPrdtNum);
@@ -160,10 +179,6 @@ zx::result<ResponseUpiu> TransferRequestProcessor::SendScsiUpiu(std::unique_ptr<
     memset(prdt, 0, prdt_length);
   }
   FillPrdt(prdt, xfer->buffer_phys, prdt_entry_count, data_transfer_length);
-
-  request->GetHeader().lun = xfer->lun;
-  request->GetHeader().task_tag = slot;  // Record the slot number to |task_tag| for debugging.
-  request->SetExpectedDataTransferLength(data_transfer_length);
 
   // TODO(fxbug.dev/124835): Enable unmmap and write buffer command. Umap and writebuffer must set
   // the xfer->count value differently.
@@ -235,6 +250,8 @@ zx::result<> TransferRequestProcessor::SendRequest(uint8_t slot_num, bool sync) 
     ZX_ASSERT(request_slot.state == SlotState::kReserved);
     request_slot.state = SlotState::kScheduled;
 
+    // TODO(fxbug.dev/124835): Set the UtrInterruptAggregationControlReg.
+
     UtrListDoorBellReg::Get().FromValue(1 << slot_num).WriteTo(&register_);
   }
 
@@ -247,6 +264,7 @@ zx::result<> TransferRequestProcessor::SendRequest(uint8_t slot_num, bool sync) 
       status != ZX_OK) {
     return zx::error(status);
   }
+
   return zx::ok();
 }
 
@@ -303,7 +321,8 @@ zx::result<> TransferRequestProcessor::SendCommand(
   descriptor->set_interrupt(true);
   descriptor->set_data_direction(data_dir);
   descriptor->set_command_type(kCommandTypeUfsStorage);
-  descriptor->set_overall_command_status(OverallCommandStatus::kSuccess);
+  // If the command was successful, overwrite |overall_command_status| field with |kSuccess|.
+  descriptor->set_overall_command_status(OverallCommandStatus::kInvalid);
   descriptor->set_utp_command_descriptor_base_address(static_cast<uint32_t>(paddr & 0xffffffff));
   descriptor->set_utp_command_descriptor_base_address_upper(static_cast<uint32_t>(paddr >> 32));
 
@@ -339,16 +358,16 @@ zx::result<> TransferRequestProcessor::GetResponseStatus(TransferRequestDescript
       (descriptor->overall_command_status() != OverallCommandStatus::kSuccess ||
        status != ScsiCommandSetStatus::kGood ||
        header_response != UpiuHeaderResponse::kTargetSuccess)) {
-    zxlogf(ERROR, "SCSI failure: ocs=0x%x status=0x%x header_response=0x%x",
+    zxlogf(ERROR, "SCSI failure: ocs=0x%x, status=0x%x, header_response=0x%x",
            descriptor->overall_command_status(), status, header_response);
     ScsiSenseData *sense_data = reinterpret_cast<ScsiSenseData *>(response->GetSenseData());
-    zxlogf(ERROR, "SCSI sense data:sense_key=0x%x asc=0x%x ascq=0x%x", sense_data->sense_key,
+    zxlogf(ERROR, "SCSI sense data:sense_key=0x%x, asc=0x%x, ascq=0x%x", sense_data->sense_key,
            sense_data->asc, sense_data->ascq);
   } else if (transaction_type == UpiuTransactionCodes::kQueryRequest &&
              (descriptor->overall_command_status() != OverallCommandStatus::kSuccess ||
               header_response != UpiuHeaderResponse::kTargetSuccess)) {
-    zxlogf(ERROR, "Query failure: ocs=0x%x header_response=0x%x",
-           descriptor->overall_command_status(), header_response);
+    zxlogf(ERROR, "Query failure: ocs=0x%x, status=0x%x, header_response=0x%x",
+           descriptor->overall_command_status(), status, header_response);
   } else if (descriptor->overall_command_status() != OverallCommandStatus::kSuccess) {
     zxlogf(ERROR, "Generic failure: ocs=0x%x", descriptor->overall_command_status());
   } else {

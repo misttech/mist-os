@@ -153,7 +153,7 @@ class CommandUpiu : public RequestUpiu {
     // dword 3
     uint32_t expected_data_transfer_length = 0;  // (Big-endian)
 
-    // dword 4 ~ 6
+    // dword 4 ~ 7
     uint8_t cdb[16] = {0};
   } data_ __PACKED;
   static_assert(sizeof(CommandUpiu::Data) == 32, "CommandUpiu struct must be 32 bytes");
