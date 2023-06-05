@@ -104,7 +104,10 @@ impl<L> InterruptibleBaseLock<L> {
         loop {
             self.waiters.wait_async(&waiter);
             if let Some(guard) = acquire_guard(&self.lock) {
-                return Ok(InterruptibleGuard { guard, lock: self, notify_all });
+                return Ok(InterruptibleGuard {
+                    guard,
+                    _notifier: LockNotifier { lock: self, notify_all },
+                });
             }
             if let Err(e) = waiter.wait(current_task) {
                 // If the wait is interrupted, notify the queue before quitting in case the
@@ -124,11 +127,26 @@ impl<L> InterruptibleBaseLock<L> {
     }
 }
 
+/// Guard like structure that notify its lock when dropped.
 #[derive(Debug)]
-pub struct InterruptibleGuard<'a, L, G> {
-    guard: G,
+pub struct LockNotifier<'a, L> {
     lock: &'a InterruptibleBaseLock<L>,
     notify_all: bool,
+}
+
+impl<'a, L> Drop for LockNotifier<'a, L> {
+    fn drop(&mut self) {
+        self.lock.notify(self.notify_all);
+    }
+}
+
+#[derive(Debug)]
+pub struct InterruptibleGuard<'a, L, G> {
+    /// The guard that this object wraps.
+    guard: G,
+    /// Guard like member that will notify the lock when the guard is dropped. Need to be after
+    /// `guard` to ensure the notification happens after the guard is released.
+    _notifier: LockNotifier<'a, L>,
 }
 
 impl<'a, L, G: Deref<Target = T>, T> Deref for InterruptibleGuard<'a, L, G> {
@@ -141,12 +159,6 @@ impl<'a, L, G: Deref<Target = T>, T> Deref for InterruptibleGuard<'a, L, G> {
 impl<'a, L, G: DerefMut<Target = T>, T> DerefMut for InterruptibleGuard<'a, L, G> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.guard.deref_mut()
-    }
-}
-
-impl<'a, L, G> Drop for InterruptibleGuard<'a, L, G> {
-    fn drop(&mut self) {
-        self.lock.notify(self.notify_all);
     }
 }
 
