@@ -21,6 +21,7 @@ use futures::{
     channel::{mpsc, oneshot},
     pin_mut, StreamExt as _, TryStreamExt as _,
 };
+use net_types::ip::IpVersion;
 use netlink_packet_core::NetlinkMessage;
 use netlink_packet_route::{
     AddressHeader, AddressMessage, LinkHeader, LinkMessage, RtnlMessage, AF_INET, AF_INET6,
@@ -41,6 +42,7 @@ use crate::{
 /// Arguments for an RTM_GETLINK [`Request`].
 #[derive(Debug)]
 pub(crate) enum GetLinkArgs {
+    /// Dump state for all the links.
     #[allow(unused)]
     Dump,
     // TODO(https://issuetracker.google.com/283134954): Support get requests w/
@@ -55,11 +57,31 @@ pub(crate) enum LinkRequestArgs {
     Get(GetLinkArgs),
 }
 
+/// Arguments for an RTM_GETADDR [`Request`].
+#[derive(Debug)]
+pub(crate) enum GetAddressArgs {
+    /// Dump state for all addresses with the optional IP version filter.
+    #[allow(unused)]
+    Dump { ip_version_filter: Option<IpVersion> },
+    // TODO(https://issuetracker.google.com/283134032): Support get requests w/
+    // filter.
+}
+
+/// [`Request`] arguments associated with addresses.
+#[derive(Debug)]
+pub(crate) enum AddressRequestArgs {
+    /// RTM_GETADDR
+    #[allow(unused)]
+    Get(GetAddressArgs),
+}
+
 /// The argument(s) for a [`Request`].
 #[derive(Debug)]
 pub(crate) enum RequestArgs {
     #[allow(unused)]
     Link(LinkRequestArgs),
+    #[allow(unused)]
+    Address(AddressRequestArgs),
 }
 
 /// A request associated with links or addresses.
@@ -234,6 +256,7 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
                 req = request_stream.next() => {
                     Self::handle_request(
                         &interface_properties,
+                        &addresses,
                         req.expect(
                             "request stream should never end because of chained `pending`",
                         ),
@@ -245,6 +268,7 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
 
     fn handle_request(
         interface_properties: &HashMap<u64, fnet_interfaces_ext::Properties>,
+        all_addresses: &BTreeMap<InterfaceAndAddr, NetlinkAddressMessage>,
         Request { args, mut client, completer }: Request<S>,
     ) {
         debug!("got request {args:?} from {client}");
@@ -256,6 +280,25 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
                         .values()
                         .filter_map(NetlinkLinkMessage::optionally_from)
                         .for_each(|message| client.send(message.into_rtnl_new_link()));
+                }
+            },
+            RequestArgs::Address(AddressRequestArgs::Get(args)) => match args {
+                GetAddressArgs::Dump { ip_version_filter } => {
+                    all_addresses
+                        .values()
+                        .filter(|NetlinkAddressMessage(message)| {
+                            ip_version_filter.map_or(true, |ip_version| {
+                                ip_version.eq(&match message.header.family.into() {
+                                    AF_INET => IpVersion::V4,
+                                    AF_INET6 => IpVersion::V6,
+                                    family => unreachable!(
+                                        "unexpected address familly ({}); addr = {:?}",
+                                        family, message,
+                                    ),
+                                })
+                            })
+                        })
+                        .for_each(|message| client.send(message.to_rtnl_new_addr()));
                 }
             },
         }
@@ -1188,6 +1231,14 @@ mod tests {
         );
     }
 
+    fn test_addr(addr: fnet::Subnet) -> fnet_interfaces::Address {
+        fnet_interfaces::Address {
+            addr: Some(addr),
+            valid_until: Some(zx::sys::ZX_TIME_INFINITE),
+            ..Default::default()
+        }
+    }
+
     #[fuchsia::test]
     fn test_interface_to_address_conversion() {
         let interface_name: String = "test".into();
@@ -1266,12 +1317,6 @@ mod tests {
         });
         let event_loop_fut = event_loop.run().fuse();
         futures::pin_mut!(event_loop_fut);
-
-        let test_addr = |addr| fnet_interfaces::Address {
-            addr: Some(addr),
-            valid_until: Some(zx::sys::ZX_TIME_INFINITE),
-            ..Default::default()
-        };
 
         // Existing events should never trigger messages to be sent.
         let watcher_stream_fut = respond_to_watcher(
@@ -1464,20 +1509,20 @@ mod tests {
         assert_eq!(&other_sink.take_messages()[..], &[]);
     }
 
-    #[fuchsia::test]
-    async fn test_get_link() {
-        let (mut link_sink, link_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
-            crate::client::testutil::CLIENT_ID_1,
-            &[ModernGroup(RTNLGRP_LINK)],
+    async fn test_get(args: RequestArgs) -> Vec<NetlinkMessage<RtnlMessage>> {
+        let (mut expected_sink, expected_client) = crate::client::testutil::new_fake_client::<
+            NetlinkRoute,
+        >(
+            crate::client::testutil::CLIENT_ID_1, &[]
         );
         let (mut other_sink, other_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
             crate::client::testutil::CLIENT_ID_2,
-            &[ModernGroup(RTNLGRP_IPV4_ROUTE)],
+            &[],
         );
         let Setup { event_loop, mut watcher_stream, mut request_sink } =
             setup_with_route_clients({
                 let route_clients = ClientTable::default();
-                route_clients.add_client(link_client.clone());
+                route_clients.add_client(expected_client.clone());
                 route_clients.add_client(other_client);
                 route_clients
             });
@@ -1492,7 +1537,7 @@ mod tests {
                     name: Some(LO_NAME.to_string()),
                     device_class: Some(LOOPBACK),
                     online: Some(true),
-                    addresses: Some(Vec::new()),
+                    addresses: Some(vec![test_addr(TEST_V6_ADDR), test_addr(TEST_V4_ADDR)]),
                     has_default_ipv4_route: Some(false),
                     has_default_ipv6_route: Some(false),
                     ..Default::default()
@@ -1502,7 +1547,7 @@ mod tests {
                     name: Some(ETH_NAME.to_string()),
                     device_class: Some(ETHERNET),
                     online: Some(false),
-                    addresses: Some(Vec::new()),
+                    addresses: Some(vec![test_addr(TEST_V4_ADDR), test_addr(TEST_V6_ADDR)]),
                     has_default_ipv4_route: Some(false),
                     has_default_ipv6_route: Some(false),
                     ..Default::default()
@@ -1514,16 +1559,12 @@ mod tests {
             () = watcher_stream_fut.fuse() => {},
             err = event_loop_fut => unreachable!("eventloop should not return: {err:?}"),
         }
-        assert_eq!(&link_sink.take_messages()[..], &[]);
+        assert_eq!(&expected_sink.take_messages()[..], &[]);
         assert_eq!(&other_sink.take_messages()[..], &[]);
 
         let (completer, waiter) = oneshot::channel();
         let fut = request_sink
-            .send(Request {
-                args: RequestArgs::Link(LinkRequestArgs::Get(GetLinkArgs::Dump)),
-                client: link_client.clone(),
-                completer,
-            })
+            .send(Request { args, client: expected_client.clone(), completer })
             .then(|res| {
                 res.expect("send request");
                 waiter
@@ -1532,9 +1573,16 @@ mod tests {
             res = fut.fuse() => assert_eq!(res, Ok(())),
             err = event_loop_fut => unreachable!("eventloop should not return: {err:?}"),
         }
+        assert_eq!(&other_sink.take_messages()[..], &[]);
+        expected_sink.take_messages()
+    }
+
+    #[fuchsia::test]
+    async fn test_get_link() {
         assert_eq!(
             {
-                let mut messages = link_sink.take_messages();
+                let mut messages =
+                    test_get(RequestArgs::Link(LinkRequestArgs::Get(GetLinkArgs::Dump))).await;
                 messages.sort_by_key(|message| {
                     assert_matches!(
                         &message.payload,
@@ -1562,6 +1610,43 @@ mod tests {
                 .into_rtnl_new_link(),
             ],
         );
-        assert_eq!(&other_sink.take_messages()[..], &[]);
+    }
+
+    #[test_case(Some(IpVersion::V4); "v4")]
+    #[test_case(Some(IpVersion::V6); "v6")]
+    #[test_case(None; "all")]
+    #[fuchsia::test]
+    async fn test_get_addr(ip_version_filter: Option<IpVersion>) {
+        pretty_assertions::assert_eq!(
+            test_get(RequestArgs::Address(AddressRequestArgs::Get(GetAddressArgs::Dump {
+                ip_version_filter
+            })))
+            .await,
+            [(LO_INTERFACE_ID, LO_NAME), (ETH_INTERFACE_ID, ETH_NAME)]
+                .into_iter()
+                .map(|(id, name)| {
+                    [TEST_V4_ADDR, TEST_V6_ADDR]
+                        .into_iter()
+                        .filter(|fnet::Subnet { addr, prefix_len: _ }| {
+                            ip_version_filter.map_or(true, |ip_version| {
+                                ip_version.eq(&match addr {
+                                    fnet::IpAddress::Ipv4(_) => IpVersion::V4,
+                                    fnet::IpAddress::Ipv6(_) => IpVersion::V6,
+                                })
+                            })
+                        })
+                        .map(move |addr| {
+                            create_address_message(
+                                id.try_into().unwrap(),
+                                addr,
+                                name.to_string(),
+                                IFA_F_PERMANENT,
+                            )
+                            .to_rtnl_new_addr()
+                        })
+                })
+                .flatten()
+                .collect::<Vec<_>>(),
+        );
     }
 }
