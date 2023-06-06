@@ -13,7 +13,6 @@ import (
 	"sort"
 	"strings"
 
-	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/backend/c"
 	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/backend/cpp"
 	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/backend/dart"
 	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/backend/driver_cpp"
@@ -39,7 +38,6 @@ import (
 type Generator func(ir.All, fidlgen.Root, config.GeneratorConfig) ([]byte, error)
 
 var conformanceGenerators = map[string]Generator{
-	"c":             c.GenerateConformanceTests,
 	"dynfidl":       dynfidl.GenerateConformanceTests,
 	"go":            golang.GenerateConformanceTests,
 	"cpp":           cpp.GenerateConformanceTests,

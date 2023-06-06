@@ -207,12 +207,6 @@ struct Padding2ByteAlignmentLength6 {
 }  // namespace test_padding
 namespace fidl {
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_padding::wire::Padding1ByteEnd> {
-  static constexpr const fidl_type_t* kType = &::test_padding::wire::test_padding_Padding1ByteEndTable;
-};
-
 template <>
 struct TypeTraits<::test_padding::wire::Padding1ByteEnd> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -263,12 +257,6 @@ struct ::fidl::internal::WireCodingTraits<::test_padding::wire::Padding1ByteEnd,
     }
     internal::WireCheckPadding<uint16_t>(decoder, position + 2, 0xff00);
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_padding::wire::Padding2ByteEnd> {
-  static constexpr const fidl_type_t* kType = &::test_padding::wire::test_padding_Padding2ByteEndTable;
 };
 
 template <>
@@ -323,12 +311,6 @@ struct ::fidl::internal::WireCodingTraits<::test_padding::wire::Padding2ByteEnd,
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_padding::wire::Padding3ByteEnd> {
-  static constexpr const fidl_type_t* kType = &::test_padding::wire::test_padding_Padding3ByteEndTable;
-};
-
 template <>
 struct TypeTraits<::test_padding::wire::Padding3ByteEnd> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -381,12 +363,6 @@ struct ::fidl::internal::WireCodingTraits<::test_padding::wire::Padding3ByteEnd,
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_padding::wire::Padding4ByteEnd> {
-  static constexpr const fidl_type_t* kType = &::test_padding::wire::test_padding_Padding4ByteEndTable;
-};
-
 template <>
 struct TypeTraits<::test_padding::wire::Padding4ByteEnd> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -437,12 +413,6 @@ struct ::fidl::internal::WireCodingTraits<::test_padding::wire::Padding4ByteEnd,
     }
     internal::WireCheckPadding<uint64_t>(decoder, position + 8, 0xffffffff00000000ull);
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_padding::wire::Padding5ByteEnd> {
-  static constexpr const fidl_type_t* kType = &::test_padding::wire::test_padding_Padding5ByteEndTable;
 };
 
 template <>
@@ -501,12 +471,6 @@ struct ::fidl::internal::WireCodingTraits<::test_padding::wire::Padding5ByteEnd,
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_padding::wire::Padding6ByteEnd> {
-  static constexpr const fidl_type_t* kType = &::test_padding::wire::test_padding_Padding6ByteEndTable;
-};
-
 template <>
 struct TypeTraits<::test_padding::wire::Padding6ByteEnd> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -557,12 +521,6 @@ struct ::fidl::internal::WireCodingTraits<::test_padding::wire::Padding6ByteEnd,
     }
     internal::WireCheckPadding<uint64_t>(decoder, position + 8, 0xffffffffffff0000ull);
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_padding::wire::Padding7ByteEnd> {
-  static constexpr const fidl_type_t* kType = &::test_padding::wire::test_padding_Padding7ByteEndTable;
 };
 
 template <>
@@ -617,12 +575,6 @@ struct ::fidl::internal::WireCodingTraits<::test_padding::wire::Padding7ByteEnd,
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_padding::wire::Padding1ByteMiddle> {
-  static constexpr const fidl_type_t* kType = &::test_padding::wire::test_padding_Padding1ByteMiddleTable;
-};
-
 template <>
 struct TypeTraits<::test_padding::wire::Padding1ByteMiddle> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -673,12 +625,6 @@ struct ::fidl::internal::WireCodingTraits<::test_padding::wire::Padding1ByteMidd
     }
     internal::WireCheckPadding<uint16_t>(decoder, position + 0, 0xff00);
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_padding::wire::Padding2ByteMiddle> {
-  static constexpr const fidl_type_t* kType = &::test_padding::wire::test_padding_Padding2ByteMiddleTable;
 };
 
 template <>
@@ -733,12 +679,6 @@ struct ::fidl::internal::WireCodingTraits<::test_padding::wire::Padding2ByteMidd
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_padding::wire::Padding3ByteMiddle> {
-  static constexpr const fidl_type_t* kType = &::test_padding::wire::test_padding_Padding3ByteMiddleTable;
-};
-
 template <>
 struct TypeTraits<::test_padding::wire::Padding3ByteMiddle> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -791,12 +731,6 @@ struct ::fidl::internal::WireCodingTraits<::test_padding::wire::Padding3ByteMidd
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_padding::wire::Padding4ByteMiddle> {
-  static constexpr const fidl_type_t* kType = &::test_padding::wire::test_padding_Padding4ByteMiddleTable;
-};
-
 template <>
 struct TypeTraits<::test_padding::wire::Padding4ByteMiddle> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -847,12 +781,6 @@ struct ::fidl::internal::WireCodingTraits<::test_padding::wire::Padding4ByteMidd
     }
     internal::WireCheckPadding<uint64_t>(decoder, position + 0, 0xffffffff00000000ull);
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_padding::wire::Padding5ByteMiddle> {
-  static constexpr const fidl_type_t* kType = &::test_padding::wire::test_padding_Padding5ByteMiddleTable;
 };
 
 template <>
@@ -911,12 +839,6 @@ struct ::fidl::internal::WireCodingTraits<::test_padding::wire::Padding5ByteMidd
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_padding::wire::Padding6ByteMiddle> {
-  static constexpr const fidl_type_t* kType = &::test_padding::wire::test_padding_Padding6ByteMiddleTable;
-};
-
 template <>
 struct TypeTraits<::test_padding::wire::Padding6ByteMiddle> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -969,12 +891,6 @@ struct ::fidl::internal::WireCodingTraits<::test_padding::wire::Padding6ByteMidd
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_padding::wire::Padding7ByteMiddle> {
-  static constexpr const fidl_type_t* kType = &::test_padding::wire::test_padding_Padding7ByteMiddleTable;
-};
-
 template <>
 struct TypeTraits<::test_padding::wire::Padding7ByteMiddle> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -1025,12 +941,6 @@ struct ::fidl::internal::WireCodingTraits<::test_padding::wire::Padding7ByteMidd
     }
     internal::WireCheckPadding<uint64_t>(decoder, position + 0, 0xffffffffffffff00ull);
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_padding::wire::Padding4ByteAlignmentLength12> {
-  static constexpr const fidl_type_t* kType = &::test_padding::wire::test_padding_Padding4ByteAlignmentLength12Table;
 };
 
 template <>
@@ -1093,12 +1003,6 @@ struct ::fidl::internal::WireCodingTraits<::test_padding::wire::Padding4ByteAlig
     internal::WireCheckPadding<uint32_t>(decoder, position + 4, 0x0000ff00);
     internal::WireCheckPadding<uint32_t>(decoder, position + 8, 0xffff0000);
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_padding::wire::Padding2ByteAlignmentLength6> {
-  static constexpr const fidl_type_t* kType = &::test_padding::wire::test_padding_Padding2ByteAlignmentLength6Table;
 };
 
 template <>

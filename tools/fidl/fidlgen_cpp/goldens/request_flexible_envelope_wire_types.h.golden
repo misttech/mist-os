@@ -229,12 +229,6 @@ struct ProtocolRequestFlexibleResponseStrictResponse {
 }  // namespace test_requestflexibleenvelope
 namespace fidl {
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_requestflexibleenvelope::wire::ProtocolRequestStrictResponseFlexibleRequest> {
-  static constexpr const fidl_type_t* kType = &::test_requestflexibleenvelope::wire::test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleRequestTable;
-};
-
 template <>
 struct TypeTraits<::test_requestflexibleenvelope::wire::ProtocolRequestStrictResponseFlexibleRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -279,12 +273,6 @@ struct ::fidl::internal::WireCodingTraits<::test_requestflexibleenvelope::wire::
           decoder, position + 0, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_requestflexibleenvelope::wire::ProtocolRequestStrictResponseFlexibleResponse> {
-  static constexpr const fidl_type_t* kType = &::test_requestflexibleenvelope::wire::test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleResponseTable;
 };
 
 template <>
@@ -333,12 +321,6 @@ struct ::fidl::internal::WireCodingTraits<::test_requestflexibleenvelope::wire::
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_requestflexibleenvelope::wire::ProtocolRequestFlexibleResponseStrictRequest> {
-  static constexpr const fidl_type_t* kType = &::test_requestflexibleenvelope::wire::test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictRequestTable;
-};
-
 template <>
 struct TypeTraits<::test_requestflexibleenvelope::wire::ProtocolRequestFlexibleResponseStrictRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -383,12 +365,6 @@ struct ::fidl::internal::WireCodingTraits<::test_requestflexibleenvelope::wire::
           decoder, position + 0, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_requestflexibleenvelope::wire::ProtocolRequestFlexibleResponseStrictResponse> {
-  static constexpr const fidl_type_t* kType = &::test_requestflexibleenvelope::wire::test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictResponseTable;
 };
 
 template <>

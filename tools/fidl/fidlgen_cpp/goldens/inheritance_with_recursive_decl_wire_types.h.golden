@@ -70,12 +70,6 @@ namespace fidl {
 template <>
 struct IsResource<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest> : public std::true_type {};
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest> {
-  static constexpr const fidl_type_t* kType = &::test_inheritancewithrecursivedecl::wire::test_inheritancewithrecursivedecl_ParentFirstRequestTable;
-};
-
 template <>
 struct TypeTraits<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest> {
   static constexpr uint32_t kMaxNumHandles = 1;
@@ -127,12 +121,6 @@ struct ::fidl::internal::WireCodingTraits<::test_inheritancewithrecursivedecl::w
 #ifdef __Fuchsia__
 template <>
 struct IsResource<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest> : public std::true_type {};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest> {
-  static constexpr const fidl_type_t* kType = &::test_inheritancewithrecursivedecl::wire::test_inheritancewithrecursivedecl_ChildSecondRequestTable;
-};
 
 template <>
 struct TypeTraits<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest> {

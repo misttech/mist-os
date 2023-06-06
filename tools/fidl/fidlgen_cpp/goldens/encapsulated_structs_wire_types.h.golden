@@ -110,12 +110,6 @@ struct TopLevelStruct {
 }  // namespace test_encapsulatedstructs
 namespace fidl {
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_encapsulatedstructs::wire::Int8Int32> {
-  static constexpr const fidl_type_t* kType = &::test_encapsulatedstructs::wire::test_encapsulatedstructs_Int8Int32Table;
-};
-
 template <>
 struct TypeTraits<::test_encapsulatedstructs::wire::Int8Int32> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -166,12 +160,6 @@ struct ::fidl::internal::WireCodingTraits<::test_encapsulatedstructs::wire::Int8
     }
     internal::WireCheckPadding<uint32_t>(decoder, position + 0, 0xffffff00);
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_encapsulatedstructs::wire::Int16Int8> {
-  static constexpr const fidl_type_t* kType = &::test_encapsulatedstructs::wire::test_encapsulatedstructs_Int16Int8Table;
 };
 
 template <>
@@ -226,12 +214,6 @@ struct ::fidl::internal::WireCodingTraits<::test_encapsulatedstructs::wire::Int1
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_encapsulatedstructs::wire::ArrayInt16Int8> {
-  static constexpr const fidl_type_t* kType = &::test_encapsulatedstructs::wire::test_encapsulatedstructs_ArrayInt16Int8Table;
-};
-
 template <>
 struct TypeTraits<::test_encapsulatedstructs::wire::ArrayInt16Int8> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -276,12 +258,6 @@ struct ::fidl::internal::WireCodingTraits<::test_encapsulatedstructs::wire::Arra
           decoder, position + 0, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_encapsulatedstructs::wire::StructPaddingTestStruct> {
-  static constexpr const fidl_type_t* kType = &::test_encapsulatedstructs::wire::test_encapsulatedstructs_StructPaddingTestStructTable;
 };
 
 template <>
@@ -342,12 +318,6 @@ struct ::fidl::internal::WireCodingTraits<::test_encapsulatedstructs::wire::Stru
 template <>
 struct IsResource<::test_encapsulatedstructs::wire::NonInlineStructTestStruct> : public std::true_type {};
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_encapsulatedstructs::wire::NonInlineStructTestStruct> {
-  static constexpr const fidl_type_t* kType = &::test_encapsulatedstructs::wire::test_encapsulatedstructs_NonInlineStructTestStructTable;
-};
-
 template <>
 struct TypeTraits<::test_encapsulatedstructs::wire::NonInlineStructTestStruct> {
   static constexpr uint32_t kMaxNumHandles = 1;
@@ -405,12 +375,6 @@ struct ::fidl::internal::WireCodingTraits<::test_encapsulatedstructs::wire::NonI
 #ifdef __Fuchsia__
 template <>
 struct IsResource<::test_encapsulatedstructs::wire::TopLevelStruct> : public std::true_type {};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_encapsulatedstructs::wire::TopLevelStruct> {
-  static constexpr const fidl_type_t* kType = &::test_encapsulatedstructs::wire::test_encapsulatedstructs_TopLevelStructTable;
-};
 
 template <>
 struct TypeTraits<::test_encapsulatedstructs::wire::TopLevelStruct> {

@@ -639,12 +639,6 @@ struct StructLargeArray {
 }  // namespace test_arrays
 namespace fidl {
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_arrays::wire::StructSmallArray> {
-  static constexpr const fidl_type_t* kType = &::test_arrays::wire::test_arrays_StructSmallArrayTable;
-};
-
 template <>
 struct TypeTraits<::test_arrays::wire::StructSmallArray> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -689,12 +683,6 @@ struct ::fidl::internal::WireCodingTraits<::test_arrays::wire::StructSmallArray,
           decoder, position + 0, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_arrays::wire::StructLargeArray> {
-  static constexpr const fidl_type_t* kType = &::test_arrays::wire::test_arrays_StructLargeArrayTable;
 };
 
 template <>

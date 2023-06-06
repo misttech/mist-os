@@ -46,12 +46,6 @@ struct Foo {
 }  // namespace test_structdefaultvalueenumlibraryreference
 namespace fidl {
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_structdefaultvalueenumlibraryreference::wire::Foo> {
-  static constexpr const fidl_type_t* kType = &::test_structdefaultvalueenumlibraryreference::wire::test_structdefaultvalueenumlibraryreference_FooTable;
-};
-
 template <>
 struct TypeTraits<::test_structdefaultvalueenumlibraryreference::wire::Foo> {
   static constexpr uint32_t kMaxNumHandles = 0;

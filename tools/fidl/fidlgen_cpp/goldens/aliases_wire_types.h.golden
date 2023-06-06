@@ -101,12 +101,6 @@ struct internal::WireCodingTraits<::test_aliases::wire::ObjType, ::fidl::interna
 template <>
 struct IsResource<::test_aliases::wire::ExampleOfUseOfAliases> : public std::true_type {};
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_aliases::wire::ExampleOfUseOfAliases> {
-  static constexpr const fidl_type_t* kType = &::test_aliases::wire::test_aliases_ExampleOfUseOfAliasesTable;
-};
-
 template <>
 struct TypeTraits<::test_aliases::wire::ExampleOfUseOfAliases> {
   static constexpr uint32_t kMaxNumHandles = 3;

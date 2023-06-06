@@ -325,12 +325,6 @@ struct SandwichUnionSize36Alignment4 {
 }  // namespace test_unionsandwich
 namespace fidl {
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_unionsandwich::wire::SandwichUnionSize8Alignment4> {
-  static constexpr const fidl_type_t* kType = &::test_unionsandwich::wire::test_unionsandwich_SandwichUnionSize8Alignment4Table;
-};
-
 template <>
 struct TypeTraits<::test_unionsandwich::wire::SandwichUnionSize8Alignment4> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -387,12 +381,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::SandwichUn
     internal::WireCheckPadding<uint64_t>(decoder, position + 0, 0xffffffff00000000ull);
     internal::WireCheckPadding<uint64_t>(decoder, position + 24, 0xffffffff00000000ull);
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_unionsandwich::wire::SandwichUnionSize12Alignment4> {
-  static constexpr const fidl_type_t* kType = &::test_unionsandwich::wire::test_unionsandwich_SandwichUnionSize12Alignment4Table;
 };
 
 template <>
@@ -453,12 +441,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::SandwichUn
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_unionsandwich::wire::StructSize16Alignment8> {
-  static constexpr const fidl_type_t* kType = &::test_unionsandwich::wire::test_unionsandwich_StructSize16Alignment8Table;
-};
-
 template <>
 struct TypeTraits<::test_unionsandwich::wire::StructSize16Alignment8> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -507,12 +489,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::StructSize
           decoder, position + 8, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_unionsandwich::wire::SandwichUnionSize24Alignment8> {
-  static constexpr const fidl_type_t* kType = &::test_unionsandwich::wire::test_unionsandwich_SandwichUnionSize24Alignment8Table;
 };
 
 template <>
@@ -571,12 +547,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::SandwichUn
     internal::WireCheckPadding<uint64_t>(decoder, position + 0, 0xffffffff00000000ull);
     internal::WireCheckPadding<uint64_t>(decoder, position + 24, 0xffffffff00000000ull);
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_unionsandwich::wire::SandwichUnionSize36Alignment4> {
-  static constexpr const fidl_type_t* kType = &::test_unionsandwich::wire::test_unionsandwich_SandwichUnionSize36Alignment4Table;
 };
 
 template <>

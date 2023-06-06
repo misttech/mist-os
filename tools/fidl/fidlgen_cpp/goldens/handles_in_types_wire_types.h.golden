@@ -597,12 +597,6 @@ struct internal::WireCodingTraits<::test_handlesintypes::wire::ObjType, ::fidl::
 template <>
 struct IsResource<::test_handlesintypes::wire::HandlesInTypes> : public std::true_type {};
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_handlesintypes::wire::HandlesInTypes> {
-  static constexpr const fidl_type_t* kType = &::test_handlesintypes::wire::test_handlesintypes_HandlesInTypesTable;
-};
-
 template <>
 struct TypeTraits<::test_handlesintypes::wire::HandlesInTypes> {
   static constexpr uint32_t kMaxNumHandles = 4294967295;
@@ -678,12 +672,6 @@ struct ::fidl::internal::WireCodingTraits<::test_handlesintypes::wire::HandlesIn
 #ifdef __Fuchsia__
 template <>
 struct IsResource<::test_handlesintypes::wire::EmptyResourceStruct> : public std::true_type {};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_handlesintypes::wire::EmptyResourceStruct> {
-  static constexpr const fidl_type_t* kType = &::test_handlesintypes::wire::test_handlesintypes_EmptyResourceStructTable;
-};
 
 template <>
 struct TypeTraits<::test_handlesintypes::wire::EmptyResourceStruct> {

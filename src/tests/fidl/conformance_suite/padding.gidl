@@ -357,7 +357,7 @@ success("Struct3Byte_randomly_generated") {
 }
 
 success("CorrectPaddingEndOfInlineObject3Byte") {
-    bindings_denylist = [c, llcpp],
+    bindings_denylist = [llcpp],
     value = PaddingEndOfInlineObject3Byte{
         a: Struct3Byte{
             a: 0x0102,

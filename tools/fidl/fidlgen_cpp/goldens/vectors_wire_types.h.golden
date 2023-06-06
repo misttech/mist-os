@@ -47,12 +47,6 @@ struct ExampleUseOfVectors {
 }  // namespace test_vectors
 namespace fidl {
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_vectors::wire::ExampleUseOfVectors> {
-  static constexpr const fidl_type_t* kType = &::test_vectors::wire::test_vectors_ExampleUseOfVectorsTable;
-};
-
 template <>
 struct TypeTraits<::test_vectors::wire::ExampleUseOfVectors> {
   static constexpr uint32_t kMaxNumHandles = 0;

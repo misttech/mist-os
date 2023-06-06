@@ -1806,12 +1806,6 @@ struct internal::WireCodingTraits<::test_typesinprotocols::wire::Enum, ::fidl::i
   
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::Struct>{
-  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_StructTable;
-};
-
 template<>
 struct TypeTraits<::test_typesinprotocols::wire::Struct> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -1866,12 +1860,6 @@ struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::Struct,
 template <>
 struct IsResource<::test_typesinprotocols::wire::ResourceStruct> : public std::true_type {};
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::ResourceStruct>{
-  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_ResourceStructTable;
-};
-
 template<>
 struct TypeTraits<::test_typesinprotocols::wire::ResourceStruct> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -1925,12 +1913,6 @@ struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::Resourc
 #endif  // __Fuchsia__
 
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::Basic>{
-  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_BasicTable;
-};
 
 template<>
 struct TypeTraits<::test_typesinprotocols::wire::Basic> {
@@ -2030,12 +2012,6 @@ struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::Basic, 
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::Compound>{
-  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_CompoundTable;
-};
-
 template<>
 struct TypeTraits<::test_typesinprotocols::wire::Compound> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -2109,12 +2085,6 @@ struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::Compoun
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::ArrayBasic>{
-  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_ArrayBasicTable;
-};
 
 template<>
 struct TypeTraits<::test_typesinprotocols::wire::ArrayBasic> {
@@ -2218,12 +2188,6 @@ struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ArrayBa
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::ArrayCompound>{
-  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_ArrayCompoundTable;
-};
-
 template<>
 struct TypeTraits<::test_typesinprotocols::wire::ArrayCompound> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -2297,12 +2261,6 @@ struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ArrayCo
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::VectorBasic>{
-  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_VectorBasicTable;
-};
 
 template<>
 struct TypeTraits<::test_typesinprotocols::wire::VectorBasic> {
@@ -2396,12 +2354,6 @@ struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::VectorB
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::VectorCompound>{
-  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_VectorCompoundTable;
-};
-
 template<>
 struct TypeTraits<::test_typesinprotocols::wire::VectorCompound> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -2474,12 +2426,6 @@ struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::VectorC
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::VectorOptional>{
-  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_VectorOptionalTable;
-};
-
 template<>
 struct TypeTraits<::test_typesinprotocols::wire::VectorOptional> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -2539,12 +2485,6 @@ struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::VectorO
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::ArrayVectorNested>{
-  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_ArrayVectorNestedTable;
-};
 
 template<>
 struct TypeTraits<::test_typesinprotocols::wire::ArrayVectorNested> {
@@ -2610,12 +2550,6 @@ struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::ArrayVe
 #ifdef __Fuchsia__
 template <>
 struct IsResource<::test_typesinprotocols::wire::Resource> : public std::true_type {};
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::Resource>{
-  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_ResourceTable;
-};
 
 template<>
 struct TypeTraits<::test_typesinprotocols::wire::Resource> {
@@ -2776,12 +2710,6 @@ struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::Resourc
 
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::ProtocolErrorBasicTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_ProtocolErrorBasicTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorBasicTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -2829,12 +2757,6 @@ struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::Protoco
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::ProtocolErrorCompoundTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_ProtocolErrorCompoundTopResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorCompoundTopResponse> {
@@ -2884,12 +2806,6 @@ struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::Protoco
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::ProtocolErrorArrayBasicTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_ProtocolErrorArrayBasicTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorArrayBasicTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -2937,12 +2853,6 @@ struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::Protoco
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_ProtocolErrorArrayCompoundTopResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorArrayCompoundTopResponse> {
@@ -2992,12 +2902,6 @@ struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::Protoco
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::ProtocolErrorVectorBasicTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_ProtocolErrorVectorBasicTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorVectorBasicTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -3045,12 +2949,6 @@ struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::Protoco
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_ProtocolErrorVectorCompoundTopResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorVectorCompoundTopResponse> {
@@ -3100,12 +2998,6 @@ struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::Protoco
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_ProtocolErrorVectorOptionalTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorVectorOptionalTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -3153,12 +3045,6 @@ struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::Protoco
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_ProtocolErrorArrayVectorNestedTopResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorArrayVectorNestedTopResponse> {
@@ -3210,12 +3096,6 @@ struct ::fidl::internal::WireCodingTraits<::test_typesinprotocols::wire::Protoco
 #ifdef __Fuchsia__
 template <>
 struct IsResource<::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse> : public std::true_type {};
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_typesinprotocols::wire::test_typesinprotocols_ProtocolErrorResourceTopResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_typesinprotocols::wire::ProtocolErrorResourceTopResponse> {

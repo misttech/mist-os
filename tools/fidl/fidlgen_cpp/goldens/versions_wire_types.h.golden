@@ -339,12 +339,6 @@ struct internal::WireCodingTraits<::test_versions::wire::Enum, ::fidl::internal:
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_versions::wire::Struct> {
-  static constexpr const fidl_type_t* kType = &::test_versions::wire::test_versions_StructTable;
-};
-
 template <>
 struct TypeTraits<::test_versions::wire::Struct> {
   static constexpr uint32_t kMaxNumHandles = 0;

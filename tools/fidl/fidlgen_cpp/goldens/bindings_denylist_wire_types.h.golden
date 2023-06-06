@@ -617,12 +617,6 @@ struct DenyEachBindingOnlyDenySyzkallerTopResponse {
 }  // namespace test_bindingsdenylist
 namespace fidl {
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartRequest> {
-  static constexpr const fidl_type_t* kType = &::test_bindingsdenylist::wire::test_bindingsdenylist_DenyEachBindingOnlyDenyDartRequestTable;
-};
-
 template <>
 struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -667,12 +661,6 @@ struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEac
           decoder, position + 0, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartResponse> {
-  static constexpr const fidl_type_t* kType = &::test_bindingsdenylist::wire::test_bindingsdenylist_DenyEachBinding_OnlyDenyDart_ResponseTable;
 };
 
 template <>
@@ -721,12 +709,6 @@ struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEac
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartTopResponse> {
-  static constexpr const fidl_type_t* kType = &::test_bindingsdenylist::wire::test_bindingsdenylist_DenyEachBindingOnlyDenyDartTopResponseTable;
-};
-
 template <>
 struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -771,12 +753,6 @@ struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEac
           decoder, position + 0, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoRequest> {
-  static constexpr const fidl_type_t* kType = &::test_bindingsdenylist::wire::test_bindingsdenylist_DenyEachBindingOnlyDenyGoRequestTable;
 };
 
 template <>
@@ -825,12 +801,6 @@ struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEac
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoResponse> {
-  static constexpr const fidl_type_t* kType = &::test_bindingsdenylist::wire::test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_ResponseTable;
-};
-
 template <>
 struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -875,12 +845,6 @@ struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEac
           decoder, position + 0, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoTopResponse> {
-  static constexpr const fidl_type_t* kType = &::test_bindingsdenylist::wire::test_bindingsdenylist_DenyEachBindingOnlyDenyGoTopResponseTable;
 };
 
 template <>
@@ -929,12 +893,6 @@ struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEac
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerRequest> {
-  static constexpr const fidl_type_t* kType = &::test_bindingsdenylist::wire::test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerRequestTable;
-};
-
 template <>
 struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -979,12 +937,6 @@ struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEac
           decoder, position + 0, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerResponse> {
-  static constexpr const fidl_type_t* kType = &::test_bindingsdenylist::wire::test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResponseTable;
 };
 
 template <>
@@ -1033,12 +985,6 @@ struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEac
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerTopResponse> {
-  static constexpr const fidl_type_t* kType = &::test_bindingsdenylist::wire::test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerTopResponseTable;
-};
-
 template <>
 struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -1083,12 +1029,6 @@ struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEac
           decoder, position + 0, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustRequest> {
-  static constexpr const fidl_type_t* kType = &::test_bindingsdenylist::wire::test_bindingsdenylist_DenyEachBindingOnlyDenyRustRequestTable;
 };
 
 template <>
@@ -1137,12 +1077,6 @@ struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEac
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustResponse> {
-  static constexpr const fidl_type_t* kType = &::test_bindingsdenylist::wire::test_bindingsdenylist_DenyEachBinding_OnlyDenyRust_ResponseTable;
-};
-
 template <>
 struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -1187,12 +1121,6 @@ struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEac
           decoder, position + 0, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustTopResponse> {
-  static constexpr const fidl_type_t* kType = &::test_bindingsdenylist::wire::test_bindingsdenylist_DenyEachBindingOnlyDenyRustTopResponseTable;
 };
 
 template <>
@@ -1241,12 +1169,6 @@ struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEac
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerRequest> {
-  static constexpr const fidl_type_t* kType = &::test_bindingsdenylist::wire::test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerRequestTable;
-};
-
 template <>
 struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -1291,12 +1213,6 @@ struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEac
           decoder, position + 0, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerResponse> {
-  static constexpr const fidl_type_t* kType = &::test_bindingsdenylist::wire::test_bindingsdenylist_DenyEachBinding_OnlyDenySyzkaller_ResponseTable;
 };
 
 template <>
@@ -1345,12 +1261,6 @@ struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEac
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerTopResponse> {
-  static constexpr const fidl_type_t* kType = &::test_bindingsdenylist::wire::test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerTopResponseTable;
-};
-
 template <>
 struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -1397,12 +1307,6 @@ struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEac
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_bindingsdenylist::wire::MemberOnlyAppearsInImportingLibrary> {
-  static constexpr const fidl_type_t* kType = &::test_bindingsdenylist::wire::test_bindingsdenylist_MemberOnlyAppearsInImportingLibraryTable;
-};
-
 template <>
 struct TypeTraits<::test_bindingsdenylist::wire::MemberOnlyAppearsInImportingLibrary> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -1447,12 +1351,6 @@ struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::MemberO
           decoder, position + 0, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_bindingsdenylist::wire::OnlyAppearsInImportingLibrary> {
-  static constexpr const fidl_type_t* kType = &::test_bindingsdenylist::wire::test_bindingsdenylist_OnlyAppearsInImportingLibraryTable;
 };
 
 template <>

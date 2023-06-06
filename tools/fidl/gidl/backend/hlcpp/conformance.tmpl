@@ -52,8 +52,6 @@ TEST(Conformance, {{ .Name }}_Decode) {
   }
   {{- end }}
   auto bytes = {{ .Bytes }};
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = {{ .Handles }};
   auto {{ .ActualValueVar }} =
       fidl::test::util::DecodedBytes<{{ .ValueType }}>({{ .WireFormat }}, std::move(bytes), std::move(handles));
@@ -96,8 +94,6 @@ TEST(Conformance, {{ .Name }}_Decode_Failure) {
   const auto handle_defs = {{ .HandleDefs }};
   {{- end }}
   auto bytes = {{ .Bytes }};
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = {{ .Handles }};
   fidl::test::util::CheckDecodeFailure<{{ .ValueType }}>({{ .WireFormat }}, std::move(bytes), std::move(handles), {{ .ErrorCode }});
   {{- if .HandleDefs }}

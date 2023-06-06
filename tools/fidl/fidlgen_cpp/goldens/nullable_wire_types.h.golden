@@ -212,12 +212,6 @@ struct StructWithNullableUnion {
 }  // namespace test_nullable
 namespace fidl {
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_nullable::wire::StructWithNullableString> {
-  static constexpr const fidl_type_t* kType = &::test_nullable::wire::test_nullable_StructWithNullableStringTable;
-};
-
 template <>
 struct TypeTraits<::test_nullable::wire::StructWithNullableString> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -262,12 +256,6 @@ struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::StructWithNulla
           decoder, position + 0, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_nullable::wire::StructWithNullableVector> {
-  static constexpr const fidl_type_t* kType = &::test_nullable::wire::test_nullable_StructWithNullableVectorTable;
 };
 
 template <>
@@ -320,12 +308,6 @@ struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::StructWithNulla
 template <>
 struct IsResource<::test_nullable::wire::StructWithNullableHandle> : public std::true_type {};
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_nullable::wire::StructWithNullableHandle> {
-  static constexpr const fidl_type_t* kType = &::test_nullable::wire::test_nullable_StructWithNullableHandleTable;
-};
-
 template <>
 struct TypeTraits<::test_nullable::wire::StructWithNullableHandle> {
   static constexpr uint32_t kMaxNumHandles = 1;
@@ -373,12 +355,6 @@ struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::StructWithNulla
 };
 
 #endif  // __Fuchsia__
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_nullable::wire::SimpleProtocolAddRequest> {
-  static constexpr const fidl_type_t* kType = &::test_nullable::wire::test_nullable_SimpleProtocolAddRequestTable;
-};
 
 template <>
 struct TypeTraits<::test_nullable::wire::SimpleProtocolAddRequest> {
@@ -430,12 +406,6 @@ struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::SimpleProtocolA
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_nullable::wire::SimpleProtocolAddResponse> {
-  static constexpr const fidl_type_t* kType = &::test_nullable::wire::test_nullable_SimpleProtocolAddResponseTable;
-};
-
 template <>
 struct TypeTraits<::test_nullable::wire::SimpleProtocolAddResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -485,12 +455,6 @@ struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::SimpleProtocolA
 #ifdef __Fuchsia__
 template <>
 struct IsResource<::test_nullable::wire::StructWithNullableProtocol> : public std::true_type {};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_nullable::wire::StructWithNullableProtocol> {
-  static constexpr const fidl_type_t* kType = &::test_nullable::wire::test_nullable_StructWithNullableProtocolTable;
-};
 
 template <>
 struct TypeTraits<::test_nullable::wire::StructWithNullableProtocol> {
@@ -544,12 +508,6 @@ struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::StructWithNulla
 template <>
 struct IsResource<::test_nullable::wire::StructWithNullableRequest> : public std::true_type {};
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_nullable::wire::StructWithNullableRequest> {
-  static constexpr const fidl_type_t* kType = &::test_nullable::wire::test_nullable_StructWithNullableRequestTable;
-};
-
 template <>
 struct TypeTraits<::test_nullable::wire::StructWithNullableRequest> {
   static constexpr uint32_t kMaxNumHandles = 1;
@@ -598,12 +556,6 @@ struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::StructWithNulla
 
 #endif  // __Fuchsia__
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_nullable::wire::Int32Wrapper> {
-  static constexpr const fidl_type_t* kType = &::test_nullable::wire::test_nullable_Int32WrapperTable;
-};
-
 template <>
 struct TypeTraits<::test_nullable::wire::Int32Wrapper> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -650,12 +602,6 @@ struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::Int32Wrapper, :
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_nullable::wire::StructWithNullableStruct> {
-  static constexpr const fidl_type_t* kType = &::test_nullable::wire::test_nullable_StructWithNullableStructTable;
-};
-
 template <>
 struct TypeTraits<::test_nullable::wire::StructWithNullableStruct> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -700,12 +646,6 @@ struct ::fidl::internal::WireCodingTraits<::test_nullable::wire::StructWithNulla
           decoder, position + 0, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_nullable::wire::StructWithNullableUnion> {
-  static constexpr const fidl_type_t* kType = &::test_nullable::wire::test_nullable_StructWithNullableUnionTable;
 };
 
 template <>

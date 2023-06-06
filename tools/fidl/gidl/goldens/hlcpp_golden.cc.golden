@@ -464,8 +464,6 @@ TEST(Conformance, GoldenBoolStruct_V2_Decode) {
   auto bytes = std::vector<uint8_t>{
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   auto value =
       fidl::test::util::DecodedBytes<test::conformance::GoldenBoolStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles));
@@ -478,8 +476,6 @@ TEST(Conformance, GoldenIntStruct_V2_Decode) {
   auto bytes = std::vector<uint8_t>{
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   auto value =
       fidl::test::util::DecodedBytes<test::conformance::GoldenIntStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles));
@@ -492,8 +488,6 @@ TEST(Conformance, GoldenUintStruct_V2_Decode) {
   auto bytes = std::vector<uint8_t>{
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   auto value =
       fidl::test::util::DecodedBytes<test::conformance::GoldenUintStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles));
@@ -506,8 +500,6 @@ TEST(Conformance, GoldenFloatStruct_V2_Decode) {
   auto bytes = std::vector<uint8_t>{
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   auto value =
       fidl::test::util::DecodedBytes<test::conformance::GoldenFloatStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles));
@@ -520,8 +512,6 @@ TEST(Conformance, GoldenDoubleStruct_V2_Decode) {
   auto bytes = std::vector<uint8_t>{
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   auto value =
       fidl::test::util::DecodedBytes<test::conformance::GoldenDoubleStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles));
@@ -536,8 +526,6 @@ TEST(Conformance, GoldenStringStruct_V2_Decode) {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x61,0x62,0x63,0x64,0x00,0x00,0x00,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   auto value =
       fidl::test::util::DecodedBytes<test::conformance::GoldenStringStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles));
@@ -552,8 +540,6 @@ TEST(Conformance, GoldenNullableStringStructNonNull_V2_Decode) {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x61,0x62,0x63,0x64,0x00,0x00,0x00,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   auto value =
       fidl::test::util::DecodedBytes<test::conformance::GoldenNullableStringStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles));
@@ -567,8 +553,6 @@ TEST(Conformance, GoldenNullableStringStructNull_V2_Decode) {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   auto value =
       fidl::test::util::DecodedBytes<test::conformance::GoldenNullableStringStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles));
@@ -581,8 +565,6 @@ TEST(Conformance, GoldenEnumStruct_V2_Decode) {
   auto bytes = std::vector<uint8_t>{
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   auto value =
       fidl::test::util::DecodedBytes<test::conformance::GoldenEnumStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles));
@@ -595,8 +577,6 @@ TEST(Conformance, GoldenBitsStruct_V2_Decode) {
   auto bytes = std::vector<uint8_t>{
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   auto value =
       fidl::test::util::DecodedBytes<test::conformance::GoldenBitsStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles));
@@ -611,8 +591,6 @@ TEST(Conformance, GoldenTableStruct_V2_Decode) {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x00,0x00,0x00,0x00,0x00,0x01,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   auto value =
       fidl::test::util::DecodedBytes<test::conformance::GoldenTableStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles));
@@ -628,8 +606,6 @@ TEST(Conformance, GoldenUnionStruct_V2_Decode) {
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x01,0x00,0x00,0x00,0x00,0x00,0x01,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   auto value =
       fidl::test::util::DecodedBytes<test::conformance::GoldenUnionStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles));
@@ -645,8 +621,6 @@ TEST(Conformance, GoldenNullableUnionStructNonNull_V2_Decode) {
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x01,0x00,0x00,0x00,0x00,0x00,0x01,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   auto value =
       fidl::test::util::DecodedBytes<test::conformance::GoldenNullableUnionStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles));
@@ -662,8 +636,6 @@ TEST(Conformance, GoldenNullableUnionStructNull_V2_Decode) {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   auto value =
       fidl::test::util::DecodedBytes<test::conformance::GoldenNullableUnionStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles));
@@ -676,8 +648,6 @@ TEST(Conformance, GoldenByteArrayStruct_V2_Decode) {
   auto bytes = std::vector<uint8_t>{
 0x01,0x02,0x03,0x04,0x00,0x00,0x00,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   auto value =
       fidl::test::util::DecodedBytes<test::conformance::GoldenByteArrayStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles));
@@ -694,8 +664,6 @@ TEST(Conformance, GoldenStructArrayStruct_V2_Decode) {
   auto bytes = std::vector<uint8_t>{
 0x01,0x00,0x02,0x00,0x00,0x00,0x00,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   auto value =
       fidl::test::util::DecodedBytes<test::conformance::GoldenStructArrayStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles));
@@ -715,8 +683,6 @@ TEST(Conformance, GoldenByteVectorStruct_V2_Decode) {
 0x01,0x02,0x03,0x04,0x01,0x02,0x03,0x04,
 0x01,0x02,0x03,0x04,0x00,0x00,0x00,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   auto value =
       fidl::test::util::DecodedBytes<test::conformance::GoldenByteVectorStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles));
@@ -744,8 +710,6 @@ TEST(Conformance, GoldenByteNullableVectorStructNonNull_V2_Decode) {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x02,0x03,0x04,0x00,0x00,0x00,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   auto value =
       fidl::test::util::DecodedBytes<test::conformance::GoldenNullableByteVectorStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles));
@@ -764,8 +728,6 @@ TEST(Conformance, GoldenNullableByteVectorStructNull_V2_Decode) {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   auto value =
       fidl::test::util::DecodedBytes<test::conformance::GoldenNullableByteVectorStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles));
@@ -780,8 +742,6 @@ TEST(Conformance, GoldenStructVectorStruct_V2_Decode) {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x00,0x02,0x00,0x00,0x00,0x00,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   auto value =
       fidl::test::util::DecodedBytes<test::conformance::GoldenStructVectorStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles));
@@ -800,8 +760,6 @@ TEST(Conformance, GoldenNullableStructNonNull_V2_Decode) {
 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   auto value =
       fidl::test::util::DecodedBytes<test::conformance::GoldenNullableStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles));
@@ -815,8 +773,6 @@ TEST(Conformance, GoldenNullableStructNull_V2_Decode) {
   auto bytes = std::vector<uint8_t>{
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   auto value =
       fidl::test::util::DecodedBytes<test::conformance::GoldenNullableStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles));
@@ -846,8 +802,6 @@ zx_handle_info_t{
   auto bytes = std::vector<uint8_t>{
 0xff,0xff,0xff,0xff,0x00,0x00,0x00,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{
 handle_defs[0],};
   auto value =
@@ -885,8 +839,6 @@ zx_handle_info_t{
   auto bytes = std::vector<uint8_t>{
 0xff,0xff,0xff,0xff,0x00,0x00,0x00,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{
 handle_defs[0],};
   auto value =
@@ -906,8 +858,6 @@ TEST(Conformance, GoldenNullableHandleStructNull_V2_Decode) {
   auto bytes = std::vector<uint8_t>{
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   auto value =
       fidl::test::util::DecodedBytes<test::conformance::GoldenNullableHandleStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles));
@@ -941,8 +891,6 @@ zx_handle_info_t{
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0xff,0xff,0xff,0xff,0x01,0x00,0x01,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{
 handle_defs[0],};
   auto value =
@@ -972,8 +920,6 @@ TEST(Conformance, GoldenStringStructNullBody_V2_Decode_Failure) {
 0x03,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 };
-  // TODO(fxbug.dev/81889) Remove the following line once the transformer is no longer needed.
-  bytes.reserve(ZX_CHANNEL_MAX_MSG_BYTES); // For transforming V2 -> V1
   auto handles = std::vector<zx_handle_info_t>{};
   fidl::test::util::CheckDecodeFailure<test::conformance::GoldenStringStruct>(fidl::internal::WireFormatVersion::kV2, std::move(bytes), std::move(handles), ZX_ERR_INVALID_ARGS);
 }

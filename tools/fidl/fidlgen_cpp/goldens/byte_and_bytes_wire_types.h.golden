@@ -45,12 +45,6 @@ struct ByteAndBytes {
 }  // namespace test_byteandbytes
 namespace fidl {
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_byteandbytes::wire::ByteAndBytes> {
-  static constexpr const fidl_type_t* kType = &::test_byteandbytes::wire::test_byteandbytes_ByteAndBytesTable;
-};
-
 template <>
 struct TypeTraits<::test_byteandbytes::wire::ByteAndBytes> {
   static constexpr uint32_t kMaxNumHandles = 0;

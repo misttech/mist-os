@@ -9,7 +9,6 @@ assert(is_host, "GIDL only runs on host")
 
 go_library("main") {
   deps = [
-    "//tools/fidl/gidl/backend/c",
     "//tools/fidl/gidl/backend/cpp",
     "//tools/fidl/gidl/backend/dart",
     "//tools/fidl/gidl/backend/driver_cpp",

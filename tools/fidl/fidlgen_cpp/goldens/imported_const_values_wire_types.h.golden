@@ -50,12 +50,6 @@ constexpr ::test_dependent::wire::MyEnum kEnumMember = ::test_dependent::wire::M
 }  // namespace test_importedconstvalues
 namespace fidl {
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_importedconstvalues::wire::MyStruct> {
-  static constexpr const fidl_type_t* kType = &::test_importedconstvalues::wire::test_importedconstvalues_MyStructTable;
-};
-
 template <>
 struct TypeTraits<::test_importedconstvalues::wire::MyStruct> {
   static constexpr uint32_t kMaxNumHandles = 0;

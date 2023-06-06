@@ -990,12 +990,6 @@ struct internal::WireCodingTraits<::test_anonymous::wire::SomeProtocolSomeMethod
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_anonymous::wire::OverrideTest> {
-  static constexpr const fidl_type_t* kType = &::test_anonymous::wire::test_anonymous_OverrideTestTable;
-};
-
 template <>
 struct TypeTraits<::test_anonymous::wire::OverrideTest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -1052,12 +1046,6 @@ struct ::fidl::internal::WireCodingTraits<::test_anonymous::wire::OverrideTest, 
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_anonymous::wire::TableData> {
-  static constexpr const fidl_type_t* kType = &::test_anonymous::wire::test_anonymous_TableDataTable;
-};
-
 template <>
 struct TypeTraits<::test_anonymous::wire::TableData> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -1102,12 +1090,6 @@ struct ::fidl::internal::WireCodingTraits<::test_anonymous::wire::TableData, ::f
           decoder, position + 0, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_anonymous::wire::SomeProtocolSomeMethodRequest> {
-  static constexpr const fidl_type_t* kType = &::test_anonymous::wire::test_anonymous_SomeProtocolSomeMethodRequestTable;
 };
 
 template <>
@@ -1160,12 +1142,6 @@ struct ::fidl::internal::WireCodingTraits<::test_anonymous::wire::SomeProtocolSo
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_anonymous::wire::SomeProtocolSomeMethodResponse> {
-  static constexpr const fidl_type_t* kType = &::test_anonymous::wire::test_anonymous_SomeProtocol_SomeMethod_ResponseTable;
-};
-
 template <>
 struct TypeTraits<::test_anonymous::wire::SomeProtocolSomeMethodResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -1210,12 +1186,6 @@ struct ::fidl::internal::WireCodingTraits<::test_anonymous::wire::SomeProtocolSo
           decoder, position + 0, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_anonymous::wire::SomeProtocolSomeMethodTopResponse> {
-  static constexpr const fidl_type_t* kType = &::test_anonymous::wire::test_anonymous_SomeProtocolSomeMethodTopResponseTable;
 };
 
 template <>

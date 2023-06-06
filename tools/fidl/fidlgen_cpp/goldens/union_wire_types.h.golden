@@ -2126,12 +2126,6 @@ namespace fidl {
   
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_union::wire::Pizza>{
-  static constexpr const fidl_type_t* kType = &::test_union::wire::test_union_PizzaTable;
-};
-
 template<>
 struct TypeTraits<::test_union::wire::Pizza> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -2179,12 +2173,6 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::Pizza, ::fidl::int
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_union::wire::Pasta>{
-  static constexpr const fidl_type_t* kType = &::test_union::wire::test_union_PastaTable;
-};
 
 template<>
 struct TypeTraits<::test_union::wire::Pasta> {
@@ -2234,12 +2222,6 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::Pasta, ::fidl::int
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_union::wire::NullableUnionStruct>{
-  static constexpr const fidl_type_t* kType = &::test_union::wire::test_union_NullableUnionStructTable;
-};
-
 template<>
 struct TypeTraits<::test_union::wire::NullableUnionStruct> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -2287,12 +2269,6 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::NullableUnionStruc
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_union::wire::Empty>{
-  static constexpr const fidl_type_t* kType = &::test_union::wire::test_union_EmptyTable;
-};
 
 template<>
 struct TypeTraits<::test_union::wire::Empty> {
@@ -2345,12 +2321,6 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::Empty, ::fidl::int
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>{
-  static constexpr const fidl_type_t* kType = &::test_union::wire::test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -2398,12 +2368,6 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::TestProtocolStrict
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>{
-  static constexpr const fidl_type_t* kType = &::test_union::wire::test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse> {
@@ -2453,12 +2417,6 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::TestProtocolFlexib
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_union::wire::StructWithNullableUnion>{
-  static constexpr const fidl_type_t* kType = &::test_union::wire::test_union_StructWithNullableUnionTable;
-};
-
 template<>
 struct TypeTraits<::test_union::wire::StructWithNullableUnion> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -2506,12 +2464,6 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::StructWithNullable
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_union::wire::UnionSandwich>{
-  static constexpr const fidl_type_t* kType = &::test_union::wire::test_union_UnionSandwichTable;
-};
 
 template<>
 struct TypeTraits<::test_union::wire::UnionSandwich> {

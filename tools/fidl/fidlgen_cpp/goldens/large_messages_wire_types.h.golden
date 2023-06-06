@@ -232,12 +232,6 @@ struct UnboundedMaybeLargeResource {
 }  // namespace test_largemessages
 namespace fidl {
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_largemessages::wire::BoundedKnownToBeSmall> {
-  static constexpr const fidl_type_t* kType = &::test_largemessages::wire::test_largemessages_BoundedKnownToBeSmallTable;
-};
-
 template <>
 struct TypeTraits<::test_largemessages::wire::BoundedKnownToBeSmall> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -284,12 +278,6 @@ struct ::fidl::internal::WireCodingTraits<::test_largemessages::wire::BoundedKno
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_largemessages::wire::BoundedMaybeLarge> {
-  static constexpr const fidl_type_t* kType = &::test_largemessages::wire::test_largemessages_BoundedMaybeLargeTable;
-};
-
 template <>
 struct TypeTraits<::test_largemessages::wire::BoundedMaybeLarge> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -334,12 +322,6 @@ struct ::fidl::internal::WireCodingTraits<::test_largemessages::wire::BoundedMay
           decoder, position + 0, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_largemessages::wire::UnboundedMaybeLargeValue> {
-  static constexpr const fidl_type_t* kType = &::test_largemessages::wire::test_largemessages_UnboundedMaybeLargeValueTable;
 };
 
 template <>
@@ -391,12 +373,6 @@ struct ::fidl::internal::WireCodingTraits<::test_largemessages::wire::UnboundedM
 #ifdef __Fuchsia__
 template <>
 struct IsResource<::test_largemessages::wire::Elements> : public std::true_type {};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_largemessages::wire::Elements> {
-  static constexpr const fidl_type_t* kType = &::test_largemessages::wire::test_largemessages_ElementsTable;
-};
 
 template <>
 struct TypeTraits<::test_largemessages::wire::Elements> {
@@ -455,12 +431,6 @@ struct ::fidl::internal::WireCodingTraits<::test_largemessages::wire::Elements, 
 #ifdef __Fuchsia__
 template <>
 struct IsResource<::test_largemessages::wire::UnboundedMaybeLargeResource> : public std::true_type {};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_largemessages::wire::UnboundedMaybeLargeResource> {
-  static constexpr const fidl_type_t* kType = &::test_largemessages::wire::test_largemessages_UnboundedMaybeLargeResourceTable;
-};
 
 template <>
 struct TypeTraits<::test_largemessages::wire::UnboundedMaybeLargeResource> {

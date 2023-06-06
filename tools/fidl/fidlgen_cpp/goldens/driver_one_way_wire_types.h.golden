@@ -54,12 +54,6 @@ struct OneWaySendRequest {
 }  // namespace test_driveroneway
 namespace fidl {
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_driveroneway::wire::Payload> {
-  static constexpr const fidl_type_t* kType = &::test_driveroneway::wire::test_driveroneway_PayloadTable;
-};
-
 template <>
 struct TypeTraits<::test_driveroneway::wire::Payload> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -104,12 +98,6 @@ struct ::fidl::internal::WireCodingTraits<::test_driveroneway::wire::Payload, ::
           decoder, position + 0, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_driveroneway::wire::OneWaySendRequest> {
-  static constexpr const fidl_type_t* kType = &::test_driveroneway::wire::test_driveroneway_OneWaySendRequestTable;
 };
 
 template <>

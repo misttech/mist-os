@@ -169,12 +169,6 @@ namespace fidl {
 template <>
 struct IsResource<::test_handles::wire::Handles> : public std::true_type {};
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_handles::wire::Handles> {
-  static constexpr const fidl_type_t* kType = &::test_handles::wire::test_handles_HandlesTable;
-};
-
 template <>
 struct TypeTraits<::test_handles::wire::Handles> {
   static constexpr uint32_t kMaxNumHandles = 34;
@@ -358,12 +352,6 @@ struct ::fidl::internal::WireCodingTraits<::test_handles::wire::Handles, ::fidl:
 #ifdef __Fuchsia__
 template <>
 struct IsResource<::test_handles::wire::FdfHandles> : public std::true_type {};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_handles::wire::FdfHandles> {
-  static constexpr const fidl_type_t* kType = &::test_handles::wire::test_handles_FdfHandlesTable;
-};
 
 template <>
 struct TypeTraits<::test_handles::wire::FdfHandles> {

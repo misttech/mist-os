@@ -13651,12 +13651,6 @@ namespace fidl {
   
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayFieldsResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -13704,12 +13698,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayErrResponse> {
@@ -13762,12 +13750,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -13815,12 +13797,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayFieldsErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse> {
@@ -13870,12 +13846,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayFieldsErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -13923,12 +13893,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayUnionErrTopResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionErrTopResponse> {
@@ -13978,12 +13942,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayTableErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -14031,12 +13989,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWay_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayResponse> {
@@ -14089,12 +14041,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocolFlexibleTwoWayTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -14142,12 +14088,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFields_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse> {
@@ -14197,12 +14137,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocolFlexibleTwoWayFieldsTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -14250,12 +14184,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocolFlexibleTwoWayUnionTopResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionTopResponse> {
@@ -14305,12 +14233,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocolFlexibleTwoWayTableTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -14358,12 +14280,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayErrResponse> {
@@ -14416,12 +14332,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocolFlexibleTwoWayErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -14469,12 +14379,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse> {
@@ -14524,12 +14428,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocolFlexibleTwoWayFieldsErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -14577,12 +14475,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocolFlexibleTwoWayUnionErrTopResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionErrTopResponse> {
@@ -14632,12 +14524,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocolFlexibleTwoWayTableErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -14686,12 +14572,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocolStrictEventFieldsRequestTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -14739,12 +14619,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocol_StrictEventErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResponse> {
@@ -14797,12 +14671,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocolStrictEventErrRequestTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -14850,12 +14718,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocol_StrictEventFieldsErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResponse> {
@@ -14905,12 +14767,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocolStrictEventFieldsErrRequestTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -14958,12 +14814,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocolStrictEventUnionErrRequestTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrRequest> {
@@ -15013,12 +14863,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocolStrictEventTableErrRequestTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -15067,12 +14911,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventFieldsRequestTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -15120,12 +14958,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleEventErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResponse> {
@@ -15178,12 +15010,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventErrRequestTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -15231,12 +15057,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleEventFieldsErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse> {
@@ -15286,12 +15106,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventFieldsErrRequestTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -15339,12 +15153,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventUnionErrRequestTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrRequest> {
@@ -15394,12 +15202,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventTableErrRequestTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -15448,12 +15250,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -15501,12 +15297,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayErrResponse> {
@@ -15559,12 +15349,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -15612,12 +15396,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse> {
@@ -15667,12 +15445,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -15720,12 +15492,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayUnionErrTopResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrTopResponse> {
@@ -15775,12 +15541,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayTableErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -15829,12 +15589,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventFieldsRequestTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -15882,12 +15636,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictEventErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResponse> {
@@ -15940,12 +15688,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventErrRequestTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -15993,12 +15735,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictEventFieldsErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse> {
@@ -16048,12 +15784,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventFieldsErrRequestTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -16101,12 +15831,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventUnionErrRequestTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrRequest> {
@@ -16156,12 +15880,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventTableErrRequestTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -16210,12 +15928,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventFieldsRequestTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -16263,12 +15975,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarProtocol_FlexibleEventErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResponse> {
@@ -16321,12 +16027,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventErrRequestTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -16374,12 +16074,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse> {
@@ -16429,12 +16123,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventFieldsErrRequestTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -16482,12 +16170,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventUnionErrRequestTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrRequest> {
@@ -16537,12 +16219,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventTableErrRequestTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -16591,12 +16267,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -16644,12 +16314,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayErrResponse> {
@@ -16702,12 +16366,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -16755,12 +16413,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse> {
@@ -16810,12 +16462,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -16863,12 +16509,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayUnionErrTopResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrTopResponse> {
@@ -16918,12 +16558,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayTableErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -16972,12 +16606,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventFieldsRequestTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -17025,12 +16653,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictEventErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResponse> {
@@ -17083,12 +16705,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventErrRequestTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -17136,12 +16752,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictEventFieldsErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse> {
@@ -17191,12 +16801,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventFieldsErrRequestTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -17244,12 +16848,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventUnionErrRequestTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrRequest> {
@@ -17299,12 +16897,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrRequest>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventTableErrRequestTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -17353,12 +16945,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -17406,12 +16992,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayErrResponse> {
@@ -17464,12 +17044,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -17517,12 +17091,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse> {
@@ -17572,12 +17140,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -17625,12 +17187,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayUnionErrTopResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrTopResponse> {
@@ -17680,12 +17236,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayTableErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -17733,12 +17283,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWay_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayResponse> {
@@ -17791,12 +17335,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsDriverProtocolFlexibleTwoWayTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -17844,12 +17382,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse> {
@@ -17899,12 +17431,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -17952,12 +17478,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsDriverProtocolFlexibleTwoWayUnionTopResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionTopResponse> {
@@ -18007,12 +17527,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsDriverProtocolFlexibleTwoWayTableTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -18060,12 +17574,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse> {
@@ -18118,12 +17626,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsDriverProtocolFlexibleTwoWayErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -18171,12 +17673,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse> {
@@ -18226,12 +17722,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -18279,12 +17769,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrTopResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrTopResponse> {
@@ -18334,12 +17818,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -18388,12 +17866,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -18441,12 +17913,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse> {
@@ -18499,12 +17965,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -18552,12 +18012,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse> {
@@ -18607,12 +18061,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -18660,12 +18108,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrTopResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrTopResponse> {
@@ -18715,12 +18157,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -18769,12 +18205,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -18822,12 +18252,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse> {
@@ -18880,12 +18304,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -18933,12 +18351,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_ResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse> {
@@ -18988,12 +18400,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -19042,12 +18448,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -19095,12 +18495,6 @@ struct ::fidl::internal::WireCodingTraits<::test_unknowninteractions::wire::Unkn
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_unknowninteractions::wire::test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrTopResponseTable;
-};
 
 template<>
 struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrTopResponse> {

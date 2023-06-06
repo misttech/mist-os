@@ -22,13 +22,11 @@ var corpusPaths = map[string]string{
 
 var corpusLanguages = map[string][]string{
 	"conformance": {
-		"c",
 		"go",
 		"llcpp",
 		"hlcpp",
 		"dart",
 		"rust",
-		"transformer",
 		"fuzzer_corpus",
 	},
 	"benchmark": {

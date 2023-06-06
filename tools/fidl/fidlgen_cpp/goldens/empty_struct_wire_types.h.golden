@@ -78,12 +78,6 @@ struct EmptyProtocolSendAndReceiveResponse {
 }  // namespace test_emptystruct
 namespace fidl {
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_emptystruct::wire::Empty> {
-  static constexpr const fidl_type_t* kType = &::test_emptystruct::wire::test_emptystruct_EmptyTable;
-};
-
 template <>
 struct TypeTraits<::test_emptystruct::wire::Empty> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -133,12 +127,6 @@ struct ::fidl::internal::WireCodingTraits<::test_emptystruct::wire::Empty, ::fid
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_emptystruct::wire::EmptyProtocolSendRequest> {
-  static constexpr const fidl_type_t* kType = &::test_emptystruct::wire::test_emptystruct_EmptyProtocolSendRequestTable;
-};
-
 template <>
 struct TypeTraits<::test_emptystruct::wire::EmptyProtocolSendRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -183,12 +171,6 @@ struct ::fidl::internal::WireCodingTraits<::test_emptystruct::wire::EmptyProtoco
           decoder, position + 0, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_emptystruct::wire::EmptyProtocolReceiveRequest> {
-  static constexpr const fidl_type_t* kType = &::test_emptystruct::wire::test_emptystruct_EmptyProtocolReceiveRequestTable;
 };
 
 template <>
@@ -237,12 +219,6 @@ struct ::fidl::internal::WireCodingTraits<::test_emptystruct::wire::EmptyProtoco
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_emptystruct::wire::EmptyProtocolSendAndReceiveRequest> {
-  static constexpr const fidl_type_t* kType = &::test_emptystruct::wire::test_emptystruct_EmptyProtocolSendAndReceiveRequestTable;
-};
-
 template <>
 struct TypeTraits<::test_emptystruct::wire::EmptyProtocolSendAndReceiveRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -287,12 +263,6 @@ struct ::fidl::internal::WireCodingTraits<::test_emptystruct::wire::EmptyProtoco
           decoder, position + 0, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_emptystruct::wire::EmptyProtocolSendAndReceiveResponse> {
-  static constexpr const fidl_type_t* kType = &::test_emptystruct::wire::test_emptystruct_EmptyProtocolSendAndReceiveResponseTable;
 };
 
 template <>

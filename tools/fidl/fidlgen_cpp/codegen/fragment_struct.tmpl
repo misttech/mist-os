@@ -64,12 +64,6 @@ template <>
 struct IsResource<{{ . }}> : public std::true_type {};
 {{- end }}
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<{{ . }}>{
-  static constexpr const fidl_type_t* kType = &{{ .CodingTableType }};
-};
-
 template<>
 struct TypeTraits<{{ . }}> {
   static constexpr uint32_t kMaxNumHandles = {{ .TypeShapeV2.MaxHandles }};

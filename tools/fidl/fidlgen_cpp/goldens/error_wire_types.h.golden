@@ -145,12 +145,6 @@ struct ExampleFooTopResponse {
 }  // namespace test_error
 namespace fidl {
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_error::wire::ExampleFooRequest> {
-  static constexpr const fidl_type_t* kType = &::test_error::wire::test_error_ExampleFooRequestTable;
-};
-
 template <>
 struct TypeTraits<::test_error::wire::ExampleFooRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -197,12 +191,6 @@ struct ::fidl::internal::WireCodingTraits<::test_error::wire::ExampleFooRequest,
   }
 };
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_error::wire::ExampleFooResponse> {
-  static constexpr const fidl_type_t* kType = &::test_error::wire::test_error_Example_foo_ResponseTable;
-};
-
 template <>
 struct TypeTraits<::test_error::wire::ExampleFooResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -247,12 +235,6 @@ struct ::fidl::internal::WireCodingTraits<::test_error::wire::ExampleFooResponse
           decoder, position + 0, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_error::wire::ExampleFooTopResponse> {
-  static constexpr const fidl_type_t* kType = &::test_error::wire::test_error_ExampleFooTopResponseTable;
 };
 
 template <>

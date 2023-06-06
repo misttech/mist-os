@@ -351,12 +351,6 @@ namespace fidl {
 template <>
 struct IsResource<::test_driverhandle::wire::ClientEndWrapper> : public std::true_type {};
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_driverhandle::wire::ClientEndWrapper> {
-  static constexpr const fidl_type_t* kType = &::test_driverhandle::wire::test_driverhandle_ClientEndWrapperTable;
-};
-
 template <>
 struct TypeTraits<::test_driverhandle::wire::ClientEndWrapper> {
   static constexpr uint32_t kMaxNumHandles = 1;
@@ -409,12 +403,6 @@ struct ::fidl::internal::WireCodingTraits<::test_driverhandle::wire::ClientEndWr
 template <>
 struct IsResource<::test_driverhandle::wire::ServerEndWrapper> : public std::true_type {};
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_driverhandle::wire::ServerEndWrapper> {
-  static constexpr const fidl_type_t* kType = &::test_driverhandle::wire::test_driverhandle_ServerEndWrapperTable;
-};
-
 template <>
 struct TypeTraits<::test_driverhandle::wire::ServerEndWrapper> {
   static constexpr uint32_t kMaxNumHandles = 1;
@@ -466,12 +454,6 @@ struct ::fidl::internal::WireCodingTraits<::test_driverhandle::wire::ServerEndWr
 #ifdef __Fuchsia__
 template <>
 struct IsResource<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest> : public std::true_type {};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest> {
-  static constexpr const fidl_type_t* kType = &::test_driverhandle::wire::test_driverhandle_HandlesInProtocolSendHandlesRequestTable;
-};
 
 template <>
 struct TypeTraits<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest> {

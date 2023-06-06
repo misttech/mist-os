@@ -156,28 +156,6 @@ template("gidl_llcpp_conformance") {
   }
 }
 
-template("gidl_c_conformance") {
-  _gidl_cc_source_set(target_name) {
-    type = "conformance"
-    language = "c"
-    bindings_suffix = "_cpp_wire"
-    forward_variables_from(invoker, "*")
-  }
-}
-
-template("gidl_transformer_conformance") {
-  _gidl_cc_source_set(target_name) {
-    type = "conformance"
-    language = "transformer"
-    bindings_suffix = "_cpp_wire"
-    forward_variables_from(invoker, "*")
-
-    # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
-    # rather than builders.
-    configs = [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
-  }
-}
-
 template("gidl_cpp_benchmarks") {
   _gidl_cc_source_set(target_name) {
     type = "benchmark"

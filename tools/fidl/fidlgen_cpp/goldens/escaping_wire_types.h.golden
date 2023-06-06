@@ -64,12 +64,6 @@ extern const char* kDollarBrace;
 }  // namespace test_escaping
 namespace fidl {
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_escaping::wire::DocCommentWithQuotes> {
-  static constexpr const fidl_type_t* kType = &::test_escaping::wire::test_escaping_DocCommentWithQuotesTable;
-};
-
 template <>
 struct TypeTraits<::test_escaping::wire::DocCommentWithQuotes> {
   static constexpr uint32_t kMaxNumHandles = 0;

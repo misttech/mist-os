@@ -33,7 +33,7 @@ success("OneEmptyStructInStruct") {
 }
 
 decode_failure("OneEmptyStructInStructNonZeroBytes") {
-    bindings_denylist = [llcpp, hlcpp, c],
+    bindings_denylist = [llcpp, hlcpp],
     type = OneEmptyStructInStruct,
     bytes = {
         v1, v2 = [
@@ -56,7 +56,7 @@ success("TwoEmptyStructsInStruct") {
 }
 
 decode_failure("TwoEmptyStructsInStructNonZeroBytes") {
-    bindings_denylist = [llcpp, hlcpp, c],
+    bindings_denylist = [llcpp, hlcpp],
     type = TwoEmptyStructsInStruct,
     bytes = {
         v1, v2 = [
@@ -83,7 +83,7 @@ success("EmptyStructsInArrayInStruct") {
 }
 
 decode_failure("EmptyStructsInArrayInStructNonZeroBytes") {
-    bindings_denylist = [llcpp, hlcpp, c],
+    bindings_denylist = [llcpp, hlcpp],
     type = EmptyStructsInArrayInStruct,
     bytes = {
         v1, v2 = [
@@ -114,7 +114,7 @@ success("EmptyStructsInVectorInStruct") {
 
 // Bindings that use iovec with vectors may have special handling.
 decode_failure("EmptyStructsInVectorInStructNonZeroBytes") {
-    bindings_denylist = [llcpp, hlcpp, c],
+    bindings_denylist = [llcpp, hlcpp],
     type = EmptyStructsInVectorInStruct,
     bytes = {
         v1, v2 = [
@@ -155,7 +155,7 @@ success("TwoEmptyStructsInStructInVectorInStruct") {
 
 // Bindings that use iovec with vectors may have special handling.
 decode_failure("TwoEmptyStructsInStructInVectorInStructNonZeroBytes") {
-    bindings_denylist = [llcpp, hlcpp, c],
+    bindings_denylist = [llcpp, hlcpp],
     type = TwoEmptyStructsInStructInVectorInStruct,
     bytes = {
         v1, v2 = [

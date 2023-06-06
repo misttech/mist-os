@@ -98,12 +98,6 @@ namespace fidl {
 template <>
 struct IsResource<::test_protocolrequest::wire::ParentGetChildResponse> : public std::true_type {};
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_protocolrequest::wire::ParentGetChildResponse> {
-  static constexpr const fidl_type_t* kType = &::test_protocolrequest::wire::test_protocolrequest_ParentGetChildResponseTable;
-};
-
 template <>
 struct TypeTraits<::test_protocolrequest::wire::ParentGetChildResponse> {
   static constexpr uint32_t kMaxNumHandles = 1;
@@ -155,12 +149,6 @@ struct ::fidl::internal::WireCodingTraits<::test_protocolrequest::wire::ParentGe
 #ifdef __Fuchsia__
 template <>
 struct IsResource<::test_protocolrequest::wire::ParentGetChildRequestResponse> : public std::true_type {};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_protocolrequest::wire::ParentGetChildRequestResponse> {
-  static constexpr const fidl_type_t* kType = &::test_protocolrequest::wire::test_protocolrequest_ParentGetChildRequestResponseTable;
-};
 
 template <>
 struct TypeTraits<::test_protocolrequest::wire::ParentGetChildRequestResponse> {
@@ -214,12 +202,6 @@ struct ::fidl::internal::WireCodingTraits<::test_protocolrequest::wire::ParentGe
 template <>
 struct IsResource<::test_protocolrequest::wire::ParentTakeChildRequest> : public std::true_type {};
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_protocolrequest::wire::ParentTakeChildRequest> {
-  static constexpr const fidl_type_t* kType = &::test_protocolrequest::wire::test_protocolrequest_ParentTakeChildRequestTable;
-};
-
 template <>
 struct TypeTraits<::test_protocolrequest::wire::ParentTakeChildRequest> {
   static constexpr uint32_t kMaxNumHandles = 1;
@@ -271,12 +253,6 @@ struct ::fidl::internal::WireCodingTraits<::test_protocolrequest::wire::ParentTa
 #ifdef __Fuchsia__
 template <>
 struct IsResource<::test_protocolrequest::wire::ParentTakeChildRequestRequest> : public std::true_type {};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_protocolrequest::wire::ParentTakeChildRequestRequest> {
-  static constexpr const fidl_type_t* kType = &::test_protocolrequest::wire::test_protocolrequest_ParentTakeChildRequestRequestTable;
-};
 
 template <>
 struct TypeTraits<::test_protocolrequest::wire::ParentTakeChildRequestRequest> {

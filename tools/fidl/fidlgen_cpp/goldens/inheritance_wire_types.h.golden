@@ -54,12 +54,6 @@ struct SuperFooResponse {
 }  // namespace test_inheritance
 namespace fidl {
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_inheritance::wire::SuperFooRequest> {
-  static constexpr const fidl_type_t* kType = &::test_inheritance::wire::test_inheritance_SuperFooRequestTable;
-};
-
 template <>
 struct TypeTraits<::test_inheritance::wire::SuperFooRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -104,12 +98,6 @@ struct ::fidl::internal::WireCodingTraits<::test_inheritance::wire::SuperFooRequ
           decoder, position + 0, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_inheritance::wire::SuperFooResponse> {
-  static constexpr const fidl_type_t* kType = &::test_inheritance::wire::test_inheritance_SuperFooResponseTable;
 };
 
 template <>

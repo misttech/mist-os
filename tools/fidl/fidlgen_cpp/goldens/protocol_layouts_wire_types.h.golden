@@ -1941,12 +1941,6 @@ namespace fidl {
   
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_protocollayouts::wire::test_protocollayouts_MainProtocolTwoWayImportWithErrorTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -1994,12 +1988,6 @@ struct ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProt
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_protocollayouts::wire::MainProtocolOnImportWithErrorRequest>{
-  static constexpr const fidl_type_t* kType = &::test_protocollayouts::wire::test_protocollayouts_MainProtocolOnImportWithErrorRequestTable;
-};
 
 template<>
 struct TypeTraits<::test_protocollayouts::wire::MainProtocolOnImportWithErrorRequest> {
@@ -2049,12 +2037,6 @@ struct ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProt
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_protocollayouts::wire::test_protocollayouts_MainProtocolTwoWayLocalWithErrorTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -2102,12 +2084,6 @@ struct ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProt
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_protocollayouts::wire::MainProtocolOnLocalWithErrorRequest>{
-  static constexpr const fidl_type_t* kType = &::test_protocollayouts::wire::test_protocollayouts_MainProtocolOnLocalWithErrorRequestTable;
-};
 
 template<>
 struct TypeTraits<::test_protocollayouts::wire::MainProtocolOnLocalWithErrorRequest> {
@@ -2157,12 +2133,6 @@ struct ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProt
 };
 
 
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorTopResponse>{
-  static constexpr const fidl_type_t* kType = &::test_protocollayouts::wire::test_protocollayouts_MainProtocolTwoWayAnonWithErrorTopResponseTable;
-};
-
 template<>
 struct TypeTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorTopResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -2210,12 +2180,6 @@ struct ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProt
   }
 };
 
-
-// TODO(fxbug.dev/95833) Remove this.
-template<>
-struct DeprecatedCTypeTraits<::test_protocollayouts::wire::MainProtocolOnAnonWithErrorRequest>{
-  static constexpr const fidl_type_t* kType = &::test_protocollayouts::wire::test_protocollayouts_MainProtocolOnAnonWithErrorRequestTable;
-};
 
 template<>
 struct TypeTraits<::test_protocollayouts::wire::MainProtocolOnAnonWithErrorRequest> {

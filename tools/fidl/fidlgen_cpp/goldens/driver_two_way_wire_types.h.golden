@@ -56,12 +56,6 @@ struct TwoWayAddResponse {
 }  // namespace test_drivertwoway
 namespace fidl {
 
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_drivertwoway::wire::TwoWayAddRequest> {
-  static constexpr const fidl_type_t* kType = &::test_drivertwoway::wire::test_drivertwoway_TwoWayAddRequestTable;
-};
-
 template <>
 struct TypeTraits<::test_drivertwoway::wire::TwoWayAddRequest> {
   static constexpr uint32_t kMaxNumHandles = 0;
@@ -110,12 +104,6 @@ struct ::fidl::internal::WireCodingTraits<::test_drivertwoway::wire::TwoWayAddRe
           decoder, position + 2, recursion_depth);
     }
   }
-};
-
-// TODO(fxbug.dev/95833) Remove this.
-template <>
-struct DeprecatedCTypeTraits<::test_drivertwoway::wire::TwoWayAddResponse> {
-  static constexpr const fidl_type_t* kType = &::test_drivertwoway::wire::test_drivertwoway_TwoWayAddResponseTable;
 };
 
 template <>
