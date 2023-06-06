@@ -10,22 +10,21 @@ This script allows for the conversion between ids.txt and .build-id formats.
 import argparse
 import errno
 import os
-import sys
 
-# rel_to is expected to be absolute
 def abs_path(path, rel_to):
+    assert os.path.isabs(rel_to)
     if os.path.isabs(path):
         return path
     else:
         return os.path.abspath(os.path.join(rel_to, path))
 
-# rel_to is assumed to be absolute
 def read_ids_txt(ids_path, rel_to):
+    assert os.path.isabs(rel_to)
     with open(ids_path) as f:
         return {build_id:abs_path(path, rel_to) for (build_id, path) in (x.split() for x in f.readlines())}
 
-# build_id_dir is assumed to be absolute
 def read_build_id_dir(build_id_dir):
+    assert os.path.isabs(build_id_dir)
     out = {}
     for root, dirs, files in os.walk(build_id_dir):
         if len(files) != 0 and len(dirs) != 0:
@@ -67,22 +66,23 @@ def write_build_id_dir(build_id_dir, link_func, mods):
         mkdir(os.path.join(build_id_dir, build_id[:2]))
         link_func(path, os.path.join(build_id_dir, build_id[:2], build_id[2:] + ".debug"))
 
-# rel_to and path are assumed to be absolute
 # if rel_to is None fix_path returns the absolute path. If rel_to
 # is not None it turns the path into a relative path.
 def fix_path(path, rel_to):
+    assert os.path.isabs(path)
+    assert rel_to is None or os.path.isabs(rel_to)
     if rel_to is None:
         return path
     return os.path.relpath(path, rel_to)
 
-# rel_to is assumed to be an absolute path
 def write_ids_txt(ids_path, rel_to, mods):
+    assert rel_to is None or os.path.isabs(rel_to)
     with open(ids_path, "w") as f:
         for build_id, path in sorted(mods.items()):
             path = fix_path(mods[build_id], rel_to)
             f.write("%s %s\n" % (build_id, path))
 
-def main():
+def main(unparsed_args=None):
     ids_fmt = "ids.txt"
     build_id_fmt = ".build-id"
     symlink_mode = "symlink"
@@ -110,7 +110,7 @@ def main():
                         help=".build-id directories or ids.txt files depending on the output format")
     parser.add_argument("output")
 
-    args = parser.parse_args()
+    args = parser.parse_args(unparsed_args)
 
     input_paths = map(os.path.abspath, args.input)
     input_paths = list(filter(os.path.exists, input_paths)) # conventionally ignore empty inputs
