@@ -182,11 +182,15 @@ pub fn create_filesystem_from_spec<'a>(
     spec: &'a str,
 ) -> Result<(&'a [u8], WhatToMount), Error> {
     use WhatToMount::*;
-    let mut iter = spec.splitn(3, ':');
+    let mut iter = spec.splitn(4, ':');
     let mount_point =
         iter.next().ok_or_else(|| anyhow!("mount point is missing from {:?}", spec))?;
     let fs_type = iter.next().ok_or_else(|| anyhow!("fs type is missing from {:?}", spec))?;
-    let fs_src = iter.next().unwrap_or(".");
+    let fs_src = match iter.next() {
+        Some(src) if !src.is_empty() => src,
+        _ => ".",
+    };
+    let options = iter.next().unwrap_or("");
 
     // Default rights for remotefs.
     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
@@ -203,7 +207,7 @@ pub fn create_filesystem_from_spec<'a>(
             fs_type.as_bytes(),
             fs_src.as_bytes(),
             MountFlags::empty(),
-            b"",
+            options.as_bytes(),
         )?,
     };
     Ok((mount_point.as_bytes(), fs))
