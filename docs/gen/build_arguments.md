@@ -109,7 +109,7 @@ From //build/images/args.gni:152
 
 **Current value (from the default):** `true`
 
-From //build/config/fuchsia/platform_version.gni:38
+From //build/config/fuchsia/platform_version.gni:49
 
 ### appmgr_core_shards
 
@@ -1036,7 +1036,7 @@ If true, build for N+1 api level, where N is platform_version.in_development_api
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:8
+From //build/config/fuchsia/platform_version.gni:19
 
 ### cache_package_labels
 
@@ -2442,7 +2442,7 @@ source code.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/github.com/google/emboss/src"`
 
-From //.gn:83
+From //.gn:84
 
 **Overridden from the default:** `""`
 
@@ -2450,7 +2450,7 @@ From //third_party/pigweed/src/third_party/emboss/emboss.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/github.com/google/emboss/src"`
 
-From //.gn:83
+From //.gn:84
 
 **Overridden from the default:** `""`
 
@@ -4155,7 +4155,7 @@ platform-version-roller when the API level is incremented.
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:37
+From //build/config/fuchsia/platform_version.gni:48
 
 ### include_shell_commands_package
 
@@ -5558,7 +5558,7 @@ Allows building the platform source code for a specific API level.
 
 **Current value (from the default):** `-1`
 
-From //build/config/fuchsia/platform_version.gni:11
+From //build/config/fuchsia/platform_version.gni:22
 
 ### package_flavor_selections
 
@@ -5949,7 +5949,7 @@ Backend for the pw_assert module's CHECK facade.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_assert"`
 
-From //.gn:64
+From //.gn:65
 
 **Overridden from the default:** `""`
 
@@ -5957,7 +5957,7 @@ From //third_party/pigweed/src/pw_assert/backend.gni:19
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_assert"`
 
-From //.gn:64
+From //.gn:65
 
 **Overridden from the default:** `""`
 
@@ -6051,7 +6051,7 @@ Explicitly setting a target's visibility overrides this default.
 
 **Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/*"]`
 
-From //.gn:61
+From //.gn:62
 
 **Overridden from the default:** `"*"`
 
@@ -6059,7 +6059,7 @@ From //third_party/pigweed/src/pw_build/defaults.gni:38
 
 **Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/*"]`
 
-From //.gn:61
+From //.gn:62
 
 **Overridden from the default:** `"*"`
 
@@ -6099,7 +6099,7 @@ libraries such as pw_assert.
 
 **Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/src/pw_assert:impl", "//third_party/pigweed/src/pw_log:impl"]`
 
-From //.gn:74
+From //.gn:75
 
 **Overridden from the default:** `[]`
 
@@ -6107,7 +6107,7 @@ From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:24
 
 **Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/src/pw_assert:impl", "//third_party/pigweed/src/pw_log:impl"]`
 
-From //.gn:74
+From //.gn:75
 
 **Overridden from the default:** `[]`
 
@@ -6178,7 +6178,7 @@ Backend for the pw_chrono module's system_clock.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_chrono_stl:system_clock"`
 
-From //.gn:67
+From //.gn:68
 
 **Overridden from the default:** `""`
 
@@ -6186,7 +6186,7 @@ From //third_party/pigweed/src/pw_chrono/backend.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_chrono_stl:system_clock"`
 
-From //.gn:67
+From //.gn:68
 
 **Overridden from the default:** `""`
 
@@ -6310,7 +6310,7 @@ public config (which may -include a file or add defines directly).
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_function:define_overrides"`
 
-From //.gn:71
+From //.gn:72
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_build:empty"`
 
@@ -6318,7 +6318,7 @@ From //third_party/pigweed/src/pw_function/BUILD.gn:27
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_function:define_overrides"`
 
-From //.gn:71
+From //.gn:72
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_build:empty"`
 
@@ -6330,7 +6330,7 @@ Backend for the pw_log module.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_log"`
 
-From //.gn:65
+From //.gn:66
 
 **Overridden from the default:** `""`
 
@@ -6338,7 +6338,7 @@ From //third_party/pigweed/src/pw_log/backend.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_log"`
 
-From //.gn:65
+From //.gn:66
 
 **Overridden from the default:** `""`
 
@@ -6683,7 +6683,7 @@ use Pigweed's boringssl exclusively.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/boringssl"`
 
-From //.gn:80
+From //.gn:81
 
 **Overridden from the default:** `""`
 
@@ -6691,7 +6691,7 @@ From //third_party/pigweed/src/third_party/boringssl/boringssl.gni:25
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/boringssl"`
 
-From //.gn:80
+From //.gn:81
 
 **Overridden from the default:** `""`
 
