@@ -45,27 +45,26 @@ bool SeqLock<Osal>::EndReadTransaction(ReadTransactionToken token) {
     return false;
   }
 
-  // TODO(johngro): figure out how best to document/communicate this.  The
-  // assumption is that We can get away with a relaxed load here because the
-  // user just observed some data with either atomic loads with
-  // memory_order_acquire, or they observed some data with relaxed atomic
-  // loads followed by an atomic_thread_fence with memory_order_acquire.
   return seq_num_.load(std::memory_order_relaxed) == token.seq_num_;
 }
 
 template <typename Osal>
 void SeqLock<Osal>::Acquire() {
   while (true) {
-    SequenceNumber expected = seq_num_.load(std::memory_order_acquire);
-    if ((expected & 0x1) == 0) {
-      if (seq_num_.compare_exchange_strong(expected, expected + 1,
-                                           std::memory_order_release,
-                                           std::memory_order_relaxed)) {
-        break;
-      }
+    SequenceNumber expected;
+
+    // Wait until we observe an even sequence number.
+    while (((expected = seq_num_.load(std::memory_order_relaxed)) & 0x1) != 0) {
+      Osal::ArchYield();
     }
 
-    Osal::ArchYield();
+    // Attempt to increment the even number we observed to be an odd number,
+    // with Acquire semantics on the RMW if we succeed.
+    if (seq_num_.compare_exchange_strong(expected, expected + 1,
+                                         std::memory_order_acquire,
+                                         std::memory_order_relaxed)) {
+      break;
+    }
   }
 }
 
@@ -77,26 +76,38 @@ bool SeqLock<Osal>::TryAcquire(zx_duration_t timeout) {
 template <typename Osal>
 bool SeqLock<Osal>::TryAcquireDeadline(zx_time_t deadline) {
   while (true) {
-    SequenceNumber expected = seq_num_.load(std::memory_order_acquire);
-    if ((expected & 0x1) == 0) {
-      if (seq_num_.compare_exchange_strong(expected, expected + 1,
-                                           std::memory_order_release,
-                                           std::memory_order_relaxed)) {
-        return true;
+    SequenceNumber expected;
+
+    // Wait until we observe an even sequence number.  Bail out if we exceed our
+    // deadline.
+    while (((expected = seq_num_.load(std::memory_order_relaxed)) & 0x1) != 0) {
+      if (Osal::GetClockMonotonic() >= deadline) {
+        return false;
       }
+      Osal::ArchYield();
     }
 
+    // Attempt to increment the even number we observed to be an odd number,
+    // with Acquire semantics on the RMW if we succeed.
+    if (seq_num_.compare_exchange_strong(expected, expected + 1,
+                                         std::memory_order_acquire,
+                                         std::memory_order_relaxed)) {
+      return true;
+    }
+
+    // Make sure we check our deadline again.  We don't want to be in a
+    // situation where the relaxed load (at the start of the while) always sees
+    // an even number, but the subsequent CMPX always fails, causing us to never
+    // check our deadline.
     if (Osal::GetClockMonotonic() >= deadline) {
       return false;
     }
-
-    Osal::ArchYield();
   }
 }
 
 template <typename Osal>
 void SeqLock<Osal>::Release() {
-  [[maybe_unused]] SequenceNumber before = seq_num_.fetch_add(1, std::memory_order_acq_rel);
+  [[maybe_unused]] SequenceNumber before = seq_num_.fetch_add(1, std::memory_order_release);
   ZX_DEBUG_ASSERT((before & 0x1) != 0);
 }
 

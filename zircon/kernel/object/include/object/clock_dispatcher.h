@@ -48,7 +48,7 @@ class ClockDispatcher final : public SoloDispatcher<ClockDispatcher, ZX_DEFAULT_
 
   bool is_monotonic() const { return (options_ & ZX_CLOCK_OPT_MONOTONIC) != 0; }
   bool is_continuous() const { return (options_ & ZX_CLOCK_OPT_CONTINUOUS) != 0; }
-  bool is_started() const TA_REQ(seq_lock_) {
+  bool is_started() TA_REQ(seq_lock_) {
     // Note, we require that we hold the seq_lock_ exclusively here.  This
     // should ensure that there are no other threads writing to this memory
     // location concurrent with our read, meaning there is no formal data race

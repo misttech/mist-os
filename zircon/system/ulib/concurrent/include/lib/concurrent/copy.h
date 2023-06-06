@@ -141,7 +141,12 @@ class WellDefinedCopyable {
   // mutate their instance of T, it is OK for them to read T directly without
   // using Read as this will not cause any undefined behavior when done
   // concurrently with other readers in the system.
-  const T& unsynchronized_get() const { return instance_; }
+  //
+  // Note that the method returns a `const T&`, but is not flagged as being
+  // `const` itself.  This helps to guarantee that users who need to read data
+  // in the exclusive portion of a sequence lock can do so, but cannot do so
+  // while in the middle of a shared read transaction.
+  const T& unsynchronized_get() { return instance_; }
 
  private:
   T instance_;

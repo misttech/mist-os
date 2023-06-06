@@ -230,7 +230,7 @@ that they continue to use `Update` when they wish to mutate their instance of
 will not cause any undefined behavior when done concurrently with other readers
 in the system.
 
-## `SeqLock`
+## SeqLock
 
 ### Overview
 
@@ -245,7 +245,8 @@ useful in patterns where any of the following conditions hold:
 + Write operations must never be delayed by concurrent read operations.
 + Readers have strictly read-only access to the shared state of the published
   data.  No modifications of the state are allowed, as would be required when
-  using an synchronization primitive such as a mutex.
+  using a shared synchronization building-block such as a reader/writer lock
+  obtained for shared access.
 
 To assist in implementing data sharing via a sequence lock, `libconcurrent`
 offers the `SeqLock` primitive.  The `SeqLock` behaves like a spinlock when
@@ -268,50 +269,53 @@ transaction.  It is only after a read transaction has _successfully_ concluded
 that a program is guaranteed to have made a coherent observation of the
 protected data.
 
-Rules #1 and #2 can be easily satisfied by always accessing protected data using
-the `WellDefinedCopy` primitives described above.
+Given a sequence of write transactions, a read transaction has made a "coherent"
+observation if all of the values of the members of the protected data is
+observes came from a single write transaction.  If it ever might have observed
+values written by two different write transactions, the read transaction *must*
+fail, and the user may choose to either retry the operation, or give up.
 
-### Example
+### Patterns for properly using SeqLocks
 
-Here is a small example of how it looks to use a SeqLock.
+Here are a small set of patterns which demonstrate how to properly observe and
+make updates to a set of data protected by a SeqLock.  It is strongly advised
+that you follow these patterns exactly as presented.  _Do not deviate from the
+patterns presented here unless you are extremely knowledgable with both the
+internals of the SeqLock implementation, its synchronization requirements, and
+the formal C++ memory model_.  Even then, you probably don't want to deviate
+from these patterns without an extremely compelling reason.
+
+Each of these examples will be shown with the assumption that the code is being
+used in the context of the Zircon kernel.  While it is possible to use SeqLock's
+in user-mode, they only make sense when being used to read data from a piece of
+memory shared with the kernel, where all updates to the protected data are done
+from the kernel.
+
+This is because user mode has no guaranteed way to prevent a situation where
+their thread might become preempted in the middle of a write transaction.  Any
+readers attempting to read data concurrently with this write transaction are
+going to get stuck, spinning at the start of the transaction until either the
+writer is re-scheduled and finishes, or they themselves exhaust their timeslice
+and are preempted.
+
+#### The simplest example.
+
+Let's start with a simple setup.  We will define a class which contains an
+instance of a structure (`Foo`) which is guarded by an instance of a SeqLock.
+We will declare a method `Update` which takes a constant reference to a `Foo`
+instance and updates the local contents of `foo_` with it.  Likewise, we will
+declare an Observe method which will perform a successful observation of the
+internal `foo_`, and return the observed copy of the data to the caller.
 
 ```c++
+struct Foo {
+  uint32_t a, b;
+};
+
 class MyClass {
  public:
-  void Update(const Foo& foo) {
-    seq_lock_.Acquire();  // Acquire the lock for exclusive write access.
-    foo_.Update(foo);     // The wrapper ensures data race free access, as well
-                          // as properly synchronizing-with the lock.
-    seq_lock_.Release();  // Release the lock to allow concurrent read
-                          // trasnactions to succeed.
-  }
-
-  Foo Observe() {
-    Foo ret;
-    concurrent::SeqLock::ReadTransactionToken token;
-    do {
-      // Start a new read transaction.  Note that this operation will spin if
-      // there happens to be write transaction taking place at the same time. Be
-      // sure to use one of the TryBeginReadTransaction forms along with a
-      // timeout if this is a time sensitive code path where the observation
-      // operation may need to be aborted if it is taking too long.
-      token = seq_lock_.BeginReadTransaction();
-
-      // Make a local copy of the data using the WellDefinedCopyWrapper to
-      // ensure that we have no data races, and that we properly
-      // synchronize-with the lock and any concurrent write operations.
-      foo_.Read(ret);
-
-      // End the transaction, and check to see if it succeeded.  If it didn't
-      // then an update operation must have overlapped with this observation
-      // operation.  Keep trying until we manage to make a coherent observation
-      // with no overlapping concurrent write.
-    } while (!seq_lock_.EndReadTransaction(token));
-
-    // Our read transaction was successful.  It is now OK to make decisions
-    // based on our results, stored in |ret|
-    return ret;
-  }
+  void Update(const Foo& foo);
+  Foo Observe();
 
  private:
   concurrent::SeqLock seq_lock_;
@@ -319,7 +323,189 @@ class MyClass {
 };
 ```
 
-### Blocking behavior
+Note that our class:
+
+1) Declares the `SeqLock` instance `seq_lock_`.
+2) Declares the instance of `Foo` as being wrapped in a `WellDefinedCopyWrapper<>`
+   template.
+3) Declares `foo_` instance as being `TA_GUARDED` by the instance of the lock.
+
+*Always follow steps 2 and 3.*  Wrapping the `Foo` instance in a
+`WellDefinedCopyWrapper<>` will prevent anyone from accidentally reaching in and
+reading or writing the contents of the protected data directly, running the risk
+of failing to access the data in a atomic fashion (which could lead to a
+data-race), or accessing the data without properly specified memory ordering
+semantics, leading to the possibility of an incoherent observation being made by
+a reader.
+
+Flagging the protected data as being `TA_GUARDED` by the lock guarantees that
+clang static thread analysis (when enabled) will catch at compile time any
+attempts to access the protected data while not inside a `SeqLock` transaction,
+and well prevent all attempts to mutate the protected data during a read
+transaction instead of a write transaction.
+
+Now let's take a look at the implementation of `Update` and `Observe`
+
+```c++
+void MyClass::Update(const Foo& foo) {
+  Guard<SeqLock, ExclusiveIrqSave> lock{&seq_lock_};
+  foo_.Update(foo);
+}
+
+Foo MyClass::Observe() {
+  Foo ret;
+
+  bool success;
+  do {
+    Guard<SeqLock, SharedNoIrqSave> lock{&seq_lock_, success};
+    foo_.Read(ret);
+  } while (!success);
+
+  return ret;
+}
+```
+
+`Update` is extremely simple.  We simply:
+
+1) Declare a `lockdep::Guard` with the appropriate type and access mode (`SeqLock`
+   and `ExclusiveIrqSave`)
+2) Copy our payload into the structure using the `WellDefinedCopyWrapper`'s
+   `Update` methods.
+
+The `lockdep::Guard` guarantees that we will properly disable and re-enable
+interrupts, as well as acquire and release the lock exclusively, before and
+after the update of the payload.  Disabling and re-enabling interrupts
+guarantees that we will never be preempted during the update operation itself,
+which is important to preventing readers from spinning pointlessly.
+
+`Observe` is almost as simple, but has a few extra details involved.  Read
+transactions are not guaranteed to succeed, so we need a loop to try again in he
+case of failure.  In this example, we don't define any timeout conditions, we
+simply try repeatedly until we eventually succeed.
+
+The `lockdep::Guard` guard we use:
+
+1) Uses the access type `SharedNoIrqSave`.  `Shared` is the access level we use
+   when reading the protected data, and we do not disable IRQs during this
+   operation.  We don't need to, and we don't really _want_ to, as we don't want
+   to spin for any length of time with interrupts off attempting to start the
+   transaction.
+2) Is declared in the scope of the `while` body, while the `success` bool is
+   declared outside of the `while` body scope.  This is important because the
+   end of the transaction and the determination of success or failure happens
+   when the guard destructs, and the results are recorded in `success`.  The
+   guard must destruct, and therefore is declared in the while body, but the
+   `success` needs to be evaluated as part of the `while` predicate, so it must
+   exist in a scope outside of the `while` body.
+
+Finally, we copy our protected data into a local stack-allocated Foo instance
+while inside the guard, and return that copy to the caller after we have ended
+the transaction successfully.
+
+#### Reads of data while writing
+
+Writes protected by a `SeqLock` are exclusive (meaning no two writes can ever
+take place at the same time, they must happen sequentially with a well defined
+order), therefore we can actually read our protected data while the lock is held
+exclusively without needing to consider either memory order or data race issues.
+What we can *never* do, however, is update the contents without using the
+`WellDefinedCopyWrapper<>`'s `Update` method.  Let's take a quick look at two
+simple examples of this:
+
+```c++
+class MyClass {
+  // ...
+
+  void Sort();
+  void Inc(uitn32_t amt);
+};
+
+void MyClass::Sort() {
+  Guard<SeqLock, ExclusiveIrqSave> lock{&seq_lock_};
+
+  const Foo& current_foo = foo_.unsynchronized_get();
+  if (current_foo.a > current_foo.b) {
+    Foo new_foo{current_foo.b, current_foo.a};
+    foo.Update(new_foo);
+  }
+}
+
+void MyClass::Inc(uitn32_t amt) {
+  Guard<SeqLock, ExclusiveIrqSave> lock{&seq_lock_};
+
+  Foo new_foo = foo_.unsynchronized_get();
+  new_foo.a += amt;
+  new_foo.b += amt;
+  foo_.Update(new_foo);
+}
+```
+
+We declare two new methods for our class.  `Sort` (as the name implies) sorts
+the elements of the protected `Foo` instance in ascending order.  It grabs a
+`const Foo&` from the copy wrapper's `unsynchronized_get` method, then based on
+the relationship between the protected data's `a` and `b`.  It either constructs
+a new Foo instance on the stack with the values of the fields swapped, then
+updates `foo_` using the `Update` method, or it simply exits because the
+elements are already in the desired order.
+
+Note that we are actually directly accessing the contends of `foo_` via the
+`const Foo&` we obtained from our call to `unsynchronized_get()`.  This is OK
+when we have the `SeqLock` locked exclusively because we are the only possible
+writer in the lock.  No other writers can issue any stores, so it is impossible
+to create a data-race, even if our loads are non-atomic.
+
+The second example, `Inc` is going to increment both of the fields of the `foo_`
+instance by `amt`.  In this case, we also read the current state of `foo_` via a
+call to `unsynchronized_get()`, but this time we do it to copy-construct a local
+copy `new_foo`, then increment both members, and finally update the protected
+data using a call to `WellDefinedCopyWrapper<>::Update()`.
+
+*Never* attempt to use `unsynchronised_get()` during a read transaction.  The
+data being observed in the middle of a read transaction:
+
+1) Could be getting concurrently written to by a writer, creating a data-race,
+   and
+2) Even if no writes were happening, there absolutely no guarantee that the
+   loads performed against the data would provide a coherent view of the data.
+
+If you have clang static thread analysis enabled (you should), and you have
+annotated your protected data as being `TA_GUARDED` by your lock, the static
+analysis should catch this mistake at compile time.  If you are using some other
+tool-chain, or you have not enabled static analysis, this mistake will get
+missed, and you will be Very Sad.
+
+#### Partial updates and partial observations.
+
+Users of `SeqLock`s can also protect multiple sets of data with one `SeqLock`.
+The easiest way is to simply introduce more structures wrapped in
+`WellDefinedCopyWrapper<>`s.
+
+```c++
+struct Foo { uint32_t a, b; };
+struct Bar { uint32_t c, d; };
+
+class MyClass {
+ public:
+  void Update(const Foo& foo);
+  void Update(const Bar& bar);
+  void Update(const Foo& foo, const Bar& bar);
+
+  Foo ObserveFoo();
+  Bar ObserveBar();
+  ktl::pair<Foo, Bar> Observe();
+
+ private:
+  concurrent::SeqLock seq_lock_;
+  concurrent::WellDefinedCopyWrapper<Foo> foo_ TA_GUARDED(seq_lock_);
+  concurrent::WellDefinedCopyWrapper<Bar> bar_ TA_GUARDED(seq_lock_);
+};
+```
+
+We may now observe or update one, or the other, or both of these containers of
+protected data, provided we follow the previously established rules for
+obtaining the `SeqLock` as we do.
+
+#### Blocking/Spinning behavior
 
 Both the `BeginReadTransaction` and the `Acquire` operations have the potential
 to spin-wait if there happens to be another thread which has currently
@@ -337,3 +523,34 @@ take place.
 + `bool TryBeginReadTransactionDeadline(ReadTransactionToken& out_token, zx_time_t deadline)`
 + `bool TryAcquire(zx_duration_t timeout)`
 + `bool TryAcquireDeadline(zx_time_t deadline)`
+
+Note that there is currently no lockdep::Guard adapter defined which works with
+timeouts/deadlines, so we will need to manually manage locking/unlocking and
+manipulating read tokens ourselves.
+
+For example:
+
+```c++
+zx_status_t UpdateWithTimeout(const Foo& foo, zx_duration_t timeout) {
+  if (!seq_lock_.TryAcquire(timeout)) {
+    return ZX_ERR_TIMED_OUT;
+  }
+  foo_.Update(foo);
+  return ZX_OK;
+}
+
+zx::result<Foo> ObserveWithTimeout(zx_duration_t timeout) {
+  Foo ret;
+  SeqLock::ReadTransactionToken token;
+  zx_time_t deadline = zx_deadline_after(timeout);
+
+  do {
+    if (!seq_lock_.TryBeginReadTransactionDeadline(token, deadline)) {
+      return zx::error(ZX_ERR_TIMED_OUT);
+    }
+    foo_.Observe(ret);
+  } while (!seq_lock_.EndReadTransaction(token));
+
+  return zx::ok(ret);
+}
+```
