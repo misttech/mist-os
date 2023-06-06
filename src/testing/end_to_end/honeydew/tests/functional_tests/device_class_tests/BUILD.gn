@@ -3,12 +3,21 @@
 # found in the LICENSE file.
 
 if (is_host) {
+  group("emulator_tests") {
+    testonly = true
+    public_deps = [ "test_generic_fuchsia_device:generic_fuchsia_device_test($host_toolchain)" ]
+  }
+
+  group("nuc_tests") {
+    testonly = true
+    public_deps = [ "test_x64:x64_test($host_toolchain)" ]
+  }
+
   group("tests") {
     testonly = true
     public_deps = [
-      "test_fuchsia_device:fuchsia_device_test($host_toolchain)",
-      "test_generic_fuchsia_device:generic_fuchsia_device_test($host_toolchain)",
-      "test_x64:x64_test($host_toolchain)",
+      ":emulator_tests",
+      ":nuc_tests",
     ]
   }
 }

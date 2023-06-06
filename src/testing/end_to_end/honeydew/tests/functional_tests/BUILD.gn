@@ -3,6 +3,22 @@
 # found in the LICENSE file.
 
 if (is_host) {
+  group("emulator_tests") {
+    testonly = true
+    public_deps = [
+      "affordance_tests:emulator_tests",
+      "device_class_tests:emulator_tests",
+    ]
+  }
+
+  group("nuc_tests") {
+    testonly = true
+    public_deps = [
+      "affordance_tests:nuc_tests",
+      "device_class_tests:nuc_tests",
+    ]
+  }
+
   group("tests") {
     testonly = true
     public_deps = [

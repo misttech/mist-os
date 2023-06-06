@@ -3,12 +3,24 @@
 # found in the LICENSE file.
 
 if (is_host) {
+  group("emulator_tests") {
+    testonly = true
+    public_deps = [
+      "test_component:component_test($host_toolchain)",
+      "test_tracing:tracing_test($host_toolchain)",
+    ]
+  }
+
+  group("nuc_tests") {
+    testonly = true
+    public_deps = [ "test_bluetooth:bluetooth_test($host_toolchain)" ]
+  }
+
   group("tests") {
     testonly = true
     public_deps = [
-      "test_bluetooth:bluetooth_test($host_toolchain)",
-      "test_component:component_test($host_toolchain)",
-      "test_tracing:tracing_test($host_toolchain)",
+      ":emulator_tests",
+      ":nuc_tests",
     ]
   }
 }
