@@ -24,9 +24,6 @@ use anyhow::{format_err, Error};
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use std::sync::Arc;
 
-#[cfg(not(feature = "in_thread_exceptions"))]
-use {super::shared::read_channel_sync, fuchsia_zircon::Task as zxTask};
-
 extern "C" {
     /// The function which enters restricted mode. This function never technically returns, instead
     /// it saves some register state and calls `zx_restricted_enter`. When the thread traps in
@@ -70,7 +67,6 @@ extern "C" {
 pub struct RestrictedState {
     state_size: usize,
     bound_state: &'static mut [u8],
-    addr_and_size_for_unmap: Option<(usize, usize)>,
 }
 
 impl RestrictedState {
@@ -82,20 +78,7 @@ impl RestrictedState {
             .unwrap();
         let bound_state =
             unsafe { std::slice::from_raw_parts_mut(state_address as *mut u8, state_size) };
-        Ok(Self {
-            state_size,
-            bound_state,
-            addr_and_size_for_unmap: Some((state_address, state_size)),
-        })
-    }
-
-    /// Takes a tuple of (mapping_size, mapping_address), and by doing so the caller
-    /// is taking responsibility for un-mapping this range when no longer used.
-    ///
-    /// Safety: The caller must guarantee that no more accesses into the state VMO occur
-    /// after this range is unmapped.
-    pub unsafe fn take_addr_and_size_for_unmap(&mut self) -> Option<(usize, usize)> {
-        self.addr_and_size_for_unmap.take()
+        Ok(Self { state_size, bound_state })
     }
 
     pub fn write_state(&mut self, state: &zx::sys::zx_restricted_state_t) {
@@ -154,28 +137,19 @@ impl RestrictedState {
 
 impl std::ops::Drop for RestrictedState {
     fn drop(&mut self) {
+        let mapping_addr = self.bound_state.as_ptr() as usize;
+        let mapping_size = self.bound_state.len();
         // Safety: We are un-mapping the state VMO. This is safe because we route all access
         // into this memory region though this struct so it is safe to unmap on Drop.
-        //
-        // If we don't have a mapping size and address here, that means someone has called
-        // `take_addr_and_size_for_unmap` and are taking responsibility for un-mapping for us.
-        // This is specifically needed in the situation where a thread is killed by Zircon
-        // such that we do not get a chance to unwind our stack gracefully. This work-around will
-        // no longer be needed once we are using in-thread exception handling.
         unsafe {
-            if let Some((mapping_address, mapping_size)) = self.take_addr_and_size_for_unmap() {
-                fuchsia_runtime::vmar_root_self()
-                    .unmap(mapping_address, mapping_size)
-                    .expect("Failed to unmap");
-            }
+            fuchsia_runtime::vmar_root_self()
+                .unmap(mapping_addr, mapping_size)
+                .expect("Failed to unmap");
         }
     }
 }
 
-#[cfg(feature = "in_thread_exceptions")]
 const RESTRICTED_ENTER_OPTIONS: u32 = 0;
-#[cfg(not(feature = "in_thread_exceptions"))]
-const RESTRICTED_ENTER_OPTIONS: u32 = zx::sys::ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL;
 
 trait ExceptionContext {
     fn read_registers(&self) -> RegisterState;
@@ -255,11 +229,6 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
     {
         let mut thread = current_task.thread.write();
         *thread = Some(fuchsia_runtime::thread_self().duplicate(zx::Rights::SAME_RIGHTS).unwrap());
-
-        // If we are not using in-thread exceptions we can now start up a thread to poll the
-        // exception channel.
-        #[cfg(not(feature = "in_thread_exceptions"))]
-        start_exception_handler_thread(thread, task.clone())?;
     }
 
     // This is the pointer that is passed to `restricted_enter`.
@@ -291,20 +260,6 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
 
     // Map the restricted state VMO and arrange for it to be unmapped later.
     let mut restricted_state = RestrictedState::from_vmo(state_vmo)?;
-
-    // TODO(https://fxbug.dev/117302): If we are not using in-thread exceptions we delegate to
-    // the task to handle un-mapping the restricted state VMO because we won't always unwind our
-    // stack far enough to allow the Drop implementation on `RestrictedState` to do it for us.
-    //
-    // We don't have to worry about this when running with in-thread exceptions so we allow
-    // `RestrictedState` to manage the un-map itself when we tear down the task.
-    if !cfg!(feature = "in_thread_exceptions") {
-        unsafe {
-            let mut task_state = current_task.write();
-            task_state.restricted_state_addr_and_size =
-                restricted_state.take_addr_and_size_for_unmap();
-        }
-    }
 
     let mut syscall_decl = SyscallDecl::from_number(u64::MAX);
     loop {
@@ -525,43 +480,6 @@ fn process_completed_exception<E: ExceptionContext>(
             exception.set_exception_state(&zx::sys::ZX_EXCEPTION_STATE_HANDLED).unwrap();
         }
     }
-}
-
-/// Spawn a thread to handle page faults from restricted code.
-///
-/// This will be handled by the kernel in the future, where the thread will pop out of restricted
-/// mode just like it does on a syscall, but for now this needs to be handled by a separate thread.
-#[cfg(not(feature = "in_thread_exceptions"))]
-fn start_exception_handler_thread<T: std::ops::Deref<Target = Option<zx::Thread>>>(
-    thread: T,
-    task: Arc<Task>,
-) -> Result<(), Error> {
-    // Create an exception channel to monitor for page faults in restricted code.
-    let exception_channel = thread.as_ref().unwrap().create_exception_channel()?;
-    std::mem::drop(thread);
-
-    std::thread::spawn(move || {
-        let mut buffer = zx::MessageBuf::new();
-        loop {
-            match read_channel_sync(&exception_channel, &mut buffer) {
-                Ok(_) => {}
-                Err(_) => return,
-            };
-            assert!(buffer.n_handles() == 1);
-            let exception = zx::Exception::from(buffer.take_handle(0).unwrap());
-            if task.ignore_exceptions.load(std::sync::atomic::Ordering::Acquire) {
-                log_warn!("ignoring exception");
-                continue;
-            }
-            let thread = exception.get_thread().unwrap();
-            let report = thread.get_exception_report().unwrap();
-            let mut exception = ChannelException { exception, thread };
-
-            let exception_result = task.process_exception(&report);
-            process_completed_exception(task.clone(), exception_result, &mut exception);
-        }
-    });
-    Ok(())
 }
 
 /// Creates a process that shares half its address space with this process.

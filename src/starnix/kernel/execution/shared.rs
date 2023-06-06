@@ -311,22 +311,3 @@ mod tests {
         block_while_stopped(&task);
     }
 }
-
-/// Reads from `chan` into `buf`.
-///
-/// If the initial read returns `SHOULD_WAIT`, the function waits for the channel to be readable and
-/// tries again (once).
-#[cfg(not(feature = "in_thread_exceptions"))]
-pub fn read_channel_sync(chan: &zx::Channel, buf: &mut zx::MessageBuf) -> Result<(), zx::Status> {
-    use fuchsia_zircon::AsHandleRef;
-    let res = chan.read(buf);
-    if let Err(zx::Status::SHOULD_WAIT) = res {
-        chan.wait_handle(
-            zx::Signals::CHANNEL_READABLE | zx::Signals::CHANNEL_PEER_CLOSED,
-            zx::Time::INFINITE,
-        )?;
-        chan.read(buf)
-    } else {
-        res
-    }
-}
