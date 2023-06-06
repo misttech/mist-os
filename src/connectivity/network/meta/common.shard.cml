@@ -52,6 +52,11 @@
             to: [ "#netstack" ],
         },
         {
+            protocol: [ "fuchsia.scheduler.ProfileProvider" ],
+            from: "parent",
+            to: [ "#dns-resolver" ],
+        },
+        {
             protocol: [ "fuchsia.logger.LogSink" ],
             from: "parent",
             to: [
