@@ -21,6 +21,7 @@ group("tests") {
     "//tools/debug/bloaty:bloaty_tests",
     "//tools/debug/breakpad:breakpad_tests",
     "//tools/debug/covargs:tests",
+    "//tools/debug/debugsyms:tests($host_toolchain)",
     "//tools/debug/elflib:elflib_tests($host_toolchain)",
     "//tools/debug/generate_breakpad:tests($host_toolchain)",
     "//tools/debug/symbolize:symbolize_tests($host_toolchain)",
