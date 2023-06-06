@@ -56,6 +56,18 @@ impl ToBeStagedPackage {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+#[error(
+    "blob {hash} at {path:?} is {file_size} bytes in size, \
+     but the package manifest indicates it should be {manifest_size} bytes in size"
+)]
+struct BlobSizeMismatchError {
+    hash: Hash,
+    path: String,
+    manifest_size: u64,
+    file_size: u64,
+}
+
 /// RepoBuilder can create and manipulate package repositories.
 #[derive(Debug)]
 pub struct RepoBuilder<'a, R: RepoStorageProvider> {
@@ -371,7 +383,16 @@ where
 
             while let Some((blob, result)) = stream.next().await {
                 match result {
-                    Ok(_) => {
+                    Ok(metadata) => {
+                        if blob.size != metadata.len() {
+                            return Err(anyhow!(BlobSizeMismatchError {
+                                hash: blob.merkle,
+                                path: blob.source_path.clone(),
+                                manifest_size: blob.size,
+                                file_size: metadata.len(),
+                            }));
+                        }
+
                         blobs.push(blob);
                     }
                     Err(err) => {
@@ -760,6 +781,7 @@ mod tests {
         std::{
             collections::{BTreeMap, BTreeSet, HashMap},
             fs,
+            io::Write as _,
         },
         tuf::{
             crypto::Ed25519PrivateKey,
@@ -1762,5 +1784,36 @@ mod tests {
             .add_package(pkg2_manifest_path)
             .await
             .is_err());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_blob_size_differs_from_manifest_errors_out() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = Utf8Path::from_path(tmp.path()).unwrap();
+
+        let metadata_repo_path = dir.join("metadata");
+        let blob_repo_path = dir.join("blobs");
+        let repo = FileSystemRepository::new(metadata_repo_path, blob_repo_path);
+        let repo_keys = test_utils::make_repo_keys();
+
+        let pkg1_dir = dir.join("package1");
+        let (_pkg1_meta_far_path, pkg1_manifest) =
+            test_utils::make_package_manifest("package1", pkg1_dir.as_std_path(), Vec::new());
+        let pkg1_manifest_path = pkg1_dir.join("package1.manifest");
+        serde_json::to_writer(std::fs::File::create(&pkg1_manifest_path).unwrap(), &pkg1_manifest)
+            .unwrap();
+
+        // Oh no, the blob now disagrees with metadata in the manifest.
+        let pkg1_blob_path = pkg1_dir.join("package1").join("bin").join("package1");
+        let mut blob = fs::File::options().append(true).open(pkg1_blob_path).unwrap();
+        blob.write_all(b"more bytes the manifest doesn't know about.").unwrap();
+        blob.write_all(b"also, my hash is now wrong").unwrap();
+        drop(blob);
+
+        let err = RepoBuilder::create(&repo, &repo_keys)
+            .add_package_manifest(Some(pkg1_dir), pkg1_manifest)
+            .await
+            .unwrap_err();
+        assert_matches!(err.downcast_ref::<BlobSizeMismatchError>(), Some(_));
     }
 }
