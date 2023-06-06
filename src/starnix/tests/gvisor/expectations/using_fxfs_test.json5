@@ -202,15 +202,8 @@
                 //  * "JobControlTest.SetForegroundProcessGroupSIGTTOUBlocked"
                 "JobControlTest.*",
 
-                // select_test - these tests hang
-                "SelectTest.NullFds",
-                "SelectTest.NegativeNfds",
-                "SelectTest.ClosedFds",
-                "SelectTest.ZeroTimeout",
-                "SelectTest.NoTimeout",
-                "SelectTest.InvalidTimeoutNegative",
-                "SelectTest.InterruptedBySignal",
-                "SelectTest.IgnoreBitsAboveNfds",
+                // select_test - this test causes a starnix kernel panic because it uses an invalid
+                // watch handle and unwraps the result.
                 "SelectTest.SetrlimitCallNOFILE",
 
                 // sendfile_test - these tests hang
