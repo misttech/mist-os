@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::input_device::{Handled, InputDeviceEvent, InputEvent};
+use crate::input_device::{Handled, InputDeviceEvent, InputDeviceType, InputEvent};
 use crate::input_handler::InputHandler;
 use async_trait::async_trait;
 use fuchsia_inspect::{self as inspect, Inspector, NumericProperty, Property};
 use fuchsia_zircon as zx;
 use futures::lock::Mutex;
 use futures::FutureExt;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -128,11 +128,20 @@ impl CircularBuffer {
     fn record_all_lazy_inspect(&self, inspector: inspect::Inspector) -> inspect::Inspector {
         self._events.iter().enumerate().for_each(|(i, &ref event)| {
             let event_clone = event.clone();
-            inspector
-                .root()
-                .record_child(format!("{}_{}", event_clone.get_event_type(), i), move |node| {
-                    event_clone.record_inspect(node)
-                });
+
+            // Include leading zeros so Inspect will display events in correct numerical order.
+            // Inspect displays nodes in alphabetical order by default.
+            let mut prefix = "";
+            if i < 10 {
+                prefix = "00";
+            } else if i < 100 {
+                prefix = "0";
+            }
+
+            inspector.root().record_child(
+                format!("{}{}_{}", prefix, i, event_clone.get_event_type()),
+                move |node| event_clone.record_inspect(node),
+            );
         });
         inspector
     }
@@ -186,8 +195,17 @@ impl InspectHandler {
     /// Creates a new inspect handler instance.
     ///
     /// `node` is the inspect node that will receive the stats.
-    pub fn new(node: inspect::Node, displays_recent_events: bool) -> Rc<Self> {
-        Self::new_with_now(node, zx::Time::get_monotonic, displays_recent_events)
+    pub fn new(
+        node: inspect::Node,
+        supported_input_devices: &HashSet<&InputDeviceType>,
+        displays_recent_events: bool,
+    ) -> Rc<Self> {
+        Self::new_with_now(
+            node,
+            zx::Time::get_monotonic,
+            supported_input_devices,
+            displays_recent_events,
+        )
     }
 
     /// Creates a new inspect handler instance, using `now` to supply the current timestamp.
@@ -195,6 +213,7 @@ impl InspectHandler {
     fn new_with_now(
         node: inspect::Node,
         now: fn() -> zx::Time,
+        supported_input_devices: &HashSet<&InputDeviceType>,
         displays_recent_events: bool,
     ) -> Rc<Self> {
         let event_count = node.create_uint("events_count", 0);
@@ -212,12 +231,22 @@ impl InspectHandler {
         };
 
         let mut events_by_type = HashMap::new();
-        EventCounters::add_new_into(&mut events_by_type, &node, EventType::Keyboard);
-        EventCounters::add_new_into(&mut events_by_type, &node, EventType::ConsumerControls);
-        EventCounters::add_new_into(&mut events_by_type, &node, EventType::LightSensor);
-        EventCounters::add_new_into(&mut events_by_type, &node, EventType::Mouse);
-        EventCounters::add_new_into(&mut events_by_type, &node, EventType::TouchScreen);
-        EventCounters::add_new_into(&mut events_by_type, &node, EventType::Touchpad);
+        if supported_input_devices.contains(&InputDeviceType::Keyboard) {
+            EventCounters::add_new_into(&mut events_by_type, &node, EventType::Keyboard);
+        }
+        if supported_input_devices.contains(&InputDeviceType::ConsumerControls) {
+            EventCounters::add_new_into(&mut events_by_type, &node, EventType::ConsumerControls);
+        }
+        if supported_input_devices.contains(&InputDeviceType::LightSensor) {
+            EventCounters::add_new_into(&mut events_by_type, &node, EventType::LightSensor);
+        }
+        if supported_input_devices.contains(&InputDeviceType::Mouse) {
+            EventCounters::add_new_into(&mut events_by_type, &node, EventType::Mouse);
+        }
+        if supported_input_devices.contains(&InputDeviceType::Touch) {
+            EventCounters::add_new_into(&mut events_by_type, &node, EventType::TouchScreen);
+            EventCounters::add_new_into(&mut events_by_type, &node, EventType::Touchpad);
+        }
         #[cfg(test)]
         EventCounters::add_new_into(&mut events_by_type, &node, EventType::Fake);
 
@@ -440,14 +469,14 @@ mod tests {
 
         assert_data_tree!(inspector, root: {
             recent_events_log: {
-                keyboard_event_0: {
+                "000_keyboard_event": {
                     event_time: AnyProperty,
                 },
-                consumer_controls_event_1: {
+                "001_consumer_controls_event": {
                     event_time: AnyProperty,
                     pressed_buttons: vec!["volume_up", "volume_up", "pause", "volume_down", "mic_mute", "camera_disable", "factory_reset", "reboot"],
                 },
-                mouse_event_2: {
+                "002_mouse_event": {
                     event_time: AnyProperty,
                     location_absolute: { x: 7.0f64, y: 15.0f64},
                     wheel_delta_v: {
@@ -463,7 +492,7 @@ mod tests {
                     affected_buttons: vec![1u64],
                     pressed_buttons: pressed_buttons_vec.clone(),
                 },
-                touch_screen_event_3: {
+                "003_touch_screen_event": {
                     event_time: AnyProperty,
                     injector_contacts: {
                         add: {
@@ -481,7 +510,7 @@ mod tests {
                         remove: {},
                     },
                 },
-                touchpad_event_4: {
+                "004_touchpad_event": {
                     event_time: AnyProperty,
                     pressed_buttons: pressed_buttons_vec,
                     injector_contacts: {
@@ -495,14 +524,14 @@ mod tests {
                         },
                     },
                 },
-                light_sensor_event_5: {
+                "005_light_sensor_event": {
                     event_time: AnyProperty,
                     red: 1u64,
                     green: 2u64,
                     blue: 3u64,
                     clear: 14747u64,
                 },
-                keyboard_event_6: {
+                "006_keyboard_event": {
                     event_time: AnyProperty,
                 },
             }
@@ -514,9 +543,19 @@ mod tests {
         let inspector = inspect::Inspector::default();
         let root = inspector.root();
         let test_node = root.create_child("test_node");
+        let supported_input_devices: HashSet<&InputDeviceType> = HashSet::from([
+            &input_device::InputDeviceType::Keyboard,
+            &input_device::InputDeviceType::ConsumerControls,
+            &input_device::InputDeviceType::LightSensor,
+            &input_device::InputDeviceType::Mouse,
+            &input_device::InputDeviceType::Touch,
+        ]);
 
         let handler = super::InspectHandler::new_with_now(
-            test_node, fixed_now, /* displays_recent_events = */ false,
+            test_node,
+            fixed_now,
+            &supported_input_devices,
+            /* displays_recent_events = */ false,
         );
         assert_data_tree!(inspector, root: {
             test_node: {
@@ -742,9 +781,19 @@ mod tests {
         let inspector = inspect::Inspector::default();
         let root = inspector.root();
         let test_node = root.create_child("test_node");
+        let supported_input_devices: HashSet<&InputDeviceType> = HashSet::from([
+            &input_device::InputDeviceType::Keyboard,
+            &input_device::InputDeviceType::ConsumerControls,
+            &input_device::InputDeviceType::LightSensor,
+            &input_device::InputDeviceType::Mouse,
+            &input_device::InputDeviceType::Touch,
+        ]);
 
         let handler = super::InspectHandler::new_with_now(
-            test_node, fixed_now, /* displays_recent_events = */ true,
+            test_node,
+            fixed_now,
+            &supported_input_devices,
+            /* displays_recent_events = */ true,
         );
         assert_data_tree!(inspector, root: {
             test_node: {
@@ -809,7 +858,7 @@ mod tests {
                 last_seen_timestamp_ns: 42i64,
                 last_generated_timestamp_ns: 43i64,
                 recent_events_log: {
-                    fake_event_0: {
+                    "000_fake_event": {
                         event_time: 43i64,
                     },
                 },
@@ -870,10 +919,10 @@ mod tests {
                 last_seen_timestamp_ns: 42i64,
                 last_generated_timestamp_ns: 44i64,
                 recent_events_log: {
-                    fake_event_0: {
+                    "000_fake_event": {
                         event_time: 43i64,
                     },
-                    fake_event_1: {
+                    "001_fake_event": {
                         event_time: 44i64,
                     },
                 },
@@ -934,13 +983,13 @@ mod tests {
                 last_seen_timestamp_ns: 42i64,
                 last_generated_timestamp_ns: 44i64,
                 recent_events_log: {
-                    fake_event_0: {
+                    "000_fake_event": {
                         event_time: 43i64,
                     },
-                    fake_event_1: {
+                    "001_fake_event": {
                         event_time: 44i64,
                     },
-                    fake_event_2: {
+                    "002_fake_event": {
                         event_time: 44i64,
                     },
                 },

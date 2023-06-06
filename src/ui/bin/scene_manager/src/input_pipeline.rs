@@ -398,7 +398,12 @@ async fn build_input_pipeline_assembly(
     {
         // Keep this handler first because it keeps performance measurement counters
         // for the rest of the pipeline at entry.
-        assembly = add_inspect_handler(node.create_child("input_pipeline_entry"), assembly);
+        assembly = add_inspect_handler(
+            node.create_child("input_pipeline_entry"),
+            assembly,
+            &supported_input_devices,
+            /* displays_recent_events = */ true,
+        );
         if supported_input_devices.contains(&input_device::InputDeviceType::Keyboard) {
             info!("Registering keyboard-related input handlers.");
             assembly = register_keyboard_related_input_handlers(
@@ -445,7 +450,12 @@ async fn build_input_pipeline_assembly(
     // Keep this handler last because it keeps performance measurement counters
     // for the rest of the pipeline at exit.  We compare these values to the
     // values at entry.
-    assembly = add_inspect_handler(node.create_child("input_pipeline_exit"), assembly);
+    assembly = add_inspect_handler(
+        node.create_child("input_pipeline_exit"),
+        assembly,
+        &supported_input_devices,
+        /* displays_recent_events = */ false,
+    );
 
     assembly
 }
@@ -470,9 +480,13 @@ fn add_key_meaning_modifier_handler(assembly: InputPipelineAssembly) -> InputPip
 fn add_inspect_handler(
     node: inspect::Node,
     assembly: InputPipelineAssembly,
+    supported_input_devices: &HashSet<&input_device::InputDeviceType>,
+    displays_recent_events: bool,
 ) -> InputPipelineAssembly {
     assembly.add_handler(input_pipeline::inspect_handler::InspectHandler::new(
-        node, /* displays_recent_events = */ false,
+        node,
+        supported_input_devices,
+        displays_recent_events,
     ))
 }
 
