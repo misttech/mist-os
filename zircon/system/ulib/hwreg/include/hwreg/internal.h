@@ -63,6 +63,22 @@ constexpr IntType ComputeMask(uint32_t num_bits) {
   return static_cast<IntType>((static_cast<IntType>(1) << num_bits) - 1);
 }
 
+// Unfortunately, some register layouts conditionally define the same field in
+// different locations (e.g., PAT in x86 page table entries)! This type is a
+// version of std::enable_if that helps us to support such cases. Using a naive
+// SFINAE approach that wraps getter/setter return types with
+// `std::enable_if_t<COND, ...>` across complementary values of COND would
+// result in method redeclaration. What EnableIf adds is a trivial
+// parameterization by a bit range that makes the compiler treat these as
+// different return signatures, a difference that compiles away.
+template <bool Cond, typename T, unsigned int HighBit, unsigned int LowBit>
+struct enable_if {
+  using type = std::enable_if_t<Cond, T>;
+};
+
+template <bool Cond, typename T, unsigned int HighBit, unsigned int LowBit>
+using enable_if_t = typename enable_if<Cond, T, HighBit, LowBit>::type;
+
 class FieldPrinter {
  public:
   constexpr FieldPrinter() : name_(nullptr), bit_high_incl_(0), bit_low_(0) {}
@@ -117,7 +133,7 @@ struct FieldParameters {
 // The UnusedMarker argument is to give each Field member its own type.  This,
 // combined with __NO_UNIQUE_ADDRESS, allows the compiler to use no storage
 // for the Field members.
-template <class RegType, typename UnusedMarker>
+template <class RegType, typename UnusedMarker, bool Enabled>
 class Field {
  private:
   using IntType = typename RegType::ValueType;
@@ -125,13 +141,15 @@ class Field {
  public:
   Field(FieldParameters<RegType::PrinterEnabled::value, IntType>* reg, const char* name,
         uint32_t bit_high_incl, uint32_t bit_low) {
-    IntType mask = static_cast<IntType>(internal::ComputeMask<IntType>(bit_high_incl - bit_low + 1)
-                                        << bit_low);
-    // Check for overlapping bit ranges
-    ZX_DEBUG_ASSERT((reg->fields_mask & mask) == 0ull);
-    reg->fields_mask = static_cast<IntType>(reg->fields_mask | mask);
+    if constexpr (Enabled) {
+      IntType mask = static_cast<IntType>(
+          internal::ComputeMask<IntType>(bit_high_incl - bit_low + 1) << bit_low);
+      // Check for overlapping bit ranges
+      ZX_DEBUG_ASSERT((reg->fields_mask & mask) == 0ull);
+      reg->fields_mask = static_cast<IntType>(reg->fields_mask | mask);
 
-    reg->printer.AppendField(name, bit_high_incl, bit_low);
+      reg->printer.AppendField(name, bit_high_incl, bit_low);
+    }
   }
 };
 
@@ -141,18 +159,20 @@ class Field {
 // The UnusedMarker argument is to give each RsvdZField member its own type.
 // This, combined with __NO_UNIQUE_ADDRESS, allows the compiler to use no
 // storage for the RsvdZField members.
-template <class RegType, typename UnusedMarker>
-class RsvdZField : public Field<RegType, UnusedMarker> {
+template <class RegType, typename UnusedMarker, bool Enabled>
+class RsvdZField : public Field<RegType, UnusedMarker, Enabled> {
  private:
   using IntType = typename RegType::ValueType;
 
  public:
   RsvdZField(FieldParameters<RegType::PrinterEnabled::value, IntType>* reg, uint32_t bit_high_incl,
              uint32_t bit_low)
-      : Field<RegType, UnusedMarker>(reg, "RsvdZ", bit_high_incl, bit_low) {
-    IntType mask = static_cast<IntType>(internal::ComputeMask<IntType>(bit_high_incl - bit_low + 1)
-                                        << bit_low);
-    reg->rsvdz_mask = static_cast<IntType>(reg->rsvdz_mask | mask);
+      : Field<RegType, UnusedMarker, Enabled>(reg, "RsvdZ", bit_high_incl, bit_low) {
+    if constexpr (Enabled) {
+      IntType mask = static_cast<IntType>(
+          internal::ComputeMask<IntType>(bit_high_incl - bit_low + 1) << bit_low);
+      reg->rsvdz_mask = static_cast<IntType>(reg->rsvdz_mask | mask);
+    }
   }
 };
 

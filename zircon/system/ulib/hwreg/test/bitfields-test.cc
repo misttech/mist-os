@@ -14,26 +14,26 @@
 #include <hwreg/pio.h>
 #include <zxtest/zxtest.h>
 
+class CompilationTestReg32 : public hwreg::RegisterBase<CompilationTestReg32, uint32_t> {
+ public:
+  DEF_FIELD(30, 12, field1);
+  DEF_BIT(11, field2);
+  DEF_RSVDZ_FIELD(10, 5);
+  DEF_FIELD(4, 3, field3);
+  DEF_RSVDZ_BIT(2);
+  DEF_RSVDZ_BIT(1);
+  DEF_FIELD(0, 0, field4);
+
+  static auto Get() { return hwreg::RegisterAddr<CompilationTestReg32>(0); }
+};
+
 // This function exists so that the resulting code can be inspected easily in the
 // object file.
 void compilation_test() {
-  class TestReg32 : public hwreg::RegisterBase<TestReg32, uint32_t> {
-   public:
-    DEF_FIELD(30, 12, field1);
-    DEF_BIT(11, field2);
-    DEF_RSVDZ_FIELD(10, 5);
-    DEF_FIELD(4, 3, field3);
-    DEF_RSVDZ_BIT(2);
-    DEF_RSVDZ_BIT(1);
-    DEF_FIELD(0, 0, field4);
-
-    static auto Get() { return hwreg::RegisterAddr<TestReg32>(0); }
-  };
-
   volatile uint32_t fake_reg = 1ul << 31;
   hwreg::RegisterMmio mmio(&fake_reg);
 
-  auto reg = TestReg32::Get().ReadFrom(&mmio);
+  auto reg = CompilationTestReg32::Get().ReadFrom(&mmio);
   reg.set_field1(0x31234);
   reg.set_field2(1);
   reg.set_field3(2);
@@ -41,24 +41,25 @@ void compilation_test() {
   reg.WriteTo(&mmio);
 }
 
+namespace {
+
 template <typename IntType>
 struct LastBit {
   static constexpr const unsigned int value = sizeof(IntType) * CHAR_BIT - 1;
 };
 
-namespace {
+template <typename IntType>
+struct StructSubBitTestReg {
+  IntType field;
+
+  DEF_SUBBIT(field, 0, first_bit);
+  DEF_SUBBIT(field, 1, mid_bit);
+  DEF_SUBBIT(field, LastBit<IntType>::value, last_bit);
+};
 
 template <typename IntType>
 void struct_sub_bit_test() {
-  struct StructSubBitTest {
-    IntType field;
-
-    DEF_SUBBIT(field, 0, first_bit);
-    DEF_SUBBIT(field, 1, mid_bit);
-    DEF_SUBBIT(field, LastBit<IntType>::value, last_bit);
-  };
-
-  StructSubBitTest val = {};
+  StructSubBitTestReg<IntType> val = {};
   EXPECT_EQ(0u, val.first_bit());
   EXPECT_EQ(0u, val.mid_bit());
   EXPECT_EQ(0u, val.last_bit());
@@ -91,20 +92,21 @@ TEST(StructSubBitTestCase, Uint32) { ASSERT_NO_FAILURES(struct_sub_bit_test<uint
 TEST(StructSubBitTestCase, Uint64) { ASSERT_NO_FAILURES(struct_sub_bit_test<uint64_t>()); }
 
 template <typename IntType>
+struct StructSubFieldTestReg {
+  IntType field1;
+  DEF_SUBFIELD(field1, LastBit<IntType>::value, 0, whole_length);
+
+  IntType field2;
+  DEF_SUBFIELD(field2, 2, 2, single_bit);
+
+  IntType field3;
+  DEF_SUBFIELD(field3, 2, 1, range1);
+  DEF_SUBFIELD(field3, 5, 3, range2);
+};
+
+template <typename IntType>
 void struct_sub_field_test() {
-  struct StructSubFieldTest {
-    IntType field1;
-    DEF_SUBFIELD(field1, LastBit<IntType>::value, 0, whole_length);
-
-    IntType field2;
-    DEF_SUBFIELD(field2, 2, 2, single_bit);
-
-    IntType field3;
-    DEF_SUBFIELD(field3, 2, 1, range1);
-    DEF_SUBFIELD(field3, 5, 3, range2);
-  };
-
-  StructSubFieldTest val = {};
+  StructSubFieldTestReg<IntType> val = {};
 
   // Ensure writing to a whole length field affects all bits
   constexpr IntType kMax = std::numeric_limits<IntType>::max();
@@ -152,7 +154,7 @@ TEST(StructSubFieldTestCase, Uint32) { ASSERT_NO_FAILURES(struct_sub_field_test<
 TEST(StructSubFieldTestCase, Uint64) { ASSERT_NO_FAILURES(struct_sub_field_test<uint64_t>()); }
 
 template <typename IntType>
-void struct_enum_sub_field_test() {
+struct StructEnumSubFieldTestReg {
   enum class EnumWholeRange : IntType {
     kZero = 0,
     kOne = 1,
@@ -169,19 +171,25 @@ void struct_enum_sub_field_test() {
     kThree = 3,
   };
 
-  struct StructEnumSubFieldTest {
-    IntType field1;
-    DEF_ENUM_SUBFIELD(field1, EnumWholeRange, LastBit<IntType>::value, 0, whole_length);
+  IntType field1;
+  DEF_ENUM_SUBFIELD(field1, EnumWholeRange, LastBit<IntType>::value, 0, whole_length);
 
-    IntType field2;
-    DEF_ENUM_SUBFIELD(field2, EnumBit, 2, 2, single_bit);
+  IntType field2;
+  DEF_ENUM_SUBFIELD(field2, EnumBit, 2, 2, single_bit);
 
-    IntType field3;
-    DEF_ENUM_SUBFIELD(field3, EnumRange, 2, 1, range1);
-    DEF_ENUM_SUBFIELD(field3, EnumRange, 5, 3, range2);
-  };
+  IntType field3;
+  DEF_ENUM_SUBFIELD(field3, EnumRange, 2, 1, range1);
+  DEF_ENUM_SUBFIELD(field3, EnumRange, 5, 3, range2);
+};
 
-  StructEnumSubFieldTest val = {};
+template <typename IntType>
+void struct_enum_sub_field_test() {
+  using Reg = StructEnumSubFieldTestReg<IntType>;
+  using EnumWholeRange = typename Reg::EnumWholeRange;
+  using EnumRange = typename Reg::EnumRange;
+  using EnumBit = typename Reg::EnumBit;
+
+  Reg val = {};
 
   // Ensure writing to a whole length field affects all bits
   constexpr IntType kMax = std::numeric_limits<IntType>::max();
@@ -236,56 +244,118 @@ TEST(StructEnumSubFieldTestCase, Uint64) {
   ASSERT_NO_FAILURES(struct_enum_sub_field_test<uint64_t>());
 }
 
-struct GloballyScopedSubfieldTest {
-  uint16_t data;
-  DEF_SUBBIT(data, 0, bit);
-  DEF_SUBFIELD(data, 2, 1, field);
-  enum class Enum : uint8_t {
-    kA = 0,
-    kB = 1,
-  };
-  DEF_ENUM_SUBFIELD(data, Enum, 3, 3, enum_field);
+enum class ConditionalSubfieldTestRegEnum {
+  kA,
+  kB,
+  kC,
 };
 
-TEST(SubFieldTestCase, GloballyScopedEnumField) {
-  // In the past [1], globally scoped structures have triggered GCC warnings (and
-  // hence build failures) not generated when the structure was defined in
-  // a function. Test that we can compile and execute a simple struct with
-  // a subfield at global scope.
-  //
-  // [1] c.f. https://fuchsia-review.googlesource.com/q/I3bcb2a997d2080c483c557b59fb95a54cc18b73b
-  GloballyScopedSubfieldTest reg{};
+template <ConditionalSubfieldTestRegEnum Condition>
+struct ConditionalSubfieldTestReg {
+  using SelfType = ConditionalSubfieldTestReg<Condition>;
 
-  reg.set_bit(1);
-  EXPECT_EQ(reg.bit(), 1);
+  static constexpr bool kA = Condition == ConditionalSubfieldTestRegEnum::kA;
+  static constexpr bool kB = Condition == ConditionalSubfieldTestRegEnum::kB;
+  static constexpr bool kC = Condition == ConditionalSubfieldTestRegEnum::kC;
 
-  reg.set_field(1);
-  EXPECT_EQ(reg.field(), 1);
+  uint8_t field;
 
-  reg.set_enum_field(GloballyScopedSubfieldTest::Enum::kB);
-  EXPECT_EQ(reg.enum_field(), GloballyScopedSubfieldTest::Enum::kB);
+  // Conditional kA fields.
+  DEF_COND_SUBBIT(field, 7, a_7, kA);
+  DEF_COND_SUBFIELD(field, 6, 4, a_6_4, kA);
+  DEF_COND_SUBBIT(field, 3, a_3, kA);
+
+  // Conditional kB fields.
+  DEF_COND_UNSHIFTED_SUBFIELD(field, 7, 5, b_7_5, kB);
+  DEF_COND_SUBFIELD(field, 4, 3, b_4_3, kB);
+
+  // Conditional kC fields.
+  enum class Rsvp { kNo = 0, kYes = 0b1111 };
+  DEF_COND_ENUM_SUBFIELD(field, Rsvp, 7, 4, c_7_4, kC);
+  DEF_COND_SUBBIT(field, 3, c_3, kC);
+
+  // Unconditional, common field.
+  DEF_SUBFIELD(field, 2, 0, common);
+};
+
+TEST(StructConditionalSubfieldsTestCase, ConditionalSubfields) {
+  using Enum = ConditionalSubfieldTestRegEnum;
+  {
+    using RegA = ConditionalSubfieldTestReg<Enum::kA>;
+
+    RegA reg{.field = 0xff};
+    EXPECT_EQ(0b1, reg.a_7());
+    reg.set_a_7(0);
+    EXPECT_EQ(0b111, reg.a_6_4());
+    reg.set_a_6_4(0);
+    EXPECT_EQ(0b1, reg.a_3());
+    reg.set_a_3(0);
+    EXPECT_EQ(0b111, reg.common());
+    reg.set_common(0);
+    EXPECT_EQ(0, reg.field);
+  }
+
+  {
+    using RegB = ConditionalSubfieldTestReg<Enum::kB>;
+
+    RegB reg{.field = 0xff};
+    EXPECT_EQ(0b11100000, reg.b_7_5());
+    reg.set_b_7_5(0);
+    EXPECT_EQ(0b11, reg.b_4_3());
+    reg.set_b_4_3(0);
+    EXPECT_EQ(0b111, reg.common());
+    reg.set_common(0);
+    EXPECT_EQ(0, reg.field);
+  }
+
+  {
+    using RegC = ConditionalSubfieldTestReg<Enum::kC>;
+    using Rsvp = typename RegC::Rsvp;
+
+    RegC reg{.field = 0xff};
+    EXPECT_EQ(Rsvp::kYes, reg.c_7_4());
+    reg.set_c_7_4(Rsvp::kNo);
+    EXPECT_EQ(0b1, reg.c_3());
+    reg.set_c_3(0);
+    EXPECT_EQ(0b111, reg.common());
+    reg.set_common(0);
+    EXPECT_EQ(0, reg.field);
+  }
 }
 
-TEST(SubFieldTestCase, ConstFields) {
-  const GloballyScopedSubfieldTest reg = {0xf};
-  EXPECT_EQ(reg.bit(), 1);
-  EXPECT_EQ(reg.field(), 3);
-  EXPECT_EQ(reg.enum_field(), GloballyScopedSubfieldTest::Enum::kB);
-}
+// This definition amounts to a compilation test.
+template <bool Condition>
+struct ConditionalSubfieldsWithSameNameTestReg {
+  using SelfType = ConditionalSubfieldsWithSameNameTestReg<Condition>;
+
+  uint16_t field;
+
+  enum class Enum { kA = 0b00, kB = 0b11 };
+
+  DEF_COND_SUBBIT(field, 15, a, Condition);
+  DEF_COND_SUBFIELD(field, 14, 12, b, Condition);
+  DEF_COND_UNSHIFTED_SUBFIELD(field, 11, 10, c, Condition);
+  DEF_COND_ENUM_SUBFIELD(field, Enum, 9, 8, d, Condition);
+
+  DEF_COND_ENUM_SUBFIELD(field, Enum, 7, 6, d, !Condition);
+  DEF_COND_UNSHIFTED_SUBFIELD(field, 5, 4, c, !Condition);
+  DEF_COND_SUBFIELD(field, 3, 1, b, !Condition);
+  DEF_COND_SUBBIT(field, 0, a, !Condition);
+};
+
+struct UnshiftedFieldTestReg {
+  uint16_t data;
+
+  DEF_UNSHIFTED_SUBFIELD(data, 15, 12, field1);
+  DEF_UNSHIFTED_SUBFIELD(data, 11, 8, field2);
+  DEF_UNSHIFTED_SUBFIELD(data, 7, 4, field3);
+  DEF_UNSHIFTED_SUBFIELD(data, 3, 0, field4);
+};
 
 TEST(SubFieldTestCase, UnshifedFields) {
-  struct TestReg16 {
-    uint16_t data;
-
-    DEF_UNSHIFTED_SUBFIELD(data, 15, 12, field1);
-    DEF_UNSHIFTED_SUBFIELD(data, 11, 8, field2);
-    DEF_UNSHIFTED_SUBFIELD(data, 7, 4, field3);
-    DEF_UNSHIFTED_SUBFIELD(data, 3, 0, field4);
-  };
-
   // Tests simple field isolation
   {
-    auto test_reg = TestReg16{.data = 0xffff};
+    auto test_reg = UnshiftedFieldTestReg{.data = 0xffff};
     EXPECT_EQ(0xf000, test_reg.field1());
     EXPECT_EQ(0x0f00, test_reg.field2());
     EXPECT_EQ(0x00f0, test_reg.field3());
@@ -294,7 +364,7 @@ TEST(SubFieldTestCase, UnshifedFields) {
 
   // Test assignment
   {
-    auto test_reg = TestReg16{.data = 0x0};
+    auto test_reg = UnshiftedFieldTestReg{.data = 0x0};
     EXPECT_EQ(test_reg.field1(), 0u);
     EXPECT_EQ(test_reg.field2(), 0u);
     EXPECT_EQ(test_reg.field3(), 0u);
@@ -326,35 +396,35 @@ TEST(SubFieldTestCase, UnshifedFields) {
   }
 }
 
-TEST(RegisterTestCase, Rsvdz) {
-  class TestReg8 : public hwreg::RegisterBase<TestReg8, uint8_t> {
-   public:
-    DEF_RSVDZ_FIELD(7, 3);
+class RsvdZPartialTestReg8 : public hwreg::RegisterBase<RsvdZPartialTestReg8, uint8_t> {
+ public:
+  DEF_RSVDZ_FIELD(7, 3);
 
-    static auto Get() { return hwreg::RegisterAddr<TestReg8>(0); }
-  };
-  class TestReg16 : public hwreg::RegisterBase<TestReg16, uint16_t> {
-   public:
-    DEF_RSVDZ_FIELD(14, 1);
+  static auto Get() { return hwreg::RegisterAddr<RsvdZPartialTestReg8>(0); }
+};
+class RsvdZPartialTestReg16 : public hwreg::RegisterBase<RsvdZPartialTestReg16, uint16_t> {
+ public:
+  DEF_RSVDZ_FIELD(14, 1);
 
-    static auto Get() { return hwreg::RegisterAddr<TestReg16>(0); }
-  };
-  class TestReg32 : public hwreg::RegisterBase<TestReg32, uint32_t> {
-   public:
-    DEF_RSVDZ_FIELD(31, 12);
-    DEF_RSVDZ_FIELD(10, 5);
-    DEF_RSVDZ_BIT(3);
+  static auto Get() { return hwreg::RegisterAddr<RsvdZPartialTestReg16>(0); }
+};
+class RsvdZPartialTestReg32 : public hwreg::RegisterBase<RsvdZPartialTestReg32, uint32_t> {
+ public:
+  DEF_RSVDZ_FIELD(31, 12);
+  DEF_RSVDZ_FIELD(10, 5);
+  DEF_RSVDZ_BIT(3);
 
-    static auto Get() { return hwreg::RegisterAddr<TestReg32>(0); }
-  };
-  class TestReg64 : public hwreg::RegisterBase<TestReg64, uint64_t> {
-   public:
-    DEF_RSVDZ_FIELD(63, 18);
-    DEF_RSVDZ_FIELD(10, 0);
+  static auto Get() { return hwreg::RegisterAddr<RsvdZPartialTestReg32>(0); }
+};
+class RsvdZPartialTestReg64 : public hwreg::RegisterBase<RsvdZPartialTestReg64, uint64_t> {
+ public:
+  DEF_RSVDZ_FIELD(63, 18);
+  DEF_RSVDZ_FIELD(10, 0);
 
-    static auto Get() { return hwreg::RegisterAddr<TestReg64>(0); }
-  };
+  static auto Get() { return hwreg::RegisterAddr<RsvdZPartialTestReg64>(0); }
+};
 
+TEST(RegisterTestCase, RsvdzPartial) {
   volatile uint64_t fake_reg;
   hwreg::RegisterPio mmio(&fake_reg);
 
@@ -364,14 +434,14 @@ TEST(RegisterTestCase, Rsvdz) {
     constexpr auto allones = std::numeric_limits<uint8_t>::max();
     hwreg::Mock mock;
     mock.ExpectRead(allones, 0).ExpectWrite(uint8_t{0x7}, 0);
-    auto reg = TestReg8::Get().ReadFrom(mock.io());
+    auto reg = RsvdZPartialTestReg8::Get().ReadFrom(mock.io());
     EXPECT_EQ(allones, reg.reg_value());
     reg.WriteTo(mock.io());
     mock.VerifyAndClear();
   }
   {
     fake_reg = std::numeric_limits<uint16_t>::max();
-    auto reg = TestReg16::Get().ReadFrom(&mmio);
+    auto reg = RsvdZPartialTestReg16::Get().ReadFrom(&mmio);
     EXPECT_EQ(std::numeric_limits<uint16_t>::max(), reg.reg_value());
     reg.WriteTo(&mmio);
     uint64_t reg_value = fake_reg;
@@ -379,7 +449,7 @@ TEST(RegisterTestCase, Rsvdz) {
   }
   {
     fake_reg = std::numeric_limits<uint32_t>::max();
-    auto reg = TestReg32::Get().ReadFrom(&mmio);
+    auto reg = RsvdZPartialTestReg32::Get().ReadFrom(&mmio);
     EXPECT_EQ(std::numeric_limits<uint32_t>::max(), reg.reg_value());
     reg.WriteTo(&mmio);
     uint64_t reg_value = fake_reg;
@@ -387,7 +457,7 @@ TEST(RegisterTestCase, Rsvdz) {
   }
   {
     fake_reg = std::numeric_limits<uint64_t>::max();
-    auto reg = TestReg64::Get().ReadFrom(&mmio);
+    auto reg = RsvdZPartialTestReg64::Get().ReadFrom(&mmio);
     EXPECT_EQ(std::numeric_limits<uint64_t>::max(), reg.reg_value());
     reg.WriteTo(&mmio);
     uint64_t reg_value = fake_reg;
@@ -395,32 +465,32 @@ TEST(RegisterTestCase, Rsvdz) {
   }
 }
 
+class RsvdZFullTestReg8 : public hwreg::RegisterBase<RsvdZFullTestReg8, uint8_t> {
+ public:
+  DEF_RSVDZ_FIELD(7, 0);
+
+  static auto Get() { return hwreg::RegisterAddr<RsvdZFullTestReg8>(0); }
+};
+class RsvdZFullTestReg16 : public hwreg::RegisterBase<RsvdZFullTestReg16, uint16_t> {
+ public:
+  DEF_RSVDZ_FIELD(15, 0);
+
+  static auto Get() { return hwreg::RegisterAddr<RsvdZFullTestReg16>(0); }
+};
+class RsvdZFullTestReg32 : public hwreg::RegisterBase<RsvdZFullTestReg32, uint32_t> {
+ public:
+  DEF_RSVDZ_FIELD(31, 0);
+
+  static auto Get() { return hwreg::RegisterAddr<RsvdZFullTestReg32>(0); }
+};
+class RsvdZFullTestReg64 : public hwreg::RegisterBase<RsvdZFullTestReg64, uint64_t> {
+ public:
+  DEF_RSVDZ_FIELD(63, 0);
+
+  static auto Get() { return hwreg::RegisterAddr<RsvdZFullTestReg64>(0); }
+};
+
 TEST(RegisterTestCase, RsvdzFull) {
-  class TestReg8 : public hwreg::RegisterBase<TestReg8, uint8_t> {
-   public:
-    DEF_RSVDZ_FIELD(7, 0);
-
-    static auto Get() { return hwreg::RegisterAddr<TestReg8>(0); }
-  };
-  class TestReg16 : public hwreg::RegisterBase<TestReg16, uint16_t> {
-   public:
-    DEF_RSVDZ_FIELD(15, 0);
-
-    static auto Get() { return hwreg::RegisterAddr<TestReg16>(0); }
-  };
-  class TestReg32 : public hwreg::RegisterBase<TestReg32, uint32_t> {
-   public:
-    DEF_RSVDZ_FIELD(31, 0);
-
-    static auto Get() { return hwreg::RegisterAddr<TestReg32>(0); }
-  };
-  class TestReg64 : public hwreg::RegisterBase<TestReg64, uint64_t> {
-   public:
-    DEF_RSVDZ_FIELD(63, 0);
-
-    static auto Get() { return hwreg::RegisterAddr<TestReg64>(0); }
-  };
-
   volatile uint64_t fake_reg;
   hwreg::RegisterPio mmio(&fake_reg);
 
@@ -428,7 +498,7 @@ TEST(RegisterTestCase, RsvdzFull) {
   // what we read them as.
   {
     fake_reg = std::numeric_limits<uint8_t>::max();
-    auto reg = TestReg8::Get().ReadFrom(&mmio);
+    auto reg = RsvdZFullTestReg8::Get().ReadFrom(&mmio);
     EXPECT_EQ(std::numeric_limits<uint8_t>::max(), reg.reg_value());
     reg.WriteTo(&mmio);
     uint64_t reg_value = fake_reg;
@@ -436,7 +506,7 @@ TEST(RegisterTestCase, RsvdzFull) {
   }
   {
     fake_reg = std::numeric_limits<uint16_t>::max();
-    auto reg = TestReg16::Get().ReadFrom(&mmio);
+    auto reg = RsvdZFullTestReg16::Get().ReadFrom(&mmio);
     EXPECT_EQ(std::numeric_limits<uint16_t>::max(), reg.reg_value());
     reg.WriteTo(&mmio);
     uint64_t reg_value = fake_reg;
@@ -444,7 +514,7 @@ TEST(RegisterTestCase, RsvdzFull) {
   }
   {
     fake_reg = std::numeric_limits<uint32_t>::max();
-    auto reg = TestReg32::Get().ReadFrom(&mmio);
+    auto reg = RsvdZFullTestReg32::Get().ReadFrom(&mmio);
     EXPECT_EQ(std::numeric_limits<uint32_t>::max(), reg.reg_value());
     reg.WriteTo(&mmio);
     uint64_t reg_value = fake_reg;
@@ -452,7 +522,7 @@ TEST(RegisterTestCase, RsvdzFull) {
   }
   {
     fake_reg = std::numeric_limits<uint64_t>::max();
-    auto reg = TestReg64::Get().ReadFrom(&mmio);
+    auto reg = RsvdZFullTestReg64::Get().ReadFrom(&mmio);
     EXPECT_EQ(std::numeric_limits<uint64_t>::max(), reg.reg_value());
     reg.WriteTo(&mmio);
     uint64_t reg_value = fake_reg;
@@ -460,38 +530,38 @@ TEST(RegisterTestCase, RsvdzFull) {
   }
 }
 
+class FieldTestReg8 : public hwreg::RegisterBase<FieldTestReg8, uint8_t> {
+ public:
+  DEF_FIELD(7, 3, field1);
+  DEF_FIELD(2, 0, field2);
+
+  static auto Get() { return hwreg::RegisterAddr<FieldTestReg8>(0); }
+};
+class FieldTestReg16 : public hwreg::RegisterBase<FieldTestReg16, uint16_t> {
+ public:
+  DEF_FIELD(13, 3, field1);
+  DEF_FIELD(2, 1, field2);
+  DEF_BIT(0, field3);
+
+  static auto Get() { return hwreg::RegisterAddr<FieldTestReg16>(0); }
+};
+class FieldTestReg32 : public hwreg::RegisterBase<FieldTestReg32, uint32_t> {
+ public:
+  DEF_FIELD(30, 21, field1);
+  DEF_FIELD(20, 12, field2);
+  DEF_RSVDZ_FIELD(11, 0);
+
+  static auto Get() { return hwreg::RegisterAddr<FieldTestReg32>(0); }
+};
+class FieldTestReg64 : public hwreg::RegisterBase<FieldTestReg64, uint64_t> {
+ public:
+  DEF_FIELD(60, 20, field1);
+  DEF_FIELD(10, 0, field2);
+
+  static auto Get() { return hwreg::RegisterAddr<FieldTestReg64>(0); }
+};
+
 TEST(RegisterTestCase, Field) {
-  class TestReg8 : public hwreg::RegisterBase<TestReg8, uint8_t> {
-   public:
-    DEF_FIELD(7, 3, field1);
-    DEF_FIELD(2, 0, field2);
-
-    static auto Get() { return hwreg::RegisterAddr<TestReg8>(0); }
-  };
-  class TestReg16 : public hwreg::RegisterBase<TestReg16, uint16_t> {
-   public:
-    DEF_FIELD(13, 3, field1);
-    DEF_FIELD(2, 1, field2);
-    DEF_BIT(0, field3);
-
-    static auto Get() { return hwreg::RegisterAddr<TestReg16>(0); }
-  };
-  class TestReg32 : public hwreg::RegisterBase<TestReg32, uint32_t> {
-   public:
-    DEF_FIELD(30, 21, field1);
-    DEF_FIELD(20, 12, field2);
-    DEF_RSVDZ_FIELD(11, 0);
-
-    static auto Get() { return hwreg::RegisterAddr<TestReg32>(0); }
-  };
-  class TestReg64 : public hwreg::RegisterBase<TestReg64, uint64_t> {
-   public:
-    DEF_FIELD(60, 20, field1);
-    DEF_FIELD(10, 0, field2);
-
-    static auto Get() { return hwreg::RegisterAddr<TestReg64>(0); }
-  };
-
   volatile uint64_t fake_reg;
   hwreg::RegisterPio mmio(&fake_reg);
 
@@ -500,7 +570,7 @@ TEST(RegisterTestCase, Field) {
   {
     constexpr uint8_t kInitVal = 0x42u;
     fake_reg = kInitVal;
-    auto reg = TestReg8::Get().ReadFrom(&mmio);
+    auto reg = FieldTestReg8::Get().ReadFrom(&mmio);
     EXPECT_EQ(kInitVal, reg.reg_value());
     EXPECT_EQ(kInitVal >> 3, reg.field1());
     EXPECT_EQ(0x2u, reg.field2());
@@ -516,7 +586,7 @@ TEST(RegisterTestCase, Field) {
   {
     constexpr uint16_t kInitVal = 0b1010'1111'0101'0000u;
     fake_reg = kInitVal;
-    auto reg = TestReg16::Get().ReadFrom(&mmio);
+    auto reg = FieldTestReg16::Get().ReadFrom(&mmio);
     EXPECT_EQ(kInitVal, reg.reg_value());
     EXPECT_EQ((kInitVal >> 3) & ((1u << 11) - 1), reg.field1());
     EXPECT_EQ((kInitVal >> 1) & 0x3u, reg.field2());
@@ -534,7 +604,7 @@ TEST(RegisterTestCase, Field) {
   {
     constexpr uint32_t kInitVal = 0xe987'2fffu;
     fake_reg = kInitVal;
-    auto reg = TestReg32::Get().ReadFrom(&mmio);
+    auto reg = FieldTestReg32::Get().ReadFrom(&mmio);
     EXPECT_EQ(kInitVal, reg.reg_value());
     EXPECT_EQ((kInitVal >> 21) & ((1u << 10) - 1), reg.field1());
     EXPECT_EQ((kInitVal >> 12) & ((1u << 9) - 1), reg.field2());
@@ -549,7 +619,7 @@ TEST(RegisterTestCase, Field) {
   {
     constexpr uint64_t kInitVal = 0xfedc'ba98'7654'3210ull;
     fake_reg = kInitVal;
-    auto reg = TestReg64::Get().ReadFrom(&mmio);
+    auto reg = FieldTestReg64::Get().ReadFrom(&mmio);
     EXPECT_EQ(kInitVal, reg.reg_value());
     EXPECT_EQ((kInitVal >> 20) & ((1ull << 41) - 1), reg.field1());
     EXPECT_EQ(kInitVal & ((1ull << 11) - 1), reg.field2());
@@ -563,88 +633,90 @@ TEST(RegisterTestCase, Field) {
   }
 }
 
+class EnumFieldTestReg8 : public hwreg::RegisterBase<EnumFieldTestReg8, uint8_t> {
+ public:
+  enum MyEnum { Test0 = 0, Test1 = 1, Test2 = 2, Test3 = 3 };
+  DEF_ENUM_FIELD(MyEnum, 3, 2, TestField);
+  static auto Get() { return hwreg::RegisterAddr<EnumFieldTestReg8>(0); }
+};
+class EnumFieldTestReg8WithEnumClass
+    : public hwreg::RegisterBase<EnumFieldTestReg8WithEnumClass, uint8_t> {
+ public:
+  enum class MyEnum { Test0 = 0, Test1 = 1, Test2 = 2, Test3 = 3 };
+  DEF_ENUM_FIELD(MyEnum, 3, 2, TestField);
+  static auto Get() { return hwreg::RegisterAddr<EnumFieldTestReg8WithEnumClass>(0); }
+};
+
 TEST(RegisterTestCase, EnumField) {
-  class TestReg8 : public hwreg::RegisterBase<TestReg8, uint8_t> {
-   public:
-    enum MyEnum { Test0 = 0, Test1 = 1, Test2 = 2, Test3 = 3 };
-    DEF_ENUM_FIELD(MyEnum, 3, 2, TestField);
-    static auto Get() { return hwreg::RegisterAddr<TestReg8>(0); }
-  };
-  class TestReg8WithEnumClass : public hwreg::RegisterBase<TestReg8WithEnumClass, uint8_t> {
-   public:
-    enum class MyEnum { Test0 = 0, Test1 = 1, Test2 = 2, Test3 = 3 };
-    DEF_ENUM_FIELD(MyEnum, 3, 2, TestField);
-    static auto Get() { return hwreg::RegisterAddr<TestReg8WithEnumClass>(0); }
-  };
   {
     uint8_t result = []() {
-      TestReg8WithEnumClass reg = TestReg8WithEnumClass::Get().FromValue(255);
-      reg.set_TestField(TestReg8WithEnumClass::MyEnum::Test0);
+      EnumFieldTestReg8WithEnumClass reg = EnumFieldTestReg8WithEnumClass::Get().FromValue(255);
+      reg.set_TestField(EnumFieldTestReg8WithEnumClass::MyEnum::Test0);
       return reg.reg_value();
     }();
     int mask = 0xF3;
     ASSERT_TRUE(result == mask);
-    ASSERT_TRUE(TestReg8WithEnumClass::Get().FromValue(result).TestField() ==
-                TestReg8WithEnumClass::MyEnum::Test0);
+    ASSERT_TRUE(EnumFieldTestReg8WithEnumClass::Get().FromValue(result).TestField() ==
+                EnumFieldTestReg8WithEnumClass::MyEnum::Test0);
   }
   {
     uint8_t result = []() {
-      TestReg8 reg = TestReg8::Get().FromValue(255);
-      reg.set_TestField(TestReg8::Test1);
+      EnumFieldTestReg8 reg = EnumFieldTestReg8::Get().FromValue(255);
+      reg.set_TestField(EnumFieldTestReg8::Test1);
       return reg.reg_value();
     }();
     int mask = 0xF3;
     ASSERT_TRUE(result == (mask | (1 << 2)));
-    ASSERT_TRUE(TestReg8::Get().FromValue(result).TestField() == TestReg8::Test1);
+    ASSERT_TRUE(EnumFieldTestReg8::Get().FromValue(result).TestField() == EnumFieldTestReg8::Test1);
   }
   {
     uint8_t result = []() {
-      TestReg8 reg = TestReg8::Get().FromValue(255);
-      reg.set_TestField(TestReg8::Test2);
+      EnumFieldTestReg8 reg = EnumFieldTestReg8::Get().FromValue(255);
+      reg.set_TestField(EnumFieldTestReg8::Test2);
       return reg.reg_value();
     }();
     int mask = 0xF3;
     ASSERT_TRUE(result == (mask | (2 << 2)));
-    ASSERT_TRUE(TestReg8::Get().FromValue(result).TestField() == TestReg8::Test2);
+    ASSERT_TRUE(EnumFieldTestReg8::Get().FromValue(result).TestField() == EnumFieldTestReg8::Test2);
   }
   {
     uint8_t result = []() {
-      TestReg8 reg = TestReg8::Get().FromValue(255);
-      reg.set_TestField(TestReg8::Test3);
+      EnumFieldTestReg8 reg = EnumFieldTestReg8::Get().FromValue(255);
+      reg.set_TestField(EnumFieldTestReg8::Test3);
       return reg.reg_value();
     }();
     constexpr int mask = 0xF3;
     ASSERT_TRUE(result == (mask | (3 << 2)));
-    ASSERT_TRUE(TestReg8::Get().FromValue(result).TestField() == TestReg8::Test3);
+    ASSERT_TRUE(EnumFieldTestReg8::Get().FromValue(result).TestField() == EnumFieldTestReg8::Test3);
   }
 }
 
+class UnshiftedTestReg16 : public hwreg::RegisterBase<UnshiftedTestReg16, uint16_t> {
+ public:
+  DEF_UNSHIFTED_FIELD(15, 12, field1);
+  DEF_UNSHIFTED_FIELD(11, 8, field2);
+  DEF_UNSHIFTED_FIELD(7, 4, field3);
+  DEF_UNSHIFTED_FIELD(3, 0, field4);
+
+  static auto Get() { return hwreg::RegisterAddr<UnshiftedTestReg16>(0); }
+};
+
+class TestPciBar32 : public hwreg::RegisterBase<TestPciBar32, uint32_t> {
+ public:
+  DEF_UNSHIFTED_FIELD(31, 4, address);
+  DEF_BIT(3, is_prefetchable);
+  DEF_RSVDZ_BIT(2);
+  DEF_BIT(1, is_64bit);
+  DEF_BIT(0, is_io_space);
+
+  static auto Get() { return hwreg::RegisterAddr<TestPciBar32>(0); }
+};
+
 TEST(RegisterTestCase, UnshiftedField) {
-  class TestReg16 : public hwreg::RegisterBase<TestReg16, uint16_t> {
-   public:
-    DEF_UNSHIFTED_FIELD(15, 12, field1);
-    DEF_UNSHIFTED_FIELD(11, 8, field2);
-    DEF_UNSHIFTED_FIELD(7, 4, field3);
-    DEF_UNSHIFTED_FIELD(3, 0, field4);
-
-    static auto Get() { return hwreg::RegisterAddr<TestReg16>(0); }
-  };
-
-  class TestPciBar32 : public hwreg::RegisterBase<TestPciBar32, uint32_t> {
-   public:
-    DEF_UNSHIFTED_FIELD(31, 4, address);
-    DEF_BIT(3, is_prefetchable);
-    DEF_RSVDZ_BIT(2);
-    DEF_BIT(1, is_64bit);
-    DEF_BIT(0, is_io_space);
-
-    static auto Get() { return hwreg::RegisterAddr<TestPciBar32>(0); }
-  };
-
   // Tests simple field isolation
   {
     volatile uint16_t fake_reg = 0xffff;
-    auto test_reg = TestReg16::Get().FromValue(fake_reg);
+    auto test_reg = UnshiftedTestReg16::Get().FromValue(fake_reg);
     EXPECT_EQ(0xf000, test_reg.field1());
     EXPECT_EQ(0x0f00, test_reg.field2());
     EXPECT_EQ(0x00f0, test_reg.field3());
@@ -654,7 +726,7 @@ TEST(RegisterTestCase, UnshiftedField) {
   // Test assignment
   {
     volatile uint16_t fake_reg = 0x0000;
-    auto test_reg = TestReg16::Get().FromValue(fake_reg);
+    auto test_reg = UnshiftedTestReg16::Get().FromValue(fake_reg);
     EXPECT_EQ(test_reg.field1(), 0u);
     EXPECT_EQ(test_reg.field2(), 0u);
     EXPECT_EQ(test_reg.field3(), 0u);
@@ -701,24 +773,123 @@ TEST(RegisterTestCase, UnshiftedField) {
   }
 }
 
+struct ConstexprArithmeticTestReg
+    : public hwreg::RegisterBase<ConstexprArithmeticTestReg, uint32_t> {
+  static constexpr unsigned int kTen = 10;
+
+  DEF_FIELD(kTen + 2 * kTen, kTen, field2);
+  DEF_RSVDZ_FIELD(kTen - 1, 2);
+  DEF_BIT(2 + 3 - 4, field1);
+
+  static auto Get() { return hwreg::RegisterAddr<ConstexprArithmeticTestReg>(0); }
+};
+
 TEST(RegisterTestCase, BitsAsConstexprArithmeticExpressions) {
-  constexpr unsigned int kTen = 10;
-
-  struct TestReg : public hwreg::RegisterBase<TestReg, uint32_t> {
-    DEF_FIELD(kTen + 2 * kTen, kTen, field2);
-    DEF_RSVDZ_FIELD(kTen - 1, 2);
-    DEF_BIT(2 + 3 - 4, field1);
-
-    static auto Get() { return hwreg::RegisterAddr<TestReg>(0); }
-  };
-
   volatile uint32_t fake_reg = 1ul << 31;
   hwreg::RegisterMmio mmio(&fake_reg);
 
-  auto reg = TestReg::Get().ReadFrom(&mmio);
+  auto reg = ConstexprArithmeticTestReg::Get().ReadFrom(&mmio);
   reg.set_field1(1);
   reg.set_field2(0xabcd);
   reg.WriteTo(&mmio);
+}
+
+enum class ConditionalFieldTestRegEnum {
+  kA,
+  kB,
+  kC,
+};
+
+template <ConditionalFieldTestRegEnum Condition>
+struct ConditionalFieldTestReg
+    : public hwreg::RegisterBase<ConditionalFieldTestReg<Condition>, uint8_t> {
+  using SelfType = ConditionalFieldTestReg<Condition>;
+
+  static constexpr bool kA = Condition == ConditionalFieldTestRegEnum::kA;
+  static constexpr bool kB = Condition == ConditionalFieldTestRegEnum::kB;
+  static constexpr bool kC = Condition == ConditionalFieldTestRegEnum::kC;
+
+  // Conditional kA fields.
+  DEF_COND_BIT(7, a_7, kA);
+  DEF_COND_FIELD(6, 4, a_6_4, kA);
+  DEF_COND_RSVDZ_BIT(3, kA);
+
+  // Conditional kB fields.
+  DEF_COND_UNSHIFTED_FIELD(7, 5, b_7_5, kB);
+  DEF_COND_RSVDZ_FIELD(4, 3, kB);
+
+  // Conditional kC fields.
+  enum class Rsvp { kNo = 0, kYes = 0b1111 };
+  DEF_COND_ENUM_FIELD(Rsvp, 7, 4, c_7_4, kC);
+  DEF_COND_BIT(3, c_3, kC);
+
+  // Unconditional, common field.
+  DEF_FIELD(2, 0, common);
+
+  static auto Get() { return hwreg::RegisterAddr<SelfType>(0); }
+};
+
+// This definition amounts to a compilation test.
+template <bool Condition>
+struct ConditionalFieldsWithSameNameTestReg
+    : hwreg::RegisterBase<ConditionalFieldsWithSameNameTestReg<Condition>, uint16_t> {
+  using SelfType = ConditionalFieldsWithSameNameTestReg<Condition>;
+
+  enum class Enum { kA = 0b00, kB = 0b11 };
+
+  DEF_COND_BIT(15, a, Condition);
+  DEF_COND_FIELD(14, 12, b, Condition);
+  DEF_COND_UNSHIFTED_FIELD(11, 10, c, Condition);
+  DEF_COND_ENUM_FIELD(Enum, 9, 8, d, Condition);
+
+  DEF_COND_ENUM_FIELD(Enum, 7, 6, d, !Condition);
+  DEF_COND_UNSHIFTED_FIELD(5, 4, c, !Condition);
+  DEF_COND_FIELD(3, 1, b, !Condition);
+  DEF_COND_BIT(0, a, !Condition);
+};
+
+TEST(RegisterTestCase, ConditionalFields) {
+  {
+    using RegA = ConditionalFieldTestReg<ConditionalFieldTestRegEnum::kA>;
+
+    volatile uint8_t fake_reg = 0xff;
+    hwreg::RegisterMmio mmio(&fake_reg);
+
+    auto reg = RegA::Get().ReadFrom(&mmio);
+    EXPECT_EQ(0b1, reg.a_7());
+    EXPECT_EQ(0b111, reg.a_6_4());
+    EXPECT_EQ(0b111, reg.common());
+    reg = reg.WriteTo(&mmio).ReadFrom(&mmio);
+    EXPECT_EQ(0b11110111, reg.reg_value());
+  }
+
+  {
+    using RegB = ConditionalFieldTestReg<ConditionalFieldTestRegEnum::kB>;
+
+    volatile uint8_t fake_reg = 0xff;
+    hwreg::RegisterMmio mmio(&fake_reg);
+
+    auto reg = RegB::Get().ReadFrom(&mmio);
+    EXPECT_EQ(0b11100000, reg.b_7_5());
+    EXPECT_EQ(0b111, reg.common());
+    reg = reg.WriteTo(&mmio).ReadFrom(&mmio);
+    EXPECT_EQ(0b11100111, reg.reg_value());
+  }
+
+  {
+    using RegC = ConditionalFieldTestReg<ConditionalFieldTestRegEnum::kC>;
+    using Rsvp = typename RegC::Rsvp;
+
+    volatile uint8_t fake_reg = 0xff;
+    hwreg::RegisterMmio mmio(&fake_reg);
+
+    auto reg = RegC::Get().ReadFrom(&mmio);
+    EXPECT_EQ(Rsvp::kYes, reg.c_7_4());
+    EXPECT_EQ(0b1, reg.c_3());
+    EXPECT_EQ(0b111, reg.common());
+    reg = reg.WriteTo(&mmio).ReadFrom(&mmio);
+    EXPECT_EQ(0xff, reg.reg_value());
+  }
 }
 
 template <unsigned int N>
@@ -759,24 +930,34 @@ TEST(RegisterTestCase, Templated) {
   }
 }
 
+class PrintableTestReg
+    : public hwreg::RegisterBase<PrintableTestReg, uint32_t, hwreg::EnablePrinter> {
+ public:
+  DEF_RSVDZ_BIT(31);
+  DEF_FIELD(30, 21, field1);
+  DEF_FIELD(20, 12, field2);
+  DEF_RSVDZ_FIELD(11, 0);
+
+  static auto Get() { return hwreg::RegisterAddr<PrintableTestReg>(0); }
+};
+
+class PrintableTestReg2
+    : public hwreg::RegisterBase<PrintableTestReg2, uint32_t, hwreg::EnablePrinter> {
+ public:
+  DEF_FIELD(30, 21, field1);
+  DEF_FIELD(20, 12, field2);
+
+  static auto Get() { return hwreg::RegisterAddr<PrintableTestReg2>(0); }
+};
+
 TEST(RegisterTestCase, Print) {
-  class TestReg : public hwreg::RegisterBase<TestReg, uint32_t, hwreg::EnablePrinter> {
-   public:
-    DEF_RSVDZ_BIT(31);
-    DEF_FIELD(30, 21, field1);
-    DEF_FIELD(20, 12, field2);
-    DEF_RSVDZ_FIELD(11, 0);
-
-    static auto Get() { return hwreg::RegisterAddr<TestReg>(0); }
-  };
-
   volatile uint64_t fake_reg;
   hwreg::RegisterPio mmio(&fake_reg);
 
   constexpr uint32_t kInitVal = 0xe987'2fffu;
   fake_reg = kInitVal;
   {
-    auto reg = TestReg::Get().ReadFrom(&mmio);
+    auto reg = PrintableTestReg::Get().ReadFrom(&mmio);
     unsigned call_count = 0;
     const char* expected[] = {
         "RsvdZ[31:31]: 0x1 (1)",
@@ -791,16 +972,8 @@ TEST(RegisterTestCase, Print) {
     EXPECT_EQ(std::size(expected), call_count);
   }
 
-  class TestReg2 : public hwreg::RegisterBase<TestReg2, uint32_t, hwreg::EnablePrinter> {
-   public:
-    DEF_FIELD(30, 21, field1);
-    DEF_FIELD(20, 12, field2);
-
-    static auto Get() { return hwreg::RegisterAddr<TestReg2>(0); }
-  };
-
   {
-    auto reg = TestReg2::Get().ReadFrom(&mmio);
+    auto reg = PrintableTestReg2::Get().ReadFrom(&mmio);
     unsigned call_count = 0;
     const char* expected[] = {
         "field1[30:21]: 0x34c (844)",
@@ -815,16 +988,17 @@ TEST(RegisterTestCase, Print) {
   }
 }
 
-TEST(RegisterTestCase, ForEachField) {
-  class TestReg : public hwreg::RegisterBase<TestReg, uint32_t, hwreg::EnablePrinter> {
-   public:
-    DEF_RSVDZ_BIT(31);
-    DEF_FIELD(30, 21, field1);
-    DEF_FIELD(20, 12, field2);
-    DEF_RSVDZ_FIELD(11, 0);
-  };
+class IterableTestReg
+    : public hwreg::RegisterBase<IterableTestReg, uint32_t, hwreg::EnablePrinter> {
+ public:
+  DEF_RSVDZ_BIT(31);
+  DEF_FIELD(30, 21, field1);
+  DEF_FIELD(20, 12, field2);
+  DEF_RSVDZ_FIELD(11, 0);
+};
 
-  auto reg = TestReg{}.set_field1(0b1001111001).set_field2(0b101010101);
+TEST(RegisterTestCase, ForEachField) {
+  auto reg = IterableTestReg{}.set_field1(0b1001111001).set_field2(0b101010101);
   const struct {
     const char* name;
     uint32_t value;
@@ -851,137 +1025,137 @@ TEST(RegisterTestCase, ForEachField) {
   EXPECT_EQ(std::size(expected_calls), call_idx);
 }
 
+class ChainingTestReg : public hwreg::RegisterBase<ChainingTestReg, uint32_t> {
+ public:
+  DEF_RSVDZ_BIT(31);
+  DEF_FIELD(30, 21, field1);
+  DEF_FIELD(20, 12, field2);
+  DEF_RSVDZ_FIELD(11, 0);
+
+  static auto Get() { return hwreg::RegisterAddr<ChainingTestReg>(0); }
+};
+
 // Test using the "fluent" style of chaining calls, like:
-// TestReg::Get().ReadFrom(&mmio).set_field1(0x234).set_field2(0x123).WriteTo(&mmio);
+// ChainingTestReg::Get().ReadFrom(&mmio).set_field1(0x234).set_field2(0x123).WriteTo(&mmio);
 TEST(RegisterTestCase, SetChaining) {
-  class TestReg : public hwreg::RegisterBase<TestReg, uint32_t> {
-   public:
-    DEF_RSVDZ_BIT(31);
-    DEF_FIELD(30, 21, field1);
-    DEF_FIELD(20, 12, field2);
-    DEF_RSVDZ_FIELD(11, 0);
-
-    static auto Get() { return hwreg::RegisterAddr<TestReg>(0); }
-  };
-
   volatile uint32_t fake_reg;
   hwreg::RegisterPio mmio(&fake_reg);
 
   // With ReadFrom from a RegAddr
   fake_reg = ~0u;
-  TestReg::Get().ReadFrom(&mmio).set_field1(0x234).set_field2(0x123).WriteTo(&mmio);
+  ChainingTestReg::Get().ReadFrom(&mmio).set_field1(0x234).set_field2(0x123).WriteTo(&mmio);
   uint32_t reg_value = fake_reg;
   EXPECT_EQ((0x234u << 21) | (0x123u << 12), reg_value);
 
-  // With ReadFrom from TestReg
+  // With ReadFrom from ChainingTestReg
   fake_reg = ~0u;
-  auto reg = TestReg::Get().FromValue(0);
+  auto reg = ChainingTestReg::Get().FromValue(0);
   reg.ReadFrom(&mmio).set_field1(0x234).set_field2(0x123).WriteTo(&mmio);
   reg_value = fake_reg;
   EXPECT_EQ((0x234u << 21) | (0x123u << 12), reg_value);
 }
 
+class TestRegWithPrinter
+    : public hwreg::RegisterBase<TestRegWithPrinter, uint64_t, hwreg::EnablePrinter> {};
+class TestRegWithoutPrinter : public hwreg::RegisterBase<TestRegWithoutPrinter, uint64_t> {};
+
 // Compile-time test that not enabling printing functions provides a size reduction
 [[maybe_unused]] void printer_size_reduction() {
-  class TestRegWithPrinter
-      : public hwreg::RegisterBase<TestRegWithPrinter, uint64_t, hwreg::EnablePrinter> {};
-  class TestRegWithoutPrinter : public hwreg::RegisterBase<TestRegWithoutPrinter, uint64_t> {};
-
   static_assert(sizeof(TestRegWithPrinter) > sizeof(TestRegWithoutPrinter), "");
 }
 
+class TestRegForSizing8 : public hwreg::RegisterBase<TestRegForSizing8, uint8_t> {
+ public:
+  DEF_RSVDZ_BIT(7);
+  DEF_RSVDZ_BIT(6);
+  DEF_RSVDZ_BIT(5);
+  DEF_RSVDZ_BIT(4);
+  DEF_RSVDZ_BIT(3);
+  DEF_RSVDZ_BIT(2);
+  DEF_RSVDZ_BIT(1);
+  DEF_RSVDZ_BIT(0);
+
+  static auto Get() { return hwreg::RegisterAddr<TestRegForSizing8>(0); }
+};
+class TestRegForSizing16 : public hwreg::RegisterBase<TestRegForSizing16, uint16_t> {
+ public:
+  DEF_RSVDZ_BIT(15);
+  DEF_RSVDZ_BIT(14);
+  DEF_RSVDZ_BIT(13);
+  DEF_RSVDZ_BIT(12);
+  DEF_RSVDZ_BIT(11);
+  DEF_RSVDZ_BIT(10);
+  DEF_RSVDZ_BIT(9);
+  DEF_RSVDZ_BIT(8);
+  DEF_RSVDZ_BIT(7);
+  DEF_RSVDZ_BIT(6);
+  DEF_RSVDZ_BIT(5);
+  DEF_RSVDZ_BIT(4);
+  DEF_RSVDZ_BIT(3);
+  DEF_RSVDZ_BIT(2);
+  DEF_RSVDZ_BIT(1);
+  DEF_RSVDZ_BIT(0);
+
+  static auto Get() { return hwreg::RegisterAddr<TestRegForSizing16>(0); }
+};
+class TestRegForSizing32 : public hwreg::RegisterBase<TestRegForSizing32, uint32_t> {
+ public:
+  DEF_RSVDZ_BIT(15);
+  DEF_RSVDZ_BIT(14);
+  DEF_RSVDZ_BIT(13);
+  DEF_RSVDZ_BIT(12);
+  DEF_RSVDZ_BIT(11);
+  DEF_RSVDZ_BIT(10);
+  DEF_RSVDZ_BIT(9);
+  DEF_RSVDZ_BIT(8);
+  DEF_RSVDZ_BIT(7);
+  DEF_RSVDZ_BIT(6);
+  DEF_RSVDZ_BIT(5);
+  DEF_RSVDZ_BIT(4);
+  DEF_RSVDZ_BIT(3);
+  DEF_RSVDZ_BIT(2);
+  DEF_RSVDZ_BIT(1);
+  DEF_RSVDZ_BIT(0);
+
+  static auto Get() { return hwreg::RegisterAddr<TestRegForSizing32>(0); }
+};
+class TestRegForSizing64 : public hwreg::RegisterBase<TestRegForSizing64, uint64_t> {
+ public:
+  DEF_RSVDZ_BIT(15);
+  DEF_RSVDZ_BIT(14);
+  DEF_RSVDZ_BIT(13);
+  DEF_RSVDZ_BIT(12);
+  DEF_RSVDZ_BIT(11);
+  DEF_RSVDZ_BIT(10);
+  DEF_RSVDZ_BIT(9);
+  DEF_RSVDZ_BIT(8);
+  DEF_RSVDZ_BIT(7);
+  DEF_RSVDZ_BIT(6);
+  DEF_RSVDZ_BIT(5);
+  DEF_RSVDZ_BIT(4);
+  DEF_RSVDZ_BIT(3);
+  DEF_RSVDZ_BIT(2);
+  DEF_RSVDZ_BIT(1);
+  DEF_RSVDZ_BIT(0);
+
+  static auto Get() { return hwreg::RegisterAddr<TestRegForSizing64>(0); }
+};
+
 [[maybe_unused]] void type_size() {
-  class TestReg8 : public hwreg::RegisterBase<TestReg8, uint8_t> {
-   public:
-    DEF_RSVDZ_BIT(7);
-    DEF_RSVDZ_BIT(6);
-    DEF_RSVDZ_BIT(5);
-    DEF_RSVDZ_BIT(4);
-    DEF_RSVDZ_BIT(3);
-    DEF_RSVDZ_BIT(2);
-    DEF_RSVDZ_BIT(1);
-    DEF_RSVDZ_BIT(0);
-
-    static auto Get() { return hwreg::RegisterAddr<TestReg8>(0); }
-  };
-  class TestReg16 : public hwreg::RegisterBase<TestReg16, uint16_t> {
-   public:
-    DEF_RSVDZ_BIT(15);
-    DEF_RSVDZ_BIT(14);
-    DEF_RSVDZ_BIT(13);
-    DEF_RSVDZ_BIT(12);
-    DEF_RSVDZ_BIT(11);
-    DEF_RSVDZ_BIT(10);
-    DEF_RSVDZ_BIT(9);
-    DEF_RSVDZ_BIT(8);
-    DEF_RSVDZ_BIT(7);
-    DEF_RSVDZ_BIT(6);
-    DEF_RSVDZ_BIT(5);
-    DEF_RSVDZ_BIT(4);
-    DEF_RSVDZ_BIT(3);
-    DEF_RSVDZ_BIT(2);
-    DEF_RSVDZ_BIT(1);
-    DEF_RSVDZ_BIT(0);
-
-    static auto Get() { return hwreg::RegisterAddr<TestReg16>(0); }
-  };
-  class TestReg32 : public hwreg::RegisterBase<TestReg32, uint32_t> {
-   public:
-    DEF_RSVDZ_BIT(15);
-    DEF_RSVDZ_BIT(14);
-    DEF_RSVDZ_BIT(13);
-    DEF_RSVDZ_BIT(12);
-    DEF_RSVDZ_BIT(11);
-    DEF_RSVDZ_BIT(10);
-    DEF_RSVDZ_BIT(9);
-    DEF_RSVDZ_BIT(8);
-    DEF_RSVDZ_BIT(7);
-    DEF_RSVDZ_BIT(6);
-    DEF_RSVDZ_BIT(5);
-    DEF_RSVDZ_BIT(4);
-    DEF_RSVDZ_BIT(3);
-    DEF_RSVDZ_BIT(2);
-    DEF_RSVDZ_BIT(1);
-    DEF_RSVDZ_BIT(0);
-
-    static auto Get() { return hwreg::RegisterAddr<TestReg32>(0); }
-  };
-  class TestReg64 : public hwreg::RegisterBase<TestReg64, uint64_t> {
-   public:
-    DEF_RSVDZ_BIT(15);
-    DEF_RSVDZ_BIT(14);
-    DEF_RSVDZ_BIT(13);
-    DEF_RSVDZ_BIT(12);
-    DEF_RSVDZ_BIT(11);
-    DEF_RSVDZ_BIT(10);
-    DEF_RSVDZ_BIT(9);
-    DEF_RSVDZ_BIT(8);
-    DEF_RSVDZ_BIT(7);
-    DEF_RSVDZ_BIT(6);
-    DEF_RSVDZ_BIT(5);
-    DEF_RSVDZ_BIT(4);
-    DEF_RSVDZ_BIT(3);
-    DEF_RSVDZ_BIT(2);
-    DEF_RSVDZ_BIT(1);
-    DEF_RSVDZ_BIT(0);
-
-    static auto Get() { return hwreg::RegisterAddr<TestReg64>(0); }
-  };
-
   // This C++ feature allows us to reduce the storage requirements.  Without
   // this, instances of derivatives of RegisterBase that escape the compiler's
   // analysis will pay a cost of 1 byte per internal field (so 1 for each
   // BIT/FIELD declaration and 2 for each RSVDZ_BIT/FIELD declaration).
 #if __has_cpp_attribute(no_unique_address)
-  static_assert(sizeof(TestReg8) == 8);
-  static_assert(sizeof(TestReg16) == 12);
-  static_assert(sizeof(TestReg32) == 16);
-  static_assert(sizeof(TestReg64) == 32);
+  static_assert(sizeof(TestRegForSizing8) == 8);
+  static_assert(sizeof(TestRegForSizing16) == 12);
+  static_assert(sizeof(TestRegForSizing32) == 16);
+  static_assert(sizeof(TestRegForSizing64) == 32);
 #else
-  static_assert(sizeof(TestReg8) == 24);
-  static_assert(sizeof(TestReg16) == 44);
-  static_assert(sizeof(TestReg32) == 52);
-  static_assert(sizeof(TestReg64) == 72);
+  static_assert(sizeof(TestRegForSizing8) == 24);
+  static_assert(sizeof(TestRegForSizing16) == 44);
+  static_assert(sizeof(TestRegForSizing32) == 52);
+  static_assert(sizeof(TestRegForSizing64) == 72);
 #endif
 }
 
@@ -997,20 +1171,20 @@ struct FakeIo {
   }
 };
 
+class TestRegForVariantIo : public hwreg::RegisterBase<TestRegForVariantIo, uint64_t> {
+ public:
+  DEF_FIELD(63, 0, value);
+
+  static auto Get() { return hwreg::RegisterAddr<TestRegForVariantIo>(0); }
+};
+
 TEST(RegisterTestCase, Variant) {
-  class TestReg64 : public hwreg::RegisterBase<TestReg64, uint64_t> {
-   public:
-    DEF_FIELD(63, 0, value);
-
-    static auto Get() { return hwreg::RegisterAddr<TestReg64>(0); }
-  };
-
   using MyIo = std::variant<std::variant<FakeIo, hwreg::RegisterMmio>, hwreg::Mock::RegisterIo>;
 
   MyIo io;
 
   {
-    auto reg = TestReg64::Get().ReadFrom(&io);
+    auto reg = TestRegForVariantIo::Get().ReadFrom(&io);
     EXPECT_EQ(23, reg.value());
     reg.set_value(17);
     reg.WriteTo(&io);
@@ -1019,7 +1193,7 @@ TEST(RegisterTestCase, Variant) {
   {
     volatile uint64_t fake_reg = 17;
     io.emplace<0>(&fake_reg);
-    auto reg = TestReg64::Get().ReadFrom(&io);
+    auto reg = TestRegForVariantIo::Get().ReadFrom(&io);
     EXPECT_EQ(17, reg.value());
     reg.set_value(23);
     reg.WriteTo(&io);
@@ -1030,7 +1204,7 @@ TEST(RegisterTestCase, Variant) {
     hwreg::Mock mock;
     io.emplace<1>(*mock.io());
     mock.ExpectRead(uint64_t{17}, 0).ExpectWrite(uint64_t{23}, 1);
-    auto reg = TestReg64::Get().ReadFrom(&io);
+    auto reg = TestRegForVariantIo::Get().ReadFrom(&io);
     EXPECT_EQ(17, reg.value());
     reg.set_reg_addr(1);
     reg.set_value(23);
