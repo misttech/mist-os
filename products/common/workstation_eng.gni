@@ -45,10 +45,6 @@ legacy_cache_package_labels += [
   # TODO(crbug.com/1408597): Remove once the Chromium tests package the fake.
   "//src/testing/fidl/intl_property_manager",
   "//src/developer/build_info/testing:fake-build-info",
-
-  # Archivist for manual embedding in tests. Note that this archivist won't attribute logs by
-  # moniker and is unable to ingest Inspect.
-  "//src/diagnostics/archivist:archivist-without-attribution",
 ]
 
 legacy_universe_package_labels += [ "//src/fonts:open-fonts" ]

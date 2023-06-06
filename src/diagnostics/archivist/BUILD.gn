@@ -195,24 +195,9 @@ fuchsia_component_manifest("archivist-for-embedding-v2-manifest") {
   component_name = "archivist-for-embedding"
 }
 
-fuchsia_component_manifest("archivist-without-attribution-manifest") {
-  manifest = "meta/archivist-without-attribution.cml"
-  component_name = "archivist-without-attribution"
-}
-
 fuchsia_component("archivist-for-embedding-v2-component") {
   cm_label = ":archivist-for-embedding-v2-manifest"
   deps = [ ":bin" ]
-}
-
-fuchsia_component("archivist-without-attribution-component") {
-  cm_label = ":archivist-without-attribution-manifest"
-  deps = [ ":bin" ]
-}
-
-fuchsia_structured_config_values("without-attribution-config") {
-  cm_label = ":archivist-without-attribution-manifest"
-  values = without_attribution_config
 }
 
 fuchsia_structured_config_values("archivist-embedded-config") {
@@ -234,13 +219,6 @@ group("archivist-for-embedding-v2") {
 fuchsia_package("package") {
   package_name = "archivist"
   deps = [ ":component" ]
-}
-
-fuchsia_package("archivist-without-attribution") {
-  deps = [
-    ":archivist-without-attribution-component",
-    ":without-attribution-config",
-  ]
 }
 
 fuchsia_package("archivist-for-embedding") {

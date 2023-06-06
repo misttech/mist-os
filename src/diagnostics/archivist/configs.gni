@@ -38,9 +38,3 @@ embedded_config = {
   log_to_debuglog = false
   num_threads = 1
 }
-
-without_attribution_config = {
-  forward_variables_from(embedded_config, "*")
-  enable_event_source = false
-  is_unattributed = true
-}

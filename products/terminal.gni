@@ -65,13 +65,7 @@ legacy_base_package_labels += [
 # infrastructure, Chromium infrastructure runs such tests run on this image,
 # so they must be explicitly included in cached packages.
 # TODO(crbug.com/1408597): Remove once the Chromium tests package the fake.
-legacy_cache_package_labels += [
-  "//src/chromium:chromium_test_base_deps",
-
-  # Archivist for manual embedding in tests. Note that this archivist won't attribute logs by
-  # moniker and is unable to ingest Inspect. Used in Chromium tests.
-  "//src/diagnostics/archivist:archivist-without-attribution",
-]
+legacy_cache_package_labels += [ "//src/chromium:chromium_test_base_deps" ]
 
 # Add SDK tools set to "cache" so these tools are automatically available in
 # QEMU images generated for the SDK, but in cache, so they can be updated.

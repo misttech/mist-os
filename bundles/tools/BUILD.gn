@@ -21,7 +21,6 @@ group("tools") {
     "//src/developer/ffx:ffx_tool",
     "//src/devices/bundles:tools",
     "//src/devices/lib/bind",
-    "//src/diagnostics/archivist:archivist-without-attribution",
     "//src/graphics/display:tools",
     "//src/graphics/lib/magma:magma-tools",
     "//src/identity:tools",
