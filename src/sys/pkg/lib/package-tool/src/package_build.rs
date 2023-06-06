@@ -69,18 +69,15 @@ pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
         create_dir_all(&cmd.out).with_context(|| format!("creating {}", cmd.out))?;
     }
 
+    let package_manifest_path = cmd.out.join(PACKAGE_MANIFEST_NAME);
+    builder.manifest_path(package_manifest_path);
+
     // Build the package.
     let gendir = tempfile::TempDir::new_in(&cmd.out)?;
     let meta_far_path = cmd.out.join(META_FAR_NAME);
     let package_manifest = builder
         .build(gendir.path(), &meta_far_path)
         .with_context(|| format!("creating package manifest {meta_far_path}"))?;
-
-    // Write out the package manifest to `package_manifest.json`.
-    let package_manifest_path = cmd.out.join(PACKAGE_MANIFEST_NAME);
-    let file = File::create(&package_manifest_path)
-        .with_context(|| format!("creating {package_manifest_path}"))?;
-    to_writer_json_pretty(file, &package_manifest)?;
 
     // FIXME(fxbug.dev/101306): We're replicating `pm build --depfile` here, and directly expressing
     // that the `meta.far` depends on all the package contents. However, I think this should
