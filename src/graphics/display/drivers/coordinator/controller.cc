@@ -255,12 +255,10 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
         }
       }
       if (vc_client_ && vc_ready_) {
-        vc_client_->OnDisplaysChanged(added_ids.data(), added_ids.size(),
-                                      removed_display_ids.data(), removed_display_ids.size());
+        vc_client_->OnDisplaysChanged(added_ids, removed_display_ids);
       }
       if (primary_client_ && primary_ready_) {
-        primary_client_->OnDisplaysChanged(added_ids.data(), added_ids.size(),
-                                           removed_display_ids.data(), removed_display_ids.size());
+        primary_client_->OnDisplaysChanged(added_ids, removed_display_ids);
       }
 
     } else {
@@ -844,7 +842,9 @@ zx_status_t Controller::CreateClient(
                   current_displays[idx++] = display.id;
                 }
               }
-              client_ptr->OnDisplaysChanged(current_displays, idx, nullptr, 0);
+              cpp20::span<uint64_t> removed_display_ids = {};
+              client_ptr->OnDisplaysChanged(
+                  cpp20::span<uint64_t>(current_displays, displays_.size()), removed_display_ids);
             }
 
             if (vc_client_ == client_ptr) {

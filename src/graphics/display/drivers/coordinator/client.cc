@@ -13,6 +13,7 @@
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/fit/defer.h>
 #include <lib/image-format/image_format.h>
+#include <lib/stdcompat/span.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/clock.h>
@@ -1021,12 +1022,12 @@ void Client::SetOwnership(bool is_owner) {
   }
 }
 
-void Client::OnDisplaysChanged(const uint64_t* displays_added, size_t added_count,
-                               const uint64_t* displays_removed, size_t removed_count) {
+void Client::OnDisplaysChanged(cpp20::span<const uint64_t> added_display_ids,
+                               cpp20::span<const uint64_t> removed_display_ids) {
   ZX_DEBUG_ASSERT(controller_->current_thread_is_loop());
 
   controller_->AssertMtxAliasHeld(controller_->mtx());
-  for (unsigned i = 0; i < added_count; i++) {
+  for (uint64_t added_display_id : added_display_ids) {
     fbl::AllocChecker ac;
     auto config = fbl::make_unique_checked<DisplayConfig>(&ac);
     if (!ac.check()) {
@@ -1034,7 +1035,7 @@ void Client::OnDisplaysChanged(const uint64_t* displays_added, size_t added_coun
       continue;
     }
 
-    config->id = displays_added[i];
+    config->id = added_display_id;
 
     zx::result get_supported_pixel_formats_result =
         controller_->GetSupportedPixelFormats(config->id);
@@ -1085,14 +1086,14 @@ void Client::OnDisplaysChanged(const uint64_t* displays_added, size_t added_coun
   // We need 2 loops, since we need to make sure we allocate the
   // correct size array in the fidl response.
   std::vector<fhd::wire::Info> coded_configs;
-  coded_configs.reserve(added_count);
+  coded_configs.reserve(added_display_ids.size());
 
   // Hang on to modes values until we send the message.
   std::vector<std::vector<fhd::wire::Mode>> modes_vector;
 
   fidl::Arena arena;
-  for (unsigned i = 0; i < added_count; i++) {
-    auto config = configs_.find(displays_added[i]);
+  for (uint64_t added_display_id : added_display_ids) {
+    auto config = configs_.find(added_display_id);
     if (!config.IsValid()) {
       continue;
     }
@@ -1142,14 +1143,14 @@ void Client::OnDisplaysChanged(const uint64_t* displays_added, size_t added_coun
     const char* manufacturer_name = "";
     const char* monitor_name = "";
     const char* monitor_serial = "";
-    if (!controller_->GetDisplayIdentifiers(displays_added[i], &manufacturer_name, &monitor_name,
+    if (!controller_->GetDisplayIdentifiers(added_display_id, &manufacturer_name, &monitor_name,
                                             &monitor_serial)) {
       zxlogf(ERROR, "Failed to get display identifiers");
       ZX_DEBUG_ASSERT(false);
     }
 
     info.using_fallback_size = false;
-    if (!controller_->GetDisplayPhysicalDimensions(displays_added[i], &info.horizontal_size_mm,
+    if (!controller_->GetDisplayPhysicalDimensions(added_display_id, &info.horizontal_size_mm,
                                                    &info.vertical_size_mm)) {
       zxlogf(ERROR, "Failed to get display physical dimensions");
       ZX_DEBUG_ASSERT(false);
@@ -1168,10 +1169,10 @@ void Client::OnDisplaysChanged(const uint64_t* displays_added, size_t added_coun
   }
 
   std::vector<uint64_t> removed_ids;
-  removed_ids.reserve(removed_count);
+  removed_ids.reserve(removed_display_ids.size());
 
-  for (unsigned i = 0; i < removed_count; i++) {
-    auto display = configs_.erase(displays_removed[i]);
+  for (uint64_t removed_display_id : removed_display_ids) {
+    auto display = configs_.erase(removed_display_id);
     if (display) {
       display->pending_layers_.clear();
       display->current_layers_.clear();
@@ -1431,9 +1432,9 @@ void ClientProxy::SetOwnership(bool is_owner) {
   mtx_unlock(&task_mtx_);
 }
 
-void ClientProxy::OnDisplaysChanged(const uint64_t* displays_added, size_t added_count,
-                                    const uint64_t* displays_removed, size_t removed_count) {
-  handler_.OnDisplaysChanged(displays_added, added_count, displays_removed, removed_count);
+void ClientProxy::OnDisplaysChanged(cpp20::span<const uint64_t> added_display_ids,
+                                    cpp20::span<const uint64_t> removed_display_ids) {
+  handler_.OnDisplaysChanged(added_display_ids, removed_display_ids);
 }
 
 void ClientProxy::ReapplySpecialConfigs() {

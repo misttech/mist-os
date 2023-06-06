@@ -167,8 +167,8 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   fpromise::result<fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator>, zx_status_t> Init(
       fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
 
-  void OnDisplaysChanged(const uint64_t* displays_added, size_t added_count,
-                         const uint64_t* displays_removed, size_t removed_count);
+  void OnDisplaysChanged(cpp20::span<const uint64_t> added_display_ids,
+                         cpp20::span<const uint64_t> removed_display_ids);
   void SetOwnership(bool is_owner);
   void ApplyConfig();
 
@@ -358,8 +358,8 @@ class ClientProxy {
   // Requires holding controller_->mtx() lock
   zx_status_t OnDisplayVsync(uint64_t display_id, zx_time_t timestamp,
                              ConfigStamp controller_stamp);
-  void OnDisplaysChanged(const uint64_t* displays_added, size_t added_count,
-                         const uint64_t* displays_removed, size_t removed_count);
+  void OnDisplaysChanged(cpp20::span<const uint64_t> added_display_ids,
+                         cpp20::span<const uint64_t> removed_display_ids);
   void SetOwnership(bool is_owner);
   void ReapplyConfig();
   zx_status_t OnCaptureComplete();
