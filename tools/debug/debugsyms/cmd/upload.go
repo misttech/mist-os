@@ -70,6 +70,10 @@ func (cmd uploadCommand) execute(ctx context.Context, dirs []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to collect .debug files: %v", err)
 	}
+	bfrs, err = prune(ctx, bfrs)
+	if err != nil {
+		return fmt.Errorf("pruning .debug files failed: %v", err)
+	}
 	if !verify(ctx, bfrs) {
 		return fmt.Errorf("verification failed for .debug files")
 	}
@@ -108,19 +112,45 @@ func collect(dirs []string) ([]elflib.BinaryFileRef, error) {
 	return out, nil
 }
 
-// Returns true iff all bfrs are valid debug binaries.
-func verify(ctx context.Context, bfrs []elflib.BinaryFileRef) bool {
-	succeeded := true
+// Removes files from the collected set of BinaryFileRefs that but might not have a debug_info but
+// should not cause errors in verify.
+func prune(ctx context.Context, bfrs []elflib.BinaryFileRef) ([]elflib.BinaryFileRef, error) {
+	var out []elflib.BinaryFileRef
 	for _, bfr := range bfrs {
 		hasDebugInfo, err := bfr.HasDebugInfo()
 		if err != nil {
 			logger.Errorf(ctx, "cannot read %s: %v", bfr.Filepath, err)
-			succeeded = false
+			return nil, err
 		}
 		if !hasDebugInfo {
-			logger.Errorf(ctx, "%s missing .debug_info section", bfr.Filepath)
-			succeeded = false
+			hasDex, err := bfr.HasDex()
+			if err != nil {
+				logger.Errorf(ctx, "could not determine whether %s has a dex section: %v", bfr.Filepath, err)
+				return nil, err
+			}
+			if !hasDex {
+				// Found a file that doesn't have a debug_info section or a dex
+				// section, this is an error.
+				return nil, fmt.Errorf("%s missing .debug_info and .dex sections", bfr.Filepath)
+			}
+
+			// Fallthrough if the file has a dex section but no debug_info section.
+			// These files are technically valid, but will cause issues in downstream
+			// pipelines that assume all of the files in a debug package have debug_info
+			// sections, so do not upload these files but also don't fail in the verify
+			// step when the expectation is that they have a debug_info section.
+		} else {
+			// This one has a debug_info section, add it.
+			out = append(out, bfr)
 		}
+	}
+	return out, nil
+}
+
+// Returns true iff all bfrs are valid debug binaries.
+func verify(ctx context.Context, bfrs []elflib.BinaryFileRef) bool {
+	succeeded := true
+	for _, bfr := range bfrs {
 		if err := bfr.Verify(); err != nil {
 			logger.Errorf(ctx, "verification failed for %s: %v", bfr.Filepath, err)
 			succeeded = false
