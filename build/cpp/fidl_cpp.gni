@@ -57,6 +57,7 @@ template("_fidl_cpp_codegen_impl") {
     visibility = generation_visibility
 
     tool = invoker.fidlgen_tool
+    mnemonic = "FIDLGEN"
 
     inputs = [
       fidl_ir_json,

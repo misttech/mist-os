@@ -79,6 +79,7 @@ template("fidl_dart") {
     ]
 
     tool = "//tools/fidl/fidlgen_dart"
+    mnemonic = "FIDLGEN"
 
     inputs = [ fidl_ir_json ]
 

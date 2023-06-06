@@ -58,6 +58,7 @@ template("fidl_bind_library") {
       visibility = [ ":*" ]
 
       tool = "//tools/bindc:bin"
+      mnemonic = "BINDC"
       tool_output_name = "bindc"
 
       inputs = [ fidl_ir_json ]

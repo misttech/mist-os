@@ -288,6 +288,7 @@ template("_zither") {
       visibility = [ ":*" ]
 
       tool = "//zircon/tools/zither"
+      mnemonic = "ZITHER"
 
       inputs = [ fidl_ir_json ]
 

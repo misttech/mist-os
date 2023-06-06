@@ -142,6 +142,7 @@ template("fidl_library") {
     visibility = [ ":*" ]
 
     script = "//build/scripts/run_and_stamp.sh"
+    mnemonic = "LINT"
 
     # run_and_stamp.sh runs this tool, and touches lint_stamp_file if successful
     _tool_with_no_output = "//tools/fidl/fidlc:fidl-lint"

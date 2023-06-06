@@ -87,6 +87,7 @@ template("_compiled_action_target") {
                              "hermetic_inputs_target",
                              "inputs",
                              "metadata",
+                             "mnemonic",
                              "no_output_dir_leaks",
                              "outputs",
                              "public_deps",

@@ -357,6 +357,7 @@ template("bindc") {
 
     tool = "//tools/bindc:bin"
     tool_output_name = "bindc"
+    mnemonic = "BINDC"
 
     if (defined(invoker.rules)) {
       sources = [ invoker.rules ]

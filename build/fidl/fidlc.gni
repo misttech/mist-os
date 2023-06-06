@@ -123,7 +123,6 @@ template("fidlc") {
                              "testonly",
                              "visibility",
                            ])
-
     tool = "//tools/fidl/fidlc:fidlc"
     inputs = [ response_file ]
     depfile = fidlc_depfile_path
@@ -131,6 +130,7 @@ template("fidlc") {
       coding_tables,
       invoker.json_representation,
     ]
+    mnemonic = "FIDLC"
     args = [ "@" + rebase_path(response_file, root_build_dir) ]
     if (defined(invoker.non_fidl_deps)) {
       deps = invoker.non_fidl_deps

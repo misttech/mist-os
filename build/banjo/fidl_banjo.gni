@@ -29,6 +29,7 @@ template("_fidl_banjo_c") {
 
       tool = "//src/devices/tools/fidlgen_banjo:bin"
       tool_output_name = "fidlgen_banjo"
+      mnemonic = "FIDLGEN"
 
       inputs = [ invoker.fidl_ir_json ]
 
