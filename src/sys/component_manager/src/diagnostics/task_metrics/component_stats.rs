@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::diagnostics::cpu::{
+    crate::diagnostics::task_metrics::{
         measurement::Measurement, runtime_stats_source::RuntimeStatsSource, task_info::TaskInfo,
     },
     fuchsia_inspect as inspect, fuchsia_zircon as zx,

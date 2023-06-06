@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        diagnostics::cpu::{
+        diagnostics::task_metrics::{
             component_stats::ComponentStats,
             constants::*,
             measurement::{Measurement, MeasurementsQueue},
@@ -551,7 +551,7 @@ mod tests {
     use {
         super::*,
         crate::{
-            diagnostics::cpu::testing::{FakeDiagnosticsContainer, FakeRuntime, FakeTask},
+            diagnostics::task_metrics::testing::{FakeDiagnosticsContainer, FakeRuntime, FakeTask},
             model::testing::routing_test_helpers::RoutingTest,
         },
         cm_rust_testing::ComponentDeclBuilder,

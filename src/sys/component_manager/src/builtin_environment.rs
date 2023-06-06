@@ -38,7 +38,7 @@ use {
             time::{create_utc_clock, UtcTimeMaintainer},
             vmex_resource::VmexResource,
         },
-        diagnostics::{cpu::ComponentTreeStats, startup::ComponentEarlyStartupTimeStats},
+        diagnostics::{startup::ComponentEarlyStartupTimeStats, task_metrics::ComponentTreeStats},
         directory_ready_notifier::DirectoryReadyNotifier,
         framework::{
             binder::BinderCapabilityHost, lifecycle_controller::LifecycleController,
