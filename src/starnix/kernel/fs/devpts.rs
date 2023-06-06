@@ -90,7 +90,7 @@ impl FileSystemOps for DevPtsFs {
     }
 
     fn generate_node_ids(&self) -> bool {
-        true
+        false
     }
 }
 
