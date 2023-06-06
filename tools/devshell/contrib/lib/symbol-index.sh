@@ -46,7 +46,7 @@ function _fx-symbol-index-ids-txt-to-build-id {
     fx-info "Rebuilding build-id directory from $ids_txt_file into $build_id_dir"
     rm -rf "$cache_dir"
     if ! "$FUCHSIA_DIR/scripts/build_id_conv.py" \
-      --input "$ids_txt_file" --stamp "$stamp_file" \
+      --input "$ids_txt_file" --stamp "$stamp_file" --build-id-mode symlink \
       --output-format .build-id "$build_id_dir"; then
       fx-warn "Failed to convert $ids_txt_file into a build-id directory"
       return 1
