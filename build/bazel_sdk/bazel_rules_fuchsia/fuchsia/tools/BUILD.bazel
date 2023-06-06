@@ -143,6 +143,12 @@ py_binary(
 )
 
 py_binary(
+    name = "rebase_flash_manifest",
+    srcs = ["rebase_flash_manifest.py"],
+    python_version = "PY3",
+)
+
+py_binary(
     name = "size_report_merger",
     srcs = ["size_report_merger.py"],
     python_version = "PY3",

@@ -519,6 +519,22 @@ def _fuchsia_product_bundle_impl(ctx):
             pave_script.path,
         ],
     )
+
+    # TODO(fxb/121752): Remove the generation of flash.json after infra is
+    # ready to use product bundle to flash device.
+    flash_manifest = ctx.actions.declare_file(ctx.label.name + "_flash.json")
+    ctx.actions.run(
+        outputs = [flash_manifest],
+        inputs = [pb_out_dir],
+        executable = ctx.executable._rebase_flash_manifest,
+        arguments = [
+            "--product-bundle",
+            pb_out_dir.path,
+            "--flash-manifest-path",
+            flash_manifest.path,
+        ],
+    )
+    deps.append(flash_manifest)
     deps.append(pave_script)
 
     return [DefaultInfo(files = depset(direct = deps)), FuchsiaProductBundleInfo(
@@ -593,6 +609,11 @@ fuchsia_product_bundle = rule(
         ),
         "_create_pave_script": attr.label(
             default = "//fuchsia/tools:create_pave_script",
+            executable = True,
+            cfg = "exec",
+        ),
+        "_rebase_flash_manifest": attr.label(
+            default = "//fuchsia/tools:rebase_flash_manifest",
             executable = True,
             cfg = "exec",
         ),
