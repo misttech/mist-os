@@ -6,6 +6,7 @@
 ### generates documentation for a Rust target
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -87,6 +88,11 @@ def main():
         ROOT_PATH / "scripts/rust/rustdoc_no_ld_library_path.sh")
     env["RUSTDOCFLAGS"] = "-Z unstable-options --enable-index-page"
     env["RUST_BACKTRACE"] = "1"
+    # Ideally this would somehow be automatically handled by the Cargo.toml
+    # generator reading the gn BUILD config. It doesn't do that today because
+    # we're re-using the third_party Cargo manifests, so we hardcode it instead
+    with open(ROOT_PATH / "third_party/icu/default/version.json") as f:
+        env["RUST_ICU_MAJOR_VERSION_NUMBER"] = json.load(f)["major_version"]
 
     call_args = [
         rust_dir / "cargo", "doc", "--manifest-path=" + str(args.manifest_path)
