@@ -68,6 +68,21 @@ impl Drop for MagmaBuffer {
     }
 }
 
+/// A `MagmaSemaphore` is an RAII wrapper around a `magma_semaphore_t`.
+pub struct MagmaSemaphore {
+    // This reference is needed to release the semaphore.
+    pub connection: Arc<MagmaConnection>,
+    pub handle: magma_semaphore_t,
+}
+
+impl Drop for MagmaSemaphore {
+    /// SAFETY: Makes an FFI call to release a a `magma_semaphore_t` handle. `connection.handle` must
+    /// be valid because `connection` is refcounted.
+    fn drop(&mut self) {
+        unsafe { magma_connection_release_semaphore(self.connection.handle, self.handle) }
+    }
+}
+
 /// A `BufferMap` stores all the magma buffers for a given connection.
 type BufferMap = HashMap<magma_buffer_t, BufferInfo>;
 
@@ -91,6 +106,7 @@ pub struct MagmaFile {
     devices: Arc<Mutex<DeviceMap>>,
     connections: Arc<Mutex<ConnectionMap>>,
     buffers: Arc<Mutex<HashMap<magma_buffer_t, Arc<MagmaBuffer>>>>,
+    semaphores: Arc<Mutex<HashMap<magma_semaphore_t, Arc<MagmaSemaphore>>>>,
 }
 
 impl MagmaFile {
@@ -104,6 +120,7 @@ impl MagmaFile {
             devices: Arc::new(Mutex::new(HashMap::new())),
             connections: Arc::new(Mutex::new(HashMap::new())),
             buffers: Arc::new(Mutex::new(HashMap::new())),
+            semaphores: Arc::new(Mutex::new(HashMap::new())),
         }))
     }
 
@@ -178,6 +195,10 @@ impl MagmaFile {
 
     fn get_buffer(&self, buffer: magma_buffer_t) -> Result<Arc<MagmaBuffer>, Errno> {
         Ok(self.buffers.lock().get(&buffer).ok_or_else(|| errno!(EINVAL))?.clone())
+    }
+
+    fn get_semaphore(&self, semaphore: magma_semaphore_t) -> Result<Arc<MagmaSemaphore>, Errno> {
+        Ok(self.semaphores.lock().get(&semaphore).ok_or_else(|| errno!(EINVAL))?.clone())
     }
 }
 
@@ -464,14 +485,21 @@ impl FileOps for MagmaFile {
 
                 let mut semaphore_out = 0;
                 let mut semaphore_id = 0;
-                response.result_return = unsafe {
+                let status = unsafe {
                     magma_connection_create_semaphore(
                         connection.handle,
                         &mut semaphore_out,
                         &mut semaphore_id,
-                    ) as u64
+                    )
                 };
+                if status == MAGMA_STATUS_OK {
+                    self.semaphores.lock().insert(
+                        semaphore_out,
+                        Arc::new(MagmaSemaphore { connection, handle: semaphore_out }),
+                    );
+                }
 
+                response.result_return = status as u64;
                 response.semaphore_out = semaphore_out;
                 response.id_out = semaphore_id;
                 response.hdr.type_ =
@@ -501,14 +529,21 @@ impl FileOps for MagmaFile {
 
                 let mut semaphore_out = 0;
                 let mut semaphore_id = 0;
-                response.result_return = unsafe {
+                let status = unsafe {
                     magma_connection_import_semaphore(
                         connection.handle,
                         control.semaphore_handle,
                         &mut semaphore_out,
                         &mut semaphore_id,
-                    ) as u64
+                    )
                 };
+                if status == MAGMA_STATUS_OK {
+                    self.semaphores.lock().insert(
+                        semaphore_out,
+                        Arc::new(MagmaSemaphore { connection, handle: semaphore_out }),
+                    );
+                }
+                response.result_return = status as u64;
                 response.semaphore_out = semaphore_out;
                 response.id_out = semaphore_id;
 
@@ -521,14 +556,8 @@ impl FileOps for MagmaFile {
                     virtio_magma_connection_release_semaphore_ctrl_t,
                     virtio_magma_connection_release_semaphore_resp_t,
                 ) = read_control_and_response(current_task, &command)?;
-                let connection = self.get_connection(control.connection)?;
 
-                unsafe {
-                    magma_connection_release_semaphore(
-                        connection.handle,
-                        control.semaphore as magma_semaphore_t,
-                    );
-                };
+                self.semaphores.lock().remove(&{ control.semaphore });
 
                 response.hdr.type_ =
                     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_RELEASE_SEMAPHORE as u32;
@@ -540,12 +569,11 @@ impl FileOps for MagmaFile {
                     virtio_magma_semaphore_export_resp_t,
                 ) = read_control_and_response(current_task, &command)?;
 
+                let semaphore = self.get_semaphore(control.semaphore)?;
+
                 let mut semaphore_handle_out = 0;
                 response.result_return = unsafe {
-                    magma_semaphore_export(
-                        control.semaphore as magma_semaphore_t,
-                        &mut semaphore_handle_out,
-                    ) as u64
+                    magma_semaphore_export(semaphore.handle, &mut semaphore_handle_out) as u64
                 };
                 response.semaphore_handle_out = semaphore_handle_out as u64;
 
@@ -558,9 +586,10 @@ impl FileOps for MagmaFile {
                     virtio_magma_semaphore_reset_ctrl_t,
                     virtio_magma_semaphore_reset_resp_t,
                 ) = read_control_and_response(current_task, &command)?;
+                let semaphore = self.get_semaphore(control.semaphore)?;
 
                 unsafe {
-                    magma_semaphore_reset(control.semaphore as magma_semaphore_t);
+                    magma_semaphore_reset(semaphore.handle);
                 };
 
                 response.hdr.type_ =
@@ -572,9 +601,10 @@ impl FileOps for MagmaFile {
                     virtio_magma_semaphore_signal_ctrl_t,
                     virtio_magma_semaphore_signal_resp_t,
                 ) = read_control_and_response(current_task, &command)?;
+                let semaphore = self.get_semaphore(control.semaphore)?;
 
                 unsafe {
-                    magma_semaphore_signal(control.semaphore as magma_semaphore_t);
+                    magma_semaphore_signal(semaphore.handle);
                 };
 
                 response.hdr.type_ =
