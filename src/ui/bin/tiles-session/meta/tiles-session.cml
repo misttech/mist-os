@@ -69,6 +69,7 @@
             protocol: [
                 "fuchsia.paver.Paver",
                 "fuchsia.power.battery.BatteryManager",
+                "fuchsia.update.installer.Installer",
             ],
             from: "parent",
             to: "#elements",
