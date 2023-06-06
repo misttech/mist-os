@@ -10,7 +10,6 @@
 #include <fuchsia/ui/display/singleton/cpp/fidl.h>
 #include <fuchsia/ui/focus/cpp/fidl.h>
 #include <fuchsia/ui/observation/test/cpp/fidl.h>
-#include <fuchsia/ui/policy/cpp/fidl.h>
 #include <fuchsia/ui/test/scene/cpp/fidl.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
