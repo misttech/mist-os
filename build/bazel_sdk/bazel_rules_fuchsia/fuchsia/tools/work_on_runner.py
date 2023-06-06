@@ -10,8 +10,6 @@ import json
 import time
 import signal
 
-from pathlib import Path
-
 
 class FfxRunner():
 
@@ -19,19 +17,29 @@ class FfxRunner():
         # We need to get a absolute path to ffx since we are running from the
         # repository root
         self.ffx = os.path.realpath(ffx)
-        print(self.ffx)
         self.cwd = cwd
 
     def run(self, *args):
         try:
-            cmd = [self.ffx] + list(args)
             return subprocess.check_output(
-                cmd,
+                self._build_cmd(*args),
                 text=True,
             ).strip()
         except subprocess.CalledProcessError as e:
             print(e.stdout)
             raise e
+
+    def run_streamed(self, *args):
+        try:
+            proc = subprocess.Popen(
+                self._build_cmd(*args), stdout=None, stderr=None)
+            return proc.wait()
+        except subprocess.CalledProcessError as e:
+            print(e.stdout)
+            raise e
+
+    def _build_cmd(self, *args):
+        return [self.ffx] + list(args)
 
 
 class Context():
@@ -89,6 +97,12 @@ class Context():
     def log(self, msg):
         # TODO: allow for verbose or not settings
         print(msg)
+
+
+class StepEarlyExit():
+
+    def __init__(self, reason):
+        self.reason = reason
 
 
 class Step():
@@ -177,9 +191,12 @@ class FetchProductBundle(Step):
                 "--base-url",
                 f"gs://fuchsia/development/{ctx.sdk_id}",
             )
-            ctx.ffx().run(
-                "product", "download", transfer_manifest, ctx.pb_path,
-                "--force")
+            try:
+                ctx.ffx().run_streamed(
+                    "product", "download", transfer_manifest, ctx.pb_path,
+                    "--force")
+            except:
+                return StepEarlyExit("Failed to download product bundle.")
         else:
             ctx.log(
                 f"Skipping download. Product bundle already exists at {ctx.pb_path}"
@@ -194,7 +211,10 @@ class FetchProductBundle(Step):
         ctx.ffx().run("repository", "add", ctx.pb_path)
 
     def cleanup(self, ctx):
-        os.remove(self.pb_config_path(ctx))
+        try:
+            os.remove(self.pb_config_path(ctx))
+        except:
+            pass
 
     def _download_needed(self, ctx):
         if os.path.exists(ctx.pb_path):
@@ -267,11 +287,19 @@ class WatchForTarget(Step):
 
         product_dot_board = f"{product}.{board}"
         if ctx.sdk_id != sdk_version or ctx.pb_name != product_dot_board:
-            ctx.log(f"WARNING: the target {target} might not be compatible with your SDK.")
-            ctx.log("If you experience unexpected errors, try updating your target or")
+            ctx.log(
+                f"WARNING: the target {target} might not be compatible with your SDK."
+            )
+            ctx.log(
+                "If you experience unexpected errors, try updating your target or"
+            )
             ctx.log("restarting this program with the correct target.")
-            ctx.log(f"Expected SDK id: {ctx.sdk_id}, Target SDK id: {sdk_version}")
-            ctx.log(f"Expected product: {ctx.pb_name}, Target product: {product_dot_board}")
+            ctx.log(
+                f"Expected SDK id: {ctx.sdk_id}, Target SDK id: {sdk_version}")
+            ctx.log(
+                f"Expected product: {ctx.pb_name}, Target product: {product_dot_board}"
+            )
+
 
 class Runner:
 
@@ -286,13 +314,17 @@ class Runner:
 
     def run(self):
         for step in self.progression:
-            step.run(self.ctx)
+            result = step.run(self.ctx)
+            if type(result) is StepEarlyExit:
+                self.ctx.log("Exiting early:")
+                self.ctx.log(result.reason)
+                break
+        self.shutdown()
 
-    def shutdown(self, signum, frame):
+    def shutdown(self):
         self.ctx.log("Shutting down")
         for step in self.progression:
             step.cleanup(self.ctx)
-        exit(0)
 
 
 def main():
@@ -337,7 +369,11 @@ def main():
     args = parser.parse_args()
     runner = Runner(Context(args))
 
-    signal.signal(signal.SIGINT, runner.shutdown)
+    def handle_signal(signum, frame):
+        runner.shutdown()
+        exit(1)
+
+    signal.signal(signal.SIGINT, handle_signal)
     runner.run()
 
 
