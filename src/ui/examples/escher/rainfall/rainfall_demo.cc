@@ -1,5 +1,6 @@
-// Copyright 2018 The Fuchsia Authors. All rights reserved.// Use of this source code is governed by
-// a BSD-style license that can be// found in the LICENSE file.
+// Copyright 2018 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
 #include "src/ui/examples/escher/rainfall/rainfall_demo.h"
 
 #include "src/ui/examples/escher/rainfall/scenes/flatland_demo_scene1.h"
