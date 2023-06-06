@@ -918,8 +918,8 @@ def main():
         ### Python
         # Python scripts access Python prebuilts for the interpreter,
         # standard library, and other things that are not strict inputs
-        # to Python scripts.
-        os.path.join(src_root, "prebuilt", "third_party", "python3/"),
+        # to Python scripts.  This also covers dirs named python3.x.
+        os.path.join(src_root, "prebuilt", "third_party", "python3"),
 
         ### Dart
         # TODO(jayzhuang): flutter's dart_libraries currently don't have sources
