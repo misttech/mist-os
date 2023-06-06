@@ -33,7 +33,7 @@
 use std::marker::PhantomData;
 
 use bit_set::BitSet;
-use tracing::{info, warn};
+use tracing::warn;
 
 use crate::NETLINK_LOG_TAG;
 
@@ -133,11 +133,9 @@ impl<F: MulticastCapableNetlinkFamily> MulticastGroupMemberships<F> {
     ) -> Result<(), InvalidModernGroupError> {
         let MulticastGroupMemberships { family: _, memberships } = self;
         if !F::is_valid_group(&group) {
-            warn!(tag = NETLINK_LOG_TAG, "failed to join invalid group: {:?}", group);
             return Err(InvalidModernGroupError);
         }
         let _was_absent: bool = memberships.insert(group.into());
-        info!(tag = NETLINK_LOG_TAG, "joined group: {:?}", group);
         return Ok(());
     }
 
@@ -148,11 +146,9 @@ impl<F: MulticastCapableNetlinkFamily> MulticastGroupMemberships<F> {
     ) -> Result<(), InvalidModernGroupError> {
         let MulticastGroupMemberships { family: _, memberships } = self;
         if !F::is_valid_group(&group) {
-            warn!(tag = NETLINK_LOG_TAG, "failed to leave invalid group: {:?}", group);
             return Err(InvalidModernGroupError);
         }
         let _was_present: bool = memberships.remove(group.into());
-        info!(tag = NETLINK_LOG_TAG, "left group: {:?}", group);
         return Ok(());
     }
 
@@ -202,12 +198,10 @@ impl<F: MulticastCapableNetlinkFamily> MulticastGroupMemberships<F> {
             match mutation {
                 Mutation::None => {}
                 Mutation::Add(group) => {
-                    info!(tag = NETLINK_LOG_TAG, "joined group: {:?}", group);
                     let _was_absent: bool = memberships.insert(group.into());
                 }
                 Mutation::Del(group) => {
                     let _was_present: bool = memberships.remove(group.into());
-                    info!(tag = NETLINK_LOG_TAG, "left group: {:?}", group);
                 }
             }
         }
