@@ -36,9 +36,6 @@
                 "FifoTest.FifoTruncNoOp",
                 "FifoTest.MknodAtFIFO",
 
-                // fuse_test
-                "FuseTest.RejectBadInit",
-
                 // getdents_test
                 "GetdentsTest/*.LargeDir",
                 "GetdentsTest/*.PartialBuffer",

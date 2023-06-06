@@ -84,12 +84,17 @@ class FuseTest : public ::testing::Test {
         return testing::AssertionFailure() << "Unable to create witness file: " << strerror(errno);
       }
     }
-    fork_helper_.RunInForkedProcess([&] {
+    pid_t child_pid = fork_helper_.RunInForkedProcess([&] {
       std::string configuration =
           "lowerdir=" + lowerdir + ",upperdir=" + upperdir + ",workdir=" + workdir;
       execl(GetOverlayFsPath().c_str(), GetOverlayFsPath().c_str(), "-f", "-o",
             configuration.c_str(), mergedir.c_str(), NULL);
     });
+    if (child_pid <= 0) {
+      return testing::AssertionFailure() << "Unable to fork to start the fuse server process";
+    }
+    mount_dir_ = mergedir;
+
     std::string witness = mergedir + "/" + witness_name;
     for (int i = 0; i < 20 && access(witness.c_str(), R_OK) != 0; ++i) {
       usleep(100000);
@@ -97,7 +102,6 @@ class FuseTest : public ::testing::Test {
     if (access(witness.c_str(), R_OK) != 0) {
       return testing::AssertionFailure() << "Unable to see witness file. Mount failed?";
     }
-    mount_dir_ = mergedir;
     return testing::AssertionSuccess();
   }
 
