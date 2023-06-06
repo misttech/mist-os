@@ -10,7 +10,6 @@ mod apply;
 mod channel;
 mod channel_handler;
 mod check;
-mod config;
 mod connect;
 mod errors;
 mod poller;
@@ -22,7 +21,6 @@ mod update_service;
 use {
     crate::{
         channel_handler::ChannelHandler,
-        config::Config,
         poller::run_periodic_update_check,
         update_service::{RealUpdateManager, UpdateService},
     },
@@ -33,6 +31,8 @@ use {
     fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_inspect as finspect,
+    fuchsia_url::AbsolutePackageUrl,
+    fuchsia_zircon as zx,
     futures::{prelude::*, stream::FuturesUnordered},
     std::{sync::Arc, time::Duration},
     tracing::{error, warn},
@@ -40,6 +40,23 @@ use {
 
 const MAX_CONCURRENT_CONNECTIONS: usize = 100;
 const DEFAULT_UPDATE_PACKAGE_URL: &str = "fuchsia-pkg://fuchsia.com/update";
+
+/// Static service configuration options.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Config {
+    poll_frequency: Option<zx::Duration>,
+    update_package_url: Option<AbsolutePackageUrl>,
+}
+
+impl Config {
+    pub fn poll_frequency(&self) -> Option<zx::Duration> {
+        self.poll_frequency
+    }
+
+    pub fn update_package_url(&self) -> Option<&AbsolutePackageUrl> {
+        self.update_package_url.as_ref()
+    }
+}
 
 #[fuchsia::main(threads = 1, logging_tags = ["system-update-checker"])]
 async fn main() -> Result<(), Error> {
@@ -52,7 +69,7 @@ async fn main() -> Result<(), Error> {
 }
 
 async fn main_inner() -> Result<(), Error> {
-    let config = Config::load_from_config_data_or_default();
+    let config = Config::default();
     if let Some(url) = config.update_package_url() {
         warn!("Ignoring custom update package url: {}", url);
     }
@@ -149,5 +166,32 @@ async fn handle_incoming_service(incoming_service: IncomingServices) -> Result<(
         IncomingServices::ChannelControl(request_stream, handler) => {
             handler.handle_control_request_stream(request_stream).await
         }
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug)]
+pub struct ConfigBuilder(Config);
+
+#[cfg(test)]
+impl ConfigBuilder {
+    pub fn new() -> Self {
+        Self(Config::default())
+    }
+
+    pub fn poll_frequency(mut self, duration: impl Into<zx::Duration>) -> Self {
+        self.0.poll_frequency = Some(duration.into());
+        self
+    }
+
+    pub fn build(self) -> Config {
+        self.0
+    }
+}
+
+#[cfg(test)]
+impl Default for ConfigBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }

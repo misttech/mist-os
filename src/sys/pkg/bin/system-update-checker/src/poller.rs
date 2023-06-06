@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::config::Config;
 use crate::update_manager::UpdateManagerControlHandle;
 use crate::update_monitor::{AttemptNotifier, StateNotifier};
+use crate::Config;
 use fidl_fuchsia_update::CheckNotStartedReason;
 use fidl_fuchsia_update_ext::{CheckOptions, Initiator};
 use fuchsia_async as fasync;
@@ -51,7 +51,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::ConfigBuilder;
     use crate::update_manager::{
         tests::{
             FakeAttemptNotifier, FakeCommitQuerier, FakeTargetChannelUpdater, FakeUpdateChecker,
@@ -59,6 +58,7 @@ mod tests {
         },
         UpdateManager, UpdateManagerRequest,
     };
+    use crate::ConfigBuilder;
     use assert_matches::assert_matches;
     use fidl_fuchsia_update_ext::{CheckOptions, State};
     use fuchsia_async::DurationExt;

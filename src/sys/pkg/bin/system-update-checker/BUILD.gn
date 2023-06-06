@@ -5,7 +5,6 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//src/sys/core/build/core_shard.gni")
-import("//src/sys/pkg/bin/system-update-checker/ota_config.gni")
 
 rustc_binary("bin") {
   name = "system_update_checker"
@@ -63,7 +62,6 @@ rustc_binary("bin") {
     "src/channel.rs",
     "src/channel_handler.rs",
     "src/check.rs",
-    "src/config.rs",
     "src/connect.rs",
     "src/errors.rs",
     "src/main.rs",
@@ -101,11 +99,6 @@ fuchsia_test_package("system-update-checker-tests") {
       max_severity = "ERROR"
     }
   }
-}
-
-ota_config("auto_update") {
-  # Check for updates every 60 minutes
-  poll_frequency_minutes = 60
 }
 
 group("tests") {
