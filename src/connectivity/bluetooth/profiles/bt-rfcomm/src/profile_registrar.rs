@@ -9,7 +9,9 @@ use fidl::endpoints::{create_request_stream, ClientEnd};
 use fidl_fuchsia_bluetooth::ErrorCode;
 use fidl_fuchsia_bluetooth_bredr as bredr;
 use fuchsia_async as fasync;
-use fuchsia_bluetooth::profile::{psm_from_protocol, ChannelParameters, Psm, ServiceDefinition};
+use fuchsia_bluetooth::profile::{
+    l2cap_connect_parameters, psm_from_protocol, ChannelParameters, Psm, ServiceDefinition,
+};
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect_derive::Inspect;
 use futures::{
@@ -174,21 +176,20 @@ impl ProfileRegistrar {
             return Ok(());
         }
 
-        let connect_params = bredr::ConnectParameters::L2cap(bredr::L2capParameters {
-            psm: Some(bredr::PSM_RFCOMM),
-            ..Default::default()
-        });
-        let l2cap_channel =
-            match self.profile_upstream.connect(&peer_id.into(), &connect_params).await {
-                Ok(Ok(channel)) => channel.try_into().unwrap(),
-                Ok(Err(e)) => {
-                    return Err(e);
-                }
-                Err(e) => {
-                    warn!(%peer_id, "Couldn't establish L2CAP connection {e:?}");
-                    return Err(ErrorCode::Failed);
-                }
-            };
+        let l2cap_channel = match self
+            .profile_upstream
+            .connect(&peer_id.into(), &l2cap_connect_parameters(Psm::RFCOMM))
+            .await
+        {
+            Ok(Ok(channel)) => channel.try_into().unwrap(),
+            Ok(Err(e)) => {
+                return Err(e);
+            }
+            Err(e) => {
+                warn!(%peer_id, "Couldn't establish L2CAP connection {e:?}");
+                return Err(ErrorCode::Failed);
+            }
+        };
         self.rfcomm_server
             .new_l2cap_connection(peer_id, l2cap_channel)
             .map_err(|_| ErrorCode::Failed)
@@ -619,13 +620,7 @@ mod tests {
         peer_id: PeerId,
         psm: u16,
     ) -> impl Future<Output = Result<Result<bredr::Channel, ErrorCode>, fidl::Error>> {
-        client.connect(
-            &peer_id.into(),
-            &bredr::ConnectParameters::L2cap(bredr::L2capParameters {
-                psm: Some(psm),
-                ..Default::default()
-            }),
-        )
+        client.connect(&peer_id.into(), &l2cap_connect_parameters(Psm::new(psm)))
     }
 
     fn new_client(

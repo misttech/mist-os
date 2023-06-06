@@ -5,7 +5,7 @@
 use {
     anyhow::format_err,
     async_utils::hanging_get::client::HangingGetStream,
-    bt_rfcomm::profile::server_channel_from_protocol,
+    bt_rfcomm::profile::{rfcomm_connect_parameters, server_channel_from_protocol},
     fidl_fuchsia_bluetooth_bredr as bredr,
     fidl_fuchsia_bluetooth_hfp::{NetworkInformation, PeerHandlerProxy},
     fuchsia_async::Task,
@@ -225,11 +225,7 @@ impl PeerTask {
                 return;
             }
         };
-        let params = bredr::ConnectParameters::Rfcomm(bredr::RfcommParameters {
-            channel: Some(server_channel.into()),
-            ..Default::default()
-        });
-
+        let params = rfcomm_connect_parameters(server_channel);
         if self.connection_behavior.autoconnect {
             if let Err(e) = self.connect(params).await {
                 info!("Error inititating connecting to peer {}: {:?}", self.id, e);

@@ -4,7 +4,9 @@
 
 use super::{Procedure, ProcedureError, ProcedureMarker, ProcedureRequest};
 
-use crate::peer::{calls::CallIdx, service_level_connection::SlcState, slc_request::SlcRequest, update::AgUpdate};
+use crate::peer::{
+    calls::CallIdx, service_level_connection::SlcState, slc_request::SlcRequest, update::AgUpdate,
+};
 use {
     at_commands as at,
     core::convert::{TryFrom, TryInto},
@@ -92,17 +94,20 @@ impl TryFrom<&str> for CallHoldAction {
             "1" => Self::ReleaseAllActive,
             "2" => Self::HoldActiveAndAccept,
             cmd if cmd.starts_with("1") => {
-                let idx = cmd.strip_prefix("1").unwrap_or("").parse().map_err(|_| CallHoldActionError)?;
+                let idx =
+                    cmd.strip_prefix("1").unwrap_or("").parse().map_err(|_| CallHoldActionError)?;
                 Self::ReleaseSpecified(idx)
             }
             cmd if cmd.starts_with("2") => {
-                let idx = cmd.strip_prefix("2").unwrap_or("").parse().map_err(|_| CallHoldActionError)?;
+                let idx =
+                    cmd.strip_prefix("2").unwrap_or("").parse().map_err(|_| CallHoldActionError)?;
                 Self::HoldAllExceptSpecified(idx)
             }
             _ => return Err(CallHoldActionError),
         };
 
-        CallHoldAction::supported_actions().find(|&&x| x == action)
+        CallHoldAction::supported_actions()
+            .find(|&&x| x == action)
             .map_or(Err(CallHoldActionError), |&x| Ok(x))
     }
 }

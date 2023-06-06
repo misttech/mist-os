@@ -3,9 +3,11 @@
 // found in the LICENSE file.
 
 use {
-    bt_rfcomm::{profile::server_channel_from_protocol, ServerChannel},
+    bt_rfcomm::profile::{rfcomm_connect_parameters, server_channel_from_protocol},
+    bt_rfcomm::ServerChannel,
     fidl_fuchsia_bluetooth_bredr as bredr,
     fuchsia_async::{DurationExt, TimeoutExt},
+    fuchsia_bluetooth::profile::{l2cap_connect_parameters, Psm},
     fuchsia_bluetooth::types::{Channel, PeerId, Uuid},
     fuchsia_component_test::{Capability, RealmInstance},
     fuchsia_zircon::Duration,
@@ -241,10 +243,7 @@ async fn rfcomm_component_connecting_to_another_rfcomm_component() {
         .expect("observer event");
 
     // Client #2 can now connect via RFCOMM to Client #1.
-    let params = bredr::ConnectParameters::Rfcomm(bredr::RfcommParameters {
-        channel: Some(rfcomm_channel_number.into()),
-        ..Default::default()
-    });
+    let params = rfcomm_connect_parameters(rfcomm_channel_number);
     let connect_fut = other_rfcomm_proxy.connect(&this_rfcomm.peer_id().into(), &params);
     pin_mut!(connect_fut);
 
@@ -340,13 +339,7 @@ async fn passthrough_search_discovers_advertisement() {
     // Passthrough L2CAP connection is OK - the channel endpoints should be delivered to the
     // `client` and `test_driven_peer`.
     let _client_channel = profile
-        .connect(
-            &test_driven_peer.peer_id().into(),
-            &bredr::ConnectParameters::L2cap(bredr::L2capParameters {
-                psm: Some(bredr::PSM_AVDTP),
-                ..Default::default()
-            }),
-        )
+        .connect(&test_driven_peer.peer_id().into(), &l2cap_connect_parameters(Psm::AVDTP))
         .await;
 
     let (other_id, _test_driven_peer_channel, _, _) = connect_requests

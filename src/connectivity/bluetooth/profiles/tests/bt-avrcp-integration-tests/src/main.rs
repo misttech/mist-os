@@ -14,6 +14,7 @@ use {
     fidl_fuchsia_bluetooth_bredr as bredr,
     fixture::fixture,
     fuchsia_async as fasync,
+    fuchsia_bluetooth::profile::{l2cap_connect_parameters, Psm},
     fuchsia_bluetooth::types::{Channel, Uuid},
     fuchsia_component_test::Capability,
     fuchsia_zircon as zx,
@@ -199,8 +200,7 @@ async fn remote_initiates_connection_to_avrcp(mut tf: AvrcpIntegrationTest) {
     fasync::Timer::new(fasync::Time::after(MAX_AVRCP_CONNECTION_ESTABLISHMENT)).await;
 
     // Mock peer attempts to connect to AVRCP.
-    let l2cap = bredr::L2capParameters { psm: Some(bredr::PSM_AVCTP), ..Default::default() };
-    let params = bredr::ConnectParameters::L2cap(l2cap);
+    let params = l2cap_connect_parameters(Psm::AVCTP);
     let channel = tf.mock_peer.make_connection(avrcp_profile_id, params).await.unwrap();
     let channel: Channel = channel.try_into().unwrap();
 
@@ -263,8 +263,7 @@ async fn remote_initiates_browse_channel_before_control(mut tf: AvrcpIntegration
         }
     };
     // Mock peer tries to initiate a browse channel connection.
-    let l2cap = bredr::L2capParameters { psm: Some(bredr::PSM_AVCTP_BROWSE), ..Default::default() };
-    let params = bredr::ConnectParameters::L2cap(l2cap);
+    let params = l2cap_connect_parameters(Psm::AVCTP_BROWSE);
     let channel = tf.mock_peer.make_connection(avrcp_profile_id, params).await.unwrap();
     let channel: Channel = channel.try_into().unwrap();
 
