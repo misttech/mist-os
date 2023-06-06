@@ -1,4 +1,4 @@
-# Life of a pixel
+# Life of a Pixel
 
 A client requests a set of commands to be Presented as part of a future Scenic
 frame. A single Scenic frame can have multiple client "Presents", where each
