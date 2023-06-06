@@ -22,6 +22,7 @@ use crate::{
         InvalidLegacyGroupsError, InvalidModernGroupError, LegacyGroups, ModernGroup,
         MulticastCapableNetlinkFamily,
     },
+    NETLINK_LOG_TAG,
 };
 
 /// A type representing a Netlink Protocol Family.
@@ -140,7 +141,13 @@ pub mod route {
             let (req_header, payload) = req.into_parts();
             let req = match payload {
                 NetlinkPayload::InnerMessage(p) => p,
-                p => panic!("Unexpected netlink payload: {:?}", p),
+                p => {
+                    warn!(
+                        tag = NETLINK_LOG_TAG,
+                        "Ignoring request from client {} with unexpected payload: {:?}", client, p
+                    );
+                    return;
+                }
             };
             use RtnlMessage::*;
             match req {
