@@ -10,6 +10,7 @@
 #ifndef FIDL_ZITHER_EXPERIMENTAL_ZX_TYPES_DATA_C_EXPERIMENTAL_ZX_TYPES_H_
 #define FIDL_ZITHER_EXPERIMENTAL_ZX_TYPES_DATA_C_EXPERIMENTAL_ZX_TYPES_H_
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -45,6 +46,38 @@ typedef struct {
   char str[10];
   char strs[6][4];
 } zither_experimental_zx_types_struct_with_string_arrays_t;
+
+typedef struct {
+  uint64_t value;
+} zither_experimental_zx_types_overlay_struct_variant_t;
+
+#define ZITHER_EXPERIMENTAL_ZX_TYPES_OVERLAY_WITH_EQUALLY_SIZED_VARIANTS_A ((uint64_t)(1u))
+#define ZITHER_EXPERIMENTAL_ZX_TYPES_OVERLAY_WITH_EQUALLY_SIZED_VARIANTS_B ((uint64_t)(2u))
+#define ZITHER_EXPERIMENTAL_ZX_TYPES_OVERLAY_WITH_EQUALLY_SIZED_VARIANTS_C ((uint64_t)(3u))
+#define ZITHER_EXPERIMENTAL_ZX_TYPES_OVERLAY_WITH_EQUALLY_SIZED_VARIANTS_D ((uint64_t)(4u))
+
+typedef struct {
+  uint64_t discriminant;
+  union {
+    uint64_t a;
+    int64_t b;
+    zither_experimental_zx_types_overlay_struct_variant_t c;
+    uint64_t d;
+  };
+} zither_experimental_zx_types_overlay_with_equally_sized_variants_t;
+
+#define ZITHER_EXPERIMENTAL_ZX_TYPES_OVERLAY_WITH_DIFFERENTLY_SIZED_VARIANTS_A ((uint64_t)(1u))
+#define ZITHER_EXPERIMENTAL_ZX_TYPES_OVERLAY_WITH_DIFFERENTLY_SIZED_VARIANTS_B ((uint64_t)(2u))
+#define ZITHER_EXPERIMENTAL_ZX_TYPES_OVERLAY_WITH_DIFFERENTLY_SIZED_VARIANTS_C ((uint64_t)(3u))
+
+typedef struct {
+  uint64_t discriminant;
+  union {
+    zither_experimental_zx_types_overlay_struct_variant_t a;
+    uint32_t b;
+    bool c;
+  };
+} zither_experimental_zx_types_overlay_with_differently_sized_variants_t;
 
 #if defined(__cplusplus)
 }

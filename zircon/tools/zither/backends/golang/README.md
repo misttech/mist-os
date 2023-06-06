@@ -127,3 +127,50 @@ yields
 ```go
 type MyAlias = MyType
 ```
+
+### Overlays
+
+```fidl
+type MyOverlay = strict overlay {
+    1: a MyOverlayStructVariant;
+    2: b uint32;
+};
+```
+
+yields
+
+```go
+type MyOverlayDiscriminant uint64
+
+const (
+	MyOverlayDiscriminantA MyOverlayDiscriminant = 1
+	MyOverlayDiscriminantB MyOverlayDiscriminant = 2
+)
+
+type MyOverlay struct {
+	Discriminant MyOverlayDiscriminant
+	variant      [8]byte
+}
+
+func (o MyOverlay) IsA() bool {
+	return o.Discriminant == MyOverlayDiscriminantA
+}
+
+func (o *MyOverlay) AsA() *MyOverlayStructVariant {
+	if !o.IsA() {
+		return nil
+	}
+	return (*MyOverlayStructVariant)(unsafe.Pointer(&o.variant))
+}
+
+func (o MyOverlay) IsB() bool {
+	return o.Discriminant == MyOverlayDiscriminantB
+}
+
+func (o *MyOverlay) AsB() *uint32 {
+	if !o.IsB() {
+		return nil
+	}
+	return (*uint32)(unsafe.Pointer(&o.variant))
+}
+```

@@ -35,3 +35,20 @@ type StructWithStringArrays = struct {
     str string_array<10>;
     strs array<string_array<6>, 4>;
 };
+
+type OverlayStructVariant = struct {
+    value uint64;
+};
+
+type OverlayWithEquallySizedVariants = strict overlay {
+    1: a uint64;
+    2: b int64;
+    3: c OverlayStructVariant;
+    4: d uint64;
+};
+
+type OverlayWithDifferentlySizedVariants = strict overlay {
+    1: a OverlayStructVariant;
+    2: b uint32;
+    3: c bool;
+};

@@ -40,6 +40,9 @@
 {{ else if .IsStruct }}
 {{ template "GenerateAsmStruct" .AsStruct }}
 
+{{ else if .IsOverlay }}
+{{ template "GenerateAsmOverlay" .AsOverlay }}
+
 {{ end }}
 {{ end }}
 

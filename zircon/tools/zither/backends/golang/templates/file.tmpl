@@ -37,6 +37,9 @@ import (
 {{ else if .IsStruct }}
 {{ template "GenerateGoStruct" .AsStruct }}
 
+{{ else if .IsOverlay }}
+{{ template "GenerateGoOverlay" .AsOverlay }}
+
 {{ else if .IsAlias }}
 {{ template "GenerateGoAlias" .AsAlias }}
 

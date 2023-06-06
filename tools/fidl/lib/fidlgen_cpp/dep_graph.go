@@ -232,6 +232,13 @@ func (g *DeclDepGraph) addDecl(decl fidlgen.Decl) {
 		} else {
 			g.addDepsFromType(node, decl.Type)
 		}
+	case *fidlgen.Overlay:
+		for _, m := range decl.Members {
+			g.addDepsFromType(node, m.Type)
+			if m.MaybeAlias != nil {
+				g.addDepsFromTypeCtor(node, *m.MaybeAlias)
+			}
+		}
 	}
 }
 

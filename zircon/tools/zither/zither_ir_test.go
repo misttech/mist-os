@@ -26,6 +26,8 @@ var cmpOpt = cmp.AllowUnexported(
 	BitsMember{},
 	Struct{},
 	StructMember{},
+	Overlay{},
+	OverlayVariant{},
 	Alias{},
 	SyscallFamily{},
 	Syscall{},
@@ -841,6 +843,222 @@ type StructWithArrayMembers = struct {
 						Size:         8,
 					},
 					Offset: 16,
+				},
+			},
+		},
+	}
+
+	if diff := cmp.Diff(expected, actual, cmpOpt); diff != "" {
+		t.Error(diff)
+	}
+}
+
+func TestCanSummarizeOverlays(t *testing.T) {
+	wd := t.TempDir()
+	ir := fidlgentest.EndToEndTest{T: t}.WithWorkingDirectory(wd).WithExperiment("zx_c_types").Single(`
+library example;
+
+/// This is an overlay.
+type BasicOverlay = strict overlay{
+	/// This is an overlay variant.
+    1: i64 int64;
+    2: u64 uint64;
+    3: i32 int32;
+    4: u32 uint32;
+    5: i16 int16;
+    6: u16 uint16;
+    7: i8 int8;
+    8: u8 uint8;
+    9: b bool;
+	10: e Enum;
+	11: bits Bits;
+	12: s OverlayStructVariant;
+};
+
+type OverlayStructVariant = struct {
+    value uint64;
+};
+
+type Enum = enum : uint16 {
+	ZERO = 0;
+};
+
+type Bits = bits : uint16 {
+	ONE = 1;
+};
+`)
+	summary, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var actual []Overlay
+	for _, decl := range summary.Files[0].Decls {
+		if decl.IsOverlay() {
+			actual = append(actual, decl.AsOverlay())
+		}
+	}
+
+	structVariant := Struct{
+		decl: decl{
+			Name: fidlgen.MustReadName("example/OverlayStructVariant"),
+		},
+		Size: 8,
+		Members: []StructMember{
+			{
+				member: member{Name: "value"},
+				Type: TypeDescriptor{
+					Type: "uint64",
+					Kind: TypeKindInteger,
+					Size: 8,
+				},
+			},
+		},
+	}
+
+	enum := Enum{
+		decl:    decl{Name: fidlgen.MustReadName("example/Enum")},
+		Subtype: "uint16",
+		Members: []EnumMember{
+			{
+				member: member{Name: "ZERO"},
+				Value:  "0",
+			},
+		},
+	}
+
+	bits := Bits{
+		decl:    decl{Name: fidlgen.MustReadName("example/Bits")},
+		Subtype: "uint16",
+		Members: []BitsMember{
+			{
+				member: member{Name: "ONE"},
+				Index:  0,
+			},
+		},
+	}
+
+	expected := []Overlay{
+		{
+			decl: decl{
+				Name:     fidlgen.MustReadName("example/BasicOverlay"),
+				Comments: []string{" This is an overlay."},
+			},
+			MaxVariantSize: 8,
+			Variants: []OverlayVariant{
+				{
+					member: member{
+						Name:     "i64",
+						Comments: []string{" This is an overlay variant."},
+					},
+					Type: TypeDescriptor{
+						Type: "int64",
+						Kind: TypeKindInteger,
+						Size: 8,
+					},
+					Discriminant: 1,
+				},
+				{
+					member: member{Name: "u64"},
+					Type: TypeDescriptor{
+						Type: "uint64",
+						Kind: TypeKindInteger,
+						Size: 8,
+					},
+					Discriminant: 2,
+				},
+				{
+					member: member{Name: "i32"},
+					Type: TypeDescriptor{
+						Type: "int32",
+						Kind: TypeKindInteger,
+						Size: 4,
+					},
+					Discriminant: 3,
+				},
+				{
+					member: member{Name: "u32"},
+					Type: TypeDescriptor{
+						Type: "uint32",
+						Kind: TypeKindInteger,
+						Size: 4,
+					},
+					Discriminant: 4,
+				},
+				{
+					member: member{Name: "i16"},
+					Type: TypeDescriptor{
+						Type: "int16",
+						Kind: TypeKindInteger,
+						Size: 2,
+					},
+					Discriminant: 5,
+				},
+				{
+					member: member{Name: "u16"},
+					Type: TypeDescriptor{
+						Type: "uint16",
+						Kind: TypeKindInteger,
+						Size: 2,
+					},
+					Discriminant: 6,
+				},
+				{
+					member: member{Name: "i8"},
+					Type: TypeDescriptor{
+						Type: "int8",
+						Kind: TypeKindInteger,
+						Size: 1,
+					},
+					Discriminant: 7,
+				},
+				{
+					member: member{Name: "u8"},
+					Type: TypeDescriptor{
+						Type: "uint8",
+						Kind: TypeKindInteger,
+						Size: 1,
+					},
+					Discriminant: 8,
+				},
+				{
+					member: member{Name: "b"},
+					Type: TypeDescriptor{
+						Type: "bool",
+						Kind: TypeKindBool,
+						Size: 1,
+					},
+					Discriminant: 9,
+				},
+				{
+					member: member{Name: "e"},
+					Type: TypeDescriptor{
+						Type: "example/Enum",
+						Kind: TypeKindEnum,
+						Decl: &enum,
+						Size: 2,
+					},
+					Discriminant: 10,
+				},
+				{
+					member: member{Name: "bits"},
+					Type: TypeDescriptor{
+						Type: "example/Bits",
+						Kind: TypeKindBits,
+						Decl: &bits,
+						Size: 2,
+					},
+					Discriminant: 11,
+				},
+				{
+					member: member{Name: "s"},
+					Type: TypeDescriptor{
+						Type: "example/OverlayStructVariant",
+						Kind: TypeKindStruct,
+						Decl: &structVariant,
+						Size: 8,
+					},
+					Discriminant: 12,
 				},
 			},
 		},

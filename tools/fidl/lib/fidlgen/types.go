@@ -1013,6 +1013,8 @@ var _ = []Element{
 	(*UnionMember)(nil),
 	(*Alias)(nil),
 	(*NewType)(nil),
+	(*Overlay)(nil),
+	(*OverlayMember)(nil),
 }
 
 // Decl represents a FIDL declaration.
@@ -1033,6 +1035,7 @@ var _ = []Decl{
 	(*Union)(nil),
 	(*Alias)(nil),
 	(*NewType)(nil),
+	(*Overlay)(nil),
 }
 
 type decl struct {
@@ -1331,6 +1334,24 @@ func EmptyStructMember(name string) StructMember {
 			},
 		},
 	}
+}
+
+// Overlay represents a declaration of a FIDL overlay.
+type Overlay struct {
+	resourceableLayoutDecl
+	Members     []OverlayMember `json:"members"`
+	Strictness  `json:"strict"`
+	TypeShapeV1 TypeShape `json:"type_shape_v1"`
+	TypeShapeV2 TypeShape `json:"type_shape_v2"`
+}
+
+// OverlayMember represents the declaration of a member in a FIDL overlay.
+type OverlayMember struct {
+	member
+	Reserved   bool                    `json:"reserved"`
+	Ordinal    int                     `json:"ordinal"`
+	Type       Type                    `json:"type"`
+	MaybeAlias *PartialTypeConstructor `json:"experimental_maybe_from_alias,omitempty"`
 }
 
 // Openness of a protocol. Affects whether unknown interaction handlers are generated. Also controls
@@ -1741,6 +1762,7 @@ const (
 	StructDeclType   DeclType = "struct"
 	TableDeclType    DeclType = "table"
 	UnionDeclType    DeclType = "union"
+	OverlayDeclType  DeclType = "overlay"
 )
 
 func GetDeclType(decl Decl) DeclType {
@@ -1767,6 +1789,8 @@ func GetDeclType(decl Decl) DeclType {
 		return AliasDeclType
 	case *NewType:
 		return NewTypeDeclType
+	case *Overlay:
+		return OverlayDeclType
 	}
 	panic(fmt.Sprintf("unhandled declaration type: %s", reflect.TypeOf(decl).Name()))
 }
@@ -1811,7 +1835,7 @@ func (m DeclInfoMap) LookupResourceness(t Type) Resourceness {
 			return IsValueType
 		case ProtocolDeclType:
 			return IsResourceType
-		case StructDeclType, TableDeclType, UnionDeclType:
+		case StructDeclType, TableDeclType, UnionDeclType, OverlayDeclType:
 			return *info.Resourceness
 		default:
 			panic(fmt.Sprintf("unexpected decl type: %s", info.Type))
@@ -1843,6 +1867,7 @@ type Root struct {
 	ExternalStructs []Struct                    `json:"external_struct_declarations"`
 	Tables          []Table                     `json:"table_declarations"`
 	Unions          []Union                     `json:"union_declarations"`
+	Overlays        []Overlay                   `json:"overlay_declarations"`
 	Aliases         []Alias                     `json:"alias_declarations"`
 	NewTypes        []NewType                   `json:"new_type_declarations"`
 	DeclOrder       []EncodedCompoundIdentifier `json:"declaration_order"`
@@ -1889,6 +1914,9 @@ func (r *Root) ForEachDecl(cb func(Decl)) {
 	}
 	for i := range r.NewTypes {
 		cb(&r.NewTypes[i])
+	}
+	for i := range r.Overlays {
+		cb(&r.Overlays[i])
 	}
 }
 

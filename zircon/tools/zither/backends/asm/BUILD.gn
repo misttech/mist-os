@@ -13,6 +13,7 @@ go_library("asm") {
     "templates/const.tmpl",
     "templates/enum.tmpl",
     "templates/file.tmpl",
+    "templates/overlay.tmpl",
     "templates/struct.tmpl",
   ]
   deps = [

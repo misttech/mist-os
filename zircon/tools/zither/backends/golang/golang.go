@@ -90,14 +90,13 @@ func PackageBasename(lib fidlgen.LibraryName) string {
 }
 
 func PackageImports(summary zither.FileSummary) []string {
-	var imports []string
 	for _, kind := range summary.TypeKinds() {
 		switch kind {
-		case zither.TypeKindVoidPointer:
-			imports = append(imports, "unsafe")
+		case zither.TypeKindVoidPointer, zither.TypeKindOverlay:
+			return []string{"unsafe"}
 		}
 	}
-	return imports
+	return nil
 }
 
 func ConstMemberName(parent zither.Decl, member zither.Member) string {

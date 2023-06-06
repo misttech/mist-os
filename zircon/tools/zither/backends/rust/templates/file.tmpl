@@ -36,6 +36,9 @@
 {{ else if .IsStruct }}
 {{ template "GenerateRustStruct" .AsStruct }}
 
+{{ else if .IsOverlay }}
+{{ template "GenerateRustOverlay" .AsOverlay }}
+
 {{ else if .IsAlias }}
 {{ template "GenerateRustAlias" .AsAlias }}
 
@@ -44,4 +47,5 @@
 
 {{ end }}
 {{ end }}
+
 {{ end }}

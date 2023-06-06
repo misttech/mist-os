@@ -15,6 +15,7 @@ go_library("golang") {
     "templates/enum.tmpl",
     "templates/file.tmpl",
     "templates/handle.tmpl",
+    "templates/overlay.tmpl",
     "templates/struct.tmpl",
   ]
 

@@ -36,7 +36,9 @@ func NewGenerator(formatter fidlgen.Formatter) *Generator {
 		"ConstValue":               ConstValue,
 		"BitsAttributes":           BitsAttributes,
 		"EnumAttributes":           EnumAttributes,
+		"U64EnumAttributes":        U64EnumAttributes,
 		"StructAttributes":         StructAttributes,
+		"OverlayAttributes":        OverlayAttributes,
 		"DescribeType": func(desc zither.TypeDescriptor) string {
 			return DescribeType(desc, CaseStyleRust)
 		},
@@ -105,6 +107,15 @@ func (gen Generator) DeclCallback(decl zither.Decl) {
 			t.asBytes = t.asBytes && mt.asBytes
 			t.fromBytes = t.fromBytes && mt.fromBytes
 		}
+	case *zither.Overlay:
+		o := decl.(*zither.Overlay)
+		t.asBytes = true
+		for _, m := range o.Variants {
+			// AsBytes can only be derived if no variant has padding.
+			t.asBytes = t.asBytes && //
+				m.Type.Size == o.MaxVariantSize && //
+				getExtraTraitsOfDependency(m.Type, name).asBytes
+		}
 	case *zither.Alias:
 		a := decl.(*zither.Alias)
 		t = getExtraTraitsOfDependency(a.Value, name)
@@ -115,9 +126,11 @@ func (gen Generator) DeclCallback(decl zither.Decl) {
 func getExtraTraitsOfDependency(dep zither.TypeDescriptor, dependent string) *traits {
 	t := &traits{asBytes: false, fromBytes: false}
 	switch dep.Kind {
-	case zither.TypeKindBool, zither.TypeKindInteger, zither.TypeKindSize, zither.TypeKindStringArray:
+	case zither.TypeKindInteger, zither.TypeKindSize, zither.TypeKindStringArray:
 		t.asBytes = true
 		t.fromBytes = true
+	case zither.TypeKindBool:
+		t.asBytes = true
 	case zither.TypeKindEnum, zither.TypeKindBits, zither.TypeKindStruct, zither.TypeKindAlias:
 		var ok bool
 		t, ok = extraTraits[dep.Type]
@@ -291,6 +304,15 @@ func EnumAttributes(e zither.Enum) []string {
 	}
 }
 
+func U64EnumAttributes() []string {
+	supported := append(defaultTraits, "AsBytes")
+	sort.Strings(supported)
+	return []string{
+		"#[repr(u64)]",
+		fmt.Sprintf("#[derive(%s)]", strings.Join(supported, ", ")),
+	}
+}
+
 func BitsAttributes() []string {
 	// The default traits are already implicitly derived via the bitflags!
 	// macro.
@@ -303,6 +325,17 @@ func BitsAttributes() []string {
 func StructAttributes(s zither.Struct) []string {
 	t := extraTraits[s.Name.String()]
 	supported := append(defaultTraits, t.supported()...)
+	sort.Strings(supported)
+	return []string{
+		"#[repr(C)]",
+		fmt.Sprintf("#[derive(%s)]", strings.Join(supported, ", ")),
+	}
+}
+
+func OverlayAttributes(o zither.Overlay) []string {
+	t := extraTraits[o.Name.String()]
+	// Unions do not automatically support "Eq" and "PartialEq".
+	supported := append(t.supported(), "Clone", "Copy")
 	sort.Strings(supported)
 	return []string{
 		"#[repr(C)]",

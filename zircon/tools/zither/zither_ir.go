@@ -51,17 +51,18 @@ type Element interface {
 }
 
 var _ = []Element{
+	(*Alias)(nil),
+	(*Bits)(nil),
+	(*BitsMember)(nil),
 	(*Const)(nil),
 	(*Enum)(nil),
 	(*EnumMember)(nil),
-	(*Bits)(nil),
-	(*BitsMember)(nil),
+	(*Handle)(nil),
+	(*OverlayVariant)(nil),
 	(*Struct)(nil),
 	(*StructMember)(nil),
-	(*Alias)(nil),
-	(*Handle)(nil),
-	(*SyscallFamily)(nil),
 	(*Syscall)(nil),
+	(*SyscallFamily)(nil),
 	(*SyscallParameter)(nil),
 }
 
@@ -72,12 +73,12 @@ type Decl interface {
 }
 
 var _ = []Decl{
+	(*Alias)(nil),
 	(*Const)(nil),
 	(*Enum)(nil),
-	(*Bits)(nil),
-	(*Struct)(nil),
-	(*Alias)(nil),
 	(*Handle)(nil),
+	(*Overlay)(nil),
+	(*Struct)(nil),
 	(*SyscallFamily)(nil),
 }
 
@@ -113,8 +114,9 @@ type Member interface {
 }
 
 var _ = []Member{
-	(*EnumMember)(nil),
 	(*BitsMember)(nil),
+	(*EnumMember)(nil),
+	(*OverlayVariant)(nil),
 	(*StructMember)(nil),
 	(*Syscall)(nil),
 	(*SyscallParameter)(nil),
@@ -195,6 +197,15 @@ func (decl DeclWrapper) IsStruct() bool {
 
 func (decl DeclWrapper) AsStruct() Struct {
 	return *decl.value.(*Struct)
+}
+
+func (decl DeclWrapper) IsOverlay() bool {
+	_, ok := decl.value.(*Overlay)
+	return ok
+}
+
+func (decl DeclWrapper) AsOverlay() Overlay {
+	return *decl.value.(*Overlay)
 }
 
 func (decl DeclWrapper) IsAlias() bool {
@@ -364,10 +375,24 @@ func Summarize(ir fidlgen.Root, sourceDir string, order DeclOrder, cb func(Decl)
 			}
 		case *fidlgen.Struct:
 			decl, err = newStruct(*fidlDecl, processedDecls, typeKinds)
+			if err == nil {
+				typeKinds[TypeKindStruct] = struct{}{}
+			}
+		case *fidlgen.Overlay:
+			decl, err = newOverlay(*fidlDecl, processedDecls, typeKinds)
+			if err == nil {
+				typeKinds[TypeKindOverlay] = struct{}{}
+			}
 		case *fidlgen.Alias:
 			decl, err = newAlias(*fidlDecl, processedDecls, typeKinds)
+			if err == nil {
+				typeKinds[TypeKindAlias] = struct{}{}
+			}
 		case *fidlgen.Resource:
 			decl, err = newHandle(*fidlDecl, typeKinds)
+			if err == nil {
+				typeKinds[TypeKindHandle] = struct{}{}
+			}
 		case *fidlgen.Protocol:
 			decl, err = newSyscallFamily(*fidlDecl, processedDecls)
 		}
@@ -459,6 +484,7 @@ const (
 	TypeKindArray       TypeKind = "array"
 	TypeKindStringArray TypeKind = "string_array"
 	TypeKindStruct      TypeKind = "struct"
+	TypeKindOverlay     TypeKind = "overlay"
 	TypeKindAlias       TypeKind = "alias" // Not a type per se, but conveniently regarded as such.
 
 	// TODO(fxbug.dev/110021): These kinds exist only for the sake of the
@@ -780,6 +806,8 @@ func resolveType(typ recursiveType, attrs fidlgen.Attributes, decls declMap, typ
 			desc.Kind = TypeKindBits
 		case *Struct:
 			desc.Kind = TypeKindStruct
+		case *Overlay:
+			desc.Kind = TypeKindOverlay
 		case *Alias:
 			desc.Kind = TypeKindAlias
 		default: // TODO(fxbug.dev/106538): Skip if unknown.
@@ -983,6 +1011,63 @@ func newStruct(strct fidlgen.Struct, decls declMap, typeKinds map[TypeKind]struc
 		return nil, nil
 	}
 	return s, nil
+}
+
+// Overlay represents a FIDL overlay declaration.
+type Overlay struct {
+	decl
+
+	// MaxVariantSize is the maximum wire size of the overlay's variant types,
+	// including padding.
+	MaxVariantSize int
+
+	Variants []OverlayVariant
+}
+
+// Size gives the wire size of the overlay.
+func (o Overlay) Size() int {
+	return 8 + o.MaxVariantSize // sizeof(discriminant) + max. variant size.
+}
+
+// OverlayVariant represents a FIDL overlay variant (i.e., member).
+type OverlayVariant struct {
+	member
+
+	Type TypeDescriptor
+
+	// Discriminant is the ordinal uniquely identifying the variant.
+	Discriminant int
+}
+
+func newOverlay(overlay fidlgen.Overlay, decls declMap, typeKinds map[TypeKind]struct{}) (*Overlay, error) {
+	o := &Overlay{
+		decl:           newDecl(overlay),
+		MaxVariantSize: overlay.TypeShapeV2.InlineSize - 8,
+		Variants:       make([]OverlayVariant, len(overlay.Members)),
+	}
+	for i, member := range overlay.Members {
+		attrs := member.GetAttributes()
+
+		// TODO(fxbug.dev/105758): For overlay members, we have the
+		// `MaybeAlias` field as a workaround for recovering any alias name.
+		memberType := recursiveType(fidlgenType(member.Type))
+		if member.MaybeAlias != nil {
+			memberType = recursiveType(fidlgenTypeCtor(*member.MaybeAlias))
+		}
+		typ, err := resolveType(memberType, attrs, decls, typeKinds)
+		if err != nil {
+			return nil, fmt.Errorf("%s.%s: failed to derive type: %w", o.Name, member.Name, err)
+		}
+		if err != nil || typ == nil {
+			return nil, fmt.Errorf("%s.%s: failed to derive type: %w", o.Name, member.Name, err)
+		}
+		o.Variants[i] = OverlayVariant{
+			member:       newMember(member),
+			Type:         *typ,
+			Discriminant: member.Ordinal,
+		}
+	}
+	return o, nil
 }
 
 // Alias represents a FIDL type alias declaration.

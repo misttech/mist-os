@@ -698,6 +698,10 @@ zither_golden_test("experimental_zx_types") {
 
   cases = [
     {
+      backend = "asm"
+      files = [ "experimental_zx_types.h" ]
+    },
+    {
       backend = "c"
       files = [
         "experimental_zx_types.h",

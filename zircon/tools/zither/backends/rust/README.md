@@ -123,3 +123,62 @@ yields
 ```rust
 pub type MyAlias = MyType;
 ```
+
+### Overlays
+
+```fidl
+type MyOverlay = strict overlay {
+    1: a MyOverlayStructVariant;
+    2: b uint32;
+};
+```
+
+yields
+
+```rust
+#[repr(C)]
+#[derive(AsBytes, Clone, Copy)]
+pub struct MyOverlay {
+    pub discriminant: MyOverlayDiscriminant,
+    pub variant: MyOverlayVariant,
+}
+
+#[repr(u64)]
+#[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MyOverlayDiscriminant {
+    A = 1,
+    B = 2,
+}
+
+// TODO(https://github.com/rust-lang/rust/issues/49804): Define anonymously.
+#[repr(C)]
+#[derive(AsBytes, Clone, Copy)]
+pub union MyOverlayVariant {
+    pub a: MyOverlayStructVariant,
+    pub b: u32,
+}
+
+impl MyOverlay {
+    pub fn is_a(&self) -> bool {
+        self.discriminant == MyOverlayDiscriminant::A
+    }
+
+    pub fn as_a(&mut self) -> Option<&MyOverlayStructVariant> {
+        if self.is_a() {
+            return None;
+        }
+        unsafe { Some(&mut self.variant.a) }
+    }
+
+    pub fn is_b(&self) -> bool {
+        self.discriminant == MyOverlayDiscriminant::B
+    }
+
+    pub fn as_b(&mut self) -> Option<&u32> {
+        if self.is_b() {
+            return None;
+        }
+        unsafe { Some(&mut self.variant.b) }
+    }
+}
+```

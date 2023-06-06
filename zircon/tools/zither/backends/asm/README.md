@@ -104,3 +104,27 @@ yields
 where the `*_SIZEOF` macro gives the size of the struct on the wire (that is,
 including padding), and where the macros associated with members give the
 field's offset into the wire layout.
+
+### Overlays
+
+```fidl
+type MyOverlay = strict overlay {
+    1: a MyOverlayStructVariant;
+    2: b uint32;
+};
+
+type MyOverlayStructVariant = struct {
+  value uint64;
+};
+```
+
+yields
+
+```c
+#define EXAMPLE_MY_OVERLAY_SIZEOF (24)
+#define EXAMPLE_MY_OVERLAY_DISCRIMINANT (0)
+#define EXAMPLE_MY_OVERLAY_VALUE (8)
+
+#define EXAMPLE_MY_OVERLAY_A (1)
+#define EXAMPLE_MY_OVERLAY_B (2)
+```

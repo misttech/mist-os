@@ -8,6 +8,7 @@ import (
 	"embed"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"text/template"
@@ -121,18 +122,23 @@ func ConstMemberName(parent zither.Decl, member zither.Member) string {
 
 // StandardIncludes gives the list of language standard headers used by a file.
 func StandardIncludes(summary zither.FileSummary) []string {
-	var includes []string
+	includes := make(map[string]struct{})
 	for _, kind := range summary.TypeKinds() {
 		switch kind {
-		case zither.TypeKindInteger:
-			includes = append(includes, "stdint.h")
+		case zither.TypeKindInteger, zither.TypeKindOverlay:
+			includes["stdint.h"] = struct{}{}
 		case zither.TypeKindBool:
-			includes = append(includes, "stdbool.h")
+			includes["stdbool.h"] = struct{}{}
 		case zither.TypeKindSize:
-			includes = append(includes, "stddef.h")
+			includes["stddef.h"] = struct{}{}
 		}
 	}
-	return includes
+	var vals []string
+	for inc := range includes {
+		vals = append(vals, inc)
+	}
+	sort.Strings(vals)
+	return vals
 }
 
 // ConstValue returns the right-hand side of a generated C "constant" declaration.

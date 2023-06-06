@@ -2227,7 +2227,10 @@
             "items": {
                 "$ref": "#/definitions/overlay"
             },
-            "type": "array"
+            "type": [
+                "array",
+                "null"
+            ]
         }
     },
     "required": [

@@ -135,3 +135,27 @@ yields
 ```c
 typedef example_lib_my_type_t example_lib_my_aliase_t;
 ```
+
+### Overlays
+
+```fidl
+type MyOverlay = strict overlay {
+    1: a MyOverlayStructVariant;
+    2: b uint32;
+};
+```
+
+yields
+
+```c
+#define EXAMPLE_MY_OVERLAY_A ((uint64_t)(1u))
+#define EXAMPLE_MY_OVERLAY_B ((uint64_t)(2u))
+
+typedef struct {
+  uint64_t discriminant;
+  union {
+    example_my_overlay_struct_variant_t a;
+    uint32_t b;
+  };
+} example_my_overlay_t;
+```

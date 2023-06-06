@@ -48,6 +48,9 @@ extern "C" {
 {{ else if .IsStruct }}
 {{ template "GenerateCStruct" .AsStruct }}
 
+{{ else if .IsOverlay }}
+{{ template "GenerateCOverlay" .AsOverlay }}
+
 {{ else if .IsAlias }}
 {{ template "GenerateCAlias" .AsAlias }}
 
