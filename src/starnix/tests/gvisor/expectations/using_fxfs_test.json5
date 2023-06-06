@@ -152,60 +152,6 @@
                 "AllUnixDomainSockets/UnixSocketPairTest.SendFromMmapBeyondEof/*",
                 "Renameat2Test.NoReplaceSuccess",
 
-                // readv_test
-                "ReadvTestNoFixture.TruncatedAtMax",
-
-                // accept_bind_test
-                // Tests [0-3] fail.
-                // Skip all until we fix the issue causing the tests to fail
-                "AllUnixDomainSockets/AllSocketPairTest.Listen/*",
-                "AllUnixDomainSockets/AllSocketPairTest.ListenIncreaseBacklog/*",
-                "AllUnixDomainSockets/AllSocketPairTest.ListenDecreaseBacklog/*",
-                "AllUnixDomainSockets/AllSocketPairTest.ListenBacklogSizes/*",
-                "AllUnixDomainSockets/AllSocketPairTest.DoubleBind/*",
-                "AllUnixDomainSockets/AllSocketPairTest.BindListenBind/*",
-                "AllUnixDomainSockets/AllSocketPairTest.DoubleListen/*",
-                "AllUnixDomainSockets/AllSocketPairTest.DoubleConnect/*",
-                "AllUnixDomainSockets/AllSocketPairTest.Connect/*",
-                "AllUnixDomainSockets/AllSocketPairTest.ConnectWithWrongType/*",
-                "AllUnixDomainSockets/AllSocketPairTest.ConnectNonListening/*",
-                "AllUnixDomainSockets/AllSocketPairTest.SelfConnect/*",
-                "AllUnixDomainSockets/AllSocketPairTest.ConnectWithoutListen/*",
-                "AllUnixDomainSockets/AllSocketPairTest.Accept/*",
-                "AllUnixDomainSockets/AllSocketPairTest.AcceptValidAddrLen/*",
-                "AllUnixDomainSockets/AllSocketPairTest.AcceptNegativeAddrLen/*",
-                "AllUnixDomainSockets/AllSocketPairTest.AcceptLargePositiveAddrLen/*",
-                "AllUnixDomainSockets/AllSocketPairTest.AcceptVeryLargePositiveAddrLen/*",
-                "AllUnixDomainSockets/AllSocketPairTest.AcceptWithoutListen/*",
-                "AllUnixDomainSockets/AllSocketPairTest.GetRemoteAddress/*",
-                "AllUnixDomainSockets/AllSocketPairTest.UnboundGetLocalAddress/*",
-                "AllUnixDomainSockets/AllSocketPairTest.BoundGetLocalAddress/*",
-                "AllUnixDomainSockets/AllSocketPairTest.BoundConnector/*",
-                "AllUnixDomainSockets/AllSocketPairTest.BoundGetLocalAddress/*",
-                "AllUnixDomainSockets/AllSocketPairTest.UnboundSenderAddr/*",
-                "AllUnixDomainSockets/AllSocketPairTest.BoundSenderAddr/*",
-                "AllUnixDomainSockets/AllSocketPairTest.BindAfterConnectSenderAddr/*",
-                "AllUnixDomainSockets/AllSocketPairTest.BindAfterAcceptSenderAddr/*",
-
-                // accept_bind_stream test
-                // Tests [0-1] fail.
-                // Skip all until we fix the issue causing the tests to fail
-                "AllUnixDomainSockets/AllSocketPairTest.BoundSenderAddrCoalesced/*",
-
-                // bind_test
-                // Tests [0-5] fail.
-                // Skip all until we fix the issue causing the tests to fail
-                "AllUnixDomainSockets/AllSocketPairTest.Bind/*",
-                "AllUnixDomainSockets/AllSocketPairTest.DoubleBindSocket/*",
-                "AllUnixDomainSockets/AllSocketPairTest.GetLocalAddr/*",
-                "AllUnixDomainSockets/AllSocketPairTest.DoubleBindAddress/*",
-                "AllUnixDomainSockets/AllSocketPairTest.Unbind/*",
-
-                // chroot_test - panicked
-                "ChrootTest.ProcMemSelfFdsYesEscapeProcOpen",
-                "ChrootTest.ProcMountsMountinfoNoEscape",
-                "ChrootTest.Success",
-
                 // epoll_test - these tests hang
                 "EpollTest.AllWritable",
                 "EpollTest.CloseFile",
@@ -379,85 +325,6 @@
                 "SetgidDirTest.OldDir",
                 "SetgidDirTest.OldFile",
 
-                // socket_blocking_local_test
-                // Tests 3, 4, 5, 12, 13, 14 fail.
-                // Skip all until we fix the issue causing the tests to fail
-                "NonBlockingUnixDomainSockets/BlockingSocketPairTest.RecvBlocks/*",
-
-                // socket_stream_local_test
-                // Tests 2, 3, 8, 9 fail.
-                // Skip all until we fix the issue causing the tests to fail
-                "StreamUnixSockets/StreamSocketPairTest.CoalescedRecv/*",
-                "StreamUnixSockets/StreamSocketPairTest.MsgTrunc/*",
-                "StreamUnixSockets/StreamSocketPairTest.RecvmsgMsghdrFlagsNoMsgTrunc/*",
-                "StreamUnixSockets/StreamSocketPairTest.RecvmsgTruncPeekZeroLen/*",
-                "StreamUnixSockets/StreamSocketPairTest.RecvmsgTruncZeroLen/*",
-                "StreamUnixSockets/StreamSocketPairTest.SplitRecv/*",
-                "StreamUnixSockets/StreamSocketPairTest.WriteOneSideClosed/*",
-
-                // socket_non_stream_blocking_local_test
-                // Tests 2, 3, 8, 9 fail.
-                // Skip all until we fix the issue causing the tests to fail
-                "BlockingNonStreamUnixSockets/BlockingNonStreamSocketPairTest.RecvLessThanBufferWaitAll/*",
-                "BlockingNonStreamUnixSockets/BlockingNonStreamSocketPairTest.RecvmsgTruncPeekDontwaitZeroLenBlocking/*",
-
-                // socket_stream_blocking_local_test
-                // Tests 1, 4 fail.
-                // Skip all until we fix the issue causing the tests to fail
-                "BlockingStreamUnixSockets/BlockingStreamSocketPairTest.SendMsgTooLarge/*",
-                "BlockingStreamUnixSockets/BlockingStreamSocketPairTest.RecvLessThanBuffer/*",
-                "BlockingStreamUnixSockets/BlockingStreamSocketPairTest.RecvLessThanBufferWaitAll/*",
-                "BlockingStreamUnixSockets/BlockingStreamSocketPairTest.SendTimeout/*",
-
-                // socket_stream_nonblock_local_test
-                // Tests 1, 4 fail.
-                // Skip all until we fix the issue causing the tests to fail
-                "NonBlockingStreamUnixSockets/NonBlockingStreamSocketPairTest.SendMsgTooLarge/*",
-
-                // socket_unix_dgram_local_test
-                // Tests 4-7, 16-19 fail.
-                // Skip all until we fix the issue causing the tests to fail
-                "DgramUnixSockets/DgramUnixSocketPairTest.*/*",
-                "DgramUnixSockets/NonStreamSocketPairTest.*/*",
-                "DgramUnixSockets/UnixNonStreamSocketPairTest.*/*",
-
-                // socket_unix_seqpacket_local_test
-                // Tests 2, 3, 8, 9 fail.
-                // Skip all until we fix the issue causing the tests to fail
-                "SeqpacketUnixSockets/NonStreamSocketPairTest.*/*",
-                "SeqpacketUnixSockets/SeqpacketUnixSocketPairTest.*/*",
-                "SeqpacketUnixSockets/UnixNonStreamSocketPairTest.*/*",
-
-                // socket_unix_stream_test
-                // Tests 2, 3, 8, 9 fail.
-                // Skip all until we fix the issue causing the tests to fail
-                "AllUnixDomainSockets/StreamUnixSocketPairTest.*/*",
-
-                // socket_unix_unbound_dgram_test
-                // Tests 0, 1 fail.
-                // Skip all until we fix the issue causing the tests to fail
-                "AllUnixDomainSockets/UnboundDgramUnixSocketPairTest.BindConnect/*",
-                "AllUnixDomainSockets/UnboundDgramUnixSocketPairTest.SelfConnect/*",
-                "AllUnixDomainSockets/UnboundDgramUnixSocketPairTest.DoubleConnect/*",
-                "AllUnixDomainSockets/UnboundDgramUnixSocketPairTest.GetRemoteAddress/*",
-
-                // socket_unix_unbound_seqpacket_test
-                // Tests 0, 1, 4, 5 fail.
-                // Skip all until we fix the issue causing the tests to fail
-                "AllUnixDomainSockets/UnboundUnixSeqpacketSocketPairTest.SendtoWithoutConnect/*",
-
-                // socket_unix_unbound_stream_test
-                // Tests 2, 3, 8, 9 fail.
-                // Skip all until we fix the issue causing the tests to fail
-                "AllUnixDomainSockets/UnixStreamSocketPairTest.FDPassCoalescedRead/*",
-                "AllUnixDomainSockets/UnixStreamSocketPairTest.FDPassCoalescedRecv/*",
-                "AllUnixDomainSockets/UnixStreamSocketPairTest.ReadsNotCoalescedAfterFDPass/*",
-                "AllUnixDomainSockets/UnixStreamSocketPairTest.FDPassNotCombined/*",
-                "AllUnixDomainSockets/UnixStreamSocketPairTest.CredsNotCoalescedDown/*",
-                "AllUnixDomainSockets/UnixStreamSocketPairTest.CoalescedCreds1/*",
-                "AllUnixDomainSockets/UnixStreamSocketPairTest.NonCoalescedDifferingCreds1/*",
-                "AllUnixDomainSockets/UnixStreamSocketPairTest.NonCoalescedDifferingCreds2/*",
-
                 // stat_test - these tests hang
                 "StatTest.LstatELOOPPath",
 
@@ -477,13 +344,6 @@
 
                 // tcp_socket_test
                 "AllInetTests/SimpleTcpSocketTest.ListenConnectParallel/*",
-
-                // utimes_test
-                // Creating a temporary directory fails.
-                "FutimesatTest.OnRelPath",
-                "UtimensatTest.OnRelPath",
-                "UtimeTest.ZeroAtimeandMtime",
-                "UtimesTest.OnDir",
 
                 // xattr_test - these tests hang
                 "XattrTest.LXattrOnSymlink",
