@@ -55,9 +55,6 @@ zx_status_t FragmentProxy::DdkGetProtocol(uint32_t proto_id, void* out) {
     case ZX_PROTOCOL_PDEV:
       proto->ops = &pdev_protocol_ops_;
       return ZX_OK;
-    case ZX_PROTOCOL_POWER:
-      proto->ops = &power_protocol_ops_;
-      return ZX_OK;
     case ZX_PROTOCOL_SPI:
       proto->ops = &spi_protocol_ops_;
       return ZX_OK;
@@ -454,115 +451,6 @@ zx_status_t FragmentProxy::PDevDeviceAdd(uint32_t index, const device_add_args_t
 zx_status_t FragmentProxy::PDevGetProtocol(uint32_t proto_id, uint32_t index, void* out_protocol,
                                            size_t protocol_size, size_t* protocol_actual) {
   return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t FragmentProxy::PowerRegisterPowerDomain(uint32_t min_voltage, uint32_t max_voltage) {
-  PowerProxyRequest req = {};
-  PowerProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_POWER;
-  req.op = PowerOp::REGISTER;
-  req.min_voltage = min_voltage;
-  req.max_voltage = max_voltage;
-
-  return Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
-}
-
-zx_status_t FragmentProxy::PowerUnregisterPowerDomain() {
-  PowerProxyRequest req = {};
-  PowerProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_POWER;
-  req.op = PowerOp::UNREGISTER;
-
-  return Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
-}
-
-zx_status_t FragmentProxy::PowerGetPowerDomainStatus(power_domain_status_t* out_status) {
-  PowerProxyRequest req = {};
-  PowerProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_POWER;
-  req.op = PowerOp::GET_STATUS;
-
-  auto status = Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
-  if (status != ZX_OK) {
-    return status;
-  }
-  *out_status = resp.status;
-  return status;
-}
-
-zx_status_t FragmentProxy::PowerGetSupportedVoltageRange(uint32_t* min_voltage,
-                                                         uint32_t* max_voltage) {
-  PowerProxyRequest req = {};
-  PowerProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_POWER;
-  req.op = PowerOp::GET_SUPPORTED_VOLTAGE_RANGE;
-
-  auto status = Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
-  if (status != ZX_OK) {
-    return status;
-  }
-  *min_voltage = resp.min_voltage;
-  *max_voltage = resp.max_voltage;
-  return status;
-}
-
-zx_status_t FragmentProxy::PowerRequestVoltage(uint32_t voltage, uint32_t* actual_voltage) {
-  PowerProxyRequest req = {};
-  PowerProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_POWER;
-  req.op = PowerOp::REQUEST_VOLTAGE;
-  req.set_voltage = voltage;
-
-  auto status = Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
-  if (status != ZX_OK) {
-    return status;
-  }
-  *actual_voltage = resp.actual_voltage;
-  return status;
-}
-
-zx_status_t FragmentProxy::PowerGetCurrentVoltage(uint32_t index, uint32_t* current_voltage) {
-  PowerProxyRequest req = {};
-  PowerProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_POWER;
-  req.op = PowerOp::GET_CURRENT_VOLTAGE;
-
-  auto status = Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
-  if (status != ZX_OK) {
-    return status;
-  }
-  *current_voltage = resp.current_voltage;
-  return status;
-}
-
-zx_status_t FragmentProxy::PowerWritePmicCtrlReg(uint32_t reg_addr, uint32_t value) {
-  PowerProxyRequest req = {};
-  PowerProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_POWER;
-  req.op = PowerOp::WRITE_PMIC_CTRL_REG;
-  req.reg_addr = reg_addr;
-  req.reg_value = value;
-
-  auto status = Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
-  if (status != ZX_OK) {
-    return status;
-  }
-  return status;
-}
-
-zx_status_t FragmentProxy::PowerReadPmicCtrlReg(uint32_t reg_addr, uint32_t* out_value) {
-  PowerProxyRequest req = {};
-  PowerProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_POWER;
-  req.op = PowerOp::READ_PMIC_CTRL_REG;
-  req.reg_addr = reg_addr;
-
-  auto status = Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
-  if (status != ZX_OK) {
-    return status;
-  }
-  *out_value = resp.reg_value;
-  return status;
 }
 
 zx_status_t FragmentProxy::SpiTransmit(const uint8_t* txdata_list, size_t txdata_count) {

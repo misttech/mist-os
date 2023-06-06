@@ -16,7 +16,6 @@
 #include <fuchsia/hardware/isp/cpp/banjo.h>
 #include <fuchsia/hardware/mipicsi/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
-#include <fuchsia/hardware/power/cpp/banjo.h>
 #include <fuchsia/hardware/powerimpl/cpp/banjo.h>
 #include <fuchsia/hardware/scpi/cpp/banjo.h>
 #include <fuchsia/hardware/sdio/cpp/banjo.h>
@@ -69,7 +68,6 @@ class Fragment : public FragmentBase {
         gpio_client_(parent, ZX_PROTOCOL_GPIO),
         dai_client_(parent, ZX_PROTOCOL_DAI),
         pdev_client_(parent, ZX_PROTOCOL_PDEV),
-        power_client_(parent, ZX_PROTOCOL_POWER),
         spi_client_(parent, ZX_PROTOCOL_SPI),
         sysmem_client_(parent, ZX_PROTOCOL_SYSMEM),
         power_impl_client_(parent, ZX_PROTOCOL_POWER_IMPL),
@@ -119,9 +117,6 @@ class Fragment : public FragmentBase {
   zx_status_t RpcPdev(const uint8_t* req_buf, uint32_t req_size, uint8_t* resp_buf,
                       uint32_t* out_resp_size, zx::handle* req_handles, uint32_t req_handle_count,
                       zx::handle* resp_handles, uint32_t* resp_handle_count);
-  zx_status_t RpcPower(const uint8_t* req_buf, uint32_t req_size, uint8_t* resp_buf,
-                       uint32_t* out_resp_size, zx::handle* req_handles, uint32_t req_handle_count,
-                       zx::handle* resp_handles, uint32_t* resp_handle_count);
   zx_status_t RpcSpi(const uint8_t* req_buf, uint32_t req_size, uint8_t* resp_buf,
                      uint32_t* out_resp_size, zx::handle* req_handles, uint32_t req_handle_count,
                      zx::handle* resp_handles, uint32_t* resp_handle_count);
@@ -137,7 +132,6 @@ class Fragment : public FragmentBase {
   ProtocolClient<ddk::GpioProtocolClient, gpio_protocol_t> gpio_client_;
   ProtocolClient<ddk::DaiProtocolClient, dai_protocol_t> dai_client_;
   ProtocolClient<ddk::PDevProtocolClient, pdev_protocol_t> pdev_client_;
-  ProtocolClient<ddk::PowerProtocolClient, power_protocol_t> power_client_;
   ProtocolClient<ddk::SpiProtocolClient, spi_protocol_t> spi_client_;
   ProtocolClient<ddk::SysmemProtocolClient, sysmem_protocol_t> sysmem_client_;
   ProtocolClient<ddk::PowerImplProtocolClient, power_impl_protocol_t> power_impl_client_;

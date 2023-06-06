@@ -6,7 +6,6 @@
 #define SRC_DEVICES_INTERNAL_DRIVERS_FRAGMENT_PROXY_PROTOCOL_H_
 
 #include <fuchsia/hardware/platform/device/c/banjo.h>
-#include <fuchsia/hardware/power/c/banjo.h>
 
 namespace fragment {
 
@@ -158,38 +157,6 @@ struct ClockProxyResponse {
   uint64_t rate;
   uint32_t num_inputs;
   uint32_t current_input;
-};
-
-// ZX_PROTOCOL_POWER proxy support.
-enum class PowerOp {
-  REGISTER,
-  UNREGISTER,
-  GET_STATUS,
-  GET_SUPPORTED_VOLTAGE_RANGE,
-  REQUEST_VOLTAGE,
-  GET_CURRENT_VOLTAGE,
-  WRITE_PMIC_CTRL_REG,
-  READ_PMIC_CTRL_REG,
-};
-
-struct PowerProxyRequest {
-  ProxyRequest header;
-  PowerOp op;
-  uint32_t set_voltage;
-  uint32_t reg_addr;
-  uint32_t reg_value;
-  uint32_t min_voltage;
-  uint32_t max_voltage;
-};
-
-struct PowerProxyResponse {
-  ProxyResponse header;
-  power_domain_status_t status;
-  uint32_t min_voltage;
-  uint32_t max_voltage;
-  uint32_t actual_voltage;
-  uint32_t current_voltage;
-  uint32_t reg_value;
 };
 
 // ZX_PROTOCOL_SYSMEM proxy support.

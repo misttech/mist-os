@@ -270,43 +270,6 @@ zx_status_t Fragment::RpcPdev(const uint8_t* req_buf, uint32_t req_size, uint8_t
   }
 }
 
-zx_status_t Fragment::RpcPower(const uint8_t* req_buf, uint32_t req_size, uint8_t* resp_buf,
-                               uint32_t* out_resp_size, zx::handle* req_handles,
-                               uint32_t req_handle_count, zx::handle* resp_handles,
-                               uint32_t* resp_handle_count) {
-  if (!power_client_.proto_client().is_valid()) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  auto* req = reinterpret_cast<const PowerProxyRequest*>(req_buf);
-  if (req_size < sizeof(*req)) {
-    zxlogf(ERROR, "%s received %u, expecting %zu", __FUNCTION__, req_size, sizeof(*req));
-    return ZX_ERR_INTERNAL;
-  }
-
-  auto* resp = reinterpret_cast<PowerProxyResponse*>(resp_buf);
-  *out_resp_size = sizeof(*resp);
-  switch (req->op) {
-    case PowerOp::REGISTER:
-      return power_client_.proto_client().RegisterPowerDomain(req->min_voltage, req->max_voltage);
-    case PowerOp::UNREGISTER:
-      return power_client_.proto_client().UnregisterPowerDomain();
-    case PowerOp::GET_STATUS:
-      return power_client_.proto_client().GetPowerDomainStatus(&resp->status);
-    case PowerOp::GET_SUPPORTED_VOLTAGE_RANGE:
-      return power_client_.proto_client().GetSupportedVoltageRange(&resp->min_voltage,
-                                                                   &resp->max_voltage);
-    case PowerOp::REQUEST_VOLTAGE:
-      return power_client_.proto_client().RequestVoltage(req->set_voltage, &resp->actual_voltage);
-    case PowerOp::WRITE_PMIC_CTRL_REG:
-      return power_client_.proto_client().WritePmicCtrlReg(req->reg_addr, req->reg_value);
-    case PowerOp::READ_PMIC_CTRL_REG:
-      return power_client_.proto_client().ReadPmicCtrlReg(req->reg_addr, &resp->reg_value);
-    default:
-      zxlogf(ERROR, "%s: unknown Power op %u", __func__, static_cast<uint32_t>(req->op));
-      return ZX_ERR_INTERNAL;
-  }
-}
-
 zx_status_t Fragment::RpcSpi(const uint8_t* req_buf, uint32_t req_size, uint8_t* resp_buf,
                              uint32_t* out_resp_size, zx::handle* req_handles,
                              uint32_t req_handle_count, zx::handle* resp_handles,
@@ -475,10 +438,6 @@ zx_status_t Fragment::ReadFidlFromChannel() {
       status = RpcPdev(req_buf, actual, resp_buf, &resp_len, req_handles, req_handle_count,
                        resp_handles, &resp_handle_count);
       break;
-    case ZX_PROTOCOL_POWER:
-      status = RpcPower(req_buf, actual, resp_buf, &resp_len, req_handles, req_handle_count,
-                        resp_handles, &resp_handle_count);
-      break;
     case ZX_PROTOCOL_SPI:
       status = RpcSpi(req_buf, actual, resp_buf, &resp_len, req_handles, req_handle_count,
                       resp_handles, &resp_handle_count);
@@ -563,13 +522,6 @@ zx_status_t Fragment::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
         return ZX_ERR_NOT_SUPPORTED;
       }
       sysmem_client_.proto_client().GetProto(static_cast<sysmem_protocol_t*>(out_protocol));
-      return ZX_OK;
-    }
-    case ZX_PROTOCOL_POWER: {
-      if (!power_client_.proto_client().is_valid()) {
-        return ZX_ERR_NOT_SUPPORTED;
-      }
-      power_client_.proto_client().GetProto(static_cast<power_protocol_t*>(out_protocol));
       return ZX_OK;
     }
     case ZX_PROTOCOL_POWER_IMPL: {
