@@ -63,7 +63,7 @@ TEST(JsonDiagnosticsTests, WarnPassed) {
   TestLibrary library(R"FIDL(
 library example;
 
-@layort("Simple")
+@discovrable
 protocol Protocol {
     Method();
 };
@@ -75,12 +75,12 @@ protocol Protocol {
   {
     "category": "fidlc/warning",
     "error_id": "fi-0145",
-    "message": "suspect attribute with name 'layort'; did you mean 'layout'?",
+    "message": "suspect attribute with name 'discovrable'; did you mean 'discoverable'?",
     "path": "example.fidl",
     "start_line": 4,
     "start_char": 0,
     "end_line": 4,
-    "end_char": 17
+    "end_char": 12
   }
 ])JSON");
 }

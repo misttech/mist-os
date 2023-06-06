@@ -3,5 +3,5 @@
 // found in the LICENSE file.
 library test.bad.fi0121;
 
-@layout("Simple")
+@example_deprecated_attribute
 type MyStruct = struct {};

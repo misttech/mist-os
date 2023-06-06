@@ -6,7 +6,6 @@ The following FIDL attributes are supported:
 * [`@deprecated`](#deprecated)
 * [`@discoverable`](#discoverable)
 * [`@doc`](#doc)
-* [`@for_deprecated_c_bindings`](#layout)
 * [`@generated_name`](#generated-name)
 * [`@no_doc`](#nodoc)
 * [`@selector`](#selector)
@@ -119,18 +118,6 @@ the target language.
 
 Note: To be identical, the `@doc` version should be `@doc(" Foo\n")`. Note
 the space before the "Foo" and the line-feed "`\n`".
-
-## `@for_deprecated_c_bindings` {#layout}
-
-**USAGE**: `@for_deprecated_c_bindings`
-
-**MEANING**:
-This attribute is used to ensure that a protocol is compatible with the
-deprecated C bindings. There should be no new uses of this attribute.
-
-```fidl
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/attributes.test.fidl" region_tag="layout-simple" %}
-```
 
 ## `@generated_name` {#generated-name}
 

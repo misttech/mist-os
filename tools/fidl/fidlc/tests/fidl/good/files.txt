@@ -235,7 +235,6 @@ fi-0186.test.fidl
 fi-0187.test.fidl
 fi-0188.test.fidl
 fi-0189.test.fidl
-fi-0190.test.fidl
 fi-0191.test.fidl
 fi-0192.test.fidl
 fi-0193.test.fidl

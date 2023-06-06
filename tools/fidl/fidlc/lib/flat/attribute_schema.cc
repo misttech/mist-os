@@ -467,6 +467,9 @@ static bool TransportConstraint(Reporter* reporter, const ExperimentalFlags flag
 // static
 AttributeSchemaMap AttributeSchema::OfficialAttributes() {
   AttributeSchemaMap map;
+  // This attribute exists only to demonstrate and test our ability to deprecate
+  // attributes. It will never be removed.
+  map["example_deprecated_attribute"].Deprecate();
   map["discoverable"]
       .RestrictTo({
           Element::Kind::kProtocol,
@@ -476,7 +479,6 @@ AttributeSchemaMap AttributeSchema::OfficialAttributes() {
       .Constrain(DiscoverableConstraint);
   map[std::string(Attribute::kDocCommentName)].AddArg(
       AttributeArgSchema(ConstantValue::Kind::kString));
-  map["layout"].Deprecate();
   // TODO(fxbug.dev/100478): Remove once large messages no longer requires flag or attribute.
   map["experimental_overflowing"]
       .RestrictTo({

@@ -169,4 +169,22 @@ TEST(ErrcatDocsTests, GoodFilesAreTested) {
   }
 }
 
+TEST(ErrcatDocsTests, RetiredErrorsAreNotTested) {
+  auto path = TestLibrary::TestFilePath("errcat_good_tests.cc");
+  auto source_file = ReadFile(path).value();
+  for (auto def : fidl::kAllDiagnosticDefs) {
+    if (def->kind != fidl::DiagnosticKind::kRetired) {
+      continue;
+    }
+    auto index = source_file.find("\"good/" + def->FormatId());
+    if (index == std::string::npos) {
+      continue;
+    }
+    auto line_number =
+        1 + static_cast<int>(std::count(source_file.data(), source_file.data() + index, '\n'));
+    ADD_FAILURE("%s:%d unexpectedly contains test for %s, which is retired", path.c_str(),
+                line_number, def->FormatId().c_str());
+  }
+}
+
 }  // namespace

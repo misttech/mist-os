@@ -1445,14 +1445,6 @@ TEST(ErrcatGoodTests, Good0189) {
   ASSERT_COMPILED(library);
 }
 
-TEST(ErrcatGoodTests, Good0190) {
-  TestLibrary library;
-  library.AddFile("good/fi-0190.test.fidl");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
-  ASSERT_COMPILED(library);
-}
-
 TEST(ErrcatGoodTests, Good0191) {
   TestLibrary library;
   library.AddFile("good/fi-0191.test.fidl");

@@ -609,12 +609,8 @@ protocol MyProtocol {
 }
 
 TEST(AttributesTests, BadSingleDeprecatedAttribute) {
-  TestLibrary library(R"FIDL(
-library fidl.test;
-
-@layout("Simple")
-type MyStruct = struct {};
-)FIDL");
+  TestLibrary library;
+  library.AddFile("bad/fi-0121.test.fidl");
   ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDeprecatedAttribute);
 }
 
@@ -622,15 +618,15 @@ TEST(AttributesTests, BadDeprecatedAttributes) {
   TestLibrary library(R"FIDL(
 library fidl.test;
 
-@layout("Simple")
+@example_deprecated_attribute
 type MyStruct = struct {};
 
-@layout("Complex")
+@example_deprecated_attribute
 protocol MyOtherProtocol {
   MyMethod();
 };
 
-@layout("Simple")
+@example_deprecated_attribute
 protocol MyProtocol {
   MyMethod();
 };

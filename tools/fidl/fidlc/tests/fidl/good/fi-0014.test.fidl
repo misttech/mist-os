@@ -3,5 +3,5 @@
 // found in the LICENSE file.
 library test.good.fi0014;
 
-@for_deprecated_c_bindings
-type MyStruct = struct {};
+@discoverable
+protocol MyProtocol {};

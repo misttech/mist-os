@@ -3,5 +3,7 @@
 // found in the LICENSE file.
 library test.good.fi0132;
 
-@for_deprecated_c_bindings
-type Foo = struct {};
+type Foo = flexible enum : uint8 {
+    @unknown
+    BAR = 1;
+};
