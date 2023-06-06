@@ -15,6 +15,7 @@
             protocol: [
                 "fuchsia.net.debug.Interfaces",
                 "fuchsia.net.interfaces.State",
+                "fuchsia.net.root.Interfaces",
                 "fuchsia.net.routes.StateV4",
                 "fuchsia.posix.socket.Provider",
             ],

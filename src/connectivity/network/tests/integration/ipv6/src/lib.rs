@@ -519,15 +519,15 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
     let (_network, realm, iface, fake_ep) =
         setup_network::<N>(&sandbox, name, None).await.expect("error setting up network");
 
-    let debug_control = realm
-        .connect_to_protocol::<fidl_fuchsia_net_debug::InterfacesMarker>()
-        .expect("failed to connect to fuchsia.net.debug/Interfaces");
+    let root_control = realm
+        .connect_to_protocol::<fidl_fuchsia_net_root::InterfacesMarker>()
+        .expect("failed to connect to fuchsia.net.root/Interfaces");
     let (control, server) =
         fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::ControlMarker>()
             .expect("create proxy");
-    let () = debug_control
+    let () = root_control
         .get_admin(iface.id(), server)
-        .expect("fuchsia.net.debug/Interfaces.GetAdmin failed");
+        .expect("fuchsia.net.root/Interfaces.GetAdmin failed");
 
     // Add an address and expect it to fail DAD because we simulate another node
     // performing DAD at the same time.

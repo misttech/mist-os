@@ -9,8 +9,8 @@
 #include <Warm/Warm.h>
 // clang-format on
 
-#include <fidl/fuchsia.net.debug/cpp/fidl.h>
 #include <fidl/fuchsia.net.interfaces.admin/cpp/fidl.h>
+#include <fidl/fuchsia.net.root/cpp/fidl.h>
 #include <fuchsia/net/cpp/fidl.h>
 #include <fuchsia/net/interfaces/cpp/fidl.h>
 #include <fuchsia/net/stack/cpp/fidl.h>
@@ -28,8 +28,8 @@ namespace nl::Weave::Warm::Platform {
 namespace {
 using DeviceLayer::ConnectivityMgrImpl;
 
-constexpr char kFuchsiaNetDebugInterfacesProtocolName[] =
-    "fuchsia.net.debug.Interfaces_OnlyForWeavestack";
+constexpr char kFuchsiaNetRootInterfacesProtocolName[] =
+    "fuchsia.net.root.Interfaces_OnlyForWeavestack";
 
 // Fixed name for tunnel interface.
 constexpr char kTunInterfaceName[] = "weav-tun0";
@@ -236,31 +236,31 @@ std::string_view AddressAssignmentStateToString(
 
 // Retrieve a handle to the `fuchsia.net.interfaces.admin/Control' API.
 //
-// Note that this uses `fuchsia.net.debug/Interfaces.GetAdmin` to do so, which
+// Note that this uses `fuchsia.net.root/Interfaces.GetAdmin` to do so, which
 // circumvents the strong ownership model of the `fuchsia.net.interfaces.api`.
 // This pattern is discouraged, but approved for this use case in Weavestack,
 // see (https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=92768#c6).
-// TODO(https://fxbug.dev/111695) Delete the usage of the debug API once an
+// TODO(https://fxbug.dev/111695) Delete the usage of the root API once an
 // alternative API is available.
-std::optional<fidl::SyncClient<fuchsia_net_interfaces_admin::Control>> GetInterfaceControlViaDebug(
+std::optional<fidl::SyncClient<fuchsia_net_interfaces_admin::Control>> GetInterfaceControlViaRoot(
     uint64_t interface_id) {
   auto svc = nl::Weave::DeviceLayer::PlatformMgrImpl().GetComponentContextForProcess()->svc();
 
-  zx::result debug_endpoints = fidl::CreateEndpoints<fuchsia_net_debug::Interfaces>();
-  if (!debug_endpoints.is_ok()) {
+  zx::result root_endpoints = fidl::CreateEndpoints<fuchsia_net_root::Interfaces>();
+  if (!root_endpoints.is_ok()) {
     FX_LOGS(ERROR)
-        << "Synchronous Error while connecting to the |fuchsia.net.debug/Interfaces| protocol: "
-        << debug_endpoints.status_string();
+        << "Synchronous Error while connecting to the |fuchsia.net.root/Interfaces| protocol: "
+        << root_endpoints.status_string();
     return std::nullopt;
   }
-  auto [debug_client_end, debug_server_end] = std::move(*debug_endpoints);
+  auto [root_client_end, root_server_end] = std::move(*root_endpoints);
   if (zx_status_t status =
-          svc->Connect(kFuchsiaNetDebugInterfacesProtocolName, debug_server_end.TakeChannel());
+          svc->Connect(kFuchsiaNetRootInterfacesProtocolName, root_server_end.TakeChannel());
       status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to connect to debug: " << zx_status_get_string(status);
+    FX_LOGS(ERROR) << "Failed to connect to root: " << zx_status_get_string(status);
     return std::nullopt;
   }
-  fidl::SyncClient debug_client{std::move(debug_client_end)};
+  fidl::SyncClient root_client{std::move(root_client_end)};
 
   zx::result control_endpoints = fidl::CreateEndpoints<fuchsia_net_interfaces_admin::Control>();
   if (!control_endpoints.is_ok()) {
@@ -270,7 +270,7 @@ std::optional<fidl::SyncClient<fuchsia_net_interfaces_admin::Control>> GetInterf
     return std::nullopt;
   }
   auto [control_client_end, control_server_end] = std::move(*control_endpoints);
-  auto result = debug_client->GetAdmin({interface_id, std::move(control_server_end)});
+  auto result = root_client->GetAdmin({interface_id, std::move(control_server_end)});
   if (!result.is_ok()) {
     FX_LOGS(ERROR) << "Failure while invoking |GetAdmin| FIDL method: " << result.error_value();
     return std::nullopt;
@@ -443,7 +443,7 @@ PlatformResult RemoveAddressInternal(uint64_t interface_id, const Inet::IPAddres
 PlatformResult AddWiFiAddress(uint64_t interface_id, const Inet::IPAddress &address,
                               uint8_t prefix_length) {
   std::optional<fidl::SyncClient<fuchsia_net_interfaces_admin::Control>> control_client =
-      GetInterfaceControlViaDebug(interface_id);
+      GetInterfaceControlViaRoot(interface_id);
   if (!control_client) {
     FX_LOGS(ERROR)
         << "Failed to acquire |fuchsia.net.interfaces.admin/Control| handle for interface "

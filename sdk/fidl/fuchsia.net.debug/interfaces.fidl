@@ -5,7 +5,6 @@
 library fuchsia.net.debug;
 
 using fuchsia.net;
-using fuchsia.net.interfaces.admin;
 using fuchsia.hardware.network;
 
 /// Network interface debugging functionality.
@@ -14,17 +13,6 @@ using fuchsia.hardware.network;
 /// load-bearing code.
 @discoverable
 protocol Interfaces {
-    /// Obtain administrative control over a network interface.
-    ///
-    /// + request `id` identifies the interface to be controlled.
-    /// + request `control` grants the client administrative control over
-    ///     the interface. Closed without a terminal event if `id` does not
-    ///     match an existing interface.
-    GetAdmin(resource struct {
-        id fuchsia.net.InterfaceId;
-        control server_end:fuchsia.net.interfaces.admin.Control;
-    });
-
     /// Return an interface's MAC address.
     ///
     /// + request `id` identifies the interface whose MAC is requested.

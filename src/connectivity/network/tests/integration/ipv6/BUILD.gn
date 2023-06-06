@@ -9,9 +9,9 @@ rustc_test("ipv6") {
   output_name = "netstack_ipv6_integration_test"
   deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
-    "//sdk/fidl/fuchsia.net.debug:fuchsia.net.debug_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
+    "//sdk/fidl/fuchsia.net.root:fuchsia.net.root_rust",
     "//sdk/fidl/fuchsia.net.routes:fuchsia.net.routes_rust",
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/lib/net-types",

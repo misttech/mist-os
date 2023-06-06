@@ -14,6 +14,7 @@ use fidl_fuchsia_net_interfaces_ext as finterfaces_ext;
 use fidl_fuchsia_net_name as fname;
 use fidl_fuchsia_net_neighbor as fneighbor;
 use fidl_fuchsia_net_neighbor_ext as fneighbor_ext;
+use fidl_fuchsia_net_root as froot;
 use fidl_fuchsia_net_routes as froutes;
 use fidl_fuchsia_net_routes_ext as froutes_ext;
 use fidl_fuchsia_net_stack as fstack;
@@ -58,6 +59,7 @@ pub trait ServiceConnector<S: fidl::endpoints::ProtocolMarker> {
 /// all FIDL dependencies required by net-cli.
 pub trait NetCliDepsConnector:
     ServiceConnector<fdebug::InterfacesMarker>
+    + ServiceConnector<froot::InterfacesMarker>
     + ServiceConnector<fdhcp::Server_Marker>
     + ServiceConnector<ffilter::FilterMarker>
     + ServiceConnector<finterfaces::StateMarker>
@@ -73,6 +75,7 @@ pub trait NetCliDepsConnector:
 
 impl<O> NetCliDepsConnector for O where
     O: ServiceConnector<fdebug::InterfacesMarker>
+        + ServiceConnector<froot::InterfacesMarker>
         + ServiceConnector<fdhcp::Server_Marker>
         + ServiceConnector<ffilter::FilterMarker>
         + ServiceConnector<finterfaces::StateMarker>
@@ -197,12 +200,12 @@ where
 
 async fn get_control<C>(connector: &C, id: u64) -> Result<finterfaces_ext::admin::Control, Error>
 where
-    C: ServiceConnector<fdebug::InterfacesMarker>,
+    C: ServiceConnector<froot::InterfacesMarker>,
 {
-    let debug_interfaces = connect_with_context::<fdebug::InterfacesMarker, _>(connector).await?;
+    let root_interfaces = connect_with_context::<froot::InterfacesMarker, _>(connector).await?;
     let (control, server_end) = finterfaces_ext::admin::Control::create_endpoints()
         .context("create admin control endpoints")?;
-    let () = debug_interfaces.get_admin(id, server_end).context("send get admin request")?;
+    let () = root_interfaces.get_admin(id, server_end).context("send get admin request")?;
     Ok(control)
 }
 
@@ -1393,6 +1396,7 @@ mod tests {
         dhcpd: Option<fdhcp::Server_Proxy>,
         interfaces_state: Option<finterfaces::StateProxy>,
         stack: Option<fstack::StackProxy>,
+        root_interfaces: Option<froot::InterfacesProxy>,
         routes_v4: Option<froutes::StateV4Proxy>,
         routes_v6: Option<froutes::StateV6Proxy>,
         name_lookup: Option<fname::LookupProxy>,
@@ -1407,6 +1411,18 @@ mod tests {
                 .as_ref()
                 .cloned()
                 .ok_or(anyhow::anyhow!("connector has no dhcp server instance"))
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl ServiceConnector<froot::InterfacesMarker> for TestConnector {
+        async fn connect(
+            &self,
+        ) -> Result<<froot::InterfacesMarker as ProtocolMarker>::Proxy, Error> {
+            self.root_interfaces
+                .as_ref()
+                .cloned()
+                .ok_or(anyhow::anyhow!("connector has no root interfaces instance"))
         }
     }
 
@@ -1603,10 +1619,10 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn if_ip_forward(ip_version: fnet::IpVersion, enable: bool) {
         let interface1 = TestInterface { nicid: 1, name: "interface1" };
-        let (debug_interfaces, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<fdebug::InterfacesMarker>().unwrap();
+        let (root_interfaces, mut requests) =
+            fidl::endpoints::create_proxy_and_stream::<froot::InterfacesMarker>().unwrap();
         let connector =
-            TestConnector { debug_interfaces: Some(debug_interfaces), ..Default::default() };
+            TestConnector { root_interfaces: Some(root_interfaces), ..Default::default() };
 
         let requests_fut = set_configuration_request(
             &mut requests,
@@ -1663,7 +1679,7 @@ mod tests {
         O: Debug + PartialEq,
         F: FnOnce(finterfaces_admin::Configuration) -> O,
     >(
-        requests: &mut fdebug::InterfacesRequestStream,
+        requests: &mut froot::InterfacesRequestStream,
         expected_nicid: u64,
         extract_config: F,
         expected_config: O,
@@ -1671,8 +1687,8 @@ mod tests {
         let (id, control, _control_handle) = requests
             .next()
             .await
-            .expect("debug request stream not ended")
-            .expect("debug request stream not error")
+            .expect("root request stream not ended")
+            .expect("root request stream not error")
             .into_get_admin()
             .expect("get admin request");
         assert_eq!(id, expected_nicid);
@@ -1693,15 +1709,15 @@ mod tests {
     }
 
     async fn get_configuration_request(
-        requests: &mut fdebug::InterfacesRequestStream,
+        requests: &mut froot::InterfacesRequestStream,
         expected_nicid: u64,
         config: finterfaces_admin::Configuration,
     ) {
         let (id, control, _control_handle) = requests
             .next()
             .await
-            .expect("debug request stream not ended")
-            .expect("debug request stream not error")
+            .expect("root request stream not ended")
+            .expect("root request stream not error")
             .into_get_admin()
             .expect("get admin request");
         assert_eq!(id, expected_nicid);
@@ -1724,10 +1740,10 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn if_igmp(igmp_version: finterfaces_admin::IgmpVersion) {
         let interface1 = TestInterface { nicid: 1, name: "interface1" };
-        let (debug_interfaces, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<fdebug::InterfacesMarker>().unwrap();
+        let (root_interfaces, mut requests) =
+            fidl::endpoints::create_proxy_and_stream::<froot::InterfacesMarker>().unwrap();
         let connector =
-            TestConnector { debug_interfaces: Some(debug_interfaces), ..Default::default() };
+            TestConnector { root_interfaces: Some(root_interfaces), ..Default::default() };
 
         let requests_fut = set_configuration_request(
             &mut requests,
@@ -1793,10 +1809,10 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn if_mld(mld_version: finterfaces_admin::MldVersion) {
         let interface1 = TestInterface { nicid: 1, name: "interface1" };
-        let (debug_interfaces, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<fdebug::InterfacesMarker>().unwrap();
+        let (root_interfaces, mut requests) =
+            fidl::endpoints::create_proxy_and_stream::<froot::InterfacesMarker>().unwrap();
         let connector =
-            TestConnector { debug_interfaces: Some(debug_interfaces), ..Default::default() };
+            TestConnector { root_interfaces: Some(root_interfaces), ..Default::default() };
 
         let requests_fut = set_configuration_request(
             &mut requests,
@@ -1928,8 +1944,8 @@ mod tests {
         const TEST_PREFIX_LENGTH: u8 = 64;
 
         let interface1 = TestInterface { nicid: 1, name: "interface1" };
-        let (debug_interfaces, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<fdebug::InterfacesMarker>().unwrap();
+        let (root_interfaces, mut requests) =
+            fidl::endpoints::create_proxy_and_stream::<froot::InterfacesMarker>().unwrap();
 
         let (stack_proxy, stack_stream) = match (!no_subnet_route)
             .then(|| fidl::endpoints::create_proxy_and_stream::<fstack::StackMarker>().unwrap())
@@ -1939,7 +1955,7 @@ mod tests {
         };
 
         let connector = TestConnector {
-            debug_interfaces: Some(debug_interfaces),
+            root_interfaces: Some(root_interfaces),
             stack: stack_proxy,
             ..Default::default()
         };
@@ -1962,8 +1978,8 @@ mod tests {
             let (id, control, _control_handle) = requests
                 .next()
                 .await
-                .expect("debug request stream not ended")
-                .expect("debug request stream not error")
+                .expect("root request stream not ended")
+                .expect("root request stream not error")
                 .into_get_admin()
                 .expect("get admin request");
             assert_eq!(id, interface1.nicid);
@@ -2059,8 +2075,8 @@ mod tests {
         let interface1 = TestInterface { nicid: 1, name: "interface1" };
         let interface2 = TestInterface { nicid: 2, name: "interface2" };
 
-        let (debug_interfaces, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<fdebug::InterfacesMarker>().unwrap();
+        let (root_interfaces, mut requests) =
+            fidl::endpoints::create_proxy_and_stream::<froot::InterfacesMarker>().unwrap();
         let (interfaces_state, interfaces_requests) =
             fidl::endpoints::create_proxy_and_stream::<finterfaces::StateMarker>().unwrap();
 
@@ -2077,7 +2093,7 @@ mod tests {
         futures::pin_mut!(interfaces_fut);
 
         let connector = TestConnector {
-            debug_interfaces: Some(debug_interfaces),
+            root_interfaces: Some(root_interfaces),
             interfaces_state: Some(interfaces_state),
             ..Default::default()
         };
@@ -2100,8 +2116,8 @@ mod tests {
             let (id, control, _control_handle) = requests
                 .next()
                 .await
-                .expect("debug request stream not ended")
-                .expect("debug request stream not error")
+                .expect("root request stream not ended")
+                .expect("root request stream not error")
                 .into_get_admin()
                 .expect("get admin request");
             assert_eq!(id, interface1.nicid);
@@ -2151,8 +2167,8 @@ mod tests {
                 let (id, control, _control_handle) = requests
                     .next()
                     .await
-                    .expect("debug request stream not ended")
-                    .expect("debug request stream not error")
+                    .expect("root request stream not ended")
+                    .expect("root request stream not error")
                     .into_get_admin()
                     .expect("get admin request");
                 assert_eq!(id, interface2.nicid);

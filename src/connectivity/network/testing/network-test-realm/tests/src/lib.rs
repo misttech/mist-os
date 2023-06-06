@@ -12,10 +12,10 @@ use derivative::Derivative;
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_debug as fnet_debug;
 use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
+use fidl_fuchsia_net_root as fnet_root;
 use fidl_fuchsia_net_stack as fstack;
 use fidl_fuchsia_net_test_realm as fntr;
 use fidl_fuchsia_posix_socket as fposix_socket;
@@ -239,7 +239,7 @@ async fn add_address_to_hermetic_interface(
         panic!("failed to find interface with name {}", interface_name);
     });
     let interfaces_proxy =
-        connect_to_hermetic_network_realm_protocol::<fnet_debug::InterfacesMarker>(realm).await;
+        connect_to_hermetic_network_realm_protocol::<fnet_root::InterfacesMarker>(realm).await;
     let (control, server_end) =
         fnet_interfaces_ext::admin::Control::create_endpoints().expect("create_endpoints failed");
     interfaces_proxy.get_admin(id, server_end).expect("get_admin failed");

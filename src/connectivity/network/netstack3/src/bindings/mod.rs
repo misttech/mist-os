@@ -18,6 +18,7 @@ mod filter_worker;
 mod interfaces_admin;
 mod interfaces_watcher;
 mod netdevice_worker;
+mod root_fidl_worker;
 mod routes_fidl_worker;
 mod socket;
 mod stack_fidl_worker;
@@ -887,6 +888,7 @@ enum Service {
     InterfacesAdmin(fidl_fuchsia_net_interfaces_admin::InstallerRequestStream),
     PacketSocket(fidl_fuchsia_posix_socket_packet::ProviderRequestStream),
     RawSocket(fidl_fuchsia_posix_socket_raw::ProviderRequestStream),
+    RootInterfaces(fidl_fuchsia_net_root::InterfacesRequestStream),
     RoutesState(fidl_fuchsia_net_routes::StateRequestStream),
     RoutesStateV4(fidl_fuchsia_net_routes::StateV4RequestStream),
     RoutesStateV6(fidl_fuchsia_net_routes::StateV6RequestStream),
@@ -954,6 +956,7 @@ impl NetstackSeed {
             .add_fidl_service(Service::Socket)
             .add_fidl_service(Service::PacketSocket)
             .add_fidl_service(Service::RawSocket)
+            .add_fidl_service(Service::RootInterfaces)
             .add_fidl_service(Service::RoutesState)
             .add_fidl_service(Service::RoutesStateV4)
             .add_fidl_service(Service::RoutesStateV6)
@@ -1001,6 +1004,13 @@ impl NetstackSeed {
                         }
                         WorkItem::Incoming(Service::RawSocket(socket)) => {
                             socket.serve_with(|rs| socket::raw::serve(rs)).await
+                        }
+                        WorkItem::Incoming(Service::RootInterfaces(root_interfaces)) => {
+                            root_interfaces
+                                .serve_with(|rs| {
+                                    root_fidl_worker::serve_interfaces(netstack.clone(), rs)
+                                })
+                                .await
                         }
                         WorkItem::Incoming(Service::RoutesState(rs)) => {
                             routes_fidl_worker::serve_state(rs, netstack.clone()).await

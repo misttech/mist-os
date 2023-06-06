@@ -75,6 +75,7 @@
                 "fuchsia.net.debug.Interfaces",
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
+                "fuchsia.net.root.Interfaces",
                 "fuchsia.net.stack.Stack",
                 "fuchsia.posix.socket.Provider",
             ],

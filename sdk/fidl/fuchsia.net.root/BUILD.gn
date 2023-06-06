@@ -1,20 +1,22 @@
-# Copyright 2021 The Fuchsia Authors. All rights reserved.
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
 import("//build/fidl/fidl.gni")
 
-fidl("fuchsia.net.debug") {
+fidl("fuchsia.net.root") {
   sdk_category = "internal"
 
   sources = [
-    "diagnostics.fidl",
     "interfaces.fidl",
+    "overview.fidl",
+    "routes.fidl",
   ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.network",
     "//sdk/fidl/fuchsia.net",
+    "//sdk/fidl/fuchsia.net.interfaces.admin",
+    "//sdk/fidl/fuchsia.net.routes.admin",
   ]
 
   enable_hlcpp = true

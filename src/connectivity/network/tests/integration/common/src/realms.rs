@@ -20,6 +20,7 @@ use fidl_fuchsia_net_multicast_admin as fnet_multicast_admin;
 use fidl_fuchsia_net_name as fnet_name;
 use fidl_fuchsia_net_neighbor as fnet_neighbor;
 use fidl_fuchsia_net_reachability as fnet_reachability;
+use fidl_fuchsia_net_root as fnet_root;
 use fidl_fuchsia_net_routes as fnet_routes;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_test_realm as fntr;
@@ -68,6 +69,7 @@ impl NetstackVersion {
                 fnet_filter::FilterMarker::PROTOCOL_NAME,
                 fnet_interfaces_admin::InstallerMarker::PROTOCOL_NAME,
                 fnet_interfaces::StateMarker::PROTOCOL_NAME,
+                fnet_root::InterfacesMarker::PROTOCOL_NAME,
                 fnet_routes::StateMarker::PROTOCOL_NAME,
                 fnet_routes::StateV4Marker::PROTOCOL_NAME,
                 fnet_routes::StateV6Marker::PROTOCOL_NAME,
@@ -526,6 +528,9 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                     fnetemul::Capability::ChildDep(protocol_dep::<fnet_debug::InterfacesMarker>(
                         constants::netstack::COMPONENT_NAME,
                     )),
+                    fnetemul::Capability::ChildDep(protocol_dep::<fnet_root::InterfacesMarker>(
+                        constants::netstack::COMPONENT_NAME,
+                    )),
                     fnetemul::Capability::ChildDep(protocol_dep::<fnet_routes::StateV4Marker>(
                         constants::netstack::COMPONENT_NAME,
                     )),
@@ -559,6 +564,9 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                         constants::netstack::COMPONENT_NAME,
                     )),
                     fnetemul::Capability::ChildDep(protocol_dep::<fnet_debug::InterfacesMarker>(
+                        constants::netstack::COMPONENT_NAME,
+                    )),
+                    fnetemul::Capability::ChildDep(protocol_dep::<fnet_root::InterfacesMarker>(
                         constants::netstack::COMPONENT_NAME,
                     )),
                     fnetemul::Capability::ChildDep(protocol_dep::<fnet_interfaces::StateMarker>(
@@ -759,7 +767,7 @@ pub trait TestRealmExt {
     async fn loopback_properties(&self) -> Result<Option<fnet_interfaces_ext::Properties>>;
 
     /// Get a `fuchsia.net.interfaces.admin/Control` client proxy for the
-    /// interface identified by [`id`] via `fuchsia.net.debug`.
+    /// interface identified by [`id`] via `fuchsia.net.root`.
     ///
     /// Note that one should prefer to operate on a `TestInterface` if it is
     /// available; but this method exists in order to obtain a Control channel
@@ -801,13 +809,13 @@ impl TestRealmExt for netemul::TestRealm<'_> {
     }
 
     fn interface_control(&self, id: u64) -> Result<fnet_interfaces_ext::admin::Control> {
-        let debug_control = self
-            .connect_to_protocol::<fnet_debug::InterfacesMarker>()
+        let root_control = self
+            .connect_to_protocol::<fnet_root::InterfacesMarker>()
             .context("connect to protocol")?;
 
         let (control, server) = fnet_interfaces_ext::admin::Control::create_endpoints()
             .context("create Control proxy")?;
-        let () = debug_control.get_admin(id, server).context("get admin")?;
+        let () = root_control.get_admin(id, server).context("get admin")?;
         Ok(control)
     }
 }

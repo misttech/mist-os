@@ -17,6 +17,7 @@ use fidl_fuchsia_net_filter as ffilter;
 use fidl_fuchsia_net_interfaces as finterfaces;
 use fidl_fuchsia_net_name as fname;
 use fidl_fuchsia_net_neighbor as fneighbor;
+use fidl_fuchsia_net_root as froot;
 use fidl_fuchsia_net_routes as froutes;
 use fidl_fuchsia_net_stack as fstack;
 
@@ -66,6 +67,15 @@ impl net_cli::ServiceConnector<fdebug::InterfacesMarker> for FfxConnector<'_> {
         &self,
     ) -> Result<<fdebug::InterfacesMarker as ProtocolMarker>::Proxy, anyhow::Error> {
         self.remotecontrol_connect::<fdebug::InterfacesMarker>(NETSTACK_MONIKER_SUFFIX).await
+    }
+}
+
+#[async_trait::async_trait]
+impl net_cli::ServiceConnector<froot::InterfacesMarker> for FfxConnector<'_> {
+    async fn connect(
+        &self,
+    ) -> Result<<froot::InterfacesMarker as ProtocolMarker>::Proxy, anyhow::Error> {
+        self.remotecontrol_connect::<froot::InterfacesMarker>(NETSTACK_MONIKER_SUFFIX).await
     }
 }
 

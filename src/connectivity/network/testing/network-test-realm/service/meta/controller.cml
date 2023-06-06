@@ -27,6 +27,7 @@
                 "fuchsia.net.dhcp.ClientProvider",
                 "fuchsia.net.dhcpv6.ClientProvider",
                 "fuchsia.net.interfaces.State",
+                "fuchsia.net.root.Interfaces",
             ],
         },
     ],

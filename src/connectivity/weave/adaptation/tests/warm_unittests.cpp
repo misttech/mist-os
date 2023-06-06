@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 #include <fuchsia/net/cpp/fidl.h>
-#include <fuchsia/net/debug/cpp/fidl_test_base.h>
 #include <fuchsia/net/interfaces/admin/cpp/fidl_test_base.h>
 #include <fuchsia/net/interfaces/cpp/fidl_test_base.h>
+#include <fuchsia/net/root/cpp/fidl_test_base.h>
 #include <fuchsia/net/stack/cpp/fidl_test_base.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/fit/function.h>
@@ -304,14 +304,14 @@ class FakeNetInterfaces : public fuchsia::net::interfaces::testing::State_TestBa
 };
 
 // The minimal set of fuchsia networking protocols required for WARM to run.
-class FakeNetstack : public fuchsia::net::debug::testing::Interfaces_TestBase,
+class FakeNetstack : public fuchsia::net::root::testing::Interfaces_TestBase,
                      public fuchsia::net::stack::testing::Stack_TestBase {
  private:
   // Default implementation for any API method not explicitly overridden.
   void NotImplemented_(const std::string& name) override { FAIL() << "Not implemented: " << name; }
 
   // TODO(https://fxbug.dev/111695) Delete this once Weavestack no longer relies
-  // on the debug API.
+  // on the root API.
   void GetAdmin(
       uint64_t id,
       fidl::InterfaceRequest<::fuchsia::net::interfaces::admin::Control> server_end) override {
@@ -453,19 +453,19 @@ class FakeNetstack : public fuchsia::net::debug::testing::Interfaces_TestBase,
   }
 
   // TODO(https://fxbug.dev/111695) Delete this once Weavestack no longer relies
-  // on the debug API.
-  fidl::InterfaceRequestHandler<fuchsia::net::debug::Interfaces> GetDebugHandler(
+  // on the root API.
+  fidl::InterfaceRequestHandler<fuchsia::net::root::Interfaces> GetRootHandler(
       async_dispatcher_t* dispatcher) {
     dispatcher_ = dispatcher;
-    return [this](fidl::InterfaceRequest<fuchsia::net::debug::Interfaces> request) {
-      debug_binding_.Bind(std::move(request), dispatcher_);
+    return [this](fidl::InterfaceRequest<fuchsia::net::root::Interfaces> request) {
+      root_binding_.Bind(std::move(request), dispatcher_);
     };
   }
 
  private:
   // TODO(https://fxbug.dev/111695) Delete this once Weavestack no longer relies
-  // on the debug API.
-  fidl::Binding<fuchsia::net::debug::Interfaces> debug_binding_{this};
+  // on the root API.
+  fidl::Binding<fuchsia::net::root::Interfaces> root_binding_{this};
   fidl::Binding<fuchsia::net::stack::Stack> stack_binding_{this};
   async_dispatcher_t* dispatcher_;
   std::vector<fuchsia::net::stack::ForwardingEntry> route_table_;
@@ -486,10 +486,10 @@ class WarmTest : public testing::WeaveTestFixture<> {
     context_provider_.service_directory_provider()->AddService(
         fake_net_stack_.GetStackHandler(dispatcher()));
     // TODO(https://fxbug.dev/111695) Delete this once Weavestack no longer
-    // relies on the debug API.
+    // relies on the root API.
     context_provider_.service_directory_provider()->AddService(
-        fake_net_stack_.GetDebugHandler(dispatcher()),
-        "fuchsia.net.debug.Interfaces_OnlyForWeavestack");
+        fake_net_stack_.GetRootHandler(dispatcher()),
+        "fuchsia.net.root.Interfaces_OnlyForWeavestack");
 
     PlatformMgrImpl().SetComponentContextForProcess(context_provider_.TakeContext());
     ConfigurationMgrImpl().SetDelegate(std::make_unique<TestConfigurationManager>());

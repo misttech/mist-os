@@ -784,13 +784,13 @@ async fn test_watcher_online_edges<N: Netstack>(name: &str) {
             },
         );
         let disable_fut = {
-            let debug_interfaces = realm
-                .connect_to_protocol::<fidl_fuchsia_net_debug::InterfacesMarker>()
+            let root_interfaces = realm
+                .connect_to_protocol::<fidl_fuchsia_net_root::InterfacesMarker>()
                 .expect("connect to protocol");
             let (control, server) =
                 fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::ControlMarker>()
                     .expect("create Control");
-            debug_interfaces.get_admin(iface_id, server).expect("send get_admin");
+            root_interfaces.get_admin(iface_id, server).expect("send get_admin");
             futures::stream::iter(std::iter::repeat(()).take(ITERATIONS)).fold(
                 0,
                 move |change_count, ()| {
@@ -865,8 +865,8 @@ async fn test_watcher_race<N: Netstack>(name: &str) {
     let interface_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("connect to protocol");
-    let debug_interfaces = realm
-        .connect_to_protocol::<fidl_fuchsia_net_debug::InterfacesMarker>()
+    let root_interfaces = realm
+        .connect_to_protocol::<fidl_fuchsia_net_root::InterfacesMarker>()
         .expect("connect to protocol");
     for _ in 0..100 {
         let (watcher, server) =
@@ -891,7 +891,7 @@ async fn test_watcher_race<N: Netstack>(name: &str) {
             let (control, server_end) =
                 fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
                     .expect("create endpoints");
-            debug_interfaces.get_admin(ep.id(), server_end).expect("send get_admin");
+            root_interfaces.get_admin(ep.id(), server_end).expect("send get_admin");
             control
         };
 

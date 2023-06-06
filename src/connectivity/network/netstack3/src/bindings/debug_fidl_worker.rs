@@ -6,18 +6,15 @@
 
 use core::ops::Deref as _;
 
-use async_utils::channel::TrySend as _;
-use fidl::endpoints::{ControlHandle as _, ProtocolMarker as _, ServerEnd};
+use fidl::endpoints::{ProtocolMarker as _, ServerEnd};
 use fidl_fuchsia_hardware_network as fhardware_network;
 use fidl_fuchsia_net_debug as fnet_debug;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fuchsia_zircon as zx;
 use futures::{SinkExt as _, StreamExt as _, TryStreamExt as _};
 use tracing::{debug, error, warn};
 
 use crate::bindings::{
     devices::{BindingId, LOOPBACK_MAC},
-    interfaces_admin,
     util::IntoFidl,
     DeviceIdExt as _, DeviceSpecificInfo, Netstack,
 };
@@ -31,9 +28,6 @@ pub(crate) async fn serve_interfaces(
     debug!(protocol = fnet_debug::InterfacesMarker::DEBUG_NAME, "serving");
     rs.try_for_each(|req| async {
         match req {
-            fnet_debug::InterfacesRequest::GetAdmin { id, control, control_handle: _ } => {
-                handle_get_admin(&ns, id, control).await;
-            }
             fnet_debug::InterfacesRequest::GetMac { id, responder } => {
                 responder_send!(
                     responder,
@@ -47,39 +41,6 @@ pub(crate) async fn serve_interfaces(
         Ok(())
     })
     .await
-}
-
-async fn handle_get_admin(
-    ns: &Netstack,
-    interface_id: u64,
-    control: ServerEnd<fnet_interfaces_admin::ControlMarker>,
-) {
-    debug!(interface_id, "handling fuchsia.net.debug.Interfaces::GetAdmin");
-    let ctx = ns.ctx.clone();
-    let core_id =
-        BindingId::new(interface_id).and_then(|id| ctx.non_sync_ctx.devices.get_core_id(id));
-    let core_id = match core_id {
-        Some(c) => c,
-        None => {
-            control.close_with_epitaph(zx::Status::NOT_FOUND).unwrap_or_else(|e| {
-                if e.is_closed() {
-                    debug!(err = ?e, "control handle closed before sending epitaph")
-                } else {
-                    error!(err = ?e, "failed to send epitaph")
-                }
-            });
-            return;
-        }
-    };
-
-    let mut sender = core_id.external_state().with_common_info(|i| i.control_hook.clone());
-
-    match sender.try_send_fut(interfaces_admin::OwnedControlHandle::new_unowned(control)).await {
-        Ok(()) => {}
-        Err(owned_control_handle) => {
-            owned_control_handle.into_control_handle().shutdown_with_epitaph(zx::Status::NOT_FOUND)
-        }
-    }
 }
 
 fn handle_get_mac(ns: &Netstack, interface_id: u64) -> fnet_debug::InterfacesGetMacResult {

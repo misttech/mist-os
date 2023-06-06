@@ -117,6 +117,7 @@ impl From<(fidl_fuchsia_net_interfaces_ext::Properties, Option<fidl_fuchsia_net:
 pub struct NetstackFacade {
     interfaces_state: OnceCell<fidl_fuchsia_net_interfaces::StateProxy>,
     debug_interfaces: OnceCell<fidl_fuchsia_net_debug::InterfacesProxy>,
+    root_interfaces: OnceCell<fidl_fuchsia_net_root::InterfacesProxy>,
 }
 
 async fn get_netstack_proxy<P: fidl::endpoints::DiscoverableProtocolMarker>(
@@ -134,7 +135,7 @@ impl NetstackFacade {
     async fn get_interfaces_state(
         &self,
     ) -> Result<&fidl_fuchsia_net_interfaces::StateProxy, Error> {
-        let Self { interfaces_state, debug_interfaces: _ } = self;
+        let Self { interfaces_state, debug_interfaces: _, root_interfaces: _ } = self;
         if let Some(state_proxy) = interfaces_state.get() {
             Ok(state_proxy)
         } else {
@@ -149,7 +150,7 @@ impl NetstackFacade {
     async fn get_debug_interfaces(
         &self,
     ) -> Result<&fidl_fuchsia_net_debug::InterfacesProxy, Error> {
-        let Self { interfaces_state: _, debug_interfaces } = self;
+        let Self { interfaces_state: _, debug_interfaces, root_interfaces: _ } = self;
         if let Some(interfaces_proxy) = debug_interfaces.get() {
             Ok(interfaces_proxy)
         } else {
@@ -161,11 +162,24 @@ impl NetstackFacade {
         }
     }
 
+    async fn get_root_interfaces(&self) -> Result<&fidl_fuchsia_net_root::InterfacesProxy, Error> {
+        let Self { interfaces_state: _, debug_interfaces: _, root_interfaces } = self;
+        if let Some(interfaces_proxy) = root_interfaces.get() {
+            Ok(interfaces_proxy)
+        } else {
+            let interfaces_proxy =
+                get_netstack_proxy::<fidl_fuchsia_net_root::InterfacesMarker>().await?;
+            root_interfaces.set(interfaces_proxy).unwrap();
+            let interfaces_proxy = root_interfaces.get().unwrap();
+            Ok(interfaces_proxy)
+        }
+    }
+
     async fn get_control(
         &self,
         id: u64,
     ) -> Result<fidl_fuchsia_net_interfaces_ext::admin::Control, Error> {
-        let debug_interfaces = self.get_debug_interfaces().await?;
+        let debug_interfaces = self.get_root_interfaces().await?;
         let (control, server_end) =
             fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
                 .context("create admin control endpoints")?;

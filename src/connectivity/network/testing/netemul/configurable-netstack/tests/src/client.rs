@@ -10,6 +10,7 @@ use fidl_fuchsia_net_debug as fnet_debug;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
+use fidl_fuchsia_net_root as fnet_root;
 use fidl_fuchsia_net_routes as fnet_routes;
 use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fuchsia_component::client::connect_to_protocol;
@@ -181,9 +182,10 @@ async fn enable_forwarding(
     });
     futures_util::pin_mut!(matching_interface);
     let id = matching_interface.next().await.expect("could not find interface");
+    let root = connect_to_protocol::<fnet_root::InterfacesMarker>().expect("connect to protocol");
     let (control, server_end) =
         fnet_interfaces_ext::admin::Control::create_endpoints().expect("create endpoints");
-    debug.get_admin(id, server_end).expect("get control handle to interface");
+    root.get_admin(id, server_end).expect("get control handle to interface");
 
     let fnet_interfaces_admin::Configuration { ipv4, ipv6, .. } = control
         .get_configuration()

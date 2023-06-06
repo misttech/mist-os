@@ -19,6 +19,7 @@ use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
+use fidl_fuchsia_net_root as fnet_root;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_test_realm as fntr;
 use fidl_fuchsia_posix_socket as fposix_socket;
@@ -314,20 +315,20 @@ async fn connect_to_interface_admin_control(
     id: u64,
     connector: &impl Connector,
 ) -> Result<fnet_interfaces_ext::admin::Control, fntr::Error> {
-    let debug_interfaces_proxy = connector.connect_to_protocol::<fnet_debug::InterfacesMarker>()?;
+    let root_interfaces_proxy = connector.connect_to_protocol::<fnet_root::InterfacesMarker>()?;
     let (control, server) =
         fnet_interfaces_ext::admin::Control::create_endpoints().map_err(|e| {
             error!("create_endpoints failure: {:?}", e);
             fntr::Error::Internal
         })?;
-    debug_interfaces_proxy.get_admin(id, server).map_err(|e| {
+    root_interfaces_proxy.get_admin(id, server).map_err(|e| {
         error!("get_admin failure: {:?}", e);
         fntr::Error::Internal
     })?;
     Ok(control)
 }
 
-/// Enables the interface with `id` using the provided `debug_interfaces_proxy`.
+/// Enables the interface with `id` using the provided `root_interfaces_proxy`.
 async fn enable_interface(id: u64, connector: &impl Connector) -> Result<(), fntr::Error> {
     let control_proxy = connect_to_interface_admin_control(id, connector).await?;
     let _did_enable: bool = control_proxy
@@ -345,7 +346,7 @@ async fn enable_interface(id: u64, connector: &impl Connector) -> Result<(), fnt
 }
 
 /// Disables the interface with `id` using the provided
-/// `debug_interfaces_proxy`.
+/// `root_interfaces_proxy`.
 async fn disable_interface(id: u64, connector: &impl Connector) -> Result<(), fntr::Error> {
     let control_proxy = connect_to_interface_admin_control(id, connector).await?;
     let _did_disable: bool = control_proxy

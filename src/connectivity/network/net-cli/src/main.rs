@@ -11,6 +11,7 @@ use fidl_fuchsia_net_filter as ffilter;
 use fidl_fuchsia_net_interfaces as finterfaces;
 use fidl_fuchsia_net_name as fname;
 use fidl_fuchsia_net_neighbor as fneighbor;
+use fidl_fuchsia_net_root as froot;
 use fidl_fuchsia_net_routes as froutes;
 use fidl_fuchsia_net_stack as fstack;
 use fidl_fuchsia_sys2 as fsys;
@@ -91,6 +92,13 @@ const DNS_RESOLVER_MONIKER: &str = "./core/network/dns-resolver";
 impl net_cli::ServiceConnector<fdebug::InterfacesMarker> for Connector {
     async fn connect(&self) -> Result<<fdebug::InterfacesMarker as ProtocolMarker>::Proxy, Error> {
         self.connect_to_exposed_protocol::<fdebug::InterfacesMarker>(NETSTACK_MONIKER).await
+    }
+}
+
+#[async_trait::async_trait]
+impl net_cli::ServiceConnector<froot::InterfacesMarker> for Connector {
+    async fn connect(&self) -> Result<<froot::InterfacesMarker as ProtocolMarker>::Proxy, Error> {
+        self.connect_to_exposed_protocol::<froot::InterfacesMarker>(NETSTACK_MONIKER).await
     }
 }
 

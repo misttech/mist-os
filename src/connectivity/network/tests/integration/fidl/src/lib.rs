@@ -120,13 +120,13 @@ async fn add_remove_address_on_loopback<N: Netstack>(name: &str) {
         .collect();
     assert_eq!(addresses[..], [IPV4_LOOPBACK, IPV6_LOOPBACK]);
 
-    let debug = realm
-        .connect_to_protocol::<fidl_fuchsia_net_debug::InterfacesMarker>()
+    let root = realm
+        .connect_to_protocol::<fidl_fuchsia_net_root::InterfacesMarker>()
         .expect("connect to protocol");
 
     let (control, server_end) =
         fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints().expect("create proxy");
-    let () = debug.get_admin(loopback_id.get(), server_end).expect("get admin");
+    let () = root.get_admin(loopback_id.get(), server_end).expect("get admin");
 
     futures::stream::iter([IPV4_LOOPBACK, IPV6_LOOPBACK].into_iter())
         .for_each_concurrent(None, |mut addr| {
@@ -197,13 +197,13 @@ async fn disable_interface_loopback<N: Netstack>(name: &str) {
         ))) => ()
     );
 
-    let debug = realm
-        .connect_to_protocol::<fidl_fuchsia_net_debug::InterfacesMarker>()
+    let root = realm
+        .connect_to_protocol::<fidl_fuchsia_net_root::InterfacesMarker>()
         .expect("connect to protocol");
 
     let (control, server_end) =
         fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints().expect("create proxy");
-    let () = debug.get_admin(loopback_id, server_end).expect("get admin");
+    let () = root.get_admin(loopback_id, server_end).expect("get admin");
 
     let did_disable = control.disable().await.expect("send disable").expect("disable");
     assert!(did_disable);

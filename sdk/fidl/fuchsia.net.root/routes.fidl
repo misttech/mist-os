@@ -2,14 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-library fuchsia.net.debug;
+library fuchsia.net.root;
 
 using fuchsia.net.routes.admin;
 
-/// Debugging functionality for IPv4 network routes.
+/// Provides access to IPv4 routes.
 ///
-/// This protocol is intended for debugging and testing only; it is not intended
-/// for production code.
+/// This protocol provides the ability to bypass regular ownership-controls
+/// which allow only the route set owner to remove routes it added.
+///
+/// Circumventing the strong-ownership semantics through use of this protocol
+/// is highly discouraged and applications considering use of this protocol
+/// are encouraged to exhaust other options first by working with the Netstack
+/// team to find an alternative solution.
 @discoverable
 protocol RoutesV4 {
     /// Returns a `RouteSetV4` containing all IPv4 routes from the global
@@ -37,10 +42,15 @@ protocol RoutesV4 {
 };
 
 
-/// Debugging functionality for IPv6 network routes.
+/// Provides access to IPv6 routes.
 ///
-/// This protocol is intended for debugging and testing only; it is not intended
-/// for production code.
+/// This protocol provides the ability to bypass regular ownership-controls
+/// which allow only the route set owner to remove routes it added.
+///
+/// Circumventing the strong-ownership semantics through use of this protocol
+/// is highly discouraged and applications considering use of this protocol
+/// are encouraged to exhaust other options first by working with the Netstack
+/// team to find an alternative solution.
 @discoverable
 protocol RoutesV6 {
     /// Returns a `RouteSetV6` containing all IPv6 routes from the global

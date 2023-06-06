@@ -6,11 +6,11 @@
 
 use assert_matches::assert_matches;
 use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_debug as fnet_debug;
 use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_ext::IntoExt;
 use fidl_fuchsia_net_interfaces_admin as finterfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
+use fidl_fuchsia_net_root as fnet_root;
 use fidl_fuchsia_net_routes as fnet_routes;
 use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fidl_fuchsia_posix_socket as fposix_socket;
@@ -309,13 +309,13 @@ async fn add_address_removal<N: Netstack>(name: &str) {
         .expect("install interface");
     let id = interface.id();
 
-    let debug_control = realm
-        .connect_to_protocol::<fidl_fuchsia_net_debug::InterfacesMarker>()
-        .expect(<fidl_fuchsia_net_debug::InterfacesMarker as fidl::endpoints::DiscoverableProtocolMarker>::PROTOCOL_NAME);
+    let root_control = realm
+        .connect_to_protocol::<fidl_fuchsia_net_root::InterfacesMarker>()
+        .expect(<fidl_fuchsia_net_root::InterfacesMarker as fidl::endpoints::DiscoverableProtocolMarker>::PROTOCOL_NAME);
 
     let (control, server) = fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
         .expect("create Control proxy");
-    let () = debug_control.get_admin(id, server).expect("get admin");
+    let () = root_control.get_admin(id, server).expect("get admin");
 
     let valid_address_parameters = fidl_fuchsia_net_interfaces_admin::AddressParameters::default();
 
@@ -395,14 +395,14 @@ async fn add_address_offline<N: Netstack>(name: &str) {
     let interface = device.into_interface_in_realm(&realm).await.expect("add endpoint to Netstack");
     let id = interface.id();
 
-    let debug_control = realm
-        .connect_to_protocol::<fidl_fuchsia_net_debug::InterfacesMarker>()
-        .expect(<fidl_fuchsia_net_debug::InterfacesMarker as fidl::endpoints::DiscoverableProtocolMarker>::PROTOCOL_NAME);
+    let root_control = realm
+        .connect_to_protocol::<fidl_fuchsia_net_root::InterfacesMarker>()
+        .expect(<fidl_fuchsia_net_root::InterfacesMarker as fidl::endpoints::DiscoverableProtocolMarker>::PROTOCOL_NAME);
 
     let (control, server) =
         fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::ControlMarker>()
             .expect("create Control proxy");
-    let () = debug_control.get_admin(id, server).expect("get admin");
+    let () = root_control.get_admin(id, server).expect("get admin");
 
     let valid_address_parameters = fidl_fuchsia_net_interfaces_admin::AddressParameters::default();
 
@@ -521,13 +521,13 @@ async fn create_realm_and_interface<'a, N: Netstack>(
         .next()
         .expect("interface properties map unexpectedly does not include loopback");
 
-    let debug_control = realm
-        .connect_to_protocol::<fidl_fuchsia_net_debug::InterfacesMarker>()
-        .expect(<fidl_fuchsia_net_debug::InterfacesMarker as fidl::endpoints::DiscoverableProtocolMarker>::PROTOCOL_NAME);
+    let root_control = realm
+        .connect_to_protocol::<fidl_fuchsia_net_root::InterfacesMarker>()
+        .expect(<fidl_fuchsia_net_root::InterfacesMarker as fidl::endpoints::DiscoverableProtocolMarker>::PROTOCOL_NAME);
 
     let (control, server) = fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
         .expect("create Control proxy");
-    debug_control.get_admin(id, server).expect("get admin");
+    root_control.get_admin(id, server).expect("get admin");
 
     (realm, interface_state, id, control)
 }
@@ -1181,17 +1181,17 @@ async fn control_terminal_events<N: Netstack>(
             let control =
                 create_interface(port_id, fidl_fuchsia_net_interfaces_admin::Options::default());
             let interface_id = control.get_id().await.expect("get id");
-            // Setup a control handle via the debug API, and drop the original control handle.
-            let debug_interfaces = realm
-                .connect_to_protocol::<fnet_debug::InterfacesMarker>()
+            // Setup a control handle via the root API, and drop the original control handle.
+            let root_interfaces = realm
+                .connect_to_protocol::<fnet_root::InterfacesMarker>()
                 .expect("connect to protocol");
-            let (debug_control, server_end) =
+            let (root_control, server_end) =
                 fidl::endpoints::create_proxy::<finterfaces_admin::ControlMarker>()
                     .expect("create proxy");
-            debug_interfaces.get_admin(interface_id, server_end).expect("get admin failed");
-            // Wait for the debug handle to be fully installed by synchronizing on `get_id`.
-            assert_eq!(debug_control.get_id().await.expect("get id"), interface_id);
-            (debug_control, vec![KeepResource::Port(port)])
+            root_interfaces.get_admin(interface_id, server_end).expect("get admin failed");
+            // Wait for the root handle to be fully installed by synchronizing on `get_id`.
+            assert_eq!(root_control.get_id().await.expect("get id"), interface_id);
+            (root_control, vec![KeepResource::Port(port)])
         }
         unknown_reason => panic!("unknown reason {:?}", unknown_reason),
     };
@@ -2023,13 +2023,13 @@ async fn control_owns_interface_lifetime<N: Netstack>(name: &str, detach: bool) 
         ) if id == iface_id
     );
 
-    let debug = realm
-        .connect_to_protocol::<fidl_fuchsia_net_debug::InterfacesMarker>()
+    let root = realm
+        .connect_to_protocol::<fidl_fuchsia_net_root::InterfacesMarker>()
         .expect("connect to protocol");
-    let (debug_control, control_server_end) =
+    let (root_control, control_server_end) =
         fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints().expect("create proxy");
-    let () = debug.get_admin(iface_id, control_server_end).expect("get admin");
-    let same_iface_id = debug_control.get_id().await.expect("get id");
+    let () = root.get_admin(iface_id, control_server_end).expect("get admin");
+    let same_iface_id = root_control.get_id().await.expect("get id");
     assert_eq!(same_iface_id, iface_id);
 
     if detach {
@@ -2039,11 +2039,11 @@ async fn control_owns_interface_lifetime<N: Netstack>(name: &str, detach: bool) 
         let watcher_fut =
             watcher.select_next_some().map(|event| panic!("unexpected event {:?}", event));
 
-        let debug_control_fut = debug_control
+        let root_control_fut = root_control
             .wait_termination()
             .map(|event| panic!("unexpected termination {:?}", event));
 
-        let ((), ()) = futures::future::join(watcher_fut, debug_control_fut)
+        let ((), ()) = futures::future::join(watcher_fut, root_control_fut)
             .on_timeout(
                 fuchsia_async::Time::after(
                     netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
@@ -2060,10 +2060,10 @@ async fn control_owns_interface_lifetime<N: Netstack>(name: &str, detach: bool) 
             fidl_fuchsia_net_interfaces::Event::Removed(id) if id == iface_id
         );
 
-        // The debug control channel is a weak ref, it didn't prevent destruction,
+        // The root control channel is a weak ref, it didn't prevent destruction,
         // but is closed now.
         assert_matches::assert_matches!(
-            debug_control.wait_termination().await,
+            root_control.wait_termination().await,
             fidl_fuchsia_net_interfaces_ext::admin::TerminalError::Terminal(
                 fidl_fuchsia_net_interfaces_admin::InterfaceRemovedReason::User
             )

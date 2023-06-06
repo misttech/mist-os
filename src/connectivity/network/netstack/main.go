@@ -39,6 +39,7 @@ import (
 	"fidl/fuchsia/net/interfaces"
 	"fidl/fuchsia/net/interfaces/admin"
 	"fidl/fuchsia/net/neighbor"
+	"fidl/fuchsia/net/root"
 	fnetRoutes "fidl/fuchsia/net/routes"
 	"fidl/fuchsia/net/stack"
 	"fidl/fuchsia/posix/socket"
@@ -802,6 +803,21 @@ func Main() {
 		stub := debug.InterfacesWithCtxStub{Impl: &debugInterfacesImpl{ns: ns}}
 		componentCtx.OutgoingService.AddService(
 			debug.InterfacesName,
+			func(ctx context.Context, c zx.Channel) error {
+				go component.Serve(ctx, &stub, c, component.ServeOptions{
+					OnError: func(err error) {
+						_ = syslog.WarnTf(debug.InterfacesName, "%s", err)
+					},
+				})
+				return nil
+			},
+		)
+	}
+
+	{
+		stub := root.InterfacesWithCtxStub{Impl: &rootInterfacesImpl{ns: ns}}
+		componentCtx.OutgoingService.AddService(
+			root.InterfacesName,
 			func(ctx context.Context, c zx.Channel) error {
 				go component.Serve(ctx, &stub, c, component.ServeOptions{
 					OnError: func(err error) {

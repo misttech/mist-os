@@ -13,7 +13,6 @@
     use: [
         {
             protocol: [
-                "fuchsia.net.debug.Interfaces",
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.stack.Stack",
@@ -37,6 +36,7 @@
             protocol: [
                 "fuchsia.net.debug.Interfaces",
                 "fuchsia.net.interfaces.State",
+                "fuchsia.net.root.Interfaces",
                 "fuchsia.net.routes.StateV4",
                 "fuchsia.net.routes.StateV6",
                 "fuchsia.net.stack.Stack",

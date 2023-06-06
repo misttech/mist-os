@@ -21,7 +21,6 @@ import (
 
 	"fidl/fuchsia/hardware/network"
 	"fidl/fuchsia/net/debug"
-	"fidl/fuchsia/net/interfaces/admin"
 
 	"gvisor.dev/gvisor/pkg/tcpip"
 )
@@ -30,23 +29,6 @@ var _ debug.InterfacesWithCtx = (*debugInterfacesImpl)(nil)
 
 type debugInterfacesImpl struct {
 	ns *Netstack
-}
-
-func (ci *debugInterfacesImpl) GetAdmin(_ fidl.Context, nicid uint64, request admin.ControlWithCtxInterfaceRequest) error {
-	{
-		nicid := tcpip.NICID(nicid)
-		nicInfo, ok := ci.ns.stack.NICInfo()[nicid]
-		if !ok {
-			if err := component.CloseWithEpitaph(request.Channel, zx.ErrNotFound); err != nil {
-				_ = syslog.WarnTf(debug.InterfacesName, "GetAdmin(%d) close error: %s", nicid, err)
-			}
-			return nil
-		}
-
-		ifs := nicInfo.Context.(*ifState)
-		ifs.addAdminConnection(request, false /* strong */)
-		return nil
-	}
 }
 
 func (ci *debugInterfacesImpl) GetMac(_ fidl.Context, nicid uint64) (debug.InterfacesGetMacResult, error) {

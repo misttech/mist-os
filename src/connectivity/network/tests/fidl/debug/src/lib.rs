@@ -10,6 +10,7 @@ use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_debug as fnet_debug;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
+use fidl_fuchsia_net_root as fnet_root;
 use fuchsia_zircon::{self as zx, AsHandleRef as _};
 use futures::TryStreamExt as _;
 use net_declare::fidl_mac;
@@ -39,14 +40,14 @@ async fn get_admin_unknown<N: Netstack>(name: &str) {
 
     let id = get_loopback_id(&realm).await;
 
-    let debug_interfaces =
-        realm.connect_to_protocol::<fnet_debug::InterfacesMarker>().expect("connect to protocol");
+    let root_interfaces =
+        realm.connect_to_protocol::<fnet_root::InterfacesMarker>().expect("connect to protocol");
 
     // Request unknown NIC ID, expect request channel to be closed.
     let (admin_control, server_end) =
         fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
             .expect("create proxy");
-    let () = debug_interfaces.get_admin(id + 1, server_end).expect("get admin failed");
+    let () = root_interfaces.get_admin(id + 1, server_end).expect("get admin failed");
 
     let events = admin_control.take_event_stream().try_collect::<Vec<_>>().await;
     assert_matches!(
@@ -59,14 +60,14 @@ async fn get_admin_unknown<N: Netstack>(name: &str) {
 async fn get_admin_loopback<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
-    let debug_interfaces =
-        realm.connect_to_protocol::<fnet_debug::InterfacesMarker>().expect("connect to protocol");
+    let root_interfaces =
+        realm.connect_to_protocol::<fnet_root::InterfacesMarker>().expect("connect to protocol");
 
     let (admin_control, server_end) =
         fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
             .expect("create proxy");
     let id = get_loopback_id(&realm).await;
-    debug_interfaces.get_admin(id, server_end).expect("get admin failed");
+    root_interfaces.get_admin(id, server_end).expect("get admin failed");
 
     // Actuate the admin API to verify it's hooked up correctly.
     assert_eq!(admin_control.get_id().await.expect("get id"), id);
@@ -76,8 +77,8 @@ async fn get_admin_loopback<N: Netstack>(name: &str) {
 async fn get_admin_netemul_endpoint<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
-    let debug_interfaces =
-        realm.connect_to_protocol::<fnet_debug::InterfacesMarker>().expect("connect to protocol");
+    let root_interfaces =
+        realm.connect_to_protocol::<fnet_root::InterfacesMarker>().expect("connect to protocol");
     let device = sandbox.create_endpoint(name).await.expect("create netemul endpoint");
     // Retain `_control` and `_device_control` to keep the FIDL channel open.
     let (id, _control, _device_control) = device
@@ -88,7 +89,7 @@ async fn get_admin_netemul_endpoint<N: Netstack>(name: &str) {
         fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
             .expect("create proxy");
 
-    debug_interfaces.get_admin(id, server_end).expect("get admin failed");
+    root_interfaces.get_admin(id, server_end).expect("get admin failed");
 
     // Actuate the admin API to verify it's hooked up correctly.
     assert_eq!(admin_control.get_id().await.expect("get id"), id);
