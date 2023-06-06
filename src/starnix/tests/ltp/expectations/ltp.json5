@@ -228,7 +228,6 @@
                 "*/ltp_fanotify22.cm",
                 "*/ltp_fanotify23.cm",
                 "*/ltp_fanout01.cm",
-                "*/ltp_fchmod06.cm",
                 "*/ltp_fchown01_16.cm",
                 "*/ltp_fchown02_16.cm",
                 "*/ltp_fchown03_16.cm",

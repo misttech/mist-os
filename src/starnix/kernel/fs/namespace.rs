@@ -824,6 +824,16 @@ impl NamespaceNode {
         ))
     }
 
+    /// Checks whether this namespace node has a writable file system mounted.
+    pub fn check_readonly_filesystem(&self) -> Result<(), Errno> {
+        if let Some(mount) = &self.mount {
+            if mount.flags().contains(MountFlags::RDONLY) {
+                return error!(EROFS);
+            }
+        }
+        Ok(())
+    }
+
     pub fn open_create_node(
         &self,
         current_task: &CurrentTask,
