@@ -6,9 +6,9 @@
 #define SRC_DEVICES_THERMAL_DRIVERS_AS370_THERMAL_AS370_THERMAL_H_
 
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
+#include <fidl/fuchsia.hardware.power/cpp/wire.h>
 #include <fidl/fuchsia.hardware.thermal/cpp/fidl.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
-#include <fuchsia/hardware/power/cpp/banjo.h>
 #include <lib/mmio/mmio.h>
 
 #include <ddktl/device.h>
@@ -30,12 +30,12 @@ class As370Thermal : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_TH
  public:
   As370Thermal(zx_device_t* parent, ddk::MmioBuffer mmio, const ThermalDeviceInfo& device_info,
                fidl::ClientEnd<fuchsia_hardware_clock::Clock> cpu_clock,
-               const ddk::PowerProtocolClient& cpu_power)
+               fidl::ClientEnd<fuchsia_hardware_power::Device> cpu_power)
       : DeviceType(parent),
         mmio_(std::move(mmio)),
         device_info_(device_info),
         cpu_clock_(std::move(cpu_clock)),
-        cpu_power_(cpu_power) {}
+        cpu_power_(std::move(cpu_power)) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
@@ -68,7 +68,7 @@ class As370Thermal : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_TH
   const ddk::MmioBuffer mmio_;
   const ThermalDeviceInfo device_info_;
   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> cpu_clock_;
-  const ddk::PowerProtocolClient cpu_power_;
+  fidl::WireSyncClient<fuchsia_hardware_power::Device> cpu_power_;
   uint16_t operating_point_ = 0;
 };
 

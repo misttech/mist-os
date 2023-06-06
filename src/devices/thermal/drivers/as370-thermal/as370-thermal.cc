@@ -48,11 +48,15 @@ zx_status_t As370Thermal::Create(void* ctx, zx_device_t* parent) {
   }
   fidl::ClientEnd<fuchsia_hardware_clock::Clock> cpu_clock = std::move(*clock_result);
 
-  ddk::PowerProtocolClient cpu_power(parent, "power");
-  if (!cpu_power.is_valid()) {
-    zxlogf(ERROR, "%s: Failed to get power protocol", __func__);
+  zx::result cpu_power_result =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_power::Service::Device>(
+          parent, "power");
+  if (cpu_power_result.is_error()) {
+    zxlogf(WARNING, "Failed to get cpu power protocol from fragment: %s",
+           cpu_power_result.status_string());
     return ZX_ERR_NO_RESOURCES;
   }
+  fidl::ClientEnd<fuchsia_hardware_power::Device> cpu_power = std::move(*cpu_power_result);
 
   std::optional<ddk::MmioBuffer> mmio;
   zx_status_t status = pdev.MapMmio(0, &mmio);
@@ -75,7 +79,7 @@ zx_status_t As370Thermal::Create(void* ctx, zx_device_t* parent) {
 
   fbl::AllocChecker ac;
   auto device = fbl::make_unique_checked<As370Thermal>(&ac, parent, *std::move(mmio), device_info,
-                                                       std::move(cpu_clock), cpu_power);
+                                                       std::move(cpu_clock), std::move(cpu_power));
   if (!ac.check()) {
     zxlogf(ERROR, "%s: Failed to allocate device memory", __func__);
     return ZX_ERR_NO_MEMORY;
@@ -190,11 +194,19 @@ zx_status_t As370Thermal::Init() {
       device_info_.opps[static_cast<uint32_t>(PowerDomain::kBigClusterPowerDomain)];
   const auto max_operating_point = static_cast<uint16_t>(operating_points.count - 1);
 
-  zx_status_t status = cpu_power_.RegisterPowerDomain(
+  fidl::WireResult result = cpu_power_->RegisterPowerDomain(
       operating_points.opp[0].volt_uv, operating_points.opp[max_operating_point].volt_uv);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: Failed to register power domain: %d", __func__, status);
-    return status;
+
+  if (!result.ok()) {
+    zxlogf(ERROR, "%s: Failed to send request for register power domain: %s", __func__,
+           result.status_string());
+    return result.status();
+  }
+
+  if (result->is_error()) {
+    zxlogf(ERROR, "%s: Failed to register power domain: %s", __func__,
+           zx_status_get_string(result.value().error_value()));
+    return result.value().error_value();
   }
 
   return SetOperatingPoint(max_operating_point);
@@ -204,13 +216,22 @@ zx_status_t As370Thermal::SetOperatingPoint(uint16_t op_idx) {
   const auto& opps =
       device_info_.opps[static_cast<uint32_t>(PowerDomain::kBigClusterPowerDomain)].opp;
 
-  zx_status_t status;
-  uint32_t actual_voltage = 0;
   if (opps[op_idx].freq_hz > opps[operating_point_].freq_hz) {
-    if ((status = cpu_power_.RequestVoltage(opps[op_idx].volt_uv, &actual_voltage)) != ZX_OK) {
-      zxlogf(ERROR, "%s: Failed to set voltage: %d", __func__, status);
-      return status;
+    fidl::WireResult result = cpu_power_->RequestVoltage(opps[op_idx].volt_uv);
+    if (!result.ok()) {
+      zxlogf(ERROR, "%s: Failed to send request for set voltage: %s", __func__,
+             result.status_string());
+      return result.status();
     }
+
+    if (result->is_error()) {
+      zxlogf(ERROR, "%s:Failed to set voltage: %s", __func__,
+             zx_status_get_string(result.value().error_value()));
+      return result.value().error_value();
+    }
+
+    uint32_t actual_voltage = result.value()->actual_voltage;
+
     if (actual_voltage != opps[op_idx].volt_uv) {
       zxlogf(ERROR, "%s: Failed to set exact voltage: set %u, wanted %u", __func__, actual_voltage,
              opps[op_idx].volt_uv);
@@ -241,10 +262,20 @@ zx_status_t As370Thermal::SetOperatingPoint(uint16_t op_idx) {
       return set_rate_result->error_value();
     }
 
-    if ((status = cpu_power_.RequestVoltage(opps[op_idx].volt_uv, &actual_voltage)) != ZX_OK) {
-      zxlogf(ERROR, "%s: Failed to set voltage: %d", __func__, status);
-      return status;
+    fidl::WireResult result = cpu_power_->RequestVoltage(opps[op_idx].volt_uv);
+    if (!result.ok()) {
+      zxlogf(ERROR, "%s: Failed to send request for set voltage: %s", __func__,
+             result.status_string());
+      return result.status();
     }
+
+    if (result->is_error()) {
+      zxlogf(ERROR, "%s:Failed to set voltage: %s", __func__,
+             zx_status_get_string(result.value().error_value()));
+      return result.value().error_value();
+    }
+
+    uint32_t actual_voltage = result.value()->actual_voltage;
     if (actual_voltage != opps[op_idx].volt_uv) {
       zxlogf(ERROR, "%s: Failed to set exact voltage: set %u, wanted %u", __func__, actual_voltage,
              opps[op_idx].volt_uv);
