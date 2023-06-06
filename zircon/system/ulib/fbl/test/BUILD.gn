@@ -54,6 +54,7 @@ test("fbl") {
   ]
 
   deps = [
+    "//sdk/lib/stdcompat",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zxtest",
   ]

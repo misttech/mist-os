@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/stdcompat/span.h>
+
 #include <memory>
 #include <utility>
 
@@ -896,5 +898,21 @@ TEST(VectorTest, InitializerListValueType) {
 }
 
 TEST(VectorTest, InitializerListRefPtr) { ASSERT_NO_FAILURES(InitializerList<RefPtrTraits>()); }
+
+TEST(VectorTest, ImplicitlyConvertibleToSpan) {
+  fbl::Vector<int> vector_int = {1, 2, 3, 4, 5};
+
+  cpp20::span<int> vector_span(vector_int);
+  EXPECT_EQ(vector_int.size(), vector_span.size());
+  EXPECT_EQ(vector_int.data(), vector_span.data());
+}
+
+TEST(VectorTest, ImplicitlyConvertibleToConstSpan) {
+  const fbl::Vector<int> vector_int = {1, 2, 3, 4, 5};
+
+  cpp20::span<const int> vector_span(vector_int);
+  EXPECT_EQ(vector_int.size(), vector_span.size());
+  EXPECT_EQ(vector_int.data(), vector_span.data());
+}
 
 }  // namespace
