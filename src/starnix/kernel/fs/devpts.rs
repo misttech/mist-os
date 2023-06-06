@@ -328,8 +328,7 @@ impl FileOps for DevPtmxFile {
             }
             TIOCGPTLCK => {
                 // Get the lock status.
-                #[allow(clippy::bool_to_int_with_if)]
-                let value = if self.terminal.read().locked { 1 } else { 0 };
+                let value = i32::from(self.terminal.read().locked);
                 current_task.mm.write_object(UserRef::<i32>::new(user_addr), &value)?;
                 Ok(SUCCESS)
             }
