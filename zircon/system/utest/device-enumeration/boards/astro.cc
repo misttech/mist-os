@@ -88,7 +88,7 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
 
   static const char* kTouchscreenDevicePaths[] = {
-      "sys/platform/05:00:2:1/aml-i2c/i2c/i2c-1-56/focaltech_touch/focaltouch HidDevice/hid-device/InputReport",
+      "sys/platform/05:00:2:1/aml-i2c/i2c/i2c-1-56/focaltech_touch/focaltouch HidDevice",
       "sys/platform/05:00:2:1/aml-i2c/i2c/i2c-1-93/gt92xx_touch/gt92xx HidDevice/hid-device/InputReport",
   };
   ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForOne(

@@ -5,11 +5,12 @@
 #ifndef SRC_UI_INPUT_DRIVERS_FOCALTECH_FT_DEVICE_H_
 #define SRC_UI_INPUT_DRIVERS_FOCALTECH_FT_DEVICE_H_
 
+#include <fidl/fuchsia.input.report/cpp/wire.h>
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
-#include <fuchsia/hardware/hidbus/cpp/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/focaltech/focaltech.h>
+#include <lib/input_report_reader/reader.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/interrupt.h>
@@ -21,11 +22,8 @@
 #include <atomic>
 
 #include <ddktl/device.h>
+#include <ddktl/protocol/empty-protocol.h>
 #include <fbl/mutex.h>
-#include <hid/ft3x27.h>
-#include <hid/ft5336_khadas_ts050.h>
-#include <hid/ft5726.h>
-#include <hid/ft6336.h>
 
 // clang-format off
 #define FTS_REG_CURPOINT                    0x02
@@ -66,34 +64,58 @@
 
 namespace ft {
 
-class FtDevice : public ddk::Device<FtDevice, ddk::Unbindable>,
-                 public ddk::HidbusProtocol<FtDevice, ddk::base_protocol> {
+class FtDevice;
+using DeviceType = ddk::Device<FtDevice, ddk::Messageable<fuchsia_input_report::InputDevice>::Mixin,
+                               ddk::Unbindable>;
+
+class FtDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INPUTREPORT> {
  public:
-  FtDevice(zx_device_t* device);
+  explicit FtDevice(zx_device_t* device, async_dispatcher_t* dispatcher)
+      : DeviceType(device), dispatcher_(dispatcher) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* device);
 
   void DdkRelease();
-  void DdkUnbind(ddk::UnbindTxn txn) __TA_EXCLUDES(client_lock_);
+  void DdkUnbind(ddk::UnbindTxn txn);
 
-  // Hidbus required methods
-  void HidbusStop();
-  zx_status_t HidbusGetDescriptor(hid_description_type_t desc_type, uint8_t* out_data_buffer,
-                                  size_t data_size, size_t* out_data_actual);
-  zx_status_t HidbusGetReport(uint8_t rpt_type, uint8_t rpt_id, uint8_t* data, size_t len,
-                              size_t* out_len);
-  zx_status_t HidbusSetReport(uint8_t rpt_type, uint8_t rpt_id, const uint8_t* data, size_t len);
-  zx_status_t HidbusGetIdle(uint8_t rpt_id, uint8_t* duration);
-  zx_status_t HidbusSetIdle(uint8_t rpt_id, uint8_t duration);
-  zx_status_t HidbusGetProtocol(uint8_t* protocol);
-  zx_status_t HidbusSetProtocol(uint8_t protocol);
-  zx_status_t HidbusStart(const hidbus_ifc_protocol_t* ifc) __TA_EXCLUDES(client_lock_);
-  zx_status_t HidbusQuery(uint32_t options, hid_info_t* info) __TA_EXCLUDES(client_lock_);
+  // fuchsia_input_report::InputDevice required methods
+  void GetInputReportsReader(GetInputReportsReaderRequestView request,
+                             GetInputReportsReaderCompleter::Sync& completer) override;
+  void GetDescriptor(GetDescriptorCompleter::Sync& completer) override;
+  void SendOutputReport(SendOutputReportRequestView request,
+                        SendOutputReportCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void GetFeatureReport(GetFeatureReportCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void SetFeatureReport(SetFeatureReportRequestView request,
+                        SetFeatureReportCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void GetInputReport(GetInputReportRequestView request,
+                      GetInputReportCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
 
   // Visible for testing.
   zx_status_t Init();
+  void StartThread();
+  zx_status_t ShutDown();
+
+#ifdef FT_TEST
+  zx_status_t WaitForNextReader(zx::duration timeout) {
+    zx_status_t status = sync_completion_wait(&next_reader_wait_, timeout.get());
+    if (status == ZX_OK) {
+      sync_completion_reset(&next_reader_wait_);
+    }
+    return status;
+  }
+#endif
 
  private:
+  static constexpr size_t kFeatureAndDescriptorBufferSize = 512;
+
   /* Note: the focaltouch device is connected via i2c and is NOT a HID
       device.  This driver reads a collection of data from the data and
       parses it into a message which will be sent up the stack.  This message
@@ -105,8 +127,24 @@ class FtDevice : public ddk::Device<FtDevice, ddk::Unbindable>,
   // Size of each individual touch record (note: there are kMaxPoints of
   //  them) on the i2c bus.  This is not the HID report size.
   static constexpr uint32_t kFingerRptSize = 6;
+  static constexpr uint8_t kFingerIdContactMask = 0xfc;
 
   static constexpr size_t kMaxI2cTransferLength = 8;
+
+  struct FtInputReport {
+    zx::time event_time = zx::time(ZX_TIME_INFINITE_PAST);
+    uint8_t contact_count;
+    struct Contact {
+      uint8_t finger_id;
+      uint16_t x;
+      uint16_t y;
+    };
+    std::array<Contact, kMaxPoints> contacts;
+
+    void ToFidlInputReport(
+        fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
+        fidl::AnyArena& allocator);
+  };
 
   static uint8_t CalculateEcc(const uint8_t* buffer, size_t size, uint8_t initial = 0);
 
@@ -132,20 +170,18 @@ class FtDevice : public ddk::Device<FtDevice, ddk::Unbindable>,
   zx_status_t WriteReg8(uint8_t address, uint8_t value);
   zx_status_t WriteReg16(uint8_t address, uint16_t value);
 
-  zx_status_t ShutDown() __TA_EXCLUDES(client_lock_);
-
   uint8_t Read(uint8_t addr);
   zx_status_t Read(uint8_t addr, uint8_t* buf, size_t len);
 
   int Thread();
 
-  ft3x27_touch_t ft_rpt_ __TA_GUARDED(client_lock_);
-  void ParseReport(ft3x27_finger_t* rpt, uint8_t* buf);
+  static FtInputReport ParseReport(const uint8_t* buf);
 
   void LogRegisterValue(uint8_t addr, const char* name);
 
   zx_status_t UpdateFirmwareIfNeeded(const FocaltechMetadata& metadata);
 
+  async_dispatcher_t* dispatcher_;
   ddk::GpioProtocolClient int_gpio_;
   ddk::GpioProtocolClient reset_gpio_;
   zx::interrupt irq_;
@@ -154,15 +190,27 @@ class FtDevice : public ddk::Device<FtDevice, ddk::Unbindable>,
   thrd_t thread_;
   std::atomic<bool> running_;
 
-  fbl::Mutex client_lock_;
-  ddk::HidbusIfcProtocolClient client_ __TA_GUARDED(client_lock_);
-
-  const uint8_t* descriptor_ = nullptr;
-  size_t descriptor_len_ = 0;
-
   inspect::Inspector inspector_;
   inspect::Node node_;
   inspect::ValueList values_;
+
+  inspect::Node metrics_root_;
+  inspect::UintProperty average_latency_usecs_;
+  inspect::UintProperty max_latency_usecs_;
+  inspect::UintProperty total_report_count_;
+  inspect::UintProperty last_event_timestamp_;
+
+  uint64_t report_count_ = 0;
+  zx::duration total_latency_ = {};
+  zx::duration max_latency_ = {};
+
+  input_report_reader::InputReportReaderManager<FtInputReport> readers_;
+  uint32_t x_max_;
+  uint32_t y_max_;
+
+#ifdef FT_TEST
+  sync_completion_t next_reader_wait_;
+#endif
 };
 }  // namespace ft
 
