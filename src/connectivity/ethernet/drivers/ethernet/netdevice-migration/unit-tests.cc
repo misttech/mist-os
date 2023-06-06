@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/fake-bti/bti.h>
+
 #include <array>
 
 #include <fbl/auto_lock.h>
@@ -9,7 +11,6 @@
 #include <gtest/gtest.h>
 
 #include "netdevice_migration.h"
-#include "src/devices/testing/fake-bti/include/lib/fake-bti/bti.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/lib/testing/predicates/status.h"
