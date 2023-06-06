@@ -290,9 +290,12 @@ class __TA_CAPABILITY("mutex") Lock<GlobalReference<LockType, Reference>> {
 //      // ...
 //  };
 //
-template <typename Class, typename LockType, size_t Index = 0, LockFlags Flags = LockFlagsNone>
-class LockDep : public Lock<LockType> {
+template <typename Class, typename LockType_, size_t Index = 0, LockFlags Flags = LockFlagsNone>
+class LockDep : public Lock<LockType_> {
  public:
+  // Expose the wrapped lock type to user via an alias.
+  using LockType = LockType_;
+
   // Alias that may be used by subclasses to simplify constructor
   // expressions.
   using Base = LockDep;
@@ -310,9 +313,12 @@ class LockDep : public Lock<LockType> {
 // Singleton version of the lock wrapper above. This type is appropriate for
 // global locks. This type is used by the macros LOCK_DEP_SINGLETON_LOCK and
 // LOCK_DEP_SINGLETON_LOCK_WRAPPER to define instrumented global locks.
-template <typename Class, typename LockType, LockFlags Flags = LockFlagsNone>
-class SingletonLockDep : public Lock<LockType> {
+template <typename Class, typename LockType_, LockFlags Flags = LockFlagsNone>
+class SingletonLockDep : public Lock<LockType_> {
  public:
+  // Expose the wrapped lock type to user via an alias.
+  using LockType = LockType_;
+
   // Alias of the lock class that this wrapper represents.
   using LockClass = ConditionalLockClass<Class, RemoveGlobalReference<LockType>, 0, Flags>;
 
