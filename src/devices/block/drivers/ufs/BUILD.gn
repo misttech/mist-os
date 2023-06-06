@@ -44,7 +44,6 @@ source_set("shared") {
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
     "//zircon/third_party/ulib/safemath",
   ]
@@ -54,6 +53,7 @@ source_set("shared") {
     "//src/devices/pci/lib/device-protocol-pci",
     "//src/devices/pci/lib/pci",
     "//zircon/system/ulib/hwreg",
+    "//zircon/system/ulib/zircon-internal",
   ]
 }
 
