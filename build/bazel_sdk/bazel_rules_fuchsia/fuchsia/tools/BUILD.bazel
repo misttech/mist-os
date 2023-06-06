@@ -17,6 +17,7 @@ py_binary(
 py_library(
     name = "pylib_elf_info",
     srcs = ["pylib/elf_info.py"],
+    imports = ["."],
 )
 
 py_binary(
@@ -60,6 +61,7 @@ py_binary(
 py_library(
     name = "fuchsia_task_lib",
     srcs = ["fuchsia_task_lib.py"],
+    imports = ["."],
 )
 
 py_binary(
