@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include <type_traits>
+#include <unordered_set>
 
 #include <fbl/strong_int.h>
 #include <zxtest/zxtest.h>
@@ -176,5 +177,32 @@ TEST(StrongIntTest, ChainedOps) {
     EXPECT_EQ(c, Strong(4));
   }
 }
+
+#if !_KERNEL
+
+TEST(StrongIntTest, Hashing) {
+  DEFINE_STRONG_INT(Strong, uint64_t);
+
+  // std::hash delegates to the underlying type.
+  {
+    EXPECT_EQ(std::hash<uint64_t>()(0), std::hash<Strong>()(Strong(0)));
+    EXPECT_EQ(std::hash<uint64_t>()(1), std::hash<Strong>()(Strong(1)));
+    EXPECT_EQ(std::hash<uint64_t>()(42), std::hash<Strong>()(Strong(42)));
+  }
+
+  // Correct integration with a type that uses std::hash.
+  {
+    std::unordered_set<Strong> hashed_set;
+    hashed_set.insert(Strong(1));
+    hashed_set.insert(Strong(3));
+    hashed_set.insert(Strong(5));
+
+    EXPECT_EQ(1u, hashed_set.count(Strong(1)));
+    EXPECT_EQ(0u, hashed_set.count(Strong(2)));
+    EXPECT_EQ(1u, hashed_set.count(Strong(3)));
+  }
+}
+
+#endif  // !_KERNEL
 
 }  // anonymous namespace

@@ -5,6 +5,8 @@
 #ifndef FBL_STRONG_INT_H_
 #define FBL_STRONG_INT_H_
 
+#include <cstdint>
+#include <functional>
 #include <type_traits>
 
 // StrongInt is a strongly-typed wrapper around integer types that supports
@@ -177,5 +179,18 @@ class StrongInt {
 };
 
 }  // namespace fbl
+
+#if !_KERNEL
+
+namespace std {
+template <typename UniqueTagType, typename T>
+struct hash<fbl::StrongInt<UniqueTagType, T>> {
+  constexpr size_t operator()(fbl::StrongInt<UniqueTagType, T> strong_int) const noexcept {
+    return std::hash<T>()(strong_int.value());
+  }
+};
+}  // namespace std
+
+#endif  // !KERNEL
 
 #endif  // FBL_STRONG_INT_H_
