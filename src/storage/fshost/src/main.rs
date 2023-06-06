@@ -93,13 +93,13 @@ async fn main() -> Result<(), Error> {
     let launcher = env.launcher();
     // Records inspect metrics
     register_stats(inspector.root(), env.data_root()?).await;
-    let blob_root = env.blobfs_root()?;
-    let data_root = env.data_root()?;
+    let blob_exposed_dir = env.blobfs_exposed_dir()?;
+    let data_exposed_dir = env.data_exposed_dir()?;
     let env: Arc<Mutex<dyn Environment>> = Arc::new(Mutex::new(env));
     let export = vfs::pseudo_directory! {
         "fs" => vfs::pseudo_directory! {
-            "blob" => remote_dir(blob_root),
-            "data" => remote_dir(data_root),
+            "blob" => remote_dir(blob_exposed_dir),
+            "data" => remote_dir(data_exposed_dir),
         },
         "mnt" => vfs::pseudo_directory! {},
         inspect_runtime::DIAGNOSTICS_DIR => inspect_runtime::create_diagnostics_dir(

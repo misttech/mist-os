@@ -1094,6 +1094,12 @@
             to: "#pkg-cache",
         },
         {
+            protocol: "fuchsia.fxfs.WriteBlob",
+            from: "#fshost",
+            to: "#pkg-cache",
+            availability: "optional",
+        },
+        {
             protocol: "fuchsia.logger.LogSink",
             from: "#archivist",
             to: "#pkg-cache",

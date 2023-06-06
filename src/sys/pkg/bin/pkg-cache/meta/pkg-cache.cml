@@ -74,6 +74,10 @@
             protocol: "fuchsia.tracing.provider.Registry",
             availability: "optional",
         },
+        {
+            protocol: "fuchsia.fxfs.WriteBlob",
+            availability: "optional",
+        },
     ],
     expose: [
         {

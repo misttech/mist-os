@@ -309,8 +309,16 @@
                     "/bootstrap/fshost",
                     "/core",
                     "/core/appmgr",
-                    "/core/pkg-cache",
                     "/core/sshd-host",
+                ],
+            },
+            {
+                source_moniker: "/bootstrap/fshost",
+                source: "component",
+                source_name: "fuchsia.fxfs.WriteBlob",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap/pkg-cache",
                 ],
             },
             {

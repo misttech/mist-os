@@ -18,7 +18,7 @@
         {
             directory: "blob",
             rights: [ "rw*" ],
-            path: "/fs/blob",
+            path: "/fs/blob/root",
         },
         {
             directory: "blob-exec",
@@ -26,10 +26,14 @@
                 "execute",
                 "rw*",
             ],
-            path: "/fs/blob",
+            path: "/fs/blob/root",
         },
         {
             protocol: [ "fuchsia.update.verify.BlobfsVerifier" ],
+        },
+        {
+            protocol: "fuchsia.fxfs.WriteBlob",
+            path: "/fs/blob/svc/fuchsia.fxfs.WriteBlob",
         },
     ],
     use: [
@@ -99,6 +103,10 @@
         },
         {
             protocol: "fuchsia.update.verify.BlobfsVerifier",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.fxfs.WriteBlob",
             from: "self",
         },
     ],

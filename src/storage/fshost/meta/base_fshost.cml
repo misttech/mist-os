@@ -21,7 +21,7 @@
         {
             directory: "data",
             rights: [ "rw*" ],
-            path: "/fs/data",
+            path: "/fs/data/root",
         },
         {
             directory: "factory",

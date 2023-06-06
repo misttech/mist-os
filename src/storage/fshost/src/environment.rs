@@ -126,29 +126,44 @@ impl Filesystem {
         }
     }
 
-    pub fn root(
+    pub fn exposed_dir(
         &mut self,
         serving_fs: Option<&mut ServingMultiVolumeFilesystem>,
     ) -> Result<fio::DirectoryProxy, Error> {
         let (proxy, server) = create_proxy::<fio::DirectoryMarker>()?;
         match self {
             Filesystem::Queue(queue) => queue.push(server),
-            Filesystem::Serving(fs) => {
-                fs.root().clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?
-            }
+            Filesystem::Serving(fs) => fs
+                .exposed_dir()
+                .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?,
             Filesystem::ServingMultiVolume(_, fs, data_volume_name) => fs
                 .volume(&data_volume_name)
                 .ok_or(anyhow!("data volume {} not found", data_volume_name))?
-                .root()
+                .exposed_dir()
                 .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?,
             Filesystem::ServingVolumeInFxblob(_, data_volume_name) => serving_fs
                 .unwrap()
                 .volume(&data_volume_name)
                 .ok_or(anyhow!("data volume {} not found", data_volume_name))?
-                .root()
+                .exposed_dir()
                 .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?,
         }
         Ok(proxy)
+    }
+
+    pub fn root(
+        &mut self,
+        serving_fs: Option<&mut ServingMultiVolumeFilesystem>,
+    ) -> Result<fio::DirectoryProxy, Error> {
+        let root = fuchsia_fs::directory::open_directory_no_describe(
+            &self.exposed_dir(serving_fs).context("failed to get exposed dir")?,
+            "root",
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::POSIX_EXECUTABLE
+                | fio::OpenFlags::POSIX_WRITABLE,
+        )
+        .context("failed to open the root directory")?;
+        Ok(root)
     }
 
     fn volume(&mut self, volume_name: &str) -> Option<&mut ServingVolume> {
@@ -230,14 +245,20 @@ impl FshostEnvironment {
         bail!("fvm was not initialized");
     }
 
-    /// Returns a proxy for the root of the Blobfs filesystem.  This can be called before Blobfs is
-    /// mounted and it will get routed once Blobfs is mounted.
-    pub fn blobfs_root(&mut self) -> Result<fio::DirectoryProxy, Error> {
-        self.blobfs.root(self.fxblob.as_mut())
+    /// Returns a proxy for the exposed dir of the Blobfs filesystem.  This can be called before
+    /// Blobfs is mounted and it will get routed once Blobfs is mounted.
+    pub fn blobfs_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
+        self.blobfs.exposed_dir(self.fxblob.as_mut())
     }
 
-    /// Returns a proxy for the root of the data filesystem.  This can be called before "/data"
-    /// is mounted and it will get routed once the data partition is mounted.
+    /// Returns a proxy for the exposed dir of the data filesystem.  This can be called before
+    /// "/data" is mounted and it will get routed once the data partition is mounted.
+    pub fn data_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
+        self.data.exposed_dir(self.fxblob.as_mut())
+    }
+
+    /// Returns a proxy for the root of the data filesystem.  This can be called before "/data" is
+    /// mounted and it will get routed once the data partition is mounted.
     pub fn data_root(&mut self) -> Result<fio::DirectoryProxy, Error> {
         self.data.root(self.fxblob.as_mut())
     }
@@ -453,9 +474,9 @@ impl FshostEnvironment {
 
         let mut fs = self.launcher.serve_blobfs(device).await?;
 
-        let root_dir = fs.root(None)?;
+        let exposed_dir = fs.exposed_dir(None)?;
         for server in queue.drain(..) {
-            root_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
+            exposed_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
         }
         self.blobfs = fs;
         Ok(())
@@ -608,10 +629,10 @@ impl Environment for FshostEnvironment {
             .open_volume("blob", MountOptions { crypt: None, as_blob: true })
             .await
             .context("Failed to open the blob volume")?;
-        let root_dir = blobfs.root();
+        let exposed_dir = blobfs.exposed_dir();
         let queue = self.blobfs.queue().ok_or(anyhow!("blobfs already mounted"))?;
         for server in queue.drain(..) {
-            root_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
+            exposed_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
         }
         self.blobfs = Filesystem::ServingVolumeInFxblob(None, "blob".to_string());
         Ok(())
@@ -625,9 +646,9 @@ impl Environment for FshostEnvironment {
         let mut filesystem = self.launcher.serve_data_fxblob(multi_vol_fs).await?;
 
         let queue = self.data.queue().unwrap();
-        let root_dir = filesystem.root(self.fxblob.as_mut())?;
+        let exposed_dir = filesystem.exposed_dir(self.fxblob.as_mut())?;
         for server in queue.drain(..) {
-            root_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
+            exposed_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
         }
         self.data = filesystem;
         Ok(())
@@ -776,9 +797,9 @@ impl Environment for FshostEnvironment {
         let _ = self.data.queue().ok_or_else(|| anyhow!("data partition already mounted"))?;
 
         let queue = self.data.queue().unwrap();
-        let root_dir = filesystem.root(None)?;
+        let exposed_dir = filesystem.exposed_dir(None)?;
         for server in queue.drain(..) {
-            root_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
+            exposed_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
         }
         self.data = filesystem;
         Ok(())

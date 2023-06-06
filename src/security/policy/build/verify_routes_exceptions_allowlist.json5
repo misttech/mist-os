@@ -252,6 +252,27 @@
                         message: "security policy disallows \"fuchsia.pkg.PackageResolver\" from \"/core/pkg-resolver\" being used at \"/bootstrap/console-launcher\"",
                     },
                 },
+
+                // TODO(https://fxbug.dev/107231): Fix when optional exposes are supported. Right
+                // now fshost only exposes fuchsia.fxfs.WriteBlob when fxblob is enabled.
+                {
+                    using_node: "/bootstrap/pkg-cache",
+                    capability: "fuchsia.fxfs.WriteBlob",
+                    error: {
+                        error: {
+                            analyzer_model_error: {
+                                routing_error: {
+                                    offer_from_child_expose_not_found: {
+                                        child_moniker: "fshost",
+                                        moniker: "/bootstrap",
+                                        capability_id: "fuchsia.fxfs.WriteBlob",
+                                    },
+                                },
+                            },
+                        },
+                        message: "`fuchsia.fxfs.WriteBlob` was not exposed to `/bootstrap` from child `#fshost`.",
+                    },
+                },
                 {
                     using_node: "/bootstrap/full_resolver",
                     capability: "fuchsia.pkg.PackageResolver",
@@ -1523,13 +1544,13 @@
                                     offer_from_child_expose_not_found: {
                                         child_moniker: "core",
                                         moniker: "/",
-                                        capability_id: "fuchsia.dash.Launcher"
-                                    }
-                                }
-                            }
+                                        capability_id: "fuchsia.dash.Launcher",
+                                    },
+                                },
+                            },
                         },
-                        message: "`fuchsia.dash.Launcher` was not exposed to `/` from child `#core`."
-                    }
+                        message: "`fuchsia.dash.Launcher` was not exposed to `/` from child `#core`.",
+                    },
                 },
             ],
         },
