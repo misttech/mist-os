@@ -342,9 +342,6 @@
                 "AbsAndRelTarget/ParamSymlinkTest.CreatLinkCreatesTarget/*",
                 "SymlinkTest.*",
 
-                // tcp_socket_test
-                "AllInetTests/SimpleTcpSocketTest.ListenConnectParallel/*",
-
                 // xattr_test - these tests hang
                 "XattrTest.LXattrOnSymlink",
                 "XattrTest.XattrOnSymlink",
