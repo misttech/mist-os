@@ -10,7 +10,6 @@
 #include <fuchsia/ui/app/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/gfx/cpp/fidl.h>
-#include <fuchsia/ui/policy/cpp/fidl.h>
 #include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/wait.h>

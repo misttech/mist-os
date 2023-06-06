@@ -1075,12 +1075,6 @@ From //src/camera/debug.gni:6
 
 From //src/camera/bin/camera-gym/BUILD.gn:12
 
-### camera_gym_enable_root_presenter
-
-**Current value (from the default):** `false`
-
-From //src/camera/bin/camera-gym/BUILD.gn:13
-
 ### carnelian_enable_vulkan_validation
 
 Include the vulkan validation layers in carnelian examples.

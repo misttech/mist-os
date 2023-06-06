@@ -9,7 +9,6 @@
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
 #include <fuchsia/ui/gfx/cpp/fidl.h>
-#include <fuchsia/ui/policy/cpp/fidl.h>
 #include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fidl/cpp/binding.h>
@@ -82,7 +81,7 @@ class BufferCollage : public fuchsia::ui::app::ViewProvider {
   // invoked exactly once if non-null.
   static fpromise::result<std::unique_ptr<BufferCollage>, zx_status_t> Create(
       fuchsia::ui::scenic::ScenicHandle scenic, fuchsia::sysmem::AllocatorHandle allocator,
-      fuchsia::ui::policy::PresenterHandle presenter, fit::closure stop_callback = nullptr);
+      fit::closure stop_callback = nullptr);
 
   // Returns the view request handler.
   fidl::InterfaceRequestHandler<fuchsia::ui::app::ViewProvider> GetHandler();
@@ -217,7 +216,6 @@ class BufferCollage : public fuchsia::ui::app::ViewProvider {
   async_dispatcher_t* controller_dispatcher_;
   fuchsia::ui::scenic::ScenicPtr scenic_;
   fuchsia::sysmem::AllocatorPtr allocator_;
-  fuchsia::ui::policy::PresenterPtr presenter_;
   fit::closure stop_callback_;
   std::unique_ptr<scenic::Session> session_;
   std::unique_ptr<scenic::View> view_;

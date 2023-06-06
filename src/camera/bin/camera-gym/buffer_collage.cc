@@ -85,10 +85,6 @@ BufferCollage::BufferCollage()
   SetStopOnError(scenic_);
   SetStopOnError(allocator_);
 
-#if CAMERA_GYM_ENABLE_ROOT_PRESENTER
-  SetStopOnError(presenter_);
-#endif
-
   view_provider_binding_.set_error_handler([this](zx_status_t status) {
     FX_PLOGS(DEBUG, status) << "ViewProvider client disconnected.";
     view_provider_binding_.Unbind();
@@ -104,7 +100,7 @@ BufferCollage::~BufferCollage() {
 
 fpromise::result<std::unique_ptr<BufferCollage>, zx_status_t> BufferCollage::Create(
     fuchsia::ui::scenic::ScenicHandle scenic, fuchsia::sysmem::AllocatorHandle allocator,
-    fuchsia::ui::policy::PresenterHandle presenter, fit::closure stop_callback) {
+    fit::closure stop_callback) {
   auto collage = std::unique_ptr<BufferCollage>(new BufferCollage);
   collage->start_time_ = zx::clock::get_monotonic();
 
@@ -119,13 +115,6 @@ fpromise::result<std::unique_ptr<BufferCollage>, zx_status_t> BufferCollage::Cre
     FX_PLOGS(ERROR, status);
     return fpromise::error(status);
   }
-#if CAMERA_GYM_ENABLE_ROOT_PRESENTER
-  status = collage->presenter_.Bind(std::move(presenter), collage->loop_.dispatcher());
-  if (status != ZX_OK) {
-    FX_PLOGS(ERROR, status);
-    return fpromise::error(status);
-  }
-#endif
   collage->stop_callback_ = std::move(stop_callback);
 
   // Create a scenic session and set its event handlers.
@@ -147,12 +136,6 @@ fpromise::result<std::unique_ptr<BufferCollage>, zx_status_t> BufferCollage::Cre
     FX_PLOGS(ERROR, status);
     return fpromise::error(status);
   }
-
-#if CAMERA_GYM_ENABLE_ROOT_PRESENTER
-  async::PostDelayedTask(collage->loop_.dispatcher(),
-                         fit::bind_member(collage.get(), &BufferCollage::MaybeTakeDisplay),
-                         zx::msec(kViewRequestTimeoutMs));
-#endif
 
   return fpromise::ok(std::move(collage));
 }
@@ -376,7 +359,6 @@ void BufferCollage::Stop() {
   }
   scenic_ = nullptr;
   allocator_ = nullptr;
-  presenter_ = nullptr;
   view_ = nullptr;
   collection_views_.clear();
   loop_.Quit();
@@ -766,20 +748,6 @@ void BufferCollage::UpdateLayout() {
     mute_indicator_->node.SetTranslation(view_width * 0.5f, view_height * 0.5f,
                                          mute_visible_ ? kMuteDepth : kOffscreenDepth);
   }
-}
-
-void BufferCollage::MaybeTakeDisplay() {
-  if (view_) {
-    // View already created.
-    return;
-  }
-  FX_LOGS(WARNING) << "Component host did not create a view within " << kViewRequestTimeoutMs
-                   << "ms. camera-gym will now take over the display.";
-  auto tokens = scenic::NewViewTokenPair();
-  auto view_ref_pair = scenic::ViewRefPair::New();
-  CreateViewWithViewRef(std::move(tokens.first.value), std::move(view_ref_pair.control_ref),
-                        std::move(view_ref_pair.view_ref));
-  presenter_->PresentOrReplaceView(std::move(tokens.second), nullptr);
 }
 
 void BufferCollage::SetupView() {
