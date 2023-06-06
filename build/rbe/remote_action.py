@@ -1715,8 +1715,16 @@ class RemoteAction(object):
             )
             for local_out, remote_out, result in differences:
                 msg(f"  {local_out} vs. {remote_out}:")
-                for line in result.stdout:
-                    print(line)
+                if result.stdout:
+                    print("---- stdout ----")
+                    for line in result.stdout:
+                        print(line)
+                if result.stderr:
+                    print("---- stderr ----")
+                    for line in result.stderr:
+                        print(line)
+                if not result.stdout and not result.stderr:
+                    print(f"diff tool exited {result.returncode}, but did not report differences.")
                 msg("------------------------------------")
 
             # Also compare file access traces, if available.
