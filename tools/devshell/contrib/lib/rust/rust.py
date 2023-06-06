@@ -4,6 +4,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+from functools import lru_cache
 import hashlib
 import os
 from pathlib import Path
@@ -75,20 +76,13 @@ class GnTarget:
         return ROOT_PATH / self.label_path
 
     def gen_dir(self, build_dir=None):
-        """The path to the directory containing this target's generated files.
-
-        Note: this function uses a heuristic to differentiate between default and
-        non-default toolchains. The gen_dir for the default toolchain is
-        <build_dir>/gen but otherwise it's <build_dir>/<toolchain>/gen. For the
-        purpose of most rust targets, saying that a toolchain that includes "fuchsia"
-        is default is usually good enough for finding generated_files, however this
-        could result in incorrect paths for any toolchain that contains "fuchsia" but
-        doesn't happen to be the default.
-        """
+        """The path to the directory containing this target's generated files."""
         tc = self.explicit_toolchain
+        build_dir = build_dir or FUCHSIA_BUILD_DIR
+        default = default_toolchain(build_dir)
         return (
-            (build_dir or FUCHSIA_BUILD_DIR)
-            / (tc.split(":")[-1] if tc and "fuchsia" not in tc else "")
+            build_dir
+            / (tc.split(":")[-1] if tc and tc != default else "")
             / "gen"
             / self.label_path
         )
@@ -100,3 +94,8 @@ class GnTarget:
 
         hashed_gn_path = hashlib.sha1(self.ninja_target.encode("utf-8")).hexdigest()
         return Path(build_dir) / "cargo" / hashed_gn_path / "Cargo.toml"
+
+
+@lru_cache
+def default_toolchain(build_dir):
+    return open(build_dir / "default_toolchain_name.txt").read()

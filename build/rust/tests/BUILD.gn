@@ -65,6 +65,7 @@ if (is_host) {
     extra_args = [ host ]
     deps = [
       ":copy_clippy",
+      ":copy_default_toolchain",
       ":copy_other_toolchain",
       ":copy_script",
       ":copy_workaround",
@@ -116,6 +117,12 @@ if (is_host) {
     outputs = [
       "$target_gen_dir/tools/devshell/contrib/lib/rust/{{source_file_part}}",
     ]
+  }
+
+  host_test_data("copy_default_toolchain") {
+    sources = [ "$root_build_dir/default_toolchain_name.txt" ]
+    deps = [ "//:default_toolchain_name.txt($default_toolchain)" ]
+    outputs = [ "$target_gen_dir/out/default/{{source_file_part}}" ]
   }
 
   # The `host_test_data` can copy over all of the clippy related targets, but

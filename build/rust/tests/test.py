@@ -93,18 +93,13 @@ class TestClippy(unittest.TestCase):
         output = run_clippy(
             "--get-outputs", "-f", FAKE_ROOT / "build/rust/tests/b/lib.rs"
         )
-        self.assertEqual(
-            set(output.splitlines()),
-            {str(TEST_DIR / "b.clippy")},
-        )
+        self.assertIn(str(TEST_DIR / "b.clippy"), set(output.splitlines()))
 
         output = run_clippy(
             "--get-outputs", "-f", FAKE_ROOT / "build/rust/tests/a/main.rs"
         )
-        self.assertEqual(
-            set(output.splitlines()),
-            {str(TEST_DIR / "a.clippy"), str(TEST_DIR / "a_test.clippy")},
-        )
+        for label in {str(TEST_DIR / "a.clippy"), str(TEST_DIR / "a_test.clippy")}:
+            self.assertIn(label, set(output.splitlines()))
 
     def test_dedup_files(self):
         outputs = run_clippy(

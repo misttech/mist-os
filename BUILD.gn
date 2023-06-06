@@ -121,6 +121,10 @@ if (use_goma && goma_dir != prebuilt_goma_dir) {
   _fx_config_lines += [ "GOMA_DIR=" + rebase_path(goma_dir) ]
 }
 write_file("$root_build_dir/fx.config", _fx_config_lines)
+generated_file("default_toolchain_name.txt") {
+  outputs = [ "$root_build_dir/default_toolchain_name.txt" ]
+  contents = default_toolchain
+}
 
 ###
 ### Build API modules.
