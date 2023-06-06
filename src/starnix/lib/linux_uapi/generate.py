@@ -96,9 +96,6 @@ AUTO_DERIVE_TRAITS = [
 # General replacements to apply to the contents of the file. These are tuples of
 # compiled regular expressions + the thing to replace matches with.
 REPLACEMENTS = [
-    # Replace xt_counters pointers with u64.
-    (r'\*(const|mut) xt_counters', 'u64'),
-
     # Use CStr to represent constant C strings. The inputs look like:
     #   pub const FS_KEY_DESC_PREFIX: &[u8; 9usize] = b"fscrypt:\0";
     (
@@ -126,11 +123,11 @@ REPLACEMENTS = [
         "\n#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]\n"
     ),
 
-    # Use usize in place of pointers for compat with zerocopy traits. Because
+    # Use uaddr/uref in place of pointers for compat with zerocopy traits. Because
     # the target of the pointer is in userspace anyway, treating it as an opaque
     # pointer is harmless.
     (r'\*mut crate::types::c_void', 'uaddr'),
-    (r'([:=]) \*mut ([a-zA-Z_0-9:]*)', '\\1 uref<\\2>')
+    (r'([:=]) \*(const|mut) ([a-zA-Z_0-9:]*)', '\\1 uref<\\3>')
 ]
 
 INPUT_FILE = 'src/starnix/lib/linux_uapi/wrapper.h'

@@ -8297,7 +8297,7 @@ pub struct fb_image {
     pub bg_color: __u32,
     pub depth: __u8,
     pub __bindgen_padding_0: [u8; 7usize],
-    pub data: *const crate::types::c_char,
+    pub data: uref<crate::types::c_char>,
     pub cmap: fb_cmap,
 }
 impl Default for fb_image {
@@ -8322,7 +8322,7 @@ pub struct fb_cursor {
     pub enable: __u16,
     pub rop: __u16,
     pub __bindgen_padding_0: [u8; 2usize],
-    pub mask: *const crate::types::c_char,
+    pub mask: uref<crate::types::c_char>,
     pub hot: fbcurpos,
     pub __bindgen_padding_1: [u8; 4usize],
     pub image: fb_image,
@@ -10582,7 +10582,7 @@ pub struct ipt_replace {
     pub hook_entry: [crate::types::c_uint; 5usize],
     pub underflow: [crate::types::c_uint; 5usize],
     pub num_counters: crate::types::c_uint,
-    pub counters: u64,
+    pub counters: uref<xt_counters>,
     pub entries: __IncompleteArrayField<ipt_entry>,
 }
 impl Default for ipt_replace {
@@ -10719,7 +10719,7 @@ pub struct ip6t_replace {
     pub hook_entry: [crate::types::c_uint; 5usize],
     pub underflow: [crate::types::c_uint; 5usize],
     pub num_counters: crate::types::c_uint,
-    pub counters: u64,
+    pub counters: uref<xt_counters>,
     pub entries: __IncompleteArrayField<ip6t_entry>,
 }
 impl Default for ip6t_replace {
@@ -11493,7 +11493,7 @@ pub const EVIOCGABS_Y: __u32 = 2149074241;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct remote_binder_start_command {
-    pub incoming_service: *const crate::types::c_char,
+    pub incoming_service: uref<crate::types::c_char>,
 }
 impl Default for remote_binder_start_command {
     fn default() -> Self {
