@@ -5,7 +5,6 @@
 #include <fuchsia/hardware/clock/c/banjo.h>
 #include <fuchsia/hardware/gpio/c/banjo.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
-#include <fuchsia/hardware/power/c/banjo.h>
 #include <fuchsia/hardware/spi/c/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
@@ -207,69 +206,6 @@ static zx_status_t test_spi(spi_protocol_t* spi) {
   return ZX_OK;
 }
 
-static zx_status_t test_power(power_protocol_t* power) {
-  zx_status_t status;
-  uint32_t value;
-
-  uint32_t min_voltage = 0, max_voltage = 0;
-  if ((status = power_get_supported_voltage_range(power, &min_voltage, &max_voltage)) != ZX_OK) {
-    // Not a fixed power domain.
-    zxlogf(ERROR, "Unable to get supported voltage from power domain");
-    return status;
-  }
-
-  // These are the limits in the test power-impl driver
-  if (min_voltage != 10 && max_voltage != 1000) {
-    zxlogf(ERROR, "%s: Got wrong supported voltages", __func__);
-    return ZX_ERR_INTERNAL;
-  }
-
-  if ((status = power_register_power_domain(power, 50, 800)) != ZX_OK) {
-    zxlogf(ERROR, "Unable to register for power domain");
-    return status;
-  }
-
-  power_domain_status_t out_status;
-  if ((status = power_get_power_domain_status(power, &out_status) != ZX_OK)) {
-    zxlogf(ERROR, "Unable to power domain status");
-    return status;
-  }
-
-  if (out_status != POWER_DOMAIN_STATUS_ENABLED) {
-    zxlogf(ERROR, "power domain should have been enabled after registration");
-    return ZX_ERR_INTERNAL;
-  }
-
-  uint32_t out_actual_voltage = 0;
-  if ((status = power_request_voltage(power, 30, &out_actual_voltage)) != ZX_OK) {
-    zxlogf(ERROR, "Unable to request a particular voltage. Got out_voltage as %d",
-           out_actual_voltage);
-    return status;
-  }
-
-  // We registered to the domain with voltage range 50-800. 30 will be rounded to 50.
-  if (out_actual_voltage != 50) {
-    zxlogf(ERROR, "Generic power driver failed to set correct voltage. Got out_voltage as %d",
-           out_actual_voltage);
-    return ZX_ERR_INTERNAL;
-  }
-
-  // Write a register and read it back
-  if ((status = power_write_pmic_ctrl_reg(power, 0x1234, 6)) != ZX_OK) {
-    return status;
-  }
-  if ((status = power_read_pmic_ctrl_reg(power, 0x1234, &value)) != ZX_OK || value != 6) {
-    return status;
-  }
-
-  if ((status = power_unregister_power_domain(power) != ZX_OK)) {
-    zxlogf(ERROR, "Unable to unregister for power domain");
-    return status;
-  }
-
-  return ZX_OK;
-}
-
 static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
   zx_status_t status;
 
@@ -317,7 +253,6 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
   }
 
   clock_protocol_t clock;
-  power_protocol_t power;
   clock_protocol_t child4;
   gpio_protocol_t gpio;
   spi_protocol_t spi;
@@ -336,15 +271,6 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
     status = device_get_protocol(fragments[FRAGMENT_CLOCK_1].device, ZX_PROTOCOL_CLOCK, &clock);
     if (status != ZX_OK) {
       zxlogf(ERROR, "%s: could not get protocol ZX_PROTOCOL_CLOCK", DRIVER_NAME);
-      return status;
-    }
-    if (strncmp(fragments[FRAGMENT_POWER_1].name, "power", 32)) {
-      zxlogf(ERROR, "%s: Unexpected name: %s", DRIVER_NAME, fragments[FRAGMENT_POWER_1].name);
-      return ZX_ERR_INTERNAL;
-    }
-    status = device_get_protocol(fragments[FRAGMENT_POWER_1].device, ZX_PROTOCOL_POWER, &power);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: could not get protocol ZX_PROTOCOL_POWER", DRIVER_NAME);
       return status;
     }
     if (strncmp(fragments[FRAGMENT_CHILD4_1].name, "child4", 32)) {
@@ -373,10 +299,6 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
       zxlogf(ERROR, "%s: test_clock failed: %d", DRIVER_NAME, status);
       return status;
     }
-    if ((status = test_power(&power)) != ZX_OK) {
-      zxlogf(ERROR, "%s: test_power failed: %d", DRIVER_NAME, status);
-      return status;
-    }
     if ((status = test_gpio(&gpio)) != ZX_OK) {
       zxlogf(ERROR, "%s: test_gpio failed: %d", DRIVER_NAME, status);
       return status;
@@ -395,15 +317,6 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
     status = device_get_protocol(fragments[FRAGMENT_CLOCK_2].device, ZX_PROTOCOL_CLOCK, &clock);
     if (status != ZX_OK) {
       zxlogf(ERROR, "%s: could not get protocol ZX_PROTOCOL_CLOCK", DRIVER_NAME);
-      return status;
-    }
-    if (strncmp(fragments[FRAGMENT_POWER_2].name, "power", 32)) {
-      zxlogf(ERROR, "%s: Unexpected name: %s", DRIVER_NAME, fragments[FRAGMENT_POWER_2].name);
-      return ZX_ERR_INTERNAL;
-    }
-    status = device_get_protocol(fragments[FRAGMENT_POWER_2].device, ZX_PROTOCOL_POWER, &power);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: could not get protocol ZX_PROTOCOL_POWER", DRIVER_NAME);
       return status;
     }
     if (strncmp(fragments[FRAGMENT_CHILD4_2].name, "child4", 32)) {
@@ -426,10 +339,6 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
     }
     if ((status = test_clock(&clock)) != ZX_OK) {
       zxlogf(ERROR, "%s: test_clock failed: %d", DRIVER_NAME, status);
-      return status;
-    }
-    if ((status = test_power(&power)) != ZX_OK) {
-      zxlogf(ERROR, "%s: test_power failed: %d", DRIVER_NAME, status);
       return status;
     }
     if ((status = test_spi(&spi)) != ZX_OK) {

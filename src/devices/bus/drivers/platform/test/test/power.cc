@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <fuchsia/hardware/platform/device/c/banjo.h>
-#include <fuchsia/hardware/power/c/banjo.h>
 #include <fuchsia/hardware/powerimpl/cpp/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
