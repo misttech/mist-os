@@ -224,7 +224,12 @@ class __OWNER(T) Vector {
 
   bool is_empty() const { return size_ == 0; }
 
-  T& operator[](size_t i) const {
+  const T& operator[](size_t i) const {
+    ZX_DEBUG_ASSERT(i < size_);
+    return ptr_[i];
+  }
+
+  T& operator[](size_t i) {
     ZX_DEBUG_ASSERT(i < size_);
     return ptr_[i];
   }
