@@ -23,9 +23,22 @@ struct device;
 
 // NEEDS_TYPES
 #define WARN(cond, y, z...) (!!(cond))
-#define WARN_ON(x) (!!(x))
-#define WARN_ON_ONCE(x) (!!(x))
 #define BUILD_BUG_ON(x) ZX_ASSERT(!(x))
+
+#define __WARN_ON(x, count_down) (  \
+  {  \
+    static size_t count = 1;  \
+    count -= count_down;  \
+    if (count && !!(x)) {  \
+      char str[] = #x;  \
+      lwarn("WARN_ON(%s) is asserted in %s:%d", str, __FILE__, __LINE__);  \
+    }  \
+    !!(x);  \
+  }  \
+)
+
+#define WARN_ON(x) __WARN_ON(x, 0)
+#define WARN_ON_ONCE(x) __WARN_ON(x, 1)
 
 #define iwl_assert_lock_held(x) ZX_DEBUG_ASSERT(mtx_trylock(x) == thrd_busy)
 
