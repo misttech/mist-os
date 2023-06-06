@@ -4,13 +4,13 @@
 
 #include "src/media/audio/drivers/test/position_test.h"
 
-#include <lib/media/cpp/timeline_rate.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
 #include <zircon/compiler.h>
 
 #include <algorithm>
 #include <cstring>
+#include <sstream>
 
 #include <gtest/gtest.h>
 
@@ -100,63 +100,71 @@ void PositionTest::ExpectPositionNotifyCount(uint32_t count) {
 // notifications we've received; we'll multiply this by the per-notification time duration.
 void PositionTest::ValidatePositionInfo() {
   zx::duration notification_timestamp = zx::time(saved_position_.timestamp) - start_time();
-  zx::duration observed_timestamp = zx::clock::get_monotonic() - start_time();
+  zx::duration arrived_timestamp = zx::clock::get_monotonic() - start_time();
 
   ASSERT_GT(position_notification_count_, 0u) << "No position notifications received";
   ASSERT_GT(ring_buffer_pcm_format().frame_rate, 0u) << "Frame rate cannot be zero";
 
-  // ns/notification = nsec/sec * sec/frames * frames/ring * ring/notification
-  auto ns_per_notification =
-      TimelineRate::NsPerSecond / TimelineRate(ring_buffer_pcm_format().frame_rate) *
-      TimelineRate(ring_buffer_frames()) / TimelineRate(notifications_per_ring());
+  // nsec/notification = nsec/sec * sec/frames * frames/ring * ring/notification
+  int64_t nsec_per_notif = zx::sec(1).to_nsecs() * ring_buffer_frames();
+  nsec_per_notif /=
+      static_cast<int64_t>(ring_buffer_pcm_format().frame_rate * notifications_per_ring());
 
   // Upon enabling notifications, our first notification might arrive immediately. Thus, the average
   // number of notification periods elapsed is (position_notification_count_ - 0.5).
-  auto expected_timestamp = zx::duration(ns_per_notification.Scale(position_notification_count_) -
-                                         ns_per_notification.Scale(1) / 2);
+  auto expected_timestamp =
+      zx::duration(position_notification_count_ * nsec_per_notif - nsec_per_notif / 2);
 
   // Delivery-time requirements for pos notifications are loose; include a tolerance of +/-2 notifs.
-  auto timestamp_tolerance = zx::duration(ns_per_notification.Scale(2));
+  auto timestamp_tolerance = zx::duration(nsec_per_notif * 2);
   auto min_allowed_timestamp = expected_timestamp - timestamp_tolerance;
   auto max_allowed_timestamp = expected_timestamp + timestamp_tolerance;
 
-  EXPECT_GT(notification_timestamp.to_nsecs(), min_allowed_timestamp.to_nsecs())
-      << "Expected timestamp " << expected_timestamp.to_nsecs() << " (allow > "
-      << min_allowed_timestamp.to_nsecs() << "); actual " << notification_timestamp.to_nsecs()
-      << ". Notifications arriving too rapidly.";
-  EXPECT_LT(notification_timestamp.to_nsecs(), max_allowed_timestamp.to_nsecs())
-      << "Expected timestamp " << expected_timestamp.to_nsecs() << " (allow < "
-      << max_allowed_timestamp.to_nsecs() << "); actual " << notification_timestamp.to_nsecs()
-      << ". Notification arriving too slowly.";
+  if (notification_timestamp < min_allowed_timestamp ||
+      notification_timestamp > max_allowed_timestamp || arrived_timestamp < min_allowed_timestamp) {
+    std::ostringstream timestamps;
+    timestamps << "Expected [ min " << min_allowed_timestamp.to_nsecs() << ", ideal "
+               << expected_timestamp.to_nsecs() << ", max " << max_allowed_timestamp.to_nsecs()
+               << " ], actual " << notification_timestamp.to_nsecs() << " (arrived "
+               << arrived_timestamp.to_nsecs() << ")";
+    EXPECT_GT(notification_timestamp.to_nsecs(), min_allowed_timestamp.to_nsecs())
+        << timestamps.str() << "- notifications occurring too rapidly.";
+    EXPECT_LT(notification_timestamp.to_nsecs(), max_allowed_timestamp.to_nsecs())
+        << timestamps.str() << " - notifications occurring too slowly.";
 
-  // Also validate when the notification was actually received (not just the timestamp).
-  EXPECT_GT(observed_timestamp, min_allowed_timestamp);
+    // Also validate when the notification was actually received (not just the timestamp).
+    EXPECT_GT(arrived_timestamp.to_nsecs(), min_allowed_timestamp.to_nsecs())
+        << timestamps.str() << " - notification arrived too early.";
 
-  if constexpr (kLogDetailedPositionInfo) {
-    auto ring_buffer_bytes = ring_buffer_frames() * frame_size();
-    FX_LOGS(INFO) << "Received " << position_notification_count_ << " notifications; RingBuffer "
-                  << ring_buffer_frames() << " frames (" << ring_buffer_bytes
-                  << " bytes); start time " << start_time().get();
-    FX_LOGS(INFO) << "    Notif    Position / Delta"
-                  << "           Timestamp  /  Delta   "
-                  << "             Arrival  /  Delta";
-    for (auto idx = 0u; idx < notifications_.size(); ++idx) {
-      uint32_t position_delta = (ring_buffer_bytes + notifications_[idx].position -
-                                 (idx == 0u ? 0 : notifications_[idx - 1].position)) %
-                                ring_buffer_bytes;
-      int64_t timestamp_delta = notifications_[idx].timestamp -
-                                (idx == 0 ? start_time().get() : notifications_[idx - 1].timestamp);
-      int64_t arrival_delta =
-          notifications_[idx].arrival_time -
-          (idx == 0 ? start_time().get() : notifications_[idx - 1].arrival_time);
+    if constexpr (kLogDetailedPositionInfo) {
+      auto ring_buffer_bytes = ring_buffer_frames() * frame_size();
+      FX_LOGS(INFO) << "Start time " << start_time().get() << ", RingBuffer "
+                    << ring_buffer_frames() << " frames (" << ring_buffer_bytes << " bytes), "
+                    << ring_buffer_pcm_format().frame_rate << " Hz, " << nsec_per_notif
+                    << " nsec/notif, " << nsec_per_notif * notifications_per_ring()
+                    << " nsec/ring.";
+      FX_LOGS(INFO) << "    Notif    Position___Delta"
+                    << "           Timestamp_____Delta   "
+                    << "             Arrival_____Delta";
+      for (auto idx = 0u; idx < notifications_.size(); ++idx) {
+        uint32_t position_delta = (ring_buffer_bytes + notifications_[idx].position -
+                                   (idx == 0u ? 0 : notifications_[idx - 1].position)) %
+                                  ring_buffer_bytes;
+        int64_t timestamp_delta =
+            notifications_[idx].timestamp -
+            (idx == 0 ? start_time().get() : notifications_[idx - 1].timestamp);
+        int64_t arrival_delta =
+            notifications_[idx].arrival_time -
+            (idx == 0 ? start_time().get() : notifications_[idx - 1].arrival_time);
 
-      FX_LOGS(INFO) << "   [ " << std::setw(2) << idx << " ]"             //
-                    << std::setw(12) << notifications_[idx].position      //
-                    << std::setw(8) << position_delta                     //
-                    << std::setw(21) << notifications_[idx].timestamp     //
-                    << std::setw(12) << timestamp_delta                   //
-                    << std::setw(21) << notifications_[idx].arrival_time  //
-                    << std::setw(12) << arrival_delta;
+        FX_LOGS(INFO) << "   [ " << std::setw(2) << idx << " ]"             //
+                      << std::setw(12) << notifications_[idx].position      //
+                      << std::setw(8) << position_delta                     //
+                      << std::setw(21) << notifications_[idx].timestamp     //
+                      << std::setw(12) << timestamp_delta                   //
+                      << std::setw(21) << notifications_[idx].arrival_time  //
+                      << std::setw(12) << arrival_delta;
+      }
     }
   }
 }

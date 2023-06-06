@@ -4,7 +4,6 @@
 
 #include "src/media/audio/drivers/test/admin_test.h"
 
-#include <lib/media/cpp/timeline_rate.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/vmo.h>
 #include <zircon/compiler.h>
@@ -163,9 +162,9 @@ void AdminTest::RequestBuffer(uint32_t min_ring_buffer_frames,
 
   ring_buffer_mapper_.Unmap();
   const zx_vm_option_t option_flags = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE;
-  EXPECT_EQ(ring_buffer_mapper_.CreateAndMap(ring_buffer_frames_ * frame_size_, option_flags,
-                                             nullptr, &ring_buffer_vmo,
-                                             ZX_RIGHT_READ | ZX_RIGHT_MAP | ZX_RIGHT_TRANSFER),
+  EXPECT_EQ(ring_buffer_mapper_.CreateAndMap(
+                static_cast<uint64_t>(ring_buffer_frames_) * frame_size_, option_flags, nullptr,
+                &ring_buffer_vmo, ZX_RIGHT_READ | ZX_RIGHT_MAP | ZX_RIGHT_TRANSFER),
             ZX_OK);
 }
 

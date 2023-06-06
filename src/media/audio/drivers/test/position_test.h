@@ -9,7 +9,7 @@
 
 namespace media::audio::drivers::test {
 
-// Position cases are disabled by default; when they DO run, display verbose notification info.
+// Position cases are default-disabled; if they DO run and fail, display verbose notification info.
 inline constexpr bool kLogDetailedPositionInfo = true;
 
 class PositionTest : public AdminTest {
