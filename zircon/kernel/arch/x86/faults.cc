@@ -48,7 +48,7 @@ static void dump_fault_frame(iframe_t* frame) {
 
   if (frame->cs == CODE_64_SELECTOR) {
     printf("bottom of kernel stack at %p:\n", stack);
-    hexdump(stack, 128);
+    hexdump(stack, 256);
   }
 }
 
