@@ -4,6 +4,7 @@
 
 # This library is shared between the client and agent code.
 
+import("//build/config/fuchsia/platform_version.gni")
 import("//build/cpp/sdk_source_set.gni")
 
 sdk_source_set("ipc") {

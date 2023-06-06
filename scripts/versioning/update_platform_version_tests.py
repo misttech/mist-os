@@ -64,6 +64,16 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
             f.write(FAKE_FIDL_COMPATIBILITY_DOC_FILE_CONTENT)
         update_platform_version.FIDL_COMPATIBILITY_DOC_PATH = self.fake_fidl_compability_doc_file
 
+        self.fake_milestone_version_file = os.path.join(
+            self.test_dir, 'platform_version.json')
+        with open(self.fake_milestone_version_file, 'w') as f:
+            pv = {
+                'in_development_api_level': OLD_API_LEVEL,
+                'supported_fuchsia_api_levels': OLD_SUPPORTED_API_LEVELS,
+            }
+            json.dump(pv, f)
+        update_platform_version.PLATFORM_VERSION_PATH = self.fake_milestone_version_file
+
         self.test_src_dir = tempfile.mkdtemp()
         self.fake_src_file = os.path.join(
             self.test_src_dir, 'fuchsia_src.test.json')
@@ -107,6 +117,23 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
         self.assertFalse(
             update_platform_version.update_version_history(
                 NEW_API_LEVEL, update_platform_version.VERSION_HISTORY_PATH))
+
+    def _get_platform_version(self):
+        with open(self.fake_milestone_version_file) as f:
+            return json.load(f)
+
+    def test_update_platform_version(self):
+        pv = self._get_platform_version()
+        self.assertNotEqual(NEW_API_LEVEL, pv['in_development_api_level'])
+
+        self.assertTrue(
+            update_platform_version.update_platform_version(
+                NEW_API_LEVEL, update_platform_version.PLATFORM_VERSION_PATH))
+
+        pv = self._get_platform_version()
+        self.assertEqual(NEW_API_LEVEL, pv['in_development_api_level'])
+        self.assertEqual(
+            NEW_SUPPORTED_API_LEVELS, pv['supported_fuchsia_api_levels'])
 
     def test_update_fidl_compatibility_doc(self):
         with open(self.fake_fidl_compability_doc_file) as f:

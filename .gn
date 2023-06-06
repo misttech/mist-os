@@ -27,7 +27,6 @@ no_check_targets = [ "//third_party/*" ]
 # See: https://fuchsia.dev/fuchsia-src/concepts/build_system/best_practices#exec-script
 exec_script_whitelist = [
   "//build/config/fuchsia/BUILD.gn",
-  "//build/config/fuchsia/platform_version.gni",
   "//build/config/mac/mac_sdk.gni",
   "//build/config/profile/BUILD.gn",
   "//build/config/sanitizers/BUILD.gn",

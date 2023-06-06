@@ -31,6 +31,7 @@
 #
 # See generate_pkgdir-tests for an example.
 
+import("//build/config/fuchsia/platform_version.gni")
 import("//sdk/ctf/build/internal/fuchsia_package_with_test.gni")
 import("//sdk/ctf/build/internal/generate_ctf_packages.gni")
 
