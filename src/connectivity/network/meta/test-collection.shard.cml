@@ -28,6 +28,7 @@
             protocol: [
                 "fuchsia.net.debug.Interfaces",
                 "fuchsia.net.interfaces.State",
+                "fuchsia.net.root.Interfaces",
             ],
             from: "#netstack",
             to: [ "#test-components" ],
