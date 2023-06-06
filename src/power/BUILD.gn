@@ -23,6 +23,10 @@ group("battery") {
   ]
 }
 
+group("drivers") {
+  deps = [ "fake-battery/:fake_battery_component" ]
+}
+
 group("tests") {
   testonly = true
   deps = [

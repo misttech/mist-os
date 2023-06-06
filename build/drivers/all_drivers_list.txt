@@ -374,6 +374,7 @@
 //src/media/audio/drivers/tests/realm:dai-test-driver
 //src/media/audio/drivers/usb-audio:usb-audio-driver
 //src/media/audio/drivers/virtual_audio:virtual_audio_driver-driver
+//src/power/fake-battery:fake_battery_driver
 //src/storage/fvm/driver:fuchsia_driver
 //src/sys/component_manager/tests/structured_config/client_integration/cpp_driver:receiver_driver
 //src/ui/backlight/drivers/ti-lp8556:ti-lp8556-driver
