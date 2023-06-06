@@ -21,7 +21,7 @@ use crate::{
     bpf::BpfFs,
     device::BinderFs,
     fs::{buffers::InputBuffer, fuse::new_fuse_fs},
-    lock::RwLock,
+    lock::{Mutex, RwLock},
     mutable_state::*,
     selinux::selinux_fs,
     task::*,
@@ -82,7 +82,7 @@ impl Namespace {
 #[must_use = "Must be manually destroyed with `Mount::unmount()`"]
 pub struct Mount {
     root: DirEntryHandle,
-    flags: MountFlags,
+    flags: Mutex<MountFlags>,
     fs: FileSystemHandle,
 
     /// A unique identifier for this mount reported in /proc/pid/mountinfo.
@@ -168,8 +168,8 @@ impl Mount {
         let fs = root.node.fs();
         Arc::new(Self {
             id: NEXT_MOUNT_ID.fetch_add(1, Ordering::Relaxed),
+            flags: Mutex::new(flags),
             root,
-            flags,
             fs,
             state: Default::default(),
         })
@@ -246,7 +246,7 @@ impl Mount {
         assert!(new_root.is_descendant_of(&self.root));
         // According to mount(2) on bind mounts, all flags other than MS_REC are ignored when doing
         // a bind mount.
-        let clone = Self::new_with_root(Arc::clone(new_root), self.flags);
+        let clone = Self::new_with_root(Arc::clone(new_root), self.flags());
 
         if flags.contains(MountFlags::REC) {
             // This is two steps because the alternative (locking clone.state while iterating over
@@ -296,6 +296,29 @@ impl Mount {
                 mount.change_propagation(flag, recursive);
             }
         }
+    }
+
+    fn flags(self: &MountHandle) -> MountFlags {
+        *self.flags.lock()
+    }
+
+    pub fn update_flags(self: &MountHandle, mut flags: MountFlags) {
+        flags &= MountFlags::STORED_ON_MOUNT;
+        let atime_flags = MountFlags::NOATIME
+            | MountFlags::NODIRATIME
+            | MountFlags::RELATIME
+            | MountFlags::STRICTATIME;
+        let mut stored_flags = self.flags.lock();
+        if !flags.intersects(atime_flags) {
+            // Since Linux 3.17, if none of MS_NOATIME, MS_NODIRATIME,
+            // MS_RELATIME, or MS_STRICTATIME is specified in mountflags, then
+            // the remount operation preserves the existing values of these
+            // flags (rather than defaulting to MS_RELATIME).
+            flags |= *stored_flags & atime_flags;
+        }
+        // The "effect [of MS_STRICTATIME] is to clear the MS_NOATIME and MS_RELATIME flags."
+        flags &= !MountFlags::STRICTATIME;
+        *stored_flags = flags;
     }
 
     state_accessor!(Mount, state);
@@ -538,7 +561,7 @@ impl DynamicFileSource for ProcMountsFileSource {
             let fs_spec = String::from_utf8_lossy(mount.fs.options.source_for_display());
             let fs_file = String::from_utf8_lossy(&mountpoint.path(&task)).into_owned();
             let fs_vfstype = String::from_utf8_lossy(mount.fs.name());
-            let fs_mntopts = mount.flags.to_string();
+            let fs_mntopts = mount.flags().to_string();
             writeln!(sink, "{fs_spec} {fs_file} {fs_vfstype} {fs_mntopts} 0 0")?;
             Ok(())
         })?;
@@ -636,7 +659,7 @@ impl DynamicFileSource for ProcMountinfoFile {
                 mount.root.node.fs().dev_id,
                 String::from_utf8_lossy(&path_from_fs_root(&mount.root)),
                 String::from_utf8_lossy(&mountpoint.path(&task)),
-                mount.flags.to_string(),
+                mount.flags().to_string(),
             )?;
             if let Some(peer_group) = mount.read().peer_group() {
                 write!(sink, " shared:{}", peer_group.id)?;
@@ -1086,7 +1109,7 @@ impl NamespaceNode {
         // Do not update the atime of this node if it is not mounted
         // or is mounted with the NOATIME flag.
         if let Some(mount) = &self.mount {
-            if !mount.flags.contains(MountFlags::NOATIME) {
+            if !mount.flags().contains(MountFlags::NOATIME) {
                 self.entry.node.update_info(|info| {
                     let now = fuchsia_runtime::utc_time();
                     info.time_access = now;

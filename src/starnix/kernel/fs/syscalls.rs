@@ -1231,13 +1231,38 @@ pub fn sys_mount(
 
     let target = lookup_at(current_task, FdNumber::AT_FDCWD, target_addr, LookupFlags::default())?;
 
-    if flags.contains(MountFlags::BIND) {
+    if flags.contains(MountFlags::REMOUNT) {
+        do_mount_remount(target, flags, data_addr)
+    } else if flags.contains(MountFlags::BIND) {
         do_mount_bind(current_task, source_addr, target, flags)
     } else if flags.intersects(MountFlags::SHARED | MountFlags::PRIVATE | MountFlags::DOWNSTREAM) {
         do_mount_change_propagation_type(current_task, target, flags)
     } else {
         do_mount_create(current_task, source_addr, target, filesystemtype_addr, data_addr, flags)
     }
+}
+
+fn do_mount_remount(
+    target: NamespaceNode,
+    flags: MountFlags,
+    data_addr: UserCString,
+) -> Result<(), Errno> {
+    if !data_addr.is_null() {
+        not_implemented!("mount: MS_REMOUNT: Updating data is not implemented.");
+    }
+    let mount = target.mount_if_root()?;
+    let updated_flags = flags & MountFlags::CHANGEABLE_WITH_REMOUNT;
+    mount.update_flags(updated_flags);
+    if !flags.contains(MountFlags::BIND) {
+        // From <https://man7.org/linux/man-pages/man2/mount.2.html>
+        //
+        //   Since Linux 2.6.26, the MS_REMOUNT flag can be used with MS_BIND
+        //   to modify only the per-mount-point flags.  This is particularly
+        //   useful for setting or clearing the "read-only" flag on a mount
+        //   without changing the underlying filesystem.
+        not_implemented!("mount: MS_REMOUNT: Updating superblock flags is not implemented.");
+    }
+    Ok(())
 }
 
 fn do_mount_bind(
