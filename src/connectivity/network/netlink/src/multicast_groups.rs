@@ -16,11 +16,19 @@
 //!
 //! Note that both mode 1 and mode 2 are supported (for backwards
 //! compatibility), and the two modes operate over different sets of constants.
-//! The underlying memberships are tracked independently of the mode via which
-//! they were set. For example, a `NETLINK_ROUTE` client could bind to
-//! `RTMGRP_IPV6_IFADDR` (256), to start receiving IPv6 address events, and
-//! later set the `NETLINK_DROP_MEMBERSHIP` socket option to
-//! `RTNLGRP_IPV6_IFADDR` (9), to stop receiving events.
+//! The "modern" constants correspond to the index of the set-bit in their
+//! "legacy" counterpart. For example, consider this sample of NETLINK_ROUTE
+//! constants:
+//!     RTNLGRP_LINK:   legacy (1), modern (1),
+//!     RTNLGRP_NOTIFY: legacy (2), modern (2),
+//!     RTNLGRP_NEIGH:  legacy (4), modern (3),
+//!     RTNLGRP_TC:     legacy (8), modern (4),
+//!
+//! The [`MulticastGroupMemberships`] struct exposed by this module tracks the
+//! memberships independently of the mode via which they are set. For example, a
+//! `NETLINK_ROUTE` client could bind to `RTMGRP_IPV6_IFADDR` (256), to start
+//! receiving IPv6 address events, and later set the `NETLINK_DROP_MEMBERSHIP`
+//! socket option to `RTNLGRP_IPV6_IFADDR` (9), to stop receiving events.
 
 use std::marker::PhantomData;
 
@@ -69,13 +77,18 @@ impl TryFrom<u32> for SingleLegacyGroup {
 
 /// Multicast group semantics that are specific to a particular protocol family.
 pub(crate) trait MulticastCapableNetlinkFamily {
-    /// Translate the given legacy group membership to a modern membership.
-    ///
-    /// Returns `None` if the given legacy_group does not exist in this family.
-    fn legacy_to_modern(legacy_group: SingleLegacyGroup) -> Option<ModernGroup>;
-
     /// Returns true if the given [`ModernGroup`] is a valid multicast group.
     fn is_valid_group(group: &ModernGroup) -> bool;
+}
+
+/// Translate the given legacy group membership to a modern membership.
+///
+/// Returns `None` if the given legacy_group does not exist in this family.
+fn legacy_to_modern<F: MulticastCapableNetlinkFamily>(
+    group: SingleLegacyGroup,
+) -> Option<ModernGroup> {
+    let modern_group = ModernGroup(group.inner().ilog2() + 1);
+    F::is_valid_group(&modern_group).then_some(modern_group)
 }
 
 /// Manages the current multicast group memberships of a single connection to
@@ -167,7 +180,7 @@ impl<F: MulticastCapableNetlinkFamily> MulticastGroupMemberships<F> {
             let legacy_group = raw_legacy_group
                 .try_into()
                 .expect("raw_legacy_group unexpectedly had multiple bits set");
-            let modern_group = F::legacy_to_modern(legacy_group);
+            let modern_group = legacy_to_modern::<F>(legacy_group);
             let is_member_of_group = requested_groups & raw_legacy_group != 0;
             mutations[i] = match (modern_group, is_member_of_group) {
                 (Some(modern_group), true) => Mutation::Add(modern_group),
@@ -298,7 +311,7 @@ mod tests {
         assert!(!memberships.member_of_group(MODERN_GROUP3));
         // Verify that setting an invalid group fails.
         assert_eq!(
-            memberships.set_legacy_memberships(INVALID_LEGACY_GROUP),
+            memberships.set_legacy_memberships(LegacyGroups(INVALID_LEGACY_GROUP)),
             Err(InvalidLegacyGroupsError {})
         );
     }
