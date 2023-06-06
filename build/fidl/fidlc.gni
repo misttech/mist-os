@@ -9,6 +9,7 @@ import("//build/fidl/toolchain.gni")
 #
 # Parameters (see //build/fidl/fidl_ir.gni for descriptions):
 #
+#   available (required)
 #   fidl_library_name (required)
 #   fidl_target_name (required)
 #   gen_dir (required)
@@ -17,7 +18,6 @@ import("//build/fidl/toolchain.gni")
 #   experimental_flags
 #   non_fidl_deps
 #   public_deps
-#   target_api_level
 #   testonly
 #   visibility
 #
@@ -87,12 +87,6 @@ template("fidlc") {
              "--sources",
            ] + rebase_path(invoker.sources, root_build_dir)
 
-    if (defined(invoker.target_api_level)) {
-      args += [
-        "--target-api-level",
-        invoker.target_api_level,
-      ]
-    }
     if (defined(invoker.public_deps)) {
       inputs = []
       foreach(dep, invoker.public_deps) {
@@ -108,6 +102,12 @@ template("fidlc") {
       args += [ "--dep-libraries" ] + rebase_path(inputs, root_build_dir)
     }
 
+    foreach(available, invoker.available) {
+      args += [
+        "--available",
+        available,
+      ]
+    }
     foreach(flag, experimental_flags) {
       args += [
         "--experimental",

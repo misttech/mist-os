@@ -87,6 +87,10 @@ foreach(filename, standalone_libraries) {
       experimental_flags += [ "zx_c_types" ]
     }
 
+    if (filename == "versions.test.fidl") {
+      available = [ "test:HEAD" ]
+    }
+
     # To ensure quality of generated Dart bindings.
     dart_analysis = true
 

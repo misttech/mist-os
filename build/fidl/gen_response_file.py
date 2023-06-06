@@ -4,98 +4,48 @@
 # found in the LICENSE file.
 
 import argparse
-import os
-import string
-import sys
-
-
-def read_libraries(libraries_path):
-    with open(libraries_path) as f:
-        lines = f.readlines()
-        return [l.rstrip("\n") for l in lines]
-
-
-def write_libraries(libraries_path, libraries):
-    directory = os.path.dirname(libraries_path)
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-    with open(libraries_path, "w+") as f:
-        for library in libraries:
-            f.write(library)
-            f.write("\n")
+from pathlib import Path
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate response file for FIDL frontend")
+        description="Generate response file for FIDL frontend. "
+        "Arguments not mentioned here are forwarded as is to fidlc.")
     parser.add_argument(
         "--out-response-file",
         help="The path for for the response file to generate",
+        type=Path,
         required=True)
     parser.add_argument(
         "--out-libraries",
         help="The path for for the libraries file to generate",
+        type=Path,
         required=True)
     parser.add_argument(
-        "--json", help="The path for the JSON file to generate, if any")
-    parser.add_argument(
-        "--tables", help="The path for the tables file to generate, if any")
-    parser.add_argument(
-        "--target-api-level",
-        help="Only compile APIs available at this Fuchsia API level",
-        default="HEAD")
-    parser.add_argument(
-        "--name", help="The name for the generated FIDL library, if any")
-    parser.add_argument(
-        "--depfile", help="The name for the generated depfile, if any")
-    parser.add_argument(
-        "--sources", help="List of FIDL source files", nargs="*")
+        "--sources", help="List of FIDL source files", nargs="+", required=True)
     parser.add_argument(
         "--dep-libraries", help="List of dependent libraries", nargs="*")
-    parser.add_argument(
-        "--experimental",
-        help="An experimental flag to enable",
-        action="append")
-    args = parser.parse_args()
+    args, args_to_forward = parser.parse_known_args()
 
-    target_libraries = []
+    # Each line contains a library's source files separated by spaces.
+    # We use a dict instead of a set to maintain insertion order.
+    dep_lines = {}
+    for path in args.dep_libraries or []:
+        with open(path) as f:
+            for line in f:
+                dep_lines[line.rstrip()] = True
+    libraries = list(dep_lines)
+    libraries.append(" ".join(sorted(args.sources)))
 
-    for dep_libraries_path in args.dep_libraries or []:
-        dep_libraries = read_libraries(dep_libraries_path)
-        for library in dep_libraries:
-            if library in target_libraries:
-                continue
-            target_libraries.append(library)
+    args.out_libraries.parent.mkdir(parents=True, exist_ok=True)
+    with open(args.out_libraries, "w") as f:
+        print("\n".join(libraries), file=f)
 
-    target_libraries.append(" ".join(sorted(args.sources)))
-    write_libraries(args.out_libraries, target_libraries)
-
-    response_file = []
-
-    response_file.append("--available fuchsia:%s" % args.target_api_level)
-
-    if args.json:
-        response_file.append("--json %s" % args.json)
-
-    if args.tables:
-        response_file.append("--tables %s" % args.tables)
-
-    if args.name:
-        response_file.append("--name %s" % args.name)
-
-    if args.depfile:
-        response_file.append("--depfile %s" % args.depfile)
-
-    if args.experimental:
-        response_file.extend(
-            "--experimental %s" % flag for flag in args.experimental)
-
-    response_file.extend("--files %s" % library for library in target_libraries)
-
-    with open(args.out_response_file, "w+") as f:
-        f.write(" ".join(response_file))
-        f.write("\n")
+    args.out_response_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(args.out_response_file, "w") as f:
+        fidlc_args = args_to_forward + ["--files " + line for line in libraries]
+        print(" ".join(fidlc_args), file=f)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

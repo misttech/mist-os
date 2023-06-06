@@ -22,9 +22,9 @@ import("//build/fidl/fidlc.gni")
 #   json_representation (required)
 #     [path] Where to generate the FIDL IR. Must be relative to gen_dir.
 #
-#   target_api_level
-#     [string] Only compile APIs available at this Fuchsia API level. See the
-#     FIDL compiler's --available flag for more info.
+#   target_api_level (required)
+#     [string] Only compile APIs available at this Fuchsia API level. For more
+#     information, look for --available in `fidlc --help`.
 #
 #   out_json_summary
 #     [path] If set, generates a JSON API summary file at the given path.
@@ -33,8 +33,9 @@ import("//build/fidl/fidlc.gni")
 # Other parameters (see //build/fidl/fidl.gni for descriptions):
 #
 #   sources (required)
-#   goldens_dir
+#   available
 #   experimental_flags
+#   goldens_dir
 #   non_fidl_deps
 #   public_deps
 #   testonly
@@ -62,8 +63,13 @@ template("fidl_ir") {
                              "goldens_dir",
                              "out_json_summary",
                              "visibility",
+                             "target_api_level",
                            ])
     visibility = [ ":*" ]
+    if (!defined(available)) {
+      available = []
+    }
+    available += [ "fuchsia:" + invoker.target_api_level ]
   }
 
   main_target_deps += [ ":$fidlc_target_name" ]
@@ -79,16 +85,12 @@ template("fidl_ir") {
       deps = [ ":$fidlc_target_name" ]
 
       metadata = {
-        _api_level = ""
-        if (defined(invoker.target_api_level)) {
-          _api_level = invoker.target_api_level
-        }
         _summary_basename = get_path_info(invoker.out_json_summary, "file")
         _new_golden_file = "${invoker.goldens_dir}/${invoker.target_api_level}/${_summary_basename}"
 
         compatibility_testing_goldens = [
           {
-            api_level = _api_level
+            api_level = invoker.target_api_level
             src = rebase_path(invoker.out_json_summary, root_build_dir)
             dst = rebase_path(_new_golden_file, root_build_dir)
           },

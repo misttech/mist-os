@@ -39,8 +39,8 @@ import("//build/testing/golden_files.gni")
 #    - Required: See //build/fidl/fidl.gni for a description.
 #    - Type: list(path)
 #
-#  * api, excluded_checks, experimental_checks, experimental_flags, goldens_dir,
-#    non_fidl_deps, sdk_category
+#  * api, available, excluded_checks, experimental_checks, experimental_flags,
+#    goldens_dir, non_fidl_deps, sdk_category
 #    - Optional: See //build/fidl/fidl.gni for a description.
 #
 #  * testonly, visibility, public_deps
@@ -101,6 +101,7 @@ template("fidl_library") {
   fidl_ir(compilation_target_name) {
     forward_variables_from(invoker,
                            [
+                             "available",
                              "experimental_flags",
                              "non_fidl_deps",
                              "public_deps",
@@ -252,6 +253,7 @@ template("fidl_library") {
       fidl_ir(fidl_ir_target_name) {
         forward_variables_from(invoker,
                                [
+                                 "available",
                                  "experimental_flags",
                                  "non_fidl_deps",
                                  "public_deps",

@@ -73,6 +73,11 @@ import("//build/go/toolchain.gni")
 #     Boolean flag to generate a LibFuzzer fuzz target for all protocols, used
 #     to ensure fuzzers for golden libraries compile successfully.
 #
+#   available (optional)
+#     A list of strings of the form PLATFORM:VERSION. This is needed when using
+#     @available annotations for platforms other than "fuchsia". For more
+#     information, look for --available in `fidlc --help`.
+#
 #   experimental_flags (optional)
 #     A list of experimental fidlc features to enable.
 #
@@ -168,6 +173,7 @@ template("fidl") {
 
   fidl_only = [
     "api",
+    "available",
     "excluded_checks",
     "experimental_checks",
     "experimental_flags",
