@@ -9,6 +9,8 @@ declare_args() {
 
   # Allows building the platform source code for a specific API level.
   override_target_api_level = -1
+
+  freeze_api_level = false
 }
 
 if (override_target_api_level == -1) {
@@ -32,6 +34,9 @@ if (override_target_api_level == -1) {
 }
 
 declare_args() {
+  assert(!freeze_api_level || !bump_api_level,
+         "freeze_api_level and bump_api_level shouldn't be used together")
+
   # If true, generate golden files for next api level. This is used by
   # platform-version-roller when the API level is incremented.
   include_next_api_level = bump_api_level

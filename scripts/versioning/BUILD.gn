@@ -76,3 +76,13 @@ action("bump_api_level") {
 
   testonly = true
 }
+
+action("freeze_api_level") {
+  script = "//scripts/versioning/freeze_in_development_api_level.py"
+
+  _stamp_file = "$target_out_dir/$target_name.status"
+
+  outputs = [ _stamp_file ]
+
+  testonly = true
+}
