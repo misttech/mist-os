@@ -305,7 +305,7 @@ struct ::fidl::internal::IncomingEventsHandleStorage<::test_inheritance::Super> 
 template <>
 struct ::fidl::internal::IncomingEventsStorage<::test_inheritance::Super> final : public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_inheritance::Super>> {
  public:
-  ::fidl::internal::InlineMessageBuffer<16> bytes_;
+  ::fidl::internal::InlineMessageBuffer<24> bytes_;
   ::fidl::internal::IncomingEventsHandleStorage<::test_inheritance::Super> handles_storage_;
 };
 
@@ -784,7 +784,7 @@ struct ::fidl::internal::IncomingEventsHandleStorage<::test_inheritance::Sub> fi
 template <>
 struct ::fidl::internal::IncomingEventsStorage<::test_inheritance::Sub> final : public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_inheritance::Sub>> {
  public:
-  ::fidl::internal::InlineMessageBuffer<16> bytes_;
+  ::fidl::internal::InlineMessageBuffer<24> bytes_;
   ::fidl::internal::IncomingEventsHandleStorage<::test_inheritance::Sub> handles_storage_;
 };
 

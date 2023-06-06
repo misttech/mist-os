@@ -526,7 +526,7 @@ struct ::fidl::internal::IncomingEventsHandleStorage<::test_requestflexibleenvel
 template <>
 struct ::fidl::internal::IncomingEventsStorage<::test_requestflexibleenvelope::Protocol> final : public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_requestflexibleenvelope::Protocol>> {
  public:
-  ::fidl::internal::InlineMessageBuffer<16> bytes_;
+  ::fidl::internal::InlineMessageBuffer<24> bytes_;
   ::fidl::internal::IncomingEventsHandleStorage<::test_requestflexibleenvelope::Protocol> handles_storage_;
 };
 

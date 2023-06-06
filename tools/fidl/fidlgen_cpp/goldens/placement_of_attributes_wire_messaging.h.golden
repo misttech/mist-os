@@ -170,7 +170,7 @@ struct ::fidl::internal::IncomingEventsHandleStorage<::test_placementofattribute
 template <>
 struct ::fidl::internal::IncomingEventsStorage<::test_placementofattributes::ExampleProtocol> final : public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_placementofattributes::ExampleProtocol>> {
  public:
-  ::fidl::internal::InlineMessageBuffer<16> bytes_;
+  ::fidl::internal::InlineMessageBuffer<24> bytes_;
   ::fidl::internal::IncomingEventsHandleStorage<::test_placementofattributes::ExampleProtocol> handles_storage_;
 };
 

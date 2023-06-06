@@ -531,7 +531,7 @@ struct ::fidl::internal::IncomingEventsHandleStorage<::test_errorsyntax::Example
 template <>
 struct ::fidl::internal::IncomingEventsStorage<::test_errorsyntax::ExampleUseOfErrorSyntax> final : public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_errorsyntax::ExampleUseOfErrorSyntax>> {
  public:
-  ::fidl::internal::InlineMessageBuffer<16> bytes_;
+  ::fidl::internal::InlineMessageBuffer<24> bytes_;
   ::fidl::internal::IncomingEventsHandleStorage<::test_errorsyntax::ExampleUseOfErrorSyntax> handles_storage_;
 };
 

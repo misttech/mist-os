@@ -307,7 +307,7 @@ struct ::fidl::internal::IncomingEventsHandleStorage<::test_anonymous::SomeProto
 template <>
 struct ::fidl::internal::IncomingEventsStorage<::test_anonymous::SomeProtocol> final : public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_anonymous::SomeProtocol>> {
  public:
-  ::fidl::internal::InlineMessageBuffer<16> bytes_;
+  ::fidl::internal::InlineMessageBuffer<24> bytes_;
   ::fidl::internal::IncomingEventsHandleStorage<::test_anonymous::SomeProtocol> handles_storage_;
 };
 

@@ -152,7 +152,9 @@ Define an [event handler][event-handlers]:
 
 Call `client.HandleOneEvent` to block until an event is received. If the event
 was recognized and successfully decoded, `HandleOneEvent` returns
-`fidl::Status::Ok()`. Otherwise, it returns an appropriate error:
+`fidl::Status::Ok()`. Otherwise, it returns an appropriate error. If the server
+closes the connection with an epitaph, the status contained in the epitaph is
+returned.
 
 ```cpp
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/cpp/client_sync/main.cc" region_tag="handle-one-event" adjust_indentation="auto" %}

@@ -79,7 +79,7 @@ struct ::fidl::internal::IncomingEventsHandleStorage<::test_protocolrequest::Chi
 template <>
 struct ::fidl::internal::IncomingEventsStorage<::test_protocolrequest::Child> final : public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_protocolrequest::Child>> {
  public:
-  ::fidl::internal::InlineMessageBuffer<16> bytes_;
+  ::fidl::internal::InlineMessageBuffer<24> bytes_;
   ::fidl::internal::IncomingEventsHandleStorage<::test_protocolrequest::Child> handles_storage_;
 };
 
@@ -862,7 +862,7 @@ struct ::fidl::internal::IncomingEventsHandleStorage<::test_protocolrequest::Par
 template <>
 struct ::fidl::internal::IncomingEventsStorage<::test_protocolrequest::Parent> final : public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_protocolrequest::Parent>> {
  public:
-  ::fidl::internal::InlineMessageBuffer<16> bytes_;
+  ::fidl::internal::InlineMessageBuffer<24> bytes_;
   ::fidl::internal::IncomingEventsHandleStorage<::test_protocolrequest::Parent> handles_storage_;
 };
 

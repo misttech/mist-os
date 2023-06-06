@@ -2965,7 +2965,7 @@ static_assert(offsetof(::fidl::WireResponse<::test_protocols::WithErrorSyntax::H
   struct ::fidl::internal::IncomingEventsStorage<::test_protocols::WithErrorSyntax> final :
       public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_protocols::WithErrorSyntax>> {
    public:
-    ::fidl::internal::InlineMessageBuffer<16> bytes_;
+    ::fidl::internal::InlineMessageBuffer<24> bytes_;
     ::fidl::internal::IncomingEventsHandleStorage<::test_protocols::WithErrorSyntax> handles_storage_;
   };
 
@@ -5935,7 +5935,7 @@ static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_protocols::
   struct ::fidl::internal::IncomingEventsStorage<::test_protocols::DiscoverableProtocol> final :
       public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_protocols::DiscoverableProtocol>> {
    public:
-    ::fidl::internal::InlineMessageBuffer<16> bytes_;
+    ::fidl::internal::InlineMessageBuffer<24> bytes_;
     ::fidl::internal::IncomingEventsHandleStorage<::test_protocols::DiscoverableProtocol> handles_storage_;
   };
 
@@ -6164,7 +6164,7 @@ namespace fidl {
   struct ::fidl::internal::IncomingEventsStorage<::test_protocols::AnotherDiscoverableProtocol> final :
       public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_protocols::AnotherDiscoverableProtocol>> {
    public:
-    ::fidl::internal::InlineMessageBuffer<16> bytes_;
+    ::fidl::internal::InlineMessageBuffer<24> bytes_;
     ::fidl::internal::IncomingEventsHandleStorage<::test_protocols::AnotherDiscoverableProtocol> handles_storage_;
   };
 
@@ -7940,7 +7940,7 @@ static_assert(offsetof(::fidl::WireResponse<::test_protocols::WithProtocolEnds::
   struct ::fidl::internal::IncomingEventsStorage<::test_protocols::WithProtocolEnds> final :
       public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_protocols::WithProtocolEnds>> {
    public:
-    ::fidl::internal::InlineMessageBuffer<16> bytes_;
+    ::fidl::internal::InlineMessageBuffer<24> bytes_;
     ::fidl::internal::IncomingEventsHandleStorage<::test_protocols::WithProtocolEnds> handles_storage_;
   };
 
@@ -8568,7 +8568,7 @@ static_assert(offsetof(::test_protocols::wire::ManyParametersFifteenRequest, p15
   struct ::fidl::internal::IncomingEventsStorage<::test_protocols::ManyParameters> final :
       public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_protocols::ManyParameters>> {
    public:
-    ::fidl::internal::InlineMessageBuffer<16> bytes_;
+    ::fidl::internal::InlineMessageBuffer<24> bytes_;
     ::fidl::internal::IncomingEventsHandleStorage<::test_protocols::ManyParameters> handles_storage_;
   };
 
@@ -9040,7 +9040,7 @@ static_assert(offsetof(::fidl::WireResponse<::test_protocols::MethodWithUnion::U
   struct ::fidl::internal::IncomingEventsStorage<::test_protocols::MethodWithUnion> final :
       public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_protocols::MethodWithUnion>> {
    public:
-    ::fidl::internal::InlineMessageBuffer<16> bytes_;
+    ::fidl::internal::InlineMessageBuffer<24> bytes_;
     ::fidl::internal::IncomingEventsHandleStorage<::test_protocols::MethodWithUnion> handles_storage_;
   };
 

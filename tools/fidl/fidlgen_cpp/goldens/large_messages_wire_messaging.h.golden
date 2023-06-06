@@ -2132,7 +2132,7 @@ static_assert(offsetof(::fidl::WireResponse<::test_largemessages::Overflowing::E
   struct ::fidl::internal::IncomingEventsStorage<::test_largemessages::Overflowing> final :
       public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_largemessages::Overflowing>> {
    public:
-    ::fidl::internal::InlineMessageBuffer<16> bytes_;
+    ::fidl::internal::InlineMessageBuffer<24> bytes_;
     ::fidl::internal::IncomingEventsHandleStorage<::test_largemessages::Overflowing> handles_storage_;
   };
 

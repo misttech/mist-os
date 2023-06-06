@@ -239,6 +239,10 @@ class [[nodiscard]] Status {
                   ::fidl::internal::kErrorUnknownOrdinal);
   }
 
+  constexpr static Status PeerClosedWhileReading(zx_status_t status) {
+    return Status(status, ::fidl::Reason::kPeerClosedWhileReading, nullptr);
+  }
+
   // Constructs a transport error with |status| and optional |error_message|.
   // |status| must not be |ZX_OK|.
   constexpr static Status TransportError(zx_status_t status, const char* error_message = nullptr) {

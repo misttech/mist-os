@@ -176,7 +176,7 @@ struct ::fidl::internal::IncomingEventsHandleStorage<::test_inheritancewithrecur
 template <>
 struct ::fidl::internal::IncomingEventsStorage<::test_inheritancewithrecursivedecl::Parent> final : public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_inheritancewithrecursivedecl::Parent>> {
  public:
-  ::fidl::internal::InlineMessageBuffer<16> bytes_;
+  ::fidl::internal::InlineMessageBuffer<24> bytes_;
   ::fidl::internal::IncomingEventsHandleStorage<::test_inheritancewithrecursivedecl::Parent> handles_storage_;
 };
 
@@ -563,7 +563,7 @@ struct ::fidl::internal::IncomingEventsHandleStorage<::test_inheritancewithrecur
 template <>
 struct ::fidl::internal::IncomingEventsStorage<::test_inheritancewithrecursivedecl::Child> final : public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_inheritancewithrecursivedecl::Child>> {
  public:
-  ::fidl::internal::InlineMessageBuffer<16> bytes_;
+  ::fidl::internal::InlineMessageBuffer<24> bytes_;
   ::fidl::internal::IncomingEventsHandleStorage<::test_inheritancewithrecursivedecl::Child> handles_storage_;
 };
 

@@ -108,7 +108,7 @@ namespace fidl {
   struct ::fidl::internal::IncomingEventsStorage<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> final :
       public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>> {
    public:
-    ::fidl::internal::InlineMessageBuffer<16> bytes_;
+    ::fidl::internal::InlineMessageBuffer<24> bytes_;
     ::fidl::internal::IncomingEventsHandleStorage<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> handles_storage_;
   };
 
@@ -277,7 +277,7 @@ namespace fidl {
   struct ::fidl::internal::IncomingEventsStorage<::test_bindingsdenylist::OnlyCppAndDeps> final :
       public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_bindingsdenylist::OnlyCppAndDeps>> {
    public:
-    ::fidl::internal::InlineMessageBuffer<16> bytes_;
+    ::fidl::internal::InlineMessageBuffer<24> bytes_;
     ::fidl::internal::IncomingEventsHandleStorage<::test_bindingsdenylist::OnlyCppAndDeps> handles_storage_;
   };
 
@@ -1666,7 +1666,7 @@ static_assert(offsetof(::fidl::WireResponse<::test_bindingsdenylist::DenyEachBin
   struct ::fidl::internal::IncomingEventsStorage<::test_bindingsdenylist::DenyEachBinding> final :
       public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_bindingsdenylist::DenyEachBinding>> {
    public:
-    ::fidl::internal::InlineMessageBuffer<16> bytes_;
+    ::fidl::internal::InlineMessageBuffer<24> bytes_;
     ::fidl::internal::IncomingEventsHandleStorage<::test_bindingsdenylist::DenyEachBinding> handles_storage_;
   };
 
@@ -2435,7 +2435,7 @@ namespace fidl {
   struct ::fidl::internal::IncomingEventsStorage<::test_bindingsdenylist::Allowed> final :
       public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_bindingsdenylist::Allowed>> {
    public:
-    ::fidl::internal::InlineMessageBuffer<16> bytes_;
+    ::fidl::internal::InlineMessageBuffer<24> bytes_;
     ::fidl::internal::IncomingEventsHandleStorage<::test_bindingsdenylist::Allowed> handles_storage_;
   };
 
@@ -2767,7 +2767,7 @@ static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_bindingsden
   struct ::fidl::internal::IncomingEventsStorage<::test_bindingsdenylist::ImportsSameNameContext> final :
       public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_bindingsdenylist::ImportsSameNameContext>> {
    public:
-    ::fidl::internal::InlineMessageBuffer<16> bytes_;
+    ::fidl::internal::InlineMessageBuffer<24> bytes_;
     ::fidl::internal::IncomingEventsHandleStorage<::test_bindingsdenylist::ImportsSameNameContext> handles_storage_;
   };
 

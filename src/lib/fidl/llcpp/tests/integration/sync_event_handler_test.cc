@@ -141,4 +141,17 @@ TEST(SyncEventHandler, UnhandledTransitionalEvent) {
   EXPECT_SUBSTR(status.FormatDescription().c_str(), "transitional");
 }
 
+TEST(SyncEventHandler, Epitaph) {
+  zx::result endpoints = fidl::CreateEndpoints<test::TwoEvents>();
+  ASSERT_OK(endpoints.status_value());
+  endpoints->server.Close(ZX_ERR_WRONG_TYPE);
+
+  struct EventHandler : public fidl::testing::WireSyncEventHandlerTestBase<test::TwoEvents> {
+    void NotImplemented_(const std::string&) override {}
+  } event_handler;
+  fidl::Status status = event_handler.HandleOneEvent(endpoints->client);
+  EXPECT_EQ(ZX_ERR_WRONG_TYPE, status.status());
+  EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, status.reason());
+}
+
 }  // namespace

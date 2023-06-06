@@ -13,6 +13,9 @@ import (
 
 const kMessageHeaderSize = 16
 
+// This excludes the header.
+const kEpitaphSize = 8
+
 //
 // Generate code for sending and receiving FIDL messages i.e. the messaging API.
 //
@@ -1210,8 +1213,9 @@ func (c *compiler) compileProtocol(p fidlgen.Protocol) *Protocol {
 		methods = append(methods, method)
 	}
 
-	var maxEventSizeV1 int
-	var maxEventSizeV2 int
+	// Always include room to receive an epitaph.
+	var maxEventSizeV1 int = kEpitaphSize
+	var maxEventSizeV2 int = kEpitaphSize
 	for _, method := range methods {
 		if method.HasRequest || !method.HasResponsePayload {
 			continue

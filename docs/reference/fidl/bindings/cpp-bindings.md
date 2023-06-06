@@ -659,7 +659,8 @@ following methods:
   the stack if they fit under 512 bytes, or else on the heap. See
   [WireResult](#result) for details on buffer management.
 * `fidl::Status HandleOneEvent(SyncEventHandler& event_handler)`: Blocks to
-  consume exactly one event from the channel. See [Events](#events).
+  consume exactly one event from the channel. If the server has sent an epitaph,
+  the status contained within the epitaph is returned. See [Events](#events).
 
 `fidl::WireSyncClient<TicTacToe>::buffer` provides the following methods:
 

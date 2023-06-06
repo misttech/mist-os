@@ -290,7 +290,7 @@ struct ::fidl::internal::IncomingEventsHandleStorage<::test_foreigntypeinrespons
 template <>
 struct ::fidl::internal::IncomingEventsStorage<::test_foreigntypeinresponseusedthroughcompose::Top> final : public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_foreigntypeinresponseusedthroughcompose::Top>> {
  public:
-  ::fidl::internal::InlineMessageBuffer<16> bytes_;
+  ::fidl::internal::InlineMessageBuffer<24> bytes_;
   ::fidl::internal::IncomingEventsHandleStorage<::test_foreigntypeinresponseusedthroughcompose::Top> handles_storage_;
 };
 

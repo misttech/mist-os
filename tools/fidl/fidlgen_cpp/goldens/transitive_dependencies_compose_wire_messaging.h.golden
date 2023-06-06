@@ -290,7 +290,7 @@ struct ::fidl::internal::IncomingEventsHandleStorage<::test_transitivedependenci
 template <>
 struct ::fidl::internal::IncomingEventsStorage<::test_transitivedependenciescompose::Top> final : public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_transitivedependenciescompose::Top>> {
  public:
-  ::fidl::internal::InlineMessageBuffer<16> bytes_;
+  ::fidl::internal::InlineMessageBuffer<24> bytes_;
   ::fidl::internal::IncomingEventsHandleStorage<::test_transitivedependenciescompose::Top> handles_storage_;
 };
 

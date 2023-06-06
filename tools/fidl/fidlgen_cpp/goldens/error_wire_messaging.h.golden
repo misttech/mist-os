@@ -306,7 +306,7 @@ struct ::fidl::internal::IncomingEventsHandleStorage<::test_error::Example> fina
 template <>
 struct ::fidl::internal::IncomingEventsStorage<::test_error::Example> final : public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_error::Example>> {
  public:
-  ::fidl::internal::InlineMessageBuffer<16> bytes_;
+  ::fidl::internal::InlineMessageBuffer<24> bytes_;
   ::fidl::internal::IncomingEventsHandleStorage<::test_error::Example> handles_storage_;
 };
 

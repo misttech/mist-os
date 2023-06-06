@@ -164,7 +164,7 @@ struct ::fidl::internal::IncomingEventsHandleStorage<::test_service::FirstProtoc
 template <>
 struct ::fidl::internal::IncomingEventsStorage<::test_service::FirstProtocol> final : public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_service::FirstProtocol>> {
  public:
-  ::fidl::internal::InlineMessageBuffer<16> bytes_;
+  ::fidl::internal::InlineMessageBuffer<24> bytes_;
   ::fidl::internal::IncomingEventsHandleStorage<::test_service::FirstProtocol> handles_storage_;
 };
 
@@ -436,7 +436,7 @@ struct ::fidl::internal::IncomingEventsHandleStorage<::test_service::SecondProto
 template <>
 struct ::fidl::internal::IncomingEventsStorage<::test_service::SecondProtocol> final : public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingEventsStorage<::test_service::SecondProtocol>> {
  public:
-  ::fidl::internal::InlineMessageBuffer<16> bytes_;
+  ::fidl::internal::InlineMessageBuffer<24> bytes_;
   ::fidl::internal::IncomingEventsHandleStorage<::test_service::SecondProtocol> handles_storage_;
 };
 

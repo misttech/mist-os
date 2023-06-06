@@ -161,7 +161,7 @@
   "include/zircon/errors.h": "2cedd2f5229af61131f107330cbd3181",
   "include/zircon/exception.h": "425c558088583172dc860b894ac6ea0a",
   "include/zircon/features.h": "6bd1e1745ec1467587742d843fd2fede",
-  "include/zircon/fidl.h": "38aa0f242ee6d423c6c7b281edcfb13f",
+  "include/zircon/fidl.h": "20e1801f5b2d87dde7d7adac2cee18b0",
   "include/zircon/hw/debug/arm64.h": "da4c4dad07e5bbe4f6b09a6aa0b0ec70",
   "include/zircon/hw/debug/x86.h": "650133fd836a6ca92b979be57a46fc28",
   "include/zircon/hw/gpt.h": "8bb129c95f49edd90ff2205a0c1e3d7e",

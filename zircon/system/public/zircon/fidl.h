@@ -609,6 +609,8 @@ typedef struct fidl_incoming_msg {
   uint32_t num_handles;
 } fidl_incoming_msg_t;
 
+// LINT.IfChange
+
 // An epitaph is a message that a server sends just prior to closing the
 // connection.  It provides an indication of why the connection is being closed.
 // Epitaphs are defined in the FIDL wire format specification.  Once sent down
@@ -625,6 +627,10 @@ typedef struct fidl_epitaph {
   // errors. A value of ZX_OK indicates no error.
   zx_status_t error;
 } fidl_epitaph_t;
+
+static_assert(sizeof(fidl_epitaph_t) == 24, "If the size changes, the compiler needs updating");
+
+// LINT.ThenChange(//tools/fidl/lib/fidlgen_cpp/protocol.go)
 
 // This ordinal value is reserved for Epitaphs.
 enum {
