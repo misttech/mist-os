@@ -761,13 +761,17 @@ class DispatcherCoordinator {
   // Returns ZX_OK if |dispatcher| was added successfully.
   // Returns ZX_ERR_BAD_STATE if the driver is currently shutting down.
   zx_status_t AddDispatcher(fbl::RefPtr<Dispatcher> dispatcher);
-  // Records the dispatcher as being shutdown.
-  void SetShutdown(driver_runtime::Dispatcher& dispatcher);
   // Notifies the dispatcher coordinator that a dispatcher has completed shutdown.
-  void NotifyShutdown(driver_runtime::Dispatcher& dispatcher);
+  // |dispatcher_shutdown_observer| is the observer to call.
+  void NotifyDispatcherShutdown(driver_runtime::Dispatcher& dispatcher,
+                                fdf_dispatcher_shutdown_observer_t* dispatcher_shutdown_observer);
   void RemoveDispatcher(Dispatcher& dispatcher);
   static zx_status_t Start();
   static void EnvReset();
+
+  bool AreAllDriversDestroyedLocked() __TA_REQUIRES(&lock_) {
+    return (drivers_.size() == 0) && (num_notify_shutdown_threads_ == 0);
+  }
 
   // Resets to 0 threads.
   // Must only be called when there are no outstanding dispatchers.
@@ -794,8 +798,11 @@ class DispatcherCoordinator {
 
  private:
   // Tracks the dispatchers owned by a driver.
-  class DriverState : public fbl::WAVLTreeContainable<std::unique_ptr<DriverState>> {
+  class DriverState : public fbl::RefCounted<DriverState>,
+                      public fbl::WAVLTreeContainable<fbl::RefPtr<DriverState>> {
    public:
+    using DriverShutdownCallback = fit::inline_callback<void(void), sizeof(void*) * 3>;
+
     explicit DriverState(const void* driver) : driver_(driver) {}
 
     // Required to instantiate fbl::DefaultKeyedObjectTraits.
@@ -829,22 +836,22 @@ class DispatcherCoordinator {
       }
     }
 
-    // Sets the driver as shutting down, and the observer which will be notified once
+    // Sets the driver as shutting down, and the callback which will be invoked once
     // shutting down the driver's dispatchers completes.
-    zx_status_t SetShuttingDown(fdf_env_driver_shutdown_observer_t* observer) {
-      if (shutdown_observer_ || driver_shutting_down_) {
+    zx_status_t SetDriverShuttingDown(DriverShutdownCallback callback) {
+      if (shutdown_callback_ || driver_shutting_down_) {
         // Currently we only support one observer at a time.
         return ZX_ERR_BAD_STATE;
       }
       driver_shutting_down_ = true;
-      shutdown_observer_ = observer;
+      shutdown_callback_ = std::move(callback);
       return ZX_OK;
     }
 
-    void SetShutdownComplete() {
+    void SetDriverShutdownComplete() {
       ZX_ASSERT(driver_shutting_down_);
       // We should have already called the shutdown observer.
-      ZX_ASSERT(!shutdown_observer_);
+      ZX_ASSERT(!shutdown_callback_);
       driver_shutting_down_ = false;
     }
 
@@ -857,13 +864,22 @@ class DispatcherCoordinator {
     // Returns whether there are dispatchers that have not yet been removed with |RemoveDispatcher|.
     bool HasDispatchers() { return !dispatchers_.is_empty() || !shutdown_dispatchers_.is_empty(); }
 
-    fdf_env_driver_shutdown_observer_t* take_shutdown_observer() {
-      auto observer = shutdown_observer_;
-      shutdown_observer_ = nullptr;
-      return observer;
+    void ObserverCallStarted() { num_pending_observer_calls_++; }
+
+    void ObserverCallComplete() {
+      ZX_ASSERT(num_pending_observer_calls_ > 0);
+      num_pending_observer_calls_--;
+    }
+
+    DriverShutdownCallback take_driver_shutdown_callback() {
+      auto callback = std::move(shutdown_callback_);
+      shutdown_callback_ = nullptr;
+      return callback;
     }
 
     fbl::RefPtr<driver_runtime::Dispatcher> initial_dispatcher() { return initial_dispatcher_; }
+
+    uint32_t num_pending_observer_calls() const { return num_pending_observer_calls_; }
 
    private:
     const void* driver_ = nullptr;
@@ -875,15 +891,18 @@ class DispatcherCoordinator {
     fbl::RefPtr<driver_runtime::Dispatcher> initial_dispatcher_ = nullptr;
     // Whether the driver is in the process of shutting down.
     bool driver_shutting_down_ = false;
-    // The observer which will be notified once shutdown completes.
-    fdf_env_driver_shutdown_observer_t* shutdown_observer_ = nullptr;
+    // The callback which will be invoked once shutdown completes.
+    DriverShutdownCallback shutdown_callback_ = nullptr;
+    // The number of threads currently calling a dispatcher shutdown observer handler
+    // for a dispatcher.
+    uint32_t num_pending_observer_calls_ = 0;
   };
 
   // Make sure this destructs after |loop_|. This is as dispatchers will remove themselves
   // from this list on shutdown.
   fbl::Mutex lock_;
   // Maps from driver owner to driver state.
-  fbl::WAVLTree<const void*, std::unique_ptr<DriverState>> drivers_ __TA_GUARDED(&lock_);
+  fbl::WAVLTree<const void*, fbl::RefPtr<DriverState>> drivers_ __TA_GUARDED(&lock_);
   // Notified when all drivers are destroyed.
   fbl::ConditionVariable drivers_destroyed_event_ __TA_GUARDED(&lock_);
 
@@ -896,7 +915,8 @@ class DispatcherCoordinator {
   Dispatcher::ThreadPool default_thread_pool_;
   // Thread pool that is not managed.
   std::optional<Dispatcher::ThreadPool> unmanaged_thread_pool_;
-
+  // Number of threads that are in the process of handling |NotifyDispatcherShutdown| events.
+  uint32_t num_notify_shutdown_threads_ = 0;
   TokenManager token_manager_;
 };
 
