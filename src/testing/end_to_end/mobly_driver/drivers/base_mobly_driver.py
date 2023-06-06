@@ -35,7 +35,7 @@ class BaseDriver(ABC):
         - Name: SomeName
           Controllers:
             FuchsiaDevice:
-            - nodename: fuchsia-1234-5678-90ab
+            - name: fuchsia-1234-5678-90ab
           TestParams:
             param_1: "val_1"
             param_2: "val_2"

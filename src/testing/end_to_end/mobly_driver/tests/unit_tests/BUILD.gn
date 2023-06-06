@@ -7,7 +7,10 @@ import("//build/python/python_host_test.gni")
 if (is_host) {
   python_host_test("api_mobly_test") {
     main_source = "api_mobly_test.py"
-    sources = [ "//src/testing/end_to_end/mobly_driver/api_mobly.py" ]
+    sources = [
+      "//src/testing/end_to_end/mobly_driver/api_infra.py",
+      "//src/testing/end_to_end/mobly_driver/api_mobly.py",
+    ]
     libraries = [
       "//src/testing/end_to_end/mobly_driver:api_mobly",
       "//third_party/parameterized",

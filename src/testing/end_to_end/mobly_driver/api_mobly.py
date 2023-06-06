@@ -5,6 +5,7 @@
 """Contains all Mobly APIs used in Mobly Driver."""
 
 import os
+import api_infra
 from mobly import keys
 from mobly import records
 from typing import List, Dict, Any
@@ -58,20 +59,21 @@ def get_result_path(mobly_output_path: str, testbed_name: str) -> str:
             mobly_output_path, testbed_name), records.OUTPUT_FILE_SUMMARY)
 
 
-# TODO(fxbug.dev/119213) - Update |fuchsia_controllers| type to use HoneyDew's
-# definition. When HoneyDew's FuchsiaDevice Mobly device class is available, we
+# TODO(fxbug.dev/119213) - Update |controllers| type to use HoneyDew's
+# definition. When HoneyDew's Mobly device class is available, we
 # should use that class as the Pytype to reduce the chance of controller
 # instantiation error.
 def new_testbed_config(
-        testbed_name: str, log_path: str, fuchsia_controllers: List[Dict[str,
-                                                                         Any]],
-        test_params_dict: MoblyConfigComponent) -> MoblyConfigComponent:
+        testbed_name: str, log_path: str, mobly_controllers: List[Dict[str,
+                                                                       Any]],
+        test_params_dict: MoblyConfigComponent,
+        botanist_honeydew_map: Dict[str, str]) -> MoblyConfigComponent:
     """Returns a Mobly testbed config which is required for running Mobly tests.
 
-    This method expects the |fuchsia_controller| object to follow the schema of
+    This method expects the |controller| object to follow the schema of
     tools/botanist/cmd/run.go's |targetInfo| struct.
 
-    Example |fuchsia_controllers|:
+    Example |mobly_controllers|:
        [{
           "type": "FuchsiaDevice",
           "nodename":"fuchsia-54b2-030e-eb19",
@@ -92,11 +94,11 @@ def new_testbed_config(
               "Controllers": {
                 "FuchsiaDevice": [
                   {
-                    "nodename":"fuchsia-54b2-030e-eb19",
+                    "name":"fuchsia-54b2-030e-eb19",
                     "ipv4":"192.168.42.112",
                     "ipv6":"",
                     "serial_socket":"/tmp/fuchsia-54b2-030e-eb19_mux",
-                    "ssh_key":"/etc/botanist/keys/pkey_infra"
+                    "ssh_private_key":"/etc/botanist/keys/pkey_infra"
                   }
                 ],
                 "AccessPoint": [
@@ -115,20 +117,28 @@ def new_testbed_config(
     Args:
         testbed_name: Mobly testbed name to use.
         log_path: absolute path to Mobly's top-level output directory.
-        fuchsia_controllers: List of FuchsiaDevice Mobly controller objects.
+        mobly_controllers: List of Mobly controller objects.
         test_params_dict: Mobly testbed params dictionary.
-
+        botanist_honeydew_map: Dictionary that maps Botanist config names to
+                               Honeydew config names.
     Returns:
       A Mobly Config that corresponds to the user-specified arguments.
     """
     controllers = {}
-    for c in fuchsia_controllers:
-        t = c['type']
-        del c['type']
-        if t in controllers:
-            controllers[t].append(c)
+    for controller in mobly_controllers:
+        controller_type = controller['type']
+        del controller['type']
+        # Convert botanist key names to relative Honeydew key names for fuchsia
+        # devices. This is done here so that Honeydew does not have to do
+        # the conversions itself.
+        if api_infra.FUCHSIA_DEVICE == controller_type:
+            for botanist_key, honeydew_key in botanist_honeydew_map.items():
+                if botanist_key in controller:
+                    controller[honeydew_key] = controller.pop(botanist_key)
+        if controller_type in controllers:
+            controllers[controller_type].append(controller)
         else:
-            controllers[t] = [c]
+            controllers[controller_type] = [controller]
 
     config_dict = {
         keys.Config.key_testbed.value:

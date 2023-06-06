@@ -33,8 +33,8 @@ def create(
 
             Ensure to have following keys in the config dict:
             * name - Device name returned by `ffx target list`.
-            * ssh_key - Absolute path to the SSH private key file needed to SSH
-                into fuchsia device.
+            * ssh_private_key - Absolute path to the SSH private key file needed
+                to SSH into fuchsia device.
             * ssh_user - Username to be used to SSH into fuchsia device.
             * transport - Transport to be used to perform the host-target
                 interactions.
@@ -55,7 +55,7 @@ def create(
 
     fuchsia_devices: List[fuchsia_device_interface.FuchsiaDevice] = []
     for config in configs:
-        device_config: Dict[str, Any] = _get_device_config(config)
+        device_config: Dict[str, Any] = _parse_device_config(config)
         fuchsia_devices.append(
             honeydew.create_device(
                 device_name=device_config["name"],
@@ -134,20 +134,18 @@ def _get_fuchsia_device_info(
     return device_info
 
 
-# TODO(fxbug.dev/123746): Remove this after fxbug.dev/123746 is fixed.
-def _get_device_config(config: Dict[str, str]) -> Dict[str, Any]:
-    """Parse, validate and update the mobly configuration associated with
-    FuchsiaDevice controller.
+def _parse_device_config(config: Dict[str, str]) -> Dict[str, Any]:
+    """Validates and parses mobly configuration associated with FuchsiaDevice controller.
 
     Args:
-        config: mobly configuration associated with FuchsiaDevice controller.
+        config: The mobly configuration associated with FuchsiaDevice controller.
 
     Returns:
-        Validated mobly configuration associated with FuchsiaDevice controller.
+        Validated and parsed mobly configuration associated with FuchsiaDevice controller.
 
     Raises:
-        RuntimeError: If any required information is missing.
-        ValueError:   If the transport is invalid, or the device_ip_port is invalid
+        RuntimeError: If the fuchsia device name in the config is missing.
+        ValueError: If the transport is invalid, or the device_ip_port is invalid.
     """
     _LOGGER.debug(
         "FuchsiaDevice controller config received in testbed yml file is '%s'",
@@ -161,48 +159,38 @@ def _get_device_config(config: Dict[str, str]) -> Dict[str, Any]:
     #       nodename: botanist-target-qemu
     #       serial_socket: ''
     #       ssh_key: private_key
-    #       device_ip_port: IpPort
-    device_config: Dict[str, Any] = {
-        "ssh_user": config.get("ssh_user"),
-    }
-
-    if config.get("name"):
-        device_config["name"] = config["name"]
-    elif config.get("nodename"):
-        device_config["name"] = config["nodename"]
-    else:
+    #       transport: sl4f
+    #       device_ip_port: [::1]:8022
+    if "name" not in config:
         raise RuntimeError("Missing fuchsia device name in the config")
 
-    if config.get("ssh_private_key"):
-        device_config["ssh_private_key"] = config["ssh_private_key"]
-    elif config.get("nodename"):
-        device_config["ssh_private_key"] = config["ssh_key"]
+    device_config: Dict[str, Any] = {}
 
-    if config.get("device_ip_port"):
-        try:
-            device_config["device_ip_port"] = custom_types.IpPort.parse(
-                config["device_ip_port"])
-        except Exception as err:  # pylint: disable=broad-except
-            raise ValueError(
-                f"Invalid value for 'device_ip_port': {config['device_ip_port']} "
-            ) from err
-
-    if config.get("transport"):
-        transport: str = config["transport"]
-
-        if transport == "sl4f":
-            device_config["transport"] = transports.TRANSPORT.SL4F
-        elif transport in transports.FUCHSIA_CONTROLLER_TRANSPORTS:
-            device_config["transport"] = transports.TRANSPORT.FUCHSIA_CONTROLLER
+    for config_key, config_value in config.items():
+        if config_key == "transport":
+            if config["transport"] == "sl4f":
+                device_config["transport"] = transports.TRANSPORT.SL4F
+            elif config["transport"] in transports.FUCHSIA_CONTROLLER_TRANSPORTS:
+                device_config["transport"] = transports.TRANSPORT.FUCHSIA_CONTROLLER
+            else:
+                raise ValueError(
+                    f"Invalid transport `{config_value}` passed for " \
+                    f"{config['name']}"
+                )
+        elif config_key == "device_ip_port":
+            try:
+                device_config["device_ip_port"] = custom_types.IpPort.parse(config_value)
+            except Exception as err:  # pylint: disable=broad-except
+                raise ValueError(
+                    f"Invalid device_ip_port `{config_value}` passed for " \
+                    f"{config['name']}"
+                ) from err
         else:
-            raise ValueError(
-                f"Invalid transport '{transport}' passed for " \
-                f"{device_config['name']}"
-            )
+            device_config[config_key] = config_value
 
     _LOGGER.debug(
         "Updated FuchsiaDevice controller config after the validation is '%s'",
-        config)
+        device_config)
 
     return device_config
 

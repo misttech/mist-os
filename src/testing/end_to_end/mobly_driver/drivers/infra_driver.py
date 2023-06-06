@@ -7,7 +7,7 @@
 import json
 import os
 
-from typing import Optional
+from typing import Dict, Optional
 
 import yaml
 
@@ -61,7 +61,7 @@ class InfraDriver(base_mobly_driver.BaseDriver):
         - Name: SomeName
           Controllers:
             FuchsiaDevice:
-            - nodename: fuchsia-1234-5678-90ab
+            - name: fuchsia-1234-5678-90ab
           TestParams:
             param_1: "val_1"
             param_2: "val_2"
@@ -85,11 +85,13 @@ class InfraDriver(base_mobly_driver.BaseDriver):
             test_params = {}
             if self._params_path:
                 test_params = common.read_yaml_from_file(self._params_path)
-
-            # `botanist.json` currently only contains FuchsiaDevice listings
-            # so its content can be used as-is to represent Fuchsia controllers.
+            botanist_honeydew_translation_map: Dict[str, str] = {
+                "nodename": "name",
+                "ssh_key": "ssh_private_key",
+            }
             config = api_mobly.new_testbed_config(
-                self._TESTBED_NAME, self._log_path, tb_config, test_params)
+                self._TESTBED_NAME, self._log_path, tb_config, test_params,
+                botanist_honeydew_translation_map)
             return yaml.dump(config)
         except (IOError, OSError) as e:
             raise common.DriverException('Failed to open file: %')

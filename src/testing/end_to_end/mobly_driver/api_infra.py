@@ -10,5 +10,8 @@ BOT_ENV_TESTBED_CONFIG = 'FUCHSIA_TESTBED_CONFIG'
 # Defined in infra recipes.
 BOT_ENV_TEST_OUTDIR = 'FUCHSIA_TEST_OUTDIR'
 
+# Defined in https://osscs.corp.google.com/fuchsia/fuchsia/+/main:tools/botanist/targets/target.go
+FUCHSIA_DEVICE = "FuchsiaDevice"
+
 # Defined in https://osscs.corp.google.com/fuchsia/fuchsia/+/main:tools/testing/testparser/moblytest.go.
 TESTPARSER_PREAMBLE = '[=====MOBLY RESULTS=====]'

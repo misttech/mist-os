@@ -50,7 +50,7 @@ class ApiMoblyTest(unittest.TestCase):
 
     @parameterized.expand(
         [
-            ('success_empty_controllers_empty_params', [], {}),
+            ('success_empty_controllers_empty_params', [], {}, {}),
             (
                 'success_valid_controllers_valid_params',
                 [{
@@ -58,7 +58,7 @@ class ApiMoblyTest(unittest.TestCase):
                     'nodename': 'fuchsia_abcd'
                 }], {
                     'param': 'value'
-                }),
+                },{}),
             (
                 'success_multiple_controllers_same_type', [
                     {
@@ -68,7 +68,7 @@ class ApiMoblyTest(unittest.TestCase):
                         'type': 'FuchsiaDevice',
                         'nodename': 'fuchsia_bcde'
                     }
-                ], {}),
+                ], {}, {}),
             (
                 'success_multiple_controllers_different_types', [
                     {
@@ -78,12 +78,25 @@ class ApiMoblyTest(unittest.TestCase):
                         'type': 'AccessPoint',
                         'ip': '192.168.42.11'
                     }
-                ], {}),
+                ], {}, {}),
+            (
+                'success_controller_with_translation_map', [
+                    {
+                        'type': 'FuchsiaDevice',
+                        'nodename': 'fuchsia_abcd',
+                        'ssh_key': 'key',
+                    },
+                ], {}, {
+                    "nodename": "name",
+                    "ssh_key": "ssh_private_key",
+                }),
         ])
-    def test_new_testbed_config(self, unused_name, controllers, params_dict):
+    def test_new_testbed_config(self, unused_name, controllers, params_dict,
+                                botanist_honeydew_map):
         """Test case for new testbed config generation"""
         config_obj = api_mobly.new_testbed_config(
-            'tb_name', 'log_path', controllers, params_dict)
+            'tb_name', 'log_path', controllers, params_dict,
+            botanist_honeydew_map)
 
         with NamedTemporaryFile(mode='w') as config_fh:
             config_fh.write(json.dumps(config_obj))

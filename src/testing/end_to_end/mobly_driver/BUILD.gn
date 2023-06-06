@@ -13,7 +13,10 @@ if (is_host) {
 
   python_library("api_mobly") {
     sources = [ "api_mobly.py" ]
-    library_deps = [ "//third_party/mobly" ]
+    library_deps = [
+      ":api_infra",
+      "//third_party/mobly",
+    ]
   }
 
   python_library("mobly_driver_lib") {

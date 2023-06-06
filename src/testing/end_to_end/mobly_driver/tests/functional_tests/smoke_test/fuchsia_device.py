@@ -11,7 +11,7 @@ This implements the required APIs to make this module compatible with Mobly.
 """
 
 MOBLY_CONTROLLER_CONFIG_NAME = 'FuchsiaDevice'
-CONFIG_KEY_NAME = 'nodename'
+CONFIG_KEY_NAME = 'name'
 
 
 def create(configs):

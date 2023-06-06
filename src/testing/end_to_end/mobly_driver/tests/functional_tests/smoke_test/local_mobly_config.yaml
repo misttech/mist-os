@@ -2,4 +2,4 @@ TestBeds:
   - Name: LocalTestbed
     Controllers:
       FuchsiaDevice:
-        - nodename: "fuchsia-LOCAL_NODE_NAME"
+        - name: "fuchsia-LOCAL_NODE_NAME"
