@@ -296,7 +296,7 @@ impl SeccompState {
                     errno: (action & SECCOMP_RET_DATA) as i32,
                     code: SYS_SECCOMP as i32,
                     detail: SignalDetail::SigSys {
-                        call_addr: task.registers.instruction_pointer_register() as usize,
+                        call_addr: task.registers.instruction_pointer_register().into(),
                         syscall: syscall.decl.number as i32,
                         arch: arch_val,
                     },

@@ -32,6 +32,51 @@ where
     fn only_derive_is_allowed_to_implement_this_trait() {}
 }
 
+#[repr(transparent)]
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    Eq,
+    PartialEq,
+    Hash,
+    Ord,
+    PartialOrd,
+    AsBytes,
+    FromBytes,
+    FromZeroes,
+)]
+pub struct uaddr {
+    pub addr: u64,
+}
+
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    Eq,
+    PartialEq,
+    Hash,
+    Ord,
+    PartialOrd,
+    AsBytes,
+    FromBytes,
+    FromZeroes,
+)]
+#[repr(transparent)]
+pub struct uref<T> {
+    pub addr: uaddr,
+    _phantom: std::marker::PhantomData<T>,
+}
+
+impl<T> From<uaddr> for uref<T> {
+    fn from(addr: uaddr) -> Self {
+        Self { addr, _phantom: Default::default() }
+    }
+}
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct __BindgenBitfieldUnit<Storage> {
@@ -4410,7 +4455,7 @@ pub struct __kernel_sockaddr_storage {
 #[derive(Copy, Clone)]
 pub union __kernel_sockaddr_storage__bindgen_ty_1 {
     pub __bindgen_anon_1: __kernel_sockaddr_storage__bindgen_ty_1__bindgen_ty_1,
-    pub __align: usize,
+    pub __align: uaddr,
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -4493,7 +4538,7 @@ pub type __kernel_time64_t = crate::types::c_longlong;
 pub type __kernel_clock_t = __kernel_long_t;
 pub type __kernel_timer_t = crate::types::c_int;
 pub type __kernel_clockid_t = crate::types::c_int;
-pub type __kernel_caddr_t = *mut crate::types::c_char;
+pub type __kernel_caddr_t = uref<crate::types::c_char>;
 pub type __kernel_uid16_t = crate::types::c_ushort;
 pub type __kernel_gid16_t = crate::types::c_ushort;
 pub type __le16 = __u16;
@@ -4641,7 +4686,7 @@ pub struct sigaction {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct sigaltstack {
-    pub ss_sp: usize,
+    pub ss_sp: uaddr,
     pub ss_flags: crate::types::c_int,
     pub __bindgen_padding_0: [u8; 4usize],
     pub ss_size: __kernel_size_t,
@@ -4661,7 +4706,7 @@ pub type stack_t = sigaltstack;
 #[derive(Copy, Clone)]
 pub struct ucontext {
     pub uc_flags: crate::types::c_ulong,
-    pub uc_link: *mut ucontext,
+    pub uc_link: uref<ucontext>,
     pub uc_stack: stack_t,
     pub uc_sigmask: sigset_t,
     pub __linux_unused: [__u8; 120usize],
@@ -6174,7 +6219,7 @@ pub struct __sk_buff {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union __sk_buff__bindgen_ty_1 {
-    pub flow_keys: *mut bpf_flow_keys,
+    pub flow_keys: uref<bpf_flow_keys>,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -6197,7 +6242,7 @@ impl __sk_buff__bindgen_ty_1 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union __sk_buff__bindgen_ty_2 {
-    pub sk: *mut bpf_sock,
+    pub sk: uref<bpf_sock>,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -6541,7 +6586,7 @@ pub struct sk_msg_md {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union sk_msg_md__bindgen_ty_1 {
-    pub data: usize,
+    pub data: uaddr,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -6564,7 +6609,7 @@ impl sk_msg_md__bindgen_ty_1 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union sk_msg_md__bindgen_ty_2 {
-    pub data_end: usize,
+    pub data_end: uaddr,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -6587,7 +6632,7 @@ impl sk_msg_md__bindgen_ty_2 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union sk_msg_md__bindgen_ty_3 {
-    pub sk: *mut bpf_sock,
+    pub sk: uref<bpf_sock>,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -6633,7 +6678,7 @@ pub struct sk_reuseport_md {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union sk_reuseport_md__bindgen_ty_1 {
-    pub data: usize,
+    pub data: uaddr,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -6656,7 +6701,7 @@ impl sk_reuseport_md__bindgen_ty_1 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union sk_reuseport_md__bindgen_ty_2 {
-    pub data_end: usize,
+    pub data_end: uaddr,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -6679,7 +6724,7 @@ impl sk_reuseport_md__bindgen_ty_2 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union sk_reuseport_md__bindgen_ty_3 {
-    pub sk: *mut bpf_sock,
+    pub sk: uref<bpf_sock>,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -6702,7 +6747,7 @@ impl sk_reuseport_md__bindgen_ty_3 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union sk_reuseport_md__bindgen_ty_4 {
-    pub migrating_sk: *mut bpf_sock,
+    pub migrating_sk: uref<bpf_sock>,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -6986,7 +7031,7 @@ pub struct bpf_sock_addr {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union bpf_sock_addr__bindgen_ty_1 {
-    pub sk: *mut bpf_sock,
+    pub sk: uref<bpf_sock>,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -7079,7 +7124,7 @@ impl Default for bpf_sock_ops__bindgen_ty_1 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union bpf_sock_ops__bindgen_ty_2 {
-    pub sk: *mut bpf_sock,
+    pub sk: uref<bpf_sock>,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -7102,7 +7147,7 @@ impl bpf_sock_ops__bindgen_ty_2 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union bpf_sock_ops__bindgen_ty_3 {
-    pub skb_data: usize,
+    pub skb_data: uaddr,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -7125,7 +7170,7 @@ impl bpf_sock_ops__bindgen_ty_3 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union bpf_sock_ops__bindgen_ty_4 {
-    pub skb_data_end: usize,
+    pub skb_data_end: uaddr,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -7528,7 +7573,7 @@ pub struct bpf_sockopt {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union bpf_sockopt__bindgen_ty_1 {
-    pub sk: *mut bpf_sock,
+    pub sk: uref<bpf_sock>,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -7551,7 +7596,7 @@ impl bpf_sockopt__bindgen_ty_1 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union bpf_sockopt__bindgen_ty_2 {
-    pub optval: usize,
+    pub optval: uaddr,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -7574,7 +7619,7 @@ impl bpf_sockopt__bindgen_ty_2 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union bpf_sockopt__bindgen_ty_3 {
-    pub optval_end: usize,
+    pub optval_end: uaddr,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -7635,7 +7680,7 @@ pub union bpf_sk_lookup__bindgen_ty_1 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union bpf_sk_lookup__bindgen_ty_1__bindgen_ty_1 {
-    pub sk: *mut bpf_sock,
+    pub sk: uref<bpf_sock>,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -7683,7 +7728,7 @@ impl bpf_sk_lookup {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct btf_ptr {
-    pub ptr: usize,
+    pub ptr: uaddr,
     pub type_id: __u32,
     pub flags: __u32,
 }
@@ -7738,7 +7783,7 @@ pub struct __user_cap_header_struct {
     pub version: __u32,
     pub pid: crate::types::c_int,
 }
-pub type cap_user_header_t = *mut __user_cap_header_struct;
+pub type cap_user_header_t = uref<__user_cap_header_struct>;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct __user_cap_data_struct {
@@ -7746,7 +7791,7 @@ pub struct __user_cap_data_struct {
     pub permitted: __u32,
     pub inheritable: __u32,
 }
-pub type cap_user_data_t = *mut __user_cap_data_struct;
+pub type cap_user_data_t = uref<__user_cap_data_struct>;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct vfs_cap_data {
@@ -7803,7 +7848,7 @@ pub struct i2c_msg {
     pub flags: __u16,
     pub len: __u16,
     pub __bindgen_padding_0: [u8; 2usize],
-    pub buf: *mut __u8,
+    pub buf: uref<__u8>,
 }
 impl Default for i2c_msg {
     fn default() -> Self {
@@ -7897,10 +7942,10 @@ pub struct fb_var_screeninfo {
 pub struct fb_cmap {
     pub start: __u32,
     pub len: __u32,
-    pub red: *mut __u16,
-    pub green: *mut __u16,
-    pub blue: *mut __u16,
-    pub transp: *mut __u16,
+    pub red: uref<__u16>,
+    pub green: uref<__u16>,
+    pub blue: uref<__u16>,
+    pub transp: uref<__u16>,
 }
 impl Default for fb_cmap {
     fn default() -> Self {
@@ -8015,7 +8060,7 @@ pub struct sock_filter {
 pub struct sock_fprog {
     pub len: crate::types::c_ushort,
     pub __bindgen_padding_0: [u8; 6usize],
-    pub filter: usize,
+    pub filter: uref<sock_filter>,
 }
 impl Default for sock_fprog {
     fn default() -> Self {
@@ -8864,7 +8909,7 @@ pub struct futex_waitv {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct robust_list {
-    pub next: *mut robust_list,
+    pub next: uref<robust_list>,
 }
 impl Default for robust_list {
     fn default() -> Self {
@@ -8880,7 +8925,7 @@ impl Default for robust_list {
 pub struct robust_list_head {
     pub list: robust_list,
     pub futex_offset: crate::types::c_long,
-    pub list_op_pending: *mut robust_list,
+    pub list_op_pending: uref<robust_list>,
 }
 impl Default for robust_list_head {
     fn default() -> Self {
@@ -9050,7 +9095,7 @@ pub struct ff_periodic_effect {
     pub envelope: ff_envelope,
     pub __bindgen_padding_0: [u8; 2usize],
     pub custom_len: __u32,
-    pub custom_data: *mut __s16,
+    pub custom_data: uref<__s16>,
 }
 impl Default for ff_periodic_effect {
     fn default() -> Self {
@@ -9750,14 +9795,14 @@ pub struct if_settings {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union if_settings__bindgen_ty_1 {
-    pub raw_hdlc: *mut raw_hdlc_proto,
-    pub cisco: *mut cisco_proto,
-    pub fr: *mut fr_proto,
-    pub fr_pvc: *mut fr_proto_pvc,
-    pub fr_pvc_info: *mut fr_proto_pvc_info,
-    pub x25: *mut x25_hdlc_proto,
-    pub sync: *mut sync_serial_settings,
-    pub te1: *mut te1_settings,
+    pub raw_hdlc: uref<raw_hdlc_proto>,
+    pub cisco: uref<cisco_proto>,
+    pub fr: uref<fr_proto>,
+    pub fr_pvc: uref<fr_proto_pvc>,
+    pub fr_pvc_info: uref<fr_proto_pvc_info>,
+    pub x25: uref<x25_hdlc_proto>,
+    pub sync: uref<sync_serial_settings>,
+    pub te1: uref<te1_settings>,
 }
 impl Default for if_settings__bindgen_ty_1 {
     fn default() -> Self {
@@ -9811,7 +9856,7 @@ pub union ifreq__bindgen_ty_2 {
     pub ifru_map: ifmap,
     pub ifru_slave: [crate::types::c_char; 16usize],
     pub ifru_newname: [crate::types::c_char; 16usize],
-    pub ifru_data: usize,
+    pub ifru_data: uaddr,
     pub ifru_settings: if_settings,
 }
 impl Default for ifreq__bindgen_ty_2 {
@@ -9842,8 +9887,8 @@ pub struct ifconf {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union ifconf__bindgen_ty_1 {
-    pub ifcu_buf: *mut crate::types::c_char,
-    pub ifcu_req: *mut ifreq,
+    pub ifcu_buf: uref<crate::types::c_char>,
+    pub ifcu_req: uref<ifreq>,
 }
 impl Default for ifconf__bindgen_ty_1 {
     fn default() -> Self {
@@ -10090,7 +10135,7 @@ pub struct xt_entry_match__bindgen_ty_1__bindgen_ty_1 {
 pub struct xt_entry_match__bindgen_ty_1__bindgen_ty_2 {
     pub match_size: __u16,
     pub __bindgen_padding_0: [u8; 6usize],
-    pub match_: *mut xt_match,
+    pub match_: uref<xt_match>,
 }
 impl Default for xt_entry_match__bindgen_ty_1__bindgen_ty_2 {
     fn default() -> Self {
@@ -10143,7 +10188,7 @@ pub struct xt_entry_target__bindgen_ty_1__bindgen_ty_1 {
 pub struct xt_entry_target__bindgen_ty_1__bindgen_ty_2 {
     pub target_size: __u16,
     pub __bindgen_padding_0: [u8; 6usize],
-    pub target: *mut xt_target,
+    pub target: uref<xt_target>,
 }
 impl Default for xt_entry_target__bindgen_ty_1__bindgen_ty_2 {
     fn default() -> Self {
@@ -10593,7 +10638,7 @@ pub struct prctl_mm_map {
     pub arg_end: __u64,
     pub env_start: __u64,
     pub env_end: __u64,
-    pub auxv: *mut __u64,
+    pub auxv: uref<__u64>,
     pub auxv_size: __u32,
     pub exe_fd: __u32,
 }
@@ -10723,7 +10768,7 @@ pub struct seccomp_notif_addfd {
 #[derive(Copy, Clone)]
 pub union sigval {
     pub sival_int: crate::types::c_int,
-    pub sival_ptr: usize,
+    pub sival_ptr: uaddr,
 }
 impl Default for sigval {
     fn default() -> Self {
@@ -10799,7 +10844,7 @@ pub struct __sifields__bindgen_ty_4 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct __sifields__bindgen_ty_5 {
-    pub _addr: usize,
+    pub _addr: uaddr,
     pub __bindgen_anon_1: __sifields__bindgen_ty_5__bindgen_ty_1,
 }
 #[repr(C)]
@@ -10815,8 +10860,8 @@ pub union __sifields__bindgen_ty_5__bindgen_ty_1 {
 #[derive(Debug, Copy, Clone)]
 pub struct __sifields__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1 {
     pub _dummy_bnd: [crate::types::c_char; 8usize],
-    pub _lower: usize,
-    pub _upper: usize,
+    pub _lower: uaddr,
+    pub _upper: uaddr,
 }
 impl Default for __sifields__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1 {
     fn default() -> Self {
@@ -10868,7 +10913,7 @@ pub struct __sifields__bindgen_ty_6 {
 #[repr(C)]
 #[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct __sifields__bindgen_ty_7 {
-    pub _call_addr: usize,
+    pub _call_addr: uaddr,
     pub _syscall: crate::types::c_int,
     pub _arch: crate::types::c_uint,
 }
@@ -10955,7 +11000,7 @@ pub union sigevent__bindgen_ty_1 {
 #[derive(Debug, Copy, Clone)]
 pub struct sigevent__bindgen_ty_1__bindgen_ty_1 {
     pub _function: ::std::option::Option<unsafe extern "C" fn(arg1: sigval_t)>,
-    pub _attribute: usize,
+    pub _attribute: uaddr,
 }
 impl Default for sigevent__bindgen_ty_1__bindgen_ty_1 {
     fn default() -> Self {
@@ -11116,7 +11161,7 @@ pub struct termio {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct iovec {
-    pub iov_base: usize,
+    pub iov_base: uaddr,
     pub iov_len: __kernel_size_t,
 }
 impl Default for iovec {

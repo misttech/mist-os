@@ -67,7 +67,7 @@ impl FileOps for SignalFd {
                         siginfo.ssi_status = status;
                     }
                     SignalDetail::SigSys { call_addr, syscall, arch } => {
-                        siginfo.ssi_call_addr = call_addr as u64;
+                        siginfo.ssi_call_addr = call_addr.into();
                         siginfo.ssi_syscall = syscall;
                         siginfo.ssi_arch = arch;
                     }

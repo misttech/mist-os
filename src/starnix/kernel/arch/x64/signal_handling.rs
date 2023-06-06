@@ -83,7 +83,7 @@ impl SignalStackFrame {
             uc_stack: signal_state
                 .alt_stack
                 .map(|stack| sigaltstack {
-                    ss_sp: stack.ss_sp.ptr(),
+                    ss_sp: stack.ss_sp.into(),
                     ss_flags: stack.ss_flags as i32,
                     ss_size: stack.ss_size as u64,
                     ..Default::default()

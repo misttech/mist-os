@@ -11,7 +11,7 @@ use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use super::UserBuffer;
 use crate::mm::vmo::round_up_to_increment;
-use crate::types::{error, Errno};
+use crate::types::{error, uapi, Errno};
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, AsBytes, FromZeroes, FromBytes)]
 #[repr(transparent)]
@@ -62,6 +62,24 @@ impl Default for UserAddress {
 impl From<u64> for UserAddress {
     fn from(value: u64) -> Self {
         UserAddress(value)
+    }
+}
+
+impl From<UserAddress> for u64 {
+    fn from(value: UserAddress) -> Self {
+        value.0
+    }
+}
+
+impl From<uapi::uaddr> for UserAddress {
+    fn from(value: uapi::uaddr) -> Self {
+        UserAddress(value.addr)
+    }
+}
+
+impl From<UserAddress> for uapi::uaddr {
+    fn from(value: UserAddress) -> Self {
+        Self { addr: value.0 }
     }
 }
 
@@ -189,6 +207,18 @@ impl<T> TryFrom<UserBuffer> for UserRef<T> {
             return error!(EINVAL);
         }
         Ok(Self::new(buf.address))
+    }
+}
+
+impl<T> From<uapi::uref<T>> for UserRef<T> {
+    fn from(value: uapi::uref<T>) -> Self {
+        Self::new(value.addr.into())
+    }
+}
+
+impl<T> From<UserRef<T>> for uapi::uref<T> {
+    fn from(value: UserRef<T>) -> Self {
+        uapi::uaddr::from(value.addr).into()
     }
 }
 

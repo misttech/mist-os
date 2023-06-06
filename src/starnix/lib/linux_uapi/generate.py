@@ -30,6 +30,25 @@ where
 {
     fn only_derive_is_allowed_to_implement_this_trait() {}
 }
+
+#[repr(transparent)]
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, AsBytes, FromBytes, FromZeroes)]
+pub struct uaddr {
+    pub addr: u64,
+}
+
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, AsBytes, FromBytes, FromZeroes)]
+#[repr(transparent)]
+pub struct uref<T> {
+    pub addr: uaddr,
+    _phantom: std::marker::PhantomData<T>,
+}
+
+impl<T> From<uaddr> for uref<T> {
+    fn from(addr: uaddr) -> Self {
+        Self { addr, _phantom: Default::default() }
+    }
+}
 """
 
 # Tell bindgen not to produce records for these types.
@@ -110,8 +129,8 @@ REPLACEMENTS = [
     # Use usize in place of pointers for compat with zerocopy traits. Because
     # the target of the pointer is in userspace anyway, treating it as an opaque
     # pointer is harmless.
-    (r'\*mut crate::types::c_void', 'usize'),
-    (r'\*mut sock_filter', 'usize')
+    (r'\*mut crate::types::c_void', 'uaddr'),
+    (r'([:=]) \*mut ([a-zA-Z_0-9:]*)', '\\1 uref<\\2>')
 ]
 
 INPUT_FILE = 'src/starnix/lib/linux_uapi/wrapper.h'
