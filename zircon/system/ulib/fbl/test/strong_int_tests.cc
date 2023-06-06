@@ -178,8 +178,6 @@ TEST(StrongIntTest, ChainedOps) {
   }
 }
 
-#if !_KERNEL
-
 TEST(StrongIntTest, Hashing) {
   DEFINE_STRONG_INT(Strong, uint64_t);
 
@@ -202,7 +200,5 @@ TEST(StrongIntTest, Hashing) {
     EXPECT_EQ(1u, hashed_set.count(Strong(3)));
   }
 }
-
-#endif  // !_KERNEL
 
 }  // anonymous namespace

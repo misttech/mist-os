@@ -5,8 +5,12 @@
 #ifndef FBL_STRONG_INT_H_
 #define FBL_STRONG_INT_H_
 
-#include <cstdint>
+#if !_KERNEL
+#include <stddef.h>
+
 #include <functional>
+#endif  // !_KERNEL
+
 #include <type_traits>
 
 // StrongInt is a strongly-typed wrapper around integer types that supports
