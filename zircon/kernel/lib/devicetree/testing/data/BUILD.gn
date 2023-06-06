@@ -5,6 +5,7 @@
 # https://opensource.org/licenses/MIT
 
 import("//build/components.gni")
+import("//build/devicetree/devicetree.gni")
 import("//build/testing/host_test_data.gni")
 
 # Real device produced device tree binary format files. These files are the blobs obtained from such devices.
@@ -12,18 +13,34 @@ import("//build/testing/host_test_data.gni")
 #
 # NOTE: Do NOT regenerate 'dtb' files from the dts file, this might change the structure of the blob obtained
 # from the device.
-#
-# Synthetic devicetree blobs meant for testing, they are not required to reflect any real node.
-dtbs_all = [
+dtbs_real_device = [
   "qemu-gic2.dtb",
   "qemu-gic3.dtb",
-  "synthetic/complex_no_properties.dtb",
-  "synthetic/complex_with_alias.dtb",
-  "synthetic/complex_with_alias_first.dtb",
-  "synthetic/empty.dtb",
-  "synthetic/memory_reservations.dtb",
-  "synthetic/simple_with_properties.dtb",
 ]
+
+# Synthetic devicetree source files meant for testing, they are not required to reflect any real node.
+dts_synthetic = [
+  "synthetic/complex_no_properties.dts",
+  "synthetic/complex_with_alias.dts",
+  "synthetic/complex_with_alias_first.dts",
+  "synthetic/empty.dts",
+  "synthetic/memory_reservations.dts",
+  "synthetic/simple_with_properties.dts",
+]
+
+# Compile the synthetic source file to get blobs.
+dtbs_synthetic = []
+dtbs_synthetic_deps = []
+foreach(dts_file, dts_synthetic) {
+  dtb_target = get_path_info(dts_file, "name")
+  dtb(dtb_target) {
+    sources = [ dts_file ]
+  }
+  dtbs_synthetic += get_target_outputs(":$dtb_target")
+  dtbs_synthetic_deps += [ ":$dtb_target" ]
+}
+
+dtbs_all = dtbs_real_device + dtbs_synthetic
 
 # Check for no overlapping files, so we guarantee that they all fit in the same subdirectory.
 filenames = []
@@ -51,10 +68,12 @@ if (is_host) {
   host_test_data("data") {
     sources = dtbs_all
     outputs = [ "$root_out_dir/$runtime_path/{{source_file_part}}" ]
+    deps = dtbs_synthetic_deps
   }
 } else {
   resource("data") {
     sources = dtbs_all
     outputs = [ "$runtime_path/{{source_file_part}}" ]
+    deps = dtbs_synthetic_deps
   }
 }
