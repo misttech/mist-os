@@ -611,7 +611,7 @@ func StartTargets(ctx context.Context, opts StartOptions, targets []FuchsiaTarge
 
 	// Check the first target to see if ffx is enabled. All targets share the same ffx daemon,
 	// so we can use the ffx associated with the first target to set config values.
-	if len(targets) > 0 && targets[0].UseFFXExperimental(1) {
+	if len(targets) > 0 && targets[0].UseFFX() {
 		ffx := targets[0].GetFFX()
 		if err := ffx.ConfigSet(ctx, "fastboot.flash.timeout_rate", "4"); err != nil {
 			return err
