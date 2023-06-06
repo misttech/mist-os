@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(fxbug.dev/120283): Remove. This is force-included as part of ffx_plugin.
-use anyhow as _;
 use async_trait::async_trait;
 use component_debug::cli::{
     storage_copy_cmd, storage_delete_cmd, storage_list_cmd, storage_make_directory_cmd,
