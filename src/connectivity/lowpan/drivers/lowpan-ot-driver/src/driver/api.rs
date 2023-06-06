@@ -968,7 +968,14 @@ where
         let driver_state = self.driver_state.lock();
         let ot = &driver_state.ot_instance;
 
-        Ok(FeatureConfig { trel_enabled: Some(ot.trel_is_enabled()), ..Default::default() })
+        let (detailed_logging_enabled, detailed_logging_level) =
+            driver_state.detailed_logging.process_detailed_logging_get();
+        Ok(FeatureConfig {
+            trel_enabled: Some(ot.trel_is_enabled()),
+            detailed_logging_enabled: Some(detailed_logging_enabled),
+            detailed_logging_level: Some(detailed_logging_level.into()),
+            ..Default::default()
+        })
     }
 
     #[tracing::instrument(skip_all)]
@@ -982,6 +989,13 @@ where
                 ot.trel_set_enabled(trel_enabled);
             }
         }
+
+        if let Err(e) = driver_state.detailed_logging.process_detailed_logging_set(
+            config.detailed_logging_enabled,
+            config.detailed_logging_level.map(|level| level.into()),
+        ) {
+            warn!("error in process_detailed_logging_set: {:?}", e);
+        };
 
         Ok(())
     }

@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 use crate::prelude_internal::*;
+use fidl_fuchsia_diagnostics::Severity;
+use fidl_fuchsia_lowpan_thread::DetailedLoggingLevel;
 
 /// Logging Region.
 /// Functional equivalent of [`otsys::otLogRegion`](crate::otsys::otLogRegion).
@@ -70,5 +72,48 @@ impl From<otLogLevel> for LogLevel {
 impl From<LogLevel> for otLogLevel {
     fn from(x: LogLevel) -> Self {
         x as otLogLevel
+    }
+}
+
+impl From<DetailedLoggingLevel> for LogLevel {
+    fn from(x: DetailedLoggingLevel) -> Self {
+        match x {
+            DetailedLoggingLevel::LowpanLogEmerg
+            | DetailedLoggingLevel::LowpanLogAlert
+            | DetailedLoggingLevel::LowpanLogCrit => LogLevel::Crit,
+            DetailedLoggingLevel::LowpanLogErr | DetailedLoggingLevel::LowpanLogWarning => {
+                LogLevel::Warn
+            }
+            DetailedLoggingLevel::LowpanLogNotice => LogLevel::Note,
+            DetailedLoggingLevel::LowpanLogInfo => LogLevel::Info,
+            DetailedLoggingLevel::LowpanLogDebug => LogLevel::Debg,
+            _ => LogLevel::None,
+        }
+    }
+}
+
+impl From<LogLevel> for DetailedLoggingLevel {
+    fn from(x: LogLevel) -> Self {
+        match x {
+            LogLevel::Crit => DetailedLoggingLevel::LowpanLogCrit,
+            LogLevel::Warn => DetailedLoggingLevel::LowpanLogWarning,
+            LogLevel::Note => DetailedLoggingLevel::LowpanLogNotice,
+            LogLevel::Info => DetailedLoggingLevel::LowpanLogInfo,
+            LogLevel::Debg => DetailedLoggingLevel::LowpanLogDebug,
+            _ => DetailedLoggingLevel::LowpanLogUnspecified,
+        }
+    }
+}
+
+impl From<LogLevel> for Severity {
+    fn from(x: LogLevel) -> Self {
+        match x {
+            LogLevel::Crit => Severity::Fatal,
+            LogLevel::Warn => Severity::Warn,
+            LogLevel::Note => Severity::Info,
+            LogLevel::Info => Severity::Info,
+            LogLevel::Debg => Severity::Debug,
+            _ => Severity::Info,
+        }
     }
 }

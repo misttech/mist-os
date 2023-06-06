@@ -12,6 +12,7 @@ rustc_binary("bin") {
   with_unit_tests = true
   edition = "2021"
   deps = [
+    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.factory.lowpan:fuchsia.factory.lowpan_rust",
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
     "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_rust",
@@ -35,6 +36,7 @@ rustc_binary("bin") {
     "//src/connectivity/lowpan/lib/openthread_fuchsia",
     "//src/connectivity/lowpan/lib/openthread_rust:openthread",
     "//src/lib/diagnostics/log/rust",
+    "//src/lib/diagnostics/selectors",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
@@ -72,6 +74,7 @@ rustc_binary("bin") {
     "src/driver/border_agent.rs",
     "src/driver/connectivity_state.rs",
     "src/driver/convert.rs",
+    "src/driver/detailed_logging.rs",
     "src/driver/driver_state.rs",
     "src/driver/error_adapter.rs",
     "src/driver/host_to_thread.rs",

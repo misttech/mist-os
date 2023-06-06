@@ -16,6 +16,7 @@
     use: [
         {
             protocol: [
+                "fuchsia.diagnostics.LogSettings",
                 "fuchsia.factory.lowpan.FactoryRegister",
                 "fuchsia.hwinfo.Product",
                 "fuchsia.location.namedplace.RegulatoryRegionWatcher",

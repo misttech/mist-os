@@ -95,6 +95,11 @@
             to: [ "#lowpan-ot-driver" ],
         },
         {
+            protocol: [ "fuchsia.diagnostics.LogSettings" ],
+            from: "parent",
+            to: [ "#lowpan-ot-driver" ],
+        },
+        {
             directory: "dev-class",
             from: "parent",
             as: "dev-class-ot-radio",

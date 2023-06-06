@@ -21,6 +21,8 @@ pub struct DriverState<OT> {
     pub srp_advertising_proxy: Option<AdvertisingProxy>,
 
     pub ot_ctl: ot_ctl::OtCtl,
+
+    pub detailed_logging: detailed_logging::DetailedLogging,
 }
 
 impl<OT: AsRef<ot::Instance>> AsRef<ot::Instance> for DriverState<OT> {
@@ -82,6 +84,7 @@ impl<OT> DriverState<OT> {
             srp_discovery_proxy: None,
             srp_advertising_proxy: None,
             ot_ctl: ot_ctl::OtCtl::new(),
+            detailed_logging: detailed_logging::DetailedLogging::new(),
         }
     }
 }

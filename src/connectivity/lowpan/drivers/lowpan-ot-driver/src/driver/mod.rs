@@ -12,6 +12,7 @@ mod api;
 mod border_agent;
 mod connectivity_state;
 mod convert;
+mod detailed_logging;
 mod driver_state;
 mod error_adapter;
 mod host_to_thread;

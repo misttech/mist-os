@@ -185,6 +185,11 @@ pub fn set_logging_level(level: LogLevel) {
     }
 }
 
+/// Get the logging level.
+pub fn get_logging_level() -> LogLevel {
+    unsafe { otLoggingGetLevel().into() }
+}
+
 /// Represents the thread version
 #[derive(
     Debug,
