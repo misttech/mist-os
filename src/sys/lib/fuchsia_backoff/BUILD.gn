@@ -15,13 +15,17 @@ rustc_library("fuchsia_backoff") {
     "//third_party/rust_crates:futures",
   ]
 
-  test_deps = [ "//src/lib/zircon/rust:fuchsia-zircon" ]
-
   sources = [ "src/lib.rs" ]
 }
 
 fuchsia_unittest_package("fuchsia_backoff_tests") {
   deps = [ ":fuchsia_backoff_test" ]
-  test_specs = {
-  }
+}
+
+group("tests") {
+  testonly = true
+  public_deps = [
+    ":fuchsia_backoff_test($host_toolchain)",
+    ":fuchsia_backoff_tests($default_toolchain)",
+  ]
 }

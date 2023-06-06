@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_async as fasync;
+use fuchsia_async::{self as fasync, DurationExt};
 use futures::Future;
 use std::time::Duration;
 
@@ -197,7 +197,7 @@ where
         Ok(value) => Ok(value),
         Err(err) => match backoff.next_backoff(&err) {
             Some(delay) => {
-                let delay = fasync::Time::after(delay.into());
+                let delay = delay.after_now();
                 fasync::Timer::new(delay).await;
                 Err((err, Some(task)))
             }
@@ -253,13 +253,12 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_async::DurationExt;
-    use fuchsia_zircon::DurationNum;
     use futures::prelude::*;
-    use futures::task::Poll;
     use std::iter;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+
+    const BACKOFF_DURATION: u64 = 100;
 
     #[derive(Clone)]
     struct Counter {
@@ -291,18 +290,21 @@ mod tests {
         }
     }
 
+    #[cfg(target_os = "fuchsia")]
     fn run<F>(future: F, pending_count: usize) -> F::Output
     where
-        F: Future + Send,
+        F: Future,
         F::Output: std::fmt::Debug + PartialEq + Eq,
     {
-        let mut future = future.boxed();
+        use std::{pin::pin, task::Poll};
+
+        let mut future = pin!(future);
         let mut executor = fasync::TestExecutor::new_with_fake_time();
 
         for _ in 0..pending_count {
             assert_eq!(executor.run_until_stalled(&mut future), Poll::Pending);
             assert_eq!(executor.wake_expired_timers(), false);
-            executor.set_fake_time(2.seconds().after_now());
+            executor.set_fake_time(Duration::from_millis(BACKOFF_DURATION).after_now());
             assert_eq!(executor.wake_expired_timers(), true);
         }
 
@@ -312,14 +314,36 @@ mod tests {
         }
     }
 
+    #[cfg(not(target_os = "fuchsia"))]
+    fn run<F>(future: F, pending_count: usize) -> F::Output
+    where
+        F: Future,
+        F::Output: std::fmt::Debug + PartialEq + Eq,
+    {
+        // The host-side executor doesn't support fake time, so just run the future and make sure
+        // it ran longer than the backoff duration.
+        let mut executor = fasync::LocalExecutor::new();
+
+        let start_time = fasync::Time::now();
+
+        let result = executor.run_singlethreaded(future);
+
+        let actual_duration = fasync::Time::now() - start_time;
+        let expected_duration = Duration::from_millis(BACKOFF_DURATION) * pending_count as u32;
+
+        assert!(expected_duration <= actual_duration);
+
+        result
+    }
+
     // Return `attempts` durations.
     fn backoff(attempts: usize) -> impl Iterator<Item = Duration> {
-        iter::repeat(Duration::from_secs(1)).take(attempts)
+        iter::repeat(Duration::from_millis(BACKOFF_DURATION)).take(attempts)
     }
 
     #[test]
     fn test_should_succeed() {
-        for i in 0..10 {
+        for i in 0..5 {
             // to test passing, always attempt one more attempt than necessary before Counter
             // succeeds.
 
@@ -338,7 +362,7 @@ mod tests {
 
     #[test]
     fn test_should_error() {
-        for i in 0..10 {
+        for i in 0..5 {
             assert_eq!(run(retry_or_first_error(backoff(i), Counter::never_ok()), i), Err(0));
             assert_eq!(run(retry_or_last_error(backoff(i), Counter::never_ok()), i), Err(i));
             assert_eq!(
