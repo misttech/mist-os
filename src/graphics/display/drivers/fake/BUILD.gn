@@ -96,6 +96,7 @@ test("fake-display-test-bin") {
     "//src/devices/testing/mock-ddk",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
+    "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
   ]
 }
