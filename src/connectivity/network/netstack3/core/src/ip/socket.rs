@@ -890,7 +890,7 @@ pub(crate) mod testutil {
     use super::*;
     use crate::{
         context::{
-            testutil::{FakeCounterCtx, FakeInstant, FakeInstantCtx, FakeNonSyncCtx, FakeSyncCtx},
+            testutil::{FakeInstant, FakeNonSyncCtx, FakeSyncCtx},
             RngContext, SendFrameContext, TracingContext,
         },
         device::testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId},
@@ -937,7 +937,7 @@ pub(crate) mod testutil {
 
     impl<
             I: IpExt + IpDeviceStateIpExt,
-            C: AsMut<FakeCounterCtx> + AsRef<FakeInstantCtx> + TracingContext,
+            C: CounterContext + InstantContext + TracingContext,
             DeviceId: FakeStrongDeviceId + 'static,
         > TransportIpContext<I, C> for FakeIpSocketCtx<I, DeviceId>
     {
@@ -983,7 +983,7 @@ pub(crate) mod testutil {
 
     impl<
             I: IpDeviceStateIpExt,
-            C: AsMut<FakeCounterCtx> + AsRef<FakeInstantCtx> + TracingContext,
+            C: CounterContext + InstantContext + TracingContext,
             DeviceId: FakeStrongDeviceId + 'static,
         > IpSocketContext<I, C> for FakeIpSocketCtx<I, DeviceId>
     {
@@ -1229,7 +1229,7 @@ pub(crate) mod testutil {
 
     impl<
             I: IpExt + IpDeviceStateIpExt,
-            C: AsMut<FakeCounterCtx> + AsRef<FakeInstantCtx> + TracingContext,
+            C: CounterContext + InstantContext + TracingContext,
             D: FakeStrongDeviceId + 'static,
             Meta,
         > TransportIpContext<I, C> for FakeSyncCtx<FakeBufferIpSocketCtx<I, D>, Meta, D>

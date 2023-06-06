@@ -1913,6 +1913,7 @@ mod test {
     use test_case::test_case;
 
     use crate::{
+        context::testutil::{FakeNonSyncCtx, WrappedFakeSyncCtx},
         data_structures::socketmap::SocketMap,
         device::{
             testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
@@ -1920,12 +1921,12 @@ mod test {
         },
         ip::{
             device::state::IpDeviceStateIpExt,
-            socket::testutil::{FakeDeviceConfig, FakeIpSocketCtx},
+            socket::testutil::{FakeBufferIpSocketCtx, FakeDeviceConfig, FakeIpSocketCtx},
             testutil::FakeIpDeviceIdCtx,
             IpLayerIpExt, DEFAULT_HOP_LIMITS,
         },
         socket::{IncompatibleError, InsertError, RemoveResult},
-        testutil::{FakeNonSyncCtx, TestIpExt},
+        testutil::TestIpExt,
     };
 
     use super::*;
@@ -2090,24 +2091,39 @@ mod test {
         }
     }
 
-    #[derive(Derivative)]
-    #[derivative(Default(bound = ""))]
-    struct FakeDatagramState<I: DatagramIpExt, D: FakeStrongDeviceId> {
-        sockets: DatagramSockets<
+    type FakeSyncCtx<I, D> = WrappedFakeSyncCtx<
+        DatagramSockets<
             FakeAddrSpec<I, FakeWeakDeviceId<D>>,
             FakeStateSpec<I, FakeWeakDeviceId<D>>,
         >,
-        state: FakeIpSocketCtx<I, D>,
+        FakeBufferIpSocketCtx<I, D>,
+        (),
+        D,
+    >;
+
+    impl<I: DatagramIpExt, D: FakeStrongDeviceId + 'static> FakeSyncCtx<I, D> {
+        fn with_sockets(
+            sockets: DatagramSockets<
+                FakeAddrSpec<I, FakeWeakDeviceId<D>>,
+                FakeStateSpec<I, FakeWeakDeviceId<D>>,
+            >,
+        ) -> Self {
+            Self::with_inner_and_outer_state(
+                FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::default()),
+                sockets,
+            )
+        }
     }
 
     impl<I: DatagramIpExt + IpLayerIpExt, D: FakeStrongDeviceId + 'static>
         DatagramStateContext<
             FakeAddrSpec<I, FakeWeakDeviceId<D>>,
-            FakeNonSyncCtx,
+            FakeNonSyncCtx<(), (), ()>,
             FakeStateSpec<I, FakeWeakDeviceId<D>>,
-        > for FakeDatagramState<I, D>
+        > for FakeSyncCtx<I, D>
     {
-        type IpSocketsCtx<'a> = FakeIpSocketCtx<I, D>;
+        type IpSocketsCtx<'a> =
+            crate::context::testutil::FakeSyncCtx<FakeBufferIpSocketCtx<I, D>, (), D>;
         type LocalIdAllocator = ();
 
         fn with_sockets<
@@ -2123,8 +2139,8 @@ mod test {
             &mut self,
             cb: F,
         ) -> O {
-            let Self { sockets, state } = self;
-            cb(state, sockets)
+            let Self { outer, inner } = self;
+            cb(inner, outer)
         }
 
         fn with_sockets_mut<
@@ -2141,8 +2157,8 @@ mod test {
             &mut self,
             cb: F,
         ) -> O {
-            let Self { sockets, state } = self;
-            cb(state, sockets, &mut ())
+            let Self { outer, inner } = self;
+            cb(inner, outer, &mut ())
         }
     }
 
@@ -2150,7 +2166,7 @@ mod test {
         DatagramStateNonSyncContext<
             FakeAddrSpec<I, FakeWeakDeviceId<FakeDeviceId>>,
             FakeStateSpec<I, FakeWeakDeviceId<D>>,
-        > for FakeNonSyncCtx
+        > for FakeNonSyncCtx<(), (), ()>
     {
         fn try_alloc_listen_identifier(
             &mut self,
@@ -2165,7 +2181,7 @@ mod test {
     impl<I: DatagramIpExt, D: FakeStrongDeviceId + 'static>
         LocalIdentifierAllocator<
             FakeAddrSpec<I, FakeWeakDeviceId<D>>,
-            FakeNonSyncCtx,
+            FakeNonSyncCtx<(), (), ()>,
             FakeStateSpec<I, FakeWeakDeviceId<D>>,
         > for ()
     {
@@ -2175,7 +2191,7 @@ mod test {
                 FakeAddrSpec<I, FakeWeakDeviceId<D>>,
                 FakeStateSpec<I, FakeWeakDeviceId<D>>,
             >,
-            _ctx: &mut FakeNonSyncCtx,
+            _ctx: &mut FakeNonSyncCtx<(), (), ()>,
             _flow: DatagramFlowId<
                 <FakeAddrSpec<I, FakeWeakDeviceId<D>> as SocketMapAddrSpec>::IpAddr,
                 <FakeAddrSpec<I, FakeWeakDeviceId<D>> as SocketMapAddrSpec>::RemoteIdentifier,
@@ -2200,7 +2216,7 @@ mod test {
 
     #[ip_test]
     fn set_get_hop_limits<I: Ip + DatagramIpExt + IpLayerIpExt>() {
-        let mut sync_ctx = FakeDatagramState::<I, FakeDeviceId>::default();
+        let mut sync_ctx = FakeSyncCtx::<I, FakeDeviceId>::with_sockets(DatagramSockets::default());
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
         let unbound = create_unbound(&mut sync_ctx);
@@ -2219,14 +2235,14 @@ mod test {
 
     #[ip_test]
     fn set_get_device_hop_limits<I: Ip + DatagramIpExt + IpLayerIpExt>() {
-        let mut sync_ctx = FakeDatagramState::<I, FakeDeviceId> {
-            sockets: Default::default(),
-            state: FakeIpSocketCtx::new([FakeDeviceConfig {
+        let mut sync_ctx = FakeSyncCtx::<I, _>::with_inner_and_outer_state(
+            FakeBufferIpSocketCtx::with_ctx(FakeIpSocketCtx::new([FakeDeviceConfig {
                 device: FakeDeviceId,
                 local_ips: Default::default(),
                 remote_ips: Default::default(),
-            }]),
-        };
+            }])),
+            DatagramSockets::default(),
+        );
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
         let unbound = create_unbound(&mut sync_ctx);
@@ -2235,8 +2251,9 @@ mod test {
         let HopLimits { mut unicast, multicast } = DEFAULT_HOP_LIMITS;
         unicast = unicast.checked_add(1).unwrap();
         {
+            let ip_socket_ctx: &FakeIpSocketCtx<_, _> = sync_ctx.inner.get_ref().as_ref();
             let mut default_hop_limit =
-                sync_ctx.state.get_device_state(&FakeDeviceId).default_hop_limit.write();
+                ip_socket_ctx.get_device_state(&FakeDeviceId).default_hop_limit.write();
             let default_hop_limit = default_hop_limit.deref_mut();
             assert_ne!(*default_hop_limit, unicast);
             *default_hop_limit = unicast;
@@ -2247,14 +2264,14 @@ mod test {
         );
 
         // If the device is removed, use default hop limits.
-        AsMut::<FakeIpDeviceIdCtx<_>>::as_mut(&mut sync_ctx.state)
+        AsMut::<FakeIpDeviceIdCtx<_>>::as_mut(&mut sync_ctx.inner.get_mut())
             .set_device_removed(FakeDeviceId, true);
         assert_eq!(get_ip_hop_limits(&mut sync_ctx, &non_sync_ctx, unbound), DEFAULT_HOP_LIMITS);
     }
 
     #[ip_test]
     fn default_hop_limits<I: Ip + DatagramIpExt + IpLayerIpExt>() {
-        let mut sync_ctx = FakeDatagramState::<I, FakeDeviceId>::default();
+        let mut sync_ctx = FakeSyncCtx::<I, _>::with_sockets(DatagramSockets::default());
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
         let unbound = create_unbound(&mut sync_ctx);
@@ -2279,7 +2296,7 @@ mod test {
 
     #[ip_test]
     fn bind_device_unbound<I: Ip + DatagramIpExt + IpLayerIpExt>() {
-        let mut sync_ctx = FakeDatagramState::<I, FakeDeviceId>::default();
+        let mut sync_ctx = FakeSyncCtx::<I, _>::with_sockets(DatagramSockets::default());
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
         let unbound = create_unbound(&mut sync_ctx);
@@ -2305,7 +2322,7 @@ mod test {
                 remote_ips: Default::default(),
             }),
         );
-        let mut non_sync_ctx = FakeNonSyncCtx::default();
+        let mut non_sync_ctx = FakeNonSyncCtx::<(), (), ()>::default();
 
         let multicast_addr1 = I::get_multicast_addr(1);
         let mut memberships = MulticastMemberships::default();
