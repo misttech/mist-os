@@ -17,7 +17,6 @@ use crate::device::{
     wayland::image_file::{ImageFile, ImageInfo},
 };
 use crate::fs::{Anon, FdFlags, FsNodeInfo, VmoFileObject};
-use crate::logging::log_warn;
 use crate::mm::{MemoryAccessor, MemoryAccessorExt};
 use crate::task::CurrentTask;
 use crate::types::*;
@@ -93,8 +92,15 @@ pub fn create_image(
     let create_info_address = UserAddress::from(create_info_ptr);
     let create_info = current_task.mm.read_object(UserRef::new(create_info_address))?;
 
-    let (vmo, token, info) = create_drm_image(0, &create_info).map_err(|e| {
-        log_warn!("Error creating drm image: {:?}", e);
+    response.hdr.type_ =
+        virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_VIRT_CONNECTION_CREATE_IMAGE as u32;
+    response.result_return = MAGMA_STATUS_INVALID_ARGS as u64;
+    response.image_out = 0;
+    response.buffer_id_out = 0;
+    response.size_out = 0;
+
+    let (vmo, token, info) = create_drm_image(0, &create_info).map_err(|status| {
+        response.result_return = status as u64;
         errno!(EINVAL)
     })?;
 
@@ -114,8 +120,6 @@ pub fn create_image(
     response.image_out = buffer_out;
     response.buffer_id_out = buffer_id_out;
     response.size_out = size_out;
-    response.hdr.type_ =
-        virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_VIRT_CONNECTION_CREATE_IMAGE as u32;
 
     Ok(BufferInfo::Image(ImageInfo { info, token }))
 }

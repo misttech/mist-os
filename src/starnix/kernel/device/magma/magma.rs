@@ -97,7 +97,7 @@ pub fn create_drm_image(
         return Err(MAGMA_STATUS_INVALID_ARGS);
     }
 
-    let loader = Loader::new(physical_device_index).map_err(|_| MAGMA_STATUS_INVALID_ARGS)?;
+    let loader = Loader::new(physical_device_index).map_err(|_| MAGMA_STATUS_INTERNAL_ERROR)?;
 
     let mut vk_format_features = 0 as vk::FormatFeatureFlagBits;
     let mut vk_usage = 0 as vk::ImageUsageFlagBits;
@@ -162,8 +162,11 @@ pub fn create_drm_image(
     };
 
     // TODO: verify physical device limits
-    let scenic_allocator =
-        if use_scenic { Some(init_scenic().map_err(|_| MAGMA_STATUS_INVALID_ARGS)?) } else { None };
+    let scenic_allocator = if use_scenic {
+        Some(init_scenic().map_err(|_| MAGMA_STATUS_INTERNAL_ERROR)?)
+    } else {
+        None
+    };
 
     let image_create_info = vk::ImageCreateInfo {
         sType: vk::STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -218,7 +221,7 @@ pub fn create_drm_image(
     };
 
     let (tokens, sysmem_allocator) =
-        init_sysmem(use_scenic).map_err(|_| MAGMA_STATUS_INVALID_ARGS)?;
+        init_sysmem(use_scenic).map_err(|_| MAGMA_STATUS_INTERNAL_ERROR)?;
 
     let (scenic_import_token, buffer_collection) = loader
         .create_collection(

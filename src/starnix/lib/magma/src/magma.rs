@@ -366,7 +366,7 @@ pub struct magma_image_info {
 }
 pub type magma_image_info_t = magma_image_info;
 extern "C" {
-    #[doc = "\n \\brief Imports and takes ownership of a channel to a device.\n \\param device_channel A channel connecting to a gpu class device.\n \\param device_out Returned device.\n"]
+    #[doc = "\n \\brief Imports and takes ownership of a channel to a device. Takes ownership of |device_channel|\n        on both success and failure.\n \\param device_channel A channel connecting to a gpu class device.\n \\param device_out Returned device.\n"]
     pub fn magma_device_import(
         device_channel: magma_handle_t,
         device_out: *mut magma_device_t,
@@ -426,7 +426,7 @@ extern "C" {
     pub fn magma_connection_release_buffer(connection: magma_connection_t, buffer: magma_buffer_t);
 }
 extern "C" {
-    #[doc = "\n \\brief Imports and takes ownership of the buffer referred to by the given handle.\n \\param connection An open connection.\n \\param buffer_handle A valid handle.\n \\param size_out The size of the buffer in bytes.\n \\param buffer_out The returned buffer.\n \\param id_out The buffer id of the buffer.\n"]
+    #[doc = "\n \\brief Imports and takes ownership of the buffer referred to by the given handle. Takes\n        ownership of |buffer_handle| on both success and failure.\n \\param connection An open connection.\n \\param buffer_handle A valid handle.\n \\param size_out The size of the buffer in bytes.\n \\param buffer_out The returned buffer.\n \\param id_out The buffer id of the buffer.\n"]
     pub fn magma_connection_import_buffer(
         connection: magma_connection_t,
         buffer_handle: magma_handle_t,
@@ -451,7 +451,7 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = "\n \\brief Imports and takes ownership of the semaphore referred to by the given handle.\n \\param connection An open connection.\n \\param semaphore_handle A valid semaphore handle.\n \\param semaphore_out The returned semaphore.\n \\param id_out The id of the semaphore.\n"]
+    #[doc = "\n \\brief Imports and takes ownership of the semaphore referred to by the given handle. Takes\n        ownership of |semaphore_handle| on both success and failure.\n \\param connection An open connection.\n \\param semaphore_handle A valid semaphore handle.\n \\param semaphore_out The returned semaphore.\n \\param id_out The id of the semaphore.\n"]
     pub fn magma_connection_import_semaphore(
         connection: magma_connection_t,
         semaphore_handle: magma_handle_t,
@@ -1789,6 +1789,8 @@ pub struct virtio_magma_internal_unmap_resp {
 pub type virtio_magma_internal_unmap_resp_t = virtio_magma_internal_unmap_resp;
 pub const _MAGMA_STATUS_OK: magma_status_t = 0;
 pub const MAGMA_STATUS_OK: magma_status_t = 0;
+pub const _MAGMA_STATUS_INTERNAL_ERROR: magma_status_t = -1;
+pub const MAGMA_STATUS_INTERNAL_ERROR: magma_status_t = -1;
 pub const _MAGMA_STATUS_INVALID_ARGS: magma_status_t = -2;
 pub const MAGMA_STATUS_INVALID_ARGS: magma_status_t = -2;
 pub const _MAGMA_IMAGE_CREATE_FLAGS_PRESENTABLE: u32 = 1;

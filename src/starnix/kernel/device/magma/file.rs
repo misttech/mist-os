@@ -181,8 +181,9 @@ impl FileOps for MagmaFile {
                     virtio_magma_virt_connection_create_image_resp_t,
                 ) = read_control_and_response(current_task, &command)?;
 
-                let buffer = create_image(current_task, control, &mut response)?;
-                self.add_buffer_info(control.connection, response.image_out, buffer);
+                if let Ok(buffer) = create_image(current_task, control, &mut response) {
+                    self.add_buffer_info(control.connection, response.image_out, buffer);
+                }
 
                 current_task.mm.write_object(UserRef::new(response_address), &response)
             }

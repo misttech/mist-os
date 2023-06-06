@@ -20,6 +20,7 @@ use zerocopy::{AsBytes, FromBytes, FromZeroes};"
 # https://github.com/rust-lang/rust-bindgen/issues/316
 readonly define_list=(
 magma_status_t,MAGMA_STATUS_OK
+magma_status_t,MAGMA_STATUS_INTERNAL_ERROR
 magma_status_t,MAGMA_STATUS_INVALID_ARGS
 uint32_t,MAGMA_IMAGE_CREATE_FLAGS_PRESENTABLE
 uint32_t,MAGMA_IMAGE_CREATE_FLAGS_VULKAN_USAGE
