@@ -1259,16 +1259,17 @@ static zx_status_t iwl_parse_tlv_firmware(struct iwl_drv* drv, const struct firm
         capa->fmac_error_log_size = le32_to_cpu(recov_info->buf_size);
       } break;
 #endif
+#if 0   // NEEDS_PORTING
       case IWL_UCODE_TLV_TYPE_BUFFER_ALLOCATION:
       case IWL_UCODE_TLV_TYPE_HCMD:
       case IWL_UCODE_TLV_TYPE_REGIONS:
       case IWL_UCODE_TLV_TYPE_TRIGGERS:
       case IWL_UCODE_TLV_TYPE_DEBUG_FLOW:
-#if 0   // NEEDS_PORTING
             if (iwlwifi_mod_params.enable_ini) {
 				iwl_dbg_tlv_alloc(drv->trans, tlv, false);
             }
             break;
+#endif  // NEEDS_PORTING
 		case IWL_UCODE_TLV_CMD_VERSIONS:
 			if (tlv_len % sizeof(struct iwl_fw_cmd_version)) {
 				IWL_ERR(drv,
@@ -1278,14 +1279,14 @@ static zx_status_t iwl_parse_tlv_firmware(struct iwl_drv* drv, const struct firm
 				tlv_len *= sizeof(struct iwl_fw_cmd_version);
 			}
 			if (WARN_ON(capa->cmd_versions))
-				return -EINVAL;
-			capa->cmd_versions = kmemdup(tlv_data, tlv_len,
-						     GFP_KERNEL);
+				return ZX_ERR_INVALID_ARGS;
+			capa->cmd_versions = kmemdup(tlv_data, tlv_len);
 			if (!capa->cmd_versions)
-				return -ENOMEM;
+				return ZX_ERR_NO_MEMORY;
 			capa->n_cmd_versions =
 				tlv_len / sizeof(struct iwl_fw_cmd_version);
 			break;
+#if 0   // NEEDS_PORTING
 		case IWL_UCODE_TLV_PHY_INTEGRATION_VERSION:
 			if (drv->fw.phy_integration_ver) {
 				IWL_ERR(drv,
