@@ -5,10 +5,14 @@
 use crate::lock::Mutex;
 
 use super::*;
-use crate::fs::buffers::{InputBuffer, OutputBuffer, VecOutputBuffer};
-use crate::fs::SeekOrigin;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    fs::{
+        buffers::{InputBuffer, OutputBuffer, VecOutputBuffer},
+        SeekOrigin,
+    },
+    task::*,
+    types::*,
+};
 use std::collections::VecDeque;
 
 pub trait SequenceFileSource: Send + Sync + 'static {

@@ -5,11 +5,12 @@
 use std::mem;
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
-use crate::fs::*;
-use crate::mm::vmo::round_up_to_increment;
-use crate::mm::MemoryAccessor;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    fs::*,
+    mm::{vmo::round_up_to_increment, MemoryAccessor},
+    task::*,
+    types::*,
+};
 
 #[derive(Debug, Default, Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub struct DirectoryEntryType(u8);

@@ -4,11 +4,12 @@
 
 #![allow(dead_code)]
 
-use crate::lock::RwLock;
-use crate::task::{WaitQueue, WaiterRef};
-use crate::types::*;
-use std::collections::VecDeque;
-use std::sync::Arc;
+use crate::{
+    lock::RwLock,
+    task::{WaitQueue, WaiterRef},
+    types::*,
+};
+use std::{collections::VecDeque, sync::Arc};
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 /// `SignalActions` contains a `sigaction_t` for each valid signal.

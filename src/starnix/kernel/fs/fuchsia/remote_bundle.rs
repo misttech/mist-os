@@ -2,25 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        auth::FsCred,
-        fs::{
-            fuchsia::{update_into_from_attrs, RemoteFileObject},
-            *,
-        },
-        lock::{RwLock, RwLockReadGuard, RwLockWriteGuard},
-        logging::log_warn,
-        task::{CurrentTask, Kernel},
-        types::*,
+use crate::{
+    auth::FsCred,
+    fs::{
+        fuchsia::{update_into_from_attrs, RemoteFileObject},
+        *,
     },
-    anyhow::{anyhow, ensure, Error},
-    ext4_metadata::{Node, NodeInfo},
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon::{self as zx, HandleBased},
-    std::{io::Read, sync::Arc},
-    syncio::Zxio,
+    lock::{RwLock, RwLockReadGuard, RwLockWriteGuard},
+    logging::log_warn,
+    task::{CurrentTask, Kernel},
+    types::*,
 };
+use anyhow::{anyhow, ensure, Error};
+use ext4_metadata::{Node, NodeInfo};
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon::{self as zx, HandleBased};
+use std::{io::Read, sync::Arc};
+use syncio::Zxio;
 
 use ext4_metadata::Metadata;
 
@@ -309,9 +307,10 @@ fn to_fs_node_info(inode_num: ino_t, metadata_node: &ext4_metadata::Node) -> FsN
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::fs::buffers::VecOutputBuffer;
-    use crate::fs::SymlinkTarget;
-    use crate::testing::*;
+    use crate::{
+        fs::{buffers::VecOutputBuffer, SymlinkTarget},
+        testing::*,
+    };
     use fidl_fuchsia_io as fio;
     use std::collections::{HashMap, HashSet};
 

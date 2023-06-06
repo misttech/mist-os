@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 use super::*;
-use crate::task::{CurrentTask, Kernel};
-use crate::types::*;
+use crate::{
+    task::{CurrentTask, Kernel},
+    types::*,
+};
 
 pub struct Anon;
 

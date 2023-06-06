@@ -9,17 +9,19 @@ use magma::*;
 use std::mem::ManuallyDrop;
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
-use crate::device::{
-    magma::{
-        file::{BufferInfo, ConnectionMap, DeviceMap, MagmaDevice},
-        magma::create_drm_image,
+use crate::{
+    device::{
+        magma::{
+            file::{BufferInfo, ConnectionMap, DeviceMap, MagmaDevice},
+            magma::create_drm_image,
+        },
+        wayland::image_file::{ImageFile, ImageInfo},
     },
-    wayland::image_file::{ImageFile, ImageInfo},
+    fs::{Anon, FdFlags, FsNodeInfo, VmoFileObject},
+    mm::{MemoryAccessor, MemoryAccessorExt},
+    task::CurrentTask,
+    types::*,
 };
-use crate::fs::{Anon, FdFlags, FsNodeInfo, VmoFileObject};
-use crate::mm::{MemoryAccessor, MemoryAccessorExt};
-use crate::task::CurrentTask;
-use crate::types::*;
 
 /// Returns a vector of at least one `T`. The vector will be of length `item_count` if > 0.
 fn at_least_one<T>(item_count: usize) -> Vec<T>

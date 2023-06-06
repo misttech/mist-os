@@ -5,9 +5,11 @@
 use anyhow::{bail, Result};
 use itertools::Itertools;
 use serde::Deserialize;
-use std::fs::{canonicalize, File};
-use std::io::Read;
-use std::path::Path;
+use std::{
+    fs::{canonicalize, File},
+    io::Read,
+    path::Path,
+};
 use tar::Archive;
 use tempfile::TempDir;
 

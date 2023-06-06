@@ -5,10 +5,7 @@
 use std::ops::Bound;
 
 use super::*;
-use crate::fs::fileops_impl_directory;
-use crate::lock::Mutex;
-use crate::task::*;
-use crate::types::*;
+use crate::{fs::fileops_impl_directory, lock::Mutex, task::*, types::*};
 
 pub struct MemoryDirectoryFile {
     /// The current position for readdir.

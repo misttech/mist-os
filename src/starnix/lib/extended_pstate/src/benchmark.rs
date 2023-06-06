@@ -21,13 +21,11 @@
 //
 // aarch64 processors provide only one mechanism for saving and restoring state.
 
+use criterion::Criterion;
+use extended_pstate::ExtendedPstateState;
 use fuchsia as _;
-use {
-    criterion::Criterion,
-    extended_pstate::ExtendedPstateState,
-    fuchsia_criterion::FuchsiaCriterion,
-    std::{mem, time::Duration},
-};
+use fuchsia_criterion::FuchsiaCriterion;
+use std::{mem, time::Duration};
 
 #[cfg(target_arch = "x86_64")]
 use extended_pstate::x86_64::{Strategy, PREFERRED_STRATEGY};

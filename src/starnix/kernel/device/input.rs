@@ -2,16 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::DeviceOps;
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::*;
-use crate::lock::Mutex;
-use crate::logging::*;
-use crate::mm::MemoryAccessorExt;
-use crate::syscalls::SyscallResult;
-use crate::syscalls::SUCCESS;
-use crate::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
-use crate::types::*;
+use crate::{
+    device::DeviceOps,
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        *,
+    },
+    lock::Mutex,
+    logging::*,
+    mm::MemoryAccessorExt,
+    syscalls::{SyscallResult, SUCCESS},
+    task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
+    types::*,
+};
 
 use fidl::endpoints::Proxy as _; // for `on_closed()`
 use fidl::handle::fuchsia_handles::Signals;
@@ -22,8 +25,7 @@ use fidl_fuchsia_ui_pointer::{
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use futures::future::{self, Either};
-use std::collections::VecDeque;
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
 use zerocopy::AsBytes as _; // for `as_bytes()`
 
 pub struct InputFile {
@@ -520,9 +522,11 @@ mod test {
     #![allow(clippy::unused_unit)] // for compatibility with `test_case`
 
     use super::*;
-    use crate::fs::buffers::VecOutputBuffer;
-    use crate::task::Kernel;
-    use crate::testing::{create_kernel_and_task, map_memory};
+    use crate::{
+        fs::buffers::VecOutputBuffer,
+        task::Kernel,
+        testing::{create_kernel_and_task, map_memory},
+    };
     use anyhow::anyhow;
     use assert_matches::assert_matches;
     use fuchsia_zircon as zx;

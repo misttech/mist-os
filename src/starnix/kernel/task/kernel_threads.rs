@@ -5,13 +5,14 @@
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
-use std::ffi::CString;
-use std::sync::Arc;
+use std::{ffi::CString, sync::Arc};
 
-use crate::dynamic_thread_pool::DynamicThreadPool;
-use crate::fs::FsContext;
-use crate::task::{CurrentTask, Kernel, Task};
-use crate::types::*;
+use crate::{
+    dynamic_thread_pool::DynamicThreadPool,
+    fs::FsContext,
+    task::{CurrentTask, Kernel, Task},
+    types::*,
+};
 
 /// The threads that the kernel runs internally.
 ///

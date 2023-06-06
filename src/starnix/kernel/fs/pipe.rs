@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::convert::TryInto;
-use std::sync::Arc;
+use std::{convert::TryInto, sync::Arc};
 
-use crate::arch::uapi::blksize_t;
-use crate::fs::{buffers::*, *};
-use crate::lock::{Mutex, MutexGuard};
-use crate::mm::MemoryAccessorExt;
-use crate::mm::PAGE_SIZE;
-use crate::signals::*;
-use crate::syscalls::*;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    arch::uapi::blksize_t,
+    fs::{buffers::*, *},
+    lock::{Mutex, MutexGuard},
+    mm::{MemoryAccessorExt, PAGE_SIZE},
+    signals::*,
+    syscalls::*,
+    task::*,
+    types::*,
+};
 
 const ATOMIC_IO_BYTES: blksize_t = 4096;
 const PIPE_MAX_SIZE: usize = 1048576; // From pipe.go in gVisor.

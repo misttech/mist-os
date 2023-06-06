@@ -14,25 +14,27 @@ use fidl_fuchsia_component_runner::{
 use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
-use futures::channel::oneshot;
-use futures::{FutureExt, StreamExt};
+use futures::{channel::oneshot, FutureExt, StreamExt};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use std::ffi::CString;
-use std::os::unix::ffi::OsStrExt;
-use std::path::Path;
-use std::sync::{Arc, Weak};
-
-use crate::auth::Credentials;
-use crate::execution::{
-    container::Container, create_filesystem_from_spec, execute_task, parse_numbered_handles,
-    set_rlimits,
+use std::{
+    ffi::CString,
+    os::unix::ffi::OsStrExt,
+    path::Path,
+    sync::{Arc, Weak},
 };
-use crate::fs::fuchsia::RemoteFs;
-use crate::fs::*;
-use crate::logging::{log_error, log_info};
-use crate::signals;
-use crate::task::*;
-use crate::types::*;
+
+use crate::{
+    auth::Credentials,
+    execution::{
+        container::Container, create_filesystem_from_spec, execute_task, parse_numbered_handles,
+        set_rlimits,
+    },
+    fs::{fuchsia::RemoteFs, *},
+    logging::{log_error, log_info},
+    signals,
+    task::*,
+    types::*,
+};
 
 /// Starts a component inside the given container.
 ///

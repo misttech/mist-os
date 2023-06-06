@@ -5,15 +5,15 @@
 use super::*;
 use zerocopy::{AsBytes, FromBytes};
 
-use crate::device::{DeviceListener, DeviceListenerKey};
-use crate::fs::buffers::*;
-use crate::fs::kobject::*;
-use crate::fs::*;
-use crate::lock::Mutex;
-use crate::logging::{log, log_error, not_implemented};
-use crate::mm::MemoryAccessorExt;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    device::{DeviceListener, DeviceListenerKey},
+    fs::{buffers::*, kobject::*, *},
+    lock::Mutex,
+    logging::{log, log_error, not_implemented},
+    mm::MemoryAccessorExt,
+    task::*,
+    types::*,
+};
 use std::sync::Arc;
 
 const NETLINK_LOG_TAG: &str = "netlink";

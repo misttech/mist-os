@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, bail, Error};
-use fidl::endpoints::{ControlHandle, RequestStream};
-use fidl::AsyncChannel;
+use fidl::{
+    endpoints::{ControlHandle, RequestStream},
+    AsyncChannel,
+};
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_io as fio;
@@ -16,23 +18,20 @@ use fuchsia_inspect as inspect;
 use fuchsia_runtime as fruntime;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::Task as _;
-use futures::channel::oneshot;
-use futures::{FutureExt, StreamExt, TryStreamExt};
+use futures::{channel::oneshot, FutureExt, StreamExt, TryStreamExt};
 use runner::{get_program_string, get_program_strvec};
 use starnix_kernel_config::Config;
-use std::collections::BTreeMap;
-use std::ffi::CString;
-use std::sync::Arc;
+use std::{collections::BTreeMap, ffi::CString, sync::Arc};
 
-use crate::auth::Credentials;
-use crate::device::run_features;
-use crate::execution::*;
-use crate::fs::layeredfs::LayeredFs;
-use crate::fs::tmpfs::TmpFs;
-use crate::fs::*;
-use crate::logging::{log_error, log_info};
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    auth::Credentials,
+    device::run_features,
+    execution::*,
+    fs::{layeredfs::LayeredFs, tmpfs::TmpFs, *},
+    logging::{log_error, log_info},
+    task::*,
+    types::*,
+};
 
 /// A temporary wrapper struct that contains both a `Config` for the container, as well as optional
 /// handles for the container's component controller and `/pkg` directory.
@@ -490,9 +489,7 @@ fn record_task_command_to_node(
 #[cfg(test)]
 mod test {
     use super::wait_for_init_file;
-    use crate::fs::FdNumber;
-    use crate::testing::create_kernel_and_task;
-    use crate::types::*;
+    use crate::{fs::FdNumber, testing::create_kernel_and_task, types::*};
     use fuchsia_async as fasync;
     use futures::{SinkExt, StreamExt};
 

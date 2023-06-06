@@ -6,12 +6,16 @@ use fuchsia_runtime::duplicate_utc_clock_handle;
 use fuchsia_zircon as zx;
 use std::sync::Arc;
 
-use crate::execution::notify_debugger_of_module_list;
-use crate::fs::buffers::{OutputBuffer, UserBuffersInputBuffer, UserBuffersOutputBuffer};
-use crate::fs::*;
-use crate::logging::*;
-use crate::mm::*;
-use crate::syscalls::*;
+use crate::{
+    execution::notify_debugger_of_module_list,
+    fs::{
+        buffers::{OutputBuffer, UserBuffersInputBuffer, UserBuffersOutputBuffer},
+        *,
+    },
+    logging::*,
+    mm::*,
+    syscalls::*,
+};
 
 // Returns any platform-specific mmap flags. This is a separate function because as of this writing
 // "attributes on expressions are experimental."

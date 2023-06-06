@@ -9,15 +9,17 @@
 
 use std::sync::{Arc, Weak};
 
-use crate::auth::FsCred;
-use crate::fs::buffers::InputBuffer;
-use crate::fs::{
-    fileops_impl_delegate_read_and_seek, DynamicFile, DynamicFileBuf, DynamicFileSource,
-    FileObject, FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, MemoryDirectoryFile,
+use crate::{
+    auth::FsCred,
+    fs::{
+        buffers::InputBuffer, fileops_impl_delegate_read_and_seek, DynamicFile, DynamicFileBuf,
+        DynamicFileSource, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
+        MemoryDirectoryFile,
+    },
+    lock::Mutex,
+    task::{CurrentTask, Task},
+    types::*,
 };
-use crate::lock::Mutex;
-use crate::task::{CurrentTask, Task};
-use crate::types::*;
 
 type ControlGroupHandle = Arc<Mutex<ControlGroup>>;
 

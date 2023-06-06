@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::{MemoryAccessor, MemoryManager};
-use crate::types::{errno, error, Errno, UserAddress, UserBuffer};
+use crate::{
+    mm::{MemoryAccessor, MemoryManager},
+    types::{errno, error, Errno, UserAddress, UserBuffer},
+};
 use zerocopy::FromBytes;
 
 /// The callback for `OutputBuffer::write_each`. The callback is passed the buffers to write to in
@@ -439,8 +441,7 @@ impl VecInputBuffer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mm::PAGE_SIZE;
-    use crate::testing::*;
+    use crate::{mm::PAGE_SIZE, testing::*};
 
     #[::fuchsia::test]
     async fn test_data_input_buffer() {

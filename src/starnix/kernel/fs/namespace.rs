@@ -2,28 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::{HashMap, HashSet};
-use std::fmt;
-use std::hash::{Hash, Hasher};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Weak};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
+    hash::{Hash, Hasher},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Weak,
+    },
+};
 
 use ref_cast::RefCast;
 
-use super::devpts::dev_pts_fs;
-use super::devtmpfs::dev_tmp_fs;
-use super::proc::proc_fs;
-use super::sysfs::sys_fs;
-use super::tmpfs::TmpFs;
-use super::*;
-use crate::bpf::BpfFs;
-use crate::device::BinderFs;
-use crate::fs::{buffers::InputBuffer, fuse::new_fuse_fs};
-use crate::lock::RwLock;
-use crate::mutable_state::*;
-use crate::selinux::selinux_fs;
-use crate::task::*;
-use crate::types::*;
+use super::{
+    devpts::dev_pts_fs, devtmpfs::dev_tmp_fs, proc::proc_fs, sysfs::sys_fs, tmpfs::TmpFs, *,
+};
+use crate::{
+    bpf::BpfFs,
+    device::BinderFs,
+    fs::{buffers::InputBuffer, fuse::new_fuse_fs},
+    lock::RwLock,
+    mutable_state::*,
+    selinux::selinux_fs,
+    task::*,
+    types::*,
+};
 
 /// A mount namespace.
 ///
@@ -1128,8 +1131,7 @@ impl Hash for NamespaceNode {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::fs::tmpfs::TmpFs;
-    use crate::testing::*;
+    use crate::{fs::tmpfs::TmpFs, testing::*};
 
     #[::fuchsia::test]
     async fn test_namespace() -> anyhow::Result<()> {

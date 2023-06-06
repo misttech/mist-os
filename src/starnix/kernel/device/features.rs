@@ -2,15 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::{binder::create_binders, starnix::StarnixDevice};
-use crate::fs::{
-    devtmpfs::dev_tmp_fs,
-    kobject::{KObjectDeviceAttribute, KType},
-    SpecialNode,
+use crate::{
+    device::{binder::create_binders, starnix::StarnixDevice},
+    fs::{
+        devtmpfs::dev_tmp_fs,
+        kobject::{KObjectDeviceAttribute, KType},
+        SpecialNode,
+    },
+    logging::log_warn,
+    task::CurrentTask,
+    types::*,
 };
-use crate::logging::log_warn;
-use crate::task::CurrentTask;
-use crate::types::*;
 
 use fidl_fuchsia_ui_composition as fuicomposition;
 

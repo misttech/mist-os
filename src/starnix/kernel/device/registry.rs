@@ -2,17 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::mem::*;
-use crate::fs::kobject::*;
-use crate::fs::{FileOps, FsNode};
-use crate::lock::RwLock;
-use crate::logging::log_error;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    device::mem::*,
+    fs::{kobject::*, FileOps, FsNode},
+    lock::RwLock,
+    logging::log_error,
+    task::*,
+    types::*,
+};
 
-use std::collections::btree_map::{BTreeMap, Entry};
-use std::marker::{Send, Sync};
-use std::sync::Arc;
+use std::{
+    collections::btree_map::{BTreeMap, Entry},
+    marker::{Send, Sync},
+    sync::Arc,
+};
 
 /// The mode or category of the device driver.
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
@@ -279,8 +282,7 @@ impl DeviceOps for Arc<RwLock<DynRegistry>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fs::*;
-    use crate::testing::*;
+    use crate::{fs::*, testing::*};
 
     #[::fuchsia::test]
     fn registry_fails_to_add_duplicate_device() {

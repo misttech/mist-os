@@ -2,22 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        fs::{
-            buffers::{InputBuffer, InputBufferCallback},
-            pipe::PipeFileObject,
-            FdNumber, FileHandle,
-        },
-        lock::{ordered_lock, MutexGuard},
-        logging::{log_warn, not_implemented},
-        mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE},
-        task::CurrentTask,
-        types::{errno, error, off_t, uapi, Errno, OpenFlags, UserAddress, UserRef, MAX_RW_COUNT},
+use crate::{
+    fs::{
+        buffers::{InputBuffer, InputBufferCallback},
+        pipe::PipeFileObject,
+        FdNumber, FileHandle,
     },
-    fuchsia_zircon as zx,
-    std::{cmp::Ordering, sync::Arc, usize},
+    lock::{ordered_lock, MutexGuard},
+    logging::{log_warn, not_implemented},
+    mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE},
+    task::CurrentTask,
+    types::{errno, error, off_t, uapi, Errno, OpenFlags, UserAddress, UserRef, MAX_RW_COUNT},
 };
+use fuchsia_zircon as zx;
+use std::{cmp::Ordering, sync::Arc, usize};
 
 /// An input buffer that reads from a VMO in PAGE_SIZE segments
 /// Used by the `sendfile` syscall.

@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::HashMap;
-use std::sync::{Arc, Weak};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Weak},
+};
 
-use crate::task::*;
-use crate::types::*;
+use crate::{task::*, types::*};
 
 /// Entities identified by a pid.
 #[derive(Default)]

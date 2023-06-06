@@ -14,11 +14,10 @@ use magma::*;
 use vk_sys as vk;
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
-use crate::device::wayland::vulkan::*;
-use crate::logging::log_warn;
-use crate::mm::MemoryAccessorExt;
-use crate::task::CurrentTask;
-use crate::types::*;
+use crate::{
+    device::wayland::vulkan::*, logging::log_warn, mm::MemoryAccessorExt, task::CurrentTask,
+    types::*,
+};
 
 /// Reads a magma command and its type from user space.
 ///

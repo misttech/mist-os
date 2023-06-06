@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::BTreeMap;
-use std::sync::{Arc, Weak};
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, Weak},
+};
 
-use crate::device::terminal::*;
-use crate::lock::RwLock;
-use crate::mutable_state::*;
-use crate::task::*;
-use crate::types::*;
+use crate::{device::terminal::*, lock::RwLock, mutable_state::*, task::*, types::*};
 
 #[derive(Debug)]
 pub struct SessionMutableState {

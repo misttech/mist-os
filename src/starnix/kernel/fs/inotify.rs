@@ -2,11 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::*;
-use crate::logging::not_implemented;
-use crate::task::{CurrentTask, EventHandler, WaitCanceler, Waiter};
-use crate::types::*;
+use crate::{
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        *,
+    },
+    logging::not_implemented,
+    task::{CurrentTask, EventHandler, WaitCanceler, Waiter},
+    types::*,
+};
 use fuchsia_zircon as zx;
 
 pub struct InotifyFileObject {}

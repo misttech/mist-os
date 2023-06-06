@@ -6,15 +6,18 @@ use fuchsia_zircon as zx;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use std::ffi::CString;
-use std::sync::Arc;
+use std::{ffi::CString, sync::Arc};
 
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::*;
-use crate::mm::{MemoryAccessor, ProcMapsFile, ProcSmapsFile, PAGE_SIZE};
-use crate::selinux::selinux_proc_attrs;
-use crate::task::{CurrentTask, Task, TaskStateCode, ThreadGroup};
-use crate::types::*;
+use crate::{
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        *,
+    },
+    mm::{MemoryAccessor, ProcMapsFile, ProcSmapsFile, PAGE_SIZE},
+    selinux::selinux_proc_attrs,
+    task::{CurrentTask, Task, TaskStateCode, ThreadGroup},
+    types::*,
+};
 
 /// Creates an [`FsNode`] that represents the `/proc/<pid>` directory for `task`.
 pub fn pid_directory(fs: &FileSystemHandle, task: &Arc<Task>) -> Arc<FsNode> {

@@ -4,9 +4,7 @@
 
 use fuchsia_zircon as zx;
 
-use crate::fs::FileHandle;
-use crate::task::CurrentTask;
-use crate::types::*;
+use crate::{fs::FileHandle, task::CurrentTask, types::*};
 
 mod remote;
 mod remote_bundle;

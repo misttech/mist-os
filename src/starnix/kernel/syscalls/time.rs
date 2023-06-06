@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_runtime::duplicate_utc_clock_handle;
-use fuchsia_runtime::utc_time;
+use fuchsia_runtime::{duplicate_utc_clock_handle, utc_time};
 use fuchsia_zircon::{self as zx, Task};
 use once_cell::sync::Lazy;
 
-use crate::logging::impossible_error;
-use crate::mm::MemoryAccessorExt;
-use crate::syscalls::*;
-use crate::task::*;
+use crate::{logging::impossible_error, mm::MemoryAccessorExt, syscalls::*, task::*};
 
 static UTC_CLOCK: Lazy<zx::Clock> = Lazy::new(|| {
     duplicate_utc_clock_handle(zx::Rights::SAME_RIGHTS)

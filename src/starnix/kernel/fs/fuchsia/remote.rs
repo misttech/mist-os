@@ -11,16 +11,20 @@ use syncio::{
     ZxioSignals,
 };
 
-use crate::arch::uapi::{blksize_t, nlink_t};
-use crate::auth::FsCred;
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::*;
-use crate::lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
-use crate::logging::*;
-use crate::mm::ProtectionFlags;
-use crate::task::*;
-use crate::types::*;
-use crate::vmex_resource::VMEX_RESOURCE;
+use crate::{
+    arch::uapi::{blksize_t, nlink_t},
+    auth::FsCred,
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        *,
+    },
+    lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
+    logging::*,
+    mm::ProtectionFlags,
+    task::*,
+    types::*,
+    vmex_resource::VMEX_RESOURCE,
+};
 
 pub struct RemoteFs;
 impl FileSystemOps for RemoteFs {
@@ -765,10 +769,7 @@ impl FsNodeOps for RemoteSymlink {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::arch::uapi::epoll_event;
-    use crate::fs::buffers::VecOutputBuffer;
-    use crate::mm::PAGE_SIZE;
-    use crate::testing::*;
+    use crate::{arch::uapi::epoll_event, fs::buffers::VecOutputBuffer, mm::PAGE_SIZE, testing::*};
     use fidl::endpoints::Proxy;
     use fidl_fuchsia_io as fio;
     use fuchsia_async as fasync;

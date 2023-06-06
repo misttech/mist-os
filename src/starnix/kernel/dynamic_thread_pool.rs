@@ -2,14 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::lock::Mutex;
-use crate::types::{errno, Errno};
-use futures::channel::oneshot;
-use futures::TryFutureExt;
-use std::future::Future;
-use std::sync::mpsc::{sync_channel, SendError, SyncSender, TrySendError};
-use std::sync::Arc;
-use std::thread::JoinHandle;
+use crate::{
+    lock::Mutex,
+    types::{errno, Errno},
+};
+use futures::{channel::oneshot, TryFutureExt};
+use std::{
+    future::Future,
+    sync::{
+        mpsc::{sync_channel, SendError, SyncSender, TrySendError},
+        Arc,
+    },
+    thread::JoinHandle,
+};
 
 type BoxedClosure = Box<dyn FnOnce() + Send + 'static>;
 

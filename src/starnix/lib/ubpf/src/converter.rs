@@ -5,8 +5,7 @@
 use linux_uapi::*;
 use std::collections::HashMap;
 
-use crate::UbpfError;
-use crate::UbpfError::*;
+use crate::{UbpfError, UbpfError::*};
 
 // These are accessors for bits in an BPF/EBPF instruction.
 // Instructions are encoded in one byte.  The first 3 LSB represent

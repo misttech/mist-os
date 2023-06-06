@@ -4,18 +4,18 @@
 
 use fuchsia_zircon as zx;
 use static_assertions::const_assert_eq;
-use std::convert::TryFrom;
-use std::sync::Arc;
+use std::{convert::TryFrom, sync::Arc};
 
 use super::signalfd::*;
-use crate::fs::*;
-use crate::logging::not_implemented;
-use crate::mm::{MemoryAccessor, MemoryAccessorExt};
-use crate::signals::restore_from_signal_handler;
-use crate::signals::*;
-use crate::syscalls::*;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    fs::*,
+    logging::not_implemented,
+    mm::{MemoryAccessor, MemoryAccessorExt},
+    signals::{restore_from_signal_handler, *},
+    syscalls::*,
+    task::*,
+    types::*,
+};
 use zerocopy::FromBytes;
 
 pub use super::signal_handling::sys_restart_syscall;
@@ -657,9 +657,11 @@ pub fn sys_wait4(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::auth::Credentials;
-    use crate::mm::{vmo::round_up_to_system_page_size, PAGE_SIZE};
-    use crate::testing::*;
+    use crate::{
+        auth::Credentials,
+        mm::{vmo::round_up_to_system_page_size, PAGE_SIZE},
+        testing::*,
+    };
     use std::convert::TryInto;
     use zerocopy::AsBytes;
 

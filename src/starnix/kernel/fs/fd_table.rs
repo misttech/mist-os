@@ -3,14 +3,9 @@
 // found in the LICENSE file.
 
 use bitflags::bitflags;
-use std::collections::HashMap;
-use std::ops::DerefMut;
-use std::sync::Arc;
+use std::{collections::HashMap, ops::DerefMut, sync::Arc};
 
-use crate::fs::*;
-use crate::lock::Mutex;
-use crate::task::Task;
-use crate::types::*;
+use crate::{fs::*, lock::Mutex, task::Task, types::*};
 
 bitflags! {
     pub struct FdFlags: u32 {
@@ -348,9 +343,7 @@ impl Clone for FdTable {
 mod test {
     use super::*;
 
-    use crate::fs::fuchsia::SyslogFile;
-    use crate::task::*;
-    use crate::testing::*;
+    use crate::{fs::fuchsia::SyslogFile, task::*, testing::*};
 
     fn add(
         current_task: &CurrentTask,

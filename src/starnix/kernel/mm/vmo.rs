@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::PAGE_SIZE;
-use crate::types::*;
+use crate::{mm::PAGE_SIZE, types::*};
 
 // TODO: Move this function to somewhere more generic. It doesn't really have
 // anything to do with the memory manager.

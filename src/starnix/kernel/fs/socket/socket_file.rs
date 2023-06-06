@@ -4,10 +4,12 @@
 
 use fuchsia_zircon as zx;
 
-use crate::fs::{buffers::*, socket::*, *};
-use crate::syscalls::SyscallResult;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    fs::{buffers::*, socket::*, *},
+    syscalls::SyscallResult,
+    task::*,
+    types::*,
+};
 
 pub struct SocketFile {
     socket: SocketHandle,

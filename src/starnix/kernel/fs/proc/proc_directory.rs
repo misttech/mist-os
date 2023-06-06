@@ -2,24 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::pid_directory::*;
-use super::sysctl::*;
+use super::{pid_directory::*, sysctl::*};
 
-use crate::auth::FsCred;
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::*;
-use crate::logging::{log_error, not_implemented};
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    auth::FsCred,
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        *,
+    },
+    logging::{log_error, not_implemented},
+    task::*,
+    types::*,
+};
 use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
 
 use maplit::btreemap;
-use std::collections::BTreeMap;
-use std::sync::Arc;
-use std::sync::Weak;
-use std::time::SystemTime;
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, Weak},
+    time::SystemTime,
+};
 
 /// `ProcDirectory` represents the top-level directory in `procfs`.
 ///

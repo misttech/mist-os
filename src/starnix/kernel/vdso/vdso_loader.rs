@@ -5,9 +5,11 @@
 use fuchsia_zircon as zx;
 use std::sync::Arc;
 
-use crate::arch::vdso::{get_sigreturn_offset, set_vdso_constants, HAS_VDSO};
-use crate::types::{errno, from_status_like_fdio, Errno};
-use crate::vmex_resource::VMEX_RESOURCE;
+use crate::{
+    arch::vdso::{get_sigreturn_offset, set_vdso_constants, HAS_VDSO},
+    types::{errno, from_status_like_fdio, Errno},
+    vmex_resource::VMEX_RESOURCE,
+};
 
 #[derive(Default)]
 pub struct Vdso {

@@ -2,18 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::buffers::{VecInputBuffer, VecOutputBuffer};
-use crate::fs::RenameFlags;
-use crate::fs::{
-    DirEntry, DirectoryEntryType, DirentSink, FileHandle, FsStr, LookupContext, NamespaceNode,
-    SeekOrigin, UnlinkKind,
+use crate::{
+    fs::{
+        buffers::{VecInputBuffer, VecOutputBuffer},
+        DirEntry, DirectoryEntryType, DirentSink, FileHandle, FsStr, LookupContext, NamespaceNode,
+        RenameFlags, SeekOrigin, UnlinkKind,
+    },
+    mm::ProtectionFlags,
+    task::CurrentTask,
+    types::{errno, error, ino_t, off_t, DeviceType, Errno, FileMode, OpenFlags},
 };
-use crate::mm::ProtectionFlags;
-use crate::task::CurrentTask;
-use crate::types::{errno, error, ino_t, off_t, DeviceType, Errno, FileMode, OpenFlags};
 use async_trait::async_trait;
-use fidl::endpoints::{ClientEnd, ServerEnd};
-use fidl::HandleBased;
+use fidl::{
+    endpoints::{ClientEnd, ServerEnd},
+    HandleBased,
+};
 use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
@@ -532,8 +535,7 @@ impl directory::entry::DirectoryEntry for StarnixNodeConnection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fs::tmpfs::TmpFs;
-    use crate::testing::*;
+    use crate::{fs::tmpfs::TmpFs, testing::*};
     use std::collections::HashSet;
     use syncio::Zxio;
 

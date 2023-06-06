@@ -2,16 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::auth::FsCred;
-use crate::fs::{
-    emit_dotdot, fileops_impl_directory, fs_node_impl_dir_readonly, unbounded_seek,
-    DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle, FsNode,
-    FsNodeInfo, FsNodeOps, FsStr, SeekOrigin,
+use crate::{
+    auth::FsCred,
+    fs::{
+        emit_dotdot, fileops_impl_directory, fs_node_impl_dir_readonly, unbounded_seek,
+        DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle, FsNode,
+        FsNodeInfo, FsNodeOps, FsStr, SeekOrigin,
+    },
+    task::CurrentTask,
+    types::*,
 };
-use crate::task::CurrentTask;
-use crate::types::*;
-use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 /// Builds an implementation of [`FsNodeOps`] that serves as a directory of static and immutable
 /// entries.

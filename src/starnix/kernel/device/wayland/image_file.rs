@@ -9,11 +9,15 @@ use magma::*;
 
 use std::sync::Arc;
 
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::*;
-use crate::mm::ProtectionFlags;
-use crate::task::CurrentTask;
-use crate::types::*;
+use crate::{
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        *,
+    },
+    mm::ProtectionFlags,
+    task::CurrentTask,
+    types::*,
+};
 
 pub struct ImageInfo {
     /// The magma image info associated with the `vmo`.

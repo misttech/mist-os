@@ -4,14 +4,12 @@
 
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use process_builder::{elf_load, elf_parse};
-use std::ffi::{CStr, CString};
-use std::sync::Arc;
+use std::{
+    ffi::{CStr, CString},
+    sync::Arc,
+};
 
-use crate::fs::FileHandle;
-use crate::logging::*;
-use crate::mm::*;
-use crate::task::*;
-use crate::types::*;
+use crate::{fs::FileHandle, logging::*, mm::*, task::*, types::*};
 
 #[derive(Debug)]
 struct StackResult {

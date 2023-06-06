@@ -5,11 +5,12 @@ use super::*;
 
 use std::sync::Arc;
 
-use crate::auth::FsCred;
-use crate::fs::cgroup::CgroupDirectoryNode;
-use crate::fs::kobject::*;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    auth::FsCred,
+    fs::{cgroup::CgroupDirectoryNode, kobject::*},
+    task::*,
+    types::*,
+};
 
 struct SysFs;
 impl FileSystemOps for SysFs {

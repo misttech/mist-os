@@ -4,15 +4,16 @@
 
 use std::sync::Arc;
 
-use super::directory_file::MemoryDirectoryFile;
-use super::*;
-use crate::arch::uapi::blksize_t;
-use crate::auth::FsCred;
-use crate::lock::{Mutex, MutexGuard};
-use crate::logging::not_implemented;
-use crate::mm::PAGE_SIZE;
-use crate::task::{CurrentTask, Kernel};
-use crate::types::*;
+use super::{directory_file::MemoryDirectoryFile, *};
+use crate::{
+    arch::uapi::blksize_t,
+    auth::FsCred,
+    lock::{Mutex, MutexGuard},
+    logging::not_implemented,
+    mm::PAGE_SIZE,
+    task::{CurrentTask, Kernel},
+    types::*,
+};
 
 pub struct TmpFs(());
 
@@ -273,8 +274,10 @@ impl FsNodeOps for TmpfsSpecialNode {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::fs::buffers::{VecInputBuffer, VecOutputBuffer};
-    use crate::testing::*;
+    use crate::{
+        fs::buffers::{VecInputBuffer, VecOutputBuffer},
+        testing::*,
+    };
     use zerocopy::AsBytes;
 
     #[::fuchsia::test]

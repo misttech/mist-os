@@ -28,8 +28,7 @@ use fuchsia_zircon as zx;
 use futures::{StreamExt, TryStreamExt};
 use std::sync::{mpsc::channel, Arc};
 
-use crate::logging::log_warn;
-use crate::types::*;
+use crate::{logging::log_warn, types::*};
 
 /// The offset at which the framebuffer will be placed.
 pub const TRANSLATION_X: i32 = 0;

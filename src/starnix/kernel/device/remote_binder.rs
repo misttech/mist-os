@@ -2,19 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::{DeviceOps, RemoteBinderConnection};
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::{fileops_impl_nonseekable, FdEvents, FileObject, FileOps, FsNode, NamespaceNode};
-use crate::lock::Mutex;
-use crate::logging::{log_error, log_warn};
-use crate::mm::{DesiredAddress, MappedVmo, MappingOptions, MemoryAccessorExt, ProtectionFlags};
-use crate::syscalls::{SyscallResult, SUCCESS};
-use crate::task::{CurrentTask, ThreadGroup, WaitQueue, Waiter};
-use crate::types::{
-    errno,
-    errno::{EAGAIN, EINTR},
-    errno_from_code, error, pid_t, uapi, DeviceType, Errno, ErrnoCode, OpenFlags, UserAddress,
-    UserCString, UserRef, PATH_MAX,
+use crate::{
+    device::{DeviceOps, RemoteBinderConnection},
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        fileops_impl_nonseekable, FdEvents, FileObject, FileOps, FsNode, NamespaceNode,
+    },
+    lock::Mutex,
+    logging::{log_error, log_warn},
+    mm::{DesiredAddress, MappedVmo, MappingOptions, MemoryAccessorExt, ProtectionFlags},
+    syscalls::{SyscallResult, SUCCESS},
+    task::{CurrentTask, ThreadGroup, WaitQueue, Waiter},
+    types::{
+        errno,
+        errno::{EAGAIN, EINTR},
+        errno_from_code, error, pid_t, uapi, DeviceType, Errno, ErrnoCode, OpenFlags, UserAddress,
+        UserCString, UserRef, PATH_MAX,
+    },
 };
 use anyhow::Error;
 use derivative::Derivative;
@@ -27,9 +31,11 @@ use fidl_fuchsia_starnix_binder as fbinder;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use futures::{channel::oneshot, future::FutureExt, pin_mut, select, TryStreamExt};
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::rc::Rc;
-use std::sync::{Arc, Weak};
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    rc::Rc,
+    sync::{Arc, Weak},
+};
 
 // The name used to track the duration of a remote binder ioctl.
 fuchsia_trace::string_name_macro!(trace_name_remote_binder_ioctl, "remote_binder_ioctl");
@@ -759,19 +765,18 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::device::binder::tests::run_process_accessor;
-    use crate::device::BinderFs;
-    use crate::fs::{FileSystemOptions, WhatToMount};
-    use crate::mm::MemoryAccessor;
-    use crate::task::Task;
-    use crate::testing::*;
-    use crate::types::{mode, MountFlags};
+    use crate::{
+        device::{binder::tests::run_process_accessor, BinderFs},
+        fs::{FileSystemOptions, WhatToMount},
+        mm::MemoryAccessor,
+        task::Task,
+        testing::*,
+        types::{mode, MountFlags},
+    };
     use fidl::endpoints::{create_endpoints, create_proxy, Proxy};
     use once_cell::sync::Lazy;
     use rand::distributions::{Alphanumeric, DistString};
-    use std::collections::BTreeMap;
-    use std::ffi::CString;
-    use std::future::Future;
+    use std::{collections::BTreeMap, ffi::CString, future::Future};
 
     static REMOTE_CONTROLLER_CLIENT: Lazy<
         Mutex<BTreeMap<String, ClientEnd<fbinder::RemoteControllerMarker>>>,

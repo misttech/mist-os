@@ -4,10 +4,12 @@
 
 use std::collections::BTreeSet;
 
-use crate::fs::*;
-use crate::lock::Mutex;
-use crate::task::{CurrentTask, WaitQueue, Waiter};
-use crate::types::*;
+use crate::{
+    fs::*,
+    lock::Mutex,
+    task::{CurrentTask, WaitQueue, Waiter},
+    types::*,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RecordLength {

@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::hash_map::Entry;
-use std::collections::HashMap;
-use std::sync::{Arc, Weak};
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    sync::{Arc, Weak},
+};
 
-use crate::fs::socket::*;
-use crate::lock::Mutex;
-use crate::task::CurrentTask;
-use crate::types::*;
+use crate::{fs::socket::*, lock::Mutex, task::CurrentTask, types::*};
 
 /// A registry of abstract sockets.
 ///

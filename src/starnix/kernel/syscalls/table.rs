@@ -4,10 +4,12 @@
 
 use paste::paste;
 
-use crate::arch::syscalls::*;
-use crate::fs::{FdNumber, WdNumber};
-use crate::syscalls::{decls::Syscall, CurrentTask, SyscallResult};
-use crate::types::*;
+use crate::{
+    arch::syscalls::*,
+    fs::{FdNumber, WdNumber},
+    syscalls::{decls::Syscall, CurrentTask, SyscallResult},
+    types::*,
+};
 
 macro_rules! syscall_match {
     {
@@ -43,14 +45,14 @@ pub fn dispatch_syscall(
     current_task: &mut CurrentTask,
     syscall: &Syscall,
 ) -> Result<SyscallResult, Errno> {
-    use crate::bpf::*;
-    use crate::fs::socket::syscalls::*;
-    use crate::fs::syscalls::*;
-    use crate::mm::syscalls::*;
-    use crate::signals::syscalls::*;
-    use crate::syscalls::misc::*;
-    use crate::syscalls::time::*;
-    use crate::task::syscalls::*;
+    use crate::{
+        bpf::*,
+        fs::{socket::syscalls::*, syscalls::*},
+        mm::syscalls::*,
+        signals::syscalls::*,
+        syscalls::{misc::*, time::*},
+        task::syscalls::*,
+    };
 
     let args = (syscall.arg0, syscall.arg1, syscall.arg2, syscall.arg3, syscall.arg4, syscall.arg5);
     syscall_match! {

@@ -148,8 +148,10 @@
 //! }
 //! ```
 
-use std::ops::{Deref, DerefMut};
-use std::sync::Arc;
+use std::{
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 use crate::lock::*;
 

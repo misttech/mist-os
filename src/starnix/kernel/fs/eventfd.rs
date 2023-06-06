@@ -2,11 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::*;
-use crate::lock::Mutex;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        *,
+    },
+    lock::Mutex,
+    task::*,
+    types::*,
+};
 
 const DATA_SIZE: usize = 8;
 

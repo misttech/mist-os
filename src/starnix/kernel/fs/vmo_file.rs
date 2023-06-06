@@ -6,15 +6,16 @@ use fuchsia_zircon::{self as zx, HandleBased};
 use std::sync::Arc;
 
 use super::*;
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::lock::Mutex;
-use crate::logging::impossible_error;
-use crate::mm::vmo::round_up_to_system_page_size;
-use crate::mm::{ProtectionFlags, PAGE_SIZE};
-use crate::syscalls::{SyscallResult, SUCCESS};
-use crate::task::CurrentTask;
-use crate::types::*;
-use crate::vmex_resource::VMEX_RESOURCE;
+use crate::{
+    fs::buffers::{InputBuffer, OutputBuffer},
+    lock::Mutex,
+    logging::impossible_error,
+    mm::{vmo::round_up_to_system_page_size, ProtectionFlags, PAGE_SIZE},
+    syscalls::{SyscallResult, SUCCESS},
+    task::CurrentTask,
+    types::*,
+    vmex_resource::VMEX_RESOURCE,
+};
 
 pub struct VmoFileNode {
     /// The memory that backs this file.

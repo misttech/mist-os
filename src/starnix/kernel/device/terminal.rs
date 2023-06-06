@@ -3,17 +3,23 @@
 // found in the LICENSE file.
 
 use derivative::Derivative;
-use std::collections::{BTreeSet, HashMap, VecDeque};
-use std::sync::{Arc, Weak};
+use std::{
+    collections::{BTreeSet, HashMap, VecDeque},
+    sync::{Arc, Weak},
+};
 
-use crate::auth::FsCred;
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::devpts::*;
-use crate::fs::*;
-use crate::lock::{Mutex, RwLock};
-use crate::mutable_state::*;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    auth::FsCred,
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        devpts::*,
+        *,
+    },
+    lock::{Mutex, RwLock},
+    mutable_state::*,
+    task::*,
+    types::*,
+};
 
 // CANON_MAX_BYTES is the number of bytes that fit into a single line of
 // terminal input in canonical mode. See https://github.com/google/gvisor/blob/master/pkg/sentry/fs/tty/line_discipline.go

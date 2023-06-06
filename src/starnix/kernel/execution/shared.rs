@@ -9,20 +9,23 @@ use fidl_fuchsia_process as fprocess;
 use fuchsia_inspect::NumericProperty;
 use fuchsia_runtime::{HandleInfo, HandleType};
 use fuchsia_zircon::{self as zx};
-use std::convert::TryFrom;
-use std::sync::Arc;
+use std::{convert::TryFrom, sync::Arc};
 
-use crate::fs::fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, SyslogFile};
-use crate::fs::*;
-use crate::logging::log_trace;
-use crate::mm::MemoryManager;
-use crate::signals::dequeue_signal;
-use crate::syscalls::{
-    decls::{Syscall, SyscallDecl},
-    table::dispatch_syscall,
+use crate::{
+    fs::{
+        fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, SyslogFile},
+        *,
+    },
+    logging::log_trace,
+    mm::MemoryManager,
+    signals::dequeue_signal,
+    syscalls::{
+        decls::{Syscall, SyscallDecl},
+        table::dispatch_syscall,
+    },
+    task::*,
+    types::*,
 };
-use crate::task::*;
-use crate::types::*;
 
 /// Contains context to track the most recently failing system call.
 ///
@@ -244,8 +247,7 @@ pub fn block_while_stopped(current_task: &CurrentTask) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::signals::*;
-    use crate::testing::*;
+    use crate::{signals::*, testing::*};
 
     #[::fuchsia::test]
     async fn test_block_while_stopped_stop_and_continue() {

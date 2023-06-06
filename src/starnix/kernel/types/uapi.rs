@@ -8,8 +8,10 @@
 
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
-use crate::mm::PAGE_SIZE;
-use crate::types::{SigSet, UserAddress};
+use crate::{
+    mm::PAGE_SIZE,
+    types::{SigSet, UserAddress},
+};
 
 use linux_uapi as uapi;
 

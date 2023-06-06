@@ -4,17 +4,22 @@
 
 use fuchsia_zircon as zx;
 use itertools::Itertools;
-use std::collections::hash_map::Entry;
-use std::collections::{HashMap, VecDeque};
-use std::sync::{Arc, Weak};
+use std::{
+    collections::{hash_map::Entry, HashMap, VecDeque},
+    sync::{Arc, Weak},
+};
 
-use crate::arch::uapi::epoll_event;
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::*;
-use crate::lock::RwLock;
-use crate::logging::*;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    arch::uapi::epoll_event,
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        *,
+    },
+    lock::RwLock,
+    logging::*,
+    task::*,
+    types::*,
+};
 
 /// Maximum depth of epoll instances monitoring one another.
 /// From https://man7.org/linux/man-pages/man2/epoll_ctl.2.html
@@ -485,11 +490,13 @@ impl FileOps for EpollFileObject {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fs::buffers::{VecInputBuffer, VecOutputBuffer};
-    use crate::fs::fuchsia::create_fuchsia_pipe;
-    use crate::fs::pipe::new_pipe;
-    use crate::fs::socket::{SocketDomain, SocketType, UnixSocket};
-    use crate::fs::FdEvents;
+    use crate::fs::{
+        buffers::{VecInputBuffer, VecOutputBuffer},
+        fuchsia::create_fuchsia_pipe,
+        pipe::new_pipe,
+        socket::{SocketDomain, SocketType, UnixSocket},
+        FdEvents,
+    };
     use fuchsia_zircon::HandleBased;
     use std::sync::atomic::{AtomicU64, Ordering};
     use syncio::Zxio;

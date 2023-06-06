@@ -2,12 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::{
-    emit_dotdot, fileops_impl_directory, unbounded_seek, DirectoryEntryType, DirentSink,
-    FileObject, FileOps, FsString, SeekOrigin,
+use crate::{
+    fs::{
+        emit_dotdot, fileops_impl_directory, unbounded_seek, DirectoryEntryType, DirentSink,
+        FileObject, FileOps, FsString, SeekOrigin,
+    },
+    task::CurrentTask,
+    types::*,
 };
-use crate::task::CurrentTask;
-use crate::types::*;
 
 /// A directory entry used for [`VecDirectory`].
 #[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]

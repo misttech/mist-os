@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 use super::*;
-use crate::fs::fs_node_impl_symlink;
-use crate::fs::fs_node_impl_xattr_delegate;
-use crate::task::CurrentTask;
-use crate::types::*;
+use crate::{
+    fs::{fs_node_impl_symlink, fs_node_impl_xattr_delegate},
+    task::CurrentTask,
+    types::*,
+};
 
 /// A node that represents a symlink to another node.
 pub struct SymlinkNode {

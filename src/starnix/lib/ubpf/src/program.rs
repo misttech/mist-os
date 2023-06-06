@@ -4,9 +4,11 @@
 
 use linux_uapi::*;
 
-use crate::converter::cbpf_to_ebpf;
-use crate::ubpf::{ubpf_create, ubpf_destroy, ubpf_exec, ubpf_load, ubpf_vm};
-use crate::UbpfError::*;
+use crate::{
+    converter::cbpf_to_ebpf,
+    ubpf::{ubpf_create, ubpf_destroy, ubpf_exec, ubpf_load, ubpf_vm},
+    UbpfError::*,
+};
 
 // This file contains wrapper logic to build programs and execute
 // them in the ubpf VM.

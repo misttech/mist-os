@@ -7,13 +7,13 @@ use std::convert::TryInto;
 use zerocopy::AsBytes;
 
 use super::*;
-use crate::fs::buffers::*;
-use crate::fs::*;
-use crate::logging::{log_trace, not_implemented};
-use crate::mm::vmo::round_up_to_increment;
-use crate::mm::{MemoryAccessor, MemoryAccessorExt};
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    fs::{buffers::*, *},
+    logging::{log_trace, not_implemented},
+    mm::{vmo::round_up_to_increment, MemoryAccessor, MemoryAccessorExt},
+    task::*,
+    types::*,
+};
 
 pub fn sys_socket(
     current_task: &CurrentTask,

@@ -4,22 +4,27 @@
 
 use fuchsia_zircon as zx;
 use itertools::Itertools;
-use std::collections::BTreeMap;
-use std::fmt;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Weak};
+use std::{
+    collections::BTreeMap,
+    fmt,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Weak,
+    },
+};
 
-use crate::auth::Credentials;
-use crate::device::terminal::*;
-use crate::drop_notifier::DropNotifier;
-use crate::lock::RwLock;
-use crate::logging::log_error;
-use crate::mutable_state::*;
-use crate::selinux::SeLinuxThreadGroupState;
-use crate::signals::syscalls::WaitingOptions;
-use crate::signals::*;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    auth::Credentials,
+    device::terminal::*,
+    drop_notifier::DropNotifier,
+    lock::RwLock,
+    logging::log_error,
+    mutable_state::*,
+    selinux::SeLinuxThreadGroupState,
+    signals::{syscalls::WaitingOptions, *},
+    task::*,
+    types::*,
+};
 
 /// The mutable state of the ThreadGroup.
 pub struct ThreadGroupMutableState {

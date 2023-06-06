@@ -3,14 +3,9 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon as zx;
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
-use crate::lock::Mutex;
-use crate::logging::impossible_error;
-use crate::mm::ProtectionFlags;
-use crate::task::*;
-use crate::types::*;
+use crate::{lock::Mutex, logging::impossible_error, mm::ProtectionFlags, task::*, types::*};
 
 /// A table of futexes.
 ///

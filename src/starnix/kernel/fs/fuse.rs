@@ -2,19 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        fs::{
-            buffers::{InputBuffer, OutputBuffer},
-            fileops_impl_nonseekable, fs_args, CacheMode, FdNumber, FileObject, FileOps,
-            FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
-            FsNodeOps, FsStr,
-        },
-        task::CurrentTask,
-        types::{errno, error, statfs, Errno, OpenFlags},
+use crate::{
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        fileops_impl_nonseekable, fs_args, CacheMode, FdNumber, FileObject, FileOps, FileSystem,
+        FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeOps, FsStr,
     },
-    std::sync::Arc,
+    task::CurrentTask,
+    types::{errno, error, statfs, Errno, OpenFlags},
 };
+use std::sync::Arc;
 
 #[derive(Debug, Default)]
 pub struct FuseState;

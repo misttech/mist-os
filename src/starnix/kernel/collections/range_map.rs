@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::borrow::Borrow;
-use std::cmp::{Eq, Ord, Ordering, PartialOrd};
-use std::collections::BTreeMap;
-use std::iter::Iterator;
-use std::ops::Range;
+use std::{
+    borrow::Borrow,
+    cmp::{Eq, Ord, Ordering, PartialOrd},
+    collections::BTreeMap,
+    iter::Iterator,
+    ops::Range,
+};
 
 /// Keys for the map inside RangeMap.
 ///

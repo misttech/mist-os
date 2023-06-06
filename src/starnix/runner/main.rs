@@ -5,8 +5,7 @@
 use anyhow::Error;
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_runner as frunner;
-use fuchsia_component::client::connect_to_protocol;
-use fuchsia_component::server::ServiceFs;
+use fuchsia_component::{client::connect_to_protocol, server::ServiceFs};
 use futures::{StreamExt, TryStreamExt};
 use kernel_manager::StarnixKernel;
 

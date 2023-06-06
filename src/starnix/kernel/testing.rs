@@ -4,21 +4,24 @@
 
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
-use std::ffi::CString;
-use std::sync::Arc;
+use std::{ffi::CString, sync::Arc};
 use zerocopy::AsBytes;
 
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::fuchsia::RemoteFs;
-use crate::fs::tmpfs::TmpFs;
-use crate::fs::*;
-use crate::mm::{
-    syscalls::{do_mmap, sys_mremap},
-    MemoryAccessor, MemoryManager, PAGE_SIZE,
+use crate::{
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        fuchsia::RemoteFs,
+        tmpfs::TmpFs,
+        *,
+    },
+    mm::{
+        syscalls::{do_mmap, sys_mremap},
+        MemoryAccessor, MemoryManager, PAGE_SIZE,
+    },
+    syscalls::SyscallResult,
+    task::*,
+    types::*,
 };
-use crate::syscalls::SyscallResult;
-use crate::task::*;
-use crate::types::*;
 
 /// Create a FileSystemHandle for use in testing.
 ///

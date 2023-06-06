@@ -2,24 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::cmp::Ordering;
-use std::convert::TryInto;
-use std::sync::Arc;
-use std::usize;
+use std::{cmp::Ordering, convert::TryInto, sync::Arc, usize};
 
-use crate::arch::uapi::{epoll_event, stat_t};
-use crate::fs::buffers::*;
-use crate::fs::eventfd::*;
-use crate::fs::fuchsia::*;
-use crate::fs::inotify::*;
-use crate::fs::pipe::*;
-use crate::fs::*;
-use crate::lock::Mutex;
-use crate::logging::*;
-use crate::mm::{MemoryAccessor, MemoryAccessorExt};
-use crate::syscalls::*;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    arch::uapi::{epoll_event, stat_t},
+    fs::{buffers::*, eventfd::*, fuchsia::*, inotify::*, pipe::*, *},
+    lock::Mutex,
+    logging::*,
+    mm::{MemoryAccessor, MemoryAccessorExt},
+    syscalls::*,
+    task::*,
+    types::*,
+};
 use fuchsia_zircon as zx;
 
 /// A memfd file descriptor cannot have a name longer than 250 bytes, including
@@ -2090,8 +2084,7 @@ pub fn sys_splice(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mm::PAGE_SIZE;
-    use crate::testing::*;
+    use crate::{mm::PAGE_SIZE, testing::*};
     use std::sync::Arc;
 
     #[::fuchsia::test]

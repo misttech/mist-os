@@ -9,21 +9,19 @@ use fidl_fuchsia_io as fio;
 use fidl_fuchsia_starnix_container as fstarcontainer;
 use fuchsia_async::{self as fasync, DurationExt};
 use fuchsia_zircon as zx;
-use futures::TryStreamExt;
-use futures::{AsyncReadExt, AsyncWriteExt};
-use std::ffi::CString;
-use std::sync::Arc;
+use futures::{AsyncReadExt, AsyncWriteExt, TryStreamExt};
+use std::{ffi::CString, sync::Arc};
 
-use crate::execution::{execute_task, Container};
-use crate::fs::buffers::*;
-use crate::fs::devpts::create_main_and_replica;
-use crate::fs::file_server::serve_file_at;
-use crate::fs::fuchsia::create_fuchsia_pipe;
-use crate::fs::socket::VsockSocket;
-use crate::fs::*;
-use crate::logging::log_error;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    execution::{execute_task, Container},
+    fs::{
+        buffers::*, devpts::create_main_and_replica, file_server::serve_file_at,
+        fuchsia::create_fuchsia_pipe, socket::VsockSocket, *,
+    },
+    logging::log_error,
+    task::*,
+    types::*,
+};
 
 use super::*;
 

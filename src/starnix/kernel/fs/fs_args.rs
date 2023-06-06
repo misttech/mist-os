@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        fs::FsStr,
-        types::{errno, Errno},
-    },
-    std::collections::HashMap,
+use crate::{
+    fs::FsStr,
+    types::{errno, Errno},
 };
+use std::collections::HashMap;
 
 /// generic_parse_mount_options parses a comma-separated list of options of the
 /// form "key" or "key=value", where neither key nor value contain commas, and

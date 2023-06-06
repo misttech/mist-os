@@ -4,9 +4,10 @@
 
 use fuchsia_zircon as zx;
 
-use crate::mm::{MemoryAccessor, MemoryAccessorExt};
-use crate::syscalls::decls::SyscallDecl;
-use crate::syscalls::*;
+use crate::{
+    mm::{MemoryAccessor, MemoryAccessorExt},
+    syscalls::{decls::SyscallDecl, *},
+};
 
 pub fn sys_uname(current_task: &CurrentTask, name: UserRef<utsname_t>) -> Result<(), Errno> {
     fn init_array(fixed: &mut [u8; 65], init: &[u8]) {

@@ -2,12 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::*;
-use crate::lock::Mutex;
-use crate::signals::*;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        *,
+    },
+    lock::Mutex,
+    signals::*,
+    task::*,
+    types::*,
+};
 use std::convert::TryInto;
 
 use zerocopy::AsBytes;

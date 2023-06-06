@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use super::proc_directory::*;
-use crate::fs::*;
-use crate::task::*;
-use crate::types::*;
+use crate::{fs::*, task::*, types::*};
 
 use std::sync::Arc;
 

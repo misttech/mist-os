@@ -3,15 +3,18 @@
 // found in the LICENSE file.
 
 use std::sync::atomic::{AtomicU8, Ordering};
-use ubpf::converter::{bpf_addressing_mode, bpf_class};
-use ubpf::program::EbpfProgram;
+use ubpf::{
+    converter::{bpf_addressing_mode, bpf_class},
+    program::EbpfProgram,
+};
 
-use crate::logging::log_warn;
-use crate::signals::{send_signal, SignalDetail, SignalInfo};
-use crate::syscalls::decls::Syscall;
-use crate::syscalls::SyscallResult;
-use crate::task::{CurrentTask, ExitStatus, Task};
-use crate::types::*;
+use crate::{
+    logging::log_warn,
+    signals::{send_signal, SignalDetail, SignalInfo},
+    syscalls::{decls::Syscall, SyscallResult},
+    task::{CurrentTask, ExitStatus, Task},
+    types::*,
+};
 
 #[derive(Clone)]
 pub struct SeccompFilter {

@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::socket::*;
-use crate::logging::log_warn;
-use crate::logging::not_implemented;
-use crate::mm::MemoryAccessorExt;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    fs::socket::*,
+    logging::{log_warn, not_implemented},
+    mm::MemoryAccessorExt,
+    task::*,
+    types::*,
+};
 use std::collections::HashMap;
 use zerocopy::{AsBytes, FromBytes};
 

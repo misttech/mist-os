@@ -2,12 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::*;
-use crate::logging::log;
-use crate::syscalls::SyscallResult;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        *,
+    },
+    logging::log,
+    syscalls::SyscallResult,
+    task::*,
+    types::*,
+};
 
 pub struct SyslogFile;
 

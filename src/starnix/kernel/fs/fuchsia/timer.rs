@@ -8,11 +8,15 @@ use fuchsia_zircon::{AsHandleRef, Clock, Unowned};
 use std::sync::Arc;
 use zerocopy::AsBytes;
 
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::*;
-use crate::lock::Mutex;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        *,
+    },
+    lock::Mutex,
+    task::*,
+    types::*,
+};
 
 /// Clock types supported by TimerFiles.
 pub enum TimerFileClock {

@@ -6,13 +6,14 @@ use zerocopy::AsBytes;
 
 use super::*;
 
-use crate::fs::buffers::*;
-use crate::fs::*;
-use crate::lock::Mutex;
-use crate::mm::MemoryAccessorExt;
-use crate::syscalls::{SyscallResult, SUCCESS};
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    fs::{buffers::*, *},
+    lock::Mutex,
+    mm::MemoryAccessorExt,
+    syscalls::{SyscallResult, SUCCESS},
+    task::*,
+    types::*,
+};
 
 use std::sync::Arc;
 
@@ -874,8 +875,7 @@ impl UnixSocketInner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mm::MemoryAccessor;
-    use crate::testing::*;
+    use crate::{mm::MemoryAccessor, testing::*};
     use std::convert::TryInto;
 
     #[::fuchsia::test]

@@ -2,11 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::auth::FsCred;
-use crate::fs::*;
-use crate::lock::Mutex;
-use crate::task::*;
-use crate::types::*;
+use crate::{auth::FsCred, fs::*, lock::Mutex, task::*, types::*};
 use std::borrow::Cow;
 
 pub fn sysctl_directory(fs: &FileSystemHandle) -> FsNodeHandle {

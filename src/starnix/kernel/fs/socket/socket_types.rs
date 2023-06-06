@@ -5,8 +5,7 @@
 use bitflags::bitflags;
 use zerocopy::{AsBytes, FromBytes};
 
-use crate::fs::*;
-use crate::types::*;
+use crate::{fs::*, types::*};
 pub use syncio::ZxioShutdownFlags as SocketShutdownFlags;
 
 use super::NetlinkAddress;

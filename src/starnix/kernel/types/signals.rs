@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 use static_assertions::assert_eq_size;
-use std::convert::{From, TryFrom};
-use std::fmt;
+use std::{
+    convert::{From, TryFrom},
+    fmt,
+};
 
 use crate::types::*;
 use zerocopy::{AsBytes, FromBytes, FromZeroes};

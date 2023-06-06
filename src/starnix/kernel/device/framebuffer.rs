@@ -3,15 +3,19 @@
 // found in the LICENSE file.
 
 use super::framebuffer_server::{spawn_view_provider, FramebufferServer};
-use crate::device::DeviceOps;
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::*;
-use crate::lock::RwLock;
-use crate::logging::*;
-use crate::mm::{MemoryAccessorExt, ProtectionFlags};
-use crate::syscalls::{SyscallResult, SUCCESS};
-use crate::task::CurrentTask;
-use crate::types::*;
+use crate::{
+    device::DeviceOps,
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        *,
+    },
+    lock::RwLock,
+    logging::*,
+    mm::{MemoryAccessorExt, ProtectionFlags},
+    syscalls::{SyscallResult, SUCCESS},
+    task::CurrentTask,
+    types::*,
+};
 
 use fidl_fuchsia_ui_composition as fuicomposition;
 use fuchsia_zircon as zx;

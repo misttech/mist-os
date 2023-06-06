@@ -6,8 +6,7 @@
 
 use std::ops;
 
-use crate::types::uapi;
-use crate::types::*;
+use crate::types::{uapi, *};
 
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub struct FileMode(u32);

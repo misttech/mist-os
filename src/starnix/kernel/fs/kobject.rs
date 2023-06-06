@@ -3,13 +3,17 @@
 // found in the LICENSE file.
 use super::*;
 
-use std::collections::BTreeMap;
-use std::sync::{Arc, Weak};
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, Weak},
+};
 
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::lock::Mutex;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    fs::buffers::{InputBuffer, OutputBuffer},
+    lock::Mutex,
+    task::*,
+    types::*,
+};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum KType {

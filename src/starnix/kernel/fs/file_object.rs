@@ -4,22 +4,24 @@
 
 use fidl::HandleBased;
 use fuchsia_zircon as zx;
-use std::fmt;
-use std::sync::Arc;
+use std::{fmt, sync::Arc};
 
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::file_server::serve_file;
-use crate::fs::*;
-use crate::lock::Mutex;
-use crate::logging::{impossible_error, not_implemented};
-use crate::mm::{
-    vmo::round_up_to_system_page_size, DesiredAddress, MappedVmo, MappingName, MappingOptions,
-    ProtectionFlags,
+use crate::{
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        file_server::serve_file,
+        *,
+    },
+    lock::Mutex,
+    logging::{impossible_error, not_implemented},
+    mm::{
+        vmo::round_up_to_system_page_size, DesiredAddress, MappedVmo, MappingName, MappingOptions,
+        ProtectionFlags,
+    },
+    syscalls::*,
+    task::*,
+    types::{as_any::*, *},
 };
-use crate::syscalls::*;
-use crate::task::*;
-use crate::types::as_any::*;
-use crate::types::*;
 
 pub const MAX_LFS_FILESIZE: usize = 0x7fffffffffffffff;
 

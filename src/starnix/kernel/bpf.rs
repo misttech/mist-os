@@ -12,20 +12,21 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
-use std::collections::BTreeMap;
-use std::ops::Bound;
-use std::sync::Arc;
+use std::{collections::BTreeMap, ops::Bound, sync::Arc};
 use zerocopy::{AsBytes, FromBytes};
 
-use crate::auth::*;
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::*;
-use crate::lock::Mutex;
-use crate::mm::{MemoryAccessor, MemoryAccessorExt};
-use crate::syscalls::*;
-use crate::task::Kernel;
-use crate::types::as_any::AsAny;
-use crate::types::*;
+use crate::{
+    auth::*,
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        *,
+    },
+    lock::Mutex,
+    mm::{MemoryAccessor, MemoryAccessorExt},
+    syscalls::*,
+    task::Kernel,
+    types::{as_any::AsAny, *},
+};
 
 /// The default selinux context to use for each BPF object.
 const DEFAULT_BPF_SELINUX_CONTEXT: &FsStr = b"u:object_r:fs_bpf:s0";

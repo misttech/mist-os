@@ -4,11 +4,12 @@
 
 use super::*;
 
-use crate::fs::buffers::*;
-use crate::fs::*;
-use crate::lock::Mutex;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    fs::{buffers::*, *},
+    lock::Mutex,
+    task::*,
+    types::*,
+};
 
 // An implementation of AF_VSOCK.
 // See https://man7.org/linux/man-pages/man7/vsock.7.html
@@ -282,11 +283,15 @@ impl VsockSocketInner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::arch::uapi::epoll_event;
-    use crate::fs::buffers::{VecInputBuffer, VecOutputBuffer};
-    use crate::fs::fuchsia::create_fuchsia_pipe;
-    use crate::mm::PAGE_SIZE;
-    use crate::testing::*;
+    use crate::{
+        arch::uapi::epoll_event,
+        fs::{
+            buffers::{VecInputBuffer, VecOutputBuffer},
+            fuchsia::create_fuchsia_pipe,
+        },
+        mm::PAGE_SIZE,
+        testing::*,
+    };
     use fuchsia_zircon as zx;
     use fuchsia_zircon::HandleBased;
     use syncio::Zxio;

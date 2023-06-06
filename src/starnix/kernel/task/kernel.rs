@@ -9,22 +9,24 @@ use fidl_fuchsia_ui_display_singleton as fuidisplay;
 use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
-use std::collections::{BTreeMap, HashSet};
-use std::iter::FromIterator;
-use std::sync::Arc;
+use std::{
+    collections::{BTreeMap, HashSet},
+    iter::FromIterator,
+    sync::Arc,
+};
 
-use crate::device::framebuffer::Framebuffer;
-use crate::device::input::InputFile;
-use crate::device::{BinderDriver, DeviceMode, DeviceRegistry};
-use crate::fs::socket::SocketAddress;
-use crate::fs::{FileOps, FileSystemHandle, FsNode};
-use crate::lock::RwLock;
-use crate::logging::set_zx_name;
-use crate::mm::FutexTable;
-use crate::task::*;
-use crate::types::*;
-use crate::types::{DeviceType, Errno, OpenFlags};
-use crate::vdso::vdso_loader::Vdso;
+use crate::{
+    device::{
+        framebuffer::Framebuffer, input::InputFile, BinderDriver, DeviceMode, DeviceRegistry,
+    },
+    fs::{socket::SocketAddress, FileOps, FileSystemHandle, FsNode},
+    lock::RwLock,
+    logging::set_zx_name,
+    mm::FutexTable,
+    task::*,
+    types::{DeviceType, Errno, OpenFlags, *},
+    vdso::vdso_loader::Vdso,
+};
 
 /// The width of the display by default.
 pub const DISPLAY_WIDTH: u32 = 720;

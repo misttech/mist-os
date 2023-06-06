@@ -4,12 +4,12 @@
 
 use super::*;
 
-use crate::fs::buffers::*;
-use crate::fs::fuchsia::*;
-use crate::fs::*;
-use crate::mm::MemoryAccessorExt;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    fs::{buffers::*, fuchsia::*, *},
+    mm::MemoryAccessorExt,
+    task::*,
+    types::*,
+};
 use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;

@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::{syscalls::do_clone, CurrentTask};
-use crate::types::{clone_args, pid_t, Errno, UserAddress, UserRef, CSIGNAL};
+use crate::{
+    task::{syscalls::do_clone, CurrentTask},
+    types::{clone_args, pid_t, Errno, UserAddress, UserRef, CSIGNAL},
+};
 
 /// The parameter order for `clone` varies by architecture.
 pub fn sys_clone(

@@ -5,19 +5,21 @@
 #![allow(non_camel_case_types)]
 
 use super::shared::{execute_syscall, process_completed_restricted_exit, TaskInfo};
-use crate::arch::{
-    execution::{generate_cfi_directives, restore_cfi_directives},
-    registers::RegisterState,
+use crate::{
+    arch::{
+        execution::{generate_cfi_directives, restore_cfi_directives},
+        registers::RegisterState,
+    },
+    logging::{log_trace, log_warn, set_current_task_info, set_zx_name},
+    mm::MemoryManager,
+    signals::{deliver_signal, SignalActions, SignalInfo},
+    syscalls::decls::SyscallDecl,
+    task::{
+        CurrentTask, ExceptionResult, ExitStatus, Kernel, ProcessGroup, Task, ThreadGroup,
+        ThreadGroupWriteGuard,
+    },
+    types::*,
 };
-use crate::logging::{log_trace, log_warn, set_current_task_info, set_zx_name};
-use crate::mm::MemoryManager;
-use crate::signals::{deliver_signal, SignalActions, SignalInfo};
-use crate::syscalls::decls::SyscallDecl;
-use crate::task::{
-    CurrentTask, ExceptionResult, ExitStatus, Kernel, ProcessGroup, Task, ThreadGroup,
-    ThreadGroupWriteGuard,
-};
-use crate::types::*;
 use anyhow::{format_err, Error};
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use std::sync::Arc;

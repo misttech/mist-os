@@ -7,20 +7,22 @@
 use fuchsia_zircon as zx;
 use fuchsia_zircon::HandleBased;
 use magma::*;
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
-use super::ffi::*;
-use super::magma::*;
-use crate::device::wayland::image_file::*;
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::*;
-use crate::lock::Mutex;
-use crate::logging::{impossible_error, log_error, log_warn};
-use crate::mm::MemoryAccessorExt;
-use crate::syscalls::*;
-use crate::task::CurrentTask;
-use crate::types::*;
+use super::{ffi::*, magma::*};
+use crate::{
+    device::wayland::image_file::*,
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        *,
+    },
+    lock::Mutex,
+    logging::{impossible_error, log_error, log_warn},
+    mm::MemoryAccessorExt,
+    syscalls::*,
+    task::CurrentTask,
+    types::*,
+};
 
 #[derive(Clone)]
 pub enum BufferInfo {

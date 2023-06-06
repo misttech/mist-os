@@ -5,18 +5,19 @@
 use fuchsia_zircon::AsHandleRef;
 
 use static_assertions::const_assert;
-use std::ffi::CString;
-use std::sync::Arc;
+use std::{ffi::CString, sync::Arc};
 use zerocopy::AsBytes;
 
-use crate::auth::{Credentials, SecureBits};
-use crate::execution::*;
-use crate::fs::*;
-use crate::lock::RwLock;
-use crate::logging::{log_error, log_trace};
-use crate::mm::*;
-use crate::syscalls::*;
-use crate::task::*;
+use crate::{
+    auth::{Credentials, SecureBits},
+    execution::*,
+    fs::*,
+    lock::RwLock,
+    logging::{log_error, log_trace},
+    mm::*,
+    syscalls::*,
+    task::*,
+};
 
 pub fn do_clone(current_task: &CurrentTask, args: &clone_args) -> Result<pid_t, Errno> {
     let child_exit_signal = if args.exit_signal == 0 {
@@ -1183,8 +1184,7 @@ pub fn sys_unshare(current_task: &CurrentTask, flags: u32) -> Result<(), Errno> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mm::syscalls::sys_munmap;
-    use crate::testing::*;
+    use crate::{mm::syscalls::sys_munmap, testing::*};
     use std::u64;
 
     #[::fuchsia::test]

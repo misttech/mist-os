@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::{magma::MagmaFile, DeviceOps};
-use crate::fs::{FileOps, FsNode};
-use crate::task::CurrentTask;
-use crate::types::*;
+use crate::{
+    device::{magma::MagmaFile, DeviceOps},
+    fs::{FileOps, FsNode},
+    task::CurrentTask,
+    types::*,
+};
 
 // Starnix device is a grouping for devices specific to Starnix.
 pub struct StarnixDevice;

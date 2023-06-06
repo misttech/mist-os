@@ -4,17 +4,20 @@
 
 use std::sync::{Arc, Weak};
 
-use crate::arch::uapi::blksize_t;
-use crate::auth::FsCred;
-use crate::device::terminal::*;
-use crate::device::DeviceOps;
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::*;
-use crate::logging::log_error;
-use crate::mm::MemoryAccessorExt;
-use crate::syscalls::*;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    arch::uapi::blksize_t,
+    auth::FsCred,
+    device::{terminal::*, DeviceOps},
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        *,
+    },
+    logging::log_error,
+    mm::MemoryAccessorExt,
+    syscalls::*,
+    task::*,
+    types::*,
+};
 
 // See https://www.kernel.org/doc/Documentation/admin-guide/devices.txt
 const DEVPTS_FIRST_MAJOR: u32 = 136;
@@ -533,10 +536,14 @@ fn shared_ioctl(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::auth::{Credentials, FsCred};
-    use crate::fs::buffers::{VecInputBuffer, VecOutputBuffer};
-    use crate::fs::tmpfs::TmpFs;
-    use crate::testing::*;
+    use crate::{
+        auth::{Credentials, FsCred},
+        fs::{
+            buffers::{VecInputBuffer, VecOutputBuffer},
+            tmpfs::TmpFs,
+        },
+        testing::*,
+    };
 
     fn ioctl<T: zerocopy::AsBytes + zerocopy::FromBytes + Copy>(
         task: &CurrentTask,

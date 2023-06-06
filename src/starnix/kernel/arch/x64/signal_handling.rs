@@ -4,10 +4,7 @@
 
 use fuchsia_zircon as zx;
 
-use crate::arch::registers::RegisterState;
-use crate::signals::*;
-use crate::task::*;
-use crate::types::*;
+use crate::{arch::registers::RegisterState, signals::*, task::*, types::*};
 
 /// The size of the red zone.
 ///
@@ -174,8 +171,10 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use crate::mm::{DesiredAddress, MappingName, MappingOptions, ProtectionFlags};
-    use crate::testing::*;
+    use crate::{
+        mm::{DesiredAddress, MappingName, MappingOptions, ProtectionFlags},
+        testing::*,
+    };
 
     const SYSCALL_INSTRUCTION_ADDRESS: UserAddress = UserAddress::from(100);
     const SYSCALL_NUMBER: u64 = 42;

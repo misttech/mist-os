@@ -30,10 +30,10 @@ use zxio::{
 
 pub mod zxio;
 
-pub use zxio::zxio_dirent_t;
-pub use zxio::zxio_node_attr_zxio_node_attr_has_t as zxio_node_attr_has_t;
-pub use zxio::zxio_node_attributes_t;
-pub use zxio::zxio_signals_t;
+pub use zxio::{
+    zxio_dirent_t, zxio_node_attr_zxio_node_attr_has_t as zxio_node_attr_has_t,
+    zxio_node_attributes_t, zxio_signals_t,
+};
 
 bitflags! {
     // These values should match the values in sdk/lib/zxio/include/lib/zxio/types.h

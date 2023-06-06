@@ -5,28 +5,31 @@
 use extended_pstate::ExtendedPstateState;
 use fuchsia_zircon::{self as zx, sys::zx_thread_state_general_regs_t, AsHandleRef, Signals};
 use once_cell::sync::OnceCell;
-use std::cmp;
-use std::convert::TryFrom;
-use std::ffi::CString;
-use std::fmt;
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
-
-use crate::arch::{
-    registers::RegisterState,
-    task::{decode_page_fault_exception_report, get_signal_for_general_exception},
+use std::{
+    cmp,
+    convert::TryFrom,
+    ffi::CString,
+    fmt,
+    sync::{atomic::Ordering, Arc},
 };
-use crate::auth::*;
-use crate::execution::*;
-use crate::fs::*;
-use crate::loader::*;
-use crate::lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
-use crate::logging::*;
-use crate::mm::{MemoryAccessorExt, MemoryManager};
-use crate::signals::{types::*, SignalInfo};
-use crate::syscalls::{decls::Syscall, SyscallResult};
-use crate::task::*;
-use crate::types::*;
+
+use crate::{
+    arch::{
+        registers::RegisterState,
+        task::{decode_page_fault_exception_report, get_signal_for_general_exception},
+    },
+    auth::*,
+    execution::*,
+    fs::*,
+    loader::*,
+    lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
+    logging::*,
+    mm::{MemoryAccessorExt, MemoryManager},
+    signals::{types::*, SignalInfo},
+    syscalls::{decls::Syscall, SyscallResult},
+    task::*,
+    types::*,
+};
 
 // In user space, priority (niceness) is an integer from -20..19 (inclusive)
 // with the default being 0.

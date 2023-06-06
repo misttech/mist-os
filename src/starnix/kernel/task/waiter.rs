@@ -3,17 +3,22 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon as zx;
-use std::collections::HashMap;
-use std::ops::DerefMut;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Weak};
+use std::{
+    collections::HashMap,
+    ops::DerefMut,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Weak,
+    },
+};
 
-use crate::fs::FdEvents;
-use crate::lock::Mutex;
-use crate::logging::*;
-use crate::task::*;
-use crate::types::Errno;
-use crate::types::*;
+use crate::{
+    fs::FdEvents,
+    lock::Mutex,
+    logging::*,
+    task::*,
+    types::{Errno, *},
+};
 
 pub type SignalHandler = Box<dyn FnOnce(zx::Signals) + Send + Sync>;
 pub type EventHandler = Box<dyn FnOnce(FdEvents) + Send + Sync>;
@@ -666,10 +671,14 @@ impl WaitQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fs::buffers::{VecInputBuffer, VecOutputBuffer};
-    use crate::fs::fuchsia::*;
-    use crate::fs::{new_eventfd, EventFdType, FdEvents};
-    use crate::testing::*;
+    use crate::{
+        fs::{
+            buffers::{VecInputBuffer, VecOutputBuffer},
+            fuchsia::*,
+            new_eventfd, EventFdType, FdEvents,
+        },
+        testing::*,
+    };
     use std::sync::atomic::AtomicU64;
 
     static INIT_VAL: u64 = 0;

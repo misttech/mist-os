@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::BTreeMap;
-use std::sync::{Arc, Weak};
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, Weak},
+};
 
-use crate::lock::RwLock;
-use crate::mutable_state::*;
-use crate::signals::*;
-use crate::task::*;
-use crate::types::*;
+use crate::{lock::RwLock, mutable_state::*, signals::*, task::*, types::*};
 
 #[derive(Debug)]
 pub struct ProcessGroupMutableState {

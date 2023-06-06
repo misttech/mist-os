@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        lock::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard},
-        task::{CurrentTask, WaitQueue, Waiter},
-        types::Errno,
-    },
-    std::ops::{Deref, DerefMut},
+use crate::{
+    lock::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard},
+    task::{CurrentTask, WaitQueue, Waiter},
+    types::Errno,
 };
+use std::ops::{Deref, DerefMut};
 
 /// The guard associated with `InterruptibleMutex`.
 pub type InterruptibleMutexGuard<'a, T> = InterruptibleGuard<'a, Mutex<T>, MutexGuard<'a, T>>;
@@ -164,16 +162,14 @@ impl<'a, L, G: DerefMut<Target = T>, T> DerefMut for InterruptibleGuard<'a, L, G
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::{
-            testing::{create_kernel_and_task, create_task},
-            types::{errno, pid_t},
-        },
-        std::{
-            sync::{mpsc::sync_channel, Arc},
-            thread,
-        },
+    use super::*;
+    use crate::{
+        testing::{create_kernel_and_task, create_task},
+        types::{errno, pid_t},
+    };
+    use std::{
+        sync::{mpsc::sync_channel, Arc},
+        thread,
     };
 
     #[::fuchsia::test]

@@ -5,8 +5,10 @@
 use fuchsia_zircon as zx;
 use std::{cell::RefCell, fmt};
 
-use crate::task::CurrentTask;
-use crate::types::{pid_t, Errno};
+use crate::{
+    task::CurrentTask,
+    types::{pid_t, Errno},
+};
 
 macro_rules! log {
     (level = $level:ident, $($arg:tt)*) => {{

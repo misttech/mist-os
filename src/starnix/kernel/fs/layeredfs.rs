@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 use super::*;
-use crate::task::*;
-use crate::types::*;
+use crate::{task::*, types::*};
 
 /// A filesystem that will delegate most operation to a base one, but have a number of top level
 /// directory that points to other filesystems.
@@ -147,8 +145,7 @@ impl FileOps for LayeredFsRootNodeOps {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::fs::tmpfs::TmpFs;
-    use crate::testing::*;
+    use crate::{fs::tmpfs::TmpFs, testing::*};
 
     fn get_root_entry_names(current_task: &CurrentTask, fs: &FileSystem) -> Vec<Vec<u8>> {
         struct DirentNameCapturer {

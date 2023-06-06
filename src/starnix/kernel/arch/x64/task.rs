@@ -4,8 +4,10 @@
 
 use fuchsia_zircon as zx;
 
-use crate::task::PageFaultExceptionReport;
-use crate::types::signals::{Signal, SIGFPE, SIGSEGV};
+use crate::{
+    task::PageFaultExceptionReport,
+    types::signals::{Signal, SIGFPE, SIGSEGV},
+};
 
 pub fn decode_page_fault_exception_report(
     report: &zx::sys::zx_exception_report_t,

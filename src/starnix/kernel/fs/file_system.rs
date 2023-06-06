@@ -6,15 +6,20 @@ use linked_hash_map::LinkedHashMap;
 use once_cell::sync::OnceCell;
 use ref_cast::RefCast;
 use smallvec::SmallVec;
-use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Weak};
+use std::{
+    collections::{hash_map::Entry, HashMap, HashSet},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Weak,
+    },
+};
 
 use super::*;
-use crate::lock::Mutex;
-use crate::task::Kernel;
-use crate::types::{as_any::AsAny, *};
+use crate::{
+    lock::Mutex,
+    task::Kernel,
+    types::{as_any::AsAny, *},
+};
 
 const LRU_CAPACITY: usize = 32;
 

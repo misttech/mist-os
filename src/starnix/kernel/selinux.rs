@@ -2,16 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::*;
-use crate::lock::Mutex;
-use crate::logging::not_implemented;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        *,
+    },
+    lock::Mutex,
+    logging::not_implemented,
+    task::*,
+    types::*,
+};
 use derivative::Derivative;
-use std::borrow::Cow;
-use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::{borrow::Cow, collections::BTreeMap, sync::Arc};
 use zerocopy::AsBytes;
 
 /// The version of selinux_status_t this kernel implements.

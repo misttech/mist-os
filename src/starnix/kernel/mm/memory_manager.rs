@@ -6,20 +6,24 @@ use anyhow::{anyhow, Error};
 use bitflags::bitflags;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use once_cell::sync::Lazy;
-use std::collections::{hash_map::Entry, HashMap};
-use std::convert::TryInto;
-use std::ops::Range;
-use std::sync::Arc;
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    convert::TryInto,
+    ops::Range,
+    sync::Arc,
+};
 use zerocopy::{AsBytes, FromBytes};
 
-use crate::collections::*;
-use crate::fs::*;
-use crate::lock::{Mutex, RwLock};
-use crate::logging::*;
-use crate::mm::{vmo::round_up_to_system_page_size, FutexTable};
-use crate::task::*;
-use crate::types::{range_ext::RangeExt, *};
-use crate::vmex_resource::VMEX_RESOURCE;
+use crate::{
+    collections::*,
+    fs::*,
+    lock::{Mutex, RwLock},
+    logging::*,
+    mm::{vmo::round_up_to_system_page_size, FutexTable},
+    task::*,
+    types::{range_ext::RangeExt, *},
+    vmex_resource::VMEX_RESOURCE,
+};
 
 pub static PAGE_SIZE: Lazy<u64> = Lazy::new(|| zx::system_get_page_size() as u64);
 
@@ -2078,9 +2082,7 @@ pub fn create_anonymous_mapping_vmo(size: u64) -> Result<Arc<zx::Vmo>, Errno> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mm::syscalls::do_mmap;
-    use crate::task::syscalls::sys_prctl;
-    use crate::testing::*;
+    use crate::{mm::syscalls::do_mmap, task::syscalls::sys_prctl, testing::*};
     use assert_matches::assert_matches;
     use itertools::assert_equal;
     use std::ffi::CString;

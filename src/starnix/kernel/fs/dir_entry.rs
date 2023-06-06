@@ -3,17 +3,19 @@
 // found in the LICENSE file.
 
 use bitflags::bitflags;
-use std::collections::btree_map::Entry;
-use std::collections::BTreeMap;
-use std::fmt;
-use std::sync::{Arc, Weak};
+use std::{
+    collections::{btree_map::Entry, BTreeMap},
+    fmt,
+    sync::{Arc, Weak},
+};
 
-use crate::auth::FsCred;
-use crate::fs::socket::*;
-use crate::fs::*;
-use crate::lock::{RwLock, RwLockWriteGuard};
-use crate::task::CurrentTask;
-use crate::types::*;
+use crate::{
+    auth::FsCred,
+    fs::{socket::*, *},
+    lock::{RwLock, RwLockWriteGuard},
+    task::CurrentTask,
+    types::*,
+};
 
 bitflags! {
     pub struct RenameFlags: u32 {

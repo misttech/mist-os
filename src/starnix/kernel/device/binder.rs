@@ -4,39 +4,42 @@
 
 #![allow(non_upper_case_globals)]
 
-use crate::device::mem::new_null_file;
-use crate::device::remote_binder::RemoteBinderDevice;
-use crate::device::DeviceOps;
-use crate::fs::buffers::{InputBuffer, OutputBuffer, VecInputBuffer};
-use crate::fs::devtmpfs::dev_tmp_fs;
-use crate::fs::fuchsia::new_remote_file;
-use crate::fs::{
-    fileops_impl_nonseekable, fs_node_impl_dir_readonly, CacheMode, DirEntryHandle, FdEvents,
-    FdFlags, FdNumber, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle,
-    FileSystemOps, FileSystemOptions, FsNode, FsNodeOps, FsStr, FsString, MemoryDirectoryFile,
-    NamespaceNode, SpecialNode,
+use crate::{
+    device::{mem::new_null_file, remote_binder::RemoteBinderDevice, DeviceOps},
+    fs::{
+        buffers::{InputBuffer, OutputBuffer, VecInputBuffer},
+        devtmpfs::dev_tmp_fs,
+        fileops_impl_nonseekable, fs_node_impl_dir_readonly,
+        fuchsia::new_remote_file,
+        CacheMode, DirEntryHandle, FdEvents, FdFlags, FdNumber, FileHandle, FileObject, FileOps,
+        FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeOps, FsStr,
+        FsString, MemoryDirectoryFile, NamespaceNode, SpecialNode,
+    },
+    lock::{Mutex, MutexGuard, RwLock},
+    logging::*,
+    mm::{
+        vmo::round_up_to_increment, DesiredAddress, MappedVmo, MappingName, MappingOptions,
+        MemoryAccessor, MemoryAccessorExt, ProtectionFlags,
+    },
+    mutable_state::Guard,
+    syscalls::{SyscallResult, SUCCESS},
+    task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, WaitQueue, Waiter},
+    types::*,
 };
-use crate::lock::{Mutex, MutexGuard, RwLock};
-use crate::logging::*;
-use crate::mm::vmo::round_up_to_increment;
-use crate::mm::{
-    DesiredAddress, MappedVmo, MappingName, MappingOptions, MemoryAccessor, MemoryAccessorExt,
-    ProtectionFlags,
-};
-use crate::mutable_state::Guard;
-use crate::syscalls::{SyscallResult, SUCCESS};
-use crate::task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, WaitQueue, Waiter};
-use crate::types::*;
 use bitflags::bitflags;
 use derivative::Derivative;
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_starnix_binder as fbinder;
 use fuchsia_zircon as zx;
-use std::collections::{btree_map::BTreeMap, VecDeque};
-use std::ops::DerefMut;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Weak};
+use std::{
+    collections::{btree_map::BTreeMap, VecDeque},
+    ops::DerefMut,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Weak,
+    },
+};
 use zerocopy::{AsBytes, FromBytes};
 
 // The name used to track the duration of a local binder ioctl.
@@ -3811,10 +3814,11 @@ pub fn create_binders(current_task: &CurrentTask) -> Result<(), Errno> {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::fs::{DirEntry, FdFlags};
-    use crate::mm::MemoryAccessor;
-    use crate::mm::PAGE_SIZE;
-    use crate::testing::*;
+    use crate::{
+        fs::{DirEntry, FdFlags},
+        mm::{MemoryAccessor, PAGE_SIZE},
+        testing::*,
+    };
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_endpoints, RequestStream, ServerEnd};
     use fuchsia_async as fasync;

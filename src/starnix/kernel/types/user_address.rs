@@ -3,15 +3,14 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon::sys::zx_vaddr_t;
-use std::fmt;
-use std::marker::PhantomData;
-use std::mem;
-use std::ops;
+use std::{fmt, marker::PhantomData, mem, ops};
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use super::UserBuffer;
-use crate::mm::vmo::round_up_to_increment;
-use crate::types::{error, uapi, Errno};
+use crate::{
+    mm::vmo::round_up_to_increment,
+    types::{error, uapi, Errno},
+};
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, AsBytes, FromZeroes, FromBytes)]
 #[repr(transparent)]

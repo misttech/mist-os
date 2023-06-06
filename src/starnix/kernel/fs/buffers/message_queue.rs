@@ -5,10 +5,14 @@
 use std::collections::VecDeque;
 
 use super::message_types::*;
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::socket::SocketAddress;
-use crate::fs::FdEvents;
-use crate::types::*;
+use crate::{
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        socket::SocketAddress,
+        FdEvents,
+    },
+    types::*,
+};
 
 #[derive(Debug, Default, Clone)]
 pub struct MessageReadInfo {

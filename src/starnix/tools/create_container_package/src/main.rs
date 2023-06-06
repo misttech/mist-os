@@ -6,9 +6,7 @@ use anyhow::{bail, Context, Result};
 use ext4_metadata::ROOT_INODE_NUM;
 use fuchsia_async as fasync;
 use fuchsia_pkg::{PackageBuilder, PathToStringExt};
-use std::collections::HashSet;
-use std::fs::File;
-use std::path::Path;
+use std::{collections::HashSet, fs::File, path::Path};
 use tempfile::TempDir;
 
 mod args;

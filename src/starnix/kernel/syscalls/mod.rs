@@ -11,8 +11,7 @@ pub use syscall_result::*;
 // Here we reexport common items needed for syscall implementations. This way you can quickly get
 // most things you need by importing crate::syscalls::*.
 pub(crate) use crate::logging::{log_trace, not_implemented};
-pub use crate::task::CurrentTask;
-pub use crate::types::*;
+pub use crate::{task::CurrentTask, types::*};
 
 mod misc;
 mod time;

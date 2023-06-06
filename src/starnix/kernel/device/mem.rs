@@ -4,15 +4,19 @@
 
 use fuchsia_zircon::{self as zx, cprng_draw};
 
-use crate::auth::FsCred;
-use crate::device::DeviceOps;
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::fuse::DevFuse;
-use crate::fs::*;
-use crate::logging::*;
-use crate::mm::*;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    auth::FsCred,
+    device::DeviceOps,
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        fuse::DevFuse,
+        *,
+    },
+    logging::*,
+    mm::*,
+    task::*,
+    types::*,
+};
 
 struct DevNull;
 

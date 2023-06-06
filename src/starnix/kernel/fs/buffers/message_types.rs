@@ -2,14 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use zerocopy::byteorder::{ByteOrder, NativeEndian};
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{
+    byteorder::{ByteOrder, NativeEndian},
+    AsBytes, FromBytes,
+};
 
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::socket::{SocketAddress, SocketMessageFlags};
-use crate::fs::*;
-use crate::task::CurrentTask;
-use crate::types::*;
+use crate::{
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        socket::{SocketAddress, SocketMessageFlags},
+        *,
+    },
+    task::CurrentTask,
+    types::*,
+};
 use syncio;
 
 /// A `Message` represents a typed segment of bytes within a `MessageQueue`.

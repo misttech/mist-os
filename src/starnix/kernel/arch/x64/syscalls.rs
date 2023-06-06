@@ -6,21 +6,23 @@ use fuchsia_runtime::utc_time;
 use fuchsia_zircon as zx;
 
 use super::uapi::stat_t;
-use crate::arch::uapi::epoll_event;
-use crate::fs::{
-    syscalls::{
-        poll, sys_dup3, sys_epoll_create1, sys_epoll_pwait, sys_eventfd2, sys_faccessat,
-        sys_fchmodat, sys_fchownat, sys_inotify_init1, sys_linkat, sys_mkdirat, sys_mknodat,
-        sys_newfstatat, sys_openat, sys_pipe2, sys_readlinkat, sys_renameat, sys_symlinkat,
-        sys_unlinkat,
+use crate::{
+    arch::uapi::epoll_event,
+    fs::{
+        syscalls::{
+            poll, sys_dup3, sys_epoll_create1, sys_epoll_pwait, sys_eventfd2, sys_faccessat,
+            sys_fchmodat, sys_fchownat, sys_inotify_init1, sys_linkat, sys_mkdirat, sys_mknodat,
+            sys_newfstatat, sys_openat, sys_pipe2, sys_readlinkat, sys_renameat, sys_symlinkat,
+            sys_unlinkat,
+        },
+        DirentSink, DirentSink32, FdNumber,
     },
-    DirentSink, DirentSink32, FdNumber,
+    mm::MemoryAccessorExt,
+    signals::syscalls::sys_signalfd4,
+    syscalls::not_implemented,
+    task::{syscalls::do_clone, CurrentTask, Waiter},
+    types::*,
 };
-use crate::mm::MemoryAccessorExt;
-use crate::signals::syscalls::sys_signalfd4;
-use crate::syscalls::not_implemented;
-use crate::task::{syscalls::do_clone, CurrentTask, Waiter};
-use crate::types::*;
 
 pub fn sys_access(
     current_task: &CurrentTask,
@@ -324,9 +326,11 @@ pub fn sys_vfork(current_task: &CurrentTask) -> Result<pid_t, Errno> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fs::FdFlags;
-    use crate::mm::{MemoryAccessor, PAGE_SIZE};
-    use crate::testing::*;
+    use crate::{
+        fs::FdFlags,
+        mm::{MemoryAccessor, PAGE_SIZE},
+        testing::*,
+    };
 
     #[::fuchsia::test]
     async fn test_sys_dup2() {

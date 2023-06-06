@@ -4,10 +4,7 @@
 
 use std::sync::Arc;
 
-use crate::fs::*;
-use crate::lock::RwLock;
-use crate::task::CurrentTask;
-use crate::types::*;
+use crate::{fs::*, lock::RwLock, task::CurrentTask, types::*};
 
 /// The mutable state for an FsContext.
 ///
@@ -139,8 +136,7 @@ impl FsContext {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::fs::tmpfs::TmpFs;
-    use crate::testing::*;
+    use crate::{fs::tmpfs::TmpFs, testing::*};
 
     #[::fuchsia::test]
     async fn test_umask() {
