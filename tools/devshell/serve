@@ -315,7 +315,11 @@ else
 
     # the manifest list file has relative paths and package manifest watcher looks for them
     # from PWD, so the command needs to be executed in "$FUCHSIA_BUILD_DIR"
-    cd "${FUCHSIA_BUILD_DIR}" && fx-command-exec host-tool package-tool "${package_tool_args[@]}" &
+    if [[ "${verbose}" == true ]]; then
+      cd "${FUCHSIA_BUILD_DIR}" && fx-command-exec host-tool package-tool "${package_tool_args[@]}" &
+    else
+      cd "${FUCHSIA_BUILD_DIR}" && fx-command-exec host-tool package-tool "${package_tool_args[@]}" >/dev/null &
+    fi
     package_tool_pid=$!
   fi
 fi
