@@ -8,9 +8,11 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -26,13 +28,12 @@ import (
 	"time"
 
 	"github.com/google/subcommands"
-	"github.com/ulikunitz/xz"
 	"golang.org/x/crypto/openpgp"
 	"gopkg.in/yaml.v2"
 )
 
 const (
-	packagesFile = "Packages.xz"
+	packagesFile = "Packages.gz"
 )
 
 type stringsValue []string
@@ -104,6 +105,8 @@ func parsePackages(r io.Reader) ([]map[string]string, error) {
 		}
 		return 0, nil, nil
 	})
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 1024*1024)
 	space := regexp.MustCompile(`\s+`)
 	exp := regexp.MustCompile(`(?m)^(?P<key>\S+): (?P<value>(.*)(?:$\s^ .*)*)$`)
 	var ps []map[string]string
@@ -225,7 +228,7 @@ func downloadPackageList(config *Config, depends bool) ([]Lock, error) {
 						return nil, fmt.Errorf("%s: checksum doesn't match %s vs %s", packagesUrl.String(), checksum, hex.EncodeToString(sum[:]))
 					}
 
-					g, err := xz.NewReader(bytes.NewReader(buf))
+					g, err := gzip.NewReader(bytes.NewReader(buf))
 					if err != nil {
 						return nil, err
 					}
@@ -272,7 +275,6 @@ func downloadPackageList(config *Config, depends bool) ([]Lock, error) {
 								depends = append(depends, strings.Split(strings.TrimSpace(n), " ")[0])
 							}
 							n := p["Package"]
-							//fmt.Printf("%s (%s)\n", n, a)
 							if _, ok := descriptors[n]; !ok {
 								descriptors[n] = map[string]descriptor{}
 							}
@@ -319,6 +321,7 @@ func downloadPackageList(config *Config, depends bool) ([]Lock, error) {
 
 	// Process all dependencies until we drain the queue.
 	locks := map[string]map[string]Lock{}
+	var errs []error
 	for len(queue) > 0 {
 		p := queue[0]
 		queue = queue[1:]
@@ -347,11 +350,14 @@ func downloadPackageList(config *Config, depends bool) ([]Lock, error) {
 					}
 				}
 			} else {
-				return nil, fmt.Errorf("package %q not found for architecture %q", p.name, p.architecture)
+				errs = append(errs, fmt.Errorf("package %q not found for architecture %q", p.name, p.architecture))
 			}
 		} else {
-			return nil, fmt.Errorf("package %q not found", p.name)
+			errs = append(errs, fmt.Errorf("package %q not found", p.name))
 		}
+	}
+	if len(errs) != 0 {
+		return nil, errors.Join(errs...)
 	}
 
 	// Eliminate all duplicates.
