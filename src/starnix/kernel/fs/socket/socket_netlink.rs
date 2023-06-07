@@ -832,19 +832,7 @@ impl SocketOps for RouteNetlinkSocket {
         _flags: SocketMessageFlags,
     ) -> Result<MessageReadInfo, Errno> {
         let RouteNetlinkSocket { inner, client: _, message_sender: _ } = self;
-        match inner.lock().read_message() {
-            Some(message) => {
-                let message_length = message.data.len();
-                let bytes_read = data.write(message.data.bytes())?;
-                Ok(MessageReadInfo {
-                    bytes_read,
-                    message_length,
-                    address: Some(SocketAddress::Netlink(NetlinkAddress::default())),
-                    ancillary_data: vec![],
-                })
-            }
-            None => Ok(MessageReadInfo::default()),
-        }
+        inner.lock().read_datagram(data)
     }
 
     fn write(
