@@ -7,14 +7,7 @@ if (is_host) {
   ctf_host_test("ffx_cts_test") {
     binary_path = "$root_out_dir/ffx"
 
-    # TODO(fxbug.dev/96506): Remove the config override when the CTS plugin is
-    # no longer experimental.
-    args = [
-      "--config",
-      "cts.experimental=true",
-      "cts",
-      "run",
-    ]
+    args = [ "version" ]
     deps = [ "//src/developer/ffx:ffx_bin" ]
   }
 
