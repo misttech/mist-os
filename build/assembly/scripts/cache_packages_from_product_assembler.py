@@ -11,6 +11,8 @@ import json
 import os
 import sys
 
+from pathlib import Path
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -36,12 +38,19 @@ def main():
     assert not args.rebase or os.path.isdir(
         args.rebase), "--rebase needs to specify a valid directory path!"
     assembly_manifest = json.load(args.assembly_manifest)
-    with open(args.output, 'w') as output:
-        for cache_package in assembly_manifest["cache"]:
-            if args.rebase:
-                output.write(args.rebase.rstrip("/") + "/")
-            output.write(cache_package)
-            output.write("\n")
+    cache_package_manifests = [
+        args.rebase.rstrip("/") + "/" +
+        cache_package if args.rebase else cache_package
+        for cache_package in assembly_manifest["cache"]
+    ]
+    Path(args.output).write_text(
+        json.dumps(
+            {
+                "content": {
+                    "manifests": cache_package_manifests
+                },
+                "version": "1",
+            }))
 
     return 0
 

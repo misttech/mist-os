@@ -4,7 +4,7 @@
 # found in the LICENSE file.
 
 import argparse
-import os
+import json
 import subprocess
 import shlex
 import sys
@@ -126,7 +126,7 @@ def main() -> int:
     # Report package publishing.
     publish_count = sum(
         [
-            len(file.read_text().strip().split(os.linesep))
+            len(json.loads(file.read_text())['content']['manifests'])
             for file in packages_to_publish
         ])
     publish_count_msg = f'Published {publish_count} packages'
@@ -136,7 +136,7 @@ def main() -> int:
             Terminal.warn(
                 f'{publish_count_msg}, but it looks like the package server is not running.'
             )
-            Terminal.warn('You probably need to run "fx serve-updates".')
+            Terminal.warn('You probably need to run "fx serve".')
         else:
             Terminal.info(f'{publish_count_msg}!')
 
