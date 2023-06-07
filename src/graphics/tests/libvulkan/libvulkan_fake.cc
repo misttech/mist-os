@@ -138,10 +138,11 @@ vk_icdGetPhysicalDeviceProcAddr(VkInstance instance, const char* pName) {
 
 extern "C" {
 typedef VkResult(VKAPI_PTR* PFN_vkOpenInNamespaceAddr)(const char* pName, uint32_t handle);
-VKAPI_ATTR void VKAPI_CALL vk_icdInitializeOpenInNamespaceCallback(PFN_vkOpenInNamespaceAddr addr);
+VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL
+vk_icdInitializeOpenInNamespaceCallback(PFN_vkOpenInNamespaceAddr addr);
 }
 
-VKAPI_ATTR __attribute__((visibility("default"))) void VKAPI_CALL
+VKAPI_ATTR __attribute__((visibility("default"))) PFN_vkVoidFunction VKAPI_CALL
 vk_icdInitializeOpenInNamespaceCallback(PFN_vkOpenInNamespaceAddr open_in_namespace_addr) {
   zx::channel server_end, client_end;
   zx::channel::create(0, &server_end, &client_end);
@@ -153,22 +154,23 @@ vk_icdInitializeOpenInNamespaceCallback(PFN_vkOpenInNamespaceAddr open_in_namesp
         open_in_namespace_addr("/loader-gpu-devices/libvulkan_fake.json", server_end.release());
     if (result != VK_SUCCESS) {
       fprintf(stderr, "Opening libvulkan_fake.json failed with error %d\n", result);
-      return;
+      return nullptr;
     }
 
     fdio_t* fdio;
     zx_status_t status = fdio_create(client_end.release(), &fdio);
     if (status != ZX_OK) {
       fprintf(stderr, "fdio create failed with status %d\n", status);
-      return;
+      return nullptr;
     }
 
     int fd = fdio_bind_to_fd(fdio, -1, 0);
     if (fd < 0) {
       fprintf(stderr, "fdio_bind_to_fd failed\n");
-      return;
+      return nullptr;
     }
   }
 
   open_in_namespace_callback_initialized = true;
+  return nullptr;
 }
