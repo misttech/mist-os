@@ -128,6 +128,12 @@ func (r *Runner) RunCommand(ctx context.Context, cmd *exec.Cmd) error {
 		return err
 	}
 
+	return WaitForCmd(ctx, cmd)
+}
+
+// WaitForCmd waits for the command to finish and sends a SIGTERM and SIGKILL
+// if the command doesn't complete on its own.
+func WaitForCmd(ctx context.Context, cmd *exec.Cmd) error {
 	errs := make(chan error)
 
 	go func() {

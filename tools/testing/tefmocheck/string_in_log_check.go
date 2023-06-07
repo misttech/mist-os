@@ -546,5 +546,11 @@ func infraToolLogChecks() []FailureModeCheck {
 			String: "FFX Daemon was told not to autostart",
 			Type:   swarmingOutputType,
 		},
+		// For fxbug.dev/128608.
+		&stringInLogCheck{
+			String:         "No daemon was running.",
+			Type:           swarmingOutputType,
+			SkipPassedTask: true,
+		},
 	}
 }

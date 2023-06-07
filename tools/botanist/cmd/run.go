@@ -199,6 +199,7 @@ func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.Fuch
 		}
 		cmd.Stdout = daemonLog
 		logger.Debugf(ctx, "%s", cmd.Args)
+		daemonCtx, daemonCancel := context.WithCancel(ctx)
 		if err := cmd.Start(); err != nil {
 			return cleanup, err
 		}
@@ -207,7 +208,9 @@ func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.Fuch
 		// terminated earlier than expected.
 		cmdWait := make(chan error)
 		go func() {
-			if err := cmd.Wait(); err != nil {
+			// Using subprocess.WaitForCmd() instead of cmd.Wait() ensures that
+			// the function returns when the context is done.
+			if err := subprocess.WaitForCmd(daemonCtx, cmd); err != nil {
 				logger.Errorf(ctx, "daemon process finished with err: %s", err)
 			} else {
 				logger.Debugf(ctx, "ffx daemon process finished")
@@ -220,7 +223,9 @@ func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.Fuch
 			if err := ffx.Stop(); err != nil {
 				logger.Errorf(ctx, "failed to stop ffx daemon: %s", err)
 			}
+
 			// Wait for the daemon process to finish before closing the log.
+			daemonCancel()
 			<-cmdWait
 			if err := daemonLog.Close(); err != nil {
 				logger.Errorf(ctx, "failed to close ffx daemon log: %s", err)
