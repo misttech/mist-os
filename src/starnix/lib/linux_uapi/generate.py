@@ -80,6 +80,8 @@ AUTO_DERIVE_TRAITS = [
         ['AsBytes', 'FromBytes', 'FromZeroes']),
     (r'bpf_attr.*', ['FromBytes', 'FromZeroes']),
     (r'flat_binder_object.*', ['FromBytes', 'FromZeroes']),
+    (r'ifreq.*', ['FromBytes', 'FromZeroes']),
+    (r'if_settings.*', ['FromBytes', 'FromZeroes']),
     (r'ip6?t_entry', ['FromBytes', 'FromZeroes']),
     (r'ip6?t_get_entries', ['FromBytes', 'FromZeroes']),
     (r'ip6?t_replace', ['FromBytes', 'FromZeroes']),

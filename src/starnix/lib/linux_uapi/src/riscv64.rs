@@ -9786,14 +9786,14 @@ pub struct ifmap {
     pub __bindgen_padding_0: [u8; 3usize],
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, FromZeroes)]
 pub struct if_settings {
     pub type_: crate::types::c_uint,
     pub size: crate::types::c_uint,
     pub ifs_ifsu: if_settings__bindgen_ty_1,
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, FromZeroes)]
 pub union if_settings__bindgen_ty_1 {
     pub raw_hdlc: uref<raw_hdlc_proto>,
     pub cisco: uref<cisco_proto>,
@@ -9823,13 +9823,13 @@ impl Default for if_settings {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, FromZeroes)]
 pub struct ifreq {
     pub ifr_ifrn: ifreq__bindgen_ty_1,
     pub ifr_ifru: ifreq__bindgen_ty_2,
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, FromZeroes)]
 pub union ifreq__bindgen_ty_1 {
     pub ifrn_name: [crate::types::c_char; 16usize],
 }
@@ -9843,7 +9843,7 @@ impl Default for ifreq__bindgen_ty_1 {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, FromZeroes)]
 pub union ifreq__bindgen_ty_2 {
     pub ifru_addr: sockaddr,
     pub ifru_dstaddr: sockaddr,
