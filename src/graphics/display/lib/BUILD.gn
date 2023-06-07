@@ -5,6 +5,7 @@
 group("tests") {
   testonly = true
   deps = [
+    "api-types-cpp:tests",
     "designware:tests",
     "edid:tests",
     "mipi-dsi:tests",
