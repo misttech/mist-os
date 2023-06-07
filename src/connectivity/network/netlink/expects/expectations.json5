@@ -10,12 +10,14 @@
             ],
         },
 
-        // These are tests that excercise panic conditions which trigger
-        // error logs.
+        // These are tests that excercise panic or other error conditions which
+        // trigger error logs.
         {
             type: "expect_pass_with_err_logs",
             matchers: [
                 "interfaces::tests::test_new_addr_failed_unexpected_reason::*",
+                "interfaces::tests::test_del_addr::v[46]_unrecognized_error",
+                "interfaces::tests::test_del_addr_interface_closed_unexpected_reason::*",
             ],
         },
     ],

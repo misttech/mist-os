@@ -87,6 +87,17 @@ pub(crate) struct NewAddressArgs {
     pub interface_id: u32,
 }
 
+/// Arguments for an RTM_DELADDR [`Request`].
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct DelAddressArgs {
+    /// The address to be removed.
+    #[allow(unused)]
+    pub address: AddrSubnetEither,
+    /// The ID of the interface the address should be removed from.
+    #[allow(unused)]
+    pub interface_id: u32,
+}
+
 /// [`Request`] arguments associated with addresses.
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum AddressRequestArgs {
@@ -96,6 +107,9 @@ pub(crate) enum AddressRequestArgs {
     /// RTM_NEWADDR
     #[allow(unused)]
     New(NewAddressArgs),
+    /// RTM_DELADDR
+    #[allow(unused)]
+    Del(DelAddressArgs),
 }
 
 /// The argument(s) for a [`Request`].
@@ -113,6 +127,7 @@ pub(crate) enum RequestError {
     InvalidRequest,
     UnrecognizedInterface,
     AlreadyExists,
+    NotFound,
 }
 
 fn map_existing_interface_terminal_error(
@@ -463,6 +478,41 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
         }
     }
 
+    async fn handle_del_address_request(
+        interfaces_proxy: &fnet_root::InterfacesProxy,
+        DelAddressArgs { address, interface_id }: DelAddressArgs,
+    ) -> Result<(), RequestError> {
+        let control = Self::get_interface_control(interfaces_proxy, interface_id);
+
+        match control.remove_address(&mut address.into_ext()).await.map_err(|e| {
+            warn!("error removing {address} from interface ({interface_id}): {e:?}");
+            map_existing_interface_terminal_error(e, interface_id)
+        })? {
+            Ok(did_remove) => {
+                if did_remove {
+                    Ok(())
+                } else {
+                    Err(RequestError::NotFound)
+                }
+            }
+            Err(e) => {
+                // `e` is a flexible FIDL enum so we cannot exhaustively match.
+                let e: fnet_interfaces_admin::ControlRemoveAddressError = e;
+                match e {
+                    fnet_interfaces_admin::ControlRemoveAddressErrorUnknown!() => {
+                        error!(
+                            "unrecognized address removal error {:?} for address {} on interface ({})",
+                            e, address, interface_id,
+                        );
+
+                        // Assume the error was because the request was invalid.
+                        Err(RequestError::InvalidRequest)
+                    }
+                }
+            }
+        }
+    }
+
     async fn handle_request(
         interfaces_proxy: &fnet_root::InterfacesProxy,
         interface_properties: &HashMap<u64, fnet_interfaces_ext::Properties>,
@@ -504,6 +554,9 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
                 },
                 AddressRequestArgs::New(args) => {
                     Self::handle_new_address_request(interfaces_proxy, args).await
+                }
+                AddressRequestArgs::Del(args) => {
+                    Self::handle_del_address_request(interfaces_proxy, args).await
                 }
             },
         };
@@ -974,7 +1027,7 @@ fn interface_properties_to_address_messages(
 mod tests {
     use super::*;
 
-    use fidl::endpoints::{ControlHandle as _, RequestStream as _};
+    use fidl::endpoints::{ControlHandle as _, RequestStream as _, Responder as _};
     use fidl_fuchsia_net as fnet;
     use fnet_interfaces::AddressAssignmentState;
     use fuchsia_async::{self as fasync};
@@ -1751,7 +1804,7 @@ mod tests {
 
     async fn test_request<
         Fut: Future<Output = ()>,
-        F: Fn(fnet_root::InterfacesRequestStream) -> Fut,
+        F: FnOnce(fnet_root::InterfacesRequestStream) -> Fut,
     >(
         args: RequestArgs,
         root_handler: F,
@@ -1919,37 +1972,76 @@ mod tests {
         net_addr_subnet!("2001:db8::1/32")
     }
 
-    /// Tests RTM_NEWADDR when the interface is removed, indicated by the
-    /// closure of the admin Control's server-end.
+    /// Tests RTM_NEWADDR and RTM_DEL_ADDR when the interface is removed,
+    /// indicated by the closure of the admin Control's server-end.
     #[test_case(
         addr_subnet_v4(),
-        None; "v4_no_terminal")]
+        None,
+        true; "v4_no_terminal_new")]
     #[test_case(
         addr_subnet_v6(),
-        None; "v6_no_terminal")]
+        None,
+        true; "v6_no_terminal_new")]
     #[test_case(
         addr_subnet_v4(),
-        Some(InterfaceRemovedReason::PortClosed); "v4_port_closed_terminal")]
+        Some(InterfaceRemovedReason::PortClosed),
+        true; "v4_port_closed_terminal_new")]
     #[test_case(
         addr_subnet_v6(),
-        Some(InterfaceRemovedReason::PortClosed); "v6_port_closed_terminal")]
+        Some(InterfaceRemovedReason::PortClosed),
+        true; "v6_port_closed_terminal_new")]
     #[test_case(
         addr_subnet_v4(),
-        Some(InterfaceRemovedReason::User); "v4_user_terminal")]
+        Some(InterfaceRemovedReason::User),
+        true; "v4_user_terminal_new")]
     #[test_case(
         addr_subnet_v6(),
-        Some(InterfaceRemovedReason::User); "v6_user_terminal")]
+        Some(InterfaceRemovedReason::User),
+        true; "v6_user_terminal_new")]
+    #[test_case(
+        addr_subnet_v4(),
+        None,
+        false; "v4_no_terminal_del")]
+    #[test_case(
+        addr_subnet_v6(),
+        None,
+        false; "v6_no_terminal_del")]
+    #[test_case(
+        addr_subnet_v4(),
+        Some(InterfaceRemovedReason::PortClosed),
+        false; "v4_port_closed_terminal_del")]
+    #[test_case(
+        addr_subnet_v6(),
+        Some(InterfaceRemovedReason::PortClosed),
+        false; "v6_port_closed_terminal_del")]
+    #[test_case(
+        addr_subnet_v4(),
+        Some(InterfaceRemovedReason::User),
+        false; "v4_user_terminal_del")]
+    #[test_case(
+        addr_subnet_v6(),
+        Some(InterfaceRemovedReason::User),
+        false; "v6_user_terminal_del")]
     #[fuchsia::test]
-    async fn test_new_addr_interface_removed(
+    async fn test_new_del_addr_interface_removed(
         address: AddrSubnetEither,
         removal_reason: Option<InterfaceRemovedReason>,
+        is_new: bool,
     ) {
+        let interface_id = LO_INTERFACE_ID.try_into().unwrap();
         pretty_assertions::assert_eq!(
             test_request(
-                RequestArgs::Address(AddressRequestArgs::New(NewAddressArgs {
-                    address,
-                    interface_id: LO_INTERFACE_ID.try_into().unwrap(),
-                })),
+                if is_new {
+                    RequestArgs::Address(AddressRequestArgs::New(NewAddressArgs {
+                        address,
+                        interface_id,
+                    }))
+                } else {
+                    RequestArgs::Address(AddressRequestArgs::Del(DelAddressArgs {
+                        address,
+                        interface_id,
+                    }))
+                },
                 |interfaces_request_stream| async {
                     interfaces_request_stream
                         .for_each(|req| {
@@ -1980,20 +2072,29 @@ mod tests {
         )
     }
 
-    /// An RTM_NEWADDR test helper that calls the callback with a stream of ASP
-    /// requests.
-    async fn test_new_addr_asp_helper<
+    /// A test helper that calls the callback with a
+    /// [`fnet_interfaces_admin::ControlRequest`] as they arrive.
+    async fn test_interface_request<
         Fut: Future<Output = ()>,
-        F: Fn(fnet_interfaces_admin::AddressStateProviderRequestStream) -> Fut,
+        F: FnMut(fnet_interfaces_admin::ControlRequest) -> Fut,
     >(
         address: AddrSubnetEither,
-        asp_handler: F,
+        is_new: bool,
+        mut control_request_handler: F,
     ) -> TestRequestResult {
+        let interface_id = ETH_INTERFACE_ID.try_into().unwrap();
         test_request(
-            RequestArgs::Address(AddressRequestArgs::New(NewAddressArgs {
-                address,
-                interface_id: ETH_INTERFACE_ID.try_into().unwrap(),
-            })),
+            if is_new {
+                RequestArgs::Address(AddressRequestArgs::New(NewAddressArgs {
+                    address,
+                    interface_id,
+                }))
+            } else {
+                RequestArgs::Address(AddressRequestArgs::Del(DelAddressArgs {
+                    address,
+                    interface_id,
+                }))
+            },
             |interfaces_request_stream| async {
                 interfaces_request_stream
                     .then(|req| {
@@ -2009,27 +2110,40 @@ mod tests {
                         })
                     })
                     .flatten()
-                    .for_each(|req| async {
-                        match req.unwrap() {
-                            fnet_interfaces_admin::ControlRequest::AddAddress {
-                                address: got_address,
-                                parameters,
-                                address_state_provider,
-                                control_handle: _,
-                            } => {
-                                pretty_assertions::assert_eq!(got_address, address.into_ext());
-                                pretty_assertions::assert_eq!(
-                                    parameters,
-                                    fnet_interfaces_admin::AddressParameters::default()
-                                );
-                                asp_handler(address_state_provider.into_stream().unwrap()).await
-                            }
-                            req => panic!("unexpected request {req:?}"),
-                        }
-                    })
+                    .for_each(|req| control_request_handler(req.unwrap()))
                     .await
             },
         )
+        .await
+    }
+
+    /// An RTM_NEWADDR test helper that calls the callback with a stream of ASP
+    /// requests.
+    async fn test_new_addr_asp_helper<
+        Fut: Future<Output = ()>,
+        F: Fn(fnet_interfaces_admin::AddressStateProviderRequestStream) -> Fut,
+    >(
+        address: AddrSubnetEither,
+        asp_handler: F,
+    ) -> TestRequestResult {
+        test_interface_request(address, true, |req| async {
+            match req {
+                fnet_interfaces_admin::ControlRequest::AddAddress {
+                    address: got_address,
+                    parameters,
+                    address_state_provider,
+                    control_handle: _,
+                } => {
+                    pretty_assertions::assert_eq!(got_address, address.into_ext());
+                    pretty_assertions::assert_eq!(
+                        parameters,
+                        fnet_interfaces_admin::AddressParameters::default()
+                    );
+                    asp_handler(address_state_provider.into_stream().unwrap()).await
+                }
+                req => panic!("unexpected request {req:?}"),
+            }
+        })
         .await
     }
 
@@ -2173,6 +2287,97 @@ mod tests {
             })
             .await,
             TestRequestResult { messages: Vec::new(), waiter_result: Ok(()) },
+        )
+    }
+
+    /// Test RTM_DELADDR when the interface is closed with an unexpected reaosn.
+    #[test_case(
+        addr_subnet_v4(),
+        InterfaceRemovedReason::DuplicateName; "v4_duplicate_name")]
+    #[test_case(
+        addr_subnet_v6(),
+        InterfaceRemovedReason::DuplicateName; "v6_duplicate_name")]
+    #[test_case(
+        addr_subnet_v4(),
+        InterfaceRemovedReason::PortAlreadyBound; "v4_port_already_bound")]
+    #[test_case(
+        addr_subnet_v6(),
+        InterfaceRemovedReason::PortAlreadyBound; "v6_port_already_bound")]
+    #[test_case(
+        addr_subnet_v4(),
+        InterfaceRemovedReason::BadPort; "v4_bad_port")]
+    #[test_case(
+        addr_subnet_v6(),
+        InterfaceRemovedReason::BadPort; "v6_bad_port")]
+    #[should_panic(expected = "unexpected interface removed reason")]
+    #[fuchsia::test]
+    async fn test_del_addr_interface_closed_unexpected_reason(
+        address: AddrSubnetEither,
+        removal_reason: InterfaceRemovedReason,
+    ) {
+        let _: TestRequestResult = test_interface_request(address, false, |req| async {
+            match req {
+                fnet_interfaces_admin::ControlRequest::RemoveAddress {
+                    address: got_address,
+                    responder,
+                } => {
+                    pretty_assertions::assert_eq!(got_address, address.into_ext());
+                    let control_handle = responder.control_handle();
+                    control_handle.send_on_interface_removed(removal_reason).unwrap();
+                    control_handle.shutdown();
+                }
+                req => panic!("unexpected request {req:?}"),
+            }
+        })
+        .await;
+    }
+
+    /// Test RTM_DELADDR with all interesting responses to remove address.
+    #[test_case(
+        addr_subnet_v4(),
+        Ok(true),
+        Ok(()); "v4_did_remove")]
+    #[test_case(
+        addr_subnet_v6(),
+        Ok(true),
+        Ok(()); "v6_did_remove")]
+    #[test_case(
+        addr_subnet_v4(),
+        Ok(false),
+        Err(RequestError::NotFound); "v4_did_not_remove")]
+    #[test_case(
+        addr_subnet_v6(),
+        Ok(false),
+        Err(RequestError::NotFound); "v6_did_not_remove")]
+    #[test_case(
+        addr_subnet_v4(),
+        Err(fnet_interfaces_admin::ControlRemoveAddressError::unknown()),
+        Err(RequestError::InvalidRequest); "v4_unrecognized_error")]
+    #[test_case(
+        addr_subnet_v6(),
+        Err(fnet_interfaces_admin::ControlRemoveAddressError::unknown()),
+        Err(RequestError::InvalidRequest); "v6_unrecognized_error")]
+    #[fuchsia::test]
+    async fn test_del_addr(
+        address: AddrSubnetEither,
+        response: Result<bool, fnet_interfaces_admin::ControlRemoveAddressError>,
+        waiter_result: Result<(), RequestError>,
+    ) {
+        pretty_assertions::assert_eq!(
+            test_interface_request(address, false, |req| async {
+                match req {
+                    fnet_interfaces_admin::ControlRequest::RemoveAddress {
+                        address: got_address,
+                        responder,
+                    } => {
+                        pretty_assertions::assert_eq!(got_address, address.into_ext());
+                        responder.send(response).unwrap();
+                    }
+                    req => panic!("unexpected request {req:?}"),
+                }
+            },)
+            .await,
+            TestRequestResult { messages: Vec::new(), waiter_result },
         )
     }
 }
