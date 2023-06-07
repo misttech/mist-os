@@ -276,15 +276,20 @@ template("clang_toolchain") {
                                                root_build_dir),
                                  ])
 
+    use_buildidtool =
+        invoker.toolchain_os == "linux" || invoker.toolchain_os == "fuchsia"
+    if (use_buildidtool) {
+      buildidtool = rebase_path(
+              "//prebuilt/tools/buildidtool/${host_platform}/buildidtool",
+              root_build_dir)
+    }
+
     forward_variables_from(invoker, [ "use_strip" ])
     if (use_strip) {
       if (invoker.toolchain_os == "mac") {
         strip = "${prefix}/llvm-strip"
       } else {
         strip = "${prefix}/llvm-objcopy"
-        buildidtool = rebase_path(
-                "//prebuilt/tools/buildidtool/${host_platform}/buildidtool",
-                root_build_dir)
         if (output_breakpad_syms && invoker.toolchain_os == "fuchsia") {
           dump_syms = breakpad_dump_syms
 
@@ -403,58 +408,149 @@ template("clang_toolchain") {
              "Unsupported toolchain_os value \"${invoker.toolchain_os}\"")
     }
 
+    # The _link_common scope is used to capture common computations that
+    # are needed by the C++ and rust link tools. It should define the
+    # following keys:
+    #
+    #   command: The command used to build the binary.
+    #
+    #   command_suffix: A suffix to append to commands after linking it. Used
+    #      to perform optional symbol extraction and stripping.
+    #
+    #   depfile: The depfile to use.
+    #
+    #   outfile: Path to the final output file.
+    #
+    #   outname: Base name of final output file (including extension).
+    #
+    #   outputs: The list of outputs for the command.
+    #
+    #   pool: Pool name (optional).
+    #
+    #   remote_strip_prefix: The strip tool prefix to use when building
+    #       remotely with RBE.
+    #
+    #   unstripped_outfile: Path to unstripped output file.
+    #
+    # Note that the 'command' and 'outputs' keys will use template parameters
+    # in their value, with the following expressions, which must be expanded
+    # based on the final target type:
+    #
+    # - {{UNSTRIPPED_OUTFILE}}: path of the unstripped output file. Should be
+    #   'unstripped_outfile', except for tool("rust_bin") when toolchain_os is
+    #   "wasm32", where it should be "${unstripped_outfile}.wasm" instead.
+    #   The reason for this is that setting default_output_extension doesn't
+    #   work for binaries as it does for libraries.
+    #
+    # - {{UNSTRIPPED_DIR}}: name of directory holding unstripped binaries.
+    #   'lib.unstripped' for shared libraries and modules, and 'exe.unstripped'
+    #   for executables. Must be expanded after {{UNSTRIPPED_OUTFILE}}.
+    #
+    # - {{BREAKPAD_NAME}}: Either an empty string, or "-n \"$breakpad_name\" "
+    #   (note the trailing space) for loadable modules and executables
+    #   (but not shared libraries), when breakpad symbols must be generated.
+    #   Note that this is only used if 'breakpad_name' is defined.
+    #
+    # - {{STRIP_ARGS}}: The argument to the tool being used to strip binaries,
+    #   when use_strip is true. Expansion depends on the target type, the
+    #   host os and whether invoker.strip_cxx_bin_args is defined.
+    #
+    # - {{REMOTE_STRIP_PREFIX}}: Either an empty string, or the value of
+    #   `remote_strip_prefix` if the target type and RBE settings need it.
+    #
+    # Note that the choice of GN-style source expansion parameters is
+    # intentional: If by mistake the parameters are not properly expanded
+    # inside the tool() definitions, GN will complain loudly about it!
+    #
+    _link_common = {
+      outname = "{{target_output_name}}{{output_extension}}"
+      outfile = "{{output_dir}}/$outname"
+      depfile = "$outfile.d"
+      command = ""
+      command_suffix = ""
+      unstripped_outfile = outfile
+
+      if (use_strip) {
+        command += "mkdir -p {{output_dir}}/{{UNSTRIPPED_DIR}} && "
+        unstripped_outfile = "{{output_dir}}/{{UNSTRIPPED_DIR}}/$outname"
+      }
+
+      if (defined(invoker.pool)) {
+        pool = invoker.pool
+      }
+
+      outputs = [ outfile ]
+      if (outfile != unstripped_outfile) {
+        outputs += [ unstripped_outfile ]
+      }
+      if (defined(breakpad_name) && host_os != "mac") {
+        command_suffix += " && $dump_syms -r {{BREAKPAD_NAME}}-o Fuchsia \"{{UNSTRIPPED_OUTFILE}}\" > \"$outfile.sym\""
+        outputs += [ "$outfile.sym" ]
+      }
+      if (output_gsym && invoker.toolchain_os == "fuchsia") {
+        outputs += [ "$outfile.gsym" ]
+        command_suffix += " && $gsymutil --convert=\"{{UNSTRIPPED_OUTFILE}}\" --out-file=\"$outfile.gsym\""
+      }
+      if (use_strip) {
+        remote_strip_prefix = ""
+
+        if (rust_rbe_enable || cxx_rbe_enable) {
+          remote_strip_prefix = string_join(
+                  " ",
+                  [
+                    rebase_path(python_exe_src, root_build_dir),
+                    "-S",
+                    rebase_path(prebuilt_tool_remote_wrapper, root_build_dir),
+                    "--inputs",
+                    "\"$unstripped_outfile\"",
+                    "--output_files",
+                    "\"$outfile\"",
+                    "-- ",
+                  ])
+        }
+        if (invoker.toolchain_os == "mac") {
+          command_suffix += " && {{REMOTE_STRIP_PREFIX}}$strip {{STRIP_ARGS}} \"{{UNSTRIPPED_OUTFILE}}\" -o \"$outfile\""
+        } else {
+          # TODO(fxbug.dev/59286): Strip .rustc section from packaged dylibs.
+          command_suffix += " && {{REMOTE_STRIP_PREFIX}}$strip {{STRIP_ARGS}} \"{{UNSTRIPPED_OUTFILE}}\" \"$outfile\""
+        }
+        if (use_buildidtool) {
+          outputs += [ "$outfile.build-id.stamp" ]
+          command_suffix +=
+              " && $buildidtool -build-id-dir .build-id" +
+              " -stamp \"$outfile.build-id.stamp\"" + " -entry \"=$outfile\"" +
+              " -entry \".debug={{UNSTRIPPED_OUTFILE}}\""
+        }
+      }
+    }
+
+    # Quiet GN for wasm32 toolchain
+    not_needed(_link_common, [ "command_suffix" ])
+
     if (enable_rust) {
       # The _rust_link_common scope is used to capture common computations that
       # are needed by the "rust_bin", "rust_dylib" and "rust_cdylib" tool()
       # definitions below. It should define the following keys:
       #
-      #   depfile: The depfile to use.
       #   command: The command used to build the binary.
+      #   depfile: The depfile to use.
+      #   outfile: Path to final output file.
       #   outputs: The list of outputs for the command.
       #   unstripped_outfile: Path to unstripped output file (see below).
       #
-      # Note that the 'command' and 'outputs' keys will use template parameters in their
-      # string, with the following values, which must be expanded based on the final
-      # target type:
+      # Note that the 'command' and 'outputs' keys will use template parameters
+      # in their string, with the following values, which must be expanded
+      # based on the final target type (see `_link_common` comment for details):
       #
-      # - {{UNSTRIPPED_OUTFILE}}: path of the unstripped output file. Should be
-      #   'unstripped_outfile', except for tool("rust_bin") when toolchain_os == "wasm32", where
-      #   it should be "${unstripped_outfile}.wasm" instead. The reason for this is that setting
-      #   default_output_extension doesn't work for binaries as it does for libraries.
-      #
-      # - {{UNSTRIPPED_DIR}}: name of directory holding unstripped binaries. 'lib.unstripped'
-      #   for shared libraries and modules, and 'exe.unstripped' for executables. Must be
-      #   expanded after {{UNSTRIPPED_OUTFILE}}.
-      #
-      # - {{BREAKPAD_NAME}}: Either an empty string, or "-n \"$breakpad_name\" "
-      #   (note the trailing space) for loadable modules and executables
-      #   (but not shared libraries), when breakpad symbols must be generated. Note that
-      #   this is only used if 'breakpad_name' is defined.
-      #
-      # Note that the choice of GN-style source expansion parameters is intentional: If by
-      # mistake the parameters are not properly expanded inside the tool() definitions, GN
-      # will complain loudly about it!
+      #  {{UNSTRIPPED_OUTFILE}}
+      #  {{UNSTRIPPED_DIR}}
+      #  {{BREAKPAD_NAME}}
+      #  {{STRIP_ARGS}}
+      #  {{REMOTE_STRIP_PREFIX}}
       #
       _rust_link_common = {
-        outname = "{{target_output_name}}{{output_extension}}"
-        outfile = "{{output_dir}}/$outname"
-        depfile = "$outfile.d"
-        command = ""
-        unstripped_outfile = outfile
-
-        if (use_strip) {
-          unstripped_outfile = "{{output_dir}}/{{UNSTRIPPED_DIR}}/{{target_output_name}}{{output_extension}}"
-        }
-
+        forward_variables_from(_link_common, "*", [ "remote_strip_prefix" ])
         forward_variables_from(_rust_concurrent_jobs, "*")
-        if (defined(invoker.pool)) {
-          pool = invoker.pool
-        }
-
-        # TODO: see the comment below.
-        if (use_strip) {
-          command += "mkdir -p {{output_dir}}/{{UNSTRIPPED_DIR}} && "
-        }
 
         ld_location_env = ""
         link_map_args = ""
@@ -497,48 +593,24 @@ template("clang_toolchain") {
         command +=
             " && $verify_depfile -t \"{{label}}\" -d $depfile {{sources}}"
 
-        outputs = [ outfile ]
-        if (outfile != unstripped_outfile) {
-          outputs += [ unstripped_outfile ]
+        # Append command suffix and expand {{STRIP_ARGS}} and {{REMOTE_STRIP_PREFIX}}
+        if (invoker.toolchain_os == "mac") {
+          _strip_args = "-Sx"
+        } else {
+          _strip_args = "--strip-all --keep-section=.rustc"
         }
-        if (defined(breakpad_name) && host_os != "mac") {
-          command += " && $dump_syms -r {{BREAKPAD_NAME}}-o Fuchsia \"{{UNSTRIPPED_OUTFILE}}\" > \"$outfile.sym\""
-          outputs += [ "$outfile.sym" ]
+        command += string_replace(_link_common.command_suffix,
+                                  "{{STRIP_ARGS}}",
+                                  _strip_args)
+
+        _remote_strip_prefix = ""
+        if (use_strip && rust_rbe_enable) {
+          _remote_strip_prefix = _link_common.remote_strip_prefix
         }
-        if (output_gsym && invoker.toolchain_os == "fuchsia") {
-          outputs += [ "$outfile.gsym" ]
-          command += " && $gsymutil --convert=\"{{UNSTRIPPED_OUTFILE}}\" --out-file=\"$outfile.gsym\""
-        }
-        if (use_strip) {
-          remote_strip_prefix = ""
-          if (rust_rbe_enable) {
-            remote_strip_prefix = string_join(
-                    " ",
-                    [
-                      rebase_path(python_exe_src, root_build_dir),
-                      "-S",
-                      rebase_path(prebuilt_tool_remote_wrapper, root_build_dir),
-                      "--inputs",
-                      "\"{{UNSTRIPPED_OUTFILE}}\"",
-                      "--output_files",
-                      "\"$outfile\"",
-                      "--",
-                    ])
-          }
-          if (invoker.toolchain_os == "mac") {
-            command += " && $remote_strip_prefix $strip -Sx \"{{UNSTRIPPED_OUTFILE}}\" -o \"$outfile\""
-          } else {
-            # TODO(fxbug.dev/59286): Strip .rustc section from packaged dylibs.
-            command += " && $remote_strip_prefix $strip --strip-all --keep-section=.rustc \"{{UNSTRIPPED_OUTFILE}}\" \"$outfile\""
-          }
-          if (invoker.toolchain_os != "mac" && invoker.toolchain_os != "win") {
-            outputs += [ "$outfile.build-id.stamp" ]
-            command += " && $buildidtool -build-id-dir .build-id" +
-                       " -stamp \"$outfile.build-id.stamp\"" +
-                       " -entry \"=$outfile\"" +
-                       " -entry \".debug={{UNSTRIPPED_OUTFILE}}\""
-          }
-        }
+        command = string_replace(command,
+                                 "{{REMOTE_STRIP_PREFIX}}",
+                                 _remote_strip_prefix)
+
         rust_sysroot = "$rebased_rustc_prefix"
       }
 
@@ -733,103 +805,79 @@ template("clang_toolchain") {
       output_prefix = "lib"
     }
 
-    # The _cxx_link_common captures common computations used by the "solink", "solink_module"
-    # and "link" tool() definitions below. In particular it may contain the following
-    # important keys:
+    # The _cxx_link_common captures common computations used by the "solink",
+    # "solink_module" and "link" tool() definitions below. In particular it may
+    # contain the following important keys:
     #
     # - command
-    # - outputs
+    # - command_suffix
     # - depfile
     # - depsformat
     # - rspfile
     # - rspfile_content
+    # - outputs
     #
-    # Note that the 'command' and 'outputs' keys will use template parameters in their
-    # string, with the following values, which must be expanded based on the final
-    # target type:
+    # Note that the 'command' and 'outputs' keys will use template parameters
+    # in their string, with the following values, which must be expanded based
+    # on the final target type:
     #
-    # - {{UNSTRIPPED_DIR}}: name of directory holding unstripped binaries. 'lib.unstripped'
-    #   for shared libraries and modules, and 'exe.unstripped' for executables.
+    # - {{UNSTRIPPED_OUTFILE}}, {{UNSTRIPPED_DIR}}, {{BREAKPAD_NAME}},
+    #   {{STRIP_ARGS}}: see `_link_common` comment.
     #
-    # - {{STRIP_ARGS}}: Arguments to the strip command, only present when 'use_strip' is true
-    #   and when not generating MacOS binaries. Should be "--strip-sections" when generating
-    #   Fuchsia executables (not shared objects), and "--strip-all" otherwise.
+    # - {{SOLINK_FLAGS}}: linker flags used to generate shared libraries,
+    #   should be empty for executables. Must use a trailing space if not empty.
     #
-    # - {{BREAKPAD_NAME}}: Either an empty string, or "-n \"$breakpad_name\" "
-    #   (note the trailing space) for loadable modules and executables
-    #   (but not shared libraries), when breakpad symbols must be generated. Note that
-    #   this is only used if 'breakpad_name' is defined.
+    # - {{START_GROUP}}: should expand to "-Wl,--start-group " on ELF systems
+    #   that support it when generating executables, and to an empty string
+    #   otherwise. Must include a trailing space if not empty.
     #
-    # - {{SOLINK_FLAGS}}: linker flags used to generate shared libraries, should be empty
-    #   for executables. Must use a trailing space if not empty.
-    #
-    # - {{START_GROUP}}: should expand to "-Wl,--start-group " on ELF systems that support it
-    #   when generating executables, and to an empty string otherwise. Must include a trailing
-    #   space if not empty.
-    #
-    # - {{END_GROUP}}: similar to {{START_GROUP}}, but should expand to "-Wl,--end-group "
-    #   instead. Must include a trailing space if not empty.
-    #
-    # Note that the choice of GN-style source expansion parameters is intentional: If by
-    # mistake the parameters are not properly expanded inside the tool() definitions, GN
-    # will complain loudly about it!
+    # - {{END_GROUP}}: similar to {{START_GROUP}}, but should expand to
+    #   "-Wl,--end-group " instead. Must include a trailing space if not empty.
     #
     _cxx_link_common = {
+      forward_variables_from(_link_common,
+                             "*",
+                             [
+                               "command_suffix",
+                               "depfile",
+                               "remote_strip_prefix",
+                             ])
       forward_variables_from(concurrent_jobs.local, "*")
-      outname = "{{target_output_name}}{{output_extension}}"
-      outfile = "{{output_dir}}/$outname"
       rspfile = "$outfile.rsp"
-      command = ""
 
       use_llvm_ifs =
           invoker.toolchain_os != "mac" && invoker.toolchain_os != "win"
-      unstripped_outfile = outfile
-      if (use_strip) {
-        command += "mkdir -p {{output_dir}}/{{UNSTRIPPED_DIR}} && "
-        unstripped_outfile = "{{output_dir}}/{{UNSTRIPPED_DIR}}/{{target_output_name}}{{output_extension}}"
-      }
       if (invoker.toolchain_os == "mac") {
+        # TODO(https://fxbug.dev/128634): enable depfile support in ld64.lld.
         command += "$ld {{SOLINK_FLAGS}}{{ldflags}} -o \"$unstripped_outfile\" -Wl,-filelist,\"$rspfile\" {{solibs}} {{libs}} {{frameworks}}"
         rspfile_content = "{{inputs_newline}}"
       } else {
-        depfile = "$outfile.d"
+        depfile = _link_common.depfile
         depsformat = "gcc"
         command += "$ld {{SOLINK_FLAGS}}{{ldflags}} -o \"$unstripped_outfile\" -Wl,--dependency-file=\"$depfile\" -Wl,--Map=\"$unstripped_outfile.map\""
         command +=
             " {{START_GROUP}}\"@$rspfile\" {{solibs}} {{END_GROUP}}{{libs}}"
         rspfile_content = "{{inputs}}"
       }
-      outputs = [ outfile ]
-      if (outfile != unstripped_outfile) {
-        outputs += [ unstripped_outfile ]
+
+      # Expand {{REMOTE_STRIP_PREFIX}}
+      _remote_strip_prefix = ""
+
+      # NOTE: remote stripping is currently disabled for C++ linking which
+      # always happen locally at the moment. Remove the hard-coded `false`
+      # below when this will no longer be the case.
+      if (use_strip && false && cxx_rbe_enable) {
+        _remote_strip_prefix = _link_common.remote_strip_prefix
       }
-      if (use_strip) {
-        if (invoker.toolchain_os == "mac") {
-          command += " && $strip -Sx \"$unstripped_outfile\" -o \"$outfile\""
-        } else {
-          command +=
-              " && $strip {{STRIP_ARGS}} \"$unstripped_outfile\" \"$outfile\""
-          outputs += [ "$outfile.build-id.stamp" ]
-          command +=
-              " && $buildidtool -build-id-dir .build-id" +
-              " -stamp \"$outfile.build-id.stamp\"" + " -entry \"=$outfile\"" +
-              " -entry \".debug=$unstripped_outfile\""
-        }
-      }
-      if (defined(breakpad_name)) {
-        outputs += [ "$outfile.sym" ]
-        command += " && $dump_syms -r {{BREAKPAD_NAME}}-o Fuchsia \"$unstripped_outfile\" > \"$outfile.sym\""
-      }
-      if (output_gsym && invoker.toolchain_os == "fuchsia") {
-        outputs += [ "$outfile.gsym" ]
-        command += " && $gsymutil --convert=\"$unstripped_outfile\" --out-file=\"$outfile.gsym\""
-      }
+      command_suffix = string_replace(_link_common.command_suffix,
+                                      "{{REMOTE_STRIP_PREFIX}}",
+                                      _remote_strip_prefix)
     }
 
     # Expand _cxx_link_common into a scope that can be used for "solink" and "solink_module" tools
     # below directly. All template parameters will be expanded, except BREAKPAD_NAME.
     _cxx_link_solink = {
-      forward_variables_from(_cxx_link_common, "*")
+      forward_variables_from(_cxx_link_common, "*", [ "command_suffix" ])
       if (invoker.toolchain_os == "mac") {
         command = string_replace(
                 command,
@@ -846,7 +894,13 @@ template("clang_toolchain") {
       command = string_replace(command, "{{END_GROUP}}", "")
 
       # Expand STRIP_ARGS, which is always --strip-all for shared objects / libraries.
-      command = string_replace(command, "{{STRIP_ARGS}}", "--strip-all")
+      command += string_replace(_cxx_link_common.command_suffix,
+                                "{{STRIP_ARGS}}",
+                                "--strip-all")
+
+      # Expand {{UNSTRIPPED_OUTFILE}}
+      command =
+          string_replace(command, "{{UNSTRIPPED_OUTFILE}}", unstripped_outfile)
 
       # Expand {{UNSTRIPPED_DIR}}
       _unstripped_dir = "lib.unstripped"
@@ -861,21 +915,9 @@ template("clang_toolchain") {
     # Expand _cxx_link_common into a scope that can be used for the "link" tool below.
     # All template parameters will be expanded.
     _cxx_link_bin = {
-      forward_variables_from(_cxx_link_common, "*")
+      forward_variables_from(_cxx_link_common, "*", [ "command_suffix" ])
 
-      # Expand {{UNSTRIPPED_DIR}}
-      _unstripped_dir = "exe.unstripped"
-      command = string_replace(command, "{{UNSTRIPPED_DIR}}", _unstripped_dir)
-      outputs = []
-      foreach(output, _cxx_link_common.outputs) {
-        outputs +=
-            [ string_replace(output, "{{UNSTRIPPED_DIR}}", _unstripped_dir) ]
-      }
-
-      # There is no SOLINK_FLAGS for binaries
-      command = string_replace(command, "{{SOLINK_FLAGS}}", "")
-
-      # Expand STRIP_ARGS
+      # Append command suffix and Expand STRIP_ARGS
       if (defined(invoker.strip_cxx_bin_args)) {
         _strip_args = invoker.strip_cxx_bin_args
       } else if (invoker.toolchain_os == "mac") {
@@ -883,7 +925,12 @@ template("clang_toolchain") {
       } else {
         _strip_args = "--strip-all"
       }
-      command = string_replace(command, "{{STRIP_ARGS}}", _strip_args)
+      command += string_replace(_cxx_link_common.command_suffix,
+                                "{{STRIP_ARGS}}",
+                                _strip_args)
+
+      # There is no SOLINK_FLAGS for binaries
+      command = string_replace(command, "{{SOLINK_FLAGS}}", "")
 
       # Use --start-group and --eng-group for binaries, except on Mac.
       # IMPORTANT: The trailing spaces in the replacement strings are critical!
@@ -901,6 +948,19 @@ template("clang_toolchain") {
         command = string_replace(command,
                                  "{{BREAKPAD_NAME}}",
                                  "-n \"$breakpad_name\" ")
+      }
+
+      # Expand {{UNSTRIPPED_OUTFILE}}
+      command =
+          string_replace(command, "{{UNSTRIPPED_OUTFILE}}", unstripped_outfile)
+
+      # Expand {{UNSTRIPPED_DIR}}
+      _unstripped_dir = "exe.unstripped"
+      command = string_replace(command, "{{UNSTRIPPED_DIR}}", _unstripped_dir)
+      outputs = []
+      foreach(output, _cxx_link_common.outputs) {
+        outputs +=
+            [ string_replace(output, "{{UNSTRIPPED_DIR}}", _unstripped_dir) ]
       }
     }
 
