@@ -13,7 +13,6 @@
             type: "expect_failure",
             matchers: [
                 "*/ltp_accept02.cm",
-                "*/ltp_accept4_01.cm",
                 "*/ltp_access01.cm",
                 "*/ltp_access04.cm",
                 "*/ltp_acct01.cm",
@@ -52,7 +51,6 @@
                 "*/ltp_bind01.cm",
                 "*/ltp_bind01.cm",
                 "*/ltp_bind02.cm",
-                "*/ltp_bind04.cm",
                 "*/ltp_bind05.cm",
                 "*/ltp_bind06.cm",
                 "*/ltp_block_dev.cm",

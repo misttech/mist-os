@@ -197,6 +197,7 @@ struct SocketState {
 
 pub type SocketHandle = Arc<Socket>;
 
+#[derive(Clone)]
 pub enum SocketPeer {
     Handle(SocketHandle),
     Address(SocketAddress),

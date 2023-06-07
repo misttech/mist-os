@@ -14,7 +14,6 @@
             matchers: [
                 "io.ReadFd*",
                 "adb_utils.mkdirs*",
-                "socket_spec.socket_spec_listen_connect_tcp*",
                 "sysdeps.stat*",
                 "io.WriteFdExactly_whole",
                 "io.WriteFdExactly_partial",

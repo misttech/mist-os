@@ -4,6 +4,7 @@
 
 use fuchsia_zircon as zx;
 use std::convert::TryInto;
+use std::mem::size_of;
 use zerocopy::AsBytes;
 
 use super::*;
@@ -250,17 +251,39 @@ pub fn sys_connect(
         // Connect not available for AF_VSOCK
         SocketAddress::Vsock(_) => return error!(ENOSYS),
         SocketAddress::Inet(ref addr) | SocketAddress::Inet6(ref addr) => {
-            log_trace!("connect to inet socket named {:?}", String::from_utf8_lossy(addr));
+            log_trace!("connect to inet socket named {:?}", addr);
             SocketPeer::Address(address)
         }
         SocketAddress::Netlink(_) => SocketPeer::Address(address),
     };
 
-    // TODO(tbodt): Support blocking when the UNIX domain socket queue fills up. This one's weird
-    // because as far as I can tell, removing a socket from the queue does not actually trigger
-    // FdEvents on anything.
-    client_socket.connect(current_task, peer)?;
-    Ok(())
+    let result = client_socket.connect(current_task, peer.clone());
+
+    if client_file.is_non_blocking() {
+        return result;
+    }
+
+    match result {
+        // EINPROGRESS may be returned for inet sockets when `connect()` is completed
+        // asynchronously.
+        Err(errno) if errno.code == EINPROGRESS => {
+            let waiter = Waiter::new();
+            client_socket.wait_async(
+                current_task,
+                &waiter,
+                FdEvents::POLLOUT,
+                WaitCallback::none(),
+            );
+            if !client_socket.query_events(current_task).contains(FdEvents::POLLOUT) {
+                waiter.wait_until(current_task, zx::Time::INFINITE)?;
+            }
+            client_socket.connect(current_task, peer)
+        }
+        // TODO(tbodt): Support blocking when the UNIX domain socket queue fills up. This one's
+        // weird because as far as I can tell, removing a socket from the queue does not actually
+        // trigger FdEvents on anything.
+        result => result,
+    }
 }
 
 fn write_socket_address(
@@ -366,7 +389,7 @@ fn recvmsg_internal(
 
     let cmsg_buffer_size = message_header.msg_controllen;
     let mut cmsg_bytes_written = 0;
-    let header_size = std::mem::size_of::<cmsghdr>();
+    let header_size = size_of::<cmsghdr>();
 
     for ancillary_data in info.ancillary_data {
         if ancillary_data.total_size() == 0 {
@@ -401,8 +424,7 @@ fn recvmsg_internal(
                 .write_memory(message_header.msg_control + cmsg_bytes_written, &message_bytes)?;
             cmsg_bytes_written += message_bytes.len();
             if !truncated {
-                cmsg_bytes_written =
-                    round_up_to_increment(cmsg_bytes_written, std::mem::size_of::<usize>())?;
+                cmsg_bytes_written = round_up_to_increment(cmsg_bytes_written, size_of::<usize>())?;
             }
         }
     }
@@ -481,8 +503,7 @@ pub fn sys_recvmmsg(
             }
             Ok(bytes_read) => {
                 let msg_len = bytes_read as u32;
-                let user_msg_len =
-                    UserRef::<u32>::new(user_mmsghdr.addr() + std::mem::size_of::<msghdr>());
+                let user_msg_len = UserRef::<u32>::new(user_mmsghdr.addr() + size_of::<msghdr>());
                 current_task.mm.write_object(user_msg_len, &msg_len)?;
             }
         }
@@ -556,7 +577,7 @@ fn sendmsg_internal(
 
     let mut next_message_offset = 0;
     let mut ancillary_data = Vec::new();
-    let header_size = std::mem::size_of::<cmsghdr>();
+    let header_size = size_of::<cmsghdr>();
     loop {
         let space = message_header.msg_controllen.saturating_sub(next_message_offset);
         if space < header_size {
@@ -578,8 +599,7 @@ fn sendmsg_internal(
             message_header.msg_control + next_message_offset + header_size,
             &mut data,
         )?;
-        next_message_offset +=
-            round_up_to_increment(header_size + data.len(), std::mem::size_of::<usize>())?;
+        next_message_offset += round_up_to_increment(header_size + data.len(), size_of::<usize>())?;
         ancillary_data.push(AncillaryData::from_cmsg(
             current_task,
             ControlMsg::new(cmsg.cmsg_level, cmsg.cmsg_type, data),
@@ -641,8 +661,7 @@ pub fn sys_sendmmsg(
             }
             Ok(bytes_read) => {
                 let msg_len = bytes_read as u32;
-                let user_msg_len =
-                    UserRef::<u32>::new(user_mmsghdr.addr() + std::mem::size_of::<msghdr>());
+                let user_msg_len = UserRef::<u32>::new(user_mmsghdr.addr() + size_of::<msghdr>());
                 current_task.mm.write_object(user_msg_len, &msg_len)?;
             }
         }
