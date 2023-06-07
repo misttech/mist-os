@@ -909,7 +909,7 @@ int AmlogicDisplay::HpdThread() {
     added_display_info_t info;
     uint64_t display_removed = INVALID_DISPLAY_ID;
     if (hpd && !display_attached_) {
-      DISP_ERROR("Display is connected\n");
+      DISP_INFO("Display is connected\n");
 
       display_attached_ = true;
       vout_->DisplayConnected();
@@ -917,7 +917,7 @@ int AmlogicDisplay::HpdThread() {
       display_added = true;
       hpd_gpio_.SetPolarity(GPIO_POLARITY_LOW);
     } else if (!hpd && display_attached_) {
-      DISP_ERROR("Display Disconnected!\n");
+      DISP_INFO("Display Disconnected!\n");
       vout_->DisplayDisconnected();
 
       display_removed = display_id_;
