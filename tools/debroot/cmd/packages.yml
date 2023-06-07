@@ -21,6 +21,8 @@ packages:
   - package: libgl1
   - package: libgl1-mesa-dev
   - package: libglapi-mesa
+  - package: libglu1-mesa
+  - package: libglu1-mesa-dev
   - package: libpython3.8
   - package: libpython3.8-dev
   - package: libx11-6
@@ -49,7 +51,9 @@ packages:
   - package: libxrandr2
   - package: libxrender-dev
   - package: libxrender1
+  - package: libxss1
   - package: libxss-dev
+  - package: libxxf86vm1
   - package: libxxf86vm-dev
   - package: linux-libc-dev
   - package: mesa-common-dev
