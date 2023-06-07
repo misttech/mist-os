@@ -61,5 +61,25 @@
             from: "parent",
             to: "#devices-tests",
         },
+        {
+            // The `audio_driver_tests` suite requires access to various audio driver types...
+            directory: [
+                "dev-audio-input",
+                "dev-audio-output",
+                "dev-codec",
+                "dev-composite",
+                "dev-dai",
+            ],
+            from: "parent",
+            to: [ "#devices-tests" ],
+            rights: [ "r*" ],
+        },
+        {
+            // ... including the `virtual_audio` driver, at /dev/sys/platform/00:00:2f.
+            directory: "sys",
+            from: "parent",
+            to: [ "#devices-tests" ],
+            rights: [ "r*" ],
+        },
     ],
 }

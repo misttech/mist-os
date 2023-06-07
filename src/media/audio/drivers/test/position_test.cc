@@ -270,6 +270,9 @@ DEFINE_POSITION_TEST_CLASS(PositionNotifyNone, {
 void RegisterPositionTestsForDevice(const DeviceEntry& device_entry,
                                     bool expect_audio_core_not_connected,
                                     bool enable_position_tests) {
+  if (device_entry.isCodec()) {
+    return;
+  }
   // If audio_core is connected to the audio driver, admin tests will fail.
   // We test a hermetic instance of the A2DP driver, so audio_core is never connected.
   if (device_entry.isA2DP() || expect_audio_core_not_connected) {

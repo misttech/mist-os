@@ -376,6 +376,13 @@
         {
             directory: "dev-class",
             from: "parent",
+            as: "dev-codec",
+            to: "#test_manager",
+            subdir: "codec",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
             as: "dev-dai",
             to: "#test_manager",
             subdir: "dai",

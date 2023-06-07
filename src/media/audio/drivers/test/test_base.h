@@ -12,7 +12,9 @@
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/device/audio.h>
+#include <zircon/rights.h>
 
+#include "lib/fidl/cpp/interface_handle.h"
 #include "src/media/audio/drivers/test/audio_device_enumerator_stub.h"
 #include "src/media/audio/lib/test/test_fixture.h"
 
@@ -35,7 +37,8 @@ enum DriverType : uint16_t {
   StreamConfigInput = 0,
   StreamConfigOutput = 1,
   Dai = 2,
-  Composite = 3
+  Codec = 3,
+  Composite = 4
 };
 inline std::ostream& operator<<(std::ostream& out, const DriverType& dev_dir) {
   switch (dev_dir) {
@@ -45,6 +48,8 @@ inline std::ostream& operator<<(std::ostream& out, const DriverType& dev_dir) {
       return (out << "StreamConfig(Out)");
     case DriverType::Dai:
       return (out << "Dai");
+    case DriverType::Codec:
+      return (out << "Codec");
     case DriverType::Composite:
       return (out << "Composite");
   }
@@ -74,6 +79,7 @@ struct DeviceEntry {
            driver_type == DriverType::StreamConfigOutput;
   }
   bool isDai() const { return driver_type == DriverType::Dai; }
+  bool isCodec() const { return driver_type == DriverType::Codec; }
   bool isComposite() const { return driver_type == DriverType::Composite; }
 
   bool operator<(const DeviceEntry& rhs) const {
@@ -99,6 +105,8 @@ std::string inline DevNameForEntry(const DeviceEntry& device_entry) {
       return "audio-output/" + device_name;
     case DriverType::Dai:
       return "dai/" + device_name;
+    case DriverType::Codec:
+      return "codec/" + device_name;
     case DriverType::Composite:
       return "audio-composite/" + device_name;
   }
@@ -118,11 +126,13 @@ class TestBase : public media::audio::test::TestFixture {
 
   void ConnectToStreamConfigDevice(const DeviceEntry& device_entry);
   void ConnectToDaiDevice(const DeviceEntry& device_entry);
+  void ConnectToCodecDevice(const DeviceEntry& device_entry);
   void ConnectToCompositeDevice(const DeviceEntry& device_entry);
   void ConnectToBluetoothDevice();
   void CreateStreamConfigFromChannel(
       fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> channel);
   void CreateDaiFromChannel(fidl::InterfaceHandle<fuchsia::hardware::audio::Dai> channel);
+  void CreateCodecFromChannel(fidl::InterfaceHandle<fuchsia::hardware::audio::Codec> channel);
   void CreateCompositeFromChannel(
       fidl::InterfaceHandle<fuchsia::hardware::audio::Composite> channel);
 
@@ -149,6 +159,7 @@ class TestBase : public media::audio::test::TestFixture {
     return stream_config_;
   }
   fidl::InterfacePtr<fuchsia::hardware::audio::Dai>& dai() { return dai_; }
+  fidl::InterfacePtr<fuchsia::hardware::audio::Codec>& codec() { return codec_; }
   fidl::InterfacePtr<fuchsia::hardware::audio::Composite>& composite() { return composite_; }
 
   const fuchsia::hardware::audio::PcmFormat& min_ring_buffer_format() const {
@@ -191,7 +202,9 @@ class TestBase : public media::audio::test::TestFixture {
 
   fidl::InterfacePtr<fuchsia::hardware::audio::StreamConfig> stream_config_;
   fidl::InterfacePtr<fuchsia::hardware::audio::Dai> dai_;
+  fidl::InterfacePtr<fuchsia::hardware::audio::Codec> codec_;
   fidl::InterfacePtr<fuchsia::hardware::audio::Composite> composite_;
+  fidl::InterfacePtr<fuchsia::hardware::audio::Health> health_;
 
   std::vector<fuchsia::hardware::audio::PcmSupportedFormats> ring_buffer_pcm_formats_;
   std::vector<fuchsia::hardware::audio::DaiSupportedFormats> dai_formats_;

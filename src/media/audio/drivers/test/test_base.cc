@@ -15,6 +15,7 @@
 #include <lib/zx/time.h>
 
 #include <algorithm>
+#include <cstddef>
 #include <cstring>
 #include <string>
 
@@ -41,16 +42,19 @@ void TestBase::SetUp() {
     ConnectToBluetoothDevice();
   } else {
     switch (entry.driver_type) {
-      case DriverType::Dai:
-        ConnectToDaiDevice(device_entry());
-        break;
-      case DriverType::Composite:
-        ConnectToCompositeDevice(device_entry());
-        break;
       case DriverType::StreamConfigInput:
         [[fallthrough]];
       case DriverType::StreamConfigOutput:
         ConnectToStreamConfigDevice(device_entry());
+        break;
+      case DriverType::Dai:
+        ConnectToDaiDevice(device_entry());
+        break;
+      case DriverType::Codec:
+        ConnectToCodecDevice(device_entry());
+        break;
+      case DriverType::Composite:
+        ConnectToCompositeDevice(device_entry());
         break;
     }
   }
@@ -59,6 +63,7 @@ void TestBase::SetUp() {
 void TestBase::TearDown() {
   stream_config_.Unbind();
   dai_.Unbind();
+  codec_.Unbind();
   composite_.Unbind();
 
   if (realm_.has_value()) {
@@ -169,6 +174,29 @@ void TestBase::ConnectToDaiDevice(const DeviceEntry& device_entry) {
   CreateDaiFromChannel(fidl::InterfaceHandle<fuchsia::hardware::audio::Dai>(std::move(channel)));
 }
 
+// Given this device_entry, use its channel to open the Codec device.
+void TestBase::ConnectToCodecDevice(const DeviceEntry& device_entry) {
+  fuchsia::hardware::audio::CodecConnectorPtr device;
+  ASSERT_EQ(device_entry.dir.index(), 1u);
+  ASSERT_EQ(fdio_service_connect_at(std::get<1>(device_entry.dir).channel()->get(),
+                                    device_entry.filename.c_str(),
+                                    device.NewRequest().TakeChannel().release()),
+            ZX_OK);
+
+  device.set_error_handler([](zx_status_t status) {
+    FAIL() << status << "Err " << status << ", failed to open channel to audio Codec";
+  });
+  fidl::InterfaceHandle<fuchsia::hardware::audio::Codec> codec_client;
+  fidl::InterfaceRequest<fuchsia::hardware::audio::Codec> codec_server = codec_client.NewRequest();
+  device->Connect(std::move(codec_server));
+
+  auto channel = codec_client.TakeChannel();
+  FX_LOGS(TRACE) << "Successfully opened devnode '" << device_entry.filename << "' for audio codec";
+
+  CreateCodecFromChannel(
+      fidl::InterfaceHandle<fuchsia::hardware::audio::Codec>(std::move(channel)));
+}
+
 void TestBase::ConnectToCompositeDevice(const DeviceEntry& device_entry) {
   fuchsia::hardware::audio::CompositeConnectorPtr device;
   ASSERT_EQ(device_entry.dir.index(), 1u);
@@ -212,6 +240,17 @@ void TestBase::CreateDaiFromChannel(fidl::InterfaceHandle<fuchsia::hardware::aud
     FAIL() << "Failed to get DAI channel for this device";
   }
   AddErrorHandler(dai_, "DAI");
+}
+
+void TestBase::CreateCodecFromChannel(
+    fidl::InterfaceHandle<fuchsia::hardware::audio::Codec> channel) {
+  codec_ = channel.Bind();
+
+  // If no device was enumerated, don't waste further time.
+  if (!codec_.is_bound()) {
+    FAIL() << "Failed to get codec channel for this device";
+  }
+  AddErrorHandler(codec_, "Codec");
 }
 
 void TestBase::CreateCompositeFromChannel(
@@ -293,6 +332,7 @@ void TestBase::RequestFormats() {
             dai_formats_.push_back(std::move(supported_dai_formats[i]));
           }
         }));
+  } else if (device_entry().isCodec()) {
   } else {
     stream_config()->GetSupportedFormats(AddCallback(
         "GetSupportedFormats",
@@ -385,7 +425,7 @@ void TestBase::SetMinMaxRingBufferFormats() {
 
     // Save, if less than min.
     auto bit_rate = min_chans * min_bytes_per_sample * min_frame_rate;
-    if (i == 0 || bit_rate < min_ring_buffer_format_.number_of_channels *
+    if (i == 0 || bit_rate < static_cast<size_t>(min_ring_buffer_format_.number_of_channels) *
                                  min_ring_buffer_format_.bytes_per_sample *
                                  min_ring_buffer_format_.frame_rate) {
       min_ring_buffer_format_ = {
@@ -399,7 +439,7 @@ void TestBase::SetMinMaxRingBufferFormats() {
 
     // Save, if more than max.
     bit_rate = max_chans * max_bytes_per_sample * max_frame_rate;
-    if (i == 0 || bit_rate > max_ring_buffer_format_.number_of_channels *
+    if (i == 0 || bit_rate > static_cast<size_t>(max_ring_buffer_format_.number_of_channels) *
                                  max_ring_buffer_format_.bytes_per_sample *
                                  max_ring_buffer_format_.frame_rate) {
       max_ring_buffer_format_ = {
@@ -553,7 +593,7 @@ void TestBase::RequestTopologies() {
     return;
   }
   // If supported, GetElements must return at least one element.
-  ASSERT_TRUE(elements_.size() > 0);
+  ASSERT_TRUE(!elements_.empty());
 
   sp_->GetTopologies(AddCallback(
       "Composite::GetTopologies",
@@ -564,7 +604,7 @@ void TestBase::RequestTopologies() {
   ExpectCallbacks();
 
   // We only call GetTopologies if we have elements, so we must have at least one topology.
-  ASSERT_TRUE(topologies_.size() > 0);
+  ASSERT_TRUE(!topologies_.empty());
 }
 
 }  // namespace media::audio::drivers::test

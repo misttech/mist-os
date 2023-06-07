@@ -45,6 +45,7 @@ static const struct {
     {.path = "/dev/class/audio-input", .driver_type = DriverType::StreamConfigInput},
     {.path = "/dev/class/audio-output", .driver_type = DriverType::StreamConfigOutput},
     {.path = "/dev/class/dai", .driver_type = DriverType::Dai},
+    {.path = "/dev/class/codec", .driver_type = DriverType::Codec},
     {.path = "/dev/class/audio-composite", .driver_type = DriverType::Composite},
 };
 
