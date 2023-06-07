@@ -109,7 +109,7 @@ TYPED_TEST(ElfldltlSymbolTests, LookupGnuHash) {
 
 template <class Elf>
 struct CompatHash {
-  using Table = typename elfldltl::CompatHash<typename Elf::Word>;
+  using Table = typename elfldltl::CompatHash<Elf>;
   static Table Get(const elfldltl::SymbolInfo<Elf>& si) { return *si.compat_hash(); }
   static constexpr std::string_view kNames[] = {
       "bar",
@@ -121,7 +121,7 @@ struct CompatHash {
 
 template <class Elf>
 struct GnuHash {
-  using Table = typename elfldltl::GnuHash<typename Elf::Word, typename Elf::Addr>;
+  using Table = typename elfldltl::GnuHash<Elf>;
   static Table Get(const elfldltl::SymbolInfo<Elf>& si) { return *si.gnu_hash(); }
   static constexpr std::string_view kNames[] = {
       // The DT_GNU_HASH table omits the undefined symbols.
@@ -175,6 +175,15 @@ TYPED_TEST(ElfldltlSymbolTests, SymbolInfoForSingleLookup) {
 
   elfldltl::SymbolName name{si, si.symbol()};
   EXPECT_EQ(name, "sym");
+}
+
+TYPED_TEST(ElfldltlSymbolTests, Remote) {
+  using Elf = typename TestFixture::Elf;
+
+  using RemoteSymbolInfo = elfldltl::SymbolInfo<Elf, elfldltl::RemoteAbiTraits>;
+
+  RemoteSymbolInfo si;
+  si = RemoteSymbolInfo(si);
 }
 
 }  // namespace

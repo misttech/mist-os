@@ -11,6 +11,8 @@
 #include <cstdint>
 #include <string_view>
 
+#include "abi-span.h"
+
 namespace elfldltl {
 
 // This handles the DT_HASH format, which is mostly obsolete but is the
@@ -36,9 +38,11 @@ constexpr uint32_t kCompatNoHash = ~uint32_t{};
 // the number of buckets and the number of chain entries (i.e. the number of
 // symbol table entries).  Then the bucket words follow, then the chain words.
 
-template <typename Word>
+template <class Elf, class AbiTraits = LocalAbiTraits>
 class CompatHash {
  public:
+  using Word = typename Elf::Word;
+
   class iterator;
 
   class BucketIterator;
@@ -67,11 +71,13 @@ class CompatHash {
   constexpr iterator end() const;
 
  private:
-  cpp20::span<const Word> buckets_, chain_;
+  AbiSpan<const Word, cpp20::dynamic_extent, Elf, AbiTraits> buckets_, chain_;
 };
 
-template <typename Word>
-class CompatHash<Word>::BucketIterator {
+// This is only actually used when AbiTraits supports direct memory access, so
+// it doesn't need to work with other instantiations.
+template <class Elf, class AbiTraits>
+class CompatHash<Elf, AbiTraits>::BucketIterator {
  public:
   constexpr BucketIterator() = default;
   constexpr BucketIterator(const BucketIterator&) = default;
@@ -118,15 +124,15 @@ class CompatHash<Word>::BucketIterator {
     return 0;
   }
 
-  cpp20::span<const Word> chain_;
+  cpp20::span<const typename Elf::Word> chain_;
   uint32_t i_ = 0;
   uint32_t count_ = 0;
 };
 
 // Iterate over the hash buckets to yield a BucketIerator for each bucket.
 // Together this allows for exhaustive iteration over the whole table.
-template <typename Word>
-class CompatHash<Word>::iterator {
+template <class Elf, class AbiTraits>
+class CompatHash<Elf, AbiTraits>::iterator {
  public:
   constexpr bool operator==(const iterator& other) const { return it_ == other.it_; }
   constexpr bool operator!=(const iterator& other) const { return it_ != other.it_; }
@@ -145,22 +151,22 @@ class CompatHash<Word>::iterator {
   constexpr BucketIterator operator*() const { return BucketIterator(*table_, *it_, 0); }
 
  private:
-  friend CompatHash<Word>;
+  friend CompatHash<Elf, AbiTraits>;
 
-  const CompatHash<Word>* table_ = nullptr;
-  typename cpp20::span<const Word>::iterator it_;
+  const CompatHash<Elf, AbiTraits>* table_ = nullptr;
+  typename cpp20::span<const typename Elf::Word>::iterator it_;
 };
 
-template <typename Word>
-constexpr auto CompatHash<Word>::begin() const -> iterator {
+template <class Elf, class AbiTraits>
+constexpr auto CompatHash<Elf, AbiTraits>::begin() const -> iterator {
   iterator it;
   it.table_ = this;
   it.it_ = buckets_.begin();
   return it;
 }
 
-template <typename Word>
-constexpr auto CompatHash<Word>::end() const -> iterator {
+template <class Elf, class AbiTraits>
+constexpr auto CompatHash<Elf, AbiTraits>::end() const -> iterator {
   iterator it;
   it.table_ = this;
   it.it_ = buckets_.end();

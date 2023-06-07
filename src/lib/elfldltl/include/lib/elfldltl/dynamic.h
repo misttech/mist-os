@@ -613,9 +613,9 @@ class DynamicNeededObserver
 
 // Deduction guides.
 
-template <class Elf, template <typename Elf1> class SymbolInfo, class Callback>
-DynamicNeededObserver(SymbolInfo<Elf>& info, Callback)
-    -> DynamicNeededObserver<Elf, SymbolInfo<Elf>, Callback>;
+template <class Elf, class AbiTraits, template <class, class> class SymbolInfo, class Callback>
+DynamicNeededObserver(SymbolInfo<Elf, AbiTraits>& info, Callback)
+    -> DynamicNeededObserver<Elf, SymbolInfo<Elf, AbiTraits>, Callback>;
 
 }  // namespace elfldltl
 

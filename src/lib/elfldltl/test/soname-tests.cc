@@ -36,4 +36,12 @@ TEST(ElfldltlSonameTests, Basic) {
   EXPECT_NE(a, b);
 }
 
+TEST(ElfldltlSonameTests, Remote) {
+  using RemoteSoname = elfldltl::Soname<elfldltl::Elf<>, elfldltl::RemoteAbiTraits>;
+
+  RemoteSoname name;
+  name = RemoteSoname(name);
+  EXPECT_EQ(name.hash(), 0u);
+}
+
 }  // anonymous namespace

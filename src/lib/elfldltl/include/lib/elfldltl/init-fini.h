@@ -9,6 +9,8 @@
 
 #include <optional>
 
+#include "abi-span.h"
+
 namespace elfldltl {
 
 // A module initializer or finalizer function has type void().
@@ -27,7 +29,7 @@ using InitFiniFunction = void();
 //
 // The CallInit and CallFini methods directly call each function in order, for
 // immediate in-process uses.
-template <class Elf>
+template <class Elf, class AbiTraits = LocalAbiTraits>
 struct InitFiniInfo {
  public:
   using Addr = typename Elf::Addr;
@@ -47,7 +49,12 @@ struct InitFiniInfo {
   // is not contiguous with the array and is stored separately in the ELF
   // headers where no relocation records apply.  So this address always needs
   // the load bias added to yield a runtime function pointer.
-  constexpr std::optional<Addr> legacy() const { return legacy_; }
+  constexpr std::optional<Addr> legacy() const {
+    if (legacy_ != 0) {
+      return legacy_;
+    }
+    return std::nullopt;
+  }
 
   constexpr InitFiniInfo& set_array(cpp20::span<const Addr> array) {
     array_ = array;
@@ -60,7 +67,7 @@ struct InitFiniInfo {
   }
 
   // Return the number of function pointers present.
-  constexpr size_t size() const { return array_.size() + (legacy_ ? 1 : 0); }
+  constexpr size_t size() const { return array_.size() + (legacy_ != 0 ? 1 : 0); }
 
   constexpr bool empty() const { return size() == 0; }
 
@@ -69,8 +76,8 @@ struct InitFiniInfo {
   // true iff relocations affecting RELRO data have already been applied.
   template <typename T>
   constexpr void VisitInit(T&& init, bool relocated) {
-    if (legacy_) {
-      init(*legacy_, false);
+    if (legacy_ != 0) {
+      init(legacy_, false);
     }
     for (const auto& addr : array_) {
       init(addr, relocated);
@@ -83,8 +90,8 @@ struct InitFiniInfo {
     for (auto it = array_.rbegin(); it != array_.rend(); ++it) {
       fini(*it, relocated);
     }
-    if (legacy_) {
-      fini(*legacy_, false);
+    if (legacy_ != 0) {
+      fini(legacy_, false);
     }
   }
 
@@ -112,8 +119,8 @@ struct InitFiniInfo {
   }
 
  private:
-  cpp20::span<const Addr> array_;
-  std::optional<Addr> legacy_;
+  AbiSpan<const Addr, cpp20::dynamic_extent, Elf, AbiTraits> array_;
+  Addr legacy_ = 0;
 };
 
 }  // namespace elfldltl

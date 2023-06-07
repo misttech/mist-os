@@ -101,3 +101,27 @@ framework for examining the `PT_DYNAMIC` metadata in a single pass using a
 mix-and-match variety of observer objects looking for different kinds of
 entries.  The toolkit provides observer object types for some common tasks.
 Custom observer objects can be implemented easily.
+
+## "Remotable" pointers
+
+['<lib/elfldltl/abi-ptr.h>`](include/lib/elfldltl/abi-ptr.h) and
+['<lib/elfldltl/abi-span.h>`](include/lib/elfldltl/abi-span.h) provide an
+abstraction for pointer types and `std::span`-style types.  The purpose of
+these is to define data structure layouts that can be populated from outside
+the address space where they will be used.  This is used to implement the
+"passive ABI" concept that enables out-of-process dynamic linking to be
+indistinguishable from in-process dynamic linking for application code.  See
+[`//sdk/lib/ld`](/sdk/lib/ld) for a more thorough explanation.
+
+A subset of the class APIs representing information of use in this kind of ABI
+are defined using `elfldltl::AbiPtr` and related template types.  These classes
+take an extra "traits" template parameter that's passed along to the
+`elfldltl::AbiPtr` template to facilitate duplicating the data structure from
+one address space and pointer encoding to another.  There is a default that
+boils down to using normal pointer and integer types under the hood, so this
+can generally be ignored by users of these classes.  When these classes are
+instantiated using different traits as part of the "remoting" process, those
+class objects can't really be used with all the methods supported by the
+default instantiations--they're really just for the mechanics of remoting.
+
+**TODO(fxbug.dev/121817):** Remoting is not implemented yet.

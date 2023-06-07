@@ -12,6 +12,7 @@
 #include <optional>
 #include <string_view>
 
+#include "abi-span.h"
 #include "compat-hash.h"
 #include "gnu-hash.h"
 #include "layout.h"
@@ -131,11 +132,12 @@ class SymbolName : public std::string_view {
 // also be used to enumerate the symbol table or the hash tables.  It holds
 // non-owning pointers into target data normally found in the RODATA segment.
 //
-template <class Elf>
+template <class Elf, class AbiTraits = LocalAbiTraits>
 class SymbolInfo {
  public:
   using Word = typename Elf::Word;
   using Addr = typename Elf::Addr;
+  using size_type = typename Elf::size_type;
   using Sym = typename Elf::Sym;
 
   // Each flavor of hash table has a support class with a compatible API,
@@ -165,8 +167,8 @@ class SymbolInfo {
   //   there exhaustively visits every symbol in the whole hash table exactly
   //   once.  This is only used for diagnostic purposes.
   //
-  using CompatHash = ::elfldltl::CompatHash<Word>;  // See compat-hash.h.
-  using GnuHash = ::elfldltl::GnuHash<Word, Addr>;  // See gnu-hash.h.
+  using CompatHash = ::elfldltl::CompatHash<Elf, AbiTraits>;  // compat-hash.h
+  using GnuHash = ::elfldltl::GnuHash<Elf, AbiTraits>;        // gnu-hash.h
 
   // This is a forward-iterable container view of a symbol table hash bucket.
   // Each uint32_t element is a symbol table index.
@@ -216,17 +218,17 @@ class SymbolInfo {
   constexpr const Sym* Lookup(const HashTable& table, std::string_view name, uint32_t hash,
                               Filter&& filter = DefinedSymbol) const {
     static_assert(std::is_invocable_r_v<bool, Filter, const Sym&>);
-    uint32_t bucket = table.Bucket(hash);
-    if (bucket != 0 && name.size() < strtab_.size()) {
+    const uint32_t bucket = table.Bucket(hash);
+    if (bucket != 0 && name.size() < strtab().size()) {
       for (uint32_t i : HashBucket<HashTable>(table, bucket, hash)) {
         if (i >= symtab_.size()) [[unlikely]] {
           break;
         }
         const Sym& sym = symtab_[i];
         // TODO(mcgrathr): diag for bad st_name
-        if (filter(sym) && sym.name < strtab_.size() && strtab_.size() - name.size() > sym.name &&
-            strtab_[sym.name + name.size()] == '\0' &&
-            strtab_.substr(sym.name, name.size()) == name) {
+        if (filter(sym) && sym.name < strtab().size() && strtab().size() - name.size() > sym.name &&
+            strtab()[sym.name + name.size()] == '\0' &&
+            strtab().substr(sym.name, name.size()) == name) {
           return &sym;
         }
       }
@@ -235,15 +237,15 @@ class SymbolInfo {
   }
 
   // Fetch the raw string table.
-  constexpr auto strtab() const { return strtab_; }
+  constexpr std::string_view strtab() const { return strtab_; }
 
   // Fetch a NUL-terminated string from the string table by offset,
   // e.g. as stored in st_name or DT_SONAME.
   constexpr std::string_view string(size_t offset) const {
-    if (offset < strtab_.size()) {
-      size_t pos = strtab_.find_first_of('\0', offset);
+    if (offset < strtab().size()) {
+      size_t pos = strtab().find_first_of('\0', offset);
       if (pos != std::string_view::npos) {
-        return strtab_.substr(offset, pos - offset);
+        return strtab().substr(offset, pos - offset);
       }
     }
     return {};
@@ -252,7 +254,7 @@ class SymbolInfo {
   // Fetch the raw symbol table.  Note this size may be an upper bound.  It's
   // all valid memory to read, but there might be garbage data past the last
   // actual valid symbol table index.
-  constexpr auto symtab() const { return symtab_; }
+  constexpr cpp20::span<const Sym> symtab() const { return symtab_; }
 
   // Fetch the symbol table and try to reduce its apparent size to its real
   // size or at least a better approximation.  This provides no guarantee that
@@ -260,7 +262,7 @@ class SymbolInfo {
   // work to try to ensure it.  If using only indices that are presumed to be
   // valid, such as those in relocation entries, just use symtab() instead.
   // This is better for blind enumeration.
-  auto safe_symtab() const { return symtab_.subspan(0, safe_symtab_size()); }
+  cpp20::span<const Sym> safe_symtab() const { return symtab_.subspan(0, safe_symtab_size()); }
 
   // Return the CompatHash object (see compat-hash.h) if DT_HASH is present.
   constexpr std::optional<CompatHash> compat_hash() const {
@@ -311,26 +313,29 @@ class SymbolInfo {
     return *this;
   }
 
-  constexpr SymbolInfo& set_soname(typename Elf::size_type soname) {
+  constexpr SymbolInfo& set_soname(size_type soname) {
     soname_ = soname;
     return *this;
   }
 
  private:
-  size_t safe_symtab_size() const {
+  template <typename T>
+  using Span = AbiSpan<const T, cpp20::dynamic_extent, Elf, AbiTraits>;
+
+  size_type safe_symtab_size() const {
     if (symtab_.empty()) {
       return 0;
     }
 
     // The old format makes it very cheap to detect, so prefer that.
     if (CompatHash::Valid(compat_hash_)) {
-      size_t hash_max = CompatHash(compat_hash_).symtab_size();
+      size_type hash_max = CompatHash(compat_hash_).symtab_size();
       return std::min(symtab_.size(), hash_max);
     }
 
     // The DT_GNU_HASH format has to be fully scanned to determine the size.
     if (GnuHash::Valid(gnu_hash_)) {
-      size_t hash_max = GnuHash(gnu_hash_).symtab_size();
+      size_type hash_max = GnuHash(gnu_hash_).symtab_size();
       return std::min(symtab_.size(), hash_max);
     }
 
@@ -340,7 +345,7 @@ class SymbolInfo {
     auto base = reinterpret_cast<const char*>(symtab_.data());
     auto limit = reinterpret_cast<const char*>(symtab_.data() + symtab_.size());
     if (base < strtab_.data() && limit > strtab_.data()) {
-      return (strtab_.data() - base) / sizeof(Sym);
+      return static_cast<size_type>(strtab_.data() - base) / sizeof(Sym);
     }
 
     // Worst case, there might still be some garbage entries at the end.  We
@@ -349,11 +354,11 @@ class SymbolInfo {
     return symtab_.size();
   }
 
-  std::string_view strtab_;
-  cpp20::span<const Sym> symtab_;
-  cpp20::span<const Word> compat_hash_;
-  cpp20::span<const Addr> gnu_hash_;
-  typename Elf::size_type soname_ = 0;
+  AbiStringView<Elf, AbiTraits> strtab_;
+  Span<Sym> symtab_;
+  Span<Word> compat_hash_;
+  Span<Addr> gnu_hash_;
+  Addr soname_ = 0;
 };
 
 // This constructs a SymbolInfo that just contains a single undefined symbol.

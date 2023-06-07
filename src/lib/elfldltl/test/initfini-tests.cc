@@ -282,6 +282,15 @@ TYPED_TEST(ElfldltlInitFiniTests, VisitFiniTests) {
       false);
 }
 
+TYPED_TEST(ElfldltlInitFiniTests, Remote) {
+  using Elf = typename TestFixture::Elf;
+
+  using RemoteInitFiniInfo = elfldltl::InitFiniInfo<Elf, elfldltl::RemoteAbiTraits>;
+
+  RemoteInitFiniInfo info;
+  info = RemoteInitFiniInfo(info);
+}
+
 // The tests for CallInit and CallFini must use global state since
 // the callees are simple function pointers taking no arguments.
 std::vector<int> gCalls;

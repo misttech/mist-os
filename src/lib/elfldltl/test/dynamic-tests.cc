@@ -1503,7 +1503,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadGnuHashAlign) {
   EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
 }
 
-template <typename Elf>
+template <class Elf, class AbiTraits = elfldltl::LocalAbiTraits>
 struct NotCalledSymbolInfo {
   std::string_view string(typename Elf::size_type) const {
     ADD_FAILURE();

@@ -14,6 +14,7 @@
 #include <string_view>
 #include <utility>
 
+#include "abi-span.h"
 #include "layout.h"
 
 namespace elfldltl {
@@ -91,10 +92,12 @@ constexpr uint32_t kGnuNoHash = uint32_t{};
 //  * Otherwise (i.e. the low bit is one), the lookup has failed.
 //
 
-template <typename Word, typename Addr>
+template <class Elf, class AbiTraits = elfldltl::LocalAbiTraits>
 class GnuHash {
  public:
-  using size_type = typename Addr::value_type;
+  using Addr = typename Elf::Addr;
+  using Word = typename Elf::Word;
+  using size_type = typename Elf::size_type;
 
   class iterator;
 
@@ -314,15 +317,15 @@ class GnuHash {
     return ((filter_index_mask_ + 1) * kBucketsPerAddr) + BucketChainStart(symndx);
   }
 
-  cpp20::span<const Addr> tables_;
-  uint32_t bucket_count_ = 0;
-  uint32_t chain_index_bias_ = 0;
-  uint32_t filter_index_mask_ = 0;
-  uint32_t filter_hash_shift_ = 0;
+  AbiSpan<const Addr, cpp20::dynamic_extent, Elf, AbiTraits> tables_;
+  Word bucket_count_ = 0;
+  Word chain_index_bias_ = 0;
+  Word filter_index_mask_ = 0;
+  Word filter_hash_shift_ = 0;
 };
 
-template <typename Word, typename Addr>
-class GnuHash<Word, Addr>::BucketIterator {
+template <class Elf, class AbiTraits>
+class GnuHash<Elf, AbiTraits>::BucketIterator {
  public:
   constexpr BucketIterator() = default;
   constexpr BucketIterator(const BucketIterator&) = default;
@@ -464,8 +467,8 @@ class GnuHash<Word, Addr>::BucketIterator {
 // that's what a BucketIterator covers.  So this is useful for exhaustive
 // iteration over the hash table, and for detecting actual hash collisions,
 // but is not useful for counting bucket depth and the like.
-template <typename Word, typename Addr>
-class GnuHash<Word, Addr>::iterator {
+template <class Elf, class AbiTraits>
+class GnuHash<Elf, AbiTraits>::iterator {
  public:
   constexpr iterator() = default;
   constexpr iterator(const iterator&) = default;
@@ -531,16 +534,16 @@ class GnuHash<Word, Addr>::iterator {
   uint32_t i_ = -1;
 };
 
-template <typename Word, typename Addr>
-constexpr auto GnuHash<Word, Addr>::begin() const -> iterator {
+template <class Elf, class AbiTraits>
+constexpr auto GnuHash<Elf, AbiTraits>::begin() const -> iterator {
   iterator it;
   it.table_ = this;
   it.i_ = AbsoluteBucketChainStart(chain_index_bias_);
   return it;
 }
 
-template <typename Word, typename Addr>
-constexpr auto GnuHash<Word, Addr>::end() const -> iterator {
+template <class Elf, class AbiTraits>
+constexpr auto GnuHash<Elf, AbiTraits>::end() const -> iterator {
   iterator it;
   it.table_ = this;
   it.i_ = static_cast<uint32_t>(tables_.size() * kBucketsPerAddr);
