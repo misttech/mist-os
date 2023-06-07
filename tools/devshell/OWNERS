@@ -1,7 +1,7 @@
 olivernewman@google.com
 
 per-file             add-update-source,build-push,lib/updates.sh = file: /src/sys/pkg/OWNERS
-per-file             push-package,ota,serve,serve-remote,serve-updates,update = file: /src/sys/pkg/OWNERS
+per-file             push-package,ota,serve,serve-remote,update = file: /src/sys/pkg/OWNERS
 per-file             tests/subcommands/fx_ota_test = file: /src/sys/pkg/OWNERS
 per-file             tests/subcommands/fx_remote_test = file: /src/sys/pkg/OWNERS
 per-file             tests/subcommands/fx_serve_update_test = file: /src/sys/pkg/OWNERS
