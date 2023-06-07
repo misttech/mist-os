@@ -36,6 +36,7 @@ library_headers("headers") {
 
   headers = [
     "lib/elfldltl/abi-ptr.h",
+    "lib/elfldltl/abi-span.h",
     "lib/elfldltl/compat-hash.h",
     "lib/elfldltl/constants.h",
     "lib/elfldltl/container.h",
@@ -60,7 +61,6 @@ library_headers("headers") {
     "lib/elfldltl/mapped-vmo-file.h",
     "lib/elfldltl/memory.h",
     "lib/elfldltl/mmap-loader.h",
-    "lib/elfldltl/vmar-loader.h",
     "lib/elfldltl/note.h",
     "lib/elfldltl/phdr.h",
     "lib/elfldltl/posix.h",
@@ -73,6 +73,7 @@ library_headers("headers") {
     "lib/elfldltl/static-pie.h",
     "lib/elfldltl/static-vector.h",
     "lib/elfldltl/symbol.h",
+    "lib/elfldltl/vmar-loader.h",
     "lib/elfldltl/vmo.h",
     "lib/elfldltl/zircon.h",
   ]
