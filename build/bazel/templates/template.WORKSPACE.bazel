@@ -69,6 +69,13 @@ local_repository(
     path = "third_party/bazel_rules_python",
 )
 
+# The repository containing common definitions for the Fuchsia platform build
+# and the Fuchsia Bazel SDK rules.
+local_repository(
+    name = "fuchsia_sdk_common",
+    path = "build/bazel_sdk/bazel_rules_fuchsia/common",
+)
+
 # Create the @fuchsia_icu_config repository which contains the constants.bzl file
 # exporting generating configuration constants related to the ICU library flavors
 # buildifier: disable=load-on-top
@@ -246,11 +253,6 @@ generate_prebuilt_clang_toolchain_repository(
 )
 register_toolchains("@prebuilt_clang//:host_clang_{host_os}_x64_cc_toolchain")
 register_toolchains("@prebuilt_clang//:host_clang_{host_os}_arm64_cc_toolchain")
-
-local_repository(
-    name = "fuchsia_sdk_common",
-    path = "build/bazel_sdk/bazel_rules_fuchsia/common",
-)
 
 # buildifier: disable=load-on-top
 load(

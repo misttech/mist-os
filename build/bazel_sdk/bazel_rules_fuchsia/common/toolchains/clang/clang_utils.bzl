@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""Utilities to process clang output."""
+"""Utilities related to Clang."""
 
 def process_clang_builtins_output(probe_output):
     """Get Clang builtin data
@@ -58,3 +58,48 @@ def process_clang_builtins_output(probe_output):
             builtin_include_paths.append(line.strip())
 
     return (short_version, long_version, builtin_include_paths)
+
+def to_clang_target_tuple(target_os, target_cpu):
+    """Find the Clang target tuple corresponding to a given (os, cpu) pair.
+
+    Args:
+      target_os: Target os name, following Fuchsia or Bazel conventions.
+      target_cpu: Target cpu name, following Fuchsia or Bazel conventions.
+    Returns:
+      A Clang target tuple.
+    """
+
+    clang_arch = {
+        # Fuchsia-only conventions first.
+        "x64": "x86_64",
+
+        # Bazel-only conventions second.
+        "k8": "x86_64",
+        "x86_64": "x86_64",
+
+        # Common names.
+        "aarch64": "aarch64",
+        "arm64": "aarch64",
+        "riscv64": "riscv64",
+    }.get(target_cpu)
+
+    if not clang_arch:
+        fail("Unknown target_cpu value: %s" % target_cpu)
+
+    clang_os = {
+        # Fuchsia-only conventions first
+        "mac": "apple-darwin",
+
+        # Bazel conventions second
+        "osx": "apple-darwin",
+        "macos": "apple-darwin",
+
+        # Common names
+        "fuchsia": "unknown-fuchsia",
+        "linux": "unknown-linux-gnu",
+    }.get(target_os)
+
+    if not clang_os:
+        fail("Uknown target_os value: %s" % target_os)
+
+    return "%s-%s" % (clang_arch, clang_os)

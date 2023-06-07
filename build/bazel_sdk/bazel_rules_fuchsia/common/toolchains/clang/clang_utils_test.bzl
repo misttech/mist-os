@@ -2,11 +2,28 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""Tests for clang_utilities.bzl"""
+"""
+Tests for clang_utilities.bzl
+
+The BUILD.bazel file of a clang repository should include this file
+and call the `include_clang_utils_test_suite()` function to define a target
+that can be launched with `bazel test` to run the test suite, as in:
+
+  bazel test @clang_repo//:test_suite
+
+If @clang_repo//BUILD.bazel contains something like:
+
+  load("@fuchsia_sdk_common//:toolchains/clang/clang_utils_test.bzl",
+       "include_clang_utils_test_suite")
+
+  include_clang_utils_test_suite(
+    name = "test_suite",
+  )
+"""
 
 load("@bazel_skylib//lib:unittest.bzl", "asserts", "unittest")
 load(
-    "//:build/bazel/toolchains/clang/clang_utilities.bzl",
+    "//:toolchains/clang/clang_utils.bzl",
     "process_clang_builtins_output",
 )
 
@@ -52,7 +69,7 @@ End of search list.
 
 process_clang_builtins_output_test = unittest.make(_process_clang_builtins_output_test_impl)
 
-def include_clang_utilities_test_suite(name):
+def include_clang_utils_test_suite(name):
     unittest.suite(
         name,
         process_clang_builtins_output_test,
