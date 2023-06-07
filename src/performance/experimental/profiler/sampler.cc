@@ -6,6 +6,8 @@
 
 #include <lib/zx/suspend_token.h>
 
+#include "lib/async/cpp/task.h"
+
 std::pair<zx::ticks, std::vector<uint64_t>> SampleThread(const zx::process& process,
                                                          const zx::thread& thread,
                                                          unwinder::FramePointerUnwinder& unwinder) {
@@ -83,54 +85,61 @@ std::pair<zx::ticks, std::vector<uint64_t>> SampleThread(const zx::process& proc
 
 zx::result<> Sampler::Start() {
   {
-    std::lock_guard lock(state_lock_);
     if (state_ != State::Stopped) {
       return zx::error(ZX_ERR_BAD_STATE);
     }
     state_ = State::Running;
   }
-  std::lock_guard data_lock(data_lock_);
-  collection_thread_ = std::thread([this]() mutable { CollectSamples(); });
-  collection_thread_.detach();
+
+  for (SamplingInfo& target : targets_) {
+    // If a target launches a new thread, we want to add it to the set of monitored threads.
+    zx::result watch_result = watchers_
+                                  .emplace_back(std::make_unique<ProcessWatcher>(
+                                      target.process.borrow(),
+                                      [&target](zx_koid_t, zx_koid_t tid, zx::thread t) {
+                                        target.threads.emplace_back(tid, std::move(t));
+                                      }))
+                                  ->Watch(dispatcher_);
+    if (watch_result.is_error()) {
+      FX_PLOGS(ERROR, watch_result.status_value())
+          << "Failed to watch process: " << target.process.get();
+      watchers_.clear();
+      return watch_result.take_error();
+    }
+  }
+
+  inspecting_durations_.reserve(1000);
+  samples_.reserve(1000);
+  async::PostTask(dispatcher_, [this]() mutable { CollectSamples(); });
   return zx::ok();
 }
 
 zx::result<> Sampler::Stop() {
   {
-    std::unique_lock lock(state_lock_);
     if (state_ == State::Stopped) {
       return zx::ok();
     }
-    state_ = State::Stopping;
-    state_cv_.wait(lock, [this]() { return state_ == State::Stopped; });
+    state_ = State::Stopped;
   }
-  std::lock_guard data_lock(data_lock_);
-  FX_LOGS(INFO) << "Stopped! Collected " << stacks_.size() << " samples";
+  FX_LOGS(INFO) << "Stopped! Collected " << samples_.size() << " samples";
   return zx::ok();
 }
 
 void Sampler::CollectSamples() {
-  std::lock_guard data_lock(data_lock_);
-  inspecting_durations_.reserve(1000);
-  stacks_.reserve(1000);
-
-  FX_LOGS(INFO) << "Main Sampling Loop";
-  while (state_.load() == State::Running) {
-    for (SamplingInfo& target : targets_) {
-      for (const zx::thread& thread : target.threads) {
-        auto [time_sampling, pcs] = SampleThread(target.process, thread, target.fp_unwinder);
-        if (time_sampling != zx::ticks()) {
-          stacks_.push_back(pcs);
-          inspecting_durations_.push_back(time_sampling);
-        }
+  if (state_.load() != State::Running) {
+    FX_LOGS(INFO) << "Done profiling";
+    return;
+  }
+  for (SamplingInfo& target : targets_) {
+    for (const auto& [tid, thread] : target.threads) {
+      auto [time_sampling, pcs] = SampleThread(target.process, thread, target.fp_unwinder);
+      if (time_sampling != zx::ticks()) {
+        samples_.push_back({target.pid, tid, pcs});
+        inspecting_durations_.push_back(time_sampling);
       }
     }
-    zx::nanosleep(zx::deadline_after(zx::msec(10)));
   }
-  {
-    std::lock_guard lock(state_lock_);
-    state_ = State::Stopped;
-    state_cv_.notify_all();
-  }
-  FX_LOGS(INFO) << "Done profiling";
+
+  async::PostDelayedTask(
+      dispatcher_, [this]() mutable { CollectSamples(); }, zx::msec(10));
 }

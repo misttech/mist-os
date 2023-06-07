@@ -5,18 +5,14 @@
 import("//build/components.gni")
 import("//src/sys/core/build/core_shard.gni")
 
-executable("bin") {
-  testonly = true
-  output_name = "profiler"
-
+source_set("lib") {
   sources = [
-    "main.cc",
-    "profiler_controller_impl.cc",
+    "process_watcher.cc",
     "sampler.cc",
     "taskfinder.cc",
   ]
 
-  deps = [
+  public_deps = [
     "//sdk/fidl/fuchsia.cpu.profiler:fuchsia.cpu.profiler_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fidl/cpp",
@@ -28,6 +24,26 @@ executable("bin") {
     "//zircon/system/ulib/elf-search",
     "//zircon/system/ulib/inspector",
     "//zircon/system/ulib/task-utils",
+  ]
+}
+
+executable("bin") {
+  testonly = true
+  output_name = "profiler"
+
+  sources = [
+    "main.cc",
+    "profiler_controller_impl.cc",
+  ]
+
+  deps = [
+    ":lib",
+    "//sdk/fidl/fuchsia.cpu.profiler:fuchsia.cpu.profiler_cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/syslog/cpp",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

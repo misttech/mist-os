@@ -17,7 +17,7 @@
 // for based on koids.
 class TaskFinder : TaskEnumerator {
  public:
-  zx::result<std::vector<zx::handle>> FindHandles();
+  zx::result<std::vector<std::pair<zx_koid_t, zx::handle>>> FindHandles();
   // Each of these methods visits the corresponding task type. If any On*()
   // method returns a value other than ZX_OK, the enumeration stops. See
   // |task_callback_t| for a description of parameters.
@@ -43,7 +43,7 @@ class TaskFinder : TaskEnumerator {
   std::set<zx_koid_t> threads_;
   std::set<zx_koid_t> processes_;
 
-  std::vector<zx::handle> found_handles_;
+  std::vector<std::pair<zx_koid_t, zx::handle>> found_handles_;
 };
 
 #endif  // SRC_PERFORMANCE_EXPERIMENTAL_PROFILER_TASKFINDER_H_

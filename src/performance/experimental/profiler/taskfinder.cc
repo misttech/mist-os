@@ -4,7 +4,7 @@
 
 #include "taskfinder.h"
 
-zx::result<std::vector<zx::handle>> TaskFinder::FindHandles() {
+zx::result<std::vector<std::pair<zx_koid_t, zx::handle>>> TaskFinder::FindHandles() {
   auto status = WalkRootJobTree();
   if (status != ZX_OK) {
     return zx::error(status);
@@ -21,6 +21,7 @@ zx_status_t TaskFinder::OnJob(int depth, zx_handle_t job, zx_koid_t koid, zx_koi
     if (result != ZX_OK) {
       return result;
     }
+    found_handles_.emplace_back(koid, std::move(dup));
   }
   return ZX_OK;
 }
@@ -33,7 +34,7 @@ zx_status_t TaskFinder::OnProcess(int depth, zx_handle_t process, zx_koid_t koid
     if (result != ZX_OK) {
       return result;
     }
-    found_handles_.push_back(std::move(dup));
+    found_handles_.emplace_back(koid, std::move(dup));
   }
   return ZX_OK;
 }
@@ -46,7 +47,7 @@ zx_status_t TaskFinder::OnThread(int depth, zx_handle_t process, zx_koid_t koid,
     if (result != ZX_OK) {
       return result;
     }
-    found_handles_.push_back(std::move(dup));
+    found_handles_.emplace_back(koid, std::move(dup));
   }
   return ZX_OK;
 }

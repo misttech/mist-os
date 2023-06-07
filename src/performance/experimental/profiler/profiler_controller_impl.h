@@ -16,6 +16,7 @@
 
 class ProfilerControllerImpl : public fidl::Server<fuchsia_cpu_profiler::Session> {
  public:
+  explicit ProfilerControllerImpl(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
   void Configure(ConfigureRequest& request, ConfigureCompleter::Sync& completer) override;
   void Start(StartRequest& request, StartCompleter::Sync& completer) override;
   void Stop(StopCompleter::Sync& completer) override;
@@ -34,6 +35,7 @@ class ProfilerControllerImpl : public fidl::Server<fuchsia_cpu_profiler::Session
     Running,
     Stopped,
   };
+  async_dispatcher_t* dispatcher_;
   std::mutex state_lock_;
   std::unique_ptr<Sampler> sampler_ __TA_GUARDED(state_lock_);
   ProfilingState state_ __TA_GUARDED(state_lock_) = ProfilingState::Unconfigured;

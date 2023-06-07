@@ -16,14 +16,13 @@
 int main() {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   async_dispatcher_t* dispatcher = loop.dispatcher();
-  ProfilerControllerImpl profiler_app;
 
   // Expose the FIDL server.
   component::OutgoingDirectory outgoing = component::OutgoingDirectory(dispatcher);
   zx::result result = outgoing.AddUnmanagedProtocol<fuchsia_cpu_profiler::Session>(
       [dispatcher](fidl::ServerEnd<fuchsia_cpu_profiler::Session> server_end) {
         fidl::BindServer(dispatcher, std::move(server_end),
-                         std::make_unique<ProfilerControllerImpl>(),
+                         std::make_unique<ProfilerControllerImpl>(dispatcher),
                          std::mem_fn(&ProfilerControllerImpl::OnUnbound));
       });
   FX_CHECK(result.is_ok()) << "Failed to expose ProfilingController protocol: "

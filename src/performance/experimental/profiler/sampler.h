@@ -15,7 +15,6 @@
 
 #include <condition_variable>
 #include <mutex>
-#include <thread>
 #include <vector>
 
 #include <inspector/inspector.h>
@@ -24,9 +23,14 @@
 #include <src/lib/unwinder/fuchsia.h>
 #include <src/lib/unwinder/unwind.h>
 
+#include "process_watcher.h"
+
 struct SamplingInfo {
-  SamplingInfo(zx::process process, std::vector<zx::thread> threads, unwinder::CfiUnwinder unwinder)
+  SamplingInfo(zx::process process, zx_koid_t pid,
+               std::vector<std::pair<zx_koid_t, zx::thread>> threads,
+               unwinder::CfiUnwinder unwinder)
       : process(std::move(process)),
+        pid(pid),
         threads(std::move(threads)),
         cfi_unwinder(std::move(unwinder)),
         fp_unwinder(&cfi_unwinder) {}
@@ -34,50 +38,53 @@ struct SamplingInfo {
   SamplingInfo& operator=(SamplingInfo&&) = default;
 
   zx::process process;
-  std::vector<zx::thread> threads;
+  zx_koid_t pid;
+  std::vector<std::pair<zx_koid_t, zx::thread>> threads;
   unwinder::CfiUnwinder cfi_unwinder;
   unwinder::FramePointerUnwinder fp_unwinder;
 };
 
+struct Sample {
+  zx_koid_t pid;
+  zx_koid_t tid;
+  std::vector<uint64_t> stack;
+};
+
 class Sampler {
  public:
-  explicit Sampler(std::vector<SamplingInfo> targets) : targets_(std::move(targets)) {}
+  explicit Sampler(async_dispatcher_t* dispatcher, std::vector<SamplingInfo> targets)
+      : dispatcher_(dispatcher), targets_(std::move(targets)) {}
 
   zx::result<> Start();
   zx::result<> Stop();
 
   void PrintMarkupContext(FILE* f) {
-    std::lock_guard lock(data_lock_);
     for (const SamplingInfo& target : targets_) {
       inspector_print_markup_context(f, target.process.get());
     }
   }
 
-  std::vector<std::vector<uint64_t>> GetStacks() {
-    std::lock_guard lock(data_lock_);
-    return stacks_;
-  }
-  std::vector<zx::ticks> SamplingDurations() {
-    std::lock_guard lock(data_lock_);
-    return inspecting_durations_;
-  }
+  std::vector<Sample> GetSamples() { return samples_; }
+  std::vector<zx::ticks> SamplingDurations() { return inspecting_durations_; }
 
  private:
+  void AddThread(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
+                 const zx_packet_signal_t* signal) {}
+
   void CollectSamples();
   enum State {
     Running,
-    Stopping,
     Stopped,
   };
-  std::mutex state_lock_;
-  std::mutex data_lock_;
+
+  async_dispatcher_t* dispatcher_;
 
   std::atomic<State> state_ = State::Stopped;
   std::condition_variable state_cv_;
 
-  std::vector<SamplingInfo> targets_ __TA_GUARDED(data_lock_);
-  std::thread collection_thread_ __TA_GUARDED(data_lock_);
-  std::vector<zx::ticks> inspecting_durations_ __TA_GUARDED(data_lock_);
-  std::vector<std::vector<uint64_t>> stacks_ __TA_GUARDED(data_lock_);
+  std::vector<SamplingInfo> targets_;
+  std::vector<zx::ticks> inspecting_durations_;
+  std::vector<Sample> samples_;
+  std::vector<std::unique_ptr<ProcessWatcher>> watchers_;
 };
 #endif  // SRC_PERFORMANCE_EXPERIMENTAL_PROFILER_SAMPLER_H_

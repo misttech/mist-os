@@ -49,7 +49,6 @@ zx::result<std::vector<zx_koid_t>> GetChildrenTids(const zx::process& process) {
 
 void ProfilerControllerImpl::Configure(ConfigureRequest& request,
                                        ConfigureCompleter::Sync& completer) {
-  FX_LOGS(INFO) << "Configure!";
   std::lock_guard lock(state_lock_);
   if (state_ != ProfilingState::Unconfigured) {
     completer.Reply(fit::error(fuchsia_cpu_profiler::SessionConfigureError::kBadState));
@@ -89,7 +88,7 @@ void ProfilerControllerImpl::Configure(ConfigureRequest& request,
     }
   }
 
-  zx::result<std::vector<zx::handle>> handles_result = finder.FindHandles();
+  zx::result<std::vector<std::pair<zx_koid_t, zx::handle>>> handles_result = finder.FindHandles();
   if (handles_result.is_error()) {
     FX_PLOGS(ERROR, handles_result.error_value()) << "Failed to walk job tree";
     completer.Reply(fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
@@ -102,7 +101,7 @@ void ProfilerControllerImpl::Configure(ConfigureRequest& request,
   }
 
   targets_.clear();
-  for (auto&& handle : *handles_result) {
+  for (auto&& [koid, handle] : *handles_result) {
     zx_info_handle_basic_t info;
     zx_status_t res = handle.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
     if (res != ZX_OK) {
@@ -120,7 +119,7 @@ void ProfilerControllerImpl::Configure(ConfigureRequest& request,
               fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
           return;
         }
-        std::vector<zx::thread> threads;
+        std::vector<std::pair<zx_koid_t, zx::thread>> threads;
         for (auto child : *children) {
           zx::thread child_thread;
           zx_status_t res = process.get_child(child, ZX_DEFAULT_THREAD_RIGHTS, &child_thread);
@@ -128,7 +127,7 @@ void ProfilerControllerImpl::Configure(ConfigureRequest& request,
             FX_PLOGS(ERROR, res) << "Failed to get handle for child (koid: " << child << ")";
             continue;
           }
-          threads.push_back(std::move(child_thread));
+          threads.emplace_back(child, std::move(child_thread));
         }
 
         unwinder::FuchsiaMemory memory(process.get());
@@ -138,7 +137,8 @@ void ProfilerControllerImpl::Configure(ConfigureRequest& request,
               modules.emplace_back(info.vaddr, &memory, unwinder::Module::AddressMode::kProcess);
             });
         unwinder::CfiUnwinder cfi_unwinder{modules};
-        targets_.emplace_back(std::move(process), std::move(threads), std::move(cfi_unwinder));
+        targets_.emplace_back(std::move(process), koid, std::move(threads),
+                              std::move(cfi_unwinder));
         break;
       }
       case ZX_OBJ_TYPE_JOB:
@@ -153,7 +153,8 @@ void ProfilerControllerImpl::Configure(ConfigureRequest& request,
         zx::thread thread{std::move(handle)};
         TaskFinder finder;
         finder.AddProcess(info.related_koid);
-        zx::result<std::vector<zx::handle>> handles_result = finder.FindHandles();
+        zx::result<std::vector<std::pair<zx_koid_t, zx::handle>>> handles_result =
+            finder.FindHandles();
         if (handles_result.is_error()) {
           FX_PLOGS(ERROR, handles_result.error_value()) << "Failed to walk job tree";
           completer.Reply(
@@ -166,18 +167,20 @@ void ProfilerControllerImpl::Configure(ConfigureRequest& request,
               fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
           return;
         }
-        zx::process process{std::move((*handles_result)[0])};
+        auto [pid, process] = std::move((*handles_result)[0]);
 
         std::vector<unwinder::Module> modules;
         unwinder::FuchsiaMemory memory(process.get());
-        elf_search::ForEachModule(
-            *zx::unowned_process{process}, [&modules, &memory](const elf_search::ModuleInfo& info) {
-              modules.emplace_back(info.vaddr, &memory, unwinder::Module::AddressMode::kProcess);
-            });
+        elf_search::ForEachModule(*zx::unowned_process{process.get()},
+                                  [&modules, &memory](const elf_search::ModuleInfo& info) {
+                                    modules.emplace_back(info.vaddr, &memory,
+                                                         unwinder::Module::AddressMode::kProcess);
+                                  });
         unwinder::CfiUnwinder cfi_unwinder{modules};
-        std::vector<zx::thread> threads;
-        threads.push_back(std::move(thread));
-        targets_.emplace_back(std::move(process), std::move(threads), std::move(cfi_unwinder));
+        std::vector<std::pair<zx_koid_t, zx::thread>> threads;
+        threads.emplace_back(koid, std::move(thread));
+        targets_.emplace_back(zx::process(std::move(process)), pid, std::move(threads),
+                              std::move(cfi_unwinder));
         break;
       }
       default:
@@ -190,11 +193,9 @@ void ProfilerControllerImpl::Configure(ConfigureRequest& request,
 
   state_ = ProfilingState::Stopped;
   completer.Reply(fit::ok());
-  FX_LOGS(INFO) << "/Configure!";
 }
 
 void ProfilerControllerImpl::Start(StartRequest& request, StartCompleter::Sync& completer) {
-  FX_LOGS(INFO) << "Start!";
   std::lock_guard lock(state_lock_);
   if (state_ != ProfilingState::Stopped) {
     completer.Reply(fit::error(fuchsia_cpu_profiler::SessionStartError::kBadState));
@@ -202,7 +203,7 @@ void ProfilerControllerImpl::Start(StartRequest& request, StartCompleter::Sync& 
   }
 
   FX_LOGS(INFO) << "Starting Collection for " << targets_.size() << " targets";
-  sampler_ = std::make_unique<Sampler>(std::move(targets_));
+  sampler_ = std::make_unique<Sampler>(dispatcher_, std::move(targets_));
   zx::result<> start_res = sampler_->Start();
   if (start_res.is_error()) {
     Reset();
@@ -211,7 +212,6 @@ void ProfilerControllerImpl::Start(StartRequest& request, StartCompleter::Sync& 
   }
   state_ = ProfilingState::Running;
   completer.Reply(fit::ok());
-  FX_LOGS(INFO) << "/Start!";
 }
 
 void ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
@@ -233,9 +233,10 @@ void ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
     return;
   }
   sampler_->PrintMarkupContext(f);
-  for (const auto& stack : sampler_->GetStacks()) {
+  for (const Sample& sample : sampler_->GetSamples()) {
     int n = 0;
-    for (const auto& frame : stack) {
+    fprintf(f, "%lu\n%lu\n", sample.pid, sample.tid);
+    for (const auto& frame : sample.stack) {
       const char* address_type = "ra";
       if (n == 0) {
         address_type = "pc";
@@ -282,7 +283,7 @@ void ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
 
   std::vector<zx::ticks> inspecting_durations = sampler_->SamplingDurations();
   fuchsia_cpu_profiler::SessionStopResponse stats;
-  stats.samples_collected() = sampler_->GetStacks().size();
+  stats.samples_collected() = sampler_->GetSamples().size();
   if (!inspecting_durations.empty()) {
     zx::ticks total_ticks;
     for (zx::ticks ticks : inspecting_durations) {
