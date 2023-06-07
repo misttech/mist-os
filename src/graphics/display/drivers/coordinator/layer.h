@@ -29,7 +29,7 @@ struct LayerNode : public fbl::DoublyLinkedListable<LayerNode*> {
 };
 
 // Almost-POD used by Client to manage layer state. Public state is used by Controller.
-class Layer : public IdMappable<std::unique_ptr<Layer>> {
+class Layer : public IdMappable<std::unique_ptr<Layer>, /*IdType=*/uint64_t> {
  public:
   explicit Layer(uint64_t id);
   ~Layer();

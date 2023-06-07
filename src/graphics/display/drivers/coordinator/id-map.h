@@ -5,13 +5,16 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_ID_MAP_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_ID_MAP_H_
 
+#include <cstddef>
+#include <functional>
+
 #include <fbl/intrusive_hash_table.h>
 #include <fbl/intrusive_single_list.h>
 
 namespace display {
 
 // Helper for allowing structs which are identified by unique ids to be put in a hashmap.
-template <typename PtrType>
+template <typename PtrType, typename IdType>
 class IdMappable {
  private:
   // Private forward-declarations to define the hash table.
@@ -22,12 +25,12 @@ class IdMappable {
   using HashTableLinkedListType = fbl::SinglyLinkedListCustomTraits<PtrType, IdMappableTraits>;
 
  public:
-  using Map = fbl::HashTable</*KeyType=*/uint64_t, PtrType, /*BucketType=*/HashTableLinkedListType>;
+  using Map = fbl::HashTable</*KeyType=*/IdType, PtrType, /*BucketType=*/HashTableLinkedListType>;
 
-  static size_t GetHash(uint64_t id) { return id; }
-  uint64_t GetKey() const { return id; }
+  static size_t GetHash(IdType id) { return std::hash<IdType>()(id); }
+  IdType GetKey() const { return id; }
 
-  uint64_t id;
+  IdType id;
 
  private:
   IdMappableNodeState id_mappable_state_;

@@ -41,7 +41,7 @@ class FenceCallback {
 // in order to avoid data races, we require `Fence`s and its `FenceReference`s
 // be created and destroyed on the same thread where the Fence is created.
 class Fence : public fbl::RefCounted<Fence>,
-              public IdMappable<fbl::RefPtr<Fence>>,
+              public IdMappable<fbl::RefPtr<Fence>, /*IdType=*/uint64_t>,
               public fbl::SinglyLinkedListable<fbl::RefPtr<Fence>> {
  public:
   Fence(FenceCallback* cb, async_dispatcher_t* dispatcher, uint64_t id, zx::event&& event);

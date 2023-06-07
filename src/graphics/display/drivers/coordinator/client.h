@@ -52,7 +52,7 @@
 namespace display {
 
 // Almost-POD used by Client to manage display configuration. Public state is used by Controller.
-class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>> {
+class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, /*IdType=*/uint64_t> {
  public:
   void InitializeInspect(inspect::Node* parent);
 

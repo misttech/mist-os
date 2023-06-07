@@ -30,7 +30,7 @@
 
 namespace display {
 
-class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>>,
+class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, /*IdType=*/uint64_t>,
                     public fbl::RefCounted<DisplayInfo> {
  public:
   static zx::result<fbl::RefPtr<DisplayInfo>> Create(const added_display_args_t& info);

@@ -43,7 +43,8 @@ class Controller;
 //
 // One special transition exists: upon the owning Client's death/disconnection, the
 // ImageUse will move from ACQUIRED to NOT_READY.
-class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image>> {
+class Image : public fbl::RefCounted<Image>,
+              public IdMappable<fbl::RefPtr<Image>, /*IdType=*/uint64_t> {
  private:
   // Private forward declaration.
   template <typename PtrType, typename TagType>
