@@ -5,7 +5,7 @@
 use {
     crate::{
         io::{Directory, RemoteDirectory},
-        path::RemotePath,
+        path::RemoteComponentStoragePath,
     },
     anyhow::{anyhow, Result},
     fidl::endpoints::create_proxy,
@@ -19,14 +19,14 @@ use {
 /// * `storage_admin`: The StorageAdminProxy
 /// * `path`: The name of a file on the target component
 pub async fn delete(storage_admin: StorageAdminProxy, path: String) -> Result<()> {
-    let remote_path = RemotePath::parse(&path)?;
+    let remote_path = RemoteComponentStoragePath::parse(&path)?;
 
     let (dir_proxy, server) = create_proxy::<fio::DirectoryMarker>()?;
     let server = server.into_channel();
     let storage_dir = RemoteDirectory::from_proxy(dir_proxy);
 
     storage_admin
-        .open_component_storage_by_id(&remote_path.remote_id, server.into())
+        .open_component_storage_by_id(&remote_path.instance_id, server.into())
         .await?
         .map_err(|e| anyhow!("Could not open component storage: {:?}", e))?;
 

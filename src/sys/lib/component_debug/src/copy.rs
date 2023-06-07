@@ -8,7 +8,8 @@ use {
     crate::{
         io::{Directory, DirentKind, LocalDirectory, RemoteDirectory},
         path::{
-            add_source_filename_to_path_if_absent, open_parent_subdir_readable, LocalOrRemotePath,
+            add_source_filename_to_path_if_absent, open_parent_subdir_readable,
+            LocalOrRemoteDirectoryPath,
         },
     },
     anyhow::{bail, Result},
@@ -69,14 +70,17 @@ pub async fn copy_cmd<W: std::io::Write>(
 
     for source_path in paths {
         let result: Result<()> = match (
-            LocalOrRemotePath::parse(&source_path),
-            LocalOrRemotePath::parse(&destination_path),
+            LocalOrRemoteDirectoryPath::parse(&source_path),
+            LocalOrRemoteDirectoryPath::parse(&destination_path),
         ) {
-            (LocalOrRemotePath::Remote(source), LocalOrRemotePath::Local(destination_path)) => {
+            (
+                LocalOrRemoteDirectoryPath::Remote(source),
+                LocalOrRemoteDirectoryPath::Local(destination_path),
+            ) => {
                 let source_dir = RemoteDirectory::from_proxy(
                     get_or_cache_namespace_dir_for_moniker(
                         &realm_query,
-                        &source.remote_id,
+                        &source.moniker,
                         &mut namespace_dir_cache,
                     )
                     .await?,
@@ -94,12 +98,15 @@ pub async fn copy_cmd<W: std::io::Write>(
                 .await
             }
 
-            (LocalOrRemotePath::Local(source_path), LocalOrRemotePath::Remote(destination)) => {
+            (
+                LocalOrRemoteDirectoryPath::Local(source_path),
+                LocalOrRemoteDirectoryPath::Remote(destination),
+            ) => {
                 let source_dir = LocalDirectory::new();
                 let destination_dir = RemoteDirectory::from_proxy(
                     get_or_cache_namespace_dir_for_moniker(
                         &realm_query,
-                        &destination.remote_id,
+                        &destination.moniker,
                         &mut namespace_dir_cache,
                     )
                     .await?,
@@ -116,11 +123,14 @@ pub async fn copy_cmd<W: std::io::Write>(
                 .await
             }
 
-            (LocalOrRemotePath::Remote(source), LocalOrRemotePath::Remote(destination)) => {
+            (
+                LocalOrRemoteDirectoryPath::Remote(source),
+                LocalOrRemoteDirectoryPath::Remote(destination),
+            ) => {
                 let source_dir = RemoteDirectory::from_proxy(
                     get_or_cache_namespace_dir_for_moniker(
                         &realm_query,
-                        &source.remote_id,
+                        &source.moniker,
                         &mut namespace_dir_cache,
                     )
                     .await?,
@@ -129,7 +139,7 @@ pub async fn copy_cmd<W: std::io::Write>(
                 let destination_dir = RemoteDirectory::from_proxy(
                     get_or_cache_namespace_dir_for_moniker(
                         &realm_query,
-                        &destination.remote_id,
+                        &destination.moniker,
                         &mut namespace_dir_cache,
                     )
                     .await?,
@@ -146,7 +156,10 @@ pub async fn copy_cmd<W: std::io::Write>(
                 .await
             }
 
-            (LocalOrRemotePath::Local(source_path), LocalOrRemotePath::Local(destination_path)) => {
+            (
+                LocalOrRemoteDirectoryPath::Local(source_path),
+                LocalOrRemoteDirectoryPath::Local(destination_path),
+            ) => {
                 let source_dir = LocalDirectory::new();
                 let destination_dir = LocalDirectory::new();
                 do_copy(
@@ -310,7 +323,7 @@ async fn open_namespace_dir_for_moniker(
     realm_query: &fsys::RealmQueryProxy,
     moniker: &str,
 ) -> Result<fio::DirectoryProxy> {
-    // A relative moniker is required for |fuchsia.sys2/RealmQuery.GetInstanceInfo|
+    // A relative moniker is required for |fuchsia.sys2/RealmQuery.GetInstance|
     let relative_moniker = format!(".{moniker}");
     let (namespace, server_end) = create_proxy::<fio::DirectoryMarker>()?;
     let server_end = ServerEnd::new(server_end.into_channel());
@@ -802,9 +815,9 @@ mod tests {
             .sources
             .clone()
             .into_iter()
-            .map(|path| match LocalOrRemotePath::parse(&path) {
-                LocalOrRemotePath::Remote(_) => path.to_string(),
-                LocalOrRemotePath::Local(_) => local_path.join(path).display().to_string(),
+            .map(|path| match LocalOrRemoteDirectoryPath::parse(&path) {
+                LocalOrRemoteDirectoryPath::Remote(_) => path.to_string(),
+                LocalOrRemoteDirectoryPath::Local(_) => local_path.join(path).display().to_string(),
             })
             .collect();
         paths.push(input.destination.to_owned());

@@ -4,7 +4,10 @@
 
 use {
     crate::io::{Directory, LocalDirectory, RemoteDirectory},
-    crate::path::{add_source_filename_to_path_if_absent, LocalOrRemotePath, REMOTE_PATH_HELP},
+    crate::path::{
+        add_source_filename_to_path_if_absent, LocalOrRemoteComponentStoragePath,
+        REMOTE_COMPONENT_STORAGE_PATH_HELP,
+    },
     anyhow::{anyhow, bail, Result},
     fidl::endpoints::create_proxy,
     fidl_fuchsia_io as fio,
@@ -28,21 +31,30 @@ pub async fn copy(
     let server = server.into_channel();
     let storage_dir = RemoteDirectory::from_proxy(dir_proxy);
 
-    match (LocalOrRemotePath::parse(&source_path), LocalOrRemotePath::parse(&destination_path)) {
-        (LocalOrRemotePath::Remote(source), LocalOrRemotePath::Local(destination_path)) => {
+    match (
+        LocalOrRemoteComponentStoragePath::parse(&source_path),
+        LocalOrRemoteComponentStoragePath::parse(&destination_path),
+    ) {
+        (
+            LocalOrRemoteComponentStoragePath::Remote(source),
+            LocalOrRemoteComponentStoragePath::Local(destination_path),
+        ) => {
             // Copying from remote to host
             storage_admin
-                .open_component_storage_by_id(&source.remote_id, server.into())
+                .open_component_storage_by_id(&source.instance_id, server.into())
                 .await?
                 .map_err(|e| anyhow!("Could not open component storage: {:?}", e))?;
 
             let destination_dir = LocalDirectory::new();
             do_copy(&storage_dir, &source.relative_path, &destination_dir, &destination_path).await
         }
-        (LocalOrRemotePath::Local(source_path), LocalOrRemotePath::Remote(destination)) => {
+        (
+            LocalOrRemoteComponentStoragePath::Local(source_path),
+            LocalOrRemoteComponentStoragePath::Remote(destination),
+        ) => {
             // Copying from host to remote
             storage_admin
-                .open_component_storage_by_id(&destination.remote_id, server.into())
+                .open_component_storage_by_id(&destination.instance_id, server.into())
                 .await?
                 .map_err(|e| anyhow!("Could not open component storage: {:?}", e))?;
 
@@ -50,7 +62,10 @@ pub async fn copy(
             do_copy(&source_dir, &source_path, &storage_dir, &destination.relative_path).await
         }
         _ => {
-            bail!("One path must be remote and the other must be host. {}", REMOTE_PATH_HELP)
+            bail!(
+                "One path must be remote and the other must be host. {}",
+                REMOTE_COMPONENT_STORAGE_PATH_HELP
+            )
         }
     }
 }

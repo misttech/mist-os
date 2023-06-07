@@ -1,46 +1,139 @@
-// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 use {
     crate::io::{Directory, DirentKind},
-    anyhow::{anyhow, bail, Error, Result},
-    std::path::{Component, PathBuf},
+    anyhow::{anyhow, bail, Result},
+    fidl_fuchsia_sys2 as fsys,
+    std::{
+        path::{Component, PathBuf},
+        str::FromStr,
+    },
+    thiserror::Error,
 };
 
-pub const REMOTE_PATH_HELP: &'static str = r#"Remote paths allow the following formats:
+/// Separator for user input for parsing command line arguments to structs
+/// in this crate.
+const REMOTE_PATH_SEPARATOR: &'static str = "::";
+
+pub const REMOTE_COMPONENT_STORAGE_PATH_HELP: &'static str = r#"Remote storage paths allow the following formats:
 1)  [instance ID]::[path relative to storage]
     Example: "c1a6d0aebbf7c092c53e8e696636af8ec0629ff39b7f2e548430b0034d809da4::/path/to/file"
 
     `..` is not valid anywhere in the remote path.
 
-    To learn about component instance IDs, see https://fuchsia.dev/go/components/instance-id
+    To learn about component instance IDs, see https://fuchsia.dev/go/components/instance-id"#;
 
-2) [absolute moniker]::[path in namespace]
+pub const REMOTE_DIRECTORY_PATH_HELP: &'static str = r#"Remote directory paths must be:
+1)  [absolute moniker]::[path in namespace]
     Example: /foo/bar::/config/data/sample.json
 
-   To learn more about absolute monikers, see https://fuchsia.dev/go/components/moniker#absolute"#;
+    To learn more about absolute monikers, see https://fuchsia.dev/go/components/moniker#absolute
 
-#[derive(Clone)]
-pub struct RemotePath {
-    pub remote_id: String,
+2)  [absolute moniker]::[dir type]::[path] where [dir type] is one of "in", "out", or "pkg", specifying
+    the component's namespace directory, outgoing directory, or package directory (if packaged).
+"#;
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct RemoteDirectoryPath {
+    pub moniker: String,
+    pub dir_type: fsys::OpenDirType,
     pub relative_path: PathBuf,
 }
 
-/// Represents a path to a component instance.
-/// Refer to REMOTE_PATH_HELP above for the format of RemotePath.
-impl RemotePath {
+#[derive(Clone, Debug, PartialEq)]
+pub struct RemoteComponentStoragePath {
+    pub instance_id: String,
+    pub relative_path: PathBuf,
+}
+
+#[derive(Error, Debug, PartialEq)]
+pub enum ParsePathError {
+    #[error("Unsupported directory type: {dir_type}. {}", REMOTE_DIRECTORY_PATH_HELP)]
+    UnsupportedDirectory { dir_type: String },
+
+    #[error("Disallowed path component: {component}. {}", REMOTE_DIRECTORY_PATH_HELP)]
+    DisallowedPathComponent { component: String },
+
+    #[error("Malformatted remote directory path. {}", REMOTE_DIRECTORY_PATH_HELP)]
+    InvalidFormat,
+}
+
+impl FromStr for RemoteDirectoryPath {
+    type Err = ParsePathError;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        let parts: Vec<&str> = input.split(REMOTE_PATH_SEPARATOR).collect();
+        if parts.len() < 2 || parts.len() > 3 {
+            return Err(ParsePathError::InvalidFormat);
+        }
+
+        // TODO(fxb/126681): Use common Moniker parsing logic instead of String.
+        let moniker = parts.first().unwrap().to_string();
+        let (dir_type, path_str) = if parts.len() == 3 {
+            let parsed = parse_dir_type_from_str(parts[1])?;
+            (parsed, parts[2])
+        } else {
+            (fsys::OpenDirType::NamespaceDir, parts[1])
+        };
+        let path = PathBuf::from(path_str);
+
+        // Perform checks on path that ignore `.`  and disallow `..`, `/` or Windows path prefixes such as C: or \\
+        let mut normalized_path = PathBuf::new();
+        for component in path.components() {
+            match component {
+                Component::Normal(c) => normalized_path.push(c),
+                Component::RootDir => continue,
+                Component::CurDir => continue,
+                c => {
+                    return Err(ParsePathError::DisallowedPathComponent {
+                        component: format!("{:?}", c),
+                    })
+                }
+            }
+        }
+
+        Ok(Self { moniker, dir_type, relative_path: normalized_path })
+    }
+}
+
+fn parse_dir_type_from_str(s: &str) -> Result<fsys::OpenDirType, ParsePathError> {
+    // Only match on either the namespace (in), outgoing (out) or package (pkg) directories.
+    // The parser could be expected to support others, if the need arises.
+    match s {
+        "in" | "namespace" => Ok(fsys::OpenDirType::NamespaceDir),
+        "out" => Ok(fsys::OpenDirType::OutgoingDir),
+        "pkg" => Ok(fsys::OpenDirType::PackageDir),
+        _ => Err(ParsePathError::UnsupportedDirectory { dir_type: s.into() }),
+    }
+}
+
+fn dir_type_to_str(dir_type: &fsys::OpenDirType) -> Result<&str> {
+    // Only match on either the namespace (in), outgoing (out) or package (pkg) directories.
+    // The parser could be expected to support others, if the need arises.
+    match dir_type {
+        fsys::OpenDirType::NamespaceDir => Ok("in"),
+        fsys::OpenDirType::OutgoingDir => Ok("out"),
+        fsys::OpenDirType::PackageDir => Ok("pkg"),
+        _ => Err(anyhow!("Unsupported OpenDirType: {:?}", dir_type)),
+    }
+}
+
+/// Represents a path to a file/directory within a component's storage.
+impl RemoteComponentStoragePath {
     pub fn parse(input: &str) -> Result<Self> {
-        match input.split_once("::") {
+        match input.split_once(REMOTE_PATH_SEPARATOR) {
             Some((first, second)) => {
-                if second.contains("::") {
+                if second.contains(REMOTE_PATH_SEPARATOR) {
                     bail!(
-                        "Remote path must contain exactly one `::` separator. {}",
-                        REMOTE_PATH_HELP
+                        "Remote storage path must contain exactly one `{}` separator. {}",
+                        REMOTE_PATH_SEPARATOR,
+                        REMOTE_COMPONENT_STORAGE_PATH_HELP
                     )
                 }
 
-                let remote_id = first.to_string();
+                let instance_id = first.to_string();
                 let relative_path = PathBuf::from(second);
 
                 // Perform checks on path that ignore `.`  and disallow `..`, `/` or Windows path prefixes such as C: or \\
@@ -50,14 +143,22 @@ impl RemotePath {
                         Component::Normal(c) => normalized_relative_path.push(c),
                         Component::RootDir => continue,
                         Component::CurDir => continue,
-                        c => bail!("Unsupported path component: {:?}. {}", c, REMOTE_PATH_HELP),
+                        c => bail!(
+                            "Unsupported path component: {:?}. {}",
+                            c,
+                            REMOTE_COMPONENT_STORAGE_PATH_HELP
+                        ),
                     }
                 }
 
-                Ok(Self { remote_id, relative_path: normalized_relative_path })
+                Ok(Self { instance_id, relative_path: normalized_relative_path })
             }
             None => {
-                bail!("Remote path must contain exactly one `::` separator. {}", REMOTE_PATH_HELP)
+                bail!(
+                    "Remote storage path must contain exactly one `{}` separator. {}",
+                    REMOTE_PATH_SEPARATOR,
+                    REMOTE_COMPONENT_STORAGE_PATH_HELP
+                )
             }
         }
     }
@@ -71,26 +172,61 @@ impl RemotePath {
     }
 }
 
-impl ToString for RemotePath {
+impl ToString for RemoteComponentStoragePath {
     fn to_string(&self) -> String {
-        format!("{}::/{}", self.remote_id, self.relative_path.to_string_lossy().to_string())
+        format!(
+            "{}{sep}/{}",
+            self.instance_id,
+            self.relative_path.to_string_lossy().to_string(),
+            sep = REMOTE_PATH_SEPARATOR
+        )
+    }
+}
+
+impl ToString for RemoteDirectoryPath {
+    fn to_string(&self) -> String {
+        format!(
+            "{}{sep}{}{sep}/{}",
+            self.moniker,
+            dir_type_to_str(&self.dir_type).unwrap(),
+            self.relative_path.to_string_lossy().to_string(),
+            sep = REMOTE_PATH_SEPARATOR
+        )
     }
 }
 
 #[derive(Clone)]
 /// Represents either a local path to a file or directory, or the path to a file/directory
-/// within a component.
-pub enum LocalOrRemotePath {
+/// in a directory associated with a remote component.
+pub enum LocalOrRemoteDirectoryPath {
     Local(PathBuf),
-    Remote(RemotePath),
+    Remote(RemoteDirectoryPath),
 }
 
-impl LocalOrRemotePath {
-    pub fn parse(path: &str) -> LocalOrRemotePath {
-        match RemotePath::parse(path) {
-            Ok(path) => LocalOrRemotePath::Remote(path),
+impl LocalOrRemoteDirectoryPath {
+    pub fn parse(path: &str) -> LocalOrRemoteDirectoryPath {
+        match RemoteDirectoryPath::from_str(path) {
+            Ok(path) => LocalOrRemoteDirectoryPath::Remote(path),
             // If we can't parse a remote path, then it is a host path.
-            Err(_) => LocalOrRemotePath::Local(PathBuf::from(path)),
+            Err(_) => LocalOrRemoteDirectoryPath::Local(PathBuf::from(path)),
+        }
+    }
+}
+
+#[derive(Clone)]
+/// Represents either a local path to a file or directory, or the path to a file/directory
+/// in a directory associated with a remote component.
+pub enum LocalOrRemoteComponentStoragePath {
+    Local(PathBuf),
+    Remote(RemoteComponentStoragePath),
+}
+
+impl LocalOrRemoteComponentStoragePath {
+    pub fn parse(path: &str) -> LocalOrRemoteComponentStoragePath {
+        match RemoteComponentStoragePath::parse(path) {
+            Ok(path) => LocalOrRemoteComponentStoragePath::Remote(path),
+            // If we can't parse a remote path, then it is a host path.
+            Err(_) => LocalOrRemoteComponentStoragePath::Local(PathBuf::from(path)),
         }
     }
 }
@@ -131,7 +267,7 @@ pub async fn add_source_filename_to_path_if_absent<D: Directory>(
     destination_dir: &D,
     source_path: &PathBuf,
     destination_path: &PathBuf,
-) -> Result<PathBuf, Error> {
+) -> Result<PathBuf> {
     let source_file = source_path
         .file_name()
         .map_or_else(|| Err(anyhow!("Source path is empty")), |file| Ok(PathBuf::from(file)))?;
@@ -146,5 +282,66 @@ pub async fn add_source_filename_to_path_if_absent<D: Directory>(
         }
     } else {
         Ok(destination_path.join(source_file_str))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use {
+        crate::path::{dir_type_to_str, parse_dir_type_from_str, RemoteDirectoryPath},
+        fidl_fuchsia_sys2 as fsys,
+        std::str::FromStr,
+    };
+
+    #[test]
+    fn test_parse_dir_type_from_str() {
+        assert_eq!(parse_dir_type_from_str("in"), Ok(fsys::OpenDirType::NamespaceDir));
+        assert_eq!(parse_dir_type_from_str("namespace"), Ok(fsys::OpenDirType::NamespaceDir));
+        assert_eq!(parse_dir_type_from_str("out"), Ok(fsys::OpenDirType::OutgoingDir));
+        assert_eq!(parse_dir_type_from_str("pkg"), Ok(fsys::OpenDirType::PackageDir));
+        assert!(parse_dir_type_from_str("nonexistent").is_err());
+    }
+
+    #[test]
+    fn test_dir_type_to_str() {
+        assert_eq!(dir_type_to_str(&fsys::OpenDirType::NamespaceDir).unwrap(), "in");
+        assert_eq!(dir_type_to_str(&fsys::OpenDirType::OutgoingDir).unwrap(), "out");
+        assert_eq!(dir_type_to_str(&fsys::OpenDirType::PackageDir).unwrap(), "pkg");
+        assert!(dir_type_to_str(&fsys::OpenDirType::RuntimeDir).is_err());
+        assert!(dir_type_to_str(&fsys::OpenDirType::ExposedDir).is_err());
+    }
+
+    #[test]
+    fn test_remote_directory_path_from_str() {
+        assert_eq!(
+            RemoteDirectoryPath::from_str("/foo/bar::/path"),
+            Ok(RemoteDirectoryPath {
+                moniker: "/foo/bar".into(),
+                dir_type: fsys::OpenDirType::NamespaceDir,
+                relative_path: "path".into(),
+            })
+        );
+
+        assert_eq!(
+            RemoteDirectoryPath::from_str("/foo/bar::out::/path"),
+            Ok(RemoteDirectoryPath {
+                moniker: "/foo/bar".into(),
+                dir_type: fsys::OpenDirType::OutgoingDir,
+                relative_path: "path".into(),
+            })
+        );
+
+        assert_eq!(
+            RemoteDirectoryPath::from_str("/foo/bar::pkg::/path"),
+            Ok(RemoteDirectoryPath {
+                moniker: "/foo/bar".into(),
+                dir_type: fsys::OpenDirType::PackageDir,
+                relative_path: "path".into(),
+            })
+        );
+
+        assert!(RemoteDirectoryPath::from_str("/foo/bar").is_err());
+        assert!(RemoteDirectoryPath::from_str("/foo/bar::one::two::three").is_err());
+        assert!(RemoteDirectoryPath::from_str("/foo/bar::not_a_dir::three").is_err());
     }
 }

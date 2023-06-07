@@ -5,7 +5,7 @@
 use {
     crate::{
         io::{Directory, RemoteDirectory},
-        path::RemotePath,
+        path::RemoteComponentStoragePath,
     },
     anyhow::{anyhow, bail, Result},
     fidl::endpoints::create_proxy,
@@ -19,7 +19,7 @@ use {
 /// * `storage_admin`: The StorageAdminProxy
 /// * `path`: The name of a new directory on the target component
 pub async fn make_directory(storage_admin: StorageAdminProxy, path: String) -> Result<()> {
-    let remote_path = RemotePath::parse(&path)?;
+    let remote_path = RemoteComponentStoragePath::parse(&path)?;
 
     let (dir_proxy, server) = create_proxy::<fio::DirectoryMarker>()?;
     let server = server.into_channel();
@@ -31,7 +31,7 @@ pub async fn make_directory(storage_admin: StorageAdminProxy, path: String) -> R
 
     // Open the storage
     storage_admin
-        .open_component_storage_by_id(&remote_path.remote_id, server.into())
+        .open_component_storage_by_id(&remote_path.instance_id, server.into())
         .await?
         .map_err(|e| anyhow!("Could not open component storage: {:?}", e))?;
 
