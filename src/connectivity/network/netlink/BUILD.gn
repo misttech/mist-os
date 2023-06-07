@@ -2,8 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
+import(
+    "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
 
 rustc_library("netlink") {
   version = "0.0.1"
@@ -14,10 +15,13 @@ rustc_library("netlink") {
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
+    "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
+    "//sdk/fidl/fuchsia.net.root:fuchsia.net.root_rust",
     "//src/connectivity/lib/net-types",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
+    "//src/lib/network/fidl_fuchsia_net_ext",
     "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
     "//src/lib/network/fidl_fuchsia_net_routes_ext",
     "//third_party/rust_crates:anyhow",
@@ -61,14 +65,33 @@ rustc_library("netlink") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-fuchsia_unittest_package("netlink-lib-test") {
+fuchsia_test_component("netlink-lib-test-component") {
+  manifest = "meta/netlink-lib-test.cml"
   deps = [ ":netlink_test" ]
+}
+
+fuchsia_test_with_expectations_package("netlink-lib-test-no-err-logs") {
+  test_components = [ ":netlink-lib-test-component" ]
+  treatment_of_cases_with_error_logs = "SKIP_CASES_WITH_ERROR_LOGS"
+  expectations = "expects/expectations.json5"
+}
+
+fuchsia_test_with_expectations_package("netlink-lib-test-with-err-logs") {
+  test_components = [ ":netlink-lib-test-component" ]
+  treatment_of_cases_with_error_logs = "RUN_ONLY_CASES_WITH_ERROR_LOGS"
+  expectations = "expects/expectations.json5"
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 group("tests") {
   testonly = true
   deps = [
     ":netlink",
-    ":netlink-lib-test",
+    ":netlink-lib-test-no-err-logs",
+    ":netlink-lib-test-with-err-logs",
   ]
 }

@@ -14,21 +14,30 @@ use std::{
 
 use fidl_fuchsia_hardware_network as fhwnet;
 use fidl_fuchsia_net as fnet;
+use fidl_fuchsia_net_ext::IntoExt as _;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fidl_fuchsia_net_interfaces_ext::{self as fnet_interfaces_ext, Update as _};
+use fidl_fuchsia_net_interfaces_admin::{
+    self as fnet_interfaces_admin, AddressRemovalReason, InterfaceRemovedReason,
+};
+use fidl_fuchsia_net_interfaces_ext::{
+    self as fnet_interfaces_ext,
+    admin::{assignment_state_stream, AddressStateProviderError, TerminalError},
+    Update as _,
+};
+use fidl_fuchsia_net_root as fnet_root;
 
 use futures::{
     channel::{mpsc, oneshot},
     pin_mut, StreamExt as _, TryStreamExt as _,
 };
-use net_types::ip::IpVersion;
+use net_types::ip::{AddrSubnetEither, IpVersion};
 use netlink_packet_core::NetlinkMessage;
 use netlink_packet_route::{
     AddressHeader, AddressMessage, LinkHeader, LinkMessage, RtnlMessage, AF_INET, AF_INET6,
     AF_UNSPEC, ARPHRD_ETHER, ARPHRD_LOOPBACK, ARPHRD_PPP, ARPHRD_VOID, IFA_F_PERMANENT,
     IFF_LOOPBACK, IFF_RUNNING, IFF_UP, RTNLGRP_IPV4_IFADDR, RTNLGRP_IPV6_IFADDR, RTNLGRP_LINK,
 };
-use tracing::{debug, warn};
+use tracing::{debug, error, warn};
 
 use crate::{
     client::{ClientTable, InternalClient},
@@ -40,7 +49,7 @@ use crate::{
 };
 
 /// Arguments for an RTM_GETLINK [`Request`].
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) enum GetLinkArgs {
     /// Dump state for all the links.
     #[allow(unused)]
@@ -50,7 +59,7 @@ pub(crate) enum GetLinkArgs {
 }
 
 /// [`Request`] arguments associated with links.
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) enum LinkRequestArgs {
     /// RTM_GETLINK
     #[allow(unused)]
@@ -58,7 +67,7 @@ pub(crate) enum LinkRequestArgs {
 }
 
 /// Arguments for an RTM_GETADDR [`Request`].
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) enum GetAddressArgs {
     /// Dump state for all addresses with the optional IP version filter.
     #[allow(unused)]
@@ -67,16 +76,30 @@ pub(crate) enum GetAddressArgs {
     // filter.
 }
 
+/// Arguments for an RTM_NEWADDR [`Request`].
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct NewAddressArgs {
+    /// The address to be added.
+    #[allow(unused)]
+    pub address: AddrSubnetEither,
+    /// The ID of the interface the address should be added to.
+    #[allow(unused)]
+    pub interface_id: u32,
+}
+
 /// [`Request`] arguments associated with addresses.
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) enum AddressRequestArgs {
     /// RTM_GETADDR
     #[allow(unused)]
     Get(GetAddressArgs),
+    /// RTM_NEWADDR
+    #[allow(unused)]
+    New(NewAddressArgs),
 }
 
 /// The argument(s) for a [`Request`].
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) enum RequestArgs {
     #[allow(unused)]
     Link(LinkRequestArgs),
@@ -86,7 +109,57 @@ pub(crate) enum RequestArgs {
 
 /// An error encountered while handling a [`Request`].
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum RequestError {}
+pub(crate) enum RequestError {
+    InvalidRequest,
+    UnrecognizedInterface,
+    AlreadyExists,
+}
+
+fn map_existing_interface_terminal_error(
+    e: TerminalError<InterfaceRemovedReason>,
+    interface_id: u32,
+) -> RequestError {
+    match e {
+        TerminalError::Fidl(e) => {
+            // If the channel was closed, then we likely tried to get a control
+            // chandle to an interface that does not exist.
+            if !e.is_closed() {
+                error!(
+                    "unexpected interface terminal error for interface ({}): {:?}",
+                    interface_id, e,
+                )
+            }
+        }
+        TerminalError::Terminal(reason) => match reason {
+            reason @ (InterfaceRemovedReason::DuplicateName
+            | InterfaceRemovedReason::PortAlreadyBound
+            | InterfaceRemovedReason::BadPort) => {
+                // These errors are only expected when the interface fails to
+                // be installed.
+                unreachable!(
+                    "unexpected interface removed reason {:?} for interface ({})",
+                    reason, interface_id,
+                )
+            }
+            InterfaceRemovedReason::PortClosed | InterfaceRemovedReason::User => {
+                // The interface was removed. Treat this scenario as if the
+                // interface did not exist.
+            }
+            reason => {
+                // `InterfaceRemovedReason` is a flexible FIDL enum so we
+                // cannot exhaustively match.
+                //
+                // We don't know what the reason is but we know the interface
+                // was removed so just assume that the unrecognized reason is
+                // valid and return the same error as if it was removed with
+                // `PortClosed`/`User` reasons.
+                error!("unrecognized removal reason {:?} from interface {}", reason, interface_id)
+            }
+        },
+    }
+
+    RequestError::UnrecognizedInterface
+}
 
 /// A request associated with links or addresses.
 pub(crate) struct Request<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> {
@@ -103,6 +176,8 @@ pub(crate) struct Request<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> 
 /// Connects to the interfaces watcher and can respond to RTM_LINK and RTM_ADDR
 /// message requests.
 pub(crate) struct EventLoop<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> {
+    /// An `InterfacesProxy` to get controlling access to interfaces.
+    interfaces_proxy: fnet_root::InterfacesProxy,
     /// A `StateProxy` to connect to the interfaces watcher.
     state_proxy: fnet_interfaces::StateProxy,
     /// The current set of clients of NETLINK_ROUTE protocol family.
@@ -117,6 +192,9 @@ pub(crate) enum InterfacesFidlError {
     /// Error in the FIDL event stream.
     #[error("event stream: {0}")]
     EventStream(fidl::Error),
+    /// Error connecting to the root interfaces protocol.
+    #[error("connecting to `fuchsia.net.root/Interfaces`: {0}")]
+    RootInterfaces(anyhow::Error),
     /// Error connecting to state marker.
     #[error("connecting to state marker: {0}")]
     State(anyhow::Error),
@@ -147,10 +225,12 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
         request_stream: mpsc::Receiver<Request<S>>,
     ) -> Result<Self, EventLoopError<InterfacesFidlError, InterfacesNetstackError>> {
         use fuchsia_component::client::connect_to_protocol;
+        let interfaces_proxy = connect_to_protocol::<fnet_root::InterfacesMarker>()
+            .map_err(|e| EventLoopError::Fidl(InterfacesFidlError::RootInterfaces(e)))?;
         let state_proxy = connect_to_protocol::<fnet_interfaces::StateMarker>()
             .map_err(|e| EventLoopError::Fidl(InterfacesFidlError::State(e)))?;
 
-        Ok(EventLoop { state_proxy, route_clients, request_stream })
+        Ok(EventLoop { interfaces_proxy, state_proxy, route_clients, request_stream })
     }
 
     /// Run the asynchronous work related to RTM_LINK and RTM_ADDR messages.
@@ -161,7 +241,7 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
     /// event loop task, for example, if the watcher stream ends or if
     /// the FIDL protocol cannot be connected.
     pub(crate) async fn run(self) -> EventLoopError<InterfacesFidlError, InterfacesNetstackError> {
-        let EventLoop { state_proxy, route_clients, request_stream } = self;
+        let EventLoop { interfaces_proxy, state_proxy, route_clients, request_stream } = self;
         let if_event_stream = {
             let stream_res = fnet_interfaces_ext::event_stream_from_state(&state_proxy);
 
@@ -259,25 +339,139 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
                 }
                 req = request_stream.next() => {
                     Self::handle_request(
+                        &interfaces_proxy,
                         &interface_properties,
                         &addresses,
                         req.expect(
                             "request stream should never end because of chained `pending`",
                         ),
-                    )
+                    ).await
                 }
             }
         }
     }
 
-    fn handle_request(
+    fn get_interface_control(
+        interfaces_proxy: &fnet_root::InterfacesProxy,
+        interface_id: u32,
+    ) -> fnet_interfaces_ext::admin::Control {
+        let (control, server_end) = fnet_interfaces_ext::admin::Control::create_endpoints()
+            .expect("create Control endpoints");
+        interfaces_proxy
+            .get_admin(interface_id.into(), server_end)
+            .expect("send get admin request");
+        control
+    }
+
+    async fn handle_new_address_request(
+        interfaces_proxy: &fnet_root::InterfacesProxy,
+        NewAddressArgs { address, interface_id }: NewAddressArgs,
+    ) -> Result<(), RequestError> {
+        let control = Self::get_interface_control(interfaces_proxy, interface_id);
+
+        let (asp, asp_server_end) =
+            fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>()
+                .expect("create ASP proxy");
+        control
+            .add_address(
+                &mut address.into_ext(),
+                fnet_interfaces_admin::AddressParameters::default(),
+                asp_server_end,
+            )
+            .map_err(|e| {
+                warn!("error adding {address} to interface ({interface_id}): {e:?}");
+                map_existing_interface_terminal_error(e, interface_id)
+            })?;
+
+        // Detach the ASP so that the address's lifetime isn't bound to the
+        // client end of the ASP.
+        //
+        // We do this first because `assignment_state_stream` takes ownership
+        // of the ASP proxy.
+        asp.detach().unwrap_or_else(|e| {
+            // Likely failed because the address addition failed or it was
+            // immediately removed. Don't fail just yet because we need to check
+            // the assignment state & terminal error below.
+            warn!("error detaching ASP for {} on interface ({}): {:?}", address, interface_id, e)
+        });
+
+        match assignment_state_stream(asp).try_next().await {
+            Ok(None) => {
+                warn!(
+                    "ASP state stream ended before update for {} on interface ({})",
+                    address, interface_id,
+                );
+
+                // If the ASP stream ended without sending a state update, then
+                // assume the server end was closed immediately which occurs
+                // when the interface does not exist (either because it was
+                // removed of the request interface never existed).
+                Err(RequestError::UnrecognizedInterface)
+            }
+            Ok(Some(state)) => {
+                debug!(
+                    "{} added on interface ({}) with initial state = {:?}",
+                    address, interface_id, state,
+                );
+
+                // We got an initial state update indicating that the address
+                // was successfully added.
+                Ok(())
+            }
+            Err(e) => {
+                warn!(
+                    "error waiting for state update for {} on interface ({}): {:?}",
+                    address, interface_id, e,
+                );
+
+                Err(match e {
+                    AddressStateProviderError::AddressRemoved(reason) => match reason {
+                        AddressRemovalReason::Invalid => RequestError::InvalidRequest,
+                        AddressRemovalReason::AlreadyAssigned => RequestError::AlreadyExists,
+                        reason @ (AddressRemovalReason::DadFailed
+                        | AddressRemovalReason::InterfaceRemoved
+                        | AddressRemovalReason::UserRemoved) => {
+                            // These errors are only returned when the address
+                            // is removed after it has been added. We have not
+                            // yet observed the initial state so these removal
+                            // reasons are unexpected.
+                            unreachable!(
+                                "expected netstack to send initial state before removing {} on interface ({}) with reason {:?}",
+                                address, interface_id, reason,
+                            )
+                        }
+                    },
+                    AddressStateProviderError::Fidl(e) => {
+                        // If the channel is closed, assume a similar situation
+                        // as `Ok(None)`.
+                        if !e.is_closed() {
+                            error!(
+                                "unexpected ASP error when adding {} on interface ({}): {:?}",
+                                address, interface_id, e,
+                            )
+                        }
+
+                        RequestError::UnrecognizedInterface
+                    }
+                    AddressStateProviderError::ChannelClosed => {
+                        // If the channel is closed, assume a similar situation
+                        // as `Ok(None)`.
+                        RequestError::UnrecognizedInterface
+                    }
+                })
+            }
+        }
+    }
+
+    async fn handle_request(
+        interfaces_proxy: &fnet_root::InterfacesProxy,
         interface_properties: &HashMap<u64, fnet_interfaces_ext::Properties>,
         all_addresses: &BTreeMap<InterfaceAndAddr, NetlinkAddressMessage>,
         Request { args, mut client, completer }: Request<S>,
     ) {
         debug!("handling request {args:?} from {client}");
 
-        let result = match &args {
+        let result = match args {
             RequestArgs::Link(LinkRequestArgs::Get(args)) => match args {
                 GetLinkArgs::Dump => {
                     interface_properties
@@ -287,25 +481,29 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
                     Ok(())
                 }
             },
-            RequestArgs::Address(AddressRequestArgs::Get(args)) => match args {
-                GetAddressArgs::Dump { ip_version_filter } => {
-                    all_addresses
-                        .values()
-                        .filter(|NetlinkAddressMessage(message)| {
-                            ip_version_filter.map_or(true, |ip_version| {
-                                ip_version.eq(&match message.header.family.into() {
-                                    AF_INET => IpVersion::V4,
-                                    AF_INET6 => IpVersion::V6,
-                                    family => unreachable!(
-                                        "unexpected address familly ({}); addr = {:?}",
-                                        family, message,
-                                    ),
+            RequestArgs::Address(args) => match args {
+                AddressRequestArgs::Get(args) => match args {
+                    GetAddressArgs::Dump { ip_version_filter } => {
+                        all_addresses
+                            .values()
+                            .filter(|NetlinkAddressMessage(message)| {
+                                ip_version_filter.map_or(true, |ip_version| {
+                                    ip_version.eq(&match message.header.family.into() {
+                                        AF_INET => IpVersion::V4,
+                                        AF_INET6 => IpVersion::V6,
+                                        family => unreachable!(
+                                            "unexpected address family ({}); addr = {:?}",
+                                            family, message,
+                                        ),
+                                    })
                                 })
                             })
-                        })
-                        .for_each(|message| client.send(message.to_rtnl_new_addr()));
-
-                    Ok(())
+                            .for_each(|message| client.send(message.to_rtnl_new_addr()));
+                        Ok(())
+                    }
+                },
+                AddressRequestArgs::New(args) => {
+                    Self::handle_new_address_request(interfaces_proxy, args).await
                 }
             },
         };
@@ -359,7 +557,7 @@ fn update_addresses<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>>(
             AF_INET => RTNLGRP_IPV4_IFADDR,
             AF_INET6 => RTNLGRP_IPV6_IFADDR,
             family => {
-                unreachable!("unrecognized interface address family ({family}); addr = {addr:?}",)
+                unreachable!("unrecognized interface address family ({family}); addr = {addr:?}")
             }
         };
 
@@ -776,13 +974,19 @@ fn interface_properties_to_address_messages(
 mod tests {
     use super::*;
 
+    use fidl::endpoints::{ControlHandle as _, RequestStream as _};
     use fidl_fuchsia_net as fnet;
+    use fnet_interfaces_admin::AddressAssignmentState;
     use fuchsia_async::{self as fasync};
     use fuchsia_zircon as zx;
-    use futures::{future::FutureExt as _, sink::SinkExt as _, stream::Stream};
 
     use assert_matches::assert_matches;
-    use net_declare::fidl_ip;
+    use futures::{
+        future::{Future, FutureExt as _},
+        sink::SinkExt as _,
+        stream::Stream,
+    };
+    use net_declare::{fidl_subnet, net_addr_subnet};
     use netlink_packet_core::NetlinkPayload;
     use netlink_packet_route::{
         AddressHeader, AddressMessage, AF_INET, AF_INET6, RTNLGRP_IPV4_ROUTE,
@@ -802,9 +1006,8 @@ mod tests {
         fnet_interfaces::DeviceClass::Device(fhwnet::DeviceClass::Ppp);
     const LOOPBACK: fnet_interfaces::DeviceClass =
         fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {});
-    const TEST_V4_ADDR: fnet::Subnet = fnet::Subnet { addr: fidl_ip!("192.0.2.0"), prefix_len: 24 };
-    const TEST_V6_ADDR: fnet::Subnet =
-        fnet::Subnet { addr: fidl_ip!("2001:db8::0"), prefix_len: 32 };
+    const TEST_V4_ADDR: fnet::Subnet = fidl_subnet!("192.0.2.1/24");
+    const TEST_V6_ADDR: fnet::Subnet = fidl_subnet!("2001:db8::1/32");
 
     fn create_interface(
         id: u64,
@@ -1004,15 +1207,23 @@ mod tests {
         event_loop: EventLoop<FakeSender<NetlinkMessage<RtnlMessage>>>,
         watcher_stream: W,
         request_sink: mpsc::Sender<Request<FakeSender<NetlinkMessage<RtnlMessage>>>>,
+        interfaces_request_stream: fnet_root::InterfacesRequestStream,
     }
 
     fn setup_with_route_clients(
         route_clients: ClientTable<NetlinkRoute, FakeSender<NetlinkMessage<RtnlMessage>>>,
     ) -> Setup<impl Stream<Item = fnet_interfaces::WatcherRequest>> {
+        let (interfaces_proxy, interfaces_request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<fnet_root::InterfacesMarker>().unwrap();
         let (state_proxy, if_stream) =
             fidl::endpoints::create_proxy_and_stream::<fnet_interfaces::StateMarker>().unwrap();
         let (request_sink, request_stream) = mpsc::channel(1);
-        let event_loop = EventLoop::<FakeSender<_>> { state_proxy, route_clients, request_stream };
+        let event_loop = EventLoop::<FakeSender<_>> {
+            interfaces_proxy,
+            state_proxy,
+            route_clients,
+            request_stream,
+        };
 
         let watcher_stream = if_stream
             .and_then(|req| match req {
@@ -1025,7 +1236,7 @@ mod tests {
             .try_flatten()
             .map(|res| res.expect("watcher stream error"));
 
-        Setup { event_loop, watcher_stream, request_sink }
+        Setup { event_loop, watcher_stream, request_sink, interfaces_request_stream }
     }
 
     fn setup() -> Setup<impl Stream<Item = fnet_interfaces::WatcherRequest>> {
@@ -1111,7 +1322,8 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_event_loop_errors_stream_ended() {
-        let Setup { event_loop, watcher_stream, request_sink: _ } = setup();
+        let Setup { event_loop, watcher_stream, request_sink: _, interfaces_request_stream: _ } =
+            setup();
         let event_loop_fut = event_loop.run();
         let interfaces = vec![get_fake_interface(1, "lo", LOOPBACK)];
         let watcher_fut =
@@ -1128,7 +1340,8 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_event_loop_errors_duplicate_events() {
-        let Setup { event_loop, watcher_stream, request_sink: _ } = setup();
+        let Setup { event_loop, watcher_stream, request_sink: _, interfaces_request_stream: _ } =
+            setup();
         let event_loop_fut = event_loop.run();
         let interfaces =
             vec![get_fake_interface(1, "lo", LOOPBACK), get_fake_interface(1, "lo", LOOPBACK)];
@@ -1148,7 +1361,8 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_event_loop_errors_duplicate_adds() {
-        let Setup { event_loop, watcher_stream, request_sink: _ } = setup();
+        let Setup { event_loop, watcher_stream, request_sink: _, interfaces_request_stream: _ } =
+            setup();
         let event_loop_fut = event_loop.run();
         let interfaces_existing = vec![get_fake_interface(1, "lo", LOOPBACK)];
         let interfaces_new = vec![get_fake_interface(1, "lo", LOOPBACK)];
@@ -1171,7 +1385,8 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_event_loop_errors_existing_after_add() {
-        let Setup { event_loop, watcher_stream, request_sink: _ } = setup();
+        let Setup { event_loop, watcher_stream, request_sink: _, interfaces_request_stream: _ } =
+            setup();
         let event_loop_fut = event_loop.run();
         let interfaces_existing =
             vec![get_fake_interface(1, "lo", LOOPBACK), get_fake_interface(2, "eth001", ETHERNET)];
@@ -1316,15 +1531,16 @@ mod tests {
                 ModernGroup(RTNLGRP_IPV4_IFADDR),
             ],
         );
-        let Setup { event_loop, mut watcher_stream, request_sink: _ } = setup_with_route_clients({
-            let route_clients = ClientTable::default();
-            route_clients.add_client(link_client);
-            route_clients.add_client(addr4_client);
-            route_clients.add_client(addr6_client);
-            route_clients.add_client(all_client);
-            route_clients.add_client(other_client);
-            route_clients
-        });
+        let Setup { event_loop, mut watcher_stream, request_sink: _, interfaces_request_stream: _ } =
+            setup_with_route_clients({
+                let route_clients = ClientTable::default();
+                route_clients.add_client(link_client);
+                route_clients.add_client(addr4_client);
+                route_clients.add_client(addr6_client);
+                route_clients.add_client(all_client);
+                route_clients.add_client(other_client);
+                route_clients
+            });
         let event_loop_fut = event_loop.run().fuse();
         futures::pin_mut!(event_loop_fut);
 
@@ -1519,7 +1735,27 @@ mod tests {
         assert_eq!(&other_sink.take_messages()[..], &[]);
     }
 
-    async fn test_get(args: RequestArgs) -> Vec<NetlinkMessage<RtnlMessage>> {
+    async fn expect_no_root_requests(
+        interfaces_request_stream: fnet_root::InterfacesRequestStream,
+    ) {
+        interfaces_request_stream
+            .for_each(|req| async move { panic!("unexpected request {req:?}") })
+            .await
+    }
+
+    #[derive(Debug, PartialEq)]
+    struct TestRequestResult {
+        messages: Vec<NetlinkMessage<RtnlMessage>>,
+        waiter_result: Result<(), RequestError>,
+    }
+
+    async fn test_request<
+        Fut: Future<Output = ()>,
+        F: Fn(fnet_root::InterfacesRequestStream) -> Fut,
+    >(
+        args: RequestArgs,
+        root_handler: F,
+    ) -> TestRequestResult {
         let (mut expected_sink, expected_client) = crate::client::testutil::new_fake_client::<
             NetlinkRoute,
         >(
@@ -1529,7 +1765,7 @@ mod tests {
             crate::client::testutil::CLIENT_ID_2,
             &[],
         );
-        let Setup { event_loop, mut watcher_stream, mut request_sink } =
+        let Setup { event_loop, mut watcher_stream, mut request_sink, interfaces_request_stream } =
             setup_with_route_clients({
                 let route_clients = ClientTable::default();
                 route_clients.add_client(expected_client.clone());
@@ -1579,20 +1815,27 @@ mod tests {
                 res.expect("send request");
                 waiter
             });
-        futures::select! {
-            res = fut.fuse() => assert_eq!(res, Ok(Ok(()))),
+        let waiter_result = futures::select! {
+            () = root_handler(interfaces_request_stream).fuse() => {
+                unreachable!("root handler should not return")
+            },
+            res = fut.fuse() => res.unwrap(),
             err = event_loop_fut => unreachable!("eventloop should not return: {err:?}"),
-        }
+        };
         assert_eq!(&other_sink.take_messages()[..], &[]);
-        expected_sink.take_messages()
+        TestRequestResult { messages: expected_sink.take_messages(), waiter_result }
     }
 
     #[fuchsia::test]
     async fn test_get_link() {
+        let TestRequestResult { mut messages, waiter_result } = test_request(
+            RequestArgs::Link(LinkRequestArgs::Get(GetLinkArgs::Dump)),
+            expect_no_root_requests,
+        )
+        .await;
+        assert_eq!(waiter_result, Ok(()));
         assert_eq!(
             {
-                let mut messages =
-                    test_get(RequestArgs::Link(LinkRequestArgs::Get(GetLinkArgs::Dump))).await;
                 messages.sort_by_key(|message| {
                     assert_matches!(
                         &message.payload,
@@ -1628,35 +1871,308 @@ mod tests {
     #[fuchsia::test]
     async fn test_get_addr(ip_version_filter: Option<IpVersion>) {
         pretty_assertions::assert_eq!(
-            test_get(RequestArgs::Address(AddressRequestArgs::Get(GetAddressArgs::Dump {
-                ip_version_filter
-            })))
+            test_request(
+                RequestArgs::Address(AddressRequestArgs::Get(GetAddressArgs::Dump {
+                    ip_version_filter
+                })),
+                expect_no_root_requests,
+            )
             .await,
-            [(LO_INTERFACE_ID, LO_NAME), (ETH_INTERFACE_ID, ETH_NAME)]
-                .into_iter()
-                .map(|(id, name)| {
-                    [TEST_V4_ADDR, TEST_V6_ADDR]
-                        .into_iter()
-                        .filter(|fnet::Subnet { addr, prefix_len: _ }| {
-                            ip_version_filter.map_or(true, |ip_version| {
-                                ip_version.eq(&match addr {
-                                    fnet::IpAddress::Ipv4(_) => IpVersion::V4,
-                                    fnet::IpAddress::Ipv6(_) => IpVersion::V6,
+            TestRequestResult {
+                messages: [(LO_INTERFACE_ID, LO_NAME), (ETH_INTERFACE_ID, ETH_NAME)]
+                    .into_iter()
+                    .map(|(id, name)| {
+                        [TEST_V4_ADDR, TEST_V6_ADDR]
+                            .into_iter()
+                            .filter(|fnet::Subnet { addr, prefix_len: _ }| {
+                                ip_version_filter.map_or(true, |ip_version| {
+                                    ip_version.eq(&match addr {
+                                        fnet::IpAddress::Ipv4(_) => IpVersion::V4,
+                                        fnet::IpAddress::Ipv6(_) => IpVersion::V6,
+                                    })
                                 })
                             })
-                        })
-                        .map(move |addr| {
-                            create_address_message(
-                                id.try_into().unwrap(),
-                                addr,
-                                name.to_string(),
-                                IFA_F_PERMANENT,
-                            )
-                            .to_rtnl_new_addr()
-                        })
-                })
-                .flatten()
-                .collect::<Vec<_>>(),
+                            .map(move |addr| {
+                                create_address_message(
+                                    id.try_into().unwrap(),
+                                    addr,
+                                    name.to_string(),
+                                    IFA_F_PERMANENT,
+                                )
+                                .to_rtnl_new_addr()
+                            })
+                    })
+                    .flatten()
+                    .collect(),
+                waiter_result: Ok(()),
+            },
         );
+    }
+
+    // AddrSubnetEither does not have any const methods so we need a method.
+    fn addr_subnet_v4() -> AddrSubnetEither {
+        net_addr_subnet!("192.0.2.1/24")
+    }
+
+    // AddrSubnetEither does not have any const methods so we need a method.
+    fn addr_subnet_v6() -> AddrSubnetEither {
+        net_addr_subnet!("2001:db8::1/32")
+    }
+
+    /// Tests RTM_NEWADDR when the interface is removed, indicated by the
+    /// closure of the admin Control's server-end.
+    #[test_case(
+        addr_subnet_v4(),
+        None; "v4_no_terminal")]
+    #[test_case(
+        addr_subnet_v6(),
+        None; "v6_no_terminal")]
+    #[test_case(
+        addr_subnet_v4(),
+        Some(InterfaceRemovedReason::PortClosed); "v4_port_closed_terminal")]
+    #[test_case(
+        addr_subnet_v6(),
+        Some(InterfaceRemovedReason::PortClosed); "v6_port_closed_terminal")]
+    #[test_case(
+        addr_subnet_v4(),
+        Some(InterfaceRemovedReason::User); "v4_user_terminal")]
+    #[test_case(
+        addr_subnet_v6(),
+        Some(InterfaceRemovedReason::User); "v6_user_terminal")]
+    #[fuchsia::test]
+    async fn test_new_addr_interface_removed(
+        address: AddrSubnetEither,
+        removal_reason: Option<InterfaceRemovedReason>,
+    ) {
+        pretty_assertions::assert_eq!(
+            test_request(
+                RequestArgs::Address(AddressRequestArgs::New(NewAddressArgs {
+                    address,
+                    interface_id: LO_INTERFACE_ID.try_into().unwrap(),
+                })),
+                |interfaces_request_stream| async {
+                    interfaces_request_stream
+                        .for_each(|req| {
+                            futures::future::ready(match req.unwrap() {
+                                fnet_root::InterfacesRequest::GetAdmin {
+                                    id,
+                                    control,
+                                    control_handle: _,
+                                } => {
+                                    pretty_assertions::assert_eq!(id, LO_INTERFACE_ID);
+                                    let control = control.into_stream().unwrap();
+                                    let control = control.control_handle();
+                                    if let Some(reason) = removal_reason {
+                                        control.send_on_interface_removed(reason).unwrap()
+                                    }
+                                    control.shutdown();
+                                }
+                            })
+                        })
+                        .await
+                },
+            )
+            .await,
+            TestRequestResult {
+                messages: Vec::new(),
+                waiter_result: Err(RequestError::UnrecognizedInterface),
+            },
+        )
+    }
+
+    /// An RTM_NEWADDR test helper that calls the callback with a stream of ASP
+    /// requests.
+    async fn test_new_addr_asp_helper<
+        Fut: Future<Output = ()>,
+        F: Fn(fnet_interfaces_admin::AddressStateProviderRequestStream) -> Fut,
+    >(
+        address: AddrSubnetEither,
+        asp_handler: F,
+    ) -> TestRequestResult {
+        test_request(
+            RequestArgs::Address(AddressRequestArgs::New(NewAddressArgs {
+                address,
+                interface_id: ETH_INTERFACE_ID.try_into().unwrap(),
+            })),
+            |interfaces_request_stream| async {
+                interfaces_request_stream
+                    .then(|req| {
+                        futures::future::ready(match req.unwrap() {
+                            fnet_root::InterfacesRequest::GetAdmin {
+                                id,
+                                control,
+                                control_handle: _,
+                            } => {
+                                pretty_assertions::assert_eq!(id, ETH_INTERFACE_ID);
+                                control.into_stream().unwrap()
+                            }
+                        })
+                    })
+                    .flatten()
+                    .for_each(|req| async {
+                        match req.unwrap() {
+                            fnet_interfaces_admin::ControlRequest::AddAddress {
+                                address: got_address,
+                                parameters,
+                                address_state_provider,
+                                control_handle: _,
+                            } => {
+                                pretty_assertions::assert_eq!(got_address, address.into_ext());
+                                pretty_assertions::assert_eq!(
+                                    parameters,
+                                    fnet_interfaces_admin::AddressParameters::default()
+                                );
+                                asp_handler(address_state_provider.into_stream().unwrap()).await
+                            }
+                            req => panic!("unexpected request {req:?}"),
+                        }
+                    })
+                    .await
+            },
+        )
+        .await
+    }
+
+    /// Tests RTM_NEWADDR when the ASP is dropped immediately (doesn't handle
+    /// any request).
+    #[test_case(addr_subnet_v4(); "v4")]
+    #[test_case(addr_subnet_v6(); "v6")]
+    #[fuchsia::test]
+    async fn test_new_addr_drop_asp_immediately(address: AddrSubnetEither) {
+        pretty_assertions::assert_eq!(
+            test_new_addr_asp_helper(address, |_asp_request_stream| async {}).await,
+            TestRequestResult {
+                messages: Vec::new(),
+                waiter_result: Err(RequestError::UnrecognizedInterface),
+            },
+        )
+    }
+
+    /// RTM_NEWADDR test helper that exercises the ASP being closed with a
+    /// terminal event.
+    async fn test_new_addr_failed_helper(
+        address: AddrSubnetEither,
+        reason: AddressRemovalReason,
+    ) -> TestRequestResult {
+        test_new_addr_asp_helper(address, |asp_request_stream| async move {
+            asp_request_stream.control_handle().send_on_address_removed(reason).unwrap()
+        })
+        .await
+    }
+
+    /// Tests RTM_NEWADDR when the ASP is closed with an unexpected terminal
+    /// event.
+    #[test_case(
+        addr_subnet_v4(),
+        AddressRemovalReason::DadFailed; "v4_dad_failed")]
+    #[test_case(
+        addr_subnet_v6(),
+        AddressRemovalReason::DadFailed; "v6_dad_failed")]
+    #[test_case(
+        addr_subnet_v4(),
+        AddressRemovalReason::InterfaceRemoved; "v4_interface_removed")]
+    #[test_case(
+        addr_subnet_v6(),
+        AddressRemovalReason::InterfaceRemoved; "v6_interface_removed")]
+    #[test_case(
+        addr_subnet_v4(),
+        AddressRemovalReason::UserRemoved; "v4_user_removed")]
+    #[test_case(
+        addr_subnet_v6(),
+        AddressRemovalReason::UserRemoved; "v6_user_removed")]
+    #[should_panic(expected = "expected netstack to send initial state before removing")]
+    #[fuchsia::test]
+    async fn test_new_addr_failed_unexpected_reason(
+        address: AddrSubnetEither,
+        reason: AddressRemovalReason,
+    ) {
+        let _: TestRequestResult = test_new_addr_failed_helper(address, reason).await;
+    }
+
+    /// Tests RTM_NEWADDR when the ASP is gracefully closed with a terminal event.
+    #[test_case(
+        addr_subnet_v4(),
+        AddressRemovalReason::Invalid,
+        RequestError::InvalidRequest; "v4_invalid")]
+    #[test_case(
+        addr_subnet_v6(),
+        AddressRemovalReason::Invalid,
+        RequestError::InvalidRequest; "v6_invalid")]
+    #[test_case(
+        addr_subnet_v4(),
+        AddressRemovalReason::AlreadyAssigned,
+        RequestError::AlreadyExists; "v4_exists")]
+    #[test_case(
+        addr_subnet_v6(),
+        AddressRemovalReason::AlreadyAssigned,
+        RequestError::AlreadyExists; "v6_exists")]
+    #[fuchsia::test]
+    async fn test_new_addr_failed(
+        address: AddrSubnetEither,
+        reason: AddressRemovalReason,
+        expected_error: RequestError,
+    ) {
+        pretty_assertions::assert_eq!(
+            test_new_addr_failed_helper(address, reason).await,
+            TestRequestResult { messages: Vec::new(), waiter_result: Err(expected_error) },
+        )
+    }
+
+    /// An RTM_NEWADDR test helper that calls the callback with a stream of ASP
+    /// requests after the Detach request is handled.
+    async fn test_new_addr_asp_detach_handled_helper<
+        Fut: Future<Output = ()>,
+        F: Fn(fnet_interfaces_admin::AddressStateProviderRequestStream) -> Fut,
+    >(
+        address: AddrSubnetEither,
+        asp_handler: F,
+    ) -> TestRequestResult {
+        test_new_addr_asp_helper(address, |mut asp_request_stream| async {
+            let _: fnet_interfaces_admin::AddressStateProviderControlHandle = asp_request_stream
+                .next()
+                .await
+                .expect("eventloop uses ASP before dropping")
+                .expect("unexpected error while waiting for Detach request")
+                .into_detach()
+                .expect("eventloop makes detach request immediately");
+            asp_handler(asp_request_stream).await
+        })
+        .await
+    }
+
+    /// Test RTM_NEWADDR when the ASP is dropped immediately after handling the
+    /// Detach request (no assignment state update or terminal event).
+    #[test_case(addr_subnet_v4(); "v4")]
+    #[test_case(addr_subnet_v6(); "v6")]
+    #[fuchsia::test]
+    async fn test_new_addr_drop_asp_after_detach(address: AddrSubnetEither) {
+        pretty_assertions::assert_eq!(
+            test_new_addr_asp_detach_handled_helper(address, |_asp_stream| async {}).await,
+            TestRequestResult {
+                messages: Vec::new(),
+                waiter_result: Err(RequestError::UnrecognizedInterface),
+            },
+        )
+    }
+
+    /// Test RTM_NEWADDR when the ASP yields an assignment state update.
+    #[test_case(addr_subnet_v4(); "v4")]
+    #[test_case(addr_subnet_v6(); "v6")]
+    #[fuchsia::test]
+    async fn test_new_addr_with_state_update(address: AddrSubnetEither) {
+        pretty_assertions::assert_eq!(
+            test_new_addr_asp_detach_handled_helper(address, |mut asp_request_stream| async move {
+                let responder = asp_request_stream
+                    .next()
+                    .await
+                    .expect("eventloop watches for address assignment state before dropping ASP")
+                    .expect("unexpected error while waiting for event from event loop")
+                    .into_watch_address_assignment_state()
+                    .expect("eventloop only makes WatchAddressAssignmentState request");
+                responder.send(AddressAssignmentState::Assigned).unwrap();
+            })
+            .await,
+            TestRequestResult { messages: Vec::new(), waiter_result: Ok(()) },
+        )
     }
 }
