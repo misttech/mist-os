@@ -16,8 +16,6 @@ group("tests") {
   testonly = true
 
   deps = [
-    ":appmgr-cpu-stats-tests",
-    ":appmgr-log-tests",
     ":archivist-feedback-health-tests",
     ":archivist-pipeline-metrics-tests",
     ":archivist-sampler-metrics-tests",
@@ -41,6 +39,16 @@ group("tests") {
   if (data_filesystem_format == "minfs") {
     deps += [ ":fshost-minfs-metrics-tests" ]
   }
+}
+
+# TODO(fxbug.dev/102390): Delete all these tests
+group("legacy_tests") {
+  testonly = true
+
+  deps = [
+    ":appmgr-cpu-stats-tests",
+    ":appmgr-log-tests",
+  ]
 }
 
 fuchsia_unittest_package("appmgr-log-tests") {
