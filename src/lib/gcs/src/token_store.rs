@@ -6,13 +6,15 @@
 
 use {
     crate::error::GcsError,
-    anyhow::{bail, Context, Result},
+    anyhow::{bail, Context, Error, Result},
     async_lock::Mutex,
+    fuchsia_backoff::{retry_or_last_error, Backoff},
     fuchsia_hyper::HttpsClient,
     http::{request, StatusCode},
     hyper::{Body, Method, Request, Response},
+    rand::{rngs::StdRng, Rng, SeedableRng},
     serde_json,
-    std::{fmt, string::String},
+    std::{cmp, fmt, string::String, time::Duration},
     url::Url,
 };
 
@@ -127,7 +129,7 @@ impl TokenStore {
             .storage_base
             .join(&format!("{}/{}", bucket, object))
             .context("joining to storage base")?;
-        self.send_request(https_client, url).await.context("sending http(s) request")
+        self.request_with_retries(https_client, url).await.context("sending http(s) request")
     }
 
     /// Make one attempt to request data from GCS.
@@ -158,6 +160,75 @@ impl TokenStore {
             _ => (),
         }
         Ok(res)
+    }
+
+    /// Request data from GCS, retrying in the case of common transient errors.
+    ///
+    /// Callers are expected to handle non-transient errors and call
+    /// request_with_retries() again as desired (e.g. follow redirects).
+    /// See https://cloud.google.com/storage/docs/retry-strategy.
+    async fn request_with_retries(
+        &self,
+        https_client: &HttpsClient,
+        url: Url,
+    ) -> Result<Response<Body>> {
+        struct ExponentialBackoff {
+            rng: StdRng,
+            backoff_base: u64,
+            backoff_budget: u64,
+            transient_errors: u32,
+        }
+
+        // Exponential backoff impl with backoff time budget and FullJitter:
+        // https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/
+        impl Backoff<Error> for ExponentialBackoff {
+            fn next_backoff(&mut self, err: &Error) -> Option<Duration> {
+                match err.downcast_ref::<GcsError>() {
+                    // Handle transient errors.
+                    Some(GcsError::HttpTransientError(_)) => {
+                        self.transient_errors += 1;
+                        if self.backoff_budget == 0 {
+                            None
+                        } else {
+                            let backoff_time = cmp::min(
+                                self.rng.gen_range(0..self.backoff_base.pow(self.transient_errors)),
+                                self.backoff_budget,
+                            );
+                            self.backoff_budget -= backoff_time;
+                            Some(Duration::from_millis(backoff_time))
+                        }
+                    }
+                    // Ignore non-transient [GcsError]s (eg: NeedNewAccessToken)
+                    // and non-[GcsError]s.
+                    _ => None,
+                }
+            }
+        }
+
+        retry_or_last_error(
+            // Keep retrying up to a 5 second cumulative backoff. Given these
+            // constants, we'll expect to handle up to ~6 transient failures.
+            ExponentialBackoff {
+                rng: StdRng::from_entropy(),
+                backoff_base: 4,
+                backoff_budget: 5000,
+                transient_errors: 0,
+            },
+            || async {
+                let result =
+                    self.send_request(https_client, url.clone()).await.context("send_request")?;
+                let status = result.status();
+                // Retry on http errors 408 | 429 | 500..=599.
+                if matches!(status, StatusCode::REQUEST_TIMEOUT | StatusCode::TOO_MANY_REQUESTS)
+                    || status.is_server_error()
+                {
+                    bail!(GcsError::HttpTransientError(result.status()))
+                }
+                Ok(result)
+            },
+        )
+        .await
+        .context("send_request with retries")
     }
 
     /// Determine whether a gs url points to either a file or directory.
@@ -235,7 +306,8 @@ impl TokenStore {
             if let Some(t) = page_token {
                 url.query_pairs_mut().append_pair("pageToken", t.as_str());
             }
-            let res = self.send_request(https_client, url).await.context("sending request")?;
+            let res =
+                self.request_with_retries(https_client, url).await.context("sending request")?;
             match res.status() {
                 StatusCode::OK => {
                     let bytes = hyper::body::to_bytes(res.into_body())

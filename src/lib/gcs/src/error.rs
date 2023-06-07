@@ -43,9 +43,7 @@ pub enum GcsError {
     MissingRefreshToken,
 
     /// The auth tool encountered a runtime error.
-    #[error(
-        "Executing {0:?} failed ({1}) with output: {2:?}"
-    )]
+    #[error("Executing {0:?} failed ({1}) with output: {2:?}")]
     ExecForAccessFailed(std::path::PathBuf, std::process::ExitStatus, String),
 
     /// The user should check that the path passed in is a file that can be
@@ -61,6 +59,10 @@ pub enum GcsError {
         "Unable to refresh GCS access token: HTTP {0}. Check network connection and try again."
     )]
     RefreshAccessError(http::StatusCode),
+
+    /// May be a network issue. Consider informing the user and offer to retry.
+    #[error("GCS HttpTransientError: {0}. Too many transient network errors; check network connection and try again.")]
+    HttpTransientError(http::StatusCode),
 
     /// May be a network issue. Consider informing the user and offer to retry.
     #[error("GCS HttpResponseError: {0}. Check network connection and try again.")]
