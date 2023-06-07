@@ -15,15 +15,6 @@ using zx;
 const MAX_NUM_MATCHES uint16 = 250;
 const MAX_CONNECT_MATCHES uint16 = 5;
 
-type RebootType = strict enum {
-    // Standard reboot.
-    REBOOT = 1;
-    // Reboots into recovery mode.
-    RECOVERY = 2;
-    // Reboots into the bootloader.
-    BOOTLOADER = 3;
-};
-
 type TunnelError = strict enum {
     // Couldn't connect to the address to forward.
     CONNECT_FAILED = 1;
@@ -41,6 +32,13 @@ protocol RemoteControl {
     }) -> (struct {
         response string:255;
     });
+
+    /// Writes a string to the syslog on the device.
+    LogMessage(struct {
+        tag string:MAX;
+        message string:MAX;
+        severity diagnostics.Severity;
+    }) -> ();
 
     /// Connects to the root [`fuchsia.sys2/RealmExplorer`] protocol.
     RootRealmExplorer(resource struct {

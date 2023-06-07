@@ -9,8 +9,7 @@ use {
     component_debug::lifecycle::*,
     fidl::endpoints::ServerEnd,
     fidl::prelude::*,
-    fidl_fuchsia_developer_remotecontrol as rcs,
-    fidl_fuchsia_diagnostics::Selector,
+    fidl_fuchsia_developer_remotecontrol as rcs, fidl_fuchsia_diagnostics as diagnostics,
     fidl_fuchsia_io as io,
     fidl_fuchsia_net_ext::SocketAddress as SocketAddressExt,
     fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
@@ -135,6 +134,19 @@ impl RemoteControlService {
             rcs::RemoteControlRequest::EchoString { value, responder } => {
                 info!("Received echo string {}", value);
                 responder.send(&value)?;
+                Ok(())
+            }
+            rcs::RemoteControlRequest::LogMessage { tag, message, severity, responder } => {
+                match severity {
+                    diagnostics::Severity::Trace => trace!(%tag, "{}", message),
+                    diagnostics::Severity::Debug => debug!(%tag, "{}", message),
+                    diagnostics::Severity::Info => info!(%tag, "{}", message),
+                    diagnostics::Severity::Warn => warn!(%tag, "{}", message),
+                    diagnostics::Severity::Error => error!(%tag, "{}", message),
+                    // Tracing crate doesn't have a Fatal level, just log an error with a FATAL message embedded.
+                    diagnostics::Severity::Fatal => error!(%tag, "<FATAL> {}", message),
+                }
+                responder.send()?;
                 Ok(())
             }
             rcs::RemoteControlRequest::AddId { id, responder } => {
@@ -391,8 +403,8 @@ impl RemoteControlService {
 
     pub(crate) fn map_selector(
         self: &Rc<Self>,
-        selector: Selector,
-    ) -> Result<Selector, rcs::ConnectError> {
+        selector: diagnostics::Selector,
+    ) -> Result<diagnostics::Selector, rcs::ConnectError> {
         self.maps.map_selector(selector.clone()).map_err(|e| {
             match e {
                 MappingError::BadSelector(selector_str, err) => {
@@ -486,7 +498,7 @@ impl RemoteControlService {
     /// Connects to an exposed capability identified by the given selector.
     async fn connect_to_service(
         self: &Rc<Self>,
-        selector: Selector,
+        selector: diagnostics::Selector,
         server_end: zx::Channel,
     ) -> Result<rcs::ServiceMatch, rcs::ConnectError> {
         // If applicable, get a remapped selector
@@ -584,7 +596,7 @@ async fn connect_to_exposed_capability(
 }
 
 fn extract_moniker_and_protocol_from_selector(
-    selector: Selector,
+    selector: diagnostics::Selector,
 ) -> Option<(RelativeMoniker, String)> {
     // Construct the moniker from the selector
     let moniker_segments = selector.component_selector?.moniker_segments?;
@@ -1116,11 +1128,11 @@ mod tests {
         Ok(())
     }
 
-    fn service_selector() -> Selector {
+    fn service_selector() -> diagnostics::Selector {
         parse_selector::<VerboseError>(FAKE_SERVICE_SELECTOR).unwrap()
     }
 
-    fn mapped_service_selector() -> Selector {
+    fn mapped_service_selector() -> diagnostics::Selector {
         parse_selector::<VerboseError>(MAPPED_SERVICE_SELECTOR).unwrap()
     }
 
