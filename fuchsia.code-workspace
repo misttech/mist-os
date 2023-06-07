@@ -57,9 +57,6 @@
       // The official Clang LSP for C/C++.
       "llvm-vs-code-extensions.vscode-clangd",
 
-      // Provides GN syntax highlighting.
-      "npclaudiu.vscode-gn",
-
       // Supports inserting and formatting C/C++ include guards as required
       // in Fuchsia.
       "akiramiyakoda.cppincludeguard",
@@ -78,6 +75,9 @@
       // Conflicts with vscode-clangd intellisense, and vscode-clangd is the
       // preferred C++ extension.
       "ms-vscode.cpptools",
+
+      // Redundant and conflicts with gnls, which is preferred.
+      "npclaudiu.vscode-gn",
 
       // Redundant and conflicts with gnls, which is preferred.
       "persidskiy.vscode-gnformat",
