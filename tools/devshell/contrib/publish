@@ -11,71 +11,8 @@
 ## Publishes a given set of packages.
 ## Currently only cache packages can be published.
 
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../lib/vars.sh || exit $?
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+source "$SCRIPT_DIR/../lib/vars.sh" || exit $?
+
 fx-config-read
-
-function main {
-  publish_cache=false
-  while [ $# -gt 0 ]; do
-    case "$1" in
-    cache)
-      publish_cache=true
-      shift
-      ;;
-    # TODO(chandarren): Support publishing universe packages.
-    universe)
-      fx-error "Publishing universe packages is not supported yet."
-      return 1
-      ;;
-    --help | -h)
-      fx-command-help
-      return 1
-      ;;
-    *)
-      fx-error "Unrecognized argument \"$1\""
-      fx-command-help
-      return 1
-      ;;
-    esac
-  done
-
-  if ! $publish_cache; then
-    fx-error "You must specify package set(s) to publish!"
-    fx-command-help
-    return 1
-  fi
-
-  function throw {
-    fx-error "$@"
-    exit 1
-  }
-
-  # Ensure repo is initialized; build cache packages.
-  fx-command-run build build/images/updates:prepare_publish assembly_cache_packages.list || throw "Build failures!"
-
-  PACKAGE_TOOL="${FUCHSIA_BUILD_DIR}/host-tools/package-tool"
-  AMBER_FILES="${FUCHSIA_BUILD_DIR}/amber-files"
-  PACKAGES_TO_PUBLISH="${FUCHSIA_BUILD_DIR}/assembly_cache_packages.list"
-
-  # Publish packages.
-  mapfile -t PUBLISH_OPTS < "${AMBER_FILES}/publish_tool_opts"
-  (cd "${FUCHSIA_BUILD_DIR}" &&
-    $PACKAGE_TOOL \
-    repository \
-    publish \
-    "${AMBER_FILES}" \
-    "${PUBLISH_OPTS[@]}" \
-    --package-list "${PACKAGES_TO_PUBLISH}"
-  ) || throw "An internal error occured while publishing."
-
-  # Check if package server is running.
-  PUBLISHED_PACKAGE_COUNT_MSG="Published $(wc -l < ${PACKAGES_TO_PUBLISH}) packages"
-  if fx-command-run is-package-server-running >/dev/null 2>&1; then
-    fx-info "${PUBLISHED_PACKAGE_COUNT_MSG}!"
-  else
-    fx-warn "${PUBLISHED_PACKAGE_COUNT_MSG}, but it looks like the package server is not running."
-    fx-warn "You probably need to run \"fx serve\"."
-  fi
-}
-
-main "$@"
+cd $FUCHSIA_BUILD_DIR && "${PREBUILT_PYTHON3_DIR}/bin/python3.8" "$SCRIPT_DIR"/publish.py "$@"
