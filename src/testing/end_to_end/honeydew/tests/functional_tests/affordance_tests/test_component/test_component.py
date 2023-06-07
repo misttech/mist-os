@@ -8,7 +8,6 @@ import logging
 from typing import List
 
 from fuchsia_base_test import fuchsia_base_test
-from honeydew.interfaces.device_classes import component_capable_device
 from honeydew.interfaces.device_classes import fuchsia_device
 from mobly import asserts
 from mobly import test_runner
@@ -32,11 +31,6 @@ class ComponentAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         """
         super().setup_class()
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
-
-    def test_is_device_component_capable(self) -> None:
-        """Test case to make sure DUT is a component capable device"""
-        asserts.assert_is_instance(
-            self.device, component_capable_device.ComponentCapableDevice)
 
     def test_component_list(self) -> None:
         """Test case for component.list()"""

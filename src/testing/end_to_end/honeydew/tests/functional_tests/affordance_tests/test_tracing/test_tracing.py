@@ -11,7 +11,6 @@ import time
 
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.interfaces.device_classes import tracing_capable_device
 from mobly import asserts
 from mobly import test_runner
 
@@ -29,11 +28,6 @@ class TracingAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         """
         super().setup_class()
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
-
-    def test_is_device_tracing_capable(self) -> None:
-        """Test case to make sure DUT is a tracing capable device"""
-        asserts.assert_is_instance(
-            self.device, tracing_capable_device.TracingCapableDevice)
 
     # Mobly enumerates test cases alphabetically, change in order of test cases
     # or their names or mobly enumeration logic can break tests. To avoid this,

@@ -12,6 +12,10 @@ from unittest import mock
 
 from honeydew import custom_types
 from honeydew.device_classes.fuchsia_controller import fuchsia_device
+from honeydew.interfaces.device_classes import affordances_capable
+from honeydew.interfaces.device_classes import \
+    fuchsia_device as fuchsia_device_interface
+from honeydew.interfaces.device_classes import transports_capable
 
 _INPUT_ARGS: Dict[str, Any] = {
     "device_name": "fuchsia-emulator",
@@ -45,6 +49,36 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         self.assertIsInstance(self.fd_obj, fuchsia_device.FuchsiaDevice)
         mock_ssh_check_connection.assert_called()
         mock_ffx_check_connection.assert_called()
+
+    def test_device_is_a_fuchsia_device(self) -> None:
+        """Test case to make sure DUT is a fuchsia device"""
+        self.assertIsInstance(
+            self.fd_obj, fuchsia_device_interface.FuchsiaDevice)
+
+    # List all the tests related to affordances in alphabetical order
+    def test_fuchsia_device_is_bluetooth_capable(self) -> None:
+        """Test case to make sure fuchsia device is bluetooth capable"""
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.BluetoothCapableDevice)
+
+    def test_fuchsia_device_is_component_capable(self) -> None:
+        """Test case to make sure fuchsia device is component capable"""
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.ComponentCapableDevice)
+
+    def test_fuchsia_device_is_tracing_capable(self) -> None:
+        """Test case to make sure fuchsia device is tracing capable"""
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.TracingCapableDevice)
+
+    # List all the tests related to transports in alphabetical order
+    def test_fuchsia_device_is_ssh_capable(self) -> None:
+        """Test case to make sure fuchsia device is SSH capable"""
+        self.assertIsInstance(self.fd_obj, transports_capable.SSHCapableDevice)
+
+    def test_fuchsia_device_is_ffx_capable(self) -> None:
+        """Test case to make sure fuchsia device is FFX capable"""
+        self.assertIsInstance(self.fd_obj, transports_capable.FFXCapableDevice)
 
     # List all the tests related to static properties in alphabetical order
     @mock.patch.object(

@@ -15,8 +15,6 @@ from honeydew import transports
 from honeydew.device_classes.fuchsia_controller import \
     fuchsia_device as fc_fuchsia_device
 from honeydew.device_classes.sl4f import fuchsia_device as sl4f_fuchsia_device
-from honeydew.interfaces.device_classes import bluetooth_capable_device
-from honeydew.interfaces.device_classes import component_capable_device
 from honeydew.interfaces.device_classes import fuchsia_device
 from mobly import asserts
 from mobly import test_runner
@@ -48,20 +46,6 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
         else:
             asserts.assert_is_instance(
                 self.device, sl4f_fuchsia_device.FuchsiaDevice)
-
-    def test_device_is_a_fuchsia_device(self) -> None:
-        """Test case to make sure DUT is a fuchsia device"""
-        asserts.assert_is_instance(self.device, fuchsia_device.FuchsiaDevice)
-
-    def test_fuchsia_device_is_bluetooth_capable(self) -> None:
-        """Test case to make sure fuchsia device is a bluetooth capable device"""
-        asserts.assert_is_instance(
-            self.device, bluetooth_capable_device.BluetoothCapableDevice)
-
-    def test_fuchsia_device_is_component_capable(self) -> None:
-        """Test case to make sure fuchsia device is a component capable device"""
-        asserts.assert_is_instance(
-            self.device, component_capable_device.ComponentCapableDevice)
 
     def test_device_type(self) -> None:
         """Test case for device_type"""

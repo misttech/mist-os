@@ -16,19 +16,20 @@ from honeydew.interfaces.affordances import component
 from honeydew.interfaces.affordances import tracing
 from honeydew.interfaces.auxiliary_devices import \
     power_switch as power_switch_interface
-from honeydew.interfaces.device_classes import bluetooth_capable_device
-from honeydew.interfaces.device_classes import component_capable_device
+from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.interfaces.device_classes import tracing_capable_device
+from honeydew.interfaces.device_classes import transports_capable
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import ssh as ssh_transport
 from honeydew.utils import properties
 
 
 class FuchsiaDevice(fuchsia_device.FuchsiaDevice,
-                    component_capable_device.ComponentCapableDevice,
-                    bluetooth_capable_device.BluetoothCapableDevice,
-                    tracing_capable_device.TracingCapableDevice):
+                    affordances_capable.BluetoothCapableDevice,
+                    affordances_capable.ComponentCapableDevice,
+                    affordances_capable.TracingCapableDevice,
+                    transports_capable.FFXCapableDevice,
+                    transports_capable.SSHCapableDevice):
     """FuchsiaDevice abstract base class implementation using
     Fuchsia-Controller.
 

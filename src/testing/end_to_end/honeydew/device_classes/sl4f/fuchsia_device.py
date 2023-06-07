@@ -22,10 +22,9 @@ from honeydew.interfaces.affordances import component as component_interface
 from honeydew.interfaces.affordances import tracing as tracing_interface
 from honeydew.interfaces.auxiliary_devices import \
     power_switch as power_switch_interface
-from honeydew.interfaces.device_classes import bluetooth_capable_device
-from honeydew.interfaces.device_classes import component_capable_device
+from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.interfaces.device_classes import tracing_capable_device
+from honeydew.interfaces.device_classes import transports_capable
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import sl4f as sl4f_transport
 from honeydew.transports import ssh as ssh_transport
@@ -53,9 +52,12 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 class FuchsiaDevice(fuchsia_device.FuchsiaDevice,
-                    component_capable_device.ComponentCapableDevice,
-                    bluetooth_capable_device.BluetoothCapableDevice,
-                    tracing_capable_device.TracingCapableDevice):
+                    affordances_capable.BluetoothCapableDevice,
+                    affordances_capable.ComponentCapableDevice,
+                    affordances_capable.TracingCapableDevice,
+                    transports_capable.FFXCapableDevice,
+                    transports_capable.SL4FCapableDevice,
+                    transports_capable.SSHCapableDevice):
     """FuchsiaDevice abstract base class implementation using SL4F.
 
     Args:
