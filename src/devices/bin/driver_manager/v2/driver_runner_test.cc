@@ -1167,7 +1167,7 @@ TEST_F(DriverRunnerTest, BindThroughRequest) {
   auto root_driver = StartRootDriver("fuchsia-boot:///#meta/root-driver.cm", driver_runner);
   ASSERT_EQ(ZX_OK, root_driver.status_value());
 
-  ASSERT_EQ(1u, driver_runner.NumOrphanedNodes());
+  ASSERT_EQ(1u, driver_runner.bind_manager().NumOrphanedNodes());
 
   driver_index.set_match_callback([](auto args) -> zx::result<FakeDriverIndex::MatchResult> {
     return zx::ok(FakeDriverIndex::MatchResult{
@@ -1179,7 +1179,7 @@ TEST_F(DriverRunnerTest, BindThroughRequest) {
   node_controller->RequestBind(std::move(bind_request), [](auto result) {});
 
   RunLoopUntilIdle();
-  ASSERT_EQ(0u, driver_runner.NumOrphanedNodes());
+  ASSERT_EQ(0u, driver_runner.bind_manager().NumOrphanedNodes());
 
   fidl::InterfaceRequest<fdh::Driver> second_driver_request;
   fidl::InterfaceHandle<fdf::Node> second_node;
@@ -1243,7 +1243,7 @@ TEST_F(DriverRunnerTest, BindAndRestartThroughRequest) {
   auto root_driver = StartRootDriver("fuchsia-boot:///#meta/root-driver.cm", driver_runner);
   ASSERT_EQ(ZX_OK, root_driver.status_value());
 
-  ASSERT_EQ(1u, driver_runner.NumOrphanedNodes());
+  ASSERT_EQ(1u, driver_runner.bind_manager().NumOrphanedNodes());
 
   driver_index.set_match_callback([](auto args) -> zx::result<FakeDriverIndex::MatchResult> {
     if (args.has_driver_url_suffix()) {
@@ -1268,7 +1268,7 @@ TEST_F(DriverRunnerTest, BindAndRestartThroughRequest) {
   auto bind_request = fdf::NodeControllerRequestBindRequest();
   node_controller->RequestBind(std::move(bind_request), [](auto result) {});
   RunLoopUntilIdle();
-  ASSERT_EQ(0u, driver_runner.NumOrphanedNodes());
+  ASSERT_EQ(0u, driver_runner.bind_manager().NumOrphanedNodes());
 
   // Get the second-driver running.
   driver_host().SetStartHandler([&](fdf::DriverStartArgs start_args, auto request) {
@@ -1390,7 +1390,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UnknownNode) {
   ASSERT_EQ(ZX_OK, root_driver.status_value());
 
   StartDriver(driver_runner, {.close = true});
-  ASSERT_EQ(1u, driver_runner.NumOrphanedNodes());
+  ASSERT_EQ(1u, driver_runner.bind_manager().NumOrphanedNodes());
 
   StopDriverComponent(std::move(root_driver.value()));
   realm().AssertDestroyedChildren({CreateChildRef("dev", "boot-drivers")});
@@ -1442,7 +1442,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_BindOrphanToBaseDriver) {
   ASSERT_EQ(ZX_OK, root_driver.status_value());
 
   // Make sure the node we added was orphaned.
-  ASSERT_EQ(1u, driver_runner.NumOrphanedNodes());
+  ASSERT_EQ(1u, driver_runner.bind_manager().NumOrphanedNodes());
 
   // Set the handlers for the new driver.
   realm().SetCreateChildHandler(
@@ -1463,7 +1463,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_BindOrphanToBaseDriver) {
   ASSERT_TRUE(RunLoopUntilIdle());
 
   // See that we don't have an orphan anymore.
-  ASSERT_EQ(0u, driver_runner.NumOrphanedNodes());
+  ASSERT_EQ(0u, driver_runner.bind_manager().NumOrphanedNodes());
 
   StopDriverComponent(std::move(root_driver.value()));
   realm().AssertDestroyedChildren({CreateChildRef("dev", "boot-drivers")});

@@ -7,6 +7,8 @@ import("//build/test.gni")
 
 source_set("driver_runner") {
   sources = [
+    "bind_manager.cc",
+    "bind_manager.h",
     "composite_assembler.cc",
     "composite_assembler.h",
     "composite_node_spec_v2.cc",
@@ -165,9 +167,9 @@ fuchsia_test_package("driver-runner-tests") {
 
   test_components = [
     ":composite-node-spec-v2-test",
-    ":node-test",
     ":driver-runner-test",
     ":composite-assembler-test",
     ":node-removal-tracker-test",
+    ":node-test",
   ]
 }
