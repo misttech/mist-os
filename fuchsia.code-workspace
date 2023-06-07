@@ -248,23 +248,6 @@
         ],
       },
       {
-        // This task requires the ms-vscode.cpptools extension.
-        "label": "Fuchsia: fx build (C++ problem matcher)",
-        "type": "shell",
-        "command": "fx build",
-        "problemMatcher": [
-          {
-            "base": "$gcc",
-            // Error file paths are relative to a build directory. The names
-            // are arbitrary.
-            "fileLocation": [
-              "relative",
-              "${workspaceFolder}/a/b"
-            ],
-          }
-        ],
-      },
-      {
         "label": "Fuchsia: fx serve",
         "type": "shell",
          "command": "fx serve",
