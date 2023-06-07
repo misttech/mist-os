@@ -4,6 +4,7 @@
 
 #include "src/media/audio/drivers/test/audio_device_enumerator_stub.h"
 
+#include <fuchsia/media/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <gtest/gtest.h>
@@ -15,19 +16,19 @@ void AudioDeviceEnumeratorStub::OnStart() {
   ASSERT_EQ(outgoing()->AddPublicService(audio_device_enumerator_bindings_.GetHandler(this)),
             ZX_OK);
 }
-void AudioDeviceEnumeratorStub::GetDevices(GetDevicesCallback get_devices_cbk) {}
-void AudioDeviceEnumeratorStub::GetDeviceGain(uint64_t dev_id, GetDeviceGainCallback dev_gain_cbk) {
-}
+void AudioDeviceEnumeratorStub::GetDevices(GetDevicesCallback get_devices_callback) {}
+void AudioDeviceEnumeratorStub::GetDeviceGain(uint64_t dev_id,
+                                              GetDeviceGainCallback get_device_gain_callback) {}
 void AudioDeviceEnumeratorStub::SetDeviceGain(uint64_t dev_id,
                                               fuchsia::media::AudioGainInfo gain_info,
                                               fuchsia::media::AudioGainValidFlags flags) {}
 void AudioDeviceEnumeratorStub::GetDefaultInputDevice(
-    GetDefaultInputDeviceCallback get_def_in_cbk) {}
+    GetDefaultInputDeviceCallback get_default_input_callback) {}
 void AudioDeviceEnumeratorStub::GetDefaultOutputDevice(
-    GetDefaultOutputDeviceCallback get_def_out_cbk) {}
+    GetDefaultOutputDeviceCallback get_default_output_callback) {}
 
 void AudioDeviceEnumeratorStub::AddDeviceByChannel(
-    std::string dev_name, bool is_input,
+    std::string device_name, bool is_input,
     fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> channel) {
   channel_ = std::move(channel);
 }

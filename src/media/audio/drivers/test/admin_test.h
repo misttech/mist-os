@@ -17,6 +17,13 @@
 
 namespace media::audio::drivers::test {
 
+// BasicTest cases must run in environments where an audio driver may already have an active client.
+// AdminTest cases, by contrast, need not worry about interfering with any other client. AdminTest
+// cases, by definition, can reconfigure devices without worrying about restoring previous state.
+//
+// A driver can have only one RingBuffer client connection at any time, so BasicTest avoids any
+// usage of the RingBuffer interface. AdminTest includes (but is not limited to) RingBuffer tests.
+// AdminTest cases may also change signalprocessing topology/elements or other device state.
 class AdminTest : public TestBase {
  public:
   explicit AdminTest(const DeviceEntry& dev_entry) : TestBase(dev_entry) {}

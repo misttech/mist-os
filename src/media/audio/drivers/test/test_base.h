@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fuchsia/hardware/audio/cpp/fidl.h>
-#include <fuchsia/media/cpp/fidl.h>
 #include <lib/async-loop/default.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/macros.h>
@@ -116,6 +115,7 @@ std::string inline TestNameForEntry(const std::string& test_class_name,
   return DevNameForEntry(device_entry) + ":" + test_class_name;
 }
 
+// TestBase methods are used by both BasicTest and AdminTest cases.
 class TestBase : public media::audio::test::TestFixture {
  public:
   explicit TestBase(const DeviceEntry& device_entry) : device_entry_(device_entry) {}
@@ -140,16 +140,17 @@ class TestBase : public media::audio::test::TestFixture {
   DriverType driver_type() const { return device_entry_.driver_type; }
   DeviceType device_type() const { return device_entry_.device_type; }
 
-  // "Basic" (nonringbuffer) tests and "Admin" (ringbuffer) tests both need to know
-  // the supported formats, so this is implemented in the shared base class.
+  // BasicTest (non-destructive) and AdminTest (destructive or RingBuffer) cases both need to
+  // know the supported formats, so this is implemented in this shared parent class.
   void RequestFormats();
 
-  // "Basic" (nonringbuffer) tests and "Admin" (ringbuffer) tests both need to know
-  // the supported topologies, so this is implemented in the shared base class.
+  // BasicTest (non-destructive) and AdminTest (destructive or RingBuffer) cases both need to
+  // connect to fuchsia.hardware.audio.signalprocessing and query the supported topologies, so this
+  // is implemented in this shared parent class.
   void SignalProcessingConnect();
   void RequestTopologies();
 
-  // TODO(fxbug.dev/83972): Consider a more functional style when validating formats
+  // TODO(fxbug.dev/83972): Consider a more functional style when validating formats.
   const std::vector<fuchsia::hardware::audio::PcmSupportedFormats>& ring_buffer_pcm_formats()
       const {
     return ring_buffer_pcm_formats_;

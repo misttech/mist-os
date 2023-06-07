@@ -12,6 +12,7 @@ namespace media::audio::drivers::test {
 // Position cases are default-disabled; if they DO run and fail, display verbose notification info.
 inline constexpr bool kLogDetailedPositionInfo = true;
 
+// This child of the AdminTest class is intended to run only in real-time capable environments.
 class PositionTest : public AdminTest {
  public:
   explicit PositionTest(const DeviceEntry& dev_entry) : AdminTest(dev_entry) {}
