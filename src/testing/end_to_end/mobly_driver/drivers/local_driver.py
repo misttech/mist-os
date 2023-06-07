@@ -33,7 +33,7 @@ class LocalDriver(base_mobly_driver.BaseDriver):
         super().__init__(params_path=params_path)
         self._config_path = config_path
 
-    def generate_test_config(self) -> str:
+    def generate_test_config(self, transport: Optional[str] = None) -> str:
         """Returns a Mobly test config in YAML format.
 
         The Mobly test config is a required input file of any Mobly tests.
@@ -54,6 +54,9 @@ class LocalDriver(base_mobly_driver.BaseDriver):
         added to the Mobly test config; otherwise, the test config is returned
         as-is but in YAML form.
 
+        Args:
+          transport: host->device transport type to use.
+
         Returns:
           A YAML string that represents a Mobly test config.
 
@@ -65,6 +68,8 @@ class LocalDriver(base_mobly_driver.BaseDriver):
         """
         try:
             config = common.read_yaml_from_file(self._config_path)
+            if transport:
+                api_mobly.set_transport_in_config(config, transport)
 
             if not self._params_path:
                 return yaml.dump(config)

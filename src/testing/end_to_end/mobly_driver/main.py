@@ -25,11 +25,15 @@ parser.add_argument(
 parser.add_argument(
     '-test_timeout_sec',
     default=0,
-    help='Integer to specify number of seconds before a Mobly test times out.')
+    help='integer to specify number of seconds before a Mobly test times out.')
 parser.add_argument(
     '-test_data_path',
     default=None,
     help='path to directory containing test-time data dependencies.')
+parser.add_argument(
+    '-transport',
+    default=None,
+    help='value to use in mobly config for host->device transport type.')
 parser.add_argument(
     '-v',
     action='store_const',
@@ -60,4 +64,5 @@ def main():
         test_path=args.mobly_test_path,
         timeout_sec=args.test_timeout_sec,
         test_data_path=args.test_data_path,
+        transport=args.transport,
         verbose=args.v)

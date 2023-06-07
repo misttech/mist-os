@@ -5,7 +5,7 @@
 """Unit tests for Mobly driver's local_driver.py."""
 
 import unittest
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 import common
 import local_driver
@@ -40,6 +40,19 @@ class LocalDriverTest(unittest.TestCase):
         mock_get_config.assert_not_called()
         mock_read_yaml.assert_called_once()
         self.assertEqual(ret, 'yaml_str')
+
+    @patch('yaml.dump', return_value='yaml_str')
+    @patch('common.read_yaml_from_file')
+    @patch('api_mobly.get_config_with_test_params')
+    @patch('api_mobly.set_transport_in_config')
+    def test_generate_test_config_with_transport_success(
+            self, mock_set_transport, *unused_args):
+        """Test case for successful config without params generation"""
+        transport_name = 'transport'
+        driver = local_driver.LocalDriver(config_path='config/path')
+        ret = driver.generate_test_config(transport=transport_name)
+
+        mock_set_transport.assert_called_with(ANY, transport_name)
 
     @patch(
         'common.read_yaml_from_file', side_effect=common.InvalidFormatException)

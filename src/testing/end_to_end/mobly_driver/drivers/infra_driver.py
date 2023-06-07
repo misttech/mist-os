@@ -49,7 +49,7 @@ class InfraDriver(base_mobly_driver.BaseDriver):
         self._tb_json_path = tb_json_path
         self._log_path = log_path
 
-    def generate_test_config(self) -> str:
+    def generate_test_config(self, transport: Optional[str] = None) -> str:
         """Returns a Mobly test config in YAML format.
 
         The Mobly test config is a required input file of any Mobly tests.
@@ -69,6 +69,9 @@ class InfraDriver(base_mobly_driver.BaseDriver):
         If |params_path| is specified in InfraDriver(), then its content is
         added to the Mobly test config; otherwise, the Mobly test config will
         not include any test params.
+
+        Args:
+          transport: host->device transport type to use.
 
         Returns:
           A YAML string that represents a Mobly test config.
@@ -92,6 +95,8 @@ class InfraDriver(base_mobly_driver.BaseDriver):
             config = api_mobly.new_testbed_config(
                 self._TESTBED_NAME, self._log_path, tb_config, test_params,
                 botanist_honeydew_translation_map)
+            if transport:
+                api_mobly.set_transport_in_config(config, transport)
             return yaml.dump(config)
         except (IOError, OSError) as e:
             raise common.DriverException('Failed to open file: %')

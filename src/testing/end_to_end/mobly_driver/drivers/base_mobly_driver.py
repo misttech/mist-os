@@ -25,7 +25,7 @@ class BaseDriver(ABC):
         self._params_path = params_path
 
     @abstractmethod
-    def generate_test_config(self) -> str:
+    def generate_test_config(self, transport: Optional[str] = None) -> str:
         """Returns a Mobly test config in YAML format.
         The Mobly test config is a required input file of any Mobly tests.
         It includes information on the DUT(s) and specifies test parameters.
@@ -36,9 +36,14 @@ class BaseDriver(ABC):
           Controllers:
             FuchsiaDevice:
             - name: fuchsia-1234-5678-90ab
+            - transport: fuchsia-controller
           TestParams:
             param_1: "val_1"
             param_2: "val_2"
+
+        Args:
+          transport: host->device transport type to use.
+
         Returns:
           A YAML string that represents a Mobly test config.
         """

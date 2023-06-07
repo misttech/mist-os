@@ -8,6 +8,7 @@ import unittest
 import json
 
 from tempfile import NamedTemporaryFile
+from mobly import keys
 from mobly import config_parser
 from parameterized import parameterized
 
@@ -58,7 +59,7 @@ class ApiMoblyTest(unittest.TestCase):
                     'nodename': 'fuchsia_abcd'
                 }], {
                     'param': 'value'
-                },{}),
+                }, {}),
             (
                 'success_multiple_controllers_same_type', [
                     {
@@ -91,8 +92,8 @@ class ApiMoblyTest(unittest.TestCase):
                     "ssh_key": "ssh_private_key",
                 }),
         ])
-    def test_new_testbed_config(self, unused_name, controllers, params_dict,
-                                botanist_honeydew_map):
+    def test_new_testbed_config(
+            self, unused_name, controllers, params_dict, botanist_honeydew_map):
         """Test case for new testbed config generation"""
         config_obj = api_mobly.new_testbed_config(
             'tb_name', 'log_path', controllers, params_dict,
@@ -103,6 +104,193 @@ class ApiMoblyTest(unittest.TestCase):
             config_fh.flush()
             # Assert that no exceptions are raised.
             config_parser.load_test_config_file(config_fh.name)
+
+    @parameterized.expand(
+        [
+            ('success_empty_config', {}, {}),
+            (
+                'success_empty_controllers', {
+                    keys.Config.key_testbed.value:
+                        [
+                            {
+                                keys.Config.key_testbed_name.value: "testbed",
+                                keys.Config.key_testbed_controllers.value: {}
+                            },
+                        ],
+                }, {
+                    keys.Config.key_testbed.value:
+                        [
+                            {
+                                keys.Config.key_testbed_name.value: "testbed",
+                                keys.Config.key_testbed_controllers.value: {}
+                            },
+                        ]
+                }),
+            (
+                'success_valid_controllers', {
+                    keys.Config.key_testbed.value:
+                        [
+                            {
+                                keys.Config.key_testbed_name.value: "testbed",
+                                keys.Config.key_testbed_controllers.value:
+                                    {
+                                        "FuchsiaDevice":
+                                            [{
+                                                "nodename": "fuchsia_abcd"
+                                            }]
+                                    }
+                            }
+                        ]
+                }, {
+                    keys.Config.key_testbed.value:
+                        [
+                            {
+                                keys.Config.key_testbed_name.value: "testbed",
+                                keys.Config.key_testbed_controllers.value:
+                                    {
+                                        "FuchsiaDevice":
+                                            [
+                                                {
+                                                    "nodename":
+                                                        "fuchsia_abcd",
+                                                    "transport":
+                                                        "fuchsia-controller"
+                                                }
+                                            ]
+                                    }
+                            }
+                        ]
+                }),
+            (
+                'success_existing_transport', {
+                    keys.Config.key_testbed.value:
+                        [
+                            {
+                                keys.Config.key_testbed_name.value: "testbed",
+                                keys.Config.key_testbed_controllers.value:
+                                    {
+                                        "FuchsiaDevice":
+                                            [
+                                                {
+                                                    "nodename": "fuchsia_abcd",
+                                                    "transport": "foobar"
+                                                }
+                                            ]
+                                    }
+                            }
+                        ]
+                }, {
+                    keys.Config.key_testbed.value:
+                        [
+                            {
+                                keys.Config.key_testbed_name.value: "testbed",
+                                keys.Config.key_testbed_controllers.value:
+                                    {
+                                        "FuchsiaDevice":
+                                            [
+                                                {
+                                                    "nodename":
+                                                        "fuchsia_abcd",
+                                                    "transport":
+                                                        "fuchsia-controller"
+                                                }
+                                            ]
+                                    }
+                            }
+                        ]
+                }),
+            (
+                'success_multiple_controllers_same_type', {
+                    keys.Config.key_testbed.value:
+                        [
+                            {
+                                keys.Config.key_testbed_name.value: "testbed",
+                                keys.Config.key_testbed_controllers.value:
+                                    {
+                                        "FuchsiaDevice":
+                                            [
+                                                {
+                                                    "nodename": "fuchsia_abcd",
+                                                }, {
+                                                    "nodename": "fuchsia_bcde"
+                                                }
+                                            ]
+                                    }
+                            }
+                        ]
+                }, {
+                    keys.Config.key_testbed.value:
+                        [
+                            {
+                                keys.Config.key_testbed_name.value: "testbed",
+                                keys.Config.key_testbed_controllers.value:
+                                    {
+                                        "FuchsiaDevice":
+                                            [
+                                                {
+                                                    "nodename":
+                                                        "fuchsia_abcd",
+                                                    "transport":
+                                                        "fuchsia-controller"
+                                                }, {
+                                                    "nodename":
+                                                        "fuchsia_bcde",
+                                                    "transport":
+                                                        "fuchsia-controller"
+                                                }
+                                            ]
+                                    }
+                            }
+                        ]
+                }),
+            (
+                'success_multiple_controllers_different_types', {
+                    keys.Config.key_testbed.value:
+                        [
+                            {
+                                keys.Config.key_testbed_name.value: "testbed",
+                                keys.Config.key_testbed_controllers.value:
+                                    {
+                                        "FuchsiaDevice":
+                                            [{
+                                                "nodename": "fuchsia_abcd"
+                                            }],
+                                        "AccessPoint": [{
+                                            "ip_addr": "1.1.1.1"
+                                        }]
+                                    }
+                            }
+                        ]
+                }, {
+                    keys.Config.key_testbed.value:
+                        [
+                            {
+                                keys.Config.key_testbed_name.value: "testbed",
+                                keys.Config.key_testbed_controllers.value:
+                                    {
+                                        "FuchsiaDevice":
+                                            [
+                                                {
+                                                    "nodename":
+                                                        "fuchsia_abcd",
+                                                    "transport":
+                                                        "fuchsia-controller"
+                                                }
+                                            ],
+                                        "AccessPoint": [{
+                                            "ip_addr": "1.1.1.1"
+                                        }]
+                                    }
+                            }
+                        ]
+                })
+        ])
+    def test_set_transport_in_config(
+            self, unused_name, config_obj, transformed_config_obj):
+        """Test case for mutating transports in config"""
+        new_config_obj = config_obj.copy()
+        api_mobly.set_transport_in_config(new_config_obj, "fuchsia-controller")
+        self.assertDictEqual(new_config_obj, transformed_config_obj)
 
     @parameterized.expand(
         [

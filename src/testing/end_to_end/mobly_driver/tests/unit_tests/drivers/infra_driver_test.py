@@ -5,7 +5,7 @@
 """Unit tests for Mobly driver's infra_driver.py."""
 
 import unittest
-from unittest.mock import call, mock_open, patch
+from unittest.mock import ANY, call, mock_open, patch
 
 import common
 import infra_driver
@@ -47,6 +47,21 @@ class InfraMoblyDriverTest(unittest.TestCase):
         mock_read_yaml.assert_not_called()
         mock_read_json.assert_called_once()
         self.assertEqual(ret, 'yaml_str')
+
+    @patch('yaml.dump', return_value='yaml_str')
+    @patch('common.read_json_from_file')
+    @patch('common.read_yaml_from_file')
+    @patch('api_mobly.new_testbed_config')
+    @patch('api_mobly.set_transport_in_config')
+    def test_generate_test_config_with_transport_success(
+            self, mock_set_transport, *unused_args):
+        """Test case for successful config without params generation"""
+        transport_name = 'transport'
+        driver = infra_driver.InfraDriver(
+            tb_json_path='tb/json/path', log_path='')
+        ret = driver.generate_test_config(transport=transport_name)
+
+        mock_set_transport.assert_called_with(ANY, transport_name)
 
     @patch(
         'common.read_json_from_file', side_effect=common.InvalidFormatException)

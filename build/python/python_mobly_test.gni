@@ -89,6 +89,13 @@ import("//build/testing/host_test_data.gni")
 #    If not provided, Mobly test will execute without test params.
 #    Type: string
 #
+#  transport (optional)
+#    Force a specific host->device transport.
+#    Any transport supported by honeydew can be used here, but Recommended
+#    values are "sl4f", "fc", or "fuchsia-controller".
+#    If not set, the one specified in local Mobly config Yaml is used.
+#    Type: String
+#
 #  test_data_deps (optional)
 #    List of test data GN targets that are needed at runtime.
 #    Type: list(string)
@@ -184,6 +191,12 @@ template("python_mobly_test") {
     "-test_data_path",
     rebase_path(_test_dir, root_build_dir),
   ]
+  if (defined(invoker.transport)) {
+    _host_test_args += [
+      "-transport",
+      invoker.transport,
+    ]
+  }
   _additional_deps = []
 
   # If specified, define test params data target and data path add to host args.

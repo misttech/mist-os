@@ -27,6 +27,7 @@ def _execute_test(
         test_path: str,
         timeout_sec: int = 0,
         test_data_path: Optional[str] = None,
+        transport: Optional[str] = None,
         verbose: bool = False) -> None:
     """Executes a Mobly test with the specified Mobly Driver.
 
@@ -40,6 +41,7 @@ def _execute_test(
         If set to 0, timeout is not enforced.
       test_data_path: path to directory containing test-time data
         dependencies.
+      transport: host->target transport type to use.
       verbose: Whether to enable verbose output from the mobly test.
 
     Raises:
@@ -57,7 +59,7 @@ def _execute_test(
         test_env['PATH'] = os.pathsep.join([test_data_path, test_env['PATH']])
 
     with NamedTemporaryFile(mode='w') as tmp_config:
-        config = driver.generate_test_config()
+        config = driver.generate_test_config(transport)
         print(f'Mobly config content:\n{config}')
         tmp_config.write(config)
         tmp_config.flush()
@@ -98,6 +100,7 @@ def run(
         test_path: str,
         timeout_sec: int = 0,
         test_data_path: Optional[str] = None,
+        transport: Optional[str] = None,
         verbose: bool = False) -> None:
     """Runs the Mobly Driver which handles the lifecycle of a Mobly test.
 
@@ -113,6 +116,7 @@ def run(
           If set to 0, timeout is not enforced.
       test_data_path: path to directory containing test-time data
           dependencies.
+      transport: host->target transport type to use.
       verbose: Whether to enable verbose output from the mobly test.
 
     Raises:
@@ -136,6 +140,7 @@ def run(
             driver=driver,
             timeout_sec=timeout_sec,
             test_data_path=test_data_path,
+            transport=transport,
             verbose=verbose)
     finally:
         driver.teardown()

@@ -10,7 +10,13 @@ from mobly import keys
 from mobly import records
 from typing import List, Dict, Any
 
-LATEST_RES_SYMLINK_NAME = 'latest'
+LATEST_RES_SYMLINK_NAME: str = 'latest'
+
+# Fuchsia-specific keys and values used in Mobly configs.
+# Defined and used in
+# https://osscs.corp.google.com/fuchsia/fuchsia/+/main:src/testing/end_to_end/mobly_controller/fuchsia_device.py
+MOBLY_CONTROLLER_FUCHSIA_DEVICE: str = 'FuchsiaDevice'
+TRANSPORT_KEY: str = 'transport'
 
 MoblyConfigComponent = Dict[str, Any]
 
@@ -181,3 +187,17 @@ def get_config_with_test_params(
         return ret
     except (AttributeError, KeyError, TypeError) as e:
         raise ApiException('Unexpected Mobly config content: %s' % e)
+
+
+def set_transport_in_config(mobly_config: MoblyConfigComponent, transport: str):
+    """Updates a mobly config to ensure the fuchsia devices in the config use
+    the specified transport.
+
+    Args:
+      mobly_config: Mobly config object to update.
+      transport: Transport to set on fuchsia devices in the Mobly config.
+    """
+    for testbed in mobly_config.get(keys.Config.key_testbed.value, []):
+        controllers = testbed.get(keys.Config.key_testbed_controllers.value, {})
+        for device in controllers.get(MOBLY_CONTROLLER_FUCHSIA_DEVICE, []):
+            device[TRANSPORT_KEY] = transport
