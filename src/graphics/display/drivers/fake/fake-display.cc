@@ -24,6 +24,7 @@
 #include <iterator>
 #include <limits>
 #include <memory>
+#include <type_traits>
 
 #include <ddktl/device.h>
 #include <fbl/algorithm.h>
@@ -36,6 +37,13 @@
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace fake_display {
+
+// Current FakeDisplay implementation uses pointers to ImageInfo as handles to
+// images, while handles to images are defined as a fixed-size uint64_t in the
+// banjo protocol. This works on platforms where uint64_t and uintptr_t are
+// equivalent but this may cause portability issues in the future.
+// TODO(fxbug.dev/128653): Do not use pointers as handles.
+static_assert(std::is_same_v<uint64_t, uintptr_t>);
 
 namespace {
 // List of supported pixel formats
@@ -302,14 +310,12 @@ void FakeDisplay::DisplayControllerImplApplyConfiguration(const display_config_t
 
   fbl::AutoLock lock(&display_lock_);
 
-  uint64_t addr;
   if (display_count == 1 && display_configs[0]->layer_count) {
     // Only support one display.
-    addr = reinterpret_cast<uint64_t>(display_configs[0]->layer_list[0]->cfg.primary.image.handle);
-    current_image_valid_ = true;
-    current_image_ = addr;
+    current_image_to_capture_ =
+        reinterpret_cast<ImageInfo*>(display_configs[0]->layer_list[0]->cfg.primary.image.handle);
   } else {
-    current_image_valid_ = false;
+    current_image_to_capture_ = nullptr;
   }
   current_config_stamp_ = *config_stamp;
 }
@@ -461,7 +467,7 @@ zx_status_t FakeDisplay::DisplayControllerImplSetDisplayCaptureInterface(
     const display_capture_interface_protocol_t* intf) {
   fbl::AutoLock lock(&capture_lock_);
   capture_interface_client_ = ddk::DisplayCaptureInterfaceProtocolClient(intf);
-  capture_active_id_ = INVALID_ID;
+  current_capture_target_image_ = nullptr;
   return ZX_OK;
 }
 
@@ -532,7 +538,7 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture(uint64_t col
 
 zx_status_t FakeDisplay::DisplayControllerImplStartCapture(uint64_t capture_handle) {
   fbl::AutoLock lock(&capture_lock_);
-  if (capture_active_id_ != INVALID_ID) {
+  if (current_capture_target_image_ != nullptr) {
     return ZX_ERR_SHOULD_WAIT;
   }
 
@@ -543,14 +549,15 @@ zx_status_t FakeDisplay::DisplayControllerImplStartCapture(uint64_t capture_hand
     // invalid handle
     return ZX_ERR_INVALID_ARGS;
   }
-  capture_active_id_ = capture_handle;
+  current_capture_target_image_ = info;
 
   return ZX_OK;
 }
 
 zx_status_t FakeDisplay::DisplayControllerImplReleaseCapture(uint64_t capture_handle) {
   fbl::AutoLock lock(&capture_lock_);
-  if (capture_handle == capture_active_id_) {
+  if (current_capture_target_image_ != nullptr &&
+      reinterpret_cast<uint64_t>(current_capture_target_image_) == capture_handle) {
     return ZX_ERR_SHOULD_WAIT;
   }
 
@@ -566,7 +573,7 @@ zx_status_t FakeDisplay::DisplayControllerImplReleaseCapture(uint64_t capture_ha
 
 bool FakeDisplay::DisplayControllerImplIsCaptureCompleted() {
   fbl::AutoLock lock(&capture_lock_);
-  return (capture_active_id_ == INVALID_ID);
+  return current_capture_target_image_ == nullptr;
 }
 
 void FakeDisplay::DdkRelease() {
@@ -598,7 +605,7 @@ zx_status_t FakeDisplay::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
 zx_status_t FakeDisplay::SetupDisplayInterface() {
   fbl::AutoLock lock(&display_lock_);
 
-  current_image_valid_ = false;
+  current_image_to_capture_ = nullptr;
 
   if (controller_interface_client_.is_valid()) {
     added_display_args_t args;
@@ -622,14 +629,14 @@ int FakeDisplay::CaptureThread() {
     }
     {
       fbl::AutoLock lock(&capture_lock_);
-      if (capture_interface_client_.is_valid() && (capture_active_id_ != INVALID_ID) &&
+      if (capture_interface_client_.is_valid() && (current_capture_target_image_ != nullptr) &&
           ++capture_complete_signal_count_ >= kNumOfVsyncsForCapture) {
         {
           fbl::AutoLock lock(&display_lock_);
-          if (current_image_) {
+          if (current_image_to_capture_ != nullptr) {
             // We have a valid image being displayed. Let's capture it.
-            auto src = reinterpret_cast<ImageInfo*>(current_image_);
-            auto dst = reinterpret_cast<ImageInfo*>(capture_active_id_);
+            ImageInfo* src = current_image_to_capture_;
+            ImageInfo* dst = current_capture_target_image_;
 
             if (src->pixel_format != dst->pixel_format) {
               zxlogf(ERROR, "Trying to capture format=%d as format=%d\n", src->pixel_format,
@@ -684,7 +691,7 @@ int FakeDisplay::CaptureThread() {
           }
         }
         capture_interface_client_.OnCaptureComplete();
-        capture_active_id_ = INVALID_ID;
+        current_capture_target_image_ = nullptr;
         capture_complete_signal_count_ = 0;
       }
     }

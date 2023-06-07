@@ -180,8 +180,9 @@ class FakeDisplay : public DeviceType,
   mutable fbl::Mutex image_lock_;    // Guards `imported_images`_`
   mutable fbl::Mutex capture_lock_;  // General capture state
 
-  // The ID for currently active capture
-  uint64_t capture_active_id_ TA_GUARDED(capture_lock_);
+  // Points to the next capture target image to capture displayed contents into.
+  // Stores nullptr if capture is not going to be performed.
+  ImageInfo* current_capture_target_image_ TA_GUARDED(capture_lock_);
 
   // The sysmem allocator client used to bind incoming buffer collection tokens.
   fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client_;
@@ -194,8 +195,9 @@ class FakeDisplay : public DeviceType,
   fbl::DoublyLinkedList<std::unique_ptr<ImageInfo>> imported_images_ TA_GUARDED(image_lock_);
   fbl::DoublyLinkedList<std::unique_ptr<ImageInfo>> imported_captures_ TA_GUARDED(capture_lock_);
 
-  uint64_t current_image_ TA_GUARDED(display_lock_);
-  bool current_image_valid_ TA_GUARDED(display_lock_);
+  // Points to the current image to be displayed and captured.
+  // Stores nullptr if there is no image displaying on the fake display.
+  ImageInfo* current_image_to_capture_ TA_GUARDED(display_lock_);
   config_stamp_t current_config_stamp_ TA_GUARDED(display_lock_) = {
       .value = INVALID_CONFIG_STAMP_VALUE};
 
