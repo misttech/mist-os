@@ -691,22 +691,6 @@ pub(crate) mod tests {
     pub const CURRENT_UPDATE_PACKAGE: &str =
         "2222222222222222222222222222222222222222222222222222222222222222";
 
-    pub(crate) struct FakeUpdateManagerControlHandle<N: StateNotifier, Att> {
-        requests: mpsc::Receiver<UpdateManagerRequest<N, Att>>,
-    }
-
-    impl<N: StateNotifier, Att> FakeUpdateManagerControlHandle<N, Att> {
-        pub(crate) fn new() -> (UpdateManagerControlHandle<N, Att>, Self) {
-            let (send, recv) = mpsc::channel(0);
-
-            (UpdateManagerControlHandle(send), Self { requests: recv })
-        }
-
-        pub(crate) fn next(&mut self) -> Option<UpdateManagerRequest<N, Att>> {
-            self.requests.next().now_or_never().flatten()
-        }
-    }
-
     type CheckResultFactory = fn() -> Result<SystemUpdateStatus, crate::errors::Error>;
 
     #[derive(Clone)]
@@ -746,12 +730,6 @@ pub(crate) mod tests {
                     fidl_fuchsia_pkg_ext::ResolveError::Internal,
                 )))
             })
-        }
-        pub fn block(&self) -> Option<futures::lock::MutexGuard<'_, ()>> {
-            self.check_blocked.try_lock()
-        }
-        pub fn call_count(&self) -> u64 {
-            self.call_count.load(Ordering::SeqCst)
         }
     }
     impl UpdateChecker for FakeUpdateChecker {
@@ -901,14 +879,6 @@ pub(crate) mod tests {
     #[derive(Clone, Debug)]
     pub struct StateChangeCollector {
         states: Arc<Mutex<Vec<State>>>,
-    }
-    impl StateChangeCollector {
-        pub fn new() -> Self {
-            Self { states: Arc::new(Mutex::new(vec![])) }
-        }
-        pub fn take_states(&self) -> Vec<State> {
-            std::mem::take(&mut self.states.lock())
-        }
     }
     impl Notify for StateChangeCollector {
         type Event = State;

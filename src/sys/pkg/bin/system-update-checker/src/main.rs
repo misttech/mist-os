@@ -12,7 +12,6 @@ mod channel_handler;
 mod check;
 mod connect;
 mod errors;
-mod poller;
 mod rate_limiter;
 mod update_manager;
 mod update_monitor;
@@ -21,47 +20,25 @@ mod update_service;
 use {
     crate::{
         channel_handler::ChannelHandler,
-        poller::run_periodic_update_check,
         update_service::{RealUpdateManager, UpdateService},
     },
     anyhow::{anyhow, Context as _, Error},
     fidl_fuchsia_update_channel::ProviderRequestStream,
     fidl_fuchsia_update_channelcontrol::ChannelControlRequestStream,
-    fidl_fuchsia_update_ext::{CheckOptions, Initiator},
-    fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_inspect as finspect,
-    fuchsia_url::AbsolutePackageUrl,
-    fuchsia_zircon as zx,
     futures::{prelude::*, stream::FuturesUnordered},
-    std::{sync::Arc, time::Duration},
+    std::sync::Arc,
     tracing::{error, warn},
 };
 
 const MAX_CONCURRENT_CONNECTIONS: usize = 100;
 const DEFAULT_UPDATE_PACKAGE_URL: &str = "fuchsia-pkg://fuchsia.com/update";
 
-/// Static service configuration options.
-#[derive(Debug, Default, PartialEq, Eq)]
-pub struct Config {
-    poll_frequency: Option<zx::Duration>,
-    update_package_url: Option<AbsolutePackageUrl>,
-}
-
-impl Config {
-    pub fn poll_frequency(&self) -> Option<zx::Duration> {
-        self.poll_frequency
-    }
-
-    pub fn update_package_url(&self) -> Option<&AbsolutePackageUrl> {
-        self.update_package_url.as_ref()
-    }
-}
-
 #[fuchsia::main(threads = 1, logging_tags = ["system-update-checker"])]
 async fn main() -> Result<(), Error> {
     main_inner().await.map_err(|err| {
-        // Use anyhow to print the error chain.
+        // anyhow with alternate formatting prints the Display impl of each error in the chain.
         let err = anyhow!(err);
         error!("error running system-update-checker: {:#}", err);
         err
@@ -69,11 +46,6 @@ async fn main() -> Result<(), Error> {
 }
 
 async fn main_inner() -> Result<(), Error> {
-    let config = Config::default();
-    if let Some(url) = config.update_package_url() {
-        warn!("Ignoring custom update package url: {}", url);
-    }
-
     let inspector = finspect::Inspector::default();
 
     let target_channel_manager =
@@ -90,7 +62,7 @@ async fn main_inner() -> Result<(), Error> {
     futures.push(current_channel_notifier.run().boxed());
     let current_channel_manager = Arc::new(current_channel_manager);
 
-    let (mut update_manager, update_manager_fut) = RealUpdateManager::new(
+    let (update_manager, update_manager_fut) = RealUpdateManager::new(
         Arc::clone(&target_channel_manager),
         inspector.root().create_child("update-manager"),
     )
@@ -127,23 +99,6 @@ async fn main_inner() -> Result<(), Error> {
         .boxed(),
     );
 
-    futures.push(run_periodic_update_check(update_manager.clone(), &config).boxed());
-
-    // In order to ensure cobalt gets a valid channel quickly, we sometimes perform an additional
-    // update check 60 seconds in.
-    futures.push(
-        async move {
-            if config.poll_frequency().is_some() {
-                fasync::Timer::new(Duration::from_secs(60)).await;
-                let options = CheckOptions::builder().initiator(Initiator::Service).build();
-                if let Err(e) = update_manager.try_start_update(options, None).await {
-                    warn!("Update check failed with error: {:?}", e);
-                }
-            }
-        }
-        .boxed(),
-    );
-
     futures.collect::<()>().await;
 
     Ok(())
@@ -166,32 +121,5 @@ async fn handle_incoming_service(incoming_service: IncomingServices) -> Result<(
         IncomingServices::ChannelControl(request_stream, handler) => {
             handler.handle_control_request_stream(request_stream).await
         }
-    }
-}
-
-#[cfg(test)]
-#[derive(Debug)]
-pub struct ConfigBuilder(Config);
-
-#[cfg(test)]
-impl ConfigBuilder {
-    pub fn new() -> Self {
-        Self(Config::default())
-    }
-
-    pub fn poll_frequency(mut self, duration: impl Into<zx::Duration>) -> Self {
-        self.0.poll_frequency = Some(duration.into());
-        self
-    }
-
-    pub fn build(self) -> Config {
-        self.0
-    }
-}
-
-#[cfg(test)]
-impl Default for ConfigBuilder {
-    fn default() -> Self {
-        Self::new()
     }
 }
