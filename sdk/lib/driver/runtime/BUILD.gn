@@ -116,3 +116,8 @@ source_set("driver_runtime_testing") {
   ]
   public_configs = [ ":include" ]
 }
+
+source_set("driver_runtime_internal") {
+  sources = [ "include/lib/fdf/internal.h" ]
+  public_configs = [ ":include" ]
+}

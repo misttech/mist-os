@@ -10,7 +10,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdf/cpp/env.h>
-#include <lib/fdf/testing.h>
+#include <lib/fdf/internal.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/inspect/cpp/reader.h>
@@ -210,7 +210,7 @@ class DriverHostTest : public testing::Test {
           });
     }
     EXPECT_EQ(ZX_OK, loop().RunUntilIdle());
-    fdf_testing_wait_until_all_dispatchers_idle();
+    fdf_internal_wait_until_all_dispatchers_idle();
     EXPECT_EQ(ZX_OK, loop().RunUntilIdle());
     EXPECT_EQ(expected_epitaph, epitaph);
 
@@ -247,7 +247,7 @@ TEST_F(DriverHostTest, Start_SingleDriver) {
   // guarantee that the Stop task will or will not complete (and quit the loop)
   // by the time |RunUntilIdle| returns.
   loop().RunUntilIdle();
-  fdf_testing_wait_until_all_dispatchers_destroyed();
+  fdf_internal_wait_until_all_dispatchers_destroyed();
   EXPECT_EQ(ZX_ERR_CANCELED, loop().RunUntilIdle());
   EXPECT_EQ(ASYNC_LOOP_QUIT, loop().GetState());
 }
@@ -259,13 +259,13 @@ TEST_F(DriverHostTest, Start_MultipleDrivers) {
 
   driver_1.reset();
   EXPECT_EQ(ZX_OK, loop().RunUntilIdle());
-  fdf_testing_wait_until_all_dispatchers_idle();
+  fdf_internal_wait_until_all_dispatchers_idle();
   EXPECT_EQ(ZX_OK, loop().RunUntilIdle());
   EXPECT_EQ(ASYNC_LOOP_RUNNABLE, loop().GetState());
 
   driver_2.reset();
   loop().RunUntilIdle();
-  fdf_testing_wait_until_all_dispatchers_destroyed();
+  fdf_internal_wait_until_all_dispatchers_destroyed();
   EXPECT_EQ(ZX_ERR_CANCELED, loop().RunUntilIdle());
   EXPECT_EQ(ASYNC_LOOP_QUIT, loop().GetState());
 }
@@ -301,7 +301,7 @@ TEST_F(DriverHostTest, Start_OutgoingServices) {
 
   driver.reset();
   loop().RunUntilIdle();
-  fdf_testing_wait_until_all_dispatchers_destroyed();
+  fdf_internal_wait_until_all_dispatchers_destroyed();
   EXPECT_EQ(ZX_ERR_CANCELED, loop().RunUntilIdle());
   EXPECT_EQ(ASYNC_LOOP_QUIT, loop().GetState());
 }
@@ -319,7 +319,7 @@ TEST_F(DriverHostTest, Start_IncomingServices) {
 
   driver.reset();
   loop().RunUntilIdle();
-  fdf_testing_wait_until_all_dispatchers_destroyed();
+  fdf_internal_wait_until_all_dispatchers_destroyed();
   EXPECT_EQ(ZX_ERR_CANCELED, loop().RunUntilIdle());
   EXPECT_EQ(ASYNC_LOOP_QUIT, loop().GetState());
 }
@@ -334,7 +334,7 @@ TEST_F(DriverHostTest, Start_ReturnError) {
 
   driver.reset();
   loop().RunUntilIdle();
-  fdf_testing_wait_until_all_dispatchers_idle();
+  fdf_internal_wait_until_all_dispatchers_idle();
   EXPECT_EQ(ZX_OK, loop().RunUntilIdle());
   // We never started our first driver, so the driver host would not attempt to
   // quit the loop after the last driver has stopped.
@@ -354,7 +354,7 @@ TEST_F(DriverHostTest, Start_NodeSymbols) {
 
   driver.reset();
   loop().RunUntilIdle();
-  fdf_testing_wait_until_all_dispatchers_destroyed();
+  fdf_internal_wait_until_all_dispatchers_destroyed();
   EXPECT_EQ(ZX_ERR_CANCELED, loop().RunUntilIdle());
   EXPECT_EQ(ASYNC_LOOP_QUIT, loop().GetState());
 }
@@ -378,7 +378,7 @@ TEST_F(DriverHostTest, Start_DifferentDispatcher) {
   driver_1.reset();
   driver_2.reset();
   loop().RunUntilIdle();
-  fdf_testing_wait_until_all_dispatchers_destroyed();
+  fdf_internal_wait_until_all_dispatchers_destroyed();
   EXPECT_EQ(ZX_ERR_CANCELED, loop().RunUntilIdle());
   EXPECT_EQ(ASYNC_LOOP_QUIT, loop().GetState());
 }
@@ -405,7 +405,7 @@ TEST_F(DriverHostTest, Start_InvalidStartArgs) {
       status = result.error_value().domain_error();
     });
     loop().RunUntilIdle();
-    fdf_testing_wait_until_all_dispatchers_idle();
+    fdf_internal_wait_until_all_dispatchers_idle();
     loop().RunUntilIdle();
 
     return status;
@@ -515,7 +515,7 @@ TEST_F(DriverHostTest, Start_InvalidBinary) {
         status = result.error_value().domain_error();
       });
   EXPECT_EQ(ZX_OK, loop().RunUntilIdle());
-  fdf_testing_wait_until_all_dispatchers_idle();
+  fdf_internal_wait_until_all_dispatchers_idle();
   EXPECT_EQ(ZX_OK, loop().RunUntilIdle());
 
   EXPECT_EQ(ZX_ERR_NOT_FOUND, status);
@@ -541,7 +541,7 @@ TEST_F(DriverHostTest, StartAndInspect) {
   driver_1.reset();
   driver_2.reset();
   loop().RunUntilIdle();
-  fdf_testing_wait_until_all_dispatchers_destroyed();
+  fdf_internal_wait_until_all_dispatchers_destroyed();
   EXPECT_EQ(ZX_ERR_CANCELED, loop().RunUntilIdle());
   EXPECT_EQ(ASYNC_LOOP_QUIT, loop().GetState());
 }

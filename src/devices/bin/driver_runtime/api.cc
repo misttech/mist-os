@@ -6,6 +6,7 @@
 #include <lib/fdf/channel.h>
 #include <lib/fdf/dispatcher.h>
 #include <lib/fdf/env.h>
+#include <lib/fdf/internal.h>
 #include <lib/fdf/testing.h>
 #include <lib/fdf/token.h>
 #include <lib/fit/defer.h>
@@ -246,11 +247,11 @@ __EXPORT void fdf_testing_push_driver(const void* driver) { driver_context::Push
 
 __EXPORT void fdf_testing_pop_driver() { driver_context::PopDriver(); }
 
-__EXPORT void fdf_testing_wait_until_all_dispatchers_idle() {
+__EXPORT void fdf_internal_wait_until_all_dispatchers_idle() {
   return driver_runtime::DispatcherCoordinator::WaitUntilDispatchersIdle();
 }
 
-__EXPORT void fdf_testing_wait_until_all_dispatchers_destroyed() {
+__EXPORT void fdf_internal_wait_until_all_dispatchers_destroyed() {
   return driver_runtime::DispatcherCoordinator::WaitUntilDispatchersDestroyed();
 }
 

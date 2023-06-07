@@ -8,7 +8,7 @@
 #include <lib/async/cpp/task.h>
 #include <lib/driver/testing/cpp/driver_runtime_env.h>
 #include <lib/fdf/cpp/dispatcher.h>
-#include <lib/fdf/testing.h>
+#include <lib/fdf/internal.h>
 #include <lib/sync/cpp/completion.h>
 
 #include <gtest/gtest.h>
@@ -38,7 +38,7 @@ namespace gtest {
 //   }
 class DriverTestLoopFixture : public ::testing::Test {
  public:
-  static void WaitUntilIdle() { fdf_testing_wait_until_all_dispatchers_idle(); }
+  static void WaitUntilIdle() { fdf_internal_wait_until_all_dispatchers_idle(); }
 
   void SetUp() override { ::testing::Test::SetUp(); }
 

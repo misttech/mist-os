@@ -9,6 +9,7 @@ source_set("gtest") {
 
   public_deps = [
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_internal",
     "//sdk/lib/driver/runtime:driver_runtime_testing",
     "//sdk/lib/driver/runtime/testing/cpp",
     "//sdk/lib/driver/testing/cpp",

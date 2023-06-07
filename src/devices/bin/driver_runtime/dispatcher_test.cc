@@ -14,6 +14,7 @@
 #include <lib/fdf/cpp/channel_read.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/cpp/env.h>
+#include <lib/fdf/internal.h>
 #include <lib/fdf/testing.h>
 #include <lib/fit/defer.h>
 #include <lib/sync/cpp/completion.h>
@@ -2673,7 +2674,7 @@ TEST_F(DispatcherTest, DestroyAllDispatchers) {
 
 TEST_F(DispatcherTest, WaitUntilDispatchersDestroyed) {
   // No dispatchers, should immediately return.
-  fdf_testing_wait_until_all_dispatchers_destroyed();
+  fdf_internal_wait_until_all_dispatchers_destroyed();
 
   constexpr uint32_t kNumDispatchers = 4;
   fdf_dispatcher_t* dispatchers[kNumDispatchers];
@@ -2693,7 +2694,7 @@ TEST_F(DispatcherTest, WaitUntilDispatchersDestroyed) {
   std::atomic_bool wait_complete = false;
   std::thread thread = std::thread([&]() {
     thread_started.Signal();
-    fdf_testing_wait_until_all_dispatchers_destroyed();
+    fdf_internal_wait_until_all_dispatchers_destroyed();
     wait_complete = true;
   });
 
@@ -2723,7 +2724,7 @@ TEST_F(DispatcherTest, WaitUntilDispatchersDestroyedHasDriverShutdownObserver) {
   std::atomic_bool wait_complete = false;
   std::thread thread = std::thread([&]() {
     thread_started.Signal();
-    fdf_testing_wait_until_all_dispatchers_destroyed();
+    fdf_internal_wait_until_all_dispatchers_destroyed();
     wait_complete = true;
   });
 
@@ -2769,7 +2770,7 @@ TEST_F(DispatcherTest, WaitUntilDispatchersDestroyedDuringDriverShutdownHandler)
   std::atomic_bool wait_complete = false;
   std::thread thread = std::thread([&]() {
     thread_started.Signal();
-    fdf_testing_wait_until_all_dispatchers_destroyed();
+    fdf_internal_wait_until_all_dispatchers_destroyed();
     wait_complete = true;
   });
 
@@ -3017,7 +3018,7 @@ TEST_F(DispatcherTest, ConcurrentDispatcherDestroy) {
 
   // Wait for the driver to be removed from the dispatcher coordinator's |driver_state_| map as
   // |Reset| expects it to be empty.
-  fdf_testing_wait_until_all_dispatchers_destroyed();
+  fdf_internal_wait_until_all_dispatchers_destroyed();
 }
 
 // Tests that the sequence id retrieved in the driver shutdown callback
