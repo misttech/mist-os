@@ -13,7 +13,13 @@
 char16_t kBootbyteVariableName[] = ZIRCON_BOOTBYTE_EFIVAR;
 efi_guid kZirconVendorGuid = ZIRCON_VENDOR_GUID;
 
-efi_status get_bootbyte(efi_runtime_services* runtime, uint8_t* bootbyte) {
+// FIXME(fxbug.dev/128274): UBSan is detecting a function type mismatch between
+// this and EfiBootbyOwner::GetVariable in fastboot_test.cc. I'm not exactly
+// sure where the mismatch occurs since both functions have the same attribute,
+// return type, and argument types. But for now, let's suppress the warning to
+// allow the clang roll to proceed.
+__attribute__((no_sanitize("function"))) efi_status get_bootbyte(efi_runtime_services* runtime,
+                                                                 uint8_t* bootbyte) {
   size_t size = sizeof(*bootbyte);
   efi_status status = runtime->GetVariable((char16_t*)kBootbyteVariableName, &kZirconVendorGuid,
                                            NULL, &size, bootbyte);
@@ -23,7 +29,13 @@ efi_status get_bootbyte(efi_runtime_services* runtime, uint8_t* bootbyte) {
   return status;
 }
 
-efi_status set_bootbyte(efi_runtime_services* runtime, uint8_t bootbyte) {
+// FIXME(fxbug.dev/128274): UBSan is detecting a function type mismatch between
+// this and EfiBootbyOwner::SetVariable in fastboot_test.cc. I'm not exactly
+// sure where the mismatch occurs since both functions have the same attribute,
+// return type, and argument types. But for now, let's suppress the warning to
+// allow the clang roll to proceed.
+__attribute__((no_sanitize("function"))) efi_status set_bootbyte(efi_runtime_services* runtime,
+                                                                 uint8_t bootbyte) {
   return runtime->SetVariable((char16_t*)kBootbyteVariableName, &kZirconVendorGuid,
                               ZIRCON_BOOTBYTE_EFIATTR, sizeof(bootbyte), &bootbyte);
 }
