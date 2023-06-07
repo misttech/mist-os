@@ -26,7 +26,7 @@ impl<M: Send, S> Receiver<M> for S where S: Stream<Item = M> + Send + 'static {}
 /// A type capable of providing a concrete type of [`Sender`] & [`Receiver`].
 pub trait SenderReceiverProvider {
     /// The type of [`Sender`] provided.
-    type Sender<M: Clone + Send + Emitable + 'static>: Sender<M>;
+    type Sender<M: Clone + Emitable + Send + Sync + 'static>: Sender<M>;
     /// The type of [`Receiver`] provided.
     type Receiver<M: Send + 'static>: Receiver<M>;
 }
@@ -90,7 +90,7 @@ pub(crate) mod testutil {
     pub(crate) struct FakeSenderReceiverProvider;
 
     impl SenderReceiverProvider for FakeSenderReceiverProvider {
-        type Sender<M: Clone + Send + Emitable + 'static> = FakeSender<M>;
+        type Sender<M: Clone + Emitable + Send + Sync + 'static> = FakeSender<M>;
         type Receiver<M: Send + 'static> = FakeReceiver<M>;
     }
 }

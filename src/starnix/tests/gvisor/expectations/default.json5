@@ -752,13 +752,14 @@
                 "NetlinkRouteTest.RemoveLinkByNameNotFound",
                 "NetlinkRouteTest.MsgHdrMsgUnsuppType",
                 "NetlinkRouteTest.SpliceFromPipe",
-                "NetlinkRouteTest.ControlMessageIgnored",
                 "NetlinkRouteTest.AddAndRemoveAddr",
                 "NetlinkRouteTest.GetRouteDump",
                 "NetlinkRouteTest.GetRouteRequest",
                 "NetlinkRouteTest.RecvmsgTrunc",
                 "NetlinkRouteTest.RecvmsgTruncPeek",
                 "NetlinkRouteTest.PasscredCreds",
+                "NetlinkRouteTest.MsgHdrMsgTrunc",
+                "NetlinkRouteTest.MsgTruncMsgHdrMsgTrunc",
 
                 // socket_netlink_uevent
                 "NetlinkUeventTest.AttachFilter",

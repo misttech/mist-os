@@ -3,20 +3,30 @@
 // found in the LICENSE file.
 
 use super::*;
+
+use std::{marker::PhantomData, sync::Arc};
+
+use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use netlink::{
+    messaging::{Sender, SenderReceiverProvider},
+    multicast_groups::{InvalidLegacyGroupsError, LegacyGroups},
+    protocol_family::route::NetlinkRouteClient,
+    NewClientError, NETLINK_LOG_TAG,
+};
+use netlink_packet_core::NetlinkMessage;
+use netlink_packet_route::rtnl::RtnlMessage;
+use netlink_packet_utils::Emitable;
 use zerocopy::{AsBytes, FromBytes};
 
 use crate::{
     device::{DeviceListener, DeviceListenerKey},
     fs::{buffers::*, kobject::*, *},
     lock::Mutex,
-    logging::{log, log_error, not_implemented},
+    logging::{log_error, log_info, log_warn, not_implemented},
     mm::MemoryAccessorExt,
     task::*,
     types::*,
 };
-use std::sync::Arc;
-
-const NETLINK_LOG_TAG: &str = "netlink";
 
 // From netlink/socket.go in gVisor.
 pub const SOCKET_MIN_SIZE: usize = 4 << 10;
@@ -28,13 +38,14 @@ pub fn new_netlink_socket(
     socket_type: SocketType,
     family: NetlinkFamily,
 ) -> Result<Box<dyn SocketOps>, Errno> {
-    log!(level = info, tag = NETLINK_LOG_TAG, "Creating {:?} Netlink Socket", family);
+    log_info!(tag = NETLINK_LOG_TAG, "Creating {:?} Netlink Socket", family);
     if socket_type != SocketType::Datagram && socket_type != SocketType::Raw {
         return error!(ESOCKTNOSUPPORT);
     }
 
     let ops: Box<dyn SocketOps> = match family {
         NetlinkFamily::KobjectUevent => Box::new(UEventNetlinkSocket::new(kernel)),
+        NetlinkFamily::Route => Box::new(RouteNetlinkSocket::new(kernel)?),
         _ => Box::new(BaseNetlinkSocket::new(family)),
     };
     Ok(ops)
@@ -687,5 +698,294 @@ impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
             Some(NetlinkAddress { pid: 0, groups: 1 }),
             &mut ancillary_data,
         );
+    }
+}
+
+/// Type for sending messages from [`netlink::Netlink`] to an individual socket.
+#[derive(Clone)]
+pub struct NetlinkToClientSender<M> {
+    _message_type: PhantomData<M>,
+    /// The inner socket implementation, which holds a message queue.
+    inner: Arc<Mutex<NetlinkSocketInner>>,
+}
+
+impl<M> NetlinkToClientSender<M> {
+    fn new(inner: Arc<Mutex<NetlinkSocketInner>>) -> Self {
+        NetlinkToClientSender { _message_type: PhantomData::<M>, inner }
+    }
+}
+
+impl<M: Clone + Emitable + Send + Sync + 'static> Sender<M> for NetlinkToClientSender<M> {
+    fn send(&mut self, message: M) {
+        // Serialize the message
+        let mut buf = vec![0; message.buffer_len()];
+        message.emit(&mut buf);
+        let mut buf: VecInputBuffer = buf.into();
+        // Write the message into the inner socket buffer.
+        let NetlinkToClientSender { _message_type: _, inner } = self;
+        let _bytes_written: usize =
+            inner.lock().write_to_queue(&mut buf, None, &mut Vec::new()).unwrap_or_else(|e| {
+                log_warn!(
+                    tag = NETLINK_LOG_TAG,
+                    "Failed to write message into buffer for socket. Errno: {:?}",
+                    e
+                );
+                0
+            });
+    }
+}
+
+/// Provide Starnix implementations of `Sender` and `Receiver to [`Netlink`].
+pub(crate) struct NetlinkSenderReceiverProvider;
+
+impl SenderReceiverProvider for NetlinkSenderReceiverProvider {
+    type Sender<M: Clone + Emitable + Send + Sync + 'static> = NetlinkToClientSender<M>;
+    type Receiver<M: Send + 'static> = UnboundedReceiver<M>;
+}
+
+/// Socket implementation for the NETLINK_ROUTE family of netlink sockets.
+struct RouteNetlinkSocket {
+    /// The inner Netlink socket implementation
+    inner: Arc<Mutex<NetlinkSocketInner>>,
+    /// The implementation of a client (socket connection) to NETLINK_ROUTE.
+    client: NetlinkRouteClient,
+    /// The sender of messages from this socket to Netlink.
+    // TODO(https://issuetracker.google.com/285880057): Bound the capacity of
+    // the "send buffer".
+    message_sender: UnboundedSender<NetlinkMessage<RtnlMessage>>,
+}
+
+impl RouteNetlinkSocket {
+    pub fn new(kernel: &Arc<Kernel>) -> Result<Self, Errno> {
+        let inner = Arc::new(Mutex::new(NetlinkSocketInner {
+            family: NetlinkFamily::Route,
+            messages: MessageQueue::new(SOCKET_DEFAULT_SIZE),
+            waiters: WaitQueue::default(),
+            address: None,
+            passcred: false,
+            timestamp: false,
+        }));
+        let (message_sender, message_receiver) = mpsc::unbounded();
+        let client = match kernel
+            .network_netlink()
+            .new_route_client(NetlinkToClientSender::new(inner.clone()), message_receiver)
+        {
+            Ok(client) => client,
+            Err(NewClientError::Disconnected) => {
+                log_error!(
+                    tag = NETLINK_LOG_TAG,
+                    "Netlink async worker is unexpectedly disconnected"
+                );
+                return error!(EPIPE);
+            }
+        };
+        Ok(RouteNetlinkSocket { inner, client, message_sender })
+    }
+}
+
+impl SocketOps for RouteNetlinkSocket {
+    fn connect(
+        &self,
+        _socket: &SocketHandle,
+        current_task: &CurrentTask,
+        peer: SocketPeer,
+    ) -> Result<(), Errno> {
+        let RouteNetlinkSocket { inner, client: _, message_sender: _ } = self;
+        inner.lock().connect(current_task, peer)
+    }
+
+    fn listen(&self, _socket: &Socket, _backlog: i32, _credentials: ucred) -> Result<(), Errno> {
+        error!(EOPNOTSUPP)
+    }
+
+    fn accept(&self, _socket: &Socket) -> Result<SocketHandle, Errno> {
+        error!(EOPNOTSUPP)
+    }
+
+    fn bind(
+        &self,
+        _socket: &Socket,
+        current_task: &CurrentTask,
+        socket_address: SocketAddress,
+    ) -> Result<(), Errno> {
+        let RouteNetlinkSocket { inner, client, message_sender: _ } = self;
+        let multicast_groups = match socket_address {
+            SocketAddress::Unspecified
+            | SocketAddress::Inet(_)
+            | SocketAddress::Inet6(_)
+            | SocketAddress::Unix(_)
+            | SocketAddress::Vsock(_) => return error!(EINVAL),
+            SocketAddress::Netlink(NetlinkAddress { pid: _, groups }) => groups,
+        };
+        inner.lock().bind(current_task, socket_address)?;
+        match client.set_legacy_memberships(LegacyGroups(multicast_groups)) {
+            Err(InvalidLegacyGroupsError {}) => error!(EPERM),
+            Ok(()) => Ok(()),
+        }
+    }
+
+    fn read(
+        &self,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
+        data: &mut dyn OutputBuffer,
+        _flags: SocketMessageFlags,
+    ) -> Result<MessageReadInfo, Errno> {
+        let RouteNetlinkSocket { inner, client: _, message_sender: _ } = self;
+        match inner.lock().read_message() {
+            Some(message) => {
+                let message_length = message.data.len();
+                let bytes_read = data.write(message.data.bytes())?;
+                Ok(MessageReadInfo {
+                    bytes_read,
+                    message_length,
+                    address: Some(SocketAddress::Netlink(NetlinkAddress::default())),
+                    ancillary_data: vec![],
+                })
+            }
+            None => Ok(MessageReadInfo::default()),
+        }
+    }
+
+    fn write(
+        &self,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
+        data: &mut dyn InputBuffer,
+        _dest_address: &mut Option<SocketAddress>,
+        _ancillary_data: &mut Vec<AncillaryData>,
+    ) -> Result<usize, Errno> {
+        let RouteNetlinkSocket { inner: _, client: _, message_sender } = self;
+        let data = data.read_all()?;
+        match NetlinkMessage::<RtnlMessage>::deserialize(&data) {
+            Err(e) => {
+                log_warn!(
+                    tag = NETLINK_LOG_TAG,
+                    "Failed to process write; data could not be deserialized: {:?}",
+                    e
+                );
+                error!(EINVAL)
+            }
+            Ok(msg) => match message_sender.unbounded_send(msg) {
+                Ok(()) => Ok(data.len()),
+                Err(e) => {
+                    log_warn!(
+                        tag = NETLINK_LOG_TAG,
+                        "Netlink receiver unexpectedly disconnected for socket: {:?}",
+                        e
+                    );
+                    error!(EPIPE)
+                }
+            },
+        }
+    }
+
+    fn wait_async(
+        &self,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
+        waiter: &Waiter,
+        events: FdEvents,
+        handler: EventHandler,
+    ) -> WaitCanceler {
+        let RouteNetlinkSocket { inner, client: _, message_sender: _ } = self;
+        inner.lock().wait_async(waiter, events, handler)
+    }
+
+    fn query_events(&self, _socket: &Socket, _current_task: &CurrentTask) -> FdEvents {
+        let RouteNetlinkSocket { inner, client: _, message_sender: _ } = self;
+        inner.lock().query_events() & FdEvents::POLLIN
+    }
+
+    fn shutdown(&self, _socket: &Socket, _how: SocketShutdownFlags) -> Result<(), Errno> {
+        error!(EOPNOTSUPP)
+    }
+
+    fn close(&self, _socket: &Socket) {
+        // TODO(https://issuetracker.google.com/285013342): Support Close.
+    }
+
+    fn getsockname(&self, _socket: &Socket) -> Vec<u8> {
+        let RouteNetlinkSocket { inner, client: _, message_sender: _ } = self;
+        inner.lock().getsockname()
+    }
+
+    fn getpeername(&self, _socket: &Socket) -> Result<Vec<u8>, Errno> {
+        self.inner.lock().getpeername()
+    }
+
+    fn getsockopt(
+        &self,
+        _socket: &Socket,
+        level: u32,
+        optname: u32,
+        _optlen: u32,
+    ) -> Result<Vec<u8>, Errno> {
+        self.inner.lock().getsockopt(level, optname)
+    }
+
+    fn setsockopt(
+        &self,
+        _socket: &Socket,
+        task: &Task,
+        level: u32,
+        optname: u32,
+        user_opt: UserBuffer,
+    ) -> Result<(), Errno> {
+        // TODO(https://issuetracker.google.com/283827094): Support add/del
+        // multicast group membership.
+        self.inner.lock().setsockopt(task, level, optname, user_opt)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use netlink_packet_route::rtnl::RouteMessage;
+    use test_case::test_case;
+
+    // TODO(https://github.com/frondeus/test-case/issues/66): Remove once fixed
+    // at ToT.
+    #[allow(clippy::unused_unit)]
+    // Successfully send the message and observe it's stored in the queue.
+    #[test_case(true; "sufficient_capacity")]
+    // TODO(https://github.com/frondeus/test-case/issues/66): Remove once fixed
+    // at ToT.
+    #[allow(clippy::unused_unit)]
+    // Attempting to send when the queue is full should succeed without changing
+    // the contents of the queue.
+    #[test_case(false; "insufficient_capacity")]
+    #[allow(clippy::unused_init)]
+    fn test_netlink_to_client_sender(sufficient_capacity: bool) {
+        let mut message: NetlinkMessage<RtnlMessage> =
+            RtnlMessage::NewRoute(RouteMessage::default()).into();
+        message.finalize();
+
+        let (queue_size, expected_message) = if sufficient_capacity {
+            (SOCKET_DEFAULT_SIZE, Some(message.clone()))
+        } else {
+            (0, None)
+        };
+
+        let socket_inner = Arc::new(Mutex::new(NetlinkSocketInner {
+            family: NetlinkFamily::Route,
+            messages: MessageQueue::new(queue_size),
+            waiters: WaitQueue::default(),
+            address: None,
+            passcred: false,
+            timestamp: false,
+        }));
+
+        let mut sender =
+            NetlinkToClientSender::<NetlinkMessage<RtnlMessage>>::new(socket_inner.clone());
+        sender.send(message);
+
+        let message = socket_inner.lock().read_message();
+        assert_eq!(
+            message.map(|m| NetlinkMessage::<RtnlMessage>::deserialize(m.data.bytes())
+                .expect("message should deserialize into RtnlMessage")),
+            expected_message
+        )
     }
 }

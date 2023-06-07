@@ -64,4 +64,11 @@ impl KernelThreads {
     pub fn system_task(&self) -> &Arc<CurrentTask> {
         self.system_task.get().unwrap()
     }
+
+    pub fn dispatch<F>(&self, f: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        self.pool.dispatch(f)
+    }
 }

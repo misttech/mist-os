@@ -15,7 +15,7 @@ mod client;
 mod errors;
 mod interfaces;
 pub mod messaging;
-mod multicast_groups;
+pub mod multicast_groups;
 mod netlink_packet;
 pub mod protocol_family;
 mod routes;

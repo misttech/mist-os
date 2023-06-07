@@ -6,8 +6,10 @@ use fidl::endpoints::{create_endpoints, ClientEnd, ProtocolMarker, Proxy};
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_math as fmath;
 use fidl_fuchsia_ui_display_singleton as fuidisplay;
+use fuchsia_async as fasync;
 use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_zircon as zx;
+use netlink::{Netlink, NETLINK_LOG_TAG};
 use once_cell::sync::OnceCell;
 use std::{
     collections::{BTreeMap, HashSet},
@@ -19,9 +21,12 @@ use crate::{
     device::{
         framebuffer::Framebuffer, input::InputFile, BinderDriver, DeviceMode, DeviceRegistry,
     },
-    fs::{socket::SocketAddress, FileOps, FileSystemHandle, FsNode},
+    fs::{
+        socket::{NetlinkSenderReceiverProvider, SocketAddress},
+        FileOps, FileSystemHandle, FsNode,
+    },
     lock::RwLock,
-    logging::set_zx_name,
+    logging::{log_error, set_zx_name},
     mm::FutexTable,
     task::*,
     types::{DeviceType, Errno, OpenFlags, *},
@@ -118,6 +123,9 @@ pub struct Kernel {
 
     /// A struct containing a VMO with a vDSO implementation, if implemented for a given architecture, and possibly an offset for a sigreturn function.
     pub vdso: Vdso,
+
+    /// The implementation of networking-related Netlink protocol families.
+    network_netlink: OnceCell<Netlink<NetlinkSenderReceiverProvider>>,
 }
 
 impl Kernel {
@@ -162,6 +170,7 @@ impl Kernel {
             shared_futexes: Default::default(),
             root_uts_ns: Arc::new(RwLock::new(UtsNamespace::default())),
             vdso: Vdso::new(),
+            network_netlink: OnceCell::new(),
         }))
     }
 
@@ -176,6 +185,21 @@ impl Kernel {
     ) -> Result<Box<dyn FileOps>, Errno> {
         let registry = self.device_registry.read();
         registry.open_device(current_task, node, flags, dev, mode)
+    }
+
+    /// Return a reference to the [`netlink::Netlink`] implementation.
+    ///
+    /// This function follows the lazy initialization pattern, where the first
+    /// call will instantiate the Netlink implementation.
+    pub(crate) fn network_netlink(&self) -> &Netlink<NetlinkSenderReceiverProvider> {
+        self.network_netlink.get_or_init(|| {
+            let (network_netlink, network_netlink_async_worker) = Netlink::new();
+            self.kthreads.dispatch(move || {
+                fasync::LocalExecutor::new().run_singlethreaded(network_netlink_async_worker);
+                log_error!(tag = NETLINK_LOG_TAG, "Netlink async worker unexpectedly exited");
+            });
+            network_netlink
+        })
     }
 
     /// Returns a Proxy to the service exposed to the container at `filename`.
