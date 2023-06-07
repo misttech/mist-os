@@ -43,6 +43,7 @@
 
 #include "src/graphics/display/drivers/coordinator/config-stamp.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
+#include "src/graphics/display/drivers/coordinator/display-id.h"
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
@@ -52,7 +53,7 @@
 namespace display {
 
 // Almost-POD used by Client to manage display configuration. Public state is used by Controller.
-class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, /*IdType=*/uint64_t> {
+class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, DisplayId> {
  public:
   void InitializeInspect(inspect::Node* parent);
 
@@ -167,8 +168,8 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   fpromise::result<fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator>, zx_status_t> Init(
       fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
 
-  void OnDisplaysChanged(cpp20::span<const uint64_t> added_display_ids,
-                         cpp20::span<const uint64_t> removed_display_ids);
+  void OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
+                         cpp20::span<const DisplayId> removed_display_ids);
   void SetOwnership(bool is_owner);
   void ApplyConfig();
 
@@ -355,10 +356,10 @@ class ClientProxy {
   void CloseOnControllerLoop();
 
   // Requires holding controller_->mtx() lock
-  zx_status_t OnDisplayVsync(uint64_t display_id, zx_time_t timestamp,
+  zx_status_t OnDisplayVsync(DisplayId display_id, zx_time_t timestamp,
                              ConfigStamp controller_stamp);
-  void OnDisplaysChanged(cpp20::span<const uint64_t> added_display_ids,
-                         cpp20::span<const uint64_t> removed_display_ids);
+  void OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
+                         cpp20::span<const DisplayId> removed_display_ids);
   void SetOwnership(bool is_owner);
   void ReapplyConfig();
   zx_status_t OnCaptureComplete();
@@ -438,7 +439,7 @@ class ClientProxy {
   uint64_t total_oom_errors_ = 0;
 
   using vsync_msg_t = struct vsync_msg {
-    uint64_t display_id;
+    DisplayId display_id;
     zx_time_t timestamp;
     ConfigStamp config_stamp;
   };

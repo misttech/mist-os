@@ -30,6 +30,7 @@
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/coordinator/config-stamp.h"
+#include "src/graphics/display/drivers/coordinator/display-id.h"
 #include "src/graphics/display/drivers/coordinator/display-info.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
@@ -74,10 +75,11 @@ class Controller : public DeviceType,
                                                    added_display_info_t* out_display_info_list,
                                                    size_t display_info_count,
                                                    size_t* display_info_actual);
-  void DisplayControllerInterfaceOnDisplayVsync(uint64_t display_id, zx_time_t timestamp,
+  void DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display_id, zx_time_t timestamp,
                                                 const config_stamp_t* config_stamp);
   zx_status_t DisplayControllerInterfaceGetAudioFormat(
-      uint64_t display_id, uint32_t fmt_idx, audio_types_audio_stream_format_range_t* fmt_out);
+      uint64_t banjo_display_id, uint32_t fmt_idx,
+      audio_types_audio_stream_format_range_t* fmt_out);
 
   void DisplayCaptureInterfaceOnCaptureComplete();
   void OnClientDead(ClientProxy* client);
@@ -92,18 +94,18 @@ class Controller : public DeviceType,
   void ReleaseCaptureImage(uint64_t handle);
 
   // |mtx()| must be held for as long as |edid| and |params| are retained.
-  bool GetPanelConfig(uint64_t display_id, const fbl::Vector<edid::timing_params_t>** timings,
+  bool GetPanelConfig(DisplayId display_id, const fbl::Vector<edid::timing_params_t>** timings,
                       const display_params_t** params) __TA_REQUIRES(mtx());
 
-  zx::result<fbl::Array<CoordinatorPixelFormat>> GetSupportedPixelFormats(uint64_t display_id)
+  zx::result<fbl::Array<CoordinatorPixelFormat>> GetSupportedPixelFormats(DisplayId display_id)
       __TA_REQUIRES(mtx());
 
-  zx::result<fbl::Array<CoordinatorCursorInfo>> GetCursorInfo(uint64_t display_id)
+  zx::result<fbl::Array<CoordinatorCursorInfo>> GetCursorInfo(DisplayId display_id)
       __TA_REQUIRES(mtx());
-  bool GetDisplayIdentifiers(uint64_t display_id, const char** manufacturer_name,
+  bool GetDisplayIdentifiers(DisplayId display_id, const char** manufacturer_name,
                              const char** monitor_name, const char** monitor_serial)
       __TA_REQUIRES(mtx());
-  bool GetDisplayPhysicalDimensions(uint64_t display_id, uint32_t* horizontal_size_mm,
+  bool GetDisplayPhysicalDimensions(DisplayId display_id, uint32_t* horizontal_size_mm,
                                     uint32_t* vertical_size_mm) __TA_REQUIRES(mtx());
   ddk::DisplayControllerImplProtocolClient* dc() { return &dc_; }
   ddk::DisplayClampRgbImplProtocolClient* dc_clamp_rgb() {

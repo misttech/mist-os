@@ -13,6 +13,7 @@
 #include <fbl/intrusive_double_list.h>
 
 #include "fuchsia/hardware/display/controller/c/banjo.h"
+#include "src/graphics/display/drivers/coordinator/display-id.h"
 #include "src/graphics/display/drivers/coordinator/fence.h"
 
 namespace fhd = fuchsia_hardware_display;
@@ -46,7 +47,7 @@ Layer::Layer(uint64_t id) {
   config_change_ = false;
   pending_node_.layer = this;
   current_node_.layer = this;
-  current_display_id_ = INVALID_DISPLAY_ID;
+  current_display_id_ = kInvalidDisplayId;
   current_layer_.type = kInvalidLayerType;
   pending_layer_.type = kInvalidLayerType;
   is_skipped_ = false;

@@ -15,6 +15,7 @@
 #include <fbl/ref_ptr.h>
 
 #include "src/graphics/display/drivers/coordinator/config-stamp.h"
+#include "src/graphics/display/drivers/coordinator/display-id.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 
 namespace display {
@@ -152,7 +153,7 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, /*IdType=*/uint64_t> {
   LayerNode current_node_;
 
   // The display this layer was most recently displayed on
-  uint64_t current_display_id_;
+  DisplayId current_display_id_;
 
   bool is_skipped_;
 };

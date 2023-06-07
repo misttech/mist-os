@@ -19,6 +19,7 @@
 #include <zircon/types.h>
 
 #include <algorithm>
+#include <cinttypes>
 #include <cstdint>
 #include <iterator>
 #include <memory>
@@ -38,6 +39,7 @@
 
 #include "src/graphics/display/drivers/coordinator/client.h"
 #include "src/graphics/display/drivers/coordinator/config-stamp.h"
+#include "src/graphics/display/drivers/coordinator/display-id.h"
 #include "src/graphics/display/drivers/coordinator/display-info.h"
 #include "src/graphics/display/drivers/coordinator/eld.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
@@ -91,7 +93,7 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
   test_layer.type = LAYER_TYPE_PRIMARY;
   display_config_t test_config;
   const display_config_t* test_configs[] = {&test_config};
-  test_config.display_id = info->id;
+  test_config.display_id = ToBanjoDisplayId(info->id);
   test_config.layer_count = 1;
   test_config.layer_list = test_layers;
 
@@ -143,7 +145,7 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
   ZX_DEBUG_ASSERT(!out_display_info_list || added_count == display_info_count);
 
   fbl::Vector<fbl::RefPtr<DisplayInfo>> added_display_infos;
-  fbl::Vector<uint64_t> removed_display_ids;
+  fbl::Vector<DisplayId> removed_display_ids;
   std::unique_ptr<async::Task> task;
   uint32_t added_success_count = 0;
 
@@ -162,7 +164,7 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
       return;
     }
     for (size_t i = 0; i < removed_count; ++i) {
-      removed_display_ids.push_back(displays_removed[i]);
+      removed_display_ids.push_back(ToDisplayId(displays_removed[i]));
     }
   }
   task = fbl::make_unique_checked<async::Task>(&alloc_checker);
@@ -174,7 +176,9 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
   fbl::AutoLock lock(mtx());
 
   for (unsigned i = 0; i < removed_count; i++) {
-    auto target = displays_.erase(displays_removed[i]);
+    DisplayId removed_display_id(displays_removed[i]);
+
+    auto target = displays_.erase(removed_display_id);
     if (target) {
       while (fbl::RefPtr<Image> image = target->images.pop_front()) {
         AssertMtxAliasHeld(image->mtx());
@@ -182,7 +186,7 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
         image->OnRetire();
       }
     } else {
-      zxlogf(DEBUG, "Unknown display %ld removed", displays_removed[i]);
+      zxlogf(DEBUG, "Unknown display %" PRIu64 " removed", removed_display_id.value());
     }
   }
 
@@ -197,7 +201,7 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
     if (info->edid.has_value()) {
       fbl::Array<uint8_t> eld;
       ComputeEld(info->edid->base, eld);
-      dc_.SetEld(info->id, eld.get(), eld.size());
+      dc_.SetEld(ToBanjoDisplayId(info->id), eld.get(), eld.size());
     }
     auto* display_info = out_display_info_list ? &out_display_info_list[i] : nullptr;
     if (display_info && info->edid.has_value()) {
@@ -240,7 +244,7 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
       }
       fbl::AutoLock lock(mtx());
 
-      fbl::Vector<uint64_t> added_ids;
+      fbl::Vector<DisplayId> added_ids;
       added_ids.reserve(added_display_infos.size());
       for (const fbl::RefPtr<DisplayInfo>& added_display_info : added_display_infos) {
         // Dropping some add events can result in spurious removes, but
@@ -295,12 +299,15 @@ void Controller::DisplayCaptureInterfaceOnCaptureComplete() {
   task.release()->Post(loop_.dispatcher());
 }
 
-void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t display_id, zx_time_t timestamp,
+void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display_id,
+                                                          zx_time_t timestamp,
                                                           const config_stamp_t* config_stamp_ptr) {
   // Emit an event called "VSYNC", which is by convention the event
   // that Trace Viewer looks for in its "Highlight VSync" feature.
-  TRACE_INSTANT("gfx", "VSYNC", TRACE_SCOPE_THREAD, "display_id", display_id);
-  TRACE_DURATION("gfx", "Display::Controller::OnDisplayVsync", "display_id", display_id);
+  TRACE_INSTANT("gfx", "VSYNC", TRACE_SCOPE_THREAD, "display_id", banjo_display_id);
+  TRACE_DURATION("gfx", "Display::Controller::OnDisplayVsync", "display_id", banjo_display_id);
+
+  const DisplayId display_id(banjo_display_id);
 
   last_vsync_ns_property_.Set(timestamp);
   last_vsync_interval_ns_property_.Set(timestamp - last_vsync_timestamp_.load().get());
@@ -321,7 +328,7 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t display_id, z
   }
 
   if (!info) {
-    zxlogf(ERROR, "No such display %lu", display_id);
+    zxlogf(ERROR, "No such display %" PRIu64, display_id.value());
     return;
   }
 
@@ -463,7 +470,9 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t display_id, z
 }
 
 zx_status_t Controller::DisplayControllerInterfaceGetAudioFormat(
-    uint64_t display_id, uint32_t fmt_idx, audio_types_audio_stream_format_range_t* fmt_out) {
+    uint64_t banjo_display_id, uint32_t fmt_idx, audio_types_audio_stream_format_range_t* fmt_out) {
+  const DisplayId display_id = ToDisplayId(banjo_display_id);
+
   fbl::AutoLock lock(mtx());
   auto display = displays_.find(display_id);
   if (!display.IsValid()) {
@@ -531,7 +540,7 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc
     // image if there is also a pending image.
     if (switching_client || applied_layer_stamp_ != layer_stamp) {
       for (int i = 0; i < count; i++) {
-        auto* config = configs[i];
+        DisplayConfig* config = configs[i];
         auto display = displays_.find(config->id);
         if (!display.IsValid()) {
           continue;
@@ -682,7 +691,7 @@ void Controller::OnClientDead(ClientProxy* client) {
       [client](std::unique_ptr<ClientProxy>& list_client) { return list_client.get() == client; });
 }
 
-bool Controller::GetPanelConfig(uint64_t display_id,
+bool Controller::GetPanelConfig(DisplayId display_id,
                                 const fbl::Vector<edid::timing_params_t>** timings,
                                 const display_params_t** params) {
   ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
@@ -704,7 +713,7 @@ bool Controller::GetPanelConfig(uint64_t display_id,
   return false;
 }
 
-zx::result<fbl::Array<CoordinatorCursorInfo>> Controller::GetCursorInfo(uint64_t display_id) {
+zx::result<fbl::Array<CoordinatorCursorInfo>> Controller::GetCursorInfo(DisplayId display_id) {
   ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
   fbl::Array<CoordinatorCursorInfo> cursor_info_out;
   for (auto& display : displays_) {
@@ -724,7 +733,7 @@ zx::result<fbl::Array<CoordinatorCursorInfo>> Controller::GetCursorInfo(uint64_t
 }
 
 zx::result<fbl::Array<CoordinatorPixelFormat>> Controller::GetSupportedPixelFormats(
-    uint64_t display_id) {
+    DisplayId display_id) {
   ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
   fbl::Array<CoordinatorPixelFormat> formats_out;
   for (auto& display : displays_) {
@@ -743,7 +752,7 @@ zx::result<fbl::Array<CoordinatorPixelFormat>> Controller::GetSupportedPixelForm
   return zx::error(ZX_ERR_NOT_FOUND);
 }
 
-bool Controller::GetDisplayIdentifiers(uint64_t display_id, const char** manufacturer_name,
+bool Controller::GetDisplayIdentifiers(DisplayId display_id, const char** manufacturer_name,
                                        const char** monitor_name, const char** monitor_serial) {
   ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
   for (auto& display : displays_) {
@@ -755,10 +764,10 @@ bool Controller::GetDisplayIdentifiers(uint64_t display_id, const char** manufac
   return false;
 }
 
-bool Controller::GetDisplayPhysicalDimensions(uint64_t display_id, uint32_t* horizontal_size_mm,
+bool Controller::GetDisplayPhysicalDimensions(DisplayId display_id, uint32_t* horizontal_size_mm,
                                               uint32_t* vertical_size_mm) {
   ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
-  for (auto& display : displays_) {
+  for (DisplayInfo& display : displays_) {
     if (display.id == display_id) {
       display.GetPhysicalDimensions(horizontal_size_mm, vertical_size_mm);
       return true;
@@ -835,16 +844,16 @@ zx_status_t Controller::CreateClient(
           if (client_ptr == vc_client_ || client_ptr == primary_client_) {
             // Add all existing displays to the client
             if (displays_.size() > 0) {
-              uint64_t current_displays[displays_.size()];
+              DisplayId current_displays[displays_.size()];
               int idx = 0;
               for (const DisplayInfo& display : displays_) {
                 if (display.init_done) {
                   current_displays[idx++] = display.id;
                 }
               }
-              cpp20::span<uint64_t> removed_display_ids = {};
+              cpp20::span<DisplayId> removed_display_ids = {};
               client_ptr->OnDisplaysChanged(
-                  cpp20::span<uint64_t>(current_displays, displays_.size()), removed_display_ids);
+                  cpp20::span<DisplayId>(current_displays, displays_.size()), removed_display_ids);
             }
 
             if (vc_client_ == client_ptr) {

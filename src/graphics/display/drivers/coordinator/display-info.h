@@ -23,6 +23,7 @@
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/coordinator/config-stamp.h"
+#include "src/graphics/display/drivers/coordinator/display-id.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
@@ -30,7 +31,7 @@
 
 namespace display {
 
-class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, /*IdType=*/uint64_t>,
+class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, DisplayId>,
                     public fbl::RefCounted<DisplayInfo> {
  public:
   static zx::result<fbl::RefPtr<DisplayInfo>> Create(const added_display_args_t& info);

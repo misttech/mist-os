@@ -23,6 +23,7 @@
 #include "src/graphics/display/drivers/coordinator/client.h"
 #include "src/graphics/display/drivers/coordinator/config-stamp.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
+#include "src/graphics/display/drivers/coordinator/display-id.h"
 #include "src/graphics/display/drivers/coordinator/tests/base.h"
 #include "src/graphics/display/drivers/coordinator/tests/fidl_client.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
@@ -35,7 +36,7 @@ namespace display {
 
 class IntegrationTest : public TestBase, public testing::WithParamInterface<bool> {
  public:
-  fbl::RefPtr<display::DisplayInfo> display_info(uint64_t id) __TA_REQUIRES(controller()->mtx()) {
+  fbl::RefPtr<display::DisplayInfo> display_info(DisplayId id) __TA_REQUIRES(controller()->mtx()) {
     auto iter = controller()->displays_.find(id);
     if (iter.IsValid()) {
       return iter.CopyPointer();
@@ -67,7 +68,7 @@ class IntegrationTest : public TestBase, public testing::WithParamInterface<bool
     return controller()->primary_client_->handler_.LatestAckedCookie() == cookie;
   }
 
-  void SendVsyncAfterUnbind(std::unique_ptr<TestFidlClient> client, uint64_t display_id) {
+  void SendVsyncAfterUnbind(std::unique_ptr<TestFidlClient> client, DisplayId display_id) {
     fbl::AutoLock l(controller()->mtx());
     // Reseting client will *start* client tear down.
     client.reset();
@@ -89,7 +90,7 @@ class IntegrationTest : public TestBase, public testing::WithParamInterface<bool
 
   void client_proxy_send_vsync() {
     fbl::AutoLock l(controller()->mtx());
-    controller()->active_client_->OnDisplayVsync(0, 0, kInvalidConfigStamp);
+    controller()->active_client_->OnDisplayVsync(kInvalidDisplayId, 0, kInvalidConfigStamp);
   }
 
   void SendDisplayVsync() { display()->SendVsync(); }
@@ -183,7 +184,9 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
   // Set an empty config
   {
     fbl::AutoLock lock(primary_client->mtx());
-    EXPECT_OK(primary_client->dc_->SetDisplayLayers(primary_client->display_id(), {}).status());
+    EXPECT_OK(
+        primary_client->dc_->SetDisplayLayers(ToBanjoDisplayId(primary_client->display_id()), {})
+            .status());
     EXPECT_OK(primary_client->dc_->ApplyConfig().status());
   }
   ConfigStamp empty_config_stamp = controller()->TEST_controller_stamp();
@@ -217,8 +220,8 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
 
   // Empty vsync for last client. Nothing should be sent to the new client.
   const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(empty_config_stamp);
-  controller()->DisplayControllerInterfaceOnDisplayVsync(primary_client->display_id(), 0u,
-                                                         &banjo_config_stamp);
+  controller()->DisplayControllerInterfaceOnDisplayVsync(
+      ToBanjoDisplayId(primary_client->display_id()), 0u, &banjo_config_stamp);
 
   // Send a second vsync, using the config the client applied.
   count = primary_client->vsync_count();
@@ -258,8 +261,8 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
   // Send the controller a vsync for an image / a config it won't recognize anymore.
   ConfigStamp invalid_config_stamp = controller()->TEST_controller_stamp() - ConfigStamp{1};
   const config_stamp_t invalid_banjo_config_stamp = ToBanjoConfigStamp(invalid_config_stamp);
-  controller()->DisplayControllerInterfaceOnDisplayVsync(primary_client->display_id(), 0u,
-                                                         &invalid_banjo_config_stamp);
+  controller()->DisplayControllerInterfaceOnDisplayVsync(
+      ToBanjoDisplayId(primary_client->display_id()), 0u, &invalid_banjo_config_stamp);
 
   // Send a second vsync, using the config the client applied.
   SendDisplayVsync();

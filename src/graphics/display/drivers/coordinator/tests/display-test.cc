@@ -15,9 +15,10 @@
 #include <fbl/auto_lock.h>
 #include <gtest/gtest.h>
 
-#include "config-stamp.h"
 #include "src/graphics/display/drivers/coordinator/client.h"
+#include "src/graphics/display/drivers/coordinator/config-stamp.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
+#include "src/graphics/display/drivers/coordinator/display-id.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace display {
@@ -42,7 +43,7 @@ TEST(DisplayTest, ClientVSyncOk) {
       .client_stamp = kClientStampValue,
   });
 
-  EXPECT_OK(clientproxy.OnDisplayVsync(0, 0, kControllerStampValue));
+  EXPECT_OK(clientproxy.OnDisplayVsync(kInvalidDisplayId, 0, kControllerStampValue));
 
   fidl::WireSyncClient client(std::move(client_end));
 
@@ -83,7 +84,7 @@ TEST(DisplayTest, ClientVSynPeerClosed) {
   clientproxy.EnableVsync(true);
   fbl::AutoLock lock(controller.mtx());
   client_end.reset();
-  EXPECT_OK(clientproxy.OnDisplayVsync(0, 0, kInvalidConfigStamp));
+  EXPECT_OK(clientproxy.OnDisplayVsync(kInvalidDisplayId, 0, kInvalidConfigStamp));
   clientproxy.CloseTest();
 }
 
@@ -96,7 +97,8 @@ TEST(DisplayTest, ClientVSyncNotSupported) {
   Controller controller(nullptr);
   ClientProxy clientproxy(&controller, false, 0, std::move(server_end));
   fbl::AutoLock lock(controller.mtx());
-  EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED, clientproxy.OnDisplayVsync(0, 0, kInvalidConfigStamp));
+  EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED,
+                clientproxy.OnDisplayVsync(kInvalidDisplayId, 0, kInvalidConfigStamp));
   clientproxy.CloseTest();
 }
 
@@ -121,8 +123,9 @@ TEST(DisplayTest, ClientMustDrainPendingStamps) {
     });
   }
 
-  EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED,
-                clientproxy.OnDisplayVsync(0, 0, ConfigStamp(kControllerStampValues.back())));
+  EXPECT_STATUS(
+      ZX_ERR_NOT_SUPPORTED,
+      clientproxy.OnDisplayVsync(kInvalidDisplayId, 0, ConfigStamp(kControllerStampValues.back())));
 
   // Even if Vsync is disabled, ClientProxy should always drain pending
   // controller stamps.

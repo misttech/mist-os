@@ -21,6 +21,7 @@
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/coordinator/config-stamp.h"
+#include "src/graphics/display/drivers/coordinator/display-id.h"
 
 namespace display {
 
@@ -30,7 +31,7 @@ class TestFidlClient {
    public:
     explicit Display(const fuchsia_hardware_display::wire::Info& info);
 
-    uint64_t id_;
+    DisplayId id_;
     fbl::Vector<fuchsia_images2::wire::PixelFormat> pixel_formats_;
     fbl::Vector<fuchsia_hardware_display::wire::Mode> modes_;
     fbl::Vector<fuchsia_hardware_display::wire::CursorInfo> cursors_;
@@ -78,7 +79,7 @@ class TestFidlClient {
 
   zx_status_t PresentLayers(std::vector<PresentLayerInfo> layers);
 
-  uint64_t display_id() const;
+  DisplayId display_id() const;
 
   fbl::Vector<Display> displays_;
   fidl::WireSyncClient<fuchsia_hardware_display::Coordinator> dc_ TA_GUARDED(mtx());

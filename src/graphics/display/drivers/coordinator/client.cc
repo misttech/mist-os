@@ -40,6 +40,7 @@
 #include <fbl/string_printf.h>
 
 #include "src/graphics/display/drivers/coordinator/config-stamp.h"
+#include "src/graphics/display/drivers/coordinator/display-id.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/edid/edid.h"
 #include "src/lib/fsl/handles/object_info.h"
@@ -255,7 +256,8 @@ void Client::DestroyLayer(DestroyLayerRequestView request,
 
 void Client::SetDisplayMode(SetDisplayModeRequestView request,
                             SetDisplayModeCompleter::Sync& /*_completer*/) {
-  auto config = configs_.find(request->display_id);
+  const DisplayId display_id = ToDisplayId(request->display_id);
+  auto config = configs_.find(display_id);
   if (!config.IsValid()) {
     return;
   }
@@ -263,7 +265,7 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
   fbl::AutoLock lock(controller_->mtx());
   const fbl::Vector<edid::timing_params_t>* edid_timings;
   const display_params_t* params;
-  controller_->GetPanelConfig(request->display_id, &edid_timings, &params);
+  controller_->GetPanelConfig(display_id, &edid_timings, &params);
 
   if (edid_timings) {
     for (auto timing : *edid_timings) {
@@ -286,7 +288,8 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
 
 void Client::SetDisplayColorConversion(SetDisplayColorConversionRequestView request,
                                        SetDisplayColorConversionCompleter::Sync& /*_completer*/) {
-  auto config = configs_.find(request->display_id);
+  const DisplayId display_id = ToDisplayId(request->display_id);
+  auto config = configs_.find(display_id);
   if (!config.IsValid()) {
     return;
   }
@@ -319,7 +322,8 @@ void Client::SetDisplayColorConversion(SetDisplayColorConversionRequestView requ
 
 void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
                               SetDisplayLayersCompleter::Sync& /*_completer*/) {
-  auto config = configs_.find(request->display_id);
+  const DisplayId display_id = ToDisplayId(request->display_id);
+  auto config = configs_.find(display_id);
   if (!config.IsValid()) {
     return;
   }
@@ -927,7 +931,7 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
       for (uint8_t i = 0; i < 32; i++) {
         if (err & (1 << i)) {
           ops->emplace_back(fhd::wire::ClientCompositionOp{
-              .display_id = display_config.id,
+              .display_id = ToFidlDisplayId(display_config.id),
               .layer_id = layer_node.layer->id,
               .opcode = static_cast<fhd::wire::ClientCompositionOpcode>(i),
 
@@ -1022,12 +1026,12 @@ void Client::SetOwnership(bool is_owner) {
   }
 }
 
-void Client::OnDisplaysChanged(cpp20::span<const uint64_t> added_display_ids,
-                               cpp20::span<const uint64_t> removed_display_ids) {
+void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
+                               cpp20::span<const DisplayId> removed_display_ids) {
   ZX_DEBUG_ASSERT(controller_->current_thread_is_loop());
 
   controller_->AssertMtxAliasHeld(controller_->mtx());
-  for (uint64_t added_display_id : added_display_ids) {
+  for (DisplayId added_display_id : added_display_ids) {
     fbl::AllocChecker ac;
     auto config = fbl::make_unique_checked<DisplayConfig>(&ac);
     if (!ac.check()) {
@@ -1062,7 +1066,7 @@ void Client::OnDisplaysChanged(cpp20::span<const uint64_t> added_display_ids,
       continue;
     }
 
-    config->current_.display_id = config->id;
+    config->current_.display_id = ToBanjoDisplayId(config->id);
     config->current_.layer_list = nullptr;
     config->current_.layer_count = 0;
 
@@ -1092,14 +1096,14 @@ void Client::OnDisplaysChanged(cpp20::span<const uint64_t> added_display_ids,
   std::vector<std::vector<fhd::wire::Mode>> modes_vector;
 
   fidl::Arena arena;
-  for (uint64_t added_display_id : added_display_ids) {
+  for (DisplayId added_display_id : added_display_ids) {
     auto config = configs_.find(added_display_id);
     if (!config.IsValid()) {
       continue;
     }
 
     fhd::wire::Info info;
-    info.id = config->id;
+    info.id = ToFidlDisplayId(config->id);
 
     const fbl::Vector<edid::timing_params>* edid_timings;
     const display_params_t* params;
@@ -1168,23 +1172,23 @@ void Client::OnDisplaysChanged(cpp20::span<const uint64_t> added_display_ids,
     coded_configs.push_back(info);
   }
 
-  std::vector<uint64_t> removed_ids;
-  removed_ids.reserve(removed_display_ids.size());
+  std::vector<uint64_t> fidl_removed_display_ids;
+  fidl_removed_display_ids.reserve(removed_display_ids.size());
 
-  for (uint64_t removed_display_id : removed_display_ids) {
+  for (DisplayId removed_display_id : removed_display_ids) {
     auto display = configs_.erase(removed_display_id);
     if (display) {
       display->pending_layers_.clear();
       display->current_layers_.clear();
-      removed_ids.push_back(display->id);
+      fidl_removed_display_ids.push_back(ToFidlDisplayId(display->id));
     }
   }
 
-  if (!coded_configs.empty() || !removed_ids.empty()) {
+  if (!coded_configs.empty() || !fidl_removed_display_ids.empty()) {
     fidl::Status result = binding_state_.SendEvents([&](auto&& endpoint) {
       return fidl::WireSendEvent(endpoint)->OnDisplaysChanged(
           fidl::VectorView<fhd::wire::Info>::FromExternal(coded_configs),
-          fidl::VectorView<uint64_t>::FromExternal(removed_ids));
+          fidl::VectorView<uint64_t>::FromExternal(fidl_removed_display_ids));
     });
     if (!result.ok()) {
       zxlogf(ERROR, "Error writing remove message: %s", result.FormatDescription().c_str());
@@ -1432,8 +1436,8 @@ void ClientProxy::SetOwnership(bool is_owner) {
   mtx_unlock(&task_mtx_);
 }
 
-void ClientProxy::OnDisplaysChanged(cpp20::span<const uint64_t> added_display_ids,
-                                    cpp20::span<const uint64_t> removed_display_ids) {
+void ClientProxy::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
+                                    cpp20::span<const DisplayId> removed_display_ids) {
   handler_.OnDisplaysChanged(added_display_ids, removed_display_ids);
 }
 
@@ -1483,7 +1487,7 @@ zx_status_t ClientProxy::OnCaptureComplete() {
   return ZX_OK;
 }
 
-zx_status_t ClientProxy::OnDisplayVsync(uint64_t display_id, zx_time_t timestamp,
+zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestamp,
                                         ConfigStamp controller_stamp) {
   ZX_DEBUG_ASSERT(mtx_trylock(controller_->mtx()) == thrd_busy);
   fidl::Status event_sending_result = fidl::Status::Ok();
@@ -1577,7 +1581,7 @@ zx_status_t ClientProxy::OnDisplayVsync(uint64_t display_id, zx_time_t timestamp
     vsync_msg_t v = buffered_vsync_messages_.front();
     buffered_vsync_messages_.pop();
     event_sending_result = handler_.binding_state().SendEvents([&](auto&& endpoint) {
-      return fidl::WireSendEvent(endpoint)->OnVsync(v.display_id, v.timestamp,
+      return fidl::WireSendEvent(endpoint)->OnVsync(ToFidlDisplayId(v.display_id), v.timestamp,
                                                     ToFidlConfigStamp(v.config_stamp), 0);
     });
     if (!event_sending_result.ok()) {
@@ -1590,7 +1594,7 @@ zx_status_t ClientProxy::OnDisplayVsync(uint64_t display_id, zx_time_t timestamp
 
   // Send the latest vsync event
   event_sending_result = handler_.binding_state().SendEvents([&](auto&& endpoint) {
-    return fidl::WireSendEvent(endpoint)->OnVsync(display_id, timestamp,
+    return fidl::WireSendEvent(endpoint)->OnVsync(ToFidlDisplayId(display_id), timestamp,
                                                   ToFidlConfigStamp(client_stamp), cookie);
   });
   if (!event_sending_result.ok()) {

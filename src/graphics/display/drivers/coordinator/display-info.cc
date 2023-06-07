@@ -7,10 +7,13 @@
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 
+#include <cinttypes>
+
 #include <audio-proto-utils/format-utils.h>
 #include <pretty/hexdump.h>
 
 #include "src/devices/lib/audio/audio.h"
+#include "src/graphics/display/drivers/coordinator/display-id.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 
 namespace display {
@@ -34,7 +37,7 @@ edid::ddc_i2c_transact ddc_tx = [](void* ctx, edid::ddc_i2c_msg_t* msgs, uint32_
 
 void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
   ZX_DEBUG_ASSERT(init_done);
-  node = parent_node->CreateChild(fbl::StringPrintf("display-%lu", id).c_str());
+  node = parent_node->CreateChild(fbl::StringPrintf("display-%" PRIu64, id.value()).c_str());
 
   if (!edid.has_value()) {
     node.CreateUint("width", params.width, &properties);
@@ -69,7 +72,7 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(const added_display_arg
 
   out->pending_layer_change = false;
   out->layer_count = 0;
-  out->id = info.display_id;
+  out->id = ToDisplayId(info.display_id);
   if (info.edid_present) {
     out->edid = DisplayInfo::Edid{};
   }

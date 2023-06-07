@@ -19,7 +19,7 @@ namespace sysmem = fuchsia_sysmem;
 namespace display {
 
 TestFidlClient::Display::Display(const fhd::wire::Info& info) {
-  id_ = info.id;
+  id_ = ToDisplayId(info.id);
 
   for (size_t i = 0; i < info.pixel_format.count(); i++) {
     pixel_formats_.push_back(info.pixel_format[i]);
@@ -38,7 +38,7 @@ TestFidlClient::Display::Display(const fhd::wire::Info& info) {
   image_config_.type = fhd::wire::kTypeSimple;
 }
 
-uint64_t TestFidlClient::display_id() const { return displays_[0].id_; }
+DisplayId TestFidlClient::display_id() const { return displays_[0].id_; }
 
 bool TestFidlClient::CreateChannel(const fidl::WireSyncClient<fhd::Provider>& provider,
                                    bool is_vc) {
@@ -258,8 +258,8 @@ zx_status_t TestFidlClient::PresentLayers(std::vector<PresentLayerInfo> present_
   for (const auto& info : present_layers) {
     layers.push_back(info.layer_id);
   }
-  if (auto reply =
-          dc_->SetDisplayLayers(display_id(), fidl::VectorView<uint64_t>::FromExternal(layers));
+  if (auto reply = dc_->SetDisplayLayers(ToFidlDisplayId(display_id()),
+                                         fidl::VectorView<uint64_t>::FromExternal(layers));
       !reply.ok()) {
     return reply.status();
   }
