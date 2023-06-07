@@ -171,7 +171,13 @@ void AnnotationControllerImpl::WatchAnnotations(WatchAnnotationsCallback callbac
   }
 
   have_pending_update_ = false;
-  GetAnnotations(std::move(reinterpret_cast<GetAnnotationsCallback&>(callback)));
+  auto watch_annot_to_get_annot_callback =
+      [&callback](::fuchsia::element::AnnotationController_GetAnnotations_Result&& result) {
+        return callback(std::move(
+            reinterpret_cast<fuchsia::element::AnnotationController_WatchAnnotations_Result&&>(
+                result)));
+      };
+  GetAnnotations(watch_annot_to_get_annot_callback);
 }
 
 }  // namespace modular
