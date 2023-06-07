@@ -746,7 +746,6 @@
                 "NetlinkRouteTest.RecvmsgTrunc",
                 "NetlinkRouteTest.RecvmsgTruncPeek",
                 "NetlinkRouteTest.PasscredCreds",
-                "NetlinkRouteTest.MsgHdrMsgTrunc",
                 "NetlinkRouteTest.MsgTruncMsgHdrMsgTrunc",
 
                 // socket_netlink_uevent
@@ -963,6 +962,7 @@
                 "AddressFamily/SendFileTest.SendMultiple/*",
                 "AddressFamily/SendFileTest.Shutdown/*",
                 "NetlinkRouteTest.LookupAll",
+                "NetlinkRouteTest.MsgHdrMsgTrunc",
                 "BindToDeviceTest/BindToDeviceDistributionTest.Tcp/*",
                 "BindToDeviceTest/BindToDeviceDistributionTest.Udp/*",
                 "BlockingTCPSockets/BlockingStreamSocketPairTest.SendMsgTooLarge/*",
