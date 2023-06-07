@@ -2,7 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("common/riscv64-common.gni")
+import("//boards/common/riscv64-common.gni")
+
 _imports = {  # Import into hidden scope, to avoid importing into args.gn.
   import("//boards/emulation/virtio_drivers.gni")
 }
@@ -25,5 +26,5 @@ board_bootfs_labels += [
 board_bootfs_labels += _imports.virtio_drivers
 
 images_config_label = "//boards/images:riscv64"
-zedboot_images_config_label = "//boards/images:zedboot_default"
+zedboot_images_config_label = "//boards/images:zedboot_qemu"
 partitions_config_label = "//boards/partitions:riscv64"

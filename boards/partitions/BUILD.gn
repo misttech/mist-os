@@ -67,6 +67,10 @@ generated_partitions_config("arm64") {
   hw_revision = "arm64"
 }
 
+generated_partitions_config("riscv64") {
+  hw_revision = "riscv64"
+}
+
 generated_partitions_config("qemu-x64") {
   hw_revision = "qemu-x64"
 }

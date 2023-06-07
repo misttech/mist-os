@@ -10,10 +10,3 @@ import("//build/suspend/config.gni")
 has_board = true
 
 target_cpu = "riscv64"
-
-# TODO(mcgrathr): This overrides the default of zedboot, which can't work since
-# there is no mexec for riscv64 so far. This just adds another pointer to the
-# main image so that nothing extra is added to the build graph, but isn't
-# really right for an image to go in an R partition. This should be changed
-# to something else when actual installation to partitions is supported.
-recovery_label = "//build/images:main_assembly"

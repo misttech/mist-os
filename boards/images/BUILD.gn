@@ -74,6 +74,11 @@ generated_images_config("arm64") {
   forward_variables_from(_default_fvm_with_size_limits, "*")
 }
 
+generated_images_config("riscv64") {
+  forward_variables_from(_default_zbi, "*")
+  forward_variables_from(_default_fvm, "*")
+}
+
 generated_images_config("x64") {
   forward_variables_from(_default_zbi, "*")
   forward_variables_from(_default_vbmeta, "*")
