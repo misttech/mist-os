@@ -28,11 +28,11 @@ class CustomTypesTests(unittest.TestCase):
             (
                 "valid_ipv6_scope", "[::1%eth0]:8081",
                 custom_types.IpPort(
-                    ip=ipaddress.ip_address("::1"), scope='eth0', port=8081)),
+                    ip=ipaddress.ip_address("::1"), scope="eth0", port=8081)),
             (
                 "valid_ipv6_scope_digit", "[::1%123]:8081",
                 custom_types.IpPort(
-                    ip=ipaddress.ip_address("::1"), scope='123', port=8081)),
+                    ip=ipaddress.ip_address("::1"), scope="123", port=8081)),
             (
                 "valid_ipv6_no_brackets", "::1:8081",
                 custom_types.IpPort(
@@ -40,7 +40,7 @@ class CustomTypesTests(unittest.TestCase):
         ])
     def test_parse(self, _, addr: str, expected: custom_types.IpPort) -> None:
         """Test cases for IpPort.parse()."""
-        got = custom_types.IpPort.parse(addr)
+        got: custom_types.IpPort = custom_types.IpPort.parse(addr)
         self.assertEqual(got, expected)
 
     @parameterized.expand(

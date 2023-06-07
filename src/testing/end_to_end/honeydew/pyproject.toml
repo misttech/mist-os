@@ -23,5 +23,4 @@ guidelines = [
     "pylint",         # required for code linting
     "mypy",           # required for type checking
     "pytype",         # required for type checking
-    "yapf",           # required for formatting
 ]

@@ -152,11 +152,17 @@ follow the below instructions every time HoneyDew code is changed.
 #### Install dependencies
 * Below guidelines requires certain dependencies that are not yet available
   in [Fuchsia third-party]. So for the time being you need to [pip] install
-  each of these dependent module either inside a [python virtual environment]
-  (activate virtual environment and run `pip install <dependency-module>`) or at
-  system level (`pip install --user <dependency-module>`)
+  each of these dependent module inside a [python virtual environment]
+  * Note - Create virtual environment using `fuchsia-vendored-python` as all
+    the in-tree code is written using `fuchsia-vendored-python`
+    ```sh
+    ~/fuchsia$ mkdir -p ~/venvs/
+    ~/fuchsia$ fuchsia-vendored-python -m venv ~/venvs/fuchsia_python_venv
+    ~/fuchsia$ source ~/venvs/fuchsia_python_venv/bin/activate
+    (fuchsia_python_venv)~/fuchsia$ pip install <dependency-module>
+    ```
 * List of all these dependencies can be found in `guidelines` and `test` lists
-  defined in `[project.optional-dependencies]` section inside the
+  defined in `[project.optional-dependencies]` section of the
   [pyproject.toml](pyproject.toml) file
 
 
@@ -188,7 +194,7 @@ Broadly this is how we can define the scope of each tests:
   * Tests individual code units (such as functions) in isolation from the rest
     of the system by mocking all of the dependencies.
   * Makes it easy to test different error conditions, corner cases etc
-  * Minimum of 80% of HoneyDew code is tested using these unit tests
+  * Minimum of 90% of HoneyDew code is tested using these unit tests
 * Functional test cases
   * Aims to ensure that a given API works as intended and indeed does what it is
     supposed to do (that is, `<device>.reboot()` actually reboots Fuchsia
@@ -196,7 +202,7 @@ Broadly this is how we can define the scope of each tests:
   * Every single HoneyDew’s Host-(Fuchsia)Target interaction API should have at
     least one functional test case
 
-We use [coverage] tool for measuring 80% code coverage requirement of HoneyDew.
+We use [coverage] tool for measuring 90% code coverage requirement of HoneyDew.
 
 At this point, we do not have an automated way (in CQ) for identifying this and
 alerting the CL author prior to submitting the CL. Until then CL author need to

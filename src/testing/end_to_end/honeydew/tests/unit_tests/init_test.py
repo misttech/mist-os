@@ -6,11 +6,12 @@
 
 import os
 import subprocess
-from typing import Any, Dict, Set, Type
+from typing import Any, Dict, List, Set, Type
 import unittest
 from unittest import mock
 
 import honeydew
+from honeydew import custom_types
 from honeydew import errors
 from honeydew.device_classes.fuchsia_controller import \
     generic_fuchsia_device as fc_generic_fuchsia_device
@@ -18,10 +19,7 @@ from honeydew.device_classes.fuchsia_controller import x64 as fc_x64
 from honeydew.device_classes.sl4f import \
     generic_fuchsia_device as sl4f_generic_fuchsia_device
 from honeydew.device_classes.sl4f import x64 as sl4f_x64
-from honeydew import custom_types
-from honeydew import errors
 from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.transports.ffx import FFX
 from parameterized import parameterized
 
 
@@ -221,7 +219,8 @@ class InitTests(unittest.TestCase):
         """Test case for honeydew.create_device() where it returns a device
         from an IpPort."""
         device_name = "fuchsia-1234"
-        device_ip_port = "[::1]:8088"
+        device_ip_port: custom_types.IpPort = custom_types.IpPort.parse(
+            "[::1]:8088")
 
         mock_ffx.return_value = mock_ffx
         mock_ffx.get_target_name.return_value = device_name
@@ -268,7 +267,8 @@ class InitTests(unittest.TestCase):
         """Test case for honeydew.create_device() where it raises an error due
         to an exception in add_target."""
         device_name = "fuchsia-1234"
-        device_ip_port = "[::1]:8022"
+        device_ip_port: custom_types.IpPort = custom_types.IpPort.parse(
+            "[::1]:8022")
 
         mock_ffx.return_value = mock_ffx
         mock_ffx.add_target.side_effect = subprocess.CalledProcessError(
@@ -317,7 +317,8 @@ class InitTests(unittest.TestCase):
         because the returned target name is different from the given one."""
 
         device_name = "fuchsia-1234"
-        device_ip_port = "[::1]:8022"
+        device_ip_port: custom_types.IpPort = custom_types.IpPort.parse(
+            "[::1]:8022")
 
         mock_ffx.return_value = mock_ffx
         mock_ffx.get_target_name.return_value = "not-a-fuchsia-name"
@@ -364,7 +365,8 @@ class InitTests(unittest.TestCase):
         target since it is already registered."""
 
         device_name = "fuchsia-1234"
-        device_ip_port = "[::1]:8022"
+        device_ip_port: custom_types.IpPort = custom_types.IpPort.parse(
+            "[::1]:8022")
 
         mock_ffx.return_value = mock_ffx
         mock_ffx.get_target_name.return_value = "fuchsia-1234"
@@ -404,7 +406,7 @@ class InitTests(unittest.TestCase):
             self, mock_get_device_class) -> None:
         """Test case for honeydew.get_all_affordances() for a SL4F based
         device."""
-        expected_affordances: list[str] = ["bluetooth", "component", "tracing"]
+        expected_affordances: List[str] = ["bluetooth", "component", "tracing"]
 
         self.assertEqual(
             honeydew.get_all_affordances(
@@ -422,7 +424,7 @@ class InitTests(unittest.TestCase):
             self, mock_get_device_class) -> None:
         """Test case for honeydew.get_all_affordances() for a Fuchsia-Controller
         based device."""
-        expected_affordances: list[str] = ["bluetooth", "component", "tracing"]
+        expected_affordances: List[str] = ["bluetooth", "component", "tracing"]
 
         self.assertEqual(
             honeydew.get_all_affordances(

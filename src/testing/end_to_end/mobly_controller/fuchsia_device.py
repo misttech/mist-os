@@ -123,7 +123,7 @@ def _get_fuchsia_device_info(
             continue
 
         try:
-            attr_type: Any | None = getattr(type(fuchsia_device), attr, None)
+            attr_type: Any = getattr(type(fuchsia_device), attr, None)
             if isinstance(attr_type, properties.DynamicProperty):
                 device_info["dynamic"][attr] = getattr(fuchsia_device, attr)
             elif isinstance(attr_type, properties.PersistentProperty):
@@ -135,17 +135,17 @@ def _get_fuchsia_device_info(
 
 
 def _parse_device_config(config: Dict[str, str]) -> Dict[str, Any]:
-    """Validates and parses mobly configuration associated with FuchsiaDevice controller.
+    """Validates and parses mobly configuration associated with FuchsiaDevice.
 
     Args:
-        config: The mobly configuration associated with FuchsiaDevice controller.
+        config: The mobly configuration associated with FuchsiaDevice.
 
     Returns:
-        Validated and parsed mobly configuration associated with FuchsiaDevice controller.
+        Validated and parsed mobly configuration associated with FuchsiaDevice.
 
     Raises:
         RuntimeError: If the fuchsia device name in the config is missing.
-        ValueError: If the transport is invalid, or the device_ip_port is invalid.
+        ValueError: If either transport device_ip_port is invalid.
     """
     _LOGGER.debug(
         "FuchsiaDevice controller config received in testbed yml file is '%s'",
@@ -170,8 +170,10 @@ def _parse_device_config(config: Dict[str, str]) -> Dict[str, Any]:
         if config_key == "transport":
             if config["transport"] == "sl4f":
                 device_config["transport"] = transports.TRANSPORT.SL4F
-            elif config["transport"] in transports.FUCHSIA_CONTROLLER_TRANSPORTS:
-                device_config["transport"] = transports.TRANSPORT.FUCHSIA_CONTROLLER
+            elif config[
+                    "transport"] in transports.FUCHSIA_CONTROLLER_TRANSPORTS:
+                device_config[
+                    "transport"] = transports.TRANSPORT.FUCHSIA_CONTROLLER
             else:
                 raise ValueError(
                     f"Invalid transport `{config_value}` passed for " \
@@ -179,7 +181,8 @@ def _parse_device_config(config: Dict[str, str]) -> Dict[str, Any]:
                 )
         elif config_key == "device_ip_port":
             try:
-                device_config["device_ip_port"] = custom_types.IpPort.parse(config_value)
+                device_config["device_ip_port"] = custom_types.IpPort.parse(
+                    config_value)
             except Exception as err:  # pylint: disable=broad-except
                 raise ValueError(
                     f"Invalid device_ip_port `{config_value}` passed for " \

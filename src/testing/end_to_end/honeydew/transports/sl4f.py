@@ -152,7 +152,7 @@ class SL4F:
                     interval=interval,
                     exceptions_to_skip=exceptions_to_skip)
 
-                error: str | None = http_response.get("error")
+                error: Optional[str] = http_response.get("error")
                 if not error:
                     return http_response
 

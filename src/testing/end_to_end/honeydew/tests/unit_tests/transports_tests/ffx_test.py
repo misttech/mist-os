@@ -406,9 +406,10 @@ class FfxCliTests(unittest.TestCase):
         mock_subprocess_check_output.assert_called()
 
     @mock.patch.object(ffx.subprocess, "check_output", autospec=True)
-    def test_add_target(self, mock_subprocess_check_output):
+    def test_add_target(self, mock_subprocess_check_output) -> None:
         """Test case for ffx_cli.add_target()."""
-        ip_port = custom_types.IpPort.parse("127.0.0.1:8082")
+        ip_port: custom_types.IpPort = custom_types.IpPort.parse(
+            "127.0.0.1:8082")
         ffx.FFX.add_target(target_ip_port=ip_port)
 
         mock_subprocess_check_output.assert_called_once()
@@ -441,7 +442,8 @@ class FfxCliTests(unittest.TestCase):
     def test_add_target_exception(
             self, parameterized_dict, mock_subprocess_check_output) -> None:
         """Verify ffx_cli.add_target raise exception in failure cases."""
-        ip_port = custom_types.IpPort.parse("127.0.0.1:8082")
+        ip_port: custom_types.IpPort = custom_types.IpPort.parse(
+            "127.0.0.1:8082")
         mock_subprocess_check_output.side_effect = parameterized_dict[
             "side_effect"]
 
@@ -459,8 +461,8 @@ class FfxCliTests(unittest.TestCase):
         autospec=True)
     def test_get_target_name(self, mock_ffx_get_target_information) -> None:
         """Verify get_target_name returns the name of the fuchsia device."""
-        ip_port = custom_types.IpPort.parse(
-            f'[{_SSH_ADDRESS}%{_SSH_ADDRESS_SCOPE}]:{_SSH_PORT}')
+        ip_port: custom_types.IpPort = custom_types.IpPort.parse(
+            f"[{_SSH_ADDRESS}%{_SSH_ADDRESS_SCOPE}]:{_SSH_PORT}")
         self.ffx_obj = ffx.FFX(target=str(ip_port))
 
         self.assertEqual(self.ffx_obj.get_target_name(), "fuchsia-emulator")
@@ -481,7 +483,8 @@ class FfxCliTests(unittest.TestCase):
                         subprocess.CalledProcessError(
                             returncode=1,
                             cmd=
-                            f'ffx -t "[{_SSH_ADDRESS}%{_SSH_ADDRESS_SCOPE}]:{_SSH_PORT}" target show'
+                            f"ffx -t '[{_SSH_ADDRESS}%{_SSH_ADDRESS_SCOPE}]:" \
+                            f"{_SSH_PORT}' target show"
                         )
                 },),
         ],

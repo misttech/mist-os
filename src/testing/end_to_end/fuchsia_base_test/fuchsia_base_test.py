@@ -10,7 +10,6 @@ from typing import Dict, List
 
 from honeydew import transports
 from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.transports import ffx
 from mobly import base_test
 from mobly import test_runner
 from mobly_controller import fuchsia_device as fuchsia_device_mobly_controller

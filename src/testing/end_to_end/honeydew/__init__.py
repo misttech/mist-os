@@ -13,15 +13,14 @@ import subprocess
 import types
 from typing import Any, List, Optional, Set, Type
 
-from honeydew import device_classes
 from honeydew import custom_types
+from honeydew import device_classes
 from honeydew import errors
 from honeydew import transports
 from honeydew.device_classes.fuchsia_controller import \
     generic_fuchsia_device as fc_generic_fuchsia_device
 from honeydew.device_classes.sl4f import \
     generic_fuchsia_device as sl4f_generic_fuchsia_device
-from honeydew import transports
 from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.transports import ffx as ffx_transport
 from honeydew.utils import properties
@@ -112,7 +111,7 @@ def get_all_affordances(
     for attr in dir(device_class):
         if attr.startswith("_"):
             continue
-        attr_type: Any | None = getattr(device_class, attr, None)
+        attr_type: Any = getattr(device_class, attr, None)
         if isinstance(attr_type, properties.Affordance):
             affordances.append(attr)
     return affordances
@@ -234,17 +233,16 @@ def _get_device_class(
         "Didn't find any matching device class implementation for '%s'",
         device_name)
 
+    default_device_class: Optional[Type[fuchsia_device.FuchsiaDevice]] = None
     if transport == transports.TRANSPORT.SL4F:
-        default_device_class: Type[fuchsia_device.FuchsiaDevice] = \
-            sl4f_generic_fuchsia_device.GenericFuchsiaDevice
+        default_device_class = sl4f_generic_fuchsia_device.GenericFuchsiaDevice
         _LOGGER.info(
             "Returning '%s' which is the default implementation for '%s' " \
             "using '%s' transport",
             default_device_class.__name__, device_name, transport.value)
         return default_device_class
     else:  # transports.TRANSPORT.FUCHSIA_CONTROLLER
-        default_device_class: Type[fuchsia_device.FuchsiaDevice] = \
-            fc_generic_fuchsia_device.GenericFuchsiaDevice
+        default_device_class = fc_generic_fuchsia_device.GenericFuchsiaDevice
     _LOGGER.info(
         "Returning '%s' which is the default implementation for '%s' " \
         "using '%s' transport",
