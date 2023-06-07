@@ -35,7 +35,6 @@ library_headers("headers") {
   }
 
   headers = [
-    "lib/elfldltl/abi-ptr.h",
     "lib/elfldltl/compat-hash.h",
     "lib/elfldltl/constants.h",
     "lib/elfldltl/container.h",
