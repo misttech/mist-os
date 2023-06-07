@@ -140,4 +140,28 @@ declare_args() {
   #
   #   (There are other rewrapper options that are not exposed.)
   cxx_rbe_exec_strategy = "remote_local_fallback"
+
+  # Run one of the more expensive checks, intended for CI.
+  # All of these require cxx_rbe_enable=true.
+  #
+  # One of:
+  #
+  #   * "none": No additional check.
+  #
+  #   * "determinism":
+  #       Check of determinism of C++ targets by running locally twice
+  #       and comparing outputs, failing if any differences are found.
+  #       Even though this check doesn't involve RBE, it uses the same
+  #       wrapper script, which knows what output files to expect and
+  #       compare.
+  #
+  #       Build outputs that depend on time are discouraged because they
+  #       impact caching.  Known bad preprocessing macros include
+  #       __DATE__ and __TIME__.
+  #
+  #   * "consistency":
+  #       Check consistency between local and remote C++ compiles,
+  #       by running both and comparing results.
+  #
+  cxx_rbe_check = "none"
 }
