@@ -7,10 +7,11 @@ mod suite_definition;
 
 use crate::{connector::RunConnector, suite_definition::TestParamsOptions};
 use anyhow::{anyhow, format_err, Context, Result};
+use async_trait::async_trait;
 use either::Either;
 use errors::{ffx_bail, ffx_bail_with_code, ffx_error, ffx_error_with_code, FfxError};
-use ffx_core::ffx_plugin;
 use ffx_test_args::{ListCommand, RunCommand, TestCommand, TestSubCommand};
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_developer_remotecontrol as fremotecontrol;
 use fidl_fuchsia_test_manager as ftest_manager;
@@ -42,22 +43,34 @@ lazy_static! {
 /// times this occurs.
 const SUITE_BATCH_SIZE: usize = 100;
 
-#[ffx_plugin()]
-pub async fn test(
-    remote_control_result: Result<fremotecontrol::RemoteControlProxy>,
+#[derive(FfxTool)]
+pub struct TestTool {
+    #[command]
     cmd: TestCommand,
-) -> Result<()> {
-    let writer = Box::new(stdout());
-    let remote_control =
-        remote_control_result.map_err(|e| ffx_error_with_code!(*SETUP_FAILED_CODE, "{:?}", e))?;
-    match cmd.subcommand {
-        TestSubCommand::Run(run) => run_test(remote_control, writer, run).await,
-        TestSubCommand::List(list) => {
-            let query_proxy = testing_lib::connect_to_query(&remote_control)
-                .await
-                .map_err(|e| ffx_error_with_code!(*SETUP_FAILED_CODE, "{:?}", e))?;
-            get_tests(query_proxy, writer, list).await
+    rcs: fho::Deferred<fremotecontrol::RemoteControlProxy>,
+}
+
+fho::embedded_plugin!(TestTool);
+
+#[async_trait(?Send)]
+impl FfxMain for TestTool {
+    type Writer = SimpleWriter;
+
+    // TODO(fxbug.dev/127955): use Writer when it becomes possible.
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        let writer = Box::new(stdout());
+        let remote_control =
+            self.rcs.await.map_err(|e| ffx_error_with_code!(*SETUP_FAILED_CODE, "{:?}", e))?;
+        match self.cmd.subcommand {
+            TestSubCommand::Run(run) => run_test(remote_control, writer, run).await?,
+            TestSubCommand::List(list) => {
+                let query_proxy = testing_lib::connect_to_query(&remote_control)
+                    .await
+                    .map_err(|e| ffx_error_with_code!(*SETUP_FAILED_CODE, "{:?}", e))?;
+                get_tests(query_proxy, writer, list).await?;
+            }
         }
+        Ok(())
     }
 }
 
