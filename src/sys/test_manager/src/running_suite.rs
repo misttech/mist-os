@@ -673,10 +673,7 @@ async fn get_realm(
     }));
     debug_data_decl.capabilities.push(cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
         name: "fuchsia.debugdata.Publisher".parse().unwrap(),
-        source_path: Some(cm_rust::CapabilityPath {
-            dirname: "/svc".into(),
-            basename: "fuchsia.debugdata.Publisher".into(),
-        }),
+        source_path: Some("/svc/fuchsia.debugdata.Publisher".parse().unwrap()),
     }));
     wrapper_realm.replace_component_decl(&debug_data, debug_data_decl).await?;
 
@@ -694,10 +691,7 @@ async fn get_realm(
     hermetic_resolver_decl.capabilities.push(cm_rust::CapabilityDecl::Resolver(
         cm_rust::ResolverDecl {
             name: HERMETIC_RESOLVER_CAPABILITY_NAME.parse().unwrap(),
-            source_path: Some(cm_rust::CapabilityPath {
-                dirname: "/svc".into(),
-                basename: "fuchsia.component.resolution.Resolver".into(),
-            }),
+            source_path: Some("/svc/fuchsia.component.resolution.Resolver".parse().unwrap()),
         },
     ));
 

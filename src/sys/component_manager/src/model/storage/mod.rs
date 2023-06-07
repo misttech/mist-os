@@ -19,7 +19,6 @@ use {
     anyhow::Error,
     clonable_error::ClonableError,
     cm_moniker::{InstancedAbsoluteMoniker, InstancedRelativeMoniker},
-    cm_rust::CapabilityPath,
     derivative::Derivative,
     fidl::endpoints,
     fidl_fuchsia_io as fio,
@@ -48,7 +47,7 @@ pub struct BackingDirectoryInfo {
 
     /// The path to the backing directory in the providing component's outgoing directory (or
     /// component_manager's namespace).
-    pub backing_directory_path: CapabilityPath,
+    pub backing_directory_path: cm_types::Path,
 
     /// The subdirectory inside of the backing directory capability to use, if any
     pub backing_directory_subdir: Option<PathBuf>,
@@ -81,7 +80,7 @@ pub enum StorageError {
     #[error("failed to open {:?}'s directory {}: {} ", dir_source_moniker, dir_source_path, err)]
     OpenRoot {
         dir_source_moniker: Option<InstancedAbsoluteMoniker>,
-        dir_source_path: CapabilityPath,
+        dir_source_path: cm_types::Path,
         #[source]
         err: ClonableError,
     },
@@ -95,7 +94,7 @@ pub enum StorageError {
     )]
     Open {
         dir_source_moniker: Option<InstancedAbsoluteMoniker>,
-        dir_source_path: CapabilityPath,
+        dir_source_path: cm_types::Path,
         relative_moniker: InstancedRelativeMoniker,
         instance_id: Option<ComponentInstanceId>,
         #[source]
@@ -110,7 +109,7 @@ pub enum StorageError {
     )]
     OpenById {
         dir_source_moniker: Option<InstancedAbsoluteMoniker>,
-        dir_source_path: CapabilityPath,
+        dir_source_path: cm_types::Path,
         instance_id: ComponentInstanceId,
         #[source]
         err: ClonableError,
@@ -125,7 +124,7 @@ pub enum StorageError {
     )]
     Remove {
         dir_source_moniker: Option<InstancedAbsoluteMoniker>,
-        dir_source_path: CapabilityPath,
+        dir_source_path: cm_types::Path,
         relative_moniker: InstancedRelativeMoniker,
         instance_id: Option<ComponentInstanceId>,
         #[source]
@@ -145,7 +144,7 @@ pub enum StorageError {
 impl StorageError {
     pub fn open_root(
         dir_source_moniker: Option<InstancedAbsoluteMoniker>,
-        dir_source_path: CapabilityPath,
+        dir_source_path: cm_types::Path,
         err: impl Into<Error>,
     ) -> Self {
         Self::OpenRoot { dir_source_moniker, dir_source_path, err: err.into().into() }
@@ -153,7 +152,7 @@ impl StorageError {
 
     pub fn open(
         dir_source_moniker: Option<InstancedAbsoluteMoniker>,
-        dir_source_path: CapabilityPath,
+        dir_source_path: cm_types::Path,
         relative_moniker: InstancedRelativeMoniker,
         instance_id: Option<ComponentInstanceId>,
         err: impl Into<Error>,
@@ -169,7 +168,7 @@ impl StorageError {
 
     pub fn open_by_id(
         dir_source_moniker: Option<InstancedAbsoluteMoniker>,
-        dir_source_path: CapabilityPath,
+        dir_source_path: cm_types::Path,
         instance_id: ComponentInstanceId,
         err: impl Into<Error>,
     ) -> Self {
@@ -178,7 +177,7 @@ impl StorageError {
 
     pub fn remove(
         dir_source_moniker: Option<InstancedAbsoluteMoniker>,
-        dir_source_path: CapabilityPath,
+        dir_source_path: cm_types::Path,
         relative_moniker: InstancedRelativeMoniker,
         instance_id: Option<ComponentInstanceId>,
         err: impl Into<Error>,
@@ -573,7 +572,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .directory(DirectoryDecl {
                         name: "data".parse().unwrap(),
-                        source_path: Some("/data".try_into().unwrap()),
+                        source_path: Some("/data".parse().unwrap()),
                         rights: fio::RW_STAR_DIR,
                     })
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
@@ -594,7 +593,7 @@ mod tests {
             .look_up(&vec!["b"].try_into().unwrap())
             .await
             .expect("failed to find component for b:0");
-        let dir_source_path = CapabilityPath::try_from("/data").unwrap();
+        let dir_source_path: cm_types::Path = "/data".parse().unwrap();
         let relative_moniker = InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
 
         // Open.
@@ -664,7 +663,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .directory(DirectoryDecl {
                         name: "data".parse().unwrap(),
-                        source_path: Some("/data".try_into().unwrap()),
+                        source_path: Some("/data".parse().unwrap()),
                         rights: fio::RW_STAR_DIR,
                     })
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
@@ -685,7 +684,7 @@ mod tests {
             .look_up(&vec!["b"].try_into().unwrap())
             .await
             .expect("failed to find component for b:0");
-        let dir_source_path = CapabilityPath::try_from("/data").unwrap();
+        let dir_source_path: cm_types::Path = "/data".parse().unwrap();
         let relative_moniker = InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
 
         // open the storage directory using instance ID.
@@ -766,7 +765,7 @@ mod tests {
         let res = open_isolated_storage(
             &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&test.model.root())),
-                backing_directory_path: CapabilityPath::try_from("/data").unwrap().clone(),
+                backing_directory_path: "/data".parse().unwrap(),
                 backing_directory_subdir: None,
                 storage_subdir: None,
                 storage_source_moniker: InstancedAbsoluteMoniker::root(),
@@ -788,7 +787,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .directory(DirectoryDecl {
                         name: "data".parse().unwrap(),
-                        source_path: Some("/data".try_into().unwrap()),
+                        source_path: Some("/data".parse().unwrap()),
                         rights: fio::RW_STAR_DIR,
                     })
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
@@ -809,7 +808,7 @@ mod tests {
             .look_up(&vec!["b"].try_into().unwrap())
             .await
             .expect("failed to find component for b:0");
-        let dir_source_path = CapabilityPath::try_from("/data").unwrap();
+        let dir_source_path: cm_types::Path = "/data".parse().unwrap();
         let storage_moniker = InstancedAbsoluteMoniker::try_from(vec!["c:0"]).unwrap();
         let parent_moniker = InstancedRelativeMoniker::try_from(vec!["c:0"]).unwrap();
         let child_moniker = InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
@@ -923,7 +922,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .directory(DirectoryDecl {
                         name: "data".parse().unwrap(),
-                        source_path: Some("/data".try_into().unwrap()),
+                        source_path: Some("/data".parse().unwrap()),
                         rights: fio::RW_STAR_DIR,
                     })
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
@@ -944,7 +943,7 @@ mod tests {
             .look_up(&vec!["b"].try_into().unwrap())
             .await
             .expect("failed to find component for b:0");
-        let dir_source_path = CapabilityPath::try_from("/data").unwrap();
+        let dir_source_path: cm_types::Path = "/data".parse().unwrap();
         let parent_moniker = InstancedAbsoluteMoniker::try_from(vec!["c:0"]).unwrap();
         let child_moniker = InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
         let instance_id = ComponentInstanceId::from_str(&component_id_index::gen_instance_id(

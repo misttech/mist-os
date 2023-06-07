@@ -14,7 +14,6 @@ use {
         },
     },
     async_trait::async_trait,
-    cm_rust::{CapabilityPath, ProtocolDecl},
     cm_task_scope::TaskScope,
     cm_types::Name,
     cm_util::channel,
@@ -32,12 +31,9 @@ use {
 lazy_static! {
     pub static ref BINDER_SERVICE: Name = "fuchsia.component.Binder".parse().unwrap();
     pub static ref BINDER_CAPABILITY: ComponentCapability =
-        ComponentCapability::Protocol(ProtocolDecl {
+        ComponentCapability::Protocol(cm_rust::ProtocolDecl {
             name: BINDER_SERVICE.clone(),
-            source_path: Some(CapabilityPath {
-                basename: "fuchsia.component.Binder".into(),
-                dirname: "svc".into()
-            }),
+            source_path: Some("/svc/fuchsia.component.Binder".parse().unwrap()),
         });
 }
 

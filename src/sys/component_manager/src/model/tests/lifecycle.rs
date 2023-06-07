@@ -22,8 +22,8 @@ use {
     assert_matches::assert_matches,
     async_trait::async_trait,
     cm_rust::{
-        Availability, CapabilityPath, ComponentDecl, RegistrationSource, RunnerDecl,
-        RunnerRegistration, UseEventStreamDecl, UseSource,
+        Availability, ComponentDecl, RegistrationSource, RunnerDecl, RunnerRegistration,
+        UseEventStreamDecl, UseSource,
     },
     cm_rust_testing::*,
     cm_types::Name,
@@ -34,7 +34,7 @@ use {
     futures::{channel::mpsc, future::pending, join, lock::Mutex, prelude::*},
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker},
     std::sync::{Arc, Weak},
-    std::{collections::HashSet, convert::TryFrom, str::FromStr},
+    std::{collections::HashSet, convert::TryFrom},
 };
 
 async fn new_model(
@@ -337,7 +337,7 @@ async fn bind_eager_children_reentrant() {
                     )
                     .runner(RunnerDecl {
                         name: "foo".parse().unwrap(),
-                        source_path: Some(CapabilityPath::try_from("/svc/runner").unwrap()),
+                        source_path: Some("/svc/runner".parse().unwrap()),
                     })
                     .add_environment(
                         EnvironmentDeclBuilder::new()
@@ -362,7 +362,7 @@ async fn bind_eager_children_reentrant() {
     let (runner_service, mut receiver) =
         create_service_directory_entry::<fcrunner::ComponentRunnerMarker>();
     let mut out_dir = OutDir::new();
-    out_dir.add_entry(CapabilityPath::try_from("/svc/runner").unwrap(), runner_service);
+    out_dir.add_entry("/svc/runner".parse().unwrap(), runner_service);
     mock_runner.add_host_fn("test:///a_resolved", out_dir.host_fn());
 
     // Start the top component, and check that it and the eager components were started.
@@ -432,8 +432,7 @@ async fn bind_action_sequence() {
                         source_name: event,
                         source: UseSource::Parent,
                         scope: None,
-                        target_path: CapabilityPath::from_str("/svc/fuchsia.component.EventStream")
-                            .unwrap(),
+                        target_path: "/svc/fuchsia.component.EventStream".parse().unwrap(),
                         filter: None,
                         availability: Availability::Required,
                     },
@@ -564,11 +563,7 @@ async fn on_terminate_stop_triggers_reboot() {
     let test = RoutingTestBuilder::new("root", components)
         .set_reboot_on_terminate_enabled(true)
         .set_reboot_on_terminate_policy(vec![AllowlistEntryBuilder::new().exact("system").build()])
-        .add_outgoing_path(
-            "root",
-            CapabilityPath::try_from(&reboot_protocol_path as &str).unwrap(),
-            reboot_service,
-        )
+        .add_outgoing_path("root", reboot_protocol_path.parse().unwrap(), reboot_service)
         .build()
         .await;
 
@@ -625,11 +620,7 @@ async fn on_terminate_exit_triggers_reboot() {
     let test = RoutingTestBuilder::new("root", components)
         .set_reboot_on_terminate_enabled(true)
         .set_reboot_on_terminate_policy(vec![AllowlistEntryBuilder::new().exact("system").build()])
-        .add_outgoing_path(
-            "root",
-            CapabilityPath::try_from(&reboot_protocol_path as &str).unwrap(),
-            reboot_service,
-        )
+        .add_outgoing_path("root", reboot_protocol_path.parse().unwrap(), reboot_service)
         .build()
         .await;
 
@@ -682,11 +673,7 @@ async fn reboot_shutdown_does_not_trigger_reboot() {
     let test = RoutingTestBuilder::new("root", components)
         .set_reboot_on_terminate_enabled(true)
         .set_reboot_on_terminate_policy(vec![AllowlistEntryBuilder::new().exact("system").build()])
-        .add_outgoing_path(
-            "root",
-            CapabilityPath::try_from(&reboot_protocol_path as &str).unwrap(),
-            reboot_service,
-        )
+        .add_outgoing_path("root", reboot_protocol_path.parse().unwrap(), reboot_service)
         .build()
         .await;
 
@@ -789,11 +776,7 @@ async fn on_terminate_with_failed_reboot_panics() {
     let test = RoutingTestBuilder::new("root", components)
         .set_reboot_on_terminate_enabled(true)
         .set_reboot_on_terminate_policy(vec![AllowlistEntryBuilder::new().exact("system").build()])
-        .add_outgoing_path(
-            "root",
-            CapabilityPath::try_from(&reboot_protocol_path as &str).unwrap(),
-            reboot_service,
-        )
+        .add_outgoing_path("root", reboot_protocol_path.parse().unwrap(), reboot_service)
         .build()
         .await;
 

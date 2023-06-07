@@ -4,12 +4,11 @@
 
 use {
     super::mocks::HostFn,
-    cm_rust::CapabilityPath,
     fidl::endpoints::ServerEnd,
     fidl_fidl_examples_routing_echo::{EchoRequest, EchoRequestStream},
     fidl_fuchsia_io as fio,
     futures::TryStreamExt,
-    std::{collections::HashMap, convert::TryFrom, sync::Arc},
+    std::{collections::HashMap, sync::Arc},
     vfs::{
         self, directory::entry::DirectoryEntry, directory::immutable::simple as pfs,
         execution_scope::ExecutionScope, file::vmo::read_only, remote::remote_dir, service::host,
@@ -20,7 +19,7 @@ use {
 /// Used to construct and then host an outgoing directory.
 #[derive(Clone)]
 pub struct OutDir {
-    paths: HashMap<CapabilityPath, Arc<dyn DirectoryEntry>>,
+    paths: HashMap<cm_types::Path, Arc<dyn DirectoryEntry>>,
 }
 
 impl OutDir {
@@ -29,24 +28,24 @@ impl OutDir {
     }
 
     /// Add a `DirectoryEntry` served at the given path.
-    pub fn add_entry(&mut self, path: CapabilityPath, entry: Arc<dyn DirectoryEntry>) {
+    pub fn add_entry(&mut self, path: cm_types::Path, entry: Arc<dyn DirectoryEntry>) {
         self.paths.insert(path, entry);
     }
 
     /// Adds a file providing the echo protocol at the given path.
-    pub fn add_echo_protocol(&mut self, path: CapabilityPath) {
+    pub fn add_echo_protocol(&mut self, path: cm_types::Path) {
         self.add_entry(path, host(Self::echo_protocol_fn));
     }
 
     /// Adds a static file at the given path.
-    pub fn add_static_file(&mut self, path: CapabilityPath, contents: &str) {
+    pub fn add_static_file(&mut self, path: cm_types::Path, contents: &str) {
         self.add_entry(path, read_only(String::from(contents)));
     }
 
     /// Adds the given directory proxy at location "/data".
     pub fn add_directory_proxy(&mut self, test_dir_proxy: &fio::DirectoryProxy) {
         self.add_entry(
-            CapabilityPath::try_from("/data").unwrap(),
+            "/data".parse().unwrap(),
             remote_dir(
                 fuchsia_fs::directory::clone_no_describe(&test_dir_proxy, None)
                     .expect("could not clone directory"),

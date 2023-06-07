@@ -62,10 +62,7 @@ async fn resolver_receives_expected_request_params() -> Result<(), Error> {
     }));
     resolver_decl.capabilities.push(cm_rust::CapabilityDecl::Resolver(cm_rust::ResolverDecl {
         name: fcresolution::ResolverMarker::PROTOCOL_NAME.parse().unwrap(),
-        source_path: Some(cm_rust::CapabilityPath {
-            dirname: "/svc".into(),
-            basename: "fuchsia.component.resolution.Resolver".into(),
-        }),
+        source_path: Some("/svc/fuchsia.component.resolution.Resolver".parse().unwrap()),
     }));
     builder.replace_component_decl(RESOLVER_NAME, resolver_decl).await?;
 

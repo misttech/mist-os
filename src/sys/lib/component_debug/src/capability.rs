@@ -124,7 +124,7 @@ mod tests {
                     uses: vec![UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "fuchsia.foo.bar".parse().unwrap(),
-                        target_path: "/svc/fuchsia.foo.bar".try_into().unwrap(),
+                        target_path: "/svc/fuchsia.foo.bar".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     })],
@@ -148,7 +148,7 @@ mod tests {
                     })],
                     capabilities: vec![CapabilityDecl::Protocol(ProtocolDecl {
                         name: "fuchsia.foo.bar".parse().unwrap(),
-                        source_path: Some("/svc/fuchsia.foo.bar".try_into().unwrap()),
+                        source_path: Some("/svc/fuchsia.foo.bar".parse().unwrap()),
                     })],
                     ..ComponentDecl::default()
                 }
@@ -183,7 +183,7 @@ mod tests {
                         UseDecl::Protocol(UseProtocolDecl {
                             source: UseSource::Parent,
                             source_name: "fuchsia.foo.bar".parse().unwrap(),
-                            target_path: "/svc/fuchsia.foo.bar".try_into().unwrap(),
+                            target_path: "/svc/fuchsia.foo.bar".parse().unwrap(),
                             dependency_type: DependencyType::Strong,
                             availability: Availability::Required
                         })
@@ -228,7 +228,7 @@ mod tests {
                         capability,
                         CapabilityDecl::Protocol(ProtocolDecl {
                             name: "fuchsia.foo.bar".parse().unwrap(),
-                            source_path: Some("/svc/fuchsia.foo.bar".try_into().unwrap()),
+                            source_path: Some("/svc/fuchsia.foo.bar".parse().unwrap()),
                         })
                     );
                 }

@@ -18,7 +18,7 @@ use {
     },
     clonable_error::ClonableError,
     cm_logger::scoped::ScopedLogger,
-    cm_rust::{self, CapabilityPath, ComponentDecl, UseDecl, UseProtocolDecl},
+    cm_rust::{self, ComponentDecl, UseDecl, UseProtocolDecl},
     cm_task_scope::TaskScope,
     fidl::{
         endpoints::{create_endpoints, ClientEnd, ServerEnd},
@@ -376,7 +376,7 @@ async fn start_directory_waiters(
 fn add_service_or_protocol_use(
     svc_dirs: &mut HashMap<String, Directory>,
     use_: UseDecl,
-    capability_path: &CapabilityPath,
+    capability_path: &cm_types::Path,
     component: WeakComponentInstance,
 ) {
     let not_found_component_copy = component.clone();
@@ -449,21 +449,22 @@ fn add_service_or_protocol_use(
         scope.spawn(async move { component.blocking_task_scope().add_task(task).await })
     };
 
-    let service_dir = svc_dirs.entry(capability_path.dirname.clone().into()).or_insert_with(|| {
-        make_dir_with_not_found_logging(
-            capability_path.dirname.clone().into(),
-            not_found_component_copy,
-        )
-    });
+    let service_dir =
+        svc_dirs.entry(capability_path.dirname().clone().into()).or_insert_with(|| {
+            make_dir_with_not_found_logging(
+                capability_path.dirname().clone().into(),
+                not_found_component_copy,
+            )
+        });
     // NOTE: UseEventStream is special, in that we can route a single stream from multiple
     // sources (merging them).
     if matches!(use_clone, UseDecl::EventStream(_)) {
         // Ignore duplication error if already exists
-        service_dir.clone().add_entry(&capability_path.basename, remote(route_open_fn)).ok();
+        service_dir.clone().add_entry(capability_path.basename(), remote(route_open_fn)).ok();
     } else {
         service_dir
             .clone()
-            .add_entry(&capability_path.basename, remote(route_open_fn))
+            .add_entry(capability_path.basename(), remote(route_open_fn))
             .expect("could not add service to directory");
     }
 }
@@ -597,19 +598,16 @@ pub mod test {
     use {
         super::*,
         crate::model::testing::test_helpers::MockServiceRequest,
-        cm_rust::{Availability, CapabilityPath, DependencyType, UseProtocolDecl, UseSource},
+        cm_rust::{Availability, DependencyType, UseProtocolDecl, UseSource},
         fidl::endpoints,
         fidl_fuchsia_component_runner as fcrunner,
         fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest},
         fuchsia_async,
         fuchsia_component::server::ServiceFs,
         futures::StreamExt,
-        std::{
-            convert::TryFrom,
-            sync::{
-                atomic::{AtomicU8, Ordering},
-                Arc,
-            },
+        std::sync::{
+            atomic::{AtomicU8, Ordering},
+            Arc,
         },
     };
 
@@ -643,7 +641,7 @@ pub mod test {
         let log_decl = UseProtocolDecl {
             source: UseSource::Parent,
             source_name: "logsink".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/fuchsia.logger.LogSink").unwrap(),
+            target_path: "/fuchsia.logger.LogSink".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         };
@@ -670,7 +668,7 @@ pub mod test {
         let log_decl = UseProtocolDecl {
             source: UseSource::Parent,
             source_name: "logsink".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/arbitrary-dir/fuchsia.logger.LogSink").unwrap(),
+            target_path: "/arbitrary-dir/fuchsia.logger.LogSink".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         };
@@ -696,7 +694,7 @@ pub mod test {
         let log_decl = UseProtocolDecl {
             source: UseSource::Parent,
             source_name: "logsink".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/fuchsia.logger.LogSink").unwrap(),
+            target_path: "/svc/fuchsia.logger.LogSink".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         };
@@ -736,7 +734,7 @@ pub mod test {
         let log_decl = UseProtocolDecl {
             source: UseSource::Parent,
             source_name: "logsink".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/fuchsia.logger.LogSink").unwrap(),
+            target_path: "/svc/fuchsia.logger.LogSink".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         };
@@ -759,7 +757,7 @@ pub mod test {
         let log_decl = UseProtocolDecl {
             source: UseSource::Parent,
             source_name: "logsink".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/fuchsia.logger.LogSink").unwrap(),
+            target_path: "/svc/fuchsia.logger.LogSink".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         };

@@ -66,7 +66,7 @@ use {
         environment::{DebugRegistry, RunnerRegistry},
     },
     anyhow::{format_err, Context as _, Error},
-    cm_rust::{Availability, CapabilityPath, RunnerRegistration, UseEventStreamDecl, UseSource},
+    cm_rust::{Availability, RunnerRegistration, UseEventStreamDecl, UseSource},
     cm_types::Name,
     elf_runner::{
         crash_info::CrashRecords,
@@ -84,7 +84,7 @@ use {
     fuchsia_zircon::{self as zx, Clock, HandleBased, Resource},
     futures::prelude::*,
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
-    std::{str::FromStr, sync::Arc},
+    std::sync::Arc,
     tracing::{info, warn},
 };
 
@@ -950,10 +950,9 @@ impl BuiltinEnvironment {
                                         source_name: EventType::Started.into(),
                                         source: UseSource::Parent,
                                         scope: None,
-                                        target_path: CapabilityPath::from_str(
-                                            "/svc/fuchsia.component.EventStream",
-                                        )
-                                        .unwrap(),
+                                        target_path: "/svc/fuchsia.component.EventStream"
+                                            .parse()
+                                            .unwrap(),
                                         filter: None,
                                         availability: Availability::Required,
                                     },
@@ -963,10 +962,9 @@ impl BuiltinEnvironment {
                                         source_name: EventType::Stopped.into(),
                                         source: UseSource::Parent,
                                         scope: None,
-                                        target_path: CapabilityPath::from_str(
-                                            "/svc/fuchsia.component.EventStream",
-                                        )
-                                        .unwrap(),
+                                        target_path: "/svc/fuchsia.component.EventStream"
+                                            .parse()
+                                            .unwrap(),
                                         filter: None,
                                         availability: Availability::Required,
                                     },
@@ -976,10 +974,9 @@ impl BuiltinEnvironment {
                                         source_name: EventType::Destroyed.into(),
                                         source: UseSource::Parent,
                                         scope: None,
-                                        target_path: CapabilityPath::from_str(
-                                            "/svc/fuchsia.component.EventStream",
-                                        )
-                                        .unwrap(),
+                                        target_path: "/svc/fuchsia.component.EventStream"
+                                            .parse()
+                                            .unwrap(),
                                         filter: None,
                                         availability: Availability::Required,
                                     },
@@ -989,10 +986,9 @@ impl BuiltinEnvironment {
                                         source_name: EventType::Discovered.into(),
                                         source: UseSource::Parent,
                                         scope: None,
-                                        target_path: CapabilityPath::from_str(
-                                            "/svc/fuchsia.component.EventStream",
-                                        )
-                                        .unwrap(),
+                                        target_path: "/svc/fuchsia.component.EventStream"
+                                            .parse()
+                                            .unwrap(),
                                         filter: None,
                                         availability: Availability::Required,
                                     },
@@ -1002,10 +998,9 @@ impl BuiltinEnvironment {
                                         source_name: EventType::Resolved.into(),
                                         source: UseSource::Parent,
                                         scope: None,
-                                        target_path: CapabilityPath::from_str(
-                                            "/svc/fuchsia.component.EventStream",
-                                        )
-                                        .unwrap(),
+                                        target_path: "/svc/fuchsia.component.EventStream"
+                                            .parse()
+                                            .unwrap(),
                                         filter: None,
                                         availability: Availability::Required,
                                     },
@@ -1015,10 +1010,9 @@ impl BuiltinEnvironment {
                                         source_name: EventType::Unresolved.into(),
                                         source: UseSource::Parent,
                                         scope: None,
-                                        target_path: CapabilityPath::from_str(
-                                            "/svc/fuchsia.component.EventStream",
-                                        )
-                                        .unwrap(),
+                                        target_path: "/svc/fuchsia.component.EventStream"
+                                            .parse()
+                                            .unwrap(),
                                         filter: None,
                                         availability: Availability::Required,
                                     },

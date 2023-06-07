@@ -144,14 +144,13 @@ pub mod tests {
             },
         },
         assert_matches::assert_matches,
-        cm_rust::{Availability, CapabilityPath, ComponentDecl, UseEventStreamDecl, UseSource},
+        cm_rust::{Availability, ComponentDecl, UseEventStreamDecl, UseSource},
         cm_rust_testing::ComponentDeclBuilder,
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
         fuchsia_zircon as zx,
         futures::{channel::mpsc, lock::Mutex, StreamExt},
         moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker},
         std::fmt::Debug,
-        std::str::FromStr,
         std::sync::atomic::Ordering,
     };
 
@@ -360,8 +359,7 @@ pub mod tests {
                 source_name: e.into(),
                 source: UseSource::Parent,
                 scope: None,
-                target_path: CapabilityPath::from_str("/svc/fuchsia.component.EventStream")
-                    .unwrap(),
+                target_path: "/svc/fuchsia.component.EventStream".parse().unwrap(),
                 filter: None,
                 availability: Availability::Required,
             })

@@ -1910,10 +1910,10 @@ pub mod tests {
         ::routing::component_id_index::ComponentInstanceId,
         assert_matches::assert_matches,
         cm_rust::{
-            Availability, CapabilityDecl, CapabilityPath, ChildRef, DependencyType, ExposeDecl,
-            ExposeProtocolDecl, ExposeSource, ExposeTarget, OfferDecl, OfferDirectoryDecl,
-            OfferProtocolDecl, OfferServiceDecl, OfferSource, OfferTarget, ProtocolDecl,
-            UseEventStreamDecl, UseProtocolDecl, UseSource,
+            Availability, CapabilityDecl, ChildRef, DependencyType, ExposeDecl, ExposeProtocolDecl,
+            ExposeSource, ExposeTarget, OfferDecl, OfferDirectoryDecl, OfferProtocolDecl,
+            OfferServiceDecl, OfferSource, OfferTarget, ProtocolDecl, UseEventStreamDecl,
+            UseProtocolDecl, UseSource,
         },
         cm_rust_testing::{
             ChildDeclBuilder, CollectionDeclBuilder, ComponentDeclBuilder, EnvironmentDeclBuilder,
@@ -2392,8 +2392,7 @@ pub mod tests {
                         source_name: event,
                         source: UseSource::Parent,
                         scope: None,
-                        target_path: CapabilityPath::from_str("/svc/fuchsia.component.EventStream")
-                            .unwrap(),
+                        target_path: "/svc/fuchsia.component.EventStream".parse().unwrap(),
                         filter: None,
                         availability: Availability::Required,
                     })
@@ -2455,8 +2454,7 @@ pub mod tests {
                 source_name: EventType::Stopped.into(),
                 source: UseSource::Parent,
                 scope: None,
-                target_path: CapabilityPath::from_str("/svc/fuchsia.component.EventStream")
-                    .unwrap(),
+                target_path: "/svc/fuchsia.component.EventStream".parse().unwrap(),
                 filter: None,
                 availability: Availability::Required,
             })])
@@ -2609,7 +2607,7 @@ pub mod tests {
         });
         let example_capability = ProtocolDecl {
             name: "bar".parse().unwrap(),
-            source_path: Some("/svc/bar".try_into().unwrap()),
+            source_path: Some("/svc/bar".parse().unwrap()),
         };
         let example_expose = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
@@ -2621,7 +2619,7 @@ pub mod tests {
         let example_use = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
             source_name: "baz".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/baz").expect("parsing"),
+            target_path: "/svc/baz".parse().expect("parsing"),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });

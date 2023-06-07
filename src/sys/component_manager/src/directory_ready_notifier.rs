@@ -12,10 +12,8 @@ use {
     },
     ::routing::{event::EventFilter, rights::Rights},
     async_trait::async_trait,
-    cm_rust::{
-        CapabilityPath, ComponentDecl, ExposeDecl, ExposeDirectoryDecl, ExposeSource, ExposeTarget,
-    },
-    cm_types::Name,
+    cm_rust::{ComponentDecl, ExposeDecl, ExposeDirectoryDecl, ExposeSource, ExposeTarget},
+    cm_types::{Name, Path},
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_fs, fuchsia_zircon as zx,
     futures::stream::StreamExt,
@@ -190,7 +188,7 @@ impl DirectoryReadyNotifier {
         target: &Arc<ComponentInstance>,
         outgoing_dir_result: Result<&fio::DirectoryProxy, &ModelError>,
         rights: Rights,
-        source_path: &CapabilityPath,
+        source_path: &Path,
         target_name: &Name,
     ) -> Option<Event> {
         let target_name = target_name.to_string();
@@ -420,7 +418,6 @@ mod tests {
     };
     use cm_rust_testing::ComponentDeclBuilder;
     use moniker::AbsoluteMonikerBase;
-    use std::convert::TryFrom;
     use zerocopy::AsBytes;
 
     #[fuchsia::test]
@@ -447,7 +444,7 @@ mod tests {
                 &component,
                 Ok(&proxy),
                 Rights::from(fio::R_STAR_DIR),
-                &CapabilityPath::try_from("/foo").unwrap(),
+                &"/foo".parse().unwrap(),
                 &"foo".parse().unwrap(),
             )
             .await

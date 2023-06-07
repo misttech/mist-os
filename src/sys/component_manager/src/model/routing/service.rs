@@ -1055,7 +1055,7 @@ mod tests {
             Ok(CapabilitySource::Component {
                 capability: ComponentCapability::Service(ServiceDecl {
                     name: "my.service.Service".parse().unwrap(),
-                    source_path: Some("/svc/my.service.Service".try_into().unwrap()),
+                    source_path: Some("/svc/my.service.Service".parse().unwrap()),
                 }),
                 component: self
                     .instances
@@ -1105,7 +1105,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Framework,
                         source_name: "fuchsia.component.Realm".parse().unwrap(),
-                        target_path: "/svc/fuchsia.component.Realm".try_into().unwrap(),
+                        target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
@@ -1139,7 +1139,7 @@ mod tests {
                     }))
                     .service(ServiceDecl {
                         name: "my.service.Service".parse().unwrap(),
-                        source_path: Some("/svc/my.service.Service".try_into().unwrap()),
+                        source_path: Some("/svc/my.service.Service".parse().unwrap()),
                     })
                     .build(),
             ),
@@ -1155,7 +1155,7 @@ mod tests {
                     }))
                     .service(ServiceDecl {
                         name: "my.service.Service".parse().unwrap(),
-                        source_path: Some("/svc/my.service.Service".try_into().unwrap()),
+                        source_path: Some("/svc/my.service.Service".parse().unwrap()),
                     })
                     .build(),
             ),
@@ -1171,7 +1171,7 @@ mod tests {
                     }))
                     .service(ServiceDecl {
                         name: "my.service.Service".parse().unwrap(),
-                        source_path: Some("/svc/my.service.Service".try_into().unwrap()),
+                        source_path: Some("/svc/my.service.Service".parse().unwrap()),
                     })
                     .build(),
             ),
@@ -1217,17 +1217,17 @@ mod tests {
         let test = RoutingTestBuilder::new("root", components)
             .add_outgoing_path(
                 "foo",
-                "/svc/my.service.Service".try_into().unwrap(),
+                "/svc/my.service.Service".parse().unwrap(),
                 mock_single_instance.clone(),
             )
             .add_outgoing_path(
                 "bar",
-                "/svc/my.service.Service".try_into().unwrap(),
+                "/svc/my.service.Service".parse().unwrap(),
                 mock_single_instance,
             )
             .add_outgoing_path(
                 "baz",
-                "/svc/my.service.Service".try_into().unwrap(),
+                "/svc/my.service.Service".parse().unwrap(),
                 mock_dual_instance,
             )
             .build()
@@ -1467,12 +1467,12 @@ mod tests {
         let test = RoutingTestBuilder::new("root", components)
             .add_outgoing_path(
                 "foo",
-                "/svc/my.service.Service".try_into().unwrap(),
+                "/svc/my.service.Service".parse().unwrap(),
                 mock_single_instance.clone(),
             )
             .add_outgoing_path(
                 "bar",
-                "/svc/my.service.Service".try_into().unwrap(),
+                "/svc/my.service.Service".parse().unwrap(),
                 mock_single_instance,
             )
             .build()
@@ -1544,16 +1544,8 @@ mod tests {
         };
 
         let test = RoutingTestBuilder::new("root", components)
-            .add_outgoing_path(
-                "foo",
-                "/svc/my.service.Service".try_into().unwrap(),
-                mock_instance_foo,
-            )
-            .add_outgoing_path(
-                "bar",
-                "/svc/my.service.Service".try_into().unwrap(),
-                mock_instance_bar,
-            )
+            .add_outgoing_path("foo", "/svc/my.service.Service".parse().unwrap(), mock_instance_foo)
+            .add_outgoing_path("bar", "/svc/my.service.Service".parse().unwrap(), mock_instance_bar)
             .build()
             .await;
 
@@ -1645,7 +1637,7 @@ mod tests {
         let test = RoutingTestBuilder::new("root", components)
             .add_outgoing_path(
                 "foo",
-                "/svc/my.service.Service".try_into().unwrap(),
+                "/svc/my.service.Service".parse().unwrap(),
                 mock_instance_foo.clone(),
             )
             .build()
@@ -1729,7 +1721,7 @@ mod tests {
         let test = RoutingTestBuilder::new("root", components)
             .add_outgoing_path(
                 "foo",
-                "/svc/my.service.Service".try_into().unwrap(),
+                "/svc/my.service.Service".parse().unwrap(),
                 mock_instance_foo.clone(),
             )
             .build()
@@ -1817,7 +1809,7 @@ mod tests {
         let test = RoutingTestBuilder::new("root", components)
             .add_outgoing_path(
                 "foo",
-                "/svc/my.service.Service".try_into().unwrap(),
+                "/svc/my.service.Service".parse().unwrap(),
                 mock_instance_foo.clone(),
             )
             .build()

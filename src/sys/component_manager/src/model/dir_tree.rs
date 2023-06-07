@@ -10,7 +10,7 @@ use {
         routing::{self, RouteRequest},
     },
     ::routing::capability_source::ComponentCapability,
-    cm_rust::{CapabilityPath, CapabilityTypeName, ComponentDecl, ExposeDecl, UseDecl},
+    cm_rust::{CapabilityTypeName, ComponentDecl, ExposeDecl, UseDecl},
     fidl_fuchsia_io as fio,
     std::collections::HashMap,
     std::sync::Arc,
@@ -101,7 +101,7 @@ impl DirTree {
         target_name: &str,
         exposes: Vec<&ExposeDecl>,
     ) {
-        let path: CapabilityPath =
+        let path: cm_types::Path =
             format!("/{}", target_name).parse().expect("couldn't parse name as path");
         // If there are multiple exposes, choosing the first expose for `cap`. `cap` is only used
         // for debug info.
@@ -124,18 +124,18 @@ impl DirTree {
 
     fn add_capability(
         &mut self,
-        path: CapabilityPath,
+        path: cm_types::Path,
         _type_name: CapabilityTypeName,
         routing_fn: RoutingFn,
     ) {
         // TODO(fxbug.dev/126066): Don't set this to Unknown, set it based on the type_name.
         let dirent_type = fio::DirentType::Unknown;
         let tree = self.to_directory_node(&path);
-        tree.broker_nodes.insert(path.basename.to_string(), (routing_fn, dirent_type));
+        tree.broker_nodes.insert(path.basename().to_string(), (routing_fn, dirent_type));
     }
 
-    fn to_directory_node(&mut self, path: &CapabilityPath) -> &mut DirTree {
-        let components = path.dirname.split("/");
+    fn to_directory_node(&mut self, path: &cm_types::Path) -> &mut DirTree {
+        let components = path.dirname().split("/");
         let mut tree = self;
         for component in components {
             if !component.is_empty() {
@@ -160,16 +160,13 @@ mod tests {
         },
         ::routing::component_instance::ComponentInstanceInterface,
         cm_rust::{
-            Availability, CapabilityPath, DependencyType, ExposeDecl, ExposeDirectoryDecl,
-            ExposeProtocolDecl, ExposeRunnerDecl, ExposeServiceDecl, ExposeSource, ExposeTarget,
-            UseDecl, UseDirectoryDecl, UseProtocolDecl, UseSource, UseStorageDecl,
+            Availability, DependencyType, ExposeDecl, ExposeDirectoryDecl, ExposeProtocolDecl,
+            ExposeRunnerDecl, ExposeServiceDecl, ExposeSource, ExposeTarget, UseDecl,
+            UseDirectoryDecl, UseProtocolDecl, UseSource, UseStorageDecl,
         },
         fidl::endpoints::{ClientEnd, ServerEnd},
         fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-        std::{
-            convert::{TryFrom, TryInto},
-            sync::{Arc, Weak},
-        },
+        std::sync::{Arc, Weak},
         vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path},
     };
 
@@ -181,7 +178,7 @@ mod tests {
         let decl = ComponentDecl {
             uses: vec![UseDecl::Storage(UseStorageDecl {
                 source_name: "data".parse().unwrap(),
-                target_path: "/data".try_into().unwrap(),
+                target_path: "/data".parse().unwrap(),
                 availability: Availability::Required,
             })],
             ..default_component_decl()
@@ -231,7 +228,7 @@ mod tests {
                 UseDecl::Directory(UseDirectoryDecl {
                     source: UseSource::Parent,
                     source_name: "baz-dir".parse().unwrap(),
-                    target_path: CapabilityPath::try_from("/in/data/hippo").unwrap(),
+                    target_path: "/in/data/hippo".parse().unwrap(),
                     rights: fio::Operations::CONNECT,
                     subdir: None,
                     dependency_type: DependencyType::Strong,
@@ -240,18 +237,18 @@ mod tests {
                 UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Parent,
                     source_name: "baz-svc".parse().unwrap(),
-                    target_path: CapabilityPath::try_from("/in/svc/hippo").unwrap(),
+                    target_path: "/in/svc/hippo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }),
                 UseDecl::Storage(UseStorageDecl {
                     source_name: "data".parse().unwrap(),
-                    target_path: "/in/data/persistent".try_into().unwrap(),
+                    target_path: "/in/data/persistent".parse().unwrap(),
                     availability: Availability::Required,
                 }),
                 UseDecl::Storage(UseStorageDecl {
                     source_name: "cache".parse().unwrap(),
-                    target_path: "/in/data/cache".try_into().unwrap(),
+                    target_path: "/in/data/cache".parse().unwrap(),
                     availability: Availability::Required,
                 }),
             ],

@@ -42,10 +42,10 @@ use {
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, ChildMonikerBase},
     std::{
         collections::{HashMap, HashSet},
-        convert::{TryFrom, TryInto},
         default::Default,
         fs,
         path::Path,
+        str::FromStr,
         sync::Arc,
     },
     tempfile::TempDir,
@@ -73,7 +73,7 @@ pub struct RoutingTestBuilder {
     components: Vec<(&'static str, ComponentDecl)>,
     blockers: Vec<(&'static str, (oneshot::Sender<()>, oneshot::Receiver<()>))>,
     additional_hooks: Vec<HooksRegistration>,
-    outgoing_paths: HashMap<String, HashMap<CapabilityPath, Arc<dyn DirectoryEntry>>>,
+    outgoing_paths: HashMap<String, HashMap<cm_types::Path, Arc<dyn DirectoryEntry>>>,
     builtin_runners: HashMap<Name, Arc<dyn BuiltinRunnerFactory>>,
     mock_builtin_runners: HashSet<Name>,
     namespace_capabilities: Vec<CapabilityDecl>,
@@ -114,7 +114,7 @@ impl RoutingTestBuilder {
     pub fn add_outgoing_path(
         mut self,
         component: &str,
-        path: CapabilityPath,
+        path: cm_types::Path,
         entry: Arc<dyn DirectoryEntry>,
     ) -> Self {
         self.outgoing_paths
@@ -341,10 +341,10 @@ impl RoutingTest {
     ///   - A static file `/svc/file`, containing the string "hippos" encoded as UTF-8.
     pub fn install_default_out_files(dir: &mut OutDir) {
         // Add "/svc/foo", providing an echo server.
-        dir.add_echo_protocol(CapabilityPath::try_from("/svc/foo").unwrap());
+        dir.add_echo_protocol(cm_types::Path::from_str("/svc/foo").unwrap());
 
         // Add "/svc/file", providing a read-only file.
-        dir.add_static_file(CapabilityPath::try_from("/svc/file").unwrap(), "hippos");
+        dir.add_static_file(cm_types::Path::from_str("/svc/file").unwrap(), "hippos");
     }
 
     /// Creates a dynamic child `child_decl` in `moniker`'s `collection`.
@@ -467,12 +467,12 @@ impl RoutingTest {
             .into_iter()
             .filter_map(|u| match u {
                 UseDecl::Directory(d) => Some(d.target_path.to_string()),
-                UseDecl::Service(s) => Some(s.target_path.dirname.into()),
-                UseDecl::Protocol(s) => Some(s.target_path.dirname.into()),
+                UseDecl::Service(s) => Some(s.target_path.dirname().into()),
+                UseDecl::Protocol(s) => Some(s.target_path.dirname().into()),
                 UseDecl::Storage(s) => Some(s.target_path.to_string()),
                 UseDecl::EventStream(s) => {
                     // TODO(fxbug.dev/81980): Route EventStream path
-                    Some(s.target_path.dirname.into())
+                    Some(s.target_path.dirname().into())
                 }
             })
             .collect();
@@ -508,7 +508,7 @@ impl RoutingTest {
         let component_name =
             self.start_instance_and_wait_start(&moniker).await.expect("bind instance failed");
         let component_resolved_url = Self::resolved_url(&component_name);
-        let path = "/svc/fuchsia.component.Realm".try_into().unwrap();
+        let path = "/svc/fuchsia.component.Realm".parse().unwrap();
         Self::check_namespace(component_name, &self.mock_runner, self.components.clone()).await;
         capability_util::call_realm_svc(
             path,
@@ -523,7 +523,7 @@ impl RoutingTest {
     fn build_outgoing_dir(
         decl: &ComponentDecl,
         test_dir_proxy: &fio::DirectoryProxy,
-        mut outgoing_paths: HashMap<CapabilityPath, Arc<dyn DirectoryEntry>>,
+        mut outgoing_paths: HashMap<cm_types::Path, Arc<dyn DirectoryEntry>>,
     ) -> OutDir {
         // if this decl is offering/exposing something from `Self`, let's host it
         let mut out_dir = OutDir::new();
@@ -538,7 +538,7 @@ impl RoutingTest {
             };
             if let Some(path) = path {
                 if outgoing_paths
-                    .contains_key(&CapabilityPath::try_from(&format!("{}", path) as &str).unwrap())
+                    .contains_key(&cm_types::Path::from_str(&format!("{}", path) as &str).unwrap())
                 {
                     // Client installed a custom DirectoryEntry at this path, don't serve the
                     // default.
@@ -551,7 +551,7 @@ impl RoutingTest {
                 }
                 CapabilityDecl::Service(_) => {
                     out_dir.add_echo_protocol(
-                        CapabilityPath::try_from("/svc/foo.service/default/echo").unwrap(),
+                        cm_types::Path::from_str("/svc/foo.service/default/echo").unwrap(),
                     );
                 }
                 CapabilityDecl::Directory(_) => out_dir.add_directory_proxy(test_dir_proxy),
@@ -763,7 +763,7 @@ impl RoutingTestModel for RoutingTest {
                 let storage_admin_proxy =
                     capability_util::connect_to_svc_in_namespace::<fsys::StorageAdminMarker>(
                         &namespace,
-                        &"/svc/fuchsia.sys2.StorageAdmin".try_into().unwrap(),
+                        &"/svc/fuchsia.sys2.StorageAdmin".parse().unwrap(),
                     )
                     .await;
                 let (storage_proxy, server_end) = create_proxy().unwrap();
@@ -922,7 +922,7 @@ impl RoutingTestModel for RoutingTest {
         self.model.look_up(&moniker).await.map_err(|err| anyhow!(err))
     }
 
-    async fn check_open_file(&self, moniker: AbsoluteMoniker, path: CapabilityPath) {
+    async fn check_open_file(&self, moniker: AbsoluteMoniker, path: cm_types::Path) {
         let component_name =
             self.start_instance_and_wait_start(&moniker).await.expect("start instance failed");
         let component_resolved_url = Self::resolved_url(&component_name);
@@ -988,7 +988,7 @@ pub mod capability_util {
     /// should contain the string "hello".
     pub async fn read_data_from_namespace(
         namespace: &ManagedNamespace,
-        path: CapabilityPath,
+        path: cm_types::Path,
         file: &str,
         expected_res: ExpectedResult,
     ) {
@@ -1045,7 +1045,7 @@ pub mod capability_util {
 
     pub async fn write_file_to_storage(
         namespace: &ManagedNamespace,
-        path: CapabilityPath,
+        path: cm_types::Path,
         expected_res: ExpectedResult,
     ) {
         let dir_path = path.to_string();
@@ -1178,32 +1178,31 @@ pub mod capability_util {
 
     pub async fn connect_to_svc_in_namespace<T: ProtocolMarker>(
         namespace: &ManagedNamespace,
-        path: &CapabilityPath,
+        path: &cm_types::Path,
     ) -> T::Proxy {
-        let dir_proxy = take_dir_from_namespace(namespace, &path.dirname).await;
-        let proxy =
-            connect_to_named_protocol_at_dir_root::<T>(&dir_proxy, &path.basename.to_string())
-                .expect("failed to open service");
-        add_dir_to_namespace(namespace, &path.dirname, dir_proxy).await;
+        let dir_proxy = take_dir_from_namespace(namespace, path.dirname()).await;
+        let proxy = connect_to_named_protocol_at_dir_root::<T>(&dir_proxy, path.basename())
+            .expect("failed to open service");
+        add_dir_to_namespace(namespace, path.dirname(), dir_proxy).await;
         proxy
     }
 
     pub async fn connect_to_instance_svc_in_namespace<T: ProtocolMarker>(
         namespace: &ManagedNamespace,
-        path: &CapabilityPath,
+        path: &cm_types::Path,
         instance: &str,
         member: &str,
     ) -> Result<T::Proxy, fidl::Error> {
-        let dir_proxy = take_dir_from_namespace(namespace, &path.dirname).await;
+        let dir_proxy = take_dir_from_namespace(namespace, path.dirname()).await;
         // TODO(fxbug.dev/118249): Utilize the new fuchsia_component::client method to connect to
         // the service instance, passing in the service_dir, instance name, and member path.
         let service_dir = fuchsia_fs::directory::open_directory(
             &dir_proxy,
-            &path.basename,
+            path.basename(),
             fio::OpenFlags::empty(),
         )
         .await;
-        add_dir_to_namespace(namespace, &path.dirname, dir_proxy).await;
+        add_dir_to_namespace(namespace, path.dirname(), dir_proxy).await;
         let service_dir = service_dir
             // `open_directory` could fail if service capability routing fails.
             .map_err(|e| match e {
@@ -1224,12 +1223,12 @@ pub mod capability_util {
 
     pub async fn read_service_in_namespace(
         namespace: &ManagedNamespace,
-        path: CapabilityPath,
+        path: cm_types::Path,
     ) -> Vec<String> {
-        let dir_proxy = take_dir_from_namespace(namespace, &path.dirname).await;
+        let dir_proxy = take_dir_from_namespace(namespace, path.dirname()).await;
         let service_dir = fuchsia_fs::directory::open_directory(
             &dir_proxy,
-            &path.basename,
+            path.basename(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
         )
         .await
@@ -1242,7 +1241,7 @@ pub mod capability_util {
             .map(|e| e.name)
             .collect();
 
-        add_dir_to_namespace(namespace, &path.dirname, dir_proxy).await;
+        add_dir_to_namespace(namespace, path.dirname(), dir_proxy).await;
         entries
     }
 
@@ -1250,7 +1249,7 @@ pub mod capability_util {
     /// to be fidl.examples.routing.echo.Echo.
     pub async fn call_echo_svc_from_namespace(
         namespace: &ManagedNamespace,
-        path: CapabilityPath,
+        path: cm_types::Path,
         expected_res: ExpectedResult,
     ) {
         let echo_proxy = connect_to_svc_in_namespace::<echo::EchoMarker>(namespace, &path).await;
@@ -1261,7 +1260,7 @@ pub mod capability_util {
     /// to be fidl.examples.routing.echo.Echo.
     pub async fn call_service_instance_echo_svc_from_namespace(
         namespace: &ManagedNamespace,
-        path: CapabilityPath,
+        path: cm_types::Path,
         instance: String,
         member: String,
         expected_res: ExpectedResult,
@@ -1328,21 +1327,18 @@ pub mod capability_util {
     /// Looks up `resolved_url` in the namespace, and attempts to use `path`.
     /// Expects the service to work like a fuchsia.io service, and respond with
     /// an OnOpen event when opened with OPEN_FLAG_DESCRIBE.
-    pub async fn call_file_svc_from_namespace(namespace: &ManagedNamespace, path: CapabilityPath) {
-        let dir_proxy = take_dir_from_namespace(namespace, &path.dirname).await;
-        let _file_proxy = fuchsia_fs::directory::open_file(
-            &dir_proxy,
-            &path.basename.to_string(),
-            fio::OpenFlags::empty(),
-        )
-        .await
-        .expect("failed to open file");
+    pub async fn call_file_svc_from_namespace(namespace: &ManagedNamespace, path: cm_types::Path) {
+        let dir_proxy = take_dir_from_namespace(namespace, path.dirname()).await;
+        let _file_proxy =
+            fuchsia_fs::directory::open_file(&dir_proxy, path.basename(), fio::OpenFlags::empty())
+                .await
+                .expect("failed to open file");
     }
 
     /// Attempts to read ${path}/hippo in `abs_moniker`'s exposed directory. The file should
     /// contain the string "hello".
     pub async fn read_data_from_exposed_dir<'a>(
-        path: CapabilityPath,
+        path: cm_types::Path,
         file: &str,
         abs_moniker: &'a AbsoluteMoniker,
         model: &'a Arc<Model>,
@@ -1393,7 +1389,7 @@ pub mod capability_util {
     /// Attempts to use the fidl.examples.routing.echo.Echo service at `path` in `abs_moniker`'s exposed
     /// directory.
     pub async fn call_echo_svc_from_exposed_dir<'a>(
-        path: CapabilityPath,
+        path: cm_types::Path,
         abs_moniker: &'a AbsoluteMoniker,
         model: &'a Arc<Model>,
         expected_res: ExpectedResult,
@@ -1405,7 +1401,7 @@ pub mod capability_util {
     }
 
     pub async fn call_service_instance_echo_svc_from_exposed_dir(
-        path: CapabilityPath,
+        path: cm_types::Path,
         instance: String,
         member: String,
         abs_moniker: &AbsoluteMoniker,
@@ -1431,7 +1427,7 @@ pub mod capability_util {
     }
 
     pub async fn read_service_from_exposed_dir(
-        path: CapabilityPath,
+        path: cm_types::Path,
         abs_moniker: &AbsoluteMoniker,
         model: &Arc<Model>,
     ) -> Vec<String> {
@@ -1452,15 +1448,15 @@ pub mod capability_util {
     /// Looks up `resolved_url` in the namespace, and attempts to use `path`. Expects the service
     /// to be fuchsia.component.Realm.
     pub async fn call_realm_svc(
-        path: CapabilityPath,
+        path: cm_types::Path,
         resolved_url: &str,
         namespace: &ManagedNamespace,
         bind_calls: Arc<Mutex<Vec<String>>>,
     ) {
-        let dir_proxy = take_dir_from_namespace(namespace, &path.dirname).await;
+        let dir_proxy = take_dir_from_namespace(namespace, path.dirname()).await;
         let realm_proxy = connect_to_named_protocol_at_dir_root::<fcomponent::RealmMarker>(
             &dir_proxy,
-            &path.basename.to_string(),
+            path.basename(),
         )
         .expect("failed to open realm service");
         let child_ref = fdecl::ChildRef { name: "my_child".to_string(), collection: None };
@@ -1481,7 +1477,7 @@ pub mod capability_util {
         child_decl: ChildDecl,
         args: fcomponent::CreateChildArgs,
     ) {
-        let path = CapabilityPath::try_from(&format!(
+        let path = cm_types::Path::from_str(&format!(
             "/svc/{}",
             fcomponent::RealmMarker::PROTOCOL_NAME
         ) as &str)
@@ -1528,7 +1524,7 @@ pub mod capability_util {
 
     /// Open the exposed dir for `abs_moniker`.
     async fn open_exposed_dir<'a>(
-        path: &'a CapabilityPath,
+        path: &'a cm_types::Path,
         abs_moniker: &'a AbsoluteMoniker,
         model: &'a Arc<Model>,
         directory: bool,
@@ -1560,9 +1556,9 @@ pub mod capability_util {
         }
     }
 
-    /// Function to convert a CapabilityPath to a pseudo_fs_mt::Path
-    fn to_fvfs_path(path: &CapabilityPath) -> vfs::path::Path {
-        let full_path = format!("{}/{}", path.dirname, path.basename);
+    /// Function to convert a cm_types::Path to a pseudo_fs_mt::Path
+    fn to_fvfs_path(path: &cm_types::Path) -> vfs::path::Path {
+        let full_path = format!("{}/{}", path.dirname(), path.basename());
         let split_string = full_path.split('/').filter(|s| !s.is_empty()).collect::<Vec<_>>();
         vfs::path::Path::validate_and_split(split_string.join("/"))
             .expect("Failed to validate and split path")

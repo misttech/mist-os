@@ -12,15 +12,15 @@ use {
     },
     async_trait::async_trait,
     cm_rust::{
-        CapabilityDecl, CapabilityPath, CapabilityTypeName, DirectoryDecl, EventStreamDecl,
-        ExposeDecl, ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl,
+        CapabilityDecl, CapabilityTypeName, DirectoryDecl, EventStreamDecl, ExposeDecl,
+        ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl,
         ExposeServiceDecl, ExposeSource, OfferDecl, OfferDirectoryDecl, OfferEventStreamDecl,
         OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl, OfferSource,
         OfferStorageDecl, ProtocolDecl, RegistrationSource, ResolverDecl, RunnerDecl, ServiceDecl,
         StorageDecl, UseDecl, UseDirectoryDecl, UseProtocolDecl, UseServiceDecl, UseSource,
         UseStorageDecl,
     },
-    cm_types::Name,
+    cm_types::{Name, Path},
     derivative::Derivative,
     from_enum::FromEnum,
     moniker::ChildMoniker,
@@ -427,7 +427,7 @@ impl ComponentCapability {
     }
 
     /// Return the source path of the capability, if one exists.
-    pub fn source_path(&self) -> Option<&CapabilityPath> {
+    pub fn source_path(&self) -> Option<&Path> {
         match self {
             ComponentCapability::Storage(_) => None,
             ComponentCapability::Protocol(protocol) => protocol.source_path.as_ref(),

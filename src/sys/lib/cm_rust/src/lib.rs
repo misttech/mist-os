@@ -8,7 +8,7 @@ use {
         CapabilityDeclCommon, ExposeDeclCommon, ExposeDeclCommonAlwaysRequired, FidlDecl,
         OfferDeclCommon, OfferDeclCommonNoAvailability, UseDeclCommon,
     },
-    cm_types::{AllowedOffers, Name},
+    cm_types::{AllowedOffers, Name, Path},
     fidl_fuchsia_component_config as fconfig, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess,
     flyweights::FlyStr,
@@ -19,7 +19,6 @@ use {
     std::fmt,
     std::hash::Hash,
     std::path::PathBuf,
-    std::str::FromStr,
     thiserror::Error,
 };
 
@@ -64,6 +63,19 @@ impl FidlIntoNative<Name> for String {
 }
 
 impl NativeIntoFidl<String> for Name {
+    fn native_into_fidl(self) -> String {
+        self.to_string()
+    }
+}
+
+impl FidlIntoNative<Path> for String {
+    fn fidl_into_native(self) -> Path {
+        // cm_fidl_validator should have already validated this
+        self.parse().unwrap()
+    }
+}
+
+impl NativeIntoFidl<String> for Path {
     fn native_into_fidl(self) -> String {
         self.to_string()
     }
@@ -258,7 +270,7 @@ pub enum UseDecl {
 pub struct UseServiceDecl {
     pub source: UseSource,
     pub source_name: Name,
-    pub target_path: CapabilityPath,
+    pub target_path: Path,
     pub dependency_type: DependencyType,
     #[fidl_decl(default)]
     pub availability: Availability,
@@ -270,7 +282,7 @@ pub struct UseServiceDecl {
 pub struct UseProtocolDecl {
     pub source: UseSource,
     pub source_name: Name,
-    pub target_path: CapabilityPath,
+    pub target_path: Path,
     pub dependency_type: DependencyType,
     #[fidl_decl(default)]
     pub availability: Availability,
@@ -282,7 +294,7 @@ pub struct UseProtocolDecl {
 pub struct UseDirectoryDecl {
     pub source: UseSource,
     pub source_name: Name,
-    pub target_path: CapabilityPath,
+    pub target_path: Path,
 
     #[cfg_attr(
         feature = "serde",
@@ -304,7 +316,7 @@ pub struct UseDirectoryDecl {
 #[fidl_decl(fidl_table = "fdecl::UseStorage")]
 pub struct UseStorageDecl {
     pub source_name: Name,
-    pub target_path: CapabilityPath,
+    pub target_path: Path,
     #[fidl_decl(default)]
     pub availability: Availability,
 }
@@ -339,7 +351,7 @@ pub struct UseEventStreamDecl {
     pub source_name: Name,
     pub source: UseSource,
     pub scope: Option<Vec<EventScope>>,
-    pub target_path: CapabilityPath,
+    pub target_path: Path,
     pub filter: Option<BTreeMap<String, DictionaryValue>>,
     #[fidl_decl(default)]
     pub availability: Availability,
@@ -753,7 +765,7 @@ impl CapabilityDeclCommon for CapabilityDecl {
 #[fidl_decl(fidl_table = "fdecl::Service")]
 pub struct ServiceDecl {
     pub name: Name,
-    pub source_path: Option<CapabilityPath>,
+    pub source_path: Option<Path>,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -761,7 +773,7 @@ pub struct ServiceDecl {
 #[fidl_decl(fidl_table = "fdecl::Protocol")]
 pub struct ProtocolDecl {
     pub name: Name,
-    pub source_path: Option<CapabilityPath>,
+    pub source_path: Option<Path>,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -769,7 +781,7 @@ pub struct ProtocolDecl {
 #[fidl_decl(fidl_table = "fdecl::Directory")]
 pub struct DirectoryDecl {
     pub name: Name,
-    pub source_path: Option<CapabilityPath>,
+    pub source_path: Option<Path>,
 
     #[cfg_attr(
         feature = "serde",
@@ -798,7 +810,7 @@ pub struct StorageDecl {
 #[fidl_decl(fidl_table = "fdecl::Runner")]
 pub struct RunnerDecl {
     pub name: Name,
-    pub source_path: Option<CapabilityPath>,
+    pub source_path: Option<Path>,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -806,7 +818,7 @@ pub struct RunnerDecl {
 #[fidl_decl(fidl_table = "fdecl::Resolver")]
 pub struct ResolverDecl {
     pub name: Name,
-    pub source_path: Option<CapabilityPath>,
+    pub source_path: Option<Path>,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -829,7 +841,7 @@ impl CapabilityDecl {
         }
     }
 
-    pub fn path(&self) -> Option<&CapabilityPath> {
+    pub fn path(&self) -> Option<&Path> {
         match self {
             CapabilityDecl::Directory(decl) => decl.source_path.as_ref(),
             CapabilityDecl::Protocol(decl) => decl.source_path.as_ref(),
@@ -1606,60 +1618,8 @@ fidl_translations_symmetrical_enums!(
     WeakForMigration
 );
 
-/// A path to a capability.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct CapabilityPath {
-    /// The directory containing the last path element, e.g. `/svc/foo` in `/svc/foo/bar`.
-    pub dirname: FlyStr,
-    /// The last path element: e.g. `bar` in `/svc/foo/bar`.
-    pub basename: FlyStr,
-}
-
-impl CapabilityPath {
-    pub fn to_path_buf(&self) -> PathBuf {
-        PathBuf::from(self.to_string())
-    }
-
-    /// Splits the path according to "/", ignoring empty path components
-    pub fn split(&self) -> Vec<String> {
-        self.to_string().split("/").map(|s| s.to_string()).filter(|s| !s.is_empty()).collect()
-    }
-}
-
-impl FromStr for CapabilityPath {
-    type Err = Error;
-
-    fn from_str(path: &str) -> Result<CapabilityPath, Error> {
-        cm_types::Path::validate(path)
-            .map_err(|_| Error::InvalidCapabilityPath { raw: path.to_string() })?;
-        let idx = path.rfind('/').expect("path validation is wrong");
-        Ok(CapabilityPath {
-            dirname: if idx == 0 { "/".into() } else { path[0..idx].into() },
-            basename: path[idx + 1..].into(),
-        })
-    }
-}
-
-impl TryFrom<&str> for CapabilityPath {
-    type Error = Error;
-
-    fn try_from(path: &str) -> Result<CapabilityPath, Error> {
-        Self::from_str(path)
-    }
-}
-
-impl fmt::Display for CapabilityPath {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if &self.dirname == "/" {
-            write!(f, "/{}", self.basename)
-        } else {
-            write!(f, "{}/{}", self.dirname, self.basename)
-        }
-    }
-}
-
 impl UseDecl {
-    pub fn path(&self) -> Option<&CapabilityPath> {
+    pub fn path(&self) -> Option<&Path> {
         match self {
             UseDecl::Service(d) => Some(&d.target_path),
             UseDecl::Protocol(d) => Some(&d.target_path),
@@ -1819,19 +1779,6 @@ impl FidlIntoNative<BTreeMap<String, DictionaryValue>> for fdata::Dictionary {
 impl NativeIntoFidl<fdata::Dictionary> for BTreeMap<String, DictionaryValue> {
     fn native_into_fidl(self) -> fdata::Dictionary {
         to_fidl_dict_btree(self)
-    }
-}
-
-impl FidlIntoNative<CapabilityPath> for String {
-    fn fidl_into_native(self) -> CapabilityPath {
-        // cm_fidl_validator should have already validated this
-        self.as_str().parse().unwrap()
-    }
-}
-
-impl NativeIntoFidl<String> for CapabilityPath {
-    fn native_into_fidl(self) -> String {
-        self.to_string()
     }
 }
 
@@ -2387,32 +2334,6 @@ mod tests {
         assert_eq!(res, expected_res);
     }
 
-    macro_rules! test_capability_path {
-        (
-            $(
-                $test_name:ident => {
-                    input = $input:expr,
-                    result = $result:expr,
-                },
-            )+
-        ) => {
-            $(
-                #[test]
-                fn $test_name() {
-                    test_capability_path_helper($input, $result);
-                }
-            )+
-        }
-    }
-
-    fn test_capability_path_helper(input: &str, result: Result<CapabilityPath, Error>) {
-        let res = CapabilityPath::try_from(input);
-        assert_eq!(format!("{:?}", res), format!("{:?}", result));
-        if let Ok(p) = res {
-            assert_eq!(&p.to_string(), input);
-        }
-    }
-
     test_try_from_decl! {
         try_from_empty => {
             input = fdecl::Component {
@@ -2924,7 +2845,7 @@ mod tests {
                             source: UseSource::Child("netstack".to_string()),
                             scope: Some(vec![EventScope::Child(ChildRef{ name: "a".into(), collection: None}), EventScope::Collection("b".to_string())]),
                             source_name: "stopped".parse().unwrap(),
-                            target_path: CapabilityPath::from_str("/svc/test").unwrap(),
+                            target_path: "/svc/test".parse().unwrap(),
                             filter: None,
                             availability: Availability::Optional,
                         }),
@@ -3178,44 +3099,6 @@ mod tests {
                     }),
                 }
             },
-        },
-    }
-
-    test_capability_path! {
-        capability_path_one_part => {
-            input = "/foo",
-            result = Ok(CapabilityPath{dirname: "/".into(), basename: "foo".into()}),
-        },
-        capability_path_two_parts => {
-            input = "/foo/bar",
-            result = Ok(CapabilityPath{dirname: "/foo".into(), basename: "bar".into()}),
-        },
-        capability_path_many_parts => {
-            input = "/foo/bar/long/path",
-            result = Ok(CapabilityPath{
-                dirname: "/foo/bar/long".into(),
-                basename: "path".into()
-            }),
-        },
-        capability_path_invalid_empty_part => {
-            input = "/foo/bar//long/path",
-            result = Err(Error::InvalidCapabilityPath{raw: "/foo/bar//long/path".to_string()}),
-        },
-        capability_path_invalid_empty => {
-            input = "",
-            result = Err(Error::InvalidCapabilityPath{raw: "".to_string()}),
-        },
-        capability_path_invalid_root => {
-            input = "/",
-            result = Err(Error::InvalidCapabilityPath{raw: "/".to_string()}),
-        },
-        capability_path_invalid_relative => {
-            input = "foo/bar",
-            result = Err(Error::InvalidCapabilityPath{raw: "foo/bar".to_string()}),
-        },
-        capability_path_invalid_trailing => {
-            input = "/foo/bar/",
-            result = Err(Error::InvalidCapabilityPath{raw: "/foo/bar/".to_string()}),
         },
     }
 

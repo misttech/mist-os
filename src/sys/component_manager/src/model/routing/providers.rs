@@ -13,9 +13,8 @@ use {
     ::routing::path::PathBufExt,
     async_trait::async_trait,
     clonable_error::ClonableError,
-    cm_rust::{self, CapabilityPath},
     cm_task_scope::TaskScope,
-    cm_types::Name,
+    cm_types::{Name, Path},
     cm_util::channel,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
@@ -31,7 +30,7 @@ pub struct DefaultComponentCapabilityProvider {
     pub target: WeakComponentInstance,
     pub source: WeakComponentInstance,
     pub name: Name,
-    pub path: CapabilityPath,
+    pub path: Path,
 }
 
 #[async_trait]
@@ -95,7 +94,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
 
 /// The default provider for a Namespace Capability.
 pub struct NamespaceCapabilityProvider {
-    pub path: CapabilityPath,
+    pub path: cm_types::Path,
 }
 
 #[async_trait]

@@ -197,7 +197,7 @@ async fn use_framework_service() {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    target_path: CapabilityPath::try_from("/svc/fuchsia.component.Realm").unwrap(),
+                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     availability: Availability::Required,
                 }))
                 .build(),
@@ -247,7 +247,7 @@ async fn capability_requested_event_at_parent() {
                     source: UseSource::Parent,
                     source_name: "capability_requested".parse().unwrap(),
                     scope: None,
-                    target_path: CapabilityPath::try_from("/events/capability_requested").unwrap(),
+                    target_path: "/events/capability_requested".parse().unwrap(),
                     filter: Some(btreemap! {
                         "name".to_string() => DictionaryValue::Str("foo_svc".to_string())
                     }),
@@ -263,7 +263,7 @@ async fn capability_requested_event_at_parent() {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
                     source_name: "bar_svc".parse().unwrap(),
-                    target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
+                    target_path: "/svc/hippo".parse().unwrap(),
                     availability: Availability::Required,
                 }))
                 .build(),
@@ -280,14 +280,14 @@ async fn capability_requested_event_at_parent() {
     let event_stream =
         capability_util::connect_to_svc_in_namespace::<fcomponent::EventStreamMarker>(
             &namespace_root,
-            &"/events/capability_requested".try_into().unwrap(),
+            &"/events/capability_requested".parse().unwrap(),
         )
         .await;
 
     let namespace_b = test.bind_and_get_namespace(vec!["b"].try_into().unwrap()).await;
     let _echo_proxy = capability_util::connect_to_svc_in_namespace::<echo::EchoMarker>(
         &namespace_b,
-        &"/svc/hippo".try_into().unwrap(),
+        &"/svc/hippo".parse().unwrap(),
     )
     .await;
 
@@ -361,7 +361,7 @@ async fn use_in_collection() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    target_path: CapabilityPath::try_from("/svc/fuchsia.component.Realm").unwrap(),
+                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
@@ -393,7 +393,7 @@ async fn use_in_collection() {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
                     source_name: "hippo_data".parse().unwrap(),
-                    target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
+                    target_path: "/data/hippo".parse().unwrap(),
                     rights: fio::R_STAR_DIR,
                     subdir: None,
                     availability: Availability::Required,
@@ -407,7 +407,7 @@ async fn use_in_collection() {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
                     source_name: "hippo_svc".parse().unwrap(),
-                    target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
+                    target_path: "/svc/hippo".parse().unwrap(),
                     availability: Availability::Required,
                 }))
                 .build(),
@@ -495,7 +495,7 @@ async fn use_in_collection_not_offered() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    target_path: CapabilityPath::try_from("/svc/fuchsia.component.Realm").unwrap(),
+                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
@@ -508,7 +508,7 @@ async fn use_in_collection_not_offered() {
                 .use_(UseDecl::Directory(UseDirectoryDecl {
                     source: UseSource::Parent,
                     source_name: "hippo_data".parse().unwrap(),
-                    target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
+                    target_path: "/data/hippo".parse().unwrap(),
                     rights: fio::R_STAR_DIR,
                     subdir: None,
                     dependency_type: DependencyType::Strong,
@@ -518,7 +518,7 @@ async fn use_in_collection_not_offered() {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
                     source_name: "hippo_svc".parse().unwrap(),
-                    target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
+                    target_path: "/svc/hippo".parse().unwrap(),
                     availability: Availability::Required,
                 }))
                 .build(),
@@ -586,7 +586,7 @@ async fn dynamic_offer_from_parent() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
                     source: UseSource::Framework,
-                    target_path: CapabilityPath::try_from("/svc/fuchsia.component.Realm").unwrap(),
+                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
@@ -603,7 +603,7 @@ async fn dynamic_offer_from_parent() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "hippo_svc".parse().unwrap(),
                     source: UseSource::Parent,
-                    target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
+                    target_path: "/svc/hippo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
@@ -616,7 +616,7 @@ async fn dynamic_offer_from_parent() {
                     source_name: "hippo_svc".parse().unwrap(),
                     source: UseSource::Parent,
                     dependency_type: DependencyType::Strong,
-                    target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
+                    target_path: "/svc/hippo".parse().unwrap(),
                     availability: Availability::Required,
                 }))
                 .build(),
@@ -689,7 +689,7 @@ async fn dynamic_offer_siblings_same_collection() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
                     source: UseSource::Framework,
-                    target_path: CapabilityPath::try_from("/svc/fuchsia.component.Realm").unwrap(),
+                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
@@ -719,7 +719,7 @@ async fn dynamic_offer_siblings_same_collection() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "hippo_svc".parse().unwrap(),
                     source: UseSource::Parent,
-                    target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
+                    target_path: "/svc/hippo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
@@ -789,7 +789,7 @@ async fn dynamic_offer_siblings_cross_collection() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
                     source: UseSource::Framework,
-                    target_path: CapabilityPath::try_from("/svc/fuchsia.component.Realm").unwrap(),
+                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
@@ -822,7 +822,7 @@ async fn dynamic_offer_siblings_cross_collection() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "hippo_svc".parse().unwrap(),
                     source: UseSource::Parent,
-                    target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
+                    target_path: "/svc/hippo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
@@ -892,7 +892,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
                     source: UseSource::Framework,
-                    target_path: CapabilityPath::try_from("/svc/fuchsia.component.Realm").unwrap(),
+                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
@@ -922,7 +922,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "hippo_svc".parse().unwrap(),
                     source: UseSource::Parent,
-                    target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
+                    target_path: "/svc/hippo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
@@ -1016,7 +1016,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
                     source: UseSource::Framework,
-                    target_path: CapabilityPath::try_from("/svc/fuchsia.component.Realm").unwrap(),
+                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
@@ -1048,7 +1048,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
                 .use_(UseDecl::Directory(UseDirectoryDecl {
                     source_name: "hippo_data".parse().unwrap(),
                     source: UseSource::Parent,
-                    target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
+                    target_path: "/data/hippo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     rights: fio::R_STAR_DIR,
                     subdir: None,
@@ -1144,7 +1144,7 @@ async fn dynamic_offer_to_static_offer() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
                     source: UseSource::Framework,
-                    target_path: CapabilityPath::try_from("/svc/fuchsia.component.Realm").unwrap(),
+                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
@@ -1189,7 +1189,7 @@ async fn dynamic_offer_to_static_offer() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "hippo_svc".parse().unwrap(),
                     source: UseSource::Parent,
-                    target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
+                    target_path: "/svc/hippo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
@@ -1242,7 +1242,7 @@ async fn destroying_instance_kills_framework_service_task() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    target_path: CapabilityPath::try_from("/svc/fuchsia.component.Realm").unwrap(),
+                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
@@ -1255,7 +1255,7 @@ async fn destroying_instance_kills_framework_service_task() {
     let namespace = test.bind_and_get_namespace(vec!["b"].try_into().unwrap()).await;
     let proxy = capability_util::connect_to_svc_in_namespace::<fcomponent::RealmMarker>(
         &namespace,
-        &"/svc/fuchsia.component.Realm".try_into().unwrap(),
+        &"/svc/fuchsia.component.Realm".parse().unwrap(),
     )
     .await;
 
@@ -1303,14 +1303,14 @@ async fn destroying_instance_blocks_on_routing() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Parent,
                     source_name: "foo_svc".parse().unwrap(),
-                    target_path: CapabilityPath::try_from("/svc/echo").unwrap(),
+                    target_path: "/svc/echo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
                 .use_(UseDecl::Directory(UseDirectoryDecl {
                     source: UseSource::Parent,
                     source_name: "foo_data".parse().unwrap(),
-                    target_path: CapabilityPath::try_from("/data").unwrap(),
+                    target_path: "/data".parse().unwrap(),
                     rights: fio::R_STAR_DIR,
                     subdir: None,
                     dependency_type: DependencyType::Strong,
@@ -1358,7 +1358,7 @@ async fn destroying_instance_blocks_on_routing() {
     let namespace = test.mock_runner.get_namespace(&component_resolved_url).unwrap();
     let echo_proxy = capability_util::connect_to_svc_in_namespace::<echo::EchoMarker>(
         &namespace,
-        &CapabilityPath::try_from("/svc/echo").unwrap(),
+        &"/svc/echo".parse().unwrap(),
     )
     .await;
 
@@ -1429,7 +1429,7 @@ async fn use_runner_from_parent_environment() {
                 )
                 .runner(RunnerDecl {
                     name: "elf".parse().unwrap(),
-                    source_path: Some(CapabilityPath::try_from("/svc/runner").unwrap()),
+                    source_path: Some("/svc/runner".parse().unwrap()),
                 })
                 .build(),
         ),
@@ -1441,7 +1441,7 @@ async fn use_runner_from_parent_environment() {
         create_service_directory_entry::<fcrunner::ComponentRunnerMarker>();
     let universe = RoutingTestBuilder::new("a", components)
         // Component "b" exposes a runner service.
-        .add_outgoing_path("a", CapabilityPath::try_from("/svc/runner").unwrap(), runner_service)
+        .add_outgoing_path("a", "/svc/runner".parse().unwrap(), runner_service)
         .build()
         .await;
 
@@ -1492,13 +1492,13 @@ async fn use_runner_from_environment_in_collection() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    target_path: CapabilityPath::try_from("/svc/fuchsia.component.Realm").unwrap(),
+                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
                 .runner(RunnerDecl {
                     name: "elf".parse().unwrap(),
-                    source_path: Some(CapabilityPath::try_from("/svc/runner").unwrap()),
+                    source_path: Some("/svc/runner".parse().unwrap()),
                 })
                 .build(),
         ),
@@ -1510,7 +1510,7 @@ async fn use_runner_from_environment_in_collection() {
         create_service_directory_entry::<fcrunner::ComponentRunnerMarker>();
     let universe = RoutingTestBuilder::new("a", components)
         // Component "a" exposes a runner service.
-        .add_outgoing_path("a", CapabilityPath::try_from("/svc/runner").unwrap(), runner_service)
+        .add_outgoing_path("a", "/svc/runner".parse().unwrap(), runner_service)
         .build()
         .await;
     universe
@@ -1568,7 +1568,7 @@ async fn use_runner_from_grandparent_environment() {
                 }))
                 .runner(RunnerDecl {
                     name: "elf".parse().unwrap(),
-                    source_path: Some(CapabilityPath::try_from("/svc/runner").unwrap()),
+                    source_path: Some("/svc/runner".parse().unwrap()),
                 })
                 .build(),
         ),
@@ -1597,7 +1597,7 @@ async fn use_runner_from_grandparent_environment() {
         create_service_directory_entry::<fcrunner::ComponentRunnerMarker>();
     let universe = RoutingTestBuilder::new("a", components)
         // Component "a" exposes a runner service.
-        .add_outgoing_path("a", CapabilityPath::try_from("/svc/runner").unwrap(), runner_service)
+        .add_outgoing_path("a", "/svc/runner".parse().unwrap(), runner_service)
         .build()
         .await;
 
@@ -1655,7 +1655,7 @@ async fn use_runner_from_sibling_environment() {
                 }))
                 .runner(RunnerDecl {
                     name: "elf".parse().unwrap(),
-                    source_path: Some(CapabilityPath::try_from("/svc/runner").unwrap()),
+                    source_path: Some("/svc/runner".parse().unwrap()),
                 })
                 .build(),
         ),
@@ -1667,7 +1667,7 @@ async fn use_runner_from_sibling_environment() {
         create_service_directory_entry::<fcrunner::ComponentRunnerMarker>();
     let universe = RoutingTestBuilder::new("a", components)
         // Component "a" exposes a runner service.
-        .add_outgoing_path("b", CapabilityPath::try_from("/svc/runner").unwrap(), runner_service)
+        .add_outgoing_path("b", "/svc/runner".parse().unwrap(), runner_service)
         .build()
         .await;
 
@@ -1716,7 +1716,7 @@ async fn use_runner_from_inherited_environment() {
                 )
                 .runner(RunnerDecl {
                     name: "elf".parse().unwrap(),
-                    source_path: Some(CapabilityPath::try_from("/svc/runner").unwrap()),
+                    source_path: Some("/svc/runner".parse().unwrap()),
                 })
                 .build(),
         ),
@@ -1740,7 +1740,7 @@ async fn use_runner_from_inherited_environment() {
         create_service_directory_entry::<fcrunner::ComponentRunnerMarker>();
     let universe = RoutingTestBuilder::new("a", components)
         // Component "a" exposes a runner service.
-        .add_outgoing_path("a", CapabilityPath::try_from("/svc/runner").unwrap(), runner_service)
+        .add_outgoing_path("a", "/svc/runner".parse().unwrap(), runner_service)
         .build()
         .await;
 
@@ -1787,14 +1787,14 @@ async fn use_runner_from_environment_failed() {
                 )
                 .runner(RunnerDecl {
                     name: "runner".parse().unwrap(),
-                    source_path: Some(CapabilityPath::try_from("/svc/runner").unwrap()),
+                    source_path: Some("/svc/runner".parse().unwrap()),
                 })
                 // For Stopped event
                 .use_(UseDecl::EventStream(UseEventStreamDecl {
                     source: UseSource::Parent,
                     source_name: "stopped".parse().unwrap(),
                     scope: None,
-                    target_path: CapabilityPath::try_from("/events/stopped").unwrap(),
+                    target_path: "/events/stopped".parse().unwrap(),
                     filter: None,
                     availability: Availability::Required,
                 }))
@@ -1862,7 +1862,7 @@ async fn use_runner_from_environment_failed() {
     let event_stream =
         capability_util::connect_to_svc_in_namespace::<fcomponent::EventStreamMarker>(
             &namespace_root,
-            &"/events/stopped".try_into().unwrap(),
+            &"/events/stopped".parse().unwrap(),
         )
         .await;
 
@@ -1920,7 +1920,7 @@ async fn use_runner_from_environment_not_found() {
                 )
                 .runner(RunnerDecl {
                     name: "elf".parse().unwrap(),
-                    source_path: Some(CapabilityPath::try_from("/svc/runner").unwrap()),
+                    source_path: Some("/svc/runner".parse().unwrap()),
                 })
                 .build(),
         ),
@@ -1932,7 +1932,7 @@ async fn use_runner_from_environment_not_found() {
         create_service_directory_entry::<fcrunner::ComponentRunnerMarker>();
     let universe = RoutingTestBuilder::new("a", components)
         // Component "a" exposes a runner service.
-        .add_outgoing_path("a", CapabilityPath::try_from("/svc/runner").unwrap(), runner_service)
+        .add_outgoing_path("a", "/svc/runner".parse().unwrap(), runner_service)
         .build()
         .await;
 
@@ -1979,7 +1979,7 @@ async fn use_with_destroyed_parent() {
     let use_protocol_decl = UseProtocolDecl {
         source: UseSource::Parent,
         source_name: "foo_svc".parse().unwrap(),
-        target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
+        target_path: "/svc/hippo".parse().unwrap(),
         dependency_type: DependencyType::Strong,
         availability: Availability::Required,
     };
@@ -1992,7 +1992,7 @@ async fn use_with_destroyed_parent() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    target_path: CapabilityPath::try_from("/svc/fuchsia.component.Realm").unwrap(),
+                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
@@ -2110,7 +2110,7 @@ async fn use_from_destroyed_but_not_removed() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Parent,
                     source_name: "baz_svc".parse().unwrap(),
-                    target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
+                    target_path: "/svc/hippo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
@@ -2192,7 +2192,7 @@ async fn use_resolver_from_parent_environment() {
         // Component "c" exposes a resolver service.
         .add_outgoing_path(
             "c",
-            CapabilityPath::try_from("/svc/fuchsia.component.resolution.Resolver").unwrap(),
+            "/svc/fuchsia.component.resolution.Resolver".parse().unwrap(),
             resolver_service,
         )
         .build()
@@ -2297,7 +2297,7 @@ async fn use_resolver_from_grandparent_environment() {
         // Component "c" exposes a resolver service.
         .add_outgoing_path(
             "a",
-            CapabilityPath::try_from("/svc/fuchsia.component.resolution.Resolver").unwrap(),
+            "/svc/fuchsia.component.resolution.Resolver".parse().unwrap(),
             resolver_service,
         )
         .build()
@@ -2391,7 +2391,7 @@ async fn resolver_is_not_available() {
         // Component "c" exposes a resolver service.
         .add_outgoing_path(
             "a",
-            CapabilityPath::try_from("/svc/fuchsia.component.resolution.Resolver").unwrap(),
+            "/svc/fuchsia.component.resolution.Resolver".parse().unwrap(),
             resolver_service,
         )
         .build()
@@ -2493,7 +2493,7 @@ async fn resolver_component_decl_is_validated() {
         // Component "a" exposes a resolver service.
         .add_outgoing_path(
             "a",
-            CapabilityPath::try_from("/svc/fuchsia.component.resolution.Resolver").unwrap(),
+            "/svc/fuchsia.component.resolution.Resolver".parse().unwrap(),
             resolver_service,
         )
         .build()
@@ -2620,7 +2620,7 @@ async fn verify_service_route(
     test.check_use(
         target_moniker,
         CheckUse::Service {
-            path: "/svc/foo".try_into().unwrap(),
+            path: "/svc/foo".parse().unwrap(),
             instance: ServiceInstance::Aggregated(child_monikers.len()),
             member: "echo".to_string(),
             expected_res: ExpectedResult::Ok,
@@ -2633,7 +2633,7 @@ async fn verify_service_route(
             test.check_use_exposed_dir(
                 agg_moniker,
                 CheckUse::Service {
-                    path: "/foo".try_into().unwrap(),
+                    path: "/foo".parse().unwrap(),
                     instance: ServiceInstance::Aggregated(child_monikers.len()),
                     member: "echo".to_string(),
                     expected_res: ExpectedResult::Ok,
@@ -2656,7 +2656,7 @@ async fn offer_service_from_collection() {
         dependency_type: DependencyType::Strong,
         source: UseSource::Parent,
         source_name: "foo".parse().unwrap(),
-        target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
+        target_path: "/svc/foo".parse().unwrap(),
         availability: Availability::Required,
     };
     let mut components = vec![
@@ -2719,7 +2719,7 @@ async fn offer_service_from_collections() {
         dependency_type: DependencyType::Strong,
         source: UseSource::Parent,
         source_name: "foo".parse().unwrap(),
-        target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
+        target_path: "/svc/foo".parse().unwrap(),
         availability: Availability::Required,
     };
     let mut offers: Vec<_> = ["coll1", "coll2", "coll3"]
@@ -2794,7 +2794,7 @@ async fn offer_service_from_collections_multilevel() {
         dependency_type: DependencyType::Strong,
         source: UseSource::Parent,
         source_name: "foo".parse().unwrap(),
-        target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
+        target_path: "/svc/foo".parse().unwrap(),
         availability: Availability::Required,
     };
     let mut offers: Vec<_> = ["coll1", "coll2", "coll3"]
@@ -2884,7 +2884,7 @@ async fn expose_service_from_collection() {
         dependency_type: DependencyType::Strong,
         source: UseSource::Child("b".into()),
         source_name: "foo".parse().unwrap(),
-        target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
+        target_path: "/svc/foo".parse().unwrap(),
         availability: Availability::Required,
     };
     let mut components = vec![
@@ -2949,7 +2949,7 @@ async fn expose_service_from_collections() {
         dependency_type: DependencyType::Strong,
         source: UseSource::Child("b".into()),
         source_name: "foo".parse().unwrap(),
-        target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
+        target_path: "/svc/foo".parse().unwrap(),
         availability: Availability::Required,
     };
     let mut exposes: Vec<_> = ["coll1", "coll2", "coll3"]
@@ -3026,7 +3026,7 @@ async fn expose_service_from_collections_multilevel() {
         dependency_type: DependencyType::Strong,
         source: UseSource::Child("m".into()),
         source_name: "foo".parse().unwrap(),
-        target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
+        target_path: "/svc/foo".parse().unwrap(),
         availability: Availability::Required,
     };
     let mut exposes: Vec<_> = ["coll1", "coll2", "coll3"]
@@ -3112,7 +3112,7 @@ async fn list_service_instances_from_collections() {
         dependency_type: DependencyType::Strong,
         source: UseSource::Parent,
         source_name: "foo".parse().unwrap(),
-        target_path: CapabilityPath::try_from("/foo").unwrap(),
+        target_path: "/foo".parse().unwrap(),
         availability: Availability::Required,
     };
     let mut offers: Vec<_> = ["coll1", "coll2"]
@@ -3154,7 +3154,7 @@ async fn list_service_instances_from_collections() {
                 }))
                 .service(ServiceDecl {
                     name: "foo".parse().unwrap(),
-                    source_path: Some("/svc/foo.service".try_into().unwrap()),
+                    source_path: Some("/svc/foo.service".parse().unwrap()),
                 })
                 .build(),
         ),
@@ -3170,7 +3170,7 @@ async fn list_service_instances_from_collections() {
                 }))
                 .service(ServiceDecl {
                     name: "foo".parse().unwrap(),
-                    source_path: Some("/svc/foo.service".try_into().unwrap()),
+                    source_path: Some("/svc/foo.service".parse().unwrap()),
                 })
                 .build(),
         ),
@@ -3232,7 +3232,7 @@ async fn list_service_instances_from_collections() {
             assert_eq!(name, "foo");
             assert_eq!(
                 source_path.expect("source path"),
-                "/svc/foo.service".parse::<CapabilityPath>().unwrap()
+                "/svc/foo.service".parse::<cm_types::Path>().unwrap()
             );
             assert_eq!(component.abs_moniker, vec!["coll1:service_child_a"].try_into().unwrap());
         }
@@ -3277,7 +3277,7 @@ async fn use_service_from_sibling_collection() {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
                     source_name: "my.service.Service".parse().unwrap(),
-                    target_path: "/svc/my.service.Service".try_into().unwrap(),
+                    target_path: "/svc/my.service.Service".parse().unwrap(),
                     availability: Availability::Required,
                 }))
                 .build(),
@@ -3289,7 +3289,7 @@ async fn use_service_from_sibling_collection() {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    target_path: "/svc/fuchsia.component.Realm".try_into().unwrap(),
+                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     availability: Availability::Required,
                 }))
                 .expose(ExposeDecl::Service(ExposeServiceDecl {
@@ -3314,7 +3314,7 @@ async fn use_service_from_sibling_collection() {
                 }))
                 .service(ServiceDecl {
                     name: "my.service.Service".parse().unwrap(),
-                    source_path: Some("/svc/my.service.Service".try_into().unwrap()),
+                    source_path: Some("/svc/my.service.Service".parse().unwrap()),
                 })
                 .build(),
         ),
@@ -3330,7 +3330,7 @@ async fn use_service_from_sibling_collection() {
                 }))
                 .service(ServiceDecl {
                     name: "my.service.Service".parse().unwrap(),
-                    source_path: Some("/svc/my.service.Service".try_into().unwrap()),
+                    source_path: Some("/svc/my.service.Service".parse().unwrap()),
                 })
                 .build(),
         ),
@@ -3344,14 +3344,10 @@ async fn use_service_from_sibling_collection() {
     let test = RoutingTestBuilder::new("a", components)
         .add_outgoing_path(
             "foo",
-            "/svc/my.service.Service/default".try_into().unwrap(),
+            "/svc/my.service.Service/default".parse().unwrap(),
             instance_dir.clone(),
         )
-        .add_outgoing_path(
-            "bar",
-            "/svc/my.service.Service/default".try_into().unwrap(),
-            instance_dir,
-        )
+        .add_outgoing_path("bar", "/svc/my.service.Service/default".parse().unwrap(), instance_dir)
         .build()
         .await;
 
@@ -3386,7 +3382,7 @@ async fn use_service_from_sibling_collection() {
             test.check_use(
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Service {
-                    path: "/svc/my.service.Service".try_into().unwrap(),
+                    path: "/svc/my.service.Service".parse().unwrap(),
                     instance: ServiceInstance::Aggregated(2),
                     member: "echo".to_string(),
                     expected_res: ExpectedResult::Ok,
@@ -3456,7 +3452,7 @@ async fn use_filtered_service_from_sibling() {
                 }))
                 .service(ServiceDecl {
                     name: "my.service.Service".parse().unwrap(),
-                    source_path: Some("/svc/my.service.Service".try_into().unwrap()),
+                    source_path: Some("/svc/my.service.Service".parse().unwrap()),
                 })
                 .build(),
         ),
@@ -3467,7 +3463,7 @@ async fn use_filtered_service_from_sibling() {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
                     source_name: "my.service.Service".parse().unwrap(),
-                    target_path: "/svc/my.service.Service".try_into().unwrap(),
+                    target_path: "/svc/my.service.Service".parse().unwrap(),
                     availability: Availability::Required,
                 }))
                 .build(),
@@ -3479,7 +3475,7 @@ async fn use_filtered_service_from_sibling() {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
                     source_name: "my.service.Service".parse().unwrap(),
-                    target_path: "/svc/my.service.Service".try_into().unwrap(),
+                    target_path: "/svc/my.service.Service".parse().unwrap(),
                     availability: Availability::Required,
                 }))
                 .build(),
@@ -3493,12 +3489,12 @@ async fn use_filtered_service_from_sibling() {
     let test = RoutingTestBuilder::new("a", components)
         .add_outgoing_path(
             "b",
-            "/svc/my.service.Service/default".try_into().unwrap(),
+            "/svc/my.service.Service/default".parse().unwrap(),
             instance_dir.clone(),
         )
         .add_outgoing_path(
             "b",
-            "/svc/my.service.Service/variantinstance".try_into().unwrap(),
+            "/svc/my.service.Service/variantinstance".parse().unwrap(),
             instance_dir,
         )
         .build()
@@ -3553,7 +3549,7 @@ async fn use_filtered_service_from_sibling() {
     test.check_use(
         vec!["c"].try_into().unwrap(),
         CheckUse::Service {
-            path: "/svc/my.service.Service".try_into().unwrap(),
+            path: "/svc/my.service.Service".parse().unwrap(),
             instance: ServiceInstance::Named("variantinstance".to_string()),
             member: "echo".to_string(),
             expected_res: ExpectedResult::Ok,
@@ -3563,7 +3559,7 @@ async fn use_filtered_service_from_sibling() {
     test.check_use(
         vec!["d"].try_into().unwrap(),
         CheckUse::Service {
-            path: "/svc/my.service.Service".try_into().unwrap(),
+            path: "/svc/my.service.Service".parse().unwrap(),
             instance: ServiceInstance::Named("renamed_default".to_string()),
             member: "echo".to_string(),
             expected_res: ExpectedResult::Ok,
@@ -3573,7 +3569,7 @@ async fn use_filtered_service_from_sibling() {
     test.check_use(
         vec!["d"].try_into().unwrap(),
         CheckUse::Service {
-            path: "/svc/my.service.Service".try_into().unwrap(),
+            path: "/svc/my.service.Service".parse().unwrap(),
             instance: ServiceInstance::Named("variantinstance".to_string()),
             member: "echo".to_string(),
             expected_res: ExpectedResult::Ok,

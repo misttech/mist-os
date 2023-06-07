@@ -422,7 +422,7 @@ mod tests {
             testing::test_helpers::{TestModelResult, *},
         },
         assert_matches::assert_matches,
-        cm_rust::{Availability, CapabilityPath, UseSource},
+        cm_rust::{Availability, UseSource},
         fuchsia_zircon as zx,
         futures::StreamExt,
         moniker::AbsoluteMoniker,
@@ -466,7 +466,7 @@ mod tests {
                     source_name: EventType::Discovered.into(),
                     source: UseSource::Parent,
                     scope: None,
-                    target_path: CapabilityPath::from_str("/svc/fuchsia.component.EventStream")
+                    target_path: cm_types::Path::from_str("/svc/fuchsia.component.EventStream")
                         .unwrap(),
                     filter: None,
                     availability: Availability::Required,
@@ -484,7 +484,7 @@ mod tests {
                     source_name: EventType::Discovered.into(),
                     source: UseSource::Parent,
                     scope: None,
-                    target_path: CapabilityPath::from_str("/svc/fuchsia.component.EventStream")
+                    target_path: cm_types::Path::from_str("/svc/fuchsia.component.EventStream")
                         .unwrap(),
                     filter: None,
                     availability: Availability::Required,
@@ -535,7 +535,7 @@ mod tests {
                     source_name: EventType::CapabilityRequested.into(),
                     source: UseSource::Parent,
                     scope: None,
-                    target_path: CapabilityPath::from_str("/svc/fuchsia.component.EventStream")
+                    target_path: cm_types::Path::from_str("/svc/fuchsia.component.EventStream")
                         .unwrap(),
                     filter: None,
                     availability: Availability::Required,
@@ -556,8 +556,7 @@ mod tests {
                     source_name: EventType::CapabilityRequested.into(),
                     source: UseSource::Parent,
                     scope: None,
-                    target_path: CapabilityPath::from_str("/svc/fuchsia.component.EventStream")
-                        .unwrap(),
+                    target_path: "/svc/fuchsia.component.EventStream".parse().unwrap(),
                     filter: None,
                     availability: Availability::Required,
                 })],

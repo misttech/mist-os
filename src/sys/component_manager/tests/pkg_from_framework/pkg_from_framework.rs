@@ -10,7 +10,6 @@ use {
     },
     fuchsia_fs,
     futures::{channel::mpsc, FutureExt, SinkExt, StreamExt},
-    std::convert::TryInto,
 };
 
 // The path in our namespace we can read the example configuration from, which is used to compare
@@ -148,7 +147,7 @@ async fn use_pkg_from_framework() {
     config_reader_decl.uses.push(cm_rust::UseDecl::Directory(cm_rust::UseDirectoryDecl {
         source: cm_rust::UseSource::Framework,
         source_name: "pkg".parse().unwrap(),
-        target_path: "/config".try_into().unwrap(),
+        target_path: "/config".parse().unwrap(),
         rights: fio::R_STAR_DIR,
         subdir: Some("data".into()),
         dependency_type: cm_rust::DependencyType::Strong,

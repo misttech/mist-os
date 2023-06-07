@@ -851,7 +851,7 @@ mod tests {
             let use_decl = UseDecl::Protocol(UseProtocolDecl {
                 source: UseSource::Framework,
                 source_name: use_name.parse().unwrap(),
-                target_path: CapabilityPath::try_from(capability_path.as_str()).unwrap(),
+                target_path: capability_path.parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
             });
@@ -985,7 +985,7 @@ mod tests {
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
             source_name: "foo".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
+            target_path: "/svc/foo".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
@@ -1137,7 +1137,7 @@ mod tests {
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
             source_name: "foo".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/foo").unwrap(),
+            target_path: "/svc/foo".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
@@ -1216,10 +1216,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .directory(DirectoryDecl {
                         name: "fs".parse().unwrap(),
-                        source_path: Some(CapabilityPath {
-                            basename: "data".into(),
-                            dirname: "/fs".into(),
-                        }),
+                        source_path: Some("/fs/data".parse().unwrap()),
                         rights: fio::Operations::all(),
                     })
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {

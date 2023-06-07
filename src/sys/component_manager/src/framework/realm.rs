@@ -395,8 +395,7 @@ mod tests {
         },
         assert_matches::assert_matches,
         cm_rust::{
-            self, CapabilityPath, ComponentDecl, ExposeDecl, ExposeProtocolDecl, ExposeSource,
-            ExposeTarget,
+            self, ComponentDecl, ExposeDecl, ExposeProtocolDecl, ExposeSource, ExposeTarget,
         },
         cm_rust_testing::*,
         fidl::endpoints,
@@ -407,7 +406,6 @@ mod tests {
         moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
         routing_test_helpers::component_decl_with_exposed_binder,
         std::collections::HashSet,
-        std::convert::TryFrom,
     };
 
     struct RealmCapabilityTest {
@@ -1219,7 +1217,7 @@ mod tests {
             .new_event_stream(vec![EventType::Resolved.into(), EventType::Started.into()])
             .await;
         let mut out_dir = OutDir::new();
-        out_dir.add_echo_protocol(CapabilityPath::try_from("/svc/foo").unwrap());
+        out_dir.add_echo_protocol("/svc/foo".parse().unwrap());
         test.mock_runner.add_host_fn("test:///system_resolved", out_dir.host_fn());
 
         // Open exposed directory of child.
@@ -1285,7 +1283,7 @@ mod tests {
             .new_event_stream(vec![EventType::Resolved.into(), EventType::Started.into()])
             .await;
         let mut out_dir = OutDir::new();
-        out_dir.add_echo_protocol(CapabilityPath::try_from("/svc/foo").unwrap());
+        out_dir.add_echo_protocol("/svc/foo".parse().unwrap());
         test.mock_runner.add_host_fn("test:///system_resolved", out_dir.host_fn());
 
         // Add "system" to collection.

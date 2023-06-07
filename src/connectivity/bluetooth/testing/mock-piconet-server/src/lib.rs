@@ -879,9 +879,9 @@ mod tests {
         super::*,
         assert_matches::assert_matches,
         cm_rust::{
-            Availability, CapabilityPath, DependencyType, ExposeDecl, ExposeProtocolDecl,
-            ExposeSource, ExposeTarget, OfferDecl, OfferProtocolDecl, OfferSource, OfferTarget,
-            UseDecl, UseProtocolDecl, UseSource,
+            Availability, DependencyType, ExposeDecl, ExposeProtocolDecl, ExposeSource,
+            ExposeTarget, OfferDecl, OfferProtocolDecl, OfferSource, OfferTarget, UseDecl,
+            UseProtocolDecl, UseSource,
         },
         cm_types::Name,
         fidl_fuchsia_component_test as fctest,
@@ -1085,10 +1085,9 @@ mod tests {
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
             source_name: bredr::ProfileTestMarker::PROTOCOL_NAME.parse().unwrap(),
-            target_path: CapabilityPath {
-                dirname: "/svc".into(),
-                basename: bredr::ProfileTestMarker::PROTOCOL_NAME.into(),
-            },
+            target_path: format!("/svc/{}", bredr::ProfileTestMarker::PROTOCOL_NAME)
+                .parse()
+                .unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
@@ -1156,10 +1155,9 @@ mod tests {
         let profile_test_use = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
             source_name: profile_test_name.clone(),
-            target_path: CapabilityPath {
-                dirname: "/svc".into(),
-                basename: bredr::ProfileTestMarker::PROTOCOL_NAME.into(),
-            },
+            target_path: format!("/svc/{}", bredr::ProfileTestMarker::PROTOCOL_NAME)
+                .parse()
+                .unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });

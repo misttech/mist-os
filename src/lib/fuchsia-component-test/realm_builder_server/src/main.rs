@@ -19,7 +19,6 @@ use {
     lazy_static::lazy_static,
     std::{
         collections::HashMap,
-        convert::TryInto,
         ops::{Deref, DerefMut},
         path::PathBuf,
         str::FromStr,
@@ -1345,17 +1344,15 @@ fn try_into_target_name(
     })?)
 }
 
-/// Attempts to produce a valid CapabilityPath from the "path" field from a capability
-fn try_into_capability_path(
-    input: &Option<String>,
-) -> Result<cm_rust::CapabilityPath, RealmBuilderError> {
+/// Attempts to produce a valid path from the "path" field from a capability
+fn try_into_capability_path(input: &Option<String>) -> Result<cm_types::Path, RealmBuilderError> {
     input
         .as_ref()
         .ok_or_else(|| {
             RealmBuilderError::CapabilityInvalid(anyhow::format_err!("The `path` field is not set. This field is required when routing to or from a local component. For more information on the `path` field, see https://fuchsia.dev/go/components/realm-builder-reference#Directory."))
         })?
         .as_str()
-        .try_into()
+        .parse()
         .map_err(|e| {
             RealmBuilderError::CapabilityInvalid(anyhow::format_err!("The `path` field is invalid: {:?}. All paths must be `/` delimited strings with a leading slash.", e))
         })
@@ -1367,12 +1364,12 @@ fn try_into_capability_path(
 fn try_into_service_path(
     name: &Option<String>,
     path: &Option<String>,
-) -> Result<cm_rust::CapabilityPath, RealmBuilderError> {
+) -> Result<cm_types::Path, RealmBuilderError> {
     let name = name.as_ref().ok_or_else(|| {
         RealmBuilderError::CapabilityInvalid(anyhow::format_err!("Required field `name` is empty. This field must be provided. For more information on the `name` field, see https://fuchsia.dev/go/components/realm-builder-reference#Protocol."))
     })?;
     let path = path.as_ref().cloned().unwrap_or_else(|| format!("/svc/{}", name));
-    path.as_str().try_into().map_err(|e| {
+    path.as_str().parse().map_err(|e| {
         RealmBuilderError::CapabilityInvalid(anyhow::format_err!(
             "Could not create path for protocol {}. Encountered unexpected error. {:?}",
             name,
@@ -1954,7 +1951,6 @@ mod tests {
         fidl_fuchsia_io as fio,
         fidl_fuchsia_logger::LogSinkMarker,
         fidl_fuchsia_mem as fmem, fuchsia_async as fasync, fuchsia_zircon as zx,
-        std::convert::TryInto,
         std::time::Duration,
         test_case::test_case,
     };
@@ -2999,7 +2995,7 @@ mod tests {
             uses: vec![cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
                 source: cm_rust::UseSource::Parent,
                 source_name: "example.Hippo".parse().unwrap(),
-                target_path: "/svc/example.Hippo".try_into().unwrap(),
+                target_path: "/svc/example.Hippo".parse().unwrap(),
                 dependency_type: cm_rust::DependencyType::Strong,
                 availability: cm_rust::Availability::Required,
             })],
@@ -3088,7 +3084,7 @@ mod tests {
             uses: vec![cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
                 source: cm_rust::UseSource::Parent,
                 source_name: "example.Hippo".parse().unwrap(),
-                target_path: "/svc/non-default-path".try_into().unwrap(),
+                target_path: "/svc/non-default-path".parse().unwrap(),
                 dependency_type: cm_rust::DependencyType::Strong,
                 availability: cm_rust::Availability::Required,
             })],
@@ -3446,14 +3442,14 @@ mod tests {
                 cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
                     source: cm_rust::UseSource::Parent,
                     source_name: "fuchsia.examples.Elephant".parse().unwrap(),
-                    target_path: "/svc/fuchsia.examples.Elephant".try_into().unwrap(),
+                    target_path: "/svc/fuchsia.examples.Elephant".parse().unwrap(),
                     dependency_type: cm_rust::DependencyType::Strong,
                     availability: cm_rust::Availability::Optional,
                 }),
                 cm_rust::UseDecl::Directory(cm_rust::UseDirectoryDecl {
                     source: cm_rust::UseSource::Parent,
                     source_name: "config-data".parse().unwrap(),
-                    target_path: "/config-data".try_into().unwrap(),
+                    target_path: "/config-data".parse().unwrap(),
                     rights: fio::RW_STAR_DIR,
                     subdir: None,
                     dependency_type: cm_rust::DependencyType::Strong,
@@ -3461,13 +3457,13 @@ mod tests {
                 }),
                 cm_rust::UseDecl::Storage(cm_rust::UseStorageDecl {
                     source_name: "data".parse().unwrap(),
-                    target_path: "/data".try_into().unwrap(),
+                    target_path: "/data".parse().unwrap(),
                     availability: cm_rust::Availability::Optional,
                 }),
                 cm_rust::UseDecl::Service(cm_rust::UseServiceDecl {
                     source: cm_rust::UseSource::Parent,
                     source_name: "fuchsia.examples.Orca".parse().unwrap(),
-                    target_path: "/svc/fuchsia.examples.Orca".try_into().unwrap(),
+                    target_path: "/svc/fuchsia.examples.Orca".parse().unwrap(),
                     dependency_type: cm_rust::DependencyType::Strong,
                     availability: cm_rust::Availability::Optional,
                 }),
@@ -3813,10 +3809,7 @@ mod tests {
                         capabilities: vec![cm_rust::CapabilityDecl::Protocol(
                             cm_rust::ProtocolDecl {
                                 name: "fuchsia.examples.Hippo".parse().unwrap(),
-                                source_path: Some(cm_rust::CapabilityPath {
-                                    dirname: "/svc".into(),
-                                    basename: "fuchsia.examples.Hippo".into(),
-                                }),
+                                source_path: Some("/svc/fuchsia.examples.Hippo".parse().unwrap()),
                             },
                         )],
                         exposes: vec![cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
@@ -4035,19 +4028,15 @@ mod tests {
                         capabilities: vec![cm_rust::CapabilityDecl::Protocol(
                             cm_rust::ProtocolDecl {
                                 name: "fuchsia.examples.Echo".parse().unwrap(),
-                                source_path: Some(cm_rust::CapabilityPath {
-                                    dirname: "/svc".into(),
-                                    basename: "fuchsia.examples.Echo".into(),
-                                }),
+                                source_path: Some("/svc/fuchsia.examples.Echo".parse().unwrap()),
                             },
                         )],
                         uses: vec![cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
                             source: cm_rust::UseSource::Parent,
                             source_name: "fuchsia.examples.RandonNumberGenerator".parse().unwrap(),
-                            target_path: cm_rust::CapabilityPath {
-                                dirname: "/svc".into(),
-                                basename: "fuchsia.examples.RandonNumberGenerator".into(),
-                            },
+                            target_path: "/svc/fuchsia.examples.RandonNumberGenerator"
+                                .parse()
+                                .unwrap(),
                             dependency_type: cm_rust::DependencyType::Strong,
                             availability: cm_rust::Availability::Required,
                         })],
@@ -4199,7 +4188,7 @@ mod tests {
         a_decl.uses.push(cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
             source: cm_rust::UseSource::Parent,
             source_name: "example.Hippo".parse().unwrap(),
-            target_path: "/svc/example.Hippo".try_into().unwrap(),
+            target_path: "/svc/example.Hippo".parse().unwrap(),
             dependency_type: cm_rust::DependencyType::Strong,
             availability: cm_rust::Availability::Required,
         }));
@@ -4540,7 +4529,7 @@ mod tests {
             }),
             capabilities: vec![cm_rust::CapabilityDecl::Directory(cm_rust::DirectoryDecl {
                 name: "data".parse().unwrap(),
-                source_path: Some("/data".try_into().unwrap()),
+                source_path: Some("/data".parse().unwrap()),
                 rights: fio::R_STAR_DIR,
             })],
             exposes: vec![cm_rust::ExposeDecl::Directory(cm_rust::ExposeDirectoryDecl {

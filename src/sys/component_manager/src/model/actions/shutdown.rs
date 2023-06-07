@@ -809,10 +809,10 @@ mod tests {
             },
         },
         cm_rust::{
-            Availability, CapabilityPath, ChildDecl, ComponentDecl, DependencyType, ExposeDecl,
-            ExposeProtocolDecl, ExposeSource, ExposeTarget, OfferDecl, OfferProtocolDecl,
-            OfferResolverDecl, OfferSource, OfferStorageDecl, OfferTarget, ProtocolDecl,
-            StorageDecl, StorageDirectorySource, UseDecl, UseSource,
+            Availability, ChildDecl, ComponentDecl, DependencyType, ExposeDecl, ExposeProtocolDecl,
+            ExposeSource, ExposeTarget, OfferDecl, OfferProtocolDecl, OfferResolverDecl,
+            OfferSource, OfferStorageDecl, OfferTarget, ProtocolDecl, StorageDecl,
+            StorageDirectorySource, UseDecl, UseSource,
         },
         cm_rust_testing::{
             ChildDeclBuilder, CollectionDeclBuilder, ComponentDeclBuilder, EnvironmentDeclBuilder,
@@ -2411,7 +2411,7 @@ mod tests {
             uses: vec![UseDecl::Protocol(UseProtocolDecl {
                 source: UseSource::Child("childA".to_string()),
                 source_name: "test.protocol".parse().unwrap(),
-                target_path: CapabilityPath::try_from("/svc/test.protocol").unwrap(),
+                target_path: "/svc/test.protocol".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
             })],
@@ -2459,7 +2459,7 @@ mod tests {
             uses: vec![UseDecl::Protocol(UseProtocolDecl {
                 source: UseSource::Child("childA".to_string()),
                 source_name: "test.protocol".parse().unwrap(),
-                target_path: CapabilityPath::try_from("/svc/test.protocol").unwrap(),
+                target_path: "/svc/test.protocol".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
             })],
@@ -2535,7 +2535,7 @@ mod tests {
             uses: vec![UseDecl::Protocol(UseProtocolDecl {
                 source: UseSource::Child("childA".to_string()),
                 source_name: "test.protocol".parse().unwrap(),
-                target_path: CapabilityPath::try_from("/svc/test.protocol").unwrap(),
+                target_path: "/svc/test.protocol".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
             })],
@@ -2574,7 +2574,7 @@ mod tests {
             uses: vec![UseDecl::Protocol(UseProtocolDecl {
                 source: UseSource::Child("childA".to_string()),
                 source_name: "test.protocol".parse().unwrap(),
-                target_path: CapabilityPath::try_from("/svc/test.protocol").unwrap(),
+                target_path: "/svc/test.protocol".parse().unwrap(),
                 dependency_type: DependencyType::Weak,
                 availability: Availability::Required,
             })],
@@ -2623,14 +2623,14 @@ mod tests {
                 UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Child("childA".to_string()),
                     source_name: "test.protocol".parse().unwrap(),
-                    target_path: CapabilityPath::try_from("/svc/test.protocol").unwrap(),
+                    target_path: "/svc/test.protocol".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }),
                 UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Child("childB".to_string()),
                     source_name: "test.protocol2".parse().unwrap(),
-                    target_path: CapabilityPath::try_from("/svc/test.protocol2").unwrap(),
+                    target_path: "/svc/test.protocol2".parse().unwrap(),
                     dependency_type: DependencyType::Weak,
                     availability: Availability::Required,
                 }),
@@ -3214,7 +3214,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceD".parse().unwrap(),
-                        target_path: CapabilityPath::try_from("/svc/serviceD").unwrap(),
+                        target_path: "/svc/serviceD".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
@@ -3242,7 +3242,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceD".parse().unwrap(),
-                        target_path: CapabilityPath::try_from("/svc/serviceD").unwrap(),
+                        target_path: "/svc/serviceD".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
@@ -3371,7 +3371,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceD".parse().unwrap(),
-                        target_path: CapabilityPath::try_from("/svc/serviceD").unwrap(),
+                        target_path: "/svc/serviceD".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
@@ -3403,7 +3403,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceD".parse().unwrap(),
-                        target_path: CapabilityPath::try_from("/svc/serviceD").unwrap(),
+                        target_path: "/svc/serviceD".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
@@ -3422,7 +3422,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceE".parse().unwrap(),
-                        target_path: CapabilityPath::try_from("/svc/serviceE").unwrap(),
+                        target_path: "/svc/serviceE".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
@@ -3588,7 +3588,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceD".parse().unwrap(),
-                        target_path: CapabilityPath::try_from("/svc/serviceD").unwrap(),
+                        target_path: "/svc/serviceD".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
@@ -3620,7 +3620,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceE".parse().unwrap(),
-                        target_path: CapabilityPath::try_from("/svc/serviceE").unwrap(),
+                        target_path: "/svc/serviceE".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
@@ -3639,14 +3639,14 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceE".parse().unwrap(),
-                        target_path: CapabilityPath::try_from("/svc/serviceE").unwrap(),
+                        target_path: "/svc/serviceE".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceD".parse().unwrap(),
-                        target_path: CapabilityPath::try_from("/svc/serviceD").unwrap(),
+                        target_path: "/svc/serviceD".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
@@ -3794,7 +3794,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceC".parse().unwrap(),
-                        target_path: CapabilityPath::try_from("/svc/serviceC").unwrap(),
+                        target_path: "/svc/serviceC".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
@@ -3865,7 +3865,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Child("b".to_string()),
                         source_name: "serviceC".parse().unwrap(),
-                        target_path: CapabilityPath::try_from("/svc/serviceC").unwrap(),
+                        target_path: "/svc/serviceC".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
@@ -3949,7 +3949,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Child("b".to_string()),
                         source_name: "serviceB".parse().unwrap(),
-                        target_path: CapabilityPath::try_from("/svc/serviceB").unwrap(),
+                        target_path: "/svc/serviceB".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
@@ -3980,7 +3980,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceC".parse().unwrap(),
-                        target_path: CapabilityPath::try_from("/svc/serviceC").unwrap(),
+                        target_path: "/svc/serviceC".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
@@ -4063,7 +4063,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Child("b".to_string()),
                         source_name: "serviceC".parse().unwrap(),
-                        target_path: CapabilityPath::try_from("/svc/serviceC").unwrap(),
+                        target_path: "/svc/serviceC".parse().unwrap(),
                         dependency_type: DependencyType::Weak,
                         availability: Availability::Required,
                     }))

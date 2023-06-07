@@ -7,7 +7,7 @@ use {
     cm_rust::*,
     cm_rust_testing::{ComponentDeclBuilder, DirectoryDeclBuilder},
     fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status,
-    std::{convert::TryFrom, marker::PhantomData},
+    std::{marker::PhantomData, str::FromStr},
 };
 
 pub struct CommonRightsTest<T: RoutingTestModelBuilder> {
@@ -61,7 +61,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "baz_data".parse().unwrap(),
-                        target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
+                        target_path: cm_types::Path::from_str("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
                         dependency_type: DependencyType::Strong,
@@ -121,7 +121,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "baz_data".parse().unwrap(),
-                        target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
+                        target_path: cm_types::Path::from_str("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
                         dependency_type: DependencyType::Strong,
@@ -181,7 +181,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "baz_data".parse().unwrap(),
-                        target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
+                        target_path: cm_types::Path::from_str("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
                         dependency_type: DependencyType::Strong,
@@ -241,7 +241,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "baz_data".parse().unwrap(),
-                        target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
+                        target_path: cm_types::Path::from_str("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
                         dependency_type: DependencyType::Strong,
@@ -301,7 +301,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "baz_data".parse().unwrap(),
-                        target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
+                        target_path: cm_types::Path::from_str("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
                         dependency_type: DependencyType::Strong,
@@ -361,7 +361,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "baz_data".parse().unwrap(),
-                        target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
+                        target_path: cm_types::Path::from_str("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
                         dependency_type: DependencyType::Strong,
@@ -411,7 +411,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "bar_data".parse().unwrap(),
-                        target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
+                        target_path: cm_types::Path::from_str("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
                         dependency_type: DependencyType::Strong,

@@ -10,9 +10,9 @@ use {
     fidl_fuchsia_component_decl as fdecl,
     flyweights::FlyStr,
     lazy_static::lazy_static,
-    serde::de,
+    serde::{de, ser},
     serde::{Deserialize, Serialize},
-    std::{cmp, default::Default, fmt, str::FromStr},
+    std::{cmp, default::Default, fmt, path::PathBuf, str::FromStr},
     thiserror::Error,
     url,
 };
@@ -236,8 +236,32 @@ impl<'de, const N: usize> de::Deserialize<'de> for BoundedName<N> {
 }
 
 /// A filesystem path.
-#[derive(Serialize, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Path(FlyStr);
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct Path {
+    path: FlyStr,
+    dirname_idx: usize,
+}
+
+impl fmt::Debug for Path {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.path)
+    }
+}
+
+impl fmt::Display for Path {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.path)
+    }
+}
+
+impl ser::Serialize for Path {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        self.path.serialize(serializer)
+    }
+}
 
 impl Path {
     /// Creates a `Path` from a `String`, returning an `Err` if the string
@@ -246,7 +270,9 @@ impl Path {
     /// path segments.
     pub fn new(path: impl AsRef<str> + Into<String>) -> Result<Self, ParseError> {
         Self::validate(path.as_ref())?;
-        Ok(Path(FlyStr::new(path)))
+        let path = FlyStr::new(path);
+        let dirname_idx = path.rfind('/').expect("path validation is wrong");
+        Ok(Self { path, dirname_idx })
     }
 
     /// Validates `path` but does not construct a new `Path` object.
@@ -266,8 +292,29 @@ impl Path {
         Ok(())
     }
 
+    /// Splits the path according to "/", ignoring empty path components
+    pub fn split(&self) -> Vec<String> {
+        self.to_string().split("/").map(|s| s.to_string()).filter(|s| !s.is_empty()).collect()
+    }
+
     pub fn as_str(&self) -> &str {
-        &*self.0
+        &self.path
+    }
+
+    pub fn to_path_buf(&self) -> PathBuf {
+        PathBuf::from(self.to_string())
+    }
+
+    pub fn dirname(&self) -> &str {
+        if self.dirname_idx == 0 {
+            "/"
+        } else {
+            &self.path[0..self.dirname_idx]
+        }
+    }
+
+    pub fn basename(&self) -> &str {
+        &self.path[self.dirname_idx + 1..]
     }
 }
 
@@ -281,7 +328,7 @@ impl FromStr for Path {
 
 impl From<Path> for String {
     fn from(path: Path) -> String {
-        (*path.0).to_owned()
+        path.path.to_string()
     }
 }
 

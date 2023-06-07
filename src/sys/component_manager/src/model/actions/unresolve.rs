@@ -107,12 +107,11 @@ pub mod tests {
             testing::test_helpers::{component_decl_with_test_runner, ActionsTest},
         },
         assert_matches::assert_matches,
-        cm_rust::{Availability, CapabilityPath, UseEventStreamDecl, UseSource},
+        cm_rust::{Availability, UseEventStreamDecl, UseSource},
         cm_rust_testing::{CollectionDeclBuilder, ComponentDeclBuilder},
         cm_types::Name,
         fidl_fuchsia_component_decl as fdecl, fuchsia_async as fasync,
         moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
-        std::str::FromStr,
         std::sync::Arc,
     };
 
@@ -222,10 +221,7 @@ pub mod tests {
                             source_name: event,
                             source: UseSource::Parent,
                             scope: None,
-                            target_path: CapabilityPath::from_str(
-                                "/svc/fuchsia.component.EventStream",
-                            )
-                            .unwrap(),
+                            target_path: "/svc/fuchsia.component.EventStream".parse().unwrap(),
                             filter: None,
                             availability: Availability::Required,
                         },

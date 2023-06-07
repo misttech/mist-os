@@ -1213,8 +1213,8 @@ mod tests {
         anyhow::Result,
         cm_moniker::InstancedAbsoluteMoniker,
         cm_rust::{
-            Availability, CapabilityPath, ComponentDecl, DependencyType, RegistrationSource,
-            ResolverRegistration, RunnerRegistration, UseProtocolDecl, UseSource, UseStorageDecl,
+            Availability, ComponentDecl, DependencyType, RegistrationSource, ResolverRegistration,
+            RunnerRegistration, UseProtocolDecl, UseSource, UseStorageDecl,
         },
         cm_rust_testing::{ChildDeclBuilder, ComponentDeclBuilder, EnvironmentDeclBuilder},
         cm_types::Name,
@@ -1234,12 +1234,7 @@ mod tests {
             error::ComponentInstanceError,
             RouteRequest,
         },
-        std::{
-            collections::HashMap,
-            convert::{TryFrom, TryInto},
-            iter::FromIterator,
-            sync::Arc,
-        },
+        std::{collections::HashMap, iter::FromIterator, sync::Arc},
         url::Url,
     };
 
@@ -1416,7 +1411,7 @@ mod tests {
             RouteRequest::UseProtocol(UseProtocolDecl {
                 source: UseSource::Parent,
                 source_name: "bar_svc".parse().unwrap(),
-                target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
+                target_path: "/svc/hippo".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
             }),
@@ -1455,7 +1450,7 @@ mod tests {
         let _ = ComponentModelForAnalyzer::route_storage_and_backing_directory_sync(
             UseStorageDecl {
                 source_name: "cache".parse().unwrap(),
-                target_path: "/storage".try_into().unwrap(),
+                target_path: "/storage".parse().unwrap(),
                 availability: Availability::Required,
             },
             &root_instance,

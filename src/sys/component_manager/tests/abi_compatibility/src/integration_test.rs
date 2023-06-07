@@ -7,7 +7,7 @@ use {
     fuchsia_component::server as fserver,
     fuchsia_component_test::*,
     futures::{channel::mpsc, FutureExt, SinkExt, StreamExt, TryStreamExt},
-    std::{convert::TryInto, fmt},
+    std::fmt,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -136,7 +136,7 @@ async fn add_component_resolver(
     let mut child_decl = builder.get_component_decl(&child).await.unwrap();
     child_decl.capabilities.push(cm_rust::CapabilityDecl::Resolver(cm_rust::ResolverDecl {
         name: component_resolver.name().parse().unwrap(),
-        source_path: Some("/svc/fuchsia.component.resolution.Resolver".try_into().unwrap()),
+        source_path: Some("/svc/fuchsia.component.resolution.Resolver".parse().unwrap()),
     }));
     child_decl.exposes.push(cm_rust::ExposeDecl::Resolver(cm_rust::ExposeResolverDecl {
         source: cm_rust::ExposeSource::Self_,

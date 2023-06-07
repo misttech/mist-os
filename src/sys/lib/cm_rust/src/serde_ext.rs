@@ -5,13 +5,13 @@
 #![cfg(feature = "serde")]
 
 use {
-    crate::{CapabilityPath, DictionaryValue},
+    crate::DictionaryValue,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
     serde::{
         de::{self, Visitor},
         Deserialize, Deserializer, Serialize, Serializer,
     },
-    std::{fmt, str::FromStr},
+    std::fmt,
 };
 
 /// Reflect fidl_fuchsia_sys2::StorageId for serialization/deserialization.
@@ -116,47 +116,6 @@ where
     serializer.serialize_u64(operations.bits())
 }
 
-impl Serialize for CapabilityPath {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let path = if self.dirname == "/" {
-            format!("/{}", self.basename)
-        } else {
-            format!("{}/{}", self.dirname, self.basename)
-        };
-        serializer.serialize_str(&path)
-    }
-}
-
-struct CapabilityPathVisitor;
-
-impl<'de> Visitor<'de> for CapabilityPathVisitor {
-    type Value = CapabilityPath;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("A capability path")
-    }
-
-    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        CapabilityPath::from_str(value)
-            .map_err(|_| E::custom(format!("Expected capability path, but found \"{}\"", value)))
-    }
-}
-
-impl<'de> Deserialize<'de> for CapabilityPath {
-    fn deserialize<D>(deserializer: D) -> Result<CapabilityPath, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_str(CapabilityPathVisitor)
-    }
-}
-
 impl Serialize for DictionaryValue {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -228,25 +187,10 @@ mod tests {
             deserialize_fio_operations, deserialize_opt_fio_operations, serialize_fio_operations,
             serialize_opt_fio_operations,
         },
-        crate::CapabilityPath,
         fidl_fuchsia_io as fio,
         serde_json::{self, Deserializer, Serializer},
-        std::str::{from_utf8, FromStr},
+        std::str::from_utf8,
     };
-
-    #[test]
-    fn capability_path_symmetry() {
-        let cps_to_serialize = vec!["/path", "/multi/path"]
-            .into_iter()
-            .map(CapabilityPath::from_str)
-            .collect::<Result<Vec<CapabilityPath>, _>>()
-            .unwrap();
-        for cp_to_serialize in cps_to_serialize.into_iter() {
-            let cp_json_str = serde_json::to_string_pretty(&cp_to_serialize).unwrap();
-            let cp_deserialized: CapabilityPath = serde_json::from_str(&cp_json_str).unwrap();
-            assert_eq!(cp_to_serialize, cp_deserialized);
-        }
-    }
 
     #[test]
     fn test_deserialize_opt_fio_operations_some() {

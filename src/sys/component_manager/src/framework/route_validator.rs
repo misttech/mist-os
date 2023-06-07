@@ -505,7 +505,7 @@ mod tests {
         let use_from_framework_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
             source_name: "fuchsia.component.Realm".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/fuchsia.component.Realm").unwrap(),
+            target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
@@ -513,7 +513,7 @@ mod tests {
         let use_from_child_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Child("my_child".to_string()),
             source_name: "foo.bar".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/foo.bar").unwrap(),
+            target_path: "/svc/foo.bar".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
@@ -536,7 +536,7 @@ mod tests {
 
         let capability_decl = ProtocolDecl {
             name: "foo.bar".parse().unwrap(),
-            source_path: Some(CapabilityPath::try_from("/svc/foo.bar").unwrap()),
+            source_path: Some("/svc/foo.bar".parse().unwrap()),
         };
 
         let components = vec![
@@ -651,7 +651,7 @@ mod tests {
         let invalid_source_name_use_from_child_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Child("my_child".to_string()),
             source_name: "a".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/a").unwrap(),
+            target_path: "/svc/a".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
@@ -659,7 +659,7 @@ mod tests {
         let invalid_source_use_from_child_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Child("bad_child".to_string()),
             source_name: "b".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/b").unwrap(),
+            target_path: "/svc/b".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
@@ -782,7 +782,7 @@ mod tests {
         let use_from_framework_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
             source_name: "fuchsia.component.Realm".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/fuchsia.component.Realm").unwrap(),
+            target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
@@ -790,7 +790,7 @@ mod tests {
         let use_from_child_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Child("my_child".into()),
             source_name: "biz.buz".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/foo.bar").unwrap(),
+            target_path: "/svc/foo.bar".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
@@ -813,7 +813,7 @@ mod tests {
 
         let capability_decl = ProtocolDecl {
             name: "biz.buz".parse().unwrap(),
-            source_path: Some(CapabilityPath::try_from("/svc/foo.bar").unwrap()),
+            source_path: Some("/svc/foo.bar".parse().unwrap()),
         };
 
         let components = vec![
@@ -929,7 +929,7 @@ mod tests {
         let use_from_framework_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
             source_name: "foo.bar".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/foo.bar").unwrap(),
+            target_path: "/svc/foo.bar".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
@@ -952,7 +952,7 @@ mod tests {
 
         let capability_decl = ProtocolDecl {
             name: "qax.qux".parse().unwrap(),
-            source_path: Some(CapabilityPath::try_from("/svc/qax.qux").unwrap()),
+            source_path: Some("/svc/qax.qux".parse().unwrap()),
         };
 
         let components = vec![
@@ -1023,21 +1023,21 @@ mod tests {
         let use_from_framework_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
             source_name: "foo.bar".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/foo.bar").unwrap(),
+            target_path: "/svc/foo.bar".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
         let use_from_framework_decl2 = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
             source_name: "foo.buz".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/foo.buz").unwrap(),
+            target_path: "/svc/foo.buz".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
         let use_from_framework_decl3 = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
             source_name: "no.match".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/no.match").unwrap(),
+            target_path: "/svc/no.match".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
@@ -1074,7 +1074,7 @@ mod tests {
 
         let capability_decl = ProtocolDecl {
             name: "qax.qux".parse().unwrap(),
-            source_path: Some(CapabilityPath::try_from("/svc/qax.qux").unwrap()),
+            source_path: Some("/svc/qax.qux".parse().unwrap()),
         };
 
         let components = vec![
@@ -1191,13 +1191,13 @@ mod tests {
         let use_decl = UseDecl::Service(UseServiceDecl {
             source: UseSource::Parent,
             source_name: "my_service".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/foo.bar").unwrap(),
+            target_path: "/svc/foo.bar".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
         let capability_decl = ServiceDecl {
             name: "my_service".parse().unwrap(),
-            source_path: Some(CapabilityPath::try_from("/svc/foo.bar").unwrap()),
+            source_path: Some("/svc/foo.bar".parse().unwrap()),
         };
 
         let components = vec![
@@ -1260,12 +1260,8 @@ mod tests {
                 .unwrap();
 
             let mut out_dir = OutDir::new();
-            out_dir.add_echo_protocol(
-                CapabilityPath::try_from("/svc/foo.bar/instance_a/echo").unwrap(),
-            );
-            out_dir.add_echo_protocol(
-                CapabilityPath::try_from("/svc/foo.bar/instance_b/echo").unwrap(),
-            );
+            out_dir.add_echo_protocol("/svc/foo.bar/instance_a/echo".parse().unwrap());
+            out_dir.add_echo_protocol("/svc/foo.bar/instance_b/echo".parse().unwrap());
             mock_runner.add_host_fn(&format!("test:///{}_resolved", name), out_dir.host_fn());
 
             let child = model
@@ -1346,7 +1342,7 @@ mod tests {
         let invalid_source_name_use_from_child_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Child("my_child".to_string()),
             source_name: "a".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/a").unwrap(),
+            target_path: "/svc/a".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
@@ -1354,7 +1350,7 @@ mod tests {
         let invalid_source_use_from_child_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Child("bad_child".to_string()),
             source_name: "b".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/b").unwrap(),
+            target_path: "/svc/b".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });

@@ -14,14 +14,14 @@ use {
         route::VerifyRouteResult,
     },
     cm_rust::{
-        Availability, CapabilityDecl, CapabilityPath, CapabilityTypeName, ChildRef, ComponentDecl,
-        DependencyType, ExposeDecl, ExposeDeclCommon, ExposeDirectoryDecl, ExposeProtocolDecl,
-        ExposeResolverDecl, ExposeServiceDecl, ExposeSource, ExposeTarget, OfferDecl,
-        OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl, OfferServiceDecl, OfferSource,
-        OfferStorageDecl, OfferTarget, ProtocolDecl, RegistrationSource, ResolverDecl,
-        ResolverRegistration, RunnerDecl, RunnerRegistration, ServiceDecl, StorageDecl,
-        StorageDirectorySource, UseDecl, UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl,
-        UseServiceDecl, UseSource, UseStorageDecl,
+        Availability, CapabilityDecl, CapabilityTypeName, ChildRef, ComponentDecl, DependencyType,
+        ExposeDecl, ExposeDeclCommon, ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl,
+        ExposeServiceDecl, ExposeSource, ExposeTarget, OfferDecl, OfferDirectoryDecl,
+        OfferEventStreamDecl, OfferProtocolDecl, OfferServiceDecl, OfferSource, OfferStorageDecl,
+        OfferTarget, ProtocolDecl, RegistrationSource, ResolverDecl, ResolverRegistration,
+        RunnerDecl, RunnerRegistration, ServiceDecl, StorageDecl, StorageDirectorySource, UseDecl,
+        UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl, UseServiceDecl, UseSource,
+        UseStorageDecl,
     },
     cm_rust_testing::{
         ChildDeclBuilder, ComponentDeclBuilder, DirectoryDeclBuilder, EnvironmentDeclBuilder,
@@ -49,7 +49,7 @@ use {
     },
     std::{
         collections::{HashMap, HashSet},
-        convert::{TryFrom, TryInto},
+        convert::TryInto,
         iter::FromIterator,
         path::Path,
         sync::Arc,
@@ -352,7 +352,7 @@ impl RoutingTestForAnalyzer {
             | CheckUse::Service { path, expected_res, .. } => (
                 decl.exposes
                     .iter()
-                    .find(|&e| e.target_name().to_string() == path.basename.as_str())
+                    .find(|&e| e.target_name().to_string() == path.basename())
                     .cloned()
                     .ok_or(TestModelError::ExposeDeclNotFound),
                 expected_res,
@@ -517,7 +517,7 @@ impl RoutingTestModel for RoutingTestForAnalyzer {
     //
     // All file and directory operations are no-ops for the static model.
     #[allow(unused_variables)]
-    async fn check_open_file(&self, moniker: AbsoluteMoniker, path: CapabilityPath) {}
+    async fn check_open_file(&self, moniker: AbsoluteMoniker, path: cm_types::Path) {}
 
     #[allow(unused_variables)]
     async fn create_static_file(&self, path: &Path, contents: &str) -> Result<(), anyhow::Error> {
@@ -549,7 +549,6 @@ mod tests {
         super::*,
         cm_rust::{EventScope, EventStreamDecl, OfferEventStreamDecl, UseEventStreamDecl},
         routing_test_helpers::instantiate_common_routing_tests,
-        std::str::FromStr,
     };
 
     instantiate_common_routing_tests! { RoutingTestBuilderForAnalyzer }
@@ -573,7 +572,7 @@ mod tests {
             dependency_type: DependencyType::Strong,
             source: UseSource::Parent,
             source_name: "foo".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/foo").unwrap(),
+            target_path: "/foo".parse().unwrap(),
             availability: Availability::Required,
         };
         let components = vec![
@@ -591,7 +590,7 @@ mod tests {
                     }))
                     .service(ServiceDecl {
                         name: "foo".parse().unwrap(),
-                        source_path: Some("/svc/foo".try_into().unwrap()),
+                        source_path: Some("/svc/foo".parse().unwrap()),
                     })
                     .add_lazy_child("b")
                     .build(),
@@ -603,7 +602,7 @@ mod tests {
             .check_use(
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Service {
-                    path: CapabilityPath::try_from("/foo").unwrap(),
+                    path: "/foo".parse().unwrap(),
                     instance: ServiceInstance::Named("".into()),
                     member: "".into(),
                     expected_res: ExpectedResult::Ok,
@@ -624,7 +623,7 @@ mod tests {
             dependency_type: DependencyType::Strong,
             source: UseSource::Parent,
             source_name: "foo".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/foo").unwrap(),
+            target_path: "/foo".parse().unwrap(),
             availability: Availability::Required,
         };
         let components = vec![
@@ -642,7 +641,7 @@ mod tests {
                     }))
                     .service(ServiceDecl {
                         name: "foo".parse().unwrap(),
-                        source_path: Some("/svc/foo".try_into().unwrap()),
+                        source_path: Some("/svc/foo".parse().unwrap()),
                     })
                     .add_lazy_child("b")
                     .build(),
@@ -654,7 +653,7 @@ mod tests {
             .check_use(
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Service {
-                    path: CapabilityPath::try_from("/foo").unwrap(),
+                    path: "/foo".parse().unwrap(),
                     instance: ServiceInstance::Named("".into()),
                     member: "".into(),
                     expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
@@ -675,7 +674,7 @@ mod tests {
             dependency_type: DependencyType::Strong,
             source: UseSource::Child("b".to_string()),
             source_name: "foo".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/foo").unwrap(),
+            target_path: "/foo".parse().unwrap(),
             availability: Availability::Required,
         };
         let components = vec![
@@ -691,7 +690,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .service(ServiceDecl {
                         name: "foo".parse().unwrap(),
-                        source_path: Some("/svc/foo".try_into().unwrap()),
+                        source_path: Some("/svc/foo".parse().unwrap()),
                     })
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
@@ -708,7 +707,7 @@ mod tests {
             .check_use(
                 AbsoluteMoniker::root(),
                 CheckUse::Service {
-                    path: CapabilityPath::try_from("/foo").unwrap(),
+                    path: "/foo".parse().unwrap(),
                     instance: ServiceInstance::Named("".into()),
                     member: "".into(),
                     expected_res: ExpectedResult::Ok,
@@ -730,7 +729,7 @@ mod tests {
             dependency_type: DependencyType::Strong,
             source: UseSource::Parent,
             source_name: "foo".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/foo").unwrap(),
+            target_path: "/foo".parse().unwrap(),
             availability: Availability::Required,
         };
         let components = vec![
@@ -763,7 +762,7 @@ mod tests {
                     }))
                     .service(ServiceDecl {
                         name: "foo".parse().unwrap(),
-                        source_path: Some("/svc/foo".try_into().unwrap()),
+                        source_path: Some("/svc/foo".parse().unwrap()),
                     })
                     .build(),
             ),
@@ -773,7 +772,7 @@ mod tests {
             .check_use(
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Service {
-                    path: CapabilityPath::try_from("/foo").unwrap(),
+                    path: "/foo".parse().unwrap(),
                     instance: ServiceInstance::Named("".into()),
                     member: "".into(),
                     expected_res: ExpectedResult::Ok,
@@ -812,7 +811,7 @@ mod tests {
                     )
                     .runner(RunnerDecl {
                         name: "elf".parse().unwrap(),
-                        source_path: Some(CapabilityPath::try_from("/svc/runner").unwrap()),
+                        source_path: Some("/svc/runner".parse().unwrap()),
                     })
                     .build(),
             ),
@@ -860,7 +859,7 @@ mod tests {
                     source: UseSource::Parent,
                     filter: None,
                     source_name: "started".parse().unwrap(),
-                    target_path: CapabilityPath::from_str("/event/stream").unwrap(),
+                    target_path: "/event/stream".parse().unwrap(),
                     scope: None,
                     availability: Availability::Required,
                 }))
@@ -878,7 +877,7 @@ mod tests {
                 AbsoluteMoniker::root(),
                 CheckUse::EventStream {
                     expected_res: ExpectedResult::Ok,
-                    path: CapabilityPath::from_str("/event/stream").unwrap(),
+                    path: "/event/stream".parse().unwrap(),
                     scope: vec![],
                     name: "started".parse().unwrap(),
                 },
@@ -935,7 +934,7 @@ mod tests {
                         source: UseSource::Parent,
                         filter: None,
                         source_name: "started".parse().unwrap(),
-                        target_path: CapabilityPath::from_str("/event/stream").unwrap(),
+                        target_path: "/event/stream".parse().unwrap(),
                         scope: None,
                         availability: Availability::Required,
                     }))
@@ -948,7 +947,7 @@ mod tests {
                         source: UseSource::Parent,
                         filter: None,
                         source_name: "started".parse().unwrap(),
-                        target_path: CapabilityPath::from_str("/event/stream").unwrap(),
+                        target_path: "/event/stream".parse().unwrap(),
                         scope: None,
                         availability: Availability::Required,
                     }))
@@ -974,7 +973,7 @@ mod tests {
                     .use_(UseDecl::EventStream(UseEventStreamDecl {
                         source: UseSource::Parent,
                         source_name: "started".parse().unwrap(),
-                        target_path: CapabilityPath::from_str("/event/stream").unwrap(),
+                        target_path: "/event/stream".parse().unwrap(),
                         scope: None,
                         filter: None,
                         availability: Availability::Required,
@@ -995,7 +994,7 @@ mod tests {
                 vec!["b"].try_into().unwrap(),
                 CheckUse::EventStream {
                     expected_res: ExpectedResult::Ok,
-                    path: CapabilityPath::from_str("/event/stream").unwrap(),
+                    path: "/event/stream".parse().unwrap(),
                     scope: vec![ComponentEventRoute {
                         component: "/".to_string(),
                         scope: Some(vec!["b".to_string(), "c".to_string()]),
@@ -1009,7 +1008,7 @@ mod tests {
                 vec!["c"].try_into().unwrap(),
                 CheckUse::EventStream {
                     expected_res: ExpectedResult::Ok,
-                    path: CapabilityPath::from_str("/event/stream").unwrap(),
+                    path: "/event/stream".parse().unwrap(),
                     scope: vec![ComponentEventRoute {
                         component: "/".to_string(),
                         scope: Some(vec!["b".to_string(), "c".to_string()]),
@@ -1023,7 +1022,7 @@ mod tests {
                 vec!["c", "d"].try_into().unwrap(), // Should get e's event from parent
                 CheckUse::EventStream {
                     expected_res: ExpectedResult::Ok,
-                    path: CapabilityPath::from_str("/event/stream").unwrap(),
+                    path: "/event/stream".parse().unwrap(),
                     scope: vec![
                         ComponentEventRoute {
                             component: "/".to_string(),
@@ -1067,7 +1066,7 @@ mod tests {
                     )
                     .runner(RunnerDecl {
                         name: "elf".parse().unwrap(),
-                        source_path: Some(CapabilityPath::try_from("/svc/runner").unwrap()),
+                        source_path: Some("/svc/runner".parse().unwrap()),
                     })
                     .build(),
             ),
@@ -1268,7 +1267,7 @@ mod tests {
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
             source_name: "bar_svc".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
+            target_path: "/svc/hippo".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
@@ -1327,7 +1326,7 @@ mod tests {
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Child("b".to_string()),
             source_name: "bar_svc".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
+            target_path: "/svc/hippo".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
@@ -1379,7 +1378,7 @@ mod tests {
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Self_,
             source_name: "hippo".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
+            target_path: "/svc/hippo".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
@@ -1427,7 +1426,7 @@ mod tests {
         let use_decl = UseDecl::Directory(UseDirectoryDecl {
             source: UseSource::Parent,
             source_name: "foobar_data".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
+            target_path: "/data/hippo".parse().unwrap(),
             rights: fio::R_STAR_DIR,
             subdir: None,
             dependency_type: DependencyType::Strong,
@@ -1540,7 +1539,7 @@ mod tests {
         };
         let runner_decl = RunnerDecl {
             name: "elf".parse().unwrap(),
-            source_path: Some(CapabilityPath::try_from("/svc/runner").unwrap()),
+            source_path: Some("/svc/runner".parse().unwrap()),
         };
         let components = vec![
             (
@@ -1622,7 +1621,7 @@ mod tests {
         });
         let use_storage_decl = UseDecl::Storage(UseStorageDecl {
             source_name: "cache".parse().unwrap(),
-            target_path: "/storage".try_into().unwrap(),
+            target_path: "/storage".parse().unwrap(),
             availability: Availability::Required,
         });
         let components = vec![
@@ -1703,7 +1702,7 @@ mod tests {
         let use_realm_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
             source_name: "fuchsia.component.Realm".parse().unwrap(),
-            target_path: "/svc/fuchsia.component.Realm".try_into().unwrap(),
+            target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
@@ -1719,7 +1718,7 @@ mod tests {
         let use_event_source_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
             source_name: "fuchsia.sys2.EventSource".parse().unwrap(),
-            target_path: "/svc/fuchsia.sys2.EventSource".try_into().unwrap(),
+            target_path: "/svc/fuchsia.sys2.EventSource".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
@@ -1818,7 +1817,7 @@ mod tests {
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
             source_name: "bar_svc".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/hippo").unwrap(),
+            target_path: "/svc/hippo".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
@@ -2192,12 +2191,12 @@ mod tests {
         };
         let runner_decl = RunnerDecl {
             name: "hobbit".parse().unwrap(),
-            source_path: Some(CapabilityPath::try_from("/svc/runner").unwrap()),
+            source_path: Some("/svc/runner".parse().unwrap()),
         };
         let use_directory_decl = UseDecl::Directory(UseDirectoryDecl {
             source: UseSource::Parent,
             source_name: "bar_data".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/data/hippo").unwrap(),
+            target_path: "/data/hippo".parse().unwrap(),
             rights: fio::R_STAR_DIR,
             subdir: None,
             dependency_type: DependencyType::Strong,
@@ -2224,7 +2223,7 @@ mod tests {
         let use_event_decl = UseDecl::EventStream(UseEventStreamDecl {
             source: UseSource::Parent,
             source_name: "started_on_a".parse().unwrap(),
-            target_path: "/started".try_into().unwrap(),
+            target_path: "/started".parse().unwrap(),
             filter: None,
             scope: None,
             availability: Availability::Required,
@@ -2380,7 +2379,7 @@ mod tests {
         let use_protocol_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
             source_name: "fuchsia.examples.Echo".parse().unwrap(),
-            target_path: CapabilityPath::try_from("/svc/fuchsia.examples.Echo").unwrap(),
+            target_path: "/svc/fuchsia.examples.Echo".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Optional,
         });

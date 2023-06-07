@@ -13,11 +13,8 @@ use {
         node_path::NodePath,
         route::VerifyRouteResult,
     },
-    cm_rust::{
-        CapabilityDecl, CapabilityPath, CapabilityTypeName, ComponentDecl, ExposeDecl, OfferDecl,
-        UseDecl,
-    },
-    cm_types::Name,
+    cm_rust::{CapabilityDecl, CapabilityTypeName, ComponentDecl, ExposeDecl, OfferDecl, UseDecl},
+    cm_types::{Name, Path},
     routing::{component_instance::ComponentInstanceInterface, mapper::RouteSegment},
     scrutiny::model::{controller::DataController, model::DataModel},
     serde::{Deserialize, Serialize},
@@ -84,7 +81,7 @@ pub struct UseSpec {
     pub type_name: CapabilityTypeName,
     /// Target capability path the match, if any.
     #[serde(rename = "use_path")]
-    pub path: Option<CapabilityPath>,
+    pub path: Option<Path>,
     /// Target capability name, if any.
     #[serde(rename = "use_name")]
     pub name: Option<Name>,
@@ -133,7 +130,7 @@ pub struct SourceSpec {
 pub struct SourceDeclSpec {
     /// Path designated in capability declaration, if any.
     #[serde(rename = "source_path_prefix")]
-    pub path_prefix: Option<CapabilityPath>,
+    pub path_prefix: Option<Path>,
     /// Name designated in capability declaration, if any.
     #[serde(rename = "source_name")]
     pub name: Option<Name>,
@@ -184,13 +181,9 @@ impl Matches<Vec<RouteSegment>> for SourceDeclSpec {
                             next_buf.push(next);
                             next_buf
                         }).to_str().ok_or_else(|| anyhow!("Failed to format PathBuf as string; components; {:?} appended with {:?}", decl.source_path, subdirs))?.to_string();
-                    let source_path =
-                        CapabilityPath::from_str(&source_path_str).with_context(|| {
-                            anyhow!(
-                                "Failed to parse string into CapabilityPath: {}",
-                                source_path_str
-                            )
-                        })?;
+                    let source_path = Path::from_str(&source_path_str).with_context(|| {
+                        anyhow!("Failed to parse string into Path: {}", source_path_str)
+                    })?;
 
                     Ok(match_path_prefix(path_prefix, &source_path))
                 }
@@ -247,7 +240,7 @@ fn get_subdirs(route: &Vec<RouteSegment>) -> Vec<PathBuf> {
     subdir
 }
 
-fn match_path_prefix(prefix: &CapabilityPath, path: &CapabilityPath) -> bool {
+fn match_path_prefix(prefix: &Path, path: &Path) -> bool {
     let prefix = prefix.split();
     let path = path.split();
     if prefix.len() > path.len() {
@@ -636,11 +629,11 @@ mod tests {
         anyhow::Result,
         cm_fidl_analyzer::{component_model::ModelBuilderForAnalyzer, node_path::NodePath},
         cm_rust::{
-            Availability, CapabilityPath, CapabilityTypeName, ChildDecl, ComponentDecl,
-            DependencyType, DirectoryDecl, ExposeDirectoryDecl, ExposeSource, ExposeTarget,
-            OfferDirectoryDecl, OfferSource, OfferTarget, ProgramDecl, UseDirectoryDecl, UseSource,
-            UseStorageDecl,
+            Availability, CapabilityTypeName, ChildDecl, ComponentDecl, DependencyType,
+            DirectoryDecl, ExposeDirectoryDecl, ExposeSource, ExposeTarget, OfferDirectoryDecl,
+            OfferSource, OfferTarget, ProgramDecl, UseDirectoryDecl, UseSource, UseStorageDecl,
         },
+        cm_types::Path,
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
         fuchsia_merkle::{Hash, HASH_SIZE},
         maplit::{hashmap, hashset},
@@ -668,13 +661,13 @@ mod tests {
         assert!(
             UseSpec {
                 type_name: CapabilityTypeName::Storage,
-                path: Some(CapabilityPath::from_str("/path").unwrap()),
+                path: Some(Path::from_str("/path").unwrap()),
                 name: None,
             }
             .matches(
                 &UseStorageDecl {
                     source_name: "name".parse().unwrap(),
-                    target_path: CapabilityPath::from_str("/path").unwrap(),
+                    target_path: Path::from_str("/path").unwrap(),
                     availability: Availability::Required,
                 }
                 .into()
@@ -692,7 +685,7 @@ mod tests {
             .matches(
                 &UseStorageDecl {
                     source_name: "name".parse().unwrap(),
-                    target_path: CapabilityPath::from_str("/path").unwrap(),
+                    target_path: Path::from_str("/path").unwrap(),
                     availability: Availability::Required,
                 }
                 .into()
@@ -806,7 +799,7 @@ mod tests {
                 capabilities: vec![
                     DirectoryDecl{
                         name: "root_dir".parse().unwrap(),
-                        source_path: Some(CapabilityPath::from_str("/data/to/user").unwrap()),
+                        source_path: Some(Path::from_str("/data/to/user").unwrap()),
                         rights: fio::Operations::CONNECT,
                     }.into(),
                 ],
@@ -857,7 +850,7 @@ mod tests {
                     UseDirectoryDecl{
                         source: UseSource::Parent,
                         source_name: "routed_from_provider".parse().unwrap(),
-                        target_path: CapabilityPath::from_str("/data/from/provider").unwrap(),
+                        target_path: Path::from_str("/data/from/provider").unwrap(),
                         rights: fio::Operations::CONNECT,
                         subdir: Some(PathBuf::from_str("user_subdir").unwrap()),
                         dependency_type: DependencyType::Strong,
@@ -866,7 +859,7 @@ mod tests {
                     UseDirectoryDecl{
                         source: UseSource::Parent,
                         source_name: "routed_from_root".parse().unwrap(),
-                        target_path: CapabilityPath::from_str("/data/from/root").unwrap(),
+                        target_path: Path::from_str("/data/from/root").unwrap(),
                         rights: fio::Operations::CONNECT,
                         subdir: Some(PathBuf::from_str("user_subdir").unwrap()),
                         dependency_type: DependencyType::Strong,
@@ -880,7 +873,7 @@ mod tests {
                 capabilities: vec![
                     DirectoryDecl{
                         name: "provider_dir".parse().unwrap(),
-                        source_path: Some(CapabilityPath::from_str("/data/to/user").unwrap()),
+                        source_path: Some(Path::from_str("/data/to/user").unwrap()),
                         rights: fio::Operations::CONNECT,
                     }.into(),
                 ],
@@ -1091,7 +1084,7 @@ mod tests {
                     RouteMatch {
                         target: UseSpec {
                             type_name: CapabilityTypeName::Directory,
-                            path: Some(CapabilityPath::from_str("/data/from/provider").unwrap()),
+                            path: Some(Path::from_str("/data/from/provider").unwrap()),
                             name: None,
                         },
                         source: SourceSpec {
@@ -1099,7 +1092,7 @@ mod tests {
                             capability: SourceDeclSpec {
                                 // Match complete path with routed subdirs.
                                 path_prefix: Some(
-                                    CapabilityPath::from_str(
+                                    Path::from_str(
                                         "/data/to/user/provider_subdir/root_subdir/user_subdir",
                                     )
                                     .unwrap(),
@@ -1158,12 +1151,12 @@ mod tests {
                 routes_to_skip: vec![
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
-                        path: Some(CapabilityPath::from_str("/data/from/provider").unwrap()),
+                        path: Some(Path::from_str("/data/from/provider").unwrap()),
                         name: None,
                     },
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
-                        path: Some(CapabilityPath::from_str("/data/from/root").unwrap()),
+                        path: Some(Path::from_str("/data/from/root").unwrap()),
                         name: None,
                     },
                 ],
@@ -1201,17 +1194,17 @@ mod tests {
                 routes_to_skip: vec![
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
-                        path: Some(CapabilityPath::from_str("/data/from/provider").unwrap()),
+                        path: Some(Path::from_str("/data/from/provider").unwrap()),
                         name: None,
                     },
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
-                        path: Some(CapabilityPath::from_str("/data/from/root").unwrap()),
+                        path: Some(Path::from_str("/data/from/root").unwrap()),
                         name: None,
                     },
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
-                        path: Some(CapabilityPath::from_str("/new/dir/route").unwrap()),
+                        path: Some(Path::from_str("/new/dir/route").unwrap()),
                         name: None,
                     },
                 ],
@@ -1245,7 +1238,7 @@ mod tests {
                     // Skip @root_url -> @two_dir_user_url route.
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
-                        path: Some(CapabilityPath::from_str("/data/from/root").unwrap()),
+                        path: Some(Path::from_str("/data/from/root").unwrap()),
                         name: None,
                     },
                 ],
@@ -1258,7 +1251,7 @@ mod tests {
                     RouteMatch {
                         target: UseSpec {
                             type_name: CapabilityTypeName::Directory,
-                            path: Some(CapabilityPath::from_str("/data/from/provider").unwrap()),
+                            path: Some(Path::from_str("/data/from/provider").unwrap()),
                             name: None,
                         },
                         source: SourceSpec {
@@ -1266,7 +1259,7 @@ mod tests {
                             capability: SourceDeclSpec {
                                 // Match complete path with routed subdirs.
                                 path_prefix: Some(
-                                    CapabilityPath::from_str(
+                                    Path::from_str(
                                         "/data/to/user/provider_subdir/root_subdir/user_subdir",
                                     )
                                     .unwrap(),
@@ -1290,7 +1283,7 @@ mod tests {
                             node_path: config.component_routes[0].routes_to_verify[0].source.node_path.clone(),
                             capability: DirectoryDecl{
                                 name: "provider_dir".parse().unwrap(),
-                                source_path: Some(CapabilityPath::from_str("/data/to/user").unwrap()),
+                                source_path: Some(Path::from_str("/data/to/user").unwrap()),
                                 rights: fio::Operations::CONNECT,
                             }.into(),
                         })
@@ -1318,7 +1311,7 @@ mod tests {
                     // Skip @root_url -> @two_dir_user_url route.
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
-                        path: Some(CapabilityPath::from_str("/data/from/root").unwrap()),
+                        path: Some(Path::from_str("/data/from/root").unwrap()),
                         name: None,
                     },
                 ],
@@ -1331,7 +1324,7 @@ mod tests {
                     RouteMatch {
                         target: UseSpec {
                             type_name: CapabilityTypeName::Directory,
-                            path: Some(CapabilityPath::from_str("/data/from/provider").unwrap()),
+                            path: Some(Path::from_str("/data/from/provider").unwrap()),
                             name: None,
                         },
                         source: SourceSpec {
@@ -1340,10 +1333,8 @@ mod tests {
                                 // Match partial path with some (not all) routed
                                 // subdirs.
                                 path_prefix: Some(
-                                    CapabilityPath::from_str(
-                                        "/data/to/user/provider_subdir/root_subdir",
-                                    )
-                                    .unwrap(),
+                                    Path::from_str("/data/to/user/provider_subdir/root_subdir")
+                                        .unwrap(),
                                 ),
                                 name: Some("provider_dir".parse().unwrap()),
                             },
@@ -1363,7 +1354,7 @@ mod tests {
                                 node_path: config.component_routes[0].routes_to_verify[0].source.node_path.clone(),
                                 capability: DirectoryDecl{
                                     name: "provider_dir".parse().unwrap(),
-                                    source_path: Some(CapabilityPath::from_str("/data/to/user").unwrap()),
+                                    source_path: Some(Path::from_str("/data/to/user").unwrap()),
                                     rights: fio::Operations::CONNECT,
                                 }.into(),
                             })
@@ -1394,7 +1385,7 @@ mod tests {
                     RouteMatch {
                         target: UseSpec {
                             type_name: CapabilityTypeName::Directory,
-                            path: Some(CapabilityPath::from_str("/data/from/root").unwrap()),
+                            path: Some(Path::from_str("/data/from/root").unwrap()),
                             name: None,
                         },
                         source: SourceSpec {
@@ -1402,10 +1393,8 @@ mod tests {
                             capability: SourceDeclSpec {
                                 // Match complete path with routed subdirs.
                                 path_prefix: Some(
-                                    CapabilityPath::from_str(
-                                        "/data/to/user/root_subdir/user_subdir",
-                                    )
-                                    .unwrap(),
+                                    Path::from_str("/data/to/user/root_subdir/user_subdir")
+                                        .unwrap(),
                                 ),
                                 name: Some("root_dir".parse().unwrap()),
                             },
@@ -1419,7 +1408,7 @@ mod tests {
                     RouteMatch {
                         target: UseSpec {
                             type_name: CapabilityTypeName::Directory,
-                            path: Some(CapabilityPath::from_str("/data/from/provider").unwrap()),
+                            path: Some(Path::from_str("/data/from/provider").unwrap()),
                             name: None,
                         },
                         source: SourceSpec {
@@ -1427,7 +1416,7 @@ mod tests {
                             capability: SourceDeclSpec {
                                 // Match complete path with routed subdirs.
                                 path_prefix: Some(
-                                    CapabilityPath::from_str(
+                                    Path::from_str(
                                         "/data/to/user/provider_subdir/root_subdir/user_subdir",
                                     )
                                     .unwrap(),
@@ -1450,7 +1439,7 @@ mod tests {
                                 node_path: config.component_routes[0].routes_to_verify[0].source.node_path.clone(),
                                 capability: DirectoryDecl{
                                     name: "root_dir".parse().unwrap(),
-                                    source_path: Some(CapabilityPath::from_str("/data/to/user").unwrap()),
+                                    source_path: Some(Path::from_str("/data/to/user").unwrap()),
                                     rights: fio::Operations::CONNECT,
                                 }.into(),
                             })
@@ -1461,7 +1450,7 @@ mod tests {
                                 node_path: config.component_routes[0].routes_to_verify[1].source.node_path.clone(),
                                 capability: DirectoryDecl{
                                     name: "provider_dir".parse().unwrap(),
-                                    source_path: Some(CapabilityPath::from_str("/data/to/user").unwrap()),
+                                    source_path: Some(Path::from_str("/data/to/user").unwrap()),
                                     rights: fio::Operations::CONNECT,
                                 }.into(),
                             })
@@ -1501,17 +1490,15 @@ mod tests {
                         RouteMatch {
                             target: UseSpec {
                                 type_name: CapabilityTypeName::Directory,
-                                path: Some(CapabilityPath::from_str("/data/from/root").unwrap()),
+                                path: Some(Path::from_str("/data/from/root").unwrap()),
                                 name: None,
                             },
                             source: SourceSpec {
                                 node_path: NodePath::absolute_from_vec(vec![]),
                                 capability: SourceDeclSpec {
                                     path_prefix: Some(
-                                        CapabilityPath::from_str(
-                                            "/data/to/user/root_subdir/user_subdir",
-                                        )
-                                        .unwrap(),
+                                        Path::from_str("/data/to/user/root_subdir/user_subdir")
+                                            .unwrap(),
                                     ),
                                     name: Some("root_dir".parse().unwrap()),
                                 },
@@ -1525,16 +1512,14 @@ mod tests {
                         RouteMatch {
                             target: UseSpec {
                                 type_name: CapabilityTypeName::Directory,
-                                path: Some(
-                                    CapabilityPath::from_str("/data/from/provider").unwrap(),
-                                ),
+                                path: Some(Path::from_str("/data/from/provider").unwrap()),
                                 name: None,
                             },
                             source: SourceSpec {
                                 node_path: NodePath::absolute_from_vec(vec!["one_dir_provider"]),
                                 capability: SourceDeclSpec {
                                     path_prefix: Some(
-                                        CapabilityPath::from_str(
+                                        Path::from_str(
                                             "/data/to/user/provider_subdir/root_subdir/user_subdir",
                                         )
                                         .unwrap(),
@@ -1559,7 +1544,7 @@ mod tests {
                                 node_path: config.component_routes[1].routes_to_verify[0].source.node_path.clone(),
                                 capability: DirectoryDecl{
                                     name: "root_dir".parse().unwrap(),
-                                    source_path: Some(CapabilityPath::from_str("/data/to/user").unwrap()),
+                                    source_path: Some(Path::from_str("/data/to/user").unwrap()),
                                     rights: fio::Operations::CONNECT,
                                 }.into(),
                             })
@@ -1570,7 +1555,7 @@ mod tests {
                                 node_path: config.component_routes[1].routes_to_verify[1].source.node_path.clone(),
                                 capability: DirectoryDecl{
                                     name: "provider_dir".parse().unwrap(),
-                                    source_path: Some(CapabilityPath::from_str("/data/to/user").unwrap()),
+                                    source_path: Some(Path::from_str("/data/to/user").unwrap()),
                                     rights: fio::Operations::CONNECT,
                                 }.into(),
                             })
@@ -1604,7 +1589,7 @@ mod tests {
                     },
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
-                        path: Some(CapabilityPath::from_str("/data/from/root").unwrap()),
+                        path: Some(Path::from_str("/data/from/root").unwrap()),
                         name: None,
                     },
                 ],
@@ -1649,14 +1634,14 @@ mod tests {
                         type_name: CapabilityTypeName::Directory,
                         // This is the correct path, but also specifying
                         // source name should cause a failure.
-                        path: Some(CapabilityPath::from_str(&target_path).unwrap()),
+                        path: Some(Path::from_str(&target_path).unwrap()),
                         // This is the source name of the route, but
                         // directory uses are matched by target path.
                         name: Some(source_name.parse().unwrap()),
                     },
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
-                        path: Some(CapabilityPath::from_str("/data/from/root").unwrap()),
+                        path: Some(Path::from_str("/data/from/root").unwrap()),
                         name: None,
                     },
                 ],
@@ -1698,12 +1683,12 @@ mod tests {
                 routes_to_skip: vec![
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
-                        path: Some(CapabilityPath::from_str("/data/from/provider").unwrap()),
+                        path: Some(Path::from_str("/data/from/provider").unwrap()),
                         name: None,
                     },
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
-                        path: Some(CapabilityPath::from_str("/data/from/root").unwrap()),
+                        path: Some(Path::from_str("/data/from/root").unwrap()),
                         name: None,
                     },
                     // Unmatched `routes_to_skip` entry will be skipped; this
@@ -1712,7 +1697,7 @@ mod tests {
                     // work as intended.
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
-                        path: Some(CapabilityPath::from_str(&bad_path).unwrap()),
+                        path: Some(Path::from_str(&bad_path).unwrap()),
                         name: None,
                     },
                 ],
@@ -1741,19 +1726,19 @@ mod tests {
                 routes_to_skip: vec![
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
-                        path: Some(CapabilityPath::from_str("/data/from/provider").unwrap()),
+                        path: Some(Path::from_str("/data/from/provider").unwrap()),
                         name: None,
                     },
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
-                        path: Some(CapabilityPath::from_str(dup_name).unwrap()),
+                        path: Some(Path::from_str(dup_name).unwrap()),
                         name: None,
                     },
                     // Intentional error: Duplicate match for same
                     // route-to-skip.
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
-                        path: Some(CapabilityPath::from_str(dup_name).unwrap()),
+                        path: Some(Path::from_str(dup_name).unwrap()),
                         name: None,
                     },
                 ],
@@ -1781,21 +1766,21 @@ mod tests {
                 skip_if_target_node_missing: false,
                 routes_to_skip: vec![UseSpec {
                     type_name: CapabilityTypeName::Directory,
-                    path: Some(CapabilityPath::from_str("/data/from/root").unwrap()),
+                    path: Some(Path::from_str("/data/from/root").unwrap()),
                     name: None,
                 }],
                 routes_to_verify: vec![
                     RouteMatch {
                         target: UseSpec {
                             type_name: CapabilityTypeName::Directory,
-                            path: Some(CapabilityPath::from_str("/data/from/provider").unwrap()),
+                            path: Some(Path::from_str("/data/from/provider").unwrap()),
                             name: None,
                         },
                         source: SourceSpec {
                             node_path: NodePath::absolute_from_vec(vec!["one_dir_provider"]),
                             capability: SourceDeclSpec {
                                 path_prefix: Some(
-                                    CapabilityPath::from_str(
+                                    Path::from_str(
                                         "/data/to/user/provider_subdir/root_subdir/user_subdir",
                                     )
                                     .unwrap(),
@@ -1809,15 +1794,13 @@ mod tests {
                     RouteMatch {
                         target: UseSpec {
                             type_name: CapabilityTypeName::Directory,
-                            path: Some(CapabilityPath::from_str("/data/from/root").unwrap()),
+                            path: Some(Path::from_str("/data/from/root").unwrap()),
                             name: None,
                         },
                         source: SourceSpec {
                             node_path: NodePath::absolute_from_vec(vec!["one_dir_provider"]),
                             capability: SourceDeclSpec {
-                                path_prefix: Some(
-                                    CapabilityPath::from_str("/data/to/user").unwrap(),
-                                ),
+                                path_prefix: Some(Path::from_str("/data/to/user").unwrap()),
                                 name: Some("provider_dir".parse().unwrap()),
                             },
                         },
@@ -1847,12 +1830,12 @@ mod tests {
                 routes_to_skip: vec![
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
-                        path: Some(CapabilityPath::from_str(dup_name).unwrap()),
+                        path: Some(Path::from_str(dup_name).unwrap()),
                         name: None,
                     },
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
-                        path: Some(CapabilityPath::from_str("/data/from/root").unwrap()),
+                        path: Some(Path::from_str("/data/from/root").unwrap()),
                         name: None,
                     },
                 ],
@@ -1862,14 +1845,14 @@ mod tests {
                     RouteMatch {
                         target: UseSpec {
                             type_name: CapabilityTypeName::Directory,
-                            path: Some(CapabilityPath::from_str(dup_name).unwrap()),
+                            path: Some(Path::from_str(dup_name).unwrap()),
                             name: None,
                         },
                         source: SourceSpec {
                             node_path: NodePath::absolute_from_vec(vec!["one_dir_provider"]),
                             capability: SourceDeclSpec {
                                 path_prefix: Some(
-                                    CapabilityPath::from_str(
+                                    Path::from_str(
                                         "/data/to/user/provider_subdir/root_subdir/user_subdir",
                                     )
                                     .unwrap(),
@@ -1906,7 +1889,7 @@ mod tests {
                     // checks out, but route not every route is matched.
                     UseSpec {
                         type_name: CapabilityTypeName::Directory,
-                        path: Some(CapabilityPath::from_str(dup_name).unwrap()),
+                        path: Some(Path::from_str(dup_name).unwrap()),
                         name: None,
                     },
                 ],
@@ -1916,14 +1899,14 @@ mod tests {
                     RouteMatch {
                         target: UseSpec {
                             type_name: CapabilityTypeName::Directory,
-                            path: Some(CapabilityPath::from_str(dup_name).unwrap()),
+                            path: Some(Path::from_str(dup_name).unwrap()),
                             name: None,
                         },
                         source: SourceSpec {
                             node_path: NodePath::absolute_from_vec(vec!["one_dir_provider"]),
                             capability: SourceDeclSpec {
                                 path_prefix: Some(
-                                    CapabilityPath::from_str(
+                                    Path::from_str(
                                         "/data/to/user/provider_subdir/root_subdir/user_subdir",
                                     )
                                     .unwrap(),
@@ -1961,7 +1944,7 @@ mod tests {
                     RouteMatch {
                         target: UseSpec {
                             type_name: CapabilityTypeName::Directory,
-                            path: Some(CapabilityPath::from_str("/data/from/root").unwrap()),
+                            path: Some(Path::from_str("/data/from/root").unwrap()),
                             name: None,
                         },
                         source: SourceSpec {
@@ -1969,10 +1952,8 @@ mod tests {
                             capability: SourceDeclSpec {
                                 // Match complete path with routed subdirs.
                                 path_prefix: Some(
-                                    CapabilityPath::from_str(
-                                        "/data/to/user/root_subdir/user_subdir",
-                                    )
-                                    .unwrap(),
+                                    Path::from_str("/data/to/user/root_subdir/user_subdir")
+                                        .unwrap(),
                                 ),
                                 name: Some("root_dir".parse().unwrap()),
                             },
@@ -1986,7 +1967,7 @@ mod tests {
                     RouteMatch {
                         target: UseSpec {
                             type_name: CapabilityTypeName::Directory,
-                            path: Some(CapabilityPath::from_str("/data/from/provider").unwrap()),
+                            path: Some(Path::from_str("/data/from/provider").unwrap()),
                             name: None,
                         },
                         source: SourceSpec {
@@ -1994,7 +1975,7 @@ mod tests {
                             capability: SourceDeclSpec {
                                 // Match complete path with routed subdirs.
                                 path_prefix: Some(
-                                    CapabilityPath::from_str(
+                                    Path::from_str(
                                         "/data/to/user/provider_subdir/root_subdir/user_subdir",
                                     )
                                     .unwrap(),
@@ -2046,7 +2027,7 @@ mod tests {
                     RouteMatch {
                         target: UseSpec {
                             type_name: CapabilityTypeName::Directory,
-                            path: Some(CapabilityPath::from_str("/data/from/root").unwrap()),
+                            path: Some(Path::from_str("/data/from/root").unwrap()),
                             name: None,
                         },
                         source: SourceSpec {
@@ -2054,10 +2035,8 @@ mod tests {
                             capability: SourceDeclSpec {
                                 // Match complete path with routed subdirs.
                                 path_prefix: Some(
-                                    CapabilityPath::from_str(
-                                        "/data/to/user/root_subdir/user_subdir",
-                                    )
-                                    .unwrap(),
+                                    Path::from_str("/data/to/user/root_subdir/user_subdir")
+                                        .unwrap(),
                                 ),
                                 name: Some("root_dir".parse().unwrap()),
                             },
@@ -2071,7 +2050,7 @@ mod tests {
                     RouteMatch {
                         target: UseSpec {
                             type_name: CapabilityTypeName::Directory,
-                            path: Some(CapabilityPath::from_str("/data/from/provider").unwrap()),
+                            path: Some(Path::from_str("/data/from/provider").unwrap()),
                             name: None,
                         },
                         source: SourceSpec {
@@ -2079,7 +2058,7 @@ mod tests {
                             capability: SourceDeclSpec {
                                 // Match complete path with routed subdirs.
                                 path_prefix: Some(
-                                    CapabilityPath::from_str(
+                                    Path::from_str(
                                         "/data/to/user/provider_subdir/root_subdir/user_subdir",
                                     )
                                     .unwrap(),
@@ -2131,7 +2110,7 @@ mod tests {
                     RouteMatch {
                         target: UseSpec {
                             type_name: CapabilityTypeName::Directory,
-                            path: Some(CapabilityPath::from_str("/data/from/root").unwrap()),
+                            path: Some(Path::from_str("/data/from/root").unwrap()),
                             name: None,
                         },
                         source: SourceSpec {
@@ -2139,10 +2118,8 @@ mod tests {
                             capability: SourceDeclSpec {
                                 // Match complete path with routed subdirs.
                                 path_prefix: Some(
-                                    CapabilityPath::from_str(
-                                        "/data/to/user/root_subdir/user_subdir",
-                                    )
-                                    .unwrap(),
+                                    Path::from_str("/data/to/user/root_subdir/user_subdir")
+                                        .unwrap(),
                                 ),
                                 name: Some("root_dir".parse().unwrap()),
                             },
@@ -2156,7 +2133,7 @@ mod tests {
                     RouteMatch {
                         target: UseSpec {
                             type_name: CapabilityTypeName::Directory,
-                            path: Some(CapabilityPath::from_str("/data/from/provider").unwrap()),
+                            path: Some(Path::from_str("/data/from/provider").unwrap()),
                             name: None,
                         },
                         source: SourceSpec {
@@ -2164,7 +2141,7 @@ mod tests {
                             capability: SourceDeclSpec {
                                 // Match complete path with routed subdirs.
                                 path_prefix: Some(
-                                    CapabilityPath::from_str(
+                                    Path::from_str(
                                         "/data/to/user/provider_subdir/root_subdir/user_subdir",
                                     )
                                     .unwrap(),
@@ -2189,7 +2166,7 @@ mod tests {
                                 capability: UseDirectoryDecl{
                                     source: UseSource::Parent,
                                     source_name: "routed_from_root".parse().unwrap(),
-                                    target_path: CapabilityPath::from_str("/data/from/root").unwrap(),
+                                    target_path: Path::from_str("/data/from/root").unwrap(),
                                     rights: fio::Operations::CONNECT,
                                     subdir: Some(PathBuf::from_str("user_subdir").unwrap()),
                                     dependency_type: DependencyType::Strong,
@@ -2204,7 +2181,7 @@ mod tests {
                                 capability: UseDirectoryDecl{
                                     source: UseSource::Parent,
                                     source_name: "routed_from_provider".parse().unwrap(),
-                                    target_path: CapabilityPath::from_str("/data/from/provider").unwrap(),
+                                    target_path: Path::from_str("/data/from/provider").unwrap(),
                                     rights: fio::Operations::CONNECT,
                                     subdir: Some(PathBuf::from_str("user_subdir").unwrap()),
                                     dependency_type: DependencyType::Strong,

@@ -17,6 +17,7 @@ use {
         convert::TryInto,
         marker::PhantomData,
         path::{Path, PathBuf},
+        str::FromStr,
     },
 };
 
@@ -486,7 +487,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                         .use_(UseDecl::Service(UseServiceDecl {
                             source: UseSource::Child("b".to_owned()),
                             source_name: "fuchsia.examples.EchoService".parse().unwrap(),
-                            target_path: CapabilityPath::try_from(
+                            target_path: cm_types::Path::from_str(
                                 "/svc/fuchsia.examples.EchoService_a",
                             )
                             .unwrap(),
@@ -503,7 +504,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                         .use_(UseDecl::Directory(UseDirectoryDecl {
                             source: UseSource::Child("b".to_owned()),
                             source_name: "dir".parse().unwrap(),
-                            target_path: CapabilityPath::try_from("/dir_a").unwrap(),
+                            target_path: cm_types::Path::from_str("/dir_a").unwrap(),
                             rights: fio::R_STAR_DIR,
                             subdir: None,
                             dependency_type: DependencyType::Strong,
@@ -652,7 +653,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                         .use_(UseDecl::Service(UseServiceDecl {
                             source: UseSource::Child("b".to_owned()),
                             source_name: "fuchsia.examples.EchoService".parse().unwrap(),
-                            target_path: CapabilityPath::try_from(
+                            target_path: cm_types::Path::from_str(
                                 "/svc/fuchsia.examples.EchoService_a",
                             )
                             .unwrap(),
@@ -669,7 +670,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                         .use_(UseDecl::Directory(UseDirectoryDecl {
                             source: UseSource::Child("b".to_owned()),
                             source_name: "dir".parse().unwrap(),
-                            target_path: CapabilityPath::try_from("/dir_a").unwrap(),
+                            target_path: cm_types::Path::from_str("/dir_a").unwrap(),
                             rights: fio::R_STAR_DIR,
                             subdir: None,
                             dependency_type: DependencyType::Strong,

@@ -19,7 +19,6 @@ mod tests {
             component_id_index::make_index_file, storage::CommonStorageTest, CheckUse,
             ExpectedResult, RoutingTestModel, RoutingTestModelBuilder,
         },
-        std::convert::TryInto,
     };
 
     #[fuchsia::test]
@@ -197,7 +196,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .use_(UseDecl::Storage(UseStorageDecl {
                         source_name: "cache".parse().unwrap(),
-                        target_path: "/storage".try_into().unwrap(),
+                        target_path: "/storage".parse().unwrap(),
                         availability: Availability::Required,
                     }))
                     .build(),
@@ -213,7 +212,7 @@ mod tests {
             .check_use(
                 AbsoluteMoniker::parse_str("/consumer").unwrap(),
                 CheckUse::Storage {
-                    path: "/storage".try_into().unwrap(),
+                    path: "/storage".parse().unwrap(),
                     storage_relation: Some(
                         InstancedRelativeMoniker::try_from(vec!["consumer:0"]).unwrap(),
                     ),

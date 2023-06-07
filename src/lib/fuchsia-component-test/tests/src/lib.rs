@@ -20,7 +20,6 @@ use {
     },
     fuchsia_fs,
     futures::{channel::mpsc, future::pending, FutureExt, SinkExt, StreamExt, TryStreamExt},
-    std::convert::TryInto,
 };
 
 const V2_ECHO_CLIENT_ABSOLUTE_URL: &'static str =
@@ -651,7 +650,7 @@ async fn mock_component_with_a_relative_dynamic_child() -> Result<(), Error> {
     });
     echo_client_decl.capabilities.push(cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
         name: "fidl.examples.routing.echo.Echo".parse().unwrap(),
-        source_path: Some("/svc/fidl.examples.routing.echo.Echo".try_into().unwrap()),
+        source_path: Some("/svc/fidl.examples.routing.echo.Echo".parse().unwrap()),
     }));
     echo_client_decl.offers.push(cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
         source: cm_rust::OfferSource::Self_,
@@ -664,7 +663,7 @@ async fn mock_component_with_a_relative_dynamic_child() -> Result<(), Error> {
     echo_client_decl.uses.push(cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
         source: cm_rust::UseSource::Framework,
         source_name: "fuchsia.component.Realm".parse().unwrap(),
-        target_path: "/svc/fuchsia.component.Realm".try_into().unwrap(),
+        target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
         dependency_type: cm_rust::DependencyType::Strong,
         availability: cm_rust::Availability::Required,
     }));
