@@ -397,7 +397,7 @@ enum LookupResult<I: Ip, D: Id> {
 
 #[derive(Hash, Copy, Clone)]
 struct SocketSelectorParams<I: Ip, A: AsRef<I::Addr>> {
-    src_ip: A,
+    src_ip: I::Addr,
     dst_ip: A,
     src_port: u16,
     dst_port: u16,
@@ -461,7 +461,7 @@ impl<I: Ip + IpExt, D: WeakId> DatagramSockets<IpPortSpec<I, D>, Udp<I, D>> {
     /// yield 0, 1, or multiple sockets.
     fn lookup(
         &self,
-        (src_ip, src_port): (SpecifiedAddr<I::Addr>, Option<NonZeroU16>),
+        (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
         (dst_ip, dst_port): (SpecifiedAddr<I::Addr>, NonZeroU16),
         device: D,
     ) -> impl Iterator<Item = LookupResult<I, D>> + '_ {
@@ -1017,7 +1017,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> IpTransportCon
                 let Sockets {sockets, lazy_port_alloc: _} = state;
 
                 let receiver = sockets
-                    .lookup((dst_ip, Some(dst_port)), (src_ip, src_port), sync_ctx.downgrade_device_id(device))
+                    .lookup((*dst_ip, Some(dst_port)), (src_ip, src_port), sync_ctx.downgrade_device_id(device))
                     .next();
 
             if let Some(id) = receiver {
@@ -1071,16 +1071,8 @@ impl<
             let device_weak = sync_ctx.downgrade_device_id(device);
 
             let src_port = packet.src_port();
-            let mut recipients = SpecifiedAddr::new(src_ip)
-                .map(|src_ip| {
-                    sockets.lookup(
-                        (src_ip, src_port),
-                        (dst_ip, packet.dst_port()),
-                        device_weak.clone(),
-                    )
-                })
-                .into_iter()
-                .flatten()
+            let mut recipients = sockets
+                .lookup((src_ip, src_port), (dst_ip, packet.dst_port()), device_weak.clone())
                 .peekable();
 
             if recipients.peek().is_some() {
@@ -3894,6 +3886,39 @@ mod tests {
             I::FAKE_CONFIG.remote_ip.get(),
             I::FAKE_CONFIG.local_ip.get(),
             0u16,
+            LOCAL_PORT,
+            &body[..],
+        );
+        // Check that we received both packets for the listener.
+        assert_eq!(
+            non_sync_ctx.state().listen_data(),
+            HashMap::from([(listener, vec![[].as_slice()])]),
+        );
+    }
+
+    #[ip_test]
+    fn test_receive_source_addr_unspecified_on_listener<I: Ip + TestIpExt>() {
+        set_logger_for_test();
+        let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
+            UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
+        let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
+        let listener = SocketHandler::<I, _>::listen_udp(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            unbound,
+            None,
+            Some(LOCAL_PORT),
+        )
+        .expect("listen_udp failed");
+
+        let body = [];
+        receive_udp_packet(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            FakeDeviceId,
+            I::UNSPECIFIED_ADDRESS,
+            I::FAKE_CONFIG.local_ip.get(),
+            REMOTE_PORT,
             LOCAL_PORT,
             &body[..],
         );
