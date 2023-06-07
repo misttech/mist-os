@@ -92,7 +92,7 @@ class InstanceRequestorTest : public AgentTest {
                           const std::string& service_name, const std::string& instance_name,
                           inet::IpPort port, const std::vector<std::vector<uint8_t>>& text,
                           ReplyAddress sender_address, bool include_txt = true,
-                          bool include_address = true) {
+                          bool include_address = true, bool address_cache_flush = false) {
     auto service_full_name = MdnsNames::ServiceFullName(service_name);
     auto instance_full_name = MdnsNames::InstanceFullName(instance_name, service_name);
 
@@ -113,6 +113,9 @@ class InstanceRequestorTest : public AgentTest {
 
     if (include_address) {
       DnsResource a_resource(host_full_name, sender_address.socket_address().address());
+      if (address_cache_flush) {
+        a_resource.cache_flush_ = true;
+      }
       under_test.ReceiveResource(a_resource, MdnsResourceSection::kAdditional, sender_address);
     }
 
@@ -307,6 +310,59 @@ TEST_F(InstanceRequestorTest, Change) {
   EXPECT_EQ(ServiceInstance(kServiceName, kInstanceName, kHostName,
                             {inet::SocketAddress(sender_address.socket_address().address(), kPort)},
                             kAltText, 0, 0),
+            *params);
+
+  subscriber.ExpectNoOther();
+}
+
+// Tests the behavior of the requestor an address record indicate addresses should be flushed.
+TEST_F(InstanceRequestorTest, AddressCacheFlush) {
+  InstanceRequestor under_test(this, kServiceName, Media::kBoth, IpVersions::kBoth, kExcludeLocal,
+                               kExcludeLocalProxies);
+  SetAgent(under_test);
+
+  Subscriber subscriber;
+  under_test.AddSubscriber(&subscriber);
+
+  under_test.Start(kLocalHostFullName);
+
+  // Expect a PTR question on start.
+  auto message = ExpectOutboundMessage(ReplyAddress::Multicast(Media::kBoth, IpVersions::kBoth));
+  ExpectQuestion(message.get(), kServiceFullName, DnsType::kPtr);
+  ExpectNoOtherQuestionOrResource(message.get());
+  ExpectPostTaskForTime(kMinDelay, kMinDelay);
+  ExpectNoOther();
+
+  subscriber.ExpectQueryCalled(DnsType::kPtr);
+  subscriber.ExpectNoOther();
+
+  // Respond.
+  ReplyAddress sender_address(
+      inet::SocketAddress(192, 168, 1, 1, inet::IpPort::From_uint16_t(5353)),
+      inet::IpAddress(192, 168, 1, 100), 1, Media::kWireless, IpVersions::kV4);
+  ReceivePublication(under_test, kHostFullName, kServiceName, kInstanceName, kPort, kText,
+                     sender_address);
+
+  auto params = subscriber.ExpectInstanceDiscoveredCalled();
+  EXPECT_EQ(ServiceInstance(kServiceName, kInstanceName, kHostName,
+                            {inet::SocketAddress(sender_address.socket_address().address(), kPort)},
+                            kText, 0, 0),
+            *params);
+
+  subscriber.ExpectNoOther();
+
+  // Respond with different address with the cache flush bit set.
+  ReplyAddress different_sender_address(
+      inet::SocketAddress(192, 168, 1, 2, inet::IpPort::From_uint16_t(5353)),
+      inet::IpAddress(192, 168, 1, 100), 1, Media::kWireless, IpVersions::kV4);
+  ReceivePublication(under_test, kHostFullName, kServiceName, kInstanceName, kPort, kText,
+                     different_sender_address);
+
+  params = subscriber.ExpectInstanceChangedCalled();
+  EXPECT_EQ(ServiceInstance(
+                kServiceName, kInstanceName, kHostName,
+                {inet::SocketAddress(different_sender_address.socket_address().address(), kPort)},
+                kText, 0, 0),
             *params);
 
   subscriber.ExpectNoOther();

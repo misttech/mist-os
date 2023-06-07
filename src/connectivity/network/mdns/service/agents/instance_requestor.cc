@@ -351,6 +351,10 @@ void InstanceRequestor::ReceiveAResource(const DnsResource& resource, MdnsResour
     return;
   }
 
+  if (resource.cache_flush_) {
+    target_info->addresses_.clear();
+  }
+
   if (target_info->addresses_.insert(address).second) {
     target_info->dirty_ = true;
   }
@@ -369,6 +373,10 @@ void InstanceRequestor::ReceiveAaaaResource(const DnsResource& resource,
     }
 
     return;
+  }
+
+  if (resource.cache_flush_) {
+    target_info->addresses_.clear();
   }
 
   if (target_info->addresses_.insert(address).second) {
