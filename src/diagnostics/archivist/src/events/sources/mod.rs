@@ -2,13 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub use crate::events::sources::{
-    event_source::*, legacy::*, log_connector::*, unattributed_inspect_sink::*,
-    unattributed_log_sink::*,
-};
+pub use crate::events::sources::{event_source::*, legacy::*, log_connector::*};
 
 mod event_source;
 mod legacy;
 mod log_connector;
-mod unattributed_inspect_sink;
-mod unattributed_log_sink;

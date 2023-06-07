@@ -8,10 +8,7 @@ use crate::{
     error::Error,
     events::{
         router::{ConsumerConfig, EventRouter, ProducerConfig, RouterOptions},
-        sources::{
-            ComponentEventProvider, EventSource, LogConnector, UnattributedInspectSinkSource,
-            UnattributedLogSinkSource,
-        },
+        sources::{ComponentEventProvider, EventSource, LogConnector},
         types::*,
     },
     inspect::{repository::InspectRepository, servers::*},
@@ -21,7 +18,6 @@ use crate::{
 use archivist_config::Config;
 use fidl_fuchsia_diagnostics::ArchiveAccessorRequestStream;
 use fidl_fuchsia_diagnostics_host as fhost;
-use fidl_fuchsia_io as fio;
 use fidl_fuchsia_process_lifecycle::LifecycleRequestStream;
 use fidl_fuchsia_sys_internal as fsys_internal;
 use fuchsia_async as fasync;
@@ -77,12 +73,6 @@ pub struct Archivist {
 
     /// The server handling fuchsia.diagnostics.LogSettings
     log_settings_server: Arc<LogSettingsServer>,
-
-    /// The source that takes care of routing unattributed log sink request streams.
-    unattributed_log_sink_source: Option<UnattributedLogSinkSource>,
-
-    /// The source that takes care of routing unattributed InspectSink request streams.
-    unattributed_inspect_sink_source: Option<UnattributedInspectSinkSource>,
 }
 
 impl Archivist {
@@ -132,30 +122,6 @@ impl Archivist {
             events: vec![EventType::InspectSinkRequested],
         });
 
-        // Initialize the unattributed log sink provider.
-        let unattributed_log_sink_source = if config.is_unattributed {
-            let mut source = UnattributedLogSinkSource::default();
-            event_router.add_producer(ProducerConfig {
-                producer: &mut source,
-                events: vec![EventType::LogSinkRequested],
-            });
-            Some(source)
-        } else {
-            None
-        };
-
-        // Initialize the unattributed InspectSink provider.
-        let unattributed_inspect_sink_source = if config.is_unattributed {
-            let mut source = UnattributedInspectSinkSource::default();
-            event_router.add_producer(ProducerConfig {
-                producer: &mut source,
-                events: vec![EventType::InspectSinkRequested],
-            });
-            Some(source)
-        } else {
-            None
-        };
-
         // Drain klog and publish it to syslog.
         if config.enable_klog {
             match KernelDebugLog::new().await {
@@ -189,8 +155,6 @@ impl Archivist {
             pipelines,
             _inspect_repository: inspect_repo,
             logs_repository: logs_repo,
-            unattributed_log_sink_source,
-            unattributed_inspect_sink_source,
         }
     }
 
@@ -268,21 +232,19 @@ impl Archivist {
                 }
             }
 
-            if !config.is_unattributed {
-                match EventSource::new("/events/inspect_sink_requested_event_stream").await {
-                    Err(err) => {
-                        warn!(?err, "Failed to create event source for InspectSink requests")
-                    }
-                    Ok(mut event_source) => {
-                        event_router.add_producer(ProducerConfig {
-                            producer: &mut event_source,
-                            events: vec![EventType::InspectSinkRequested],
-                        });
-                        incoming_external_event_producers.push(fasync::Task::spawn(async move {
-                            // This should never exit.
-                            let _ = event_source.spawn().await;
-                        }));
-                    }
+            match EventSource::new("/events/inspect_sink_requested_event_stream").await {
+                Err(err) => {
+                    warn!(?err, "Failed to create event source for InspectSink requests")
+                }
+                Ok(mut event_source) => {
+                    event_router.add_producer(ProducerConfig {
+                        producer: &mut event_source,
+                        events: vec![EventType::InspectSinkRequested],
+                    });
+                    incoming_external_event_producers.push(fasync::Task::spawn(async move {
+                        // This should never exit.
+                        let _ = event_source.spawn().await;
+                    }));
                 }
             }
 
@@ -336,15 +298,13 @@ impl Archivist {
     /// * `outgoing_channel`- channel to serve outgoing directory on.
     pub async fn run(
         mut self,
-        outgoing_channel: fidl::endpoints::ServerEnd<fio::DirectoryMarker>,
+        mut fs: ServiceFs<ServiceObj<'static, ()>>,
         router_opts: RouterOptions,
     ) -> Result<(), Error> {
         debug!("Running Archivist.");
 
         // Start servicing all outgoing services.
-        let mut fs = ServiceFs::new();
         self.serve_protocols(&mut fs).await;
-        fs.serve_connection(outgoing_channel).map_err(Error::ServeOutgoing)?;
         let run_outgoing = fs.collect::<()>();
 
         // Start ingesting events.
@@ -431,24 +391,6 @@ impl Archivist {
             );
         }
 
-        // Ingest unattributed fuchsia.logger.LogSink connections.
-        if let Some(mut unattributed_log_sink_source) = self.unattributed_log_sink_source.take() {
-            svc_dir.add_fidl_service(move |stream| {
-                debug!("unattributed fuchsia.logger.LogSink connection");
-                unattributed_log_sink_source.new_connection(stream);
-            });
-        }
-
-        // Ingest unattributed fuchsia.inspect.InspectSink connections.
-        if let Some(mut unattributed_inspect_sink_source) =
-            self.unattributed_inspect_sink_source.take()
-        {
-            svc_dir.add_fidl_service(move |stream| {
-                debug!("unattributed fuchsia.inspect.InspectSink connection");
-                unattributed_inspect_sink_source.new_connection(stream);
-            });
-        }
-
         // Server fuchsia.logger.Log
         let log_server = Arc::clone(&self.log_server);
         svc_dir.add_fidl_service(move |stream| {
@@ -471,6 +413,7 @@ mod tests {
     use crate::{
         constants::*,
         events::router::{Dispatcher, EventProducer},
+        identity::ComponentIdentity,
         logs::testing::*,
     };
     use diagnostics_data::LogsData;
@@ -479,13 +422,16 @@ mod tests {
         ClientSelectorConfiguration, DataType, Format, StreamParameters,
     };
     use fidl_fuchsia_diagnostics_host as fhost;
+    use fidl_fuchsia_inspect::{InspectSinkMarker, InspectSinkRequestStream};
     use fidl_fuchsia_io as fio;
+    use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequestStream};
     use fidl_fuchsia_process_lifecycle::{LifecycleMarker, LifecycleProxy};
     use fuchsia_async as fasync;
     use fuchsia_component::client::connect_to_protocol_at_dir_svc;
     use futures::channel::oneshot;
+    use std::marker::PhantomData;
 
-    async fn init_archivist() -> Archivist {
+    async fn init_archivist(fs: &mut ServiceFs<ServiceObj<'static, ()>>) -> Archivist {
         let config = Config {
             enable_component_event_provider: false,
             enable_klog: false,
@@ -493,7 +439,6 @@ mod tests {
             enable_log_connector: false,
             log_to_debuglog: false,
             maximum_concurrent_snapshots_per_reader: 4,
-            is_unattributed: true,
             logs_max_cached_original_bytes: LEGACY_DEFAULT_MAXIMUM_CACHED_LOGS_BYTES,
             num_threads: 1,
             pipelines_path: DEFAULT_PIPELINES_PATH.into(),
@@ -501,44 +446,94 @@ mod tests {
         };
 
         let mut archivist = Archivist::new(&config).await;
-        // Install a fake producer that allows all incoming events. This allows skipping
-        // validation for the purposes of the tests here.
-        let mut fake_producer = FakeProducer {};
 
-        // must be updated if `is_unattributed` set to false
-        let events = vec![
-            EventType::LogSinkRequested,
-            EventType::DiagnosticsReady,
-            EventType::InspectSinkRequested,
-        ];
+        // Install a couple of iunattributed sources for the purposes of the test.
+        let mut source = UnattributedSource::<LogSinkMarker>::default();
+        archivist.event_router.add_producer(ProducerConfig {
+            producer: &mut source,
+            events: vec![EventType::LogSinkRequested],
+        });
+        fs.dir("svc").add_fidl_service(move |stream| {
+            source.new_connection(stream);
+        });
 
-        archivist
-            .event_router
-            .add_producer(ProducerConfig { producer: &mut fake_producer, events });
+        let mut source = UnattributedSource::<InspectSinkMarker>::default();
+        archivist.event_router.add_producer(ProducerConfig {
+            producer: &mut source,
+            events: vec![
+                EventType::InspectSinkRequested,
+                // This producer doesn't generate this event, but we can use it to satisfy the
+                // validation.
+                EventType::DiagnosticsReady,
+            ],
+        });
+        fs.dir("svc").add_fidl_service(move |stream| {
+            source.new_connection(stream);
+        });
 
         archivist
     }
 
-    struct FakeProducer {}
+    pub struct UnattributedSource<P> {
+        dispatcher: Dispatcher,
+        _phantom: PhantomData<P>,
+    }
 
-    impl EventProducer for FakeProducer {
-        fn set_dispatcher(&mut self, _dispatcher: Dispatcher) {}
+    impl<P> Default for UnattributedSource<P> {
+        fn default() -> Self {
+            Self { dispatcher: Dispatcher::default(), _phantom: PhantomData }
+        }
+    }
+
+    impl UnattributedSource<LogSinkMarker> {
+        pub fn new_connection(&mut self, request_stream: LogSinkRequestStream) {
+            self.dispatcher
+                .emit(Event {
+                    timestamp: zx::Time::get_monotonic(),
+                    payload: EventPayload::LogSinkRequested(LogSinkRequestedPayload {
+                        component: Arc::new(ComponentIdentity::unknown()),
+                        request_stream,
+                    }),
+                })
+                .ok();
+        }
+    }
+
+    impl UnattributedSource<InspectSinkMarker> {
+        pub fn new_connection(&mut self, request_stream: InspectSinkRequestStream) {
+            self.dispatcher
+                .emit(Event {
+                    timestamp: zx::Time::get_monotonic(),
+                    payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
+                        component: Arc::new(ComponentIdentity::unknown()),
+                        request_stream,
+                    }),
+                })
+                .ok();
+        }
+    }
+
+    impl<P> EventProducer for UnattributedSource<P> {
+        fn set_dispatcher(&mut self, dispatcher: Dispatcher) {
+            self.dispatcher = dispatcher;
+        }
     }
 
     // run archivist and send signal when it dies.
     async fn run_archivist_and_signal_on_exit(
     ) -> (fio::DirectoryProxy, LifecycleProxy, oneshot::Receiver<()>) {
         let (directory, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-        let mut archivist = init_archivist().await;
+
+        let mut fs = ServiceFs::new();
+        fs.serve_connection(server_end).unwrap();
+        let mut archivist = init_archivist(&mut fs).await;
+
         let (lifecycle_proxy, request_stream) =
             fidl::endpoints::create_proxy_and_stream::<LifecycleMarker>().unwrap();
         archivist.set_lifecycle_request_stream(request_stream);
         let (signal_send, signal_recv) = oneshot::channel();
         fasync::Task::spawn(async move {
-            archivist
-                .run(server_end, RouterOptions::default())
-                .await
-                .expect("Cannot run archivist");
+            archivist.run(fs, RouterOptions::default()).await.expect("Cannot run archivist");
             signal_send.send(()).unwrap();
         })
         .detach();
@@ -548,12 +543,11 @@ mod tests {
     // runs archivist and returns its directory.
     async fn run_archivist() -> fio::DirectoryProxy {
         let (directory, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-        let archivist = init_archivist().await;
+        let mut fs = ServiceFs::new();
+        fs.serve_connection(server_end).unwrap();
+        let archivist = init_archivist(&mut fs).await;
         fasync::Task::spawn(async move {
-            archivist
-                .run(server_end, RouterOptions::default())
-                .await
-                .expect("Cannot run archivist");
+            archivist.run(fs, RouterOptions::default()).await.expect("Cannot run archivist");
         })
         .detach();
         directory

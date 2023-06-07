@@ -46,9 +46,6 @@
                 max_size: 256,
             },
         },
-
-        // Whether or not we'll be serving an unattributed LogSink as well.
-        is_unattributed: { type: "bool" },
     },
 }
 

@@ -12,7 +12,7 @@ use archivist_config::Config;
 use archivist_lib::{archivist::Archivist, component_lifecycle, events::router::RouterOptions};
 use diagnostics_log::PublishOptions;
 use fuchsia_async as fasync;
-use fuchsia_component::server::MissingStartupHandle;
+use fuchsia_component::server::{MissingStartupHandle, ServiceFs};
 use fuchsia_inspect::{component, health::Reporter};
 use fuchsia_zircon as zx;
 use tracing::{debug, info, warn, Level, Subscriber};
@@ -55,9 +55,11 @@ async fn async_main(config: Config) -> Result<(), Error> {
         fuchsia_runtime::take_startup_handle(fuchsia_runtime::HandleType::DirectoryRequest.into())
             .ok_or(MissingStartupHandle)?;
 
+    let mut fs = ServiceFs::new();
+    fs.serve_connection(fidl::endpoints::ServerEnd::new(zx::Channel::from(startup_handle)))?;
     archivist
         .run(
-            fidl::endpoints::ServerEnd::new(zx::Channel::from(startup_handle)),
+            fs,
             RouterOptions {
                 validate: config.enable_event_source || config.enable_component_event_provider,
             },

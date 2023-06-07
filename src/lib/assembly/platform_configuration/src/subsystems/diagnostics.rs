@@ -61,8 +61,7 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
                 maximum_concurrent_snapshots_per_reader,
             )?
             .field("num_threads", num_threads)?
-            .field("pipelines_path", "/config/data")?
-            .field("is_unattributed", false)?;
+            .field("pipelines_path", "/config/data")?;
         // LINT.ThenChange(/src/diagnostics/archivist/configs.gni)
 
         let exception_handler_available =
@@ -130,7 +129,6 @@ mod tests {
             archivist_fields.get("pipelines_path"),
             Some(&Value::String("/config/data".to_string()))
         );
-        assert_eq!(archivist_fields.get("is_unattributed"), Some(&Value::Bool(false)));
     }
 
     #[test]
