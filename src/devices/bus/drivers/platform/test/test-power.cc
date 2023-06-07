@@ -53,7 +53,7 @@ const composite_device_desc_t power_domain_1_desc = {
 
 // Composite binding rules for power domain 3
 static const zx_bind_inst_t parent_domain_match[] = {
-    BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_POWER),
+    BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_POWER),
     BI_MATCH_IF(EQ, BIND_POWER_DOMAIN, 1),
 };
 constexpr device_fragment_part_t parent_domain_fragment[] = {

@@ -113,7 +113,7 @@ zx_status_t TestBoard::Create(zx_device_t* parent) {
 
   // Add a composite device
   const zx_bind_inst_t power_match[] = {
-      BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_POWER),
+      BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_POWER),
       BI_MATCH_IF(EQ, BIND_POWER_DOMAIN, 3),
   };
   device_fragment_part_t power_fragment[] = {

@@ -4,8 +4,6 @@
 
 #include "power.h"
 
-#include <fuchsia/hardware/power/c/banjo.h>
-#include <fuchsia/hardware/power/cpp/banjo.h>
 #include <fuchsia/hardware/powerimpl/cpp/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
@@ -28,43 +26,6 @@ void GetUniqueId(uint64_t* id) {
 }
 
 namespace power {
-
-zx_status_t PowerDeviceFragmentChild::PowerRegisterPowerDomain(uint32_t min_needed_voltage_uV,
-                                                               uint32_t max_supported_voltage_uV) {
-  return power_device_->RegisterPowerDomain(fragment_device_id_, min_needed_voltage_uV,
-                                            max_supported_voltage_uV);
-}
-
-zx_status_t PowerDeviceFragmentChild::PowerUnregisterPowerDomain() {
-  return power_device_->UnregisterPowerDomain(fragment_device_id_);
-}
-
-zx_status_t PowerDeviceFragmentChild::PowerGetPowerDomainStatus(power_domain_status_t* out_status) {
-  return power_device_->GetPowerDomainStatus(fragment_device_id_, out_status);
-}
-
-zx_status_t PowerDeviceFragmentChild::PowerGetSupportedVoltageRange(uint32_t* min_voltage,
-                                                                    uint32_t* max_voltage) {
-  return power_device_->GetSupportedVoltageRange(fragment_device_id_, min_voltage, max_voltage);
-}
-
-zx_status_t PowerDeviceFragmentChild::PowerRequestVoltage(uint32_t voltage,
-                                                          uint32_t* actual_voltage) {
-  return power_device_->RequestVoltage(fragment_device_id_, voltage, actual_voltage);
-}
-
-zx_status_t PowerDeviceFragmentChild::PowerGetCurrentVoltage(uint32_t index,
-                                                             uint32_t* current_voltage) {
-  return power_device_->GetCurrentVoltage(fragment_device_id_, index, current_voltage);
-}
-
-zx_status_t PowerDeviceFragmentChild::PowerWritePmicCtrlReg(uint32_t reg_addr, uint32_t value) {
-  return power_device_->WritePmicCtrlReg(fragment_device_id_, reg_addr, value);
-}
-
-zx_status_t PowerDeviceFragmentChild::PowerReadPmicCtrlReg(uint32_t reg_addr, uint32_t* out_value) {
-  return power_device_->ReadPmicCtrlReg(fragment_device_id_, reg_addr, out_value);
-}
 
 void PowerDeviceFragmentChild::RegisterPowerDomain(RegisterPowerDomainRequestView request,
                                                    RegisterPowerDomainCompleter::Sync& completer) {
@@ -221,10 +182,18 @@ zx_status_t PowerDevice::RegisterPowerDomain(uint64_t fragment_device_id,
   if (GetDependentCountLocked() == 1) {
     // First dependent. Make sure parent is enabled by registering for it.
     if (parent_power_.is_valid()) {
-      status = parent_power_.RegisterPowerDomain(min_voltage_uV_, max_voltage_uV_);
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "Failed to register with parent power domain");
-        return status;
+      fidl::WireResult result =
+          fidl::WireCall(parent_power_)->RegisterPowerDomain(min_voltage_uV_, max_voltage_uV_);
+      if (!result.ok()) {
+        zxlogf(ERROR, "Failed to send request for register with parent power domain: %s",
+               result.status_string());
+        return result.status();
+      }
+
+      if (result->is_error()) {
+        zxlogf(ERROR, "Failed to register with parent power domain: %s",
+               zx_status_get_string(result->error_value()));
+        return result.value().error_value();
       }
     }
     status = power_impl_.EnablePowerDomain(index_);
@@ -253,10 +222,17 @@ zx_status_t PowerDevice::UnregisterPowerDomain(uint64_t fragment_device_id) {
       return status;
     }
     if (parent_power_.is_valid() && status == ZX_OK) {
-      status = parent_power_.UnregisterPowerDomain();
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "Failed to unregister with parent power domain");
-        return status;
+      fidl::WireResult result = fidl::WireCall(parent_power_)->UnregisterPowerDomain();
+      if (!result.ok()) {
+        zxlogf(ERROR, "Failed to send request for unregister with parent power domain: %s",
+               result.status_string());
+        return result.status();
+      }
+
+      if (result->is_error()) {
+        zxlogf(ERROR, "Failed to unregister with parent power domain: %s",
+               zx_status_get_string(result->error_value()));
+        return result.value().error_value();
       }
     }
   }
@@ -324,80 +300,39 @@ zx_status_t PowerDevice::ReadPmicCtrlReg(uint64_t fragment_device_id, uint32_t r
   return power_impl_.ReadPmicCtrlReg(index_, reg_addr, out_value);
 }
 
-zx_status_t PowerDevice::DdkOpenProtocolSessionMultibindable(uint32_t proto_id, void* out) {
-  if (proto_id != ZX_PROTOCOL_POWER) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  fbl::AutoLock al(&power_device_lock_);
-  auto* proto = static_cast<ddk::AnyProtocol*>(out);
-  fbl::AllocChecker ac;
-  uint64_t id = 0;
-  GetUniqueId(&id);
-  std::unique_ptr<PowerDeviceFragmentChild> child(new (&ac) PowerDeviceFragmentChild(id, this));
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-  children_.push_back(std::move(child));
-  PowerDeviceFragmentChild* child_ptr = children_.back().get();
-
-  proto->ctx = child_ptr;
-  proto->ops = child_ptr->ops();
-  return ZX_OK;
-}
-
-zx_status_t PowerDevice::DdkCloseProtocolSessionMultibindable(void* child_ctx) {
-  fbl::AutoLock al(&power_device_lock_);
-  auto child = reinterpret_cast<PowerDeviceFragmentChild*>(child_ctx);
-
-  auto iter = children_.begin();
-  for (; iter != children_.end(); iter++) {
-    if (iter->get()->fragment_device_id() == child->fragment_device_id()) {
-      break;
-    }
-  }
-
-  if (iter != children_.end()) {
-    children_.erase(iter);
-  } else {
-    zxlogf(ERROR, "%s: Unable to find the child with the given child_ctx", __FUNCTION__);
-    return ZX_ERR_NOT_FOUND;
-  }
-  return ZX_OK;
-}
-
 void PowerDevice::DdkRelease() { delete this; }
 
-zx_status_t PowerDevice::Serve(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
-  fuchsia_hardware_power::Service::InstanceHandler::MemberHandler<fuchsia_hardware_power::Device>
-      device_handler = [this](fidl::ServerEnd<fuchsia_hardware_power::Device> server_end) {
-        fbl::AutoLock al(&power_device_lock_);
-        fbl::AllocChecker ac;
-        uint64_t id = 0;
-        GetUniqueId(&id);
-        std::unique_ptr<PowerDeviceFragmentChild> child(new (&ac)
-                                                            PowerDeviceFragmentChild(id, this));
-        if (!ac.check()) {
-          zxlogf(ERROR, "Failed to allocate PowerDeviceFragmentChild.");
+fit::function<void(fidl::ServerEnd<fuchsia_hardware_power::Device>)> PowerDevice::GetHandler() {
+  return [this](fidl::ServerEnd<fuchsia_hardware_power::Device> server_end) {
+    fbl::AutoLock al(&power_device_lock_);
+    fbl::AllocChecker ac;
+    uint64_t id = 0;
+    GetUniqueId(&id);
+    std::unique_ptr<PowerDeviceFragmentChild> child(new (&ac) PowerDeviceFragmentChild(id, this));
+    if (!ac.check()) {
+      zxlogf(ERROR, "Failed to allocate PowerDeviceFragmentChild.");
+      return;
+    }
+    children_.push_back(std::move(child));
+    PowerDeviceFragmentChild* child_ptr = children_.back().get();
+    auto close_handler = [this, id](fidl::UnbindInfo info) {
+      fbl::AutoLock al(&power_device_lock_);
+      for (auto iter = children_.begin(); iter != children_.end(); iter++) {
+        if (iter->get()->fragment_device_id() == id) {
+          children_.erase(iter);
           return;
         }
-        children_.push_back(std::move(child));
-        PowerDeviceFragmentChild* child_ptr = children_.back().get();
-        auto close_handler = [this, id](fidl::UnbindInfo info) {
-          fbl::AutoLock al(&power_device_lock_);
-          for (auto iter = children_.begin(); iter != children_.end(); iter++) {
-            if (iter->get()->fragment_device_id() == id) {
-              children_.erase(iter);
-              return;
-            }
-          }
+      }
 
-          zxlogf(ERROR, "Unable to find the child with the given fragment id.");
-        };
-        bindings_.AddBinding(dispatcher_, std::move(server_end), child_ptr,
-                             std::move(close_handler));
-      };
+      zxlogf(ERROR, "Unable to find the child with the given fragment id.");
+    };
+    bindings_.AddBinding(dispatcher_, std::move(server_end), child_ptr, std::move(close_handler));
+  };
+}
+
+zx_status_t PowerDevice::Serve(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
   fuchsia_hardware_power::Service::InstanceHandler handler({
-      .device = std::move(device_handler),
+      .device = GetHandler(),
   });
 
   auto result = outgoing_.AddService<fuchsia_hardware_power::Service>(std::move(handler));
@@ -431,7 +366,14 @@ zx_status_t PowerDevice::Create(void* ctx, zx_device_t* parent) {
   }
 
   // This is optional.
-  ddk::PowerProtocolClient parent_power(parent, "power-parent");
+  fidl::ClientEnd<fuchsia_hardware_power::Device> parent_power;
+  zx::result parent_power_result =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_power::Service::Device>(
+          parent, "power-parent");
+  if (parent_power_result.is_ok()) {
+    zxlogf(INFO, "Connected to optional power-parent.");
+    parent_power = std::move(*parent_power_result);
+  }
 
   uint32_t min_voltage = 0, max_voltage = 0;
   bool fixed = false;
@@ -443,8 +385,8 @@ zx_status_t PowerDevice::Create(void* ctx, zx_device_t* parent) {
     fixed = true;
   }
   fbl::AllocChecker ac;
-  std::unique_ptr<PowerDevice> dev(new (&ac) PowerDevice(parent, index, power_impl, parent_power,
-                                                         min_voltage, max_voltage, fixed));
+  std::unique_ptr<PowerDevice> dev(new (&ac) PowerDevice(
+      parent, index, power_impl, std::move(parent_power), min_voltage, max_voltage, fixed));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }

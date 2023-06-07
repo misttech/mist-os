@@ -84,7 +84,7 @@ zx_status_t As370::ThermalInit() {
   };
 
   static constexpr zx_bind_inst_t cpu_power_match[] = {
-      BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_POWER),
+      BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_POWER),
       BI_MATCH_IF(EQ, BIND_POWER_DOMAIN, kBuckSoC),
   };
   static const device_fragment_part_t cpu_power_fragment[] = {

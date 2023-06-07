@@ -39,7 +39,6 @@ zx_status_t AcpiCrOsEcUsbPdDevice::Bind(zx_device_t* parent, ChromiumosEcCore* e
   }
 
   ddk::DeviceAddArgs args("acpi-cros-ec-usb-pd");
-  args.set_proto_id(ZX_PROTOCOL_POWER);
   status = dev->DdkAdd(args);
   if (status != ZX_OK) {
     return status;

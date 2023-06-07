@@ -6,9 +6,6 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.powerimpl") {
   sources = [ "power-impl.fidl" ]
-  public_deps = [
-    "//sdk/banjo/fuchsia.hardware.power",
-    "//zircon/vdso/zx",
-  ]
+  public_deps = [ "//zircon/vdso/zx" ]
   enable_banjo = true
 }

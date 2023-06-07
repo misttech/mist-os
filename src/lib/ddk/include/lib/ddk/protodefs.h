@@ -88,7 +88,7 @@ DDK_PROTOCOL_DEF(VCAM_FACTORY,            68,   "virtual-camera-factory", 0)
 DDK_PROTOCOL_DEF(OUTPUT_STREAM,           69,   "output-stream", PF_NOPUB)
 DDK_PROTOCOL_DEF(MEDIA_CODEC,             70,   "media-codec", 0)
 DDK_PROTOCOL_DEF(BATTERY,                 71,   "battery", 0)
-DDK_PROTOCOL_DEF(POWER,                   72,   "power", 0)
+// 72 was POWER.
 DDK_PROTOCOL_DEF(THERMAL,                 73,   "thermal", 0)
 DDK_PROTOCOL_DEF(GPU_THERMAL,             74,   "gpu-thermal", 0)
 DDK_PROTOCOL_DEF(PTY,                     75,   "pty", 0)

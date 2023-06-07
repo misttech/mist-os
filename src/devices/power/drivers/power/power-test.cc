@@ -4,9 +4,9 @@
 
 #include "power.h"
 
-#include <fuchsia/hardware/power/cpp/banjo.h>
 #include <fuchsia/hardware/powerimpl/c/banjo.h>
 #include <fuchsia/hardware/powerimpl/cpp/banjo.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/runtime/testing/cpp/dispatcher.h>
 
 #include <memory>
@@ -17,38 +17,62 @@
 
 namespace power {
 
-class FakePower : public ddk::PowerProtocol<FakePower> {
+class FakePower : public fidl::WireServer<fuchsia_hardware_power::Device> {
  public:
-  FakePower() : proto_{.ops = &power_protocol_ops_, .ctx = this} {}
-  ddk::PowerProtocolClient GetClient() const { return ddk::PowerProtocolClient(&proto_); }
-  zx_status_t PowerRegisterPowerDomain(uint32_t min_needed_voltage_uV,
-                                       uint32_t max_supported_voltage_uV) {
+  void RegisterPowerDomain(RegisterPowerDomainRequestView request,
+                           RegisterPowerDomainCompleter::Sync& completer) override {
     power_domain_registered_count_++;
-    return ZX_OK;
+    completer.ReplySuccess();
   }
 
-  zx_status_t PowerUnregisterPowerDomain() {
+  void UnregisterPowerDomain(UnregisterPowerDomainCompleter::Sync& completer) override {
     power_domain_unregistered_count_++;
-    return ZX_OK;
+    completer.ReplySuccess();
   }
 
-  zx_status_t PowerGetPowerDomainStatus(power_domain_status_t* out_status) { return ZX_OK; }
-
-  zx_status_t PowerGetSupportedVoltageRange(uint32_t* min_voltage, uint32_t* max_voltage) {
-    return ZX_OK;
+  void GetPowerDomainStatus(GetPowerDomainStatusCompleter::Sync& completer) override {
+    completer.ReplySuccess(::fuchsia_hardware_power::wire::PowerDomainStatus::kEnabled);
   }
 
-  zx_status_t PowerRequestVoltage(uint32_t voltage, uint32_t* actual_voltage) { return ZX_OK; }
+  void GetSupportedVoltageRange(GetSupportedVoltageRangeCompleter::Sync& completer) override {
+    completer.ReplySuccess(0, 10);
+  }
 
-  zx_status_t PowerGetCurrentVoltage(uint32_t index, uint32_t* current_voltage) { return ZX_OK; }
+  void RequestVoltage(RequestVoltageRequestView request,
+                      RequestVoltageCompleter::Sync& completer) override {
+    completer.ReplySuccess(request->voltage);
+  }
 
-  zx_status_t PowerWritePmicCtrlReg(uint32_t reg_addr, uint32_t value) { return ZX_OK; }
-  zx_status_t PowerReadPmicCtrlReg(uint32_t reg_addr, uint32_t* out_value) { return ZX_OK; }
+  void GetCurrentVoltage(GetCurrentVoltageRequestView request,
+                         GetCurrentVoltageCompleter::Sync& completer) override {
+    completer.ReplySuccess(0);
+  }
+
+  void WritePmicCtrlReg(WritePmicCtrlRegRequestView request,
+                        WritePmicCtrlRegCompleter::Sync& completer) override {
+    completer.ReplySuccess();
+  }
+
+  void ReadPmicCtrlReg(ReadPmicCtrlRegRequestView request,
+                       ReadPmicCtrlRegCompleter::Sync& completer) override {
+    completer.ReplySuccess(0);
+  }
+
   uint32_t power_domain_registered_count() { return power_domain_registered_count_; }
   uint32_t power_domain_unregistered_count() { return power_domain_unregistered_count_; }
 
+  zx::result<fidl::ClientEnd<fuchsia_hardware_power::Device>> BindServer() {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_power::Device>();
+    if (endpoints.is_error()) {
+      return endpoints.take_error();
+    }
+    binding_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                        std::move(endpoints->server), this, fidl::kIgnoreBindingClosure);
+    return zx::ok(std::move(endpoints->client));
+  }
+
  private:
-  power_protocol_t proto_;
+  fidl::ServerBindingGroup<fuchsia_hardware_power::Device> binding_;
   uint32_t power_domain_registered_count_ = 0;
   uint32_t power_domain_unregistered_count_ = 0;
 };
@@ -107,159 +131,250 @@ class GenericPowerTest : public zxtest::Test {
   explicit GenericPowerTest() {}
   void SetUp() override {
     power_impl_ = std::make_unique<FakePowerImpl>();
-    parent_power_ = std::make_unique<FakePower>();
+
+    zx::result parent_power_client = parent_power_.SyncCall(&FakePower::BindServer);
+    ASSERT_OK(parent_power_client);
+
     dut_ = std::make_unique<PowerDevice>(fake_parent_.get(), 0, power_impl_->GetClient(),
-                                         parent_power_->GetClient(), 10, 1000, false);
-    dut_->DdkOpenProtocolSessionMultibindable(ZX_PROTOCOL_POWER, &proto_ctx_);
+                                         std::move(parent_power_client.value()), 10, 1000, false);
+  }
+
+  fidl::ClientEnd<fuchsia_hardware_power::Device> ConnectDut() {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_power::Device>();
+    EXPECT_OK(endpoints.status_value());
+    dut_->GetHandler()(std::move(endpoints->server));
+    return std::move(endpoints->client);
+  }
+
+  static void RunSyncClientTask(fit::closure task) {
+    // Spawn a separate thread to run the client task using an async::Loop.
+    async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
+    loop.StartThread();
+    zx::result result;
+    ASSERT_NO_FAILURES(result = fdf::RunOnDispatcherSync(loop.dispatcher(), std::move(task)));
+    ASSERT_EQ(ZX_OK, result.status_value());
   }
 
  protected:
+  fdf_testing::DriverRuntimeEnv managed_env_;
+  fdf::TestSynchronizedDispatcher env_dispatcher_{fdf::kDispatcherManaged};
   fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherDefault};
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
   std::unique_ptr<PowerDevice> dut_;
-  power_protocol_t proto_ctx_;
-  std::unique_ptr<FakePower> parent_power_;
+  async_patterns::TestDispatcherBound<FakePower> parent_power_{env_dispatcher_.dispatcher(),
+                                                               std::in_place};
   std::unique_ptr<FakePowerImpl> power_impl_;
 };
 
 TEST_F(GenericPowerTest, RegisterDomain) {
-  ddk::PowerProtocolClient proto_client = ddk::PowerProtocolClient(&proto_ctx_);
-  proto_client.RegisterPowerDomain(20, 800);
+  fidl::WireSyncClient<fuchsia_hardware_power::Device> dut_client(ConnectDut());
+  RunSyncClientTask([&dut_client]() {
+    fidl::WireResult result = dut_client->RegisterPowerDomain(20, 800);
+    ZX_ASSERT(result.ok() && result->is_ok());
+  });
   EXPECT_EQ(dut_->GetDependentCount(), 1);
-  EXPECT_EQ(parent_power_->power_domain_registered_count(), 1);
+  EXPECT_EQ(parent_power_.SyncCall(&FakePower::power_domain_registered_count), 1);
   EXPECT_EQ(power_impl_->power_domain_enabled_count(), 1);
 }
 
 TEST_F(GenericPowerTest, RegisterTwice) {
-  ddk::PowerProtocolClient proto_client = ddk::PowerProtocolClient(&proto_ctx_);
-  EXPECT_OK(proto_client.RegisterPowerDomain(20, 800));
+  fidl::WireSyncClient<fuchsia_hardware_power::Device> dut_client(ConnectDut());
+  RunSyncClientTask([&dut_client]() {
+    fidl::WireResult result = dut_client->RegisterPowerDomain(20, 800);
+    ZX_ASSERT(result.ok() && result->is_ok());
+  });
   EXPECT_EQ(dut_->GetDependentCount(), 1);
-  EXPECT_EQ(parent_power_->power_domain_registered_count(), 1);
+  EXPECT_EQ(parent_power_.SyncCall(&FakePower::power_domain_registered_count), 1);
   EXPECT_EQ(power_impl_->power_domain_enabled_count(), 1);
-  EXPECT_OK(proto_client.RegisterPowerDomain(20, 800));
+  RunSyncClientTask([&dut_client]() {
+    fidl::WireResult result = dut_client->RegisterPowerDomain(20, 800);
+    ZX_ASSERT(result.ok() && result->is_ok());
+  });
   EXPECT_EQ(dut_->GetDependentCount(), 1);
-  EXPECT_EQ(parent_power_->power_domain_registered_count(), 1);
+  EXPECT_EQ(parent_power_.SyncCall(&FakePower::power_domain_registered_count), 1);
   EXPECT_EQ(power_impl_->power_domain_enabled_count(), 1);
 }
 
 TEST_F(GenericPowerTest, UnregisterDomain) {
-  ddk::PowerProtocolClient proto_client = ddk::PowerProtocolClient(&proto_ctx_);
-  EXPECT_OK(proto_client.RegisterPowerDomain(20, 800));
+  fidl::WireSyncClient<fuchsia_hardware_power::Device> dut_client(ConnectDut());
+  RunSyncClientTask([&dut_client]() {
+    fidl::WireResult result = dut_client->RegisterPowerDomain(20, 800);
+    ZX_ASSERT(result.ok() && result->is_ok());
+  });
   EXPECT_EQ(dut_->GetDependentCount(), 1);
-  EXPECT_EQ(parent_power_->power_domain_registered_count(), 1);
+  EXPECT_EQ(parent_power_.SyncCall(&FakePower::power_domain_registered_count), 1);
   EXPECT_EQ(power_impl_->power_domain_enabled_count(), 1);
-  EXPECT_OK(proto_client.UnregisterPowerDomain());
+  RunSyncClientTask([&dut_client]() {
+    fidl::WireResult result = dut_client->UnregisterPowerDomain();
+    ZX_ASSERT(result.ok() && result->is_ok());
+  });
   EXPECT_EQ(dut_->GetDependentCount(), 0);
-  EXPECT_EQ(parent_power_->power_domain_unregistered_count(), 1);
+  EXPECT_EQ(parent_power_.SyncCall(&FakePower::power_domain_unregistered_count), 1);
   EXPECT_EQ(power_impl_->power_domain_disabled_count(), 1);
 }
 
 TEST_F(GenericPowerTest, UnregisterTwice) {
-  ddk::PowerProtocolClient proto_client = ddk::PowerProtocolClient(&proto_ctx_);
-  EXPECT_OK(proto_client.RegisterPowerDomain(20, 800));
+  fidl::WireSyncClient<fuchsia_hardware_power::Device> dut_client(ConnectDut());
+  RunSyncClientTask([&dut_client]() {
+    fidl::WireResult result = dut_client->RegisterPowerDomain(20, 800);
+    ZX_ASSERT(result.ok() && result->is_ok());
+  });
   EXPECT_EQ(dut_->GetDependentCount(), 1);
-  EXPECT_EQ(parent_power_->power_domain_registered_count(), 1);
+  EXPECT_EQ(parent_power_.SyncCall(&FakePower::power_domain_registered_count), 1);
   EXPECT_EQ(power_impl_->power_domain_enabled_count(), 1);
-  EXPECT_OK(proto_client.UnregisterPowerDomain());
+  RunSyncClientTask([&dut_client]() {
+    fidl::WireResult result = dut_client->UnregisterPowerDomain();
+    ZX_ASSERT(result.ok() && result->is_ok());
+  });
   EXPECT_EQ(dut_->GetDependentCount(), 0);
-  EXPECT_EQ(parent_power_->power_domain_registered_count(), 1);
+  EXPECT_EQ(parent_power_.SyncCall(&FakePower::power_domain_registered_count), 1);
   EXPECT_EQ(power_impl_->power_domain_enabled_count(), 1);
-  EXPECT_EQ(proto_client.UnregisterPowerDomain(), ZX_ERR_UNAVAILABLE);
+  RunSyncClientTask([&dut_client]() {
+    fidl::WireResult result = dut_client->UnregisterPowerDomain();
+    ZX_ASSERT(result.ok());
+    EXPECT_EQ(ZX_ERR_UNAVAILABLE, result.value().error_value());
+  });
   EXPECT_EQ(dut_->GetDependentCount(), 0);
 }
 
 TEST_F(GenericPowerTest, DependentCount_TwoChildren) {
-  ddk::PowerProtocolClient proto_client = ddk::PowerProtocolClient(&proto_ctx_);
-  proto_client.RegisterPowerDomain(20, 800);
+  fidl::WireSyncClient<fuchsia_hardware_power::Device> dut_client(ConnectDut());
+  RunSyncClientTask([&dut_client]() {
+    fidl::WireResult result = dut_client->RegisterPowerDomain(20, 800);
+    ZX_ASSERT(result.ok() && result->is_ok());
+  });
   EXPECT_EQ(dut_->GetDependentCount(), 1);
-  EXPECT_EQ(parent_power_->power_domain_registered_count(), 1);
+  EXPECT_EQ(parent_power_.SyncCall(&FakePower::power_domain_registered_count), 1);
   EXPECT_EQ(power_impl_->power_domain_enabled_count(), 1);
 
-  power_protocol_t proto_ctx_2;
-  dut_->DdkOpenProtocolSessionMultibindable(ZX_PROTOCOL_POWER, &proto_ctx_2);
-  ddk::PowerProtocolClient proto_client_2 = ddk::PowerProtocolClient(&proto_ctx_2);
+  fidl::WireSyncClient<fuchsia_hardware_power::Device> dut_client_2(ConnectDut());
   EXPECT_EQ(dut_->GetDependentCount(), 1);
-  proto_client_2.RegisterPowerDomain(50, 400);
+  RunSyncClientTask([&dut_client_2]() {
+    fidl::WireResult result = dut_client_2->RegisterPowerDomain(50, 400);
+    ZX_ASSERT(result.ok() && result->is_ok());
+  });
   EXPECT_EQ(dut_->GetDependentCount(), 2);
-  EXPECT_EQ(parent_power_->power_domain_registered_count(), 1);
+  EXPECT_EQ(parent_power_.SyncCall(&FakePower::power_domain_registered_count), 1);
   EXPECT_EQ(power_impl_->power_domain_enabled_count(), 1);
 }
 
 TEST_F(GenericPowerTest, GetSupportedVoltageRange) {
-  ddk::PowerProtocolClient proto_client = ddk::PowerProtocolClient(&proto_ctx_);
-  uint32_t min_voltage = 0;
-  uint32_t max_voltage = 0;
-  proto_client.GetSupportedVoltageRange(&min_voltage, &max_voltage);
-  EXPECT_EQ(min_voltage, 10);
-  EXPECT_EQ(max_voltage, 1000);
+  fidl::WireSyncClient<fuchsia_hardware_power::Device> dut_client(ConnectDut());
+  RunSyncClientTask([&dut_client]() {
+    fidl::WireResult result = dut_client->GetSupportedVoltageRange();
+    ZX_ASSERT(result.ok() && result->is_ok());
+    EXPECT_EQ(result->value()->min, 10);
+    EXPECT_EQ(result->value()->max, 1000);
+  });
 }
 
 TEST_F(GenericPowerTest, RequestVoltage_UnsuppportedVoltage) {
-  ddk::PowerProtocolClient proto_client = ddk::PowerProtocolClient(&proto_ctx_);
-  proto_client.RegisterPowerDomain(20, 800);
-  uint32_t min_voltage = 0;
-  uint32_t max_voltage = 0;
-  proto_client.GetSupportedVoltageRange(&min_voltage, &max_voltage);
-  EXPECT_EQ(min_voltage, 10);
-  EXPECT_EQ(max_voltage, 1000);
+  fidl::WireSyncClient<fuchsia_hardware_power::Device> dut_client(ConnectDut());
+  RunSyncClientTask([&dut_client]() {
+    fidl::WireResult result = dut_client->RegisterPowerDomain(20, 800);
+    ZX_ASSERT(result.ok() && result->is_ok());
 
-  uint32_t out_voltage = 0;
-  EXPECT_EQ(proto_client.RequestVoltage(1010, &out_voltage), ZX_ERR_INVALID_ARGS);
+    fidl::WireResult get_result = dut_client->GetSupportedVoltageRange();
+    ZX_ASSERT(get_result.ok() && get_result->is_ok());
+    EXPECT_EQ(get_result.value()->min, 10);
+    EXPECT_EQ(get_result.value()->max, 1000);
+
+    fidl::WireResult request_result = dut_client->RequestVoltage(1010);
+    ZX_ASSERT(request_result.ok());
+    EXPECT_EQ(ZX_ERR_INVALID_ARGS, request_result.value().error_value());
+  });
 }
 
 TEST_F(GenericPowerTest, RequestVoltage) {
-  ddk::PowerProtocolClient proto_client = ddk::PowerProtocolClient(&proto_ctx_);
-  EXPECT_OK(proto_client.RegisterPowerDomain(20, 800));
+  fidl::WireSyncClient<fuchsia_hardware_power::Device> dut_client(ConnectDut());
+  RunSyncClientTask([&dut_client]() {
+    fidl::WireResult result = dut_client->RegisterPowerDomain(20, 800);
+    ZX_ASSERT(result.ok() && result->is_ok());
+  });
   EXPECT_EQ(dut_->GetDependentCount(), 1);
-  EXPECT_EQ(parent_power_->power_domain_registered_count(), 1);
+  EXPECT_EQ(parent_power_.SyncCall(&FakePower::power_domain_registered_count), 1);
   EXPECT_EQ(power_impl_->power_domain_enabled_count(), 1);
 
-  power_protocol_t proto_ctx_2;
-  dut_->DdkOpenProtocolSessionMultibindable(ZX_PROTOCOL_POWER, &proto_ctx_2);
-  ddk::PowerProtocolClient proto_client_2 = ddk::PowerProtocolClient(&proto_ctx_2);
+  fidl::WireSyncClient<fuchsia_hardware_power::Device> dut_client_2(ConnectDut());
   EXPECT_EQ(dut_->GetDependentCount(), 1);
-  EXPECT_OK(proto_client_2.RegisterPowerDomain(10, 400));
-  EXPECT_EQ(dut_->GetDependentCount(), 2);
-  uint32_t out_actual_voltage = 0;
-  EXPECT_OK(proto_client_2.RequestVoltage(900, &out_actual_voltage));
-  EXPECT_EQ(out_actual_voltage, 400);
-  EXPECT_OK(proto_client_2.RequestVoltage(15, &out_actual_voltage));
-  EXPECT_EQ(out_actual_voltage, 20);
 
-  EXPECT_OK(proto_client_2.UnregisterPowerDomain());
+  RunSyncClientTask([&dut_client_2]() {
+    fidl::WireResult result = dut_client_2->RegisterPowerDomain(10, 400);
+    ZX_ASSERT(result.ok() && result->is_ok());
+  });
+
+  EXPECT_EQ(dut_->GetDependentCount(), 2);
+  RunSyncClientTask([&dut_client_2]() {
+    fidl::WireResult result = dut_client_2->RequestVoltage(900);
+    ZX_ASSERT(result.ok() && result->is_ok());
+    EXPECT_EQ(400, result.value()->actual_voltage);
+
+    fidl::WireResult result2 = dut_client_2->RequestVoltage(15);
+    ZX_ASSERT(result2.ok() && result2->is_ok());
+    EXPECT_EQ(20, result2.value()->actual_voltage);
+
+    fidl::WireResult unregister_result = dut_client_2->UnregisterPowerDomain();
+    ZX_ASSERT(unregister_result.ok() && unregister_result->is_ok());
+  });
+
   EXPECT_EQ(dut_->GetDependentCount(), 1);
-  EXPECT_OK(proto_client.RequestVoltage(900, &out_actual_voltage));
-  EXPECT_EQ(out_actual_voltage, 800);
-  EXPECT_OK(proto_client.RequestVoltage(15, &out_actual_voltage));
-  EXPECT_EQ(out_actual_voltage, 20);
+
+  RunSyncClientTask([&dut_client]() {
+    fidl::WireResult result = dut_client->RequestVoltage(900);
+    ZX_ASSERT(result.ok() && result->is_ok());
+    EXPECT_EQ(800, result.value()->actual_voltage);
+
+    fidl::WireResult result2 = dut_client->RequestVoltage(15);
+    ZX_ASSERT(result2.ok() && result2->is_ok());
+    EXPECT_EQ(20, result2.value()->actual_voltage);
+  });
 }
 
 TEST_F(GenericPowerTest, RequestVoltage_Unregistered) {
-  ddk::PowerProtocolClient proto_client = ddk::PowerProtocolClient(&proto_ctx_);
-  uint32_t out_actual_voltage;
-  EXPECT_EQ(proto_client.RequestVoltage(900, &out_actual_voltage), ZX_ERR_UNAVAILABLE);
+  fidl::WireSyncClient<fuchsia_hardware_power::Device> dut_client(ConnectDut());
+  RunSyncClientTask([&dut_client]() {
+    fidl::WireResult result = dut_client->RequestVoltage(900);
+    ZX_ASSERT(result.ok());
+    EXPECT_EQ(ZX_ERR_UNAVAILABLE, result.value().error_value());
+  });
 }
 
 TEST_F(GenericPowerTest, FixedVoltageDomain) {
-  auto dut_fixed = std::make_unique<PowerDevice>(fake_parent_.get(), 1, power_impl_->GetClient(),
-                                                 parent_power_->GetClient(), 1000, 1000, true);
-  power_protocol_t proto_ctx_2;
-  dut_fixed->DdkOpenProtocolSessionMultibindable(ZX_PROTOCOL_POWER, &proto_ctx_2);
-  ddk::PowerProtocolClient proto_client_2 = ddk::PowerProtocolClient(&proto_ctx_2);
-  EXPECT_OK(proto_client_2.RegisterPowerDomain(0, 0));
+  zx::result parent_power_client = parent_power_.SyncCall(&FakePower::BindServer);
+  ASSERT_OK(parent_power_client);
+
+  auto dut_fixed =
+      std::make_unique<PowerDevice>(fake_parent_.get(), 1, power_impl_->GetClient(),
+                                    std::move(parent_power_client.value()), 1000, 1000, true);
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_power::Device>();
+  EXPECT_OK(endpoints.status_value());
+  dut_fixed->GetHandler()(std::move(endpoints->server));
+  fidl::WireSyncClient<fuchsia_hardware_power::Device> dut_client_2(std::move(endpoints->client));
+
+  RunSyncClientTask([&dut_client_2]() {
+    fidl::WireResult result = dut_client_2->RegisterPowerDomain(0, 0);
+    ZX_ASSERT(result.ok() && result->is_ok());
+  });
+
   EXPECT_EQ(dut_fixed->GetDependentCount(), 1);
-  EXPECT_EQ(parent_power_->power_domain_registered_count(), 1);
+  EXPECT_EQ(parent_power_.SyncCall(&FakePower::power_domain_registered_count), 1);
   EXPECT_EQ(power_impl_->power_domain_enabled_count(), 1);
 
-  uint32_t min_voltage = 0, max_voltage = 0;
-  EXPECT_EQ(proto_client_2.GetSupportedVoltageRange(&min_voltage, &max_voltage),
-            ZX_ERR_NOT_SUPPORTED);
+  RunSyncClientTask([&dut_client_2]() {
+    fidl::WireResult result = dut_client_2->GetSupportedVoltageRange();
+    ZX_ASSERT(result.ok());
+    EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, result.value().error_value());
 
-  uint32_t out_voltage = 0;
-  EXPECT_EQ(proto_client_2.RequestVoltage(900, &out_voltage), ZX_ERR_NOT_SUPPORTED);
-  EXPECT_OK(proto_client_2.UnregisterPowerDomain());
+    fidl::WireResult request_result = dut_client_2->RequestVoltage(900);
+    ZX_ASSERT(request_result.ok());
+    EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, request_result.value().error_value());
+
+    fidl::WireResult unregister_result = dut_client_2->UnregisterPowerDomain();
+    ZX_ASSERT(unregister_result.ok() && unregister_result->is_ok());
+  });
+
   EXPECT_EQ(dut_fixed->GetDependentCount(), 0);
-  EXPECT_EQ(parent_power_->power_domain_unregistered_count(), 1);
+  EXPECT_EQ(parent_power_.SyncCall(&FakePower::power_domain_unregistered_count), 1);
   EXPECT_EQ(power_impl_->power_domain_disabled_count(), 1);
 }
 

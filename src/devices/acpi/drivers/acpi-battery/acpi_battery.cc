@@ -45,9 +45,7 @@ zx_status_t AcpiBattery::Bind() {
     return status;
   }
 
-  return DdkAdd(ddk::DeviceAddArgs("acpi-battery")
-                    .set_inspect_vmo(inspect_.DuplicateVmo())
-                    .set_proto_id(ZX_PROTOCOL_POWER));
+  return DdkAdd(ddk::DeviceAddArgs("acpi-battery").set_inspect_vmo(inspect_.DuplicateVmo()));
 }
 
 void AcpiBattery::DdkInit(ddk::InitTxn txn) {

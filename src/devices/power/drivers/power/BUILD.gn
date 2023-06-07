@@ -31,7 +31,6 @@ fuchsia_driver("power-driver") {
   sources = [ "power.cc" ]
   deps = [
     ":power-bind",
-    "//sdk/banjo/fuchsia.hardware.power:fuchsia.hardware.power_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.powerimpl:fuchsia.hardware.powerimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp_wire",
     "//sdk/lib/component/outgoing/cpp",
@@ -59,7 +58,6 @@ test("power-test-bin") {
     "power.cc",
   ]
   deps = [
-    "//sdk/banjo/fuchsia.hardware.power:fuchsia.hardware.power_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.powerimpl:fuchsia.hardware.powerimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp_wire",
     "//sdk/lib/component/outgoing/cpp",

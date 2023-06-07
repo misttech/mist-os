@@ -4,7 +4,11 @@
 library fuchsia.hardware.powerimpl;
 
 using zx;
-using fuchsia.hardware.power;
+
+type PowerDomainStatus = strict enum : uint8 {
+    DISABLED = 1;
+    ENABLED = 2;
+};
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
@@ -14,7 +18,7 @@ protocol PowerImpl {
         index uint32;
     }) -> (struct {
         s zx.Status;
-        status fuchsia.hardware.power.PowerDomainStatus;
+        status PowerDomainStatus;
     });
     /// Enable a power domain
     EnablePowerDomain(struct {
