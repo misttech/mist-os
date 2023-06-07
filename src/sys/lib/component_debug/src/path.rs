@@ -5,9 +5,95 @@
 use {
     crate::io::{Directory, DirentKind},
     anyhow::{anyhow, bail, Error, Result},
-    fidl_fuchsia_io as fio,
     std::path::{Component, PathBuf},
 };
+
+pub const REMOTE_PATH_HELP: &'static str = r#"Remote paths allow the following formats:
+1)  [instance ID]::[path relative to storage]
+    Example: "c1a6d0aebbf7c092c53e8e696636af8ec0629ff39b7f2e548430b0034d809da4::/path/to/file"
+
+    `..` is not valid anywhere in the remote path.
+
+    To learn about component instance IDs, see https://fuchsia.dev/go/components/instance-id
+
+2) [absolute moniker]::[path in namespace]
+    Example: /foo/bar::/config/data/sample.json
+
+   To learn more about absolute monikers, see https://fuchsia.dev/go/components/moniker#absolute"#;
+
+#[derive(Clone)]
+pub struct RemotePath {
+    pub remote_id: String,
+    pub relative_path: PathBuf,
+}
+
+/// Represents a path to a component instance.
+/// Refer to REMOTE_PATH_HELP above for the format of RemotePath.
+impl RemotePath {
+    pub fn parse(input: &str) -> Result<Self> {
+        match input.split_once("::") {
+            Some((first, second)) => {
+                if second.contains("::") {
+                    bail!(
+                        "Remote path must contain exactly one `::` separator. {}",
+                        REMOTE_PATH_HELP
+                    )
+                }
+
+                let remote_id = first.to_string();
+                let relative_path = PathBuf::from(second);
+
+                // Perform checks on path that ignore `.`  and disallow `..`, `/` or Windows path prefixes such as C: or \\
+                let mut normalized_relative_path = PathBuf::new();
+                for component in relative_path.components() {
+                    match component {
+                        Component::Normal(c) => normalized_relative_path.push(c),
+                        Component::RootDir => continue,
+                        Component::CurDir => continue,
+                        c => bail!("Unsupported path component: {:?}. {}", c, REMOTE_PATH_HELP),
+                    }
+                }
+
+                Ok(Self { remote_id, relative_path: normalized_relative_path })
+            }
+            None => {
+                bail!("Remote path must contain exactly one `::` separator. {}", REMOTE_PATH_HELP)
+            }
+        }
+    }
+
+    pub fn contains_wildcard(&self) -> bool {
+        return self.to_string().contains("*");
+    }
+
+    pub fn relative_path_string(&self) -> String {
+        return self.relative_path.to_string_lossy().to_string();
+    }
+}
+
+impl ToString for RemotePath {
+    fn to_string(&self) -> String {
+        format!("{}::/{}", self.remote_id, self.relative_path.to_string_lossy().to_string())
+    }
+}
+
+#[derive(Clone)]
+/// Represents either a local path to a file or directory, or the path to a file/directory
+/// within a component.
+pub enum LocalOrRemotePath {
+    Local(PathBuf),
+    Remote(RemotePath),
+}
+
+impl LocalOrRemotePath {
+    pub fn parse(path: &str) -> LocalOrRemotePath {
+        match RemotePath::parse(path) {
+            Ok(path) => LocalOrRemotePath::Remote(path),
+            // If we can't parse a remote path, then it is a host path.
+            Err(_) => LocalOrRemotePath::Local(PathBuf::from(path)),
+        }
+    }
+}
 
 /// Returns a readable `Directory` by opening the parent dir of `path`.
 ///
@@ -61,94 +147,4 @@ pub async fn add_source_filename_to_path_if_absent<D: Directory>(
     } else {
         Ok(destination_path.join(source_file_str))
     }
-}
-
-pub const REMOTE_PATH_HELP: &'static str = r#"Remote paths have the following formats:
-1)  [instance ID]::[path relative to storage]
-    Example: "c1a6d0aebbf7c092c53e8e696636af8ec0629ff39b7f2e548430b0034d809da4::/path/to/file"
-
-    `..` is not valid anywhere in the remote path.
-
-    To learn about component instance IDs, see https://fuchsia.dev/go/components/instance-id
-
-2) [absolute moniker]::[path in namespace]
-    Example: /foo/bar::/config/data/sample.json
-
-   To learn more about absolute monikers, see https://fuchsia.dev/go/components/moniker#absolute"#;
-
-#[derive(Clone)]
-pub struct RemotePath {
-    pub remote_id: String,
-    pub relative_path: PathBuf,
-}
-
-/// Represents a path to a component instance.
-/// Refer to REMOTE_PATH_HELP above for the format of RemotePath.
-impl RemotePath {
-    pub fn parse(input: &str) -> Result<Self> {
-        match input.split_once("::") {
-            Some((first, second)) => {
-                if second.contains("::") {
-                    bail!(
-                        "Remote path must contain exactly one `::` separator. {}",
-                        REMOTE_PATH_HELP
-                    )
-                }
-
-                let remote_id = first.to_string();
-                let relative_path = PathBuf::from(second);
-
-                // Perform checks on path that ignore `.`  and disallow `..`, `/` or Windows path prefixes such as C: or \\
-                let mut normalized_relative_path = PathBuf::new();
-                for component in relative_path.components() {
-                    match component {
-                        Component::Normal(c) => normalized_relative_path.push(c),
-                        Component::RootDir => continue,
-                        Component::CurDir => continue,
-                        c => bail!("Unsupported path object: {:?}. {}", c, REMOTE_PATH_HELP),
-                    }
-                }
-
-                Ok(Self { remote_id, relative_path: normalized_relative_path })
-            }
-            None => {
-                bail!("Remote path must contain exactly one `::` separator. {}", REMOTE_PATH_HELP)
-            }
-        }
-    }
-
-    pub fn contains_wildcard(&self) -> bool {
-        return self.to_string().contains("*");
-    }
-
-    pub fn relative_path_string(&self) -> String {
-        return self.relative_path.to_string_lossy().to_string();
-    }
-}
-
-impl ToString for RemotePath {
-    fn to_string(&self) -> String {
-        format!("{}::/{}", self.remote_id, self.relative_path.to_string_lossy().to_string())
-    }
-}
-
-#[derive(Clone)]
-pub enum HostOrRemotePath {
-    Host(PathBuf),
-    Remote(RemotePath),
-}
-
-impl HostOrRemotePath {
-    pub fn parse(path: &str) -> HostOrRemotePath {
-        match RemotePath::parse(path) {
-            Ok(path) => HostOrRemotePath::Remote(path),
-            // If we can't parse a remote path, then it is a host path.
-            Err(_) => HostOrRemotePath::Host(PathBuf::from(path)),
-        }
-    }
-}
-
-pub struct NamespacedPath {
-    pub path: RemotePath,
-    pub ns: fio::DirectoryProxy,
 }

@@ -8,8 +8,7 @@ use {
     crate::{
         io::{Directory, DirentKind, LocalDirectory, RemoteDirectory},
         path::{
-            add_source_filename_to_path_if_absent, open_parent_subdir_readable, HostOrRemotePath,
-            REMOTE_PATH_HELP,
+            add_source_filename_to_path_if_absent, open_parent_subdir_readable, LocalOrRemotePath,
         },
     },
     anyhow::{bail, Result},
@@ -25,11 +24,8 @@ pub enum CopyError {
     #[error("Destination can not have a wildcard.")]
     DestinationContainWildcard,
 
-    #[error("At least two paths (host or remote) must be provided.")]
+    #[error("At least two paths (local or remote) must be provided.")]
     NotEnoughPaths,
-
-    #[error("Could not write to host: {error}.")]
-    FailedToWriteToHost { error: std::io::Error },
 
     #[error("File name was unexpectedly empty.")]
     EmptyFileName,
@@ -37,20 +33,8 @@ pub enum CopyError {
     #[error("Path does not contain a parent folder.")]
     NoParentFolder { path: String },
 
-    #[error("Could not find files in device that matched pattern: {pattern}.")]
+    #[error("No files found matching: {pattern}.")]
     NoWildCardMatches { pattern: String },
-
-    #[error("Could not write to device.")]
-    FailedToWriteToDevice,
-
-    #[error("Unexpected error. Destination namespace was non empty but destination path is not a remote path.")]
-    UnexpectedHostDestination,
-
-    #[error("Could not create Regex pattern \"{pattern}\": {error}.")]
-    FailedToCreateRegex { pattern: String, error: regex::Error },
-
-    #[error("At least one path must be a remote path. {}", REMOTE_PATH_HELP)]
-    NoRemotePaths,
 
     #[error(
         "Could not find an instance with the moniker: {moniker}\n\
@@ -61,15 +45,15 @@ pub enum CopyError {
     #[error("Encountered an unexpected error when attempting to retrieve namespace with the provider moniker: {moniker}. {error:?}.")]
     UnexpectedErrorFromMoniker { moniker: String, error: fsys::OpenError },
 
-    #[error("Could not find file {file} in namespace.")]
+    #[error("No file found at {file} in remote component namespace.")]
     NamespaceFileNotFound { file: String },
 }
 
-/// Transfer files between a component's namespace to/from the host machine.
+/// Transfer files between a component's namespace to/from the local filesystem.
 ///
 /// # Arguments
 /// * `realm_query`: |RealmQueryProxy| to fetch the component's namespace.
-/// * `paths`: The host and remote paths used for file copying.
+/// * `paths`: The local and remote paths to copy. The last entry is the destination.
 /// * `verbose`: Flag used to indicate whether or not to print output to console.
 pub async fn copy_cmd<W: std::io::Write>(
     realm_query: &fsys::RealmQueryProxy,
@@ -85,10 +69,10 @@ pub async fn copy_cmd<W: std::io::Write>(
 
     for source_path in paths {
         let result: Result<()> = match (
-            HostOrRemotePath::parse(&source_path),
-            HostOrRemotePath::parse(&destination_path),
+            LocalOrRemotePath::parse(&source_path),
+            LocalOrRemotePath::parse(&destination_path),
         ) {
-            (HostOrRemotePath::Remote(source), HostOrRemotePath::Host(destination_path)) => {
+            (LocalOrRemotePath::Remote(source), LocalOrRemotePath::Local(destination_path)) => {
                 let source_dir = RemoteDirectory::from_proxy(
                     get_or_cache_namespace_dir_for_moniker(
                         &realm_query,
@@ -110,7 +94,7 @@ pub async fn copy_cmd<W: std::io::Write>(
                 .await
             }
 
-            (HostOrRemotePath::Host(source_path), HostOrRemotePath::Remote(destination)) => {
+            (LocalOrRemotePath::Local(source_path), LocalOrRemotePath::Remote(destination)) => {
                 let source_dir = LocalDirectory::new();
                 let destination_dir = RemoteDirectory::from_proxy(
                     get_or_cache_namespace_dir_for_moniker(
@@ -132,7 +116,7 @@ pub async fn copy_cmd<W: std::io::Write>(
                 .await
             }
 
-            (HostOrRemotePath::Remote(source), HostOrRemotePath::Remote(destination)) => {
+            (LocalOrRemotePath::Remote(source), LocalOrRemotePath::Remote(destination)) => {
                 let source_dir = RemoteDirectory::from_proxy(
                     get_or_cache_namespace_dir_for_moniker(
                         &realm_query,
@@ -162,8 +146,18 @@ pub async fn copy_cmd<W: std::io::Write>(
                 .await
             }
 
-            (HostOrRemotePath::Host(_), HostOrRemotePath::Host(_)) => {
-                Err(CopyError::NoRemotePaths.into())
+            (LocalOrRemotePath::Local(source_path), LocalOrRemotePath::Local(destination_path)) => {
+                let source_dir = LocalDirectory::new();
+                let destination_dir = LocalDirectory::new();
+                do_copy(
+                    &source_dir,
+                    &source_path,
+                    &destination_dir,
+                    &destination_path,
+                    verbose,
+                    &mut writer,
+                )
+                .await
             }
         };
 
@@ -353,9 +347,7 @@ async fn get_dirents_matching_pattern<D: Directory>(
 ) -> Result<Vec<String>> {
     let mut entries = dir.entry_names().await?;
 
-    let file_pattern = Regex::new(format!(r"^{}$", file_pattern).as_str()).map_err(|e| {
-        CopyError::FailedToCreateRegex { pattern: file_pattern.to_string(), error: e }
-    })?;
+    let file_pattern = Regex::new(format!(r"^{}$", file_pattern).as_str())?;
 
     entries.retain(|file_name| file_pattern.is_match(file_name.as_str()));
 
@@ -448,12 +440,16 @@ mod tests {
                 generate_file_paths(vec![File{ name: "data/foo.txt", data: OVER_LIMIT_FILE_DATA}]),
                 Expectation{path: "foo.txt", data: OVER_LIMIT_FILE_DATA}; "over_limit_file")]
     #[fuchsia::test]
-    async fn copy_device_to_host(input: Input, foo_files: Vec<SeedPath>, expectation: Expectation) {
-        let host_dir = create_tmp_dir(vec![]).unwrap();
-        let host_path = host_dir.path();
+    async fn copy_device_to_local(
+        input: Input,
+        foo_files: Vec<SeedPath>,
+        expectation: Expectation,
+    ) {
+        let local_dir = create_tmp_dir(vec![]).unwrap();
+        let local_path = local_dir.path();
 
         let (realm_query, _, _) = create_realm_query(foo_files, vec![]);
-        let destination_path = host_path.join(input.destination).display().to_string();
+        let destination_path = local_path.join(input.destination).display().to_string();
 
         eprintln!("Destination path: {:?}", destination_path);
 
@@ -467,7 +463,7 @@ mod tests {
         .unwrap();
 
         let expected_data = expectation.data.to_owned().into_bytes();
-        let actual_data_path = host_path.join(expectation.path);
+        let actual_data_path = local_path.join(expectation.path);
         let actual_data = read(actual_data_path).unwrap();
         assert_eq!(actual_data, expected_data);
     }
@@ -501,16 +497,16 @@ mod tests {
                      File{ name: "foo.txt", data: "World"}, File{ name: "foobar.txt", data: "Hello"}]),
                 vec![Expectation{path: "foo.txt", data: "Hello"}, Expectation{path: "foobar.txt", data: "World"}]; "multi_file_overwrite")]
     #[fuchsia::test]
-    async fn copy_device_to_host_wildcard(
+    async fn copy_device_to_local_wildcard(
         input: Input,
         foo_files: Vec<SeedPath>,
         expectation: Vec<Expectation>,
     ) {
-        let host_dir = create_tmp_dir(vec![]).unwrap();
-        let host_path = host_dir.path();
+        let local_dir = create_tmp_dir(vec![]).unwrap();
+        let local_path = local_dir.path();
 
         let (realm_query, _, _) = create_realm_query(foo_files, vec![]);
-        let destination_path = host_path.join(input.destination);
+        let destination_path = local_path.join(input.destination);
 
         copy_cmd(
             &realm_query,
@@ -523,7 +519,7 @@ mod tests {
 
         for expected in expectation {
             let expected_data = expected.data.to_owned().into_bytes();
-            let actual_data_path = host_path.join(expected.path);
+            let actual_data_path = local_path.join(expected.path);
 
             eprintln!("reading file '{}'", actual_data_path.display());
 
@@ -539,12 +535,12 @@ mod tests {
     #[test_case(Input{source: "/foo/bar::/data/foo.txt", destination: "bar/foo.txt"},
                 generate_file_paths(vec![File{ name: "data/foo.txt", data: "Hello"}]); "bad_directory")]
     #[fuchsia::test]
-    async fn copy_device_to_host_fails(input: Input, foo_files: Vec<SeedPath>) {
-        let host_dir = create_tmp_dir(vec![]).unwrap();
-        let host_path = host_dir.path();
+    async fn copy_device_to_local_fails(input: Input, foo_files: Vec<SeedPath>) {
+        let local_dir = create_tmp_dir(vec![]).unwrap();
+        let local_path = local_dir.path();
 
         let (realm_query, _, _) = create_realm_query(foo_files, vec![]);
-        let destination_path = host_path.join(input.destination).display().to_string();
+        let destination_path = local_path.join(input.destination).display().to_string();
         let result = copy_cmd(
             &realm_query,
             vec![input.source.to_string(), destination_path],
@@ -584,11 +580,15 @@ mod tests {
                 generate_directory_paths(vec!["data"]),
                 Expectation{path: "data/foo.txt", data: OVER_LIMIT_FILE_DATA}; "over_channel_limit_file")]
     #[fuchsia::test]
-    async fn copy_host_to_device(input: Input, foo_files: Vec<SeedPath>, expectation: Expectation) {
-        let host_dir = create_tmp_dir(vec![]).unwrap();
-        let host_path = host_dir.path();
+    async fn copy_local_to_device(
+        input: Input,
+        foo_files: Vec<SeedPath>,
+        expectation: Expectation,
+    ) {
+        let local_dir = create_tmp_dir(vec![]).unwrap();
+        let local_path = local_dir.path();
 
-        let source_path = host_path.join(&input.source);
+        let source_path = local_path.join(&input.source);
         write(&source_path, expectation.data.to_owned().into_bytes()).unwrap();
         let (realm_query, foo_path, _) = create_realm_query(foo_files, vec![]);
 
@@ -699,16 +699,16 @@ mod tests {
                 generate_file_paths(vec![File{ name: "data/foo.txt", data: "World"}, File{ name: "data/bar.txt", data: "World"}]),
                 vec![Expectation{path: "data/foo.txt", data: "Hello"}, Expectation{path: "data/bar.txt", data: "World"}]; "multi_wildcard_file_overwrite")]
     #[fuchsia::test]
-    async fn copy_host_to_device_wildcard(
+    async fn copy_local_to_device_wildcard(
         input: Inputs,
         foo_files: Vec<SeedPath>,
         expectation: Vec<Expectation>,
     ) {
-        let host_dir = create_tmp_dir(vec![]).unwrap();
-        let host_path = host_dir.path();
+        let local_dir = create_tmp_dir(vec![]).unwrap();
+        let local_path = local_dir.path();
 
         for (path, expected) in zip(input.sources.clone(), expectation.clone()) {
-            let source_path = host_path.join(path);
+            let source_path = local_path.join(path);
             write(&source_path, expected.data).unwrap();
         }
 
@@ -716,7 +716,7 @@ mod tests {
         let mut paths: Vec<String> = input
             .sources
             .into_iter()
-            .map(|path| host_path.join(path).display().to_string())
+            .map(|path| local_path.join(path).display().to_string())
             .collect();
         paths.push(input.destination.to_string());
 
@@ -733,11 +733,11 @@ mod tests {
     #[test_case(Input{source: "foo.txt", destination: "wrong_moniker/foo/bar::/data/foo.txt"}; "bad_moniker")]
     #[test_case(Input{source: "foo.txt", destination: "/foo/bar:://bar/foo.txt"}; "bad_directory")]
     #[fuchsia::test]
-    async fn copy_host_to_device_fails(input: Input) {
-        let host_dir = create_tmp_dir(vec![]).unwrap();
-        let host_path = host_dir.path();
+    async fn copy_local_to_device_fails(input: Input) {
+        let local_dir = create_tmp_dir(vec![]).unwrap();
+        let local_path = local_dir.path();
 
-        let source_path = host_path.join(input.source);
+        let source_path = local_path.join(input.source);
         write(&source_path, "Hello".to_owned().into_bytes()).unwrap();
 
         let (realm_query, _, _) =
@@ -758,7 +758,7 @@ mod tests {
     #[test_case(vec!["foo.txt"]; "not_enough_args")]
     #[test_case(vec!["/foo/bar::/data/*", "/foo/bar::/data/*"]; "remote_wildcard_destination")]
     #[test_case(vec!["/foo/bar::/data/*", "/foo/bar::/data/*", "/"]; "multi_wildcards_remote")]
-    #[test_case(vec!["*", "*"]; "host_wildcard_destination")]
+    #[test_case(vec!["*", "*"]; "local_wildcard_destination")]
     #[fuchsia::test]
     async fn copy_wildcard_fails(paths: Vec<&str>) {
         let (realm_query, _, _) = create_realm_query(
@@ -789,22 +789,22 @@ mod tests {
     #[fuchsia::test]
     async fn copy_mixed_tests_remote_destination(
         input: Inputs,
-        host_files: Vec<SeedPath>,
+        local_files: Vec<SeedPath>,
         foo_files: Vec<SeedPath>,
         bar_files: Vec<SeedPath>,
         expectation: Vec<Expectation>,
     ) {
-        let host_dir = create_tmp_dir(host_files).unwrap();
-        let host_path = host_dir.path();
+        let local_dir = create_tmp_dir(local_files).unwrap();
+        let local_path = local_dir.path();
 
         let (realm_query, _, bar_path) = create_realm_query(foo_files, bar_files);
         let mut paths: Vec<String> = input
             .sources
             .clone()
             .into_iter()
-            .map(|path| match HostOrRemotePath::parse(&path) {
-                HostOrRemotePath::Remote(_) => path.to_string(),
-                HostOrRemotePath::Host(_) => host_path.join(path).display().to_string(),
+            .map(|path| match LocalOrRemotePath::parse(&path) {
+                LocalOrRemotePath::Remote(_) => path.to_string(),
+                LocalOrRemotePath::Local(_) => local_path.join(path).display().to_string(),
             })
             .collect();
         paths.push(input.destination.to_owned());

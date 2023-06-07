@@ -4,7 +4,7 @@
 
 use {
     crate::io::{Directory, LocalDirectory, RemoteDirectory},
-    crate::path::{add_source_filename_to_path_if_absent, HostOrRemotePath, REMOTE_PATH_HELP},
+    crate::path::{add_source_filename_to_path_if_absent, LocalOrRemotePath, REMOTE_PATH_HELP},
     anyhow::{anyhow, bail, Result},
     fidl::endpoints::create_proxy,
     fidl_fuchsia_io as fio,
@@ -28,8 +28,8 @@ pub async fn copy(
     let server = server.into_channel();
     let storage_dir = RemoteDirectory::from_proxy(dir_proxy);
 
-    match (HostOrRemotePath::parse(&source_path), HostOrRemotePath::parse(&destination_path)) {
-        (HostOrRemotePath::Remote(source), HostOrRemotePath::Host(destination_path)) => {
+    match (LocalOrRemotePath::parse(&source_path), LocalOrRemotePath::parse(&destination_path)) {
+        (LocalOrRemotePath::Remote(source), LocalOrRemotePath::Local(destination_path)) => {
             // Copying from remote to host
             storage_admin
                 .open_component_storage_by_id(&source.remote_id, server.into())
@@ -39,7 +39,7 @@ pub async fn copy(
             let destination_dir = LocalDirectory::new();
             do_copy(&storage_dir, &source.relative_path, &destination_dir, &destination_path).await
         }
-        (HostOrRemotePath::Host(source_path), HostOrRemotePath::Remote(destination)) => {
+        (LocalOrRemotePath::Local(source_path), LocalOrRemotePath::Remote(destination)) => {
             // Copying from host to remote
             storage_admin
                 .open_component_storage_by_id(&destination.remote_id, server.into())
@@ -96,9 +96,9 @@ mod test {
             // Rewind on root directory should succeed
             let request = root_dir.try_next().await;
             if let Ok(Some(fio::DirectoryRequest::Open { path, flags, object, .. })) = request {
-                if path == "from_host" {
+                if path == "from_local" {
                     assert!(flags.intersects(fio::OpenFlags::CREATE));
-                    setup_fake_file_from_host(node_to_file(object));
+                    setup_fake_file_from_local(node_to_file(object));
                 } else if path == "from_device" {
                     setup_fake_file_from_device(node_to_file(object));
                 } else {
@@ -111,7 +111,7 @@ mod test {
         .detach();
     }
 
-    fn setup_fake_file_from_host(mut file: fio::FileRequestStream) {
+    fn setup_fake_file_from_local(mut file: fio::FileRequestStream) {
         fuchsia_async::Task::local(async move {
             // Serve the root directory
             // Truncating the file should succeed
@@ -174,87 +174,88 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_copy_host_to_device() -> Result<()> {
+    async fn test_copy_local_to_device() -> Result<()> {
         let dir = tempdir().unwrap();
         let storage_admin = setup_fake_storage_admin_with_tmp("123456", HashMap::new());
-        let from_host_filepath = dir.path().join("from_host");
-        write(&from_host_filepath, &EXPECTED_DATA).unwrap();
+        let from_local_filepath = dir.path().join("from_local");
+        write(&from_local_filepath, &EXPECTED_DATA).unwrap();
         copy(
             storage_admin,
-            from_host_filepath.display().to_string(),
-            "123456::from_host".to_string(),
+            from_local_filepath.display().to_string(),
+            "123456::from_local".to_string(),
         )
         .await
     }
 
     #[fuchsia::test]
-    async fn test_copy_host_to_device_different_file_names() -> Result<()> {
+    async fn test_copy_local_to_device_different_file_names() -> Result<()> {
         let dir = tempdir().unwrap();
         let storage_admin = setup_fake_storage_admin_with_tmp("123456", HashMap::new());
-        let from_host_filepath = dir.path().join("from_host");
-        write(&from_host_filepath, &EXPECTED_DATA).unwrap();
+        let from_local_filepath = dir.path().join("from_local");
+        write(&from_local_filepath, &EXPECTED_DATA).unwrap();
         copy(
             storage_admin,
-            from_host_filepath.display().to_string(),
-            "123456::from_host_test".to_string(),
+            from_local_filepath.display().to_string(),
+            "123456::from_local_test".to_string(),
         )
         .await
     }
 
     #[fuchsia::test]
-    async fn test_copy_host_to_device_infer_path() -> Result<()> {
+    async fn test_copy_local_to_device_infer_path() -> Result<()> {
         let dir = tempdir().unwrap();
         let storage_admin = setup_fake_storage_admin_with_tmp("123456", HashMap::new());
-        let from_host_filepath = dir.path().join("from_host");
-        write(&from_host_filepath, &EXPECTED_DATA).unwrap();
-        copy(storage_admin, from_host_filepath.display().to_string(), "123456::".to_string()).await
+        let from_local_filepath = dir.path().join("from_local");
+        write(&from_local_filepath, &EXPECTED_DATA).unwrap();
+        copy(storage_admin, from_local_filepath.display().to_string(), "123456::".to_string()).await
     }
 
     #[fuchsia::test]
-    async fn test_copy_host_to_device_infer_slash_path() -> Result<()> {
+    async fn test_copy_local_to_device_infer_slash_path() -> Result<()> {
         let dir = tempdir().unwrap();
         let storage_admin = setup_fake_storage_admin_with_tmp("123456", HashMap::new());
-        let from_host_filepath = dir.path().join("from_host");
-        write(&from_host_filepath, &EXPECTED_DATA).unwrap();
-        copy(storage_admin, from_host_filepath.display().to_string(), "123456::/".to_string()).await
+        let from_local_filepath = dir.path().join("from_local");
+        write(&from_local_filepath, &EXPECTED_DATA).unwrap();
+        copy(storage_admin, from_local_filepath.display().to_string(), "123456::/".to_string())
+            .await
     }
 
     #[fuchsia::test]
-    async fn test_copy_host_to_device_overwrite_file() -> Result<()> {
+    async fn test_copy_local_to_device_overwrite_file() -> Result<()> {
         let dir = tempdir().unwrap();
         let mut seed_files = HashMap::new();
-        seed_files.insert("from_host", "Lorem Ipsum");
+        seed_files.insert("from_local", "Lorem Ipsum");
         let storage_admin = setup_fake_storage_admin_with_tmp("123456", seed_files);
-        let from_host_filepath = dir.path().join("from_host");
-        write(&from_host_filepath, &EXPECTED_DATA).unwrap();
+        let from_local_filepath = dir.path().join("from_local");
+        write(&from_local_filepath, &EXPECTED_DATA).unwrap();
         copy(
             storage_admin,
-            from_host_filepath.display().to_string(),
-            "123456::from_host".to_string(),
+            from_local_filepath.display().to_string(),
+            "123456::from_local".to_string(),
         )
         .await
     }
 
     #[fuchsia::test]
-    async fn test_copy_host_to_device_populated_directory() -> Result<()> {
+    async fn test_copy_local_to_device_populated_directory() -> Result<()> {
         let dir = tempdir().unwrap();
         let mut seed_files = HashMap::new();
 
         seed_files.insert("foo.txt", "Lorem Ipsum");
 
         let storage_admin = setup_fake_storage_admin_with_tmp("123456", seed_files);
-        let from_host_filepath = dir.path().join("from_host");
-        write(&from_host_filepath, &EXPECTED_DATA).unwrap();
+        let from_local_filepath = dir.path().join("from_local");
+        write(&from_local_filepath, &EXPECTED_DATA).unwrap();
         copy(
             storage_admin,
-            from_host_filepath.display().to_string(),
-            "123456::from_host".to_string(),
+            from_local_filepath.display().to_string(),
+            "123456::from_local".to_string(),
         )
         .await
     }
 
     #[fuchsia::test]
-    async fn test_copy_device_to_host_infer_path() -> Result<()> {
+    async fn test_copy_device_to_local_infer_path() -> Result<()> {
         let dir = tempdir().unwrap();
         let storage_admin = setup_fake_storage_admin("123456", setup_fake_directory);
         let dest_filepath = dir.path();
@@ -269,7 +270,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_copy_device_to_host_infer_slash_path() -> Result<()> {
+    async fn test_copy_device_to_local_infer_slash_path() -> Result<()> {
         let dir = tempdir().unwrap();
         let storage_admin = setup_fake_storage_admin("123456", setup_fake_directory);
         let dest_filepath = dir.path();
@@ -288,7 +289,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_copy_device_to_host() -> Result<()> {
+    async fn test_copy_device_to_local() -> Result<()> {
         let dir = tempdir().unwrap();
         let storage_admin = setup_fake_storage_admin("123456", setup_fake_directory);
         let dest_filepath = dir.path().join("from_device");
