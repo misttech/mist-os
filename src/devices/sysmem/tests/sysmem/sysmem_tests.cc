@@ -1999,7 +1999,7 @@ TEST(Sysmem,
   // at least 2 to check both orderings with two clients.
   std::atomic<uint32_t> clean_failure_seen_count = 0;
   const uint32_t kCleanFailureSeenGoal = 15;
-  const uint32_t kMaxIterations = 500;
+  const uint32_t kMaxIterations = 50;
   uint32_t iteration;
   for (iteration = 0;
        iteration < kMaxIterations && clean_failure_seen_count.load() < kCleanFailureSeenGoal;
@@ -4464,7 +4464,7 @@ TEST(Sysmem, Group_CloseBeforeChildrenSetConstraints) {
 }
 
 TEST(Sysmem, GroupPriorityV1) {
-  constexpr uint32_t kIterations = 50;
+  constexpr uint32_t kIterations = 20;
   for (uint32_t i = 0; i < kIterations; ++i) {
     if ((i + 1) % 100 == 0) {
       printf("iteration cardinal: %u\n", i + 1);

@@ -293,7 +293,6 @@ void SysmemConnector::ProcessQueue() {
                                                      .status());
             },
             [this](fidl::ServerEnd<fuchsia_sysmem2::Allocator> allocator_request) {
-              fprintf(stderr, "ConnectV2");
               return std::make_pair("ConnectV2", fidl::WireCall(driver_connector_client_)
                                                      ->ConnectV2(std::move(allocator_request))
                                                      .status());
@@ -305,9 +304,9 @@ void SysmemConnector::ProcessQueue() {
                                         .status());
             }},
         std::move(queue_item));
-    printf("sysmem-connector: fuchsia.sysmem/DriverConnect.%s: %s\n", name,
-           zx_status_get_string(status));
     if (status != ZX_OK) {
+      printf("sysmem-connector: fuchsia.sysmem/DriverConnect.%s: %s\n", name,
+             zx_status_get_string(status));
       driver_connector_client_.reset();
     }
   }

@@ -6,16 +6,14 @@ import("//build/components.gni")
 import("//build/test.gni")
 import("//build/testing/bootfs_test.gni")
 
-test("sysmem") {
+source_set("common_sources") {
   sources = [
     "common.cc",
     "main.cc",
     "secure_vmo_read_tester.cc",
-    "sysmem_tests.cc",
-    "sysmem_tests_v2.cc",
     "test_observer.cc",
   ]
-  deps = [
+  public_deps = [
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
@@ -33,20 +31,47 @@ test("sysmem") {
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
-
-  # Uncomment this when narrowing down failures.
-  cflags_cc = [ "-Wno-unused-function" ]
+  visibility = [ ":*" ]
 }
 
-fuchsia_unittest_package("sysmem-test") {
-  manifest = "meta/sysmem.cml"
+test("sysmem-v1") {
+  sources = [ "sysmem_tests.cc" ]
+  deps = [ ":common_sources" ]
+
+  # Uncomment this when narrowing down failures.
+  # cflags_cc = [ "-Wno-unused-function" ]
+}
+
+test("sysmem-v2") {
+  sources = [ "sysmem_tests_v2.cc" ]
+  deps = [ ":common_sources" ]
+
+  # Uncomment this when narrowing down failures.
+  # cflags_cc = [ "-Wno-unused-function" ]
+}
+
+fuchsia_unittest_package("sysmem-test-v1") {
+  manifest = "meta/sysmem-v1.cml"
   deps = [
-    ":sysmem",
+    ":sysmem-v1",
     "//src/devices/sysmem/bin/sysmem_connector:sysmem_connector_cmp",
   ]
 }
 
-bootfs_test("sysmem-bootfs-test") {
-  name = "sysmem"
-  deps = [ ":sysmem" ]
+fuchsia_unittest_package("sysmem-test-v2") {
+  manifest = "meta/sysmem-v2.cml"
+  deps = [
+    ":sysmem-v2",
+    "//src/devices/sysmem/bin/sysmem_connector:sysmem_connector_cmp",
+  ]
+}
+
+bootfs_test("sysmem-bootfs-test-v1") {
+  name = "sysmem-v1"
+  deps = [ ":sysmem-v1" ]
+}
+
+bootfs_test("sysmem-bootfs-test-v2") {
+  name = "sysmem-v2"
+  deps = [ ":sysmem-v2" ]
 }

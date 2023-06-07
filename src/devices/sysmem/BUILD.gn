@@ -12,7 +12,8 @@ group("tests") {
   deps = [
     "bin/sysmem_connector:sysmem_connector_test",
     "drivers/sysmem:tests",
-    "tests/sysmem:sysmem-test",
+    "tests/sysmem:sysmem-test-v1",
+    "tests/sysmem:sysmem-test-v2",
     "tests/sysmem/fuzz",
     "tools:tests",
   ]

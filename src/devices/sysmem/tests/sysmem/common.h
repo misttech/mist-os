@@ -12,7 +12,7 @@
 #include <string>
 
 // To dump a v1 corpus file for sysmem_fuzz.cc test, enable SYSMEM_FUZZ_CORPUS. Files can be found
-// under /data/cache/r/sys/fuchsia.com:sysmem-test:0#meta:sysmem.cmx/ on the device.
+// under /data/cache/r/sys/fuchsia.com:sysmem-test-v1:0#meta:sysmem.cmx/ on the device.
 //
 // TODO(fxb/115937): Make this and sysmem_fuzz.cc work for sysmem2.
 #define SYSMEM_FUZZ_CORPUS 0
