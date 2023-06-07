@@ -12,6 +12,8 @@
 
 #include <fbl/macros.h>
 
+#include "src/devices/block/drivers/core/block-fifo.h"
+
 namespace block_client {
 
 Client::Client(fidl::ClientEnd<fuchsia_hardware_block::Session> session, zx::fifo fifo)

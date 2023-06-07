@@ -15,6 +15,8 @@
 
 #include <fbl/mutex.h>
 
+#include "src/devices/block/drivers/core/block-fifo.h"
+
 namespace block_client {
 
 // Assigns a group ID which is unique to each calling thread.

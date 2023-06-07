@@ -14,6 +14,7 @@
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
+#include "src/devices/block/drivers/core/block-fifo.h"
 #include "src/lib/storage/block_client/cpp/remote_block_device.h"
 #include "src/storage/fs_test/fs_test_fixture.h"
 #include "storage/buffer/owned_vmoid.h"

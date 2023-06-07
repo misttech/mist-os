@@ -72,41 +72,15 @@ const BLOCK_GUID_LEN uint32 = 16;
 /// device, `ZX_ERR_OUT_OF_RANGE` is returned.
 const MAX_TXN_GROUP_COUNT uint32 = 8;
 
-/// The Request ID allowing callers to correspond requests with responses. This
-/// field is entirely for client-side bookkeeping; there is no obligation to
-/// make request IDs unique.
-alias Reqid = uint32;
-alias Groupid = uint16;
-
-type BlockFifoRequest = struct {
-    opcode uint32;
-    /// Transmitted in the `block_fifo_response_t`.
-    reqid Reqid;
-    /// Only used if `opcode & BLOCK_GROUP_ITEM`.
-    group Groupid;
-    vmoid Vmoid;
-    length uint32;
-    vmo_offset uint64;
-    dev_offset uint64;
-    trace_flow_id uint64;
-};
-
-type BlockFifoResponse = struct {
-    status zx.Status;
-    reqid Reqid;
-    /// Only valid if transmitted in request.
-    group Groupid;
-    padding_to_satisfy_zerocopy uint16;
-    /// The number of messages in the transaction completed by the block server.
-    count uint32;
-    padding_to_match_request_size_and_alignment array<uint64, 3>;
-};
 
 /// `BLOCK_OP_READ`, `BLOCK_OP_WRITE`
 //
 // Note: this data structure is used for the driver <--> driver interfaces,
-// while `BlockFifoRequest` above is part of a client <--> server interface and
+// while `BlockFifoRequest` is part of a client <--> server interface and
 // related to the block FIDL API.
+//
+// See src/lib/storage/block_client/cpp/block_fifo.h for FIFO protocol.
+//
 type BlockReadWrite = resource struct {
     /// Command and flags.
     command uint32;

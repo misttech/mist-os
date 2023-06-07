@@ -24,6 +24,7 @@ rustc_library("remote-block-device") {
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:linked-hash-map",
     "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:zerocopy",
   ]
   test_deps = [
     "//src/lib/fuchsia",
@@ -32,6 +33,7 @@ rustc_library("remote-block-device") {
 
   sources = [
     "src/cache.rs",
+    "src/fifo.rs",
     "src/lib.rs",
     "src/testing.rs",
   ]

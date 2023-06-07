@@ -23,6 +23,8 @@
 
 #include <perftest/results.h>
 
+#include "src/devices/block/drivers/core/block-fifo.h"
+
 static uint64_t number(const char* str) {
   char* end;
   uint64_t n = strtoull(str, &end, 10);

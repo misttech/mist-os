@@ -16,6 +16,8 @@
 #include <fbl/macros.h>
 #include <fbl/mutex.h>
 
+#include "src/devices/block/drivers/core/block-fifo.h"
+
 class Server;
 
 // Impossible groupid used internally to signify that an operation

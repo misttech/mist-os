@@ -7,6 +7,8 @@
 
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 
+#include "src/devices/block/drivers/core/block-fifo.h"
+
 static_assert(sizeof(block_fifo_request_t) == sizeof(block_fifo_response_t),
               "FIFO messages are the same size in both directions");
 

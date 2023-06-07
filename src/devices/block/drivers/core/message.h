@@ -10,6 +10,8 @@
 
 #include <fbl/intrusive_double_list.h>
 
+#include "src/devices/block/drivers/core/block-fifo.h"
+
 class IoBuffer;
 class Server;
 

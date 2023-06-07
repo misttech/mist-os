@@ -15,6 +15,8 @@
 
 #include <storage/buffer/vmoid_registry.h>
 
+#include "src/devices/block/drivers/core/block-fifo.h"
+
 namespace block_client {
 
 // Provides a simple synchronous wrapper for talking to a block device over a FIFO.

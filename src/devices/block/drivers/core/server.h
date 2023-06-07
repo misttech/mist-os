@@ -26,6 +26,7 @@
 #include <fbl/mutex.h>
 #include <fbl/ref_ptr.h>
 
+#include "block-fifo.h"
 #include "iobuffer.h"
 #include "message-group.h"
 #include "message.h"

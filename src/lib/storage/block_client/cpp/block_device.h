@@ -15,6 +15,8 @@
 
 #include <storage/buffer/vmoid_registry.h>
 
+#include "src/devices/block/drivers/core/block-fifo.h"
+
 namespace block_client {
 
 // A high-level interface to a block device. This class also inherits from VmoidRegistry for

@@ -29,6 +29,9 @@ use {
 
 pub use cache::Cache;
 
+pub mod fifo;
+pub use fifo::*;
+
 pub mod cache;
 
 pub mod testing;
@@ -58,9 +61,6 @@ fn op_code_str(op_code: u32) -> &'static str {
         _ => "unknown",
     }
 }
-
-pub use block_driver::BlockFifoRequest;
-pub use block_driver::BlockFifoResponse;
 
 // Generates a trace ID that will be unique across the system (as long as |request_id| isn't
 // reused within this process).
