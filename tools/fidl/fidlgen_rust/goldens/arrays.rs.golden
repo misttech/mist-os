@@ -21,7 +21,6 @@ use {
     bitflags::bitflags,
     fidl::{
         client::QueryResponseFut,
-        encoding::zerocopy,
         endpoints::{ControlHandle as _, Responder as _},
         fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
@@ -89,19 +88,7 @@ fidl_union! {
     ],
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct StructLargeArray {
     pub a: [u32; 100],
@@ -130,19 +117,7 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct StructSmallArray {
     pub a: [u32; 2],

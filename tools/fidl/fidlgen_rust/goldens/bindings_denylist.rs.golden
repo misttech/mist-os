@@ -21,7 +21,6 @@ use {
     bitflags::bitflags,
     fidl::{
         client::QueryResponseFut,
-        encoding::zerocopy,
         endpoints::{ControlHandle as _, Responder as _},
         fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
@@ -168,19 +167,7 @@ fidl_struct! {
     align_v2: 1,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct DenyEachBindingOnlyDenyCppResponse {
     pub b: i32,
@@ -209,19 +196,7 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct DenyEachBindingOnlyDenyDartResponse {
     pub b: i32,
@@ -250,19 +225,7 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct DenyEachBindingOnlyDenyGoResponse {
     pub b: i32,
@@ -291,19 +254,7 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct DenyEachBindingOnlyDenyLibfuzzerResponse {
     pub b: i32,
@@ -332,19 +283,7 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct DenyEachBindingOnlyDenySyzkallerResponse {
     pub b: i32,

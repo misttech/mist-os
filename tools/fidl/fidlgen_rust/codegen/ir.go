@@ -1572,16 +1572,7 @@ const (
 	derivesOrd
 	derivesPartialOrd
 	derivesHash
-	// TODO(fxbug.dev/124207): Remove derivesAsBytes.
-	derivesAsBytes
-	// TODO(fxbug.dev/124207): Remove derivesFromBytes.
-	derivesFromBytes
-	// TODO(fxbug.dev/124207): Remove derivesFromZeroes.
-	derivesFromZeroes
 	derivesAll derives = (1 << iota) - 1
-
-	// TODO(fxbug.dev/124207): Remove derivesZerocopy.
-	derivesZerocopy derives = derivesAsBytes | derivesFromBytes | derivesFromZeroes
 )
 
 // note: keep this list in the same order as the derives definitions
@@ -1597,11 +1588,6 @@ var derivesNames = []string{
 	"PartialOrd",
 	"Hash",
 	// [END derived_traits]
-
-	// TODO(fxbug.dev/124207): Remove.
-	"zerocopy::AsBytes",
-	"zerocopy::FromBytes",
-	"zerocopy::FromZeroes",
 }
 
 // Returns the derives that are allowed for a type based on resourceness
@@ -1745,9 +1731,6 @@ func (dc *derivesCompiler) fillDerivesForECI(eci EncodedCompoundIdentifier) deri
 			break
 		}
 		derivesOut = allowedDerives(st.Resourceness)
-		if st.HasPadding || len(st.Members) == 0 {
-			derivesOut &^= derivesZerocopy
-		}
 		for _, member := range st.Members {
 			derivesOut &= dc.derivesForType(member.Type)
 		}
@@ -1778,7 +1761,7 @@ func (dc *derivesCompiler) fillDerivesForECI(eci EncodedCompoundIdentifier) deri
 		if union.IsFlexible() {
 			derivesOut = minimalDerives(union.Resourceness)
 		} else {
-			derivesOut = allowedDerives(union.Resourceness) &^ derivesZerocopy
+			derivesOut = allowedDerives(union.Resourceness)
 			for _, member := range union.Members {
 				derivesOut &= dc.derivesForType(member.Type)
 			}
@@ -1824,40 +1807,40 @@ func (dc *derivesCompiler) derivesForType(t Type) derives {
 	case fidlgen.ArrayType:
 		return dc.derivesForType(*t.ElementType)
 	case fidlgen.VectorType:
-		return derivesAll &^ (derivesCopy | derivesZerocopy) & dc.derivesForType(*t.ElementType)
+		return derivesAll &^ derivesCopy & dc.derivesForType(*t.ElementType)
 	case fidlgen.StringType:
-		return derivesAll &^ (derivesCopy | derivesZerocopy)
+		return derivesAll &^ derivesCopy
 	case fidlgen.HandleType, fidlgen.RequestType:
-		return derivesAll &^ (derivesCopy | derivesClone | derivesZerocopy)
+		return derivesAll &^ (derivesCopy | derivesClone)
 	case fidlgen.PrimitiveType:
 		switch t.PrimitiveSubtype {
 		case fidlgen.Bool:
-			return derivesAll &^ derivesZerocopy
+			return derivesAll
 		case fidlgen.Int8, fidlgen.Int16, fidlgen.Int32, fidlgen.Int64,
 			fidlgen.Uint8, fidlgen.Uint16, fidlgen.Uint32, fidlgen.Uint64:
 			return derivesAll
 		case fidlgen.Float32, fidlgen.Float64:
 			// Floats don't have a total ordering due to NAN and its multiple representations.
-			return derivesAll &^ (derivesEq | derivesOrd | derivesHash | derivesZerocopy)
+			return derivesAll &^ (derivesEq | derivesOrd | derivesHash)
 		default:
 			panic(fmt.Sprintf("unknown primitive type: %v", t.PrimitiveSubtype))
 		}
 	case fidlgen.IdentifierType:
 		switch t.DeclType {
 		case fidlgen.BitsDeclType, fidlgen.EnumDeclType:
-			return derivesAll &^ derivesZerocopy
+			return derivesAll
 		case fidlgen.StructDeclType, fidlgen.UnionDeclType:
 			result := dc.fillDerivesForECI(t.Identifier)
 			if t.Nullable {
 				// Nullable structs and unions gets put in Option<Box<...>>.
-				result &^= derivesCopy | derivesZerocopy
+				result &^= derivesCopy
 			}
 			return result
 		case fidlgen.TableDeclType:
 			return dc.fillDerivesForECI(t.Identifier)
 		case fidlgen.ProtocolDeclType:
 			// An IdentifierType referring to a Protocol is a client_end.
-			return derivesAll &^ (derivesCopy | derivesClone | derivesZerocopy)
+			return derivesAll &^ (derivesCopy | derivesClone)
 		default:
 			panic(fmt.Sprintf("unexpected identifier type: %v", t.DeclType))
 		}

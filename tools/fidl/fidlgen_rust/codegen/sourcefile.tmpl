@@ -34,8 +34,6 @@ use {
         fidl_struct,
         fidl_table,
         fidl_union,
-        {{- /* TODO(fxbug.dev/124207): Remove zerocopy. */}}
-        encoding::zerocopy,
         endpoints::{ControlHandle as _, Responder as _},
         client::QueryResponseFut,
     },

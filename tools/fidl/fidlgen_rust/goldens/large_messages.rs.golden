@@ -22,7 +22,6 @@ use {
     bitflags::bitflags,
     fidl::{
         client::QueryResponseFut,
-        encoding::zerocopy,
         endpoints::{ControlHandle as _, Responder as _},
         fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },

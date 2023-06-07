@@ -22,7 +22,6 @@ use {
     bitflags::bitflags,
     fidl::{
         client::QueryResponseFut,
-        encoding::zerocopy,
         endpoints::{ControlHandle as _, Responder as _},
         fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
@@ -1202,19 +1201,7 @@ fidl_union! {
     unknown_member: __Unknown,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest {
     pub some_field: i32,
@@ -1243,19 +1230,7 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct UnknownInteractionsAjarProtocolStrictEventFieldsRequest {
     pub some_field: i32,
@@ -1284,19 +1259,7 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse {
     pub some_field: i32,
@@ -1325,19 +1288,7 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse {
     pub some_field: i32,
@@ -1366,19 +1317,7 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse {
     pub some_field: i32,
@@ -1407,19 +1346,7 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse {
     pub some_field: i32,
@@ -1448,19 +1375,7 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct UnknownInteractionsClosedProtocolStrictEventFieldsRequest {
     pub some_field: i32,
@@ -1489,19 +1404,7 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse {
     pub some_field: i32,
@@ -1530,19 +1433,7 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse {
     pub some_field: i32,
@@ -1571,19 +1462,7 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse {
     pub some_field: i32,
@@ -1612,19 +1491,7 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct UnknownInteractionsProtocolFlexibleEventFieldsRequest {
     pub some_field: i32,
@@ -1653,19 +1520,7 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct UnknownInteractionsProtocolStrictEventFieldsRequest {
     pub some_field: i32,
@@ -1694,19 +1549,7 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct UnknownInteractionsProtocolStrictTwoWayFieldsResponse {
     pub some_field: i32,
@@ -1735,19 +1578,7 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct UnknownInteractionsProtocolFlexibleEventFieldsErrResponse {
     pub some_field: i32,
@@ -1776,19 +1607,7 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse {
     pub some_field: i32,
@@ -1817,19 +1636,7 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse {
     pub some_field: i32,
@@ -1858,19 +1665,7 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct UnknownInteractionsProtocolStrictEventFieldsErrResponse {
     pub some_field: i32,
@@ -1899,19 +1694,7 @@ fidl_struct! {
     align_v2: 4,
 }
 
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Hash,
-    zerocopy::AsBytes,
-    zerocopy::FromBytes,
-    zerocopy::FromZeroes,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {
     pub some_field: i32,

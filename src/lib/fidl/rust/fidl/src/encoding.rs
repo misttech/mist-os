@@ -6,11 +6,7 @@
 
 // TODO(fxbug.dev/118834): This file is too big. Split it into smaller files.
 
-pub use {
-    static_assertions::const_assert_eq,
-    // TODO(fxbug.dev/124207): Remove zerocopy.
-    zerocopy,
-};
+pub use static_assertions::const_assert_eq;
 
 use {
     crate::endpoints::ProtocolMarker,

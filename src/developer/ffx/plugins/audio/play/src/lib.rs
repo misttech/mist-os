@@ -114,8 +114,8 @@ mod tests {
     use ffx_audio_play_args::AudioRenderUsageExtended;
     use ffx_core::macro_deps::futures::AsyncWriteExt;
     use ffx_writer as _;
-    use fidl::encoding::zerocopy::AsBytes;
     use fidl_fuchsia_media::AudioRenderUsage;
+    use zerocopy::AsBytes;
 
     #[fuchsia_async::run_singlethreaded(test)]
     pub async fn test_play() -> Result<(), fho::Error> {

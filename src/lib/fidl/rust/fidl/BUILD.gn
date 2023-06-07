@@ -19,7 +19,6 @@ fidl_rust_deps = [
   "//third_party/rust_crates:static_assertions",
   "//third_party/rust_crates:thiserror",
   "//third_party/rust_crates:tracing",
-  "//third_party/rust_crates:zerocopy",
 ]
 
 if (is_fuchsia) {

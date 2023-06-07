@@ -651,8 +651,8 @@ mod tests {
     use ffx_audio_device_args::DevicePlayCommand;
     use ffx_audio_device_args::{DeviceCommand, DeviceDirection};
     use ffx_core::macro_deps::futures::AsyncWriteExt;
-    use fidl::encoding::zerocopy::AsBytes;
     use fidl::HandleBased;
+    use zerocopy::AsBytes;
 
     #[fuchsia_async::run_singlethreaded(test)]
     pub async fn test_play_success() -> Result<(), fho::Error> {
