@@ -337,6 +337,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     fn mknod(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _name: &FsStr,
         _mode: FileMode,
         _dev: DeviceType,
@@ -349,6 +350,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     fn mkdir(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _name: &FsStr,
         _mode: FileMode,
         _owner: FsCred,
@@ -360,6 +362,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     fn create_symlink(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _name: &FsStr,
         _target: &FsStr,
         _owner: FsCred,
@@ -377,7 +380,13 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     }
 
     /// Create a hard link with the given name to the given child.
-    fn link(&self, _node: &FsNode, _name: &FsStr, _child: &FsNodeHandle) -> Result<(), Errno> {
+    fn link(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _name: &FsStr,
+        _child: &FsNodeHandle,
+    ) -> Result<(), Errno> {
         error!(EPERM)
     }
 
@@ -385,7 +394,13 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     ///
     /// The UnlinkKind parameter indicates whether the caller intends to unlink
     /// a directory or a non-directory child.
-    fn unlink(&self, _node: &FsNode, _name: &FsStr, _child: &FsNodeHandle) -> Result<(), Errno> {
+    fn unlink(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _name: &FsStr,
+        _child: &FsNodeHandle,
+    ) -> Result<(), Errno> {
         error!(ENOTDIR)
     }
 
@@ -462,6 +477,7 @@ macro_rules! fs_node_impl_dir_readonly {
         fn mkdir(
             &self,
             _node: &crate::fs::FsNode,
+            _current_task: &crate::task::CurrentTask,
             _name: &crate::fs::FsStr,
             _mode: crate::types::FileMode,
             _owner: crate::auth::FsCred,
@@ -472,6 +488,7 @@ macro_rules! fs_node_impl_dir_readonly {
         fn mknod(
             &self,
             _node: &crate::fs::FsNode,
+            _current_task: &crate::task::CurrentTask,
             _name: &crate::fs::FsStr,
             _mode: crate::types::FileMode,
             _dev: crate::types::DeviceType,
@@ -483,6 +500,7 @@ macro_rules! fs_node_impl_dir_readonly {
         fn create_symlink(
             &self,
             _node: &crate::fs::FsNode,
+            _current_task: &crate::task::CurrentTask,
             _name: &crate::fs::FsStr,
             _target: &crate::fs::FsStr,
             _owner: crate::auth::FsCred,
@@ -493,6 +511,7 @@ macro_rules! fs_node_impl_dir_readonly {
         fn link(
             &self,
             _node: &crate::fs::FsNode,
+            _current_task: &crate::task::CurrentTask,
             _name: &crate::fs::FsStr,
             _child: &crate::fs::FsNodeHandle,
         ) -> Result<(), Errno> {
@@ -502,6 +521,7 @@ macro_rules! fs_node_impl_dir_readonly {
         fn unlink(
             &self,
             _node: &crate::fs::FsNode,
+            _current_task: &crate::task::CurrentTask,
             _name: &crate::fs::FsStr,
             _child: &crate::fs::FsNodeHandle,
         ) -> Result<(), Errno> {
@@ -752,7 +772,7 @@ impl FsNode {
     ) -> Result<FsNodeHandle, Errno> {
         assert!(mode & FileMode::IFMT != FileMode::EMPTY, "mknod called without node type.");
         self.check_access(current_task, Access::WRITE)?;
-        self.ops().mknod(self, name, mode, dev, owner)
+        self.ops().mknod(self, current_task, name, mode, dev, owner)
     }
 
     pub fn mkdir(
@@ -767,7 +787,7 @@ impl FsNode {
             "mkdir called without directory node type."
         );
         self.check_access(current_task, Access::WRITE)?;
-        self.ops().mkdir(self, name, mode, owner)
+        self.ops().mkdir(self, current_task, name, mode, owner)
     }
 
     pub fn create_symlink(
@@ -778,7 +798,7 @@ impl FsNode {
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         self.check_access(current_task, Access::WRITE)?;
-        self.ops().create_symlink(self, name, target, owner)
+        self.ops().create_symlink(self, current_task, name, target, owner)
     }
 
     // This method does not attempt to update the atime of the node.
@@ -795,7 +815,7 @@ impl FsNode {
         child: &FsNodeHandle,
     ) -> Result<(), Errno> {
         self.check_access(current_task, Access::WRITE)?;
-        self.ops().link(self, name, child)
+        self.ops().link(self, current_task, name, child)
     }
 
     pub fn unlink(
@@ -806,7 +826,7 @@ impl FsNode {
     ) -> Result<(), Errno> {
         self.check_access(current_task, Access::WRITE)?;
         self.check_sticky_bit(current_task, child)?;
-        self.ops().unlink(self, name, child)?;
+        self.ops().unlink(self, current_task, name, child)?;
         self.update_ctime_mtime()?;
         Ok(())
     }

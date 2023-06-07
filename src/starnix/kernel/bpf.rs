@@ -447,6 +447,7 @@ impl FsNodeOps for BpfFsDir {
     fn mkdir(
         &self,
         node: &FsNode,
+        _current_task: &CurrentTask,
         name: &FsStr,
         mode: FileMode,
         owner: FsCred,
@@ -461,6 +462,7 @@ impl FsNodeOps for BpfFsDir {
     fn mknod(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _name: &FsStr,
         _mode: FileMode,
         _dev: DeviceType,
@@ -472,6 +474,7 @@ impl FsNodeOps for BpfFsDir {
     fn create_symlink(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _name: &FsStr,
         _target: &FsStr,
         _owner: FsCred,
@@ -479,11 +482,23 @@ impl FsNodeOps for BpfFsDir {
         error!(EPERM)
     }
 
-    fn link(&self, _node: &FsNode, _name: &FsStr, _child: &FsNodeHandle) -> Result<(), Errno> {
+    fn link(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _name: &FsStr,
+        _child: &FsNodeHandle,
+    ) -> Result<(), Errno> {
         Ok(())
     }
 
-    fn unlink(&self, _node: &FsNode, _name: &FsStr, _child: &FsNodeHandle) -> Result<(), Errno> {
+    fn unlink(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _name: &FsStr,
+        _child: &FsNodeHandle,
+    ) -> Result<(), Errno> {
         Ok(())
     }
 }

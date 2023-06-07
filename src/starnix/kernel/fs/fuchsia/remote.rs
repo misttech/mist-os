@@ -223,6 +223,7 @@ impl FsNodeOps for RemoteNode {
     fn mknod(
         &self,
         node: &FsNode,
+        _current_task: &CurrentTask,
         name: &FsStr,
         mode: FileMode,
         _dev: DeviceType,
@@ -256,6 +257,7 @@ impl FsNodeOps for RemoteNode {
     fn mkdir(
         &self,
         node: &FsNode,
+        _current_task: &CurrentTask,
         name: &FsStr,
         mode: FileMode,
         owner: FsCred,
@@ -330,7 +332,13 @@ impl FsNodeOps for RemoteNode {
         Ok(RwLockWriteGuard::downgrade(info))
     }
 
-    fn unlink(&self, _node: &FsNode, name: &FsStr, _child: &FsNodeHandle) -> Result<(), Errno> {
+    fn unlink(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        name: &FsStr,
+        _child: &FsNodeHandle,
+    ) -> Result<(), Errno> {
         // We don't care about the _child argument because 1. unlinking already takes the parent's
         // children lock, so we don't have to worry about conflicts on this path, and 2. the remote
         // filesystem tracks the link counts so we don't need to update them here.
@@ -343,6 +351,7 @@ impl FsNodeOps for RemoteNode {
     fn create_symlink(
         &self,
         node: &FsNode,
+        _current_task: &CurrentTask,
         name: &FsStr,
         target: &FsStr,
         owner: FsCred,

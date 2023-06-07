@@ -170,6 +170,7 @@ impl FsNodeOps for TmpfsDirectory {
     fn mkdir(
         &self,
         node: &FsNode,
+        _current_task: &CurrentTask,
         _name: &FsStr,
         mode: FileMode,
         owner: FsCred,
@@ -185,6 +186,7 @@ impl FsNodeOps for TmpfsDirectory {
     fn mknod(
         &self,
         node: &FsNode,
+        _current_task: &CurrentTask,
         _name: &FsStr,
         mode: FileMode,
         dev: DeviceType,
@@ -212,6 +214,7 @@ impl FsNodeOps for TmpfsDirectory {
     fn create_symlink(
         &self,
         node: &FsNode,
+        _current_task: &CurrentTask,
         _name: &FsStr,
         target: &FsStr,
         owner: FsCred,
@@ -223,7 +226,13 @@ impl FsNodeOps for TmpfsDirectory {
         ))
     }
 
-    fn link(&self, _node: &FsNode, _name: &FsStr, child: &FsNodeHandle) -> Result<(), Errno> {
+    fn link(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _name: &FsStr,
+        child: &FsNodeHandle,
+    ) -> Result<(), Errno> {
         child.update_info(|info| {
             info.link_count += 1;
             Ok(())
@@ -232,7 +241,13 @@ impl FsNodeOps for TmpfsDirectory {
         Ok(())
     }
 
-    fn unlink(&self, node: &FsNode, _name: &FsStr, child: &FsNodeHandle) -> Result<(), Errno> {
+    fn unlink(
+        &self,
+        node: &FsNode,
+        _current_task: &CurrentTask,
+        _name: &FsStr,
+        child: &FsNodeHandle,
+    ) -> Result<(), Errno> {
         if child.is_dir() {
             node.update_info(|info| {
                 info.link_count -= 1;

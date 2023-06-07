@@ -208,6 +208,7 @@ impl FsNodeOps for Arc<FuseNode> {
     fn mknod(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _name: &FsStr,
         _mode: FileMode,
         _dev: DeviceType,
@@ -220,6 +221,7 @@ impl FsNodeOps for Arc<FuseNode> {
     fn mkdir(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _name: &FsStr,
         _mode: FileMode,
         _owner: FsCred,
@@ -231,6 +233,7 @@ impl FsNodeOps for Arc<FuseNode> {
     fn create_symlink(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _name: &FsStr,
         _target: &FsStr,
         _owner: FsCred,
@@ -248,12 +251,24 @@ impl FsNodeOps for Arc<FuseNode> {
         error!(ENOTSUP)
     }
 
-    fn link(&self, _node: &FsNode, _name: &FsStr, _child: &FsNodeHandle) -> Result<(), Errno> {
+    fn link(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _name: &FsStr,
+        _child: &FsNodeHandle,
+    ) -> Result<(), Errno> {
         not_implemented!("FsNodeOps::link");
         error!(ENOTSUP)
     }
 
-    fn unlink(&self, _node: &FsNode, _name: &FsStr, _child: &FsNodeHandle) -> Result<(), Errno> {
+    fn unlink(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _name: &FsStr,
+        _child: &FsNodeHandle,
+    ) -> Result<(), Errno> {
         not_implemented!("FsNodeOps::unlink");
         error!(ENOTSUP)
     }

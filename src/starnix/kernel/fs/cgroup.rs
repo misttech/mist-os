@@ -69,6 +69,7 @@ impl FsNodeOps for CgroupDirectoryNode {
     fn mkdir(
         &self,
         node: &FsNode,
+        _current_task: &CurrentTask,
         _name: &FsStr,
         mode: FileMode,
         owner: FsCred,
@@ -83,6 +84,7 @@ impl FsNodeOps for CgroupDirectoryNode {
     fn mknod(
         &self,
         node: &FsNode,
+        _current_task: &CurrentTask,
         _name: &FsStr,
         mode: FileMode,
         dev: DeviceType,
