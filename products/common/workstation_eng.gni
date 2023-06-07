@@ -5,14 +5,6 @@
 import("//products/common/packages.gni")
 import("//products/common/workstation_base.gni")
 
-# TODO(fxbug.dev/102390): deprecate appmgr from workstation.
-import("//src/sys/appmgr/appmgr.gni")
-
-# TODO(fxbug.dev/108016): Use appmgr_base_packages once all chromium workflows
-# use v2 components.
-legacy_base_package_labels += appmgr_with_sysmgr_base_packages
-core_realm_shards += appmgr_core_shards
-
 # Add build type config data
 legacy_base_package_labels += [
   "//src/cobalt/bin/app:build_type_eng",

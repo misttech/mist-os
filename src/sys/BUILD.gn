@@ -15,7 +15,6 @@ group("sys") {
 group("tests") {
   testonly = true
   deps = [
-    ":legacy_tests",
     "activity:tests",
     "base-resolver:tests",
     "bedrock:tests",
@@ -38,6 +37,7 @@ group("tests") {
   ]
 }
 
+# TODO(fxbug.dev/102390): Delete all these tests
 group("legacy_tests") {
   testonly = true
   deps = [

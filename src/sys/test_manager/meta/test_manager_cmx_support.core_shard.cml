@@ -4,6 +4,15 @@
 
 // Add cmx support to test_manager
 {
+    capabilities: [
+        // This exists to prevent compilation failure on builds without appmgr.
+        {
+            protocol: [
+                "fuchsia.sys.Environment",
+                "fuchsia.sys.Loader",
+            ],
+        },
+    ],
     offer: [
         {
             protocol: [
