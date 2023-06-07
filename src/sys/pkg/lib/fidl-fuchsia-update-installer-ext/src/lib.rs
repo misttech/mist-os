@@ -92,6 +92,11 @@ impl UpdateAttemptMonitor {
 
         Ok((monitor_client_end, Self { stream }))
     }
+
+    /// Create a new UpdateAttemptMonitor using the given stream.
+    pub fn from_stream(stream: MonitorRequestStream) -> Self {
+        Self { stream }
+    }
 }
 
 /// Checks if an update can be started and returns the UpdateAttempt containing
