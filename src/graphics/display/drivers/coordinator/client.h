@@ -279,7 +279,6 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   Controller* controller_;
   ClientProxy* proxy_;
   const bool is_vc_;
-  uint64_t console_fb_display_id_ = -1;
   const uint32_t id_;
   bool running_;
   uint64_t next_image_id_ = 1;         // Only INVALID_ID == 0 is invalid
