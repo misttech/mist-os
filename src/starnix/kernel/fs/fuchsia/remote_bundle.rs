@@ -297,7 +297,7 @@ fn to_fs_node_info(inode_num: ino_t, metadata_node: &ext4_metadata::Node) -> FsN
     // by the FsNodeOps on first access.
     // For now, we just use some made up values. We might need to revisit this.
     info.size = 1;
-    info.storage_size = 1;
+    info.blocks = 1;
     info.blksize = 512;
     info.link_count = 1;
     info

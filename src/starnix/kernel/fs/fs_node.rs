@@ -7,7 +7,7 @@ use once_cell::sync::OnceCell;
 use std::sync::{Arc, Weak};
 
 use crate::{
-    arch::uapi::{blksize_t, nlink_t, stat_t},
+    arch::uapi::stat_time_t,
     auth::FsCred,
     device::DeviceMode,
     fs::{pipe::Pipe, socket::*, *},
@@ -55,7 +55,7 @@ pub struct FsNode {
 
     /// Mutable information about this node.
     ///
-    /// This data is used to populate the stat_t structure.
+    /// This data is used to populate the uapi::stat structure.
     info: RwLock<FsNodeInfo>,
 
     /// Information about the locking information on this node.
@@ -73,16 +73,16 @@ pub type FsNodeHandle = Arc<FsNode>;
 pub struct FsNodeInfo {
     pub ino: ino_t,
     pub mode: FileMode,
-    pub size: usize,
-    pub storage_size: usize,
-    pub blksize: blksize_t,
+    pub link_count: usize,
     pub uid: uid_t,
     pub gid: gid_t,
-    pub link_count: nlink_t,
+    pub rdev: DeviceType,
+    pub size: usize,
+    pub blksize: usize,
+    pub blocks: usize,
     pub time_status_change: zx::Time,
     pub time_access: zx::Time,
     pub time_modify: zx::Time,
-    pub rdev: DeviceType,
 }
 
 impl FsNodeInfo {
@@ -91,15 +91,19 @@ impl FsNodeInfo {
         Self {
             ino,
             mode,
-            blksize: DEFAULT_BYTES_PER_BLOCK,
+            link_count: if mode.is_dir() { 2 } else { 1 },
             uid: owner.uid,
             gid: owner.gid,
-            link_count: if mode.is_dir() { 2 } else { 1 },
+            blksize: DEFAULT_BYTES_PER_BLOCK,
             time_status_change: now,
             time_access: now,
             time_modify: now,
             ..Default::default()
         }
+    }
+
+    pub fn storage_size(&self) -> usize {
+        self.blksize.saturating_mul(self.blocks)
     }
 
     pub fn new_factory(mode: FileMode, owner: FsCred) -> impl FnOnce(ino_t) -> Self {
@@ -179,7 +183,7 @@ impl FlockInfo {
 }
 
 /// st_blksize is measured in units of 512 bytes.
-const DEFAULT_BYTES_PER_BLOCK: blksize_t = 512;
+const DEFAULT_BYTES_PER_BLOCK: usize = 512;
 
 pub struct FlockOperation {
     operation: u32,
@@ -398,7 +402,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Update node.info as needed.
     ///
     /// FsNode calls this method before converting the FsNodeInfo struct into
-    /// the stat_t struct to give the file system a chance to update this data
+    /// the uapi::stat struct to give the file system a chance to update this data
     /// before it is used by clients.
     ///
     /// File systems that keep the FsNodeInfo up-to-date do not need to
@@ -1003,27 +1007,42 @@ impl FsNode {
         self.info().mode.is_lnk()
     }
 
-    pub fn stat(&self, current_task: &CurrentTask) -> Result<stat_t, Errno> {
+    pub fn stat(&self, current_task: &CurrentTask) -> Result<uapi::stat, Errno> {
         let info = self.ops().update_info(self, current_task, &self.info)?;
 
-        // The blksize cast is necessary depending on the architecture.
-        #[allow(clippy::unnecessary_cast)]
-        let blocks = info.storage_size as i64 / info.blksize as i64;
+        let time_to_kernel_timespec_pair = |t| {
+            let timespec { tv_sec, tv_nsec } = timespec_from_time(t);
+            // SAFETY: On some architecture (x86_64 at least), the stat definition from the kernel
+            // headers uses unsigned types for the number of seconds, while userspace expects that
+            // negative number are time before the epoch. The transmute is safe because the size is
+            // always the same as the one used in timespec.
+            #[allow(clippy::useless_transmute)]
+            let time: stat_time_t = unsafe { std::mem::transmute(tv_sec) };
+            let time_nsec = __kernel_ulong_t::try_from(tv_nsec).map_err(|_| errno!(EINVAL))?;
+            Ok((time, time_nsec))
+        };
 
-        Ok(stat_t {
+        let (st_atime, st_atime_nsec) = time_to_kernel_timespec_pair(info.time_access)?;
+        let (st_mtime, st_mtime_nsec) = time_to_kernel_timespec_pair(info.time_modify)?;
+        let (st_ctime, st_ctime_nsec) = time_to_kernel_timespec_pair(info.time_status_change)?;
+
+        Ok(uapi::stat {
+            st_dev: self.fs().dev_id.bits(),
             st_ino: info.ino,
+            st_nlink: info.link_count.try_into().map_err(|_| errno!(EINVAL))?,
             st_mode: info.mode.bits(),
-            st_size: info.size as off_t,
-            st_blocks: blocks,
-            st_nlink: info.link_count,
             st_uid: info.uid,
             st_gid: info.gid,
-            st_ctim: timespec_from_time(info.time_status_change),
-            st_mtim: timespec_from_time(info.time_modify),
-            st_atim: timespec_from_time(info.time_access),
-            st_dev: self.fs().dev_id.bits(),
             st_rdev: info.rdev.bits(),
-            st_blksize: info.blksize,
+            st_size: info.size.try_into().map_err(|_| errno!(EINVAL))?,
+            st_blksize: info.blksize.try_into().map_err(|_| errno!(EINVAL))?,
+            st_blocks: info.blocks.try_into().map_err(|_| errno!(EINVAL))?,
+            st_atime,
+            st_atime_nsec,
+            st_mtime,
+            st_mtime_nsec,
+            st_ctime,
+            st_ctime_nsec,
             ..Default::default()
         })
     }
@@ -1044,15 +1063,6 @@ impl FsNode {
             return error!(EINVAL);
         }
 
-        // The blksize cast is necessary depending on the architecture.
-        #[allow(clippy::unnecessary_cast)]
-        let blocks = info.storage_size as i64 / info.blksize as i64;
-
-        #[cfg(target_arch = "x86_64")]
-        let link_count = info.link_count as u32;
-        #[cfg(not(target_arch = "x86_64"))]
-        let link_count = info.link_count;
-
         Ok(statx {
             stx_mask: STATX_NLINK
                 | STATX_UID
@@ -1064,15 +1074,15 @@ impl FsNode {
                 | STATX_SIZE
                 | STATX_BLOCKS
                 | STATX_BASIC_STATS,
-            stx_blksize: info.blksize as u32,
+            stx_blksize: info.blksize.try_into().map_err(|_| errno!(EINVAL))?,
             stx_attributes: 0, // TODO
-            stx_nlink: link_count,
+            stx_nlink: info.link_count.try_into().map_err(|_| errno!(EINVAL))?,
             stx_uid: info.uid,
             stx_gid: info.gid,
-            stx_mode: info.mode.bits() as u16,
+            stx_mode: info.mode.bits().try_into().map_err(|_| errno!(EINVAL))?,
             stx_ino: info.ino,
-            stx_size: info.size as u64,
-            stx_blocks: blocks as u64,
+            stx_size: info.size.try_into().map_err(|_| errno!(EINVAL))?,
+            stx_blocks: info.blocks.try_into().map_err(|_| errno!(EINVAL))?,
             stx_attributes_mask: 0, // TODO
 
             stx_ctime: Self::statx_timestamp_from_time(info.time_status_change),
@@ -1286,7 +1296,7 @@ mod tests {
         node.update_info(|info| {
             info.mode = FileMode::IFSOCK;
             info.size = 1;
-            info.storage_size = 8;
+            info.blocks = 2;
             info.blksize = 4;
             info.uid = 9;
             info.gid = 10;
@@ -1307,9 +1317,12 @@ mod tests {
         assert_eq!(stat.st_uid, 9);
         assert_eq!(stat.st_gid, 10);
         assert_eq!(stat.st_nlink, 11);
-        assert_eq!(time_from_timespec(stat.st_ctim).expect("ctim"), zx::Time::from_nanos(1));
-        assert_eq!(time_from_timespec(stat.st_atim).expect("atim"), zx::Time::from_nanos(2));
-        assert_eq!(time_from_timespec(stat.st_mtim).expect("mtim"), zx::Time::from_nanos(3));
+        assert_eq!(stat.st_ctime, 0);
+        assert_eq!(stat.st_ctime_nsec, 1);
+        assert_eq!(stat.st_atime, 0);
+        assert_eq!(stat.st_atime_nsec, 2);
+        assert_eq!(stat.st_mtime, 0);
+        assert_eq!(stat.st_mtime_nsec, 3);
         assert_eq!(stat.st_rdev, DeviceType::new(13, 13).bits());
     }
 

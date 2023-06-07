@@ -6,7 +6,6 @@ use std::sync::Arc;
 
 use super::{directory_file::MemoryDirectoryFile, *};
 use crate::{
-    arch::uapi::blksize_t,
     auth::FsCred,
     lock::{Mutex, MutexGuard},
     logging::not_implemented,
@@ -204,7 +203,7 @@ impl FsNodeOps for TmpfsDirectory {
             let mut info = FsNodeInfo::new(id, mode, owner);
             info.rdev = dev;
             // blksize is PAGE_SIZE for in memory node.
-            info.blksize = *PAGE_SIZE as blksize_t;
+            info.blksize = *PAGE_SIZE as usize;
             info
         });
         Ok(node)

@@ -5,7 +5,6 @@
 use std::sync::{Arc, Weak};
 
 use crate::{
-    arch::uapi::blksize_t,
     auth::FsCred,
     device::{terminal::*, DeviceOps},
     fs::{
@@ -27,7 +26,7 @@ const DEVPTS_MAJOR_COUNT: u32 = 4;
 pub const DEVPTS_COUNT: u32 = DEVPTS_MAJOR_COUNT * 256;
 // The block size of the node in the devpts file system. Value has been taken from
 // https://github.com/google/gvisor/blob/master/test/syscalls/linux/pty.cc
-const BLOCK_SIZE: blksize_t = 1024;
+const BLOCK_SIZE: usize = 1024;
 
 // The node identifier of the different node in the devpts filesystem.
 const ROOT_NODE_ID: ino_t = 1;
@@ -751,7 +750,7 @@ mod tests {
         let fs = dev_pts_fs(&kernel, Default::default());
         let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
         let ptmx_stat = ptmx.node().stat(&task).expect("stat");
-        assert_eq!(ptmx_stat.st_blksize, BLOCK_SIZE);
+        assert_eq!(ptmx_stat.st_blksize as usize, BLOCK_SIZE);
         let pts = open_file(&task, fs, b"0").expect("open file");
         let pts_stats = pts.node().stat(&task).expect("stat");
         assert_eq!(pts_stats.st_mode & FileMode::PERMISSIONS.bits(), 0o620);

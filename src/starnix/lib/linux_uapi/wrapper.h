@@ -13,6 +13,7 @@
 #include <asm/sigcontext.h>
 #include <asm/signal.h>
 #include <asm/socket.h>
+#include <asm/stat.h>
 #include <asm/ucontext.h>
 #include <linux/android/binder.h>
 #include <linux/audit.h>

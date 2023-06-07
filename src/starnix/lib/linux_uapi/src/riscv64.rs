@@ -433,6 +433,7 @@ pub const SO_SNDTIMEO: u32 = 21;
 pub const SCM_TIMESTAMP: u32 = 29;
 pub const SCM_TIMESTAMPNS: u32 = 35;
 pub const SCM_TIMESTAMPING: u32 = 37;
+pub const STAT_HAVE_NSEC: u32 = 1;
 pub const B_TYPE_LARGE: u32 = 133;
 pub const BINDER_CURRENT_PROTOCOL_VERSION: u32 = 8;
 pub const EM_NONE: u32 = 0;
@@ -4701,6 +4702,30 @@ impl Default for sigaltstack {
     }
 }
 pub type stack_t = sigaltstack;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct stat {
+    pub st_dev: crate::types::c_ulong,
+    pub st_ino: crate::types::c_ulong,
+    pub st_mode: crate::types::c_uint,
+    pub st_nlink: crate::types::c_uint,
+    pub st_uid: crate::types::c_uint,
+    pub st_gid: crate::types::c_uint,
+    pub st_rdev: crate::types::c_ulong,
+    pub __pad1: crate::types::c_ulong,
+    pub st_size: crate::types::c_long,
+    pub st_blksize: crate::types::c_int,
+    pub __pad2: crate::types::c_int,
+    pub st_blocks: crate::types::c_long,
+    pub st_atime: crate::types::c_long,
+    pub st_atime_nsec: crate::types::c_ulong,
+    pub st_mtime: crate::types::c_long,
+    pub st_mtime_nsec: crate::types::c_ulong,
+    pub st_ctime: crate::types::c_long,
+    pub st_ctime_nsec: crate::types::c_ulong,
+    pub __unused4: crate::types::c_uint,
+    pub __unused5: crate::types::c_uint,
+}
 #[repr(C)]
 #[repr(align(16))]
 #[derive(Copy, Clone)]

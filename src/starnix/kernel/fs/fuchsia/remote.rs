@@ -12,7 +12,6 @@ use syncio::{
 };
 
 use crate::{
-    arch::uapi::{blksize_t, nlink_t},
     auth::FsCred,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
@@ -134,13 +133,13 @@ pub fn create_fuchsia_pipe(
 
 pub fn update_into_from_attrs(info: &mut FsNodeInfo, attrs: &zxio_node_attributes_t) {
     /// st_blksize is measured in units of 512 bytes.
-    const BYTES_PER_BLOCK: blksize_t = 512;
+    const BYTES_PER_BLOCK: usize = 512;
     // TODO - store these in FsNodeState and convert on fstat
     info.ino = attrs.id;
-    info.size = attrs.content_size as usize;
-    info.storage_size = attrs.storage_size as usize;
+    info.size = attrs.content_size.try_into().unwrap_or(std::usize::MAX);
+    info.blocks = usize::try_from(attrs.storage_size).unwrap_or(std::usize::MAX) / BYTES_PER_BLOCK;
     info.blksize = BYTES_PER_BLOCK;
-    info.link_count = attrs.link_count as nlink_t;
+    info.link_count = attrs.link_count.try_into().unwrap_or(std::usize::MAX);
 }
 
 fn get_mode(attrs: &zxio_node_attributes_t) -> Result<FileMode, Errno> {

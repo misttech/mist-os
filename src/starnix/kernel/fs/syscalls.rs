@@ -5,7 +5,7 @@
 use std::{cmp::Ordering, convert::TryInto, sync::Arc, usize};
 
 use crate::{
-    arch::uapi::{epoll_event, stat_t},
+    arch::uapi::epoll_event,
     fs::{buffers::*, eventfd::*, fuchsia::*, inotify::*, pipe::*, *},
     lock::Mutex,
     logging::*,
@@ -518,7 +518,7 @@ pub fn sys_fchdir(current_task: &CurrentTask, fd: FdNumber) -> Result<(), Errno>
 pub fn sys_fstat(
     current_task: &CurrentTask,
     fd: FdNumber,
-    buffer: UserRef<stat_t>,
+    buffer: UserRef<uapi::stat>,
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
     let result = file.node().stat(current_task)?;
@@ -530,7 +530,7 @@ pub fn sys_newfstatat(
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
-    buffer: UserRef<stat_t>,
+    buffer: UserRef<uapi::stat>,
     flags: u32,
 ) -> Result<(), Errno> {
     if flags & !(AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH) != 0 {

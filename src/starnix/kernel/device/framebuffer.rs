@@ -92,7 +92,7 @@ impl DeviceOps for Arc<Framebuffer> {
         }
         node.update_info(|info| {
             info.size = self.vmo_len as usize;
-            info.storage_size = self.vmo.get_size().map_err(impossible_error)? as usize;
+            info.blocks = self.vmo.get_size().map_err(impossible_error)? as usize / info.blksize;
             Ok(())
         })?;
         Ok(Box::new(Arc::clone(self)))

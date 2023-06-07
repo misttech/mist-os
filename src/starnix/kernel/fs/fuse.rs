@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    arch::uapi::{blksize_t, nlink_t},
     auth::FsCred,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
@@ -148,12 +147,12 @@ impl FuseNode {
     fn update_node_info(info: &mut FsNodeInfo, attributes: uapi::fuse_attr) -> Result<(), Errno> {
         info.ino = attributes.ino as uapi::ino_t;
         info.mode = FileMode::from_bits(attributes.mode);
-        info.size = attributes.size as usize;
-        info.storage_size = (attributes.blksize as usize) * (attributes.blocks as usize);
-        info.blksize = attributes.blksize as blksize_t;
+        info.size = attributes.size.try_into().map_err(|_| errno!(EINVAL))?;
+        info.blocks = attributes.blocks.try_into().map_err(|_| errno!(EINVAL))?;
+        info.blksize = attributes.blksize.try_into().map_err(|_| errno!(EINVAL))?;
         info.uid = attributes.uid;
         info.gid = attributes.gid;
-        info.link_count = attributes.nlink as nlink_t;
+        info.link_count = attributes.nlink.try_into().map_err(|_| errno!(EINVAL))?;
         info.time_status_change = time_from_timespec(uapi::timespec {
             tv_sec: attributes.ctime as i64,
             tv_nsec: attributes.ctimensec as i64,

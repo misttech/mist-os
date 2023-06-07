@@ -273,7 +273,7 @@ impl StarnixNodeConnection {
             mode: info.mode.bits(),
             id: self.file.fs.dev_id.bits(),
             content_size: info.size as u64,
-            storage_size: info.storage_size as u64,
+            storage_size: info.storage_size() as u64,
             link_count,
             creation_time: info.time_status_change.into_nanos() as u64,
             modification_time: info.time_modify.into_nanos() as u64,

@@ -109,7 +109,7 @@ impl FsNodeOps for VmoFileNode {
                 _ => impossible_error(status),
             })?;
             info.size = length as usize;
-            info.storage_size = self.vmo.get_size().map_err(impossible_error)? as usize;
+            info.blocks = self.vmo.get_size().map_err(impossible_error)? as usize / info.blksize;
             Ok(())
         })
     }
@@ -137,7 +137,7 @@ impl FsNodeOps for VmoFileNode {
                 _ => impossible_error(status),
             })?;
             info.size = new_size as usize;
-            info.storage_size = self.vmo.get_size().map_err(impossible_error)? as usize;
+            info.blocks = self.vmo.get_size().map_err(impossible_error)? as usize / info.blksize;
             Ok(())
         })
     }
@@ -226,14 +226,14 @@ impl VmoFileObject {
                             // Write starts outside the file.
                             // Forbid because nothing can be written without growing.
                             return Err(e);
-                        } else if info.size == info.storage_size {
+                        } else if info.size == info.storage_size() {
                             // Write starts inside file and EOF page does not need to grow.
                             // End write at EOF.
                             write_end = info.size;
                             want_write = write_end - offset;
                         } else {
                             // Write starts inside file and EOF page needs to grow.
-                            let eof_page_start = info.storage_size - (*PAGE_SIZE as usize);
+                            let eof_page_start = info.storage_size() - (*PAGE_SIZE as usize);
 
                             if offset >= eof_page_start {
                                 // Write starts in EOF page.
@@ -250,10 +250,10 @@ impl VmoFileObject {
             }
 
             if write_end > info.size {
-                if write_end > info.storage_size {
+                if write_end > info.storage_size() {
                     let new_size = round_up_to_system_page_size(write_end)?;
                     vmo.set_size(new_size as u64).map_err(|_| errno!(ENOMEM))?;
-                    info.storage_size = new_size;
+                    info.blocks = new_size / info.blksize;
                 }
                 update_content_size = true;
             }

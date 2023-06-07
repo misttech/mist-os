@@ -5,7 +5,6 @@
 use std::{convert::TryInto, sync::Arc};
 
 use crate::{
-    arch::uapi::blksize_t,
     fs::{buffers::*, *},
     lock::{Mutex, MutexGuard},
     mm::{MemoryAccessorExt, PAGE_SIZE},
@@ -15,7 +14,7 @@ use crate::{
     types::*,
 };
 
-const ATOMIC_IO_BYTES: blksize_t = 4096;
+const ATOMIC_IO_BYTES: u16 = 4096;
 const PIPE_MAX_SIZE: usize = 1048576; // From pipe.go in gVisor.
 
 fn round_up(value: usize, increment: usize) -> usize {
@@ -241,7 +240,7 @@ pub fn new_pipe(current_task: &CurrentTask) -> Result<(FileHandle, FileHandle), 
     let fs = pipe_fs(current_task.kernel());
     let node = fs.create_node(SpecialNode, |id| {
         let mut info = FsNodeInfo::new(id, mode!(IFIFO, 0o600), current_task.as_fscred());
-        info.blksize = ATOMIC_IO_BYTES;
+        info.blksize = ATOMIC_IO_BYTES.into();
         info
     });
 

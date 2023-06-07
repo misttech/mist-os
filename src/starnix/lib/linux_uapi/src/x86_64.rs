@@ -456,6 +456,7 @@ pub const SO_SNDTIMEO: u32 = 21;
 pub const SCM_TIMESTAMP: u32 = 29;
 pub const SCM_TIMESTAMPNS: u32 = 35;
 pub const SCM_TIMESTAMPING: u32 = 37;
+pub const STAT_HAVE_NSEC: u32 = 1;
 pub const UC_FP_XSTATE: u32 = 1;
 pub const UC_SIGCONTEXT_SS: u32 = 2;
 pub const UC_STRICT_RESTORE_SS: u32 = 4;
@@ -4993,6 +4994,44 @@ impl Default for sigaltstack {
     }
 }
 pub type stack_t = sigaltstack;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct stat {
+    pub st_dev: __kernel_ulong_t,
+    pub st_ino: __kernel_ulong_t,
+    pub st_nlink: __kernel_ulong_t,
+    pub st_mode: crate::types::c_uint,
+    pub st_uid: crate::types::c_uint,
+    pub st_gid: crate::types::c_uint,
+    pub __pad0: crate::types::c_uint,
+    pub st_rdev: __kernel_ulong_t,
+    pub st_size: __kernel_long_t,
+    pub st_blksize: __kernel_long_t,
+    pub st_blocks: __kernel_long_t,
+    pub st_atime: __kernel_ulong_t,
+    pub st_atime_nsec: __kernel_ulong_t,
+    pub st_mtime: __kernel_ulong_t,
+    pub st_mtime_nsec: __kernel_ulong_t,
+    pub st_ctime: __kernel_ulong_t,
+    pub st_ctime_nsec: __kernel_ulong_t,
+    pub __linux_unused: [__kernel_long_t; 3usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct __old_kernel_stat {
+    pub st_dev: crate::types::c_ushort,
+    pub st_ino: crate::types::c_ushort,
+    pub st_mode: crate::types::c_ushort,
+    pub st_nlink: crate::types::c_ushort,
+    pub st_uid: crate::types::c_ushort,
+    pub st_gid: crate::types::c_ushort,
+    pub st_rdev: crate::types::c_ushort,
+    pub __bindgen_padding_0: [u8; 2usize],
+    pub st_size: crate::types::c_uint,
+    pub st_atime: crate::types::c_uint,
+    pub st_mtime: crate::types::c_uint,
+    pub st_ctime: crate::types::c_uint,
+}
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct ucontext {

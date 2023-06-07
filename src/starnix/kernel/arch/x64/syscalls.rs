@@ -5,7 +5,6 @@
 use fuchsia_runtime::utc_time;
 use fuchsia_zircon as zx;
 
-use super::uapi::stat_t;
 use crate::{
     arch::uapi::epoll_event,
     fs::{
@@ -193,7 +192,7 @@ pub fn sys_link(
 pub fn sys_lstat(
     current_task: &CurrentTask,
     user_path: UserCString,
-    buffer: UserRef<stat_t>,
+    buffer: UserRef<uapi::stat>,
 ) -> Result<(), Errno> {
     // TODO(fxbug.dev/91430): Add the `AT_NO_AUTOMOUNT` flag once it is supported in
     // `sys_newfstatat`.
@@ -271,7 +270,7 @@ pub fn sys_rename(
 pub fn sys_stat(
     current_task: &CurrentTask,
     user_path: UserCString,
-    buffer: UserRef<stat_t>,
+    buffer: UserRef<uapi::stat>,
 ) -> Result<(), Errno> {
     // TODO(fxbug.dev/91430): Add the `AT_NO_AUTOMOUNT` flag once it is supported in
     // `sys_newfstatat`.
