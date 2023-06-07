@@ -35,15 +35,15 @@ class FakeBlockDevice : public ddk::BlockImplProtocol<FakeBlockDevice>,
 
   void BlockImplQueue(block_op_t* txn, block_impl_queue_callback callback, void* cookie) {
     zx_status_t status = ZX_ERR_NOT_SUPPORTED;
-    switch (txn->command) {
-      case BLOCK_OP_READ:
+    switch (txn->command.opcode) {
+      case BLOCK_OPCODE_READ:
         if (txn->rw.length != 1 || txn->rw.offset_dev != 0) {
           status = ZX_ERR_OUT_OF_RANGE;
         } else {
           status = zx_vmo_write(txn->rw.vmo, data_, txn->rw.offset_vmo, sizeof(data_));
         }
         break;
-      case BLOCK_OP_WRITE:
+      case BLOCK_OPCODE_WRITE:
         if (txn->rw.length != 1 || txn->rw.offset_dev != 0) {
           status = ZX_ERR_OUT_OF_RANGE;
         } else {
@@ -51,7 +51,7 @@ class FakeBlockDevice : public ddk::BlockImplProtocol<FakeBlockDevice>,
           flushed_ = status != ZX_OK && flushed_;
         }
         break;
-      case BLOCK_OP_FLUSH:
+      case BLOCK_OPCODE_FLUSH:
         flushed_ = true;
         status = ZX_OK;
         break;
@@ -138,7 +138,7 @@ TEST_F(AbrShimTest, BlockOpsPassedThrough) {
   block_op_t txn{
       .rw =
           {
-              .command = BLOCK_OP_WRITE,
+              .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
               .vmo = vmo.get(),
               .length = 1,
               .offset_dev = 0,
@@ -147,7 +147,9 @@ TEST_F(AbrShimTest, BlockOpsPassedThrough) {
   };
   block_client_.Queue(&txn, block_callback, nullptr);
 
-  txn = {.command = BLOCK_OP_FLUSH};
+  txn = {
+      .command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0},
+  };
   block_client_.Queue(&txn, block_callback, nullptr);
 
   EXPECT_STREQ(fake_block_device_.data(), "Write to block device");
@@ -155,7 +157,7 @@ TEST_F(AbrShimTest, BlockOpsPassedThrough) {
   txn = {
       .rw =
           {
-              .command = BLOCK_OP_READ,
+              .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
               .vmo = vmo.get(),
               .length = 1,
               .offset_dev = 0,
@@ -194,7 +196,7 @@ TEST_F(AbrShimTest, OneShotRecovery) {
   block_op_t txn{
       .rw =
           {
-              .command = BLOCK_OP_READ,
+              .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
               .vmo = vmo.get(),
               .length = 1,
               .offset_dev = 0,

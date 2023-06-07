@@ -331,7 +331,7 @@ TEST_F(AhciTestFixture, FlushWhenCommandQueueEmpty) {
   zx_status_t status = ZX_ERR_IO;  // Value to be overwritten by callback.
 
   SataTransaction txn = {};
-  txn.bop = {.command = BLOCK_OP_FLUSH};
+  txn.bop.command.opcode = BLOCK_OPCODE_FLUSH;
   txn.completion_cb = cb_status;
   txn.cookie = &status;
   txn.cmd = SATA_CMD_FLUSH_EXT;
@@ -374,7 +374,7 @@ TEST_F(AhciTestFixture, FlushWhenWritePrecedingAndReadFollowing) {
   zx_status_t write_status = ZX_ERR_IO;  // Value to be overwritten by callback.
 
   SataTransaction write_txn = {};
-  write_txn.bop = {.command = BLOCK_OP_WRITE};
+  write_txn.bop.command.opcode = BLOCK_OPCODE_WRITE;
   write_txn.completion_cb = cb_status;
   write_txn.cookie = &write_status;
   write_txn.cmd = SATA_CMD_WRITE_FPDMA_QUEUED;
@@ -385,7 +385,7 @@ TEST_F(AhciTestFixture, FlushWhenWritePrecedingAndReadFollowing) {
   zx_status_t flush_status = ZX_ERR_IO;  // Value to be overwritten by callback.
 
   SataTransaction flush_txn = {};
-  flush_txn.bop = {.command = BLOCK_OP_FLUSH};
+  flush_txn.bop.command.opcode = BLOCK_OPCODE_FLUSH;
   flush_txn.completion_cb = cb_status;
   flush_txn.cookie = &flush_status;
   flush_txn.cmd = SATA_CMD_FLUSH_EXT;
@@ -396,7 +396,7 @@ TEST_F(AhciTestFixture, FlushWhenWritePrecedingAndReadFollowing) {
   zx_status_t read_status = ZX_ERR_IO;  // Value to be overwritten by callback.
 
   SataTransaction read_txn = {};
-  read_txn.bop = {.command = BLOCK_OP_READ};
+  read_txn.bop.command.opcode = BLOCK_OPCODE_READ;
   read_txn.completion_cb = cb_status;
   read_txn.cookie = &read_status;
   read_txn.cmd = SATA_CMD_READ_FPDMA_QUEUED;

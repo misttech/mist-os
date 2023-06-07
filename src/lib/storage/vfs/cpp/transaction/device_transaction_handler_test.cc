@@ -89,7 +89,7 @@ TEST_F(TransactionHandlerTest, RunRequestsOneRequest) {
   EXPECT_EQ(2 * kBlockRatio, requests[0].dev_offset);
   EXPECT_EQ(3 * kBlockRatio, requests[0].length);
   EXPECT_EQ(kVmoid, requests[0].vmoid);
-  EXPECT_EQ(unsigned{BLOCK_OP_WRITE}, requests[0].opcode);
+  EXPECT_EQ(unsigned{BLOCK_OPCODE_WRITE}, requests[0].command.opcode);
 }
 
 TEST_F(TransactionHandlerTest, RunRequestsTrim) {
@@ -103,7 +103,7 @@ TEST_F(TransactionHandlerTest, RunRequestsTrim) {
   EXPECT_EQ(2 * kBlockRatio, requests[0].dev_offset);
   EXPECT_EQ(3 * kBlockRatio, requests[0].length);
   EXPECT_EQ(kVmoid, requests[0].vmoid);
-  EXPECT_EQ(unsigned{BLOCK_OP_TRIM}, requests[0].opcode);
+  EXPECT_EQ(unsigned{BLOCK_OPCODE_TRIM}, requests[0].command.opcode);
 }
 
 TEST_F(TransactionHandlerTest, RunRequestsManyRequests) {
@@ -115,19 +115,19 @@ TEST_F(TransactionHandlerTest, RunRequestsManyRequests) {
 
   const std::vector<block_fifo_request_t>& requests = handler_->GetRequests();
   EXPECT_EQ(3u, requests.size());
-  EXPECT_EQ(unsigned{BLOCK_OP_READ}, requests[0].opcode);
+  EXPECT_EQ(unsigned{BLOCK_OPCODE_READ}, requests[0].command.opcode);
   EXPECT_EQ(10, requests[0].vmoid);
   EXPECT_EQ(11 * kBlockRatio, requests[0].vmo_offset);
   EXPECT_EQ(12 * kBlockRatio, requests[0].dev_offset);
   EXPECT_EQ(13 * kBlockRatio, requests[0].length);
 
-  EXPECT_EQ(unsigned{BLOCK_OP_READ}, requests[1].opcode);
+  EXPECT_EQ(unsigned{BLOCK_OPCODE_READ}, requests[1].command.opcode);
   EXPECT_EQ(20u, requests[1].vmoid);
   EXPECT_EQ(24 * kBlockRatio, requests[1].vmo_offset);
   EXPECT_EQ(25 * kBlockRatio, requests[1].dev_offset);
   EXPECT_EQ(26 * kBlockRatio, requests[1].length);
 
-  EXPECT_EQ(unsigned{BLOCK_OP_READ}, requests[2].opcode);
+  EXPECT_EQ(unsigned{BLOCK_OPCODE_READ}, requests[2].command.opcode);
   EXPECT_EQ(30u, requests[2].vmoid);
   EXPECT_EQ(37 * kBlockRatio, requests[2].vmo_offset);
   EXPECT_EQ(38 * kBlockRatio, requests[2].dev_offset);
@@ -145,7 +145,7 @@ TEST_F(TransactionHandlerTest, FlushCallsFlush) {
   handler_->Flush();
   const std::vector<block_fifo_request_t>& requests = handler_->GetRequests();
   EXPECT_EQ(1u, requests.size());
-  EXPECT_EQ(unsigned{BLOCK_OP_FLUSH}, requests[0].opcode);
+  EXPECT_EQ(unsigned{BLOCK_OPCODE_FLUSH}, requests[0].command.opcode);
 }
 
 TEST_F(TransactionHandlerTest, RunRequestsWriteFua) {
@@ -159,7 +159,8 @@ TEST_F(TransactionHandlerTest, RunRequestsWriteFua) {
   EXPECT_EQ(2 * kBlockRatio, requests[0].dev_offset);
   EXPECT_EQ(3 * kBlockRatio, requests[0].length);
   EXPECT_EQ(kVmoid, requests[0].vmoid);
-  EXPECT_EQ(unsigned{BLOCK_OP_WRITE | BLOCK_FL_FORCE_ACCESS}, requests[0].opcode);
+  EXPECT_EQ(unsigned{BLOCK_OPCODE_WRITE}, requests[0].command.opcode);
+  EXPECT_EQ(unsigned{BLOCK_IO_FLAG_FORCE_ACCESS}, requests[0].command.flags);
 }
 
 TEST_F(TransactionHandlerTest, RunRequestsWritePreflushAndFua) {
@@ -174,8 +175,9 @@ TEST_F(TransactionHandlerTest, RunRequestsWritePreflushAndFua) {
   EXPECT_EQ(2 * kBlockRatio, requests[0].dev_offset);
   EXPECT_EQ(3 * kBlockRatio, requests[0].length);
   EXPECT_EQ(kVmoid, requests[0].vmoid);
-  EXPECT_EQ(unsigned{BLOCK_OP_WRITE | BLOCK_FL_PREFLUSH | BLOCK_FL_FORCE_ACCESS},
-            requests[0].opcode);
+  EXPECT_EQ(unsigned{BLOCK_OPCODE_WRITE}, requests[0].command.opcode);
+  EXPECT_EQ(unsigned{BLOCK_IO_FLAG_PREFLUSH | BLOCK_IO_FLAG_FORCE_ACCESS},
+            requests[0].command.flags);
 }
 
 #if ZX_DEBUG_ASSERT_IMPLEMENTED

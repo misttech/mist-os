@@ -27,9 +27,9 @@ zx_status_t extra_op_t::Init(block_op_t* block, block_impl_queue_callback cb, vo
   completion_cb = cb;
   cookie = _cookie;
 
-  switch (block->command & BLOCK_OP_MASK) {
-    case BLOCK_OP_READ:
-    case BLOCK_OP_WRITE:
+  switch (block->command.opcode) {
+    case BLOCK_OPCODE_READ:
+    case BLOCK_OPCODE_WRITE:
       if (add_overflow(block->rw.offset_dev, reserved_blocks, &block->rw.offset_dev)) {
         zxlogf(ERROR, "adjusted offset overflow: block->rw.offset_dev=%" PRIu64 "",
                block->rw.offset_dev);

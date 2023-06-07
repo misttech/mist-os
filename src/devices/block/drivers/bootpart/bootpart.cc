@@ -44,9 +44,9 @@ void BootPartition::BlockImplQuery(block_info_t* out_info, uint64_t* out_block_o
 
 void BootPartition::BlockImplQueue(block_op_t* bop, block_impl_queue_callback completion_cb,
                                    void* cookie) {
-  switch (bop->command & BLOCK_OP_MASK) {
-    case BLOCK_OP_READ:
-    case BLOCK_OP_WRITE: {
+  switch (bop->command.opcode) {
+    case BLOCK_OPCODE_READ:
+    case BLOCK_OPCODE_WRITE: {
       if (zx_status_t status = block::CheckIoRange(bop->rw, block_info_.block_count);
           status != ZX_OK) {
         completion_cb(cookie, status, bop);
@@ -57,7 +57,7 @@ void BootPartition::BlockImplQueue(block_op_t* bop, block_impl_queue_callback co
       bop->rw.offset_dev += zbi_partition_.first_block;
       break;
     }
-    case BLOCK_OP_FLUSH:
+    case BLOCK_OPCODE_FLUSH:
       break;
     default:
       completion_cb(cookie, ZX_ERR_NOT_SUPPORTED, bop);

@@ -86,7 +86,7 @@ TEST_F(BcacheTestWithMockDevice, RunOperation) {
   ASSERT_EQ(bcache_->RunOperation(operation, &buffer), ZX_OK);
 
   block_fifo_request_t request = device_->request();
-  ASSERT_EQ(request.opcode, unsigned{BLOCK_OP_WRITE});
+  ASSERT_EQ(request.command.opcode, unsigned{BLOCK_OPCODE_WRITE});
   ASSERT_EQ(buffer.vmoid(), request.vmoid);
   ASSERT_EQ(bcache_->BlockNumberToDevice(kVmoOffset), request.vmo_offset);
   ASSERT_EQ(bcache_->BlockNumberToDevice(kDeviceOffset), request.dev_offset);
@@ -98,7 +98,7 @@ TEST_F(BcacheTestWithMockDevice, RunOperation) {
   ASSERT_EQ(bcache_->RunOperation(operation, &buffer), ZX_OK);
 
   request = device_->request();
-  ASSERT_EQ(request.opcode, unsigned{BLOCK_OP_READ});
+  ASSERT_EQ(request.command.opcode, unsigned{BLOCK_OPCODE_READ});
   ASSERT_EQ(buffer.vmoid(), request.vmoid);
   ASSERT_EQ(bcache_->BlockNumberToDevice(kVmoOffset), request.vmo_offset);
   ASSERT_EQ(bcache_->BlockNumberToDevice(kDeviceOffset), request.dev_offset);

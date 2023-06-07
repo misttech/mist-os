@@ -606,20 +606,20 @@ int UsbMassStorageDevice::WorkerThread(ddk::InitTxn&& init_txn) {
       // Device is absent (likely been removed).
       status = ZX_ERR_PEER_CLOSED;
     } else {
-      switch (op.command & BLOCK_OP_MASK) {
-        case BLOCK_OP_READ:
+      switch (op.command.opcode) {
+        case BLOCK_OPCODE_READ:
           if ((status = DoTransaction(txn, USB_DIR_IN, bulk_in_addr_, "Read")) != ZX_OK) {
             zxlogf(ERROR, "UMS: Read of %u @ %zu failed: %s", op.rw.length, op.rw.offset_dev,
                    zx_status_get_string(status));
           }
           break;
-        case BLOCK_OP_WRITE:
+        case BLOCK_OPCODE_WRITE:
           if ((status = DoTransaction(txn, USB_DIR_OUT, bulk_out_addr_, "Write")) != ZX_OK) {
             zxlogf(ERROR, "UMS: Write of %u @ %zu failed: %s", op.rw.length, op.rw.offset_dev,
                    zx_status_get_string(status));
           }
           break;
-        case BLOCK_OP_FLUSH:
+        case BLOCK_OPCODE_FLUSH:
           if ((status = DoTransaction(txn, USB_DIR_OUT, 0, "Flush")) != ZX_OK) {
             zxlogf(ERROR, "UMS: Flush failed: %s", zx_status_get_string(status));
           }
@@ -649,12 +649,12 @@ int UsbMassStorageDevice::WorkerThread(ddk::InitTxn&& init_txn) {
   Transaction* txn;
   while ((txn = list_remove_head_type(&queued_txns_, Transaction, node)) != NULL) {
     const block_op_t& op = txn->disk_op.op;
-    switch (op.command & BLOCK_OP_MASK) {
-      case BLOCK_OP_READ:
+    switch (op.command.opcode) {
+      case BLOCK_OPCODE_READ:
         zxlogf(ERROR, "UMS: read of %u @ %zu discarded during unbind", op.rw.length,
                op.rw.offset_dev);
         break;
-      case BLOCK_OP_WRITE:
+      case BLOCK_OPCODE_WRITE:
         zxlogf(ERROR, "UMS: write of %u @ %zu discarded during unbind", op.rw.length,
                op.rw.offset_dev);
         break;

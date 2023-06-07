@@ -164,7 +164,7 @@ zx_status_t Bcache::Trim(block_t start, block_t num) {
   }
 
   block_fifo_request_t request = {
-      .opcode = BLOCK_OP_TRIM,
+      .command = {.opcode = BLOCK_OPCODE_TRIM, .flags = 0},
       .vmoid = BLOCK_VMOID_INVALID,
       .length = static_cast<uint32_t>(BlockNumberToDevice(num)),
       .vmo_offset = 0,

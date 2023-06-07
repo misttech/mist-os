@@ -43,7 +43,7 @@ zx_status_t BlockDevice::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
 void BlockDevice::UpdateStats(bool success, zx::ticks start_tick, block_op_t* op) {
   uint64_t bytes_transfered = op->rw.length * info_.block_size;
   fbl::AutoLock lock(&stat_lock_);
-  stats_.UpdateStats(success, start_tick, op->command, bytes_transfered);
+  stats_.UpdateStats(success, start_tick, op->command.opcode, bytes_transfered);
 }
 
 // Define the maximum I/O possible for the midlayer; this is arbitrarily
@@ -71,7 +71,8 @@ zx_status_t BlockDevice::DoIo(zx::vmo& vmo, size_t buf_len, zx_off_t off, zx_off
     size_t sub_txn_length = std::min(buf_len - sub_txn_offset, max_xfer);
 
     block_op_t* op = reinterpret_cast<block_op_t*>(io_op_.get());
-    op->command = write ? BLOCK_OP_WRITE : BLOCK_OP_READ;
+    const uint8_t opcode = write ? BLOCK_OPCODE_WRITE : BLOCK_OPCODE_READ;
+    op->command = {.opcode = opcode, .flags = 0};
     ZX_DEBUG_ASSERT(sub_txn_length / block_size < std::numeric_limits<uint32_t>::max());
     op->rw.length = static_cast<uint32_t>(sub_txn_length / block_size);
     op->rw.vmo = vmo.get();

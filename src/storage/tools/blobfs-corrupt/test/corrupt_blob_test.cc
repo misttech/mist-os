@@ -84,13 +84,13 @@ void MockBlockDevice::WriteBlock(uint64_t block_num, uint64_t fs_block_size, con
   block_fifo_request_t requests[2] = {};
 
   ASSERT_TRUE(fs_block_size % block_size_ == 0);
-  requests[0].opcode = BLOCK_OP_WRITE;
+  requests[0].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   requests[0].vmoid = vmoid.get();
   requests[0].length = static_cast<uint32_t>(fs_block_size / block_size_);
   requests[0].vmo_offset = 0;
   requests[0].dev_offset = block_num * fs_block_size / block_size_;
 
-  requests[1].opcode = BLOCK_OP_CLOSE_VMO;
+  requests[1].command = {.opcode = BLOCK_OPCODE_CLOSE_VMO, .flags = 0};
   requests[1].vmoid = vmoid.TakeId();
 
   ASSERT_OK(FifoTransaction(requests, std::size(requests)));

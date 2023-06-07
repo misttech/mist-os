@@ -239,7 +239,7 @@ class Target {
       ZX_DEBUG_ASSERT(variant_ == Variant::kBlock && block_);
       block_fifo_request_t request;
       request.vmoid = vmoid_.TakeId();
-      request.opcode = BLOCK_OP_CLOSE_VMO;
+      request.command = {.opcode = BLOCK_OPCODE_CLOSE_VMO, .flags = 0};
       if (zx_status_t status = block_->Transaction(&request, 1); status != ZX_OK) {
         fprintf(stderr, "Failed to detach VMO: %s\n", zx_status_get_string(status));
       }
@@ -336,7 +336,7 @@ class Target {
       case Variant::kBlock: {
         block_fifo_request_t request;
         request.vmoid = vmoid_.get();
-        request.opcode = BLOCK_OP_READ;
+        request.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
         request.length = nblocks;
         request.vmo_offset = 0;
         request.dev_offset = cur_block_;
@@ -386,7 +386,7 @@ class Target {
       case Variant::kBlock: {
         block_fifo_request_t request;
         request.vmoid = vmoid_.get();
-        request.opcode = BLOCK_OP_WRITE;
+        request.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
         request.length = nblocks;
         request.vmo_offset = 0;
         request.dev_offset = cur_block_;

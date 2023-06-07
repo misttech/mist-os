@@ -353,7 +353,7 @@ class VmoBuf {
   ~VmoBuf() {
     if (vmo_.is_valid()) {
       block_fifo_request_t request = {
-          .opcode = BLOCK_OP_CLOSE_VMO,
+          .command = {.opcode = BLOCK_OPCODE_CLOSE_VMO, .flags = 0},
           .group = client_->group(),
           .vmoid = vmoid_.TakeId(),
       };
@@ -409,7 +409,7 @@ void VmoClient::CheckWrite(VmoBuf& vbuf, size_t buf_off, size_t dev_off, size_t 
 
   // Write to the block device
   block_fifo_request_t request = {
-      .opcode = BLOCK_OP_WRITE,
+      .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
       .group = group(),
       .vmoid = vbuf.vmoid_.get(),
       .length = static_cast<uint32_t>(len / block_size_),
@@ -432,7 +432,7 @@ void VmoClient::CheckRead(VmoBuf& vbuf, size_t buf_off, size_t dev_off, size_t l
 
   // Read from the block device
   block_fifo_request_t request = {
-      .opcode = BLOCK_OP_READ,
+      .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
       .group = group(),
       .vmoid = vbuf.vmoid_.get(),
       .length = static_cast<uint32_t>(len / block_size_),

@@ -45,12 +45,14 @@ void BlockCompleteCb(void* cookie, zx_status_t status, block_op_t* bop) {
   msg.reset();
 }
 
-uint32_t OpcodeAndFlagsToCommand(uint32_t opcode) {
-  const uint32_t shared = BLOCK_OP_MASK | BLOCK_FLAG_MASK;
-  // BLOCK_GROUP_LAST and BLOCK_GROUP_ITEM are used in block_client, and these flags are not used in
-  // block driver.
-  const uint32_t group_mask = BLOCK_GROUP_LAST | BLOCK_GROUP_ITEM;
-  return (opcode & shared) & ~group_mask;
+block_command_t OpcodeAndFlagsToCommand(block_fifo_command_t command) {
+  // BLOCK_IO_FLAG_GROUP_LAST and BLOCK_IO_FLAG_GROUP_ITEM are used in block_client, and these flags
+  // are not used in block driver.
+  const uint32_t group_mask = BLOCK_IO_FLAG_GROUP_LAST | BLOCK_IO_FLAG_GROUP_ITEM;
+  return {
+      .opcode = command.opcode,
+      .flags = command.flags & ~group_mask,
+  };
 }
 
 }  // namespace
@@ -325,7 +327,7 @@ zx_status_t Server::ProcessReadWriteRequest(block_fifo_request_t* request, bool 
       len_remaining -= length;
 
       *msg->Op() = block_op{.rw = {
-                                .command = OpcodeAndFlagsToCommand(request->opcode),
+                                .command = OpcodeAndFlagsToCommand(request->command),
                                 .vmo = iobuf->vmo(),
                                 .length = length,
                                 .offset_dev = dev_offset,
@@ -368,7 +370,7 @@ zx_status_t Server::ProcessReadWriteRequest(block_fifo_request_t* request, bool 
     }
 
     *msg->Op() = block_op{.rw = {
-                              .command = OpcodeAndFlagsToCommand(request->opcode),
+                              .command = OpcodeAndFlagsToCommand(request->command),
                               .vmo = iobuf->vmo(),
                               .length = request->length,
                               .offset_dev = request->dev_offset,
@@ -387,18 +389,18 @@ zx_status_t Server::ProcessReadWriteRequestWithFlush(block_fifo_request_t* reque
   // 2. Device has writeback cache but doesn't support FUA command
   //    => Issue (Pre)Flush + Write + (Post)Flush(w/ completion) commands
   bool need_preflush = false, need_postflush = false;
-  if (request->opcode & BLOCK_FL_PREFLUSH) {
-    // The BLOCK_FL_PREFLUSH flag is not used by the device. Therefore, clear the BLOCK_FL_PREFLUSH
-    // flag.
-    request->opcode &= ~BLOCK_FL_PREFLUSH;
+  if (request->command.flags & BLOCK_IO_FLAG_PREFLUSH) {
+    // The BLOCK_IO_FLAG_PREFLUSH flag is not used by the device. Therefore, clear the
+    // BLOCK_IO_FLAG_PREFLUSH flag.
+    request->command.flags &= ~BLOCK_IO_FLAG_PREFLUSH;
     need_preflush = true;
   }
 
-  if ((request->opcode & BLOCK_FL_FORCE_ACCESS) && !(info_.flags & FLAG_FUA_SUPPORT)) {
-    // If the device does not support the FUA command, clear the BLOCK_FL_FORCE_ACCESS flag and
+  if ((request->command.flags & BLOCK_IO_FLAG_FORCE_ACCESS) && !(info_.flags & FLAG_FUA_SUPPORT)) {
+    // If the device does not support the FUA command, clear the BLOCK_IO_FLAG_FORCE_ACCESS flag and
     // send the (Post)Flush command. A completion for the request must be sent after the last
     // (Post)Flush is completed.
-    request->opcode &= ~BLOCK_FL_FORCE_ACCESS;
+    request->command.flags &= ~BLOCK_IO_FLAG_FORCE_ACCESS;
     need_postflush = true;
   }
 
@@ -455,9 +457,9 @@ zx_status_t Server::IssueFlushCommand(block_fifo_request_t* request, MessageComp
     return status;
   }
   if (internal_cmd) {
-    msg->Op()->command = BLOCK_OP_FLUSH;
+    msg->Op()->command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0};
   } else {
-    msg->Op()->command = OpcodeAndFlagsToCommand(request->opcode);
+    msg->Op()->command = OpcodeAndFlagsToCommand(request->command);
   }
   Enqueue(std::move(msg));
   return ZX_OK;
@@ -486,7 +488,7 @@ zx_status_t Server::ProcessTrimRequest(block_fifo_request_t* request) {
   if (status != ZX_OK) {
     return status;
   }
-  msg->Op()->command = OpcodeAndFlagsToCommand(request->opcode);
+  msg->Op()->command = OpcodeAndFlagsToCommand(request->command);
   msg->Op()->trim.length = request->length;
   msg->Op()->trim.offset_dev = request->dev_offset;
   Enqueue(std::move(msg));
@@ -494,32 +496,32 @@ zx_status_t Server::ProcessTrimRequest(block_fifo_request_t* request) {
 }
 
 void Server::ProcessRequest(block_fifo_request_t* request) {
-  TRACE_DURATION("storage", "Server::ProcessRequest", "opcode", request->opcode);
+  TRACE_DURATION("storage", "Server::ProcessRequest", "opcode", request->command.opcode);
   if (request->trace_flow_id) {
     TRACE_FLOW_STEP("storage", "BlockOp", request->trace_flow_id);
   }
-  switch (request->opcode & BLOCK_OP_MASK) {
-    case BLOCK_OP_READ:
-    case BLOCK_OP_WRITE:
+  switch (request->command.opcode) {
+    case BLOCK_OPCODE_READ:
+    case BLOCK_OPCODE_WRITE:
       if (zx_status_t status = ProcessReadWriteRequestWithFlush(request); status != ZX_OK) {
         FinishTransaction(status, request->reqid, request->group);
       }
       break;
-    case BLOCK_OP_FLUSH:
+    case BLOCK_OPCODE_FLUSH:
       if (zx_status_t status = ProcessFlushRequest(request); status != ZX_OK) {
         FinishTransaction(status, request->reqid, request->group);
       }
       break;
-    case BLOCK_OP_TRIM:
+    case BLOCK_OPCODE_TRIM:
       if (zx_status_t status = ProcessTrimRequest(request); status != ZX_OK) {
         FinishTransaction(status, request->reqid, request->group);
       }
       break;
-    case BLOCK_OP_CLOSE_VMO:
+    case BLOCK_OPCODE_CLOSE_VMO:
       FinishTransaction(ProcessCloseVmoRequest(request), request->reqid, request->group);
       break;
     default:
-      zxlogf(WARNING, "Unrecognized block server operation: %d", request->opcode);
+      zxlogf(WARNING, "Unrecognized block server operation: %d", request->command.opcode);
       FinishTransaction(ZX_ERR_NOT_SUPPORTED, request->reqid, request->group);
   }
 }
@@ -533,8 +535,8 @@ zx_status_t Server::Serve() {
     }
 
     for (size_t i = 0; i < count; i++) {
-      bool wants_reply = requests[i].opcode & BLOCK_GROUP_LAST;
-      bool use_group = requests[i].opcode & BLOCK_GROUP_ITEM;
+      bool wants_reply = requests[i].command.flags & BLOCK_IO_FLAG_GROUP_LAST;
+      bool use_group = requests[i].command.flags & BLOCK_IO_FLAG_GROUP_ITEM;
 
       reqid_t reqid = requests[i].reqid;
 

@@ -344,7 +344,7 @@ class BlockDeviceTest : public zxtest::Test {
     Operation operation(op_size(), this);
     ASSERT_TRUE(operation.SetVmo());
     auto* op = operation.GetOperation();
-    op->rw.command = BLOCK_OP_READ;
+    op->rw.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
     op->rw.length = 1;
     op->rw.offset_dev = 0;
     device_->BlockImplQueue(op, &BlockDeviceTest::CompletionCb, &operation);
@@ -357,7 +357,7 @@ class BlockDeviceTest : public zxtest::Test {
     Operation operation(op_size(), this);
     ASSERT_TRUE(operation.SetVmo());
     auto* op = operation.GetOperation();
-    op->rw.command = BLOCK_OP_WRITE;
+    op->rw.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
     op->rw.length = 1;
     op->rw.offset_dev = 0;
     memset(operation.buffer(), kMagic, kPageSize);
@@ -371,7 +371,7 @@ class BlockDeviceTest : public zxtest::Test {
     Operation operation(op_size(), this);
     ASSERT_TRUE(operation.SetVmo());
     auto* op = operation.GetOperation();
-    op->rw.command = BLOCK_OP_FLUSH;
+    op->rw.command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0};
     device_->BlockImplQueue(op, &BlockDeviceTest::CompletionCb, &operation);
 
     ASSERT_TRUE(Wait());
@@ -382,7 +382,7 @@ class BlockDeviceTest : public zxtest::Test {
     Operation operation(op_size(), this);
     ASSERT_TRUE(operation.SetVmo());
     auto* op = operation.GetOperation();
-    op->trim.command = BLOCK_OP_TRIM;
+    op->trim.command = {.opcode = BLOCK_OPCODE_TRIM, .flags = 0};
     op->trim.length = 1;
     op->trim.offset_dev = kNumPages - 1;
     device_->BlockImplQueue(op, &BlockDeviceTest::CompletionCb, &operation);
@@ -425,7 +425,7 @@ TEST_F(BlockDeviceTest, QueueOne) {
   block_op_t* op = operation.GetOperation();
   ASSERT_TRUE(op);
 
-  op->rw.command = BLOCK_OP_READ;
+  op->rw.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   device->BlockImplQueue(op, &BlockDeviceTest::CompletionCb, &operation);
 
   ASSERT_TRUE(Wait());
@@ -459,7 +459,7 @@ TEST_F(BlockDeviceTest, ReadWrite) {
   block_op_t* op = operation.GetOperation();
   ASSERT_TRUE(op);
 
-  op->rw.command = BLOCK_OP_READ;
+  op->rw.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   op->rw.length = 2;
   op->rw.offset_dev = 3;
   ASSERT_TRUE(operation.SetVmo());
@@ -474,7 +474,7 @@ TEST_F(BlockDeviceTest, ReadWrite) {
   EXPECT_EQ(3, volume->first_page());
   EXPECT_TRUE(CheckPattern(operation.buffer(), kPageSize * 2));
 
-  op->rw.command = BLOCK_OP_WRITE;
+  op->rw.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   op->rw.length = 4;
   op->rw.offset_dev = 5;
   memset(operation.buffer(), kMagic, kPageSize * 5);
@@ -496,7 +496,7 @@ TEST_F(BlockDeviceTest, Trim) {
   block_op_t* op = operation.GetOperation();
   ASSERT_TRUE(op);
 
-  op->trim.command = BLOCK_OP_TRIM;
+  op->trim.command = {.opcode = BLOCK_OPCODE_TRIM, .flags = 0};
   device->BlockImplQueue(op, &BlockDeviceTest::CompletionCb, &operation);
 
   ASSERT_TRUE(Wait());
@@ -528,7 +528,7 @@ TEST_F(BlockDeviceTest, Flush) {
   block_op_t* op = operation.GetOperation();
   ASSERT_TRUE(op);
 
-  op->rw.command = BLOCK_OP_FLUSH;
+  op->rw.command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0};
   device->BlockImplQueue(op, &BlockDeviceTest::CompletionCb, &operation);
 
   ASSERT_TRUE(Wait());
@@ -549,7 +549,7 @@ TEST_F(BlockDeviceTest, QueueMultiple) {
     block_op_t* op = operation.GetOperation();
     ASSERT_TRUE(op);
 
-    op->rw.command = BLOCK_OP_READ;
+    op->rw.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
     op->rw.length = 1;
     op->rw.offset_dev = i;
     ASSERT_TRUE(operation.SetVmo());

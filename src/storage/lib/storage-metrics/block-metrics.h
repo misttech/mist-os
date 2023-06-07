@@ -71,8 +71,7 @@ class BlockDeviceMetrics : public storage_metrics::Metrics {
     flush_.UpdateCallStat(success, delta_time, bytes_transferred);
   }
 
-  void UpdateStats(bool success, zx::ticks start_tick, uint32_t command,
-                   uint64_t bytes_transferred);
+  void UpdateStats(bool success, zx::ticks start_tick, uint8_t opcode, uint64_t bytes_transferred);
 
   // Total number of successful, failed, sum of successful and failed calls is returned if
   // |success| is true, false or nullopt, respectively.

@@ -39,7 +39,7 @@ TEST(WriterTest, Write) {
   ASSERT_EQ(writer.Write(0, kBufferSize, buf.data()), ZX_OK);
 
   block_fifo_request_t request{
-      .opcode = BLOCK_OP_READ,
+      .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
       .vmoid = vmoid.get(),
       .length = kBufferSize / kBlockSize,
   };

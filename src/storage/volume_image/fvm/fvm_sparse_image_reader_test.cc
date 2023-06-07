@@ -83,7 +83,7 @@ TEST(FvmSparseImageReaderTest, PartitionsInImagePassFsck) {
   // Initialize the entire ramdisk with a filler (that isn't zero).
   for (uint64_t offset = 0; offset < disk_size; offset += kInitialVmoSize) {
     block_fifo_request_t request = {
-        .opcode = BLOCK_OP_WRITE,
+        .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
         .vmoid = vmo_id,
         .length =
             static_cast<uint32_t>(std::min(disk_size - offset, kInitialVmoSize) / kDeviceBlockSize),
@@ -106,10 +106,12 @@ TEST(FvmSparseImageReaderTest, PartitionsInImagePassFsck) {
     ASSERT_TRUE(result.is_ok()) << result.error();
 
     // Write the mapping to the ram disk.
-    block_fifo_request_t request = {.opcode = BLOCK_OP_WRITE,
-                                    .vmoid = vmo_id,
-                                    .length = static_cast<uint32_t>(map.count / kDeviceBlockSize),
-                                    .dev_offset = map.target / kDeviceBlockSize};
+    block_fifo_request_t request = {
+        .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
+        .vmoid = vmo_id,
+        .length = static_cast<uint32_t>(map.count / kDeviceBlockSize),
+        .dev_offset = map.target / kDeviceBlockSize,
+    };
 
     ASSERT_EQ(client->FifoTransaction(&request, 1), ZX_OK)
         << "length=" << request.length << ", dev_offset=" << request.dev_offset;

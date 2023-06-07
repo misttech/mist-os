@@ -66,21 +66,21 @@ void FakeBlockDevice::BlockQueue(block_op_t* operation, block_queue_callback com
 }
 
 zx_status_t FakeBlockDevice::BlockQueueOp(block_op_t* op) {
-  const uint32_t command = op->command & BLOCK_OP_MASK;
+  const uint8_t opcode = op->command.opcode;
   const uint32_t bsize = info_.block_size;
-  if (command == BLOCK_OP_READ || command == BLOCK_OP_WRITE) {
+  if (opcode == BLOCK_OPCODE_READ || opcode == BLOCK_OPCODE_WRITE) {
     if ((op->rw.offset_dev + op->rw.length) > (bsize * info_.block_count)) {
       return ZX_ERR_OUT_OF_RANGE;
     }
-    if (command == BLOCK_OP_WRITE) {
+    if (opcode == BLOCK_OPCODE_WRITE) {
       return ZX_OK;
     }
-  } else if (command == BLOCK_OP_TRIM) {
+  } else if (opcode == BLOCK_OPCODE_TRIM) {
     if ((op->trim.offset_dev + op->trim.length) > (bsize * info_.block_count)) {
       return ZX_ERR_OUT_OF_RANGE;
     }
     return ZX_OK;
-  } else if (command == BLOCK_OP_FLUSH) {
+  } else if (opcode == BLOCK_OPCODE_FLUSH) {
     return ZX_OK;
   } else {
     return ZX_ERR_NOT_SUPPORTED;
@@ -425,7 +425,7 @@ TEST_F(GptDeviceTest, BlockOpsPropagate) {
   ASSERT_OK(zx::vmo::create(4 * block_info.block_size, 0, &vmo));
 
   block_op_t op = {};
-  op.rw.command = BLOCK_OP_READ;
+  op.rw.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   op.rw.vmo = vmo.get();
   op.rw.length = 4;
   op.rw.offset_dev = 1000;
@@ -435,12 +435,12 @@ TEST_F(GptDeviceTest, BlockOpsPropagate) {
   sync_completion_wait(&result.completion, ZX_TIME_INFINITE);
   sync_completion_reset(&result.completion);
 
-  EXPECT_EQ(result.op.command, BLOCK_OP_READ);
+  EXPECT_EQ(result.op.command.opcode, BLOCK_OPCODE_READ);
   EXPECT_EQ(result.op.rw.length, 4);
   EXPECT_EQ(result.op.rw.offset_dev, 2048 + 1000);
   EXPECT_OK(result.status);
 
-  op.rw.command = BLOCK_OP_WRITE;
+  op.rw.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   op.rw.vmo = vmo.get();
   op.rw.length = 4;
   op.rw.offset_dev = 5000;
@@ -449,12 +449,12 @@ TEST_F(GptDeviceTest, BlockOpsPropagate) {
   sync_completion_wait(&result.completion, ZX_TIME_INFINITE);
   sync_completion_reset(&result.completion);
 
-  EXPECT_EQ(result.op.command, BLOCK_OP_WRITE);
+  EXPECT_EQ(result.op.command.opcode, BLOCK_OPCODE_WRITE);
   EXPECT_EQ(result.op.rw.length, 4);
   EXPECT_EQ(result.op.rw.offset_dev, 22528 + 5000);
   EXPECT_OK(result.status);
 
-  op.trim.command = BLOCK_OP_TRIM;
+  op.trim.command = {.opcode = BLOCK_OPCODE_TRIM, .flags = 0};
   op.trim.length = 16;
   op.trim.offset_dev = 10000;
 
@@ -462,18 +462,18 @@ TEST_F(GptDeviceTest, BlockOpsPropagate) {
   sync_completion_wait(&result.completion, ZX_TIME_INFINITE);
   sync_completion_reset(&result.completion);
 
-  EXPECT_EQ(result.op.command, BLOCK_OP_TRIM);
+  EXPECT_EQ(result.op.command.opcode, BLOCK_OPCODE_TRIM);
   EXPECT_EQ(result.op.trim.length, 16);
   EXPECT_EQ(result.op.trim.offset_dev, 2048 + 10000);
   EXPECT_OK(result.status);
 
-  op.command = BLOCK_OP_FLUSH;
+  op.command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0};
 
   dev1->BlockImplQueue(&op, BlockOpCompleter, &result);
   sync_completion_wait(&result.completion, ZX_TIME_INFINITE);
   sync_completion_reset(&result.completion);
 
-  EXPECT_EQ(result.op.command, BLOCK_OP_FLUSH);
+  EXPECT_EQ(result.op.command.opcode, BLOCK_OPCODE_FLUSH);
   EXPECT_OK(result.status);
 }
 
@@ -512,7 +512,7 @@ TEST_F(GptDeviceTest, BlockOpsOutOfBounds) {
   ASSERT_OK(zx::vmo::create(4 * block_info.block_size, 0, &vmo));
 
   block_op_t op = {};
-  op.rw.command = BLOCK_OP_READ;
+  op.rw.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   op.rw.vmo = vmo.get();
   op.rw.length = 4;
   op.rw.offset_dev = 20481;
@@ -524,7 +524,7 @@ TEST_F(GptDeviceTest, BlockOpsOutOfBounds) {
 
   EXPECT_NOT_OK(result.status);
 
-  op.rw.command = BLOCK_OP_WRITE;
+  op.rw.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   op.rw.vmo = vmo.get();
   op.rw.length = 4;
   op.rw.offset_dev = 20478;
@@ -535,7 +535,7 @@ TEST_F(GptDeviceTest, BlockOpsOutOfBounds) {
 
   EXPECT_NOT_OK(result.status);
 
-  op.trim.command = BLOCK_OP_TRIM;
+  op.trim.command = {.opcode = BLOCK_OPCODE_TRIM, .flags = 0};
   op.trim.length = 18434;
   op.trim.offset_dev = 0;
 

@@ -29,7 +29,7 @@ constexpr size_t kQemuMaxTransferBlocks = 1024;  // Linux kernel limit
 static void SataIdentifyDeviceComplete(void* cookie, zx_status_t status, block_op_t* op) {
   // Use the 32-bit command field to shuttle the status back to the callsite that's waiting on the
   // completion. This works despite the int32_t (zx_status_t) vs. uint32_t (command) mismatch.
-  op->command = status;
+  op->command.flags = status;
   sync_completion_signal(static_cast<sync_completion_t*>(cookie));
 }
 
@@ -65,7 +65,7 @@ zx_status_t SataDevice::Init() {
 
   sync_completion_t completion;
   SataTransaction txn = {};
-  txn.bop.rw.command = BLOCK_OP_READ;
+  txn.bop.rw.command.opcode = BLOCK_OPCODE_READ;
   txn.bop.rw.vmo = vmo.get();
   txn.bop.rw.length = 1;
   txn.bop.rw.offset_dev = 0;
@@ -78,7 +78,7 @@ zx_status_t SataDevice::Init() {
   controller_->Queue(port_, &txn);
   sync_completion_wait(&completion, ZX_TIME_INFINITE);
 
-  status = txn.bop.command;
+  status = txn.bop.command.flags;
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: Failed IDENTIFY_DEVICE: %s", DriverName().c_str(),
            zx_status_get_string(status));
@@ -216,20 +216,20 @@ void SataDevice::BlockImplQueue(block_op_t* bop, block_impl_queue_callback compl
   txn->completion_cb = completion_cb;
   txn->cookie = cookie;
 
-  switch (BLOCK_OP(bop->command)) {
-    case BLOCK_OP_READ:
-    case BLOCK_OP_WRITE:
+  switch (bop->command.opcode) {
+    case BLOCK_OPCODE_READ:
+    case BLOCK_OPCODE_WRITE:
       if (zx_status_t status = block::CheckIoRange(bop->rw, info_.block_count); status != ZX_OK) {
         txn->Complete(status);
         return;
       }
-      if (!(info_.flags & FLAG_FUA_SUPPORT) && (bop->command & BLOCK_FL_FORCE_ACCESS)) {
+      if (!(info_.flags & FLAG_FUA_SUPPORT) && (bop->command.flags & BLOCK_IO_FLAG_FORCE_ACCESS)) {
         txn->Complete(ZX_ERR_NOT_SUPPORTED);
         return;
       }
 
       txn->device = 0x40;
-      if (BLOCK_OP(bop->command) == BLOCK_OP_READ) {
+      if (bop->command.opcode == BLOCK_OPCODE_READ) {
         if (use_command_queue_) {
           txn->cmd = SATA_CMD_READ_FPDMA_QUEUED;
         } else {
@@ -238,18 +238,18 @@ void SataDevice::BlockImplQueue(block_op_t* bop, block_impl_queue_callback compl
       } else {
         if (use_command_queue_) {
           txn->cmd = SATA_CMD_WRITE_FPDMA_QUEUED;
-          if (bop->command & BLOCK_FL_FORCE_ACCESS) {
+          if (bop->command.flags & BLOCK_IO_FLAG_FORCE_ACCESS) {
             txn->device |= 1 << 7;  // Set FUA
           }
         } else {
-          txn->cmd = (bop->command & BLOCK_FL_FORCE_ACCESS) ? SATA_CMD_WRITE_DMA_FUA_EXT
-                                                            : SATA_CMD_WRITE_DMA_EXT;
+          txn->cmd = (bop->command.flags & BLOCK_IO_FLAG_FORCE_ACCESS) ? SATA_CMD_WRITE_DMA_FUA_EXT
+                                                                       : SATA_CMD_WRITE_DMA_EXT;
         }
       }
 
-      zxlogf(DEBUG, "sata: queue op 0x%x txn %p", bop->command, txn);
+      zxlogf(DEBUG, "sata: queue op 0x%x txn %p", bop->command.opcode, txn);
       break;
-    case BLOCK_OP_FLUSH:
+    case BLOCK_OPCODE_FLUSH:
       txn->cmd = SATA_CMD_FLUSH_EXT;
       txn->device = 0x00;
       zxlogf(DEBUG, "sata: queue FLUSH txn %p", txn);

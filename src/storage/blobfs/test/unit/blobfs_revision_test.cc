@@ -90,7 +90,7 @@ TEST_F(BlobfsTestAtRev4, WontReadRev2) {
     storage::VmoBuffer buffer;
     ASSERT_EQ(buffer.Initialize(device.get(), 1, kBlobfsBlockSize, "test_buffer"), ZX_OK);
     block_fifo_request_t request{
-        .opcode = BLOCK_OP_READ,
+        .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
         .vmoid = buffer.vmoid(),
         .length = kBlobfsBlockSize / kBlockSize,
         .vmo_offset = 0,
@@ -102,7 +102,7 @@ TEST_F(BlobfsTestAtRev4, WontReadRev2) {
     Superblock* info = reinterpret_cast<Superblock*>(buffer.Data(0));
     info->oldest_minor_version = kBlobfsMinorVersionBackupSuperblock;
 
-    request.opcode = BLOCK_OP_WRITE;
+    request.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
     ASSERT_EQ(device->FifoTransaction(&request, 1), ZX_OK);
   }
 

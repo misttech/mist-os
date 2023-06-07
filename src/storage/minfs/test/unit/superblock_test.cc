@@ -80,12 +80,12 @@ void FillSuperblockFields(Superblock* info) {
 void FillWriteRequest(MockTransactionHandler* transaction_handler, uint32_t first_block_location,
                       uint32_t second_block_location, vmoid_t vmoid,
                       block_fifo_request_t* out_requests) {
-  out_requests[0].opcode = BLOCK_OP_WRITE;
+  out_requests[0].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   out_requests[0].vmoid = vmoid;
   out_requests[0].length = 1;
   out_requests[0].vmo_offset = 0;
   out_requests[0].dev_offset = first_block_location;
-  out_requests[1].opcode = BLOCK_OP_WRITE;
+  out_requests[1].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   out_requests[1].vmoid = vmoid;
   out_requests[1].length = 1;
   out_requests[1].vmo_offset = 1;

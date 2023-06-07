@@ -312,7 +312,7 @@ VnodeMinfs::~VnodeMinfs() {
   block_fifo_request_t request[2];
   if (vmoid_.IsAttached()) {
     request[request_count].vmoid = vmoid_.TakeId();
-    request[request_count].opcode = BLOCK_OP_CLOSE_VMO;
+    request[request_count].command = {.opcode = BLOCK_OPCODE_CLOSE_VMO, .flags = 0};
     request_count++;
   }
   if (request_count) {

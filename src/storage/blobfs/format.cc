@@ -231,26 +231,26 @@ zx_status_t WriteFilesystemToDisk(BlockDevice* device, const Superblock& superbl
       std::is_same_v<RequestLengthType, uint32_t>,
       "Type of length field for block FIFO request has changed, validate conversions below.");
 
-  requests[0].opcode = BLOCK_OP_WRITE;
+  requests[0].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   requests[0].vmoid = vmoid.get();
   requests[0].length =
       safemath::checked_cast<RequestLengthType>(FsToDeviceBlocks(superblock_blocks));
   requests[0].vmo_offset = FsToDeviceBlocks(0);
   requests[0].dev_offset = FsToDeviceBlocks(0);
 
-  requests[1].opcode = BLOCK_OP_WRITE;
+  requests[1].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   requests[1].vmoid = vmoid.get();
   requests[1].length = safemath::checked_cast<RequestLengthType>(FsToDeviceBlocks(blockmap_blocks));
   requests[1].vmo_offset = FsToDeviceBlocks(superblock_blocks);
   requests[1].dev_offset = FsToDeviceBlocks(BlockMapStartBlock(superblock));
 
-  requests[2].opcode = BLOCK_OP_WRITE;
+  requests[2].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   requests[2].vmoid = vmoid.get();
   requests[2].length = safemath::checked_cast<RequestLengthType>(FsToDeviceBlocks(nodemap_blocks));
   requests[2].vmo_offset = FsToDeviceBlocks(superblock_blocks + blockmap_blocks);
   requests[2].dev_offset = FsToDeviceBlocks(NodeMapStartBlock(superblock));
 
-  requests[3].opcode = BLOCK_OP_WRITE;
+  requests[3].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   requests[3].vmoid = vmoid.get();
   requests[3].length = safemath::checked_cast<RequestLengthType>(FsToDeviceBlocks(journal_blocks));
   requests[3].vmo_offset = FsToDeviceBlocks(superblock_blocks + blockmap_blocks + nodemap_blocks);
@@ -258,7 +258,7 @@ zx_status_t WriteFilesystemToDisk(BlockDevice* device, const Superblock& superbl
 
   int count = 4;
   if (superblock.flags & kBlobFlagFVM) {
-    requests[4].opcode = BLOCK_OP_WRITE;
+    requests[4].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
     requests[4].vmoid = vmoid.get();
     requests[4].length =
         safemath::checked_cast<RequestLengthType>(FsToDeviceBlocks(superblock_blocks));
@@ -271,7 +271,9 @@ zx_status_t WriteFilesystemToDisk(BlockDevice* device, const Superblock& superbl
   if (status != ZX_OK)
     return status;
 
-  block_fifo_request_t flush_request = {.opcode = BLOCK_OP_FLUSH};
+  block_fifo_request_t flush_request = {
+      .command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0},
+  };
   return device->FifoTransaction(&flush_request, 1);
 }
 

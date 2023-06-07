@@ -70,7 +70,7 @@ TEST(FakeBlockDeviceTest, WriteAndReadUsingFifoTransaction) {
   memset(src, 'a', sizeof(src));
   ASSERT_EQ(vmo.write(src, 0, sizeof(src)), ZX_OK);
   block_fifo_request_t request;
-  request.opcode = BLOCK_OP_WRITE;
+  request.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   request.vmoid = vmoid.get();
   request.length = kVmoBlocks;
   request.vmo_offset = 0;
@@ -90,7 +90,7 @@ TEST(FakeBlockDeviceTest, WriteAndReadUsingFifoTransaction) {
   ASSERT_EQ(vmo.write(dst, 0, sizeof(dst)), ZX_OK);
 
   // Read data from the fake back into the registered VMO.
-  request.opcode = BLOCK_OP_READ;
+  request.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   request.vmoid = vmoid.get();
   request.length = kVmoBlocks;
   request.vmo_offset = 0;
@@ -115,7 +115,7 @@ TEST(FakeBlockDeviceTest, FifoTransactionFlush) {
   ASSERT_NO_FATAL_FAILURE(CreateAndRegisterVmo(device, kVmoBlocks, &vmo, &vmoid));
 
   block_fifo_request_t request;
-  request.opcode = BLOCK_OP_FLUSH;
+  request.command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0};
   request.vmoid = vmoid.get();
   request.length = 0;
   request.vmo_offset = 0;
@@ -144,13 +144,13 @@ TEST(FakeBlockDeviceTest, FifoTransactionWriteThenFlush) {
   ASSERT_EQ(vmo.write(src, 0, sizeof(src)), ZX_OK);
 
   block_fifo_request_t requests[2];
-  requests[0].opcode = BLOCK_OP_WRITE;
+  requests[0].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   requests[0].vmoid = vmoid.get();
   requests[0].length = kVmoBlocks;
   requests[0].vmo_offset = 0;
   requests[0].dev_offset = 0;
 
-  requests[1].opcode = BLOCK_OP_FLUSH;
+  requests[1].command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0};
   requests[1].vmoid = vmoid.get();
   requests[1].length = 0;
   requests[1].vmo_offset = 0;
@@ -163,7 +163,7 @@ TEST(FakeBlockDeviceTest, FifoTransactionWriteThenFlush) {
   ASSERT_EQ(vmo.write(dst, 0, sizeof(dst)), ZX_OK);
 
   block_fifo_request_t request;
-  request.opcode = BLOCK_OP_READ;
+  request.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   request.vmoid = vmoid.get();
   request.length = kVmoBlocks;
   request.vmo_offset = 0;
@@ -188,13 +188,13 @@ TEST(FakeBlockDeviceTest, FifoTransactionFlushThenWrite) {
   ASSERT_EQ(vmo.write(src, 0, sizeof(src)), ZX_OK);
 
   block_fifo_request_t requests[2];
-  requests[0].opcode = BLOCK_OP_FLUSH;
+  requests[0].command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0};
   requests[0].vmoid = vmoid.get();
   requests[0].length = 0;
   requests[0].vmo_offset = 0;
   requests[0].dev_offset = 0;
 
-  requests[1].opcode = BLOCK_OP_WRITE;
+  requests[1].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   requests[1].vmoid = vmoid.get();
   requests[1].length = kVmoBlocks;
   requests[1].vmo_offset = 0;
@@ -208,7 +208,7 @@ TEST(FakeBlockDeviceTest, FifoTransactionFlushThenWrite) {
   ASSERT_EQ(vmo.write(dst, 0, sizeof(dst)), ZX_OK);
 
   block_fifo_request_t request;
-  request.opcode = BLOCK_OP_READ;
+  request.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   request.vmoid = vmoid.get();
   request.length = kVmoBlocks;
   request.vmo_offset = 0;
@@ -229,7 +229,7 @@ TEST(FakeBlockDeviceTest, FifoTransactionClose) {
   vmoid_t id = vmoid.TakeId();
 
   block_fifo_request_t request;
-  request.opcode = BLOCK_OP_CLOSE_VMO;
+  request.command = {.opcode = BLOCK_OPCODE_CLOSE_VMO, .flags = 0};
   request.vmoid = id;
   request.length = 0;
   request.vmo_offset = 0;
@@ -250,7 +250,7 @@ TEST(FakeBlockDeviceTest, FifoTransactionUnsupportedTrim) {
   ASSERT_NO_FATAL_FAILURE(CreateAndRegisterVmo(device, kVmoBlocks, &vmo, &vmoid));
 
   block_fifo_request_t request;
-  request.opcode = BLOCK_OP_TRIM;
+  request.command = {.opcode = BLOCK_OPCODE_TRIM, .flags = 0};
   request.vmoid = vmoid.get();
   request.length = kVmoBlocks;
   request.vmo_offset = 0;
@@ -274,7 +274,7 @@ TEST(FakeBlockDeviceTest, ClearStats) {
   ASSERT_NO_FATAL_FAILURE(CreateAndRegisterVmo(device, kVmoBlocks, &vmo, &vmoid));
 
   block_fifo_request_t request;
-  request.opcode = BLOCK_OP_FLUSH;
+  request.command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0};
   request.vmoid = vmoid.get();
   request.length = 0;
   request.vmo_offset = 0;
@@ -311,7 +311,7 @@ TEST(FakeBlockDeviceTest, BlockLimitPartialyFailTransaction) {
   }
 
   block_fifo_request_t request;
-  request.opcode = BLOCK_OP_WRITE;
+  request.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   request.vmoid = vmoid.get();
   request.length = kVmoBlocks;
   request.vmo_offset = 0;
@@ -332,7 +332,7 @@ TEST(FakeBlockDeviceTest, BlockLimitPartialyFailTransaction) {
     ASSERT_EQ(vmo.write(zero_block.data(), i * zero_block.size(), zero_block.size()), ZX_OK);
   }
 
-  request.opcode = BLOCK_OP_READ;
+  request.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   ASSERT_EQ(device->FifoTransaction(&request, 1), ZX_OK);
 
   // Expect to see valid data for the two blocks that were written.
@@ -357,7 +357,7 @@ TEST(FakeBlockDeviceTest, BlockLimitFailsDistinctTransactions) {
   ASSERT_NO_FATAL_FAILURE(CreateAndRegisterVmo(device.get(), kVmoBlocks, &vmo, &vmoid));
 
   block_fifo_request_t request;
-  request.opcode = BLOCK_OP_WRITE;
+  request.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   request.vmoid = vmoid.get();
   request.length = kVmoBlocks;
   request.vmo_offset = 0;
@@ -388,7 +388,7 @@ TEST(FakeBlockDeviceTest, BlockLimitFailsMergedTransactions) {
   constexpr size_t kRequests = 3;
   block_fifo_request_t requests[kRequests];
   for (auto& request : requests) {
-    request.opcode = BLOCK_OP_WRITE;
+    request.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
     request.vmoid = vmoid.get();
     request.length = kVmoBlocks;
     request.vmo_offset = 0;
@@ -414,7 +414,7 @@ TEST(FakeBlockDeviceTest, BlockLimitResetsDevice) {
   ASSERT_NO_FATAL_FAILURE(CreateAndRegisterVmo(device.get(), kVmoBlocks, &vmo, &vmoid));
 
   block_fifo_request_t request;
-  request.opcode = BLOCK_OP_WRITE;
+  request.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   request.vmoid = vmoid.get();
   request.length = kVmoBlocks;
   request.vmo_offset = 0;
@@ -444,7 +444,7 @@ TEST(FakeBlockDeviceTest, Hook) {
   ASSERT_EQ(vmo.write(&v, 0, 1), ZX_OK);
 
   block_fifo_request_t request = {
-      .opcode = BLOCK_OP_WRITE,
+      .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
       .vmoid = vmoid.get(),
       .length = 5555,
       .vmo_offset = 1234,
@@ -457,7 +457,8 @@ TEST(FakeBlockDeviceTest, Hook) {
       EXPECT_EQ(vmo->read(&v, 0, 1), ZX_OK);
       EXPECT_EQ(v, 1);
     }
-    EXPECT_EQ(request.opcode, uint32_t{BLOCK_OP_WRITE});
+    EXPECT_EQ(request.command.opcode, uint8_t{BLOCK_OPCODE_WRITE});
+    EXPECT_EQ(request.command.flags, uint32_t{0});
     EXPECT_EQ(request.vmo_offset, 1234u);
     EXPECT_EQ(request.dev_offset, 5678u);
     EXPECT_EQ(request.length, 5555u);
@@ -479,7 +480,7 @@ TEST(FakeBlockDeviceTest, WipeZeroesDevice) {
   ASSERT_EQ(vmo.write(&v, 0, 1), ZX_OK);
 
   block_fifo_request_t request = {
-      .opcode = BLOCK_OP_WRITE,
+      .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
       .vmoid = vmoid.get(),
       .length = 1,
       .vmo_offset = 0,
@@ -489,7 +490,7 @@ TEST(FakeBlockDeviceTest, WipeZeroesDevice) {
 
   device.Wipe();
 
-  request.opcode = BLOCK_OP_READ;
+  request.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   request.vmo_offset = 1;
   EXPECT_EQ(device.FifoTransaction(&request, 1), ZX_OK);
 
@@ -502,7 +503,7 @@ TEST(FakeBlockDeviceTest, TrimFailsIfUnsupported) {
       {.block_count = kBlockCountDefault, .block_size = kBlockSizeDefault, .supports_trim = false});
 
   block_fifo_request_t request = {
-      .opcode = BLOCK_OP_TRIM,
+      .command = {.opcode = BLOCK_OPCODE_TRIM, .flags = 0},
       .vmoid = BLOCK_VMOID_INVALID,
       .length = 1,
       .vmo_offset = 0,
@@ -516,7 +517,7 @@ TEST(FakeBlockDeviceTest, TrimSucceedsIfSupported) {
       {.block_count = kBlockCountDefault, .block_size = kBlockSizeDefault, .supports_trim = true});
 
   block_fifo_request_t request = {
-      .opcode = BLOCK_OP_TRIM,
+      .command = {.opcode = BLOCK_OPCODE_TRIM, .flags = 0},
       .vmoid = BLOCK_VMOID_INVALID,
       .length = 1,
       .vmo_offset = 0,

@@ -119,19 +119,19 @@ void Ramdisk::BlockImplQueue(block_op_t* bop, block_impl_queue_callback completi
   bool dead;
   bool read = false;
 
-  const auto flags = txn.operation()->command & BLOCK_FLAG_MASK;
-  switch (txn.operation()->command &= BLOCK_OP_MASK) {
-    case BLOCK_OP_READ: {
+  const auto flags = txn.operation()->command.flags;
+  switch (txn.operation()->command.opcode) {
+    case BLOCK_OPCODE_READ: {
       read = true;
       __FALLTHROUGH;
     }
-    case BLOCK_OP_WRITE: {
+    case BLOCK_OPCODE_WRITE: {
       if (zx_status_t status = block::CheckIoRange(txn.operation()->rw, block_count_);
           status != ZX_OK) {
         txn.Complete(status);
         return;
       }
-      if (flags & BLOCK_FL_FORCE_ACCESS) {
+      if (flags & BLOCK_IO_FLAG_FORCE_ACCESS) {
         txn.Complete(ZX_ERR_NOT_SUPPORTED);
         return;
       }
@@ -153,7 +153,7 @@ void Ramdisk::BlockImplQueue(block_op_t* bop, block_impl_queue_callback completi
       }
       break;
     }
-    case BLOCK_OP_FLUSH: {
+    case BLOCK_OPCODE_FLUSH: {
       {
         fbl::AutoLock lock(&lock_);
         if (!(dead = dead_)) {
@@ -309,7 +309,7 @@ void Ramdisk::ProcessRequests() {
       }
     } while (!txn);
 
-    if (txn->operation()->command == BLOCK_OP_FLUSH) {
+    if (txn->operation()->command.opcode == BLOCK_OPCODE_FLUSH) {
       zx_status_t status = ZX_OK;
       if (block_write_limit == 0) {
         status = ZX_ERR_UNAVAILABLE;
@@ -322,7 +322,7 @@ void Ramdisk::ProcessRequests() {
     }
 
     uint32_t blocks = txn->operation()->rw.length;
-    if (txn->operation()->command == BLOCK_OP_WRITE && blocks > block_write_limit) {
+    if (txn->operation()->command.opcode == BLOCK_OPCODE_WRITE && blocks > block_write_limit) {
       // Limit the number of blocks we write.
       blocks = static_cast<uint32_t>(block_write_limit);
     }
@@ -336,7 +336,7 @@ void Ramdisk::ProcessRequests() {
     zx_status_t status = ZX_OK;
     if (length > kMaxTransferSize) {
       status = ZX_ERR_OUT_OF_RANGE;
-    } else if (command == BLOCK_OP_READ) {
+    } else if (command.opcode == BLOCK_OPCODE_READ) {
       // A read operation should always succeed, even if the ramdisk is "asleep".
       status = zx_vmo_write(txn->operation()->rw.vmo, addr, vmo_offset, length);
     } else {  // BLOCK_OP_WRITE

@@ -46,8 +46,8 @@ class FakeBlockDevice : public ddk::BlockImplProtocol<FakeBlockDevice> {
   void BlockImplQueue(block_op_t* operation, block_impl_queue_callback completion_cb,
                       void* cookie) {
     zx_status_t result = ZX_OK;
-    switch (operation->command) {
-      case BLOCK_OP_READ:
+    switch (operation->command.opcode) {
+      case BLOCK_OPCODE_READ:
         // Read from device, write to VMO.
         if ((operation->rw.offset_dev + operation->rw.length) * kBlockSize <= data_.size()) {
           result = zx_vmo_write(operation->rw.vmo, &data_[operation->rw.offset_dev * kBlockSize],
@@ -57,7 +57,7 @@ class FakeBlockDevice : public ddk::BlockImplProtocol<FakeBlockDevice> {
           result = ZX_ERR_OUT_OF_RANGE;
         }
         break;
-      case BLOCK_OP_WRITE:
+      case BLOCK_OPCODE_WRITE:
         // Write to device, read from VMO.
         if ((operation->rw.offset_dev + operation->rw.length) * kBlockSize <= data_.size()) {
           result = zx_vmo_read(operation->rw.vmo, &data_[operation->rw.offset_dev * kBlockSize],
@@ -67,7 +67,7 @@ class FakeBlockDevice : public ddk::BlockImplProtocol<FakeBlockDevice> {
           result = ZX_ERR_OUT_OF_RANGE;
         }
         break;
-      case BLOCK_OP_TRIM:
+      case BLOCK_OPCODE_TRIM:
         num_trim_calls_++;
         last_trim_length_ += operation->trim.length;
         break;
@@ -182,7 +182,7 @@ TEST_F(VPartitionManagerTest, QueueTrimOneSlice) {
   const uint32_t kOperationLength = 20;
 
   block_op_t op = {};
-  op.trim.command = BLOCK_OP_TRIM;
+  op.trim.command = {.opcode = BLOCK_OPCODE_TRIM, .flags = 0};
   op.trim.length = kOperationLength;
   op.trim.offset_dev = kBlocksPerSlice / 2;
 
@@ -205,7 +205,7 @@ TEST_F(VPartitionManagerTest, QueueTrimConsecutiveSlices) {
   partition->SliceSetUnsafe(1, 1);
 
   block_op_t op = {};
-  op.trim.command = BLOCK_OP_TRIM;
+  op.trim.command = {.opcode = BLOCK_OPCODE_TRIM, .flags = 0};
   op.trim.length = kOperationLength;
   op.trim.offset_dev = kBlocksPerSlice - kOperationLength / 2;
 
@@ -226,7 +226,7 @@ TEST_F(VPartitionManagerTest, QueueTrimDisjointSlices) {
   partition_or.value()->SliceSetUnsafe(2, 5);
 
   block_op_t op = {};
-  op.trim.command = BLOCK_OP_TRIM;
+  op.trim.command = {.opcode = BLOCK_OPCODE_TRIM, .flags = 0};
   op.trim.length = kOperationLength;
   op.trim.offset_dev = kBlocksPerSlice * 2 - kOperationLength / 2;
 

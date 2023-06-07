@@ -63,10 +63,10 @@ zx_status_t Client::Transaction(block_fifo_request_t* requests, size_t count) {
 
   for (size_t i = 0; i < count; i++) {
     requests[i].group = group;
-    requests[i].opcode = requests[i].opcode | BLOCK_GROUP_ITEM;
+    requests[i].command.flags |= BLOCK_IO_FLAG_GROUP_ITEM;
   }
 
-  requests[count - 1].opcode |= BLOCK_GROUP_LAST;
+  requests[count - 1].command.flags |= BLOCK_IO_FLAG_GROUP_LAST;
 
   if (zx_status_t status = DoWrite(requests, count); status != ZX_OK) {
     {

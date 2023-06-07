@@ -222,7 +222,7 @@ class BlockChecker : public Checker {
 
       GenerateBlockData(block_idx, block_size);
       block_fifo_request_t request = {
-          .opcode = BLOCK_OP_WRITE,
+          .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
           .reqid = 0,
           .group = group_,
           .vmoid = vmoid_,
@@ -246,7 +246,7 @@ class BlockChecker : public Checker {
       }
 
       block_fifo_request_t request = {
-          .opcode = BLOCK_OP_READ,
+          .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
           .reqid = 0,
           .group = group_,
           .vmoid = vmoid_,

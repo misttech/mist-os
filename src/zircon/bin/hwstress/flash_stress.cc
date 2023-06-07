@@ -99,18 +99,20 @@ zx_status_t FlashIo(const BlockDevice& device, size_t bytes_to_test, size_t tran
   size_t blksize = device.info.block_size;
   size_t vmo_byte_offset = 0;
   size_t dev_off = 0;
-  uint32_t opcode = is_write_test ? BLOCK_OP_WRITE : BLOCK_OP_READ;
+  uint8_t opcode = is_write_test ? BLOCK_OPCODE_WRITE : BLOCK_OPCODE_READ;
 
   std::queue<reqid_t> ready_to_send;
   block_fifo_request_t reqs[kMaxInFlightRequests];
 
   for (reqid_t next_reqid = 0; next_reqid < kMaxInFlightRequests; next_reqid++) {
-    reqs[next_reqid] = {.opcode = opcode,
-                        .reqid = next_reqid,
-                        .vmoid = device.vmoid.id,
-                        // |length|, |vmo_offset|, and |dev_offset| are measured in blocks.
-                        .length = static_cast<uint32_t>(transfer_size / blksize),
-                        .vmo_offset = vmo_byte_offset / blksize};
+    reqs[next_reqid] = {
+        .command = {.opcode = opcode, .flags = 0},
+        .reqid = next_reqid,
+        .vmoid = device.vmoid.id,
+        // |length|, |vmo_offset|, and |dev_offset| are measured in blocks.
+        .length = static_cast<uint32_t>(transfer_size / blksize),
+        .vmo_offset = vmo_byte_offset / blksize,
+    };
     ready_to_send.push(next_reqid);
     vmo_byte_offset += transfer_size;
   }

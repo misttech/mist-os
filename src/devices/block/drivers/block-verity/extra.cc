@@ -27,9 +27,9 @@ zx_status_t extra_op_t::Init(block_op_t* block, block_impl_queue_callback cb, vo
   completion_cb = cb;
   cookie = _cookie;
 
-  switch (block->command & BLOCK_OP_MASK) {
-    case BLOCK_OP_READ:
-    case BLOCK_OP_WRITE:
+  switch (block->command.opcode) {
+    case BLOCK_OPCODE_READ:
+    case BLOCK_OPCODE_WRITE:
       vmo = block->rw.vmo;
       length = block->rw.length;
       offset_dev = block->rw.offset_dev;
@@ -59,7 +59,7 @@ zx_status_t extra_op_t::Init(block_op_t* block, block_impl_queue_callback cb, vo
       }
       break;
 
-    case BLOCK_OP_FLUSH:
+    case BLOCK_OPCODE_FLUSH:
       length = 0;
       offset_dev = 0;
       offset_vmo = 0;

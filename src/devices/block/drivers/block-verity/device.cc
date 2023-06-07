@@ -75,11 +75,11 @@ void Device::BlockImplQueue(block_op_t* block_op, block_impl_queue_callback comp
     return;
   }
 
-  switch (block_op->command & BLOCK_OP_MASK) {
-    case BLOCK_OP_READ:
-    case BLOCK_OP_WRITE:
-    case BLOCK_OP_FLUSH:
-    case BLOCK_OP_TRIM:
+  switch (block_op->command.opcode) {
+    case BLOCK_OPCODE_READ:
+    case BLOCK_OPCODE_WRITE:
+    case BLOCK_OPCODE_FLUSH:
+    case BLOCK_OPCODE_TRIM:
       // Queue to backing block device.
       info_.block_protocol.Queue(block_op, BlockCallback, this);
       break;
@@ -104,11 +104,11 @@ void Device::BlockCallback(void* cookie, zx_status_t status, block_op_t* block) 
     return;
   }
 
-  switch (block->command & BLOCK_OP_MASK) {
-    case BLOCK_OP_READ:
-    case BLOCK_OP_WRITE:
-    case BLOCK_OP_FLUSH:
-    case BLOCK_OP_TRIM:
+  switch (block->command.opcode) {
+    case BLOCK_OPCODE_READ:
+    case BLOCK_OPCODE_WRITE:
+    case BLOCK_OPCODE_FLUSH:
+    case BLOCK_OPCODE_TRIM:
       device->BlockComplete(block, ZX_OK);
       break;
     default:

@@ -118,7 +118,7 @@ class FakeBlock : public fuchsia::hardware::block::Session {
         ASSERT_EQ(request.dev_offset, expected_offset);
         expected_offset = request.dev_offset + request.length;
         ASSERT_LT(request.dev_offset, device_size_ * kBlockSize);
-        if (request.opcode == BLOCK_OP_WRITE) {
+        if (request.command.opcode == BLOCK_OPCODE_WRITE) {
           uint64_t expected_value = request.dev_offset;
           uint64_t found_value =
               reinterpret_cast<uint64_t*>(vmo_addr_ + request.vmo_offset * kBlockSize)[0];
@@ -136,7 +136,7 @@ class FakeBlock : public fuchsia::hardware::block::Session {
       if (status == ZX_ERR_TIMED_OUT) {
         std::shuffle(std::begin(reqs), std::end(reqs), std::default_random_engine());
         for (block_fifo_request_t request : reqs) {
-          if (request.opcode == BLOCK_OP_READ) {
+          if (request.command.opcode == BLOCK_OPCODE_READ) {
             for (size_t i = 0; i < request.length; i++) {
               uint64_t value = request.dev_offset + i;
               // If requested, simulate an incorrect read when we are half way through the test.

@@ -21,12 +21,56 @@ pub type groupid_t = u16;
 pub type vmoid_t = u16;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct BlockFifoCommand {
+    pub opcode: u8,
+    pub padding_to_satisfy_zerocopy: [u8; 3usize],
+    pub flags: u32,
+}
+#[test]
+fn bindgen_test_layout_BlockFifoCommand() {
+    const UNINIT: ::std::mem::MaybeUninit<BlockFifoCommand> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<BlockFifoCommand>(),
+        8usize,
+        concat!("Size of: ", stringify!(BlockFifoCommand))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<BlockFifoCommand>(),
+        4usize,
+        concat!("Alignment of ", stringify!(BlockFifoCommand))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).opcode) as usize - ptr as usize },
+        0usize,
+        concat!("Offset of field: ", stringify!(BlockFifoCommand), "::", stringify!(opcode))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).padding_to_satisfy_zerocopy) as usize - ptr as usize },
+        1usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(BlockFifoCommand),
+            "::",
+            stringify!(padding_to_satisfy_zerocopy)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).flags) as usize - ptr as usize },
+        4usize,
+        concat!("Offset of field: ", stringify!(BlockFifoCommand), "::", stringify!(flags))
+    );
+}
+pub type block_fifo_command_t = BlockFifoCommand;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct BlockFifoRequest {
-    pub opcode: u32,
+    pub command: block_fifo_command_t,
     pub reqid: reqid_t,
     pub group: groupid_t,
     pub vmoid: vmoid_t,
     pub length: u32,
+    pub padding_to_satisfy_zerocopy: u32,
     pub vmo_offset: u64,
     pub dev_offset: u64,
     pub trace_flow_id: u64,
@@ -37,7 +81,7 @@ fn bindgen_test_layout_BlockFifoRequest() {
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<BlockFifoRequest>(),
-        40usize,
+        48usize,
         concat!("Size of: ", stringify!(BlockFifoRequest))
     );
     assert_eq!(
@@ -46,43 +90,53 @@ fn bindgen_test_layout_BlockFifoRequest() {
         concat!("Alignment of ", stringify!(BlockFifoRequest))
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).opcode) as usize - ptr as usize },
+        unsafe { ::std::ptr::addr_of!((*ptr).command) as usize - ptr as usize },
         0usize,
-        concat!("Offset of field: ", stringify!(BlockFifoRequest), "::", stringify!(opcode))
+        concat!("Offset of field: ", stringify!(BlockFifoRequest), "::", stringify!(command))
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).reqid) as usize - ptr as usize },
-        4usize,
+        8usize,
         concat!("Offset of field: ", stringify!(BlockFifoRequest), "::", stringify!(reqid))
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).group) as usize - ptr as usize },
-        8usize,
+        12usize,
         concat!("Offset of field: ", stringify!(BlockFifoRequest), "::", stringify!(group))
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).vmoid) as usize - ptr as usize },
-        10usize,
+        14usize,
         concat!("Offset of field: ", stringify!(BlockFifoRequest), "::", stringify!(vmoid))
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).length) as usize - ptr as usize },
-        12usize,
+        16usize,
         concat!("Offset of field: ", stringify!(BlockFifoRequest), "::", stringify!(length))
     );
     assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).padding_to_satisfy_zerocopy) as usize - ptr as usize },
+        20usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(BlockFifoRequest),
+            "::",
+            stringify!(padding_to_satisfy_zerocopy)
+        )
+    );
+    assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).vmo_offset) as usize - ptr as usize },
-        16usize,
+        24usize,
         concat!("Offset of field: ", stringify!(BlockFifoRequest), "::", stringify!(vmo_offset))
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).dev_offset) as usize - ptr as usize },
-        24usize,
+        32usize,
         concat!("Offset of field: ", stringify!(BlockFifoRequest), "::", stringify!(dev_offset))
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).trace_flow_id) as usize - ptr as usize },
-        32usize,
+        40usize,
         concat!("Offset of field: ", stringify!(BlockFifoRequest), "::", stringify!(trace_flow_id))
     );
 }
@@ -94,7 +148,7 @@ pub struct BlockFifoResponse {
     pub group: groupid_t,
     pub padding_to_satisfy_zerocopy: u16,
     pub count: u32,
-    pub padding_to_match_request_size_and_alignment: [u64; 3usize],
+    pub padding_to_match_request_size_and_alignment: [u64; 4usize],
 }
 #[test]
 fn bindgen_test_layout_BlockFifoResponse() {
@@ -102,7 +156,7 @@ fn bindgen_test_layout_BlockFifoResponse() {
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<BlockFifoResponse>(),
-        40usize,
+        48usize,
         concat!("Size of: ", stringify!(BlockFifoResponse))
     );
     assert_eq!(

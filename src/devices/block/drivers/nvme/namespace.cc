@@ -184,20 +184,20 @@ void Namespace::BlockImplQueue(block_op_t* op, block_impl_queue_callback callbac
   io_cmd->namespace_id = namespace_id_;
   io_cmd->block_size_bytes = block_info_.block_size;
 
-  const auto opcode = io_cmd->op.command & BLOCK_OP_MASK;
-  switch (opcode) {
-    case BLOCK_OP_READ:
-    case BLOCK_OP_WRITE:
+  switch (op->command.opcode) {
+    case BLOCK_OPCODE_READ:
+    case BLOCK_OPCODE_WRITE:
       if (zx_status_t status =
-              block::CheckIoRange(io_cmd->op.rw, block_info_.block_count, max_transfer_blocks_);
+              block::CheckIoRange(op->rw, block_info_.block_count, max_transfer_blocks_);
           status != ZX_OK) {
         io_cmd->Complete(status);
         return;
       }
-      zxlogf(TRACE, "Block IO: %s: %u blocks @ LBA %zu", opcode == BLOCK_OP_WRITE ? "wr" : "rd",
-             io_cmd->op.rw.length, io_cmd->op.rw.offset_dev);
+      zxlogf(TRACE, "Block IO: %s: %u blocks @ LBA %zu",
+             op->command.opcode == BLOCK_OPCODE_WRITE ? "wr" : "rd", op->rw.length,
+             op->rw.offset_dev);
       break;
-    case BLOCK_OP_FLUSH:
+    case BLOCK_OPCODE_FLUSH:
       zxlogf(TRACE, "Block IO: flush");
       break;
     default:

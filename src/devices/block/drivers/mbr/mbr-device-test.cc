@@ -43,7 +43,7 @@ class FakeBlockDevice : public ddk::BlockProtocol<FakeBlockDevice> {
   }
 
   void BlockQueue(block_op_t* operation, block_queue_callback completion_cb, void* cookie) {
-    if (operation->rw.command == BLOCK_OP_READ) {
+    if (operation->rw.command.opcode == BLOCK_OPCODE_READ) {
       if ((operation->rw.offset_dev + operation->rw.length) * kBlockSz <= mbr::kMbrSize) {
         // Reading from header
         uint64_t vmo_addr = operation->rw.offset_vmo * kBlockSz;
@@ -51,7 +51,7 @@ class FakeBlockDevice : public ddk::BlockProtocol<FakeBlockDevice> {
         zx_vmo_write(operation->rw.vmo, mbr_ + off, vmo_addr, operation->rw.length * kBlockSz);
       } else {
       }
-    } else if (operation->rw.command == BLOCK_OP_WRITE) {
+    } else if (operation->rw.command.opcode == BLOCK_OPCODE_WRITE) {
       // Ensure the header is never written into.
       ASSERT_GT((operation->rw.offset_dev + operation->rw.length) * kBlockSz, mbr::kMbrSize);
     }

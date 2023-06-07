@@ -90,7 +90,7 @@ namespace block {
 //
 // void Driver::BlockImplQueue(block_op_t* op, block_queue_callback completion_cb, void* cookie) {
 //     BlockOperation block_op(op, cb, parent_req_size_));
-//     ZX_DEBUG_ASSERT(block_op.operation()->command == BLOCK_READ);
+//     ZX_DEBUG_ASSERT(block_op.operation()->command.opcode == BLOCK_OPCODE_READ);
 //     block_op.private_storage()->valid = true;
 //     block_op.private_storage()->count_metric += 1;
 //     <...>

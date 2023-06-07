@@ -358,9 +358,9 @@ zx_status_t Port::TxnBeginLocked(uint32_t slot, SataTransaction* txn) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  const auto opcode = BLOCK_OP(txn->bop.command);
-  const bool is_write = opcode == BLOCK_OP_WRITE;
-  if (opcode != BLOCK_OP_FLUSH) {
+  const auto opcode = txn->bop.command.opcode;
+  const bool is_write = opcode == BLOCK_OPCODE_WRITE;
+  if (opcode != BLOCK_OPCODE_FLUSH) {
     zx::unowned_vmo vmo(txn->bop.rw.vmo);
     uint32_t options = is_write ? ZX_BTI_PERM_READ : ZX_BTI_PERM_WRITE;
     zx::pmt pmt;

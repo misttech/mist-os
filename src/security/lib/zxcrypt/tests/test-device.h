@@ -175,8 +175,8 @@ class TestDevice final {
   // Sends a request over the block fifo to read or write the blocks given by |off| and |len|,
   // according to the given |opcode|.  The data sent or received can be accessed using |vmo_write|
   // or |vmo_read|, respectively.  |off| and |len| are in blocks.
-  zx_status_t block_fifo_txn(uint16_t opcode, uint64_t off, uint64_t len) {
-    req_.opcode = opcode;
+  zx_status_t block_fifo_txn(uint8_t opcode, uint64_t off, uint64_t len) {
+    req_.command = {.opcode = opcode, .flags = 0};
     req_.length = static_cast<uint32_t>(len);
     req_.dev_offset = off;
     req_.vmo_offset = 0;

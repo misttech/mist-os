@@ -672,10 +672,10 @@ TEST(FormatFilesystemTest, DeviceFailure) {
   bool trim_error = false;
   // Set a hook to trigger an io error which causes mkfs fail.
   auto hook = [&bad_block, &trim_error](const block_fifo_request_t &_req, const zx::vmo *_vmo) {
-    if (_req.opcode == BLOCK_OP_TRIM && trim_error) {
+    if (_req.command.opcode == BLOCK_OPCODE_TRIM && trim_error) {
       return ZX_ERR_IO_REFUSED;
     }
-    if (_req.opcode == BLOCK_OP_WRITE && _req.dev_offset == bad_block) {
+    if (_req.command.opcode == BLOCK_OPCODE_WRITE && _req.dev_offset == bad_block) {
       return ZX_ERR_IO;
     }
     return ZX_OK;

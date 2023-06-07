@@ -31,8 +31,8 @@ class FakeBlockDevice : public ddk::BlockImplProtocol<FakeBlockDevice> {
 
   void BlockImplQueue(block_op_t* txn, block_impl_queue_callback callback, void* cookie) {
     zx_status_t status = ZX_ERR_NOT_SUPPORTED;
-    switch (txn->command) {
-      case BLOCK_OP_READ: {
+    switch (txn->command.opcode) {
+      case BLOCK_OPCODE_READ: {
         static uint64_t expected_lba = 0;
         if (txn->rw.length != 1 || txn->rw.offset_dev != expected_lba) {
           status = ZX_ERR_OUT_OF_RANGE;
@@ -43,7 +43,7 @@ class FakeBlockDevice : public ddk::BlockImplProtocol<FakeBlockDevice> {
         }
         break;
       }
-      case BLOCK_OP_WRITE: {
+      case BLOCK_OPCODE_WRITE: {
         static uint64_t expected_lba = 0;
         if (txn->rw.length != 1 || txn->rw.offset_dev != expected_lba) {
           status = ZX_ERR_OUT_OF_RANGE;
@@ -55,7 +55,7 @@ class FakeBlockDevice : public ddk::BlockImplProtocol<FakeBlockDevice> {
         }
         break;
       }
-      case BLOCK_OP_FLUSH:
+      case BLOCK_OPCODE_FLUSH:
         flushed_ = true;
         status = ZX_OK;
         break;
@@ -179,7 +179,7 @@ TEST_F(BootPartitionTest, BlockImplOpsPassedThrough) {
     block_op_t txn{
         .rw =
             {
-                .command = BLOCK_OP_WRITE,
+                .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
                 .vmo = vmo.get(),
                 .length = 1,
                 .offset_dev = 0,
@@ -189,7 +189,9 @@ TEST_F(BootPartitionTest, BlockImplOpsPassedThrough) {
     block_client.Queue(&txn, block_callback, nullptr);
     EXPECT_FALSE(fake_block_device_.flushed());  // FakeBlockDevice operates synchronously.
 
-    txn = {.command = BLOCK_OP_FLUSH};
+    txn = {
+        .command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0},
+    };
     block_client.Queue(&txn, block_callback, nullptr);
     EXPECT_TRUE(fake_block_device_.flushed());  // FakeBlockDevice operates synchronously.
 
@@ -198,7 +200,7 @@ TEST_F(BootPartitionTest, BlockImplOpsPassedThrough) {
     txn = {
         .rw =
             {
-                .command = BLOCK_OP_READ,
+                .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
                 .vmo = vmo.get(),
                 .length = 1,
                 .offset_dev = 0,

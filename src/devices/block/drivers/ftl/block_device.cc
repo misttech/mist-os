@@ -35,7 +35,9 @@ constexpr char kDeviceName[] = "ftl";
 // goes through the worker thread).
 class LocalOperation {
  public:
-  explicit LocalOperation(uint32_t command) { operation_.op.command = command; }
+  explicit LocalOperation(uint8_t opcode) {
+    operation_.op.command = {.opcode = opcode, .flags = 0};
+  }
 
   block_op_t* op() { return &operation_.op; }
 
@@ -136,7 +138,7 @@ zx_status_t BlockDevice::Init() {
 }
 
 zx_status_t BlockDevice::Suspend() {
-  LocalOperation operation(BLOCK_OP_FLUSH);
+  LocalOperation operation(BLOCK_OPCODE_FLUSH);
   return operation.Execute(this);
 }
 
@@ -174,21 +176,21 @@ void BlockDevice::BlockImplQuery(block_info_t* info_out, size_t* block_op_size_o
 void BlockDevice::BlockImplQueue(block_op_t* operation, block_impl_queue_callback completion_cb,
                                  void* cookie) {
   zxlogf(DEBUG, "FTL: Queue");
-  switch (operation->command & BLOCK_OP_MASK) {
-    case BLOCK_OP_WRITE:
-    case BLOCK_OP_READ: {
+  switch (operation->command.opcode) {
+    case BLOCK_OPCODE_WRITE:
+    case BLOCK_OPCODE_READ: {
       if (zx_status_t status = block::CheckIoRange(operation->rw, params_.num_pages);
           status != ZX_OK) {
         completion_cb(cookie, status, operation);
         return;
       }
-      if (operation->command & BLOCK_FL_FORCE_ACCESS) {
+      if (operation->command.flags & BLOCK_IO_FLAG_FORCE_ACCESS) {
         completion_cb(cookie, ZX_ERR_NOT_SUPPORTED, operation);
         return;
       }
       break;
     }
-    case BLOCK_OP_TRIM:
+    case BLOCK_OPCODE_TRIM:
       if (zx_status_t status = block::CheckIoRange(operation->trim, params_.num_pages);
           status != ZX_OK) {
         completion_cb(cookie, status, operation);
@@ -196,7 +198,7 @@ void BlockDevice::BlockImplQueue(block_op_t* operation, block_impl_queue_callbac
       }
       break;
 
-    case BLOCK_OP_FLUSH:
+    case BLOCK_OPCODE_FLUSH:
       break;
 
     default:
@@ -356,28 +358,29 @@ int BlockDevice::WorkerThread() {
     nand_counters_.Reset();
     ftl::BlockOperationProperties* op_stats = nullptr;
     {
-      TRACE_DURATION_BEGIN("block:ftl", "Operation", "opcode", operation->op.command, "offset_dev",
-                           operation->op.rw.offset_dev, "length", operation->op.rw.length);
-      switch (operation->op.command) {
-        case BLOCK_OP_WRITE:
+      TRACE_DURATION_BEGIN("block:ftl", "Operation", "opcode", operation->op.command.opcode,
+                           "offset_dev", operation->op.rw.offset_dev, "length",
+                           operation->op.rw.length);
+      switch (operation->op.command.opcode) {
+        case BLOCK_OPCODE_WRITE:
           pending_flush_ = true;
           status = ReadWriteData(&operation->op);
           op_stats = &metrics_.write();
           break;
 
-        case BLOCK_OP_READ:
+        case BLOCK_OPCODE_READ:
           pending_flush_ = true;
           status = ReadWriteData(&operation->op);
           op_stats = &metrics_.read();
           break;
 
-        case BLOCK_OP_TRIM:
+        case BLOCK_OPCODE_TRIM:
           pending_flush_ = true;
           status = TrimData(&operation->op);
           op_stats = &metrics_.trim();
           break;
 
-        case BLOCK_OP_FLUSH: {
+        case BLOCK_OPCODE_FLUSH: {
           status = Flush();
           pending_flush_ = false;
           op_stats = &metrics_.flush();
@@ -434,7 +437,7 @@ zx_status_t BlockDevice::ReadWriteData(block_op_t* operation) {
     return status;
   }
 
-  if (operation->command == BLOCK_OP_WRITE) {
+  if (operation->command.opcode == BLOCK_OPCODE_WRITE) {
     zxlogf(TRACE, "FTL: BLK To write %d blocks at %d :", operation->rw.length, offset);
     status = volume_->Write(offset, operation->rw.length, mapper.start());
     if (status != ZX_OK) {
@@ -444,7 +447,7 @@ zx_status_t BlockDevice::ReadWriteData(block_op_t* operation) {
     }
   }
 
-  if (operation->command == BLOCK_OP_READ) {
+  if (operation->command.opcode == BLOCK_OPCODE_READ) {
     zxlogf(TRACE, "FTL: BLK To read %d blocks at %d :", operation->rw.length, offset);
     status = volume_->Read(offset, operation->rw.length, mapper.start());
     if (status != ZX_OK) {
@@ -463,7 +466,7 @@ zx_status_t BlockDevice::TrimData(block_op_t* operation) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  ZX_DEBUG_ASSERT(operation->command == BLOCK_OP_TRIM);
+  ZX_DEBUG_ASSERT(operation->command.opcode == BLOCK_OPCODE_TRIM);
   zxlogf(TRACE, "FTL: BLK To trim %d blocks at %d :", operation->trim.length, offset);
   zx_status_t status = volume_->Trim(offset, operation->trim.length);
   if (status != ZX_OK) {

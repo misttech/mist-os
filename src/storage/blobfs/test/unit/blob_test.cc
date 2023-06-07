@@ -169,7 +169,7 @@ TEST_P(BlobTest, ReadingBlobZerosTail) {
   storage::VmoBuffer buffer;
   ASSERT_EQ(buffer.Initialize(block_device.get(), 1, kBlobfsBlockSize, "test_buffer"), ZX_OK);
   block_fifo_request_t request = {
-      .opcode = BLOCK_OP_READ,
+      .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
       .vmoid = buffer.vmoid(),
       .length = kBlobfsBlockSize / kTestDeviceBlockSize,
       .vmo_offset = 0,
@@ -181,7 +181,7 @@ TEST_P(BlobTest, ReadingBlobZerosTail) {
   static_cast<uint8_t*>(buffer.Data(0))[PAGE_SIZE - 1] = 1;
 
   // Write the block back.
-  request.opcode = BLOCK_OP_WRITE;
+  request.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   ASSERT_EQ(block_device->FifoTransaction(&request, 1), ZX_OK);
 
   // Remount and try and read the blob.

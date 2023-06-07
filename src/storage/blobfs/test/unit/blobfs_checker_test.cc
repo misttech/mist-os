@@ -103,7 +103,7 @@ class BlobfsCheckerTest : public testing::Test {
     storage::VmoBuffer buffer;
     ASSERT_EQ(buffer.Initialize(device.get(), 1, kBlobfsBlockSize, "test_buffer"), ZX_OK);
     block_fifo_request_t request{
-        .opcode = BLOCK_OP_READ,
+        .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
         .vmoid = buffer.vmoid(),
         .length = kBlobfsBlockSize / kBlockSize,
         .vmo_offset = 0,
@@ -119,7 +119,7 @@ class BlobfsCheckerTest : public testing::Test {
     }
 
     // Write the block back.
-    request.opcode = BLOCK_OP_WRITE;
+    request.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
     ASSERT_EQ(device->FifoTransaction(&request, 1), ZX_OK);
 
     // Remount.
@@ -152,7 +152,7 @@ class BlobfsCheckerTest : public testing::Test {
     storage::VmoBuffer buffer;
     ASSERT_EQ(buffer.Initialize(device.get(), 1, kBlobfsBlockSize, "test_buffer"), ZX_OK);
     block_fifo_request_t request{
-        .opcode = BLOCK_OP_READ,
+        .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
         .vmoid = buffer.vmoid(),
         .length = kBlobfsBlockSize / kBlockSize,
         .vmo_offset = 0,
@@ -168,7 +168,7 @@ class BlobfsCheckerTest : public testing::Test {
     corrupt_fn(node);
 
     // Write the change back.
-    request.opcode = BLOCK_OP_WRITE;
+    request.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
     ASSERT_EQ(device->FifoTransaction(&request, 1), ZX_OK);
 
     *device_out = std::move(device);
@@ -230,7 +230,7 @@ class BlobfsCheckerTest : public testing::Test {
     storage::VmoBuffer buffer;
     ASSERT_EQ(buffer.Initialize(device.get(), 1, kBlobfsBlockSize, "test_buffer"), ZX_OK);
     block_fifo_request_t request{
-        .opcode = BLOCK_OP_READ,
+        .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
         .vmoid = buffer.vmoid(),
         .length = kBlobfsBlockSize / kBlockSize,
         .vmo_offset = 0,
@@ -249,7 +249,7 @@ class BlobfsCheckerTest : public testing::Test {
     corrupt_fn(container);
 
     // Write the change back.
-    request.opcode = BLOCK_OP_WRITE;
+    request.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
     ASSERT_EQ(device->FifoTransaction(&request, 1), ZX_OK);
 
     *device_out = std::move(device);
@@ -484,7 +484,7 @@ TEST_F(BlobfsCheckerTest, CorruptUnallocatedNode) {
     storage::VmoBuffer buffer;
     ASSERT_EQ(buffer.Initialize(device.get(), 1, kBlobfsBlockSize, "test_buffer"), ZX_OK);
     block_fifo_request_t request{
-        .opcode = BLOCK_OP_READ,
+        .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
         .vmoid = buffer.vmoid(),
         .length = kBlobfsBlockSize / kBlockSize,
         .vmo_offset = 0,
@@ -501,7 +501,7 @@ TEST_F(BlobfsCheckerTest, CorruptUnallocatedNode) {
     node[i].header.flags = kBlobFlagChunkCompressed;
 
     // Write the change back.
-    request.opcode = BLOCK_OP_WRITE;
+    request.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
     ASSERT_EQ(device->FifoTransaction(&request, 1), ZX_OK);
   }
 

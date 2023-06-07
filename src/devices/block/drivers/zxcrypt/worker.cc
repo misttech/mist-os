@@ -80,12 +80,12 @@ zx_status_t Worker::Run() {
     TRACE_DURATION("zxcrypt", "zxcrypt::Worker::Dispatch");
 
     // Dispatch block request
-    switch (block->command & BLOCK_OP_MASK) {
-      case BLOCK_OP_WRITE:
+    switch (block->command.opcode) {
+      case BLOCK_OPCODE_WRITE:
         device_->BlockForward(block, EncryptWrite(block));
         break;
 
-      case BLOCK_OP_READ:
+      case BLOCK_OPCODE_READ:
         device_->BlockComplete(block, DecryptRead(block));
         break;
 

@@ -217,7 +217,7 @@ class BlockDeviceTest : public zxtest::Test {
   virtio::block_txn_t TestReadCommand(uint32_t tranfser_blocks = 1) {
     virtio::block_txn_t txn;
     memset(&txn, 0, sizeof(txn));
-    txn.op.rw.command = BLOCK_OP_READ;
+    txn.op.rw.command.opcode = BLOCK_OPCODE_READ;
     txn.op.rw.length = tranfser_blocks;
     txn.op.rw.offset_vmo = kVmoOffsetBlocks;
     return txn;

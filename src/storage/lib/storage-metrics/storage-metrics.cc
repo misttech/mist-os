@@ -12,10 +12,6 @@
 
 namespace storage_metrics {
 
-namespace {
-constexpr uint32_t block_operation(uint32_t command) { return command & BLOCK_OP_MASK; }
-}  // namespace
-
 bool RawCallStatEqual(const CallStatRawFidl& lhs, const CallStatRawFidl& rhs) {
   return (lhs.total_calls == rhs.total_calls) && (lhs.bytes_transferred == rhs.bytes_transferred);
 }
@@ -209,17 +205,17 @@ void BlockDeviceMetrics::Dump(FILE* stream, std::optional<bool> success) const {
   flush_.Dump(stream, "flush", success);
 }
 
-void BlockDeviceMetrics::UpdateStats(bool success, const zx::ticks start_tick,
-                                     const uint32_t command, const uint64_t bytes_transferred) {
+void BlockDeviceMetrics::UpdateStats(bool success, const zx::ticks start_tick, uint8_t opcode,
+                                     const uint64_t bytes_transferred) {
   zx::ticks duration = zx::ticks::now() - start_tick;
 
-  if (block_operation(command) == BLOCK_OP_WRITE) {
+  if (opcode == BLOCK_OPCODE_WRITE) {
     UpdateWriteStat(success, duration.get(), bytes_transferred);
-  } else if (block_operation(command) == BLOCK_OP_READ) {
+  } else if (opcode == BLOCK_OPCODE_READ) {
     UpdateReadStat(success, duration.get(), bytes_transferred);
-  } else if (block_operation(command) == BLOCK_OP_FLUSH) {
+  } else if (opcode == BLOCK_OPCODE_FLUSH) {
     UpdateFlushStat(success, duration.get(), bytes_transferred);
-  } else if (block_operation(command) == BLOCK_OP_TRIM) {
+  } else if (opcode == BLOCK_OPCODE_TRIM) {
     UpdateTrimStat(success, duration.get(), bytes_transferred);
   }
 }

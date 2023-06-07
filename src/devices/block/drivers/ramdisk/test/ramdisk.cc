@@ -232,7 +232,7 @@ TEST(RamdiskTests, RamdiskStatsTest) {
   // Split it into two requests, spread across the disk
   block_fifo_request_t requests[] = {
       {
-          .opcode = BLOCK_OP_WRITE,
+          .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
           .group = group,
           .vmoid = vmoid,
           .length = 1,
@@ -240,7 +240,7 @@ TEST(RamdiskTests, RamdiskStatsTest) {
           .dev_offset = 0,
       },
       {
-          .opcode = BLOCK_OP_READ,
+          .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
           .group = group,
           .vmoid = vmoid,
           .length = 1,
@@ -248,7 +248,7 @@ TEST(RamdiskTests, RamdiskStatsTest) {
           .dev_offset = 100,
       },
       {
-          .opcode = BLOCK_OP_FLUSH,
+          .command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0},
           .group = group,
           .vmoid = vmoid,
           .length = 0,
@@ -256,7 +256,7 @@ TEST(RamdiskTests, RamdiskStatsTest) {
           .dev_offset = 0,
       },
       {
-          .opcode = BLOCK_OP_WRITE,
+          .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
           .group = group,
           .vmoid = vmoid,
           .length = 1,
@@ -286,7 +286,7 @@ TEST(RamdiskTests, RamdiskStatsTest) {
   ASSERT_EQ(stats.write.failure.bytes_transferred, 0ul);
 
   // Close the current vmo
-  requests[0].opcode = BLOCK_OP_CLOSE_VMO;
+  requests[0].command = {.opcode = BLOCK_OPCODE_CLOSE_VMO, .flags = 0};
   ASSERT_EQ(client.Transaction(requests, 1), ZX_OK);
 }
 
@@ -734,7 +734,7 @@ TEST(RamdiskTests, RamdiskTestFifoBasic) {
   // Split it into two requests, spread across the disk
   block_fifo_request_t requests[] = {
       {
-          .opcode = BLOCK_OP_WRITE,
+          .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
           .group = group,
           .vmoid = vmoid,
           .length = 1,
@@ -742,7 +742,7 @@ TEST(RamdiskTests, RamdiskTestFifoBasic) {
           .dev_offset = 0,
       },
       {
-          .opcode = BLOCK_OP_WRITE,
+          .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
           .group = group,
           .vmoid = vmoid,
           .length = 2,
@@ -757,14 +757,14 @@ TEST(RamdiskTests, RamdiskTestFifoBasic) {
   std::unique_ptr<uint8_t[]> out(new uint8_t[vmo_size]());
 
   ASSERT_EQ(vmo.write(out.get(), 0, vmo_size), ZX_OK);
-  requests[0].opcode = BLOCK_OP_READ;
-  requests[1].opcode = BLOCK_OP_READ;
+  requests[0].command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
+  requests[1].command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   ASSERT_EQ(client.Transaction(requests, std::size(requests)), ZX_OK);
   ASSERT_EQ(vmo.read(out.get(), 0, vmo_size), ZX_OK);
   ASSERT_EQ(memcmp(buf.get(), out.get(), vmo_size), 0) << "Read data not equal to written data";
 
   // Close the current vmo
-  requests[0].opcode = BLOCK_OP_CLOSE_VMO;
+  requests[0].command = {.opcode = BLOCK_OPCODE_CLOSE_VMO, .flags = 0};
   ASSERT_EQ(client.Transaction(requests, 1), ZX_OK);
 }
 
@@ -812,14 +812,14 @@ TEST(RamdiskTests, RamdiskTestFifoNoGroup) {
   block_fifo_request_t requests[2];
   requests[0].reqid = 0;
   requests[0].vmoid = attach_vmo_response.value()->vmoid.id;
-  requests[0].opcode = BLOCK_OP_WRITE;
+  requests[0].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   requests[0].length = 1;
   requests[0].vmo_offset = 0;
   requests[0].dev_offset = 0;
 
   requests[1].reqid = 1;
   requests[1].vmoid = attach_vmo_response.value()->vmoid.id;
-  requests[1].opcode = BLOCK_OP_WRITE;
+  requests[1].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   requests[1].length = 2;
   requests[1].vmo_offset = 1;
   requests[1].dev_offset = 100;
@@ -849,8 +849,8 @@ TEST(RamdiskTests, RamdiskTestFifoNoGroup) {
 
   ASSERT_EQ(vmo.write(out.get(), 0, vmo_size), ZX_OK);
 
-  requests[0].opcode = BLOCK_OP_READ;
-  requests[1].opcode = BLOCK_OP_READ;
+  requests[0].command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
+  requests[1].command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
 
   ASSERT_NO_FATAL_FAILURE(write_request(requests));
   ASSERT_NO_FATAL_FAILURE(read_response(0));
@@ -861,7 +861,7 @@ TEST(RamdiskTests, RamdiskTestFifoNoGroup) {
   ASSERT_EQ(memcmp(buf.get(), out.get(), vmo_size), 0) << "Read data not equal to written data";
 
   // Close the current vmo
-  requests[0].opcode = BLOCK_OP_CLOSE_VMO;
+  requests[0].command = {.opcode = BLOCK_OPCODE_CLOSE_VMO, .flags = 0};
   ASSERT_EQ(fifo.write(requests, 1, nullptr), ZX_OK);
 }
 
@@ -897,7 +897,7 @@ void WriteStripedVmoHelper(block_client::Client& client, const TestVmoObject& ob
   for (size_t b = 0; b < blocks; b++) {
     requests[b].group = group;
     requests[b].vmoid = obj.vmoid.id;
-    requests[b].opcode = BLOCK_OP_WRITE;
+    requests[b].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
     requests[b].length = 1;
     requests[b].vmo_offset = b;
     requests[b].dev_offset = i + b * objs;
@@ -919,7 +919,7 @@ void ReadStripedVmoHelper(block_client::Client& client, const TestVmoObject& obj
   for (size_t b = 0; b < blocks; b++) {
     requests[b].group = group;
     requests[b].vmoid = obj.vmoid.id;
-    requests[b].opcode = BLOCK_OP_READ;
+    requests[b].command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
     requests[b].length = 1;
     requests[b].vmo_offset = b;
     requests[b].dev_offset = i + b * objs;
@@ -939,7 +939,7 @@ void CloseVmoHelper(block_client::Client& client, const TestVmoObject& obj, grou
   block_fifo_request_t request;
   request.group = group;
   request.vmoid = obj.vmoid.id;
-  request.opcode = BLOCK_OP_CLOSE_VMO;
+  request.command = {.opcode = BLOCK_OPCODE_CLOSE_VMO, .flags = 0};
   ASSERT_EQ(client.Transaction(&request, 1), ZX_OK);
 }
 
@@ -1038,7 +1038,7 @@ TEST(RamdiskTests, RamdiskTestFifoLargeOpsCount) {
     for (size_t b = 0; b < num_ops; b++) {
       requests[b].group = group;
       requests[b].vmoid = obj.vmoid.id;
-      requests[b].opcode = BLOCK_OP_WRITE;
+      requests[b].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
       requests[b].length = 1;
       requests[b].vmo_offset = 0;
       requests[b].dev_offset = 0;
@@ -1093,7 +1093,7 @@ TEST(RamdiskTests, RamdiskTestFifoLargeOpsCountShutdown) {
   for (size_t b = 0; b < kNumOps; b++) {
     requests[b].group = group;
     requests[b].vmoid = obj.vmoid.id;
-    requests[b].opcode = BLOCK_OP_WRITE | BLOCK_GROUP_ITEM;
+    requests[b].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = BLOCK_IO_FLAG_GROUP_ITEM};
     requests[b].length = 1;
     requests[b].vmo_offset = 0;
     requests[b].dev_offset = b;
@@ -1149,7 +1149,7 @@ TEST(RamdiskTests, RamdiskTestFifoIntermediateOpFailure) {
   for (size_t i = 0; i < std::size(requests); i++) {
     requests[i].group = group;
     requests[i].vmoid = obj.vmoid.id;
-    requests[i].opcode = BLOCK_OP_WRITE;
+    requests[i].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
     requests[i].length = 1;
     requests[i].vmo_offset = i;
     requests[i].dev_offset = i;
@@ -1170,7 +1170,7 @@ TEST(RamdiskTests, RamdiskTestFifoIntermediateOpFailure) {
     for (size_t i = 0; i < std::size(requests); i++) {
       requests[i].group = group;
       requests[i].vmoid = obj.vmoid.id;
-      requests[i].opcode = BLOCK_OP_READ;
+      requests[i].command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
       requests[i].length = 1;
       requests[i].vmo_offset = i;
       requests[i].dev_offset = i;
@@ -1216,7 +1216,7 @@ TEST(RamdiskTests, RamdiskTestFifoBadClientVmoid) {
   block_fifo_request_t request;
   request.group = group;
   request.vmoid = static_cast<vmoid_t>(obj.vmoid.id + 5);
-  request.opcode = BLOCK_OP_WRITE;
+  request.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   request.length = 1;
   request.vmo_offset = 0;
   request.dev_offset = 0;
@@ -1248,7 +1248,7 @@ TEST(RamdiskTests, RamdiskTestFifoBadClientUnalignedRequest) {
   block_fifo_request_t request;
   request.group = group;
   request.vmoid = static_cast<vmoid_t>(obj.vmoid.id);
-  request.opcode = BLOCK_OP_WRITE;
+  request.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
 
   // Send a request that has zero length
   request.length = 0;
@@ -1283,7 +1283,7 @@ TEST(RamdiskTests, RamdiskTestFifoBadClientOverflow) {
   block_fifo_request_t request;
   request.group = group;
   request.vmoid = static_cast<vmoid_t>(obj.vmoid.id);
-  request.opcode = BLOCK_OP_WRITE;
+  request.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
 
   // Send a request that is barely out-of-bounds for the device
   request.length = 1;
@@ -1346,7 +1346,7 @@ TEST(RamdiskTests, RamdiskTestFifoBadClientBadVmo) {
 
   // Send a request to write to write 2 blocks -- even though that's larger than the VMO
   block_fifo_request_t request = {
-      .opcode = BLOCK_OP_WRITE,
+      .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
       .group = group,
       .vmoid = obj.vmoid.id,
       .length = 2,
@@ -1355,7 +1355,7 @@ TEST(RamdiskTests, RamdiskTestFifoBadClientBadVmo) {
   };
   ASSERT_EQ(client.Transaction(&request, 1), ZX_ERR_OUT_OF_RANGE);
   // Do the same thing, but for reading
-  request.opcode = BLOCK_OP_READ;
+  request.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   ASSERT_EQ(client.Transaction(&request, 1), ZX_ERR_OUT_OF_RANGE);
   request.length = 2;
   ASSERT_EQ(client.Transaction(&request, 1), ZX_ERR_OUT_OF_RANGE);
@@ -1396,7 +1396,7 @@ TEST(RamdiskTests, RamdiskTestFifoSleepUnavailable) {
   // Split it into two requests, spread across the disk
   block_fifo_request_t requests[] = {
       {
-          .opcode = BLOCK_OP_WRITE,
+          .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
           .group = group,
           .vmoid = vmoid,
           .length = 1,
@@ -1404,7 +1404,7 @@ TEST(RamdiskTests, RamdiskTestFifoSleepUnavailable) {
           .dev_offset = 0,
       },
       {
-          .opcode = BLOCK_OP_WRITE,
+          .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
           .group = group,
           .vmoid = vmoid,
           .length = 2,
@@ -1425,8 +1425,8 @@ TEST(RamdiskTests, RamdiskTestFifoSleepUnavailable) {
 
   // Wake the ramdisk back up
   ASSERT_EQ(ramdisk_wake(ramdisk->ramdisk_client()), ZX_OK);
-  requests[0].opcode = BLOCK_OP_READ;
-  requests[1].opcode = BLOCK_OP_READ;
+  requests[0].command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
+  requests[1].command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   ASSERT_EQ(client.Transaction(requests, std::size(requests)), ZX_OK);
 
   // Put the ramdisk to sleep after 1 block (partial transaction).
@@ -1434,10 +1434,10 @@ TEST(RamdiskTests, RamdiskTestFifoSleepUnavailable) {
 
   // Batch write the VMO to the ramdisk.
   // Split it into two requests, spread across the disk.
-  requests[0].opcode = BLOCK_OP_WRITE;
+  requests[0].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   requests[0].length = 2;
 
-  requests[1].opcode = BLOCK_OP_WRITE;
+  requests[1].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   requests[1].length = 1;
   requests[1].vmo_offset = 2;
 
@@ -1461,12 +1461,12 @@ TEST(RamdiskTests, RamdiskTestFifoSleepUnavailable) {
 
   // Wake the ramdisk back up
   ASSERT_EQ(ramdisk_wake(ramdisk->ramdisk_client()), ZX_OK);
-  requests[0].opcode = BLOCK_OP_READ;
-  requests[1].opcode = BLOCK_OP_READ;
+  requests[0].command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
+  requests[1].command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   ASSERT_EQ(client.Transaction(requests, std::size(requests)), ZX_OK);
 
   // Close the current vmo
-  requests[0].opcode = BLOCK_OP_CLOSE_VMO;
+  requests[0].command = {.opcode = BLOCK_OPCODE_CLOSE_VMO, .flags = 0};
   ASSERT_EQ(client.Transaction(requests, 1), ZX_OK);
 }
 
@@ -1567,7 +1567,7 @@ TEST_F(RamdiskTestWithClient, RamdiskTestFifoSleepDeferred) {
   for (size_t i = 0; i < std::size(requests); ++i) {
     requests[i].group = 0;
     requests[i].vmoid = vmoid_.id;
-    requests[i].opcode = BLOCK_OP_WRITE;
+    requests[i].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
     requests[i].length = 1;
     requests[i].vmo_offset = i;
     requests[i].dev_offset = i;
@@ -1598,7 +1598,7 @@ TEST_F(RamdiskTestWithClient, RamdiskTestFifoSleepDeferred) {
   ASSERT_EQ(res, 0) << "Background thread failed";
 
   for (auto& request : requests) {
-    request.opcode = BLOCK_OP_READ;
+    request.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   }
 
   // Read data we wrote to disk back into the VMO.
@@ -1608,7 +1608,7 @@ TEST_F(RamdiskTestWithClient, RamdiskTestFifoSleepDeferred) {
   ASSERT_EQ(memcmp(mapping_.start(), buf_.get(), vmo_size_), 0);
 
   // Now send 1 transaction with the full length of the VMO.
-  requests[0].opcode = BLOCK_OP_WRITE;
+  requests[0].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   requests[0].length = 16;
   requests[0].vmo_offset = 0;
   requests[0].dev_offset = 0;
@@ -1624,12 +1624,12 @@ TEST_F(RamdiskTestWithClient, RamdiskTestFifoSleepDeferred) {
 
   // Check the wake thread succeeded, and that the contents of the ramdisk match the buffer.
   ASSERT_EQ(res, 0) << "Background thread failed";
-  requests[0].opcode = BLOCK_OP_READ;
+  requests[0].command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   ASSERT_EQ(client_->Transaction(requests, 1), ZX_OK);
   ASSERT_EQ(memcmp(mapping_.start(), buf_.get(), vmo_size_), 0);
 
   // Check that we can do I/O normally again.
-  requests[0].opcode = BLOCK_OP_WRITE;
+  requests[0].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   ASSERT_EQ(client_->Transaction(requests, 1), ZX_OK);
 }
 
@@ -1690,11 +1690,11 @@ TEST_F(RamdiskTestWithClient, DiscardOnWake) {
   for (size_t i = 0; i < std::size(requests); ++i) {
     if (i == 2) {
       // Insert a flush midway through.
-      requests[i].opcode = BLOCK_OP_FLUSH;
+      requests[i].command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0};
     } else {
       requests[i].group = 0;
       requests[i].vmoid = vmoid_.id;
-      requests[i].opcode = BLOCK_OP_WRITE;
+      requests[i].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
       requests[i].length = 1;
       requests[i].vmo_offset = i;
       requests[i].dev_offset = i;
@@ -1710,7 +1710,7 @@ TEST_F(RamdiskTestWithClient, DiscardOnWake) {
   // Read back all the blocks. The extra flush shouldn't matter.
   for (size_t i = 0; i < std::size(requests); ++i) {
     if (i != 2)
-      requests[i].opcode = BLOCK_OP_READ;
+      requests[i].command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   }
   ASSERT_EQ(client_->Transaction(requests, std::size(requests)), ZX_OK);
 
@@ -1747,11 +1747,11 @@ TEST_F(RamdiskTestWithClient, DiscardRandomOnWake) {
     for (size_t i = 0; i < std::size(requests); ++i) {
       if (i == 2) {
         // Insert a flush midway through.
-        requests[i].opcode = BLOCK_OP_FLUSH;
+        requests[i].command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0};
       } else {
         requests[i].group = 0;
         requests[i].vmoid = vmoid_.id;
-        requests[i].opcode = BLOCK_OP_WRITE;
+        requests[i].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
         requests[i].length = 1;
         requests[i].vmo_offset = i;
         requests[i].dev_offset = i;
@@ -1767,7 +1767,7 @@ TEST_F(RamdiskTestWithClient, DiscardRandomOnWake) {
     // Read back all the blocks. The extra flush shouldn't matter.
     for (size_t i = 0; i < std::size(requests); ++i) {
       if (i != 2)
-        requests[i].opcode = BLOCK_OP_READ;
+        requests[i].command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
     }
     ASSERT_EQ(client_->Transaction(requests, std::size(requests)), ZX_OK);
 

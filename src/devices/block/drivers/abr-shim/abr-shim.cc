@@ -156,7 +156,7 @@ void AbrShim::BlockOpCallback(void* ctx, zx_status_t status, block_op_t* op) {
   block_op.private_storage()->complete->signal(0, kBlockOpCompleteSignal);
 }
 
-zx_status_t AbrShim::DoBlockOp(uint32_t command) const {
+zx_status_t AbrShim::DoBlockOp(uint8_t opcode) const {
   zx::event complete;
   if (zx_status_t status = zx::event::create(0, &complete); status != ZX_OK) {
     zxlogf(ERROR, "Failed to create event: %s", zx_status_get_string(status));
@@ -175,9 +175,9 @@ zx_status_t AbrShim::DoBlockOp(uint32_t command) const {
       .complete = complete.borrow(),
   };
 
-  if (command == BLOCK_OP_READ || command == BLOCK_OP_WRITE) {
+  if (opcode == BLOCK_OPCODE_READ || opcode == BLOCK_OPCODE_WRITE) {
     op->operation()->rw = {
-        .command = command,
+        .command = {.opcode = opcode, .flags = 0},
         .extra = 0,
         .vmo = block_data_.get(),
         .length = 1,
@@ -185,7 +185,7 @@ zx_status_t AbrShim::DoBlockOp(uint32_t command) const {
         .offset_vmo = 0,
     };
   } else {
-    op->operation()->command = command;
+    op->operation()->command = {.opcode = opcode, .flags = 0};
   }
 
   size_t block_op_size = block_op_size_;
@@ -210,7 +210,7 @@ bool AbrShim::ReadAbrMetadata(size_t size, uint8_t* buffer) {
   {
     fbl::AutoLock lock(&io_lock_);
 
-    if (zx_status_t status = DoBlockOp(BLOCK_OP_READ); status != ZX_OK) {
+    if (zx_status_t status = DoBlockOp(BLOCK_OPCODE_READ); status != ZX_OK) {
       zxlogf(ERROR, "Failed to read from block device: %s", zx_status_get_string(status));
       return false;
     }
@@ -236,7 +236,7 @@ bool AbrShim::WriteAbrMetadata(const uint8_t* buffer, size_t size) {
 
   if (size < block_size_) {
     // Preserve the data at the end of the block.
-    if (zx_status_t status = DoBlockOp(BLOCK_OP_READ); status != ZX_OK) {
+    if (zx_status_t status = DoBlockOp(BLOCK_OPCODE_READ); status != ZX_OK) {
       zxlogf(ERROR, "Failed to read from block device: %s", zx_status_get_string(status));
       return false;
     }
@@ -247,13 +247,13 @@ bool AbrShim::WriteAbrMetadata(const uint8_t* buffer, size_t size) {
     return false;
   }
 
-  if (zx_status_t status = DoBlockOp(BLOCK_OP_WRITE); status != ZX_OK) {
+  if (zx_status_t status = DoBlockOp(BLOCK_OPCODE_WRITE); status != ZX_OK) {
     zxlogf(ERROR, "Failed to write to block device: %s", zx_status_get_string(status));
     return false;
   }
 
   // Issue a final flush just in case.
-  if (zx_status_t status = DoBlockOp(BLOCK_OP_FLUSH); status != ZX_OK) {
+  if (zx_status_t status = DoBlockOp(BLOCK_OPCODE_FLUSH); status != ZX_OK) {
     zxlogf(ERROR, "Failed to flush block device: %s", zx_status_get_string(status));
     return false;
   }

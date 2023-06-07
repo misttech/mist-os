@@ -164,14 +164,14 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
     ASSERT_TRUE(user_.is_valid());
   }
 
-  void MakeBlockOp(uint32_t command, uint32_t length, uint64_t offset,
+  void MakeBlockOp(uint8_t opcode, uint32_t length, uint64_t offset,
                    std::optional<block::Operation<OperationContext>>* out_op) {
     *out_op = block::Operation<OperationContext>::Alloc(kBlockOpSize);
     ASSERT_TRUE(*out_op);
 
-    if (command == BLOCK_OP_READ || command == BLOCK_OP_WRITE) {
+    if (opcode == BLOCK_OPCODE_READ || opcode == BLOCK_OPCODE_WRITE) {
       (*out_op)->operation()->rw = {
-          .command = command,
+          .command = {.opcode = opcode, .flags = 0},
           .extra = 0,
           .vmo = ZX_HANDLE_INVALID,
           .length = length,
@@ -189,14 +189,14 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
         ctx->status = ZX_OK;
         (*out_op)->operation()->rw.vmo = ctx->vmo.get();
       }
-    } else if (command == BLOCK_OP_TRIM) {
+    } else if (opcode == BLOCK_OPCODE_TRIM) {
       (*out_op)->operation()->trim = {
-          .command = command,
+          .command = {.opcode = opcode, .flags = 0},
           .length = length,
           .offset_dev = offset,
       };
     } else {
-      (*out_op)->operation()->command = command;
+      (*out_op)->operation()->command = {.opcode = opcode, .flags = 0};
     }
   }
 
@@ -294,19 +294,19 @@ TEST_F(SdmmcBlockDeviceTest, BlockImplQueue) {
   AddMmcDevice();
 
   std::optional<block::Operation<OperationContext>> op1;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 1, 0, &op1));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 1, 0, &op1));
 
   std::optional<block::Operation<OperationContext>> op2;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 5, 0x8000, &op2));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 5, 0x8000, &op2));
 
   std::optional<block::Operation<OperationContext>> op3;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_FLUSH, 0, 0, &op3));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_FLUSH, 0, 0, &op3));
 
   std::optional<block::Operation<OperationContext>> op4;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 1, 0x400, &op4));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 1, 0x400, &op4));
 
   std::optional<block::Operation<OperationContext>> op5;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 10, 0x2000, &op5));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 10, 0x2000, &op5));
 
   CallbackContext ctx(5);
 
@@ -345,25 +345,25 @@ TEST_F(SdmmcBlockDeviceTest, BlockImplQueueOutOfRange) {
   AddMmcDevice();
 
   std::optional<block::Operation<OperationContext>> op1;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 1, 0x100000, &op1));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 1, 0x100000, &op1));
 
   std::optional<block::Operation<OperationContext>> op2;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 10, 0x200000, &op2));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 10, 0x200000, &op2));
 
   std::optional<block::Operation<OperationContext>> op3;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 8, 0xffff8, &op3));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 8, 0xffff8, &op3));
 
   std::optional<block::Operation<OperationContext>> op4;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 9, 0xffff8, &op4));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 9, 0xffff8, &op4));
 
   std::optional<block::Operation<OperationContext>> op5;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 16, 0xffff8, &op5));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 16, 0xffff8, &op5));
 
   std::optional<block::Operation<OperationContext>> op6;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 0, 0x80000, &op6));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 0, 0x80000, &op6));
 
   std::optional<block::Operation<OperationContext>> op7;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 1, 0xfffff, &op7));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 1, 0xfffff, &op7));
 
   CallbackContext ctx(7);
 
@@ -406,19 +406,19 @@ TEST_F(SdmmcBlockDeviceTest, AutoCmd12ForSdMultiBlockTransfer) {
   EXPECT_OK(dut_->Init());
 
   std::optional<block::Operation<OperationContext>> op1;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 1, 0, &op1));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 1, 0, &op1));
 
   std::optional<block::Operation<OperationContext>> op2;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 5, 0x8000, &op2));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 5, 0x8000, &op2));
 
   std::optional<block::Operation<OperationContext>> op3;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_FLUSH, 0, 0, &op3));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_FLUSH, 0, 0, &op3));
 
   std::optional<block::Operation<OperationContext>> op4;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 1, 0x400, &op4));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 1, 0x400, &op4));
 
   std::optional<block::Operation<OperationContext>> op5;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 10, 0x2000, &op5));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 10, 0x2000, &op5));
 
   CallbackContext ctx(5);
 
@@ -453,19 +453,19 @@ TEST_F(SdmmcBlockDeviceTest, ManualCmd12ForSdMultiBlockTransfer) {
   EXPECT_OK(dut_->Init());
 
   std::optional<block::Operation<OperationContext>> op1;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 1, 0, &op1));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 1, 0, &op1));
 
   std::optional<block::Operation<OperationContext>> op2;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 5, 0x8000, &op2));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 5, 0x8000, &op2));
 
   std::optional<block::Operation<OperationContext>> op3;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_FLUSH, 0, 0, &op3));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_FLUSH, 0, 0, &op3));
 
   std::optional<block::Operation<OperationContext>> op4;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 1, 0x400, &op4));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 1, 0x400, &op4));
 
   std::optional<block::Operation<OperationContext>> op5;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 10, 0x2000, &op5));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 10, 0x2000, &op5));
 
   CallbackContext ctx(5);
 
@@ -492,19 +492,19 @@ TEST_F(SdmmcBlockDeviceTest, NoCmd12ForMmcBlockTransfer) {
   AddMmcDevice();
 
   std::optional<block::Operation<OperationContext>> op1;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 1, 0, &op1));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 1, 0, &op1));
 
   std::optional<block::Operation<OperationContext>> op2;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 5, 0x8000, &op2));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 5, 0x8000, &op2));
 
   std::optional<block::Operation<OperationContext>> op3;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_FLUSH, 0, 0, &op3));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_FLUSH, 0, 0, &op3));
 
   std::optional<block::Operation<OperationContext>> op4;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 1, 0x400, &op4));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 1, 0x400, &op4));
 
   std::optional<block::Operation<OperationContext>> op5;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 10, 0x2000, &op5));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 10, 0x2000, &op5));
 
   CallbackContext ctx(5);
 
@@ -531,22 +531,23 @@ TEST_F(SdmmcBlockDeviceTest, ErrorsPropagate) {
   AddMmcDevice();
 
   std::optional<block::Operation<OperationContext>> op1;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 1, FakeSdmmcDevice::kBadRegionStart, &op1));
+  ASSERT_NO_FATAL_FAILURE(
+      MakeBlockOp(BLOCK_OPCODE_WRITE, 1, FakeSdmmcDevice::kBadRegionStart, &op1));
 
   std::optional<block::Operation<OperationContext>> op2;
   ASSERT_NO_FATAL_FAILURE(
-      MakeBlockOp(BLOCK_OP_WRITE, 5, FakeSdmmcDevice::kBadRegionStart | 0x80, &op2));
+      MakeBlockOp(BLOCK_OPCODE_WRITE, 5, FakeSdmmcDevice::kBadRegionStart | 0x80, &op2));
 
   std::optional<block::Operation<OperationContext>> op3;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_FLUSH, 0, 0, &op3));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_FLUSH, 0, 0, &op3));
 
   std::optional<block::Operation<OperationContext>> op4;
   ASSERT_NO_FATAL_FAILURE(
-      MakeBlockOp(BLOCK_OP_READ, 1, FakeSdmmcDevice::kBadRegionStart | 0x40, &op4));
+      MakeBlockOp(BLOCK_OPCODE_READ, 1, FakeSdmmcDevice::kBadRegionStart | 0x40, &op4));
 
   std::optional<block::Operation<OperationContext>> op5;
   ASSERT_NO_FATAL_FAILURE(
-      MakeBlockOp(BLOCK_OP_READ, 10, FakeSdmmcDevice::kBadRegionStart | 0x20, &op5));
+      MakeBlockOp(BLOCK_OPCODE_READ, 10, FakeSdmmcDevice::kBadRegionStart | 0x20, &op5));
 
   CallbackContext ctx(5);
 
@@ -583,7 +584,8 @@ TEST_F(SdmmcBlockDeviceTest, SendCmd12OnCommandFailure) {
   EXPECT_OK(dut_->Init());
 
   std::optional<block::Operation<OperationContext>> op1;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 1, FakeSdmmcDevice::kBadRegionStart, &op1));
+  ASSERT_NO_FATAL_FAILURE(
+      MakeBlockOp(BLOCK_OPCODE_WRITE, 1, FakeSdmmcDevice::kBadRegionStart, &op1));
   CallbackContext ctx1(1);
 
   user_.Queue(op1->operation(), OperationCallback, &ctx1);
@@ -601,7 +603,8 @@ TEST_F(SdmmcBlockDeviceTest, SendCmd12OnCommandFailure) {
   EXPECT_OK(dut_->Init());
 
   std::optional<block::Operation<OperationContext>> op2;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 1, FakeSdmmcDevice::kBadRegionStart, &op2));
+  ASSERT_NO_FATAL_FAILURE(
+      MakeBlockOp(BLOCK_OPCODE_WRITE, 1, FakeSdmmcDevice::kBadRegionStart, &op2));
   CallbackContext ctx2(1);
 
   user_.Queue(op2->operation(), OperationCallback, &ctx2);
@@ -615,25 +618,25 @@ TEST_F(SdmmcBlockDeviceTest, Trim) {
   AddMmcDevice();
 
   std::optional<block::Operation<OperationContext>> op1;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 10, 100, &op1));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 10, 100, &op1));
 
   std::optional<block::Operation<OperationContext>> op2;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_FLUSH, 0, 0, &op2));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_FLUSH, 0, 0, &op2));
 
   std::optional<block::Operation<OperationContext>> op3;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 10, 100, &op3));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 10, 100, &op3));
 
   std::optional<block::Operation<OperationContext>> op4;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_TRIM, 1, 103, &op4));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_TRIM, 1, 103, &op4));
 
   std::optional<block::Operation<OperationContext>> op5;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 10, 100, &op5));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 10, 100, &op5));
 
   std::optional<block::Operation<OperationContext>> op6;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_TRIM, 3, 106, &op6));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_TRIM, 3, 106, &op6));
 
   std::optional<block::Operation<OperationContext>> op7;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 10, 100, &op7));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 10, 100, &op7));
 
   FillVmo(op1->private_storage()->mapper, 10);
 
@@ -674,21 +677,21 @@ TEST_F(SdmmcBlockDeviceTest, TrimErrors) {
   AddMmcDevice();
 
   std::optional<block::Operation<OperationContext>> op1;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_TRIM, 10, 10, &op1));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_TRIM, 10, 10, &op1));
 
   std::optional<block::Operation<OperationContext>> op2;
   ASSERT_NO_FATAL_FAILURE(
-      MakeBlockOp(BLOCK_OP_TRIM, 10, FakeSdmmcDevice::kBadRegionStart | 0x40, &op2));
+      MakeBlockOp(BLOCK_OPCODE_TRIM, 10, FakeSdmmcDevice::kBadRegionStart | 0x40, &op2));
 
   std::optional<block::Operation<OperationContext>> op3;
   ASSERT_NO_FATAL_FAILURE(
-      MakeBlockOp(BLOCK_OP_TRIM, 10, FakeSdmmcDevice::kBadRegionStart - 5, &op3));
+      MakeBlockOp(BLOCK_OPCODE_TRIM, 10, FakeSdmmcDevice::kBadRegionStart - 5, &op3));
 
   std::optional<block::Operation<OperationContext>> op4;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_TRIM, 10, 100, &op4));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_TRIM, 10, 100, &op4));
 
   std::optional<block::Operation<OperationContext>> op5;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_TRIM, 10, 110, &op5));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_TRIM, 10, 110, &op5));
 
   sdmmc_.set_command_callback(MMC_ERASE_GROUP_START,
                               [](const sdmmc_req_t& req, uint32_t out_response[4]) {
@@ -799,19 +802,19 @@ TEST_F(SdmmcBlockDeviceTest, DdkLifecycleWithBootAndRpmbPartitions) {
 
 TEST_F(SdmmcBlockDeviceTest, CompleteTransactions) {
   std::optional<block::Operation<OperationContext>> op1;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 1, 0, &op1));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 1, 0, &op1));
 
   std::optional<block::Operation<OperationContext>> op2;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 5, 0x8000, &op2));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 5, 0x8000, &op2));
 
   std::optional<block::Operation<OperationContext>> op3;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_FLUSH, 0, 0, &op3));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_FLUSH, 0, 0, &op3));
 
   std::optional<block::Operation<OperationContext>> op4;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 1, 0x400, &op4));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 1, 0x400, &op4));
 
   std::optional<block::Operation<OperationContext>> op5;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 10, 0x2000, &op5));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 10, 0x2000, &op5));
 
   CallbackContext ctx(5);
 
@@ -845,19 +848,19 @@ TEST_F(SdmmcBlockDeviceTest, CompleteTransactionsOnUnbind) {
   dut_->StopWorkerThread();  // Stop the worker thread so queued requests don't get completed.
 
   std::optional<block::Operation<OperationContext>> op1;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 1, 0, &op1));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 1, 0, &op1));
 
   std::optional<block::Operation<OperationContext>> op2;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 5, 0x8000, &op2));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 5, 0x8000, &op2));
 
   std::optional<block::Operation<OperationContext>> op3;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_FLUSH, 0, 0, &op3));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_FLUSH, 0, 0, &op3));
 
   std::optional<block::Operation<OperationContext>> op4;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 1, 0x400, &op4));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 1, 0x400, &op4));
 
   std::optional<block::Operation<OperationContext>> op5;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 10, 0x2000, &op5));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 10, 0x2000, &op5));
 
   CallbackContext ctx(5);
 
@@ -883,19 +886,19 @@ TEST_F(SdmmcBlockDeviceTest, CompleteTransactionsOnSuspend) {
   dut_->StopWorkerThread();
 
   std::optional<block::Operation<OperationContext>> op1;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 1, 0, &op1));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 1, 0, &op1));
 
   std::optional<block::Operation<OperationContext>> op2;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 5, 0x8000, &op2));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 5, 0x8000, &op2));
 
   std::optional<block::Operation<OperationContext>> op3;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_FLUSH, 0, 0, &op3));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_FLUSH, 0, 0, &op3));
 
   std::optional<block::Operation<OperationContext>> op4;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 1, 0x400, &op4));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 1, 0x400, &op4));
 
   std::optional<block::Operation<OperationContext>> op5;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 10, 0x2000, &op5));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 10, 0x2000, &op5));
 
   CallbackContext ctx(5);
 
@@ -986,13 +989,13 @@ TEST_F(SdmmcBlockDeviceTest, AccessBootPartitions) {
   ASSERT_TRUE(boot2_.is_valid());
 
   std::optional<block::Operation<OperationContext>> op1;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 1, 0, &op1));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 1, 0, &op1));
 
   std::optional<block::Operation<OperationContext>> op2;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 5, 10, &op2));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 5, 10, &op2));
 
   std::optional<block::Operation<OperationContext>> op3;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 10, 500, &op3));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 10, 500, &op3));
 
   FillVmo(op1->private_storage()->mapper, 1);
   FillSdmmc(5, 10);
@@ -1055,13 +1058,13 @@ TEST_F(SdmmcBlockDeviceTest, BootPartitionRepeatedAccess) {
   ASSERT_TRUE(boot2_.is_valid());
 
   std::optional<block::Operation<OperationContext>> op1;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 1, 0, &op1));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 1, 0, &op1));
 
   std::optional<block::Operation<OperationContext>> op2;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 5, 10, &op2));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 5, 10, &op2));
 
   std::optional<block::Operation<OperationContext>> op3;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 2, 5, &op3));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 2, 5, &op3));
 
   FillSdmmc(1, 0);
   FillVmo(op2->private_storage()->mapper, 5);
@@ -1109,22 +1112,22 @@ TEST_F(SdmmcBlockDeviceTest, AccessBootPartitionOutOfRange) {
   ASSERT_TRUE(boot1_.is_valid());
 
   std::optional<block::Operation<OperationContext>> op1;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 1, 4096, &op1));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 1, 4096, &op1));
 
   std::optional<block::Operation<OperationContext>> op2;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 8, 4088, &op2));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 8, 4088, &op2));
 
   std::optional<block::Operation<OperationContext>> op3;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 9, 4088, &op3));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 9, 4088, &op3));
 
   std::optional<block::Operation<OperationContext>> op4;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 16, 4088, &op4));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 16, 4088, &op4));
 
   std::optional<block::Operation<OperationContext>> op5;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_READ, 0, 2048, &op5));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 0, 2048, &op5));
 
   std::optional<block::Operation<OperationContext>> op6;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 1, 4095, &op6));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 1, 4095, &op6));
 
   CallbackContext ctx(6);
 
@@ -1456,7 +1459,8 @@ void SdmmcBlockDeviceTest::QueueBlockOps() {
       std::optional<block::Operation<>> op = context.free_ops.pop();
       ASSERT_TRUE(op);
 
-      op->operation()->rw = {.command = BLOCK_OP_READ, .vmo = vmo.get(), .length = 1};
+      op->operation()->rw = {
+          .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0}, .vmo = vmo.get(), .length = 1};
 
       block_op_t* const bop = op->operation();
       context.outstanding_ops.push(*std::move(op));
@@ -1625,7 +1629,8 @@ TEST_F(SdmmcBlockDeviceTest, BlockOpsGetToRun) {
     std::optional<block::Operation<>> op = block::Operation<>::Alloc(kBlockOpSize);
     ASSERT_TRUE(op);
 
-    op->operation()->rw = {.command = BLOCK_OP_READ, .vmo = vmo.get(), .length = 1};
+    op->operation()->rw = {
+        .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0}, .vmo = vmo.get(), .length = 1};
 
     block_op_t* const bop = op->operation();
     outstanding_ops.push(*std::move(op));
@@ -1734,7 +1739,7 @@ TEST_F(SdmmcBlockDeviceTest, Inspect) {
 
   // IO error count should be a successful block op.
   std::optional<block::Operation<OperationContext>> op1;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 5, 0x8000, &op1));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 5, 0x8000, &op1));
 
   CallbackContext ctx1(1);
 
@@ -1763,7 +1768,7 @@ TEST_F(SdmmcBlockDeviceTest, Inspect) {
                               [](const sdmmc_req_t& req) -> zx_status_t { return ZX_ERR_IO; });
 
   std::optional<block::Operation<OperationContext>> op2;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 5, 0x8000, &op2));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 5, 0x8000, &op2));
 
   CallbackContext ctx2(1);
 
@@ -1807,7 +1812,7 @@ TEST_F(SdmmcBlockDeviceTest, InspectCmd12NotDoubleCounted) {
                               [](const sdmmc_req_t& req) -> zx_status_t { return ZX_ERR_IO; });
 
   std::optional<block::Operation<OperationContext>> op1;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 5, 0x8000, &op1));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 5, 0x8000, &op1));
 
   CallbackContext ctx1(1);
 
@@ -1836,7 +1841,7 @@ TEST_F(SdmmcBlockDeviceTest, InspectCmd12NotDoubleCounted) {
                               [](const sdmmc_req_t& req) -> zx_status_t { return ZX_ERR_IO; });
 
   std::optional<block::Operation<OperationContext>> op2;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 5, 0x8000, &op2));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 5, 0x8000, &op2));
 
   CallbackContext ctx2(1);
 
@@ -1862,7 +1867,7 @@ TEST_F(SdmmcBlockDeviceTest, InspectCmd12NotDoubleCounted) {
                               [](const sdmmc_req_t& req) -> zx_status_t { return ZX_ERR_IO; });
 
   std::optional<block::Operation<OperationContext>> op3;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OP_WRITE, 5, 0x8000, &op3));
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 5, 0x8000, &op3));
 
   CallbackContext ctx3(1);
 

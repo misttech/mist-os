@@ -40,13 +40,13 @@ class StubBlockDevice : public ddk::BlockProtocol<StubBlockDevice> {
   void BlockQueue(block_op_t* operation, block_queue_callback completion_cb, void* cookie);
   // -----------------------------------
 
-  std::vector<uint32_t>& GetCommandSequence() { return command_sequence_; }
+  std::vector<block_command_t>& GetCommandSequence() { return command_sequence_; }
 
  private:
   block_protocol_t proto_{};
   block_info_t info_{};
   Callback callback_;
-  std::vector<uint32_t> command_sequence_;
+  std::vector<block_command_t> command_sequence_;
 };
 
 #endif  // SRC_DEVICES_BLOCK_DRIVERS_CORE_TEST_STUB_BLOCK_DEVICE_H_

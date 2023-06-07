@@ -328,7 +328,7 @@ TEST_F(DiskTest, TestCreateReadDestroy) {
     fbl::AutoLock lock(&iowait_->lock_);
     iowait_->cv_.Signal();
   };
-  read.command = BLOCK_OP_READ;
+  read.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   read.rw.length = 1;      // Read one block
   read.rw.offset_dev = 1;  // Read logical block 1
   read.rw.offset_vmo = 0;

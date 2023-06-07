@@ -25,14 +25,14 @@
 namespace zxcrypt {
 
 void SyncComplete(void* cookie, zx_status_t status, block_op_t* block) {
-  // Use the 32bit command field to shuttle the response back to the callsite that's waiting on
-  // the completion
-  block->command = status;
+  // Use the 32bit command.flags field to shuttle the response back to the callsite that's waiting
+  // on the completion
+  block->command.flags = status;
   sync_completion_signal(static_cast<sync_completion_t*>(cookie));
 }
 
 // Performs synchronous I/O
-zx_status_t SyncIO(zx_device_t* dev, uint32_t cmd, void* buf, size_t off, size_t len) {
+zx_status_t SyncIO(zx_device_t* dev, uint8_t opcode, void* buf, size_t off, size_t len) {
   zx_status_t rc;
 
   if (!dev || !buf || len == 0) {
@@ -75,13 +75,13 @@ zx_status_t SyncIO(zx_device_t* dev, uint32_t cmd, void* buf, size_t off, size_t
   sync_completion_t completion;
   sync_completion_reset(&completion);
 
-  block->command = cmd;
+  block->command = {.opcode = opcode, .flags = 0};
   block->rw.vmo = vmo.get();
   block->rw.length = static_cast<uint32_t>(len / bsz);
   block->rw.offset_dev = static_cast<uint32_t>(off / bsz);
   block->rw.offset_vmo = 0;
 
-  if (cmd == BLOCK_OP_WRITE && (rc = vmo.write(buf, 0, len)) != ZX_OK) {
+  if (opcode == BLOCK_OPCODE_WRITE && (rc = vmo.write(buf, 0, len)) != ZX_OK) {
     xprintf("zx::vmo::write failed: %s\n", zx_status_get_string(rc));
     return rc;
   }
@@ -89,13 +89,13 @@ zx_status_t SyncIO(zx_device_t* dev, uint32_t cmd, void* buf, size_t off, size_t
   block_impl_queue(&proto, block, SyncComplete, &completion);
   sync_completion_wait(&completion, ZX_TIME_INFINITE);
 
-  rc = block->command;
+  rc = block->command.flags;
   if (rc != ZX_OK) {
     xprintf("Block I/O failed: %s\n", zx_status_get_string(rc));
     return rc;
   }
 
-  if (cmd == BLOCK_OP_READ && (rc = vmo.read(buf, 0, len)) != ZX_OK) {
+  if (opcode == BLOCK_OPCODE_READ && (rc = vmo.read(buf, 0, len)) != ZX_OK) {
     xprintf("zx::vmo::read failed: %s\n", zx_status_get_string(rc));
     return rc;
   }
@@ -250,11 +250,11 @@ zx_status_t DdkVolume::DoBlockFvmExtend(uint64_t start_slice, uint64_t slice_cou
 }
 
 zx_status_t DdkVolume::Read() {
-  return SyncIO(dev_, BLOCK_OP_READ, block_.get(), offset_, block_.len());
+  return SyncIO(dev_, BLOCK_OPCODE_READ, block_.get(), offset_, block_.len());
 }
 
 zx_status_t DdkVolume::Write() {
-  return SyncIO(dev_, BLOCK_OP_WRITE, block_.get(), offset_, block_.len());
+  return SyncIO(dev_, BLOCK_OPCODE_WRITE, block_.get(), offset_, block_.len());
 }
 
 zx_status_t DdkVolume::Flush() {
@@ -286,12 +286,12 @@ zx_status_t DdkVolume::Flush() {
   sync_completion_t completion;
   sync_completion_reset(&completion);
 
-  block->command = BLOCK_OP_FLUSH;
+  block->command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0};
 
   block_impl_queue(&proto, block, SyncComplete, &completion);
   sync_completion_wait(&completion, ZX_TIME_INFINITE);
 
-  rc = block->command;
+  rc = block->command.flags;
   if (rc != ZX_OK) {
     xprintf("Block I/O (BLOCK_OP_FLUSH) failed: %s\n", zx_status_get_string(rc));
     return rc;

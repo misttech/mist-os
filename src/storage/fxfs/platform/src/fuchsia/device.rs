@@ -30,7 +30,7 @@ use {
 // Multiple Block I/O request may be sent as a group.
 // Notes:
 // - the group is identified by `group_id` in the request
-// - if using groups, a response will not be sent unless `BLOCK_GROUP_LAST`
+// - if using groups, a response will not be sent unless `BlockIoFlag::GROUP_LAST`
 //   flag is set.
 // - when processing a request of a group fails, subsequent requests of that
 //   group will not be processed.
@@ -64,11 +64,9 @@ impl FifoMessageGroup {
     fn into_response(self) -> BlockFifoResponse {
         return BlockFifoResponse {
             status: self.status,
-            reqid: 0,
             group: self.group_id,
-            padding_to_satisfy_zerocopy: 0,
             count: self.count,
-            padding_to_match_request_size_and_alignment: [0; 3],
+            ..Default::default()
         };
     }
 
@@ -98,7 +96,7 @@ impl FifoMessageGroups {
         self.0.entry(group_id).or_insert_with(|| FifoMessageGroup::new(group_id))
     }
 
-    // Remove a group when `BLOCK_GROUP_LAST` flag is set.
+    // Remove a group when `BlockIoFlag::GROUP_LAST` flag is set.
     fn remove(&mut self, group_id: u16) -> FifoMessageGroup {
         match self.0.remove(&group_id) {
             Some(group) => group,
@@ -202,33 +200,34 @@ impl BlockServer {
             status.into_raw()
         }
 
-        match request.opcode & remote_block_device::BLOCK_OP_MASK {
-            remote_block_device::BLOCK_OP_CLOSE_VMO => {
+        match remote_block_device::BlockOpcode::from_primitive(request.command.opcode) {
+            Some(remote_block_device::BlockOpcode::CloseVmo) => {
                 let mut vmos = self.vmos.lock().unwrap();
                 match vmos.remove(&request.vmoid) {
                     Some(_vmo) => zx::sys::ZX_OK,
                     None => zx::sys::ZX_ERR_NOT_FOUND,
                 }
             }
-            remote_block_device::BLOCK_OP_WRITE => {
+            Some(remote_block_device::BlockOpcode::Write) => {
                 into_raw_status(self.handle_blockio_write(&request).await)
             }
-            remote_block_device::BLOCK_OP_READ => {
+            Some(remote_block_device::BlockOpcode::Read) => {
                 into_raw_status(self.handle_blockio_read(&request).await)
             }
             // TODO(fxbug.dev/89873): simply returning ZX_OK since we're
             // writing to device and no need to flush cache, but need to
             // check that flush goes down the stack
-            remote_block_device::BLOCK_OP_FLUSH => zx::sys::ZX_OK,
+            Some(remote_block_device::BlockOpcode::Flush) => zx::sys::ZX_OK,
             // TODO(fxbug.dev/89873)
-            remote_block_device::BLOCK_OP_TRIM => zx::sys::ZX_OK,
-            _ => panic!("Unexpected message, request {:?}", request.opcode),
+            Some(remote_block_device::BlockOpcode::Trim) => zx::sys::ZX_OK,
+            None => panic!("Unexpected message, request {:?}", request.command.opcode),
         }
     }
 
     async fn handle_fifo_request(&self, request: BlockFifoRequest) -> Option<BlockFifoResponse> {
-        let is_group = (request.opcode & remote_block_device::BLOCK_GROUP_ITEM) > 0;
-        let wants_reply = (request.opcode & remote_block_device::BLOCK_GROUP_LAST) > 0;
+        let flags = remote_block_device::BlockIoFlag::from_bits_truncate(request.command.flags);
+        let is_group = flags.contains(remote_block_device::BlockIoFlag::GROUP_ITEM);
+        let wants_reply = flags.contains(remote_block_device::BlockIoFlag::GROUP_LAST);
 
         // Set up the BlockFifoResponse for this request, but do no process request yet
         let mut maybe_reply = {
@@ -260,14 +259,7 @@ impl BlockServer {
                     None
                 }
             } else {
-                Some(BlockFifoResponse {
-                    status: 0,
-                    reqid: request.reqid,
-                    group: 0,
-                    padding_to_satisfy_zerocopy: 0,
-                    count: 1,
-                    padding_to_match_request_size_and_alignment: [0; 3],
-                })
+                Some(BlockFifoResponse { reqid: request.reqid, count: 1, ..Default::default() })
             }
         };
         let status = self.process_fifo_request(&request).await;
@@ -617,7 +609,7 @@ impl BlockServer {
                         // if `self.handle_fifo_request(..)` returns None, then
                         // there's no reply for this request. This occurs for
                         // requests part of a group request where
-                        // `BLOCK_GROUP_LAST` flag is not set.
+                        // `BlockIoFlag::GROUP_LAST` flag is not set.
                     }
                     Err(zx::Status::PEER_CLOSED) => break Result::<_, Error>::Ok(()),
                     Err(e) => break Err(e.into()),

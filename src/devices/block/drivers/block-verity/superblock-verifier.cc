@@ -45,7 +45,7 @@ zx_status_t SuperblockVerifier::StartVerifying(void* cookie, SuperblockVerifierC
   // Request to read the superblock.
 
   block_op_t* block_op = reinterpret_cast<block_op_t*>(block_op_buf_.get());
-  block_op->rw.command = BLOCK_OP_READ;
+  block_op->rw.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
   block_op->rw.length = info_.hw_blocks_per_virtual_block;
   block_op->rw.offset_dev = 0;  // Superblock is always block 0
   block_op->rw.offset_vmo = 0;  // Write to start of VMO

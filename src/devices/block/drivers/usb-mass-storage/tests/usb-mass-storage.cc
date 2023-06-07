@@ -520,7 +520,7 @@ TEST_F(UmsTest, TestRead) {
     auto block_op = std::make_unique<uint8_t[]>(block_op_size);
     block_op_t& op = *reinterpret_cast<block_op_t*>(block_op.get());
     op = {};
-    op.command = BLOCK_OP_READ;
+    op.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
     op.rw.offset_dev = i;
     op.rw.length = (i + 1) * 65534;
     op.rw.offset_vmo = 0;
@@ -571,7 +571,7 @@ TEST_F(UmsTest, TestWrite) {
     auto block_op = std::make_unique<uint8_t[]>(block_op_size);
     block_op_t& op = *reinterpret_cast<block_op_t*>(block_op.get());
     op = {};
-    op.command = BLOCK_OP_WRITE;
+    op.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
     op.rw.offset_dev = i;
     op.rw.length = (i + 1) * 65534;
     op.rw.offset_vmo = 0;
@@ -608,7 +608,7 @@ TEST_F(UmsTest, TestFlush) {
     auto block_op = std::make_unique<uint8_t[]>(block_op_size);
     block_op_t& op = *reinterpret_cast<block_op_t*>(block_op.get());
     op = {};
-    op.command = BLOCK_OP_FLUSH;
+    op.command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0};
 
     block_dev->BlockImplQueue(&op, CompletionCallback, &context_);
     sync_completion_wait(&context_.completion, ZX_TIME_INFINITE);

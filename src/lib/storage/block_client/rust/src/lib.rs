@@ -38,27 +38,16 @@ pub mod testing;
 
 const TEMP_VMO_SIZE: usize = 65536;
 
-pub use block_driver::BLOCK_VMOID_INVALID;
+pub use block_driver::{BlockIoFlag, BlockOpcode};
 
-pub use block_driver::BLOCK_OP_CLOSE_VMO;
-pub use block_driver::BLOCK_OP_FLUSH;
-pub use block_driver::BLOCK_OP_READ;
-pub use block_driver::BLOCK_OP_TRIM;
-pub use block_driver::BLOCK_OP_WRITE;
-
-pub use block_driver::BLOCK_GROUP_ITEM;
-pub use block_driver::BLOCK_GROUP_LAST;
-
-pub use block_driver::BLOCK_OP_MASK;
-
-fn op_code_str(op_code: u32) -> &'static str {
-    match op_code & BLOCK_OP_MASK {
-        BLOCK_OP_READ => "read",
-        BLOCK_OP_WRITE => "write",
-        BLOCK_OP_FLUSH => "flush",
-        BLOCK_OP_TRIM => "trim",
-        BLOCK_OP_CLOSE_VMO => "close_vmo",
-        _ => "unknown",
+fn opcode_str(opcode: u8) -> &'static str {
+    match BlockOpcode::from_primitive(opcode) {
+        Some(BlockOpcode::Read) => "read",
+        Some(BlockOpcode::Write) => "write",
+        Some(BlockOpcode::Flush) => "flush",
+        Some(BlockOpcode::Trim) => "trim",
+        Some(BlockOpcode::CloseVmo) => "close_vmo",
+        None => "unknown",
     }
 }
 
@@ -219,16 +208,16 @@ impl VmoId {
 
     /// Invalidates self and returns a new VmoId with the same underlying ID.
     pub fn take(&self) -> Self {
-        Self(AtomicU16::new(self.0.swap(BLOCK_VMOID_INVALID, Ordering::Relaxed)))
+        Self(AtomicU16::new(self.0.swap(block_driver::BLOCK_VMOID_INVALID, Ordering::Relaxed)))
     }
 
     pub fn is_valid(&self) -> bool {
-        self.id() != BLOCK_VMOID_INVALID
+        self.id() != block_driver::BLOCK_VMOID_INVALID
     }
 
     /// Takes the ID.  The caller assumes responsibility for detaching.
     pub fn into_id(self) -> u16 {
-        self.0.swap(BLOCK_VMOID_INVALID, Ordering::Relaxed)
+        self.0.swap(block_driver::BLOCK_VMOID_INVALID, Ordering::Relaxed)
     }
 
     pub fn id(&self) -> u16 {
@@ -248,7 +237,7 @@ impl Drop for VmoId {
     fn drop(&mut self) {
         assert_eq!(
             self.0.load(Ordering::Relaxed),
-            BLOCK_VMOID_INVALID,
+            block_driver::BLOCK_VMOID_INVALID,
             "Did you forget to detach?"
         );
     }
@@ -321,7 +310,7 @@ impl Common {
             trace::Id::new(),
             "storage",
             "BlockOp",
-            "op" => op_code_str(request.opcode)
+            "op" => opcode_str(request.command.opcode)
         );
         let (request_id, trace_flow_id) = {
             let mut state = self.fifo_state.lock().unwrap();
@@ -353,17 +342,6 @@ impl Common {
     }
 }
 
-const EMPTY_BLOCK_FIFO_REQUEST: BlockFifoRequest = BlockFifoRequest {
-    opcode: 0,
-    reqid: 0,
-    group: 0,
-    vmoid: 0,
-    length: 0,
-    vmo_offset: 0,
-    dev_offset: 0,
-    trace_flow_id: 0,
-};
-
 impl Common {
     fn new(
         fifo: fasync::Fifo<BlockFifoResponse, BlockFifoRequest>,
@@ -384,9 +362,13 @@ impl Common {
 
     async fn detach_vmo(&self, vmo_id: VmoId) -> Result<(), Error> {
         self.send(BlockFifoRequest {
-            opcode: BLOCK_OP_CLOSE_VMO,
+            command: BlockFifoCommand {
+                opcode: BlockOpcode::CloseVmo.into_primitive(),
+                flags: 0,
+                ..Default::default()
+            },
             vmoid: vmo_id.into_id(),
-            ..EMPTY_BLOCK_FIFO_REQUEST
+            ..Default::default()
         })
         .await
     }
@@ -399,12 +381,16 @@ impl Common {
         match buffer_slice {
             MutableBufferSlice::VmoId { vmo_id, offset, length } => {
                 self.send(BlockFifoRequest {
-                    opcode: BLOCK_OP_READ,
+                    command: BlockFifoCommand {
+                        opcode: BlockOpcode::Read.into_primitive(),
+                        flags: 0,
+                        ..Default::default()
+                    },
                     vmoid: vmo_id.id(),
                     length: self.to_blocks(length)?.try_into()?,
                     vmo_offset: self.to_blocks(offset)?,
                     dev_offset: self.to_blocks(device_offset)?,
-                    ..EMPTY_BLOCK_FIFO_REQUEST
+                    ..Default::default()
                 })
                 .await?
             }
@@ -415,12 +401,16 @@ impl Common {
                     let to_do = std::cmp::min(TEMP_VMO_SIZE, slice.len());
                     let block_count = self.to_blocks(to_do as u64)? as u32;
                     self.send(BlockFifoRequest {
-                        opcode: BLOCK_OP_READ,
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Read.into_primitive(),
+                            flags: 0,
+                            ..Default::default()
+                        },
                         vmoid: self.temp_vmo_id.id(),
                         length: block_count,
                         vmo_offset: 0,
                         dev_offset: device_block,
-                        ..EMPTY_BLOCK_FIFO_REQUEST
+                        ..Default::default()
                     })
                     .await?;
                     temp_vmo.read(&mut slice[..to_do], 0)?;
@@ -443,12 +433,16 @@ impl Common {
         match buffer_slice {
             BufferSlice::VmoId { vmo_id, offset, length } => {
                 self.send(BlockFifoRequest {
-                    opcode: BLOCK_OP_WRITE,
+                    command: BlockFifoCommand {
+                        opcode: BlockOpcode::Write.into_primitive(),
+                        flags: 0,
+                        ..Default::default()
+                    },
                     vmoid: vmo_id.id(),
                     length: self.to_blocks(length)?.try_into()?,
                     vmo_offset: self.to_blocks(offset)?,
                     dev_offset: self.to_blocks(device_offset)?,
-                    ..EMPTY_BLOCK_FIFO_REQUEST
+                    ..Default::default()
                 })
                 .await?;
             }
@@ -460,12 +454,16 @@ impl Common {
                     let block_count = self.to_blocks(to_do as u64)? as u32;
                     temp_vmo.write(&slice[..to_do], 0)?;
                     self.send(BlockFifoRequest {
-                        opcode: BLOCK_OP_WRITE,
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Write.into_primitive(),
+                            flags: 0,
+                            ..Default::default()
+                        },
                         vmoid: self.temp_vmo_id.id(),
                         length: block_count,
                         vmo_offset: 0,
                         dev_offset: device_block,
-                        ..EMPTY_BLOCK_FIFO_REQUEST
+                        ..Default::default()
                     })
                     .await?;
                     if to_do == slice.len() {
@@ -481,9 +479,13 @@ impl Common {
 
     async fn flush(&self) -> Result<(), Error> {
         self.send(BlockFifoRequest {
-            opcode: BLOCK_OP_FLUSH,
-            vmoid: BLOCK_VMOID_INVALID,
-            ..EMPTY_BLOCK_FIFO_REQUEST
+            command: BlockFifoCommand {
+                opcode: BlockOpcode::Flush.into_primitive(),
+                flags: 0,
+                ..Default::default()
+            },
+            vmoid: block_driver::BLOCK_VMOID_INVALID,
+            ..Default::default()
         })
         .await
     }
@@ -738,15 +740,6 @@ mod tests {
 
     const RAMDISK_BLOCK_SIZE: u64 = 1024;
     const RAMDISK_BLOCK_COUNT: u64 = 1024;
-
-    const EMPTY_BLOCK_FIFO_RESPONSE: BlockFifoResponse = BlockFifoResponse {
-        status: 0,
-        reqid: 0,
-        group: 0,
-        padding_to_satisfy_zerocopy: 0,
-        count: 0,
-        padding_to_match_request_size_and_alignment: [0; 3],
-    };
 
     pub async fn make_ramdisk() -> (RamdiskClient, block::BlockProxy, RemoteBlockClient) {
         let ramdisk = RamdiskClient::create(RAMDISK_BLOCK_SIZE, RAMDISK_BLOCK_COUNT)
@@ -1158,11 +1151,11 @@ mod tests {
                 let flush_called = std::sync::Mutex::new(false);
                 let fifo_handler = |request: BlockFifoRequest| -> BlockFifoResponse {
                     *flush_called.lock().unwrap() = true;
-                    assert_eq!(request.opcode, super::BLOCK_OP_FLUSH);
+                    assert_eq!(request.command.opcode, super::BlockOpcode::Flush.into_primitive());
                     BlockFifoResponse {
                         status: zx::Status::OK.into_raw(),
                         reqid: request.reqid,
-                        ..EMPTY_BLOCK_FIFO_RESPONSE
+                        ..Default::default()
                     }
                 };
                 FakeBlockServer::new(server, |_| false, fifo_handler).run().await;
@@ -1190,7 +1183,7 @@ mod tests {
                     BlockFifoResponse {
                         status: zx::Status::OK.into_raw(),
                         reqid: request.reqid,
-                        ..EMPTY_BLOCK_FIFO_RESPONSE
+                        ..Default::default()
                     }
                 };
                 FakeBlockServer::new(server, |_| false, fifo_handler).run().await;

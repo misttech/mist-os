@@ -98,9 +98,9 @@ void PartitionDevice::BlockImplQuery(block_info_t* info_out, size_t* block_op_si
 
 void PartitionDevice::BlockImplQueue(block_op_t* bop, block_impl_queue_callback completion_cb,
                                      void* cookie) {
-  switch (bop->command & BLOCK_OP_MASK) {
-    case BLOCK_OP_READ:
-    case BLOCK_OP_WRITE: {
+  switch (bop->command.opcode) {
+    case BLOCK_OPCODE_READ:
+    case BLOCK_OPCODE_WRITE: {
       gpt_entry_t* entry = &gpt_entry_;
       size_t max = EntryBlockCount(entry).value();
 
@@ -113,7 +113,7 @@ void PartitionDevice::BlockImplQueue(block_op_t* bop, block_impl_queue_callback 
       bop->rw.offset_dev += entry->first;
       break;
     }
-    case BLOCK_OP_TRIM: {
+    case BLOCK_OPCODE_TRIM: {
       gpt_entry_t* entry = &gpt_entry_;
       size_t max = EntryBlockCount(entry).value();
 
@@ -125,7 +125,7 @@ void PartitionDevice::BlockImplQueue(block_op_t* bop, block_impl_queue_callback 
       bop->trim.offset_dev += entry->first;
       break;
     }
-    case BLOCK_OP_FLUSH:
+    case BLOCK_OPCODE_FLUSH:
       break;
     default:
       completion_cb(cookie, ZX_ERR_NOT_SUPPORTED, bop);
@@ -207,7 +207,7 @@ zx_status_t PartitionDevice::Add(uint32_t partition_number, bool ignore_device) 
 void gpt_read_sync_complete(void* cookie, zx_status_t status, block_op_t* bop) {
   // Pass 32bit status back to caller via 32bit command field
   // Saves from needing custom structs, etc.
-  bop->command = status;
+  bop->command.flags = status;
   sync_completion_signal(static_cast<sync_completion_t*>(cookie));
 }
 
@@ -225,7 +225,7 @@ zx_status_t ReadBlocks(block_impl_protocol_t* block_protocol, size_t block_op_si
     return status;
   }
 
-  bop->command = BLOCK_OP_READ;
+  bop->command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   bop->rw.vmo = vmo.get();
   bop->rw.length = block_count;
   bop->rw.offset_dev = block_offset;
@@ -233,9 +233,9 @@ zx_status_t ReadBlocks(block_impl_protocol_t* block_protocol, size_t block_op_si
 
   block_protocol->ops->queue(block_protocol->ctx, bop, gpt_read_sync_complete, &completion);
   sync_completion_wait(&completion, ZX_TIME_INFINITE);
-  if (bop->command != ZX_OK) {
-    zxlogf(ERROR, "gpt: error %d reading GPT", bop->command);
-    return static_cast<zx_status_t>(bop->command);
+  if (bop->command.flags != ZX_OK) {
+    zxlogf(ERROR, "gpt: error %d reading GPT", bop->command.flags);
+    return static_cast<zx_status_t>(bop->command.flags);
   }
 
   return vmo.read(out_buffer, 0, vmo_size);

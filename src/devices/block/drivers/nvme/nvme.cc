@@ -135,17 +135,17 @@ void Nvme::ProcessIoSubmissions() {
     }
 
     zx_status_t status;
-    const auto opcode = io_cmd->op.command & BLOCK_OP_MASK;
-    if (opcode == BLOCK_OP_FLUSH) {
+    const auto opcode = io_cmd->op.command.opcode;
+    if (opcode == BLOCK_OPCODE_FLUSH) {
       NvmIoFlushSubmission submission;
       submission.namespace_id = io_cmd->namespace_id;
 
       status = io_queue_->Submit(submission, std::nullopt, 0, 0, io_cmd);
     } else {
-      NvmIoSubmission submission(opcode == BLOCK_OP_WRITE);
+      NvmIoSubmission submission(opcode == BLOCK_OPCODE_WRITE);
       submission.namespace_id = io_cmd->namespace_id;
       submission.set_start_lba(io_cmd->op.rw.offset_dev).set_block_count(io_cmd->op.rw.length - 1);
-      if (io_cmd->op.command & BLOCK_FL_FORCE_ACCESS) {
+      if (io_cmd->op.command.flags & BLOCK_IO_FLAG_FORCE_ACCESS) {
         submission.set_force_unit_access(true);
       }
 

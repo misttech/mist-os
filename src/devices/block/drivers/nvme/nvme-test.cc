@@ -176,7 +176,7 @@ TEST_F(NvmeTest, NamespaceReadTest) {
   auto block_op = std::make_unique<uint8_t[]>(op_size);
   auto op = reinterpret_cast<block_op_t*>(block_op.get());
   *op = {.rw = {
-             .command = BLOCK_OP_READ,
+             .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
              .vmo = vmo.get(),
              .length = 1,
              .offset_dev = 0,

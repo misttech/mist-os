@@ -36,8 +36,6 @@
 
 #define SATA_MAX_BLOCK_COUNT 0x10000  // 16-bit count
 
-#define BLOCK_OP(op) ((op)&BLOCK_OP_MASK)
-
 namespace ahci {
 
 // SATA disk identifier. Response to SATA_CMD_IDENTIFY_DEVICE command.

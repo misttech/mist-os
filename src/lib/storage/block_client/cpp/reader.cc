@@ -37,7 +37,7 @@ zx_status_t Reader::Read(uint64_t offset, const size_t count, void* buf) {
   while (remaining > 0) {
     size_t amount = std::min(remaining, read_size);
     block_fifo_request_t request = {
-        .opcode = BLOCK_OP_READ,
+        .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
         .vmoid = vmoid_.get(),
         .length = safemath::checked_cast<uint32_t>(amount / block_size_),
         .vmo_offset = 0,

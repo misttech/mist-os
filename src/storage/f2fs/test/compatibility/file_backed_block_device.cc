@@ -16,8 +16,8 @@ FileBackedBlockDevice::FileBackedBlockDevice(fbl::unique_fd fd, const uint64_t b
 zx_status_t FileBackedBlockDevice::FifoTransaction(block_fifo_request_t* requests, size_t count) {
   std::lock_guard mutex_lock(mutex_);
   for (size_t i = 0; i < count; ++i) {
-    switch (requests[i].opcode & BLOCK_OP_MASK) {
-      case BLOCK_OP_READ: {
+    switch (requests[i].command.opcode) {
+      case BLOCK_OPCODE_READ: {
         vmoid_t vmoid = requests[i].vmoid;
         zx::vmo& target_vmoid = vmos_.at(vmoid);
         uint8_t buffer[block_size_];
@@ -43,7 +43,7 @@ zx_status_t FileBackedBlockDevice::FifoTransaction(block_fifo_request_t* request
         }
         break;
       }
-      case BLOCK_OP_WRITE: {
+      case BLOCK_OPCODE_WRITE: {
         vmoid_t vmoid = requests[i].vmoid;
         zx::vmo& target_vmoid = vmos_.at(vmoid);
         uint8_t buffer[block_size_];
@@ -69,12 +69,12 @@ zx_status_t FileBackedBlockDevice::FifoTransaction(block_fifo_request_t* request
         }
         break;
       }
-      case BLOCK_OP_FLUSH:
+      case BLOCK_OPCODE_FLUSH:
         continue;
-      case BLOCK_OP_CLOSE_VMO:
+      case BLOCK_OPCODE_CLOSE_VMO:
         vmos_.erase(requests[i].vmoid);
         break;
-      case BLOCK_OP_TRIM:
+      case BLOCK_OPCODE_TRIM:
       // TODO: support trim using truncate
       default:
         return ZX_ERR_NOT_SUPPORTED;

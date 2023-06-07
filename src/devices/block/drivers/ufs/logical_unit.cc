@@ -48,23 +48,23 @@ void LogicalUnit::BlockImplQueue(block_op_t *op, block_impl_queue_callback callb
   io_cmd->block_size_bytes = block_info_.block_size;
   io_cmd->block_count = block_info_.block_count;
 
-  const uint32_t opcode = io_cmd->op.command & BLOCK_OP_MASK;
+  const uint32_t opcode = io_cmd->op.command.opcode;
   switch (opcode) {
-    case BLOCK_OP_READ:
-    case BLOCK_OP_WRITE:
+    case BLOCK_OPCODE_READ:
+    case BLOCK_OPCODE_WRITE:
       if (zx_status_t status = block::CheckIoRange(op->rw, block_info_.block_count);
           status != ZX_OK) {
         io_cmd->Complete(status);
       }
-      zxlogf(TRACE, "Block IO: %s: %u blocks @ LBA %zu", opcode == BLOCK_OP_WRITE ? "wr" : "rd",
+      zxlogf(TRACE, "Block IO: %s: %u blocks @ LBA %zu", opcode == BLOCK_OPCODE_WRITE ? "wr" : "rd",
              op->rw.length, op->rw.offset_dev);
       break;
-    case BLOCK_OP_TRIM:
+    case BLOCK_OPCODE_TRIM:
       zxlogf(TRACE, "Block IO: trim");
       // TODO(fxbug.dev/124835): Support TRIM command
       io_cmd->Complete(ZX_ERR_NOT_SUPPORTED);
       break;
-    case BLOCK_OP_FLUSH:
+    case BLOCK_OPCODE_FLUSH:
       zxlogf(TRACE, "Block IO: flush");
       break;
     default:

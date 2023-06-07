@@ -3000,12 +3000,12 @@ std::unique_ptr<Journal> CreateJournal(TestTransactionHandler& handler) {
 
   // Write the super-block to the device.
   block_fifo_request_t requests[] = {{
-                                         .opcode = BLOCK_OP_WRITE,
+                                         .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
                                          .vmoid = info_block.buffer().vmoid(),
                                          .length = kJournalMetadataBlocks,
                                      },
                                      {
-                                         .opcode = BLOCK_OP_FLUSH,
+                                         .command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0},
                                      }};
   EXPECT_EQ(handler.GetDevice()->FifoTransaction(requests, 2), ZX_OK);
 
@@ -3026,8 +3026,8 @@ TEST(JournalCallbackTest, CommitCallbackTriggeredAtCorrectTime) {
   int replay_blocks = 0;
   ASSERT_EQ(replay_buffer.Initialize(&device, 100, kBlockSize, "test-buffer"), ZX_OK);
   device.set_hook([&](const block_fifo_request_t& request, const zx::vmo* vmo) {
-    switch (request.opcode & BLOCK_OP_MASK) {
-      case BLOCK_OP_WRITE: {
+    switch (request.command.opcode) {
+      case BLOCK_OPCODE_WRITE: {
         vmo->read(replay_buffer.Data(replay_blocks), request.vmo_offset * kBlockSize,
                   request.length * kBlockSize);
         block_fifo_request_t replay_request = request;
@@ -3037,7 +3037,7 @@ TEST(JournalCallbackTest, CommitCallbackTriggeredAtCorrectTime) {
         requests.push_back(replay_request);
         break;
       }
-      case BLOCK_OP_FLUSH:
+      case BLOCK_OPCODE_FLUSH:
         requests.push_back(request);
         break;
     }
@@ -3080,7 +3080,7 @@ TEST(JournalCallbackTest, CommitCallbackTriggeredAtCorrectTime) {
                    .commit_callback =
                        [&]() {
                          block_fifo_request_t request = {
-                             .opcode = BLOCK_OP_WRITE,
+                             .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
                              .vmoid = test_buffer.vmoid(),
                              .length = 1,
                              .vmo_offset = 2,
@@ -3115,7 +3115,7 @@ TEST(JournalCallbackTest, CommitCallbackTriggeredAtCorrectTime) {
       EXPECT_TRUE(result.is_ok());
 
       block_fifo_request_t request = {
-          .opcode = BLOCK_OP_READ,
+          .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
           .vmoid = test_buffer.vmoid(),
           .length = 3,
           .dev_offset = 20,
@@ -3142,7 +3142,7 @@ TEST(JournalCallbackTest, CommitCallbackTriggeredAtCorrectTime) {
     // Now reverse the order of the writes between the flush calls, and we should see the same
     // results.
     for (auto iter = requests.begin(), sequence_start = iter;; ++iter) {
-      if (iter == requests.end() || (iter->opcode & BLOCK_OP_MASK) == BLOCK_OP_FLUSH) {
+      if (iter == requests.end() || (iter->command.opcode) == BLOCK_OPCODE_FLUSH) {
         std::reverse(sequence_start, iter);
         if (iter == requests.end())
           break;
@@ -3196,7 +3196,7 @@ TEST(JournalCallbackTest, CompleteCallbackTriggeredAtCorrectTime) {
                          EXPECT_TRUE(commit_callback_received);
 
                          block_fifo_request_t request = {
-                             .opcode = BLOCK_OP_READ,
+                             .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
                              .vmoid = test_buffer.vmoid(),
                              .length = 2,
                              .vmo_offset = 2,

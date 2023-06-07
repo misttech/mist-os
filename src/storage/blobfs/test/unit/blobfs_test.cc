@@ -60,7 +60,7 @@ class MockBlockDevice : public FakeBlockDevice {
 
 zx_status_t MockBlockDevice::FifoTransaction(block_fifo_request_t* requests, size_t count) {
   for (size_t i = 0; i < count; i++) {
-    if (requests[i].opcode == BLOCK_OP_TRIM) {
+    if (requests[i].command.opcode == BLOCK_OPCODE_TRIM) {
       saw_trim_ = true;
       return ZX_OK;
     }

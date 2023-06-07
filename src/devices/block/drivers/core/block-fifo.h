@@ -16,12 +16,19 @@ typedef uint32_t reqid_t;
 typedef uint16_t groupid_t;
 typedef uint16_t vmoid_t;
 
+typedef struct BlockFifoCommand {
+  uint8_t opcode;
+  uint8_t padding_to_satisfy_zerocopy[3];
+  uint32_t flags;
+} block_fifo_command_t;
+
 typedef struct BlockFifoRequest {
-  uint32_t opcode;
+  block_fifo_command_t command;
   reqid_t reqid;
   groupid_t group;
   vmoid_t vmoid;
   uint32_t length;
+  uint32_t padding_to_satisfy_zerocopy;
   uint64_t vmo_offset;
   uint64_t dev_offset;
   uint64_t trace_flow_id;
@@ -33,7 +40,7 @@ typedef struct BlockFifoResponse {
   groupid_t group;
   uint16_t padding_to_satisfy_zerocopy;
   uint32_t count;
-  uint64_t padding_to_match_request_size_and_alignment[3];
+  uint64_t padding_to_match_request_size_and_alignment[4];
 } block_fifo_response_t;
 
 // NOLINTEND(modernize-use-using)

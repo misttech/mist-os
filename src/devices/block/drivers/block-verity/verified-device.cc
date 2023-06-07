@@ -149,7 +149,7 @@ void VerifiedDevice::RequestBlocks(uint64_t start_block, uint64_t block_count, z
                                    void* cookie, BlockLoaderCallback callback) {
   fbl::AutoLock lock(&mtx_);
   block_op_t* block_op = reinterpret_cast<block_op_t*>(block_op_buf_.get());
-  block_op->rw.command = BLOCK_OP_READ;
+  block_op->rw.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   // The cast below is guaranteed not to overflow because
   // `hw_block_per_virtual_block` is by construction at most 4096 (2**12) (and
   // actually only expected to be at most 8 in reasonable operation) and
@@ -179,8 +179,8 @@ void VerifiedDevice::OnBlockLoaderRequestComplete(zx_status_t status, block_op_t
 }
 
 void VerifiedDevice::ForwardTranslatedBlockOp(block_op_t* block_op) {
-  switch (block_op->command & BLOCK_OP_MASK) {
-    case BLOCK_OP_READ:
+  switch (block_op->command.opcode) {
+    case BLOCK_OPCODE_READ:
       // Bounds check.  Don't forward reads that would go past the end of the
       // device.  The translated request is in physical blocks.
       if ((block_op->rw.offset_dev + block_op->rw.length) >
@@ -193,9 +193,9 @@ void VerifiedDevice::ForwardTranslatedBlockOp(block_op_t* block_op) {
       outstanding_block_requests_++;
       info_.block_protocol.Queue(block_op, ClientBlockCallback, this);
       break;
-    case BLOCK_OP_FLUSH:
-    case BLOCK_OP_WRITE:
-    case BLOCK_OP_TRIM:
+    case BLOCK_OPCODE_FLUSH:
+    case BLOCK_OPCODE_WRITE:
+    case BLOCK_OPCODE_TRIM:
       // Writes, TRIM, and flush don't make sense on a read-only device.
       BlockComplete(block_op, ZX_ERR_NOT_SUPPORTED);
       break;

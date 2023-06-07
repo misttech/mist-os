@@ -116,7 +116,7 @@ zx_status_t FlushClient(block_client::Client& client) {
   block_fifo_request_t request;
   request.group = 0;
   request.vmoid = block::wire::kVmoidInvalid;
-  request.opcode = BLOCK_OP_FLUSH;
+  request.command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0};
   request.length = 0;
   request.vmo_offset = 0;
   request.dev_offset = 0;
@@ -810,7 +810,7 @@ zx::result<> FvmStreamPartitions(const fbl::unique_fd& devfs_root,
     }
 
     block_fifo_request_t request = {
-        .opcode = BLOCK_OP_WRITE,
+        .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
         .group = 0,
         .vmoid = vmoid->TakeId(),
     };

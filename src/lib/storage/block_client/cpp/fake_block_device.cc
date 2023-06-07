@@ -106,7 +106,7 @@ void FakeBlockDevice::AdjustBlockDeviceSizeLocked(uint64_t new_size) {
 
 void FakeBlockDevice::UpdateStats(bool success, zx::ticks start_tick,
                                   const block_fifo_request_t& op) {
-  stats_.UpdateStats(success, start_tick, op.opcode, block_size_ * op.length);
+  stats_.UpdateStats(success, start_tick, op.command.opcode, block_size_ * op.length);
 }
 
 void FakeBlockDevice::WaitOnPaused() const __TA_REQUIRES(lock_) {
@@ -132,8 +132,8 @@ zx_status_t FakeBlockDevice::FifoTransaction(block_fifo_request_t* requests, siz
     }
 
     zx::ticks start_tick = zx::ticks::now();
-    switch (requests[i].opcode & BLOCK_OP_MASK) {
-      case BLOCK_OP_READ: {
+    switch (requests[i].command.opcode) {
+      case BLOCK_OPCODE_READ: {
         vmoid_t vmoid = requests[i].vmoid;
         zx::vmo& target_vmoid = vmos_.at(vmoid);
         uint8_t buffer[block_size];
@@ -157,7 +157,7 @@ zx_status_t FakeBlockDevice::FifoTransaction(block_fifo_request_t* requests, siz
         UpdateStats(true, start_tick, requests[i]);
         break;
       }
-      case BLOCK_OP_WRITE: {
+      case BLOCK_OPCODE_WRITE: {
         vmoid_t vmoid = requests[i].vmoid;
         zx::vmo& target_vmoid = vmos_.at(vmoid);
         uint8_t buffer[block_size];
@@ -187,7 +187,7 @@ zx_status_t FakeBlockDevice::FifoTransaction(block_fifo_request_t* requests, siz
         UpdateStats(true, start_tick, requests[i]);
         break;
       }
-      case BLOCK_OP_TRIM:
+      case BLOCK_OPCODE_TRIM:
         UpdateStats(false, start_tick, requests[i]);
         if (!(block_info_flags_ & fuchsia_hardware_block::wire::Flag::kTrimSupport)) {
           return ZX_ERR_NOT_SUPPORTED;
@@ -199,10 +199,10 @@ zx_status_t FakeBlockDevice::FifoTransaction(block_fifo_request_t* requests, siz
           return ZX_ERR_OUT_OF_RANGE;
         }
         break;
-      case BLOCK_OP_FLUSH:
+      case BLOCK_OPCODE_FLUSH:
         UpdateStats(true, start_tick, requests[i]);
         continue;
-      case BLOCK_OP_CLOSE_VMO:
+      case BLOCK_OPCODE_CLOSE_VMO:
         ZX_ASSERT(vmos_.erase(requests[i].vmoid) == 1);
         break;
       default:
@@ -284,12 +284,12 @@ zx_status_t FakeFVMBlockDevice::FifoTransaction(block_fifo_request_t* requests, 
   // Validate that the operation acts on valid slices before sending it to the underlying
   // mock device.
   for (size_t i = 0; i < count; i++) {
-    switch (requests[i].opcode & BLOCK_OP_MASK) {
-      case BLOCK_OP_READ:
+    switch (requests[i].command.opcode) {
+      case BLOCK_OPCODE_READ:
         break;
-      case BLOCK_OP_WRITE:
+      case BLOCK_OPCODE_WRITE:
         break;
-      case BLOCK_OP_TRIM:
+      case BLOCK_OPCODE_TRIM:
         break;
       default:
         continue;

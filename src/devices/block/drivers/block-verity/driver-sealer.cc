@@ -65,7 +65,7 @@ void DriverSealer::RequestRead(uint64_t block) {
   // For now, we'll just read one logical block, though we could move to larger
   // batches ~trivially with a larger block_op_vmo_ buffer.
   block_op_t* block_op = reinterpret_cast<block_op_t*>(block_op_buf_.get());
-  block_op->rw.command = BLOCK_OP_READ;
+  block_op->rw.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   block_op->rw.length = info_.hw_blocks_per_virtual_block;
   block_op->rw.offset_dev = block * info_.hw_blocks_per_virtual_block;
   block_op->rw.offset_vmo = 0;
@@ -105,7 +105,7 @@ void DriverSealer::WriteIntegrityBlock(HashBlockAccumulator& hba, uint64_t block
 
   // prepare write block op
   block_op_t* block_op = reinterpret_cast<block_op_t*>(block_op_buf_.get());
-  block_op->rw.command = BLOCK_OP_WRITE;
+  block_op->rw.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   block_op->rw.length = info_.hw_blocks_per_virtual_block;
   block_op->rw.offset_dev = block * info_.hw_blocks_per_virtual_block;
   block_op->rw.offset_vmo = 0;
@@ -143,7 +143,7 @@ void DriverSealer::WriteSuperblock() {
 
   // prepare write block op
   block_op_t* block_op = reinterpret_cast<block_op_t*>(block_op_buf_.get());
-  block_op->rw.command = BLOCK_OP_WRITE;
+  block_op->rw.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   block_op->rw.length = info_.hw_blocks_per_virtual_block;
   block_op->rw.offset_dev = 0;  // Superblock is block 0
   block_op->rw.offset_vmo = 0;
@@ -179,7 +179,7 @@ void DriverSealer::SuperblockWriteCompletedCallback(void* cookie, zx_status_t st
 void DriverSealer::RequestFlush() {
   // prepare flush block op
   block_op_t* block_op = reinterpret_cast<block_op_t*>(block_op_buf_.get());
-  block_op->command = BLOCK_OP_FLUSH;
+  block_op->rw.command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0};
 
   // send write request
   outstanding_block_requests_ += 1;

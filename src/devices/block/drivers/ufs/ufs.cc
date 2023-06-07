@@ -64,10 +64,10 @@ void Ufs::HandleBlockOp(IoCommand *io_cmd) {
   std::unique_ptr<ScsiCommandUpiu> upiu;
   std::array<zx_paddr_t, 2> data_paddrs = {0};
 
-  const uint32_t opcode = io_cmd->op.command & BLOCK_OP_MASK;
+  const uint32_t opcode = io_cmd->op.command.opcode;
   switch (opcode) {
-    case BLOCK_OP_READ:
-    case BLOCK_OP_WRITE: {
+    case BLOCK_OPCODE_READ:
+    case BLOCK_OPCODE_WRITE: {
       zx::unowned_vmo vmo(io_cmd->op.rw.vmo);
       const uint32_t block_size = io_cmd->block_size_bytes;
       const uint64_t length = io_cmd->op.rw.length * block_size;
@@ -87,7 +87,7 @@ void Ufs::HandleBlockOp(IoCommand *io_cmd) {
 
       // Assign physical addresses(pin) to data vmo. Currently, it only supports 8KB vmo. So, we get
       // two physical addresses. The return value is the physical address of the pinned memory.
-      uint32_t option = (opcode == BLOCK_OP_READ) ? ZX_BTI_PERM_WRITE : ZX_BTI_PERM_READ;
+      uint32_t option = (opcode == BLOCK_OPCODE_READ) ? ZX_BTI_PERM_WRITE : ZX_BTI_PERM_READ;
       if (zx_status_t status = bti_.pin(option, *vmo, io_cmd->op.rw.offset_vmo * block_size, length,
                                         data_paddrs.data(), length / kPageSize, &pmt);
           status != ZX_OK) {
@@ -102,7 +102,7 @@ void Ufs::HandleBlockOp(IoCommand *io_cmd) {
         ZX_ASSERT(data_paddrs[0] != 0 && data_paddrs[1] != 0);
       }
 
-      if (opcode == BLOCK_OP_READ) {
+      if (opcode == BLOCK_OPCODE_READ) {
         upiu = std::make_unique<ScsiRead10Upiu>(block_offset, block_length, block_size,
                                                 /*fua=*/false, 0);
       } else {
@@ -110,7 +110,7 @@ void Ufs::HandleBlockOp(IoCommand *io_cmd) {
                                                  /*fua=*/false, 0);
       }
     } break;
-    case BLOCK_OP_TRIM: {
+    case BLOCK_OPCODE_TRIM: {
       if (io_cmd->op.trim.length > UINT16_MAX) {
         zxlogf(ERROR, "Cannot handle trim block length(%d).", io_cmd->op.trim.length);
         io_cmd->Complete(ZX_ERR_NOT_SUPPORTED);
@@ -119,7 +119,7 @@ void Ufs::HandleBlockOp(IoCommand *io_cmd) {
       upiu = std::make_unique<ScsiUnmapUpiu>(static_cast<uint16_t>(io_cmd->op.trim.length));
       break;
     }
-    case BLOCK_OP_FLUSH:
+    case BLOCK_OPCODE_FLUSH:
       // TODO(fxbug.dev/124835): Use Synchronize Cache (16)
       io_cmd->Complete(ZX_OK);
       // TODO(fxbug.dev/124835): Use break;

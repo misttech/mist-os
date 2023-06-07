@@ -151,7 +151,7 @@ void DeviceBlockRead(BlockDevice* device, void* buf, size_t size, uint64_t dev_o
   storage::OwnedVmoid vmoid = AttachVmo(device, &vmo);
 
   block_fifo_request_t request;
-  request.opcode = BLOCK_OP_READ;
+  request.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   request.vmoid = vmoid.get();
   request.length = safemath::checked_cast<uint32_t>(size / block_size);
   request.vmo_offset = 0;
@@ -171,7 +171,7 @@ void DeviceBlockWrite(BlockDevice* device, const void* buf, size_t size, uint64_
   storage::OwnedVmoid vmoid = AttachVmo(device, &vmo);
 
   block_fifo_request_t request;
-  request.opcode = BLOCK_OP_WRITE;
+  request.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   request.vmoid = vmoid.get();
   request.length = safemath::checked_cast<uint32_t>(size / block_size);
   request.vmo_offset = 0;

@@ -60,7 +60,7 @@ class AbrShim : public AbrShimType,
   }
 
   static void BlockOpCallback(void* ctx, zx_status_t status, block_op_t* op);
-  zx_status_t DoBlockOp(uint32_t command) const TA_REQ(io_lock_);
+  zx_status_t DoBlockOp(uint8_t opcode) const TA_REQ(io_lock_);
 
   bool ReadAbrMetadata(size_t size, uint8_t* buffer);
   bool WriteAbrMetadata(const uint8_t* buffer, size_t size);

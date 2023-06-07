@@ -382,21 +382,21 @@ static zx_status_t pin_pages(zx_handle_t bti, block_txn_t* txn, size_t bytes, zx
 }  // namespace
 
 void BlockDevice::SignalWorker(block_txn_t* txn) {
-  switch (txn->op.command & BLOCK_OP_MASK) {
-    case BLOCK_OP_READ:
-    case BLOCK_OP_WRITE:
+  switch (txn->op.command.opcode) {
+    case BLOCK_OPCODE_READ:
+    case BLOCK_OPCODE_WRITE:
       if (zx_status_t status = block::CheckIoRange(txn->op.rw, config_.capacity); status != ZX_OK) {
         txn_complete(txn, status);
         return;
       }
-      if (txn->op.command & BLOCK_FL_FORCE_ACCESS) {
+      if (txn->op.command.flags & BLOCK_IO_FLAG_FORCE_ACCESS) {
         txn_complete(txn, ZX_ERR_NOT_SUPPORTED);
         return;
       }
-      zxlogf(TRACE, "txn %p, command %#x", txn, txn->op.command);
+      zxlogf(TRACE, "txn %p, opcode %#x\n", txn, txn->op.command.opcode);
       break;
-    case BLOCK_OP_FLUSH:
-      zxlogf(TRACE, "txn %p, command FLUSH", txn);
+    case BLOCK_OPCODE_FLUSH:
+      zxlogf(TRACE, "txn %p, opcode FLUSH\n", txn);
       break;
     default:
       txn_complete(txn, ZX_ERR_NOT_SUPPORTED);
@@ -440,13 +440,13 @@ void BlockDevice::WorkerThread() {
     size_t num_pages;
     zx_status_t status = ZX_OK;
 
-    if ((txn->op.command & BLOCK_OP_MASK) == BLOCK_OP_FLUSH) {
+    if (txn->op.command.opcode == BLOCK_OPCODE_FLUSH) {
       type = VIRTIO_BLK_T_FLUSH;
       bytes = 0;
       num_pages = 0;
       do_flush = true;
     } else {
-      if ((txn->op.command & BLOCK_OP_MASK) == BLOCK_OP_WRITE) {
+      if (txn->op.command.opcode == BLOCK_OPCODE_WRITE) {
         type = VIRTIO_BLK_T_OUT;
       } else {
         type = VIRTIO_BLK_T_IN;

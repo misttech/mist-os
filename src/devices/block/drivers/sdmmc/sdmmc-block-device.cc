@@ -25,8 +25,6 @@ namespace {
 
 constexpr size_t kTranMaxAttempts = 10;
 
-constexpr uint32_t kBlockOp(uint32_t op) { return op & BLOCK_OP_MASK; }
-
 // Boot and RPMB partition sizes are in units of 128 KiB/KB.
 constexpr uint32_t kBootSizeMultiplier = 128 * 1024;
 
@@ -214,7 +212,7 @@ zx_status_t SdmmcBlockDevice::ReadWrite(const block_read_write_t& txn,
   // For single-block transfers, we could get higher performance by using SDMMC_READ_BLOCK/
   // SDMMC_WRITE_BLOCK without the need to SDMMC_SET_BLOCK_COUNT or SDMMC_STOP_TRANSMISSION.
   // However, we always do multiple-block transfers for simplicity.
-  if (kBlockOp(txn.command) == BLOCK_OP_READ) {
+  if (txn.command.opcode == BLOCK_OPCODE_READ) {
     cmd_idx = SDMMC_READ_MULTIPLE_BLOCK;
     cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS;
   } else {
@@ -241,7 +239,7 @@ zx_status_t SdmmcBlockDevice::ReadWrite(const block_read_write_t& txn,
          "sdmmc: do_txn blockop 0x%x offset_vmo 0x%" PRIx64
          " length 0x%x blocksize 0x%x"
          " max_transfer_size 0x%x",
-         txn.command, txn.offset_vmo, txn.length, block_info_.block_size,
+         txn.command.opcode, txn.offset_vmo, txn.length, block_info_.block_size,
          block_info_.max_transfer_size);
 
   // convert offset_vmo and length to bytes
@@ -481,26 +479,26 @@ void SdmmcBlockDevice::Queue(BlockOperation txn) {
   block_op_t* btxn = txn.operation();
 
   const uint64_t max = txn.private_storage()->block_count;
-  switch (kBlockOp(btxn->command)) {
-    case BLOCK_OP_READ:
-    case BLOCK_OP_WRITE:
+  switch (btxn->command.opcode) {
+    case BLOCK_OPCODE_READ:
+    case BLOCK_OPCODE_WRITE:
       if (zx_status_t status = block::CheckIoRange(btxn->rw, max); status != ZX_OK) {
         BlockComplete(txn, status);
         return;
       }
       // MMC supports FUA writes, but not FUA reads. SD does not support FUA.
-      if (btxn->command & BLOCK_FL_FORCE_ACCESS) {
+      if (btxn->command.flags & BLOCK_IO_FLAG_FORCE_ACCESS) {
         BlockComplete(txn, ZX_ERR_NOT_SUPPORTED);
         return;
       }
       break;
-    case BLOCK_OP_TRIM:
+    case BLOCK_OPCODE_TRIM:
       if (zx_status_t status = block::CheckIoRange(btxn->trim, max); status != ZX_OK) {
         BlockComplete(txn, status);
         return;
       }
       break;
-    case BLOCK_OP_FLUSH:
+    case BLOCK_OPCODE_FLUSH:
       // queue the flush op. because there is no out of order execution in this
       // driver, when this op gets processed all previous ops are complete.
       break;
@@ -576,39 +574,39 @@ void SdmmcBlockDevice::HandleBlockOps(block::BorrowedOperationQueue<PartitionInf
     BlockOperation btxn(*std::move(txn));
 
     const block_op_t& bop = *btxn.operation();
-    const uint32_t op = kBlockOp(bop.command);
+    const uint8_t op = bop.command.opcode;
 
     zx_status_t status = ZX_ERR_INVALID_ARGS;
-    if (op == BLOCK_OP_READ || op == BLOCK_OP_WRITE) {
-      const char* const trace_name = op == BLOCK_OP_READ ? "read" : "write";
+    if (op == BLOCK_OPCODE_READ || op == BLOCK_OPCODE_WRITE) {
+      const char* const trace_name = op == BLOCK_OPCODE_READ ? "read" : "write";
       TRACE_DURATION_BEGIN("sdmmc", trace_name);
 
       status = ReadWrite(btxn.operation()->rw, btxn.private_storage()->partition);
 
-      TRACE_DURATION_END("sdmmc", trace_name, "command", TA_INT32(bop.rw.command), "extra",
+      TRACE_DURATION_END("sdmmc", trace_name, "opcode", TA_INT32(bop.rw.command.opcode), "extra",
                          TA_INT32(bop.rw.extra), "length", TA_INT32(bop.rw.length), "offset_vmo",
                          TA_INT64(bop.rw.offset_vmo), "offset_dev", TA_INT64(bop.rw.offset_dev),
                          "txn_status", TA_INT32(status));
-    } else if (op == BLOCK_OP_TRIM) {
+    } else if (op == BLOCK_OPCODE_TRIM) {
       TRACE_DURATION_BEGIN("sdmmc", "trim");
 
       status = Trim(btxn.operation()->trim, btxn.private_storage()->partition);
 
-      TRACE_DURATION_END("sdmmc", "trim", "command", TA_INT32(bop.trim.command), "length",
+      TRACE_DURATION_END("sdmmc", "trim", "opcode", TA_INT32(bop.trim.command.opcode), "length",
                          TA_INT32(bop.trim.length), "offset_dev", TA_INT64(bop.trim.offset_dev),
                          "txn_status", TA_INT32(status));
-    } else if (op == BLOCK_OP_FLUSH) {
+    } else if (op == BLOCK_OPCODE_FLUSH) {
       TRACE_DURATION_BEGIN("sdmmc", "flush");
 
       status = Flush();
 
-      TRACE_DURATION_END("sdmmc", "flush", "command", TA_INT32(bop.command), "txn_status",
+      TRACE_DURATION_END("sdmmc", "flush", "opcode", TA_INT32(bop.command.opcode), "txn_status",
                          TA_INT32(status));
     } else {
       // should not get here
-      zxlogf(ERROR, "invalid block op %d", kBlockOp(btxn.operation()->command));
-      TRACE_INSTANT("sdmmc", "unknown", TRACE_SCOPE_PROCESS, "command", TA_INT32(bop.command),
-                    "txn_status", TA_INT32(status));
+      zxlogf(ERROR, "invalid block op %d", btxn.operation()->command.opcode);
+      TRACE_INSTANT("sdmmc", "unknown", TRACE_SCOPE_PROCESS, "opcode",
+                    TA_INT32(bop.rw.command.opcode), "txn_status", TA_INT32(status));
       __UNREACHABLE;
     }
 

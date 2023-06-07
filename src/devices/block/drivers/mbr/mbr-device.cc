@@ -82,7 +82,7 @@ zx_status_t MbrReadHeader(const ddk::BlockProtocolClient& parent_proto, mbr::Mbr
 
   sync_completion_t read_complete;
 
-  bop->command = BLOCK_OP_READ;
+  bop->command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   bop->rw.vmo = vmo.get();
   bop->rw.length = iosize / block_info_out->block_size;
   bop->rw.offset_dev = 0;
@@ -93,13 +93,13 @@ zx_status_t MbrReadHeader(const ddk::BlockProtocolClient& parent_proto, mbr::Mbr
   parent_proto.Queue(
       bop,
       [](void* cookie, zx_status_t status, block_op_t* bop) {
-        bop->command = status;
+        bop->command.flags = status;
         sync_completion_signal(static_cast<sync_completion_t*>(cookie));
       },
       &read_complete);
   sync_completion_wait(&read_complete, ZX_TIME_INFINITE);
 
-  if ((status = bop->command) != ZX_OK) {
+  if ((status = bop->command.flags) != ZX_OK) {
     zxlogf(ERROR, "mbr: could not read mbr from device: %s", zx_status_get_string(status));
     return status;
   }
@@ -134,9 +134,9 @@ void MbrDevice::BlockImplQuery(block_info_t* info_out, size_t* block_op_size_out
 
 void MbrDevice::BlockImplQueue(block_op_t* operation, block_impl_queue_callback completion_cb,
                                void* cookie) {
-  switch (operation->command & BLOCK_OP_MASK) {
-    case BLOCK_OP_READ:
-    case BLOCK_OP_WRITE: {
+  switch (operation->command.opcode) {
+    case BLOCK_OPCODE_READ:
+    case BLOCK_OPCODE_WRITE: {
       if (zx_status_t status = block::CheckIoRange(operation->rw, partition_.num_sectors);
           status != ZX_OK) {
         completion_cb(cookie, status, operation);
@@ -147,7 +147,7 @@ void MbrDevice::BlockImplQueue(block_op_t* operation, block_impl_queue_callback 
       operation->rw.offset_dev += partition_.start_sector_lba;
       break;
     }
-    case BLOCK_OP_FLUSH:
+    case BLOCK_OPCODE_FLUSH:
       break;
     default:
       completion_cb(cookie, ZX_ERR_NOT_SUPPORTED, operation);

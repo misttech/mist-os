@@ -15,28 +15,30 @@ namespace block {
 inline zx_status_t IssueBlockFifoRequest(const std::string& command, uint16_t vmoid,
                                          uint32_t length, uint64_t vmo_offset, uint64_t dev_offset,
                                          block_client::BlockDevice* device) {
-  uint32_t opcode;
+  uint8_t opcode;
   if (command == "READ") {
-    opcode = BLOCK_OP_READ;
+    opcode = BLOCK_OPCODE_READ;
   } else if (command == "WRITE") {
-    opcode = BLOCK_OP_WRITE;
+    opcode = BLOCK_OPCODE_WRITE;
   } else if (command == "FLUSH") {
-    opcode = BLOCK_OP_FLUSH;
+    opcode = BLOCK_OPCODE_FLUSH;
   } else if (command == "TRIM") {
-    opcode = BLOCK_OP_TRIM;
+    opcode = BLOCK_OPCODE_TRIM;
   } else if (command == "CLOSE_VMO") {
-    opcode = BLOCK_OP_CLOSE_VMO;
+    opcode = BLOCK_OPCODE_CLOSE_VMO;
   } else {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  block_fifo_request_t request = {.opcode = opcode,
-                                  .reqid = 0,
-                                  .group = 0,
-                                  .vmoid = vmoid,
-                                  .length = length,
-                                  .vmo_offset = vmo_offset,
-                                  .dev_offset = dev_offset};
+  block_fifo_request_t request = {
+      .command = {.opcode = opcode, .flags = 0},
+      .reqid = 0,
+      .group = 0,
+      .vmoid = vmoid,
+      .length = length,
+      .vmo_offset = vmo_offset,
+      .dev_offset = dev_offset,
+  };
 
   return device->FifoTransaction(&request, 1);
 }
@@ -48,24 +50,24 @@ inline void SetFakeBlockDeviceHook(block_client::FakeBlockDevice* device, uint32
                                    uint32_t* flush_req_count = nullptr,
                                    uint32_t* trim_req_count = nullptr) {
   auto hook = [=](const block_fifo_request_t& request, const zx::vmo* vmo) {
-    switch (request.opcode) {
-      case BLOCK_OP_READ:
+    switch (request.command.opcode) {
+      case BLOCK_OPCODE_READ:
         if (read_req_count != nullptr)
           (*read_req_count)++;
         if (blocks_read != nullptr)
           (*blocks_read) += request.length;
         break;
-      case BLOCK_OP_WRITE:
+      case BLOCK_OPCODE_WRITE:
         if (write_req_count != nullptr)
           (*write_req_count)++;
         if (blocks_written != nullptr)
           (*blocks_written) += request.length;
         break;
-      case BLOCK_OP_FLUSH:
+      case BLOCK_OPCODE_FLUSH:
         if (flush_req_count != nullptr)
           (*flush_req_count)++;
         break;
-      case BLOCK_OP_TRIM:
+      case BLOCK_OPCODE_TRIM:
         if (trim_req_count != nullptr)
           (*trim_req_count)++;
         break;

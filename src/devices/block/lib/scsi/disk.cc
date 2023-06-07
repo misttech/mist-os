@@ -118,22 +118,21 @@ void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_c
   disk_op->completion_cb = completion_cb;
   disk_op->cookie = cookie;
 
-  const auto op_type = op->command & BLOCK_OP_MASK;
-  switch (op_type) {
-    case BLOCK_OP_READ:
-    case BLOCK_OP_WRITE: {
+  switch (op->command.opcode) {
+    case BLOCK_OPCODE_READ:
+    case BLOCK_OPCODE_WRITE: {
       if (zx_status_t status = block::CheckIoRange(op->rw, block_count_, max_transfer_blocks_);
           status != ZX_OK) {
         completion_cb(cookie, status, op);
         return;
       }
-      if (!dpo_fua_available_ && (op->command & BLOCK_FL_FORCE_ACCESS)) {
+      const bool is_write = op->command.opcode == BLOCK_OPCODE_WRITE;
+      const bool is_fua = op->command.flags & BLOCK_IO_FLAG_FORCE_ACCESS;
+      if (!dpo_fua_available_ && is_fua) {
         completion_cb(cookie, ZX_ERR_NOT_SUPPORTED, op);
         return;
       }
 
-      const bool is_write = op_type == BLOCK_OP_WRITE;
-      const bool is_fua = op->command & BLOCK_FL_FORCE_ACCESS;
       uint8_t cdb_buffer[16] = {};
       uint8_t cdb_length;
       if (block_count_ > UINT32_MAX) {
@@ -163,7 +162,7 @@ void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_c
                                        block_size_bytes_, disk_op);
       return;
     }
-    case BLOCK_OP_FLUSH: {
+    case BLOCK_OPCODE_FLUSH: {
       if (zx_status_t status = block::CheckFlushValid(op->rw); status != ZX_OK) {
         completion_cb(cookie, status, op);
         return;

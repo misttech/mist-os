@@ -38,7 +38,7 @@ uint64_t FsBlockClient::BlockCount() const {
 
 zx_status_t FsBlockClient::ReadBlock(uint64_t block, void* data) {
   block_fifo_request_t request = {};
-  request.opcode = BLOCK_OP_READ;
+  request.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   request.vmoid = vmoid_.get();
   request.length = static_cast<uint32_t>(fs_block_to_device_block(1));
   request.vmo_offset = 0;
@@ -59,7 +59,7 @@ zx_status_t FsBlockClient::WriteBlock(uint64_t block, const void* data) {
   }
 
   block_fifo_request_t request = {};
-  request.opcode = BLOCK_OP_WRITE;
+  request.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
   request.vmoid = vmoid_.get();
   request.length = static_cast<uint32_t>(fs_block_to_device_block(1));
   request.vmo_offset = 0;

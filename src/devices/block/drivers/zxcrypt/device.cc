@@ -154,11 +154,11 @@ void Device::BlockImplQueue(block_op_t* block, block_impl_queue_callback complet
     return;
   }
 
-  switch (block->command & BLOCK_OP_MASK) {
-    case BLOCK_OP_WRITE:
+  switch (block->command.opcode) {
+    case BLOCK_OPCODE_WRITE:
       EnqueueWrite(block);
       break;
-    case BLOCK_OP_READ:
+    case BLOCK_OPCODE_READ:
     default:
       BlockForward(block, ZX_OK);
       break;
@@ -386,11 +386,11 @@ void Device::BlockCallback(void* cookie, zx_status_t status, block_op_t* block) 
     device->BlockComplete(block, status);
     return;
   }
-  switch (block->command & BLOCK_OP_MASK) {
-    case BLOCK_OP_READ:
+  switch (block->command.opcode) {
+    case BLOCK_OPCODE_READ:
       device->worker_queue_.Push(block);
       break;
-    case BLOCK_OP_WRITE:
+    case BLOCK_OPCODE_WRITE:
     default:
       device->BlockComplete(block, ZX_OK);
       break;

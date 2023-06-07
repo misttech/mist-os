@@ -235,7 +235,7 @@ void TestDevice::Read(zx_off_t off, size_t len) {
 void TestDevice::Write(zx_off_t off, size_t len) { ASSERT_OK(SingleWriteBytes(off, len, off)); }
 
 void TestDevice::ReadVmo(zx_off_t off, size_t len) {
-  ASSERT_OK(block_fifo_txn(BLOCK_OP_READ, off, len));
+  ASSERT_OK(block_fifo_txn(BLOCK_OPCODE_READ, off, len));
   off *= block_size_;
   len *= block_size_;
   ASSERT_OK(vmo_read(off, len));
@@ -244,7 +244,7 @@ void TestDevice::ReadVmo(zx_off_t off, size_t len) {
 
 void TestDevice::WriteVmo(zx_off_t off, size_t len) {
   ASSERT_OK(vmo_write(off * block_size_, len * block_size_));
-  ASSERT_OK(block_fifo_txn(BLOCK_OP_WRITE, off, len));
+  ASSERT_OK(block_fifo_txn(BLOCK_OPCODE_WRITE, off, len));
 }
 
 void TestDevice::Corrupt(uint64_t blkno, key_slot_t slot) {

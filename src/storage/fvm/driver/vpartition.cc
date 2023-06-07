@@ -23,12 +23,12 @@ namespace fvm {
 namespace {
 
 void SetOperationDeviceOffset(uint64_t offset, block_op_t* txn) {
-  switch (txn->command & BLOCK_OP_MASK) {
-    case BLOCK_OP_READ:
-    case BLOCK_OP_WRITE:
+  switch (txn->command.opcode) {
+    case BLOCK_OPCODE_READ:
+    case BLOCK_OPCODE_WRITE:
       txn->rw.offset_dev = offset;
       break;
-    case BLOCK_OP_TRIM:
+    case BLOCK_OPCODE_TRIM:
       txn->trim.offset_dev = offset;
       break;
     default:
@@ -37,12 +37,12 @@ void SetOperationDeviceOffset(uint64_t offset, block_op_t* txn) {
 }
 
 void SetOperationVmoOffset(uint64_t offset, block_op_t* txn) {
-  switch (txn->command & BLOCK_OP_MASK) {
-    case BLOCK_OP_READ:
-    case BLOCK_OP_WRITE:
+  switch (txn->command.opcode) {
+    case BLOCK_OPCODE_READ:
+    case BLOCK_OPCODE_WRITE:
       txn->rw.offset_vmo = offset;
       break;
-    case BLOCK_OP_TRIM:
+    case BLOCK_OPCODE_TRIM:
       break;
     default:
       ZX_ASSERT_MSG(false, "Unexpected operation type");
@@ -50,12 +50,12 @@ void SetOperationVmoOffset(uint64_t offset, block_op_t* txn) {
 }
 
 void SetOperationLength(uint32_t length, block_op_t* txn) {
-  switch (txn->command & BLOCK_OP_MASK) {
-    case BLOCK_OP_READ:
-    case BLOCK_OP_WRITE:
+  switch (txn->command.opcode) {
+    case BLOCK_OPCODE_READ:
+    case BLOCK_OPCODE_WRITE:
       txn->rw.length = length;
       break;
-    case BLOCK_OP_TRIM:
+    case BLOCK_OPCODE_TRIM:
       txn->trim.length = length;
       break;
     default:
@@ -283,24 +283,24 @@ void VPartition::BlockImplQueue(block_op_t* txn, block_impl_queue_callback compl
   uint32_t txn_length = 0;
   uint64_t offset_dev = 0;
   uint64_t offset_vmo = 0;
-  switch (txn->command & BLOCK_OP_MASK) {
-    case BLOCK_OP_READ:
-    case BLOCK_OP_WRITE:
+  switch (txn->command.opcode) {
+    case BLOCK_OPCODE_READ:
+    case BLOCK_OPCODE_WRITE:
       txn_length = txn->rw.length;
       offset_dev = txn->rw.offset_dev;
       offset_vmo = txn->rw.offset_vmo;
       break;
-    case BLOCK_OP_TRIM:
+    case BLOCK_OPCODE_TRIM:
       txn_length = txn->trim.length;
       offset_dev = txn->trim.offset_dev;
       break;
 
     // Pass-through operations
-    case BLOCK_OP_FLUSH:
+    case BLOCK_OPCODE_FLUSH:
       mgr_->Queue(txn, completion_cb, cookie);
       return;
     default:
-      zxlogf(ERROR, "[BlockQueue] Unsupported Command: %x", txn->command);
+      zxlogf(ERROR, "[BlockQueue] Unsupported Command Opcode: %x", txn->command.opcode);
       completion_cb(cookie, ZX_ERR_NOT_SUPPORTED, txn);
       return;
   }

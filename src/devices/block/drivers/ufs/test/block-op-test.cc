@@ -35,13 +35,19 @@ TEST_F(BlockOpTest, ReadTest) {
   ASSERT_OK(zx::vmo::create(ufs_mock_device::kMockBlockSize, 0, &vmo));
   auto block_op = std::make_unique<uint8_t[]>(op_size);
   auto op = reinterpret_cast<block_op_t*>(block_op.get());
-  *op = {.rw = {
-             .command = BLOCK_OP_READ,
-             .vmo = vmo.get(),
-             .length = 1,
-             .offset_dev = 0,
-             .offset_vmo = 0,
-         }};
+  *op = {
+      .rw =
+          {
+              .command =
+                  {
+                      .opcode = BLOCK_OPCODE_READ,
+                  },
+              .vmo = vmo.get(),
+              .length = 1,
+              .offset_dev = 0,
+              .offset_vmo = 0,
+          },
+  };
   client.Queue(op, callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
 
@@ -84,13 +90,19 @@ TEST_F(BlockOpTest, WriteTest) {
 
   auto block_op = std::make_unique<uint8_t[]>(op_size);
   auto op = reinterpret_cast<block_op_t*>(block_op.get());
-  *op = {.rw = {
-             .command = BLOCK_OP_WRITE,
-             .vmo = vmo.get(),
-             .length = 1,
-             .offset_dev = 0,
-             .offset_vmo = 0,
-         }};
+  *op = {
+      .rw =
+          {
+              .command =
+                  {
+                      .opcode = BLOCK_OPCODE_WRITE,
+                  },
+              .vmo = vmo.get(),
+              .length = 1,
+              .offset_dev = 0,
+              .offset_vmo = 0,
+          },
+  };
   client.Queue(op, callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
 

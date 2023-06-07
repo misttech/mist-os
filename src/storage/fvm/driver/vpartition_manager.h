@@ -175,7 +175,7 @@ class VPartitionManager : public ManagerDeviceType {
   // 1-indexed).
   size_t GetPartitionNumberLocked(const uint8_t* guid) const TA_REQ(lock_);
 
-  zx_status_t DoIoLocked(zx_handle_t vmo, size_t off, size_t len, uint32_t command) const;
+  zx_status_t DoIoLocked(zx_handle_t vmo, size_t off, size_t len, uint8_t opcode) const;
 
   // Writes the current partition information out to the system log.
   void LogPartitionInfoLocked() const TA_REQ(lock_);

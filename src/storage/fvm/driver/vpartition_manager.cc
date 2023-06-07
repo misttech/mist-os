@@ -148,7 +148,7 @@ static void IoCallback(void* cookie, zx_status_t status, block_op_t* op) {
 }
 
 zx_status_t VPartitionManager::DoIoLocked(zx_handle_t vmo, size_t off, size_t len,
-                                          uint32_t command) const {
+                                          uint8_t opcode) const {
   const size_t block_size = info_.block_size;
   size_t len_remaining = len / block_size;
   size_t vmo_offset = 0;
@@ -161,7 +161,7 @@ zx_status_t VPartitionManager::DoIoLocked(zx_handle_t vmo, size_t off, size_t le
   const size_t num_data_txns = fbl::round_up(len_remaining, max_transfer) / max_transfer;
 
   // Add a "FLUSH" operation to write requests.
-  const bool flushing = command == BLOCK_OP_WRITE;
+  const bool flushing = opcode == BLOCK_OPCODE_WRITE;
   const size_t num_txns = num_data_txns + (flushing ? 1 : 0);
 
   fbl::Array<uint8_t> buffer(new uint8_t[block_op_size_ * num_txns], block_op_size_ * num_txns);
@@ -177,7 +177,7 @@ zx_status_t VPartitionManager::DoIoLocked(zx_handle_t vmo, size_t off, size_t le
 
     block_op_t* bop = reinterpret_cast<block_op_t*>(buffer.data() + (block_op_size_ * i));
 
-    bop->command = command;
+    bop->command = {.opcode = opcode, .flags = 0};
     bop->rw.vmo = vmo;
     bop->rw.length = static_cast<uint32_t>(length);
     bop->rw.offset_dev = dev_offset;
@@ -194,7 +194,7 @@ zx_status_t VPartitionManager::DoIoLocked(zx_handle_t vmo, size_t off, size_t le
     block_op_t* bop =
         reinterpret_cast<block_op_t*>(buffer.data() + (block_op_size_ * num_data_txns));
     memset(bop, 0, sizeof(*bop));
-    bop->command = BLOCK_OP_FLUSH;
+    bop->command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0};
     Queue(bop, IoCallback, &cookie);
   }
 
@@ -239,7 +239,7 @@ zx_status_t VPartitionManager::Load() {
   // partition table allocation table sizes are incorrect), we won't be able to find the secondary
   // and the drive will be lost. In the current design the A/B metadata primarily provides atomic
   // update rather than full backup capabilities.
-  if ((status = DoIoLocked(vmo.get(), 0, fvm::kBlockSize, BLOCK_OP_READ)) != ZX_OK) {
+  if ((status = DoIoLocked(vmo.get(), 0, fvm::kBlockSize, BLOCK_OPCODE_READ)) != ZX_OK) {
     zxlogf(ERROR, "Failed to read first block from underlying device");
     return status;
   }
@@ -262,7 +262,7 @@ zx_status_t VPartitionManager::Load() {
     if (status = mapper.CreateAndMap(metadata_vmo_size, "fvm-metadata"); status != ZX_OK) {
       return zx::error(status);
     }
-    if (status = DoIoLocked(mapper.vmo().get(), offset, metadata_vmo_size, BLOCK_OP_READ);
+    if (status = DoIoLocked(mapper.vmo().get(), offset, metadata_vmo_size, BLOCK_OPCODE_READ);
         status != ZX_OK) {
       zxlogf(ERROR, "Failed to read %lu bytes from offset %lu: %s", metadata_vmo_size, offset,
              zx_status_get_string(status));
@@ -439,7 +439,7 @@ zx_status_t VPartitionManager::WriteFvmLocked() {
 
   // Persist the changes to the inactive metadata. The active metadata is not modified.
   if (zx_status_t status = DoIoLocked(buffer->vmo().get(), metadata_.GetInactiveHeaderOffset(),
-                                      header->GetMetadataUsedBytes(), BLOCK_OP_WRITE);
+                                      header->GetMetadataUsedBytes(), BLOCK_OPCODE_WRITE);
       status != ZX_OK) {
     zxlogf(ERROR, "Failed to write metadata: %s", zx_status_get_string(status));
     return status;

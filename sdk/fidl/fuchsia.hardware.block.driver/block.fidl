@@ -22,34 +22,34 @@ const BLOCK_GUID_LEN uint32 = 16;
 /// block server.  Using a group allows multiple message to be buffered at once
 /// on a single communication channel before receiving a response.
 ///
-/// Usage of groups is identified by `BLOCK_GROUP_ITEM`, and is optional.
+/// Usage of groups is identified by the `GROUP_ITEM` flag, and is optional.
 ///
 /// These groups may be referred to with a "groupid", in the range [0,
 /// `MAX_TXN_GROUP_COUNT`).
 ///
 /// The protocol to communicate with a single group is as follows:
 /// 1) SEND [N - 1] messages with an allocated groupid for any value of 1 <= N.
-///    The `BLOCK_GROUP_ITEM` flag is set for these messages.
-/// 2) SEND a final Nth message with the same groupid. The `BLOCK_GROUP_ITEM
-///    | BLOCK_GROUP_LAST` flags are set for this message.
+///    The `GROUP_ITEM` flag is set for these messages.
+/// 2) SEND a final Nth message with the same groupid. The `GROUP_ITEM
+///    | GROUP_LAST` flags are set for this message.
 /// 3) RECEIVE a single response from the Block I/O server after all N requests
 ///    have completed. This response is sent once all operations either complete
 ///    or a single operation fails. At this point, step (1) may begin again for
 ///    the same groupid.
 ///
-/// For `BLOCK_OP_READ` and `BLOCK_OP_WRITE`, N may be greater than 1. Otherwise,
+/// For `READ` and `WRITE`, N may be greater than 1. Otherwise,
 /// N == 1 (skipping step (1) in the protocol above).
 ///
 /// Notes:
 /// - groupids may operate on any number of vmoids at once.
 /// - If additional requests are sent on the same groupid before step (3) has
 ///   completed, then the additional request will not be processed. If
-///   `BLOCK_GROUP_LAST` is set, an error will be returned. Otherwise, the
+///   `GROUP_LAST` is set, an error will be returned. Otherwise, the
 ///   request will be silently dropped.
 /// - Messages within a group are not guaranteed to be processed in any order
 ///   relative to each other.
-/// - All requests receive responses, except for ones with `BLOCK_GROUP_ITEM`
-///   that do not have `BLOCK_GROUP_LAST` set.
+/// - All requests receive responses, except for ones with `GROUP_ITEM`
+///   that do not have `GROUP_LAST` set.
 ///
 /// For example, the following is a valid sequence of transactions:
 ///
@@ -72,8 +72,7 @@ const BLOCK_GUID_LEN uint32 = 16;
 /// device, `ZX_ERR_OUT_OF_RANGE` is returned.
 const MAX_TXN_GROUP_COUNT uint32 = 8;
 
-
-/// `BLOCK_OP_READ`, `BLOCK_OP_WRITE`
+/// `READ`, `WRITE`
 //
 // Note: this data structure is used for the driver <--> driver interfaces,
 // while `BlockFifoRequest` is part of a client <--> server interface and
@@ -82,8 +81,8 @@ const MAX_TXN_GROUP_COUNT uint32 = 8;
 // See src/lib/storage/block_client/cpp/block_fifo.h for FIFO protocol.
 //
 type BlockReadWrite = resource struct {
-    /// Command and flags.
-    command uint32;
+    /// Opcode and flags.
+    command BlockCommand;
 
     /// Available for temporary use.
     extra uint32;
@@ -101,10 +100,10 @@ type BlockReadWrite = resource struct {
     offset_vmo uint64;
 };
 
-/// `BLOCK_OP_TRIM`
+/// `TRIM`
 type BlockTrim = struct {
-    /// Command and flags.
-    command uint32;
+    /// Opcode and flags.
+    command BlockCommand;
 
     /// Transfer length in blocks (0 is invalid).
     length uint32;
@@ -115,55 +114,57 @@ type BlockTrim = struct {
 
 type BlockOp = strict resource union {
     /// All Commands
-    1: command uint32;
+    1: command BlockCommand;
 
     /// Read and Write ops use rw for parameters.
     2: rw BlockReadWrite;
     3: trim BlockTrim;
 };
 
-/// Performs a regular data read or write from the device. The operation may
-/// be cached internally.
-const BLOCK_OP_READ uint32 = 0x00000001;
-const BLOCK_OP_WRITE uint32 = 0x00000002;
+type BlockCommand = struct {
+    opcode @generated_name("BlockOpcode") strict enum : uint8 {
+        /// Performs a regular data read or write from the device. The operation may
+        /// be cached internally.
+        READ = 1;
+        WRITE = 2;
 
-/// Write any controller or device cached data to nonvolatile storage.
-const BLOCK_OP_FLUSH uint32 = 0x00000003;
+        /// Write any controller or device cached data to nonvolatile storage.
+        FLUSH = 3;
 
-/// Instructs the device to invalidate a number of blocks, making them  usable
-/// for storing something else. This is basically a "delete" optimization,
-/// where the device is in charge of discarding the old content without
-/// clients having to write a given pattern. The operation may be cached
-/// internally.
-const BLOCK_OP_TRIM uint32 = 0x00000004;
+        /// Instructs the device to invalidate a number of blocks, making them  usable
+        /// for storing something else. This is basically a "delete" optimization,
+        /// where the device is in charge of discarding the old content without
+        /// clients having to write a given pattern. The operation may be cached
+        /// internally.
+        TRIM = 4;
 
-/// Detaches the VMO from the block device.
-const BLOCK_OP_CLOSE_VMO uint32 = 0x00000005;
+        /// Detaches the VMO from the block device.
+        CLOSE_VMO = 5;
+    };
 
-const BLOCK_OP_MASK uint32 = 0x000000FF;
+    flags @generated_name("BlockIoFlag") strict bits : uint32 {
+        /// Associate the following request with `group`.
+        GROUP_ITEM = 0x00000001;
 
-/// Mark this operation as "Force Unit Access" (FUA). For writes, this indicates that the data will
-/// be written to the non-volatile medium, only after which the operation will complete. For reads,
-/// any updated version of the requested data in the volatile cache will be written to the
-/// non-volatile medium, and then read from the non-volatile medium.
-const BLOCK_FL_FORCE_ACCESS uint32 = 0x00001000;
+        /// Only respond after this request (and all previous within group) have
+        /// completed. Only valid with `GROUP_ITEM`.
+        GROUP_LAST = 0x00000002;
 
-/// The pre-flush flag generates a flush operation before running this operation
-/// and flushes on-device caches. It ensures that previous data is written to
-/// the non-volatile medium. Applying the preflush to an operation in a group
-/// will only apply to the operation with the flag and not all the other
-/// operations in the group. The preflush only applies to an operation where the
-/// preflush flag is set. It does not affect other operations and can proceed in
-/// parallel. If the flush operation fails, the operation will not proceed.
-const BLOCK_FL_PREFLUSH uint32 = 0x00002000;
+        /// Mark this operation as "Force Unit Access" (FUA), indicating that
+        /// it should not complete until the data is written to the non-volatile
+        /// medium (write), and that reads should bypass any on-device caches.
+        FORCE_ACCESS = 0x00000004;
 
-/// Associate the following request with `group`.
-const BLOCK_GROUP_ITEM uint32 = 0x00000400;
-
-/// Only respond after this request (and all previous within group) have
-/// completed. Only valid with `BLOCK_GROUP_ITEM`.
-const BLOCK_GROUP_LAST uint32 = 0x00000800;
-const BLOCK_FLAG_MASK uint32 = 0x0000FF00;
+        /// The pre-flush flag generates a flush operation before running this operation
+        /// and flushes on-device caches. It ensures that previous data is written to
+        /// the non-volatile medium. Applying the preflush to an operation in a group
+        /// will only apply to the operation with the flag and not all the other
+        /// operations in the group. The preflush only applies to an operation where the
+        /// preflush flag is set. It does not affect other operations and can proceed in
+        /// parallel. If the flush operation fails, the operation will not proceed.
+        PREFLUSH = 0x00000008;
+    };
+};
 
 protocol Common {
     /// Obtains the parameters of the block device (`block_info_t`) and the

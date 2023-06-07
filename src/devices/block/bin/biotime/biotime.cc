@@ -214,7 +214,8 @@ static int bio_random_thread(void* arg) {
     block_fifo_request_t req = {};
     req.reqid = next_reqid.fetch_add(1);
     req.vmoid = a->blk->vmoid.id;
-    req.opcode = a->write ? BLOCK_OP_WRITE : BLOCK_OP_READ;
+    req.command.opcode = a->write ? BLOCK_OPCODE_WRITE : BLOCK_OPCODE_READ;
+    req.command.flags = 0;
     req.length = static_cast<uint32_t>(xfer);
     req.vmo_offset = off;
 

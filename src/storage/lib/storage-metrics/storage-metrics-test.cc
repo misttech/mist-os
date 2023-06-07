@@ -387,8 +387,8 @@ TEST(BlockDeviceMetricsTest, UpdateWriteStats) {
   storage_metrics::BlockDeviceMetrics metrics;
   fuchsia_hardware_block::wire::BlockStats fidl_block_metrics;
 
-  metrics.UpdateStats(true, zx::ticks(0), BLOCK_OP_WRITE, 100);
-  metrics.UpdateStats(false, zx::ticks(0), BLOCK_OP_WRITE, 10);
+  metrics.UpdateStats(true, zx::ticks(0), BLOCK_OPCODE_WRITE, 100);
+  metrics.UpdateStats(false, zx::ticks(0), BLOCK_OPCODE_WRITE, 10);
   metrics.CopyToFidl(&fidl_block_metrics);
 
   ASSERT_EQ(1, fidl_block_metrics.write.success.total_calls);
@@ -403,8 +403,8 @@ TEST(BlockDeviceMetricsTest, UpdateReadStats) {
   storage_metrics::BlockDeviceMetrics metrics;
   fuchsia_hardware_block::wire::BlockStats fidl_block_metrics;
 
-  metrics.UpdateStats(true, zx::ticks(0), BLOCK_OP_READ, 100);
-  metrics.UpdateStats(false, zx::ticks(0), BLOCK_OP_READ, 10);
+  metrics.UpdateStats(true, zx::ticks(0), BLOCK_OPCODE_READ, 100);
+  metrics.UpdateStats(false, zx::ticks(0), BLOCK_OPCODE_READ, 10);
   metrics.CopyToFidl(&fidl_block_metrics);
 
   ASSERT_EQ(1, fidl_block_metrics.read.success.total_calls);
@@ -419,8 +419,8 @@ TEST(BlockDeviceMetricsTest, UpdateFlushStats) {
   storage_metrics::BlockDeviceMetrics metrics;
   fuchsia_hardware_block::wire::BlockStats fidl_block_metrics;
 
-  metrics.UpdateStats(true, zx::ticks(0), BLOCK_OP_FLUSH, 100);
-  metrics.UpdateStats(false, zx::ticks(0), BLOCK_OP_FLUSH, 10);
+  metrics.UpdateStats(true, zx::ticks(0), BLOCK_OPCODE_FLUSH, 100);
+  metrics.UpdateStats(false, zx::ticks(0), BLOCK_OPCODE_FLUSH, 10);
   metrics.CopyToFidl(&fidl_block_metrics);
 
   ASSERT_EQ(1, fidl_block_metrics.flush.success.total_calls);
@@ -435,8 +435,8 @@ TEST(BlockDeviceMetricsTest, UpdateTrimStats) {
   storage_metrics::BlockDeviceMetrics metrics;
   fuchsia_hardware_block::wire::BlockStats fidl_block_metrics;
 
-  metrics.UpdateStats(true, zx::ticks(0), BLOCK_OP_TRIM, 100);
-  metrics.UpdateStats(false, zx::ticks(0), BLOCK_OP_TRIM, 10);
+  metrics.UpdateStats(true, zx::ticks(0), BLOCK_OPCODE_TRIM, 100);
+  metrics.UpdateStats(false, zx::ticks(0), BLOCK_OPCODE_TRIM, 10);
   metrics.CopyToFidl(&fidl_block_metrics);
 
   ASSERT_EQ(1, fidl_block_metrics.trim.success.total_calls);

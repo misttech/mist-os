@@ -86,7 +86,7 @@ class MinfsInspectorTest : public testing::Test {
       EXPECT_EQ(temp->BlockAttachVmo(buffer, &vmoid.GetReference(temp.get())), ZX_OK);
 
       std::vector<block_fifo_request_t> reqs = {{
-          .opcode = BLOCK_OP_WRITE,
+          .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
           .reqid = 0x0,
           .group = 0,
           .vmoid = vmoid.get(),

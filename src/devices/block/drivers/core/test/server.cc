@@ -96,7 +96,7 @@ TEST_F(ServerTestFixture, SplitRequestAfterFailedRequestReturnsFailure) {
   ASSERT_OK(vmoid);
 
   block_fifo_request_t request = {
-      .opcode = BLOCK_OP_WRITE | BLOCK_GROUP_ITEM,
+      .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = BLOCK_IO_FLAG_GROUP_ITEM},
       .reqid = 100,
       .group = 5,
       .vmoid = vmoid.value(),
@@ -112,7 +112,7 @@ TEST_F(ServerTestFixture, SplitRequestAfterFailedRequestReturnsFailure) {
   ASSERT_EQ(actual_count, 1);
 
   request = {
-      .opcode = BLOCK_OP_READ,
+      .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
       .reqid = 101,
       .vmoid = vmoid.value(),
   };
@@ -128,7 +128,8 @@ TEST_F(ServerTestFixture, SplitRequestAfterFailedRequestReturnsFailure) {
   EXPECT_EQ(response.reqid, 101);
 
   request = {
-      .opcode = BLOCK_OP_WRITE | BLOCK_GROUP_ITEM | BLOCK_GROUP_LAST,
+      .command = {.opcode = BLOCK_OPCODE_WRITE,
+                  .flags = BLOCK_IO_FLAG_GROUP_ITEM | BLOCK_IO_FLAG_GROUP_LAST},
       .reqid = 102,
       .group = 5,
       .vmoid = vmoid.value(),
@@ -150,7 +151,7 @@ TEST_F(ServerTestFixture, SplitRequestAfterFailedRequestReturnsFailure) {
 
   block_fifo_request_t requests[] = {
       {
-          .opcode = BLOCK_OP_WRITE | BLOCK_GROUP_ITEM,
+          .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = BLOCK_IO_FLAG_GROUP_ITEM},
           .reqid = 103,
           .group = 5,
           .vmoid = vmoid.value(),
@@ -159,7 +160,8 @@ TEST_F(ServerTestFixture, SplitRequestAfterFailedRequestReturnsFailure) {
           .dev_offset = 0,
       },
       {
-          .opcode = BLOCK_OP_WRITE | BLOCK_GROUP_ITEM | BLOCK_GROUP_LAST,
+          .command = {.opcode = BLOCK_OPCODE_WRITE,
+                      .flags = BLOCK_IO_FLAG_GROUP_ITEM | BLOCK_IO_FLAG_GROUP_LAST},
           .reqid = 104,
           .group = 5,
           .vmoid = vmoid.value(),
