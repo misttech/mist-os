@@ -46,7 +46,7 @@ use packet_formats::ip::IpProto;
 use rand::RngCore;
 use smallvec::{smallvec, SmallVec};
 use thiserror::Error;
-use tracing::warn;
+use tracing::{debug, warn};
 
 use crate::{
     algorithm::{PortAlloc, PortAllocImpl},
@@ -1398,6 +1398,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         // TODO(https://fxbug.dev/104300): Check if local_ip is a unicast address.
         self.with_ip_transport_ctx_and_tcp_sockets_mut(
             |ip_transport_ctx, Sockets { bound_state: socket_bound_state, port_alloc, inactive, socketmap }| {
+                debug!("bind {id:?} to {addr:?}:{}", port.map_or(0, NonZeroU16::get));
                 let port = match port {
                     None => {
                         let addr = addr.as_ref().map(ZonedAddr::addr);
@@ -1484,6 +1485,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         backlog: NonZeroUsize,
     ) -> Result<ListenerId<I>, ListenError> {
         self.with_tcp_sockets_mut(|sockets| {
+            debug!("listen on {id:?} with backlog {backlog}");
             let (listener, listener_sharing, addr) =
                 id.get_from_bound_state_mut(&mut sockets.bound_state).expect("missing listener");
             let id = id.into();
@@ -1527,6 +1529,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         AcceptError,
     > {
         self.with_tcp_sockets_mut(|sockets| {
+            debug!("accept on {id:?}");
             let Listener { ready, backlog: _, buffer_sizes: _, pending: _, socket_options: _ } =
                 sockets.get_listener_by_id_mut(id).expect("invalid listener id");
             let (conn_id, client_buffers) = ready.pop_front().ok_or(AcceptError::WouldBlock)?;
@@ -1559,6 +1562,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         let SocketAddr { ip: remote_ip, port: remote_port } = remote;
         self.with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut(
             |ip_transport_ctx, isn, sockets| {
+                debug!("connect on {id:?} to {remote_ip:?}:{remote_port}");
                 let Sockets { bound_state, socketmap, port_alloc: _, inactive: _ } = sockets;
                 let (bound, sharing, bound_addr) =
                     bound_id.get_from_bound_state(bound_state).expect("invalid bound");
@@ -1644,6 +1648,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
     ) -> Result<ConnectionId<I>, ConnectError> {
         self.with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut(
             |ip_transport_ctx, isn, sockets| {
+                debug!("connect on {id:?} to {remote_ip:?}:{remote_port}");
                 let inactive = match sockets.inactive.entry(id.into()) {
                     id_map::Entry::Vacant(_) => panic!("invalid unbound ID {:?}", id),
                     id_map::Entry::Occupied(o) => o,
@@ -1718,6 +1723,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
 
     fn shutdown_conn(&mut self, ctx: &mut C, id: ConnectionId<I>) -> Result<(), NoConnection> {
         self.with_ip_transport_ctx_and_tcp_sockets_mut(|ip_transport_ctx, sockets| {
+            debug!("shutdown on {id:?}");
             let (conn, _, addr): (_, &mut SharingState, _) =
                 id.get_from_bound_state_mut(&mut sockets.bound_state).expect("invalid conn ID");
             match conn.state.close(CloseReason::Shutdown, &conn.socket_options) {
@@ -1730,6 +1736,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
 
     fn close_conn(&mut self, ctx: &mut C, id: ConnectionId<I>) {
         self.with_ip_transport_ctx_and_tcp_sockets_mut(|ip_transport_ctx, sockets| {
+            debug!("close on {id:?}");
             let mut entry = id.get_bound_state_entry(&mut sockets.bound_state);
             let (conn, _, addr): &mut (_, SharingState, _) =
                 BoundConnection::from_socket_state_mut(entry.get_mut());
@@ -1775,6 +1782,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
     fn shutdown_listener(&mut self, ctx: &mut C, id: ListenerId<I>) -> BoundId<I> {
         self.with_ip_transport_ctx_and_tcp_sockets_mut(
             |ip_transport_ctx, Sockets { bound_state, socketmap, inactive: _, port_alloc: _ }| {
+                debug!("shutdown on {id:?}");
                 let listener_state =
                     id.get_from_bound_state_mut(bound_state).expect("missing listener state");
                 let (maybe_listener, sharing, addr) = listener_state;
@@ -1815,11 +1823,9 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                         ip_transport_ctx
                             .send_ip_packet(ctx, &conn.ip_sock, ser, None)
                             .unwrap_or_else(|(body, err)| {
-                                tracing::debug!(
+                                debug!(
                                     "failed to reset connection to {:?}, body: {:?}, err: {:?}",
-                                    ip,
-                                    body,
-                                    err
+                                    ip, body, err
                                 )
                             });
                     }
@@ -1836,6 +1842,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         device: Option<Self::DeviceId>,
     ) {
         self.with_ip_transport_ctx_and_tcp_sockets_mut(|sync_ctx, sockets| {
+            debug!("set device on {id:?} to {device:?}");
             let Sockets { bound_state: _, inactive, port_alloc: _, socketmap: _ } = sockets;
             let Unbound { bound_device, buffer_sizes: _, socket_options: _, sharing: _ } =
                 inactive.get_mut(id.into()).expect("invalid unbound socket ID");
@@ -1851,6 +1858,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
     ) -> Result<(), SetDeviceError> {
         let id = id.into();
         self.with_ip_transport_ctx_and_tcp_sockets_mut(|sync_ctx, sockets| {
+            debug!("set device on {id:?} to {new_device:?}");
             let Sockets { bound_state, socketmap, inactive: _, port_alloc: _ } = sockets;
             let bound_state =
                 id.get_from_bound_state_mut(bound_state).expect("missing bound state");
@@ -1890,6 +1898,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
     ) -> Result<(), SetDeviceError> {
         self.with_ip_transport_ctx_and_tcp_sockets_mut(
             |ip_transport_ctx, Sockets { bound_state, socketmap, inactive: _, port_alloc: _ }| {
+                debug!("set device on {id:?} to {new_device:?}");
                 let bound_state =
                     id.get_from_bound_state_mut(bound_state).expect("invalid conn state");
                 let (connection, _sharing, addr) = bound_state;
@@ -2326,11 +2335,9 @@ fn do_send_inner<I, SC, C>(
                 // not return the error to caller but just log it instead. If
                 // we find a case where the caller is interested in the error,
                 // then we can always come back and change this.
-                tracing::debug!(
+                debug!(
                     "failed to send an ip packet on {:?}, body: {:?}, err: {:?}",
-                    conn_id,
-                    body,
-                    err
+                    conn_id, body, err
                 )
             },
         );
