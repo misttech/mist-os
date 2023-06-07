@@ -40,7 +40,20 @@ use crate::{
 // See https://man7.org/linux/man-pages/man2/setpriority.2.html#NOTES
 const DEFAULT_TASK_PRIORITY: u8 = 20;
 
+/// The task object associated with the currently executing thread.
+///
+/// We often pass the `CurrentTask` as the first argument to functions if those functions need to
+/// know contextual information about the thread on which they are running. For example, we often
+/// use the `CurrentTask` to perform access checks, which ensures that the caller is authorized to
+/// perform the requested operation.
+///
+/// The `CurrentTask` also has state that can be referenced only on the currently executing thread,
+/// such as the register state for that thread. Syscalls are given a mutable references to the
+/// `CurrentTask`, which lets them manipulate this state.
+///
+/// See also `Task` for more information about tasks.
 pub struct CurrentTask {
+    /// The underlying task object.
     pub task: Arc<Task>,
 
     /// A copy of the registers associated with the Zircon thread. Up-to-date values can be read
@@ -294,16 +307,52 @@ impl TaskStateCode {
     }
 }
 
+/// A unit of execution.
+///
+/// A task is the primary unit of execution in the Starnix kernel. Most tasks are *user* tasks,
+/// which have an associated Zircon thread. The Zircon thread switches between restricted mode,
+/// in which the thread runs userspace code, and normal mode, in which the thread runs Starnix
+/// code.
+///
+/// Tasks track the resources used by userspace by referencing various objects, such as an
+/// `FdTable`, a `MemoryManager`, and an `FsContext`. Many tasks can share references to these
+/// objects. In principle, which objects are shared between which tasks can be largely arbitrary,
+/// but there are common patterns of sharing. For example, tasks created with `pthread_create`
+/// will share the `FdTable`, `MemoryManager`, and `FsContext` and are often called "threads" by
+/// userspace programmers. Tasks created by `posix_spawn` do not share these objects and are often
+/// called "processes" by userspace programmers. However, inside the kernel, there is no clear
+/// definition of a "thread" or a "process".
+///
+/// During boot, the kernel creates the first task, often called `init`. The vast majority of other
+/// tasks are created as transitive clones (e.g., using `clone(2)`) of that task. Sometimes, the
+/// kernel will create new tasks from whole cloth, either with a corresponding userspace component
+/// or to represent some background work inside the kernel.
+///
+/// See also `CurrentTask`, which represents the task corresponding to the thread that is currently
+/// executing.
 pub struct Task {
+    /// A unique identifier for this task.
+    ///
+    /// This value can be read in userspace using `gettid(2)`. In general, this value
+    /// is different from the value return by `getpid(2)`, which returns the `id` of the leader
+    /// of the `thread_group`.
     pub id: pid_t,
 
     /// The thread group to which this task belongs.
+    ///
+    /// The group of tasks in a thread group roughly corresponds to the userspace notion of a
+    /// process.
     pub thread_group: Arc<ThreadGroup>,
 
     /// A handle to the underlying Zircon thread object.
+    ///
+    /// Some tasks lack an underlying Zircon thread. These tasks are used internally by the
+    /// Starnix kernel to track background work, typically on a `kthread`.
     pub thread: RwLock<Option<zx::Thread>>,
 
     /// The file descriptor table for this task.
+    ///
+    /// This table can be share by many tasks.
     pub files: FdTable,
 
     /// The memory manager for this task.

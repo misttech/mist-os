@@ -23,6 +23,18 @@ pub struct SessionMutableState {
     pub controlling_terminal: Option<ControllingTerminal>,
 }
 
+/// A session is a collection of `ProcessGroup` objects that are related to each other. Each
+/// session has a session ID (`sid`), which is a unique identifier for the session.
+///
+/// The session leader is the first `ProcessGroup` in a session. It is responsible for managing the
+/// session, including sending signals to all processes in the session and controlling the
+/// foreground and background process groups.
+///
+/// When a `ProcessGroup` is created, it is automatically added to the session of its parent.
+/// See `setsid(2)` for information about creating sessions.
+///
+/// A session can be destroyed when the session leader exits or when all process groups in the
+/// session are destroyed.
 #[derive(Debug)]
 pub struct Session {
     /// The leader of the session

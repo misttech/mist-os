@@ -39,6 +39,15 @@ pub const DISPLAY_WIDTH: u32 = 720;
 /// The height of the display by default.
 pub const DISPLAY_HEIGHT: u32 = 1200;
 
+/// The shared, mutable state for the entire Starnix kernel.
+///
+/// The `Kernel` object holds all kernel threads, userspace tasks, and file system resources for a
+/// single instance of the Starnix kernel. In production, there is one instance of this object for
+/// the entire Starnix kernel. However, multiple instances of this object can be created in one
+/// process during unit testing.
+///
+/// The structure of this object will likely need to evolve as we implement more namespacing and
+/// isolation mechanisms, such as `namespaces(7)` and `pid_namespaces(7)`.
 pub struct Kernel {
     /// The Zircon job object that holds the processes running in this kernel.
     pub job: zx::Job,

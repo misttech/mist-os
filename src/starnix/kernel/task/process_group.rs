@@ -48,6 +48,23 @@ impl std::hash::Hash for ProcessGroup {
     }
 }
 
+/// A process group is a set of processes that are considered to be a unit for the purposes of job
+/// control and signal delivery. Each process in a process group has the same process group
+/// ID (PGID). The process with the same PID as the PGID is called the process group leader.
+///
+/// When a signal is sent to a process group, it is delivered to all processes in the group,
+/// including the process group leader. This allows a single signal to be used to control all
+/// processes in a group, such as stopping or resuming them all.
+///
+/// Process groups are also used for job control. The foreground and background process groups of a
+/// terminal are used to determine which processes can read from and write to the terminal. The
+/// foreground process group is the only process group that can read from and write to the terminal
+/// at any given time.
+///
+/// When a process forks from its parent, the child process inherits the parent's PGID. A process
+/// can also explicitly change its own PGID using the setpgid() system call.
+///
+/// Process groups are destroyed when the last process in the group exits.
 impl ProcessGroup {
     pub fn new(leader: pid_t, session: Option<Arc<Session>>) -> Arc<ProcessGroup> {
         let session = session.unwrap_or_else(|| Session::new(leader));

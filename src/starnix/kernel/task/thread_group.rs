@@ -100,6 +100,29 @@ pub struct ThreadGroupMutableState {
     pub children_time_stats: TaskTimeStats,
 }
 
+/// A collection of `Task` objects that roughly correspond to a "process".
+///
+/// Userspace programmers often think about "threads" and "process", but those concepts have no
+/// clear analogs inside the kernel because tasks are typically created using `clone(2)`, which
+/// takes a complex set of flags that describes how much state is shared between the original task
+/// and the new task.
+///
+/// If a new task is created with the `CLONE_THREAD` flag, the new task will be placed in the same
+/// `ThreadGroup` as the original task. Userspace typically uses this flag in conjunction with the
+/// `CLONE_FILES`, `CLONE_VM`, and `CLONE_FS`, which corresponds to the userspace notion of a
+/// "thread". For example, that's how `pthread_create` behaves. In that sense, a `ThreadGroup`
+/// normally corresponds to the set of "threads" in a "process". However, this pattern is purely a
+/// userspace convention, and nothing stops userspace from using `CLONE_THREAD` without
+/// `CLONE_FILES`, for example.
+///
+/// In Starnix, a `ThreadGroup` corresponds to a Zicon process, which means we do not support the
+/// `CLONE_THREAD` flag without the `CLONE_VM` flag. If we run into problems with this limitation,
+/// we might need to revise this correspondence.
+///
+/// Each `Task` in a `ThreadGroup` has the same thread group ID (`tgid`). The task with the same
+/// `pid` as the `tgid` is called the thread group leader.
+///
+/// Thread groups are destroyed when the last task in the group exits.
 pub struct ThreadGroup {
     /// The kernel to which this thread group belongs.
     pub kernel: Arc<Kernel>,
@@ -122,6 +145,7 @@ pub struct ThreadGroup {
     /// The signal actions that are registered for this process.
     pub signal_actions: Arc<SignalActions>,
 
+    /// A mechanism to be notified when this `ThreadGroup` is destroyed.
     pub drop_notifier: DropNotifier,
 
     /// The mutable state of the ThreadGroup.
