@@ -16,10 +16,10 @@
         {
             protocol: [
                 "fuchsia.sys.Environment",
+                "fuchsia.sys.Launcher",
                 "fuchsia.sys.Loader",
             ],
         },
-        { protocol: "fuchsia.sys.Launcher" },
         {
             directory: "svc_from_sys",
             rights: [ "r*" ],

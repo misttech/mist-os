@@ -50,18 +50,16 @@
             from: "#usb_camera_device_watcher",
             to: "#session-manager",
         },
-
-        // TODO(fxbug.dev/102390): Remove these routes
         {
+            // Routed from v1 components.
             protocol: [
                 "fuchsia.sys.Environment",
                 "fuchsia.sys.Launcher",
                 "fuchsia.sys.Loader",
             ],
-            from: "void",
+            from: "self",
             to: "#session-manager",
             dependency: "weak_for_migration",
-            availability: "optional",
         },
     ],
 }
