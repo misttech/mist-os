@@ -632,26 +632,27 @@ int FakeDisplay::CaptureThread() {
       if (capture_interface_client_.is_valid() && (current_capture_target_image_ != nullptr) &&
           ++capture_complete_signal_count_ >= kNumOfVsyncsForCapture) {
         {
+          ImageInfo& dst = *current_capture_target_image_;
+
           fbl::AutoLock lock(&display_lock_);
           if (current_image_to_capture_ != nullptr) {
             // We have a valid image being displayed. Let's capture it.
-            ImageInfo* src = current_image_to_capture_;
-            ImageInfo* dst = current_capture_target_image_;
+            ImageInfo& src = *current_image_to_capture_;
 
-            if (src->pixel_format != dst->pixel_format) {
-              zxlogf(ERROR, "Trying to capture format=%d as format=%d\n", src->pixel_format,
-                     dst->pixel_format);
+            if (src.pixel_format != dst.pixel_format) {
+              zxlogf(ERROR, "Trying to capture format=%d as format=%d\n", src.pixel_format,
+                     dst.pixel_format);
               continue;
             }
             size_t src_vmo_size;
-            auto status = src->vmo.get_size(&src_vmo_size);
+            auto status = src.vmo.get_size(&src_vmo_size);
             if (status != ZX_OK) {
               zxlogf(ERROR, "Failed to get the size of the displayed image VMO: %s",
                      zx_status_get_string(status));
               continue;
             }
             size_t dst_vmo_size;
-            status = dst->vmo.get_size(&dst_vmo_size);
+            status = dst.vmo.get_size(&dst_vmo_size);
             if (status != ZX_OK) {
               zxlogf(ERROR, "Failed to get the size of the VMO for the captured image: %s",
                      zx_status_get_string(status));
@@ -665,7 +666,7 @@ int FakeDisplay::CaptureThread() {
               continue;
             }
             fzl::VmoMapper mapped_src;
-            status = mapped_src.Map(src->vmo, 0, src_vmo_size, ZX_VM_PERM_READ);
+            status = mapped_src.Map(src.vmo, 0, src_vmo_size, ZX_VM_PERM_READ);
             if (status != ZX_OK) {
               zxlogf(ERROR, "Capture thread will exit; failed to map displayed image VMO: %s",
                      zx_status_get_string(status));
@@ -673,18 +674,18 @@ int FakeDisplay::CaptureThread() {
             }
 
             fzl::VmoMapper mapped_dst;
-            status = mapped_dst.Map(dst->vmo, 0, dst_vmo_size, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
+            status = mapped_dst.Map(dst.vmo, 0, dst_vmo_size, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
             if (status != ZX_OK) {
               zxlogf(ERROR, "Capture thread will exit; failed to map capture image VMO: %s",
                      zx_status_get_string(status));
               return status;
             }
-            if (src->ram_domain) {
+            if (src.ram_domain) {
               zx_cache_flush(mapped_src.start(), src_vmo_size,
                              ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
             }
             std::memcpy(mapped_dst.start(), mapped_src.start(), dst_vmo_size);
-            if (dst->ram_domain) {
+            if (dst.ram_domain) {
               zx_cache_flush(mapped_dst.start(), dst_vmo_size,
                              ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
             }
