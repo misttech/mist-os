@@ -233,20 +233,24 @@ void iwl_pcie_alloc_fw_monitor(struct iwl_trans* trans, uint8_t max_power) {
   iwl_pcie_alloc_fw_monitor_block(trans, max_power, 11);
 }
 
-static uint32_t iwl_trans_pcie_read_shr(struct iwl_trans* trans, uint32_t reg) {
-  iwl_write32(trans, HEEP_CTRL_WRD_PCIEX_CTRL_REG, ((reg & 0x0000ffff) | (2 << 28)));
-  return iwl_read32(trans, HEEP_CTRL_WRD_PCIEX_DATA_REG);
+static u32 iwl_trans_pcie_read_shr(struct iwl_trans *trans, u32 reg)
+{
+	iwl_write32(trans, HEEP_CTRL_WRD_PCIEX_CTRL_REG,
+		    ((reg & 0x0000ffff) | (2 << 28)));
+	return iwl_read32(trans, HEEP_CTRL_WRD_PCIEX_DATA_REG);
 }
 
-static void iwl_trans_pcie_write_shr(struct iwl_trans* trans, uint32_t reg, uint32_t val) {
-  iwl_write32(trans, HEEP_CTRL_WRD_PCIEX_DATA_REG, val);
-  iwl_write32(trans, HEEP_CTRL_WRD_PCIEX_CTRL_REG, ((reg & 0x0000ffff) | (3 << 28)));
+static void iwl_trans_pcie_write_shr(struct iwl_trans *trans, u32 reg, u32 val)
+{
+	iwl_write32(trans, HEEP_CTRL_WRD_PCIEX_DATA_REG, val);
+	iwl_write32(trans, HEEP_CTRL_WRD_PCIEX_CTRL_REG,
+		    ((reg & 0x0000ffff) | (3 << 28)));
 }
 
-static void iwl_pcie_set_pwr(struct iwl_trans* trans, bool vaux) {
-  if (trans->cfg->apmg_not_supported) {
-    return;
-  }
+static void iwl_pcie_set_pwr(struct iwl_trans *trans, bool vaux)
+{
+	if (trans->cfg->apmg_not_supported)
+		return;
 
 #if 0   // NEEDS_PORTING
     // We don't support D3 lower-power state yet.
@@ -255,12 +259,13 @@ static void iwl_pcie_set_pwr(struct iwl_trans* trans, bool vaux) {
                                ~APMG_PS_CTRL_MSK_PWR_SRC);
     else
 #endif  // NEEDS_PORTING
-  iwl_set_bits_mask_prph(trans, APMG_PS_CTRL_REG, APMG_PS_CTRL_VAL_PWR_SRC_VMAIN,
-                         ~APMG_PS_CTRL_MSK_PWR_SRC);
+		iwl_set_bits_mask_prph(trans, APMG_PS_CTRL_REG,
+				       APMG_PS_CTRL_VAL_PWR_SRC_VMAIN,
+				       ~APMG_PS_CTRL_MSK_PWR_SRC);
 }
 
 /* PCI registers */
-#define PCI_CONFIG_RETRY_TIMEOUT 0x041
+#define PCI_CFG_RETRY_TIMEOUT	0x041
 
 void iwl_pcie_apm_config(struct iwl_trans* trans) {
 #if 1  // NEEDS_PORTING
@@ -297,91 +302,95 @@ void iwl_pcie_apm_config(struct iwl_trans* trans) {
  * (e.g. after platform boot, or shutdown via iwl_pcie_apm_stop())
  * NOTE:  This does not load uCode nor start the embedded processor
  */
-static zx_status_t iwl_pcie_apm_init(struct iwl_trans* trans) {
+static int iwl_pcie_apm_init(struct iwl_trans *trans)
+{
   zx_status_t ret;
 
-  IWL_DEBUG_INFO(trans, "Init card's basic functions\n");
+	IWL_DEBUG_INFO(trans, "Init card's basic functions\n");
 
-  /*
-   * Use "set_bit" below rather than "write", to preserve any hardware
-   * bits already set by default after reset.
-   */
+	/*
+	 * Use "set_bit" below rather than "write", to preserve any hardware
+	 * bits already set by default after reset.
+	 */
 
-  /* Disable L0S exit timer (platform NMI Work/Around) */
-  if (trans->trans_cfg->device_family < IWL_DEVICE_FAMILY_8000) {
-    iwl_set_bit(trans, CSR_GIO_CHICKEN_BITS, CSR_GIO_CHICKEN_BITS_REG_BIT_DIS_L0S_EXIT_TIMER);
-  }
+	/* Disable L0S exit timer (platform NMI Work/Around) */
+	if (trans->trans_cfg->device_family < IWL_DEVICE_FAMILY_8000)
+		iwl_set_bit(trans, CSR_GIO_CHICKEN_BITS,
+			    CSR_GIO_CHICKEN_BITS_REG_BIT_DIS_L0S_EXIT_TIMER);
 
-  /*
-   * Disable L0s without affecting L1;
-   *  don't wait for ICH L0s (ICH bug W/A)
-   */
-  iwl_set_bit(trans, CSR_GIO_CHICKEN_BITS, CSR_GIO_CHICKEN_BITS_REG_BIT_L1A_NO_L0S_RX);
+	/*
+	 * Disable L0s without affecting L1;
+	 *  don't wait for ICH L0s (ICH bug W/A)
+	 */
+	iwl_set_bit(trans, CSR_GIO_CHICKEN_BITS,
+		    CSR_GIO_CHICKEN_BITS_REG_BIT_L1A_NO_L0S_RX);
 
-  /* Set FH wait threshold to maximum (HW error during stress W/A) */
-  iwl_set_bit(trans, CSR_DBG_HPET_MEM_REG, CSR_DBG_HPET_MEM_REG_VAL);
+	/* Set FH wait threshold to maximum (HW error during stress W/A) */
+	iwl_set_bit(trans, CSR_DBG_HPET_MEM_REG, CSR_DBG_HPET_MEM_REG_VAL);
 
-  /*
-   * Enable HAP INTA (interrupt from management bus) to
-   * wake device's PCI Express link L1a -> L0s
-   */
-  iwl_set_bit(trans, CSR_HW_IF_CONFIG_REG, CSR_HW_IF_CONFIG_REG_BIT_HAP_WAKE_L1A);
+	/*
+	 * Enable HAP INTA (interrupt from management bus) to
+	 * wake device's PCI Express link L1a -> L0s
+	 */
+	iwl_set_bit(trans, CSR_HW_IF_CONFIG_REG,
+		    CSR_HW_IF_CONFIG_REG_BIT_HAP_WAKE_L1A);
 
-  iwl_pcie_apm_config(trans);
+	iwl_pcie_apm_config(trans);
 
-  /* Configure analog phase-lock-loop before activating to D0A */
-  if (trans->trans_cfg->base_params->pll_cfg) {
-    iwl_set_bit(trans, CSR_ANA_PLL_CFG, CSR50_ANA_PLL_CFG_VAL);
-  }
+	/* Configure analog phase-lock-loop before activating to D0A */
+	if (trans->trans_cfg->base_params->pll_cfg)
+		iwl_set_bit(trans, CSR_ANA_PLL_CFG, CSR50_ANA_PLL_CFG_VAL);
 
 	ret = iwl_finish_nic_init(trans);
-	if (ret != ZX_OK) {
+	if (ret != ZX_OK)
 		return ret;
-  }
 
-  if (trans->cfg->host_interrupt_operation_mode) {
-    /*
-     * This is a bit of an abuse - This is needed for 7260 / 3160
-     * only check host_interrupt_operation_mode even if this is
-     * not related to host_interrupt_operation_mode.
-     *
-     * Enable the oscillator to count wake up time for L1 exit. This
-     * consumes slightly more power (100uA) - but allows to be sure
-     * that we wake up from L1 on time.
-     *
-     * This looks weird: read twice the same register, discard the
-     * value, set a bit, and yet again, read that same register
-     * just to discard the value. But that's the way the hardware
-     * seems to like it.
-     */
-    iwl_read_prph(trans, OSC_CLK);
-    iwl_read_prph(trans, OSC_CLK);
-    iwl_set_bits_prph(trans, OSC_CLK, OSC_CLK_FORCE_CONTROL);
-    iwl_read_prph(trans, OSC_CLK);
-    iwl_read_prph(trans, OSC_CLK);
-  }
+	if (trans->cfg->host_interrupt_operation_mode) {
+		/*
+		 * This is a bit of an abuse - This is needed for 7260 / 3160
+		 * only check host_interrupt_operation_mode even if this is
+		 * not related to host_interrupt_operation_mode.
+		 *
+		 * Enable the oscillator to count wake up time for L1 exit. This
+		 * consumes slightly more power (100uA) - but allows to be sure
+		 * that we wake up from L1 on time.
+		 *
+		 * This looks weird: read twice the same register, discard the
+		 * value, set a bit, and yet again, read that same register
+		 * just to discard the value. But that's the way the hardware
+		 * seems to like it.
+		 */
+		iwl_read_prph(trans, OSC_CLK);
+		iwl_read_prph(trans, OSC_CLK);
+		iwl_set_bits_prph(trans, OSC_CLK, OSC_CLK_FORCE_CONTROL);
+		iwl_read_prph(trans, OSC_CLK);
+		iwl_read_prph(trans, OSC_CLK);
+	}
 
-  /*
-   * Enable DMA clock and wait for it to stabilize.
-   *
-   * Write to "CLK_EN_REG"; "1" bits enable clocks, while "0"
-   * bits do not disable clocks.  This preserves any hardware
-   * bits already set by default in "CLK_CTRL_REG" after reset.
-   */
-  if (!trans->cfg->apmg_not_supported) {
-    iwl_write_prph(trans, APMG_CLK_EN_REG, APMG_CLK_VAL_DMA_CLK_RQT);
-    zx_nanosleep(zx_deadline_after(ZX_USEC(20)));
+	/*
+	 * Enable DMA clock and wait for it to stabilize.
+	 *
+	 * Write to "CLK_EN_REG"; "1" bits enable clocks, while "0"
+	 * bits do not disable clocks.  This preserves any hardware
+	 * bits already set by default in "CLK_CTRL_REG" after reset.
+	 */
+	if (!trans->cfg->apmg_not_supported) {
+		iwl_write_prph(trans, APMG_CLK_EN_REG,
+			       APMG_CLK_VAL_DMA_CLK_RQT);
+		udelay(20);
 
-    /* Disable L1-Active */
-    iwl_set_bits_prph(trans, APMG_PCIDEV_STT_REG, APMG_PCIDEV_STT_VAL_L1_ACT_DIS);
+		/* Disable L1-Active */
+		iwl_set_bits_prph(trans, APMG_PCIDEV_STT_REG,
+				  APMG_PCIDEV_STT_VAL_L1_ACT_DIS);
 
-    /* Clear the interrupt in APMG if the NIC is in RFKILL */
-    iwl_write_prph(trans, APMG_RTC_INT_STT_REG, APMG_RTC_INT_STT_RFKILL);
-  }
+		/* Clear the interrupt in APMG if the NIC is in RFKILL */
+		iwl_write_prph(trans, APMG_RTC_INT_STT_REG,
+			       APMG_RTC_INT_STT_RFKILL);
+	}
 
-  set_bit(STATUS_DEVICE_ENABLED, &trans->status);
+	set_bit(STATUS_DEVICE_ENABLED, &trans->status);
 
-  return ZX_OK;
+	return ZX_OK;
 }
 
 /*
@@ -391,20 +400,21 @@ static zx_status_t iwl_pcie_apm_init(struct iwl_trans* trans) {
  * Configure device's "persistence" mode to avoid resetting XTAL again when
  * SHRD_HW_RST occurs in S3.
  */
-static void iwl_pcie_apm_lp_xtal_enable(struct iwl_trans* trans) {
-  zx_status_t ret;
-  uint32_t apmg_gp1_reg;
-  uint32_t apmg_xtal_cfg_reg;
-  uint32_t dl_cfg_reg;
+static void iwl_pcie_apm_lp_xtal_enable(struct iwl_trans *trans)
+{
+	zx_status_t ret;
+	u32 apmg_gp1_reg;
+	u32 apmg_xtal_cfg_reg;
+	u32 dl_cfg_reg;
 
   /* Force XTAL ON */
-  __iwl_trans_pcie_set_bit(trans, CSR_GP_CNTRL, CSR_GP_CNTRL_REG_FLAG_XTAL_ON);
+	__iwl_trans_pcie_set_bit(trans, CSR_GP_CNTRL,
+				 CSR_GP_CNTRL_REG_FLAG_XTAL_ON);
 
   ret = iwl_trans_pcie_sw_reset(trans, true);
 
-	if (ret == ZX_OK) {
-		ret = iwl_finish_nic_init(trans);
-  }
+	if (ret == ZX_OK)
+	ret = iwl_finish_nic_init(trans);
 
 	if (WARN_ON(ret)) {
 		/* Release XTAL ON request */
@@ -413,65 +423,73 @@ static void iwl_pcie_apm_lp_xtal_enable(struct iwl_trans* trans) {
 		return;
 	}
 
-  /*
-   * Clear "disable persistence" to avoid LP XTAL resetting when
-   * SHRD_HW_RST is applied in S3.
-   */
-  iwl_clear_bits_prph(trans, APMG_PCIDEV_STT_REG, APMG_PCIDEV_STT_VAL_PERSIST_DIS);
+	/*
+	 * Clear "disable persistence" to avoid LP XTAL resetting when
+	 * SHRD_HW_RST is applied in S3.
+	 */
+	iwl_clear_bits_prph(trans, APMG_PCIDEV_STT_REG,
+				    APMG_PCIDEV_STT_VAL_PERSIST_DIS);
 
-  /*
-   * Force APMG XTAL to be active to prevent its disabling by HW
-   * caused by APMG idle state.
-   */
-  apmg_xtal_cfg_reg = iwl_trans_pcie_read_shr(trans, SHR_APMG_XTAL_CFG_REG);
-  iwl_trans_pcie_write_shr(trans, SHR_APMG_XTAL_CFG_REG,
-                           apmg_xtal_cfg_reg | SHR_APMG_XTAL_CFG_XTAL_ON_REQ);
+	/*
+	 * Force APMG XTAL to be active to prevent its disabling by HW
+	 * caused by APMG idle state.
+	 */
+	apmg_xtal_cfg_reg = iwl_trans_pcie_read_shr(trans,
+						    SHR_APMG_XTAL_CFG_REG);
+	iwl_trans_pcie_write_shr(trans, SHR_APMG_XTAL_CFG_REG,
+				 apmg_xtal_cfg_reg |
+				 SHR_APMG_XTAL_CFG_XTAL_ON_REQ);
 
-  ret = iwl_trans_pcie_sw_reset(trans, true);
-	if (ret != ZX_OK) {
+	ret = iwl_trans_pcie_sw_reset(trans, true);
+	if (ret != ZX_OK)
 		IWL_ERR(trans,
 			"iwl_pcie_apm_lp_xtal_enable: failed to retake NIC ownership\n");
-  }
 
-  /* Enable LP XTAL by indirect access through CSR */
-  apmg_gp1_reg = iwl_trans_pcie_read_shr(trans, SHR_APMG_GP1_REG);
-  iwl_trans_pcie_write_shr(
-      trans, SHR_APMG_GP1_REG,
-      apmg_gp1_reg | SHR_APMG_GP1_WF_XTAL_LP_EN | SHR_APMG_GP1_CHICKEN_BIT_SELECT);
+	/* Enable LP XTAL by indirect access through CSR */
+	apmg_gp1_reg = iwl_trans_pcie_read_shr(trans, SHR_APMG_GP1_REG);
+	iwl_trans_pcie_write_shr(trans, SHR_APMG_GP1_REG, apmg_gp1_reg |
+				 SHR_APMG_GP1_WF_XTAL_LP_EN |
+				 SHR_APMG_GP1_CHICKEN_BIT_SELECT);
 
-  /* Clear delay line clock power up */
-  dl_cfg_reg = iwl_trans_pcie_read_shr(trans, SHR_APMG_DL_CFG_REG);
-  iwl_trans_pcie_write_shr(trans, SHR_APMG_DL_CFG_REG,
-                           dl_cfg_reg & ~SHR_APMG_DL_CFG_DL_CLOCK_POWER_UP);
+	/* Clear delay line clock power up */
+	dl_cfg_reg = iwl_trans_pcie_read_shr(trans, SHR_APMG_DL_CFG_REG);
+	iwl_trans_pcie_write_shr(trans, SHR_APMG_DL_CFG_REG, dl_cfg_reg &
+				 ~SHR_APMG_DL_CFG_DL_CLOCK_POWER_UP);
 
-  /*
-   * Enable persistence mode to avoid LP XTAL resetting when
-   * SHRD_HW_RST is applied in S3.
-   */
-  iwl_set_bit(trans, CSR_HW_IF_CONFIG_REG, CSR_HW_IF_CONFIG_REG_PERSIST_MODE);
+	/*
+	 * Enable persistence mode to avoid LP XTAL resetting when
+	 * SHRD_HW_RST is applied in S3.
+	 */
+	iwl_set_bit(trans, CSR_HW_IF_CONFIG_REG,
+		    CSR_HW_IF_CONFIG_REG_PERSIST_MODE);
 
-  /*
-   * Clear "initialization complete" bit to move adapter from
-   * D0A* (powered-up Active) --> D0U* (Uninitialized) state.
-   */
-  iwl_clear_bit(trans, CSR_GP_CNTRL, CSR_GP_CNTRL_REG_FLAG_INIT_DONE);
+	/*
+	 * Clear "initialization complete" bit to move adapter from
+	 * D0A* (powered-up Active) --> D0U* (Uninitialized) state.
+	 */
+	iwl_clear_bit(trans, CSR_GP_CNTRL, CSR_GP_CNTRL_REG_FLAG_INIT_DONE);
 
-  /* Activates XTAL resources monitor */
-  __iwl_trans_pcie_set_bit(trans, CSR_MONITOR_CFG_REG, CSR_MONITOR_XTAL_RESOURCES);
+	/* Activates XTAL resources monitor */
+	__iwl_trans_pcie_set_bit(trans, CSR_MONITOR_CFG_REG,
+				 CSR_MONITOR_XTAL_RESOURCES);
 
-  /* Release XTAL ON request */
-  __iwl_trans_pcie_clear_bit(trans, CSR_GP_CNTRL, CSR_GP_CNTRL_REG_FLAG_XTAL_ON);
-  zx_nanosleep(zx_deadline_after(ZX_USEC(10)));
+	/* Release XTAL ON request */
+	__iwl_trans_pcie_clear_bit(trans, CSR_GP_CNTRL,
+				   CSR_GP_CNTRL_REG_FLAG_XTAL_ON);
+	udelay(10);
 
-  /* Release APMG XTAL */
-  iwl_trans_pcie_write_shr(trans, SHR_APMG_XTAL_CFG_REG,
-                           apmg_xtal_cfg_reg & ~SHR_APMG_XTAL_CFG_XTAL_ON_REQ);
+	/* Release APMG XTAL */
+	iwl_trans_pcie_write_shr(trans, SHR_APMG_XTAL_CFG_REG,
+				 apmg_xtal_cfg_reg &
+				 ~SHR_APMG_XTAL_CFG_XTAL_ON_REQ);
 }
 
-void iwl_pcie_apm_stop_master(struct iwl_trans* trans) {
+void iwl_pcie_apm_stop_master(struct iwl_trans *trans)
+{
   zx_status_t ret;
 
 	/* stop device's busmaster DMA activity */
+
 	if (trans->trans_cfg->device_family >= IWL_DEVICE_FAMILY_BZ) {
 		iwl_set_bit(trans, CSR_GP_CNTRL,
 			CSR_GP_CNTRL_REG_FLAG_BUS_MASTER_DISABLE_REQ);
@@ -486,106 +504,113 @@ void iwl_pcie_apm_stop_master(struct iwl_trans* trans) {
 			CSR_RESET_REG_FLAG_MASTER_DISABLED, ZX_USEC(100), NULL);
 	}
 
-  if (ret != ZX_OK) {
-    IWL_WARN(trans, "Master Disable Timed Out, 100 usec\n");
-  }
+	if (ret != ZX_OK)
+		IWL_WARN(trans, "Master Disable Timed Out, 100 usec\n");
 
-  IWL_DEBUG_INFO(trans, "stop master\n");
+	IWL_DEBUG_INFO(trans, "stop master\n");
 }
 
-static void iwl_pcie_apm_stop(struct iwl_trans* trans, bool op_mode_leave) {
-  IWL_DEBUG_INFO(trans, "Stop card, put in low power state\n");
+static void iwl_pcie_apm_stop(struct iwl_trans *trans, bool op_mode_leave)
+{
+	IWL_DEBUG_INFO(trans, "Stop card, put in low power state\n");
 
-  if (op_mode_leave) {
-    if (!test_bit(STATUS_DEVICE_ENABLED, &trans->status)) {
-      iwl_pcie_apm_init(trans);
-    }
+	if (op_mode_leave) {
+		if (!test_bit(STATUS_DEVICE_ENABLED, &trans->status))
+			iwl_pcie_apm_init(trans);
 
-    /* inform ME that we are leaving */
-    if (trans->trans_cfg->device_family == IWL_DEVICE_FAMILY_7000) {
-      iwl_set_bits_prph(trans, APMG_PCIDEV_STT_REG, APMG_PCIDEV_STT_VAL_WAKE_ME);
-    } else if (trans->trans_cfg->device_family >= IWL_DEVICE_FAMILY_8000) {
-      iwl_set_bit(trans, CSR_DBG_LINK_PWR_MGMT_REG, CSR_RESET_LINK_PWR_MGMT_DISABLED);
-      iwl_set_bit(trans, CSR_HW_IF_CONFIG_REG,
-                  CSR_HW_IF_CONFIG_REG_PREPARE | CSR_HW_IF_CONFIG_REG_ENABLE_PME);
-      zx_nanosleep(zx_deadline_after(ZX_MSEC(1)));
-      iwl_clear_bit(trans, CSR_DBG_LINK_PWR_MGMT_REG, CSR_RESET_LINK_PWR_MGMT_DISABLED);
-    }
-    zx_nanosleep(zx_deadline_after(ZX_MSEC(5)));
-  }
+		/* inform ME that we are leaving */
+		if (trans->trans_cfg->device_family == IWL_DEVICE_FAMILY_7000)
+			iwl_set_bits_prph(trans, APMG_PCIDEV_STT_REG,
+					  APMG_PCIDEV_STT_VAL_WAKE_ME);
+		else if (trans->trans_cfg->device_family >=
+			 IWL_DEVICE_FAMILY_8000) {
+			iwl_set_bit(trans, CSR_DBG_LINK_PWR_MGMT_REG,
+				    CSR_RESET_LINK_PWR_MGMT_DISABLED);
+			iwl_set_bit(trans, CSR_HW_IF_CONFIG_REG,
+				    CSR_HW_IF_CONFIG_REG_PREPARE |
+				    CSR_HW_IF_CONFIG_REG_ENABLE_PME);
+			mdelay(1);
+			iwl_clear_bit(trans, CSR_DBG_LINK_PWR_MGMT_REG,
+				      CSR_RESET_LINK_PWR_MGMT_DISABLED);
+		}
+		mdelay(5);
+	}
 
-  clear_bit(STATUS_DEVICE_ENABLED, &trans->status);
+	clear_bit(STATUS_DEVICE_ENABLED, &trans->status);
 
-  /* Stop device's DMA activity */
-  iwl_pcie_apm_stop_master(trans);
+	/* Stop device's DMA activity */
+	iwl_pcie_apm_stop_master(trans);
 
-  if (trans->cfg->lp_xtal_workaround) {
-    iwl_pcie_apm_lp_xtal_enable(trans);
-    return;
-  }
+	if (trans->cfg->lp_xtal_workaround) {
+		iwl_pcie_apm_lp_xtal_enable(trans);
+		return;
+	}
 
-  iwl_trans_pcie_sw_reset(trans, false);
+	iwl_trans_pcie_sw_reset(trans, false);
 
-  /*
-   * Clear "initialization complete" bit to move adapter from
-   * D0A* (powered-up Active) --> D0U* (Uninitialized) state.
-   */
-  iwl_clear_bit(trans, CSR_GP_CNTRL, CSR_GP_CNTRL_REG_FLAG_INIT_DONE);
+	/*
+	 * Clear "initialization complete" bit to move adapter from
+	 * D0A* (powered-up Active) --> D0U* (Uninitialized) state.
+	 */
+	iwl_clear_bit(trans, CSR_GP_CNTRL, CSR_GP_CNTRL_REG_FLAG_INIT_DONE);
 }
 
-static zx_status_t iwl_pcie_nic_init(struct iwl_trans* trans) {
-  struct iwl_trans_pcie* trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
+static int iwl_pcie_nic_init(struct iwl_trans *trans)
+{
+	struct iwl_trans_pcie* trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
+	zx_status_t ret;
 
   /* nic_init */
-  mtx_lock(&trans_pcie->irq_lock);
-  zx_status_t status = iwl_pcie_apm_init(trans);
-  mtx_unlock(&trans_pcie->irq_lock);
-  if (status != ZX_OK) {
-    return status;
-  }
+	mtx_lock(&trans_pcie->irq_lock);
+	ret = iwl_pcie_apm_init(trans);
+	mtx_unlock(&trans_pcie->irq_lock);
 
-  iwl_pcie_set_pwr(trans, false);
+	if (ret != ZX_OK)
+		return ret;
 
-  iwl_op_mode_nic_config(trans->op_mode);
+	iwl_pcie_set_pwr(trans, false);
 
-  // Allocate the RX queue, or reset if it is already allocated.
-  status = iwl_pcie_rx_init(trans);
-  if (status != ZX_OK) {
-    return status;
-  }
+	iwl_op_mode_nic_config(trans->op_mode);
 
-  // Allocate or reset and init all Tx and Command queues.
-  status = iwl_pcie_tx_init(trans);
-  if (status != ZX_OK) {
-    return status;
-  }
+	/* Allocate the RX queue, or reset if it is already allocated */
+	ret = iwl_pcie_rx_init(trans);
+	if (ret != ZX_OK)
+		return ret;
 
-  if (trans->trans_cfg->base_params->shadow_reg_enable) {
-    /* enable shadow regs in HW */
-    iwl_set_bit(trans, CSR_MAC_SHADOW_REG_CTRL, 0x800FFFFF);
-    IWL_DEBUG_INFO(trans, "Enabling shadow registers in device\n");
-  }
+	/* Allocate or reset and init all Tx and Command queues */
+	if (iwl_pcie_tx_init(trans) != ZX_OK) {
+		iwl_pcie_rx_free(trans);
+		return ZX_ERR_NO_MEMORY;
+	}
 
-  return ZX_OK;
+	if (trans->trans_cfg->base_params->shadow_reg_enable) {
+		/* enable shadow regs in HW */
+		iwl_set_bit(trans, CSR_MAC_SHADOW_REG_CTRL, 0x800FFFFF);
+		IWL_DEBUG_INFO(trans, "Enabling shadow registers in device\n");
+	}
+
+	return ZX_OK;
 }
 
 #define HW_READY_TIMEOUT ZX_USEC(50)
 
 static zx_status_t iwl_pcie_set_hw_ready(struct iwl_trans* trans) {
-  zx_status_t ret;
+	zx_status_t ret;
 
-  iwl_set_bit(trans, CSR_HW_IF_CONFIG_REG, CSR_HW_IF_CONFIG_REG_BIT_NIC_READY);
+	iwl_set_bit(trans, CSR_HW_IF_CONFIG_REG,
+		    CSR_HW_IF_CONFIG_REG_BIT_NIC_READY);
 
-  /* See if we got it */
-  ret = iwl_poll_bit(trans, CSR_HW_IF_CONFIG_REG, CSR_HW_IF_CONFIG_REG_BIT_NIC_READY,
-                     CSR_HW_IF_CONFIG_REG_BIT_NIC_READY, HW_READY_TIMEOUT, NULL);
+	/* See if we got it */
+	ret = iwl_poll_bit(trans, CSR_HW_IF_CONFIG_REG,
+			   CSR_HW_IF_CONFIG_REG_BIT_NIC_READY,
+			   CSR_HW_IF_CONFIG_REG_BIT_NIC_READY,
+			   HW_READY_TIMEOUT, NULL);
 
-  if (ret == ZX_OK) {
-    iwl_set_bit(trans, CSR_MBOX_SET_REG, CSR_MBOX_SET_REG_OS_ALIVE);
-  }
+	if (ret == ZX_OK)
+		iwl_set_bit(trans, CSR_MBOX_SET_REG, CSR_MBOX_SET_REG_OS_ALIVE);
 
-  IWL_DEBUG_INFO(trans, "hardware%s ready\n", ret != ZX_OK ? " not" : "");
-  return ret;
+	IWL_DEBUG_INFO(trans, "hardware%s ready\n", ret != ZX_OK ? " not" : "");
+	return ret;
 }
 
 zx_status_t iwl_pcie_prepare_card_hw(struct iwl_trans* trans) {
@@ -3315,7 +3340,7 @@ struct iwl_trans* iwl_trans_pcie_alloc(struct iwl_pci_dev* pdev,
 
   /* We disable the RETRY_TIMEOUT register (0x41) to keep
    * PCI Tx retries from interfering with C3 CPU state */
-  iwl_pci_write_config8(trans_pcie->pci, PCI_CONFIG_RETRY_TIMEOUT, 0x00);
+  iwl_pci_write_config8(trans_pcie->pci, PCI_CFG_RETRY_TIMEOUT, 0x00);
 
   trans_pcie->pci_dev = pdev;
   iwl_disable_interrupts(trans);
