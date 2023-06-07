@@ -6,7 +6,6 @@
 {
     name: "x64",
     provided_features: [
-        "fuchsia::driver_framework_v2_support",
         "fuchsia::wlan_softmac",
     ],
 }
