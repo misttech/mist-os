@@ -15,7 +15,6 @@ is_elf = current_os != "mac" && current_os != "win"
 test("elfldltl-unittests") {
   sources = [
     "abi-ptr-tests.cc",
-    "abi-span-tests.cc",
     "abi-tests.cc",
     "container-tests.cc",
     "diagnostics-tests.cc",
