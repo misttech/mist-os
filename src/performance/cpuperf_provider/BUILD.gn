@@ -21,6 +21,12 @@ source_set("categories") {
     ]
   }
 
+  if (current_cpu == "riscv64") {
+    # There is not currently an implementation. For now, use an ARM file to
+    # ensure symbols are defined.
+    # TODO(fxbug.dev/128614): Provide an appropriate implementation
+    sources += [ "arm64-category-db.cc" ]
+  }
   if (current_cpu == "x64") {
     sources += [
       "intel-category-db.cc",
