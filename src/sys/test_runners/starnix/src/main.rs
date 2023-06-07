@@ -6,6 +6,7 @@ mod binder_latency;
 mod gbenchmark;
 mod gtest;
 mod helpers;
+mod ltp;
 mod results_parser;
 mod runner;
 mod test_container;

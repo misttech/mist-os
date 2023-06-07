@@ -47,6 +47,7 @@ rustc_binary("bin") {
     "src/gbenchmark.rs",
     "src/gtest.rs",
     "src/helpers.rs",
+    "src/ltp.rs",
     "src/main.rs",
     "src/results_parser.rs",
     "src/runner.rs",

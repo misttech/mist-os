@@ -27,19 +27,11 @@ pub async fn run_starnix_benchmark(
     converter: impl FnOnce(&str, &str) -> Result<Vec<FuchsiaPerfBenchmarkResult>, Error>,
 ) -> Result<(), Error> {
     let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
-    let (numbered_handles, stdout_client, stderr_client) = create_numbered_handles();
+    let (numbered_handles, std_handles) = create_numbered_handles();
     start_info.numbered_handles = numbered_handles;
 
     debug!("notifying client test case started");
-    run_listener_proxy.on_test_case_started(
-        &test,
-        ftest::StdHandles {
-            out: Some(stdout_client),
-            err: Some(stderr_client),
-            ..Default::default()
-        },
-        case_listener,
-    )?;
+    run_listener_proxy.on_test_case_started(&test, std_handles, case_listener)?;
 
     debug!("getting test suite label");
     let program = start_info.program.as_ref().context("No program")?;
@@ -121,8 +113,9 @@ pub fn clone_start_info(
     })
 }
 
-/// Returns numbered handles with their respective stdout and stderr clients.
-pub fn create_numbered_handles() -> (Option<Vec<fprocess::HandleInfo>>, zx::Socket, zx::Socket) {
+/// Creates numbered handles for a test component with a respective `StdHandles` that should be
+/// passed to the `RunListener`.
+pub fn create_numbered_handles() -> (Option<Vec<fprocess::HandleInfo>>, ftest::StdHandles) {
     let (test_stdin, _) = zx::Socket::create_stream();
     let (test_stdout, stdout_client) = zx::Socket::create_stream();
     let (test_stderr, stderr_client) = zx::Socket::create_stream();
@@ -140,8 +133,13 @@ pub fn create_numbered_handles() -> (Option<Vec<fprocess::HandleInfo>>, zx::Sock
     };
 
     let numbered_handles = Some(vec![stdin_handle_info, stdout_handle_info, stderr_handle_info]);
+    let std_handles = ftest::StdHandles {
+        out: Some(stdout_client),
+        err: Some(stderr_client),
+        ..Default::default()
+    };
 
-    (numbered_handles, stdout_client, stderr_client)
+    (numbered_handles, std_handles)
 }
 
 /// Starts the test component and returns its proxy.

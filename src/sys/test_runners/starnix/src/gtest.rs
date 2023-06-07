@@ -5,7 +5,7 @@
 use {
     crate::helpers::*,
     crate::results_parser::*,
-    anyhow::{anyhow, Error},
+    anyhow::Error,
     fidl::endpoints::create_proxy,
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata,
     fidl_fuchsia_test::{self as ftest, Result_ as TestResult, Status},
@@ -30,8 +30,9 @@ pub enum TestType {
     BinderLatency,
     Gbenchmark,
     Gtest,
-    Gunit,
     GtestXmlOutput,
+    Gunit,
+    Ltp,
     Unknown,
 }
 
@@ -52,10 +53,11 @@ pub fn test_type(program: &fdata::Dictionary) -> TestType {
     match test_type_val {
         Some(fdata::DictionaryValue::Str(value)) => match value.as_str() {
             "binder_latency" => TestType::BinderLatency,
-            "gtest" => TestType::Gtest,
-            "gunit" => TestType::Gunit,
-            "gtest_xml_output" => TestType::GtestXmlOutput,
             "gbenchmark" => TestType::Gbenchmark,
+            "gtest" => TestType::Gtest,
+            "gtest_xml_output" => TestType::GtestXmlOutput,
+            "gunit" => TestType::Gunit,
+            "ltp" => TestType::Ltp,
             _ => TestType::Unknown,
         },
         _ => TestType::Unknown,
@@ -71,10 +73,10 @@ pub async fn handle_case_iterator_for_gtests(
 ) -> Result<(), Error> {
     // Replace the program args to get test cases in a json file.
     let test_type = test_type(start_info.program.as_ref().unwrap());
-    let list_tests_arg = format_arg(&test_type, LIST_TESTS_ARG)?;
+    let list_tests_arg = format_arg(&test_type, LIST_TESTS_ARG);
     let output_file_name = unique_filename();
     let output_path = format!("output=json:{}{}", OUTPUT_PATH, output_file_name);
-    let output_arg = format_arg(&test_type, &output_path)?;
+    let output_arg = format_arg(&test_type, &output_path);
     replace_program_args(
         vec![list_tests_arg, output_arg],
         start_info.program.as_mut().expect("No program."),
@@ -147,7 +149,7 @@ pub async fn run_gtest_cases(
     component_runner: &frunner::ComponentRunnerProxy,
     test_type: &TestType,
 ) -> Result<(), Error> {
-    let (numbered_handles, stdout_client, stderr_client) = create_numbered_handles();
+    let (numbered_handles, std_handles) = create_numbered_handles();
     start_info.numbered_handles = numbered_handles;
 
     // Hacky - report an overall case to see all of stdout/stderr.
@@ -159,15 +161,11 @@ pub async fn run_gtest_cases(
             tag: None,
             ..Default::default()
         },
-        ftest::StdHandles {
-            out: Some(stdout_client),
-            err: Some(stderr_client),
-            ..Default::default()
-        },
+        std_handles,
         overall_test_listener,
     )?;
 
-    let mut test_filter_arg = format_arg(test_type, FILTER_ARG)?;
+    let mut test_filter_arg = format_arg(test_type, FILTER_ARG);
     let mut run_listener_proxies = HashMap::new();
     for test in tests {
         let test_name = test.name.clone().expect("No test name.");
@@ -187,14 +185,12 @@ pub async fn run_gtest_cases(
     let output_format = match test_type {
         TestType::Gtest | TestType::Gunit => "json",
         TestType::GtestXmlOutput => "xml",
-        TestType::Gbenchmark | TestType::BinderLatency | TestType::Unknown => {
-            panic!("unexpected type")
-        }
+        _ => panic!("unexpected test type"),
     };
     let output_arg = format_arg(
         &test_type,
         &format!("output={}:{}{}", output_format, OUTPUT_PATH, output_file_name),
-    )?;
+    );
     append_program_args(
         vec![test_filter_arg, output_arg],
         start_info.program.as_mut().expect("No program."),
@@ -248,13 +244,11 @@ pub async fn run_gtest_cases(
     Ok(())
 }
 
-fn format_arg(test_type: &TestType, test_arg: &str) -> Result<String, Error> {
+fn format_arg(test_type: &TestType, test_arg: &str) -> String {
     match test_type {
-        TestType::Gtest | TestType::GtestXmlOutput => Ok(format!("--gtest_{}", test_arg)),
-        TestType::Gunit => Ok(format!("--gunit_{}", test_arg)),
-        TestType::Gbenchmark | TestType::BinderLatency | TestType::Unknown => {
-            Err(anyhow!("Unknown test type"))
-        }
+        TestType::Gtest | TestType::GtestXmlOutput => format!("--gtest_{}", test_arg),
+        TestType::Gunit => format!("--gunit_{}", test_arg),
+        _ => panic!("unexpected test type"),
     }
 }
 

@@ -7,6 +7,7 @@ use {
     crate::gbenchmark::*,
     crate::gtest::*,
     crate::helpers::*,
+    crate::ltp::*,
     crate::test_container::TestContainer,
     anyhow::{anyhow, Context, Error},
     fidl::endpoints::create_proxy,
@@ -52,6 +53,13 @@ pub async fn handle_suite_requests(
                         stream,
                     )
                     .await?;
+                } else if let TestType::Ltp = test_type {
+                    handle_case_iterator_for_ltp(
+                        test_start_info,
+                        &container.component_runner,
+                        stream,
+                    )
+                    .await?
                 } else {
                     handle_case_iterator(
                         test_start_info
@@ -112,6 +120,15 @@ pub async fn handle_suite_requests(
                         )
                         .await?
                     }
+                    TestType::Ltp => {
+                        run_ltp_cases(
+                            tests,
+                            test_start_info,
+                            &run_listener_proxy,
+                            &container.component_runner,
+                        )
+                        .await?
+                    }
                     _ => {
                         run_test_case(
                             tests.get(0).unwrap().clone(),
@@ -151,19 +168,11 @@ async fn run_test_case(
 ) -> Result<(), Error> {
     debug!("running generic fallback test suite");
     let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
-    let (numbered_handles, stdout_client, stderr_client) = create_numbered_handles();
+    let (numbered_handles, std_handles) = create_numbered_handles();
     start_info.numbered_handles = numbered_handles;
 
     debug!("notifying client test case started");
-    run_listener_proxy.on_test_case_started(
-        &test,
-        ftest::StdHandles {
-            out: Some(stdout_client),
-            err: Some(stderr_client),
-            ..Default::default()
-        },
-        case_listener,
-    )?;
+    run_listener_proxy.on_test_case_started(&test, std_handles, case_listener)?;
 
     debug!("starting test component");
     let component_controller = start_test_component(start_info, component_runner)?;
