@@ -204,6 +204,9 @@ mod tests {
     use crate::runtime::fuchsia::executor::{instrumentation::Snapshot, Time};
     use crate::{handle::channel::Channel, LocalExecutor, SendExecutor, TestExecutor, Timer};
 
+    const MICROSECOND: std::time::Duration = std::time::Duration::from_micros(1);
+    use std::thread::sleep;
+
     /// Helper which keeps track of last observed tick counts, and reports
     /// changes.
     struct Ticker<'a> {
@@ -214,7 +217,11 @@ mod tests {
 
     impl<'a> Ticker<'a> {
         fn new(c: &'a Collector) -> Self {
-            Self { c, awake: 0, asleep: 0 }
+            let result = Self { c, awake: 0, asleep: 0 };
+            // Ensure that the next interaction with the collector that's supposed to accumulate
+            // ticks will actually observe time having passed.
+            sleep(1 * MICROSECOND);
+            result
         }
 
         /// Updates awake and asleep ticks to current values. Returns a bool
@@ -225,6 +232,11 @@ mod tests {
                 mem::replace(&mut self.awake, self.c.ticks_awake.load(Ordering::Relaxed));
             let old_asleep =
                 mem::replace(&mut self.asleep, self.c.ticks_asleep.load(Ordering::Relaxed));
+
+            // Ensure that the next interaction with the collector that's supposed to accumulate
+            // ticks will actually observe time having passed.
+            sleep(1 * MICROSECOND);
+
             (self.awake > old_awake, self.asleep > old_asleep)
         }
     }
