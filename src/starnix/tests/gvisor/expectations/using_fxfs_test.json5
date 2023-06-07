@@ -220,21 +220,6 @@
                 // sendfile_test - these tests hang
                 "SendFileTest.SendFileToPipe",
 
-                // setgid_test
-                // These tests pass and fail in different cases
-                // Skip these tests for now until it can pass in all cases
-                "FileModes/FileModeTest.TruncateFile/*",
-                "FileModes/FileModeTest.WriteToFile/*",
-                "SetgidDirTest.ChownDirDoesNotClear",
-                "SetgidDirTest.ChownFileClears",
-                "SetgidDirTest.ChownNoExecFileDoesNotClear",
-                "SetgidDirTest.Control",
-                "SetgidDirTest.CreateDir",
-                "SetgidDirTest.CreateFile",
-                "SetgidDirTest.NoGroupExec",
-                "SetgidDirTest.OldDir",
-                "SetgidDirTest.OldFile",
-
                 // stat_test - these tests hang
                 "StatTest.LstatELOOPPath",
 
