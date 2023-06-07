@@ -151,7 +151,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test(logging = false)]
     async fn default_filter_is_info_when_unspecified() {
         let (proxy, _requests) = create_proxy_and_stream::<LogSinkMarker>().unwrap();
         let (filter, _on_changes) = InterestFilter::new(proxy, Interest::default(), false);
@@ -192,7 +192,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test(logging = false)]
     async fn default_filter_on_interest_changed() {
         let (proxy, mut requests) = create_proxy_and_stream::<LogSinkMarker>().unwrap();
         let (filter, on_changes) = InterestFilter::new(
@@ -255,7 +255,7 @@ mod tests {
         assert_eq!(&*observed.lock().unwrap(), &expected, "should not increment counters");
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test(logging = false)]
     async fn wait_for_initial_interest() {
         let (proxy, mut requests) = create_proxy_and_stream::<LogSinkMarker>().unwrap();
         let t = std::thread::spawn(move || {

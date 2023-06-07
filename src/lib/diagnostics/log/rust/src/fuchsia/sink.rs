@@ -166,7 +166,7 @@ mod tests {
         ]
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test(logging = false)]
     async fn packets_are_sent() {
         let socket = init_sink(&[], &[Metatag::Target]).await;
         let mut buf = [0u8; MAX_DATAGRAM_LEN_BYTES as _];
@@ -287,7 +287,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test(logging = false)]
     async fn tags_are_sent() {
         let socket = init_sink(&["tags_are_sent"], &[]).await;
         let mut buf = [0u8; MAX_DATAGRAM_LEN_BYTES as _];
@@ -316,7 +316,7 @@ mod tests {
         assert_eq!(observed, expected);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test(logging = false)]
     async fn spans_are_supported() {
         let socket = init_sink(&[], &[]).await;
         let mut buf = [0u8; MAX_DATAGRAM_LEN_BYTES as _];
@@ -348,7 +348,7 @@ mod tests {
         assert_eq!(observed, expected);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test(logging = false)]
     async fn drop_count_is_tracked() {
         let socket = init_sink(&[], &[]).await;
         let mut buf = [0u8; MAX_DATAGRAM_LEN_BYTES as _];
