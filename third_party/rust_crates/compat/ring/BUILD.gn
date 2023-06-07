@@ -11,6 +11,10 @@ ring_crate = "../../vendor/ring-0.16.12"
 
 config("ring-config") {
   cflags = [ "-fPIC" ]
+  if (current_cpu == "riscv64") {
+    # TODO(fxbug.dev/127877): this shouldn't be needed
+    cflags += [ "-Wno-option-ignored" ]
+  }
 }
 
 static_library("ring-core") {
