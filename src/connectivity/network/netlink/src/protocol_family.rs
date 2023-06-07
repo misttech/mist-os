@@ -55,6 +55,7 @@ pub mod route {
 
     use crate::interfaces;
 
+    use netlink_packet_core::{NLM_F_ACK, NLM_F_DUMP};
     use netlink_packet_route::rtnl::{
         constants::{
             RTNLGRP_DCB, RTNLGRP_DECNET_IFADDR, RTNLGRP_DECNET_ROUTE, RTNLGRP_DECNET_RULE,
@@ -149,6 +150,7 @@ pub mod route {
                     return;
                 }
             };
+
             use RtnlMessage::*;
             match req {
                 NewLink(_)
@@ -187,11 +189,18 @@ pub mod route {
                 | NewRule(_)
                 // TODO(https://issuetracker.google.com/283134947): Implement DelRule.
                 | DelRule(_) => {
-                    warn!(
-                        "Received unsupported NETLINK_ROUTE request; responding with an Ack: {:?}",
-                        req
-                    );
-                    client.send(crate::netlink_packet::new_ack(req_header));
+                    if req_header.flags&NLM_F_ACK == NLM_F_ACK {
+                        warn!(
+                            "Received unsupported NETLINK_ROUTE request; responding with an Ack: {:?}",
+                            req,
+                        );
+                        client.send(crate::netlink_packet::new_ack(req_header))
+                    } else {
+                        warn!(
+                            "Received unsupported NETLINK_ROUTE request that does not expect an Ack: {:?}",
+                            req,
+                        )
+                    }
                 }
                 GetNeighbourTable(_)
                 | GetTrafficClass(_)
@@ -210,11 +219,24 @@ pub mod route {
                 | GetQueueDiscipline(_)
                 // TODO(https://issuetracker.google.com/283134947): Implement GetRule.
                 | GetRule(_) => {
-                    warn!(
-                        "Received unsupported NETLINK_ROUTE request; responding with Done: {:?}",
-                        req
-                    );
-                    client.send(crate::netlink_packet::new_done())
+                    if req_header.flags&NLM_F_DUMP == NLM_F_DUMP {
+                        warn!(
+                            "Received unsupported NETLINK_ROUTE DUMP request; responding with Done: {:?}",
+                            req
+                        );
+                        client.send(crate::netlink_packet::new_done())
+                    } else if req_header.flags&NLM_F_ACK == NLM_F_ACK {
+                        warn!(
+                            "Received unsupported NETLINK_ROUTE GET request: responding with Ack {:?}",
+                            req
+                        );
+                        client.send(crate::netlink_packet::new_ack(req_header))
+                    } else {
+                        warn!(
+                            "Received unsupported NETLINK_ROUTE GET request that does not expect an Ack {:?}",
+                            req
+                        )
+                    }
                 },
                 req => panic!("unexpected RtnlMessage: {:?}", req),
             }
@@ -310,5 +332,122 @@ pub(crate) mod testutil {
         type RequestHandler<S: Sender<Self::Message>> = FakeNetlinkRequestHandler;
 
         const NAME: &'static str = "FAKE_PROTOCOL_FAMILY";
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use crate::{
+        messaging::testutil::FakeSender,
+        netlink_packet::{new_ack, new_done},
+        protocol_family::route::{NetlinkRoute, NetlinkRouteRequestHandler},
+    };
+    use futures::channel::mpsc;
+    use netlink_packet_core::{NetlinkHeader, NLM_F_ACK, NLM_F_DUMP};
+    use netlink_packet_route::{RtnlMessage, TcMessage};
+    use test_case::test_case;
+
+    enum ExpectedResponse {
+        Ack,
+        Done,
+    }
+
+    /// Tests that unhandled requests are treated as a no-op.
+    ///
+    /// Get requests are responded to with a Done message if the dump flag
+    /// is set, an Ack message if the ack flag is set or nothing. New/Del
+    /// requests are responded to with an Ack message if the ack flag is set
+    /// or nothing.
+    #[test_case(
+        RtnlMessage::GetTrafficChain,
+        0,
+        None; "get_with_no_flags")]
+    #[test_case(
+        RtnlMessage::GetTrafficChain,
+        NLM_F_ACK,
+        Some(ExpectedResponse::Ack); "get_with_ack_flag")]
+    #[test_case(
+        RtnlMessage::GetTrafficChain,
+        NLM_F_DUMP,
+        Some(ExpectedResponse::Done); "get_with_dump_flag")]
+    #[test_case(
+        RtnlMessage::GetTrafficChain,
+        NLM_F_ACK | NLM_F_DUMP,
+        Some(ExpectedResponse::Done); "get_with_ack_and_dump_flag")]
+    #[test_case(
+        RtnlMessage::NewTrafficChain,
+        0,
+        None; "new_with_no_flags")]
+    #[test_case(
+        RtnlMessage::NewTrafficChain,
+        NLM_F_DUMP,
+        None; "new_with_dump_flag")]
+    #[test_case(
+        RtnlMessage::NewTrafficChain,
+        NLM_F_ACK,
+        Some(ExpectedResponse::Ack); "new_with_ack_flag")]
+    #[test_case(
+        RtnlMessage::NewTrafficChain,
+        NLM_F_ACK | NLM_F_DUMP,
+        Some(ExpectedResponse::Ack); "new_with_ack_and_dump_flags")]
+    #[test_case(
+        RtnlMessage::DelTrafficChain,
+        0,
+        None; "del_with_no_flags")]
+    #[test_case(
+        RtnlMessage::DelTrafficChain,
+        NLM_F_DUMP,
+        None; "del_with_dump_flag")]
+    #[test_case(
+        RtnlMessage::DelTrafficChain,
+        NLM_F_ACK,
+        Some(ExpectedResponse::Ack); "del_with_ack_flag")]
+    #[test_case(
+        RtnlMessage::DelTrafficChain,
+        NLM_F_ACK | NLM_F_DUMP,
+        Some(ExpectedResponse::Ack); "del_with_ack_and_dump_flags")]
+    #[fuchsia::test]
+    async fn test_handle_unsupported_request_response(
+        tc_fn: fn(TcMessage) -> RtnlMessage,
+        flags: u16,
+        expected_response: Option<ExpectedResponse>,
+    ) {
+        let (interfaces_request_sink, _interfaces_request_stream) = mpsc::channel(0);
+        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>> { interfaces_request_sink };
+
+        let (mut client_sink, mut client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
+            crate::client::testutil::CLIENT_ID_1,
+            &[],
+        );
+
+        let header = {
+            let mut header = NetlinkHeader::default();
+            header.flags = flags;
+            header
+        };
+
+        handler
+            .handle_request(
+                NetlinkMessage::new(
+                    header,
+                    NetlinkPayload::InnerMessage(tc_fn(TcMessage::default())),
+                ),
+                &mut client,
+            )
+            .await;
+
+        match expected_response {
+            Some(ExpectedResponse::Ack) => {
+                assert_eq!(client_sink.take_messages(), [new_ack(header)])
+            }
+            Some(ExpectedResponse::Done) => {
+                assert_eq!(client_sink.take_messages(), [new_done()])
+            }
+            None => {
+                assert_eq!(client_sink.take_messages(), [])
+            }
+        }
     }
 }
