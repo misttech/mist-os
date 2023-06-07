@@ -106,6 +106,7 @@ mod test {
             "-o RemoteForward 8443 [ff00::]:8443",
             "-o RemoteForward 9080 [ff00::]:80",
             "-o RemoteForward 8888 [ff00::]:8888",
+            "-o RemoteForward 5554 [ff00::]:5554",
         ];
 
         assert_eq!(got, want);
@@ -141,6 +142,7 @@ mod test {
             "-o RemoteForward 8443 [ff00::]:8443",
             "-o RemoteForward 9080 [ff00::]:80",
             "-o RemoteForward 8888 [ff00::]:8888",
+            "-o RemoteForward 5554 [ff00::]:5554",
         ];
 
         assert_eq!(got, want);
