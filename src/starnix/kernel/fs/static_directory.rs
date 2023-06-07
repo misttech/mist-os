@@ -7,7 +7,7 @@ use crate::{
     fs::{
         emit_dotdot, fileops_impl_directory, fs_node_impl_dir_readonly, unbounded_seek,
         DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle, FsNode,
-        FsNodeInfo, FsNodeOps, FsStr, SeekOrigin,
+        FsNodeInfo, FsNodeOps, FsStr, SeekTarget,
     },
     task::CurrentTask,
     types::*,
@@ -156,10 +156,9 @@ impl FileOps for Arc<StaticDirectory> {
         _file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,
-        new_offset: off_t,
-        whence: SeekOrigin,
+        whence: SeekTarget,
     ) -> Result<off_t, Errno> {
-        unbounded_seek(current_offset, new_offset, whence)
+        unbounded_seek(current_offset, whence)
     }
 
     fn readdir(

@@ -5,7 +5,7 @@
 use crate::{
     fs::{
         emit_dotdot, fileops_impl_directory, unbounded_seek, DirectoryEntryType, DirentSink,
-        FileObject, FileOps, FsString, SeekOrigin,
+        FileObject, FileOps, FsString, SeekTarget,
     },
     task::CurrentTask,
     types::*,
@@ -41,10 +41,9 @@ impl FileOps for VecDirectory {
         _file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,
-        new_offset: off_t,
-        whence: SeekOrigin,
+        whence: SeekTarget,
     ) -> Result<off_t, Errno> {
-        unbounded_seek(current_offset, new_offset, whence)
+        unbounded_seek(current_offset, whence)
     }
 
     fn readdir(

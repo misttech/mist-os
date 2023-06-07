@@ -92,7 +92,7 @@ pub fn sys_lseek(
     whence: u32,
 ) -> Result<off_t, Errno> {
     let file = current_task.files.get(fd)?;
-    file.seek(current_task, offset, SeekOrigin::from_raw(whence)?)
+    file.seek(current_task, SeekTarget::from_raw(whence, offset)?)
 }
 
 pub fn sys_fcntl(
@@ -2122,21 +2122,21 @@ mod tests {
         let file_size = file_handle.node().stat(&current_task).unwrap().st_size;
         current_task.files.insert(&current_task, fd, file_handle).unwrap();
 
-        assert_eq!(sys_lseek(&current_task, fd, 0, SeekOrigin::Cur as u32)?, 0);
-        assert_eq!(sys_lseek(&current_task, fd, 1, SeekOrigin::Cur as u32)?, 1);
-        assert_eq!(sys_lseek(&current_task, fd, 3, SeekOrigin::Set as u32)?, 3);
-        assert_eq!(sys_lseek(&current_task, fd, -3, SeekOrigin::Cur as u32)?, 0);
-        assert_eq!(sys_lseek(&current_task, fd, 0, SeekOrigin::End as u32)?, file_size);
-        assert_eq!(sys_lseek(&current_task, fd, -5, SeekOrigin::Set as u32), error!(EINVAL));
+        assert_eq!(sys_lseek(&current_task, fd, 0, SEEK_CUR)?, 0);
+        assert_eq!(sys_lseek(&current_task, fd, 1, SEEK_CUR)?, 1);
+        assert_eq!(sys_lseek(&current_task, fd, 3, SEEK_SET)?, 3);
+        assert_eq!(sys_lseek(&current_task, fd, -3, SEEK_CUR)?, 0);
+        assert_eq!(sys_lseek(&current_task, fd, 0, SEEK_END)?, file_size);
+        assert_eq!(sys_lseek(&current_task, fd, -5, SEEK_SET), error!(EINVAL));
 
         // Make sure that the failed call above did not change the offset.
-        assert_eq!(sys_lseek(&current_task, fd, 0, SeekOrigin::Cur as u32)?, file_size);
+        assert_eq!(sys_lseek(&current_task, fd, 0, SEEK_CUR)?, file_size);
 
         // Prepare for an overflow.
-        assert_eq!(sys_lseek(&current_task, fd, 3, SeekOrigin::Set as u32)?, 3);
+        assert_eq!(sys_lseek(&current_task, fd, 3, SEEK_SET)?, 3);
 
         // Check for overflow.
-        assert_eq!(sys_lseek(&current_task, fd, i64::MAX, SeekOrigin::Cur as u32), error!(EINVAL));
+        assert_eq!(sys_lseek(&current_task, fd, i64::MAX, SEEK_CUR), error!(EINVAL));
 
         Ok(())
     }

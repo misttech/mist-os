@@ -6,7 +6,7 @@ use crate::{
     fs::{
         buffers::{VecInputBuffer, VecOutputBuffer},
         DirEntry, DirectoryEntryType, DirentSink, FileHandle, FsStr, LookupContext, NamespaceNode,
-        RenameFlags, SeekOrigin, UnlinkKind,
+        RenameFlags, SeekTarget, UnlinkKind,
     },
     mm::ProtectionFlags,
     task::CurrentTask,
@@ -165,7 +165,7 @@ impl StarnixNodeConnection {
             }
         };
         if *self.file.offset.lock() != offset {
-            self.file.seek(&self.task, offset, SeekOrigin::Set)?;
+            self.file.seek(&self.task, SeekTarget::Set(offset))?;
         }
         let mut file_offset = self.file.offset.lock();
         let mut dirent_sink = DirentSinkAdapter {
@@ -492,12 +492,12 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
         Ok(written as u64)
     }
     async fn seek(&self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, zx::Status> {
-        let origin = match origin {
-            fio::SeekOrigin::Start => SeekOrigin::Set,
-            fio::SeekOrigin::Current => SeekOrigin::Cur,
-            fio::SeekOrigin::End => SeekOrigin::End,
+        let target = match origin {
+            fio::SeekOrigin::Start => SeekTarget::Set(offset),
+            fio::SeekOrigin::Current => SeekTarget::Cur(offset),
+            fio::SeekOrigin::End => SeekTarget::End(offset),
         };
-        Ok(self.file.seek(&self.task, offset, origin)? as u64)
+        Ok(self.file.seek(&self.task, target)? as u64)
     }
     fn update_flags(&self, flags: fio::OpenFlags) -> zx::Status {
         let settable_flags =

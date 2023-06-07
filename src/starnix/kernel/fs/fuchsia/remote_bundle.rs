@@ -171,10 +171,9 @@ impl FileOps for DirectoryObject {
         _file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,
-        new_offset: off_t,
-        whence: SeekOrigin,
+        whence: SeekTarget,
     ) -> Result<off_t, Errno> {
-        default_seek(current_offset, new_offset, whence, |_| error!(EINVAL))
+        default_seek(current_offset, whence, |_| error!(EINVAL))
     }
 
     fn readdir(

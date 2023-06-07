@@ -522,10 +522,9 @@ impl FileOps for MemFile {
         _file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,
-        offset: off_t,
-        whence: SeekOrigin,
+        whence: SeekTarget,
     ) -> Result<off_t, Errno> {
-        default_seek(current_offset, offset, whence, |_| error!(EINVAL))
+        default_seek(current_offset, whence, |_| error!(EINVAL))
     }
 
     fn read(

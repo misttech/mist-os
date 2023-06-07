@@ -8,7 +8,7 @@ use super::*;
 use crate::{
     fs::{
         buffers::{InputBuffer, OutputBuffer, VecOutputBuffer},
-        SeekOrigin,
+        SeekTarget,
     },
     task::*,
     types::*,
@@ -166,10 +166,9 @@ impl<Source: SequenceFileSource> FileOps for DynamicFile<Source> {
         file: &FileObject,
         current_task: &CurrentTask,
         current_offset: off_t,
-        new_offset: off_t,
-        whence: SeekOrigin,
+        whence: SeekTarget,
     ) -> Result<off_t, Errno> {
-        let new_offset = default_seek(current_offset, new_offset, whence, |_| error!(EINVAL))?;
+        let new_offset = default_seek(current_offset, whence, |_| error!(EINVAL))?;
 
         // Call `read(0)` to ensure the data is generated now instead of later (except, when
         // seeking to the start of the file).
@@ -387,13 +386,13 @@ mod tests {
         assert_eq!(read(20)?, (3..10).collect::<Vec<u8>>());
 
         // Seek to the start of the file. Content should be updated on the following read.
-        file.seek(&current_task, 0, SeekOrigin::Set)?;
+        file.seek(&current_task, SeekTarget::Set(0))?;
         assert_eq!(*counter.value.lock(), 1);
         assert_eq!(read(2)?, [1, 2]);
         assert_eq!(*counter.value.lock(), 2);
 
         // Seeking to `pos > 0` should update the content.
-        file.seek(&current_task, 1, SeekOrigin::Set)?;
+        file.seek(&current_task, SeekTarget::Set(1))?;
         assert_eq!(*counter.value.lock(), 3);
 
         Ok(())

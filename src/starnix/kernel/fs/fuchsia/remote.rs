@@ -513,11 +513,10 @@ impl FileOps for RemoteDirectoryObject {
         _file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,
-        new_offset: off_t,
-        whence: SeekOrigin,
+        whence: SeekTarget,
     ) -> Result<off_t, Errno> {
         let mut iterator = self.iterator.lock();
-        let new_offset = default_seek(current_offset, new_offset, whence, |_| error!(EINVAL))?;
+        let new_offset = default_seek(current_offset, whence, |_| error!(EINVAL))?;
         let mut iterator_position = current_offset;
 
         if new_offset < iterator_position {
