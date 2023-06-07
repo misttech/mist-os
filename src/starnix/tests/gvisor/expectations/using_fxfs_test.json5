@@ -163,24 +163,8 @@
                 "AllUnixDomainSockets/UnixSocketPairTest.SendFromMmapBeyondEof/*",
                 "Renameat2Test.NoReplaceSuccess",
 
-                // epoll_test - these tests hang
-                "EpollTest.AllWritable",
-                "EpollTest.CloseFile",
-                "EpollTest.CycleOfOneDisallowed",
-                "EpollTest.CycleOfThreeDisallowed",
-                "EpollTest.DoubleLayerEpoll",
-                "EpollTest.EdgeTriggered",
-                "EpollTest.EpollPwait2Timeout",
-                "EpollTest.LastNonWritable",
-                "EpollTest.LastReadable",
-                "EpollTest.Oneshot",
-                "EpollTest.PipeReaderHupAfterWriterClosed",
-                "EpollTest.ReadyMutexCircularity",
+                // epoll_test - this test panics
                 "EpollTest.RegularFiles",
-                "EpollTest.Timeout",
-                "EpollTest.TimeoutNoFds",
-                "EpollTest.UnblockWithNewFD",
-                "EpollTest.WaitThenUnblock",
 
                 // inotify_test - these tests hang
                 "Inotify.SymlinkGeneratesCreateEvent",
