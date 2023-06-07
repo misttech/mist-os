@@ -1292,10 +1292,6 @@
             ],
             from: "#pkg-cache",
         },
-        {
-            protocol: [ "fuchsia.diagnostics.LogSettings" ],
-            from: "#archivist",
-        },
     ],
     environments: [
         {

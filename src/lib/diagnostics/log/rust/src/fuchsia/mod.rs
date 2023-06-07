@@ -140,6 +140,16 @@ pub fn initialize(opts: PublishOptions<'_>) -> Result<(), PublishError> {
     Ok(())
 }
 
+/// Sets the global minimum log severity.
+/// IMPORTANT: this function can panic if `initialize` wasn't called before.
+pub fn set_minimum_severity(severity: Severity) {
+    tracing::dispatcher::get_default(|dispatcher| {
+        let publisher: &Publisher = dispatcher.downcast_ref().unwrap();
+        let filter: &InterestFilter = (&publisher.inner as &dyn Subscriber).downcast_ref().unwrap();
+        filter.set_minimum_severity(severity);
+    });
+}
+
 struct AbortAndJoinOnDrop(
     Option<futures::future::AbortHandle>,
     Option<std::thread::JoinHandle<()>>,
@@ -354,4 +364,42 @@ pub enum PublishError {
     /// Installing a forwarder from [`log`] macros to [`tracing`] macros failed.
     #[error("failed to install a forwarder from `log` to `tracing`")]
     InitLogForward(#[from] tracing_log::log_tracer::SetLoggerError),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use diagnostics_reader::{ArchiveReader, Logs};
+    use futures::{future, StreamExt};
+    use tracing::{debug, info};
+
+    #[fuchsia::test(logging = false)]
+    async fn verify_setting_minimum_log_severity() {
+        let reader = ArchiveReader::new();
+        let (logs, _) = reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
+        let publisher = Publisher::new(PublisherOptions {
+            tags: &["verify_setting_minimum_log_severity"],
+            ..PublisherOptions::empty()
+        })
+        .expect("initialized tracing");
+        tracing::subscriber::with_default(publisher, || {
+            info!("I'm an info log");
+            debug!("I'm a debug log and won't show up");
+
+            set_minimum_severity(Severity::Debug);
+            debug!("I'm a debug log and I show up");
+        });
+
+        let results = logs
+            .filter(|data| {
+                future::ready(
+                    data.tags().unwrap().iter().any(|t| t == "verify_setting_minimum_log_severity"),
+                )
+            })
+            .take(2)
+            .collect::<Vec<_>>()
+            .await;
+        assert_eq!(results[0].msg().unwrap(), "I'm an info log");
+        assert_eq!(results[1].msg().unwrap(), "I'm a debug log and I show up");
+    }
 }

@@ -4,8 +4,7 @@
 use super::*;
 use crate::ot::LogLevel;
 use anyhow::Error;
-use selectors::{parse_component_selector, VerboseError};
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 
 #[derive(Debug)]
 pub struct DetailedLogging {
@@ -17,9 +16,6 @@ pub struct DetailedLogging {
 
     /// Store the logging level state
     pub detailed_logging_level: Cell<LogLevel>,
-
-    /// Hold the proxy of Log Settings
-    log_settings_proxy: RefCell<Option<fidl_fuchsia_diagnostics::LogSettingsProxy>>,
 }
 
 impl DetailedLogging {
@@ -28,7 +24,6 @@ impl DetailedLogging {
             log_level_default: ot::LogLevel::Info,
             detailed_logging_enabled: Cell::new(false),
             detailed_logging_level: Cell::new(ot::LogLevel::Info),
-            log_settings_proxy: RefCell::new(None),
         }
     }
 
@@ -44,26 +39,10 @@ impl DetailedLogging {
             self.detailed_logging_level.set(level);
         };
         if self.detailed_logging_enabled.get() {
-            let log_settings_client_end = fuchsia_component::client::connect_to_protocol::<
-                fidl_fuchsia_diagnostics::LogSettingsMarker,
-            >()
-            .context("Failed to connect to diagnostics service")?;
-
-            let selectors = vec![fidl_fuchsia_diagnostics::LogInterestSelector {
-                selector: parse_component_selector::<VerboseError>("core/lowpan-ot-driver")
-                    .context("Failed to parse component selector")?,
-                interest: fidl_fuchsia_diagnostics::Interest {
-                    min_severity: Some(self.detailed_logging_level.get().into()),
-                    ..Default::default()
-                },
-            }];
-            log_settings_client_end.set_interest(&selectors).now_or_never();
-            self.log_settings_proxy.replace(Some(log_settings_client_end));
-
+            diagnostics_log::set_minimum_severity(self.detailed_logging_level.get().into());
             ot::set_logging_level(self.detailed_logging_level.get());
         } else {
-            // Drop the proxy to undo the overridden log level settings
-            self.log_settings_proxy.replace(None);
+            diagnostics_log::set_minimum_severity(self.log_level_default.into());
             ot::set_logging_level(self.log_level_default);
         };
 

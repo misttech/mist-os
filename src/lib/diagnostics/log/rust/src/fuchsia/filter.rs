@@ -50,6 +50,12 @@ impl InterestFilter {
         (filter, Self::listen_to_interest_changes(listener, default_severity, min_severity, proxy))
     }
 
+    /// Sets the minimum severity.
+    pub fn set_minimum_severity(&self, severity: Severity) {
+        let mut min_severity = self.min_severity.write().unwrap();
+        *min_severity = severity;
+    }
+
     /// Sets the interest listener.
     pub fn set_interest_listener<T>(&self, listener: T)
     where

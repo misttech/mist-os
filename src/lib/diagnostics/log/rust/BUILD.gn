@@ -42,6 +42,8 @@ rustc_library("rust") {
 
     test_deps = [
       "//sdk/fidl/fuchsia.diagnostics.stream:fuchsia.diagnostics.stream_rust",
+      "//src/lib/diagnostics/reader/rust",
+      "//src/lib/fuchsia",
       "//src/lib/fuchsia-async",
       "//third_party/rust_crates:futures",
     ]
@@ -60,4 +62,5 @@ rustc_library("rust") {
 
 fuchsia_unittest_package("diagnostics-log-tests") {
   deps = [ ":rust_test" ]
+  manifest = "meta/test.cml"
 }
