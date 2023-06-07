@@ -94,6 +94,17 @@
                 "RenameTest.RenameAfterWritableFDAndChmod",
                 "RenameTest.TargetIsAncestorOfSource",
 
+                // sendfile_test
+                "SendFileTest.SendTrivially",
+                "SendFileTest.SendTriviallyWithBothFilesReadWrite",
+                "SendFileTest.SendAndUpdateFileOffset",
+                "SendFileTest.SendAndUpdateFileOffsetFromNonzeroStartingPoint",
+                "SendFileTest.SendTheCorrectNumberOfBytesEvenIfWeTryToSendTooManyBytes",
+                "SendFileTest.SendPipeWouldBlock",
+                "SendFileTest.SendToFullPipeReturnsEAGAIN",
+                "SendFileTest.SendPipeBlocks",
+                "SendFileTest.LargeCount",
+
                 // stat_test
                 "StatTest.FstatatSymlinkDir",
                 "StatTest.FstatatSymlinkDirWithTrailingSlash",
@@ -207,28 +218,7 @@
                 "SelectTest.SetrlimitCallNOFILE",
 
                 // sendfile_test - these tests hang
-                "SendFileTest.SendZeroBytes",
-                "SendFileTest.InvalidOffset",
-                "SendFileTest.Overflow",
-                "SendFileTest.SendTrivially",
-                "SendFileTest.SendTriviallyWithBothFilesReadWrite",
-                "SendFileTest.SendAndUpdateFileOffset",
-                "SendFileTest.SendAndUpdateFileOffsetFromNonzeroStartingPoint",
-                "SendFileTest.SendAndUpdateGivenOffset",
-                "SendFileTest.DoNotSendfileIfOutfileIsAppendOnly",
-                "SendFileTest.AppendCheckOrdering",
-                "SendFileTest.DoNotSendfileIfOutfileIsNotWritable",
-                "SendFileTest.DoNotSendfileIfInfileIsNotReadable",
-                "SendFileTest.DoNotSendANegativeNumberOfBytes",
-                "SendFileTest.SendTheCorrectNumberOfBytesEvenIfWeTryToSendTooManyBytes",
-                "SendFileTest.SendToNotARegularFile",
-                "SendFileTest.SendPipeWouldBlock",
-                "SendFileTest.SendPipeEOF",
-                "SendFileTest.SendToFullPipeReturnsEAGAIN",
-                "SendFileTest.SendPipeBlocks",
                 "SendFileTest.SendFileToPipe",
-                "SendFileTest.SendFileToSelf",
-                "SendFileTest.LargeCount",
 
                 // setgid_test
                 // These tests pass and fail in different cases
