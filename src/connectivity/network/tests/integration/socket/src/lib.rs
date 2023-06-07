@@ -1800,7 +1800,7 @@ async fn install_ip_device(
             // Wait for the address to be assigned.
             let wait_assignment_fut = fnet_interfaces_ext::admin::wait_assignment_state(
                 fnet_interfaces_ext::admin::assignment_state_stream(address_state_provider),
-                fnet_interfaces_admin::AddressAssignmentState::Assigned,
+                fnet_interfaces::AddressAssignmentState::Assigned,
             )
             .map(|r| r.expect("wait assignment state"));
 

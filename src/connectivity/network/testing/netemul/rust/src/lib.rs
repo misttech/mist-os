@@ -1183,7 +1183,7 @@ impl<'a> TestInterface<'a> {
             fnet_interfaces_ext::admin::assignment_state_stream(address_state_provider);
         fnet_interfaces_ext::admin::wait_assignment_state(
             &mut state_stream,
-            fnet_interfaces_admin::AddressAssignmentState::Assigned,
+            fnet_interfaces::AddressAssignmentState::Assigned,
         )
         .await?;
         Ok(())
@@ -1211,7 +1211,7 @@ impl<'a> TestInterface<'a> {
         let ((), ()) = futures::future::try_join(
             fnet_interfaces_ext::admin::wait_assignment_state(
                 &mut state_stream,
-                fnet_interfaces_admin::AddressAssignmentState::Assigned,
+                fnet_interfaces::AddressAssignmentState::Assigned,
             )
             .map(|res| res.context("assignment state")),
             self.add_subnet_route(subnet).map(|res| res.context("add subnet route")),

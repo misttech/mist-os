@@ -10,6 +10,7 @@ use std::{
 
 use assert_matches::assert_matches;
 use derivative::Derivative;
+use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use futures::stream::StreamExt as _;
 use net_types::{
@@ -197,7 +198,7 @@ pub(crate) struct AddressInfo {
     // [`UnboundedSender`] is used because it exposes a synchronous send API
     // which is required since Core is no-async.
     pub(crate) assignment_state_sender:
-        futures::channel::mpsc::UnboundedSender<fnet_interfaces_admin::AddressAssignmentState>,
+        futures::channel::mpsc::UnboundedSender<fnet_interfaces::AddressAssignmentState>,
 }
 
 /// Loopback device information.

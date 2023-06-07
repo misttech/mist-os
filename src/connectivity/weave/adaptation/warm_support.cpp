@@ -223,13 +223,13 @@ std::string_view AddressRemovalReasonToString(
 }
 
 std::string_view AddressAssignmentStateToString(
-    fuchsia_net_interfaces_admin::AddressAssignmentState state) {
+    fuchsia_net_interfaces::AddressAssignmentState state) {
   switch (state) {
-    case fuchsia_net_interfaces_admin::AddressAssignmentState::kTentative:
+    case fuchsia_net_interfaces::AddressAssignmentState::kTentative:
       return "tentative";
-    case fuchsia_net_interfaces_admin::AddressAssignmentState::kAssigned:
+    case fuchsia_net_interfaces::AddressAssignmentState::kAssigned:
       return "assigned";
-    case fuchsia_net_interfaces_admin::AddressAssignmentState::kUnavailable:
+    case fuchsia_net_interfaces::AddressAssignmentState::kUnavailable:
       return "unavailable";
   }
 }
@@ -374,7 +374,7 @@ PlatformResult AddAddressInternal(
   // (indicating an error) or for the Address to become `ASSIGNED`.
   FX_LOGS(INFO) << "Waiting for address to be assigned...";
   fidl::SyncClient asp_client{std::move(asp_client_end)};
-  fuchsia_net_interfaces_admin::AddressAssignmentState state;
+  fuchsia_net_interfaces::AddressAssignmentState state;
   do {
     fidl::Result result = asp_client->WatchAddressAssignmentState();
     if (!result.is_ok()) {
@@ -407,7 +407,7 @@ PlatformResult AddAddressInternal(
     state = result.value().assignment_state();
     FX_LOGS(INFO) << "Observed state change for " << AddressToStringInfallible(address) << ": "
                   << AddressAssignmentStateToString(state);
-  } while (state != fuchsia_net_interfaces_admin::AddressAssignmentState::kAssigned);
+  } while (state != fuchsia_net_interfaces::AddressAssignmentState::kAssigned);
 
   PlatformResult store_handle_result =
       global_asp_repo.Add(interface_id, address, std::move(asp_client));

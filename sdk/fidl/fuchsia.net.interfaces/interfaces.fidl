@@ -56,6 +56,32 @@ type PreferredLifetimeInfo = strict union {
     2: deprecated Empty;
 };
 
+/// Assignment state of an IP address.
+@available(added=HEAD)
+type AddressAssignmentState = strict enum {
+    // TODO(https://fxbug.dev/82724): Replace this comment with FIDL that
+    // actually reserves 0.
+    //
+    // The value of 0 is reserved and should never be added to avoid the
+    // ambiguity of 0 being the default integer value in some languages. See:
+    // https://fuchsia.dev/fuchsia-src/concepts/api/fidl#enum.
+
+    /// Address assignment is in progress, e.g. Duplicate Address Detection
+    /// is being performed. The address cannot be used when in this state
+    /// (cannot bind to it yet or receive packets destined to it).
+    ///
+    /// The Duplicate Address Detection mechanism is described in
+    /// [RFC 4862, section 5.4](https://tools.ietf.org/html/rfc4862#section-5.4)
+    TENTATIVE = 1;
+
+    /// The address is assigned to an interface.
+    ASSIGNED = 2;
+
+    /// The address is unavailable, e.g. if the interface holding the address
+    /// is offline.
+    UNAVAILABLE = 3;
+};
+
 /// Properties of a network interface.
 type Properties = table {
     /// An opaque identifier for the interface. Its value will not be reused

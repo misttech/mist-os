@@ -558,7 +558,7 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
 
         assert_matches::assert_matches!(
             state_stream.by_ref().next().await,
-            Some(Ok(fidl_fuchsia_net_interfaces_admin::AddressAssignmentState::Unavailable))
+            Some(Ok(fidl_fuchsia_net_interfaces::AddressAssignmentState::Unavailable))
         );
 
         // Re-enable the interface, expect DAD to repeat and have it succeed.
@@ -588,7 +588,7 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
 
     assert_matches::assert_matches!(
         state_stream.by_ref().next().await,
-        Some(Ok(fidl_fuchsia_net_interfaces_admin::AddressAssignmentState::Unavailable))
+        Some(Ok(fidl_fuchsia_net_interfaces::AddressAssignmentState::Unavailable))
     );
 
     // Re-enable the interface, DAD should run.

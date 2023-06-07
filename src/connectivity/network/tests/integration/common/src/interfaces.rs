@@ -91,7 +91,7 @@ pub async fn add_address_wait_assigned(
         futures::pin_mut!(state_stream);
         let () = fidl_fuchsia_net_interfaces_ext::admin::wait_assignment_state(
             &mut state_stream,
-            fidl_fuchsia_net_interfaces_admin::AddressAssignmentState::Assigned,
+            fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned,
         )
         .await?;
     }

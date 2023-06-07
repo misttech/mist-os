@@ -83,10 +83,10 @@ type adminAddressStateProviderImpl struct {
 		isHanging  bool
 		// NB: state is the zero value while the address has been added but the
 		// initial assignment state is unknown.
-		state admin.AddressAssignmentState
+		state interfaces.AddressAssignmentState
 		// NB: lastObserved is the zero value iff the client has yet to observe the
 		// state for the first time.
-		lastObserved admin.AddressAssignmentState
+		lastObserved interfaces.AddressAssignmentState
 		// detached is set to true if Detach has been called on the channel, and will
 		// result in the address not being removed when the client closes its end of
 		// the channel.
@@ -128,7 +128,7 @@ func (pi *adminAddressStateProviderImpl) Detach(fidl.Context) error {
 	return nil
 }
 
-func (pi *adminAddressStateProviderImpl) WatchAddressAssignmentState(ctx fidl.Context) (admin.AddressAssignmentState, error) {
+func (pi *adminAddressStateProviderImpl) WatchAddressAssignmentState(ctx fidl.Context) (interfaces.AddressAssignmentState, error) {
 	pi.mu.Lock()
 	defer pi.mu.Unlock()
 

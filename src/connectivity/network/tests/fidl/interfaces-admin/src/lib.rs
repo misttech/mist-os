@@ -423,7 +423,7 @@ async fn add_address_offline<N: Netstack>(name: &str) {
     futures::pin_mut!(state_stream);
     let () = fidl_fuchsia_net_interfaces_ext::admin::wait_assignment_state(
         &mut state_stream,
-        fidl_fuchsia_net_interfaces_admin::AddressAssignmentState::Unavailable,
+        fidl_fuchsia_net_interfaces::AddressAssignmentState::Unavailable,
     )
     .await
     .expect("wait for UNAVAILABLE address assignment state");
@@ -434,7 +434,7 @@ async fn add_address_offline<N: Netstack>(name: &str) {
 
     let () = fidl_fuchsia_net_interfaces_ext::admin::wait_assignment_state(
         &mut state_stream,
-        fidl_fuchsia_net_interfaces_admin::AddressAssignmentState::Assigned,
+        fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned,
     )
     .await
     .expect("wait for ASSIGNED address assignment state");

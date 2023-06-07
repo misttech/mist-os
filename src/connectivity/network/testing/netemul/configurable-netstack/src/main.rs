@@ -280,7 +280,7 @@ async fn configure_interface(
                     &mut fnet_interfaces_ext::admin::assignment_state_stream(
                         address_state_provider.clone(),
                     ),
-                    fnet_interfaces_admin::AddressAssignmentState::Assigned,
+                    fnet_interfaces::AddressAssignmentState::Assigned,
                 )
                 .await
                 .map_err(NetstackError::WaitForAddressAssignment)?;

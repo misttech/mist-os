@@ -563,9 +563,9 @@ async fn do_if<C: NetCliDepsConnector>(
                 state_stream
                     .try_filter_map(|state| {
                         futures::future::ok(match state {
-                            finterfaces_admin::AddressAssignmentState::Tentative => None,
-                            finterfaces_admin::AddressAssignmentState::Assigned => Some(()),
-                            finterfaces_admin::AddressAssignmentState::Unavailable => Some(()),
+                            finterfaces::AddressAssignmentState::Tentative => None,
+                            finterfaces::AddressAssignmentState::Assigned => Some(()),
+                            finterfaces::AddressAssignmentState::Unavailable => Some(()),
                         })
                     })
                     .try_next()
@@ -2024,7 +2024,7 @@ mod tests {
                     .await
                     .into_watch_address_assignment_state()
                     .expect("watch address assignment state request")
-                    .send(finterfaces_admin::AddressAssignmentState::Tentative)
+                    .send(finterfaces::AddressAssignmentState::Tentative)
                     .expect("send address assignment state succeeds");
             }
 
@@ -2033,9 +2033,9 @@ mod tests {
                 .into_watch_address_assignment_state()
                 .expect("watch address assignment state request")
                 .send(if interface_is_up {
-                    finterfaces_admin::AddressAssignmentState::Assigned
+                    finterfaces::AddressAssignmentState::Assigned
                 } else {
-                    finterfaces_admin::AddressAssignmentState::Unavailable
+                    finterfaces::AddressAssignmentState::Unavailable
                 })
                 .expect("send address assignment state succeeds");
         };

@@ -632,7 +632,7 @@ mod helpers {
             &mut fidl_fuchsia_net_interfaces_ext::admin::assignment_state_stream(
                 address_state_provider,
             ),
-            fidl_fuchsia_net_interfaces_admin::AddressAssignmentState::Assigned,
+            fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned,
         )
         .await
         .expect("failed to observe assigned address");

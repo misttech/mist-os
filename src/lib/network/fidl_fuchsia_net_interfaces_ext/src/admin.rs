@@ -4,6 +4,7 @@
 
 //! Extensions for fuchsia.net.interfaces.admin.
 
+use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fuchsia_zircon_status as zx;
 use futures::{FutureExt as _, Stream, StreamExt as _, TryStreamExt as _};
@@ -48,7 +49,7 @@ impl From<TerminalError<fnet_interfaces_admin::AddressRemovalReason>>
 /// future hanging get calls to fail or the channel to be closed.
 pub fn assignment_state_stream(
     address_state_provider: fnet_interfaces_admin::AddressStateProviderProxy,
-) -> impl Stream<Item = Result<fnet_interfaces_admin::AddressAssignmentState, AddressStateProviderError>>
+) -> impl Stream<Item = Result<fnet_interfaces::AddressAssignmentState, AddressStateProviderError>>
 {
     let event_fut = address_state_provider.take_event_stream().into_future().map(
         |(item, _stream)| match item {
@@ -100,12 +101,11 @@ pub fn assignment_state_stream(
 /// terminal error has occurred on the underlying channel.
 pub async fn wait_assignment_state<S>(
     stream: S,
-    want: fidl_fuchsia_net_interfaces_admin::AddressAssignmentState,
+    want: fnet_interfaces::AddressAssignmentState,
 ) -> Result<(), AddressStateProviderError>
 where
-    S: Stream<
-            Item = Result<fnet_interfaces_admin::AddressAssignmentState, AddressStateProviderError>,
-        > + Unpin,
+    S: Stream<Item = Result<fnet_interfaces::AddressAssignmentState, AddressStateProviderError>>
+        + Unpin,
 {
     stream
         .try_filter_map(|state| futures::future::ok((state == want).then(|| ())))
@@ -368,6 +368,7 @@ impl<E: std::fmt::Debug> std::error::Error for TerminalError<E> {}
 mod test {
     use super::{assignment_state_stream, AddressStateProviderError};
     use fidl::prelude::*;
+    use fidl_fuchsia_net_interfaces as fnet_interfaces;
     use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
     use fuchsia_zircon_status as zx;
     use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
@@ -388,8 +389,8 @@ mod test {
                 .into_stream_and_control_handle()
                 .expect("failed to create stream and control handle");
 
-            const ASSIGNMENT_STATE_ASSIGNED: fnet_interfaces_admin::AddressAssignmentState =
-                fnet_interfaces_admin::AddressAssignmentState::Assigned;
+            const ASSIGNMENT_STATE_ASSIGNED: fnet_interfaces::AddressAssignmentState =
+                fnet_interfaces::AddressAssignmentState::Assigned;
             let state_fut = state_stream.try_next().map(|r| {
                 assert_eq!(
                     r.expect("state stream error").expect("state stream ended"),
@@ -455,8 +456,8 @@ mod test {
             >()
             .expect("failed to create proxy");
 
-        const ASSIGNMENT_STATE_ASSIGNED: fnet_interfaces_admin::AddressAssignmentState =
-            fnet_interfaces_admin::AddressAssignmentState::Assigned;
+        const ASSIGNMENT_STATE_ASSIGNED: fnet_interfaces::AddressAssignmentState =
+            fnet_interfaces::AddressAssignmentState::Assigned;
         const REMOVAL_REASON_INVALID: fnet_interfaces_admin::AddressRemovalReason =
             fnet_interfaces_admin::AddressRemovalReason::Invalid;
 

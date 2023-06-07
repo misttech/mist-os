@@ -143,7 +143,7 @@ class FakeAddressStateProvider
   void NotImplemented_(const std::string& name) override { FAIL() << "Not implemented: " << name; }
 
   void WatchAddressAssignmentState(WatchAddressAssignmentStateCallback callback) override {
-    callback(fuchsia::net::interfaces::admin::AddressAssignmentState::ASSIGNED);
+    callback(fuchsia::net::interfaces::AddressAssignmentState::ASSIGNED);
   }
 
   // Callback to remove the address when the client hangs up.

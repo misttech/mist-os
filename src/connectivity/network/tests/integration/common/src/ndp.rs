@@ -108,7 +108,7 @@ pub async fn send_ra_with_router_lifetime<'a>(
 /// A result type that can be used to evaluate the outcome of Duplicate Address
 /// Detection (DAD).
 pub type DadState = Result<
-    fidl_fuchsia_net_interfaces_admin::AddressAssignmentState,
+    fidl_fuchsia_net_interfaces::AddressAssignmentState,
     fidl_fuchsia_net_interfaces_ext::admin::AddressStateProviderError,
 >;
 
@@ -207,7 +207,7 @@ async fn dad_state(
     // The address state provider doesn't buffer events, so we might see the tentative state,
     // but we might not.
     let state = match state_stream.by_ref().next().await.expect("state stream not ended") {
-        Ok(fidl_fuchsia_net_interfaces_admin::AddressAssignmentState::Tentative) => {
+        Ok(fidl_fuchsia_net_interfaces::AddressAssignmentState::Tentative) => {
             state_stream.by_ref().next().await.expect("state stream not ended")
         }
         state => state,
@@ -242,6 +242,6 @@ pub async fn assert_dad_success(
 ) {
     assert_matches::assert_matches!(
         dad_state(state_stream).await,
-        Ok(fidl_fuchsia_net_interfaces_admin::AddressAssignmentState::Assigned)
+        Ok(fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned)
     );
 }

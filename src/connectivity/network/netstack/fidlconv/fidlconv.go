@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"fidl/fuchsia/net"
+	"fidl/fuchsia/net/interfaces"
 	interfacesadmin "fidl/fuchsia/net/interfaces/admin"
 	"fidl/fuchsia/net/multicast/admin"
 	fnetRoutes "fidl/fuchsia/net/routes"
@@ -284,14 +285,14 @@ func ToTcpIpAddressDroppingUnspecifiedv6(fidl net.Ipv6Address) tcpip.Address {
 	return BytesToAddressDroppingUnspecified(fidl.Addr[:])
 }
 
-func ToAddressAssignmentState(state tcpipstack.AddressAssignmentState) interfacesadmin.AddressAssignmentState {
+func ToAddressAssignmentState(state tcpipstack.AddressAssignmentState) interfaces.AddressAssignmentState {
 	switch state {
 	case tcpipstack.AddressDisabled:
-		return interfacesadmin.AddressAssignmentStateUnavailable
+		return interfaces.AddressAssignmentStateUnavailable
 	case tcpipstack.AddressAssigned:
-		return interfacesadmin.AddressAssignmentStateAssigned
+		return interfaces.AddressAssignmentStateAssigned
 	case tcpipstack.AddressTentative:
-		return interfacesadmin.AddressAssignmentStateTentative
+		return interfaces.AddressAssignmentStateTentative
 	default:
 		panic(fmt.Errorf("unknown address assignment state: %d", state))
 	}

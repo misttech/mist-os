@@ -976,7 +976,7 @@ mod tests {
 
     use fidl::endpoints::{ControlHandle as _, RequestStream as _};
     use fidl_fuchsia_net as fnet;
-    use fnet_interfaces_admin::AddressAssignmentState;
+    use fnet_interfaces::AddressAssignmentState;
     use fuchsia_async::{self as fasync};
     use fuchsia_zircon as zx;
 

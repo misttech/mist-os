@@ -1101,7 +1101,7 @@ async fn run_address_state_provider(
     control_handle: fnet_interfaces_admin::AddressStateProviderControlHandle,
     req_stream: fnet_interfaces_admin::AddressStateProviderRequestStream,
     mut assignment_state_receiver: futures::channel::mpsc::UnboundedReceiver<
-        fnet_interfaces_admin::AddressAssignmentState,
+        fnet_interfaces::AddressAssignmentState,
     >,
     mut stop_receiver: futures::channel::oneshot::Receiver<
         fnet_interfaces_admin::AddressRemovalReason,
@@ -1258,9 +1258,9 @@ async fn address_state_provider_main_loop(
     control_handle: fnet_interfaces_admin::AddressStateProviderControlHandle,
     req_stream: fnet_interfaces_admin::AddressStateProviderRequestStream,
     assignment_state_receiver: &mut futures::channel::mpsc::UnboundedReceiver<
-        fnet_interfaces_admin::AddressAssignmentState,
+        fnet_interfaces::AddressAssignmentState,
     >,
-    initial_assignment_state: fnet_interfaces_admin::AddressAssignmentState,
+    initial_assignment_state: fnet_interfaces::AddressAssignmentState,
     stop_receiver: &mut futures::channel::oneshot::Receiver<
         fnet_interfaces_admin::AddressRemovalReason,
     >,
@@ -1274,7 +1274,7 @@ async fn address_state_provider_main_loop(
     };
     enum AddressStateProviderEvent {
         Request(Result<Option<fnet_interfaces_admin::AddressStateProviderRequest>, fidl::Error>),
-        AssignmentStateChange(fnet_interfaces_admin::AddressAssignmentState),
+        AssignmentStateChange(fnet_interfaces::AddressAssignmentState),
         Canceled(fnet_interfaces_admin::AddressRemovalReason),
     }
     futures::pin_mut!(req_stream);
@@ -1388,7 +1388,7 @@ pub(crate) enum AddressStateProviderError {
 #[derive(Debug)]
 enum AddressAssignmentWatcherStateMachine {
     // Holds the new assignment state waiting to be sent.
-    UnreportedUpdate(fnet_interfaces_admin::AddressAssignmentState),
+    UnreportedUpdate(fnet_interfaces::AddressAssignmentState),
     // Holds the hanging responder waiting for a new assignment state to send.
     HangingRequest(fnet_interfaces_admin::AddressStateProviderWatchAddressAssignmentStateResponder),
     Idle,
@@ -1398,14 +1398,14 @@ struct AddressAssignmentWatcherState {
     fsm: AddressAssignmentWatcherStateMachine,
     // The last response to a `WatchAddressAssignmentState` FIDL request.
     // `None` until the first request, after which it will always be `Some`.
-    last_response: Option<fnet_interfaces_admin::AddressAssignmentState>,
+    last_response: Option<fnet_interfaces::AddressAssignmentState>,
 }
 
 impl AddressAssignmentWatcherState {
     // Handle a change in `AddressAssignmentState` as published by Core.
     fn on_new_assignment_state(
         &mut self,
-        new_state: fnet_interfaces_admin::AddressAssignmentState,
+        new_state: fnet_interfaces::AddressAssignmentState,
     ) -> Result<(), fidl::Error> {
         use AddressAssignmentWatcherStateMachine::*;
         let Self { fsm, last_response } = self;
