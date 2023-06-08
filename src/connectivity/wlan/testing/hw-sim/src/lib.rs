@@ -38,6 +38,7 @@ use {
     wlan_rsn::{self, rsna::SecAssocUpdate},
 };
 
+pub mod event;
 pub mod netdevice_helper;
 pub mod test_utils;
 
