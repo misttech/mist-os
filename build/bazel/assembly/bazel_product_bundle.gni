@@ -235,7 +235,12 @@ template("bazel_product_bundle") {
       "${files.product_bundle_out_dir}/product_bundle.json",
       "${files.product_bundle_out_dir}/system_a/fuchsia.zbi",
       "${files.product_bundle_out_dir}/system_a/fvm.blk",
+      "${files.product_bundle_out_dir}/system_a/fvm.blob.sparse.blk",
     ]
+    if (use_vbmeta) {
+      directory_timestamp_outputs +=
+          [ "${files.product_bundle_out_dir}/system_a/fuchsia.vbmeta" ]
+    }
 
     # Populate metadata when Bazel image is not used will pollute GN assembly.
     if (use_bazel_images_only) {
@@ -417,10 +422,12 @@ template("bazel_product_bundle") {
                              "visibility",
                            ])
     deps = [
-      ":${labels.bazel_product_bundle}",
       ":${labels.package_manifest_list}",
       ":${labels.transfer_manifest}",
       ":${labels.transpose_paving_script}",
     ]
+
+    # Some dependents want to claim outputs from these targets as inputs.
+    public_deps = [ ":${labels.bazel_product_bundle}" ]
   }
 }
