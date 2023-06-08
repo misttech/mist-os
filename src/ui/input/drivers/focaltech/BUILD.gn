@@ -39,15 +39,16 @@ group("common") {
   public_deps = [
     ":focaltech_touch_bind",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.test:fuchsia.hardware.test_banjo_cpp",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp_wire",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/focaltech",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/hid",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/trace",
@@ -117,10 +118,11 @@ test("focaltech-test-bin") {
     "//sdk/lib/component/outgoing/cpp",
     "//src/devices/i2c/testing/fake-i2c",
     "//src/devices/testing/mock-ddk",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
-  defines = [ "FT_TEST" ]
 }
 
 fuchsia_unittest_package("focaltech-test") {

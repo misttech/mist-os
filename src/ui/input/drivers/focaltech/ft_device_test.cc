@@ -12,8 +12,10 @@
 #include <lib/ddk/metadata.h>
 #include <lib/fake-i2c/fake-i2c.h>
 #include <lib/focaltech/focaltech.h>
-#include <lib/zx/clock.h>
 
+#include <hid/ft3x27.h>
+#include <hid/ft5726.h>
+#include <hid/ft6336.h>
 #include <zxtest/zxtest.h>
 
 #include "ft_firmware.h"
@@ -65,13 +67,7 @@ const size_t kNumFirmwareEntries = std::size(kFirmwareEntries);
 
 class FakeFtDevice : public fake_i2c::FakeI2c {
  public:
-  ~FakeFtDevice() { EXPECT_TRUE(expected_report_.empty()); }
-
   uint32_t firmware_write_size() const { return firmware_write_size_; }
-
-  void ExpectReport(uint8_t addr, std::vector<uint8_t> report) {
-    expected_report_.emplace(addr, std::move(report));
-  }
 
  protected:
   zx_status_t Transact(const uint8_t* write_buffer, size_t write_buffer_size, uint8_t* read_buffer,
@@ -134,21 +130,8 @@ class FakeFtDevice : public fake_i2c::FakeI2c {
       read_buffer[0] = ecc_;
       *read_buffer_size = 1;
     } else if (write_buffer[0] == 0x07 && write_buffer_size == 1) {  // Reset
-    } else if ((write_buffer[0] == FTS_REG_TYPE || write_buffer[0] == FTS_REG_FIRMID ||
-                write_buffer[0] == FTS_REG_VENDOR_ID || write_buffer[0] == FTS_REG_PANEL_ID ||
-                write_buffer[0] == FTS_REG_RELEASE_ID_HIGH ||
-                write_buffer[0] == FTS_REG_RELEASE_ID_LOW ||
-                write_buffer[0] == FTS_REG_IC_VERSION) &&
-               write_buffer_size == 1) {  // LogRegisterValue
-      read_buffer[0] = 0;
-      *read_buffer_size = 1;
-    } else if (write_buffer_size == 1) {  // Read report
-      EXPECT_FALSE(expected_report_.empty());
-      EXPECT_EQ(write_buffer[0], expected_report_.front().first);
-      memcpy(read_buffer, expected_report_.front().second.data(),
-             expected_report_.front().second.size());
-      *read_buffer_size = expected_report_.front().second.size();
-      expected_report_.pop();
+    } else {
+      return ZX_ERR_IO;
     }
 
     return ZX_OK;
@@ -158,8 +141,6 @@ class FakeFtDevice : public fake_i2c::FakeI2c {
   uint16_t flash_status_ = 0;
   uint8_t ecc_ = 0;
   uint32_t firmware_write_size_ = 0;
-
-  std::queue<std::pair<uint8_t, std::vector<uint8_t>>> expected_report_;  // address, data pair
 };
 
 class FocaltechTest : public zxtest::Test, public loop_fixture::RealLoop {
@@ -186,7 +167,6 @@ class FocaltechTest : public zxtest::Test, public loop_fixture::RealLoop {
 
     zx::interrupt interrupt;
     ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &interrupt));
-    ASSERT_OK(interrupt.duplicate(ZX_RIGHT_SAME_RIGHTS, &irq_));
 
     interrupt_gpio_.ExpectConfigIn(ZX_OK, GPIO_NO_PULL)
         .ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_EDGE_LOW, std::move(interrupt));
@@ -196,61 +176,12 @@ class FocaltechTest : public zxtest::Test, public loop_fixture::RealLoop {
  protected:
   std::shared_ptr<MockDevice> fake_parent_;
   FakeFtDevice i2c_;
-  zx::interrupt irq_;
 
  private:
   ddk::MockGpio interrupt_gpio_;
   ddk::MockGpio reset_gpio_;
   component::OutgoingDirectory outgoing_;
 };
-
-void VerifyDescriptor(const fuchsia_input_report::wire::DeviceDescriptor& descriptor, size_t x_max,
-                      size_t y_max) {
-  EXPECT_TRUE(descriptor.has_device_info());
-  EXPECT_EQ(descriptor.device_info().vendor_id,
-            static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle));
-  EXPECT_EQ(descriptor.device_info().product_id,
-            static_cast<uint32_t>(
-                fuchsia_input_report::wire::VendorGoogleProductId::kFocaltechTouchscreen));
-
-  EXPECT_TRUE(descriptor.has_touch());
-  EXPECT_FALSE(descriptor.has_consumer_control());
-  EXPECT_FALSE(descriptor.has_keyboard());
-  EXPECT_FALSE(descriptor.has_mouse());
-  EXPECT_FALSE(descriptor.has_sensor());
-
-  EXPECT_TRUE(descriptor.touch().has_input());
-  EXPECT_FALSE(descriptor.touch().has_feature());
-
-  EXPECT_TRUE(descriptor.touch().input().has_touch_type());
-  EXPECT_EQ(descriptor.touch().input().touch_type(),
-            fuchsia_input_report::wire::TouchType::kTouchscreen);
-
-  EXPECT_TRUE(descriptor.touch().input().has_max_contacts());
-  EXPECT_EQ(descriptor.touch().input().max_contacts(), 5);
-
-  EXPECT_FALSE(descriptor.touch().input().has_buttons());
-  EXPECT_TRUE(descriptor.touch().input().has_contacts());
-  EXPECT_EQ(descriptor.touch().input().contacts().count(), 5);
-
-  for (const auto& c : descriptor.touch().input().contacts()) {
-    EXPECT_TRUE(c.has_position_x());
-    EXPECT_TRUE(c.has_position_y());
-    EXPECT_FALSE(c.has_contact_height());
-    EXPECT_FALSE(c.has_contact_width());
-    EXPECT_FALSE(c.has_pressure());
-
-    EXPECT_EQ(c.position_x().range.min, 0);
-    EXPECT_EQ(c.position_x().range.max, x_max);
-    EXPECT_EQ(c.position_x().unit.type, fuchsia_input_report::wire::UnitType::kOther);
-    EXPECT_EQ(c.position_x().unit.exponent, 0);
-
-    EXPECT_EQ(c.position_y().range.min, 0);
-    EXPECT_EQ(c.position_y().range.max, y_max);
-    EXPECT_EQ(c.position_y().unit.type, fuchsia_input_report::wire::UnitType::kOther);
-    EXPECT_EQ(c.position_y().unit.exponent, 0);
-  }
-}
 
 TEST_F(FocaltechTest, Metadata3x27) {
   constexpr FocaltechMetadata kFt3x27Metadata = {
@@ -259,19 +190,20 @@ TEST_F(FocaltechTest, Metadata3x27) {
   };
   fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &kFt3x27Metadata, sizeof(kFt3x27Metadata));
 
-  FtDevice dut(fake_parent_.get(), dispatcher());
+  FtDevice dut(fake_parent_.get());
   PerformBlockingWork([&] { EXPECT_OK(dut.Init()); });
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputDevice>();
-  ASSERT_OK(endpoints);
-  fidl::BindServer(dispatcher(), std::move(endpoints->server), &dut);
-  fidl::WireSyncClient<fuchsia_input_report::InputDevice> client(std::move(endpoints->client));
-
+  uint8_t actual_descriptor[1024];
+  size_t actual_size = 0;
   PerformBlockingWork([&] {
-    auto result = client->GetDescriptor();
-    EXPECT_TRUE(result.ok());
-    VerifyDescriptor(result->descriptor, 600, 1024);
+    EXPECT_OK(
+        dut.HidbusGetDescriptor(0, actual_descriptor, sizeof(actual_descriptor), &actual_size));
   });
+
+  const uint8_t* expected_descriptor;
+  const size_t expected_size = get_ft3x27_report_desc(&expected_descriptor);
+  ASSERT_EQ(actual_size, expected_size);
+  EXPECT_BYTES_EQ(actual_descriptor, expected_descriptor, expected_size);
 }
 
 TEST_F(FocaltechTest, Metadata5726) {
@@ -281,19 +213,20 @@ TEST_F(FocaltechTest, Metadata5726) {
   };
   fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &kFt5726Metadata, sizeof(kFt5726Metadata));
 
-  FtDevice dut(fake_parent_.get(), dispatcher());
+  FtDevice dut(fake_parent_.get());
   PerformBlockingWork([&] { EXPECT_OK(dut.Init()); });
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputDevice>();
-  ASSERT_OK(endpoints);
-  fidl::BindServer(dispatcher(), std::move(endpoints->server), &dut);
-  fidl::WireSyncClient<fuchsia_input_report::InputDevice> client(std::move(endpoints->client));
-
+  uint8_t actual_descriptor[1024];
+  size_t actual_size = 0;
   PerformBlockingWork([&] {
-    auto result = client->GetDescriptor();
-    EXPECT_TRUE(result.ok());
-    VerifyDescriptor(result->descriptor, 800, 1280);
+    EXPECT_OK(
+        dut.HidbusGetDescriptor(0, actual_descriptor, sizeof(actual_descriptor), &actual_size));
   });
+
+  const uint8_t* expected_descriptor;
+  const size_t expected_size = get_ft5726_report_desc(&expected_descriptor);
+  ASSERT_EQ(actual_size, expected_size);
+  EXPECT_BYTES_EQ(actual_descriptor, expected_descriptor, expected_size);
 }
 
 TEST_F(FocaltechTest, Metadata6336) {
@@ -303,19 +236,20 @@ TEST_F(FocaltechTest, Metadata6336) {
   };
   fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &kFt6336Metadata, sizeof(kFt6336Metadata));
 
-  FtDevice dut(fake_parent_.get(), dispatcher());
+  FtDevice dut(fake_parent_.get());
   PerformBlockingWork([&] { EXPECT_OK(dut.Init()); });
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputDevice>();
-  ASSERT_OK(endpoints);
-  fidl::BindServer(dispatcher(), std::move(endpoints->server), &dut);
-  fidl::WireSyncClient<fuchsia_input_report::InputDevice> client(std::move(endpoints->client));
-
+  uint8_t actual_descriptor[1024];
+  size_t actual_size = 0;
   PerformBlockingWork([&] {
-    auto result = client->GetDescriptor();
-    EXPECT_TRUE(result.ok());
-    VerifyDescriptor(result->descriptor, 480, 800);
+    EXPECT_OK(
+        dut.HidbusGetDescriptor(0, actual_descriptor, sizeof(actual_descriptor), &actual_size));
   });
+
+  const uint8_t* expected_descriptor;
+  const size_t expected_size = get_ft6336_report_desc(&expected_descriptor);
+  ASSERT_EQ(actual_size, expected_size);
+  EXPECT_BYTES_EQ(actual_descriptor, expected_descriptor, expected_size);
 }
 
 TEST_F(FocaltechTest, Firmware5726) {
@@ -327,7 +261,7 @@ TEST_F(FocaltechTest, Firmware5726) {
   };
   fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &kFt5726Metadata, sizeof(kFt5726Metadata));
 
-  FtDevice dut(fake_parent_.get(), dispatcher());
+  FtDevice dut(fake_parent_.get());
   PerformBlockingWork([&] { EXPECT_OK(dut.Init()); });
   EXPECT_EQ(i2c_.firmware_write_size(), sizeof(kFirmware3));
 }
@@ -341,96 +275,9 @@ TEST_F(FocaltechTest, Firmware5726UpToDate) {
   };
   fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &kFt5726Metadata, sizeof(kFt5726Metadata));
 
-  FtDevice dut(fake_parent_.get(), dispatcher());
+  FtDevice dut(fake_parent_.get());
   PerformBlockingWork([&] { EXPECT_OK(dut.Init()); });
   EXPECT_EQ(i2c_.firmware_write_size(), 0);
-}
-
-TEST_F(FocaltechTest, Touch) {
-  constexpr FocaltechMetadata kFt6336Metadata = {
-      .device_id = FOCALTECH_DEVICE_FT6336,
-      .needs_firmware = false,
-  };
-  fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &kFt6336Metadata, sizeof(kFt6336Metadata));
-
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-  loop.StartThread("focaltech-test-thread");
-  FtDevice dut(fake_parent_.get(), loop.dispatcher());
-  PerformBlockingWork([&] { EXPECT_OK(dut.Init()); });
-
-  auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputDevice>();
-  ASSERT_OK(endpoints);
-  fidl::BindServer(dispatcher(), std::move(endpoints->server), &dut);
-  fidl::WireSyncClient<fuchsia_input_report::InputDevice> client(std::move(endpoints->client));
-
-  auto reader_endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-  ASSERT_OK(reader_endpoints.status_value());
-  auto result = client->GetInputReportsReader(std::move(reader_endpoints->server));
-  ASSERT_OK(result.status());
-  auto reader = fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(
-      std::move(reader_endpoints->client));
-
-  PerformBlockingWork([&] { ASSERT_OK(dut.WaitForNextReader(zx::duration::infinite())); });
-
-  dut.StartThread();
-  // clang-format off
-  uint8_t expected_report[] = {
-      0x02,  // contact_count
-
-      // Contact 0, finger_id = 0
-      0x00, 0x01,  // x = 0x001
-      0x00, 0x13,  // y = 0x013
-      0x00, 0x00,
-
-      // Contact 1, finger_id = 1
-      0x80, 0x31,  // x = 0x031
-      0x00, 0x00,  // y = 0x000
-      0x00, 0x00,
-
-      // Contact 2
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-
-      // Contact 3
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-
-      // Contact 4
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  };
-  // clang-format on
-  for (size_t i = 0; i < sizeof(expected_report); i += 8) {
-    i2c_.ExpectReport(
-        static_cast<uint8_t>(i + FTS_REG_CURPOINT),
-        std::vector<uint8_t>(expected_report + i,
-                             expected_report + std::min(i + 8, sizeof(expected_report))));
-  }
-  irq_.trigger(0, zx::clock::get_monotonic());
-
-  PerformBlockingWork([&]() {
-    auto result = reader->ReadInputReports();
-    ASSERT_OK(result.status());
-    ASSERT_FALSE(result.value().is_error());
-    auto& reports = result.value().value()->reports;
-
-    ASSERT_EQ(1, reports.count());
-    auto report = reports[0];
-
-    ASSERT_TRUE(report.has_event_time());
-    ASSERT_TRUE(report.has_touch());
-    auto& touch_report = report.touch();
-
-    ASSERT_TRUE(touch_report.has_contacts());
-    ASSERT_EQ(touch_report.contacts().count(), 2);
-    EXPECT_EQ(touch_report.contacts()[0].contact_id(), 0);
-    EXPECT_EQ(touch_report.contacts()[0].position_x(), 0x001);
-    EXPECT_EQ(touch_report.contacts()[0].position_y(), 0x013);
-
-    EXPECT_EQ(touch_report.contacts()[1].contact_id(), 1);
-    EXPECT_EQ(touch_report.contacts()[1].position_x(), 0x031);
-    EXPECT_EQ(touch_report.contacts()[1].position_y(), 0x000);
-  });
-
-  EXPECT_OK(dut.ShutDown());
-  loop.Shutdown();
 }
 
 }  // namespace ft

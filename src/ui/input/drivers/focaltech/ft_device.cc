@@ -4,6 +4,7 @@
 
 #include "ft_device.h"
 
+#include <fidl/fuchsia.input.report/cpp/wire.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -12,7 +13,6 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/fit/defer.h>
-#include <lib/zx/clock.h>
 #include <lib/zx/profile.h>
 #include <lib/zx/time.h>
 #include <stdio.h>
@@ -33,62 +33,13 @@
 
 namespace ft {
 
-namespace {
+FtDevice::FtDevice(zx_device_t* device) : ddk::Device<FtDevice, ddk::Unbindable>(device) {}
 
-constexpr fuchsia_input_report::wire::Axis XYAxis(int64_t max) {
-  return {
-      .range = {.min = 0, .max = max},
-      .unit =
-          {
-              .type = fuchsia_input_report::wire::UnitType::kOther,
-              .exponent = 0,
-          },
-  };
-}
-
-constexpr size_t kFt3x27XMax = 600;
-constexpr size_t kFt3x27YMax = 1024;
-
-constexpr size_t kFt6336XMax = 480;
-constexpr size_t kFt6336YMax = 800;
-
-constexpr size_t kFt5726XMax = 800;
-constexpr size_t kFt5726YMax = 1280;
-
-constexpr size_t kFt5336XMax = 1080;
-constexpr size_t kFt5336YMax = 1920;
-
-}  // namespace
-
-void FtDevice::FtInputReport::ToFidlInputReport(
-    fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
-    fidl::AnyArena& allocator) {
-  fidl::VectorView<fuchsia_input_report::wire::ContactInputReport> contact_rpt(allocator,
-                                                                               contact_count);
-  for (size_t i = 0; i < contact_count; i++) {
-    contact_rpt[i] = fuchsia_input_report::wire::ContactInputReport::Builder(allocator)
-                         .contact_id(contacts[i].finger_id)
-                         .position_x(contacts[i].x)
-                         .position_y(contacts[i].y)
-                         .Build();
-  }
-
-  auto touch_report =
-      fuchsia_input_report::wire::TouchInputReport::Builder(allocator).contacts(contact_rpt);
-  input_report.event_time(event_time.get()).touch(touch_report.Build());
-}
-
-FtDevice::FtInputReport FtDevice::ParseReport(const uint8_t* buf) {
-  FtInputReport report;
-  report.contact_count = buf[0];
-  buf += 1;
-  for (size_t i = 0; i < report.contact_count; i++, buf += kFingerRptSize) {
-    report.contacts[i].x = static_cast<uint16_t>(((buf[0] & 0x0f) << 8) + buf[1]);
-    report.contacts[i].y = static_cast<uint16_t>(((buf[2] & 0x0f) << 8) + buf[3]);
-    report.contacts[i].finger_id = static_cast<uint8_t>(((buf[2] >> 2) & kFingerIdContactMask) |
-                                                        (((buf[0] & 0xC0) == 0x80) ? 1 : 0));
-  }
-  return report;
+void FtDevice::ParseReport(ft3x27_finger_t* rpt, uint8_t* buf) {
+  rpt->x = static_cast<uint16_t>(((buf[0] & 0x0f) << 8) + buf[1]);
+  rpt->y = static_cast<uint16_t>(((buf[2] & 0x0f) << 8) + buf[3]);
+  rpt->finger_id = static_cast<uint8_t>(((buf[2] >> 2) & FT3X27_FINGER_ID_CONTACT_MASK) |
+                                        (((buf[0] & 0xC0) == 0x80) ? 1 : 0));
 }
 
 int FtDevice::Thread() {
@@ -107,24 +58,15 @@ int FtDevice::Thread() {
     uint8_t i2c_buf[kMaxPoints * kFingerRptSize + 1];
     status = Read(FTS_REG_CURPOINT, i2c_buf, kMaxPoints * kFingerRptSize + 1);
     if (status == ZX_OK) {
-      auto report = ParseReport(i2c_buf);
-      report.event_time = timestamp;
-      readers_.SendReportToAllReaders(report);
-
-      const zx::duration latency = zx::clock::get_monotonic() - timestamp;
-
-      total_latency_ += latency;
-      report_count_++;
-      average_latency_usecs_.Set(total_latency_.to_usecs() / report_count_);
-
-      if (latency > max_latency_) {
-        max_latency_ = latency;
-        max_latency_usecs_.Set(max_latency_.to_usecs());
+      fbl::AutoLock lock(&client_lock_);
+      ft_rpt_.rpt_id = FT3X27_RPT_ID_TOUCH;
+      ft_rpt_.contact_count = i2c_buf[0];
+      for (uint i = 0; i < kMaxPoints; i++) {
+        ParseReport(&ft_rpt_.fingers[i], &i2c_buf[i * kFingerRptSize + 1]);
       }
-
-      if (i2c_buf[0] > 0) {
-        total_report_count_.Add(1);
-        last_event_timestamp_.Set(timestamp.get());
+      if (client_.is_valid()) {
+        client_.IoQueue(reinterpret_cast<uint8_t*>(&ft_rpt_), sizeof(ft3x27_touch_t),
+                        timestamp.get());
       }
     } else {
       zxlogf(ERROR, "focaltouch: i2c read error");
@@ -169,20 +111,16 @@ zx_status_t FtDevice::Init() {
   }
 
   if (device_info.device_id == FOCALTECH_DEVICE_FT3X27) {
-    x_max_ = kFt3x27XMax;
-    y_max_ = kFt3x27YMax;
+    descriptor_len_ = get_ft3x27_report_desc(&descriptor_);
   } else if (device_info.device_id == FOCALTECH_DEVICE_FT6336) {
-    x_max_ = kFt6336XMax;
-    y_max_ = kFt6336YMax;
+    descriptor_len_ = get_ft6336_report_desc(&descriptor_);
   } else if (device_info.device_id == FOCALTECH_DEVICE_FT5726) {
-    x_max_ = kFt5726XMax;
-    y_max_ = kFt5726YMax;
+    descriptor_len_ = get_ft5726_report_desc(&descriptor_);
   } else if (device_info.device_id == FOCALTECH_DEVICE_FT5336) {
     // Currently we assume the panel to be always Khadas TS050. If this changes,
     // we may need extra information from the metadata to determine which HID
     // report descriptor to use.
-    x_max_ = kFt5336XMax;
-    y_max_ = kFt5336YMax;
+    descriptor_len_ = get_ft5336_khadas_ts050_report_desc(&descriptor_);
   } else {
     zxlogf(ERROR, "focaltouch: unknown device ID %u", device_info.device_id);
     return ZX_ERR_INTERNAL;
@@ -221,38 +159,27 @@ zx_status_t FtDevice::Init() {
     zxlogf(INFO, "DDIC version:   none");
   }
 
-  // These names must match the strings in //src/diagnostics/config/sampler/input.json.
-  metrics_root_ = inspector_.GetRoot().CreateChild("hid-input-report-touch");
-  average_latency_usecs_ = metrics_root_.CreateUint("average_latency_usecs", 0);
-  max_latency_usecs_ = metrics_root_.CreateUint("max_latency_usecs", 0);
-  total_report_count_ = metrics_root_.CreateUint("total_report_count", 0);
-  last_event_timestamp_ = metrics_root_.CreateUint("last_event_timestamp", 0);
-
   return ZX_OK;
-}
-
-void FtDevice::StartThread() {
-  auto thunk = [](void* arg) -> int { return reinterpret_cast<FtDevice*>(arg)->Thread(); };
-
-  running_.store(true);
-  int ret = thrd_create_with_name(&thread_, thunk, this, "focaltouch-thread");
-  ZX_DEBUG_ASSERT(ret == thrd_success);
 }
 
 zx_status_t FtDevice::Create(void* ctx, zx_device_t* device) {
   zxlogf(INFO, "focaltouch: driver started...");
 
-  auto ft_dev = std::make_unique<FtDevice>(
-      device, fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher()));
+  auto ft_dev = std::make_unique<FtDevice>(device);
   zx_status_t status = ft_dev->Init();
   if (status != ZX_OK) {
     zxlogf(ERROR, "focaltouch: Driver bind failed %d", status);
     return status;
   }
 
+  auto thunk = [](void* arg) -> int { return reinterpret_cast<FtDevice*>(arg)->Thread(); };
+
   auto cleanup = fit::defer([&]() { ft_dev->ShutDown(); });
 
-  ft_dev->StartThread();
+  ft_dev->running_.store(true);
+  int ret = thrd_create_with_name(&ft_dev->thread_, thunk, reinterpret_cast<void*>(ft_dev.get()),
+                                  "focaltouch-thread");
+  ZX_DEBUG_ASSERT(ret == thrd_success);
 
   // Set scheduler role for device thread.
   {
@@ -282,6 +209,20 @@ zx_status_t FtDevice::Create(void* ctx, zx_device_t* device) {
   return ZX_OK;
 }
 
+zx_status_t FtDevice::HidbusQuery(uint32_t options, hid_info_t* info) {
+  if (!info) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  info->dev_num = 0;
+  info->device_class = HID_DEVICE_CLASS_OTHER;
+  info->boot_device = false;
+  info->vendor_id = static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle);
+  info->product_id = static_cast<uint32_t>(
+      fuchsia_input_report::wire::VendorGoogleProductId::kFocaltechTouchscreen);
+
+  return ZX_OK;
+}
+
 void FtDevice::DdkRelease() { delete this; }
 
 void FtDevice::DdkUnbind(ddk::UnbindTxn txn) {
@@ -293,51 +234,62 @@ zx_status_t FtDevice::ShutDown() {
   running_.store(false);
   irq_.destroy();
   thrd_join(thread_, NULL);
+  {
+    fbl::AutoLock lock(&client_lock_);
+    // client_.clear();
+  }
   return ZX_OK;
 }
 
-void FtDevice::GetInputReportsReader(GetInputReportsReaderRequestView request,
-                                     GetInputReportsReaderCompleter::Sync& completer) {
-  auto status = readers_.CreateReader(dispatcher_, std::move(request->reader));
-  if (status == ZX_OK) {
-#ifdef FT_TEST
-    sync_completion_signal(&next_reader_wait_);
-#endif
+zx_status_t FtDevice::HidbusGetDescriptor(hid_description_type_t desc_type,
+                                          uint8_t* out_data_buffer, size_t data_size,
+                                          size_t* out_data_actual) {
+  if (data_size < descriptor_len_) {
+    return ZX_ERR_BUFFER_TOO_SMALL;
   }
+
+  memcpy(out_data_buffer, descriptor_, descriptor_len_);
+  *out_data_actual = descriptor_len_;
+  return ZX_OK;
 }
 
-void FtDevice::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
-  fidl::Arena<kFeatureAndDescriptorBufferSize> allocator;
+zx_status_t FtDevice::HidbusGetReport(uint8_t rpt_type, uint8_t rpt_id, uint8_t* data, size_t len,
+                                      size_t* out_len) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
 
-  fuchsia_input_report::wire::DeviceInfo device_info;
-  device_info.vendor_id = static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle);
-  device_info.product_id = static_cast<uint32_t>(
-      fuchsia_input_report::wire::VendorGoogleProductId::kFocaltechTouchscreen);
+zx_status_t FtDevice::HidbusSetReport(uint8_t rpt_type, uint8_t rpt_id, const uint8_t* data,
+                                      size_t len) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
 
-  fidl::VectorView<fuchsia_input_report::wire::ContactInputDescriptor> contacts(allocator,
-                                                                                kMaxPoints);
-  for (auto& c : contacts) {
-    c = fuchsia_input_report::wire::ContactInputDescriptor::Builder(allocator)
-            .position_x(XYAxis(x_max_))
-            .position_y(XYAxis(y_max_))
-            .Build();
+zx_status_t FtDevice::HidbusGetIdle(uint8_t rpt_id, uint8_t* duration) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
+zx_status_t FtDevice::HidbusSetIdle(uint8_t rpt_id, uint8_t duration) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
+zx_status_t FtDevice::HidbusGetProtocol(uint8_t* protocol) { return ZX_ERR_NOT_SUPPORTED; }
+
+zx_status_t FtDevice::HidbusSetProtocol(uint8_t protocol) { return ZX_OK; }
+
+void FtDevice::HidbusStop() {
+  fbl::AutoLock lock(&client_lock_);
+  client_.clear();
+}
+
+zx_status_t FtDevice::HidbusStart(const hidbus_ifc_protocol_t* ifc) {
+  fbl::AutoLock lock(&client_lock_);
+  if (client_.is_valid()) {
+    zxlogf(ERROR, "focaltouch: Already bound!");
+    return ZX_ERR_ALREADY_BOUND;
+  } else {
+    client_ = ddk::HidbusIfcProtocolClient(ifc);
+    zxlogf(INFO, "focaltouch: started");
   }
-
-  const auto input = fuchsia_input_report::wire::TouchInputDescriptor::Builder(allocator)
-                         .touch_type(fuchsia_input_report::wire::TouchType::kTouchscreen)
-                         .max_contacts(kMaxPoints)
-                         .contacts(contacts)
-                         .Build();
-
-  const auto touch =
-      fuchsia_input_report::wire::TouchDescriptor::Builder(allocator).input(input).Build();
-
-  const auto descriptor = fuchsia_input_report::wire::DeviceDescriptor::Builder(allocator)
-                              .device_info(device_info)
-                              .touch(touch)
-                              .Build();
-
-  completer.Reply(descriptor);
+  return ZX_OK;
 }
 
 // simple i2c read for reading one register location
