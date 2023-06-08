@@ -11,7 +11,6 @@
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/cpp/env.h>
 #include <lib/fdf/env.h>
-#include <lib/fdf/testing.h>
 #include <lib/fit/function.h>
 #include <lib/sync/completion.h>
 #include <lib/sync/cpp/completion.h>
@@ -61,7 +60,7 @@ class OneWayTest {
     }
     // TODO(https://fxbug.dev/119188) migrate off this once setting a default dispatcher
     // with managed threads is possible.
-    fdf_testing_push_driver(reinterpret_cast<const void*>(client_fake_driver_));
+    fdf_env_register_driver_entry(reinterpret_cast<const void*>(client_fake_driver_));
   }
 
   void Run() {
@@ -115,7 +114,7 @@ class OneWayTest {
     client_dispatcher_shutdown_.Wait();
     server_dispatcher_shutdown_.Wait();
 
-    fdf_testing_pop_driver();
+    fdf_env_register_driver_exit();
   }
 
   void ShutdownHandler(fdf_dispatcher_t* dispatcher) {

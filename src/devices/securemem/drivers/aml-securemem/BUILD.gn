@@ -84,7 +84,7 @@ test("aml-securemem-test-bin") {
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//sdk/lib/driver/runtime:driver_runtime_testing",
+    "//sdk/lib/driver/runtime:driver_runtime_env",
     "//sdk/lib/fit-promise",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/bus/testing/fake-pdev",

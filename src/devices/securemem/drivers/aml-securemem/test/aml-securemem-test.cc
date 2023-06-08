@@ -12,7 +12,7 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdf/cpp/dispatcher.h>
-#include <lib/fdf/testing.h>
+#include <lib/fdf/env.h>
 #include <lib/fpromise/result.h>
 #include <lib/sync/cpp/completion.h>
 #include <lib/zx/interrupt.h>
@@ -119,10 +119,10 @@ class AmlogicSecureMemTest : public zxtest::Test {
 
     // We initialize this in a dispatcher thread so that fdf_dispatcher_get_current_dispatcher
     // works. This dispatcher isn't actually used in the test.
-    fdf_testing_push_driver(reinterpret_cast<void*>(0x12345678));
+    fdf_env_register_driver_entry(reinterpret_cast<void*>(0x12345678));
     auto dispatcher = fdf::SynchronizedDispatcher::Create(
         {}, "aml-securemem-test", fit::bind_member(this, &AmlogicSecureMemTest::ShutdownHandler));
-    fdf_testing_pop_driver();
+    fdf_env_register_driver_exit();
     ASSERT_OK(dispatcher.status_value());
     dispatcher_ = *std::move(dispatcher);
 

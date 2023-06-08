@@ -5,7 +5,7 @@
 #include <fidl/test.empty.protocol/cpp/wire.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fdf/cpp/dispatcher.h>
-#include <lib/fdf/testing.h>
+#include <lib/fdf/env.h>
 #include <lib/sync/cpp/completion.h>
 
 #include <utility>
@@ -35,10 +35,10 @@ class ScopedFakeDriver {
  public:
   ScopedFakeDriver() {
     void* driver = reinterpret_cast<void*>(1);
-    fdf_testing_push_driver(driver);
+    fdf_env_register_driver_entry(driver);
   }
 
-  ~ScopedFakeDriver() { fdf_testing_pop_driver(); }
+  ~ScopedFakeDriver() { fdf_env_register_driver_exit(); }
 };
 
 std::pair<fdf::Dispatcher, std::shared_ptr<libsync::Completion>> CreateSyncDispatcher() {

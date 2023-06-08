@@ -71,6 +71,13 @@ sdk_source_set("driver_runtime_env") {
     "//src/devices/bin/driver_runtime/*",
     "//src/devices/tee/drivers/optee:optee-controller-test-bin",
     "//src/devices/testing/driver-runtime-main/*",
+
+    # These can be removed when the tests stop using the fdf_env_register_driver_entry/exit calls.
+    "//sdk/lib/fidl_driver/tests/transport/*",
+    "//src/devices/securemem/drivers/aml-securemem:aml-securemem-test-bin",
+    "//src/lib/fidl/llcpp/tests/integration:*",
+    "//src/tests/benchmarks/fidl/driver_cpp:*",
+    "//src/tests/benchmarks/fidl/driver_llcpp:*",
   ]
   public_deps = [
     ":driver_runtime",

@@ -243,10 +243,6 @@ __EXPORT zx_status_t fdf_testing_run_until_idle() {
   return driver_runtime::DispatcherCoordinator::TestingRunUntilIdle();
 }
 
-__EXPORT void fdf_testing_push_driver(const void* driver) { driver_context::PushDriver(driver); }
-
-__EXPORT void fdf_testing_pop_driver() { driver_context::PopDriver(); }
-
 __EXPORT void fdf_internal_wait_until_all_dispatchers_idle() {
   return driver_runtime::DispatcherCoordinator::WaitUntilDispatchersIdle();
 }

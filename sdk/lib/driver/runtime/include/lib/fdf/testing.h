@@ -15,12 +15,6 @@ __BEGIN_CDECLS
 // See |fdf_testing_create_unmanaged_dispatcher| for creating the unmanaged dispatcher.
 zx_status_t fdf_testing_run_until_idle();
 
-// Adds |driver| to the thread's current call stack.
-void fdf_testing_push_driver(const void* driver);
-
-// Removes the driver at the top of the thread's current call stack.
-void fdf_testing_pop_driver(void);
-
 // Sets the default driver dispatcher to be returned when the current thread does not have a driver
 // associated with it. This is useful for tests that want to attach a dispatcher to their main
 // test thread, so that they can use a synchronization_checker without posting tasks manually.

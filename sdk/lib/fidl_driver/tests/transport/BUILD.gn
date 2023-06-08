@@ -28,6 +28,7 @@ source_set("fidl_driver_transport_testing_lib") {
     "server_on_unbound_helper.h",
   ]
   sources = [ "assert_peer_closed_helper.cc" ]
+  public_deps = [ "//sdk/lib/driver/runtime:driver_runtime_env" ]
   deps = [
     "//sdk/lib/driver/runtime:driver_runtime_testing",
     "//sdk/lib/fidl_driver",
