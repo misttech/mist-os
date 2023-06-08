@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {proc_macro::TokenStream, version_history_shared::version_history};
+use {
+    proc_macro::TokenStream,
+    version_history_shared::{version_history, Status},
+};
 
 #[proc_macro]
 pub fn declare_version_history(_tokens: TokenStream) -> TokenStream {
@@ -39,12 +42,17 @@ pub fn latest_sdk_version(_tokens: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn get_supported_versions(_tokens: TokenStream) -> TokenStream {
     let versions = version_history().expect("version-history.json to be parsed");
-    if versions.is_empty() {
-        panic!("version-history.json did not contain any versions");
-    } else if versions.len() < 2 {
-        panic!("version-history.json did not contain at least two versions");
+
+    let supported_versions = versions
+        .iter()
+        .filter(|version| matches!(version.status, Status::InDevelopment | Status::Supported))
+        .collect::<Vec<_>>();
+
+    if supported_versions.is_empty() {
+        panic!("version-history.json did not contain any supported versions");
+    } else if supported_versions.len() < 2 {
+        panic!("version-history.json did not contain at least two supported versions");
     }
-    let supported_versions = versions.iter().rev().take(2);
 
     let mut tokens = String::from("[");
     for version in supported_versions {

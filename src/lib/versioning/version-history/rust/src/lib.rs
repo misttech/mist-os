@@ -17,8 +17,8 @@ pub const VERSION_HISTORY: &[Version] = &version_history_macro::declare_version_
 /// LATEST_VERSION is the latest known SDK version.
 pub const LATEST_VERSION: &Version = &version_history_macro::latest_sdk_version!();
 
-/// SUPPORTED_API_LEVELS is the latest two API levels.
-pub const SUPPORTED_API_LEVELS: &[Version; 2] = &version_history_macro::get_supported_versions!();
+/// SUPPORTED_API_LEVELS are the supported API levels.
+pub const SUPPORTED_API_LEVELS: &[Version] = &version_history_macro::get_supported_versions!();
 
 /// An `AbiRevision` represents the ABI revision of a Fuchsia Package.
 /// https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0135_package_abi_revision?#design
