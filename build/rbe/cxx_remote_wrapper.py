@@ -197,7 +197,7 @@ class CxxRemoteAction(object):
     def _rewrite_remote_depfile(self):
         remote_action.rewrite_depfile(
             dep_file=self.working_dir / self.depfile,  # in-place
-            transform=self.remote_action._relativize_remote_deps,
+            transform=self.remote_action._relativize_remote_or_local_deps,
         )
 
     def prepare(self) -> int:
