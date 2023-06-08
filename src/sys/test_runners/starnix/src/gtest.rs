@@ -7,16 +7,12 @@ use {
     crate::results_parser::*,
     anyhow::Error,
     fidl::endpoints::create_proxy,
-    fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata,
+    fidl_fuchsia_component_runner as frunner,
     fidl_fuchsia_test::{self as ftest, Result_ as TestResult, Status},
     fuchsia_zircon as zx,
-    fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES,
-    futures::TryStreamExt,
     gtest_runner_lib::parser::*,
-    rust_measure_tape_for_case::Measurable as _,
     std::collections::HashMap,
     test_runners_lib::cases::TestCaseInfo,
-    test_runners_lib::elf::SuiteServerError,
 };
 
 const DYNAMIC_SKIP_RESULT: &str = "SKIPPED";
@@ -25,58 +21,17 @@ const LIST_TESTS_ARG: &str = "list_tests";
 const FILTER_ARG: &str = "filter=";
 const OUTPUT_PATH: &str = "/test_data/";
 
-#[derive(PartialEq)]
-pub enum TestType {
-    BinderLatency,
-    Gbenchmark,
-    Gtest,
-    GtestXmlOutput,
-    Gunit,
-    Ltp,
-    Unknown,
-}
-
-impl TestType {
-    pub fn is_gtest_like(&self) -> bool {
-        match self {
-            TestType::Gtest | TestType::Gunit | TestType::GtestXmlOutput => true,
-            _ => false,
-        }
-    }
-}
-
-/// Determines what type of tests the program is.
-pub fn test_type(program: &fdata::Dictionary) -> TestType {
-    // The program argument that specifies if the test is a gtest.
-    const GTEST_KEY: &str = "test_type";
-    let test_type_val = runner::get_value(program, GTEST_KEY);
-    match test_type_val {
-        Some(fdata::DictionaryValue::Str(value)) => match value.as_str() {
-            "binder_latency" => TestType::BinderLatency,
-            "gbenchmark" => TestType::Gbenchmark,
-            "gtest" => TestType::Gtest,
-            "gtest_xml_output" => TestType::GtestXmlOutput,
-            "gunit" => TestType::Gunit,
-            "ltp" => TestType::Ltp,
-            _ => TestType::Unknown,
-        },
-        _ => TestType::Unknown,
-    }
-}
-
-/// Runs the test component with `--gunit_list_tests` and returns the parsed test cases
-/// in response to `ftest::CaseIteratorRequest::GetNext`.
-pub async fn handle_case_iterator_for_gtests(
+/// Runs the test component with `--gunit_list_tests` and returns the parsed test cases list.
+pub async fn get_cases_list_for_gtests(
     mut start_info: frunner::ComponentStartInfo,
     component_runner: &frunner::ComponentRunnerProxy,
-    mut stream: ftest::CaseIteratorRequestStream,
-) -> Result<(), Error> {
+    test_type: TestType,
+) -> Result<Vec<ftest::Case>, Error> {
     // Replace the program args to get test cases in a json file.
-    let test_type = test_type(start_info.program.as_ref().unwrap());
-    let list_tests_arg = format_arg(&test_type, LIST_TESTS_ARG);
+    let list_tests_arg = format_arg(test_type, LIST_TESTS_ARG);
     let output_file_name = unique_filename();
     let output_path = format!("output=json:{}{}", OUTPUT_PATH, output_file_name);
-    let output_arg = format_arg(&test_type, &output_path);
+    let output_arg = format_arg(test_type, &output_path);
     replace_program_args(
         vec![list_tests_arg, output_arg],
         start_info.program.as_mut().expect("No program."),
@@ -95,39 +50,14 @@ pub async fn handle_case_iterator_for_gtests(
         .await
         .expect("Failed to read tests from output file.");
     let tests = parse_test_cases(read_content).expect("Failed to parse tests.");
-    let cases: Vec<_> = tests
+    Ok(tests
         .iter()
         .map(|TestCaseInfo { name, enabled }| ftest::Case {
             name: Some(name.clone()),
             enabled: Some(*enabled),
             ..Default::default()
         })
-        .collect();
-    let mut remaining_cases = &cases[..];
-
-    while let Some(event) = stream.try_next().await? {
-        match event {
-            ftest::CaseIteratorRequest::GetNext { responder } => {
-                // Paginate cases
-                // Page overhead of message header + vector
-                let mut bytes_used: usize = 32;
-                let mut case_count = 0;
-                for case in remaining_cases {
-                    bytes_used += case.measure().num_bytes;
-                    if bytes_used > ZX_CHANNEL_MAX_MSG_BYTES as usize {
-                        break;
-                    }
-                    case_count += 1;
-                }
-                responder
-                    .send(&remaining_cases[..case_count])
-                    .map_err(SuiteServerError::Response)?;
-                remaining_cases = &remaining_cases[case_count..];
-            }
-        }
-    }
-
-    Ok(())
+        .collect())
 }
 
 /// Runs a gtest case associated with a single `ftest::SuiteRequest::Run` request.
@@ -147,7 +77,7 @@ pub async fn run_gtest_cases(
     mut start_info: frunner::ComponentStartInfo,
     run_listener_proxy: &ftest::RunListenerProxy,
     component_runner: &frunner::ComponentRunnerProxy,
-    test_type: &TestType,
+    test_type: TestType,
 ) -> Result<(), Error> {
     let (numbered_handles, std_handles) = create_numbered_handles();
     start_info.numbered_handles = numbered_handles;
@@ -188,7 +118,7 @@ pub async fn run_gtest_cases(
         _ => panic!("unexpected test type"),
     };
     let output_arg = format_arg(
-        &test_type,
+        test_type,
         &format!("output={}:{}{}", output_format, OUTPUT_PATH, output_file_name),
     );
     append_program_args(
@@ -244,7 +174,7 @@ pub async fn run_gtest_cases(
     Ok(())
 }
 
-fn format_arg(test_type: &TestType, test_arg: &str) -> String {
+fn format_arg(test_type: TestType, test_arg: &str) -> String {
     match test_type {
         TestType::Gtest | TestType::GtestXmlOutput => format!("--gtest_{}", test_arg),
         TestType::Gunit => format!("--gunit_{}", test_arg),

@@ -18,6 +18,35 @@ use {
     tracing::debug,
 };
 
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum TestType {
+    BinderLatency,
+    Gbenchmark,
+    Gtest,
+    GtestXmlOutput,
+    Gunit,
+    Ltp,
+    SingleTest,
+}
+
+pub fn get_opt_str_value_from_dict(
+    dict: &fdata::Dictionary,
+    name: &str,
+) -> Result<Option<String>, Error> {
+    match runner::get_value(dict, name) {
+        Some(fdata::DictionaryValue::Str(value)) => Ok(Some(value.clone())),
+        Some(_) => Err(anyhow!("{} must a string", name)),
+        _ => Ok(None),
+    }
+}
+
+pub fn get_str_value_from_dict(dict: &fdata::Dictionary, name: &str) -> Result<String, Error> {
+    match get_opt_str_value_from_dict(dict, name)? {
+        Some(s) => Ok(s),
+        None => Err(anyhow!("{} is not specified", name)),
+    }
+}
+
 pub async fn run_starnix_benchmark(
     test: ftest::Invocation,
     mut start_info: frunner::ComponentStartInfo,
@@ -35,10 +64,7 @@ pub async fn run_starnix_benchmark(
 
     debug!("getting test suite label");
     let program = start_info.program.as_ref().context("No program")?;
-    let test_suite = match runner::get_value(program, "test_suite_label") {
-        Some(fdata::DictionaryValue::Str(value)) => value.to_owned(),
-        _ => return Err(anyhow!("No test suite label.")),
-    };
+    let test_suite = get_str_value_from_dict(program, "test_suite_label")?;
 
     // Save the custom_artifacts DirectoryProxy for result reporting.
     let custom_artifacts =

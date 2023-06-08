@@ -9,16 +9,12 @@ use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_data as fdata;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_test as ftest;
-use fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES;
-use futures::{AsyncReadExt, TryStreamExt};
-use rust_measure_tape_for_case::Measurable as _;
-use test_runners_lib::elf::SuiteServerError;
+use futures::AsyncReadExt;
 
-pub async fn handle_case_iterator_for_ltp(
+pub async fn get_cases_list_for_ltp(
     mut start_info: frunner::ComponentStartInfo,
     component_runner: &frunner::ComponentRunnerProxy,
-    mut stream: ftest::CaseIteratorRequestStream,
-) -> Result<(), Error> {
+) -> Result<Vec<ftest::Case>, Error> {
     let program = start_info.program.as_ref().unwrap();
     let base_path = get_str_value_from_dict(program, "tests_dir")?;
 
@@ -46,34 +42,10 @@ pub async fn handle_case_iterator_for_ltp(
         }
     };
 
-    let cases: Vec<ftest::Case> = tests_list
+    Ok(tests_list
         .iter()
         .map(|name| ftest::Case { name: Some(name.clone()), ..Default::default() })
-        .collect();
-    let mut remaining_cases = &cases[..];
-
-    while let Some(event) = stream.try_next().await? {
-        match event {
-            ftest::CaseIteratorRequest::GetNext { responder } => {
-                // Paginate cases
-                // Page overhead of message header + vector
-                let mut bytes_used: usize = 32;
-                let mut case_count = 0;
-                for case in remaining_cases {
-                    bytes_used += case.measure().num_bytes;
-                    if bytes_used > ZX_CHANNEL_MAX_MSG_BYTES as usize {
-                        break;
-                    }
-                    case_count += 1;
-                }
-                responder
-                    .send(&remaining_cases[..case_count])
-                    .map_err(SuiteServerError::Response)?;
-                remaining_cases = &remaining_cases[case_count..];
-            }
-        }
-    }
-    Ok(())
+        .collect())
 }
 
 pub async fn run_ltp_cases(
@@ -96,24 +68,6 @@ pub async fn run_ltp_cases(
     }
 
     Ok(())
-}
-
-fn get_opt_str_value_from_dict(
-    dict: &fdata::Dictionary,
-    name: &str,
-) -> Result<Option<String>, Error> {
-    match runner::get_value(dict, name) {
-        Some(fdata::DictionaryValue::Str(value)) => Ok(Some(value.clone())),
-        Some(_) => Err(anyhow!("{} must a string", name)),
-        _ => Ok(None),
-    }
-}
-
-fn get_str_value_from_dict(dict: &fdata::Dictionary, name: &str) -> Result<String, Error> {
-    match get_opt_str_value_from_dict(dict, name)? {
-        Some(s) => Ok(s),
-        None => Err(anyhow!("{} is not specified", name)),
-    }
 }
 
 async fn read_file_from_dir(dir: &fio::DirectoryProxy, path: &str) -> Result<String, Error> {

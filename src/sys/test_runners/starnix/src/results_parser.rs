@@ -4,14 +4,14 @@
 
 use std::iter::Peekable;
 
-use crate::gtest::TestType;
+use crate::helpers::TestType;
 use anyhow::{anyhow, Error};
 use gtest_runner_lib::parser::{
     Failure, IndividualTestOutput, IndividualTestOutputStatus, TestOutput, TestSuiteOutput,
 };
 use xml::reader::{EventReader, XmlEvent};
 
-pub fn parse_results(test_type: &TestType, contents: &str) -> Result<TestOutput, Error> {
+pub fn parse_results(test_type: TestType, contents: &str) -> Result<TestOutput, Error> {
     match test_type {
         TestType::Gtest | TestType::Gunit => {
             serde_json::from_str(contents).map_err(|e| anyhow!("JSON parsing error: {e}"))
@@ -35,7 +35,7 @@ pub fn parse_results(test_type: &TestType, contents: &str) -> Result<TestOutput,
             parse_xml_test_output(&mut iter)
                 .map_err(|e| anyhow!("Parsing error: {e} errors from XML parser: {errors:?}"))
         }
-        _ => panic!("Do not know how to parse results for test type.")
+        _ => panic!("Do not know how to parse results for test type."),
     }
 }
 
@@ -206,7 +206,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::gtest::TestType;
+    use crate::helpers::TestType;
     use gtest_runner_lib::parser::*;
 
     use super::parse_results;
@@ -331,7 +331,7 @@ mod tests {
       }
     "#;
 
-        let results = parse_results(&TestType::Gtest, results_json).unwrap();
+        let results = parse_results(TestType::Gtest, results_json).unwrap();
         assert_eq!(results, expected_results());
     }
 
@@ -358,7 +358,7 @@ mod tests {
 </testsuites>
     "#;
 
-        let results = parse_results(&TestType::GtestXmlOutput, results_xml).unwrap();
+        let results = parse_results(TestType::GtestXmlOutput, results_xml).unwrap();
         assert_eq!(results, expected_results());
     }
 }

@@ -11,11 +11,30 @@ use {
     crate::test_container::TestContainer,
     anyhow::{anyhow, Context, Error},
     fidl::endpoints::create_proxy,
-    fidl_fuchsia_component_runner as frunner,
+    fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata,
     fidl_fuchsia_test::{self as ftest},
+    fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES,
     futures::TryStreamExt,
+    rust_measure_tape_for_case::Measurable as _,
+    test_runners_lib::elf::SuiteServerError,
     tracing::debug,
 };
+
+/// Determines what type of tests the program is.
+fn get_test_type(program: &fdata::Dictionary) -> Result<TestType, Error> {
+    match get_opt_str_value_from_dict(program, "test_type")?.as_deref() {
+        Some("binder_latency") => Ok(TestType::BinderLatency),
+        Some("gbenchmark") => Ok(TestType::Gbenchmark),
+        Some("gtest") => Ok(TestType::Gtest),
+        Some("gtest_xml_output") => Ok(TestType::GtestXmlOutput),
+        Some("gunit") => Ok(TestType::Gunit),
+        Some("ltp") => Ok(TestType::Ltp),
+        Some(value) => Err(anyhow!("Unrecognized test_type: {}", value)),
+
+        // If test_type is not specified, then just run the component as a single test case.
+        None => Ok(TestType::SingleTest),
+    }
+}
 
 /// Handles a single `ftest::SuiteRequestStream`.
 ///
@@ -27,7 +46,7 @@ pub async fn handle_suite_requests(
     mut stream: ftest::SuiteRequestStream,
 ) -> Result<(), Error> {
     debug!(?start_info, "got suite request stream");
-    let test_type = test_type(start_info.program.as_ref().unwrap());
+    let test_type = get_test_type(start_info.program.as_ref().unwrap())?;
 
     // The kernel start info is largely the same as that of the test component. The main difference
     // is that the `container_start_info` does not contain the outgoing directory of the test component.
@@ -46,30 +65,32 @@ pub async fn handle_suite_requests(
                 debug!("enumerating test cases");
                 let stream = iterator.into_stream()?;
 
-                if test_type.is_gtest_like() {
-                    handle_case_iterator_for_gtests(
-                        test_start_info,
-                        &container.component_runner,
-                        stream,
-                    )
-                    .await?;
-                } else if let TestType::Ltp = test_type {
-                    handle_case_iterator_for_ltp(
-                        test_start_info,
-                        &container.component_runner,
-                        stream,
-                    )
-                    .await?
-                } else {
-                    handle_case_iterator(
-                        test_start_info
+                let test_cases = match test_type {
+                    TestType::Gtest | TestType::Gunit | TestType::GtestXmlOutput => {
+                        get_cases_list_for_gtests(
+                            test_start_info,
+                            &container.component_runner,
+                            test_type,
+                        )
+                        .await?
+                    }
+                    TestType::Ltp => {
+                        get_cases_list_for_ltp(test_start_info, &container.component_runner).await?
+                    }
+                    TestType::BinderLatency | TestType::Gbenchmark | TestType::SingleTest => {
+                        let name = test_start_info
                             .resolved_url
                             .as_ref()
-                            .ok_or(anyhow!("Missing resolved URL"))?,
-                        stream,
-                    )
-                    .await?;
-                }
+                            .ok_or(anyhow!("Missing resolved URL"))?;
+                        vec![ftest::Case {
+                            name: Some(name.clone()),
+                            enabled: Some(true),
+                            ..Default::default()
+                        }]
+                    }
+                };
+
+                handle_case_iterator(test_cases, stream).await?
             }
             ftest::SuiteRequest::Run { tests, options, listener, .. } => {
                 debug!(?tests, "running tests");
@@ -92,13 +113,13 @@ pub async fn handle_suite_requests(
                 debug!(?test_start_info, "running tests with info");
 
                 match test_type {
-                    _ if test_type.is_gtest_like() => {
+                    TestType::Gtest | TestType::Gunit | TestType::GtestXmlOutput => {
                         run_gtest_cases(
                             tests,
                             test_start_info,
                             &run_listener_proxy,
                             &container.component_runner,
-                            &test_type,
+                            test_type,
                         )
                         .await?;
                     }
@@ -129,7 +150,7 @@ pub async fn handle_suite_requests(
                         )
                         .await?
                     }
-                    _ => {
+                    TestType::SingleTest => {
                         run_test_case(
                             tests.get(0).unwrap().clone(),
                             test_start_info,
@@ -186,24 +207,30 @@ async fn run_test_case(
 
 /// Lists all the available test cases and returns them in response to
 /// `ftest::CaseIteratorRequest::GetNext`.
-///
-/// Currently only one "test case" is returned, named `test_name`.
 async fn handle_case_iterator(
-    test_name: &str,
+    cases: Vec<ftest::Case>,
     mut stream: ftest::CaseIteratorRequestStream,
 ) -> Result<(), Error> {
-    let case = ftest::Case {
-        name: Some(test_name.to_string()),
-        enabled: Some(true),
-        ..Default::default()
-    };
-    let mut remaining_cases = &[case][..];
+    let mut remaining_cases = &cases[..];
 
     while let Some(event) = stream.try_next().await? {
         match event {
             ftest::CaseIteratorRequest::GetNext { responder } => {
-                responder.send(remaining_cases)?;
-                remaining_cases = &[];
+                // Paginate cases
+                // Page overhead of message header + vector
+                let mut bytes_used: usize = 32;
+                let mut case_count = 0;
+                for case in remaining_cases {
+                    bytes_used += case.measure().num_bytes;
+                    if bytes_used > ZX_CHANNEL_MAX_MSG_BYTES as usize {
+                        break;
+                    }
+                    case_count += 1;
+                }
+                responder
+                    .send(&remaining_cases[..case_count])
+                    .map_err(SuiteServerError::Response)?;
+                remaining_cases = &remaining_cases[case_count..];
             }
         }
     }
@@ -225,12 +252,12 @@ mod tests {
     /// # Parameters
     /// - `test_name`: The name of the test case that is provided to `handle_case_iterator`.
     fn set_up_iterator(test_name: &str) -> ftest::CaseIteratorProxy {
-        let test_name = test_name.to_string();
+        let cases = vec![ftest::Case { name: Some(test_name.to_string()), ..Default::default() }];
         let (iterator_client_end, iterator_stream) =
             create_request_stream::<ftest::CaseIteratorMarker>()
                 .expect("Couldn't create case iterator");
         fasync::Task::local(async move {
-            let _ = handle_case_iterator(&test_name, iterator_stream).await;
+            let _ = handle_case_iterator(cases, iterator_stream).await;
         })
         .detach();
 
@@ -343,13 +370,6 @@ mod tests {
         let iterator_proxy = set_up_iterator(test_name);
         let result = iterator_proxy.get_next().await.expect("Didn't get first result");
         assert_eq!(result[0].name, Some(test_name.to_string()));
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn test_case_enabled() {
-        let iterator_proxy = set_up_iterator("test");
-        let result = iterator_proxy.get_next().await.expect("Didn't get first result");
-        assert_eq!(result[0].enabled, Some(true));
     }
 
     /// Tests that when starnix closes the component controller with an `OK` status, the test case
