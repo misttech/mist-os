@@ -37,7 +37,6 @@ required_ffx_plugins = [
 # to being "dual mode" subtools.
 included_ffx_plugins = [
   "//src/connectivity/network/net-cli/ffx:ffx_net",
-  "//src/developer/ffx/plugins/cts:ffx_cts",
   "//src/developer/ffx/plugins/debug:ffx_debug_plugin",
 
   # This is deliberately not included in the dual mode set as a policy decision
