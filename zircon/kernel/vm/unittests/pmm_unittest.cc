@@ -791,24 +791,24 @@ static bool pq_add_remove() {
   // Put the page in each queue and make sure it shows up
   pq.SetWired(&test_page, vmo->DebugGetCowPages().get(), 0);
   EXPECT_TRUE(pq.DebugPageIsWired(&test_page));
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0}, 0, 0, 1, 0}));
+  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.wired = 1}));
 
   pq.Remove(&test_page);
   EXPECT_FALSE(pq.DebugPageIsWired(&test_page));
   EXPECT_FALSE(pq.DebugPageIsAnonymous(&test_page));
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0}, 0, 0, 0, 0}));
+  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){}));
 
   pq.SetAnonymous(&test_page, vmo->DebugGetCowPages().get(), 0);
   EXPECT_TRUE(pq.DebugPageIsAnonymous(&test_page));
   if (pq.ReclaimIsOnlyPagerBacked()) {
-    EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0}, 0, 1, 0, 0}));
+    EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.anonymous = 1}));
   } else {
-    EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{1, 0, 0, 0}, 0, 0, 0, 0}));
+    EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.reclaim = {1, 0, 0, 0, 0, 0, 0, 0}}));
   }
 
   pq.Remove(&test_page);
   EXPECT_FALSE(pq.DebugPageIsAnonymous(&test_page));
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0}, 0, 0, 0, 0}));
+  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){}));
 
   // Need a pager VMO to claim our page is in.
   status = make_uncommitted_pager_vmo(1, false, false, &vmo);
@@ -816,11 +816,11 @@ static bool pq_add_remove() {
 
   pq.SetPagerBacked(&test_page, vmo->DebugGetCowPages().get(), 0);
   EXPECT_TRUE(pq.DebugPageIsPagerBacked(&test_page));
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{1, 0, 0, 0}, 0, 0, 0, 0}));
+  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.reclaim = {1, 0, 0, 0, 0, 0, 0, 0}}));
 
   pq.Remove(&test_page);
   EXPECT_FALSE(pq.DebugPageIsPagerBacked(&test_page));
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0}, 0, 0, 0, 0}));
+  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){}));
 
   END_TEST;
 }
@@ -842,15 +842,15 @@ static bool pq_move_queues() {
   // Move the page between queues.
   pq.SetWired(&test_page, vmo->DebugGetCowPages().get(), 0);
   EXPECT_TRUE(pq.DebugPageIsWired(&test_page));
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0}, 0, 0, 1, 0}));
+  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.wired = 1}));
 
   pq.MoveToAnonymous(&test_page);
   EXPECT_FALSE(pq.DebugPageIsWired(&test_page));
   EXPECT_TRUE(pq.DebugPageIsAnonymous(&test_page));
   if (pq.ReclaimIsOnlyPagerBacked()) {
-    EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0}, 0, 1, 0, 0}));
+    EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.anonymous = 1}));
   } else {
-    EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{1, 0, 0, 0}, 0, 0, 0, 0}));
+    EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.reclaim = {1, 0, 0, 0, 0, 0, 0, 0}}));
   }
   pq.Remove(&test_page);
 
@@ -860,12 +860,12 @@ static bool pq_move_queues() {
 
   pq.SetPagerBacked(&test_page, vmo->DebugGetCowPages().get(), 0);
   EXPECT_TRUE(pq.DebugPageIsPagerBacked(&test_page));
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{1, 0, 0, 0}, 0, 0, 0, 0}));
+  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.reclaim = {1, 0, 0, 0, 0, 0, 0, 0}}));
 
   pq.MoveToPagerBackedDontNeed(&test_page);
   EXPECT_FALSE(pq.DebugPageIsPagerBacked(&test_page));
   EXPECT_TRUE(pq.DebugPageIsPagerBackedDontNeed(&test_page));
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0}, 1, 0, 0, 0}));
+  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.reclaim_dont_need = 1}));
 
   // Verify that the DontNeed page is first in line for eviction.
   auto backlink = pq.PeekReclaim(PageQueues::kNumReclaim - 1);
@@ -875,10 +875,10 @@ static bool pq_move_queues() {
   EXPECT_FALSE(pq.DebugPageIsPagerBackedDontNeed(&test_page));
   EXPECT_FALSE(pq.DebugPageIsPagerBacked(&test_page));
   EXPECT_TRUE(pq.DebugPageIsWired(&test_page));
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0}, 0, 0, 1, 0}));
+  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.wired = 1}));
 
   pq.Remove(&test_page);
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0}, 0, 0, 0, 0}));
+  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){}));
 
   END_TEST;
 }
@@ -900,33 +900,33 @@ static bool pq_move_self_queue() {
   // Move the page into the queue it is already in.
   pq.SetWired(&test_page, vmo->DebugGetCowPages().get(), 0);
   EXPECT_TRUE(pq.DebugPageIsWired(&test_page));
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0}, 0, 0, 1, 0}));
+  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.wired = 1}));
 
   pq.MoveToWired(&test_page);
   EXPECT_TRUE(pq.DebugPageIsWired(&test_page));
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0}, 0, 0, 1, 0}));
+  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.wired = 1}));
 
   pq.Remove(&test_page);
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0}, 0, 0, 0, 0}));
+  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){}));
 
   pq.SetAnonymous(&test_page, vmo->DebugGetCowPages().get(), 0);
   EXPECT_TRUE(pq.DebugPageIsAnonymous(&test_page));
   if (pq.ReclaimIsOnlyPagerBacked()) {
-    EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0}, 0, 1, 0, 0}));
+    EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.anonymous = 1}));
   } else {
-    EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{1, 0, 0, 0}, 0, 0, 0, 0}));
+    EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.reclaim = {1, 0, 0, 0, 0, 0, 0, 0}}));
   }
 
   pq.MoveToAnonymous(&test_page);
   EXPECT_TRUE(pq.DebugPageIsAnonymous(&test_page));
   if (pq.ReclaimIsOnlyPagerBacked()) {
-    EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0}, 0, 1, 0, 0}));
+    EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.anonymous = 1}));
   } else {
-    EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{1, 0, 0, 0}, 0, 0, 0, 0}));
+    EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.reclaim = {1, 0, 0, 0, 0, 0, 0, 0}}));
   }
 
   pq.Remove(&test_page);
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0}, 0, 0, 0, 0}));
+  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){}));
 
   END_TEST;
 }
@@ -956,7 +956,8 @@ static bool pq_rotate_queue() {
   EXPECT_TRUE(pq.DebugPageIsWired(&wired_page));
   size_t queue;
   EXPECT_TRUE(pq.DebugPageIsPagerBacked(&pager_page, &queue));
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{1, 0, 0, 0, 0, 0, 0, 0}, 0, 0, 1, 0}));
+  EXPECT_TRUE(pq.QueueCounts() ==
+              ((PageQueues::Counts){.reclaim = {1, 0, 0, 0, 0, 0, 0, 0}, .wired = 1}));
   EXPECT_TRUE(pq.GetActiveInactiveCounts() == ((PageQueues::ActiveInactiveCounts){false, 1, 0}));
   EXPECT_EQ(queue, 0u);
 
@@ -964,28 +965,35 @@ static bool pq_rotate_queue() {
   pq.RotateReclaimQueues();
   EXPECT_TRUE(pq.DebugPageIsWired(&wired_page));
   EXPECT_TRUE(pq.DebugPageIsPagerBacked(&pager_page, &queue));
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0, 1, 0, 0, 0, 0, 0, 0}, 0, 0, 1, 0}));
+  EXPECT_TRUE(pq.QueueCounts() ==
+              ((PageQueues::Counts){.reclaim = {0, 1, 0, 0, 0, 0, 0, 0}, .wired = 1}));
   EXPECT_TRUE(pq.GetActiveInactiveCounts() == ((PageQueues::ActiveInactiveCounts){false, 1, 0}));
   EXPECT_EQ(queue, 1u);
 
   pq.RotateReclaimQueues();
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0, 0, 1, 0, 0, 0, 0, 0}, 0, 0, 1, 0}));
+  EXPECT_TRUE(pq.QueueCounts() ==
+              ((PageQueues::Counts){.reclaim = {0, 0, 1, 0, 0, 0, 0, 0}, .wired = 1}));
   EXPECT_TRUE(pq.GetActiveInactiveCounts() == ((PageQueues::ActiveInactiveCounts){false, 0, 1}));
   pq.RotateReclaimQueues();
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0, 0, 0, 1, 0, 0, 0, 0}, 0, 0, 1, 0}));
+  EXPECT_TRUE(pq.QueueCounts() ==
+              ((PageQueues::Counts){.reclaim = {0, 0, 0, 1, 0, 0, 0, 0}, .wired = 1}));
   EXPECT_TRUE(pq.GetActiveInactiveCounts() == ((PageQueues::ActiveInactiveCounts){false, 0, 1}));
   pq.RotateReclaimQueues();
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0, 0, 0, 0, 1, 0, 0, 0}, 0, 0, 1, 0}));
+  EXPECT_TRUE(pq.QueueCounts() ==
+              ((PageQueues::Counts){.reclaim = {0, 0, 0, 0, 1, 0, 0, 0}, .wired = 1}));
   pq.RotateReclaimQueues();
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0, 0, 0, 0, 0, 1, 0, 0}, 0, 0, 1, 0}));
+  EXPECT_TRUE(pq.QueueCounts() ==
+              ((PageQueues::Counts){.reclaim = {0, 0, 0, 0, 0, 1, 0, 0}, .wired = 1}));
   pq.RotateReclaimQueues();
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0, 0, 0, 0, 0, 0, 1, 0}, 0, 0, 1, 0}));
+  EXPECT_TRUE(pq.QueueCounts() ==
+              ((PageQueues::Counts){.reclaim = {0, 0, 0, 0, 0, 0, 1, 0}, .wired = 1}));
   pq.RotateReclaimQueues();
   // Further rotations might cause the page to be visible in the same queue, or an older one,
   // depending on whether the lru processing already ran in preparation of the next aging event.
-  const PageQueues::Counts counts_last = (PageQueues::Counts){{0, 0, 0, 0, 0, 0, 0, 1}, 0, 0, 1, 0};
+  const PageQueues::Counts counts_last =
+      (PageQueues::Counts){.reclaim = {0, 0, 0, 0, 0, 0, 0, 1}, .wired = 1};
   const PageQueues::Counts counts_second_last =
-      (PageQueues::Counts){{0, 0, 1, 0, 0, 0, 0, 0}, 0, 0, 1, 0};
+      (PageQueues::Counts){.reclaim = {0, 0, 1, 0, 0, 0, 0, 0}, .wired = 1};
   PageQueues::Counts counts = pq.QueueCounts();
   EXPECT_TRUE(counts == counts_last || counts == counts_second_last);
 
@@ -1001,15 +1009,18 @@ static bool pq_rotate_queue() {
   pq.MoveToPagerBacked(&pager_page);
   EXPECT_TRUE(pq.DebugPageIsWired(&wired_page));
   EXPECT_TRUE(pq.DebugPageIsPagerBacked(&pager_page));
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{1, 0, 0, 0, 0, 0, 0, 0}, 0, 0, 1, 0}));
+  EXPECT_TRUE(pq.QueueCounts() ==
+              ((PageQueues::Counts){.reclaim = {1, 0, 0, 0, 0, 0, 0, 0}, .wired = 1}));
   EXPECT_TRUE(pq.GetActiveInactiveCounts() == ((PageQueues::ActiveInactiveCounts){false, 1, 0}));
 
   // Just double check two rotations.
   pq.RotateReclaimQueues();
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0, 1, 0, 0, 0, 0, 0, 0}, 0, 0, 1, 0}));
+  EXPECT_TRUE(pq.QueueCounts() ==
+              ((PageQueues::Counts){.reclaim = {0, 1, 0, 0, 0, 0, 0, 0}, .wired = 1}));
   EXPECT_TRUE(pq.GetActiveInactiveCounts() == ((PageQueues::ActiveInactiveCounts){false, 1, 0}));
   pq.RotateReclaimQueues();
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0, 0, 1, 0, 0, 0, 0, 0}, 0, 0, 1, 0}));
+  EXPECT_TRUE(pq.QueueCounts() ==
+              ((PageQueues::Counts){.reclaim = {0, 0, 1, 0, 0, 0, 0, 0}, .wired = 1}));
   EXPECT_TRUE(pq.GetActiveInactiveCounts() == ((PageQueues::ActiveInactiveCounts){false, 0, 1}));
 
   pq.Remove(&wired_page);
@@ -1042,12 +1053,12 @@ static bool pq_toggle_dont_need_queue() {
   size_t queue;
   EXPECT_TRUE(pq.DebugPageIsPagerBacked(&page1, &queue));
   EXPECT_EQ(queue, 0u);
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{1, 0, 0, 0, 0, 0, 0, 0}, 0, 0, 0, 0}));
+  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.reclaim = {1, 0, 0, 0, 0, 0, 0, 0}}));
   EXPECT_TRUE(pq.GetActiveInactiveCounts() == ((PageQueues::ActiveInactiveCounts){false, 1, 0}));
   pq.SetPagerBacked(&page2, vmo->DebugGetCowPages().get(), 0);
   EXPECT_TRUE(pq.DebugPageIsPagerBacked(&page2, &queue));
   EXPECT_EQ(queue, 0u);
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{2, 0, 0, 0, 0, 0, 0, 0}, 0, 0, 0, 0}));
+  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.reclaim = {2, 0, 0, 0, 0, 0, 0, 0}}));
   EXPECT_TRUE(pq.GetActiveInactiveCounts() == ((PageQueues::ActiveInactiveCounts){false, 2, 0}));
 
   // Move the pages to the DontNeed queue.
@@ -1055,14 +1066,16 @@ static bool pq_toggle_dont_need_queue() {
   pq.MoveToPagerBackedDontNeed(&page2);
   EXPECT_TRUE(pq.DebugPageIsPagerBackedDontNeed(&page1));
   EXPECT_TRUE(pq.DebugPageIsPagerBackedDontNeed(&page2));
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0, 0, 0, 0, 0, 0, 0, 0}, 2, 0, 0, 0}));
+  EXPECT_TRUE(pq.QueueCounts() ==
+              ((PageQueues::Counts){.reclaim = {0, 0, 0, 0, 0, 0, 0, 0}, .reclaim_dont_need = 2}));
   EXPECT_TRUE(pq.GetActiveInactiveCounts() == ((PageQueues::ActiveInactiveCounts){false, 0, 2}));
 
   // Rotate the queues. This should also process the DontNeed queue.
   pq.RotateReclaimQueues();
   EXPECT_TRUE(pq.DebugPageIsPagerBackedDontNeed(&page1));
   EXPECT_TRUE(pq.DebugPageIsPagerBackedDontNeed(&page2));
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0, 0, 0, 0, 0, 0, 0, 0}, 2, 0, 0, 0}));
+  EXPECT_TRUE(pq.QueueCounts() ==
+              ((PageQueues::Counts){.reclaim = {0, 0, 0, 0, 0, 0, 0, 0}, .reclaim_dont_need = 2}));
   EXPECT_TRUE(pq.GetActiveInactiveCounts() == ((PageQueues::ActiveInactiveCounts){false, 0, 2}));
 
   // Simulate access for one of the pages. Then rotate the queues again. This should move the
@@ -1072,7 +1085,8 @@ static bool pq_toggle_dont_need_queue() {
   EXPECT_TRUE(pq.DebugPageIsPagerBacked(&page1, &queue));
   EXPECT_EQ(queue, 1u);
   EXPECT_TRUE(pq.DebugPageIsPagerBackedDontNeed(&page2));
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0, 1, 0, 0, 0, 0, 0, 0}, 1, 0, 0, 0}));
+  EXPECT_TRUE(pq.QueueCounts() ==
+              ((PageQueues::Counts){.reclaim = {0, 1, 0, 0, 0, 0, 0, 0}, .reclaim_dont_need = 1}));
   // Two active queues by default, so page1 is still considered active.
   EXPECT_TRUE(pq.GetActiveInactiveCounts() == ((PageQueues::ActiveInactiveCounts){false, 1, 1}));
 
@@ -1081,7 +1095,8 @@ static bool pq_toggle_dont_need_queue() {
   EXPECT_TRUE(pq.DebugPageIsPagerBacked(&page1, &queue));
   EXPECT_EQ(queue, 2u);
   EXPECT_TRUE(pq.DebugPageIsPagerBackedDontNeed(&page2));
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0, 0, 1, 0, 0, 0, 0, 0}, 1, 0, 0, 0}));
+  EXPECT_TRUE(pq.QueueCounts() ==
+              ((PageQueues::Counts){.reclaim = {0, 0, 1, 0, 0, 0, 0, 0}, .reclaim_dont_need = 1}));
   // page1 has now moved on past the two active queues, so it now counts as inactive.
   EXPECT_TRUE(pq.GetActiveInactiveCounts() == ((PageQueues::ActiveInactiveCounts){false, 0, 2}));
 
