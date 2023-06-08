@@ -1904,6 +1904,7 @@ pub fn sys_ppoll(
     num_fds: i32,
     user_timespec: UserRef<timespec>,
     user_mask: UserRef<SigSet>,
+    sigset_size: usize,
 ) -> Result<usize, Errno> {
     let start_time = zx::Time::get_monotonic();
 
@@ -1918,6 +1919,9 @@ pub fn sys_ppoll(
     let deadline = start_time + duration_from_poll_timeout(timeout)?;
 
     let mask = if !user_mask.is_null() {
+        if sigset_size != std::mem::size_of::<SigSet>() {
+            return error!(EINVAL);
+        }
         let mask = current_task.mm.read_object(user_mask)?;
         Some(mask)
     } else {

@@ -184,7 +184,7 @@ pub fn dispatch_syscall(
         pipe2[2],
         #[cfg(target_arch = "x86_64")] pipe[1],
         #[cfg(target_arch = "x86_64")] poll[3],
-        ppoll[4],
+        ppoll[5],
         prctl[5],
         pread64[4],
         preadv[4],
