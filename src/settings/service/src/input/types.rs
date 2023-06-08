@@ -386,9 +386,6 @@ impl From<DeviceStateSource> for FidlDeviceStateSource {
     }
 }
 
-// TODO(fxbug.dev/67156): Add a "BLOCKED" flag to represent policy-driven
-// disabling. "DISABLED" also needs to track "MUTED", as it will eventually
-// be its replacement. This should also be done for the FIDL.
 bitflags! {
     #[derive(Serialize, Deserialize)]
     pub struct DeviceState : u64 {
