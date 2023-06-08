@@ -6,6 +6,7 @@
 #define LIB_CONCURRENT_SEQLOCK_H_
 
 #include <lib/concurrent/common.h>
+#include <lib/concurrent/seqlock_payload.h>
 #include <zircon/compiler.h>
 #include <zircon/time.h>
 
@@ -14,9 +15,13 @@
 namespace concurrent {
 namespace internal {
 
-template <typename Osal>
+template <typename Osal, SyncOpt _kSyncOpt = SyncOpt::AcqRelOps>
 class __TA_CAPABILITY("mutex") SeqLock {
  public:
+  static constexpr SyncOpt kSyncOpt = _kSyncOpt;
+  static constexpr SyncOpt kCopyWrapperSyncOpt =
+      (kSyncOpt == SyncOpt::AcqRelOps) ? SyncOpt::AcqRelOps : SyncOpt::None;
+
   using SequenceNumber = uint32_t;
 
   class ReadTransactionToken {
@@ -30,7 +35,11 @@ class __TA_CAPABILITY("mutex") SeqLock {
     SequenceNumber seq_num_;
   };
 
-  SeqLock() = default;
+  SeqLock() {
+    static_assert((kSyncOpt == SyncOpt::AcqRelOps) || (kSyncOpt == SyncOpt::Fence),
+                  "The synchronization options chosen for a SeqLock must be "
+                  "either Acquire/Release, or Fence");
+  }
   ~SeqLock() = default;
 
   // No copy, no move
@@ -70,7 +79,9 @@ class __TA_CAPABILITY("mutex") SeqLock {
 namespace internal {
 struct FuchsiaUserModeOsal;
 }
-using SeqLock = internal::SeqLock<internal::FuchsiaUserModeOsal>;
+
+template <SyncOpt kSyncOpt = SyncOpt::AcqRelOps>
+using SeqLock = internal::SeqLock<internal::FuchsiaUserModeOsal, kSyncOpt>;
 #else
 ////////////////////////
 // POSIX fallback
@@ -78,7 +89,8 @@ using SeqLock = internal::SeqLock<internal::FuchsiaUserModeOsal>;
 namespace internal {
 struct PosixUserModeOsal;
 }
-using SeqLock = internal::SeqLock<internal::PosixUserModeOsal>;
+template <SyncOpt kSyncOpt = SyncOpt::AcqRelOps>
+using SeqLock = internal::SeqLock<internal::PosixUserModeOsal, kSyncOpt>;
 #endif
 
 }  // namespace concurrent

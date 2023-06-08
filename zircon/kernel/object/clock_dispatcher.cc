@@ -117,9 +117,9 @@ ClockDispatcher::ClockDispatcher(uint64_t options, zx_time_t backstop_time)
 
   // Publish the state from within the SeqLock
   {
-    Guard<SeqLock, ExclusiveIrqSave> lock{&seq_lock_};
-    ticks_to_synthetic_.Update(local_ticks_to_synthetic, concurrent::SyncOpt_Fence);
-    params_.Update(local_params, concurrent::SyncOpt_None);
+    SeqLockGuard<ExclusiveIrqSave> lock{&seq_lock_};
+    ticks_to_synthetic_.Update(local_ticks_to_synthetic);
+    params_.Update(local_params);
   }
 
   // If we auto-started our clock, update our state.
@@ -138,7 +138,7 @@ zx_status_t ClockDispatcher::Read(zx_time_t* out_now) {
 
   bool transaction_success;
   do {
-    Guard<SeqLock, SharedNoIrqSave> lock{&seq_lock_, transaction_success};
+    SeqLockGuard<SharedNoIrqSave> lock{&seq_lock_, transaction_success};
     ticks_to_synthetic_.Read(ticks_to_synthetic);
     now_ticks = current_ticks();
   } while (!transaction_success);
@@ -155,9 +155,9 @@ zx_status_t ClockDispatcher::GetDetails(zx_clock_details_v1_t* out_details) {
 
   bool transaction_success;
   do {
-    Guard<SeqLock, SharedNoIrqSave> lock{&seq_lock_, transaction_success};
-    ticks_to_synthetic_.Read(ticks_to_synthetic, concurrent::SyncOpt_None);
-    params_.Read(params, concurrent::SyncOpt_Fence);
+    SeqLockGuard<SharedNoIrqSave> lock{&seq_lock_, transaction_success};
+    ticks_to_synthetic_.Read(ticks_to_synthetic);
+    params_.Read(params);
     now_ticks = current_ticks();
   } while (!transaction_success);
 
@@ -213,7 +213,7 @@ zx_status_t ClockDispatcher::Update(uint64_t options, const UpdateArgsType& _arg
     // should be very quick, and we may have observers who are spinning
     // attempting to read the clock. We cannot afford to become preempted while
     // we are performing an update operation.
-    Guard<SeqLock, ExclusiveIrqSave> lock{&seq_lock_};
+    SeqLockGuard<ExclusiveIrqSave> lock{&seq_lock_};
 
     // If the clock has not yet been started, then we require the first update
     // to include a set operation.
@@ -255,8 +255,8 @@ zx_status_t ClockDispatcher::Update(uint64_t options, const UpdateArgsType& _arg
     // should exist here.
     affine::Transform local_ticks_to_synthetic;
     Params local_params;
-    params_.Read(local_params, concurrent::SyncOpt_None);
-    ticks_to_synthetic_.Read(local_ticks_to_synthetic, concurrent::SyncOpt_None);
+    params_.Read(local_params);
+    ticks_to_synthetic_.Read(local_ticks_to_synthetic);
 
     // Aliases make some of the typing a bit shorter.
     affine::Transform& t2s = local_ticks_to_synthetic;
@@ -372,8 +372,8 @@ zx_status_t ClockDispatcher::Update(uint64_t options, const UpdateArgsType& _arg
     // We are finished.  Bump the generation counter and publish the results in
     // the shared structures.
     ++local_params.generation_counter_;
-    ticks_to_synthetic_.Update(local_ticks_to_synthetic, concurrent::SyncOpt_Fence);
-    params_.Update(local_params, concurrent::SyncOpt_None);
+    ticks_to_synthetic_.Update(local_ticks_to_synthetic);
+    params_.Update(local_params);
   }
 
   // Now that we are out of the time critical section, if the clock was just

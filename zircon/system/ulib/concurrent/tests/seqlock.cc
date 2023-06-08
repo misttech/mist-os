@@ -11,7 +11,7 @@
 
 namespace test {
 
-using concurrent::SeqLock;
+using SeqLock = concurrent::SeqLock<>;
 
 TEST(SeqLock, UncontestedRead) {
   SeqLock lock;

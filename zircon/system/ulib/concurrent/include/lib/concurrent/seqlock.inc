@@ -9,8 +9,8 @@
 namespace concurrent {
 namespace internal {
 
-template <typename Osal>
-typename SeqLock<Osal>::ReadTransactionToken SeqLock<Osal>::BeginReadTransaction() {
+template <typename Osal, SyncOpt kSyncOpt>
+typename SeqLock<Osal, kSyncOpt>::ReadTransactionToken SeqLock<Osal, kSyncOpt>::BeginReadTransaction() {
   SequenceNumber seq_num;
 
   while (((seq_num = seq_num_.load(std::memory_order_acquire)) & 0x1) != 0) {
@@ -20,14 +20,14 @@ typename SeqLock<Osal>::ReadTransactionToken SeqLock<Osal>::BeginReadTransaction
   return ReadTransactionToken{seq_num};
 }
 
-template <typename Osal>
-bool SeqLock<Osal>::TryBeginReadTransaction(ReadTransactionToken& out_token,
+template <typename Osal, SyncOpt kSyncOpt>
+bool SeqLock<Osal, kSyncOpt>::TryBeginReadTransaction(ReadTransactionToken& out_token,
                                             zx_duration_t timeout) {
   return TryBeginReadTransactionDeadline(out_token, Osal::GetClockMonotonic() + timeout);
 }
 
-template <typename Osal>
-bool SeqLock<Osal>::TryBeginReadTransactionDeadline(ReadTransactionToken& out_token,
+template <typename Osal, SyncOpt kSyncOpt>
+bool SeqLock<Osal, kSyncOpt>::TryBeginReadTransactionDeadline(ReadTransactionToken& out_token,
                                                     zx_time_t deadline) {
   while (((out_token.seq_num_ = seq_num_.load(std::memory_order_acquire)) & 0x1) != 0) {
     if (Osal::GetClockMonotonic() >= deadline) {
@@ -39,17 +39,23 @@ bool SeqLock<Osal>::TryBeginReadTransactionDeadline(ReadTransactionToken& out_to
   return true;
 }
 
-template <typename Osal>
-bool SeqLock<Osal>::EndReadTransaction(ReadTransactionToken token) {
+template <typename Osal, SyncOpt kSyncOpt>
+bool SeqLock<Osal, kSyncOpt>::EndReadTransaction(ReadTransactionToken token) {
   if ((token.seq_num_ & 0x1) != 0) {
     return false;
+  }
+
+  // If we are using fence-to-fence synchronization, this is the place we
+  // need to put our acquire fence.
+  if constexpr (kSyncOpt == SyncOpt::Fence) {
+    std::atomic_thread_fence(std::memory_order_acquire);
   }
 
   return seq_num_.load(std::memory_order_relaxed) == token.seq_num_;
 }
 
-template <typename Osal>
-void SeqLock<Osal>::Acquire() {
+template <typename Osal, SyncOpt kSyncOpt>
+void SeqLock<Osal, kSyncOpt>::Acquire() {
   while (true) {
     SequenceNumber expected;
 
@@ -63,18 +69,23 @@ void SeqLock<Osal>::Acquire() {
     if (seq_num_.compare_exchange_strong(expected, expected + 1,
                                          std::memory_order_acquire,
                                          std::memory_order_relaxed)) {
+      // If we are using fence-to-fence synchronization, this is the place we
+      // need to put our release fence.
+      if constexpr (kSyncOpt == SyncOpt::Fence) {
+        std::atomic_thread_fence(std::memory_order_release);
+      }
       break;
     }
   }
 }
 
-template <typename Osal>
-bool SeqLock<Osal>::TryAcquire(zx_duration_t timeout) {
+template <typename Osal, SyncOpt kSyncOpt>
+bool SeqLock<Osal, kSyncOpt>::TryAcquire(zx_duration_t timeout) {
   return TryAcquireDeadline(Osal::GetClockMonotonic() + timeout);
 }
 
-template <typename Osal>
-bool SeqLock<Osal>::TryAcquireDeadline(zx_time_t deadline) {
+template <typename Osal, SyncOpt kSyncOpt>
+bool SeqLock<Osal, kSyncOpt>::TryAcquireDeadline(zx_time_t deadline) {
   while (true) {
     SequenceNumber expected;
 
@@ -92,6 +103,11 @@ bool SeqLock<Osal>::TryAcquireDeadline(zx_time_t deadline) {
     if (seq_num_.compare_exchange_strong(expected, expected + 1,
                                          std::memory_order_acquire,
                                          std::memory_order_relaxed)) {
+      // If we are using fence-to-fence synchronization, this is the place we
+      // need to put our release fence.
+      if constexpr (kSyncOpt == SyncOpt::Fence) {
+        std::atomic_thread_fence(std::memory_order_release);
+      }
       return true;
     }
 
@@ -105,8 +121,8 @@ bool SeqLock<Osal>::TryAcquireDeadline(zx_time_t deadline) {
   }
 }
 
-template <typename Osal>
-void SeqLock<Osal>::Release() {
+template <typename Osal, SyncOpt kSyncOpt>
+void SeqLock<Osal, kSyncOpt>::Release() {
   [[maybe_unused]] SequenceNumber before = seq_num_.fetch_add(1, std::memory_order_release);
   ZX_DEBUG_ASSERT((before & 0x1) != 0);
 }

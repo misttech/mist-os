@@ -16,5 +16,8 @@ struct FuchsiaKernelOsal {
 
 }  // namespace internal
 
-// Manually expand the SeqLock template using the Fuchsia user-mode OSAL
-template class ::concurrent::internal::SeqLock<::internal::FuchsiaKernelOsal>;
+// Manually expand the SeqLock templates using the Fuchsia user-mode OSAL
+template class ::concurrent::internal::SeqLock<::internal::FuchsiaKernelOsal,
+                                               ::concurrent::SyncOpt::AcqRelOps>;
+template class ::concurrent::internal::SeqLock<::internal::FuchsiaKernelOsal,
+                                               ::concurrent::SyncOpt::Fence>;

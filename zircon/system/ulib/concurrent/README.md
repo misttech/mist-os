@@ -275,7 +275,7 @@ observes came from a single write transaction.  If it ever might have observed
 values written by two different write transactions, the read transaction *must*
 fail, and the user may choose to either retry the operation, or give up.
 
-### Patterns for properly using SeqLocks
+### Patterns for properly using SeqLocks in the kernel.
 
 Here are a small set of patterns which demonstrate how to properly observe and
 make updates to a set of data protected by a SeqLock.  It is strongly advised
@@ -308,6 +308,8 @@ declare an Observe method which will perform a successful observation of the
 internal `foo_`, and return the observed copy of the data to the caller.
 
 ```c++
+#include <lib/kconcurrent/seqlock.h>
+
 struct Foo {
   uint32_t a, b;
 };
@@ -318,37 +320,52 @@ class MyClass {
   Foo Observe();
 
  private:
-  concurrent::SeqLock seq_lock_;
-  concurrent::WellDefinedCopyWrapper<Foo> foo_ TA_GUARDED(seq_lock_);
+  DECLARE_SEQLOCK(MyClass) seq_lock_;
+  SeqLockPayload<Foo, decltype(seq_lock_)> foo_ TA_GUARDED(seq_lock_);
 };
 ```
 
 Note that our class:
 
 1) Declares the `SeqLock` instance `seq_lock_`.
-2) Declares the instance of `Foo` as being wrapped in a `WellDefinedCopyWrapper<>`
-   template.
+2) Declares the instance of `Foo` as being wrapped in a `SeqLockPayload<...>` template.
 3) Declares `foo_` instance as being `TA_GUARDED` by the instance of the lock.
 
-*Always follow steps 2 and 3.*  Wrapping the `Foo` instance in a
-`WellDefinedCopyWrapper<>` will prevent anyone from accidentally reaching in and
-reading or writing the contents of the protected data directly, running the risk
-of failing to access the data in a atomic fashion (which could lead to a
-data-race), or accessing the data without properly specified memory ordering
-semantics, leading to the possibility of an incoherent observation being made by
-a reader.
+*Always follow these steps.*
 
-Flagging the protected data as being `TA_GUARDED` by the lock guarantees that
-clang static thread analysis (when enabled) will catch at compile time any
-attempts to access the protected data while not inside a `SeqLock` transaction,
-and well prevent all attempts to mutate the protected data during a read
-transaction instead of a write transaction.
+Step #1 declares the instance of the lock using a macro which ensures that the
+instance is properly instrumented by `lockdep` (when `lockdep` is enabled).
+This allows us to use `lockdep` defined RAII style `Guard`s, in addition to
+getting the runtime cycle analysis provided by lockdep.  Finally, this also
+automatically chooses synchronization methodology that we will use to ensure
+that we get proper, coherent observations of the payloads protected by the lock.
+By default, this is atomic Acquire/Release operations used on individual payload
+loads/stores.
+
+Step #2 (wrapping the `Foo` instance in a `SeqLockPayload<...>`) does two things
+for us.
+
+First, it will prevent anyone from accidentally reaching in and reading or
+writing the contents of the protected data directly, running the risk of failing
+to access the data in a atomic fashion (which could lead to a data-race).
+
+Second, it binds the synchronization method chosen during the declaration of the
+lock, to the synchronization method implemented by the payload wrapper. This
+prevents a user from accidentally accessing the data using a sync method which
+does not match that implemented by the lock instance, leading to the possibility
+of an incoherent observation being made by a reader.
+
+Finally, Step #3.  Flagging the protected data as being `TA_GUARDED` by the lock
+guarantees that clang static thread analysis (when enabled) will catch at
+compile time any attempts to access the protected data while not inside a
+`SeqLock` transaction, and well prevent all attempts to mutate the protected
+data during a read transaction instead of a write transaction.
 
 Now let's take a look at the implementation of `Update` and `Observe`
 
 ```c++
 void MyClass::Update(const Foo& foo) {
-  Guard<SeqLock, ExclusiveIrqSave> lock{&seq_lock_};
+  Guard<SeqLock<>, ExclusiveIrqSave> lock{&seq_lock_};
   foo_.Update(foo);
 }
 
@@ -357,7 +374,7 @@ Foo MyClass::Observe() {
 
   bool success;
   do {
-    Guard<SeqLock, SharedNoIrqSave> lock{&seq_lock_, success};
+    Guard<SeqLock<>, SharedNoIrqSave> lock{&seq_lock_, success};
     foo_.Read(ret);
   } while (!success);
 
@@ -367,8 +384,8 @@ Foo MyClass::Observe() {
 
 `Update` is extremely simple.  We simply:
 
-1) Declare a `lockdep::Guard` with the appropriate type and access mode (`SeqLock`
-   and `ExclusiveIrqSave`)
+1) Declare a `lockdep::Guard` with the appropriate type and access mode
+   (`SeqLock<>` and `ExclusiveIrqSave`)
 2) Copy our payload into the structure using the `WellDefinedCopyWrapper`'s
    `Update` methods.
 
@@ -376,7 +393,8 @@ The `lockdep::Guard` guarantees that we will properly disable and re-enable
 interrupts, as well as acquire and release the lock exclusively, before and
 after the update of the payload.  Disabling and re-enabling interrupts
 guarantees that we will never be preempted during the update operation itself,
-which is important to preventing readers from spinning pointlessly.
+which is important to preventing readers from spinning pointlessly.  Acquiring
+the lock exclusively is required in order to be able to `Update` the paylod.
 
 `Observe` is almost as simple, but has a few extra details involved.  Read
 transactions are not guaranteed to succeed, so we need a loop to try again in he
@@ -404,12 +422,12 @@ the transaction successfully.
 
 #### Reads of data while writing
 
-Writes protected by a `SeqLock` are exclusive (meaning no two writes can ever
-take place at the same time, they must happen sequentially with a well defined
-order), therefore we can actually read our protected data while the lock is held
+Writes protected by a `SeqLock` are exclusive, meaning no two writes can ever
+take place at the same time.  They must happen sequentially with a well defined
+order.  Therefore we can actually read our protected data while the lock is held
 exclusively without needing to consider either memory order or data race issues.
 What we can *never* do, however, is update the contents without using the
-`WellDefinedCopyWrapper<>`'s `Update` method.  Let's take a quick look at two
+`SeqLockPayload<...>`'s `Update` method.  Let's take a quick look at two
 simple examples of this:
 
 ```c++
@@ -421,7 +439,7 @@ class MyClass {
 };
 
 void MyClass::Sort() {
-  Guard<SeqLock, ExclusiveIrqSave> lock{&seq_lock_};
+  Guard<SeqLock<>, ExclusiveIrqSave> lock{&seq_lock_};
 
   const Foo& current_foo = foo_.unsynchronized_get();
   if (current_foo.a > current_foo.b) {
@@ -442,7 +460,7 @@ void MyClass::Inc(uitn32_t amt) {
 
 We declare two new methods for our class.  `Sort` (as the name implies) sorts
 the elements of the protected `Foo` instance in ascending order.  It grabs a
-`const Foo&` from the copy wrapper's `unsynchronized_get` method, then based on
+`const Foo&` from the payload wrapper's `unsynchronized_get` method, then based on
 the relationship between the protected data's `a` and `b`.  It either constructs
 a new Foo instance on the stack with the values of the fields swapped, then
 updates `foo_` using the `Update` method, or it simply exits because the
@@ -478,7 +496,7 @@ missed, and you will be Very Sad.
 
 Users of `SeqLock`s can also protect multiple sets of data with one `SeqLock`.
 The easiest way is to simply introduce more structures wrapped in
-`WellDefinedCopyWrapper<>`s.
+`SeqLockPayload<...>`s.
 
 ```c++
 struct Foo { uint32_t a, b; };
@@ -495,15 +513,71 @@ class MyClass {
   ktl::pair<Foo, Bar> Observe();
 
  private:
-  concurrent::SeqLock seq_lock_;
-  concurrent::WellDefinedCopyWrapper<Foo> foo_ TA_GUARDED(seq_lock_);
-  concurrent::WellDefinedCopyWrapper<Bar> bar_ TA_GUARDED(seq_lock_);
+  DECLARE_SEQLOCK(MyClass) seq_lock_;
+  SeqLockPayload<Foo, decltype(seq_lock_)> foo_ TA_GUARDED(seq_lock_);
+  SeqLockPayload<Bar> decltype(seq_lock_)> bar_ TA_GUARDED(seq_lock_);
 };
 ```
 
 We may now observe or update one, or the other, or both of these containers of
 protected data, provided we follow the previously established rules for
 obtaining the `SeqLock` as we do.
+
+#### Fence-to-Fence Synchronization
+
+As noted earlier, the default synchronization mechanism used by `SeqLock` is to
+use atomic loads/stores with Acquire/Release semantics whenever accessing the
+protected payload contents.  This is not the _only_ option, however.  Depending
+on the specific underlying machine architecture and the size of the payload
+which needs to be observed/published, it might be more efficient to use Relaxed
+loads/stores, and use fence-to-fence synchronization instead.
+
+Switching approaches should be pretty easy overall.  All we need to do is to
+update how we declare our lock, as well as the lock type specified when we use a
+`Guard`.  So:
+
+```c++
+class MyClass {
+ public:
+  void Update(const Foo& foo);
+
+ private:
+  DECLARE_SEQLOCK(MyClass) seq_lock_;
+  SeqLockPayload<Foo, decltype(seq_lock_)> foo_ TA_GUARDED(seq_lock_);
+};
+```
+becomes
+```c++
+class MyClass {
+ public:
+  void Update(const Foo& foo);
+
+ private:
+  DECLARE_SEQLOCK_FENCE_SYNC(MyClass) seq_lock_;
+  SeqLockPayload<Foo, decltype(seq_lock_)> foo_ TA_GUARDED(seq_lock_);
+};
+```
+and
+```c++
+void MyClass::Update(const Foo& foo) {
+  Guard<SeqLock<>, ExclusiveIrqSave> lock{&seq_lock_};
+  foo_.Update(foo);
+}
+```
+becomes
+```c++
+// Either this...
+void MyClass::Update(const Foo& foo) {
+  Guard<SeqLockFenceSync, ExclusiveIrqSave> lock{&seq_lock_};
+  foo_.Update(foo);
+}
+
+// .. or this
+void MyClass::Update(const Foo& foo) {
+  Guard<SeqLock<::concurrent::SyncOpt::Fence>, ExclusiveIrqSave> lock{&seq_lock_};
+  foo_.Update(foo);
+}
+```
 
 #### Blocking/Spinning behavior
 
@@ -526,30 +600,41 @@ take place.
 
 Note that there is currently no lockdep::Guard adapter defined which works with
 timeouts/deadlines, so we will need to manually manage locking/unlocking and
-manipulating read tokens ourselves.
+manipulating read tokens ourselves.  Additionally, because of the fact that
+lockdep instrumented SeqLocks are actually wrapped in an outer `LockDep<...>`
+wrapper, it can be a bit awkward to remember how to declare the proper type for
+the `ReadTransactionToken` we need to use with the `Try` methods.  The kernel
+environment provides a helper called `SeqLockReadTransactionToken` which can be
+used to automatically deduce the proper type for the token based on the lock,
+and this is the technique used in the example below.
 
 For example:
 
 ```c++
-zx_status_t UpdateWithTimeout(const Foo& foo, zx_duration_t timeout) {
-  if (!seq_lock_.TryAcquire(timeout)) {
+zx_status_t MyClass::UpdateWithTimeout(const Foo& foo, zx_duration_t timeout) {
+  if (!seq_lock_.lock().TryAcquire(timeout)) {
     return ZX_ERR_TIMED_OUT;
   }
   foo_.Update(foo);
+  seq_lock_.lock().Release();
   return ZX_OK;
 }
 
-zx::result<Foo> ObserveWithTimeout(zx_duration_t timeout) {
-  Foo ret;
-  SeqLock::ReadTransactionToken token;
+zx::result<Foo> MyClass::ObserveWithTimeout(zx_duration_t timeout) {
+  // Instead of needing to say this to decalre our token:
+  // decltype(seq_lock_)::LockType::ReadTransactionToken token;
+  //
+  // We can say this instead:
+  SeqLockReadTransactionToken token{seq_lock_};
   zx_time_t deadline = zx_deadline_after(timeout);
+  Foo ret;
 
   do {
-    if (!seq_lock_.TryBeginReadTransactionDeadline(token, deadline)) {
+    if (!seq_lock_.lock().TryBeginReadTransactionDeadline(token, deadline)) {
       return zx::error(ZX_ERR_TIMED_OUT);
     }
-    foo_.Observe(ret);
-  } while (!seq_lock_.EndReadTransaction(token));
+    foo_.Read(ret);
+  } while (!seq_lock_.lock().EndReadTransaction(token));
 
   return zx::ok(ret);
 }

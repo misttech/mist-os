@@ -8,7 +8,6 @@
 #define ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_CLOCK_DISPATCHER_H_
 
 #include <lib/affine/transform.h>
-#include <lib/kconcurrent/copy.h>
 #include <lib/kconcurrent/seqlock.h>
 #include <lib/relaxed_atomic.h>
 #include <sys/types.h>
@@ -65,10 +64,13 @@ class ClockDispatcher final : public SoloDispatcher<ClockDispatcher, ZX_DEFAULT_
   // rest of the parameters.  While we need to observe all of the parameters
   // during a call to GetDetails, we only need to observe ticks_to_synthetic
   // during Read, and keeping the parameters separate makes this a bit easier.
-  DECLARE_SEQLOCK(ClockDispatcher) seq_lock_;
-  TA_GUARDED(seq_lock_)
-  concurrent::WellDefinedCopyable<affine::Transform> ticks_to_synthetic_{0, 0, affine::Ratio{0, 1}};
-  concurrent::WellDefinedCopyable<Params> params_ TA_GUARDED(seq_lock_);
+  DECLARE_SEQLOCK_FENCE_SYNC(ClockDispatcher) seq_lock_;
+  template <typename T>
+  using Payload = SeqLockPayload<T, decltype(seq_lock_)>;
+  template <typename Policy>
+  using SeqLockGuard = Guard<decltype(seq_lock_)::LockType, Policy>;
+  TA_GUARDED(seq_lock_) Payload<affine::Transform> ticks_to_synthetic_{0, 0, affine::Ratio{0, 1}};
+  TA_GUARDED(seq_lock_) Payload<Params> params_;
 };
 
 #endif  // ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_CLOCK_DISPATCHER_H_
