@@ -1565,7 +1565,7 @@ mod tests {
 
     #[test_case(TargetDevice::AnyDevice)]
     #[test_case(TargetDevice::SpecificDevice(&MultipleDevicesId::A))]
-    fn set_device(device: TargetDevice<&MultipleDevicesId>) {
+    fn test_set_device(device: TargetDevice<&MultipleDevicesId>) {
         let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
 
         let bound = SocketHandler::create(&mut sync_ctx, Default::default());

@@ -904,7 +904,7 @@ if (!(current_os == "fuchsia")) {
 }
 
 group("test-case") {
-  public_deps = [ ":test-case-v1_1_0($host_toolchain)" ]
+  public_deps = [ ":test-case-v3_1_0" ]
 }
 
 group("textwrap") {
@@ -7799,6 +7799,59 @@ rust_library("prettytable-rs-v0_8_0") {
   visibility = [ ":*" ]
 }
 
+rust_library("proc-macro-error-v1_0_4") {
+  crate_name = "proc_macro_error"
+  crate_root =
+      "//third_party/rust_crates/vendor/proc-macro-error-1.0.4/src/lib.rs"
+  output_name = "proc_macro_error-7fe39f1884bfdcff"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":proc-macro-error-attr-v1_0_4($host_toolchain)" ]
+  deps += [ ":proc-macro2-v1_0_58" ]
+  deps += [ ":quote-v1_0_27" ]
+  deps += [ ":syn-v1_0_98" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=7fe39f1884bfdcff",
+    "-Cextra-filename=-7fe39f1884bfdcff",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"syn\"",
+    "--cfg=feature=\"syn-error\"",
+    "--cfg=use_fallback",
+  ]
+
+  visibility = [ ":*" ]
+}
+
+rust_proc_macro("proc-macro-error-attr-v1_0_4") {
+  crate_name = "proc_macro_error_attr"
+  crate_root =
+      "//third_party/rust_crates/vendor/proc-macro-error-attr-1.0.4/src/lib.rs"
+  output_name = "proc_macro_error_attr-f458d86aacd315ad"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":proc-macro2-v1_0_58" ]
+  deps += [ ":quote-v1_0_27" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=f458d86aacd315ad",
+    "-Cextra-filename=-f458d86aacd315ad",
+    "--cfg=use_fallback",
+  ]
+
+  visibility = [ ":*" ]
+}
+
 rust_library("proc-macro2-v0_4_27") {
   crate_name = "proc_macro2"
   crate_root = "//third_party/rust_crates/vendor/proc-macro2-0.4.27/src/lib.rs"
@@ -10859,14 +10912,37 @@ rust_library("termios-v0_3_2") {
   visibility = [ ":*" ]
 }
 
-rust_proc_macro("test-case-v1_1_0") {
+rust_library("test-case-v3_1_0") {
   crate_name = "test_case"
-  crate_root = "//third_party/rust_crates/vendor/test-case-1.1.0/src/lib.rs"
-  output_name = "test_case-f2bb0d885c2bf58f"
+  crate_root = "//third_party/rust_crates/vendor/test-case-3.1.0/src/lib.rs"
+  output_name = "test_case-7ba36a2effab90bf"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":test-case-macros-v3_1_0($host_toolchain)" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=7ba36a2effab90bf",
+    "-Cextra-filename=-7ba36a2effab90bf",
+  ]
+
+  visibility = [ ":*" ]
+}
+
+rust_library("test-case-core-v3_1_0") {
+  crate_name = "test_case_core"
+  crate_root =
+      "//third_party/rust_crates/vendor/test-case-core-3.1.0/src/lib.rs"
+  output_name = "test_case_core-e6a9b92f1d6038ce"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":cfg-if-v1_0_0" ]
+  deps += [ ":proc-macro-error-v1_0_4" ]
   deps += [ ":proc-macro2-v1_0_58" ]
   deps += [ ":quote-v1_0_27" ]
   deps += [ ":syn-v1_0_98" ]
@@ -10875,10 +10951,35 @@ rust_proc_macro("test-case-v1_1_0") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=f2bb0d885c2bf58f",
-    "-Cextra-filename=-f2bb0d885c2bf58f",
-    "--cfg=feature=\"default\"",
+    "--edition=2021",
+    "-Cmetadata=e6a9b92f1d6038ce",
+    "-Cextra-filename=-e6a9b92f1d6038ce",
+  ]
+
+  visibility = [ ":*" ]
+}
+
+rust_proc_macro("test-case-macros-v3_1_0") {
+  crate_name = "test_case_macros"
+  crate_root =
+      "//third_party/rust_crates/vendor/test-case-macros-3.1.0/src/lib.rs"
+  output_name = "test_case_macros-b3a199aff94bc52e"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":proc-macro-error-v1_0_4" ]
+  deps += [ ":proc-macro2-v1_0_58" ]
+  deps += [ ":quote-v1_0_27" ]
+  deps += [ ":syn-v1_0_98" ]
+  deps += [ ":test-case-core-v3_1_0" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=b3a199aff94bc52e",
+    "-Cextra-filename=-b3a199aff94bc52e",
   ]
 
   visibility = [ ":*" ]

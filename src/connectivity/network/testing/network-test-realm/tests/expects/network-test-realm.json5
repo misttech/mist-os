@@ -28,7 +28,7 @@
             matchers: [
                 // TODO(https://fxbug.dev/23365): Resolve `IP_ADD_MEMBERSHIP` error code
                 // discrepancy.
-                "join_multicast_group_with_non_existent_interface*netstack_v3",
+                "join_multicast_group_with_non_existent_interface*netstack_v3_expects",
             ],
         },
     ],
