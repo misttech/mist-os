@@ -87,7 +87,7 @@ cpp20::span<const DdiPhyConfigEntry> GetHdmiPhyConfigEntries(uint16_t device_id,
 // On DisplayDevice creation we cannot determine whether it is an HDMI
 // display; this will be updated when intel-i915 Controller gets EDID
 // information for this device (before Init()).
-HdmiDisplay::HdmiDisplay(Controller* controller, uint64_t id, DdiId ddi_id,
+HdmiDisplay::HdmiDisplay(Controller* controller, display::DisplayId id, DdiId ddi_id,
                          DdiReference ddi_reference, const ddk::I2cImplProtocolClient& i2c)
     : DisplayDevice(controller, id, ddi_id, std::move(ddi_reference), Type::kHdmi), i2c_(i2c) {}
 

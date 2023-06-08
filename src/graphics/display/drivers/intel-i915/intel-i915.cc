@@ -48,6 +48,7 @@
 #include "fuchsia/hardware/display/controller/c/banjo.h"
 #include "src/graphics/display/drivers/intel-i915/clock/cdclk.h"
 #include "src/graphics/display/drivers/intel-i915/ddi.h"
+#include "src/graphics/display/drivers/intel-i915/display-device.h"
 #include "src/graphics/display/drivers/intel-i915/dp-display.h"
 #include "src/graphics/display/drivers/intel-i915/dpll.h"
 #include "src/graphics/display/drivers/intel-i915/fuse-config.h"
@@ -55,6 +56,7 @@
 #include "src/graphics/display/drivers/intel-i915/pch-engine.h"
 #include "src/graphics/display/drivers/intel-i915/pci-ids.h"
 #include "src/graphics/display/drivers/intel-i915/pipe-manager.h"
+#include "src/graphics/display/drivers/intel-i915/pipe.h"
 #include "src/graphics/display/drivers/intel-i915/poll-until.h"
 #include "src/graphics/display/drivers/intel-i915/power-controller.h"
 #include "src/graphics/display/drivers/intel-i915/power.h"
@@ -64,6 +66,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 #include "src/graphics/display/drivers/intel-i915/tiling.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -127,11 +130,12 @@ constexpr zx_protocol_device_t kDisplayControllerDeviceProtocol = {
 };
 
 const display_config_t* FindBanjoConfig(
-    uint64_t display_id, cpp20::span<const display_config_t*> banjo_display_configs) {
-  auto found = std::find_if(banjo_display_configs.begin(), banjo_display_configs.end(),
-                            [display_id](const display_config_t* banjo_display_config) {
-                              return banjo_display_config->display_id == display_id;
-                            });
+    display::DisplayId display_id, cpp20::span<const display_config_t*> banjo_display_configs) {
+  auto found =
+      std::find_if(banjo_display_configs.begin(), banjo_display_configs.end(),
+                   [display_id](const display_config_t* banjo_display_config) {
+                     return display::ToDisplayId(banjo_display_config->display_id) == display_id;
+                   });
   return found != banjo_display_configs.end() ? *found : nullptr;
 }
 
@@ -181,7 +185,7 @@ void Controller::HandleHotplug(DdiId ddi_id, bool long_pulse) {
   zxlogf(TRACE, "Hotplug detected on ddi %d (long_pulse=%d)", ddi_id, long_pulse);
   std::unique_ptr<DisplayDevice> device = nullptr;
   DisplayDevice* added_device = nullptr;
-  uint64_t display_removed = INVALID_DISPLAY_ID;
+  display::DisplayId removed_display_id = display::kInvalidDisplayId;
 
   fbl::AutoLock lock(&display_lock_);
 
@@ -196,8 +200,8 @@ void Controller::HandleHotplug(DdiId ddi_id, bool long_pulse) {
     }
   }
   if (device) {  // Existing device was unplugged
-    zxlogf(INFO, "Display %ld unplugged", device->id());
-    display_removed = device->id();
+    zxlogf(INFO, "Display %ld unplugged", device->id().value());
+    removed_display_id = device->id();
     RemoveDisplay(std::move(device));
   } else {  // New device was plugged in
     std::unique_ptr<DisplayDevice> device = QueryDisplay(ddi_id, next_id_);
@@ -211,9 +215,13 @@ void Controller::HandleHotplug(DdiId ddi_id, bool long_pulse) {
     }
   }
 
-  if (dc_intf_.is_valid() && (added_device || display_removed != INVALID_DISPLAY_ID)) {
-    CallOnDisplaysChanged(&added_device, added_device != nullptr ? 1 : 0, &display_removed,
-                          display_removed != INVALID_DISPLAY_ID);
+  if (dc_intf_.is_valid() && (added_device || removed_display_id != display::kInvalidDisplayId)) {
+    const bool display_added = added_device != nullptr;
+    cpp20::span<DisplayDevice*> added = cpp20::span(&added_device, /*count=*/display_added ? 1 : 0);
+    const bool display_removed = removed_display_id != display::kInvalidDisplayId;
+    cpp20::span<const display::DisplayId> removed =
+        cpp20::span(&removed_display_id, /*count=*/display_removed ? 1 : 0);
+    CallOnDisplaysChanged(added, removed);
   }
 }
 
@@ -224,13 +232,13 @@ void Controller::HandlePipeVsync(PipeId pipe_id, zx_time_t timestamp) {
     return;
   }
 
-  uint64_t id = INVALID_DISPLAY_ID;
+  display::DisplayId pipe_attached_display_id = display::kInvalidDisplayId;
 
   std::optional<config_stamp_t> vsync_config_stamp = std::nullopt;
 
   Pipe* pipe = (*pipe_manager_)[pipe_id];
   if (pipe && pipe->in_use()) {
-    id = pipe->attached_display_id();
+    pipe_attached_display_id = pipe->attached_display_id();
 
     registers::PipeRegs regs(pipe_id);
     std::vector<uint64_t> handles;
@@ -253,13 +261,14 @@ void Controller::HandlePipeVsync(PipeId pipe_id, zx_time_t timestamp) {
     vsync_config_stamp = pipe->GetVsyncConfigStamp(handles);
   }
 
-  if (id != INVALID_DISPLAY_ID) {
-    dc_intf_.OnDisplayVsync(id, timestamp,
+  if (pipe_attached_display_id != display::kInvalidDisplayId) {
+    const uint64_t banjo_display_id = display::ToBanjoDisplayId(pipe_attached_display_id);
+    dc_intf_.OnDisplayVsync(banjo_display_id, timestamp,
                             vsync_config_stamp.has_value() ? &*vsync_config_stamp : nullptr);
   }
 }
 
-DisplayDevice* Controller::FindDevice(uint64_t display_id) {
+DisplayDevice* Controller::FindDevice(display::DisplayId display_id) {
   for (auto& d : display_devices_) {
     if (d->id() == display_id) {
       return d.get();
@@ -534,7 +543,8 @@ const GttRegion& Controller::SetupGttImage(const image_t* image, uint32_t rotati
   return *region;
 }
 
-std::unique_ptr<DisplayDevice> Controller::QueryDisplay(DdiId ddi_id, uint64_t display_id) {
+std::unique_ptr<DisplayDevice> Controller::QueryDisplay(DdiId ddi_id,
+                                                        display::DisplayId display_id) {
   fbl::AllocChecker ac;
   if (!igd_opregion_.HasDdi(ddi_id)) {
     zxlogf(INFO, "ddi %d not available.", ddi_id);
@@ -685,7 +695,7 @@ void Controller::InitDisplays() {
           // TODO(fxbug.dev/111747): We should fix the device reset logic so
           // that we don't need to delete the old device.
           const DdiId ddi_id = device->ddi_id();
-          const uint64_t display_id = device->id();
+          const display::DisplayId display_id = device->id();
           display_devices_[i].reset();
           display_devices_[i] = QueryDisplay(ddi_id, display_id);
           device = display_devices_[i].get();
@@ -785,7 +795,7 @@ void Controller::RemoveDisplay(std::unique_ptr<DisplayDevice> display) {
 }
 
 zx_status_t Controller::AddDisplay(std::unique_ptr<DisplayDevice> display) {
-  uint64_t display_id = display->id();
+  const display::DisplayId display_id = display->id();
 
   // Add the new device.
   fbl::AllocChecker ac;
@@ -795,18 +805,18 @@ zx_status_t Controller::AddDisplay(std::unique_ptr<DisplayDevice> display) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  zxlogf(INFO, "Display %ld connected", display_id);
+  zxlogf(INFO, "Display %ld connected", display_id.value());
   next_id_++;
   return ZX_OK;
 }
 
-void Controller::CallOnDisplaysChanged(DisplayDevice** added, size_t added_count, uint64_t* removed,
-                                       size_t removed_count) {
+void Controller::CallOnDisplaysChanged(cpp20::span<DisplayDevice*> added,
+                                       cpp20::span<const display::DisplayId> removed) {
   size_t added_actual;
-  added_display_args_t added_args[std::max(static_cast<size_t>(1), added_count)];
-  added_display_info_t added_info[std::max(static_cast<size_t>(1), added_count)];
-  for (unsigned i = 0; i < added_count; i++) {
-    added_args[i].display_id = added[i]->id();
+  added_display_args_t added_args[std::max(static_cast<size_t>(1), added.size())];
+  added_display_info_t added_info[std::max(static_cast<size_t>(1), added.size())];
+  for (unsigned i = 0; i < added.size(); i++) {
+    added_args[i].display_id = display::ToBanjoDisplayId(added[i]->id());
     added_args[i].edid_present = true;
     added[i]->i2c().GetProto(&added_args[i].panel.i2c);
     added_args[i].pixel_format_list = kSupportedFormats;
@@ -814,10 +824,15 @@ void Controller::CallOnDisplaysChanged(DisplayDevice** added, size_t added_count
     added_args[i].cursor_info_list = kCursorInfos;
     added_args[i].cursor_info_count = static_cast<uint32_t>(std::size(kCursorInfos));
   }
-  dc_intf_.OnDisplaysChanged(added_args, added_count, removed, removed_count, added_info,
-                             added_count, &added_actual);
-  if (added_count != added_actual) {
-    zxlogf(WARNING, "%lu displays could not be added", added_count - added_actual);
+
+  uint64_t banjo_removed_display_ids[std::max(static_cast<size_t>(1), removed.size())];
+  for (unsigned i = 0; i < removed.size(); i++) {
+    banjo_removed_display_ids[i] = display::ToBanjoDisplayId(removed[i]);
+  }
+  dc_intf_.OnDisplaysChanged(added_args, added.size(), banjo_removed_display_ids, removed.size(),
+                             added_info, added.size(), &added_actual);
+  if (added.size() != added_actual) {
+    zxlogf(WARNING, "%lu displays could not be added", added.size() - added_actual);
   }
   for (unsigned i = 0; i < added_actual; i++) {
     if (added[i]->type() == DisplayDevice::Type::kHdmi) {
@@ -840,7 +855,9 @@ void Controller::DisplayControllerImplSetDisplayControllerInterface(
     for (unsigned i = 0; i < size; i++) {
       added_displays[i] = display_devices_[i].get();
     }
-    CallOnDisplaysChanged(added_displays, size, nullptr, 0);
+    cpp20::span<DisplayDevice*> added(added_displays, size);
+    cpp20::span<const display::DisplayId> removed{};
+    CallOnDisplaysChanged(added, removed);
   }
 }
 
@@ -1103,10 +1120,11 @@ bool Controller::GetPlaneLayer(Pipe* pipe, uint32_t plane,
   if (!pipe->in_use()) {
     return false;
   }
-  uint64_t disp_id = pipe->attached_display_id();
+  display::DisplayId pipe_attached_display_id = pipe->attached_display_id();
 
   for (const display_config_t* banjo_display_config : banjo_display_configs) {
-    if (banjo_display_config->display_id != disp_id) {
+    display::DisplayId display_id = display::ToDisplayId(banjo_display_config->display_id);
+    if (display_id != pipe_attached_display_id) {
       continue;
     }
     bool has_color_layer = banjo_display_config->layer_count &&
@@ -1487,7 +1505,8 @@ bool Controller::CheckDisplayLimits(cpp20::span<const display_config_t*> banjo_d
       return false;
     }
 
-    DisplayDevice* display = FindDevice(banjo_display_config->display_id);
+    display::DisplayId display_id = display::ToDisplayId(banjo_display_config->display_id);
+    DisplayDevice* display = FindDevice(display_id);
     if (display == nullptr) {
       continue;
     }
@@ -1581,7 +1600,7 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
     return CONFIG_CHECK_RESULT_OK;
   }
 
-  uint64_t pipe_alloc[PipeIds<registers::Platform::kKabyLake>().size()];
+  display::DisplayId pipe_alloc[PipeIds<registers::Platform::kKabyLake>().size()];
   if (!CalculatePipeAllocation(banjo_display_configs_span, pipe_alloc)) {
     return CONFIG_CHECK_RESULT_TOO_MANY;
   }
@@ -1592,9 +1611,10 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
 
   for (unsigned i = 0; i < banjo_display_configs_span.size(); i++) {
     const display_config_t* banjo_display_config = banjo_display_configs_span[i];
+    const display::DisplayId display_id = display::ToDisplayId(banjo_display_config->display_id);
     DisplayDevice* display = nullptr;
     for (auto& d : display_devices_) {
-      if (d->id() == banjo_display_config->display_id) {
+      if (d->id() == display_id) {
         display = d.get();
         break;
       }
@@ -1746,9 +1766,10 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
         continue;
       }
       ZX_ASSERT(pipe->in_use());  // If the allocation failed, it should be in use
-      uint64_t display_id = pipe->attached_display_id();
+      display::DisplayId pipe_attached_display_id = pipe->attached_display_id();
       for (unsigned i = 0; i < display_config_count; i++) {
-        if (banjo_display_configs[i]->display_id != display_id) {
+        display::DisplayId display_id = display::ToDisplayId(banjo_display_configs[i]->display_id);
+        if (display_id != pipe_attached_display_id) {
           continue;
         }
         layer_cfg_result[i][0] = CLIENT_MERGE_BASE;
@@ -1765,26 +1786,28 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
 
 bool Controller::CalculatePipeAllocation(
     cpp20::span<const display_config_t*> banjo_display_configs,
-    uint64_t alloc[PipeIds<registers::Platform::kKabyLake>().size()]) {
+    display::DisplayId alloc[PipeIds<registers::Platform::kKabyLake>().size()]) {
   if (banjo_display_configs.size() > PipeIds<registers::Platform::kKabyLake>().size()) {
     return false;
   }
-  memset(alloc, 0, sizeof(uint64_t) * PipeIds<registers::Platform::kKabyLake>().size());
+  memset(alloc, 0, sizeof(display::DisplayId) * PipeIds<registers::Platform::kKabyLake>().size());
   // Keep any allocated pipes on the same display
   for (const display_config_t* banjo_display_config : banjo_display_configs) {
-    DisplayDevice* display = FindDevice(banjo_display_config->display_id);
+    display::DisplayId display_id = display::ToDisplayId(banjo_display_config->display_id);
+    DisplayDevice* display = FindDevice(display_id);
     if (display != nullptr && display->pipe() != nullptr) {
-      alloc[display->pipe()->pipe_id()] = banjo_display_config->display_id;
+      alloc[display->pipe()->pipe_id()] = display_id;
     }
   }
   // Give unallocated pipes to displays that need them
   for (const display_config_t* banjo_display_config : banjo_display_configs) {
-    DisplayDevice* display = FindDevice(banjo_display_config->display_id);
+    display::DisplayId display_id = display::ToDisplayId(banjo_display_config->display_id);
+    DisplayDevice* display = FindDevice(display_id);
     if (display != nullptr && display->pipe() == nullptr) {
       for (unsigned pipe_num = 0; pipe_num < PipeIds<registers::Platform::kKabyLake>().size();
            pipe_num++) {
         if (!alloc[pipe_num]) {
-          alloc[pipe_num] = banjo_display_config->display_id;
+          alloc[pipe_num] = display_id;
           break;
         }
       }
@@ -1813,8 +1836,9 @@ uint16_t Controller::DataBufferBlockCount() const {
   return is_tgl(device_id_) ? kTigerLakeDataBufferBlockCount : kKabyLakeDataBufferBlockCount;
 }
 
-void Controller::DisplayControllerImplSetEld(uint64_t display_id, const uint8_t* raw_eld_list,
+void Controller::DisplayControllerImplSetEld(uint64_t banjo_display_id, const uint8_t* raw_eld_list,
                                              size_t raw_eld_count) {
+  const display::DisplayId display_id = display::ToDisplayId(banjo_display_id);
   // We use the first "a" of the 3 ELD slots in the datasheet.
   if (eld_display_id_.has_value() && eld_display_id_.value() != display_id) {
     zxlogf(ERROR, "ELD display already in use");
@@ -1846,7 +1870,7 @@ void Controller::DisplayControllerImplApplyConfiguration(
     const display_config_t** banjo_display_configs, size_t display_config_count,
     const config_stamp_t* config_stamp) {
   fbl::AutoLock lock(&display_lock_);
-  uint64_t fake_vsync_display_ids[display_devices_.size() + 1];
+  display::DisplayId fake_vsync_display_ids[display_devices_.size() + 1];
   size_t fake_vsync_size = 0;
 
   cpp20::span banjo_display_configs_span(banjo_display_configs, display_config_count);
@@ -1878,7 +1902,8 @@ void Controller::DisplayControllerImplApplyConfiguration(
   if (dc_intf_.is_valid()) {
     zx_time_t now = (fake_vsync_size > 0) ? zx_clock_get_monotonic() : 0;
     for (size_t i = 0; i < fake_vsync_size; i++) {
-      dc_intf_.OnDisplayVsync(fake_vsync_display_ids[i], now, config_stamp);
+      const uint64_t banjo_display_id = display::ToBanjoDisplayId(fake_vsync_display_ids[i]);
+      dc_intf_.OnDisplayVsync(banjo_display_id, now, config_stamp);
     }
   }
 }
@@ -2133,7 +2158,9 @@ void Controller::DdkInit(ddk::InitTxn txn) {
       for (unsigned i = 0; i < size; i++) {
         added_displays[i] = display_devices_[i].get();
       }
-      CallOnDisplaysChanged(added_displays, size, NULL, 0);
+      cpp20::span<DisplayDevice*> added(added_displays, size);
+      cpp20::span<const display::DisplayId> removed{};
+      CallOnDisplaysChanged(added, removed);
     }
 
     ready_for_callback_ = true;

@@ -25,6 +25,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-i915/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-i915/registers-transcoder.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
 namespace i915 {
 
@@ -42,7 +43,7 @@ class Pipe {
   Pipe& operator=(const Pipe&) = delete;
   Pipe& operator=(Pipe&&) = delete;
 
-  void AttachToDisplay(uint64_t display_id, bool is_edp);
+  void AttachToDisplay(display::DisplayId display_id, bool is_edp);
   void Detach();
 
   void ApplyModeConfig(const display_mode_t& mode);
@@ -93,8 +94,8 @@ class Pipe {
   // we configure the display engine.
   virtual TranscoderId connected_transcoder_id() const = 0;
 
-  uint64_t attached_display_id() const { return attached_display_; }
-  bool in_use() const { return attached_display_ != INVALID_DISPLAY_ID; }
+  display::DisplayId attached_display_id() const { return attached_display_id_; }
+  bool in_use() const { return attached_display_id_ != display::kInvalidDisplayId; }
 
   // Display device registers only store image handles / addresses. We should
   // convert the handles to corresponding config stamps using the existing
@@ -119,7 +120,7 @@ class Pipe {
   // Borrowed reference to Controller instance
   fdf::MmioBuffer* mmio_space_ = nullptr;
 
-  uint64_t attached_display_ = INVALID_DISPLAY_ID;
+  display::DisplayId attached_display_id_ = display::kInvalidDisplayId;
   bool attached_edp_ = false;
 
   registers::Platform platform_;

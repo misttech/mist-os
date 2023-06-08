@@ -20,6 +20,7 @@
 #include "src/graphics/display/drivers/intel-i915/pipe.h"
 #include "src/graphics/display/drivers/intel-i915/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-i915/registers-pipe.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
 namespace i915 {
 
@@ -50,7 +51,7 @@ class PipeManagerTest : public ::testing::Test {
 
 class FakeDisplay : public DisplayDevice {
  public:
-  FakeDisplay(Controller* controller, uint64_t id, DdiId ddi_id, Type type)
+  FakeDisplay(Controller* controller, display::DisplayId id, DdiId ddi_id, Type type)
       : DisplayDevice(controller, id, ddi_id, DdiReference(), type) {}
   ~FakeDisplay() override = default;
 
@@ -83,7 +84,7 @@ TEST_F(PipeManagerTest, SkylakeAllocatePipe) {
   PipeManager* pm = controller_.pipe_manager();
 
   // Allocate pipe for DP display.
-  uint64_t kDisplay1Id = 1u;
+  display::DisplayId kDisplay1Id{1u};
   std::unique_ptr<DisplayDevice> display1 = std::make_unique<FakeDisplay>(
       controller(), kDisplay1Id, DdiId::DDI_B, DisplayDevice::Type::kDp);
   Pipe* pipe1 = pm->RequestPipe(*display1);
@@ -97,7 +98,7 @@ TEST_F(PipeManagerTest, SkylakeAllocatePipe) {
   // Allocate pipe for eDP display.
   controller()->igd_opregion_for_testing()->SetIsEdpForTesting(DdiId::DDI_A, true);
 
-  uint64_t kDisplay2Id = 2u;
+  display::DisplayId kDisplay2Id{2u};
   std::unique_ptr<DisplayDevice> display2 = std::make_unique<FakeDisplay>(
       controller(), kDisplay2Id, DdiId::DDI_A, DisplayDevice::Type::kEdp);
   Pipe* pipe2 = pm->RequestPipe(*display2);
@@ -122,8 +123,10 @@ TEST_F(PipeManagerTest, SkylakeReclaimUsedPipe) {
   controller_.SetPipeManagerForTesting(std::make_unique<PipeManagerSkylake>(controller()));
   PipeManager* pm = controller_.pipe_manager();
 
-  for (size_t display_id = 1u; display_id <= PipeIds<registers::Platform::kKabyLake>().size() * 10;
-       display_id++) {
+  for (size_t display_id_value = 1u;
+       display_id_value <= PipeIds<registers::Platform::kKabyLake>().size() * 10;
+       display_id_value++) {
+    const display::DisplayId display_id{display_id_value};
     std::unique_ptr<DisplayDevice> display = std::make_unique<FakeDisplay>(
         controller(), display_id, DdiId::DDI_B, DisplayDevice::Type::kDp);
     Pipe* pipe = pm->RequestPipe(*display);

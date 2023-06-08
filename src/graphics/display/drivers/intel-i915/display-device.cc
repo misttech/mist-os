@@ -21,6 +21,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 #include "src/graphics/display/drivers/intel-i915/tiling.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
 namespace i915 {
 
@@ -47,7 +48,7 @@ constexpr zx_protocol_device_t kBacklightDeviceOps = {
 
 }  // namespace
 
-DisplayDevice::DisplayDevice(Controller* controller, uint64_t id, DdiId ddi_id,
+DisplayDevice::DisplayDevice(Controller* controller, display::DisplayId id, DdiId ddi_id,
                              DdiReference ddi_reference, Type type)
     : controller_(controller),
       id_(id),
@@ -199,7 +200,7 @@ void DisplayDevice::ApplyConfiguration(const display_config_t* banjo_display_con
       // following error conditions, we should reset the DDI, pipe and transcoder
       // so that they can be possibly reused.
       if (!DdiModeset(banjo_display_config->mode)) {
-        zxlogf(ERROR, "Display %lu: Modeset failed; ApplyConfiguration() aborted.", id());
+        zxlogf(ERROR, "Display %lu: Modeset failed; ApplyConfiguration() aborted.", id().value());
         return;
       }
 
@@ -208,7 +209,7 @@ void DisplayDevice::ApplyConfiguration(const display_config_t* banjo_display_con
         zxlogf(ERROR,
                "Display %lu: Transcoder configuration failed before pipe setup; "
                "ApplyConfiguration() aborted.",
-               id());
+               id().value());
         return;
       }
       pipe_->ApplyModeConfig(banjo_display_config->mode);
@@ -217,7 +218,7 @@ void DisplayDevice::ApplyConfiguration(const display_config_t* banjo_display_con
         zxlogf(ERROR,
                "Display %lu: Transcoder configuration failed after pipe setup; "
                "ApplyConfiguration() aborted.",
-               id());
+               id().value());
         return;
       }
     }

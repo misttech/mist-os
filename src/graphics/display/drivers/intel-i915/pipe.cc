@@ -22,6 +22,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-i915/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-i915/tiling.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
 namespace {
 
@@ -275,12 +276,12 @@ void Pipe::ResetScaler() {
 }
 
 void Pipe::Detach() {
-  attached_display_ = INVALID_DISPLAY_ID;
+  attached_display_id_ = display::kInvalidDisplayId;
   attached_edp_ = false;
 }
 
-void Pipe::AttachToDisplay(uint64_t id, bool is_edp) {
-  attached_display_ = id;
+void Pipe::AttachToDisplay(display::DisplayId id, bool is_edp) {
+  attached_display_id_ = id;
   attached_edp_ = is_edp;
 }
 

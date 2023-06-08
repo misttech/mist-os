@@ -17,13 +17,14 @@
 #include "src/graphics/display/drivers/intel-i915/display-device.h"
 #include "src/graphics/display/drivers/intel-i915/dpll.h"
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
 namespace i915 {
 
 class HdmiDisplay : public DisplayDevice {
  public:
-  HdmiDisplay(Controller* controller, uint64_t id, DdiId ddi_id, DdiReference ddi_reference,
-              const ddk::I2cImplProtocolClient& i2c);
+  HdmiDisplay(Controller* controller, display::DisplayId id, DdiId ddi_id,
+              DdiReference ddi_reference, const ddk::I2cImplProtocolClient& i2c);
 
   HdmiDisplay(const HdmiDisplay&) = delete;
   HdmiDisplay(HdmiDisplay&&) = delete;

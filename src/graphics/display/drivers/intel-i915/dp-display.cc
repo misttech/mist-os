@@ -1657,8 +1657,9 @@ bool IsEdp(Controller* controller, DdiId ddi_id) {
 
 }  // namespace
 
-DpDisplay::DpDisplay(Controller* controller, uint64_t id, DdiId ddi_id, DpcdChannel* dp_aux,
-                     PchEngine* pch_engine, DdiReference ddi_reference, inspect::Node* parent_node)
+DpDisplay::DpDisplay(Controller* controller, display::DisplayId id, DdiId ddi_id,
+                     DpcdChannel* dp_aux, PchEngine* pch_engine, DdiReference ddi_reference,
+                     inspect::Node* parent_node)
     : DisplayDevice(controller, id, ddi_id, std::move(ddi_reference),
                     IsEdp(controller, ddi_id) ? Type::kEdp : Type::kDp),
       dp_aux_(dp_aux),
@@ -1671,7 +1672,7 @@ DpDisplay::DpDisplay(Controller* controller, uint64_t id, DdiId ddi_id, DpcdChan
     ZX_ASSERT(pch_engine_ == nullptr);
   }
 
-  inspect_node_ = parent_node->CreateChild(fbl::StringPrintf("dp-display-%lu", id));
+  inspect_node_ = parent_node->CreateChild(fbl::StringPrintf("dp-display-%lu", id.value()));
   dp_capabilities_node_ = inspect_node_.CreateChild("dpcd-capabilities");
   dp_lane_count_inspect_ = inspect_node_.CreateUint("dp_lane_count", 0);
   dp_link_rate_mhz_inspect_ = inspect_node_.CreateUint("dp_link_rate_mhz", 0);

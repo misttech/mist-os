@@ -24,6 +24,7 @@
 #include "src/graphics/display/drivers/intel-i915/power.h"
 #include "src/graphics/display/drivers/intel-i915/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-i915/registers-dpll.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
 namespace i915 {
 
@@ -167,7 +168,8 @@ class DpDisplayTest : public ::testing::Test {
     controller_.ResetMmioSpaceForTesting();
   }
 
-  std::unique_ptr<DpDisplay> MakeDisplay(DdiId ddi_id, uint64_t id = 1) {
+  std::unique_ptr<DpDisplay> MakeDisplay(DdiId ddi_id,
+                                         display::DisplayId id = display::DisplayId{1}) {
     // TODO(fxbug.dev/86038): In normal operation a DpDisplay is not fully constructed until it
     // receives a call to DisplayDevice::Query, then either DisplayDevice::Init() (for a hotplug or
     // initially powered-off display) OR DisplayDevice::AttachPipe() and

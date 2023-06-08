@@ -19,6 +19,7 @@
 #include "src/graphics/display/drivers/intel-i915/display-device.h"
 #include "src/graphics/display/drivers/intel-i915/dpcd.h"
 #include "src/graphics/display/drivers/intel-i915/pch-engine.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
 namespace i915 {
 
@@ -185,7 +186,7 @@ class DpCapabilities final {
 
 class DpDisplay : public DisplayDevice {
  public:
-  DpDisplay(Controller* controller, uint64_t id, DdiId ddi_id, DpcdChannel* dp_aux,
+  DpDisplay(Controller* controller, display::DisplayId id, DdiId ddi_id, DpcdChannel* dp_aux,
             PchEngine* pch_engine, DdiReference ddi_reference, inspect::Node* parent_node);
 
   DpDisplay(const DpDisplay&) = delete;

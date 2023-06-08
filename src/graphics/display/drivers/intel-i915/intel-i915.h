@@ -40,6 +40,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-i915/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
 namespace i915 {
 
@@ -106,12 +107,12 @@ class Controller : public DeviceType,
   void DisplayControllerImplApplyConfiguration(const display_config_t** banjo_display_configs,
                                                size_t display_config_count,
                                                const config_stamp_t* config_stamp);
-  void DisplayControllerImplSetEld(uint64_t display_id, const uint8_t* raw_eld_list,
+  void DisplayControllerImplSetEld(uint64_t banjo_display_id, const uint8_t* raw_eld_list,
                                    size_t raw_eld_count);
   zx_status_t DisplayControllerImplGetSysmemConnection(zx::channel connection);
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints(const image_t* config,
                                                                   uint64_t collection_id);
-  zx_status_t DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on) {
+  zx_status_t DisplayControllerImplSetDisplayPower(uint64_t banjo_display_id, bool power_on) {
     return ZX_ERR_NOT_SUPPORTED;
   }
   zx_status_t DisplayControllerImplStartCapture(uint64_t capture_handle) {
@@ -214,17 +215,18 @@ class Controller : public DeviceType,
   // Disables the PCU (power controller)'s automated voltage adjustments.
   void DisableSystemAgentGeyserville();
 
-  std::unique_ptr<DisplayDevice> QueryDisplay(DdiId ddi_id, uint64_t display_id)
+  std::unique_ptr<DisplayDevice> QueryDisplay(DdiId ddi_id, display::DisplayId display_id)
       __TA_REQUIRES(display_lock_);
   bool LoadHardwareState(DdiId ddi_id, DisplayDevice* device) __TA_REQUIRES(display_lock_);
   zx_status_t AddDisplay(std::unique_ptr<DisplayDevice> display) __TA_REQUIRES(display_lock_);
   void RemoveDisplay(std::unique_ptr<DisplayDevice> display) __TA_REQUIRES(display_lock_);
   bool BringUpDisplayEngine(bool resume) __TA_REQUIRES(display_lock_);
   void InitDisplayBuffers();
-  DisplayDevice* FindDevice(uint64_t display_id) __TA_REQUIRES(display_lock_);
+  DisplayDevice* FindDevice(display::DisplayId display_id) __TA_REQUIRES(display_lock_);
 
-  void CallOnDisplaysChanged(DisplayDevice** added, size_t added_count, uint64_t* removed,
-                             size_t removed_count) __TA_REQUIRES(display_lock_);
+  void CallOnDisplaysChanged(cpp20::span<DisplayDevice*> added,
+                             cpp20::span<const display::DisplayId> removed)
+      __TA_REQUIRES(display_lock_);
 
   // Gets the layer_t* config for the given pipe/plane. Return false if there is no layer.
   bool GetPlaneLayer(Pipe* pipe, uint32_t plane,
@@ -258,8 +260,9 @@ class Controller : public DeviceType,
   bool CheckDisplayLimits(cpp20::span<const display_config_t*> banjo_display_configs,
                           uint32_t** layer_cfg_results) __TA_REQUIRES(display_lock_);
 
-  bool CalculatePipeAllocation(cpp20::span<const display_config_t*> banjo_display_configs,
-                               uint64_t alloc[PipeIds<registers::Platform::kKabyLake>().size()])
+  bool CalculatePipeAllocation(
+      cpp20::span<const display_config_t*> banjo_display_configs,
+      display::DisplayId alloc[PipeIds<registers::Platform::kKabyLake>().size()])
       __TA_REQUIRES(display_lock_);
 
   // The number of DBUF (Data Buffer) blocks that can be allocated to planes.
@@ -315,7 +318,8 @@ class Controller : public DeviceType,
   // References to displays. References are owned by devmgr, but will always
   // be valid while they are in this vector.
   fbl::Vector<std::unique_ptr<DisplayDevice>> display_devices_ __TA_GUARDED(display_lock_);
-  uint64_t next_id_ __TA_GUARDED(display_lock_) = 1;  // id can't be INVALID_DISPLAY_ID == 0
+  // Display ID can't be kInvalidDisplayId.
+  display::DisplayId next_id_ __TA_GUARDED(display_lock_) = display::DisplayId{1};
   mtx_t display_lock_;
 
   std::unique_ptr<DdiManager> ddi_manager_;
@@ -347,7 +351,7 @@ class Controller : public DeviceType,
   // Various configuration values set by the BIOS which need to be carried across suspend.
   bool ddi_e_disabled_ = true;
 
-  std::optional<uint64_t> eld_display_id_;
+  std::optional<display::DisplayId> eld_display_id_;
 
   // Debug
   inspect::Inspector inspector_;

@@ -20,6 +20,7 @@
 #include "src/graphics/display/drivers/intel-i915/dpll.h"
 #include "src/graphics/display/drivers/intel-i915/pipe.h"
 #include "src/graphics/display/drivers/intel-i915/power.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
 namespace i915 {
 
@@ -44,8 +45,8 @@ class DisplayDevice : public fidl::WireServer<FidlBacklight::Device> {
     kDvi,
   };
 
-  DisplayDevice(Controller* controller, uint64_t id, DdiId ddi_id, DdiReference ddi_reference,
-                Type type);
+  DisplayDevice(Controller* controller, display::DisplayId id, DdiId ddi_id,
+                DdiReference ddi_reference, Type type);
 
   DisplayDevice(const DisplayDevice&) = delete;
   DisplayDevice(DisplayDevice&&) = delete;
@@ -89,7 +90,7 @@ class DisplayDevice : public fidl::WireServer<FidlBacklight::Device> {
   // the device will be removed.
   virtual bool HandleHotplug(bool long_pulse) { return false; }
 
-  uint64_t id() const { return id_; }
+  display::DisplayId id() const { return id_; }
   DdiId ddi_id() const { return ddi_id_; }
   Controller* controller() { return controller_; }
   const std::optional<DdiReference>& ddi_reference() const { return ddi_reference_; }
@@ -158,7 +159,7 @@ class DisplayDevice : public fidl::WireServer<FidlBacklight::Device> {
   // Borrowed reference to Controller instance
   Controller* controller_;
 
-  uint64_t id_;
+  display::DisplayId id_;
   DdiId ddi_id_;
 
   Pipe* pipe_ = nullptr;
