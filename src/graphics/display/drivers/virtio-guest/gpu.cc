@@ -749,7 +749,16 @@ zx_status_t GpuDevice::Init() {
   // Ack and set the driver status bit
   DriverStatusAck();
 
-  // XXX check features bits and ack/nak them
+  if (!DeviceFeaturesSupported(VIRTIO_F_VERSION_1)) {
+    // Declaring non-support until there is a need in the future.
+    zxlogf(ERROR, "Legacy virtio interface is not supported by this driver");
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  DriverFeaturesAck(VIRTIO_F_VERSION_1);
+  if (zx_status_t status = DeviceStatusFeaturesOk(); status != ZX_OK) {
+    zxlogf(ERROR, "Feature negotiation failed: %s", zx_status_get_string(status));
+    return status;
+  }
 
   // Allocate the main vring
   status = vring_.Init(0, 16);

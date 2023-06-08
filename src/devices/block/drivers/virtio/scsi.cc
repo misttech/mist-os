@@ -443,6 +443,17 @@ zx_status_t ScsiDevice::Init() {
 
   virtio::Device::DriverStatusAck();
 
+  if (!virtio::Device::DeviceFeaturesSupported(VIRTIO_F_VERSION_1)) {
+    // Declaring non-support until there is a need in the future.
+    zxlogf(ERROR, "Legacy virtio interface is not supported by this driver");
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  virtio::Device::DriverFeaturesAck(VIRTIO_F_VERSION_1);
+  if (zx_status_t status = virtio::Device::DeviceStatusFeaturesOk(); status != ZX_OK) {
+    zxlogf(ERROR, "Feature negotiation failed: %s", zx_status_get_string(status));
+    return status;
+  }
+
   if (!bti().is_valid()) {
     zxlogf(ERROR, "invalid bti handle");
     return ZX_ERR_BAD_HANDLE;
