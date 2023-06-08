@@ -9,7 +9,6 @@
 #include <fuchsia/hardware/camera/sensor/cpp/banjo.h>
 #include <fuchsia/hardware/clock/cpp/banjo.h>
 #include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
-#include <fuchsia/hardware/ethernet/board/cpp/banjo.h>
 #include <fuchsia/hardware/gdc/cpp/banjo.h>
 #include <fuchsia/hardware/ge2d/cpp/banjo.h>
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
@@ -64,7 +63,6 @@ class Fragment : public FragmentBase {
   explicit Fragment(zx_device_t* parent, async_dispatcher_t* dispatcher)
       : FragmentBase(parent),
         clock_client_(parent, ZX_PROTOCOL_CLOCK),
-        eth_board_client_(parent, ZX_PROTOCOL_ETH_BOARD),
         gpio_client_(parent, ZX_PROTOCOL_GPIO),
         dai_client_(parent, ZX_PROTOCOL_DAI),
         pdev_client_(parent, ZX_PROTOCOL_PDEV),
@@ -107,10 +105,6 @@ class Fragment : public FragmentBase {
   zx_status_t RpcClock(const uint8_t* req_buf, uint32_t req_size, uint8_t* resp_buf,
                        uint32_t* out_resp_size, zx::handle* req_handles, uint32_t req_handle_count,
                        zx::handle* resp_handles, uint32_t* resp_handle_count);
-  zx_status_t RpcEthBoard(const uint8_t* req_buf, uint32_t req_size, uint8_t* resp_buf,
-                          uint32_t* out_resp_size, zx::handle* req_handles,
-                          uint32_t req_handle_count, zx::handle* resp_handles,
-                          uint32_t* resp_handle_count);
   zx_status_t RpcGpio(const uint8_t* req_buf, uint32_t req_size, uint8_t* resp_buf,
                       uint32_t* out_resp_size, zx::handle* req_handles, uint32_t req_handle_count,
                       zx::handle* resp_handles, uint32_t* resp_handle_count);
@@ -128,7 +122,6 @@ class Fragment : public FragmentBase {
                      zx::handle* resp_handles, uint32_t* resp_handle_count);
 
   ProtocolClient<ddk::ClockProtocolClient, clock_protocol_t> clock_client_;
-  ProtocolClient<ddk::EthBoardProtocolClient, eth_board_protocol_t> eth_board_client_;
   ProtocolClient<ddk::GpioProtocolClient, gpio_protocol_t> gpio_client_;
   ProtocolClient<ddk::DaiProtocolClient, dai_protocol_t> dai_client_;
   ProtocolClient<ddk::PDevProtocolClient, pdev_protocol_t> pdev_client_;

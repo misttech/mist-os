@@ -5,7 +5,7 @@
 #ifndef SRC_CONNECTIVITY_ETHERNET_DRIVERS_DWMAC_DWMAC_H_
 #define SRC_CONNECTIVITY_ETHERNET_DRIVERS_DWMAC_DWMAC_H_
 
-#include <fuchsia/hardware/ethernet/board/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.ethernet.board/cpp/wire.h>
 #include <fuchsia/hardware/ethernet/cpp/banjo.h>
 #include <fuchsia/hardware/ethernet/mac/cpp/banjo.h>
 #include <fuchsia/hardware/test/c/banjo.h>
@@ -97,7 +97,8 @@ class EthMacFunction;
 
 class DWMacDevice : public ddk::Device<DWMacDevice, ddk::Unbindable, ddk::Suspendable> {
  public:
-  DWMacDevice(zx_device_t* device, ddk::PDevFidl pdev, ddk::EthBoardProtocolClient eth_board);
+  DWMacDevice(zx_device_t* device, ddk::PDevFidl pdev,
+              fidl::ClientEnd<fuchsia_hardware_ethernet_board::EthBoard> eth_board);
 
   static zx_status_t Create(void* ctx, zx_device_t* device);
 
@@ -173,7 +174,7 @@ class DWMacDevice : public ddk::Device<DWMacDevice, ddk::Unbindable, ddk::Suspen
   zx::interrupt dma_irq_;
 
   ddk::PDevFidl pdev_;
-  ddk::EthBoardProtocolClient eth_board_;
+  fidl::WireSyncClient<fuchsia_hardware_ethernet_board::EthBoard> eth_board_;
 
   std::optional<fdf::MmioBuffer> mmio_;
 

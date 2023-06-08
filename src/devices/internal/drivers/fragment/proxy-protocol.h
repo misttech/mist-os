@@ -173,16 +173,6 @@ struct SysmemProxyRequest {
   uint64_t heap;
 };
 
-// ZX_PROTOCOL_ETH_BOARD proxy support.
-enum class EthBoardOp {
-  RESET_PHY,
-};
-
-struct EthBoardProxyRequest {
-  ProxyRequest header;
-  EthBoardOp op;
-};
-
 enum class SpiOp {
   TRANSMIT,
   RECEIVE,

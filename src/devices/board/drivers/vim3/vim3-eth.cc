@@ -16,7 +16,7 @@
 
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/designware/platform/cpp/bind.h>
-#include <bind/fuchsia/ethboard/cpp/bind.h>
+#include <bind/fuchsia/hardware/ethernet/board/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <soc/aml-a311d/a311d-gpio.h>
 #include <soc/aml-a311d/a311d-hw.h>
@@ -135,7 +135,8 @@ static const device_fragment_t eth_fragments[] = {
 };
 
 const std::vector<fuchsia_driver_framework::BindRule> kEthBoardRules = {
-    fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_ethboard::BIND_PROTOCOL_DEVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_hardware_ethernet_board::BIND_FIDL_PROTOCOL_SERVICE),
     fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
                             bind_fuchsia_designware_platform::BIND_PLATFORM_DEV_VID_DESIGNWARE),
     fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
@@ -143,7 +144,8 @@ const std::vector<fuchsia_driver_framework::BindRule> kEthBoardRules = {
 };
 
 const std::vector<fuchsia_driver_framework::NodeProperty> kEthBoardProperties = {
-    fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_ethboard::BIND_PROTOCOL_DEVICE),
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                      bind_fuchsia_hardware_ethernet_board::BIND_FIDL_PROTOCOL_SERVICE),
 };
 
 const std::vector<fuchsia_driver_framework::ParentSpec> kEthBoardParents = {

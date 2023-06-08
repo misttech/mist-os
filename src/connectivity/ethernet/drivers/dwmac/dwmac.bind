@@ -6,10 +6,10 @@ composite dwmac;
 
 using fuchsia.designware.platform;
 using fuchsia.platform;
-using fuchsia.ethboard;
+using fuchsia.hardware.ethernet.board;
 
 primary node "eth-board" {
-  fuchsia.BIND_PROTOCOL == fuchsia.ethboard.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.ethernet.board.BIND_FIDL_PROTOCOL.SERVICE;
 }
 
 node "pdev" {

@@ -46,9 +46,6 @@ zx_status_t FragmentProxy::DdkGetProtocol(uint32_t proto_id, void* out) {
     case ZX_PROTOCOL_CLOCK:
       proto->ops = &clock_protocol_ops_;
       return ZX_OK;
-    case ZX_PROTOCOL_ETH_BOARD:
-      proto->ops = &eth_board_protocol_ops_;
-      return ZX_OK;
     case ZX_PROTOCOL_GPIO:
       proto->ops = &gpio_protocol_ops_;
       return ZX_OK;
@@ -239,15 +236,6 @@ zx_status_t FragmentProxy::ClockGetInput(uint32_t* out_current_input) {
   }
 
   return status;
-}
-
-zx_status_t FragmentProxy::EthBoardResetPhy() {
-  EthBoardProxyRequest req = {};
-  ProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_ETH_BOARD;
-  req.op = EthBoardOp::RESET_PHY;
-
-  return Rpc(&req.header, sizeof(req), &resp, sizeof(resp));
 }
 
 zx_status_t FragmentProxy::GpioConfigIn(uint32_t flags) {

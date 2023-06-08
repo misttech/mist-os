@@ -169,13 +169,15 @@ zx_status_t DWMacDevice::Create(void* ctx, zx_device_t* device) {
     return ZX_ERR_NO_RESOURCES;
   }
 
-  ddk::EthBoardProtocolClient eth_board(device, "eth-board");
-  if (!eth_board.is_valid()) {
-    zxlogf(ERROR, "%s could not get ZX_PROTOCOL_ETH_BOARD", __func__);
-    return ZX_ERR_NO_RESOURCES;
+  zx::result client =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_ethernet_board::Service::Device>(device,
+                                                                                       "eth-board");
+  if (client.is_error()) {
+    zxlogf(ERROR, " failed to connect to FIDL fragment: %s",
+           zx_status_get_string(client.error_value()));
+    return client.error_value();
   }
-
-  auto mac_device = std::make_unique<DWMacDevice>(device, std::move(pdev), eth_board);
+  auto mac_device = std::make_unique<DWMacDevice>(device, std::move(pdev), std::move(*client));
 
   zx_status_t status = mac_device->InitPdev();
   if (status != ZX_OK) {
@@ -183,7 +185,11 @@ zx_status_t DWMacDevice::Create(void* ctx, zx_device_t* device) {
   }
 
   // Reset the phy.
-  mac_device->eth_board_.ResetPhy();
+  fidl::WireResult result = mac_device->eth_board_->ResetPhy();
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to reset Phy");
+    return result.status();
+  }
 
   // Get and cache the mac address.
   mac_device->GetMAC(device);
@@ -362,10 +368,10 @@ zx_status_t DWMacDevice::EthMacRegisterCallbacks(const eth_mac_callbacks_t* cbs)
 }
 
 DWMacDevice::DWMacDevice(zx_device_t* device, ddk::PDevFidl pdev,
-                         ddk::EthBoardProtocolClient eth_board)
+                         fidl::ClientEnd<fuchsia_hardware_ethernet_board::EthBoard> eth_board)
     : ddk::Device<DWMacDevice, ddk::Unbindable, ddk::Suspendable>(device),
       pdev_(std::move(pdev)),
-      eth_board_(eth_board) {}
+      eth_board_(fidl::WireSyncClient(std::move(eth_board))) {}
 
 void DWMacDevice::ReleaseBuffers() {
   // Unpin the memory used for the dma buffers

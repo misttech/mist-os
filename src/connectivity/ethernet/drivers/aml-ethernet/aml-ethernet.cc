@@ -29,14 +29,14 @@ namespace eth {
 #define MCU_I2C_REG_BOOT_EN_WOL 0x21
 #define MCU_I2C_REG_BOOT_EN_WOL_RESET_ENABLE 0x03
 
-zx_status_t AmlEthernet::EthBoardResetPhy() {
+void AmlEthernet::ResetPhy(ResetPhyCompleter::Sync& completer) {
   if (gpios_[PHY_RESET].is_valid()) {
     gpios_[PHY_RESET].Write(0);
     zx_nanosleep(zx_deadline_after(ZX_MSEC(100)));
     gpios_[PHY_RESET].Write(1);
     zx_nanosleep(zx_deadline_after(ZX_MSEC(100)));
   }
-  return ZX_OK;
+  completer.ReplySuccess();
 }
 
 zx_status_t AmlEthernet::InitPdev() {
@@ -134,7 +134,37 @@ zx_status_t AmlEthernet::Bind() {
       {BIND_PLATFORM_DEV_DID, 0, mac_info.did},
   };
 
-  return DdkAdd(ddk::DeviceAddArgs("aml-ethernet").set_props(props));
+  auto* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+  outgoing_ = component::OutgoingDirectory(dispatcher);
+
+  fuchsia_hardware_ethernet_board::Service::InstanceHandler handler({
+      .device = bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
+  });
+  auto result = outgoing_->AddService<fuchsia_hardware_ethernet_board::Service>(std::move(handler));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service to the outgoing directory");
+    return result.status_value();
+  }
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.status_value();
+  }
+
+  result = outgoing_->Serve(std::move(endpoints->server));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to serve the outgoing directory");
+    return result.status_value();
+  }
+
+  std::array offers = {
+      fuchsia_hardware_ethernet_board::Service::Name,
+  };
+
+  return DdkAdd(ddk::DeviceAddArgs("aml-ethernet")
+                    .set_props(props)
+                    .set_fidl_service_offers(offers)
+                    .set_outgoing_dir(endpoints->client.TakeChannel()));
 }
 
 void AmlEthernet::DdkRelease() { delete this; }

@@ -2,8 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/hardware/ethernet/board/cpp/banjo.h>
+#ifndef SRC_CONNECTIVITY_ETHERNET_DRIVERS_AML_ETHERNET_AML_ETHERNET_H_
+#define SRC_CONNECTIVITY_ETHERNET_DRIVERS_AML_ETHERNET_AML_ETHERNET_H_
+
+#include <fidl/fuchsia.hardware.ethernet.board/cpp/wire.h>
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/device-protocol/pdev-fidl.h>
@@ -21,7 +25,7 @@ class AmlEthernet;
 using DeviceType = ddk::Device<AmlEthernet>;
 
 class AmlEthernet : public DeviceType,
-                    public ddk::EthBoardProtocol<AmlEthernet, ddk::base_protocol> {
+                    public fidl::WireServer<fuchsia_hardware_ethernet_board::EthBoard> {
  public:
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(AmlEthernet);
 
@@ -33,7 +37,7 @@ class AmlEthernet : public DeviceType,
   void DdkRelease();
 
   // ETH_BOARD protocol.
-  zx_status_t EthBoardResetPhy();
+  void ResetPhy(ResetPhyCompleter::Sync& completer);
 
  private:
   // GPIO Indexes.
@@ -55,9 +59,14 @@ class AmlEthernet : public DeviceType,
   ddk::PDevFidl pdev_;
   ddk::I2cChannel i2c_;
   ddk::GpioProtocolClient gpios_[GPIO_COUNT];
+  std::optional<component::OutgoingDirectory> outgoing_;
+  fidl::ServerEnd<fuchsia_io::Directory> outgoing_server_end_;
+  fidl::ServerBindingGroup<fuchsia_hardware_ethernet_board::EthBoard> bindings_;
 
   std::optional<fdf::MmioBuffer> periph_mmio_;
   std::optional<fdf::MmioBuffer> hhi_mmio_;
 };
 
 }  // namespace eth
+
+#endif  // SRC_CONNECTIVITY_ETHERNET_DRIVERS_AML_ETHERNET_AML_ETHERNET_H_

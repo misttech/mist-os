@@ -7,7 +7,6 @@
 
 #include <fuchsia/hardware/audio/cpp/banjo.h>
 #include <fuchsia/hardware/clock/cpp/banjo.h>
-#include <fuchsia/hardware/ethernet/board/cpp/banjo.h>
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/spi/cpp/banjo.h>
@@ -28,7 +27,6 @@ using FragmentProxyBase = ddk::Device<FragmentProxy, ddk::GetProtocolable>;
 
 class FragmentProxy : public FragmentProxyBase,
                       public ddk::ClockProtocol<FragmentProxy>,
-                      public ddk::EthBoardProtocol<FragmentProxy>,
                       public ddk::GpioProtocol<FragmentProxy>,
                       public ddk::DaiProtocol<FragmentProxy>,
                       public ddk::PDevProtocol<FragmentProxy>,
@@ -63,7 +61,6 @@ class FragmentProxy : public FragmentProxyBase,
   zx_status_t ClockSetInput(uint32_t idx);
   zx_status_t ClockGetNumInputs(uint32_t* out_num_inputs);
   zx_status_t ClockGetInput(uint32_t* out_current_input);
-  zx_status_t EthBoardResetPhy();
   zx_status_t GpioConfigIn(uint32_t flags);
   zx_status_t GpioConfigOut(uint8_t initial_value);
   zx_status_t GpioSetAltFunction(uint64_t function);
