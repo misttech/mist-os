@@ -46,8 +46,7 @@ build_dir: "{build_dir}"
 FUCHSIA_FINT_PARAMS_MAP = {
     "x64":
         os.path.join(
-            FUCHSIA_FINT_PARAMS_DIR,
-            "sdk-core-linux-x64-build_only.textproto"),
+            FUCHSIA_FINT_PARAMS_DIR, "sdk-core-linux-x64-build_only.textproto"),
     "arm64":
         os.path.join(
             FUCHSIA_FINT_PARAMS_DIR,
@@ -57,12 +56,10 @@ FUCHSIA_FINT_PARAMS_MAP = {
 INTERNAL_FINT_PARAMS_MAP = {
     "x64":
         os.path.join(
-            TQ_FINT_PARAMS_DIR,
-            "sdk-google-linux-x64-build_only.textproto"),
+            TQ_FINT_PARAMS_DIR, "sdk-google-linux-x64-build_only.textproto"),
     "arm64":
         os.path.join(
-            TQ_FINT_PARAMS_DIR,
-            "sdk-google-linux-arm64-build_only.textproto")
+            TQ_FINT_PARAMS_DIR, "sdk-google-linux-arm64-build_only.textproto")
 }
 
 
@@ -101,14 +98,12 @@ def build_for_arch(arch, fint, fint_params_files, rbe):
 
     subprocess.check_call(
         [
-            fint, "-log-level=error", "set",
-            "-static", static_params_path,
+            fint, "-log-level=error", "set", "-static", static_params_path,
             "-context", fint_params_files["context"]
         ])
     subprocess.check_call(
         [
-            fint, "-log-level=error", "build",
-            "-static", static_params_path,
+            fint, "-log-level=error", "build", "-static", static_params_path,
             "-context", fint_params_files["context"]
         ])
 
@@ -249,9 +244,9 @@ def main():
                 output_dir = tempfile.TemporaryDirectory()
                 merge.main(
                     [
-                        "--first-directory",
+                        "--input-directory",
                         primary_dir.name,
-                        "--second-directory",
+                        "--input-directory",
                         secondary_dir.name,
                         "--output-directory",
                         output_dir.name,

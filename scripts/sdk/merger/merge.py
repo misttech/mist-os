@@ -5,7 +5,9 @@
 """Merge the content of two SDKs into a new one.
 
 Use either --output-archive or --output-directory to indicate the output.
-Tp specify inputs, there are two ways due to compatibility:
+Note that it is possible to use both at the same time.
+
+To specify inputs, there are two ways due to compatibility:
 
 The legacy way (only supports two inputs):
 
@@ -18,6 +20,21 @@ The new way:
   * as many times as necessary, which means at least twice, since there is no
     point in merging a single input.
 
+It is possible to use a single input and a single output, in particular to
+create an archive from a single input directory, without any merge operation
+as in:
+
+  merge.py --input-directory DIR --output-archive ARCHIVE
+
+Another use case if filtering any stale artifacts from an input directory
+since the merge/copy will only include files listed from in the SDK metadata file,
+for example:
+
+  INPUT_DIR=out/default/sdk/exported/core
+  touch $INPUT_DIR/UNWANTED_FILE
+  merge.py --input-directory $INPUT_DIR --output-directory /tmp/FOO
+
+Will not create /tmp/FOO/UNWANTED_FILE since it is not listed in the SDK manifest.
 """
 
 # See https://stackoverflow.com/questions/33533148/how-do-i-type-hint-a-method-with-the-type-of-the-enclosing-class
@@ -303,19 +320,42 @@ def _merge_sdk_manifests(manifest_one: SdkManifest,
     return manifest
 
 
-def tarfile_writer(archive_file: Path, source_dir: Path):
+def tarfile_writer(
+        archive_file: Path, source_dir: Path, compressed: bool = True):
     """Write an archive using the Python tarfile module."""
-    with tarfile.open(archive_file, "w:gz") as archive:
-        archive.add(source_dir, arcname='')
+    all_files: List[Tuple[str, str]] = []
+    for root, dirs, files in os.walk(source_dir):
+        for f in files:
+            src_path = os.path.join(root, f)
+            dst_path = os.path.relpath(src_path, source_dir)
+            all_files.append((dst_path, src_path))
+    all_files = sorted(all_files)
+
+    options = "w:gz" if compressed else "w"
+    with tarfile.open(archive_file, options) as archive:
+        for dst_path, src_path in all_files:
+            info = tarfile.TarInfo(dst_path)
+            s = os.stat(src_path)
+            info.size = s.st_size
+            info.mode = s.st_mode
+            # Leave all other fields as default for
+            # deterministic output. uid/gid will be 0.
+            # mtime will be 0 too (January 1st 1970), and type will be
+            # tarfile.REGTYPE which is fine since directories or symlinks
+            # are never stored in the archive.
+            with open(src_path, 'rb') as f:
+                archive.addfile(info, f)
 
 
 def pigz_writer(archive_file: Path, source_dir: Path):
     """Write an uncompressed archive using the Python tarfile module,
     then compress with pigz."""
     temp_archive = archive_file + ".tmp.tar"
-    with tarfile.open(temp_archive, "w") as archive:
-        archive.add(source_dir, arcname='')
-    subprocess.check_call([PIGZ_PATH, temp_archive, "-9"])
+    tarfile_writer(temp_archive, source_dir, compressed=False)
+    # Invoke pigz with its default block size of 128 KiB
+    # The -n option avoids writing the name of the input archive into the result.
+    # The -9 option enables max compression.
+    subprocess.check_call([PIGZ_PATH, "-n", "-9", temp_archive])
     os.rename(temp_archive + ".gz", archive_file)
 
 
@@ -456,24 +496,22 @@ class OutputSdk(object):
         self._dry_run = dry_run
         self._archive = archive
         self._state = state
-        if archive:
-            assert not directory, 'Cannot set both archive and directory'
-            # When generating the final archive, ensure there are no symlinks in it!
-            self._follow_symlinks = True
-            # Create temporary directory to store archive content. The archive
-            # itself will be created in __exit__() if there were no exceptions
-            # before that.
-            self._directory = state.get_temp_dir()
-        else:
-            assert directory, 'Either archive or directory must be set'
+        if directory:
+            # NOTE: If both directory and archive are set, the directory
+            # will be populated with symlinks, then the archive will be
+            # created from its content in __exit__() below.
             if self._dry_run:
                 # Use a temporary directory to keep the destination directory
                 # untouched during dry-runs.
                 self._directory = state.get_temp_dir()
             else:
                 self._directory = directory
-            # Keep the symlinks in the final directory.
-            self._follow_symlinks = False
+        elif archive:
+            # If only archive is provided, create a temporary output directory
+            # for its content.
+            self._directory = state.get_temp_dir()
+        else:
+            assert False, 'Either archive or directory must be set'
 
     def __enter__(self):
         return self
@@ -507,8 +545,7 @@ class OutputSdk(object):
             # shutil.copy2() will complain when copying a symlinks into the same symlink.
             if os.path.islink(destination):
                 os.unlink(destination)
-            shutil.copy2(
-                source, destination, follow_symlinks=self._follow_symlinks)
+            shutil.copy2(source, destination, follow_symlinks=False)
         self._state.add_input(source)
         self._state.add_output(destination)
 
@@ -667,13 +704,12 @@ def main(main_args=None):
         help='Path to the second SDK - as a directory',
         metavar='DIR2',
         default='')
-    output_group = parser.add_mutually_exclusive_group(required=True)
-    output_group.add_argument(
+    parser.add_argument(
         '--output-archive',
         help='Path to the merged SDK - as an archive',
         metavar='OUT_ARCHIVE',
         default='')
-    output_group.add_argument(
+    parser.add_argument(
         '--output-directory',
         help='Path to the merged SDK - as a directory',
         metavar='OUT_DIR',
@@ -712,10 +748,22 @@ def main(main_args=None):
         parser.error('Using --second-xxx requires --first-xxx too!')
         return 1
 
-    if not args.inputs or len(args.inputs) < 2:
+    if not args.inputs:
         parser.error(
-            'Not enough input sdks for a merge, at least two are required!')
-        return 1
+            'At least one of --input-archive or --input directory is required!')
+
+    if not args.output_archive and not args.output_directory:
+        parser.error(
+            'At least one of --output-archive or --output-directory is required!'
+        )
+
+    if len(args.inputs
+          ) == 1 and args.inputs[0].archive and args.output_directory:
+        parser.error(
+            'Using a single input archive as input and an output directory is not supported!\n'
+            +
+            'as the result would contain dangling symlinks. Just uncompress the archive manually!'
+        )
 
     has_hermetic_inputs_file = bool(args.hermetic_inputs_file)
 
@@ -728,9 +776,10 @@ def main(main_args=None):
                 args.inputs[n].archive, args.inputs[n].directory, state)
 
             if n == 0:
-                # Just record the first entry, no merge needed.
                 previous_input_sdk = input_sdk
-                continue
+                if num_inputs > 1:
+                    # Just record the first entry, no merge needed.
+                    continue
 
             if n + 1 == num_inputs:
                 # The final output directory or archive.
