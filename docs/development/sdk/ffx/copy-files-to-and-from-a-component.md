@@ -36,20 +36,26 @@ ffx component copy {{ '<var>' }}SOURCE{{ '</var>' }} {{ '<var>' }}DESTINATION{{ 
 Replace the following:
 
 *  <var>SOURCE</var>: The path of the file(s) to be copied. This path can refer
-   to either the host machine or a Fuchsia component on the target device.
+   to either a local path or a path within a directory associated with a
+   Fuchsia component on the target device.
 
-*  <var>DESTINATION</var>: The destination path for the file(s). This path can
-   refer to either the host machine or a Fuchsia component on the target device.
+*  <var>DESTINATION</var>: The destination path for the file(s). The same
+   options and restrictions apply here as for `SOURCE`.
 
    If <var>SOURCE</var> or <var>DESTINATION</var> is a Fuchsia component,
    use the syntax below to represent the component and path:
 
    ```none {:.devsite-disable-click-to-copy}
-   {{ '<var>' }}MONIKER{{ '</var>' }}::{{ '<var>' }}PATH_IN_NAMESPACE{{ '</var>' }}
+   {{ '<var>' }}MONIKER{{ '</var>' }}::{{ '<var>' }}DIR_TYPE{{ '</var>' }}::{{ '<var>' }}PATH{{ '</var>' }}
    ```
 
-   For example, `/core/stash_secure::/data/examples.txt` means that the `example.txt` file
-   is located in the `/data` directory of the `/core/stash_secure` component.
+   `DIR_TYPE` can be one of `in`, `out`, or `pkg`, to indicate the namespace
+   (the "incoming" directory), the component's outgoing directory, or the
+   component's package directory. Optionally, `DIR_TYPE` can be omitted and the
+   command will default to the component's namespace.
+
+   For example, `/core/stash_secure::in::/data/examples.txt` means the path
+   `/data/example.txt` in the namespace of the `/core/stash_secure` component.
 
 See example commands below:
 
@@ -77,8 +83,6 @@ See example commands below:
 ## Copy multiple files to and from a component's namespace {:#copy-multiple-files-to-and-from-a-components-namespace}
 
 The `ffx component copy` command supports the use of the wildcard `*` to copy multiple files at once.
-When the wildcard is used, the paths on the host machine are interpreted by the terminal while the
-paths on the Fuchsia device are interpreted by the `ffx component copy` command.
 
 Note: In [`Zsh`][zsh]{:.external} and [`fish`][fish]{:.external}, you may run into issues when
 using `*` for the paths on the device. A workaround is to wrap the path with `*` in single quotes
@@ -118,14 +122,13 @@ See example commands below:
 
 ### Copy a file to and from a component's isolated storage {:#copy-a-file-to-and-from-a-components-isolated-storage}
 
-A Fuchsia component can allocate per-component *isolated* storage on a device using
-[storage capabilities][storage-capabilities]. This type of storage is isolated within
-the component, preventing other components from accessing files in the storage.
+Some Fuchsia component are allocated per-component *isolated* storage with
+[storage capabilities][storage-capabilities].
 
 Unlike `ffx component copy`, the `ffx component storage` command works exclusively with
 storage capabilities. Instead of an absolute moniker, this command uses a component's
 [instance ID][component-id-index] as an identifier. By default, the `ffx component storage`
-command connects to the component's `data` storage.
+command interfaces with the storage capability named `data`.
 
 To copy a file to and from a component's isolated storage, run the following command:
 
