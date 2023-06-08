@@ -81,6 +81,10 @@ def write_file_if_unchanged(path: Path, content: str) -> bool:
     return True
 
 
+def command_args_to_string(args: List) -> str:
+    return " ".join(shlex.quote(str(a)) for a in args)
+
+
 def run_command(args: List, cwd=None):
     """Run a command.
 
@@ -91,30 +95,41 @@ def run_command(args: List, cwd=None):
     Returns:
         a subprocess.run() result value.
     """
-    cmd_args = [str(a) for a in args]
-    cmd_str = " ".join(shlex.quote(a) for a in cmd_args)
-    log(f"RUN: {cmd_str}")
+    log('RUN: ' + command_args_to_string(args))
     start_time = time.time()
-    result = subprocess.run([str(c) for c in cmd_args], cwd=cwd)
+    result = subprocess.run([str(a) for a in args], cwd=cwd)
     end_time = time.time()
     log('DURATION: %.1fs' % (end_time - start_time))
     return result
 
 
 def run_checked_command(args: List, cwd=None):
+    """Run a command, return True if succeeds, False otherwise.
+
+    Args:
+        args: A list of strings or Path items (each one of them will be
+            converted to a string for convenience).
+        cwd: If not None, path to the directory where to run the command.
+    Returns:
+        True on success. In case of failure, print the command line and return False.
+    """
     try:
         ret = run_command(args, cwd)
-        ret.check_returncode()
-        return False
+        if ret.returncode == 0:
+            return False
     except KeyboardInterrupt:
+        # If the user interrupts a long-running command, do not print anything.
         return True
+
+    args_str = command_args_to_string(args)
+    print('ERROR: When running command: {args_str}\n', file=sys.stderr)
+    return True
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument("--output-dir", help="Output IDK directory.")
-    group.add_argument("--output-archive", help="Output IDK archive.")
+    parser.add_argument("--output-directory", help="Output IDK directory.")
+    parser.add_argument("--output-archive", help="Output IDK archive.")
     parser.add_argument(
         "--sdk-targets",
         nargs="+",
@@ -260,6 +275,7 @@ def main():
         # Only build host tools in the x64 sub-build, to save
         # considerable time.
         args_gn_content += "sdk_no_host_tools = true\n"
+        args_gn_content += "sdk_inside_idk_sub_build = true\n"
 
         if write_file_if_unchanged(build_dir / 'args.gn', args_gn_content):
             if run_checked_command([gn_path,
@@ -284,9 +300,9 @@ def main():
     for input_dir in all_input_dirs:
         merge_cmd_args += ["--input-directory", str(input_dir)]
 
-    if args.output_dir:
-        merge_cmd_args += ["--output-directory", args.output_dir]
-    else:
+    if args.output_directory:
+        merge_cmd_args += ["--output-directory", args.output_directory]
+    if args.output_archive:
         merge_cmd_args += ["--output-archive", args.output_archive]
 
     if run_checked_command(merge_cmd_args):

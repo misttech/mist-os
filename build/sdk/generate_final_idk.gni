@@ -53,6 +53,9 @@ template("generate_final_idk") {
       _output_name = invoker.output_name
     }
     _output_archive = root_build_dir + "/sdk/archive/${_output_name}.tgz"
+    _exported_dir = root_build_dir + "/sdk/exported/${_output_name}"
+    _exported_dir_stamp = _exported_dir + ".stamp"
+    _exported_dir_target = "${target_name}.exported"
 
     # Compute sdk target labels to pass to the script
     _sdk_targets = []
@@ -62,10 +65,13 @@ template("generate_final_idk") {
       _sdk_targets += [ "${_dir}:${_name}" ]
     }
 
-    # Run the script.
-    action(target_name) {
+    # Run the script to generate the exported directory.
+    # This only contains symlinks to the real files, but can
+    # be used by other targets that need to use it without
+    # a full archive.
+    action(_exported_dir_target) {
       script = "//build/sdk/build_final_idk.py"
-      outputs = [ _output_archive ]
+      outputs = [ _exported_dir_stamp ]
 
       inputs = [
         # Invoked at runtime by this action's script.
@@ -73,13 +79,11 @@ template("generate_final_idk") {
         "//scripts/sdk/merger/merge.py",
       ]
 
-      stamp_file = "$target_out_dir/$target_name.stamp"
-
       args = [
-               "--output-archive",
-               rebase_path(outputs[0], root_build_dir),
+               "--output-directory",
+               rebase_path(_exported_dir, root_build_dir),
                "--stamp-file",
-               rebase_path(stamp_file, root_build_dir),
+               rebase_path(_exported_dir_stamp, root_build_dir),
                "--sdk-targets",
              ] + _sdk_targets
 
@@ -133,6 +137,28 @@ template("generate_final_idk") {
       }
 
       pool = "//:console"
+    }
+
+    action(target_name) {
+      script = "//scripts/sdk/merger/merge.py"
+      outputs = [ _output_archive ]
+      mnemonic = "IDK_ARCHIVE"
+      stamp_file = "$target_out_dir/$target_name.stamp"
+      args = [
+        "--input-directory",
+        rebase_path(_exported_dir, root_build_dir),
+        "--output-archive",
+        rebase_path(outputs[0], root_build_dir),
+        "--stamp-file",
+        rebase_path(stamp_file, root_build_dir),
+      ]
+      deps = [ ":" + _exported_dir_target ]
+
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
     }
   }
 }
