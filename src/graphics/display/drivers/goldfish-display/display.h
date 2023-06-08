@@ -120,7 +120,7 @@ class Display : public DisplayType,
   struct ColorBuffer {
     ~ColorBuffer() = default;
 
-    uint32_t id = 0;
+    HostColorBufferId host_color_buffer_id = kInvalidHostColorBufferId;
     size_t size = 0;
     uint32_t width = 0;
     uint32_t height = 0;
@@ -151,7 +151,9 @@ class Display : public DisplayType,
     uint32_t x = 0;
     uint32_t y = 0;
     uint32_t refresh_rate_hz = 60;
-    uint32_t host_display_id = 0;
+    // Display ID used for host framebuffer rendering. Not to be confused with
+    // display::DisplayId or banjo display ID.
+    HostDisplayId host_display_id = kInvalidHostDisplayId;
     float scale = 1.0;
     zx::time expected_next_flush = zx::time::infinite_past();
     config_stamp_t latest_config_stamp = {.value = INVALID_CONFIG_STAMP_VALUE};
@@ -180,12 +182,11 @@ class Display : public DisplayType,
 
   zx_status_t ImportVmoImage(image_t* image, const fuchsia_sysmem::PixelFormat& pixel_format,
                              zx::vmo vmo, size_t offset);
-  zx_status_t PresentDisplayConfig(RenderControl::DisplayId display_id,
-                                   const DisplayConfig& display_config);
-  zx_status_t SetupDisplay(uint64_t id);
+  zx_status_t PresentDisplayConfig(uint64_t display_id, const DisplayConfig& display_config);
+  zx_status_t SetupDisplay(uint64_t display_id);
 
-  void TeardownDisplay(uint64_t id);
-  void FlushDisplay(async_dispatcher_t* dispatcher, uint64_t id);
+  void TeardownDisplay(uint64_t display_id);
+  void FlushDisplay(async_dispatcher_t* dispatcher, uint64_t display_id);
 
   fbl::Mutex lock_;
   ddk::GoldfishControlProtocolClient control_ TA_GUARDED(lock_);
@@ -203,7 +204,7 @@ class Display : public DisplayType,
   ddk::IoBuffer cmd_buffer_ TA_GUARDED(lock_);
   ddk::IoBuffer io_buffer_ TA_GUARDED(lock_);
 
-  std::map<uint64_t, Device> devices_;
+  std::map</*DisplayId*/ uint64_t, Device> devices_;
   fbl::Mutex flush_lock_;
   ddk::DisplayControllerInterfaceProtocolClient dc_intf_ TA_GUARDED(flush_lock_);
 

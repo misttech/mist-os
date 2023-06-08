@@ -58,7 +58,7 @@ constexpr uint32_t kOP_rcSetColorBufferVulkanMode = 10045;
 struct SetColorBufferVulkanModeCmd {
   uint32_t op = kOP_rcSetColorBufferVulkanMode;
   uint32_t size = sizeof(SetColorBufferVulkanModeCmd);
-  uint32_t id;
+  uint32_t color_buffer_id;
   uint32_t mode;
 };
 
@@ -66,7 +66,7 @@ constexpr uint32_t kOP_rcUpdateColorBuffer = 10024;
 struct UpdateColorBufferCmd {
   uint32_t op = kOP_rcUpdateColorBuffer;
   uint32_t size = sizeof(UpdateColorBufferCmd);
-  uint32_t id;
+  uint32_t color_buffer_id;
   uint32_t x;
   uint32_t y;
   uint32_t width;
@@ -80,7 +80,7 @@ constexpr uint32_t kOP_rcFbPost = 10018;
 struct FbPostCmd {
   uint32_t op = kOP_rcFbPost;
   uint32_t size = sizeof(FbPostCmd);
-  uint32_t id;
+  uint32_t color_buffer_id;
 };
 
 constexpr uint32_t kOP_rcCreateDisplay = 10038;
@@ -102,7 +102,7 @@ struct SetDisplayColorBufferCmd {
   uint32_t op = kOP_rcSetDisplayColorBuffer;
   uint32_t size = sizeof(SetDisplayColorBufferCmd);
   uint32_t display_id;
-  uint32_t id;
+  uint32_t color_buffer_id;
 };
 
 constexpr uint32_t kOP_rcSetDisplayPose = 10044;
@@ -155,9 +155,8 @@ int32_t RenderControl::GetFbParam(uint32_t param, int32_t default_value) {
   return (result.is_ok()) ? result.value()[0] : default_value;
 }
 
-zx::result<RenderControl::ColorBufferId> RenderControl::CreateColorBuffer(uint32_t width,
-                                                                          uint32_t height,
-                                                                          uint32_t format) {
+zx::result<HostColorBufferId> RenderControl::CreateColorBuffer(uint32_t width, uint32_t height,
+                                                               uint32_t format) {
   TRACE_DURATION("gfx", "RenderControl::CreateColorBuffer", "width", width, "height", height,
                  "format", format);
 
@@ -168,39 +167,40 @@ zx::result<RenderControl::ColorBufferId> RenderControl::CreateColorBuffer(uint32
   };
 
   PipeIo::WriteSrc src[] = {{.data = ToByteSpan(cmd)}};
-  auto result = pipe_io_->Call<ColorBufferId>(src, 1, true);
-  return result.is_ok() ? zx::ok(result.value()[0])
-                        : zx::result<ColorBufferId>(result.take_error());
+  auto result = pipe_io_->Call<HostColorBufferId>(src, 1, true);
+  return result.is_ok() ? zx::ok(HostColorBufferId(result.value()[0]))
+                        : zx::result<HostColorBufferId>(result.take_error());
 }
 
-zx_status_t RenderControl::OpenColorBuffer(ColorBufferId id) {
-  TRACE_DURATION("gfx", "RenderControl::OpenColorBuffer", "id", id);
+zx_status_t RenderControl::OpenColorBuffer(HostColorBufferId host_color_buffer_id) {
+  TRACE_DURATION("gfx", "RenderControl::OpenColorBuffer", "id", host_color_buffer_id.value());
 
   OpenColorBufferCmd cmd = {
-      .id = id,
+      .id = ToRenderControlHostColorBufferId(host_color_buffer_id),
   };
 
   PipeIo::WriteSrc src[] = {{.data = ToByteSpan(cmd)}};
   return pipe_io_->Write(src, true);
 }
 
-zx_status_t RenderControl::CloseColorBuffer(ColorBufferId id) {
-  TRACE_DURATION("gfx", "RenderControl::CloseColorBuffer", "id", id);
+zx_status_t RenderControl::CloseColorBuffer(HostColorBufferId host_color_buffer_id) {
+  TRACE_DURATION("gfx", "RenderControl::CloseColorBuffer", "id", host_color_buffer_id.value());
 
   CloseColorBufferCmd cmd = {
-      .id = id,
+      .id = ToRenderControlHostColorBufferId(host_color_buffer_id),
   };
 
   PipeIo::WriteSrc src[] = {{.data = ToByteSpan(cmd)}};
   return pipe_io_->Write(src, true);
 }
 
-zx::result<RenderControl::RcResult> RenderControl::SetColorBufferVulkanMode(ColorBufferId id,
-                                                                            uint32_t mode) {
-  TRACE_DURATION("gfx", "RenderControl::SetColorBufferVulkanMode", "id", id, "mode", mode);
+zx::result<RenderControl::RcResult> RenderControl::SetColorBufferVulkanMode(
+    HostColorBufferId host_color_buffer_id, uint32_t mode) {
+  TRACE_DURATION("gfx", "RenderControl::SetColorBufferVulkanMode", "id",
+                 host_color_buffer_id.value(), "mode", mode);
 
   SetColorBufferVulkanModeCmd cmd = {
-      .id = id,
+      .color_buffer_id = ToRenderControlHostColorBufferId(host_color_buffer_id),
       .mode = mode,
   };
 
@@ -210,13 +210,13 @@ zx::result<RenderControl::RcResult> RenderControl::SetColorBufferVulkanMode(Colo
 }
 
 zx::result<RenderControl::RcResult> RenderControl::UpdateColorBuffer(
-    ColorBufferId id, const fzl::PinnedVmo& pinned_vmo, uint32_t width, uint32_t height,
-    uint32_t format, size_t size) {
+    HostColorBufferId host_color_buffer_id, const fzl::PinnedVmo& pinned_vmo, uint32_t width,
+    uint32_t height, uint32_t format, size_t size) {
   TRACE_DURATION("gfx", "RenderControl::UpdateColorBuffer", "size", size);
 
   UpdateColorBufferCmd cmd = {
       .size = static_cast<uint32_t>(size + sizeof(cmd)),
-      .id = id,
+      .color_buffer_id = ToRenderControlHostColorBufferId(host_color_buffer_id),
       .x = 0,
       .y = 0,
       .width = width,
@@ -246,11 +246,11 @@ zx::result<RenderControl::RcResult> RenderControl::UpdateColorBuffer(
   return result.is_ok() ? zx::ok(result.value()[0]) : zx::result<RcResult>(result.take_error());
 }
 
-zx_status_t RenderControl::FbPost(ColorBufferId id) {
-  TRACE_DURATION("gfx", "RenderControl::FbPost", "id", id);
+zx_status_t RenderControl::FbPost(HostColorBufferId host_color_buffer_id) {
+  TRACE_DURATION("gfx", "RenderControl::FbPost", "id", host_color_buffer_id.value());
 
   FbPostCmd cmd = {
-      .id = id,
+      .color_buffer_id = ToRenderControlHostColorBufferId(host_color_buffer_id),
   };
 
   PipeIo::WriteSrc src[] = {{.data = ToByteSpan(cmd)}};
@@ -258,7 +258,7 @@ zx_status_t RenderControl::FbPost(ColorBufferId id) {
   return result;
 }
 
-zx::result<RenderControl::DisplayId> RenderControl::CreateDisplay() {
+zx::result<HostDisplayId> RenderControl::CreateDisplay() {
   TRACE_DURATION("gfx", "RenderControl::CreateDisplay");
 
   CreateDisplayCmd cmd = {
@@ -279,14 +279,14 @@ zx::result<RenderControl::DisplayId> RenderControl::CreateDisplay() {
   if (result.value()[0].result != 0) {
     return zx::error(ZX_ERR_INTERNAL);
   }
-  return zx::ok(result.value()[0].id);
+  return zx::ok(ToHostDisplayId(result.value()[0].id));
 }
 
-zx::result<RenderControl::RcResult> RenderControl::DestroyDisplay(DisplayId display_id) {
-  TRACE_DURATION("gfx", "RenderControl::DestroyDisplay", "display_id", display_id);
+zx::result<RenderControl::RcResult> RenderControl::DestroyDisplay(HostDisplayId host_display_id) {
+  TRACE_DURATION("gfx", "RenderControl::DestroyDisplay", "display_id", host_display_id.value());
 
   DestroyDisplayCmd cmd = {
-      .display_id = display_id,
+      .display_id = ToRenderControlHostDisplayId(host_display_id),
   };
 
   PipeIo::WriteSrc src[] = {{.data = ToByteSpan(cmd)}};
@@ -294,13 +294,14 @@ zx::result<RenderControl::RcResult> RenderControl::DestroyDisplay(DisplayId disp
   return result.is_ok() ? zx::ok(result.value()[0]) : zx::result<RcResult>(result.take_error());
 }
 
-zx::result<RenderControl::RcResult> RenderControl::SetDisplayColorBuffer(DisplayId display_id,
-                                                                         ColorBufferId id) {
-  TRACE_DURATION("gfx", "RenderControl::SetDisplayColorBuffer", "display_id", display_id, "id", id);
+zx::result<RenderControl::RcResult> RenderControl::SetDisplayColorBuffer(
+    HostDisplayId host_display_id, HostColorBufferId host_color_buffer_id) {
+  TRACE_DURATION("gfx", "RenderControl::SetDisplayColorBuffer", "display_id",
+                 host_display_id.value(), "id", host_color_buffer_id.value());
 
   SetDisplayColorBufferCmd cmd = {
-      .display_id = display_id,
-      .id = id,
+      .display_id = ToRenderControlHostDisplayId(host_display_id),
+      .color_buffer_id = ToRenderControlHostColorBufferId(host_color_buffer_id),
   };
 
   PipeIo::WriteSrc src[] = {{.data = ToByteSpan(cmd)}};
@@ -308,13 +309,13 @@ zx::result<RenderControl::RcResult> RenderControl::SetDisplayColorBuffer(Display
   return result.is_ok() ? zx::ok(result.value()[0]) : zx::result<RcResult>(result.take_error());
 }
 
-zx::result<RenderControl::RcResult> RenderControl::SetDisplayPose(DisplayId display_id, int32_t x,
-                                                                  int32_t y, uint32_t w,
+zx::result<RenderControl::RcResult> RenderControl::SetDisplayPose(HostDisplayId host_display_id,
+                                                                  int32_t x, int32_t y, uint32_t w,
                                                                   uint32_t h) {
-  TRACE_DURATION("gfx", "RenderControl::SetDisplayPose", "display_id", display_id);
+  TRACE_DURATION("gfx", "RenderControl::SetDisplayPose", "display_id", host_display_id.value());
 
   SetDisplayPoseCmd cmd = {
-      .display_id = display_id,
+      .display_id = ToRenderControlHostDisplayId(host_display_id),
       .x = x,
       .y = y,
       .w = w,

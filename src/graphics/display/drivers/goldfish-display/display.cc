@@ -336,7 +336,7 @@ zx_status_t Display::ImportVmoImage(image_t* image, const fuchsia_sysmem::PixelF
     zxlogf(ERROR, "%s: failed to create color buffer", kTag);
     return status.error_value();
   }
-  color_buffer->id = status.value();
+  color_buffer->host_color_buffer_id = status.value();
 
   image->handle = reinterpret_cast<uint64_t>(color_buffer.release());
   return ZX_OK;
@@ -457,7 +457,7 @@ void Display::DisplayControllerImplReleaseImage(image_t* image) {
 
   // Color buffer is owned by image in the linear case.
   if (image->type == IMAGE_TYPE_SIMPLE) {
-    rc_->CloseColorBuffer(color_buffer->id);
+    rc_->CloseColorBuffer(color_buffer->host_color_buffer_id);
   }
 
   async::PostTask(loop_.dispatcher(), [this, color_buffer] {
@@ -549,7 +549,7 @@ config_check_result_t Display::DisplayControllerImplCheckConfiguration(
   return CONFIG_CHECK_RESULT_OK;
 }
 
-zx_status_t Display::PresentDisplayConfig(RenderControl::DisplayId display_id,
+zx_status_t Display::PresentDisplayConfig(uint64_t display_id,
                                           const DisplayConfig& display_config) {
   auto* color_buffer = display_config.color_buffer;
   if (!color_buffer) {
@@ -608,9 +608,9 @@ zx_status_t Display::PresentDisplayConfig(RenderControl::DisplayId display_id,
 
   // Update host-writeable display buffers before presenting.
   if (color_buffer->pinned_vmo.region_count() > 0) {
-    auto status =
-        rc_->UpdateColorBuffer(color_buffer->id, color_buffer->pinned_vmo, color_buffer->width,
-                               color_buffer->height, color_buffer->format, color_buffer->size);
+    auto status = rc_->UpdateColorBuffer(
+        color_buffer->host_color_buffer_id, color_buffer->pinned_vmo, color_buffer->width,
+        color_buffer->height, color_buffer->format, color_buffer->size);
     if (status.is_error() || status.value()) {
       zxlogf(ERROR, "%s : color buffer update failed: %d:%u", kTag, status.status_value(),
              status.value_or(0));
@@ -620,16 +620,16 @@ zx_status_t Display::PresentDisplayConfig(RenderControl::DisplayId display_id,
 
   // Present the buffer.
   {
-    uint32_t host_display_id = devices_[display_id].host_display_id;
-    if (host_display_id) {
+    HostDisplayId host_display_id = devices_[display_id].host_display_id;
+    if (host_display_id != kInvalidHostDisplayId) {
       // Set color buffer for secondary displays.
-      auto status = rc_->SetDisplayColorBuffer(host_display_id, color_buffer->id);
+      auto status = rc_->SetDisplayColorBuffer(host_display_id, color_buffer->host_color_buffer_id);
       if (status.is_error() || status.value()) {
         zxlogf(ERROR, "%s: failed to set display color buffer", kTag);
         return status.is_error() ? status.status_value() : ZX_ERR_INTERNAL;
       }
     } else {
-      status = rc_->FbPost(color_buffer->id);
+      status = rc_->FbPost(color_buffer->host_color_buffer_id);
       if (status != ZX_OK) {
         zxlogf(ERROR, "%s: FbPost failed: %d", kTag, status);
         return status;
@@ -680,7 +680,7 @@ void Display::DisplayControllerImplApplyConfiguration(const display_config_t** d
     }
 
     auto color_buffer = reinterpret_cast<ColorBuffer*>(handle);
-    if (color_buffer && !color_buffer->id) {
+    if (color_buffer && color_buffer->host_color_buffer_id != kInvalidHostColorBufferId) {
       zx::vmo vmo;
 
       zx_status_t status = color_buffer->vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo);
@@ -688,17 +688,21 @@ void Display::DisplayControllerImplApplyConfiguration(const display_config_t** d
         zxlogf(ERROR, "%s: failed to duplicate vmo: %d", kTag, status);
       } else {
         fbl::AutoLock lock(&lock_);
-        status = control_.GetColorBuffer(std::move(vmo), &color_buffer->id);
+
+        uint32_t render_control_encoded_color_buffer_id = kInvalidHostColorBufferId.value();
+        status = control_.GetColorBuffer(std::move(vmo), &render_control_encoded_color_buffer_id);
         if (status != ZX_OK) {
           zxlogf(ERROR, "%s: failed to get color buffer: %d", kTag, status);
         }
+        color_buffer->host_color_buffer_id =
+            ToHostColorBufferId(render_control_encoded_color_buffer_id);
 
         // Color buffers are in vulkan-only mode by default as that avoids
         // unnecessary copies on the host in some cases. The color buffer
         // needs to be moved out of vulkan-only mode before being used for
         // presentation.
-        if (color_buffer->id) {
-          auto status = rc_->SetColorBufferVulkanMode(color_buffer->id, 0);
+        if (color_buffer->host_color_buffer_id != kInvalidHostColorBufferId) {
+          auto status = rc_->SetColorBufferVulkanMode(color_buffer->host_color_buffer_id, 0);
           if (status.is_error() || status.value()) {
             zxlogf(ERROR, "%s: failed to set vulkan mode: %d %d", kTag, status.status_value(),
                    status.value_or(0));
@@ -815,7 +819,7 @@ zx_status_t Display::SetupDisplay(uint64_t display_id) {
 void Display::TeardownDisplay(uint64_t display_id) {
   Device& device = devices_[display_id];
 
-  if (device.host_display_id) {
+  if (device.host_display_id != kInvalidHostDisplayId) {
     zx::result<uint32_t> status = rc_->DestroyDisplay(device.host_display_id);
     ZX_DEBUG_ASSERT(status.is_ok());
     ZX_DEBUG_ASSERT(!status.value());
