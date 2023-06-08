@@ -43,10 +43,6 @@ pub struct PackageArchiveExtractCommand {
     #[argh(option)]
     pub repository: Option<String>,
 
-    /// produce a meta.far.merkle file
-    #[argh(switch)]
-    pub meta_far_merkle: bool,
-
     /// produce a blobs.json file
     #[argh(switch)]
     pub blobs_json: bool,
@@ -83,10 +79,6 @@ pub struct PackageBuildCommand {
     /// produce a depfile file
     #[argh(switch)]
     pub depfile: bool,
-
-    /// produce a meta.far.merkle file
-    #[argh(switch)]
-    pub meta_far_merkle: bool,
 
     /// produce a blobs.json file
     #[argh(switch)]

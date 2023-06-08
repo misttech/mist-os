@@ -3,6 +3,8 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/python/python_action.gni")
+import("//build/python/python_binary.gni")
 import("../layers.gni")
 
 # To prevent confusion, restrict default visibility.
@@ -69,25 +71,26 @@ group("vulkan-validation-pkg") {
   deps = [ ":validation-server-pkg" ]
 }
 
+python_binary("make_validation_client_cml") {
+  main_source = "make_validation_client_cml.py"
+  deps = [ "//build/python/modules/assembly" ]
+}
+
 if (current_toolchain == target_toolchain) {
   # Generate a cml that includes a specific version of vulkan-validation-pkg.
-  action("cml") {
-    # This boils down to a _pm target.
-    merkle_file = get_label_info(":validation-server-pkg", "target_out_dir") +
-                  "/validation-server-pkg/meta.far.merkle"
+  python_action("cml") {
+    package_manifest_file =
+        get_label_info(":validation-server-pkg", "target_out_dir") +
+        "/validation-server-pkg/package_manifest.json"
 
-    # The meta.far.merkle file contains the current package hash.
+    # The package_manifest.json file contains the current package hash.
     deps = [ ":validation-server-pkg" ]
-    script = "make_validation_client_cml.py"
-    sources = [
-      merkle_file,
-      script,
-    ]
-
+    binary_label = ":make_validation_client_cml"
+    inputs = [ package_manifest_file ]
     outputs = [ "$target_gen_dir/validation-client.cml" ]
     args = [
       rebase_path(outputs[0], root_build_dir),
-      rebase_path(merkle_file, root_build_dir),
+      rebase_path(package_manifest_file, root_build_dir),
     ]
   }
 }

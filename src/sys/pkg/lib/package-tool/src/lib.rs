@@ -32,7 +32,6 @@ pub use crate::{
 };
 
 pub(crate) const PACKAGE_MANIFEST_NAME: &str = "package_manifest.json";
-pub(crate) const META_FAR_MERKLE_NAME: &str = "meta.far.merkle";
 pub(crate) const BLOBS_JSON_NAME: &str = "blobs.json";
 
 pub(crate) fn to_writer_json_pretty(

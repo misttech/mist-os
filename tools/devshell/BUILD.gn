@@ -211,8 +211,6 @@ host_script_test_data("fx_bash_tests") {
         "//tools/devshell/tests/subcommands/data/fx_test_test/tests_hashfile/out/default/tests.json",
         "//tools/devshell/tests/subcommands/data/fx_test_test/tests_hashfile/out/default/package-repositories.json",
         "//tools/devshell/tests/subcommands/data/fx_test_test/tests_hashfile/out/default/amber-files/repository/targets.json",
-        "//tools/devshell/tests/subcommands/data/fx_test_test/tests_hashfile/out/default/obj/examples/fuzzer/fuzzing-examples_pkg/meta.far.merkle",
-        "//tools/devshell/tests/subcommands/data/fx_test_test/tests_hashfile/out/default/obj/examples/hello_world/cpp/hello_world_cpp_tests/meta.far.merkle",
         "//tools/devshell/tests/subcommands/data/fx_test_test/tests_multiple_in_package.json",
         "//tools/devshell/tests/subcommands/data/fx_test_test/tests_package_server_integration.json",
         "//tools/devshell/vendor",

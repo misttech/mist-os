@@ -1,39 +1,54 @@
 # Copyright 2021 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+""" This script generates the component manifest used by the validation-client component."""
 
 import argparse
+import json
+from assembly import PackageManifest
+from serialization import json_load
 
-#
-# This script generates the component manifest used by the validation-client component.
-#
-parser = argparse.ArgumentParser()
-parser.add_argument("output_file")
-parser.add_argument("hash_file")
 
-args = parser.parse_args()
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("output_file")
+    parser.add_argument("package_manifest_file")
 
-test_hash = open(args.hash_file, "r").read().strip()
+    args = parser.parse_args()
 
-open(args.output_file, "w").write(
-    """{ children: [
-        {
-            name: "validation-server",
-            url: "fuchsia-pkg://fuchsia.com/validation-server-pkg?hash=%s#meta/validation-server.cm",
-        },
-    ],
-    expose: [
-        {
-            directory: "validation_server_pkg",
-            from: "#validation-server",
-        },
-    ],
-    offer: [
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: "#validation-server",
-        },
-    ],
-}
-    """ % test_hash)
+    with open(args.package_manifest_file, 'r') as f:
+        manifest = json_load(PackageManifest, f)
+        try:
+            test_hash = next(
+                b.merkle for b in manifest.blobs if b.path == "meta/")
+        except StopIteration:
+            raise ValueError(
+                "manifest %s does not contain an entry for 'meta/'" %
+                args.package_manifest_file)
+
+    open(args.output_file, "w").write(
+        """{ children: [
+            {
+                name: "validation-server",
+                url: "fuchsia-pkg://fuchsia.com/validation-server-pkg?hash=%s#meta/validation-server.cm",
+            },
+        ],
+        expose: [
+            {
+                directory: "validation_server_pkg",
+                from: "#validation-server",
+            },
+        ],
+        offer: [
+            {
+                protocol: [ "fuchsia.logger.LogSink" ],
+                from: "parent",
+                to: "#validation-server",
+            },
+        ],
+    }
+        """ % test_hash)
+
+
+if __name__ == '__main__':
+    sys.exit(main())

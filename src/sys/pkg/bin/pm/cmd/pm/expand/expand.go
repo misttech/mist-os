@@ -164,11 +164,6 @@ func writeMetadataAndManifest(cfg *build.Config, pkgArchive *far.Reader, outputD
 		return err
 	}
 
-	// Write meta.far.merkle
-	if err := os.WriteFile(filepath.Join(outputDir, metaFar+".merkle"), []byte(pkgMetaMerkle.String()), 0666); err != nil {
-		return err
-	}
-
 	// Write blobs.json
 	f, err := os.Create(filepath.Join(outputDir, "blobs.json"))
 	if err != nil {

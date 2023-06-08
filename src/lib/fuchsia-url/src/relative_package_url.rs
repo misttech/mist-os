@@ -58,6 +58,12 @@ impl From<PackageName> for RelativePackageUrl {
     }
 }
 
+impl From<RelativePackageUrl> for PackageName {
+    fn from(url: RelativePackageUrl) -> Self {
+        url.path
+    }
+}
+
 impl std::convert::TryFrom<&str> for RelativePackageUrl {
     type Error = ParseError;
 

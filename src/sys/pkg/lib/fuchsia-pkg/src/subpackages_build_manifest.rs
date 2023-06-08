@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::MetaPackage,
+    crate::{MetaPackage, PackageManifest},
     anyhow::{Context as _, Result},
     camino::Utf8PathBuf,
     fuchsia_merkle::Hash,
@@ -37,12 +37,16 @@ impl SubpackagesBuildManifest {
                 }
             };
 
-            // The merkle file is a hex encoded string.
-            let merkle = fs::read_to_string(&entry.merkle_file)
-                .with_context(|| format!("reading {}", &entry.merkle_file))?;
-            let package_hash = merkle.parse()?;
+            // Read the merkle from the package manifest.
+            let manifest = PackageManifest::try_load_from(&entry.package_manifest_file)
+                .with_context(|| format!("reading {}", &entry.package_manifest_file))?;
+            let meta_far_blob = manifest
+                .blobs()
+                .iter()
+                .find(|b| b.path == "meta/")
+                .with_context(|| format!("finding meta/in {}", &entry.package_manifest_file))?;
 
-            entries.push((url, package_hash, entry.package_manifest_file.clone()));
+            entries.push((url, meta_far_blob.merkle, entry.package_manifest_file.clone()));
         }
         Ok(entries)
     }
@@ -78,7 +82,6 @@ impl<'de> Deserialize<'de> for SubpackagesBuildManifestV0 {
         struct Helper {
             #[serde(flatten)]
             helper_kind: HelperKind,
-            merkle_file: Utf8PathBuf,
             package_manifest_file: Utf8PathBuf,
         }
 
@@ -92,7 +95,7 @@ impl<'de> Deserialize<'de> for SubpackagesBuildManifestV0 {
         let manifest_entries = Vec::<Helper>::deserialize(deserializer)?;
 
         let mut entries = vec![];
-        for Helper { helper_kind, merkle_file, package_manifest_file } in manifest_entries {
+        for Helper { helper_kind, package_manifest_file } in manifest_entries {
             let kind = match helper_kind {
                 HelperKind::Name { name } => SubpackagesBuildManifestEntryKind::Url(name),
                 HelperKind::File { meta_package_file } => {
@@ -100,11 +103,7 @@ impl<'de> Deserialize<'de> for SubpackagesBuildManifestV0 {
                 }
             };
 
-            entries.push(SubpackagesBuildManifestEntry {
-                kind,
-                merkle_file,
-                package_manifest_file,
-            });
+            entries.push(SubpackagesBuildManifestEntry { kind, package_manifest_file });
         }
 
         Ok(SubpackagesBuildManifestV0 { entries })
@@ -115,9 +114,6 @@ impl<'de> Deserialize<'de> for SubpackagesBuildManifestV0 {
 pub struct SubpackagesBuildManifestEntry {
     /// The subpackages build manifest entry's [EntryKind].
     pub kind: SubpackagesBuildManifestEntryKind,
-
-    /// The subpackages build manifest entry's merkle file.
-    pub merkle_file: Utf8PathBuf,
 
     /// The package_manifest.json of the subpackage.
     pub package_manifest_file: Utf8PathBuf,
@@ -134,13 +130,11 @@ impl Serialize for SubpackagesBuildManifestEntry {
             name: Option<&'a RelativePackageUrl>,
             #[serde(skip_serializing_if = "Option::is_none")]
             meta_package_file: Option<&'a Utf8PathBuf>,
-            merkle_file: &'a Utf8PathBuf,
             package_manifest_file: &'a Utf8PathBuf,
         }
         let mut helper = Helper {
             name: None,
             meta_package_file: None,
-            merkle_file: &self.merkle_file,
             package_manifest_file: &self.package_manifest_file,
         };
         match &self.kind {
@@ -157,10 +151,9 @@ impl SubpackagesBuildManifestEntry {
     /// Construct a new [SubpackagesBuildManifestEntry].
     pub fn new(
         kind: SubpackagesBuildManifestEntryKind,
-        merkle_file: Utf8PathBuf,
         package_manifest_file: Utf8PathBuf,
     ) -> Self {
-        Self { kind, merkle_file, package_manifest_file }
+        Self { kind, package_manifest_file }
     }
 }
 
@@ -174,6 +167,7 @@ pub enum SubpackagesBuildManifestEntryKind {
 mod tests {
     use {
         super::*,
+        crate::PackageBuilder,
         assert_matches::assert_matches,
         camino::Utf8Path,
         fuchsia_url::PackageName,
@@ -189,24 +183,28 @@ mod tests {
         // Generate a subpackages build manifest.
         let pkg1_name = PackageName::try_from("pkg1".to_string()).unwrap();
         let pkg1_url = RelativePackageUrl::from(pkg1_name.clone());
-        let pkg1_hash = fuchsia_merkle::from_slice(b"pkg1").root();
-        let pkg1_merkle_file = dir.join("pkg1-merkle");
         let pkg1_package_manifest_file = dir.join("pkg1-package_manifest.json");
+        let pkg1_meta_far_file = dir.join("pkg1-meta.far");
 
         let pkg2_name = PackageName::try_from("pkg2".to_string()).unwrap();
         let pkg2_url = RelativePackageUrl::from(pkg2_name.clone());
-        let pkg2_hash = fuchsia_merkle::from_slice(b"pkg2").root();
         let pkg2_meta_package_file = dir.join("pkg2-meta-package");
-        let pkg2_merkle_file = dir.join("pkg2-merkle");
         let pkg2_package_manifest_file = dir.join("pkg2-package_manifest.json");
+        let pkg2_meta_far_file = dir.join("pkg2-meta.far");
 
         // Write out all the files.
-        MetaPackage::from_name(pkg2_name)
-            .serialize(File::create(&pkg2_meta_package_file).unwrap())
-            .unwrap();
+        let meta_package = MetaPackage::from_name(pkg2_name.clone());
+        meta_package.serialize(File::create(&pkg2_meta_package_file).unwrap()).unwrap();
 
-        std::fs::write(&pkg1_merkle_file, pkg1_hash.to_string().as_bytes()).unwrap();
-        std::fs::write(&pkg2_merkle_file, pkg2_hash.to_string().as_bytes()).unwrap();
+        let mut builder = PackageBuilder::new(&pkg1_name);
+        builder.manifest_path(&pkg1_package_manifest_file);
+        let manifest = builder.build(dir, pkg1_meta_far_file).unwrap();
+        let pkg1_hash = manifest.blobs().iter().find(|b| b.path == "meta/").unwrap().merkle;
+
+        let mut builder = PackageBuilder::new(&pkg2_name);
+        builder.manifest_path(&pkg2_package_manifest_file);
+        let manifest = builder.build(dir, pkg2_meta_far_file).unwrap();
+        let pkg2_hash = manifest.blobs().iter().find(|b| b.path == "meta/").unwrap().merkle;
 
         // Make sure we can deserialize from the manifest format.
         let subpackages_build_manifest_path = dir.join("subpackages-build-manifest");
@@ -215,12 +213,10 @@ mod tests {
             &json!([
                 {
                     "name": pkg1_name.to_string(),
-                    "merkle_file": pkg1_merkle_file.to_string(),
                     "package_manifest_file": pkg1_package_manifest_file.to_string(),
                 },
                 {
                     "meta_package_file": pkg2_meta_package_file.to_string(),
-                    "merkle_file": pkg2_merkle_file.to_string(),
                     "package_manifest_file": pkg2_package_manifest_file.to_string(),
                 },
             ]),
@@ -237,14 +233,12 @@ mod tests {
             vec![
                 SubpackagesBuildManifestEntry {
                     kind: SubpackagesBuildManifestEntryKind::Url(pkg1_url.clone()),
-                    merkle_file: pkg1_merkle_file,
                     package_manifest_file: pkg1_package_manifest_file.clone(),
                 },
                 SubpackagesBuildManifestEntry {
                     kind: SubpackagesBuildManifestEntryKind::MetaPackageFile(
                         pkg2_meta_package_file
                     ),
-                    merkle_file: pkg2_merkle_file,
                     package_manifest_file: pkg2_package_manifest_file.clone(),
                 },
             ]
@@ -266,10 +260,8 @@ mod tests {
         let dir = Utf8Path::from_path(tmp.path()).unwrap();
 
         let pkg_meta_package_file = dir.join("pkg-meta-package");
-        let pkg_hash = fuchsia_merkle::from_slice(b"pkg").root();
-        let pkg_merkle_file = dir.join("merkle");
-        std::fs::write(&pkg_merkle_file, pkg_hash.to_string().as_bytes()).unwrap();
         let pkg_package_manifest_file = dir.join("package_manifest.json");
+        let pkg_meta_far_file = dir.join("meta.far");
 
         let subpackages_build_manifest_path = dir.join("subpackages-build-manifest");
         serde_json::to_writer(
@@ -277,7 +269,6 @@ mod tests {
             &json!([
                 {
                     "meta_package_file": pkg_meta_package_file.to_string(),
-                    "merkle_file": pkg_merkle_file.to_string(),
                     "package_manifest_file": pkg_package_manifest_file.to_string(),
                 },
             ]),
@@ -289,13 +280,18 @@ mod tests {
         ))
         .unwrap();
 
-        // We should error out if the merkle file doesn't exist.
+        // We should error out if the package manifest file doesn't exist.
         assert_matches!(
             manifest.to_subpackages(),
             Err(err) if err.downcast_ref::<io::Error>().unwrap().kind() == io::ErrorKind::NotFound
         );
 
-        // It should work once we write the file.
+        // It should work once we write the files.
+        let mut builder = PackageBuilder::new("pkg");
+        builder.manifest_path(&pkg_package_manifest_file);
+        let package_manifest = builder.build(dir, pkg_meta_far_file).unwrap();
+        let pkg_hash = package_manifest.blobs().iter().find(|b| b.path == "meta/").unwrap().merkle;
+
         let pkg_name = PackageName::try_from("pkg".to_string()).unwrap();
         MetaPackage::from_name(pkg_name.clone())
             .serialize(File::create(&pkg_meta_package_file).unwrap())
@@ -315,9 +311,8 @@ mod tests {
 
         let pkg_name = PackageName::try_from("pkg".to_string()).unwrap();
         let pkg_url = RelativePackageUrl::from(pkg_name);
-        let pkg_hash = fuchsia_merkle::from_slice(b"pkg").root();
-        let pkg_merkle_file = dir.join("merkle");
         let pkg_package_manifest_file = dir.join("package_manifest.json");
+        let pkg_meta_far_file = dir.join("meta.far");
 
         let subpackages_build_manifest_path = dir.join("subpackages-build-manifest");
         serde_json::to_writer(
@@ -325,7 +320,6 @@ mod tests {
             &json!([
                 {
                     "name": pkg_url.to_string(),
-                    "merkle_file": pkg_merkle_file.to_string(),
                     "package_manifest_file": pkg_package_manifest_file.to_string(),
                 },
             ]),
@@ -337,14 +331,18 @@ mod tests {
         ))
         .unwrap();
 
-        // We should error out if the merkle file doesn't exist.
+        // We should error out if the package manifest file doesn't exist.
         assert_matches!(
             manifest.to_subpackages(),
             Err(err) if err.downcast_ref::<io::Error>().unwrap().kind() == io::ErrorKind::NotFound
         );
 
-        // It should work once we write the file.
-        std::fs::write(&pkg_merkle_file, pkg_hash.to_string().as_bytes()).unwrap();
+        // It should work once we write the files.
+        let mut builder = PackageBuilder::new("pkg");
+        builder.manifest_path(&pkg_package_manifest_file);
+        let package_manifest = builder.build(dir, pkg_meta_far_file).unwrap();
+        let pkg_hash = package_manifest.blobs().iter().find(|b| b.path == "meta/").unwrap().merkle;
+
         assert_eq!(
             manifest.to_subpackages().unwrap(),
             vec![(pkg_url, pkg_hash, pkg_package_manifest_file)]
@@ -356,12 +354,10 @@ mod tests {
         let entries = vec![
             SubpackagesBuildManifestEntry::new(
                 SubpackagesBuildManifestEntryKind::Url("subpackage-name".parse().unwrap()),
-                "merkle-path-0".into(),
                 "package-manifest-path-0".into(),
             ),
             SubpackagesBuildManifestEntry::new(
                 SubpackagesBuildManifestEntryKind::MetaPackageFile("file-path".into()),
-                "merkle-path-1".into(),
                 "package-manifest-path-1".into(),
             ),
         ];
@@ -376,12 +372,10 @@ mod tests {
             json!([
                 {
                     "name": "subpackage-name",
-                    "merkle_file": "merkle-path-0",
                     "package_manifest_file": "package-manifest-path-0"
                 },
                 {
                     "meta_package_file": "file-path",
-                    "merkle_file": "merkle-path-1",
                     "package_manifest_file": "package-manifest-path-1"
                 },
             ])
@@ -393,12 +387,10 @@ mod tests {
         let entries = vec![
             SubpackagesBuildManifestEntry::new(
                 SubpackagesBuildManifestEntryKind::Url("subpackage-name".parse().unwrap()),
-                "merkle-path-0".into(),
                 "package-manifest-path-0".into(),
             ),
             SubpackagesBuildManifestEntry::new(
                 SubpackagesBuildManifestEntryKind::MetaPackageFile("file-path".into()),
-                "merkle-path-1".into(),
                 "package-manifest-path-1".into(),
             ),
         ];

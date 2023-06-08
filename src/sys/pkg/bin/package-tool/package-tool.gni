@@ -62,9 +62,6 @@ template("package_tool_package_archive_extract") {
     snapshot_entry = "$package_name/0=" +
                      rebase_path("$package_out_dir/blobs.json", root_build_dir)
     blob_manifest = "$package_out_dir/blobs.manifest"
-    meta_far_merkle_index_entry =
-        "$package_name/0=" +
-        rebase_path("$package_out_dir/meta.far.merkle", root_build_dir)
     package_output_manifest = pkg_output_manifest
   }
 
@@ -101,9 +98,6 @@ template("package_tool_package_archive_extract") {
       # package output manifest
       pkg_output_manifest,
 
-      # seal
-      "$package_out_dir/meta.far.merkle",
-
       # package blob json manifest
       "$package_out_dir/blobs.json",
     ]
@@ -117,7 +111,6 @@ template("package_tool_package_archive_extract") {
       rebase_path(package_out_dir, root_build_dir),
       "--repository",
       repository,
-      "--meta-far-merkle",
       "--blobs-json",
     ]
 
@@ -189,9 +182,6 @@ template("package_tool_package_build") {
     snapshot_entry = "$package_name/0=" +
                      rebase_path("$package_out_dir/blobs.json", root_build_dir)
     blob_manifest = "$package_out_dir/blobs.manifest"
-    meta_far_merkle_index_entry =
-        "$package_name/0=" +
-        rebase_path("$package_out_dir/meta.far.merkle", root_build_dir)
     package_output_manifest = pkg_output_manifest
   }
 
@@ -234,9 +224,6 @@ template("package_tool_package_build") {
       # produced by seal, must be listed first because of depfile rules.
       "$package_out_dir/meta.far",
 
-      # seal
-      "$package_out_dir/meta.far.merkle",
-
       # package blob json manifest
       "$package_out_dir/blobs.json",
 
@@ -267,7 +254,6 @@ template("package_tool_package_build") {
 
     args += [
       "--depfile",
-      "--meta-far-merkle",
       "--blobs-json",
       "--blobs-manifest",
       rebase_path(pkg_manifest_file, root_build_dir),

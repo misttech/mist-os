@@ -173,7 +173,6 @@ function diff_file_relpath() {
     # The following groups of files have known huge diffs,
     # so omit details from the general report, and diff_binary.
     meta.far) expect=unknown; diff_binary "$left" "$right" ;;
-    meta.far.merkle) expect=unknown; diff_binary "$left" "$right" ;;
     contents) expect=unknown; diff_binary "$left" "$right" ;;
     blobs.json) expect=diff; diff_binary "$left" "$right" ;;
     blob.manifest) expect=diff; diff_binary "$left" "$right" ;;  # many hashes

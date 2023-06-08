@@ -5,8 +5,7 @@
 use {
     crate::{
         args::{PackageArchiveCreateCommand, PackageArchiveExtractCommand},
-        to_writer_json_pretty, write_depfile, BLOBS_JSON_NAME, META_FAR_MERKLE_NAME,
-        PACKAGE_MANIFEST_NAME,
+        to_writer_json_pretty, write_depfile, BLOBS_JSON_NAME, PACKAGE_MANIFEST_NAME,
     },
     anyhow::{Context as _, Result},
     camino::Utf8Path,
@@ -102,15 +101,6 @@ pub async fn cmd_package_archive_extract(cmd: PackageArchiveExtractCommand) -> R
     let package_manifest = package_manifest
         .write_with_relative_paths(&package_manifest_path)
         .with_context(|| format!("creating {package_manifest_path}"))?;
-
-    // FIXME(fxbug.dev/101304): Write out the meta.far.merkle file, that contains the meta.far
-    // merkle.
-    if cmd.meta_far_merkle {
-        std::fs::write(
-            cmd.out.join(META_FAR_MERKLE_NAME),
-            package_manifest.hash().to_string().as_bytes(),
-        )?;
-    }
 
     // FIXME(fxbug.dev/101304): Some tools still depend on the legacy `blobs.json` file. We
     // should migrate them over to using `package_manifest.json` so we can stop producing this file.
@@ -308,7 +298,6 @@ mod tests {
             out: extract_dir.clone(),
             repository: None,
             archive: archive_path.clone().into(),
-            meta_far_merkle: true,
             blobs_json: true,
         })
         .await
@@ -321,11 +310,6 @@ mod tests {
             Utf8Path::new("blobs").join(META_FAR_HASH),
             Utf8Path::new("blobs").join(BIN_HASH),
             Utf8Path::new("blobs").join(LIB_HASH),
-        );
-
-        assert_eq!(
-            &extract_contents.remove(&extract_dir.join(META_FAR_MERKLE_NAME)).unwrap(),
-            META_FAR_HASH.as_bytes()
         );
 
         assert_eq!(
@@ -395,11 +379,6 @@ mod tests {
             meta_far_path.clone(),
             blobs_dir.join(BIN_HASH),
             blobs_dir.join(LIB_HASH),
-        );
-
-        assert_eq!(
-            &extract_contents.remove(&extract_dir.join(META_FAR_MERKLE_NAME)).unwrap(),
-            META_FAR_HASH.as_bytes()
         );
 
         assert_eq!(
@@ -534,7 +513,6 @@ mod tests {
         cmd_package_archive_extract(PackageArchiveExtractCommand {
             out: extract_dir.clone(),
             repository: None,
-            meta_far_merkle: false,
             blobs_json: false,
             archive: archive_path.clone().into_std_path_buf(),
         })

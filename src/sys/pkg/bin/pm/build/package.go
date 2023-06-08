@@ -39,10 +39,6 @@ type SubpackageInfo struct {
 	// containing the subpackage's declared package_name.
 	MetaPackageFile *string `json:"meta_package_file,omitempty"`
 
-	// The path to the meta.far.merkle file containing (only) the
-	// subpackage's package hash
-	MerkleFile string `json:"merkle_file"`
-
 	// The path to the package_manifest.json of the subpackage (may not be
 	// used by pm tool)
 	PackageManifestFile string `json:"package_manifest_file"`
@@ -399,14 +395,6 @@ func Seal(cfg *Config) (string, error) {
 	if _, err := archive.Seek(0, io.SeekStart); err != nil {
 		return "", err
 	}
-
-	var tree merkle.Tree
-	if _, err := tree.ReadFrom(archive); err != nil {
-		return "", err
-	}
-	if err := os.WriteFile(cfg.MetaFARMerkle(), []byte(fmt.Sprintf("%x", tree.Root())), os.ModePerm); err != nil {
-		return "", err
-	}
 	return cfg.MetaFAR(), archive.Close()
 }
 
@@ -443,14 +431,27 @@ func writeSubpackagesMeta(cfg *Config, subpackagesPath string) error {
 			}
 			name = &packageMeta.Name
 		}
-		content, err := os.ReadFile(subpackage.MerkleFile)
-		if err != nil {
-			return fmt.Errorf("a subpackage meta package file (%s) could not be read: %s", *subpackage.MetaPackageFile, err)
-		}
-		merkle := string(content)
+
 		if _, ok := meta_subpackages.Subpackages[*name]; ok {
 			return fmt.Errorf("duplicate entry in the -subpackages file (%s) for name: %s", subpackagesPath, *name)
 		}
+
+		// Find the merkle root for the subpackage.
+		packageManifest, err := LoadPackageManifest(subpackage.PackageManifestFile)
+		if err != nil {
+			return fmt.Errorf("a subpackage package manifest (%s) could not be read: %s", subpackage.PackageManifestFile, err)
+		}
+		metaFarIdx := -1
+		for i := range packageManifest.Blobs {
+			if packageManifest.Blobs[i].Path == "meta/" {
+				metaFarIdx = i
+				break
+			}
+		}
+		if metaFarIdx == -1 {
+			return fmt.Errorf("a subpackage package manifest (%s) is missing a meta.far: %s", subpackage.PackageManifestFile, err)
+		}
+		merkle := packageManifest.Blobs[metaFarIdx].Merkle.String()
 		meta_subpackages.Subpackages[*name] = merkle
 	}
 	{

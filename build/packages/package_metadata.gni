@@ -29,10 +29,6 @@ import("//build/group_with_inputs.gni")
 #         manifests to publish to repositories and to produce manifests to write
 #         into blobfs images.
 #
-#       meta_far_merkle_index_entries
-#         The metafar merkle index entries are aggregated in image builds to
-#         produce package server indices for base serving.
-#
 #       package_output_manifests
 #         The path of each output manifest for each package.
 #
@@ -103,7 +99,6 @@ template("generate_package_metadata") {
 #   package_name (required)
 #   snapshot_entry (required)
 #   blob_manifest (required)
-#   meta_far_merkle_index_entry (required)
 #   package_output_manifest (required)
 #   testonly (optional)
 #   visibility (optional)
@@ -111,8 +106,6 @@ template("define_package_metadata") {
   assert(defined(invoker.package_name), "Missing package_name")
   assert(defined(invoker.snapshot_entry), "Missing snapshot_entry")
   assert(defined(invoker.blob_manifest), "Missing blob_manifest")
-  assert(defined(invoker.meta_far_merkle_index_entry),
-         "Missing meta_far_merkle_index_entry")
   assert(defined(invoker.package_output_manifest),
          "Missing package_output_manifest")
 
@@ -126,7 +119,6 @@ template("define_package_metadata") {
       package_names = [ invoker.package_name ]
       snapshot_entries = [ invoker.snapshot_entry ]
       blob_manifests = [ rebase_path(invoker.blob_manifest, root_build_dir) ]
-      meta_far_merkle_index_entries = [ invoker.meta_far_merkle_index_entry ]
       package_output_manifests = [ invoker.package_output_manifest ]
     }
   }
@@ -181,18 +173,12 @@ template("generate_meta_subpackages") {
       package_output =
           meta_package_target_gen_dir + "/" + meta_package_target_name + ".txt"
     }
-    merkle_file =
-        get_label_info(subpackage.package, "target_out_dir") + "/" +
-        get_label_info(subpackage.package, "name") + "/meta.far.merkle"
 
     package_manifest_file =
         get_label_info(subpackage.package, "target_out_dir") + "/" +
         get_label_info(subpackage.package, "name") + "/package_manifest.json"
 
-    subpackage_inputs += [
-      merkle_file,
-      package_manifest_file,
-    ]
+    subpackage_inputs += [ package_manifest_file ]
 
     rebased_subpackages += [
       {
@@ -202,9 +188,6 @@ template("generate_meta_subpackages") {
           # to get the subpackage package name
           meta_package_file = rebase_path(package_output, root_build_dir)
         }
-
-        # to get the subpackage package hash
-        merkle_file = rebase_path(merkle_file, root_build_dir)
 
         # the package_manifest.json of the subpackage
         package_manifest_file =

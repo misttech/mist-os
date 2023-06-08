@@ -5,7 +5,7 @@
 use {
     crate::{
         args::PackageBuildCommand, to_writer_json_pretty, write_depfile, BLOBS_JSON_NAME,
-        META_FAR_MERKLE_NAME, PACKAGE_MANIFEST_NAME,
+        PACKAGE_MANIFEST_NAME,
     },
     anyhow::{bail, Context as _, Result},
     fuchsia_pkg::{
@@ -98,15 +98,13 @@ pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
 
         if let Some(subpackages_build_manifest) = &subpackages_build_manifest {
             for entry in subpackages_build_manifest.entries() {
-                let SubpackagesBuildManifestEntry { kind, merkle_file, package_manifest_file } =
-                    entry;
+                let SubpackagesBuildManifestEntry { kind, package_manifest_file } = entry;
                 match kind {
                     SubpackagesBuildManifestEntryKind::Url(_) => {}
                     SubpackagesBuildManifestEntryKind::MetaPackageFile(package_manifest_file) => {
                         deps.insert(package_manifest_file.as_str());
                     }
                 }
-                deps.insert(merkle_file.as_str());
                 deps.insert(package_manifest_file.as_str());
             }
         }
@@ -115,17 +113,6 @@ pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
         let depfile_path = cmd.out.join(META_FAR_DEPFILE_NAME);
 
         write_depfile(depfile_path.as_std_path(), meta_far_path.as_path(), dep_paths.into_iter())?;
-    }
-
-    // FIXME(fxbug.dev/101304): Write out the meta.far.merkle file, that contains the meta.far
-    // merkle.
-    if cmd.meta_far_merkle {
-        if let Some(blob) = package_manifest.blobs().iter().find(|b| b.path == "meta/") {
-            let meta_far_merkle_path = cmd.out.join(META_FAR_MERKLE_NAME);
-            std::fs::write(meta_far_merkle_path, blob.merkle.to_string().as_bytes())?;
-        } else {
-            bail!("Could not find entry for 'meta/'");
-        }
     }
 
     // FIXME(fxbug.dev/101304): Some tools still depend on the legacy `blobs.json` file. We
@@ -235,7 +222,6 @@ mod test {
             repository: None,
             published_name: None,
             depfile: false,
-            meta_far_merkle: false,
             blobs_json: false,
             blobs_manifest: false,
             subpackages_build_manifest_path: None,
@@ -261,7 +247,6 @@ mod test {
             repository: None,
             published_name: None,
             depfile: false,
-            meta_far_merkle: false,
             blobs_json: false,
             blobs_manifest: false,
             subpackages_build_manifest_path: None,
@@ -296,7 +281,6 @@ mod test {
             repository: None,
             published_name: None,
             depfile: false,
-            meta_far_merkle: false,
             blobs_json: false,
             blobs_manifest: false,
             subpackages_build_manifest_path: None,
@@ -379,7 +363,6 @@ mod test {
             repository: None,
             published_name: None,
             depfile: false,
-            meta_far_merkle: false,
             blobs_json: false,
             blobs_manifest: false,
             subpackages_build_manifest_path: None,
@@ -463,7 +446,6 @@ mod test {
             repository: None,
             published_name: None,
             depfile: false,
-            meta_far_merkle: false,
             blobs_json: false,
             blobs_manifest: false,
             subpackages_build_manifest_path: None,
@@ -504,7 +486,6 @@ mod test {
             abi_revision: None,
             repository: Some("my-repository".into()),
             published_name: None,
-            meta_far_merkle: false,
             depfile: false,
             blobs_json: false,
             blobs_manifest: false,
@@ -593,15 +574,13 @@ mod test {
             File::create(&subpackages_build_manifest_path).unwrap();
         let subpackage_url = "subpackage".parse::<RelativePackageUrl>().unwrap();
         let subpackage_hash = fuchsia_merkle::Hash::from([0; fuchsia_merkle::HASH_SIZE]);
-        let subpackage_merkle_file = root.join("subpackage.merkle");
-        std::fs::write(&subpackage_merkle_file, subpackage_hash.to_string().as_bytes()).unwrap();
 
         let subpackage_package_manifest_file = root.join("subpackage_package_manifest.json");
         let subpackage_package_manifest_file_file =
             File::create(&subpackage_package_manifest_file).unwrap();
         serde_json::to_writer(
             subpackage_package_manifest_file_file,
-            &serde_json::json!([
+            &serde_json::json!(
                 {
                     "package": {
                         "name": "mock-subpackage",
@@ -620,7 +599,7 @@ mod test {
                     "subpackages": [],
                     "repository": "fuchsia.com"
                 }
-            ]),
+            ),
         )
         .unwrap();
 
@@ -632,7 +611,6 @@ mod test {
             &serde_json::json!([
                 {
                     "name": "subpackage",
-                    "merkle_file": subpackage_merkle_file.to_string(),
                     "package_manifest_file": subpackage_package_manifest_file.to_string(),
                 }
             ]),
@@ -665,7 +643,6 @@ mod test {
             repository: None,
             published_name: Some("published-name".into()),
             depfile: true,
-            meta_far_merkle: true,
             blobs_json: true,
             blobs_manifest: true,
             subpackages_build_manifest_path: Some(subpackages_build_manifest_path.clone()),
@@ -698,7 +675,6 @@ mod test {
         );
 
         let meta_far_path = out.join(META_FAR_NAME);
-        let meta_far_merkle_path = out.join(META_FAR_MERKLE_NAME);
         let package_manifest_path = out.join(PACKAGE_MANIFEST_NAME);
         let meta_far_depfile_path = out.join(META_FAR_DEPFILE_NAME);
         let blobs_json_path = out.join(BLOBS_JSON_NAME);
@@ -715,7 +691,6 @@ mod test {
                 blobs_manifest_path.clone(),
                 meta_far_path.clone(),
                 meta_far_depfile_path.clone(),
-                meta_far_merkle_path,
                 package_manifest_path,
             ],
         );
@@ -725,7 +700,6 @@ mod test {
             convert_to_depfile_filepath(subpackages_build_manifest_path.as_str()),
             convert_to_depfile_filepath(empty_file_path.as_str()),
             convert_to_depfile_filepath(meta_package_path.as_str()),
-            convert_to_depfile_filepath(subpackage_merkle_file.as_str()),
             convert_to_depfile_filepath(subpackage_package_manifest_file.as_str()),
         ];
 

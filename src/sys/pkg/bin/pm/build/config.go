@@ -14,6 +14,7 @@ import (
 
 	versionHistory "go.fuchsia.dev/fuchsia/src/lib/versioning/version-history/go"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/pkg"
+	"go.fuchsia.dev/fuchsia/src/sys/pkg/lib/merkle"
 )
 
 // Config contains global build configuration for other build commands
@@ -151,11 +152,6 @@ func (c *Config) MetaFAR() string {
 	return filepath.Join(c.OutputDir, "meta.far")
 }
 
-// MetaFARMerkle returns the path to the meta.far.merkle that build.Seal generates
-func (c *Config) MetaFARMerkle() string {
-	return filepath.Join(c.OutputDir, "meta.far.merkle")
-}
-
 func (c *Config) Package() (pkg.Package, error) {
 	p := pkg.Package{
 		Name:    c.PkgName,
@@ -189,14 +185,16 @@ func (c *Config) BlobInfo() ([]PackageBlobInfo, error) {
 	// blob for a package, targets need to know which unnamed blob is the
 	// meta FAR.
 	{
-		merkleBytes, err := os.ReadFile(c.MetaFARMerkle())
+		archive, err := os.Open(c.MetaFAR())
 		if err != nil {
 			return nil, err
 		}
-		merkle, err := DecodeMerkleRoot(merkleBytes)
-		if err != nil {
+		var tree merkle.Tree
+		if _, err := tree.ReadFrom(archive); err != nil {
 			return nil, err
 		}
+		var merkle MerkleRoot
+		copy(merkle[:], tree.Root()[:32])
 
 		info, err := os.Stat(c.MetaFAR())
 		if err != nil {
