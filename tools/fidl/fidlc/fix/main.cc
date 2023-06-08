@@ -15,6 +15,7 @@
 #include <string>
 #include <vector>
 
+#include "src/lib/fxl/strings/split_string.h"
 #include "tools/fidl/fidlc/fix/command_line_options.h"
 #include "tools/fidl/fidlc/include/fidl/experimental_flags.h"
 #include "tools/fidl/fidlc/include/fidl/fixables.h"
@@ -94,11 +95,14 @@ int main(int argc, char* argv[]) {
   // Process dependency filepaths.
   std::vector<std::unique_ptr<fidl::SourceManager>> dependencies;
   for (const auto& filepaths : options.deps) {
-    dependencies.emplace_back();
+    dependencies.emplace_back(std::make_unique<fidl::SourceManager>());
     std::unique_ptr<fidl::SourceManager>& dep_manager = dependencies.back();
-    for (const auto& filepath : filepaths) {
-      if (!dep_manager->CreateSource(&filepath)) {
-        Fail(fidl::fix::Status::kErrorOther, "Couldn't read in source data from %s\n", filepath);
+    std::vector<std::string> filepaths_split =
+        fxl::SplitStringCopy(filepaths, ",", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
+    for (const std::string& filepath : filepaths_split) {
+      if (!dep_manager->CreateSource(filepath)) {
+        Fail(fidl::fix::Status::kErrorOther, "Couldn't read in source data from %s\n",
+             filepath.c_str());
       }
     }
   }
