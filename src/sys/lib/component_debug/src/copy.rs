@@ -16,7 +16,7 @@ use {
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     regex::Regex,
-    std::{collections::HashMap, path::PathBuf},
+    std::path::PathBuf,
     thiserror::Error,
 };
 
@@ -43,17 +43,17 @@ pub enum CopyError {
     )]
     InstanceNotFound { moniker: String },
 
-    #[error("Encountered an unexpected error when attempting to retrieve namespace with the provider moniker: {moniker}. {error:?}.")]
+    #[error("Encountered an unexpected error when attempting to open a directory with the provider moniker: {moniker}. {error:?}.")]
     UnexpectedErrorFromMoniker { moniker: String, error: fsys::OpenError },
 
-    #[error("No file found at {file} in remote component namespace.")]
+    #[error("No file found at {file} in remote component directory.")]
     NamespaceFileNotFound { file: String },
 }
 
-/// Transfer files between a component's namespace to/from the local filesystem.
+/// Transfer files between a directories associated with a component to/from the local filesystem.
 ///
 /// # Arguments
-/// * `realm_query`: |RealmQueryProxy| to fetch the component's namespace.
+/// * `realm_query`: |RealmQueryProxy| to open the component directories.
 /// * `paths`: The local and remote paths to copy. The last entry is the destination.
 /// * `verbose`: Flag used to indicate whether or not to print output to console.
 pub async fn copy_cmd<W: std::io::Write>(
@@ -64,7 +64,6 @@ pub async fn copy_cmd<W: std::io::Write>(
 ) -> Result<()> {
     validate_paths(&paths)?;
 
-    let mut namespace_dir_cache: HashMap<String, fio::DirectoryProxy> = HashMap::new();
     // paths is safe to unwrap as validate_paths ensures that it is non-empty.
     let destination_path = paths.pop().unwrap();
 
@@ -78,12 +77,8 @@ pub async fn copy_cmd<W: std::io::Write>(
                 LocalOrRemoteDirectoryPath::Local(destination_path),
             ) => {
                 let source_dir = RemoteDirectory::from_proxy(
-                    get_or_cache_namespace_dir_for_moniker(
-                        &realm_query,
-                        &source.moniker,
-                        &mut namespace_dir_cache,
-                    )
-                    .await?,
+                    open_component_dir_for_moniker(&realm_query, &source.moniker, &source.dir_type)
+                        .await?,
                 );
                 let destination_dir = LocalDirectory::new();
 
@@ -104,10 +99,10 @@ pub async fn copy_cmd<W: std::io::Write>(
             ) => {
                 let source_dir = LocalDirectory::new();
                 let destination_dir = RemoteDirectory::from_proxy(
-                    get_or_cache_namespace_dir_for_moniker(
+                    open_component_dir_for_moniker(
                         &realm_query,
                         &destination.moniker,
-                        &mut namespace_dir_cache,
+                        &destination.dir_type,
                     )
                     .await?,
                 );
@@ -128,19 +123,15 @@ pub async fn copy_cmd<W: std::io::Write>(
                 LocalOrRemoteDirectoryPath::Remote(destination),
             ) => {
                 let source_dir = RemoteDirectory::from_proxy(
-                    get_or_cache_namespace_dir_for_moniker(
-                        &realm_query,
-                        &source.moniker,
-                        &mut namespace_dir_cache,
-                    )
-                    .await?,
+                    open_component_dir_for_moniker(&realm_query, &source.moniker, &source.dir_type)
+                        .await?,
                 );
 
                 let destination_dir = RemoteDirectory::from_proxy(
-                    get_or_cache_namespace_dir_for_moniker(
+                    open_component_dir_for_moniker(
                         &realm_query,
                         &destination.moniker,
-                        &mut namespace_dir_cache,
+                        &destination.dir_type,
                     )
                     .await?,
                 );
@@ -277,26 +268,6 @@ async fn maybe_expand_wildcards<D: Directory>(path: &PathBuf, dir: &D) -> Result
     Ok(entries.iter().map(|file| parent_dir_path.join(file)).collect::<Vec<_>>())
 }
 
-/// Checks whether the hashmap contains the existing moniker and creates a new (moniker, DirectoryProxy) pair if it doesn't exist.
-///
-/// # Arguments
-///
-/// * `realm_query`: |RealmQueryProxy| to fetch the component's namespace.
-/// * `moniker`: A moniker used to retrieve a namespace directory.
-/// * `namespace_dir_cache`: A table of monikers that map to namespace directories.
-async fn get_or_cache_namespace_dir_for_moniker(
-    realm_query: &fsys::RealmQueryProxy,
-    moniker: &String,
-    namespace_dir_cache: &mut HashMap<String, fio::DirectoryProxy>,
-) -> Result<fio::DirectoryProxy> {
-    if !namespace_dir_cache.contains_key(moniker) {
-        let namespace = open_namespace_dir_for_moniker(&realm_query, moniker).await?;
-        namespace_dir_cache.insert(moniker.clone(), namespace);
-    }
-
-    Ok(namespace_dir_cache.get(moniker).unwrap().to_owned())
-}
-
 /// Checks that the paths meet the following conditions:
 ///
 /// * Destination path does not contain a wildcard.
@@ -315,30 +286,30 @@ fn validate_paths(paths: &Vec<String>) -> Result<()> {
     }
 }
 
-/// Retrieves the directory proxy associated with a component's namespace
+/// Retrieves the directory proxy for one of a component's associated directories.
 /// # Arguments
 /// * `realm_query`: |RealmQueryProxy| to retrieve a component instance.
 /// * `moniker`: Absolute moniker of a component instance.
-async fn open_namespace_dir_for_moniker(
+/// * `dir_type`: The type of directory (namespace, outgoing, ...)
+async fn open_component_dir_for_moniker(
     realm_query: &fsys::RealmQueryProxy,
     moniker: &str,
+    dir_type: &fsys::OpenDirType,
 ) -> Result<fio::DirectoryProxy> {
     // A relative moniker is required for |fuchsia.sys2/RealmQuery.GetInstance|
+    // TODO(fxb/126681): Remove this once relative/absolute monikers are not a thing.
     let relative_moniker = format!(".{moniker}");
-    let (namespace, server_end) = create_proxy::<fio::DirectoryMarker>()?;
+    let (dir, server_end) = create_proxy::<fio::DirectoryMarker>()?;
     let server_end = ServerEnd::new(server_end.into_channel());
+    let flags = match dir_type {
+        fsys::OpenDirType::PackageDir => fio::OpenFlags::RIGHT_READABLE,
+        _ => fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+    };
     match realm_query
-        .open(
-            &relative_moniker,
-            fsys::OpenDirType::NamespaceDir,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::ModeType::empty(),
-            ".",
-            server_end,
-        )
+        .open(&relative_moniker, dir_type.clone(), flags, fio::ModeType::empty(), ".", server_end)
         .await?
     {
-        Ok(()) => Ok(namespace),
+        Ok(()) => Ok(dir),
         Err(fsys::OpenError::InstanceNotFound) => {
             Err(CopyError::InstanceNotFound { moniker: moniker.to_string() }.into())
         }
@@ -375,6 +346,7 @@ mod tests {
             create_tmp_dir, generate_directory_paths, generate_file_paths, serve_realm_query, File,
             SeedPath,
         },
+        std::collections::HashMap,
         std::fs::{read, write},
         std::iter::zip,
         test_case::test_case,
@@ -409,23 +381,74 @@ mod tests {
     }
 
     fn create_realm_query(
+        foo_dir_type: fsys::OpenDirType,
         foo_files: Vec<SeedPath>,
+        bar_dir_type: fsys::OpenDirType,
         bar_files: Vec<SeedPath>,
     ) -> (fsys::RealmQueryProxy, PathBuf, PathBuf) {
         let foo_ns_dir = create_tmp_dir(foo_files).unwrap();
         let bar_ns_dir = create_tmp_dir(bar_files).unwrap();
         let foo_path = foo_ns_dir.path().to_path_buf();
         let bar_path = bar_ns_dir.path().to_path_buf();
-        let query = serve_realm_query(
+        let realm_query = serve_realm_query(
             vec![],
             HashMap::new(),
             HashMap::new(),
             HashMap::from([
-                (("./foo/bar".to_string(), fsys::OpenDirType::NamespaceDir), foo_ns_dir),
-                (("./bar/foo".to_string(), fsys::OpenDirType::NamespaceDir), bar_ns_dir),
+                (("./foo/bar".to_string(), foo_dir_type), foo_ns_dir),
+                (("./bar/foo".to_string(), bar_dir_type), bar_ns_dir),
             ]),
         );
-        (query, foo_path, bar_path)
+        (realm_query, foo_path, bar_path)
+    }
+
+    fn create_realm_query_simple(
+        foo_files: Vec<SeedPath>,
+        bar_files: Vec<SeedPath>,
+    ) -> (fsys::RealmQueryProxy, PathBuf, PathBuf) {
+        create_realm_query(
+            fsys::OpenDirType::NamespaceDir,
+            foo_files,
+            fsys::OpenDirType::NamespaceDir,
+            bar_files,
+        )
+    }
+
+    #[test_case(Input{source: "/foo/bar::out::/data/foo.txt", destination: "foo.txt"},
+                generate_file_paths(vec![File{ name: "data/foo.txt", data: "Hello"}]),
+                Expectation{path: "foo.txt", data: "Hello"}; "single_file")]
+    #[fuchsia::test]
+    async fn copy_from_outgoing_dir(
+        input: Input,
+        foo_files: Vec<SeedPath>,
+        expectation: Expectation,
+    ) {
+        // Show that the copy command will respect an input that specifies
+        // a directory other than the namespace.
+        let local_dir = create_tmp_dir(vec![]).unwrap();
+        let local_path = local_dir.path();
+
+        let (realm_query, _, _) = create_realm_query(
+            fsys::OpenDirType::OutgoingDir,
+            foo_files,
+            fsys::OpenDirType::OutgoingDir,
+            vec![],
+        );
+        let destination_path = local_path.join(input.destination).display().to_string();
+
+        copy_cmd(
+            &realm_query,
+            vec![input.source.to_string(), destination_path],
+            /*verbose=*/ false,
+            std::io::stdout(),
+        )
+        .await
+        .unwrap();
+
+        let expected_data = expectation.data.to_owned().into_bytes();
+        let actual_data_path = local_path.join(expectation.path);
+        let actual_data = read(actual_data_path).unwrap();
+        assert_eq!(actual_data, expected_data);
     }
 
     #[test_case(Input{source: "/foo/bar::/data/foo.txt", destination: "foo.txt"},
@@ -461,7 +484,7 @@ mod tests {
         let local_dir = create_tmp_dir(vec![]).unwrap();
         let local_path = local_dir.path();
 
-        let (realm_query, _, _) = create_realm_query(foo_files, vec![]);
+        let (realm_query, _, _) = create_realm_query_simple(foo_files, vec![]);
         let destination_path = local_path.join(input.destination).display().to_string();
 
         eprintln!("Destination path: {:?}", destination_path);
@@ -518,7 +541,7 @@ mod tests {
         let local_dir = create_tmp_dir(vec![]).unwrap();
         let local_path = local_dir.path();
 
-        let (realm_query, _, _) = create_realm_query(foo_files, vec![]);
+        let (realm_query, _, _) = create_realm_query_simple(foo_files, vec![]);
         let destination_path = local_path.join(input.destination);
 
         copy_cmd(
@@ -552,7 +575,7 @@ mod tests {
         let local_dir = create_tmp_dir(vec![]).unwrap();
         let local_path = local_dir.path();
 
-        let (realm_query, _, _) = create_realm_query(foo_files, vec![]);
+        let (realm_query, _, _) = create_realm_query_simple(foo_files, vec![]);
         let destination_path = local_path.join(input.destination).display().to_string();
         let result = copy_cmd(
             &realm_query,
@@ -603,7 +626,7 @@ mod tests {
 
         let source_path = local_path.join(&input.source);
         write(&source_path, expectation.data.to_owned().into_bytes()).unwrap();
-        let (realm_query, foo_path, _) = create_realm_query(foo_files, vec![]);
+        let (realm_query, foo_path, _) = create_realm_query_simple(foo_files, vec![]);
 
         copy_cmd(
             &realm_query,
@@ -655,7 +678,7 @@ mod tests {
         bar_files: Vec<SeedPath>,
         expectation: Vec<Expectation>,
     ) {
-        let (realm_query, _, bar_path) = create_realm_query(foo_files, bar_files);
+        let (realm_query, _, bar_path) = create_realm_query_simple(foo_files, bar_files);
 
         copy_cmd(
             &realm_query,
@@ -680,7 +703,7 @@ mod tests {
     #[test_case(Input{source: "/foo/bar::/data/foo.txt", destination: "/hello/world::/data/file.txt"}; "bad_destination_moniker")]
     #[fuchsia::test]
     async fn copy_device_to_device_fails(input: Input) {
-        let (realm_query, _, _) = create_realm_query(
+        let (realm_query, _, _) = create_realm_query_simple(
             generate_file_paths(vec![
                 File { name: "data/foo.txt", data: "Hello" },
                 File { name: "data/bar.txt", data: "World" },
@@ -725,7 +748,7 @@ mod tests {
             write(&source_path, expected.data).unwrap();
         }
 
-        let (realm_query, foo_path, _) = create_realm_query(foo_files, vec![]);
+        let (realm_query, foo_path, _) = create_realm_query_simple(foo_files, vec![]);
         let mut paths: Vec<String> = input
             .sources
             .into_iter()
@@ -754,7 +777,7 @@ mod tests {
         write(&source_path, "Hello".to_owned().into_bytes()).unwrap();
 
         let (realm_query, _, _) =
-            create_realm_query(generate_directory_paths(vec!["data"]), vec![]);
+            create_realm_query_simple(generate_directory_paths(vec!["data"]), vec![]);
 
         let result = copy_cmd(
             &realm_query,
@@ -774,7 +797,7 @@ mod tests {
     #[test_case(vec!["*", "*"]; "local_wildcard_destination")]
     #[fuchsia::test]
     async fn copy_wildcard_fails(paths: Vec<&str>) {
-        let (realm_query, _, _) = create_realm_query(
+        let (realm_query, _, _) = create_realm_query_simple(
             generate_file_paths(vec![File { name: "data/foo.txt", data: "Hello" }]),
             vec![],
         );
@@ -810,7 +833,7 @@ mod tests {
         let local_dir = create_tmp_dir(local_files).unwrap();
         let local_path = local_dir.path();
 
-        let (realm_query, _, bar_path) = create_realm_query(foo_files, bar_files);
+        let (realm_query, _, bar_path) = create_realm_query_simple(foo_files, bar_files);
         let mut paths: Vec<String> = input
             .sources
             .clone()
