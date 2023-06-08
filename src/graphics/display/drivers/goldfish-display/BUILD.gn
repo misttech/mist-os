@@ -54,6 +54,7 @@ source_set("common") {
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//src/devices/lib/goldfish/pipe_headers",
     "//src/devices/lib/goldfish/pipe_io",
+    "//src/graphics/display/lib/api-types-cpp",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//src/lib/fsl",

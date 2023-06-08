@@ -23,6 +23,7 @@
 #include <zircon/threads.h>
 
 #include <algorithm>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -40,6 +41,7 @@
 #include "lib/fidl/cpp/wire/traits.h"
 #include "src/devices/lib/goldfish/pipe_headers/include/base.h"
 #include "src/graphics/display/drivers/goldfish-display/render_control.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -48,7 +50,7 @@ namespace {
 
 const char* kTag = "goldfish-display";
 
-constexpr uint64_t kPrimaryDisplayId = 1;
+constexpr display::DisplayId kPrimaryDisplayId(1);
 
 constexpr fuchsia_images2_pixel_format_enum_value_t kPixelFormats[] = {
     static_cast<fuchsia_images2_pixel_format_enum_value_t>(
@@ -149,7 +151,7 @@ zx_status_t Display::Bind() {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  uint64_t next_display_id = kPrimaryDisplayId;
+  display::DisplayId next_display_id = kPrimaryDisplayId;
 
   // Parse optional display params. This is comma seperated list of
   // display devices. The format is:
@@ -241,7 +243,7 @@ void Display::DisplayControllerImplSetDisplayControllerInterface(
   std::vector<added_display_args_t> args;
   for (auto& it : devices_) {
     added_display_args_t display = {
-        .display_id = it.first,
+        .display_id = display::ToBanjoDisplayId(it.first),
         .edid_present = false,
         .panel =
             {
@@ -479,9 +481,10 @@ config_check_result_t Display::DisplayControllerImplCheckConfiguration(
   }
   for (unsigned i = 0; i < display_count; i++) {
     const size_t layer_count = display_configs[i]->layer_count;
+    const display::DisplayId display_id = display::ToDisplayId(display_configs[i]->display_id);
     if (layer_count > 0) {
-      ZX_DEBUG_ASSERT(devices_.find(display_configs[i]->display_id) != devices_.end());
-      const Device& device = devices_[display_configs[i]->display_id];
+      ZX_DEBUG_ASSERT(devices_.find(display_id) != devices_.end());
+      const Device& device = devices_[display_id];
 
       if (display_configs[i]->cc_flags != 0) {
         // Color Correction is not supported, but we will pretend we do.
@@ -549,7 +552,7 @@ config_check_result_t Display::DisplayControllerImplCheckConfiguration(
   return CONFIG_CHECK_RESULT_OK;
 }
 
-zx_status_t Display::PresentDisplayConfig(uint64_t display_id,
+zx_status_t Display::PresentDisplayConfig(display::DisplayId display_id,
                                           const DisplayConfig& display_config) {
   auto* color_buffer = display_config.color_buffer;
   if (!color_buffer) {
@@ -653,7 +656,7 @@ void Display::DisplayControllerImplApplyConfiguration(const display_config_t** d
   for (const auto& it : devices_) {
     uint64_t handle = 0;
     for (unsigned i = 0; i < display_count; i++) {
-      if (display_configs[i]->display_id == it.first) {
+      if (display::ToDisplayId(display_configs[i]->display_id) == it.first) {
         if (display_configs[i]->layer_count) {
           handle = display_configs[i]->layer_list[0]->cfg.primary.image.handle;
         }
@@ -792,7 +795,7 @@ zx_status_t Display::DisplayControllerImplSetBufferCollectionConstraints(const i
   return ZX_OK;
 }
 
-zx_status_t Display::SetupDisplay(uint64_t display_id) {
+zx_status_t Display::SetupDisplay(display::DisplayId display_id) {
   Device& device = devices_[display_id];
 
   // Create secondary displays.
@@ -816,7 +819,7 @@ zx_status_t Display::SetupDisplay(uint64_t display_id) {
   return ZX_OK;
 }
 
-void Display::TeardownDisplay(uint64_t display_id) {
+void Display::TeardownDisplay(display::DisplayId display_id) {
   Device& device = devices_[display_id];
 
   if (device.host_display_id != kInvalidHostDisplayId) {
@@ -826,7 +829,7 @@ void Display::TeardownDisplay(uint64_t display_id) {
   }
 }
 
-void Display::FlushDisplay(async_dispatcher_t* dispatcher, uint64_t display_id) {
+void Display::FlushDisplay(async_dispatcher_t* dispatcher, display::DisplayId display_id) {
   Device& device = devices_[display_id];
 
   zx::duration period = zx::sec(1) / device.refresh_rate_hz;
@@ -842,7 +845,8 @@ void Display::FlushDisplay(async_dispatcher_t* dispatcher, uint64_t display_id) 
 
     if (dc_intf_.is_valid()) {
       zx::time now = async::Now(dispatcher);
-      dc_intf_.OnDisplayVsync(display_id, now.get(), &device.latest_config_stamp);
+      const uint64_t banjo_display_id = display::ToBanjoDisplayId(display_id);
+      dc_intf_.OnDisplayVsync(banjo_display_id, now.get(), &device.latest_config_stamp);
     }
   }
 

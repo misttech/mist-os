@@ -29,6 +29,7 @@
 
 #include "src/devices/lib/goldfish/pipe_io/pipe_io.h"
 #include "src/graphics/display/drivers/goldfish-display/render_control.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
 namespace goldfish {
 
@@ -104,7 +105,8 @@ class Display : public DisplayType,
     constexpr uint32_t dummy_fr = 60;
     ZX_DEBUG_ASSERT(devices_.empty());
     for (int i = 0; i < num_devices; i++) {
-      auto& device = devices_[i + 1];
+      display::DisplayId display_id(i + 1);
+      auto& device = devices_[display_id];
       device.width = dummy_width;
       device.height = dummy_height;
       device.refresh_rate_hz = dummy_fr;
@@ -182,11 +184,12 @@ class Display : public DisplayType,
 
   zx_status_t ImportVmoImage(image_t* image, const fuchsia_sysmem::PixelFormat& pixel_format,
                              zx::vmo vmo, size_t offset);
-  zx_status_t PresentDisplayConfig(uint64_t display_id, const DisplayConfig& display_config);
-  zx_status_t SetupDisplay(uint64_t display_id);
+  zx_status_t PresentDisplayConfig(display::DisplayId display_id,
+                                   const DisplayConfig& display_config);
+  zx_status_t SetupDisplay(display::DisplayId display_id);
 
-  void TeardownDisplay(uint64_t display_id);
-  void FlushDisplay(async_dispatcher_t* dispatcher, uint64_t display_id);
+  void TeardownDisplay(display::DisplayId display_id);
+  void FlushDisplay(async_dispatcher_t* dispatcher, display::DisplayId display_id);
 
   fbl::Mutex lock_;
   ddk::GoldfishControlProtocolClient control_ TA_GUARDED(lock_);
@@ -203,8 +206,7 @@ class Display : public DisplayType,
   zx::bti bti_;
   ddk::IoBuffer cmd_buffer_ TA_GUARDED(lock_);
   ddk::IoBuffer io_buffer_ TA_GUARDED(lock_);
-
-  std::map</*DisplayId*/ uint64_t, Device> devices_;
+  std::map<display::DisplayId, Device> devices_;
   fbl::Mutex flush_lock_;
   ddk::DisplayControllerInterfaceProtocolClient dc_intf_ TA_GUARDED(flush_lock_);
 
