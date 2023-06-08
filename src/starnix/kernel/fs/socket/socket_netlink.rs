@@ -13,9 +13,9 @@ use netlink::{
     protocol_family::route::NetlinkRouteClient,
     NewClientError, NETLINK_LOG_TAG,
 };
-use netlink_packet_core::NetlinkMessage;
+use netlink_packet_core::{NetlinkMessage, NetlinkSerializable};
 use netlink_packet_route::rtnl::RtnlMessage;
-use netlink_packet_utils::Emitable;
+use netlink_packet_utils::Emitable as _;
 use zerocopy::{AsBytes, FromBytes};
 
 use crate::{
@@ -715,8 +715,10 @@ impl<M> NetlinkToClientSender<M> {
     }
 }
 
-impl<M: Clone + Emitable + Send + Sync + 'static> Sender<M> for NetlinkToClientSender<M> {
-    fn send(&mut self, message: M) {
+impl<M: Clone + NetlinkSerializable + Send + Sync + 'static> Sender<M>
+    for NetlinkToClientSender<M>
+{
+    fn send(&mut self, message: NetlinkMessage<M>) {
         // Serialize the message
         let mut buf = vec![0; message.buffer_len()];
         message.emit(&mut buf);
@@ -739,8 +741,8 @@ impl<M: Clone + Emitable + Send + Sync + 'static> Sender<M> for NetlinkToClientS
 pub(crate) struct NetlinkSenderReceiverProvider;
 
 impl SenderReceiverProvider for NetlinkSenderReceiverProvider {
-    type Sender<M: Clone + Emitable + Send + Sync + 'static> = NetlinkToClientSender<M>;
-    type Receiver<M: Send + 'static> = UnboundedReceiver<M>;
+    type Sender<M: Clone + NetlinkSerializable + Send + Sync + 'static> = NetlinkToClientSender<M>;
+    type Receiver<M: Send + 'static> = UnboundedReceiver<NetlinkMessage<M>>;
 }
 
 /// Socket implementation for the NETLINK_ROUTE family of netlink sockets.
@@ -965,8 +967,7 @@ mod tests {
             timestamp: false,
         }));
 
-        let mut sender =
-            NetlinkToClientSender::<NetlinkMessage<RtnlMessage>>::new(socket_inner.clone());
+        let mut sender = NetlinkToClientSender::<RtnlMessage>::new(socket_inner.clone());
         sender.send(message);
 
         let message = socket_inner.lock().read_message();

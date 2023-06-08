@@ -171,7 +171,7 @@ fn map_existing_interface_terminal_error(
 }
 
 /// A request associated with links or addresses.
-pub(crate) struct Request<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> {
+pub(crate) struct Request<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> {
     /// The resource and operation-specific argument(s) for this request.
     pub args: RequestArgs,
     /// The client that made the request.
@@ -184,7 +184,7 @@ pub(crate) struct Request<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> 
 ///
 /// Connects to the interfaces watcher and can respond to RTM_LINK and RTM_ADDR
 /// message requests.
-pub(crate) struct EventLoop<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> {
+pub(crate) struct EventLoop<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> {
     /// An `InterfacesProxy` to get controlling access to interfaces.
     interfaces_proxy: fnet_root::InterfacesProxy,
     /// A `StateProxy` to connect to the interfaces watcher.
@@ -226,7 +226,7 @@ pub(crate) enum InterfacesNetstackError {
     Update(fnet_interfaces_ext::UpdateError),
 }
 
-impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>> EventLoop<S> {
+impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
     /// `new` returns a `Result<EventLoop, EventLoopError>` instance.
     /// This is fallible iff it is not possible to obtain the `StateProxy`.
     pub(crate) fn new(
@@ -587,7 +587,7 @@ struct InterfaceAndAddr {
     addr: fnet::IpAddress,
 }
 
-fn update_addresses<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>>(
+fn update_addresses<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
     interface_id: &NonZeroU64,
     all_addresses: &mut BTreeMap<InterfaceAndAddr, NetlinkAddressMessage>,
     interface_addresses: BTreeMap<InterfaceAndAddr, NetlinkAddressMessage>,
@@ -654,7 +654,7 @@ fn update_addresses<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>>(
 ///
 /// Returns an `InterfaceEventLoopError` when unexpected events occur, or an
 /// `UpdateError` when updates are not consistent with the current state.
-fn handle_interface_watcher_event<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>>(
+fn handle_interface_watcher_event<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
     interface_properties: &mut HashMap<u64, fnet_interfaces_ext::Properties>,
     all_addresses: &mut BTreeMap<InterfaceAndAddr, NetlinkAddressMessage>,
     route_clients: &ClientTable<NetlinkRoute, S>,
@@ -1058,14 +1058,14 @@ pub(crate) mod testutil {
     pub(crate) const TEST_V6_ADDR: fnet::Subnet = fidl_subnet!("2001:db8::1/32");
 
     pub(crate) struct Setup<W> {
-        pub event_loop: EventLoop<FakeSender<NetlinkMessage<RtnlMessage>>>,
+        pub event_loop: EventLoop<FakeSender<RtnlMessage>>,
         pub watcher_stream: W,
-        pub request_sink: mpsc::Sender<Request<FakeSender<NetlinkMessage<RtnlMessage>>>>,
+        pub request_sink: mpsc::Sender<Request<FakeSender<RtnlMessage>>>,
         pub interfaces_request_stream: fnet_root::InterfacesRequestStream,
     }
 
     pub(crate) fn setup_with_route_clients(
-        route_clients: ClientTable<NetlinkRoute, FakeSender<NetlinkMessage<RtnlMessage>>>,
+        route_clients: ClientTable<NetlinkRoute, FakeSender<RtnlMessage>>,
     ) -> Setup<impl Stream<Item = fnet_interfaces::WatcherRequest>> {
         let (interfaces_proxy, interfaces_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<fnet_root::InterfacesMarker>().unwrap();

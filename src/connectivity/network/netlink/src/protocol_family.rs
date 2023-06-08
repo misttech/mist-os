@@ -4,8 +4,7 @@
 
 //! A module for managing protocol-specific aspects of Netlink.
 
-use netlink_packet_core::{NetlinkMessage, NetlinkPayload};
-use netlink_packet_utils::Emitable;
+use netlink_packet_core::{NetlinkMessage, NetlinkPayload, NetlinkSerializable};
 
 use std::fmt::Debug;
 
@@ -30,20 +29,24 @@ pub(crate) trait ProtocolFamily:
     MulticastCapableNetlinkFamily + Send + Sized + 'static
 {
     /// The message type associated with the protocol family.
-    type Message: Clone + Debug + Emitable + Send + 'static;
+    type InnerMessage: Clone + Debug + NetlinkSerializable + Send + 'static;
     /// The implementation for handling requests from this protocol family.
-    type RequestHandler<S: Sender<Self::Message>>: NetlinkFamilyRequestHandler<Self, S>;
+    type RequestHandler<S: Sender<Self::InnerMessage>>: NetlinkFamilyRequestHandler<Self, S>;
 
     const NAME: &'static str;
 }
 
 #[async_trait]
 /// A request handler implementation for a particular Netlink protocol family.
-pub(crate) trait NetlinkFamilyRequestHandler<F: ProtocolFamily, S: Sender<F::Message>>:
+pub(crate) trait NetlinkFamilyRequestHandler<F: ProtocolFamily, S: Sender<F::InnerMessage>>:
     Clone + Send + 'static
 {
     /// Handles the given request and generates the associated response(s).
-    async fn handle_request(&mut self, req: F::Message, client: &mut InternalClient<F, S>);
+    async fn handle_request(
+        &mut self,
+        req: NetlinkMessage<F::InnerMessage>,
+        client: &mut InternalClient<F, S>,
+    );
 }
 
 pub mod route {
@@ -121,21 +124,21 @@ pub mod route {
     }
 
     impl ProtocolFamily for NetlinkRoute {
-        type Message = NetlinkMessage<RtnlMessage>;
-        type RequestHandler<S: Sender<Self::Message>> = NetlinkRouteRequestHandler<S>;
+        type InnerMessage = RtnlMessage;
+        type RequestHandler<S: Sender<Self::InnerMessage>> = NetlinkRouteRequestHandler<S>;
 
         const NAME: &'static str = "NETLINK_ROUTE";
     }
 
     #[derive(Clone)]
     pub(crate) struct NetlinkRouteRequestHandler<
-        S: Sender<<NetlinkRoute as ProtocolFamily>::Message>,
+        S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
     > {
         pub(crate) interfaces_request_sink: mpsc::Sender<interfaces::Request<S>>,
     }
 
     #[async_trait]
-    impl<S: Sender<<NetlinkRoute as ProtocolFamily>::Message>>
+    impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>
         NetlinkFamilyRequestHandler<NetlinkRoute, S> for NetlinkRouteRequestHandler<S>
     {
         async fn handle_request(
@@ -330,7 +333,7 @@ pub mod route {
 pub(crate) mod testutil {
     use super::*;
 
-    use netlink_packet_utils::Emitable;
+    use netlink_packet_core::NetlinkHeader;
 
     pub(crate) const LEGACY_GROUP1: u32 = 0x00000001;
     pub(crate) const LEGACY_GROUP2: u32 = 0x00000002;
@@ -353,30 +356,41 @@ pub(crate) mod testutil {
         }
     }
 
-    #[derive(Clone, Debug, Default, PartialEq)]
-    pub(crate) struct FakeNetlinkMessage;
+    pub(crate) fn new_fake_netlink_message() -> NetlinkMessage<FakeNetlinkInnerMessage> {
+        NetlinkMessage::new(
+            NetlinkHeader::default(),
+            NetlinkPayload::InnerMessage(FakeNetlinkInnerMessage),
+        )
+    }
 
-    impl Emitable for FakeNetlinkMessage {
+    #[derive(Clone, Debug, Default, PartialEq)]
+    pub(crate) struct FakeNetlinkInnerMessage;
+
+    impl NetlinkSerializable for FakeNetlinkInnerMessage {
+        fn message_type(&self) -> u16 {
+            u16::MAX
+        }
+
         fn buffer_len(&self) -> usize {
             0
         }
 
-        fn emit(&self, _buffer: &mut [u8]) {}
+        fn serialize(&self, _buffer: &mut [u8]) {}
     }
 
-    /// Handler of [`FakeNetlinkMessage`] requests.
+    /// Handler of [`FakeNetlinkInnerMessage`] requests.
     ///
     /// Reflects the given request back as the response.
     #[derive(Clone)]
     pub(crate) struct FakeNetlinkRequestHandler;
 
     #[async_trait]
-    impl<S: Sender<FakeNetlinkMessage>> NetlinkFamilyRequestHandler<FakeProtocolFamily, S>
+    impl<S: Sender<FakeNetlinkInnerMessage>> NetlinkFamilyRequestHandler<FakeProtocolFamily, S>
         for FakeNetlinkRequestHandler
     {
         async fn handle_request(
             &mut self,
-            req: FakeNetlinkMessage,
+            req: NetlinkMessage<FakeNetlinkInnerMessage>,
             client: &mut InternalClient<FakeProtocolFamily, S>,
         ) {
             client.send(req)
@@ -384,8 +398,8 @@ pub(crate) mod testutil {
     }
 
     impl ProtocolFamily for FakeProtocolFamily {
-        type Message = FakeNetlinkMessage;
-        type RequestHandler<S: Sender<Self::Message>> = FakeNetlinkRequestHandler;
+        type InnerMessage = FakeNetlinkInnerMessage;
+        type RequestHandler<S: Sender<Self::InnerMessage>> = FakeNetlinkRequestHandler;
 
         const NAME: &'static str = "FAKE_PROTOCOL_FAMILY";
     }

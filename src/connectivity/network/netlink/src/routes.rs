@@ -38,7 +38,7 @@ use crate::NETLINK_LOG_TAG;
 /// Connects to the route watcher and can respond to RTM_ROUTE
 /// message requests.
 pub(crate) struct EventLoop<
-    S: Sender<<NetlinkRoute as ProtocolFamily>::Message>,
+    S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
     I: fnet_routes_ext::FidlRouteIpExt,
 > {
     /// A 'StateProxy` to connect to the routes watcher.
@@ -76,7 +76,7 @@ pub(crate) enum RoutesNetstackError<I: Ip> {
 }
 
 impl<
-        S: Sender<<NetlinkRoute as ProtocolFamily>::Message>,
+        S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
         I: fnet_routes_ext::FidlRouteIpExt,
     > EventLoop<S, I>
 {
@@ -172,7 +172,7 @@ enum RouteEventHandlerError<I: Ip> {
 /// from the underlying `NetlinkRouteMessage` set.
 ///
 /// Returns a `RoutesEventLoopError` when unexpected events or HashSet issues occur.
-fn handle_route_watcher_event<I: Ip, S: Sender<<NetlinkRoute as ProtocolFamily>::Message>>(
+fn handle_route_watcher_event<I: Ip, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
     route_messages: &mut HashSet<NetlinkRouteMessage>,
     route_clients: &ClientTable<NetlinkRoute, S>,
     event: fnet_routes_ext::Event<I>,
@@ -725,12 +725,12 @@ mod tests {
     }
 
     struct Setup<W, I: fnet_routes_ext::FidlRouteIpExt> {
-        event_loop: EventLoop<FakeSender<NetlinkMessage<RtnlMessage>>, I>,
+        event_loop: EventLoop<FakeSender<RtnlMessage>, I>,
         watcher_stream: W,
     }
 
     fn setup_with_route_clients<I: fnet_routes_ext::FidlRouteIpExt>(
-        route_clients: ClientTable<NetlinkRoute, FakeSender<NetlinkMessage<RtnlMessage>>>,
+        route_clients: ClientTable<NetlinkRoute, FakeSender<RtnlMessage>>,
     ) -> Setup<
         impl Stream<Item = <<I::WatcherMarker as ProtocolMarker>::RequestStream as Stream>::Item>,
         I,

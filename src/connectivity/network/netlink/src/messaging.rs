@@ -5,28 +5,28 @@
 //! A module for managing message passing between Netlink and its clients.
 
 use futures::Stream;
-use netlink_packet_utils::Emitable;
+use netlink_packet_core::{NetlinkMessage, NetlinkSerializable};
 
 /// A type capable of sending messages, `M`, from Netlink to a client.
 pub trait Sender<M>: Clone + Send + Sync + 'static {
     /// Sends the given message to the client.
     ///
     /// Implementors must ensure this call does not block.
-    fn send(&mut self, message: M);
+    fn send(&mut self, message: NetlinkMessage<M>);
 }
 
 /// A type capable of receiving messages, `M`, from a client to Netlink.
 ///
 /// [`Stream`] already provides a sufficient interface for this purpose.
-pub trait Receiver<M>: Stream<Item = M> + Send + 'static {}
+pub trait Receiver<M>: Stream<Item = NetlinkMessage<M>> + Send + 'static {}
 
 /// Blanket implementation allows any [`Stream`] to be used as a [`Receiver`].
-impl<M: Send, S> Receiver<M> for S where S: Stream<Item = M> + Send + 'static {}
+impl<M: Send, S> Receiver<M> for S where S: Stream<Item = NetlinkMessage<M>> + Send + 'static {}
 
 /// A type capable of providing a concrete type of [`Sender`] & [`Receiver`].
 pub trait SenderReceiverProvider {
     /// The type of [`Sender`] provided.
-    type Sender<M: Clone + Emitable + Send + Sync + 'static>: Sender<M>;
+    type Sender<M: Clone + NetlinkSerializable + Send + Sync + 'static>: Sender<M>;
     /// The type of [`Receiver`] provided.
     type Receiver<M: Send + 'static>: Receiver<M>;
 }
@@ -41,21 +41,21 @@ pub(crate) mod testutil {
 
     #[derive(Clone, Debug, Default)]
     pub(crate) struct FakeSender<M> {
-        sent_messages: Arc<Mutex<Vec<M>>>,
+        sent_messages: Arc<Mutex<Vec<NetlinkMessage<M>>>>,
     }
 
-    impl<M: Clone + Send + Emitable + 'static> Sender<M> for FakeSender<M> {
-        fn send(&mut self, message: M) {
+    impl<M: Clone + Send + NetlinkSerializable + 'static> Sender<M> for FakeSender<M> {
+        fn send(&mut self, message: NetlinkMessage<M>) {
             self.sent_messages.lock().unwrap().push(message)
         }
     }
 
     pub(crate) struct FakeSenderSink<M> {
-        messages: Arc<Mutex<Vec<M>>>,
+        messages: Arc<Mutex<Vec<NetlinkMessage<M>>>>,
     }
 
     impl<M> FakeSenderSink<M> {
-        pub(crate) fn take_messages(&mut self) -> Vec<M> {
+        pub(crate) fn take_messages(&mut self) -> Vec<NetlinkMessage<M>> {
             self.messages.lock().unwrap().drain(..).collect()
         }
     }
@@ -78,7 +78,7 @@ pub(crate) mod testutil {
     }
 
     impl<M> Stream for FakeReceiver<M> {
-        type Item = M;
+        type Item = NetlinkMessage<M>;
         fn poll_next(
             self: std::pin::Pin<&mut Self>,
             _cx: &mut std::task::Context<'_>,
@@ -90,7 +90,7 @@ pub(crate) mod testutil {
     pub(crate) struct FakeSenderReceiverProvider;
 
     impl SenderReceiverProvider for FakeSenderReceiverProvider {
-        type Sender<M: Clone + Emitable + Send + Sync + 'static> = FakeSender<M>;
+        type Sender<M: Clone + NetlinkSerializable + Send + Sync + 'static> = FakeSender<M>;
         type Receiver<M: Send + 'static> = FakeReceiver<M>;
     }
 }

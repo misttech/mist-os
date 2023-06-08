@@ -27,7 +27,6 @@ use futures::{
     FutureExt as _, StreamExt as _,
 };
 use net_types::ip::{Ipv4, Ipv6};
-use netlink_packet_core::NetlinkMessage;
 use netlink_packet_route::RtnlMessage;
 use tracing::debug;
 
@@ -52,8 +51,8 @@ pub struct Netlink<P: SenderReceiverProvider> {
     route_client_sender: UnboundedSender<
         ClientWithReceiver<
             NetlinkRoute,
-            P::Sender<<NetlinkRoute as ProtocolFamily>::Message>,
-            P::Receiver<<NetlinkRoute as ProtocolFamily>::Message>,
+            P::Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
+            P::Receiver<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
         >,
     >,
 }
@@ -78,8 +77,8 @@ impl<P: SenderReceiverProvider> Netlink<P> {
     /// `receiver` is used by Netlink to receive messages from the client.
     pub fn new_route_client(
         &self,
-        sender: P::Sender<NetlinkMessage<RtnlMessage>>,
-        receiver: P::Receiver<NetlinkMessage<RtnlMessage>>,
+        sender: P::Sender<RtnlMessage>,
+        receiver: P::Receiver<RtnlMessage>,
     ) -> Result<NetlinkRouteClient, NewClientError> {
         let Netlink { id_generator, route_client_sender } = self;
         let (external_client, internal_client) =
@@ -96,7 +95,11 @@ impl<P: SenderReceiverProvider> Netlink<P> {
 }
 
 /// A wrapper to hold an [`InternalClient`], and its [`Receiver`] of requests.
-struct ClientWithReceiver<F: ProtocolFamily, S: Sender<F::Message>, R: Receiver<F::Message>> {
+struct ClientWithReceiver<
+    F: ProtocolFamily,
+    S: Sender<F::InnerMessage>,
+    R: Receiver<F::InnerMessage>,
+> {
     client: InternalClient<F, S>,
     receiver: R,
 }
@@ -114,8 +117,8 @@ struct NetlinkWorkerParams<P: SenderReceiverProvider> {
     route_client_receiver: UnboundedReceiver<
         ClientWithReceiver<
             NetlinkRoute,
-            P::Sender<<NetlinkRoute as ProtocolFamily>::Message>,
-            P::Receiver<<NetlinkRoute as ProtocolFamily>::Message>,
+            P::Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
+            P::Receiver<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
         >,
     >,
 }
@@ -148,7 +151,7 @@ async fn run_netlink_worker<P: SenderReceiverProvider>(params: NetlinkWorkerPara
             let route_clients = route_clients.clone();
             fasync::Task::spawn(async move {
                 let worker = match routes::EventLoop::<
-                    P::Sender<<NetlinkRoute as ProtocolFamily>::Message>,
+                    P::Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
                     Ipv4,
                 >::new(route_clients)
                 {
@@ -170,7 +173,7 @@ async fn run_netlink_worker<P: SenderReceiverProvider>(params: NetlinkWorkerPara
             let route_clients = route_clients.clone();
             fasync::Task::spawn(async move {
                 let worker = match routes::EventLoop::<
-                    P::Sender<<NetlinkRoute as ProtocolFamily>::Message>,
+                    P::Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
                     Ipv6,
                 >::new(route_clients)
                 {
@@ -213,7 +216,11 @@ async fn run_netlink_worker<P: SenderReceiverProvider>(params: NetlinkWorkerPara
 ///
 /// A "Request Handler" Task will be spawned for each received client. The given
 /// `request_handler_impl` defines how the requests will be handled.
-async fn connect_new_clients<F: ProtocolFamily, S: Sender<F::Message>, R: Receiver<F::Message>>(
+async fn connect_new_clients<
+    F: ProtocolFamily,
+    S: Sender<F::InnerMessage>,
+    R: Receiver<F::InnerMessage>,
+>(
     client_table: ClientTable<F, S>,
     client_receiver: UnboundedReceiver<ClientWithReceiver<F, S, R>>,
     request_handler_impl: F::RequestHandler<S>,
@@ -234,8 +241,8 @@ async fn connect_new_clients<F: ProtocolFamily, S: Sender<F::Message>, R: Receiv
 /// Spawns a [`Task`] to handle requests from the given client.
 fn spawn_client_request_handler<
     F: ProtocolFamily,
-    S: Sender<F::Message>,
-    R: Receiver<F::Message>,
+    S: Sender<F::InnerMessage>,
+    R: Receiver<F::InnerMessage>,
 >(
     client: InternalClient<F, S>,
     receiver: R,
@@ -272,7 +279,7 @@ mod tests {
     use futures::channel::mpsc;
 
     use crate::protocol_family::testutil::{
-        FakeNetlinkMessage, FakeNetlinkRequestHandler, FakeProtocolFamily,
+        new_fake_netlink_message, FakeNetlinkRequestHandler, FakeProtocolFamily,
     };
 
     #[fasync::run_singlethreaded(test)]
@@ -295,14 +302,14 @@ mod tests {
         // Send a message and expect to see the response on the `client_sink`.
         // NB: Use the sender's channel size as a synchronization method; If a
         // second message could be sent, the first *must* have been handled.
-        req_sender.try_send(FakeNetlinkMessage).expect("should send without error");
+        req_sender.try_send(new_fake_netlink_message()).expect("should send without error");
         let could_send_fut = futures::future::poll_fn(|ctx| req_sender.poll_ready(ctx)).fuse();
         futures::pin_mut!(client_task, could_send_fut);
         futures::select!(
             res = could_send_fut => res.expect("should be able to send without error"),
             () = client_task => panic!("client task unexpectedly finished"),
         );
-        assert_eq!(&client_sink.take_messages()[..], &[FakeNetlinkMessage]);
+        assert_eq!(&client_sink.take_messages()[..], &[new_fake_netlink_message()]);
 
         // Close the sender, and expect the Task to exit.
         req_sender.close_channel();
@@ -347,14 +354,14 @@ mod tests {
         // being open (e.g. concurrent handling of requests across clients).
         // NB: Use the sender's channel size as a synchronization method; If a
         // second message could be sent, the first *must* have been handled.
-        req_sender2.try_send(FakeNetlinkMessage).expect("should send without error");
+        req_sender2.try_send(new_fake_netlink_message()).expect("should send without error");
         let could_send_fut = futures::future::poll_fn(|ctx| req_sender2.poll_ready(ctx)).fuse();
         futures::pin_mut!(client_acceptor_fut, could_send_fut);
         futures::select!(
             res = could_send_fut => res.expect("should be able to send without error"),
             () = client_acceptor_fut => panic!("client acceptor unexpectedly finished"),
         );
-        assert_eq!(&client_sink2.take_messages()[..], &[FakeNetlinkMessage]);
+        assert_eq!(&client_sink2.take_messages()[..], &[new_fake_netlink_message()]);
 
         // Close the two clients, and verify the acceptor fut is still pending.
         req_sender1.close_channel();
