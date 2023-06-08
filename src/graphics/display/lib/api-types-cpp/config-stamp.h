@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_CONFIG_STAMP_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_CONFIG_STAMP_H_
+#ifndef SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_CONFIG_STAMP_H_
+#define SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_CONFIG_STAMP_H_
 
 #include <fidl/fuchsia.hardware.display/cpp/wire_types.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
@@ -34,4 +34,4 @@ constexpr ConfigStamp kInvalidConfigStamp(fuchsia_hardware_display::wire::kInval
 
 }  // namespace display
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_CONFIG_STAMP_H_
+#endif  // SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_CONFIG_STAMP_H_

@@ -21,12 +21,12 @@
 #include <gtest/gtest.h>
 
 #include "src/graphics/display/drivers/coordinator/client.h"
-#include "src/graphics/display/drivers/coordinator/config-stamp.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/coordinator/display-id.h"
 #include "src/graphics/display/drivers/coordinator/tests/base.h"
 #include "src/graphics/display/drivers/coordinator/tests/fidl_client.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/predicates/status.h"
 

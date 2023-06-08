@@ -38,11 +38,11 @@
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/coordinator/client.h"
-#include "src/graphics/display/drivers/coordinator/config-stamp.h"
 #include "src/graphics/display/drivers/coordinator/display-id.h"
 #include "src/graphics/display/drivers/coordinator/display-info.h"
 #include "src/graphics/display/drivers/coordinator/eld.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 
 namespace fidl_display = fuchsia_hardware_display;
 

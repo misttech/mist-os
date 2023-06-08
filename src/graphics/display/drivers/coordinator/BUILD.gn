@@ -41,7 +41,6 @@ source_set("shared") {
   configs += [ "//build/config:all_source" ]
   sources = [
     "client.cc",
-    "config-stamp.cc",
     "controller.cc",
     "display-info.cc",
     "eld.cc",
@@ -62,6 +61,7 @@ source_set("shared") {
     "//sdk/lib/zbi-format",
     "//src/devices/lib/audio",
     "//src/devices/lib/mmio",
+    "//src/graphics/display/lib/api-types-cpp",
     "//src/graphics/display/lib/edid",
     "//src/lib/async-watchdog",
     "//src/lib/ddk",

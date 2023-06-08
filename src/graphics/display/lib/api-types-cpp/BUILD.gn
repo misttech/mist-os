@@ -9,6 +9,8 @@ source_set("api-types-cpp") {
   sources = [
     "alpha-mode.cc",
     "alpha-mode.h",
+    "config-stamp.cc",
+    "config-stamp.h",
     "frame.cc",
     "frame.h",
     "transform.cc",
@@ -17,12 +19,14 @@ source_set("api-types-cpp") {
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp_wire",
+    "//zircon/system/ulib/fbl",
   ]
 }
 
 test("api-types-cpp-tests-bin") {
   sources = [
     "alpha-mode-test.cc",
+    "config-stamp-test.cc",
     "frame-test.cc",
     "transform-test.cc",
   ]

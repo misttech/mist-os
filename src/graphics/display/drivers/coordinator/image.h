@@ -18,9 +18,9 @@
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 
-#include "src/graphics/display/drivers/coordinator/config-stamp.h"
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 
 namespace display {
 
