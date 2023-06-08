@@ -101,7 +101,7 @@ class BindManager {
 
   // Queue of Bind() calls that are made while there's an ongoing bind process. Once the process
   // is complete, ProcessPendingBindRequests() goes through the queue.
-  std::queue<BindRequest> pending_bind_requests_;
+  std::vector<BindRequest> pending_bind_requests_;
 
   // Orphaned nodes are nodes that have failed to bind to a driver, either
   // because no matching driver could be found, or because the matching driver

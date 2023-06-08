@@ -58,9 +58,12 @@ void BindManager::Bind(Node& node, std::string_view driver_url_suffix,
       .tracker = result_tracker,
   };
   if (bind_all_ongoing_) {
-    pending_bind_requests_.push(std::move(request));
+    pending_bind_requests_.push_back(std::move(request));
     return;
   }
+
+  // Remove the node from |orphaned_nodes_| to avoid collision.
+  orphaned_nodes_.erase(node.MakeComponentMoniker());
 
   bind_all_ongoing_ = true;
 
@@ -152,7 +155,6 @@ void BindManager::OnMatchDriverCallback(
     return;
   }
 
-  orphaned_nodes_.erase(node->MakeComponentMoniker());
   report_no_bind.cancel();
   if (request.tracker) {
     request.tracker->ReportSuccessfulBind(node->MakeComponentMoniker(), driver_url.value());
@@ -260,6 +262,13 @@ void BindManager::ProcessPendingBindRequests() {
     return;
   }
 
+  // Consolidate the pending bind requests and orphaned nodes to prevent collisions.
+  for (auto& request : pending_bind_requests_) {
+    if (auto node = request.node.lock(); node) {
+      orphaned_nodes_.erase(node->MakeComponentMoniker());
+    }
+  }
+
   bool have_bind_all_orphans_request = !pending_orphan_rebind_callbacks_.empty();
   size_t bind_tracker_size = have_bind_all_orphans_request
                                  ? pending_bind_requests_.size() + orphaned_nodes_.size()
@@ -292,9 +301,8 @@ void BindManager::ProcessPendingBindRequests() {
       std::make_shared<BindResultTracker>(bind_tracker_size, std::move(next_attempt));
 
   // Go through all the pending bind requests.
-  while (!pending_bind_requests_.empty()) {
-    BindRequest request = std::move(pending_bind_requests_.front());
-    pending_bind_requests_.pop();
+  std::vector<BindRequest> pending_bind = std::move(pending_bind_requests_);
+  for (auto& request : pending_bind) {
     auto match_complete_callback = [tracker]() mutable {
       // The bind status doesn't matter for this tracker.
       tracker->ReportNoBind();
