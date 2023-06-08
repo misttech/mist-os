@@ -45,10 +45,27 @@ function timetrace() {
   :
 }
 
+# Normalize path.  Following-symlinks is optional.
+function _normalize_path() {
+  # $1 is the path to resolve
+  if which realpath 2>&1 > /dev/null
+  then realpath "$1"
+  elif which readlink 2>&1 > /dev/null
+  then readlink -f "$1"
+  else
+    msg "Error: Unable to normalize paths."
+    exit 1
+  fi
+}
+
 # This should point to $FUCHSIA_DIR for the Fuchsia project.
 # ../../ because this script lives in build/rbe.
 # The value is an absolute path.
-readonly default_project_root="$(realpath "$script_dir"/../..)"
+readonly default_project_root="$(_normalize_path "$script_dir"/../..)"
+test -n "$default_project_root" || {
+  msg "Error: Unable to infer project root."
+  exit 1
+}
 
 # OS/Arch detection logic can also be found in 'tools/devshell/lib/platform.sh'
 [[ -n "${_FUCHSIA_RBE_CACHE_VAR_host_os+x}" ]] || {
