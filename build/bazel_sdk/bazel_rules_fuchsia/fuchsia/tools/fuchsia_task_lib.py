@@ -61,7 +61,7 @@ class Terminal:
             return text
 
 @total_ordering
-class ArgumentScope(Enum):
+class ArgumentScope(tuple, Enum):
     # Captures arguments that are passed directly to the current task:
     # 1. via command line: `bazel run :workflow -- 'TASK_MNEMONIC=--foo --bar'`
     # 2. via build rule: `arguments = ["--foo", "--bar"]`
