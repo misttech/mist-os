@@ -727,11 +727,6 @@
 
                 // socket_netlink_route_test
                 "NetlinkRouteTest.GetLinkDump",
-                "NetlinkRouteTest.GetLinkByIndex",
-                "NetlinkRouteTest.GetLinkByName",
-                "NetlinkRouteTest.RemoveLoopbackByName",
-                "NetlinkRouteTest.RemoveLoopbackByIndex",
-                "NetlinkRouteTest.SpliceFromPipe",
                 "NetlinkRouteTest.AddAndRemoveAddr",
                 "NetlinkRouteTest.GetRouteDump",
                 "NetlinkRouteTest.RecvmsgTrunc",
@@ -930,6 +925,11 @@
                 "NetlinkRouteTest.RemoveLinkByIndexNotFound",
                 "NetlinkRouteTest.RemoveLinkByNameNotFound",
                 "NetlinkRouteTest.GetRouteRequest",
+                "NetlinkRouteTest.GetLinkByIndex",
+                "NetlinkRouteTest.GetLinkByName",
+                "NetlinkRouteTest.RemoveLoopbackByName",
+                "NetlinkRouteTest.RemoveLoopbackByIndex",
+                "NetlinkRouteTest.SpliceFromPipe",
 
                 // readv_test
                 "ReadvTestNoFixture.TruncatedAtMax",

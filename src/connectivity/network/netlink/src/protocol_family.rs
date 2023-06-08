@@ -51,7 +51,10 @@ pub mod route {
 
     use super::*;
 
-    use futures::channel::mpsc;
+    use futures::{
+        channel::{mpsc, oneshot},
+        sink::SinkExt as _,
+    };
 
     use crate::interfaces;
 
@@ -124,9 +127,6 @@ pub mod route {
     pub(crate) struct NetlinkRouteRequestHandler<
         S: Sender<<NetlinkRoute as ProtocolFamily>::Message>,
     > {
-        // TODO(https://issuetracker.google.com/283827094): Handle interface/address
-        // requests.
-        #[allow(unused)]
         pub(crate) interfaces_request_sink: mpsc::Sender<interfaces::Request<S>>,
     }
 
@@ -139,6 +139,8 @@ pub mod route {
             req: NetlinkMessage<RtnlMessage>,
             client: &mut InternalClient<NetlinkRoute, S>,
         ) {
+            let Self { interfaces_request_sink } = self;
+
             let (req_header, payload) = req.into_parts();
             let req = match payload {
                 NetlinkPayload::InnerMessage(p) => p,
@@ -153,6 +155,23 @@ pub mod route {
 
             use RtnlMessage::*;
             match req {
+                GetLink(_) if req_header.flags & NLM_F_DUMP == NLM_F_DUMP => {
+                    let (completer, waiter) = oneshot::channel();
+                    interfaces_request_sink.send(interfaces::Request {
+                        args: interfaces::RequestArgs::Link(
+                            interfaces::LinkRequestArgs::Get(
+                                interfaces::GetLinkArgs::Dump,
+                            ),
+                        ),
+                        client: client.clone(),
+                        completer,
+                    }).await.expect("interface event loop should never terminate");
+                    waiter
+                        .await
+                        .expect("interfaces event loop should have handled the request")
+                        .expect("link dump requests are infallible");
+                    client.send(crate::netlink_packet::new_done())
+                }
                 NewLink(_)
                 | DelLink(_)
                 | NewLinkProp(_)
@@ -339,15 +358,23 @@ pub(crate) mod testutil {
 mod test {
     use super::*;
 
+    use fidl_fuchsia_net_interfaces as fnet_interfaces;
+
+    use futures::{channel::mpsc, future::FutureExt as _, stream::StreamExt as _};
+    use netlink_packet_core::{NetlinkHeader, NLM_F_ACK, NLM_F_DUMP};
+    use netlink_packet_route::{
+        LinkMessage, RtnlMessage, TcMessage, ARPHRD_LOOPBACK, ARPHRD_PPP, IFF_LOOPBACK,
+        IFF_RUNNING, IFF_UP,
+    };
+    use test_case::test_case;
+
     use crate::{
+        client::ClientTable,
+        interfaces,
         messaging::testutil::FakeSender,
         netlink_packet::{new_ack, new_done},
         protocol_family::route::{NetlinkRoute, NetlinkRouteRequestHandler},
     };
-    use futures::channel::mpsc;
-    use netlink_packet_core::{NetlinkHeader, NLM_F_ACK, NLM_F_DUMP};
-    use netlink_packet_route::{RtnlMessage, TcMessage};
-    use test_case::test_case;
 
     enum ExpectedResponse {
         Ack,
@@ -449,5 +476,143 @@ mod test {
                 assert_eq!(client_sink.take_messages(), [])
             }
         }
+    }
+
+    fn test_get_links_dump_messages() -> impl IntoIterator<Item = interfaces::NetlinkLinkMessage> {
+        [
+            interfaces::testutil::create_netlink_link_message(
+                interfaces::testutil::LO_INTERFACE_ID,
+                ARPHRD_LOOPBACK,
+                IFF_UP | IFF_RUNNING | IFF_LOOPBACK,
+                interfaces::testutil::create_nlas(
+                    interfaces::testutil::LO_NAME.to_string(),
+                    ARPHRD_LOOPBACK,
+                    true,
+                ),
+            ),
+            interfaces::testutil::create_netlink_link_message(
+                interfaces::testutil::PPP_INTERFACE_ID,
+                ARPHRD_PPP,
+                0,
+                interfaces::testutil::create_nlas(
+                    interfaces::testutil::PPP_NAME.to_string(),
+                    ARPHRD_PPP,
+                    false,
+                ),
+            ),
+        ]
+    }
+
+    /// Test RTM_GETLINK.
+    #[test_case(
+        0,
+        [],
+        None; "no_flags")]
+    #[test_case(
+        NLM_F_ACK,
+        [],
+        Some(ExpectedResponse::Ack); "ack_flag")]
+    #[test_case(
+        NLM_F_DUMP,
+        test_get_links_dump_messages(),
+        Some(ExpectedResponse::Done); "dump_flag")]
+    #[test_case(
+        NLM_F_DUMP | NLM_F_ACK,
+        test_get_links_dump_messages(),
+        Some(ExpectedResponse::Done); "dump_and_ack_flags")]
+    #[fuchsia::test]
+    async fn test_get_link(
+        flags: u16,
+        messages: impl IntoIterator<Item = interfaces::NetlinkLinkMessage>,
+        expected_response: Option<ExpectedResponse>,
+    ) {
+        let (mut client_sink, mut client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
+            crate::client::testutil::CLIENT_ID_1,
+            &[],
+        );
+
+        let interfaces::testutil::Setup {
+            event_loop,
+            mut watcher_stream,
+            request_sink: interfaces_request_sink,
+            interfaces_request_stream: _,
+        } = interfaces::testutil::setup_with_route_clients({
+            let route_clients = ClientTable::default();
+            route_clients.add_client(client.clone());
+            route_clients
+        });
+
+        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>> { interfaces_request_sink };
+
+        let header = {
+            let mut header = NetlinkHeader::default();
+            header.flags = flags;
+            header
+        };
+
+        let event_loop_fut = event_loop.run().fuse();
+        futures::pin_mut!(event_loop_fut);
+
+        let fut = interfaces::testutil::respond_to_watcher(
+            watcher_stream.by_ref(),
+            [
+                fnet_interfaces::Event::Existing(fnet_interfaces::Properties {
+                    id: Some(interfaces::testutil::LO_INTERFACE_ID),
+                    name: Some(interfaces::testutil::LO_NAME.to_string()),
+                    device_class: Some(interfaces::testutil::LOOPBACK),
+                    online: Some(true),
+                    addresses: Some(Vec::new()),
+                    has_default_ipv4_route: Some(false),
+                    has_default_ipv6_route: Some(false),
+                    ..Default::default()
+                }),
+                fnet_interfaces::Event::Existing(fnet_interfaces::Properties {
+                    id: Some(interfaces::testutil::PPP_INTERFACE_ID),
+                    name: Some(interfaces::testutil::PPP_NAME.to_string()),
+                    device_class: Some(interfaces::testutil::PPP),
+                    online: Some(false),
+                    addresses: Some(Vec::new()),
+                    has_default_ipv4_route: Some(false),
+                    has_default_ipv6_route: Some(false),
+                    ..Default::default()
+                }),
+                fnet_interfaces::Event::Idle(fnet_interfaces::Empty),
+            ],
+        )
+        .then(|()| {
+            handler.handle_request(
+                NetlinkMessage::new(
+                    header,
+                    NetlinkPayload::InnerMessage(RtnlMessage::GetLink(LinkMessage::default())),
+                ),
+                &mut client,
+            )
+        });
+
+        futures::select! {
+            () = fut.fuse() => {},
+            err = event_loop_fut => unreachable!("eventloop should not return: {err:?}"),
+        }
+
+        pretty_assertions::assert_eq!(
+            {
+                let mut messages = client_sink.take_messages();
+                if flags & NLM_F_DUMP == NLM_F_DUMP {
+                    // Ignore the last message in a dump when sorting since its
+                    // a done message.
+                    let len = messages.len();
+                    interfaces::testutil::sort_link_messages(&mut messages[..len - 1]);
+                }
+                messages
+            },
+            messages
+                .into_iter()
+                .map(interfaces::NetlinkLinkMessage::into_rtnl_new_link)
+                .chain(expected_response.map(|expected_response| match expected_response {
+                    ExpectedResponse::Ack => new_ack(header),
+                    ExpectedResponse::Done => new_done(),
+                }))
+                .collect::<Vec<_>>(),
+        );
     }
 }

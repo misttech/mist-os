@@ -52,7 +52,6 @@ use crate::{
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum GetLinkArgs {
     /// Dump state for all the links.
-    #[allow(unused)]
     Dump,
     // TODO(https://issuetracker.google.com/283134954): Support get requests w/
     // filter.
@@ -62,7 +61,6 @@ pub(crate) enum GetLinkArgs {
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum LinkRequestArgs {
     /// RTM_GETLINK
-    #[allow(unused)]
     Get(GetLinkArgs),
 }
 
@@ -115,7 +113,6 @@ pub(crate) enum AddressRequestArgs {
 /// The argument(s) for a [`Request`].
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum RequestArgs {
-    #[allow(unused)]
     Link(LinkRequestArgs),
     #[allow(unused)]
     Address(AddressRequestArgs),
@@ -772,7 +769,7 @@ fn handle_interface_watcher_event<S: Sender<<NetlinkRoute as ProtocolFamily>::Me
 /// from [`fnet_interfaces_ext::Properties`]. The addresses component of this
 /// struct will be handled separately.
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct NetlinkLinkMessage(LinkMessage);
+pub(crate) struct NetlinkLinkMessage(LinkMessage);
 
 impl NetlinkLinkMessage {
     fn optionally_from(properties: &fnet_interfaces_ext::Properties) -> Option<Self> {
@@ -785,7 +782,7 @@ impl NetlinkLinkMessage {
         }
     }
 
-    fn into_rtnl_new_link(self) -> NetlinkMessage<RtnlMessage> {
+    pub(crate) fn into_rtnl_new_link(self) -> NetlinkMessage<RtnlMessage> {
         let Self(message) = self;
         let mut msg: NetlinkMessage<RtnlMessage> = RtnlMessage::NewLink(message).into();
         msg.finalize();
@@ -802,7 +799,7 @@ impl NetlinkLinkMessage {
 
 // NetlinkLinkMessage conversion related errors.
 #[derive(Debug, PartialEq)]
-enum NetlinkLinkMessageConversionError {
+pub(crate) enum NetlinkLinkMessageConversionError {
     // Interface id could not be downcasted to fit into the expected u32.
     InvalidInterfaceId(u64),
 }
@@ -1024,8 +1021,144 @@ fn interface_properties_to_address_messages(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod testutil {
     use super::*;
+
+    use assert_matches::assert_matches;
+    use futures::stream::Stream;
+    use net_declare::fidl_subnet;
+    use netlink_packet_core::NetlinkPayload;
+
+    use crate::messaging::testutil::FakeSender;
+
+    pub(crate) const LO_INTERFACE_ID: u64 = 1;
+    pub(crate) const LO_NAME: &str = "lo";
+    pub(crate) const ETH_INTERFACE_ID: u64 = 2;
+    pub(crate) const ETH_NAME: &str = "eth";
+    pub(crate) const WLAN_INTERFACE_ID: u64 = 3;
+    pub(crate) const WLAN_NAME: &str = "wlan";
+    pub(crate) const PPP_INTERFACE_ID: u64 = 4;
+    pub(crate) const PPP_NAME: &str = "ppp";
+
+    pub(crate) const ETHERNET: fnet_interfaces::DeviceClass =
+        fnet_interfaces::DeviceClass::Device(fhwnet::DeviceClass::Ethernet);
+    pub(crate) const WLAN: fnet_interfaces::DeviceClass =
+        fnet_interfaces::DeviceClass::Device(fhwnet::DeviceClass::Wlan);
+    pub(crate) const WLAN_AP: fnet_interfaces::DeviceClass =
+        fnet_interfaces::DeviceClass::Device(fhwnet::DeviceClass::WlanAp);
+    pub(crate) const PPP: fnet_interfaces::DeviceClass =
+        fnet_interfaces::DeviceClass::Device(fhwnet::DeviceClass::Ppp);
+    pub(crate) const LOOPBACK: fnet_interfaces::DeviceClass =
+        fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {});
+    pub(crate) const TEST_V4_ADDR: fnet::Subnet = fidl_subnet!("192.0.2.1/24");
+    pub(crate) const TEST_V6_ADDR: fnet::Subnet = fidl_subnet!("2001:db8::1/32");
+
+    pub(crate) struct Setup<W> {
+        pub event_loop: EventLoop<FakeSender<NetlinkMessage<RtnlMessage>>>,
+        pub watcher_stream: W,
+        pub request_sink: mpsc::Sender<Request<FakeSender<NetlinkMessage<RtnlMessage>>>>,
+        pub interfaces_request_stream: fnet_root::InterfacesRequestStream,
+    }
+
+    pub(crate) fn setup_with_route_clients(
+        route_clients: ClientTable<NetlinkRoute, FakeSender<NetlinkMessage<RtnlMessage>>>,
+    ) -> Setup<impl Stream<Item = fnet_interfaces::WatcherRequest>> {
+        let (interfaces_proxy, interfaces_request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<fnet_root::InterfacesMarker>().unwrap();
+        let (state_proxy, if_stream) =
+            fidl::endpoints::create_proxy_and_stream::<fnet_interfaces::StateMarker>().unwrap();
+        let (request_sink, request_stream) = mpsc::channel(1);
+        let event_loop = EventLoop::<FakeSender<_>> {
+            interfaces_proxy,
+            state_proxy,
+            route_clients,
+            request_stream,
+        };
+
+        let watcher_stream = if_stream
+            .and_then(|req| match req {
+                fnet_interfaces::StateRequest::GetWatcher {
+                    options: _,
+                    watcher,
+                    control_handle: _,
+                } => futures::future::ready(watcher.into_stream()),
+            })
+            .try_flatten()
+            .map(|res| res.expect("watcher stream error"));
+
+        Setup { event_loop, watcher_stream, request_sink, interfaces_request_stream }
+    }
+
+    pub(crate) fn setup() -> Setup<impl Stream<Item = fnet_interfaces::WatcherRequest>> {
+        setup_with_route_clients(ClientTable::default())
+    }
+
+    pub(crate) async fn respond_to_watcher<S: Stream<Item = fnet_interfaces::WatcherRequest>>(
+        stream: S,
+        updates: impl IntoIterator<Item = fnet_interfaces::Event>,
+    ) {
+        stream
+            .zip(futures::stream::iter(updates.into_iter()))
+            .for_each(|(req, update)| async move {
+                match req {
+                    fnet_interfaces::WatcherRequest::Watch { responder } => {
+                        responder.send(&update).expect("send watch response")
+                    }
+                }
+            })
+            .await
+    }
+
+    pub(crate) fn sort_link_messages(messages: &mut [NetlinkMessage<RtnlMessage>]) {
+        messages.sort_by_key(|message| {
+            assert_matches!(
+                &message.payload,
+                NetlinkPayload::InnerMessage(RtnlMessage::NewLink(m)) => {
+                    m.header.index
+                }
+            )
+        })
+    }
+
+    pub(crate) fn create_netlink_link_message(
+        id: u64,
+        link_type: u16,
+        flags: u32,
+        nlas: Vec<netlink_packet_route::link::nlas::Nla>,
+    ) -> NetlinkLinkMessage {
+        let mut link_header = LinkHeader::default();
+        link_header.index = id.try_into().expect("should fit into u32");
+        link_header.link_layer_type = link_type;
+        link_header.flags = flags;
+        link_header.change_mask = u32::MAX;
+
+        let mut link_message = LinkMessage::default();
+        link_message.header = link_header;
+        link_message.nlas = nlas;
+
+        NetlinkLinkMessage(link_message)
+    }
+
+    pub(crate) fn create_nlas(
+        name: String,
+        link_type: u16,
+        online: bool,
+    ) -> Vec<netlink_packet_route::link::nlas::Nla> {
+        vec![
+            netlink_packet_route::link::nlas::Nla::IfName(name),
+            netlink_packet_route::link::nlas::Nla::Link(link_type.into()),
+            netlink_packet_route::link::nlas::Nla::OperState(if online {
+                netlink_packet_route::nlas::link::State::Up
+            } else {
+                netlink_packet_route::nlas::link::State::Down
+            }),
+        ]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{testutil::*, *};
 
     use fidl::endpoints::{ControlHandle as _, RequestStream as _, Responder as _};
     use fidl_fuchsia_net as fnet;
@@ -1039,8 +1172,7 @@ mod tests {
         sink::SinkExt as _,
         stream::Stream,
     };
-    use net_declare::{fidl_subnet, net_addr_subnet};
-    use netlink_packet_core::NetlinkPayload;
+    use net_declare::net_addr_subnet;
     use netlink_packet_route::{
         AddressHeader, AddressMessage, AF_INET, AF_INET6, RTNLGRP_IPV4_ROUTE,
     };
@@ -1048,19 +1180,6 @@ mod tests {
     use test_case::test_case;
 
     use crate::messaging::testutil::FakeSender;
-
-    const ETHERNET: fnet_interfaces::DeviceClass =
-        fnet_interfaces::DeviceClass::Device(fhwnet::DeviceClass::Ethernet);
-    const WLAN: fnet_interfaces::DeviceClass =
-        fnet_interfaces::DeviceClass::Device(fhwnet::DeviceClass::Wlan);
-    const WLAN_AP: fnet_interfaces::DeviceClass =
-        fnet_interfaces::DeviceClass::Device(fhwnet::DeviceClass::WlanAp);
-    const PPP: fnet_interfaces::DeviceClass =
-        fnet_interfaces::DeviceClass::Device(fhwnet::DeviceClass::Ppp);
-    const LOOPBACK: fnet_interfaces::DeviceClass =
-        fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {});
-    const TEST_V4_ADDR: fnet::Subnet = fidl_subnet!("192.0.2.1/24");
-    const TEST_V6_ADDR: fnet::Subnet = fidl_subnet!("2001:db8::1/32");
 
     fn create_interface(
         id: u64,
@@ -1091,41 +1210,6 @@ mod tests {
             fnet_interfaces_ext::Address { addr: TEST_V6_ADDR, valid_until: Default::default() },
         ];
         create_interface(id, name, device_class, online, addresses)
-    }
-
-    fn create_netlink_link_message(
-        id: u64,
-        link_type: u16,
-        flags: u32,
-        nlas: Vec<netlink_packet_route::link::nlas::Nla>,
-    ) -> NetlinkLinkMessage {
-        let mut link_header = LinkHeader::default();
-        link_header.index = id.try_into().expect("should fit into u32");
-        link_header.link_layer_type = link_type;
-        link_header.flags = flags;
-        link_header.change_mask = u32::MAX;
-
-        let mut link_message = LinkMessage::default();
-        link_message.header = link_header;
-        link_message.nlas = nlas;
-
-        NetlinkLinkMessage(link_message)
-    }
-
-    fn create_nlas(
-        name: String,
-        link_type: u16,
-        online: bool,
-    ) -> Vec<netlink_packet_route::link::nlas::Nla> {
-        vec![
-            netlink_packet_route::link::nlas::Nla::IfName(name),
-            netlink_packet_route::link::nlas::Nla::Link(link_type.into()),
-            netlink_packet_route::link::nlas::Nla::OperState(if online {
-                netlink_packet_route::nlas::link::State::Up
-            } else {
-                netlink_packet_route::nlas::link::State::Down
-            }),
-        ]
     }
 
     fn create_default_address_messages(
@@ -1254,62 +1338,6 @@ mod tests {
             has_default_ipv4_route: false,
             has_default_ipv6_route: false,
         }
-    }
-
-    struct Setup<W> {
-        event_loop: EventLoop<FakeSender<NetlinkMessage<RtnlMessage>>>,
-        watcher_stream: W,
-        request_sink: mpsc::Sender<Request<FakeSender<NetlinkMessage<RtnlMessage>>>>,
-        interfaces_request_stream: fnet_root::InterfacesRequestStream,
-    }
-
-    fn setup_with_route_clients(
-        route_clients: ClientTable<NetlinkRoute, FakeSender<NetlinkMessage<RtnlMessage>>>,
-    ) -> Setup<impl Stream<Item = fnet_interfaces::WatcherRequest>> {
-        let (interfaces_proxy, interfaces_request_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_root::InterfacesMarker>().unwrap();
-        let (state_proxy, if_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_interfaces::StateMarker>().unwrap();
-        let (request_sink, request_stream) = mpsc::channel(1);
-        let event_loop = EventLoop::<FakeSender<_>> {
-            interfaces_proxy,
-            state_proxy,
-            route_clients,
-            request_stream,
-        };
-
-        let watcher_stream = if_stream
-            .and_then(|req| match req {
-                fnet_interfaces::StateRequest::GetWatcher {
-                    options: _,
-                    watcher,
-                    control_handle: _,
-                } => futures::future::ready(watcher.into_stream()),
-            })
-            .try_flatten()
-            .map(|res| res.expect("watcher stream error"));
-
-        Setup { event_loop, watcher_stream, request_sink, interfaces_request_stream }
-    }
-
-    fn setup() -> Setup<impl Stream<Item = fnet_interfaces::WatcherRequest>> {
-        setup_with_route_clients(ClientTable::default())
-    }
-
-    async fn respond_to_watcher<S: Stream<Item = fnet_interfaces::WatcherRequest>>(
-        stream: S,
-        updates: impl IntoIterator<Item = fnet_interfaces::Event>,
-    ) {
-        stream
-            .zip(futures::stream::iter(updates.into_iter()))
-            .for_each(|(req, update)| async move {
-                match req {
-                    fnet_interfaces::WatcherRequest::Watch { responder } => {
-                        responder.send(&update).expect("send watch response")
-                    }
-                }
-            })
-            .await
     }
 
     async fn respond_to_watcher_with_interfaces<
@@ -1548,15 +1576,6 @@ mod tests {
         // Serialize will panic if `del_route_message` is malformed.
         del_link_message.serialize(&mut buf);
     }
-
-    const LO_INTERFACE_ID: u64 = 1;
-    const LO_NAME: &str = "lo";
-    const ETH_INTERFACE_ID: u64 = 2;
-    const ETH_NAME: &str = "eth";
-    const WLAN_INTERFACE_ID: u64 = 3;
-    const WLAN_NAME: &str = "wlan";
-    const PPP_INTERFACE_ID: u64 = 4;
-    const PPP_NAME: &str = "ppp";
 
     #[fuchsia::test]
     async fn test_deliver_updates() {
@@ -1886,19 +1905,10 @@ mod tests {
             expect_no_root_requests,
         )
         .await;
+        sort_link_messages(&mut messages);
         assert_eq!(waiter_result, Ok(()));
         assert_eq!(
-            {
-                messages.sort_by_key(|message| {
-                    assert_matches!(
-                        &message.payload,
-                        NetlinkPayload::InnerMessage(RtnlMessage::NewLink(m)) => {
-                            m.header.index
-                        }
-                    )
-                });
-                messages
-            },
+            messages,
             [
                 create_netlink_link_message(
                     LO_INTERFACE_ID,
