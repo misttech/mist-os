@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use crate::{
-    device::mem::*,
+    device::loopback::create_loop_device,
+    device::mem::MemDevice,
+    device::misc::create_misc_device,
     fs::{kobject::*, FileOps, FsNode},
     lock::RwLock,
     logging::log_error,
@@ -63,11 +65,37 @@ pub trait DeviceListener: Send + Sync {
     fn on_device_event(&self, action: UEventAction, kobject: KObjectHandle, context: UEventContext);
 }
 
+#[derive(Default)]
+struct MajorDevices {
+    /// Maps device major number to device implementation.
+    map: BTreeMap<u32, Box<dyn DeviceOps>>,
+}
+
+impl MajorDevices {
+    fn register(&mut self, device: impl DeviceOps, major: u32) -> Result<(), Errno> {
+        match self.map.entry(major) {
+            Entry::Vacant(e) => {
+                e.insert(Box::new(device));
+                Ok(())
+            }
+            Entry::Occupied(_) => {
+                log_error!("major device {:?} is already registered", major);
+                error!(EINVAL)
+            }
+        }
+    }
+
+    #[allow(clippy::borrowed_box)]
+    fn get(&self, id: DeviceType) -> Result<&Box<dyn DeviceOps>, Errno> {
+        self.map.get(&id.major()).ok_or_else(|| errno!(ENODEV))
+    }
+}
+
 /// The kernel's registry of drivers.
 pub struct DeviceRegistry {
     root_kobject: KObjectHandle,
-    /// Maps device identifier to character device implementation.
-    char_devices: BTreeMap<u32, Box<dyn DeviceOps>>,
+    char_devices: MajorDevices,
+    block_devices: MajorDevices,
     dyn_devices: Arc<RwLock<DynRegistry>>,
     next_anon_minor: u32,
     listeners: BTreeMap<u64, Box<dyn DeviceListener>>,
@@ -76,15 +104,12 @@ pub struct DeviceRegistry {
 }
 
 impl DeviceRegistry {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Creates a `DeviceRegistry` and populates it with common drivers such as /dev/null.
     pub fn new_with_common_devices() -> Self {
-        let mut registry = Self::new();
+        let mut registry: DeviceRegistry = Self::default();
         registry.register_chrdev_major(MemDevice, MEM_MAJOR).unwrap();
-        registry.register_chrdev_major(MiscDevice, MISC_MAJOR).unwrap();
+        registry.register_chrdev_major(create_misc_device, MISC_MAJOR).unwrap();
+        registry.register_blkdev_major(create_loop_device, LOOP_MAJOR).unwrap();
         registry.add_common_devices();
         registry
     }
@@ -158,16 +183,15 @@ impl DeviceRegistry {
         device: impl DeviceOps,
         major: u32,
     ) -> Result<(), Errno> {
-        match self.char_devices.entry(major) {
-            Entry::Vacant(e) => {
-                e.insert(Box::new(device));
-                Ok(())
-            }
-            Entry::Occupied(_) => {
-                log_error!("dev major {:?} is already registered", major);
-                error!(EINVAL)
-            }
-        }
+        self.char_devices.register(device, major)
+    }
+
+    pub fn register_blkdev_major(
+        &mut self,
+        device: impl DeviceOps,
+        major: u32,
+    ) -> Result<(), Errno> {
+        self.block_devices.register(device, major)
     }
 
     pub fn register_dyn_chrdev(&mut self, device: impl DeviceOps) -> Result<DeviceType, Errno> {
@@ -218,14 +242,11 @@ impl DeviceRegistry {
         id: DeviceType,
         mode: DeviceMode,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        match mode {
-            DeviceMode::Char => self
-                .char_devices
-                .get(&id.major())
-                .ok_or_else(|| errno!(ENODEV))?
-                .open(current_task, id, node, flags),
-            DeviceMode::Block => error!(ENODEV),
-        }
+        let devices = match mode {
+            DeviceMode::Char => &self.char_devices,
+            DeviceMode::Block => &self.block_devices,
+        };
+        devices.get(id)?.open(current_task, id, node, flags)
     }
 }
 
@@ -233,14 +254,15 @@ impl Default for DeviceRegistry {
     fn default() -> Self {
         let mut registry = Self {
             root_kobject: KObject::new_root(),
-            char_devices: BTreeMap::new(),
+            char_devices: Default::default(),
+            block_devices: Default::default(),
             dyn_devices: Default::default(),
             next_anon_minor: 1,
             listeners: Default::default(),
             next_listener_id: 0,
             next_event_id: 0,
         };
-        registry.char_devices.insert(DYN_MAJOR, Box::new(Arc::clone(&registry.dyn_devices)));
+        registry.char_devices.map.insert(DYN_MAJOR, Box::new(Arc::clone(&registry.dyn_devices)));
         registry
     }
 }
@@ -286,7 +308,7 @@ mod tests {
 
     #[::fuchsia::test]
     fn registry_fails_to_add_duplicate_device() {
-        let mut registry = DeviceRegistry::new();
+        let mut registry = DeviceRegistry::default();
         registry.register_chrdev_major(MemDevice, MEM_MAJOR).expect("registers once");
         registry.register_chrdev_major(MemDevice, 123).expect("registers unique");
         registry
@@ -298,7 +320,7 @@ mod tests {
     async fn registry_opens_device() {
         let (_kernel, current_task) = create_kernel_and_task();
 
-        let mut registry = DeviceRegistry::new();
+        let mut registry = DeviceRegistry::default();
         registry.register_chrdev_major(MemDevice, MEM_MAJOR).unwrap();
 
         let node = FsNode::new_root(PanickingFsNode);
@@ -354,7 +376,7 @@ mod tests {
             }
         }
 
-        let mut registry = DeviceRegistry::new();
+        let mut registry = DeviceRegistry::default();
         let device_type = registry.register_dyn_chrdev(TestDevice).unwrap();
         assert_eq!(device_type.major(), DYN_MAJOR);
 

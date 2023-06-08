@@ -9,7 +9,6 @@ use crate::{
     device::DeviceOps,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
-        fuse::DevFuse,
         *,
     },
     logging::*,
@@ -173,7 +172,7 @@ impl FileOps for DevFull {
     }
 }
 
-struct DevRandom;
+pub struct DevRandom;
 impl FileOps for DevRandom {
     fileops_impl_seekless!();
 
@@ -248,23 +247,6 @@ impl DeviceOps for MemDevice {
             7 => Box::new(DevFull),
             8 | 9 => Box::new(DevRandom),
             11 => Box::new(DevKmsg),
-            _ => return error!(ENODEV),
-        })
-    }
-}
-
-pub struct MiscDevice;
-impl DeviceOps for MiscDevice {
-    fn open(
-        &self,
-        _current_task: &CurrentTask,
-        id: DeviceType,
-        _node: &FsNode,
-        _flags: OpenFlags,
-    ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(match id {
-            DeviceType::HW_RANDOM => Box::new(DevRandom),
-            DeviceType::FUSE => Box::<DevFuse>::default(),
             _ => return error!(ENODEV),
         })
     }

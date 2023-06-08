@@ -19,7 +19,8 @@ use std::{
 
 use crate::{
     device::{
-        framebuffer::Framebuffer, input::InputFile, BinderDriver, DeviceMode, DeviceRegistry,
+        framebuffer::Framebuffer, input::InputFile, loopback::LoopDeviceRegistry, BinderDriver,
+        DeviceMode, DeviceRegistry,
     },
     fs::{
         socket::{NetlinkSenderReceiverProvider, SocketAddress},
@@ -98,6 +99,11 @@ pub struct Kernel {
     /// The service directory of the container.
     container_svc: Option<fio::DirectoryProxy>,
 
+    /// The registry of active loop devices.
+    ///
+    /// See <https://man7.org/linux/man-pages/man4/loop.4.html>
+    pub loop_device_registry: Arc<LoopDeviceRegistry>,
+
     /// A `Framebuffer` that can be used to display a view in the workstation UI. If the container
     /// specifies the `framebuffer` feature this framebuffer will be registered as a device.
     ///
@@ -171,6 +177,7 @@ impl Kernel {
             device_registry: RwLock::new(DeviceRegistry::new_with_common_devices()),
             features: HashSet::from_iter(features.iter().cloned()),
             container_svc,
+            loop_device_registry: Default::default(),
             framebuffer: Framebuffer::new(display_size.width, display_size.height)
                 .expect("Failed to create framebuffer"),
             input_file: InputFile::new(display_size.width, display_size.height),

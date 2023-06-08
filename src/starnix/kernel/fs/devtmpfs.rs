@@ -35,6 +35,7 @@ fn init_devtmpfs(current_task: &CurrentTask) -> FileSystemHandle {
     mkchr(b"random", DeviceType::RANDOM);
     mkchr(b"urandom", DeviceType::URANDOM);
     mkchr(b"fuse", DeviceType::FUSE);
+    mkchr(b"loop-control", DeviceType::LOOP_CONTROL);
     root.create_symlink(current_task, b"fd", b"/proc/self/fd", FsCred::root()).unwrap();
 
     mkdir(b"shm");

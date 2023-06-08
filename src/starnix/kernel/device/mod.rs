@@ -14,8 +14,10 @@ pub use registry::*;
 
 pub mod framebuffer;
 pub mod input;
+pub mod loopback;
 pub mod magma;
 pub mod mem;
+pub mod misc;
 pub mod starnix;
 pub mod terminal;
 pub mod wayland;

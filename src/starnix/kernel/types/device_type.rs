@@ -8,6 +8,7 @@ use std::fmt;
 
 pub const MEM_MAJOR: u32 = 1;
 pub const TTY_ALT_MAJOR: u32 = 5;
+pub const LOOP_MAJOR: u32 = 7;
 pub const MISC_MAJOR: u32 = 10;
 pub const INPUT_MAJOR: u32 = 13;
 pub const FB_MAJOR: u32 = 29;
@@ -23,17 +24,26 @@ pub struct DeviceType(dev_t);
 
 impl DeviceType {
     pub const NONE: DeviceType = DeviceType(0);
+
+    // MEM
     pub const NULL: DeviceType = DeviceType::new(1, 3);
     pub const ZERO: DeviceType = DeviceType::new(1, 5);
     pub const FULL: DeviceType = DeviceType::new(1, 7);
     pub const RANDOM: DeviceType = DeviceType::new(1, 8);
     pub const URANDOM: DeviceType = DeviceType::new(1, 9);
     pub const KMSG: DeviceType = DeviceType::new(1, 11);
+
+    // TTY_ALT
     pub const TTY: DeviceType = DeviceType::new(5, 0);
     pub const PTMX: DeviceType = DeviceType::new(5, 2);
+
+    // MISC
     pub const HW_RANDOM: DeviceType = DeviceType::new(10, 183);
     pub const FUSE: DeviceType = DeviceType::new(10, 229);
     pub const DEVICE_MAPPER: DeviceType = DeviceType::new(10, 236);
+    pub const LOOP_CONTROL: DeviceType = DeviceType::new(10, 237);
+
+    // Frame buffer
     pub const FB0: DeviceType = DeviceType::new(29, 0);
 
     pub const fn new(major: u32, minor: u32) -> DeviceType {

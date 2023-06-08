@@ -272,7 +272,6 @@
                 "*fdatasync02*",
                 "*fdatasync03*",
                 "*fgetxattr01*",
-                "*fgetxattr02*",
                 "*find_portbundle*",
                 "*finit_module01*",
                 "*finit_module02*",
