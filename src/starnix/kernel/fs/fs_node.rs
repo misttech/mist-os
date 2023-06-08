@@ -69,7 +69,7 @@ pub struct FsNode {
 
 pub type FsNodeHandle = Arc<FsNode>;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct FsNodeInfo {
     pub ino: ino_t,
     pub mode: FileMode,

@@ -41,6 +41,7 @@ pub mod layeredfs;
 pub mod path;
 pub mod pipe;
 pub mod proc;
+pub mod sdcard_hack;
 pub mod socket;
 pub mod syscalls;
 pub mod sysfs;

@@ -508,6 +508,108 @@ impl FileOps for OPathOps {
     }
 }
 
+pub struct ProxyFileOps(pub FileHandle);
+
+macro_rules! delegate {
+    {
+        $delegate_to:expr;
+        $(
+            fn $name:ident(&$self:ident, $file:ident: &FileObject $(, $arg_name:ident: $arg_type:ty)*$(,)?) $(-> $ret:ty)?;
+        )*
+    } => {
+        $(
+            fn $name(&$self, _file: &FileObject $(, $arg_name: $arg_type)*) $(-> $ret)? {
+                $delegate_to.ops().$name(&$delegate_to $(, $arg_name)*)
+            }
+        )*
+    }
+}
+
+impl FileOps for ProxyFileOps {
+    delegate! {
+        self.0;
+        fn close(&self, _file: &FileObject);
+        fn flush(&self, _file: &FileObject);
+        fn read(
+            &self,
+            file: &FileObject,
+            current_task: &CurrentTask,
+            offset: usize,
+            data: &mut dyn OutputBuffer,
+        ) -> Result<usize, Errno>;
+        fn write(
+            &self,
+            file: &FileObject,
+            current_task: &CurrentTask,
+            offset: usize,
+            data: &mut dyn InputBuffer,
+        ) -> Result<usize, Errno>;
+        fn seek(
+            &self,
+            file: &FileObject,
+            current_task: &CurrentTask,
+            offset: off_t,
+            whence: SeekTarget,
+        ) -> Result<off_t, Errno>;
+        fn get_vmo(
+            &self,
+            _file: &FileObject,
+            _current_task: &CurrentTask,
+            _length: Option<usize>,
+            _prot: ProtectionFlags,
+        ) -> Result<Arc<zx::Vmo>, Errno>;
+        fn mmap(
+            &self,
+            file: &FileObject,
+            current_task: &CurrentTask,
+            addr: DesiredAddress,
+            vmo_offset: u64,
+            length: usize,
+            prot_flags: ProtectionFlags,
+            options: MappingOptions,
+            filename: NamespaceNode,
+        ) -> Result<MappedVmo, Errno>;
+        fn readdir(
+            &self,
+            _file: &FileObject,
+            _current_task: &CurrentTask,
+            _sink: &mut dyn DirentSink,
+        ) -> Result<(), Errno>;
+        fn wait_async(
+            &self,
+            _file: &FileObject,
+            _current_task: &CurrentTask,
+            _waiter: &Waiter,
+            _events: FdEvents,
+            _handler: EventHandler,
+        ) -> Option<WaitCanceler>;
+        fn ioctl(
+            &self,
+            _file: &FileObject,
+            _current_task: &CurrentTask,
+            request: u32,
+            _user_addr: UserAddress,
+        ) -> Result<SyscallResult, Errno>;
+        fn fcntl(
+            &self,
+            file: &FileObject,
+            current_task: &CurrentTask,
+            cmd: u32,
+            arg: u64,
+        ) -> Result<SyscallResult, Errno>;
+    }
+    // These don't take &FileObject making it too hard to handle them properly in the macro
+    fn query_events(&self, current_task: &CurrentTask) -> FdEvents {
+        self.0.ops().query_events(current_task)
+    }
+    fn has_persistent_offsets(&self) -> bool {
+        self.0.ops().has_persistent_offsets()
+    }
+    fn is_seekable(&self) -> bool {
+        self.0.ops().is_seekable()
+    }
+}
+
 #[derive(Debug, Default, Copy, Clone)]
 pub enum FileAsyncOwner {
     #[default]
