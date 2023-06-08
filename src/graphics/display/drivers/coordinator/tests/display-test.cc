@@ -17,8 +17,8 @@
 
 #include "src/graphics/display/drivers/coordinator/client.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
-#include "src/graphics/display/drivers/coordinator/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace display {

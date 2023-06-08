@@ -39,9 +39,9 @@
 #include <fbl/ref_ptr.h>
 #include <fbl/string_printf.h>
 
-#include "src/graphics/display/drivers/coordinator/display-id.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/edid/edid.h"
 #include "src/lib/fsl/handles/object_info.h"
 

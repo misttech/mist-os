@@ -27,6 +27,7 @@ test("api-types-cpp-tests-bin") {
   sources = [
     "alpha-mode-test.cc",
     "config-stamp-test.cc",
+    "display-id-test.cc",
     "frame-test.cc",
     "transform-test.cc",
   ]

@@ -13,8 +13,8 @@
 #include <pretty/hexdump.h>
 
 #include "src/devices/lib/audio/audio.h"
-#include "src/graphics/display/drivers/coordinator/display-id.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
 namespace display {
 

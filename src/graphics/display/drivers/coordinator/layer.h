@@ -14,9 +14,9 @@
 #include <fbl/intrusive_double_list.h>
 #include <fbl/ref_ptr.h>
 
-#include "src/graphics/display/drivers/coordinator/display-id.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
 namespace display {
 

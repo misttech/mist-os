@@ -13,8 +13,8 @@
 #include <fbl/intrusive_double_list.h>
 
 #include "fuchsia/hardware/display/controller/c/banjo.h"
-#include "src/graphics/display/drivers/coordinator/display-id.h"
 #include "src/graphics/display/drivers/coordinator/fence.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
 namespace fhd = fuchsia_hardware_display;
 
