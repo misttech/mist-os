@@ -144,7 +144,6 @@ zx_status_t AmlogicDisplay::DisplayInit() {
   osd_ = std::move(osd_or_status).value();
 
   osd_->HwInit();
-  current_image_valid_ = false;
   return ZX_OK;
 }
 
@@ -465,11 +464,8 @@ void AmlogicDisplay::DisplayControllerImplApplyConfiguration(
     // a checked configuration could be invalid at this point.
     auto info =
         reinterpret_cast<ImageInfo*>(display_configs[0]->layer_list[0]->cfg.primary.image.handle);
-    current_image_valid_ = true;
-    current_image_ = display_configs[0]->layer_list[0]->cfg.primary.image.handle;
     osd_->FlipOnVsync(info->canvas_idx, display_configs[0], config_stamp);
   } else {
-    current_image_valid_ = false;
     if (fully_initialized()) {
       {
         fbl::AutoLock lock2(&capture_lock_);
@@ -782,18 +778,6 @@ zx_status_t AmlogicDisplay::DisplayControllerImplStartCapture(uint64_t capture_h
   if (capture_active_id_ != INVALID_ID) {
     DISP_ERROR("Cannot start capture while another capture is in progress\n");
     return ZX_ERR_SHOULD_WAIT;
-  }
-
-  // Confirm a valid image is being displayed
-  // Check whether a valid image is being displayed at the time of start capture.
-  // There is a chance that a client might release the image being displayed during
-  // capture, but that behavior is not within specified spec
-  {
-    fbl::AutoLock lock2(&display_lock_);
-    if (!current_image_valid_) {
-      DISP_ERROR("No Valid Image is being displayed\n");
-      return ZX_ERR_UNAVAILABLE;
-    }
   }
 
   // Confirm that the handle was previously imported (hence valid)

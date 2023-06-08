@@ -36,7 +36,6 @@
 #include "src/graphics/display/drivers/amlogic-display/osd.h"
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu.h"
-#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
 namespace amlogic_display {
 
@@ -201,11 +200,6 @@ class AmlogicDisplay
   fbl::Mutex display_lock_;  // general display state (i.e. display_id)
   fbl::Mutex image_lock_;    // used for accessing imported_images_
   fbl::Mutex capture_lock_;  // general capture state
-
-  // TODO(stevensd): This can race if this is changed right after
-  // vsync but before the interrupt is handled.
-  uint64_t current_image_ TA_GUARDED(display_lock_) = 0;
-  bool current_image_valid_ TA_GUARDED(display_lock_) = false;
 
   // Relaxed is safe because full_init_done_ only ever moves from false to true.
   std::atomic<bool> full_init_done_ = false;
