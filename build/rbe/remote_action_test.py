@@ -856,25 +856,6 @@ class RemoteActionMainParserTests(unittest.TestCase):
         mock_run.assert_called_once()
         mock_compare.assert_not_called()
 
-    def test_compare_forces_remote(self):
-        exec_root = Path('/home/project')
-        build_dir = Path('build-out')
-        working_dir = exec_root / build_dir
-        output = Path('hello.txt')
-        base_command = ['touch', str(output)]
-        p = self._make_main_parser()
-        main_args, other = p.parse_known_args(
-            ['--compare', '--exec_strategy=local', '--'] + base_command)
-        action = remote_action.remote_action_from_args(
-            main_args,
-            output_files=[output],
-            exec_root=exec_root,
-            working_dir=working_dir,
-        )
-        self.assertFalse(action.remote_disable)
-        self.assertTrue(action.compare_with_local)
-        self.assertEqual(action.exec_strategy, "remote")  # forced
-
     def test_compare_fsatraces_acceptable_match(self):
         exec_root = Path('/home/project')
         build_dir = Path('build/out/here')

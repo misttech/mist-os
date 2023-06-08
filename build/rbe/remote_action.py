@@ -912,12 +912,6 @@ class RemoteAction(object):
         self._remote_debug_command = remote_debug_command or []
         self._always_download = always_download or []
 
-        # When comparing local vs. remote, force exec_strategy=remote
-        # to eliminate any unintended local execution cases.
-        if self.compare_with_local and self.exec_strategy != "remote":
-            self.vmsg("Notice: forcing exec_strategy=remote for --compare")
-            self._exec_strategy = "remote"
-
         # By default, the local and remote commands match, but there are
         # circumstances that require them to be different.  It is the caller's
         # responsibility to ensure that they produce consistent results
@@ -1523,43 +1517,13 @@ class RemoteAction(object):
 
     def _relativize_local_deps(self, path: str) -> str:
         p = Path(path)
-        if p.is_absolute():
-            new_path = str(cl_utils.relpath(p, start=self.working_dir))
-            self.vmsg(f'transformed dep path: {path} -> {new_path}')
-            return new_path
-
-        return path
+        return str(cl_utils.relpath(
+            p, start=self.working_dir)) if p.is_absolute() else path
 
     def _relativize_remote_deps(self, path: str) -> str:
         p = Path(path)
-        if p.is_absolute():
-            new_path = str(cl_utils.relpath(p, start=self.remote_working_dir))
-            self.vmsg(f'transformed dep path: {path} -> {new_path}')
-            return new_path
-
-        return path
-
-    def _relativize_remote_or_local_deps(self, path: str) -> str:
-        """Relativize absolute paths (in depfiles).
-
-        Use this variant when it is uncertain whether or not a depfile
-        came from remote or local execution.
-        """
-        p = Path(path)
-        if p.is_absolute():
-            if self.working_dir in p.parents:
-                new_path = str(cl_utils.relpath(p, start=self.working_dir))
-            elif self.remote_working_dir in p.parents:
-                new_path = str(
-                    cl_utils.relpath(p, start=self.remote_working_dir))
-            else:
-                msg(f'Unable to relativize path: {path}')
-                return path
-
-            self.vmsg(f'transformed dep path: {path} -> {new_path}')
-            return new_path
-
-        return path
+        return str(cl_utils.relpath(
+            p, start=self.remote_working_dir)) if p.is_absolute() else path
 
     def _filtered_outputs_for_comparison(
         self,

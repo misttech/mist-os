@@ -736,7 +736,7 @@ class RustRemoteAction(object):
 
     def _post_remote_success_action(self) -> int:
         if self._depfile_exists():
-            self._rewrite_remote_or_local_depfile()
+            self._rewrite_remote_depfile()
 
         if not self.remote_action.download_outputs and self._rust_action.main_output_is_executable:
             # TODO(b/285030257): This is a workaround to a problem where
@@ -752,7 +752,7 @@ class RustRemoteAction(object):
                 self._rust_action.output_file.chmod(_EXEC_PERMS)
         return 0
 
-    def _rewrite_remote_or_local_depfile(self):
+    def _rewrite_remote_depfile(self):
         """Rewrite depfile without working dir absolute paths.
 
         TEMPORARY WORKAROUND until upstream fix lands:
@@ -770,15 +770,9 @@ class RustRemoteAction(object):
         We forgive this for depfiles, but other artifacts should be verified
         separately.
         """
-        # It is possible for this to run after local execution with
-        # exec_strategy=local,racing,remote_local_fallback, so the logic
-        # herein should accommodate both possibilities.
-        # In the future, it might be possible to determine whether the local
-        # or remote result was used from self.action_log.
-        self.vmsg(f"Rewriting the (remote or local) depfile {self.depfile}")
         remote_action.rewrite_depfile(
             dep_file=self.working_dir / self.depfile,  # in-place
-            transform=self.remote_action._relativize_remote_or_local_deps,
+            transform=self.remote_action._relativize_remote_deps,
         )
 
     def run_remote(self) -> int:
