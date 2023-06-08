@@ -258,6 +258,11 @@ template("system_test_upgrade_suite") {
       _args += [ "-use-flash" ]
     }
 
+    if (defined(invoker.build_expect_unknown_firmware) &&
+        invoker.build_expect_unknown_firmware) {
+      _args += [ "-build-expect-unknown-firmware" ]
+    }
+
     host_test(_host_test_target_name) {
       binary_path = _test_binary
       args = _args
