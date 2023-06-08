@@ -9,6 +9,7 @@
 #include <lib/async/cpp/task.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/ddk/metadata.h>
+#include <lib/ddk/platform-defs.h>
 
 #include <gtest/gtest.h>
 
@@ -80,7 +81,11 @@ class FakeTransportDevice : public ddk::BtHciProtocol<FakeTransportDevice>,
   zx_status_t BtHciOpenSnoopChannel(zx::channel channel) { return ZX_ERR_NOT_SUPPORTED; }
 
   // ddk::SerialImplAsyncProtocol mixins:
-  zx_status_t SerialImplAsyncGetInfo(serial_port_info_t* out_info) { return ZX_ERR_NOT_SUPPORTED; }
+  zx_status_t SerialImplAsyncGetInfo(serial_port_info_t* out_info) {
+    // Use this PID to match kFirmwarePath defined in the test.
+    out_info->serial_pid = PDEV_PID_BCM43458;
+    return ZX_OK;
+  }
   zx_status_t SerialImplAsyncConfig(uint32_t baud_rate, uint32_t flags) { return ZX_OK; }
   zx_status_t SerialImplAsyncEnable(bool enable) { return ZX_ERR_NOT_SUPPORTED; }
   void SerialImplAsyncReadAsync(serial_impl_async_read_async_callback callback, void* cookie) {}

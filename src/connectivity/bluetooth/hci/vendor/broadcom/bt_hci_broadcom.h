@@ -52,6 +52,8 @@ class BtHciBroadcom : public BtHciBroadcomType, public ddk::BtVendorProtocol<BtH
  private:
   static constexpr size_t kMacAddrLen = 6;
 
+  static const std::unordered_map<uint16_t, std::string> kFirmwareMap;
+
   // ddk::Messageable mixins:
   void OpenCommandChannel(OpenCommandChannelRequestView request,
                           OpenCommandChannelCompleter::Sync& completer) override;
@@ -92,6 +94,7 @@ class BtHciBroadcom : public BtHciBroadcomType, public ddk::BtVendorProtocol<BtH
 
   bt_hci_protocol_t hci_;
   serial_impl_async_protocol_t serial_;
+  uint16_t serial_pid_;
   zx::channel command_channel_;
   // true if underlying transport is UART
   bool is_uart_;

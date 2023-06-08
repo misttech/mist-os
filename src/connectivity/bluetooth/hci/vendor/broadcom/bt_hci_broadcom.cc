@@ -28,14 +28,14 @@ namespace bt_hci_broadcom {
 constexpr uint32_t kTargetBaudRate = 2000000;
 constexpr uint32_t kDefaultBaudRate = 115200;
 
-// TODO(fxb/92961): Determine firmware name based on controller version.
-const char* const kFirmwarePath = "BCM4345C5.hcd";
-
 constexpr zx::duration kFirmwareDownloadDelay = zx::msec(50);
 
 // Hardcoded. Better to parameterize on chipset. Broadcom chips need a few hundred msec delay after
 // firmware load.
 constexpr zx::duration kBaudRateSwitchDelay = zx::msec(200);
+
+const std::unordered_map<uint16_t, std::string> BtHciBroadcom::kFirmwareMap = {
+    {PDEV_PID_BCM43458, "BCM4345C5.hcd"}};
 
 BtHciBroadcom::BtHciBroadcom(zx_device_t* parent, async_dispatcher_t* dispatcher)
     : BtHciBroadcomType(parent), dispatcher_(dispatcher) {}
@@ -308,8 +308,14 @@ fpromise::promise<> BtHciBroadcom::LogControllerFallbackBdaddr() {
 fpromise::promise<void, zx_status_t> BtHciBroadcom::LoadFirmware() {
   zx::vmo fw_vmo;
   size_t fw_size;
-  zx_status_t status =
-      load_firmware(zxdev(), kFirmwarePath, fw_vmo.reset_and_get_address(), &fw_size);
+
+  // If there's no firmware for this PID, we don't expect the bind to happen without a corresponding
+  // entry in the firmware table. Please double-check the PID value and add an entry to the firmware
+  // table if it's valid.
+  ZX_ASSERT_MSG(kFirmwareMap.find(serial_pid_) != kFirmwareMap.end(), "no mapping for PID: %u",
+                serial_pid_);
+  zx_status_t status = load_firmware(zxdev(), kFirmwareMap.at(serial_pid_).c_str(),
+                                     fw_vmo.reset_and_get_address(), &fw_size);
   if (status != ZX_OK) {
     zxlogf(ERROR, "no firmware file found");
     return fpromise::make_error_promise(status);
@@ -481,6 +487,15 @@ zx_status_t BtHciBroadcom::Bind() {
   if (status == ZX_OK) {
     is_uart_ = true;
   }
+
+  serial_port_info_t info;
+  status = serial_impl_async_get_info(&serial_, &info);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "serial_get_info failed: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  serial_pid_ = info.serial_pid;
 
   ddk::DeviceAddArgs args("bt-hci-broadcom");
   args.set_proto_id(ZX_PROTOCOL_BT_HCI);
