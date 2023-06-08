@@ -215,6 +215,7 @@
 //src/sys/pkg/bin/pm:pm_bin_sdk
 //third_party/Vulkan-Loader:libvulkan_sdk_manifest
 //third_party/Vulkan-Loader:vulkan_license
+//tools/bindc:bindc_sdk
 //tools/bootserver_old:bootserver_sdk
 //tools/cmc:cmc_sdk
 //tools/configc:configc_sdk

@@ -15,9 +15,9 @@ import("config.gni")
 # $root_build_dir/sdk/archive/{output_name}.tgz
 #
 # Arguments:
-#    target_cpus: (required)
+#    target_cpus: (optional)
 #      List of target cpu names. This must include the default target_cpu
-#      value for the current build configuration.
+#      value for the current build configuration. Defaults to `idk_target_cpus`.
 #
 #    sdk_target_labels: (required)
 #      List of labels to sdk() GN targets that will be merged into the
@@ -39,9 +39,12 @@ template("generate_final_idk") {
   } else {
     # Compute the list of target_cpu values that will require a sub-build
     # directory.
-    _extra_target_cpus = invoker.target_cpus + [ host_cpu ] - [ host_cpu ]
-    assert(_extra_target_cpus != invoker.target_cpus,
-           "The value of target_cpus should include $host_cpu as well!")
+    if (defined(invoker.target_cpus)) {
+      _target_cpus = invoker.target_cpus
+    } else {
+      _target_cpus = idk_target_cpus
+    }
+    _extra_target_cpus = _target_cpus + [ current_cpu ] - [ current_cpu ]
 
     assert(
         _extra_target_cpus != [],

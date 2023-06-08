@@ -2,6 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/sdk/config.gni")
+
+# This file contains GN targets to run the //build/bazel_sdk/tests
+# test suite against different input SDK/IDK content.
+#
+
 # Run the //build/bazel_sdk/tests/scripts/bazel_test.sh
 # script, which runs the test suite for the Fuchsia Bazel
 # SDK rules, using the IDK built from the platform build
@@ -22,35 +28,115 @@
 #
 #  3) There is no way to list all inputs / outputs properly.
 #
-action("bazel_sdk_tests") {
-  testonly = true
-  script = "//build/bazel_sdk/tests/scripts/bazel_test.py"
-  inputs = [ "//prebuilt/third_party/bazel/${host_os}-${host_cpu}/bazel" ]
-  outputs = [ "$target_gen_dir/$target_name.stamp" ]
-  depfile = "$target_gen_dir/$target_name.d"
+# Arguments:
+#    target_cpu: (optional)
+#       Target cpu name. Default to current_cpu otherwise.
+#
+#    idk_exported_dir: (optional)
+#       GN path to an IDK `exported` directory to use to run the
+#       test suite. Requires `idk_exported_target` to be set as well.
+#
+#    idk_exported_target: (optional)
+#       GN label of target used to generate the directory pointed to by
+#       `idk_exported_dir`, if provided.
+#
+template("bazel_sdk_tests_for") {
+  _use_idk_exported = defined(invoker.idk_exported_path)
+  if (_use_idk_exported) {
+    _idk_exported_path = invoker.idk_exported_path
+    _idk_exported_target = invoker.idk_exported_target
+  }
 
-  _output_base = target_gen_dir + "/output_base"
-  _output_user_root = target_gen_dir + "/output_user_root"
+  _target_cpu = target_cpu
+  if (defined(invoker.target_cpu)) {
+    _target_cpu = invoker.target_cpu
+  }
 
-  args = [
-    "--verbose",
-    "--fuchsia_build_dir=" + rebase_path(root_build_dir, root_build_dir),
-    "--fuchsia_source_dir=" + rebase_path("//", root_build_dir),
-    "--output_base=" + rebase_path(_output_base, root_build_dir),
-    "--output_user_root=" + rebase_path(_output_user_root, root_build_dir),
-    "--target_cpu=${target_cpu}",
-    "--bazel=" + rebase_path(inputs[0], root_build_dir),
-    "--stamp-file=" + rebase_path(outputs[0], root_build_dir),
-    "--depfile=" + rebase_path(depfile, root_build_dir),
-    "--quiet",
-  ]
-  deps = [ "//build/bazel:generate_fuchsia_sdk_repository" ]
-  pool = "//:console"
-  hermetic_deps = false
-  no_output_dir_leaks = true
+  action(target_name) {
+    testonly = true
+    script = "//build/bazel_sdk/tests/scripts/bazel_test.py"
+    inputs = [ "//prebuilt/third_party/bazel/${host_os}-${host_cpu}/bazel" ]
+    outputs = [ "$target_gen_dir/$target_name.stamp" ]
+    depfile = "$target_gen_dir/$target_name.d"
+
+    _output_base = target_gen_dir + "/output_base"
+    _output_user_root = target_gen_dir + "/output_user_root"
+
+    args = [
+      "--verbose",
+      "--fuchsia_source_dir=" + rebase_path("//", root_build_dir),
+      "--output_base=" + rebase_path(_output_base, root_build_dir),
+      "--output_user_root=" + rebase_path(_output_user_root, root_build_dir),
+      "--target_cpu=${_target_cpu}",
+      "--bazel=" + rebase_path(inputs[0], root_build_dir),
+      "--stamp-file=" + rebase_path(outputs[0], root_build_dir),
+      "--depfile=" + rebase_path(depfile, root_build_dir),
+      "--quiet",
+    ]
+    if (_use_idk_exported) {
+      args += [
+        "--fuchsia_idk_directory",
+        rebase_path(_idk_exported_path, root_build_dir),
+      ]
+      deps = [ _idk_exported_target ]
+    } else {
+      args += [
+        "--fuchsia_build_dir",
+        rebase_path(root_build_dir, root_build_dir),
+      ]
+      deps = [ "//build/bazel:generate_fuchsia_sdk_repository" ]
+    }
+    pool = "//:console"
+    hermetic_deps = false
+    no_output_dir_leaks = true
+  }
+}
+
+# Do not define the following targets in final_fuchsia_idk sub-builds to
+# avoid dependency recursion issues!
+if (!sdk_inside_idk_sub_build) {
+  # This target runs the test suite against the content of the Bazel
+  # @fuchsia_sdk repository created internally by the platform build.
+  # This only supports the current target_cpu, and includes the content
+  # of //sdk:core, //sdk:platform and //sdk:driver only.
+  # (see //build/bazel:generate_fuchsia_sdk_repository for details).
+  bazel_sdk_tests_for("bazel_sdk_tests") {
+  }
+
+  foreach(cpu, idk_target_cpus) {
+    # This target runs the test suite against a locally-generated IDK
+    # (which includes support for all target architectures), but only
+    # for target_cpu. E.g. `bazel_sdk_tests_arm64` will run the
+    # test suite with a build configuration that generates Fuchsia/arm64
+    # binaries.
+    #
+    # Note that the IDK does _not_ contain //sdk:platform or //sdk:driver
+    # (see //sdk:final_fuchsia_idk definition for details).
+    bazel_sdk_tests_for("bazel_sdk_tests_idk_${cpu}") {
+      target_cpu = cpu
+      idk_exported_path = "$root_build_dir/sdk/exported/fuchsia_idk"
+      idk_exported_target = "//sdk:final_fuchsia_idk.exported"
+    }
+  }
+
+  # This target runs the test suite against each target architecture
+  # supported by the IDK. Currently, this runs multiple instances of
+  # the test suite, one per target cpu.
+  group("bazel_sdk_tests_idk") {
+    testonly = true
+    deps = []
+    foreach(cpu, idk_target_cpus) {
+      deps += [ ":bazel_sdk_tests_idk_${cpu}" ]
+    }
+  }
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":bazel_sdk_tests" ]
+  if (!sdk_inside_idk_sub_build) {
+    deps = [
+      ":bazel_sdk_tests",
+      ":bazel_sdk_tests_idk",
+    ]
+  }
 }

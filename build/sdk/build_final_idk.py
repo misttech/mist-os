@@ -122,7 +122,7 @@ def run_checked_command(args: List, cwd=None):
         return True
 
     args_str = command_args_to_string(args)
-    print('ERROR: When running command: {args_str}\n', file=sys.stderr)
+    print(f'ERROR: When running command: {args_str}\n', file=sys.stderr)
     return True
 
 

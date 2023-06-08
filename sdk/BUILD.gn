@@ -120,10 +120,6 @@ merged_sdk("merged") {
 # See https://fxbug.dev/126262
 generate_final_idk("final_fuchsia_idk") {
   output_name = "fuchsia_idk"
-  target_cpus = [
-    "x64",
-    "arm64",
-  ]
   sdk_target_labels = _fuchsia_idk_deps
   testonly = true
 }
@@ -261,13 +257,14 @@ sdk_molecule("host_tools") {
 
   _host_tools = [
     "//tools/fidl/fidlgen_rust:fidlgen_rust_sdk",
+    "//tools/bindc:bindc_sdk",
+    "//tools/cmc:cmc_sdk",
+    "//tools/configc:configc_sdk",
 
     # TODO(fxbug.dev/45483): Remove once all SDK customers are using `fidlgen_hlcpp` directly.
     "//tools/fidl/fidlgen_hlcpp:fidlgen_sdk",
     "//tools/fidl/fidlgen_hlcpp:fidlgen_hlcpp_sdk",
     "//tools/fidl/fidlgen_cpp:fidlgen_cpp_sdk",
-    "//tools/cmc:cmc_sdk",
-    "//tools/configc:configc_sdk",
     "//tools/fvdl:fvdl_sdk",
     "//tools/sdk-tools/fpublish:fpublish_sdk",
     "//tools/sdk-tools/fserve:fserve_sdk",

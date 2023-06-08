@@ -20,11 +20,10 @@ load("//fuchsia/workspace:utils.bzl", "workspace_path")
 _LOCAL_FUCHSIA_PLATFORM_BUILD = "LOCAL_FUCHSIA_PLATFORM_BUILD"
 _LOCAL_BUILD_SDK_PATH = "gen/build/bazel/fuchsia_sdk"
 
-def _instantiate_local_path(ctx, manifests):
-    local_paths = []
-    if ctx.attr.local_paths:
-        local_paths.extend(ctx.attr.local_paths)
+_LOCAL_FUCHSIA_IDK_DIRECTORY = "LOCAL_FUCHSIA_IDK_DIRECTORY"
 
+def _instantiate_local_path(ctx, manifests):
+    local_paths = ctx.attr.local_paths
     for local_path in local_paths:
         # Copies the SDK from a local Fuchsia platform build.
         local_sdk_path = workspace_path(ctx, local_path)
@@ -41,15 +40,26 @@ def _instantiate_local_path(ctx, manifests):
 
 def _instantiate_local_env(ctx):
     # Copies the fuchsia_sdk from a local Fuchsia platform build.
-    local_fuchsia_dir = ctx.os.environ[_LOCAL_FUCHSIA_PLATFORM_BUILD]
+    local_fuchsia_dir = ctx.os.environ.get(_LOCAL_FUCHSIA_PLATFORM_BUILD)
 
     # buildifier: disable=print
     print("WARNING: using local SDK from %s" % local_fuchsia_dir)
-    ctx.report_progress("Copying local fuchsia_sdk from %s" % local_fuchsia_dir)
     local_sdk = ctx.path("%s/%s" % (local_fuchsia_dir, _LOCAL_BUILD_SDK_PATH))
+    ctx.report_progress("Copying local fuchsia_sdk from %s" % local_fuchsia_dir)
     if not local_sdk.exists:
         fail("Cannot find SDK in local Fuchsia build.Please build it with\n\n\t\t'fx build generate_fuchsia_sdk_repository'\n\nor unset variable %s: %s" % (_LOCAL_FUCHSIA_PLATFORM_BUILD, local_fuchsia_dir))
     ctx.symlink(local_sdk, ".")
+
+def _instantiate_local_idk(ctx, manifests):
+    local_fuchsia_idk_dir = ctx.os.environ.get(_LOCAL_FUCHSIA_IDK_DIRECTORY)
+
+    # buildifier: disable=print
+    print("WARNING: using local IDK from %s" % local_fuchsia_idk_dir)
+    ctx.report_progress("Copying local IDK from %s" % local_fuchsia_idk_dir)
+    local_idk = ctx.path(local_fuchsia_idk_dir)
+    if not local_idk.exists:
+        fail("Cannot find IDK in: %s\n" % local_idk)
+    manifests.append({"root": "%s/." % local_idk, "manifest": "meta/manifest.json"})
 
 def _merge_rules_fuchsia(ctx):
     rules_fuchsia_root = ctx.path(ctx.attr._rules_fuchsia_root).dirname
@@ -76,14 +86,18 @@ def _fuchsia_sdk_repository_impl(ctx):
         _instantiate_local_env(ctx)
         return
 
-    if not ctx.attr.local_paths:
+    manifests = []
+
+    if _LOCAL_FUCHSIA_IDK_DIRECTORY in ctx.os.environ:
+        copy_content_strategy = "symlink"
+        _instantiate_local_idk(ctx, manifests)
+    elif ctx.attr.local_paths:
+        copy_content_strategy = "symlink"
+        _instantiate_local_path(ctx, manifests)
+    else:
         fail("The fuchsia sdk no longer supports downloading content via the cipd tool. Please use local_paths or provide a local fuchsia build.")
 
     ctx.file("WORKSPACE.bazel", content = "")
-    manifests = []
-    copy_content_strategy = "symlink"
-    _instantiate_local_path(ctx, manifests)
-
     ctx.report_progress("Generating Bazel rules for the SDK")
     ctx.template(
         "BUILD.bazel",
@@ -106,9 +120,6 @@ def _fuchsia_sdk_repository_impl(ctx):
 fuchsia_sdk_repository = repository_rule(
     doc = """
 Loads a particular version of the Fuchsia IDK.
-
-If cipd_tag is set, sha256 can optionally be set to verify the downloaded file and to
-allow Bazel to cache the file.
 """,
     implementation = _fuchsia_sdk_repository_impl,
     environ = [_LOCAL_FUCHSIA_PLATFORM_BUILD],
@@ -135,7 +146,7 @@ allow Bazel to cache the file.
             mandatory = False,
         ),
         "local_paths": attr.string_list(
-            doc = "Paths to local SDK directories. Incompatible with 'cipd_tag'.",
+            doc = "Paths to local SDK directories.",
         ),
         "local_sdk_version_file": attr.label(
             doc = "An optional file used to mark the version of the SDK pointed to by local_paths.",

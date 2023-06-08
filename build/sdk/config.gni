@@ -19,3 +19,10 @@ declare_args() {
   # actions.
   sdk_inside_idk_sub_build = false
 }
+
+# The list of all cpu architectures for the prebuild fuchsia binaries that go
+# into the IDK archive.
+idk_target_cpus = [
+  "arm64",
+  "x64",
+]

@@ -157,7 +157,7 @@ def _depfile_quote(path: str) -> str:
 
     Args:
        path: input file path.
-    Retursn:
+    Returns:
        The input file path with proper quoting to be included
        directly in a depfile.
     """
@@ -169,10 +169,13 @@ def main():
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--bazel", help="Specify bazel binary.")
-    parser.add_argument(
+    mutex_group = parser.add_mutually_exclusive_group()
+    mutex_group.add_argument(
         "--fuchsia_build_dir",
         help="Specify Fuchsia build directory (default is auto-detected).",
     )
+    mutex_group.add_argument(
+        "--fuchsia_idk_directory", help="Specify Fuchsia IDK directory.")
     parser.add_argument(
         "--fuchsia_source_dir",
         help="Specify Fuchsia source directory (default is auto-detected).",
@@ -243,18 +246,28 @@ def main():
     # Get Fuchsia build directory.
     if args.fuchsia_build_dir:
         fuchsia_build_dir = Path(args.fuchsia_build_dir)
+        has_fuchsia_build_dir = True
+    elif args.fuchsia_idk_directory:
+        has_fuchsia_build_dir = False
+        fuchsia_idk_directory = Path(args.fuchsia_idk_directory)
+        if not fuchsia_idk_directory.exists():
+            return _print_error(
+                f"Fuchsia IDK directory does not exist: {fuchsia_idk_directory}"
+            )
     else:
         fuchsia_build_dir = _find_fuchsia_build_dir(fuchsia_source_dir)
         if not fuchsia_build_dir:
             return _print_error(
                 "Cannot auto-detect Fuchsia build directory, use --fuchsia_build_dir=DIR"
             )
+        has_fuchsia_build_dir = True
 
-    if not fuchsia_build_dir.exists():
-        return _print_error(
-            f"Fuchsia build directory does not exist: {fuchsia_build_dir}")
+    if has_fuchsia_build_dir:
+        if not fuchsia_build_dir.exists():
+            return _print_error(
+                f"Fuchsia build directory does not exist: {fuchsia_build_dir}")
 
-    fuchsia_build_dir = fuchsia_build_dir.resolve()
+        fuchsia_build_dir = fuchsia_build_dir.resolve()
 
     # fuchsia_source_dir must be an absollute path or Bazel will complain
     # when it is used for --override_repository options below.
@@ -316,6 +329,9 @@ def main():
     if args.target_cpu:
         target_cpu = args.target_cpu
     else:
+        if not has_fuchsia_build_dir:
+            parser.error(
+                "Cannot auto-detect --target_cpu with --fuchsia_idk_directory")
         args_json = fuchsia_build_dir / "args.json"
         if not args_json.exists():
             return _print_error(
@@ -444,11 +460,6 @@ def main():
     IGNORED_REPO = Path("IGNORED")
 
     bazel_env = {
-        # Pass the location of the Fuchsia build directory to the
-        # @fuchsia_sdk repository rule. Note that using --action_env will
-        # not work because this option only affects Bazel actions, and
-        # not repository rules.
-        "LOCAL_FUCHSIA_PLATFORM_BUILD": str(fuchsia_build_dir),
         # An undocumented, but widely used, environment variable that tells Bazel to
         # not auto-detect the host C++ installation. This makes workspace setup faster
         # and ensures this can be used on containers where GCC or Clang are not
@@ -459,6 +470,17 @@ def main():
         # do not expose the system-installed one.
         "PATH": f"{python_prebuilt_dir}/bin:{PATH}",
     }
+    if has_fuchsia_build_dir:
+        # Pass the location of the Fuchsia build directory to the
+        # @fuchsia_sdk repository rule. Note that using --action_env will
+        # not work because this option only affects Bazel actions, and
+        # not repository rules.
+        bazel_env['LOCAL_FUCHSIA_PLATFORM_BUILD'] = str(fuchsia_build_dir)
+    else:
+        # Pass the location of the Fuchsia IDK archive to the @fuchsia_sdk
+        # repository rule.
+        bazel_env['LOCAL_FUCHSIA_IDK_DIRECTORY'] = str(
+            fuchsia_idk_directory.resolve())
 
     # Setting USER is required to run Bazel, so force it to run on infra bots.
     if 'USER' not in os.environ:
