@@ -4,6 +4,7 @@
 
 pub mod api;
 pub mod blob;
+pub mod boxed;
 pub mod component;
 pub mod component_capability;
 pub mod component_instance;
