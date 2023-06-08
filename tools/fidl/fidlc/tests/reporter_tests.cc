@@ -161,7 +161,7 @@ TEST(ReporterTests, ReportFixableErrorFormatParams) {
   EXPECT_SUBSTR(errors[0]->Format(reporter.program_invocation()).c_str(),
                 ">>> " + kFakeBinaryLocation + "/fidl-fix --fix=" +
                     std::string(fidl::Fixable::Get(fidl::Fixable::Kind::kNoop).name) +
-                    " --experiment=noop --dep=dep_0_file_0.fidl,dep_0_file_1.fidl" +
+                    " --experimental=noop --dep=dep_0_file_0.fidl,dep_0_file_1.fidl" +
                     " lib_file_0.fidl lib_file_1.fidl");
   EXPECT_SUBSTR(errors[0]->Format(reporter.program_invocation()).c_str(), kFixMeTagClose);
 }
@@ -190,7 +190,7 @@ TEST(ReporterTests, MakeFixableErrorThenReportIt) {
   EXPECT_SUBSTR(errors[0]->Format(reporter.program_invocation()).c_str(),
                 ">>> " + kFakeBinaryLocation + "/fidl-fix --fix=" +
                     std::string(fidl::Fixable::Get(fidl::Fixable::Kind::kNoop).name) +
-                    " --experiment=noop lib_file_0.fidl lib_file_1.fidl lib_file_2.fidl");
+                    " --experimental=noop lib_file_0.fidl lib_file_1.fidl lib_file_2.fidl");
   EXPECT_SUBSTR(errors[0]->Format(reporter.program_invocation()).c_str(), kFixMeTagClose);
 }
 
@@ -217,7 +217,7 @@ TEST(ReporterTests, ReportFixableWarningFormatParams) {
   EXPECT_SUBSTR(warnings[0]->Format(reporter.program_invocation()).c_str(),
                 ">>> " + kFakeBinaryLocation + "/fidl-fix --fix=" +
                     std::string(fidl::Fixable::Get(fidl::Fixable::Kind::kNoop).name) +
-                    " --experiment=noop --dep=dep_0_file_0.fidl,dep_0_file_1.fidl" +
+                    " --experimental=noop --dep=dep_0_file_0.fidl,dep_0_file_1.fidl" +
                     " lib_file_0.fidl lib_file_1.fidl");
   EXPECT_SUBSTR(warnings[0]->Format(reporter.program_invocation()).c_str(), kFixMeTagClose);
 }
@@ -247,7 +247,7 @@ TEST(ReporterTests, MakeFixableWarningThenReportIt) {
   EXPECT_SUBSTR(warnings[0]->Format(reporter.program_invocation()).c_str(),
                 ">>> " + kFakeBinaryLocation + "/fidl-fix --fix=" +
                     std::string(fidl::Fixable::Get(fidl::Fixable::Kind::kNoop).name) +
-                    " --experiment=noop lib_file_0.fidl lib_file_1.fidl lib_file_2.fidl");
+                    " --experimental=noop lib_file_0.fidl lib_file_1.fidl lib_file_2.fidl");
   EXPECT_SUBSTR(warnings[0]->Format(reporter.program_invocation()).c_str(), kFixMeTagClose);
 }
 
