@@ -9,20 +9,24 @@
 #include <lib/fit/function.h>
 #include <lib/zx/result.h>
 
-namespace fdf::internal {
+namespace fdf_internal {
 
-// Waits for a condition to become true while running the driver dispatchers,
-// unless the driver runtime is managing threads.
+// If no unmanaged driver dispatchers exist, returns immediately.
+// Otherwise waits for the condition to become true while running the unmanaged
+// driver dispatchers with |fdf_testing_run_until_idle|.
 //
-// Returns an OK result when:
+// Returns an OK result when either of the following happen:
 //
 // - The condition is true.
-// - The driver runtime is managing any threads, in which case manual running
-//   of the driver dispatchers is impossible.
+// - All driver dispatchers are managed by the driver runtime thread-pool.
 //
-// Propagates any other error from running the dispatchers.
-zx::result<> CheckManagedThreadOrWaitUntil(fit::function<bool()> condition);
+// Propagates any other error from running the unmanaged dispatchers.
+//
+// |condition| must be a non-blocking function.
+//
+// This MUST be called from the main test thread.
+zx::result<> IfExistsRunUnmanagedUntil(fit::function<bool()> condition);
 
-}  // namespace fdf::internal
+}  // namespace fdf_internal
 
 #endif  // LIB_DRIVER_RUNTIME_TESTING_CPP_INTERNAL_WAIT_FOR_H_

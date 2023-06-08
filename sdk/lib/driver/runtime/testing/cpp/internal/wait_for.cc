@@ -10,9 +10,9 @@
 #include <lib/fit/function.h>
 #include <lib/zx/result.h>
 
-namespace fdf::internal {
+namespace fdf_internal {
 
-zx::result<> CheckManagedThreadOrWaitUntil(fit::function<bool()> condition) {
+zx::result<> IfExistsRunUnmanagedUntil(fit::function<bool()> condition) {
   while (!condition()) {
     auto status = fdf_testing_run_until_idle();
     if (status == ZX_OK) {
@@ -33,6 +33,6 @@ zx::result<> CheckManagedThreadOrWaitUntil(fit::function<bool()> condition) {
   return zx::ok();
 }
 
-}  // namespace fdf::internal
+}  // namespace fdf_internal
 
 #endif  // LIB_DRIVER_RUNTIME_TESTING_RUNTIME_INTERNAL_WAIT_FOR_H_

@@ -8,8 +8,14 @@ source_set("cpp") {
   sources = [
     "dispatcher.cc",
     "dispatcher.h",
+    "internal/default_dispatcher_setting.cc",
+    "internal/default_dispatcher_setting.h",
+    "internal/test_dispatcher_builder.cc",
+    "internal/test_dispatcher_builder.h",
     "internal/wait_for.cc",
     "internal/wait_for.h",
+    "sync_helpers.cc",
+    "sync_helpers.h",
   ]
 
   public_deps = [

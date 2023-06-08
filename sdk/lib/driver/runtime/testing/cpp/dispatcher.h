@@ -5,68 +5,39 @@
 #ifndef LIB_DRIVER_RUNTIME_TESTING_CPP_DISPATCHER_H_
 #define LIB_DRIVER_RUNTIME_TESTING_CPP_DISPATCHER_H_
 
-#include <lib/driver/runtime/testing/cpp/internal/wait_for.h>
+#include <lib/driver/runtime/testing/cpp/internal/default_dispatcher_setting.h>
+#include <lib/driver/runtime/testing/cpp/sync_helpers.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/testing.h>
 #include <lib/sync/cpp/completion.h>
 
-#include <future>
-
 namespace fdf {
 
-// Run `task` on `dispatcher`, and wait until it is completed.
-// This will run all of the unmanaged dispatchers with |fdf_testing_run_until_idle|,
-// if there are any, to ensure the task can be completed.
-//
-// This MUST be called from the main test thread.
-zx::result<> RunOnDispatcherSync(async_dispatcher_t* dispatcher, fit::closure task);
-
-// Wait until the completion is signaled. When this function returns, the completion is signaled.
-// This will run all of the unmanaged dispatchers with |fdf_testing_run_until_idle|,
-// if there are any.
-//
-// This MUST be called from the main test thread.
-zx::result<> WaitFor(libsync::Completion& completion);
-
-// Wait until the future is resolved, then returns the resolved value of the future.
-// This will run all of the unmanaged dispatchers with |fdf_testing_run_until_idle|,
-// if there are any.
-//
-// This MUST be called from the main test thread.
-template <typename T>
-zx::result<T> WaitFor(std::future<T> future) {
-  using namespace std::chrono_literals;
-  zx::result wait_result = internal::CheckManagedThreadOrWaitUntil(
-      [&] { return future.wait_for(1ms) != std::future_status::timeout; });
-  if (wait_result.is_error()) {
-    return wait_result.take_error();
-  }
-
-  return zx::ok(future.get());
-}
-
-class TestDispatcherBuilder {
- public:
-  // Creates an unmanaged synchronized dispatcher. This dispatcher is not ran on the managed driver
-  // runtime thread pool.
-  static zx::result<fdf::SynchronizedDispatcher> CreateUnmanagedSynchronizedDispatcher(
-      const void* driver, fdf::SynchronizedDispatcher::Options options, cpp17::string_view name,
-      fdf::Dispatcher::ShutdownHandler shutdown_handler);
-
-  // Creates an unmanaged unsynchronized dispatcher. This dispatcher is not ran on the managed
-  // driver runtime thread pool.
-  static zx::result<fdf::UnsynchronizedDispatcher> CreateUnmanagedUnsynchronizedDispatcher(
-      const void* driver, fdf::UnsynchronizedDispatcher::Options options, cpp17::string_view name,
-      fdf::Dispatcher::ShutdownHandler shutdown_handler);
-};
-
-class DefaultDispatcherSetting {
- public:
-  explicit DefaultDispatcherSetting(fdf_dispatcher_t* dispatcher);
-  ~DefaultDispatcherSetting();
-};
-
 // A RAII wrapper around an fdf::SynchronizedDispatcher that is meant for testing.
+// There are two types of TestSynchronizedDispatcher: Default and managed. Both types
+// are described in length down below at |kDispatcherDefault| and |kDispatcherManaged|.
+//
+// Example with kDispatcherDefault
+// ```
+// class MyTestFixture
+//  private:
+//   fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherDefault};
+//
+//   // driver_ runs on the dispatcher_ since it is set as the default.
+//   fdf_testing::DriverUnderTest<MyTestDriver> driver_;
+// ```
+//
+// Example with kDispatcherManaged
+// ```
+// class MyTestFixture
+//  private:
+//   fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherManaged};
+//
+//   // driver_ is wrapped with a dispatcher bound and it lives on the managed dispatcher_.
+//   async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<MyTestDriver>> driver_{
+//     dispatcher_.dispatcher(), std::in_place}
+// ```
+
 class TestSynchronizedDispatcher {
  public:
   // The type of the dispatcher.
@@ -116,7 +87,7 @@ class TestSynchronizedDispatcher {
   // This MUST be called from the main test thread.
   zx::result<> Stop();
 
-  std::optional<DefaultDispatcherSetting> default_dispatcher_setting_;
+  std::optional<fdf_internal::DefaultDispatcherSetting> default_dispatcher_setting_;
   fdf::SynchronizedDispatcher dispatcher_;
   libsync::Completion dispatcher_shutdown_;
 };

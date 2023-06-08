@@ -7,6 +7,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/task.h>
 #include <lib/driver/runtime/testing/cpp/dispatcher.h>
+#include <lib/driver/runtime/testing/cpp/internal/test_dispatcher_builder.h>
 #include <lib/driver/testing/cpp/driver_runtime_env.h>
 #include <lib/fdf/cpp/channel_read.h>
 #include <lib/fdf/cpp/dispatcher.h>
@@ -396,7 +397,7 @@ TEST_F(ChannelTest, SyncDispatcherCancelQueuedReadFromTask) {
   const void* driver = CreateFakeDriver();
   libsync::Completion shutdown_completion;
   auto shutdown_handler = [&](fdf_dispatcher_t* dispatcher) { shutdown_completion.Signal(); };
-  auto dispatcher = fdf::TestDispatcherBuilder::CreateUnmanagedSynchronizedDispatcher(
+  auto dispatcher = fdf_internal::TestDispatcherBuilder::CreateUnmanagedSynchronizedDispatcher(
       driver, {}, "", shutdown_handler);
   ASSERT_FALSE(dispatcher.is_error());
 
@@ -448,7 +449,7 @@ TEST_F(ChannelTest, SyncDispatcherCancelTaskFromChannelRead) {
   const void* driver = CreateFakeDriver();
   libsync::Completion shutdown_completion;
   auto shutdown_handler = [&](fdf_dispatcher_t* dispatcher) { shutdown_completion.Signal(); };
-  auto dispatcher = fdf::TestDispatcherBuilder::CreateUnmanagedSynchronizedDispatcher(
+  auto dispatcher = fdf_internal::TestDispatcherBuilder::CreateUnmanagedSynchronizedDispatcher(
       driver, {}, "", shutdown_handler);
   ASSERT_FALSE(dispatcher.is_error());
 
@@ -552,7 +553,7 @@ TEST_F(ChannelTest, UnsyncDispatcherCancelQueuedReadFails) {
   const void* driver = CreateFakeDriver();
   libsync::Completion shutdown_completion;
   auto shutdown_handler = [&](fdf_dispatcher_t* dispatcher) { shutdown_completion.Signal(); };
-  auto dispatcher = fdf::TestDispatcherBuilder::CreateUnmanagedUnsynchronizedDispatcher(
+  auto dispatcher = fdf_internal::TestDispatcherBuilder::CreateUnmanagedUnsynchronizedDispatcher(
       driver, {}, "", shutdown_handler);
   ASSERT_FALSE(dispatcher.is_error());
 
