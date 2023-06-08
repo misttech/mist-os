@@ -35,6 +35,7 @@
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 #include <linux/limits.h>
+#include <linux/loop.h>
 #include <linux/magic.h>
 #include <linux/membarrier.h>
 #include <linux/memfd.h>

@@ -2897,6 +2897,33 @@ pub const IPV6_SRCRT_TYPE_2: u32 = 2;
 pub const IPV6_SRCRT_TYPE_3: u32 = 3;
 pub const IPV6_SRCRT_TYPE_4: u32 = 4;
 pub const IPV6_OPT_ROUTERALERT_MLD: u32 = 0;
+pub const LO_NAME_SIZE: u32 = 64;
+pub const LO_KEY_SIZE: u32 = 32;
+pub const LO_CRYPT_NONE: u32 = 0;
+pub const LO_CRYPT_XOR: u32 = 1;
+pub const LO_CRYPT_DES: u32 = 2;
+pub const LO_CRYPT_FISH2: u32 = 3;
+pub const LO_CRYPT_BLOW: u32 = 4;
+pub const LO_CRYPT_CAST128: u32 = 5;
+pub const LO_CRYPT_IDEA: u32 = 6;
+pub const LO_CRYPT_DUMMY: u32 = 9;
+pub const LO_CRYPT_SKIPJACK: u32 = 10;
+pub const LO_CRYPT_CRYPTOAPI: u32 = 18;
+pub const MAX_LO_CRYPT: u32 = 20;
+pub const LOOP_SET_FD: u32 = 19456;
+pub const LOOP_CLR_FD: u32 = 19457;
+pub const LOOP_SET_STATUS: u32 = 19458;
+pub const LOOP_GET_STATUS: u32 = 19459;
+pub const LOOP_SET_STATUS64: u32 = 19460;
+pub const LOOP_GET_STATUS64: u32 = 19461;
+pub const LOOP_CHANGE_FD: u32 = 19462;
+pub const LOOP_SET_CAPACITY: u32 = 19463;
+pub const LOOP_SET_DIRECT_IO: u32 = 19464;
+pub const LOOP_SET_BLOCK_SIZE: u32 = 19465;
+pub const LOOP_CONFIGURE: u32 = 19466;
+pub const LOOP_CTL_ADD: u32 = 19584;
+pub const LOOP_CTL_REMOVE: u32 = 19585;
+pub const LOOP_CTL_GET_FREE: u32 = 19586;
 pub const ADFS_SUPER_MAGIC: u32 = 44533;
 pub const AFFS_SUPER_MAGIC: u32 = 44543;
 pub const AFS_SUPER_MAGIC: u32 = 1397113167;
@@ -10012,6 +10039,81 @@ pub const DEVCONF_NDISC_EVICT_NOCARRIER: _bindgen_ty_44 = 56;
 pub const DEVCONF_ACCEPT_UNTRACKED_NA: _bindgen_ty_44 = 57;
 pub const DEVCONF_MAX: _bindgen_ty_44 = 58;
 pub type _bindgen_ty_44 = crate::types::c_uint;
+pub const LO_FLAGS_READ_ONLY: _bindgen_ty_45 = 1;
+pub const LO_FLAGS_AUTOCLEAR: _bindgen_ty_45 = 4;
+pub const LO_FLAGS_PARTSCAN: _bindgen_ty_45 = 8;
+pub const LO_FLAGS_DIRECT_IO: _bindgen_ty_45 = 16;
+pub type _bindgen_ty_45 = crate::types::c_uint;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct loop_info {
+    pub lo_number: crate::types::c_int,
+    pub __bindgen_padding_0: [u8; 4usize],
+    pub lo_device: __kernel_old_dev_t,
+    pub lo_inode: crate::types::c_ulong,
+    pub lo_rdevice: __kernel_old_dev_t,
+    pub lo_offset: crate::types::c_int,
+    pub lo_encrypt_type: crate::types::c_int,
+    pub lo_encrypt_key_size: crate::types::c_int,
+    pub lo_flags: crate::types::c_int,
+    pub lo_name: [crate::types::c_char; 64usize],
+    pub lo_encrypt_key: [crate::types::c_uchar; 32usize],
+    pub lo_init: [crate::types::c_ulong; 2usize],
+    pub reserved: [crate::types::c_char; 4usize],
+    pub __bindgen_padding_1: [u8; 4usize],
+}
+impl Default for loop_info {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct loop_info64 {
+    pub lo_device: __u64,
+    pub lo_inode: __u64,
+    pub lo_rdevice: __u64,
+    pub lo_offset: __u64,
+    pub lo_sizelimit: __u64,
+    pub lo_number: __u32,
+    pub lo_encrypt_type: __u32,
+    pub lo_encrypt_key_size: __u32,
+    pub lo_flags: __u32,
+    pub lo_file_name: [__u8; 64usize],
+    pub lo_crypt_name: [__u8; 64usize],
+    pub lo_encrypt_key: [__u8; 32usize],
+    pub lo_init: [__u64; 2usize],
+}
+impl Default for loop_info64 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct loop_config {
+    pub fd: __u32,
+    pub block_size: __u32,
+    pub info: loop_info64,
+    pub __reserved: [__u64; 8usize],
+}
+impl Default for loop_config {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
 pub const membarrier_cmd_MEMBARRIER_CMD_QUERY: membarrier_cmd = 0;
 pub const membarrier_cmd_MEMBARRIER_CMD_GLOBAL: membarrier_cmd = 1;
 pub const membarrier_cmd_MEMBARRIER_CMD_GLOBAL_EXPEDITED: membarrier_cmd = 2;
@@ -10117,18 +10219,18 @@ pub const net_device_flags_IFF_LOWER_UP: net_device_flags = 65536;
 pub const net_device_flags_IFF_DORMANT: net_device_flags = 131072;
 pub const net_device_flags_IFF_ECHO: net_device_flags = 262144;
 pub type net_device_flags = crate::types::c_uint;
-pub const IF_OPER_UNKNOWN: _bindgen_ty_45 = 0;
-pub const IF_OPER_NOTPRESENT: _bindgen_ty_45 = 1;
-pub const IF_OPER_DOWN: _bindgen_ty_45 = 2;
-pub const IF_OPER_LOWERLAYERDOWN: _bindgen_ty_45 = 3;
-pub const IF_OPER_TESTING: _bindgen_ty_45 = 4;
-pub const IF_OPER_DORMANT: _bindgen_ty_45 = 5;
-pub const IF_OPER_UP: _bindgen_ty_45 = 6;
-pub type _bindgen_ty_45 = crate::types::c_uint;
-pub const IF_LINK_MODE_DEFAULT: _bindgen_ty_46 = 0;
-pub const IF_LINK_MODE_DORMANT: _bindgen_ty_46 = 1;
-pub const IF_LINK_MODE_TESTING: _bindgen_ty_46 = 2;
+pub const IF_OPER_UNKNOWN: _bindgen_ty_46 = 0;
+pub const IF_OPER_NOTPRESENT: _bindgen_ty_46 = 1;
+pub const IF_OPER_DOWN: _bindgen_ty_46 = 2;
+pub const IF_OPER_LOWERLAYERDOWN: _bindgen_ty_46 = 3;
+pub const IF_OPER_TESTING: _bindgen_ty_46 = 4;
+pub const IF_OPER_DORMANT: _bindgen_ty_46 = 5;
+pub const IF_OPER_UP: _bindgen_ty_46 = 6;
 pub type _bindgen_ty_46 = crate::types::c_uint;
+pub const IF_LINK_MODE_DEFAULT: _bindgen_ty_47 = 0;
+pub const IF_LINK_MODE_DORMANT: _bindgen_ty_47 = 1;
+pub const IF_LINK_MODE_TESTING: _bindgen_ty_47 = 2;
+pub type _bindgen_ty_47 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct ifmap {
@@ -10271,36 +10373,36 @@ pub type in_addr_t = u32;
 pub struct in_addr {
     pub s_addr: in_addr_t,
 }
-pub const IPPROTO_IP: _bindgen_ty_47 = 0;
-pub const IPPROTO_ICMP: _bindgen_ty_47 = 1;
-pub const IPPROTO_IGMP: _bindgen_ty_47 = 2;
-pub const IPPROTO_IPIP: _bindgen_ty_47 = 4;
-pub const IPPROTO_TCP: _bindgen_ty_47 = 6;
-pub const IPPROTO_EGP: _bindgen_ty_47 = 8;
-pub const IPPROTO_PUP: _bindgen_ty_47 = 12;
-pub const IPPROTO_UDP: _bindgen_ty_47 = 17;
-pub const IPPROTO_IDP: _bindgen_ty_47 = 22;
-pub const IPPROTO_TP: _bindgen_ty_47 = 29;
-pub const IPPROTO_DCCP: _bindgen_ty_47 = 33;
-pub const IPPROTO_IPV6: _bindgen_ty_47 = 41;
-pub const IPPROTO_RSVP: _bindgen_ty_47 = 46;
-pub const IPPROTO_GRE: _bindgen_ty_47 = 47;
-pub const IPPROTO_ESP: _bindgen_ty_47 = 50;
-pub const IPPROTO_AH: _bindgen_ty_47 = 51;
-pub const IPPROTO_MTP: _bindgen_ty_47 = 92;
-pub const IPPROTO_BEETPH: _bindgen_ty_47 = 94;
-pub const IPPROTO_ENCAP: _bindgen_ty_47 = 98;
-pub const IPPROTO_PIM: _bindgen_ty_47 = 103;
-pub const IPPROTO_COMP: _bindgen_ty_47 = 108;
-pub const IPPROTO_L2TP: _bindgen_ty_47 = 115;
-pub const IPPROTO_SCTP: _bindgen_ty_47 = 132;
-pub const IPPROTO_UDPLITE: _bindgen_ty_47 = 136;
-pub const IPPROTO_MPLS: _bindgen_ty_47 = 137;
-pub const IPPROTO_ETHERNET: _bindgen_ty_47 = 143;
-pub const IPPROTO_RAW: _bindgen_ty_47 = 255;
-pub const IPPROTO_MPTCP: _bindgen_ty_47 = 262;
-pub const IPPROTO_MAX: _bindgen_ty_47 = 263;
-pub type _bindgen_ty_47 = crate::types::c_uint;
+pub const IPPROTO_IP: _bindgen_ty_48 = 0;
+pub const IPPROTO_ICMP: _bindgen_ty_48 = 1;
+pub const IPPROTO_IGMP: _bindgen_ty_48 = 2;
+pub const IPPROTO_IPIP: _bindgen_ty_48 = 4;
+pub const IPPROTO_TCP: _bindgen_ty_48 = 6;
+pub const IPPROTO_EGP: _bindgen_ty_48 = 8;
+pub const IPPROTO_PUP: _bindgen_ty_48 = 12;
+pub const IPPROTO_UDP: _bindgen_ty_48 = 17;
+pub const IPPROTO_IDP: _bindgen_ty_48 = 22;
+pub const IPPROTO_TP: _bindgen_ty_48 = 29;
+pub const IPPROTO_DCCP: _bindgen_ty_48 = 33;
+pub const IPPROTO_IPV6: _bindgen_ty_48 = 41;
+pub const IPPROTO_RSVP: _bindgen_ty_48 = 46;
+pub const IPPROTO_GRE: _bindgen_ty_48 = 47;
+pub const IPPROTO_ESP: _bindgen_ty_48 = 50;
+pub const IPPROTO_AH: _bindgen_ty_48 = 51;
+pub const IPPROTO_MTP: _bindgen_ty_48 = 92;
+pub const IPPROTO_BEETPH: _bindgen_ty_48 = 94;
+pub const IPPROTO_ENCAP: _bindgen_ty_48 = 98;
+pub const IPPROTO_PIM: _bindgen_ty_48 = 103;
+pub const IPPROTO_COMP: _bindgen_ty_48 = 108;
+pub const IPPROTO_L2TP: _bindgen_ty_48 = 115;
+pub const IPPROTO_SCTP: _bindgen_ty_48 = 132;
+pub const IPPROTO_UDPLITE: _bindgen_ty_48 = 136;
+pub const IPPROTO_MPLS: _bindgen_ty_48 = 137;
+pub const IPPROTO_ETHERNET: _bindgen_ty_48 = 143;
+pub const IPPROTO_RAW: _bindgen_ty_48 = 255;
+pub const IPPROTO_MPTCP: _bindgen_ty_48 = 262;
+pub const IPPROTO_MAX: _bindgen_ty_48 = 263;
+pub type _bindgen_ty_48 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct ip_mreq {
@@ -10422,16 +10524,16 @@ pub const nf_dev_hooks_NF_NETDEV_INGRESS: nf_dev_hooks = 0;
 pub const nf_dev_hooks_NF_NETDEV_EGRESS: nf_dev_hooks = 1;
 pub const nf_dev_hooks_NF_NETDEV_NUMHOOKS: nf_dev_hooks = 2;
 pub type nf_dev_hooks = crate::types::c_uint;
-pub const NFPROTO_UNSPEC: _bindgen_ty_48 = 0;
-pub const NFPROTO_INET: _bindgen_ty_48 = 1;
-pub const NFPROTO_IPV4: _bindgen_ty_48 = 2;
-pub const NFPROTO_ARP: _bindgen_ty_48 = 3;
-pub const NFPROTO_NETDEV: _bindgen_ty_48 = 5;
-pub const NFPROTO_BRIDGE: _bindgen_ty_48 = 7;
-pub const NFPROTO_IPV6: _bindgen_ty_48 = 10;
-pub const NFPROTO_DECNET: _bindgen_ty_48 = 12;
-pub const NFPROTO_NUMPROTO: _bindgen_ty_48 = 13;
-pub type _bindgen_ty_48 = crate::types::c_uint;
+pub const NFPROTO_UNSPEC: _bindgen_ty_49 = 0;
+pub const NFPROTO_INET: _bindgen_ty_49 = 1;
+pub const NFPROTO_IPV4: _bindgen_ty_49 = 2;
+pub const NFPROTO_ARP: _bindgen_ty_49 = 3;
+pub const NFPROTO_NETDEV: _bindgen_ty_49 = 5;
+pub const NFPROTO_BRIDGE: _bindgen_ty_49 = 7;
+pub const NFPROTO_IPV6: _bindgen_ty_49 = 10;
+pub const NFPROTO_DECNET: _bindgen_ty_49 = 12;
+pub const NFPROTO_NUMPROTO: _bindgen_ty_49 = 13;
+pub type _bindgen_ty_49 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union nf_inet_addr {
@@ -10930,9 +11032,9 @@ pub const nl_mmap_status_NL_MMAP_STATUS_VALID: nl_mmap_status = 2;
 pub const nl_mmap_status_NL_MMAP_STATUS_COPY: nl_mmap_status = 3;
 pub const nl_mmap_status_NL_MMAP_STATUS_SKIP: nl_mmap_status = 4;
 pub type nl_mmap_status = crate::types::c_uint;
-pub const NETLINK_UNCONNECTED: _bindgen_ty_49 = 0;
-pub const NETLINK_CONNECTED: _bindgen_ty_49 = 1;
-pub type _bindgen_ty_49 = crate::types::c_uint;
+pub const NETLINK_UNCONNECTED: _bindgen_ty_50 = 0;
+pub const NETLINK_CONNECTED: _bindgen_ty_50 = 1;
+pub type _bindgen_ty_50 = crate::types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct nlattr {
