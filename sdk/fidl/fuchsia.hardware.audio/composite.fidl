@@ -11,6 +11,14 @@ type CompositeProperties = table {
     /// If not included, then the driver may be used for both input and output.
     ///
     /// Optional.
+    //
+    // # Deprecation
+    //
+    // Removed in favor of the signal processing topology describing the one or many
+    // input and output pipelines that could not be expressed with this one field for
+    // the whole driver. If the driver exposes only one input or output that is also
+    // described by the signal processing topology.
+    @available(deprecated=12, removed=13)
     1: is_input bool;
 
     /// UI string for the manufacturer name. If not set, the manufacturer is unknown.
