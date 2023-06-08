@@ -7,6 +7,7 @@ use super::*;
 use crate::{
     fs::{buffers::*, fuchsia::*, *},
     mm::MemoryAccessorExt,
+    syscalls::{SyscallResult, SUCCESS},
     task::*,
     types::*,
 };
@@ -16,6 +17,7 @@ use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
 use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_zircon as zx;
 use static_assertions::const_assert_eq;
+use std::ffi::CStr;
 use std::sync::Arc;
 use syncio::{ControlMessage, RecvMessageInfo, ServiceConnector, Zxio};
 
@@ -269,6 +271,34 @@ impl SocketOps for InetSocket {
             .getsockopt(level, optname, optlen)
             .map_err(|status| from_status_like_fdio!(status))?
             .map_err(|out_code| errno_from_zxio_code!(out_code))
+    }
+
+    fn ioctl(
+        &self,
+        _socket: &Socket,
+        current_task: &CurrentTask,
+        request: u32,
+        user_addr: UserAddress,
+    ) -> Result<SyscallResult, Errno> {
+        // TODO(fxbug.dev/128604): Remove hardcoded constant
+        const DEFAULT_IFACE_NAME: &[u8; 16usize] = b"sta-iface-name\0\0";
+        match request {
+            SIOCGIFINDEX => {
+                let in_ifreq: ifreq = current_task.mm.read_object(UserRef::new(user_addr))?;
+                let iface_name = unsafe { CStr::from_ptr(in_ifreq.ifr_ifrn.ifrn_name.as_ptr()) };
+                if iface_name.to_bytes()[..] != DEFAULT_IFACE_NAME[..] {
+                    return error!(EINVAL);
+                }
+                let out_ifreq: [u8; std::mem::size_of::<ifreq>()] = struct_with_union_into_bytes!(ifreq {
+                    ifr_ifrn.ifrn_name: unsafe { in_ifreq.ifr_ifrn.ifrn_name },
+                    // TODO(fxbug.dev/128604): Don't hardcode iface index
+                    ifr_ifru.ifru_ivalue: 1,
+                });
+                current_task.mm.write_object(UserRef::new(user_addr), &out_ifreq)?;
+                Ok(SUCCESS)
+            }
+            _ => default_ioctl(request),
+        }
     }
 }
 

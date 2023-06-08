@@ -55,6 +55,7 @@
 #include <linux/signal.h>
 #include <linux/signalfd.h>
 #include <linux/socket.h>
+#include <linux/sockios.h>
 #include <linux/stat.h>
 #include <linux/sysinfo.h>
 #include <linux/termios.h>
