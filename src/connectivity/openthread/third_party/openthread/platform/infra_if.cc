@@ -72,6 +72,9 @@ int platformInfraIfInit(int infra_if_idx) {
 void platformInfraIfOnStateChanged(otInstance *a_instance) {
   ot::Fuchsia::InfraNetif::Get().OnStateChanged(a_instance);
 }
+
+// TODO(jiamingw) remove
+otError otPlatInfraIfDiscoverNat64Prefix(uint32_t aInfraIfIndex) { return OT_ERROR_NONE; }
 }
 bool platformInfraIfIsRunning(void) { return ot::Fuchsia::InfraNetif::Get().IsRunning(); }
 
