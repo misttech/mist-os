@@ -26,6 +26,8 @@
 #include <fbl/auto_lock.h>
 
 #include "src/graphics/display/drivers/virtio-guest/virtio-abi.h"
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -34,7 +36,7 @@ namespace virtio {
 namespace {
 
 constexpr uint32_t kRefreshRateHz = 30;
-constexpr uint64_t kDisplayId = 1;
+constexpr display::DisplayId kDisplayId{1};
 
 zx_status_t ResponseTypeToZxStatus(virtio_abi::ControlType type) {
   if (type != virtio_abi::ControlType::kEmptyResponse) {
@@ -71,7 +73,7 @@ void GpuDevice::DisplayControllerImplSetDisplayControllerInterface(
   }
 
   added_display_args_t args = {
-      .display_id = kDisplayId,
+      .display_id = display::ToBanjoDisplayId(kDisplayId),
       .edid_present = false,
       .panel =
           {
@@ -267,7 +269,7 @@ config_check_result_t GpuDevice::DisplayControllerImplCheckConfiguration(
     ZX_DEBUG_ASSERT(display_count == 0);
     return CONFIG_CHECK_RESULT_OK;
   }
-  ZX_DEBUG_ASSERT(display_configs[0]->display_id == kDisplayId);
+  ZX_DEBUG_ASSERT(display::ToDisplayId(display_configs[0]->display_id) == kDisplayId);
   bool success;
   if (display_configs[0]->layer_count != 1) {
     success = display_configs[0]->layer_count == 0;
@@ -299,8 +301,9 @@ config_check_result_t GpuDevice::DisplayControllerImplCheckConfiguration(
 
 void GpuDevice::DisplayControllerImplApplyConfiguration(const display_config_t** display_configs,
                                                         size_t display_count,
-                                                        const config_stamp_t* config_stamp) {
-  ZX_DEBUG_ASSERT(config_stamp);
+                                                        const config_stamp_t* banjo_config_stamp) {
+  ZX_DEBUG_ASSERT(banjo_config_stamp);
+  display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
   uint64_t handle = display_count == 0 || display_configs[0]->layer_count == 0
                         ? 0
                         : display_configs[0]->layer_list[0]->cfg.primary.image.handle;
@@ -308,7 +311,7 @@ void GpuDevice::DisplayControllerImplApplyConfiguration(const display_config_t**
   {
     fbl::AutoLock al(&flush_lock_);
     latest_fb_ = reinterpret_cast<imported_image_t*>(handle);
-    latest_config_stamp_ = *config_stamp;
+    latest_config_stamp_ = config_stamp;
   }
 }
 
@@ -643,8 +646,11 @@ void GpuDevice::virtio_gpu_flusher() {
     {
       fbl::AutoLock al(&flush_lock_);
       if (dc_intf_.ops) {
-        display_controller_interface_on_display_vsync(&dc_intf_, kDisplayId, next_deadline,
-                                                      &displayed_config_stamp_);
+        const uint64_t banjo_display_id = display::ToBanjoDisplayId(kDisplayId);
+        const config_stamp_t banjo_config_stamp =
+            display::ToBanjoConfigStamp(displayed_config_stamp_);
+        display_controller_interface_on_display_vsync(&dc_intf_, banjo_display_id, next_deadline,
+                                                      &banjo_config_stamp);
       }
     }
     next_deadline = zx_time_add_duration(next_deadline, period);

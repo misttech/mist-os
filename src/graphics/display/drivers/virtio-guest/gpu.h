@@ -21,6 +21,7 @@
 #include <ddktl/device.h>
 
 #include "src/graphics/display/drivers/virtio-guest/virtio-abi.h"
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 
 namespace virtio {
 
@@ -85,7 +86,7 @@ class GpuDevice : public Device,
 
   void DisplayControllerImplApplyConfiguration(const display_config_t** display_configs,
                                                size_t display_count,
-                                               const config_stamp_t* config_stamp);
+                                               const config_stamp_t* banjo_config_stamp);
 
   void DisplayControllerImplSetEld(uint64_t display_id, const uint8_t* raw_eld_list,
                                    size_t raw_eld_count) {}  // No ELD required for non-HDA systems.
@@ -171,8 +172,8 @@ class GpuDevice : public Device,
 
   struct imported_image* latest_fb_ = nullptr;
   struct imported_image* displayed_fb_ = nullptr;
-  config_stamp_t latest_config_stamp_ = {.value = INVALID_CONFIG_STAMP_VALUE};
-  config_stamp_t displayed_config_stamp_ = {.value = INVALID_CONFIG_STAMP_VALUE};
+  display::ConfigStamp latest_config_stamp_ = display::kInvalidConfigStamp;
+  display::ConfigStamp displayed_config_stamp_ = display::kInvalidConfigStamp;
 
   // TODO(fxbug.dev/122802): Support more formats.
   static constexpr std::array<fuchsia_images2_pixel_format_enum_value_t, 1> kSupportedFormats = {
