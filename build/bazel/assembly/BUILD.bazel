@@ -4,6 +4,7 @@
 
 load(
     "@fuchsia_sdk//fuchsia:assembly.bzl",
+    "fuchsia_elf_sizes",
     "fuchsia_product_bundle",
     "fuchsia_product_image",
 )
@@ -15,6 +16,11 @@ fuchsia_product_image(
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = "//build/bazel/assembly/product_configurations:minimal",
+)
+
+fuchsia_elf_sizes(
+    name = "product_image_minimal.x64_elf_sizes",
+    product_image = ":product_image_minimal.x64",
 )
 
 fuchsia_product_bundle(

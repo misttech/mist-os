@@ -126,6 +126,10 @@ load(
     _fuchsia_size_checker = "fuchsia_size_checker",
 )
 load(
+    "//fuchsia/private/assembly:fuchsia_elf_sizes.bzl",
+    _fuchsia_elf_sizes = "fuchsia_elf_sizes",
+)
+load(
     "//fuchsia/private/assembly:fuchsia_repository_keys.bzl",
     _fuchsia_repository_keys = "fuchsia_repository_keys",
 )
@@ -148,6 +152,7 @@ fuchsia_product_assembly = _fuchsia_product_assembly
 fuchsia_partitions_configuration = _fuchsia_partitions_configuration
 fuchsia_product_bundle = _fuchsia_product_bundle
 fuchsia_size_checker = _fuchsia_size_checker
+fuchsia_elf_sizes = _fuchsia_elf_sizes
 fuchsia_update_package = _fuchsia_update_package
 fuchsia_repository_keys = _fuchsia_repository_keys
 fuchsia_task_flash = _fuchsia_task_flash

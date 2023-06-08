@@ -163,3 +163,9 @@ py_binary(
     name = "work_on_runner",
     srcs = ["work_on_runner.py"],
 )
+
+py_binary(
+    name = "elf_sizes",
+    srcs = ["elf_sizes.py"],
+    python_version = "PY3",
+)
