@@ -713,16 +713,6 @@ pub fn sys_unlinkat(
     Ok(())
 }
 
-pub fn sys_renameat(
-    current_task: &CurrentTask,
-    old_dir_fd: FdNumber,
-    old_user_path: UserCString,
-    new_dir_fd: FdNumber,
-    new_user_path: UserCString,
-) -> Result<(), Errno> {
-    sys_renameat2(current_task, old_dir_fd, old_user_path, new_dir_fd, new_user_path, 0)
-}
-
 pub fn sys_renameat2(
     current_task: &CurrentTask,
     old_dir_fd: FdNumber,

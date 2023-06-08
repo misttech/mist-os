@@ -2,11 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    fs::{syscalls::sys_renameat2, FdNumber},
-    task::{syscalls::do_clone, CurrentTask},
-    types::{clone_args, pid_t, Errno, UserAddress, UserCString, UserRef, CSIGNAL},
-};
+use crate::task::{syscalls::do_clone, CurrentTask};
+use crate::types::{clone_args, pid_t, Errno, UserAddress, UserRef, CSIGNAL};
 
 /// The parameter order for `clone` varies by architecture.
 pub fn sys_clone(
@@ -31,14 +28,4 @@ pub fn sys_clone(
             ..Default::default()
         },
     )
-}
-
-pub fn sys_renameat(
-    current_task: &CurrentTask,
-    old_dir_fd: FdNumber,
-    old_user_path: UserCString,
-    new_dir_fd: FdNumber,
-    new_user_path: UserCString,
-) -> Result<(), Errno> {
-    sys_renameat2(current_task, old_dir_fd, old_user_path, new_dir_fd, new_user_path, 0)
 }

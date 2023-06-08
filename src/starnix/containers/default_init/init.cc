@@ -46,6 +46,9 @@ intptr_t _syscall4(intptr_t syscall_number, intptr_t arg1, intptr_t arg2, intptr
                    : "=r"(ret)
                    : "0"(x0), "r"(x1), "r"(x2), "r"(x3), "r"(number)
                    : "memory");
+#elif defined(__riscv) && __riscv_xlen == 64
+  // TODO(fxbug.dev/128554): implement riscv64 support.
+  ret = 0;
 #endif
   return handle_error(ret);
 }

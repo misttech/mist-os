@@ -129,6 +129,8 @@ impl SeccompFilterContainer {
         let arch_val = AUDIT_ARCH_X86_64;
         #[cfg(target_arch = "aarch64")]
         let arch_val = AUDIT_ARCH_AARCH64;
+        #[cfg(target_arch = "riscv64")]
+        let arch_val = AUDIT_ARCH_RISCV64;
 
         let mut result = SECCOMP_RET_ALLOW;
         // Filters are executed in reverse order of addition
@@ -293,6 +295,8 @@ impl SeccompState {
                 let arch_val = AUDIT_ARCH_X86_64;
                 #[cfg(target_arch = "aarch64")]
                 let arch_val = AUDIT_ARCH_AARCH64;
+                #[cfg(target_arch = "riscv64")]
+                let arch_val = AUDIT_ARCH_RISCV64;
 
                 let siginfo = SignalInfo {
                     signal: SIGSYS,

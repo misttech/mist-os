@@ -1362,10 +1362,13 @@ impl From<&zx_thread_state_general_regs_t> for zx_restricted_state_t {
 }
 
 #[cfg(target_arch = "riscv64")]
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
-pub struct zx_restricted_state_t {
-    reserved: u64,
+pub type zx_restricted_state_t = zx_thread_state_general_regs_t;
+
+#[cfg(target_arch = "riscv64")]
+impl From<&zx_thread_state_general_regs_t> for zx_restricted_state_t {
+    fn from(registers: &zx_thread_state_general_regs_t) -> Self {
+        *registers
+    }
 }
 
 #[repr(C)]

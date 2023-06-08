@@ -204,7 +204,7 @@ pub fn dispatch_syscall(
         removexattr[2],
         #[cfg(target_arch = "x86_64")] rename[2],
         renameat2[5],
-        renameat[4],
+        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))] renameat[4],
         restart_syscall[0],
         #[cfg(target_arch = "x86_64")] rmdir[1],
         rt_sigaction[4],

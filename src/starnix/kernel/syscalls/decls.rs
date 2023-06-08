@@ -56,7 +56,8 @@ macro_rules! for_each_arch_syscall {
             putpmsg, // (unused)
             query_module, // (deprecated)
             readlink,  // readlinkat
-            rename,  // renameat
+            rename,  // renameat2
+            renameat,  // renameat2
             rmdir,  // unlinkat
             security,  // (unused)
             select,  // pselect
@@ -80,6 +81,17 @@ macro_rules! for_each_arch_syscall {
 }
 
 #[cfg(target_arch = "aarch64")]
+macro_rules! for_each_arch_syscall {
+    {$callback:ident; $($context:ident;)* ; $($common_name:ident,)*} => {
+        $callback!{
+            $($context;)*
+            $($common_name,)*
+            renameat,  // renameat2
+        }
+    }
+}
+
+#[cfg(target_arch = "riscv64")]
 macro_rules! for_each_arch_syscall {
     {$callback:ident; $($context:ident;)* ; $($common_name:ident,)*} => {
         $callback!{
@@ -294,7 +306,6 @@ macro_rules! for_each_syscall {
             recvmsg,
             remap_file_pages,
             removexattr,
-            renameat,
             renameat2,
             request_key,
             restart_syscall,

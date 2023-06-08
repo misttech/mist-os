@@ -23,7 +23,7 @@ use crate::{
 fn get_valid_platform_mmap_flags() -> u32 {
     MAP_32BIT
 }
-#[cfg(target_arch = "aarch64")]
+#[cfg(not(target_arch = "x86_64"))]
 fn get_valid_platform_mmap_flags() -> u32 {
     0
 }

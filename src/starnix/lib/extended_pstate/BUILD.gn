@@ -32,9 +32,10 @@ rustc_library("lib") {
   if (target_cpu == "x64") {
     sources += [ "src/x86_64.rs" ]
     deps += [ "//third_party/rust_crates:once_cell" ]
-  }
-  if (target_cpu == "arm64") {
+  } else if (target_cpu == "arm64") {
     sources += [ "src/aarch64.rs" ]
+  } else if (target_cpu == "riscv64") {
+    sources += [ "src/riscv64.rs" ]
   }
 }
 
