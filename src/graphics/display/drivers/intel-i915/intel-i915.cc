@@ -126,12 +126,13 @@ constexpr zx_protocol_device_t kDisplayControllerDeviceProtocol = {
     .release = [](void* ctx) {},
 };
 
-const display_config_t* FindConfig(uint64_t display_id,
-                                   cpp20::span<const display_config_t*> display_configs) {
-  auto found =
-      std::find_if(display_configs.begin(), display_configs.end(),
-                   [display_id](const display_config_t* c) { return c->display_id == display_id; });
-  return found != display_configs.end() ? *found : nullptr;
+const display_config_t* FindBanjoConfig(
+    uint64_t display_id, cpp20::span<const display_config_t*> banjo_display_configs) {
+  auto found = std::find_if(banjo_display_configs.begin(), banjo_display_configs.end(),
+                            [display_id](const display_config_t* banjo_display_config) {
+                              return banjo_display_config->display_id == display_id;
+                            });
+  return found != banjo_display_configs.end() ? *found : nullptr;
 }
 
 void GetPostTransformWidth(const layer_t& layer, uint32_t* width, uint32_t* height) {
@@ -674,7 +675,7 @@ void Controller::InitDisplays() {
     ResetDdi(ddi, transcoder_maybe);
   }
 
-  for (auto* device : device_needs_init) {
+  for (DisplayDevice* device : device_needs_init) {
     ZX_ASSERT_MSG(device, "device_needs_init incorrectly populated above");
     for (unsigned i = 0; i < display_devices_.size(); i++) {
       if (display_devices_[i].get() == device) {
@@ -1097,36 +1098,37 @@ const std::unique_ptr<GttRegionImpl>& Controller::GetGttRegionImpl(uint64_t hand
 }
 
 bool Controller::GetPlaneLayer(Pipe* pipe, uint32_t plane,
-                               cpp20::span<const display_config_t*> configs,
+                               cpp20::span<const display_config_t*> banjo_display_configs,
                                const layer_t** layer_out) {
   if (!pipe->in_use()) {
     return false;
   }
   uint64_t disp_id = pipe->attached_display_id();
 
-  for (const display_config_t* config : configs) {
-    if (config->display_id != disp_id) {
+  for (const display_config_t* banjo_display_config : banjo_display_configs) {
+    if (banjo_display_config->display_id != disp_id) {
       continue;
     }
-    bool has_color_layer = config->layer_count && config->layer_list[0]->type == LAYER_TYPE_COLOR;
-    for (unsigned j = 0; j < config->layer_count; j++) {
-      if (config->layer_list[j]->type == LAYER_TYPE_PRIMARY) {
-        if (plane != (config->layer_list[j]->z_index - has_color_layer)) {
+    bool has_color_layer = banjo_display_config->layer_count &&
+                           banjo_display_config->layer_list[0]->type == LAYER_TYPE_COLOR;
+    for (unsigned j = 0; j < banjo_display_config->layer_count; j++) {
+      if (banjo_display_config->layer_list[j]->type == LAYER_TYPE_PRIMARY) {
+        if (plane != (banjo_display_config->layer_list[j]->z_index - has_color_layer)) {
           continue;
         }
-      } else if (config->layer_list[j]->type == LAYER_TYPE_CURSOR) {
+      } else if (banjo_display_config->layer_list[j]->type == LAYER_TYPE_CURSOR) {
         // Since the config is validated, we know the cursor is the
         // highest plane, so we don't care about the layer's z_index.
         if (plane != registers::kCursorPlane) {
           continue;
         }
-      } else if (config->layer_list[j]->type == LAYER_TYPE_COLOR) {
+      } else if (banjo_display_config->layer_list[j]->type == LAYER_TYPE_COLOR) {
         // color layers aren't a plane
         continue;
       } else {
         ZX_ASSERT(false);
       }
-      *layer_out = config->layer_list[j];
+      *layer_out = banjo_display_config->layer_list[j];
       return true;
     }
   }
@@ -1139,7 +1141,7 @@ uint16_t Controller::CalculateBuffersPerPipe(size_t active_pipe_count) {
 }
 
 bool Controller::CalculateMinimumAllocations(
-    cpp20::span<const display_config_t*> display_configs,
+    cpp20::span<const display_config_t*> banjo_display_configs,
     uint16_t min_allocs[PipeIds<registers::Platform::kKabyLake>().size()]
                        [registers::kImagePlaneCount]) {
   // This fn ignores layers after kImagePlaneCount. Displays with too many layers already
@@ -1151,7 +1153,7 @@ bool Controller::CalculateMinimumAllocations(
 
     for (unsigned plane_num = 0; plane_num < registers::kImagePlaneCount; plane_num++) {
       const layer_t* layer;
-      if (!GetPlaneLayer(pipe, plane_num, display_configs, &layer)) {
+      if (!GetPlaneLayer(pipe, plane_num, banjo_display_configs, &layer)) {
         min_allocs[pipe_id][plane_num] = 0;
         continue;
       }
@@ -1203,7 +1205,7 @@ bool Controller::CalculateMinimumAllocations(
       total += min_allocs[pipe_id][plane_num];
     }
 
-    if (total && total > CalculateBuffersPerPipe(display_configs.size())) {
+    if (total && total > CalculateBuffersPerPipe(banjo_display_configs.size())) {
       min_allocs[pipe_id][0] = UINT16_MAX;
       success = false;
     }
@@ -1316,16 +1318,16 @@ void Controller::UpdateAllocations(
   }
 }
 
-void Controller::ReallocatePlaneBuffers(cpp20::span<const display_config_t*> display_configs,
+void Controller::ReallocatePlaneBuffers(cpp20::span<const display_config_t*> banjo_display_configs,
                                         bool reallocate_pipes) {
-  if (display_configs.empty()) {
+  if (banjo_display_configs.empty()) {
     // Deal with reallocation later, when there are actually displays
     return;
   }
 
   uint16_t min_allocs[PipeIds<registers::Platform::kKabyLake>().size()]
                      [registers::kImagePlaneCount];
-  if (!CalculateMinimumAllocations(display_configs, min_allocs)) {
+  if (!CalculateMinimumAllocations(banjo_display_configs, min_allocs)) {
     // The allocation should have been checked, so this shouldn't fail
     ZX_ASSERT(false);
   }
@@ -1336,7 +1338,7 @@ void Controller::ReallocatePlaneBuffers(cpp20::span<const display_config_t*> dis
     PipeId pipe_id = pipe->pipe_id();
     for (unsigned plane_num = 0; plane_num < registers::kImagePlaneCount; plane_num++) {
       const layer_t* layer;
-      if (!GetPlaneLayer(pipe, plane_num, display_configs, &layer)) {
+      if (!GetPlaneLayer(pipe, plane_num, banjo_display_configs, &layer)) {
         data_rate[pipe_id][plane_num] = 0;
       } else if (layer->type == LAYER_TYPE_PRIMARY) {
         const primary_layer_t* primary = &layer->cfg.primary;
@@ -1474,17 +1476,18 @@ void Controller::DoPipeBufferReallocation(
   }
 }
 
-bool Controller::CheckDisplayLimits(cpp20::span<const display_config_t*> display_configs,
+bool Controller::CheckDisplayLimits(cpp20::span<const display_config_t*> banjo_display_configs,
                                     uint32_t** layer_cfg_results) {
-  for (unsigned i = 0; i < display_configs.size(); i++) {
-    const display_config_t* config = display_configs[i];
+  for (unsigned i = 0; i < banjo_display_configs.size(); i++) {
+    const display_config_t* banjo_display_config = banjo_display_configs[i];
 
     // The intel display controller doesn't support these flags
-    if (config->mode.flags & (MODE_FLAG_ALTERNATING_VBLANK | MODE_FLAG_DOUBLE_CLOCKED)) {
+    if (banjo_display_config->mode.flags &
+        (MODE_FLAG_ALTERNATING_VBLANK | MODE_FLAG_DOUBLE_CLOCKED)) {
       return false;
     }
 
-    DisplayDevice* display = FindDevice(config->display_id);
+    DisplayDevice* display = FindDevice(banjo_display_config->display_id);
     if (display == nullptr) {
       continue;
     }
@@ -1492,7 +1495,8 @@ bool Controller::CheckDisplayLimits(cpp20::span<const display_config_t*> display
     // Pipes don't support height of more than 4096. They support a width of up to
     // 2^14 - 1. However, planes don't support a width of more than 8192 and we need
     // to always be able to accept a single plane, fullscreen configuration.
-    if (config->mode.v_addressable > 4096 || config->mode.h_addressable > 8192) {
+    if (banjo_display_config->mode.v_addressable > 4096 ||
+        banjo_display_config->mode.h_addressable > 8192) {
       return false;
     }
 
@@ -1521,21 +1525,21 @@ bool Controller::CheckDisplayLimits(cpp20::span<const display_config_t*> display
 
     // Either the pipe pixel rate or the link pixel rate can't support a simple
     // configuration at this display resolution.
-    if (max_pipe_pixel_rate < config->mode.pixel_clock_10khz * 10000 ||
-        !display->CheckPixelRate(config->mode.pixel_clock_10khz * 10000)) {
+    if (max_pipe_pixel_rate < banjo_display_config->mode.pixel_clock_10khz * 10000 ||
+        !display->CheckPixelRate(banjo_display_config->mode.pixel_clock_10khz * 10000)) {
       return false;
     }
 
     // Compute the maximum pipe pixel rate with the desired scaling. If the max rate
     // is too low, then make the client do any downscaling itself.
     double min_plane_ratio = 1.0;
-    for (unsigned i = 0; i < config->layer_count; i++) {
-      if (config->layer_list[i]->type != LAYER_TYPE_PRIMARY) {
+    for (unsigned i = 0; i < banjo_display_config->layer_count; i++) {
+      if (banjo_display_config->layer_list[i]->type != LAYER_TYPE_PRIMARY) {
         continue;
       }
-      primary_layer_t* primary = &config->layer_list[i]->cfg.primary;
+      primary_layer_t* primary = &banjo_display_config->layer_list[i]->cfg.primary;
       uint32_t src_width, src_height;
-      GetPostTransformWidth(*config->layer_list[i], &src_width, &src_height);
+      GetPostTransformWidth(*banjo_display_config->layer_list[i], &src_width, &src_height);
 
       double downscale = std::max(1.0, 1.0 * src_height / primary->dest_frame.height) *
                          std::max(1.0, 1.0 * src_width / primary->dest_frame.width);
@@ -1545,14 +1549,14 @@ bool Controller::CheckDisplayLimits(cpp20::span<const display_config_t*> display
 
     max_pipe_pixel_rate =
         static_cast<uint64_t>(min_plane_ratio * static_cast<double>(max_pipe_pixel_rate));
-    if (max_pipe_pixel_rate < config->mode.pixel_clock_10khz * 10000) {
-      for (unsigned j = 0; j < config->layer_count; j++) {
-        if (config->layer_list[j]->type != LAYER_TYPE_PRIMARY) {
+    if (max_pipe_pixel_rate < banjo_display_config->mode.pixel_clock_10khz * 10000) {
+      for (unsigned j = 0; j < banjo_display_config->layer_count; j++) {
+        if (banjo_display_config->layer_list[j]->type != LAYER_TYPE_PRIMARY) {
           continue;
         }
-        primary_layer_t* primary = &config->layer_list[j]->cfg.primary;
+        primary_layer_t* primary = &banjo_display_config->layer_list[j]->cfg.primary;
         uint32_t src_width, src_height;
-        GetPostTransformWidth(*config->layer_list[j], &src_width, &src_height);
+        GetPostTransformWidth(*banjo_display_config->layer_list[j], &src_width, &src_height);
 
         if (src_height > primary->dest_frame.height || src_width > primary->dest_frame.width) {
           layer_cfg_results[i][j] |= CLIENT_FRAME_SCALE;
@@ -1567,30 +1571,30 @@ bool Controller::CheckDisplayLimits(cpp20::span<const display_config_t*> display
 }
 
 config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
-    const display_config_t** display_config, size_t display_config_count,
+    const display_config_t** banjo_display_configs, size_t display_config_count,
     uint32_t** layer_cfg_result, size_t* layer_cfg_result_count) {
   fbl::AutoLock lock(&display_lock_);
 
-  cpp20::span display_configs(display_config, display_config_count);
-  if (display_configs.empty()) {
+  cpp20::span banjo_display_configs_span(banjo_display_configs, display_config_count);
+  if (banjo_display_configs_span.empty()) {
     // All displays off is supported
     return CONFIG_CHECK_RESULT_OK;
   }
 
   uint64_t pipe_alloc[PipeIds<registers::Platform::kKabyLake>().size()];
-  if (!CalculatePipeAllocation(display_configs, pipe_alloc)) {
+  if (!CalculatePipeAllocation(banjo_display_configs_span, pipe_alloc)) {
     return CONFIG_CHECK_RESULT_TOO_MANY;
   }
 
-  if (!CheckDisplayLimits(display_configs, layer_cfg_result)) {
+  if (!CheckDisplayLimits(banjo_display_configs_span, layer_cfg_result)) {
     return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
   }
 
-  for (unsigned i = 0; i < display_configs.size(); i++) {
-    auto* config = display_config[i];
+  for (unsigned i = 0; i < banjo_display_configs_span.size(); i++) {
+    const display_config_t* banjo_display_config = banjo_display_configs_span[i];
     DisplayDevice* display = nullptr;
     for (auto& d : display_devices_) {
-      if (d->id() == config->display_id) {
+      if (d->id() == banjo_display_config->display_id) {
         display = d.get();
         break;
       }
@@ -1601,29 +1605,30 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
     }
 
     bool merge_all = false;
-    if (config->layer_count > 3) {
-      merge_all = config->layer_count > 4 || config->layer_list[0]->type != LAYER_TYPE_COLOR;
+    if (banjo_display_config->layer_count > 3) {
+      merge_all = banjo_display_config->layer_count > 4 ||
+                  banjo_display_config->layer_list[0]->type != LAYER_TYPE_COLOR;
     }
-    if (!merge_all && config->cc_flags) {
-      if (config->cc_flags & COLOR_CONVERSION_PREOFFSET) {
+    if (!merge_all && banjo_display_config->cc_flags) {
+      if (banjo_display_config->cc_flags & COLOR_CONVERSION_PREOFFSET) {
         for (int i = 0; i < 3; i++) {
-          merge_all |= config->cc_preoffsets[i] <= -1;
-          merge_all |= config->cc_preoffsets[i] >= 1;
+          merge_all |= banjo_display_config->cc_preoffsets[i] <= -1;
+          merge_all |= banjo_display_config->cc_preoffsets[i] >= 1;
         }
       }
-      if (config->cc_flags & COLOR_CONVERSION_POSTOFFSET) {
+      if (banjo_display_config->cc_flags & COLOR_CONVERSION_POSTOFFSET) {
         for (int i = 0; i < 3; i++) {
-          merge_all |= config->cc_postoffsets[i] <= -1;
-          merge_all |= config->cc_postoffsets[i] >= 1;
+          merge_all |= banjo_display_config->cc_postoffsets[i] <= -1;
+          merge_all |= banjo_display_config->cc_postoffsets[i] >= 1;
         }
       }
     }
 
     uint32_t total_scalers_needed = 0;
-    for (unsigned j = 0; j < config->layer_count; j++) {
-      switch (config->layer_list[j]->type) {
+    for (unsigned j = 0; j < banjo_display_config->layer_count; j++) {
+      switch (banjo_display_config->layer_list[j]->type) {
         case LAYER_TYPE_PRIMARY: {
-          primary_layer_t* primary = &config->layer_list[j]->cfg.primary;
+          primary_layer_t* primary = &banjo_display_config->layer_list[j]->cfg.primary;
           if (primary->transform_mode == FRAME_TRANSFORM_ROT_90 ||
               primary->transform_mode == FRAME_TRANSFORM_ROT_270) {
             // Linear and x tiled images don't support 90/270 rotation
@@ -1638,7 +1643,7 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
           }
 
           uint32_t src_width, src_height;
-          GetPostTransformWidth(*config->layer_list[j], &src_width, &src_height);
+          GetPostTransformWidth(*banjo_display_config->layer_list[j], &src_width, &src_height);
 
           // If the plane is too wide, force the client to do all composition
           // and just give us a simple configuration.
@@ -1688,10 +1693,10 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
           break;
         }
         case LAYER_TYPE_CURSOR: {
-          if (j != config->layer_count - 1) {
+          if (j != banjo_display_config->layer_count - 1) {
             layer_cfg_result[i][j] |= CLIENT_USE_PRIMARY;
           }
-          const image_t* image = &config->layer_list[j]->cfg.cursor.image;
+          const image_t* image = &banjo_display_config->layer_list[j]->cfg.cursor.image;
           if (image->type != IMAGE_TYPE_SIMPLE) {
             layer_cfg_result[i][j] |= CLIENT_USE_PRIMARY;
           }
@@ -1710,7 +1715,7 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
             layer_cfg_result[i][j] |= CLIENT_USE_PRIMARY;
           }
           const auto format = static_cast<fuchsia_images2::wire::PixelFormat>(
-              config->layer_list[j]->cfg.color.format);
+              banjo_display_config->layer_list[j]->cfg.color.format);
           if (format != fuchsia_images2::wire::PixelFormat::kBgra32) {
             layer_cfg_result[i][j] |= CLIENT_USE_PRIMARY;
           }
@@ -1723,7 +1728,7 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
 
     if (merge_all) {
       layer_cfg_result[i][0] = CLIENT_MERGE_BASE;
-      for (unsigned j = 1; j < config->layer_count; j++) {
+      for (unsigned j = 1; j < banjo_display_config->layer_count; j++) {
         layer_cfg_result[i][j] = CLIENT_MERGE_SRC;
       }
     }
@@ -1732,7 +1737,7 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
   // CalculateMinimumAllocations ignores layers after kImagePlaneCount. That's fine, since
   // that case already fails from an earlier check.
   uint16_t arr[PipeIds<registers::Platform::kKabyLake>().size()][registers::kImagePlaneCount];
-  if (!CalculateMinimumAllocations(display_configs, arr)) {
+  if (!CalculateMinimumAllocations(banjo_display_configs_span, arr)) {
     // Find any displays whose allocation fails and set the return code. Overwrite
     // any previous errors, since they get solved by the merge.
     for (Pipe* pipe : *pipe_manager_) {
@@ -1743,11 +1748,11 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
       ZX_ASSERT(pipe->in_use());  // If the allocation failed, it should be in use
       uint64_t display_id = pipe->attached_display_id();
       for (unsigned i = 0; i < display_config_count; i++) {
-        if (display_config[i]->display_id != display_id) {
+        if (banjo_display_configs[i]->display_id != display_id) {
           continue;
         }
         layer_cfg_result[i][0] = CLIENT_MERGE_BASE;
-        for (unsigned j = 1; j < display_config[i]->layer_count; j++) {
+        for (unsigned j = 1; j < banjo_display_configs[i]->layer_count; j++) {
           layer_cfg_result[i][j] = CLIENT_MERGE_SRC;
         }
         break;
@@ -1759,27 +1764,27 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
 }
 
 bool Controller::CalculatePipeAllocation(
-    cpp20::span<const display_config_t*> display_configs,
+    cpp20::span<const display_config_t*> banjo_display_configs,
     uint64_t alloc[PipeIds<registers::Platform::kKabyLake>().size()]) {
-  if (display_configs.size() > PipeIds<registers::Platform::kKabyLake>().size()) {
+  if (banjo_display_configs.size() > PipeIds<registers::Platform::kKabyLake>().size()) {
     return false;
   }
   memset(alloc, 0, sizeof(uint64_t) * PipeIds<registers::Platform::kKabyLake>().size());
   // Keep any allocated pipes on the same display
-  for (const display_config_t* config : display_configs) {
-    DisplayDevice* display = FindDevice(config->display_id);
+  for (const display_config_t* banjo_display_config : banjo_display_configs) {
+    DisplayDevice* display = FindDevice(banjo_display_config->display_id);
     if (display != nullptr && display->pipe() != nullptr) {
-      alloc[display->pipe()->pipe_id()] = config->display_id;
+      alloc[display->pipe()->pipe_id()] = banjo_display_config->display_id;
     }
   }
   // Give unallocated pipes to displays that need them
-  for (const display_config_t* config : display_configs) {
-    DisplayDevice* display = FindDevice(config->display_id);
+  for (const display_config_t* banjo_display_config : banjo_display_configs) {
+    DisplayDevice* display = FindDevice(banjo_display_config->display_id);
     if (display != nullptr && display->pipe() == nullptr) {
       for (unsigned pipe_num = 0; pipe_num < PipeIds<registers::Platform::kKabyLake>().size();
            pipe_num++) {
         if (!alloc[pipe_num]) {
-          alloc[pipe_num] = config->display_id;
+          alloc[pipe_num] = banjo_display_config->display_id;
           break;
         }
       }
@@ -1837,21 +1842,23 @@ void Controller::DisplayControllerImplSetEld(uint64_t display_id, const uint8_t*
   audio_pin.set_eld_valid_a(1).WriteTo(mmio_space());
 }
 
-void Controller::DisplayControllerImplApplyConfiguration(const display_config_t** display_config,
-                                                         size_t display_config_count,
-                                                         const config_stamp_t* config_stamp) {
+void Controller::DisplayControllerImplApplyConfiguration(
+    const display_config_t** banjo_display_configs, size_t display_config_count,
+    const config_stamp_t* config_stamp) {
   fbl::AutoLock lock(&display_lock_);
   uint64_t fake_vsync_display_ids[display_devices_.size() + 1];
   size_t fake_vsync_size = 0;
 
-  cpp20::span display_configs(display_config, display_config_count);
-  ReallocatePlaneBuffers(display_configs, /* reallocate_pipes */ pipe_manager_->PipeReallocated());
+  cpp20::span banjo_display_configs_span(banjo_display_configs, display_config_count);
+  ReallocatePlaneBuffers(banjo_display_configs_span,
+                         /* reallocate_pipes */ pipe_manager_->PipeReallocated());
 
-  for (auto& display : display_devices_) {
-    const display_config_t* config = FindConfig(display->id(), display_configs);
+  for (std::unique_ptr<DisplayDevice>& display : display_devices_) {
+    const display_config_t* banjo_display_config =
+        FindBanjoConfig(display->id(), banjo_display_configs_span);
 
-    if (config != nullptr) {
-      display->ApplyConfiguration(config, config_stamp);
+    if (banjo_display_config != nullptr) {
+      display->ApplyConfiguration(banjo_display_config, config_stamp);
     } else {
       if (display->pipe()) {
         // Only reset the planes so that it will display a blank screen.
@@ -1863,7 +1870,7 @@ void Controller::DisplayControllerImplApplyConfiguration(const display_config_t*
     // The hardware only gives vsyncs if at least one plane is enabled, so
     // fake one if we need to, to inform the client that we're done with the
     // images.
-    if (!config || config->layer_count == 0) {
+    if (!banjo_display_config || banjo_display_config->layer_count == 0) {
       fake_vsync_display_ids[fake_vsync_size++] = display->id();
     }
   }

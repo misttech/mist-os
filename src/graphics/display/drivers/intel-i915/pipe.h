@@ -50,7 +50,8 @@ class Pipe {
   using GetImagePixelFormatFunc = fit::function<PixelFormatAndModifier(const image_t* image)>;
   using SetupGttImageFunc =
       fit::function<const GttRegion&(const image_t* image, uint32_t rotation)>;
-  void ApplyConfiguration(const display_config_t* config, const config_stamp_t* config_stamp,
+  void ApplyConfiguration(const display_config_t* banjo_display_config,
+                          const config_stamp_t* config_stamp,
                           const SetupGttImageFunc& setup_gtt_image,
                           const GetImagePixelFormatFunc& get_pixel_format);
 

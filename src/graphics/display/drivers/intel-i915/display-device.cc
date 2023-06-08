@@ -189,29 +189,31 @@ bool DisplayDevice::CheckNeedsModeset(const display_mode_t* mode) {
   return !controller()->dpll_manager()->DdiPllMatchesConfig(ddi_id(), desired_pll_config);
 }
 
-void DisplayDevice::ApplyConfiguration(const display_config_t* config,
+void DisplayDevice::ApplyConfiguration(const display_config_t* banjo_display_config,
                                        const config_stamp_t* config_stamp) {
-  ZX_ASSERT(config);
+  ZX_ASSERT(banjo_display_config);
 
-  if (CheckNeedsModeset(&config->mode)) {
+  if (CheckNeedsModeset(&banjo_display_config->mode)) {
     if (pipe_) {
       // TODO(fxbug.dev/116009): When ApplyConfiguration() early returns on the
       // following error conditions, we should reset the DDI, pipe and transcoder
       // so that they can be possibly reused.
-      if (!DdiModeset(config->mode)) {
+      if (!DdiModeset(banjo_display_config->mode)) {
         zxlogf(ERROR, "Display %lu: Modeset failed; ApplyConfiguration() aborted.", id());
         return;
       }
 
-      if (!PipeConfigPreamble(config->mode, pipe_->pipe_id(), pipe_->connected_transcoder_id())) {
+      if (!PipeConfigPreamble(banjo_display_config->mode, pipe_->pipe_id(),
+                              pipe_->connected_transcoder_id())) {
         zxlogf(ERROR,
                "Display %lu: Transcoder configuration failed before pipe setup; "
                "ApplyConfiguration() aborted.",
                id());
         return;
       }
-      pipe_->ApplyModeConfig(config->mode);
-      if (!PipeConfigEpilogue(config->mode, pipe_->pipe_id(), pipe_->connected_transcoder_id())) {
+      pipe_->ApplyModeConfig(banjo_display_config->mode);
+      if (!PipeConfigEpilogue(banjo_display_config->mode, pipe_->pipe_id(),
+                              pipe_->connected_transcoder_id())) {
         zxlogf(ERROR,
                "Display %lu: Transcoder configuration failed after pipe setup; "
                "ApplyConfiguration() aborted.",
@@ -219,12 +221,12 @@ void DisplayDevice::ApplyConfiguration(const display_config_t* config,
         return;
       }
     }
-    info_ = config->mode;
+    info_ = banjo_display_config->mode;
   }
 
   if (pipe_) {
     pipe_->ApplyConfiguration(
-        config, config_stamp,
+        banjo_display_config, config_stamp,
         [controller = controller_](const image_t* image, uint32_t rotation) -> const GttRegion& {
           return controller->SetupGttImage(image, rotation);
         },

@@ -54,7 +54,8 @@ class DisplayDevice : public fidl::WireServer<FidlBacklight::Device> {
 
   ~DisplayDevice() override;
 
-  void ApplyConfiguration(const display_config_t* config, const config_stamp_t* config_stamp);
+  void ApplyConfiguration(const display_config_t* banjo_display_config,
+                          const config_stamp_t* config_stamp);
 
   // TODO(fxbug.dev/86038): Initialization-related interactions between the Controller class and
   // DisplayDevice can currently take different paths, with Init() being called conditionally in
