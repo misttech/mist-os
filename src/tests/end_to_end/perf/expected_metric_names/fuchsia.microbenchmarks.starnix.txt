@@ -53,3 +53,16 @@ fuchsia.microbenchmarks.starnix: RandomMemcpy/64bytes/128Mbytes
 fuchsia.microbenchmarks.starnix: RandomMemcpy/64Kbytes/128Mbytes
 fuchsia.microbenchmarks.starnix: RoundTrip_Futex_SingleProcess
 fuchsia.microbenchmarks.starnix: RoundTrip_PthreadCondvar_SingleProcess
+fuchsia.microbenchmarks.starnix: Stdcompat/CopySpan/16Kbytes/128Mbytes
+fuchsia.microbenchmarks.starnix: Stdcompat/CopySpan/16Mbytes/128Mbytes
+fuchsia.microbenchmarks.starnix: Stdcompat/CopySpan/16bytes/128Mbytes
+fuchsia.microbenchmarks.starnix: Stdcompat/CopySpan/1Kbytes/128Mbytes
+fuchsia.microbenchmarks.starnix: Stdcompat/CopySpan/1Mbytes/128Mbytes
+fuchsia.microbenchmarks.starnix: Stdcompat/CopySpan/1bytes/128Mbytes
+fuchsia.microbenchmarks.starnix: Stdcompat/CopySpan/256Kbytes/128Mbytes
+fuchsia.microbenchmarks.starnix: Stdcompat/CopySpan/256bytes/128Mbytes
+fuchsia.microbenchmarks.starnix: Stdcompat/CopySpan/4Kbytes/128Mbytes
+fuchsia.microbenchmarks.starnix: Stdcompat/CopySpan/4Mbytes/128Mbytes
+fuchsia.microbenchmarks.starnix: Stdcompat/CopySpan/4bytes/128Mbytes
+fuchsia.microbenchmarks.starnix: Stdcompat/CopySpan/64Kbytes/128Mbytes
+fuchsia.microbenchmarks.starnix: Stdcompat/CopySpan/64bytes/128Mbytes
