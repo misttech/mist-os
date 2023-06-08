@@ -134,12 +134,13 @@ zx_status_t ClockDevice::Create(void* ctx, zx_device_t* parent) {
   clock_impl_protocol_t clock_proto;
   auto status = device_get_protocol(parent, ZX_PROTOCOL_CLOCK_IMPL, &clock_proto);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: device_get_protocol failed %d", __FILE__, status);
+    zxlogf(ERROR, "device_get_protocol failed %d", status);
     return status;
   }
 
   auto clock_ids = ddk::GetMetadataArray<clock_id_t>(parent, DEVICE_METADATA_CLOCK_IDS);
   if (!clock_ids.is_ok()) {
+    zxlogf(ERROR, "GetMetadataArray failed %d.", clock_ids.error_value());
     return clock_ids.error_value();
   }
 
@@ -148,6 +149,7 @@ zx_status_t ClockDevice::Create(void* ctx, zx_device_t* parent) {
     fbl::AllocChecker ac;
     std::unique_ptr<ClockDevice> dev(new (&ac) ClockDevice(parent, &clock_proto, clock_id));
     if (!ac.check()) {
+      zxlogf(ERROR, "Failed to allocate clock device.");
       return ZX_ERR_NO_MEMORY;
     }
 
@@ -159,6 +161,7 @@ zx_status_t ClockDevice::Create(void* ctx, zx_device_t* parent) {
 
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     if (endpoints.is_error()) {
+      zxlogf(ERROR, "Failed to create IO directory endpoints - %s.", endpoints.status_string());
       return endpoints.status_value();
     }
 
@@ -178,6 +181,7 @@ zx_status_t ClockDevice::Create(void* ctx, zx_device_t* parent) {
                              .set_fidl_service_offers(offers)
                              .set_outgoing_dir(endpoints->client.TakeChannel()));
     if (status != ZX_OK) {
+      zxlogf(ERROR, "DdkAdd failed - %s", zx_status_get_string(status));
       return status;
     }
 
