@@ -1161,24 +1161,10 @@ pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
         remote_port: NonZeroU16,
     ) -> Result<ConnId<I>, SockCreationError>;
 
-    fn set_unbound_udp_device(
+    fn set_device(
         &mut self,
         ctx: &mut C,
-        id: UnboundId<I>,
-        device_id: Option<&Self::DeviceId>,
-    );
-
-    fn set_listener_udp_device(
-        &mut self,
-        ctx: &mut C,
-        id: ListenerId<I>,
-        device_id: Option<&Self::DeviceId>,
-    ) -> Result<(), LocalAddressError>;
-
-    fn set_conn_udp_device(
-        &mut self,
-        ctx: &mut C,
-        id: ConnId<I>,
+        id: SocketId<I>,
         device_id: Option<&Self::DeviceId>,
     ) -> Result<(), SocketError>;
 
@@ -1273,31 +1259,13 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         datagram::connect(self, ctx, id, remote_ip, remote_port, IpProto::Udp)
     }
 
-    fn set_unbound_udp_device(
+    fn set_device(
         &mut self,
         ctx: &mut C,
-        id: UnboundId<I>,
-        device_id: Option<&Self::DeviceId>,
-    ) {
-        datagram::set_unbound_device(self, ctx, id, device_id)
-    }
-
-    fn set_listener_udp_device(
-        &mut self,
-        ctx: &mut C,
-        id: ListenerId<I>,
-        device_id: Option<&Self::DeviceId>,
-    ) -> Result<(), LocalAddressError> {
-        datagram::set_listener_device(self, ctx, id, device_id)
-    }
-
-    fn set_conn_udp_device(
-        &mut self,
-        ctx: &mut C,
-        id: ConnId<I>,
+        id: SocketId<I>,
         device_id: Option<&Self::DeviceId>,
     ) -> Result<(), SocketError> {
-        datagram::set_connected_device(self, ctx, id, device_id)
+        datagram::set_device(self, ctx, id.into(), device_id)
     }
 
     fn get_udp_bound_device(&mut self, ctx: &C, id: SocketId<I>) -> Option<Self::WeakDeviceId> {
@@ -1861,41 +1829,16 @@ pub fn set_udp_device<I: IpExt, C: crate::NonSyncContext>(
     device_id: Option<&DeviceId<C>>,
 ) -> Result<(), SocketError> {
     let mut sync_ctx = Locked::new(sync_ctx);
-    let SocketId(id) = id.clone();
-
-    match id {
-        SocketIdInner::Unbound(id) => Ok(I::map_ip(
-            (IpInvariant((&mut sync_ctx, ctx, device_id)), id),
-            |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
-                SocketHandler::<Ipv4, _>::set_unbound_udp_device(sync_ctx, ctx, id, device_id)
-            },
-            |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
-                SocketHandler::<Ipv6, _>::set_unbound_udp_device(sync_ctx, ctx, id, device_id)
-            },
-        )),
-        SocketIdInner::Bound(BoundId::Listening(id)) => I::map_ip::<_, Result<_, _>>(
-            (IpInvariant((&mut sync_ctx, ctx, device_id)), id),
-            |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
-                SocketHandler::<Ipv4, _>::set_listener_udp_device(sync_ctx, ctx, id, device_id)
-            },
-            |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
-                SocketHandler::<Ipv6, _>::set_listener_udp_device(sync_ctx, ctx, id, device_id)
-            },
-        )
-        .map_err(LocalAddressError::into),
-        SocketIdInner::Bound(BoundId::Connected(id)) => I::map_ip::<_, Result<_, _>>(
-            (IpInvariant((&mut sync_ctx, ctx, device_id)), id),
-            |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
-                SocketHandler::<Ipv4, _>::set_conn_udp_device(sync_ctx, ctx, id, device_id)
-                    .map_err(IpInvariant)
-            },
-            |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
-                SocketHandler::<Ipv6, _>::set_conn_udp_device(sync_ctx, ctx, id, device_id)
-                    .map_err(IpInvariant)
-            },
-        )
-        .map_err(|IpInvariant(a)| a),
-    }
+    I::map_ip::<_, Result<_, _>>(
+        (IpInvariant((&mut sync_ctx, ctx, device_id)), id.clone()),
+        |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
+            SocketHandler::<Ipv4, _>::set_device(sync_ctx, ctx, id, device_id).map_err(IpInvariant)
+        },
+        |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
+            SocketHandler::<Ipv6, _>::set_device(sync_ctx, ctx, id, device_id).map_err(IpInvariant)
+        },
+    )
+    .map_err(|IpInvariant(e)| e)
 }
 
 /// Gets the device the specified socket is bound to.
@@ -2964,7 +2907,7 @@ mod tests {
         // Double-check that the bound device can't be changed after being set
         // implicitly.
         assert_eq!(
-            SocketHandler::set_conn_udp_device(&mut sync_ctx, &mut non_sync_ctx, conn, None),
+            SocketHandler::set_device(&mut sync_ctx, &mut non_sync_ctx, conn.into(), None),
             Err(SocketError::Local(
                 LocalAddressError::Zone(ZonedAddressError::DeviceZoneMismatch,)
             ))
@@ -2994,12 +2937,13 @@ mod tests {
             UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
 
         let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
-        SocketHandler::set_unbound_udp_device(
+        SocketHandler::set_device(
             &mut sync_ctx,
             &mut non_sync_ctx,
-            unbound,
+            unbound.into(),
             Some(&FakeDeviceId),
-        );
+        )
+        .unwrap();
 
         if remove_device {
             set_device_removed(&mut sync_ctx, remove_device);
@@ -3423,16 +3367,17 @@ mod tests {
             UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
         let remote_ip = remote_ip::<I>();
         let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
-        SocketHandler::set_unbound_udp_device(
+        SocketHandler::set_device(
             &mut sync_ctx,
             &mut non_sync_ctx,
-            unbound,
+            unbound.into(),
             Some(&FakeDeviceId),
-        );
+        )
+        .unwrap();
         let conn = SocketHandler::<I, _>::connect_udp(
             &mut sync_ctx,
             &mut non_sync_ctx,
-            unbound,
+            unbound.into(),
             ZonedAddr::Unzoned(remote_ip),
             NonZeroU16::new(200).unwrap(),
         )
@@ -4073,7 +4018,7 @@ mod tests {
                 REMOTE_PORT,
             )
             .expect("connect should succeed");
-            SocketHandler::set_conn_udp_device(
+            SocketHandler::set_device(
                 sync_ctx,
                 &mut non_sync_ctx,
                 conn.into(),
@@ -4085,12 +4030,13 @@ mod tests {
 
         let bound_second_device = {
             let unbound = SocketHandler::create_udp_unbound(sync_ctx);
-            SocketHandler::set_unbound_udp_device(
+            SocketHandler::set_device(
                 sync_ctx,
                 &mut non_sync_ctx,
-                unbound,
+                unbound.into(),
                 Some(&MultipleDevicesId::B),
-            );
+            )
+            .unwrap();
             SocketHandler::listen_udp(sync_ctx, &mut non_sync_ctx, unbound, None, Some(LOCAL_PORT))
                 .expect("listen should succeed")
         };
@@ -4141,12 +4087,8 @@ mod tests {
         let sync_ctx = &mut sync_ctx;
         let bound_on_devices = MultipleDevicesId::all().map(|device| {
             let unbound = SocketHandler::create_udp_unbound(sync_ctx);
-            SocketHandler::set_unbound_udp_device(
-                sync_ctx,
-                &mut non_sync_ctx,
-                unbound,
-                Some(&device),
-            );
+            SocketHandler::set_device(sync_ctx, &mut non_sync_ctx, unbound.into(), Some(&device))
+                .unwrap();
             SocketHandler::listen_udp(sync_ctx, &mut non_sync_ctx, unbound, None, Some(LOCAL_PORT))
                 .expect("listen should succeed")
         });
@@ -4224,12 +4166,13 @@ mod tests {
         // Start with `socket` bound to a device on all IPs.
         let socket = {
             let unbound = SocketHandler::create_udp_unbound(sync_ctx);
-            SocketHandler::set_unbound_udp_device(
+            SocketHandler::set_device(
                 sync_ctx,
                 &mut non_sync_ctx,
-                unbound,
+                unbound.into(),
                 Some(&MultipleDevicesId::A),
-            );
+            )
+            .unwrap();
             SocketHandler::listen_udp(sync_ctx, &mut non_sync_ctx, unbound, None, Some(LOCAL_PORT))
                 .expect("listen failed")
         };
@@ -4240,7 +4183,7 @@ mod tests {
         assert_matches!(&listen_data[..], &[]);
 
         // When unbound, the socket can receive packets on the other device.
-        SocketHandler::set_listener_udp_device(sync_ctx, &mut non_sync_ctx, socket.into(), None)
+        SocketHandler::set_device(sync_ctx, &mut non_sync_ctx, socket.into(), None)
             .expect("clearing bound device failed");
         receive_packet_on(sync_ctx, &mut non_sync_ctx, MultipleDevicesId::B);
         let listen_data = &non_sync_ctx.state().listen_data;
@@ -4259,12 +4202,8 @@ mod tests {
 
         let bound_on_devices = MultipleDevicesId::all().map(|device| {
             let unbound = SocketHandler::create_udp_unbound(sync_ctx);
-            SocketHandler::set_unbound_udp_device(
-                sync_ctx,
-                &mut non_sync_ctx,
-                unbound,
-                Some(&device),
-            );
+            SocketHandler::set_device(sync_ctx, &mut non_sync_ctx, unbound.into(), Some(&device))
+                .unwrap();
             SocketHandler::listen_udp(sync_ctx, &mut non_sync_ctx, unbound, None, Some(LOCAL_PORT))
                 .expect("listen should succeed")
         });
@@ -4273,13 +4212,8 @@ mod tests {
         // would then be shadowed by the other socket.
         for socket in bound_on_devices {
             assert_matches!(
-                SocketHandler::set_listener_udp_device(
-                    sync_ctx,
-                    &mut non_sync_ctx,
-                    socket.into(),
-                    None
-                ),
-                Err(LocalAddressError::AddressInUse)
+                SocketHandler::set_device(sync_ctx, &mut non_sync_ctx, socket.into(), None),
+                Err(SocketError::Local(LocalAddressError::AddressInUse))
             );
         }
     }
@@ -4322,20 +4256,20 @@ mod tests {
         // go through it because of the destination address. Therefore binding
         // to device `B` wil not work.
         assert_matches!(
-            SocketHandler::set_conn_udp_device(
+            SocketHandler::set_device(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
-                socket,
+                socket.into(),
                 Some(&MultipleDevicesId::B)
             ),
             Err(SocketError::Remote(RemoteAddressError::NoRoute))
         );
 
         // Binding to device `A` should be fine.
-        SocketHandler::set_conn_udp_device(
+        SocketHandler::set_device(
             &mut sync_ctx,
             &mut non_sync_ctx,
-            socket,
+            socket.into(),
             Some(&MultipleDevicesId::A),
         )
         .expect("routing picked A already");
@@ -4358,12 +4292,8 @@ mod tests {
         let sync_ctx = &mut sync_ctx;
         let bound_on_devices = MultipleDevicesId::all().map(|device| {
             let unbound = SocketHandler::create_udp_unbound(sync_ctx);
-            SocketHandler::set_unbound_udp_device(
-                sync_ctx,
-                &mut non_sync_ctx,
-                unbound,
-                Some(&device),
-            );
+            SocketHandler::set_device(sync_ctx, &mut non_sync_ctx, unbound.into(), Some(&device))
+                .unwrap();
             SocketHandler::set_udp_posix_reuse_port(sync_ctx, &mut non_sync_ctx, unbound, true);
             let listener = SocketHandler::listen_udp(
                 sync_ctx,
@@ -4966,12 +4896,13 @@ where {
                 .map(Into::into)
                 .unwrap_or(MulticastMembershipInterfaceSelector::AnyInterfaceWithRoute),
             |sync_ctx, non_sync_ctx, unbound| {
-                SocketHandler::set_unbound_udp_device(
+                SocketHandler::set_device(
                     sync_ctx,
                     non_sync_ctx,
-                    unbound,
+                    unbound.into(),
                     Some(&bound_device),
-                );
+                )
+                .unwrap();
                 make_socket(sync_ctx, non_sync_ctx, unbound)
             },
         );
@@ -4991,12 +4922,13 @@ where {
             UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
 
         let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
-        SocketHandler::set_unbound_udp_device(
+        SocketHandler::set_device(
             &mut sync_ctx,
             &mut non_sync_ctx,
             unbound.into(),
             Some(&FakeDeviceId),
-        );
+        )
+        .unwrap();
 
         set_device_removed(&mut sync_ctx, true);
 
@@ -5328,12 +5260,13 @@ where {
             None
         );
 
-        SocketHandler::set_unbound_udp_device(
+        SocketHandler::set_device(
             &mut sync_ctx,
             &mut non_sync_ctx,
             unbound.into(),
             Some(&FakeDeviceId),
-        );
+        )
+        .unwrap();
         assert_eq!(
             SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, unbound.into()),
             Some(FakeWeakDeviceId(FakeDeviceId))
@@ -5346,12 +5279,13 @@ where {
             UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
         let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
 
-        SocketHandler::set_unbound_udp_device(
+        SocketHandler::set_device(
             &mut sync_ctx,
             &mut non_sync_ctx,
-            unbound,
+            unbound.into(),
             Some(&FakeDeviceId),
-        );
+        )
+        .unwrap();
         let listen = SocketHandler::listen_udp(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -5365,13 +5299,8 @@ where {
             Some(FakeWeakDeviceId(FakeDeviceId))
         );
 
-        SocketHandler::set_listener_udp_device(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            listen.into(),
-            None,
-        )
-        .expect("failed to set device");
+        SocketHandler::set_device(&mut sync_ctx, &mut non_sync_ctx, listen.into(), None)
+            .expect("failed to set device");
         assert_eq!(
             SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, listen.into()),
             None
@@ -5384,12 +5313,13 @@ where {
             UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::<I>::default());
         let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
 
-        SocketHandler::set_unbound_udp_device(
+        SocketHandler::set_device(
             &mut sync_ctx,
             &mut non_sync_ctx,
-            unbound,
+            unbound.into(),
             Some(&FakeDeviceId),
-        );
+        )
+        .unwrap();
         let conn = SocketHandler::connect_udp(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -5402,7 +5332,7 @@ where {
             SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, conn.into()),
             Some(FakeWeakDeviceId(FakeDeviceId))
         );
-        SocketHandler::set_conn_udp_device(&mut sync_ctx, &mut non_sync_ctx, conn.into(), None)
+        SocketHandler::set_device(&mut sync_ctx, &mut non_sync_ctx, conn.into(), None)
             .expect("failed to set device");
         assert_eq!(
             SocketHandler::get_udp_bound_device(&mut sync_ctx, &non_sync_ctx, conn.into()),
@@ -5507,12 +5437,13 @@ where {
             ));
 
         let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
-        SocketHandler::set_unbound_udp_device(
+        SocketHandler::set_device(
             &mut sync_ctx,
             &mut non_sync_ctx,
-            unbound,
+            unbound.into(),
             Some(&MultipleDevicesId::A),
-        );
+        )
+        .unwrap();
 
         let result = SocketHandler::<I, _>::listen_udp(
             &mut sync_ctx,
@@ -5603,13 +5534,13 @@ where {
         );
 
         assert_eq!(
-            SocketHandler::set_listener_udp_device(
+            SocketHandler::set_device(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 listener.into(),
                 new_device.as_ref()
             ),
-            expected_result,
+            expected_result.map_err(SocketError::Local),
         );
     }
 
@@ -5683,12 +5614,13 @@ where {
             ));
 
         let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
-        SocketHandler::set_unbound_udp_device(
+        SocketHandler::set_device(
             &mut sync_ctx,
             &mut non_sync_ctx,
-            unbound,
+            unbound.into(),
             Some(&MultipleDevicesId::A),
-        );
+        )
+        .unwrap();
 
         let zoned_local_addr =
             ZonedAddr::Zoned(AddrAndZone::new(ll_addr.get(), MultipleDevicesId::A).unwrap());
@@ -5796,12 +5728,13 @@ where {
             ));
 
         let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
-        SocketHandler::set_unbound_udp_device(
+        SocketHandler::set_device(
             &mut sync_ctx,
             &mut non_sync_ctx,
-            unbound,
+            unbound.into(),
             Some(&MultipleDevicesId::A),
-        );
+        )
+        .unwrap();
 
         let result = SocketHandler::<I, _>::listen_udp(
             &mut sync_ctx,
@@ -5854,12 +5787,13 @@ where {
         let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
 
         if let Some(device) = bind_device {
-            SocketHandler::set_unbound_udp_device(
+            SocketHandler::set_device(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
-                unbound,
+                unbound.into(),
                 Some(&device),
-            );
+            )
+            .unwrap();
         }
 
         let send_to_remote_addr =
@@ -5998,12 +5932,13 @@ where {
         );
 
         let unbound = SocketHandler::create_udp_unbound(&mut sync_ctx);
-        SocketHandler::set_unbound_udp_device(
+        SocketHandler::set_device(
             &mut sync_ctx,
             &mut non_sync_ctx,
-            unbound,
+            unbound.into(),
             bind_device.as_ref(),
-        );
+        )
+        .unwrap();
 
         let listener = SocketHandler::<Ipv6, _>::listen_udp(
             &mut sync_ctx,
@@ -6120,10 +6055,10 @@ where {
         // This is a no-op functionally since the socket is already bound to the
         // device but it implies that we shouldn't unbind the device on
         // disconnect.
-        SocketHandler::set_conn_udp_device(
+        SocketHandler::set_device(
             &mut sync_ctx,
             &mut non_sync_ctx,
-            conn,
+            conn.into(),
             Some(&FakeDeviceId),
         )
         .expect("binding same device should succeed");

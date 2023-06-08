@@ -5,6 +5,7 @@
 //! Shared code for implementing datagram sockets.
 
 use alloc::collections::HashSet;
+use assert_matches::assert_matches;
 use core::{
     fmt::Debug,
     hash::Hash,
@@ -1043,27 +1044,6 @@ where
     })
 }
 
-pub(crate) fn set_unbound_device<
-    A: SocketMapAddrSpec,
-    C: DatagramStateNonSyncContext<A, S>,
-    SC: DatagramStateContext<A, C, S>,
-    S: DatagramSocketSpec<A>,
->(
-    sync_ctx: &mut SC,
-    _ctx: &mut C,
-    id: S::UnboundId,
-    device_id: Option<&<SC::IpSocketsCtx<'_> as DeviceIdContext<AnyDevice>>::DeviceId>,
-) where
-    Bound<S>: Tagged<AddrVec<A>>,
-{
-    sync_ctx.with_sockets_mut(|sync_ctx, state, _allocator| {
-        let DatagramSockets { bound_state: _, unbound, bound: _ } = state;
-        let UnboundSocketState { ref mut device, sharing: _, ip_options: _ } =
-            unbound.get_mut(id.get_key_index()).expect("unbound UDP socket not found");
-        *device = device_id.map(|d| sync_ctx.downgrade_device_id(d));
-    })
-}
-
 pub(crate) fn disconnect_connected<
     A: SocketMapAddrSpec,
     C: DatagramStateNonSyncContext<A, S>,
@@ -1399,67 +1379,7 @@ fn send_oneshot<
 
 pub(crate) type DatagramBoundId<S> = SocketId<S>;
 
-pub(crate) fn set_listener_device<
-    A: SocketMapAddrSpec,
-    C: DatagramStateNonSyncContext<A, S>,
-    SC: DatagramStateContext<A, C, S>,
-    S: DatagramSocketSpec<A>,
->(
-    sync_ctx: &mut SC,
-    _ctx: &mut C,
-    id: S::ListenerId,
-    new_device: Option<&<SC::IpSocketsCtx<'_> as DeviceIdContext<AnyDevice>>::DeviceId>,
-) -> Result<(), LocalAddressError>
-where
-    Bound<S>: Tagged<AddrVec<A>>,
-    S::ListenerAddrState:
-        SocketMapAddrStateSpec<Id = S::ListenerId, SharingState = S::ListenerSharingState>,
-    for<'a> A::WeakDeviceId:
-        PartialEq<<SC::IpSocketsCtx<'a> as DeviceIdContext<AnyDevice>>::DeviceId>,
-{
-    sync_ctx.with_sockets_mut(
-        |sync_ctx, DatagramSockets { bound_state, unbound: _, bound }, _allocator| {
-            // Don't allow changing the device if one of the IP addresses in the socket
-            // address vector requires a zone (scope ID).
-            let state = bound_state
-                .get_mut(&SocketId::Listener(id.clone()))
-                .unwrap_or_else(|| panic!("invalid listener ID {:?}", id));
-            let (_, _, addr): &(S::ListenerState, S::ListenerSharingState, _) =
-                Listener::from_socket_state_ref(state);
-            let ListenerAddr {
-                device: old_device,
-                ip: ListenerIpAddr { addr: ip_addr, identifier: _ },
-            } = addr;
-            if !socket::can_device_change(
-                ip_addr.as_ref(), /* local_ip */
-                None,             /* remote_ip */
-                old_device.as_ref(),
-                new_device,
-            ) {
-                return Err(LocalAddressError::Zone(ZonedAddressError::DeviceZoneMismatch));
-            }
-
-            let entry = bound
-                .listeners_mut()
-                .entry(&id, addr)
-                .unwrap_or_else(|| panic!("invalid listener ID {:?}", id));
-            let new_addr = ListenerAddr {
-                device: new_device.map(|d| sync_ctx.downgrade_device_id(d)),
-                ..addr.clone()
-            };
-            let new_entry = entry
-                .try_update_addr(new_addr)
-                .map_err(|(ExistsError {}, _entry)| LocalAddressError::AddressInUse)?;
-
-            let (_, _, addr): &mut (S::ListenerState, S::ListenerSharingState, _) =
-                Listener::from_socket_state_mut(state);
-            *addr = new_entry.get_addr().clone();
-            Ok(())
-        },
-    )
-}
-
-pub(crate) fn set_connected_device<
+pub(crate) fn set_device<
     A: SocketMapAddrSpec,
     C: DatagramStateNonSyncContext<A, S>,
     SC: DatagramStateContext<A, C, S>,
@@ -1467,82 +1387,128 @@ pub(crate) fn set_connected_device<
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
-    id: S::ConnId,
-    new_device: Option<&<SC::IpSocketsCtx<'_> as DeviceIdContext<AnyDevice>>::DeviceId>,
+    id: DatagramSocketId<S>,
+    new_device: Option<&<A::WeakDeviceId as WeakId>::Strong>,
 ) -> Result<(), SocketError>
 where
     Bound<S>: Tagged<AddrVec<A>>,
+    S::ListenerAddrState:
+        SocketMapAddrStateSpec<Id = S::ListenerId, SharingState = S::ListenerSharingState>,
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
-    for<'a> A::WeakDeviceId:
-        PartialEq<<SC::IpSocketsCtx<'a> as DeviceIdContext<AnyDevice>>::DeviceId>,
+    A::WeakDeviceId: PartialEq<<A::WeakDeviceId as WeakId>::Strong>,
 {
-    sync_ctx.with_sockets_mut(
-        |sync_ctx, DatagramSockets { bound_state, bound, unbound: _ }, _allocator| {
-            // Don't allow changing the device if one of the IP addresses in the socket
-            // address vector requires a zone (scope ID).
-            let bound_state = bound_state
-                .get_mut(&Connection::to_socket_id(id.clone()))
-                .unwrap_or_else(|| panic!("invalid conn ID {:?}", id));
-            let (state, _, addr): &(_, S::ConnSharingState, _) =
-                Connection::from_socket_state_ref(bound_state);
-            let ConnAddr {
-                device: old_device,
-                ip: ConnIpAddr { local: (local_ip, _), remote: (remote_ip, _) },
-            } = addr;
-            if !socket::can_device_change(
-                Some(local_ip),
-                Some(remote_ip),
-                old_device.as_ref(),
-                new_device,
-            ) {
-                return Err(SocketError::Local(LocalAddressError::Zone(
-                    ZonedAddressError::DeviceZoneMismatch,
-                )));
+    sync_ctx.with_sockets_mut(|sync_ctx, state, _allocator| {
+        let DatagramSockets { bound_state, unbound, bound } = state;
+        match id {
+            DatagramSocketId::Unbound(id) => {
+                let UnboundSocketState { ref mut device, sharing: _, ip_options: _ } =
+                    unbound.get_mut(id.get_key_index()).expect("unbound UDP socket not found");
+                *device = new_device.map(|d| sync_ctx.downgrade_device_id(d));
+                Ok(())
             }
+            DatagramSocketId::Bound(id) => match bound_state
+                .get_mut(&id)
+                .unwrap_or_else(|| panic!("invalid socket ID {:?}", id))
+            {
+                SocketState::Listener(state) => {
+                    let id = assert_matches!(id, SocketId::Listener(id) => id);
+                    // Don't allow changing the device if one of the IP addresses in the socket
+                    // address vector requires a zone (scope ID).
+                    let (_, _, addr): &(S::ListenerState, S::ListenerSharingState, _) = state;
+                    let ListenerAddr {
+                        device: old_device,
+                        ip: ListenerIpAddr { addr: ip_addr, identifier: _ },
+                    } = addr;
+                    if !socket::can_device_change(
+                        ip_addr.as_ref(), /* local_ip */
+                        None,             /* remote_ip */
+                        old_device.as_ref(),
+                        new_device,
+                    ) {
+                        return Err(SocketError::Local(LocalAddressError::Zone(
+                            ZonedAddressError::DeviceZoneMismatch,
+                        )));
+                    }
 
-            let ConnState { socket, clear_device_on_disconnect: _, shutdown: _ } = state;
-            let mut new_socket = sync_ctx
-                .new_ip_socket(
-                    ctx,
-                    new_device.map(EitherDeviceId::Strong),
-                    Some(*local_ip),
-                    *remote_ip,
-                    socket.proto(),
-                    Default::default(),
-                )
-                .map_err(|_: (IpSockCreationError, IpOptions<_, _>)| {
-                    SocketError::Remote(RemoteAddressError::NoRoute)
-                })?;
+                    let entry = bound
+                        .listeners_mut()
+                        .entry(&id, addr)
+                        .unwrap_or_else(|| panic!("invalid listener ID {:?}", id));
+                    let new_addr = ListenerAddr {
+                        device: new_device.map(|d| sync_ctx.downgrade_device_id(d)),
+                        ..addr.clone()
+                    };
+                    let new_entry = entry
+                        .try_update_addr(new_addr)
+                        .map_err(|(ExistsError {}, _entry)| LocalAddressError::AddressInUse)?;
 
-            let entry = bound
-                .conns_mut()
-                .entry(&id, addr)
-                .unwrap_or_else(|| panic!("invalid conn ID {:?}", id));
-            let new_addr = ConnAddr { device: new_socket.device().cloned(), ..addr.clone() };
-
-            let entry = match entry.try_update_addr(new_addr) {
-                Err((ExistsError, _entry)) => {
-                    return Err(SocketError::Local(LocalAddressError::AddressInUse))
+                    let (_, _, addr): &mut (S::ListenerState, S::ListenerSharingState, _) = state;
+                    *addr = new_entry.get_addr().clone();
+                    Ok(())
                 }
-                Ok(entry) => entry,
-            };
-            // Since the move was successful, replace the old socket with
-            // the new one but move the options over.
-            let (state, _, addr): &mut (_, S::ConnSharingState, _) =
-                Connection::from_socket_state_mut(bound_state);
-            let ConnState { socket, clear_device_on_disconnect, shutdown: _ } = state;
-            let _: IpOptions<_, _> = new_socket.replace_options(socket.take_options());
-            *socket = new_socket;
-            *addr = entry.get_addr().clone();
+                SocketState::Connected(bound_state) => {
+                    let id = assert_matches!(id, SocketId::Connection(id) => id);
+                    let (state, _, addr): &(_, S::ConnSharingState, _) = bound_state;
+                    let ConnAddr {
+                        device: old_device,
+                        ip: ConnIpAddr { local: (local_ip, _), remote: (remote_ip, _) },
+                    } = addr;
+                    if !socket::can_device_change(
+                        Some(local_ip),
+                        Some(remote_ip),
+                        old_device.as_ref(),
+                        new_device,
+                    ) {
+                        return Err(SocketError::Local(LocalAddressError::Zone(
+                            ZonedAddressError::DeviceZoneMismatch,
+                        )));
+                    }
 
-            // If this operation explicitly sets the device for the socket, it
-            // should no longer be cleared on disconnect.
-            if new_device.is_some() {
-                *clear_device_on_disconnect = false;
-            }
-            Ok(())
-        },
-    )
+                    let ConnState { socket, clear_device_on_disconnect: _, shutdown: _ } = state;
+                    let mut new_socket = sync_ctx
+                        .new_ip_socket(
+                            ctx,
+                            new_device.map(EitherDeviceId::Strong),
+                            Some(*local_ip),
+                            *remote_ip,
+                            socket.proto(),
+                            Default::default(),
+                        )
+                        .map_err(|_: (IpSockCreationError, IpOptions<_, _>)| {
+                            SocketError::Remote(RemoteAddressError::NoRoute)
+                        })?;
+
+                    let entry = bound
+                        .conns_mut()
+                        .entry(&id, addr)
+                        .unwrap_or_else(|| panic!("invalid conn ID {:?}", id));
+                    let new_addr =
+                        ConnAddr { device: new_socket.device().cloned(), ..addr.clone() };
+
+                    let entry = match entry.try_update_addr(new_addr) {
+                        Err((ExistsError, _entry)) => {
+                            return Err(SocketError::Local(LocalAddressError::AddressInUse))
+                        }
+                        Ok(entry) => entry,
+                    };
+                    // Since the move was successful, replace the old socket with
+                    // the new one but move the options over.
+                    let (state, _, addr): &mut (_, S::ConnSharingState, _) = bound_state;
+                    let ConnState { socket, clear_device_on_disconnect, shutdown: _ } = state;
+                    let _: IpOptions<_, _> = new_socket.replace_options(socket.take_options());
+                    *socket = new_socket;
+                    *addr = entry.get_addr().clone();
+
+                    // If this operation explicitly sets the device for the socket, it
+                    // should no longer be cleared on disconnect.
+                    if new_device.is_some() {
+                        *clear_device_on_disconnect = false;
+                    }
+                    Ok(())
+                }
+            },
+        }
+    })
 }
 
 pub(crate) fn get_bound_device<
@@ -2285,7 +2251,7 @@ mod test {
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
         let unbound = create_unbound(&mut sync_ctx);
-        set_unbound_device(&mut sync_ctx, &mut non_sync_ctx, unbound, Some(&FakeDeviceId));
+        set_device(&mut sync_ctx, &mut non_sync_ctx, unbound.into(), Some(&FakeDeviceId)).unwrap();
 
         let HopLimits { mut unicast, multicast } = DEFAULT_HOP_LIMITS;
         unicast = unicast.checked_add(1).unwrap();
@@ -2340,13 +2306,13 @@ mod test {
 
         let unbound = create_unbound(&mut sync_ctx);
 
-        set_unbound_device(&mut sync_ctx, &mut non_sync_ctx, unbound, Some(&FakeDeviceId));
+        set_device(&mut sync_ctx, &mut non_sync_ctx, unbound.into(), Some(&FakeDeviceId)).unwrap();
         assert_eq!(
             get_bound_device(&mut sync_ctx, &non_sync_ctx, unbound),
             Some(FakeWeakDeviceId(FakeDeviceId))
         );
 
-        set_unbound_device(&mut sync_ctx, &mut non_sync_ctx, unbound, None);
+        set_device(&mut sync_ctx, &mut non_sync_ctx, unbound.into(), None).unwrap();
         assert_eq!(get_bound_device(&mut sync_ctx, &non_sync_ctx, unbound), None);
     }
 
