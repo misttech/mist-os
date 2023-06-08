@@ -19,7 +19,7 @@ use zerocopy::AsBytes;
 /// The version of selinux_status_t this kernel implements.
 const SELINUX_STATUS_VERSION: u32 = 1;
 
-const SELINUX_PERMS: &[&[u8]] = &[b"add", b"find", b"set"];
+const SELINUX_PERMS: &[&[u8]] = &[b"add", b"find", b"read", b"set"];
 
 struct SeLinuxFs;
 impl FileSystemOps for SeLinuxFs {
