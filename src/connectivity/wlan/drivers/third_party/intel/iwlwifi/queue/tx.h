@@ -53,7 +53,7 @@ static inline void *iwl_txq_get_tfd(struct iwl_trans *trans,
 	if (trans->trans_cfg->use_tfh)
 		idx = iwl_txq_get_cmd_index(txq, idx);
 
-	return (u8 *)txq->tfds + trans->txqs.tfd.size * idx;
+	return (u8 *)iwl_iobuf_virtual(txq->tfds) + trans->txqs.tfd.size * idx;
 }
 
 int iwl_txq_alloc(struct iwl_trans *trans, struct iwl_txq *txq, int slots_num,

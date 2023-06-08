@@ -498,7 +498,7 @@ iwl_tfh_tfd *iwl_txq_gen2_build_tx_amsdu(struct iwl_trans *trans,
 		goto out_err;
 
 	/* building the A-MSDU might have changed this data, memcpy it now */
-	memcpy(&txq->first_tb_bufs[idx], dev_cmd, IWL_FIRST_TB_SIZE);
+	memcpy(iwl_iobuf_virtual(&txq->first_tb_bufs[idx]), dev_cmd, IWL_FIRST_TB_SIZE);
 	return tfd;
 
 out_err:

@@ -2377,7 +2377,7 @@ zx_status_t iwl_trans_pcie_tx(struct iwl_trans* trans, struct ieee80211_mac_pack
   }
 
   /* building the A-MSDU might have changed this data, so memcpy it now */
-  memcpy(&txq->first_tb_bufs[txq->write_ptr], dev_cmd, IWL_FIRST_TB_SIZE);
+  memcpy(iwl_iobuf_virtual(&txq->first_tb_bufs[txq->write_ptr]), dev_cmd, IWL_FIRST_TB_SIZE);
 #endif  // NEEDS_PORTING
 
   void* tfd = iwl_pcie_get_tfd(trans, txq, txq->write_ptr);
