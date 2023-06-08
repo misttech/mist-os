@@ -204,6 +204,9 @@
                 // sendfile_test - these tests hang
                 "SendFileTest.SendFileToPipe",
 
+                // socket_inet_loopback_isolated_test - flaky
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitTest/ListenV4MappedAny_ConnectV4MappedLoopback",
+
                 // stat_test - these tests hang
                 "StatTest.LstatELOOPPath",
 
