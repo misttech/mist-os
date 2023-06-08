@@ -41,6 +41,13 @@
 
 namespace amlogic_display {
 
+// Currently amlogic-display implementation uses pointers to ImageInfo as
+// handles to images, while handles to images are defined as a fixed-size
+// uint64_t in the banjo protocol. This works on platforms where uint64_t and
+// uintptr_t are equivalent but this may cause portability issues in the future.
+// TODO(fxbug.dev/128653): Do not use pointers as handles.
+static_assert(std::is_same_v<uint64_t, uintptr_t>);
+
 namespace {
 
 // List of supported pixel formats.
@@ -338,6 +345,8 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(image_t* image, uin
       ZX_DEBUG_ASSERT_MSG(false, "Invalid pixel format modifier: %lu\n", format_modifier);
       return ZX_ERR_INVALID_ARGS;
   }
+  // TODO(fxbug.dev/128653): Using pointers as handles impedes portability of
+  // the driver. Do not use pointers as handles.
   image->handle = reinterpret_cast<uint64_t>(import_info.get());
   fbl::AutoLock lock(&image_lock_);
   imported_images_.push_back(std::move(import_info));
@@ -469,10 +478,10 @@ void AmlogicDisplay::DisplayControllerImplApplyConfiguration(
     if (fully_initialized()) {
       {
         fbl::AutoLock lock2(&capture_lock_);
-        if (capture_active_id_ != INVALID_ID) {
+        if (current_capture_target_image_ != nullptr) {
           // there's an active capture. stop it before disabling osd
           vpu_->CaptureDone();
-          capture_active_id_ = INVALID_ID;
+          current_capture_target_image_ = nullptr;
         }
       }
       osd_->Disable(config_stamp);
@@ -678,7 +687,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetDisplayCaptureInterface(
     const display_capture_interface_protocol_t* intf) {
   fbl::AutoLock lock(&capture_lock_);
   capture_intf_ = ddk::DisplayCaptureInterfaceProtocolClient(intf);
-  capture_active_id_ = INVALID_ID;
+  current_capture_target_image_ = INVALID_ID;
   return ZX_OK;
 }
 
@@ -763,6 +772,8 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImageForCapture(
   import_capture->canvas = canvas_.client_end();
   import_capture->image_height = collection_info.settings.image_format_constraints.min_coded_height;
   import_capture->image_width = collection_info.settings.image_format_constraints.min_coded_width;
+  // TODO(fxbug.dev/128653): Using pointers as handles impedes portability of
+  // the driver. Do not use pointers as handles.
   *out_capture_handle = reinterpret_cast<uint64_t>(import_capture.get());
   imported_captures_.push_back(std::move(import_capture));
   return ZX_OK;
@@ -775,7 +786,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplStartCapture(uint64_t capture_h
   }
 
   fbl::AutoLock lock(&capture_lock_);
-  if (capture_active_id_ != INVALID_ID) {
+  if (current_capture_target_image_ != INVALID_ID) {
     DISP_ERROR("Cannot start capture while another capture is in progress\n");
     return ZX_ERR_SHOULD_WAIT;
   }
@@ -804,13 +815,13 @@ zx_status_t AmlogicDisplay::DisplayControllerImplStartCapture(uint64_t capture_h
     DISP_ERROR("Failed to start capture %d\n", status);
     return status;
   }
-  capture_active_id_ = capture_handle;
+  current_capture_target_image_ = info;
   return ZX_OK;
 }
 
 zx_status_t AmlogicDisplay::DisplayControllerImplReleaseCapture(uint64_t capture_handle) {
   fbl::AutoLock lock(&capture_lock_);
-  if (capture_handle == capture_active_id_) {
+  if (capture_handle == reinterpret_cast<uint64_t>(current_capture_target_image_)) {
     return ZX_ERR_SHOULD_WAIT;
   }
 
@@ -826,7 +837,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplReleaseCapture(uint64_t capture
 
 bool AmlogicDisplay::DisplayControllerImplIsCaptureCompleted() {
   fbl::AutoLock lock(&capture_lock_);
-  return (capture_active_id_ == INVALID_ID);
+  return (current_capture_target_image_ == nullptr);
 }
 
 int AmlogicDisplay::CaptureThread() {
@@ -847,7 +858,7 @@ int AmlogicDisplay::CaptureThread() {
     if (capture_intf_.is_valid()) {
       capture_intf_.OnCaptureComplete();
     }
-    capture_active_id_ = INVALID_ID;
+    current_capture_target_image_ = nullptr;
   }
   return status;
 }

@@ -210,8 +210,9 @@ class AmlogicDisplay
   // Display Capture interface protocol
   ddk::DisplayCaptureInterfaceProtocolClient capture_intf_ TA_GUARDED(capture_lock_);
 
-  // The ID for currently active capture
-  uint64_t capture_active_id_ TA_GUARDED(capture_lock_);
+  // Points to the next capture target image to capture displayed contents into.
+  // Stores nullptr if capture is not going to be performed.
+  ImageInfo* current_capture_target_image_ TA_GUARDED(capture_lock_);
 
   // The sysmem allocator client used to bind incoming buffer collection tokens.
   fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client_;
