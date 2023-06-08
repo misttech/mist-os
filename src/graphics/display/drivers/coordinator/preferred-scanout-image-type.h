@@ -19,6 +19,10 @@ constexpr uint32_t IMAGE_TYPE_PREFERRED_SCANOUT = 1;
 // TYPE_SIMPLE from fuchsia.hardware.display/display-controller.fidl
 // ImageType::SIMPLE from display-controller.banjo
 constexpr uint32_t IMAGE_TYPE_PREFERRED_SCANOUT = 0;
+#elif defined(__riscv)
+// A temporary value to get past build issues.
+// TODO(fxbug.dev/128617): Define an appropriate value.
+constexpr uint32_t IMAGE_TYPE_PREFERRED_SCANOUT = 0;
 #else
 #error "Preferred scanout image format only defined on Intel and ARM."
 #endif
