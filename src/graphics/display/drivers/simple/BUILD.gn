@@ -22,6 +22,7 @@ source_set("shared") {
     "//src/devices/lib/mmio",
     "//src/devices/pci/lib/device-protocol-pci",
     "//src/devices/pci/lib/pci",
+    "//src/graphics/display/lib/api-types-cpp",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/async:async-cpp",

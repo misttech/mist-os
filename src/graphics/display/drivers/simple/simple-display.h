@@ -11,6 +11,8 @@
 
 #include <fbl/mutex.h>
 
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+
 #if __cplusplus
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
@@ -75,7 +77,7 @@ class SimpleDisplay : public DeviceType,
       size_t* layer_cfg_result_count);
   void DisplayControllerImplApplyConfiguration(const display_config_t** display_config,
                                                size_t display_count,
-                                               const config_stamp_t* config_stamp);
+                                               const config_stamp_t* banjo_config_stamp);
   void DisplayControllerImplSetEld(uint64_t display_id, const uint8_t* raw_eld_list,
                                    size_t raw_eld_count) {}  // No ELD required for non-HDA systems.
   zx_status_t DisplayControllerImplGetSysmemConnection(zx::channel connection);
@@ -121,7 +123,7 @@ class SimpleDisplay : public DeviceType,
   // A lock is required to ensure the atomicity when setting |config_stamp| in
   // |ApplyConfiguration()| and passing |&config_stamp_| to |OnDisplayVsync()|.
   fbl::Mutex mtx_;
-  config_stamp_t config_stamp_ TA_GUARDED(mtx_) = {.value = INVALID_CONFIG_STAMP_VALUE};
+  display::ConfigStamp config_stamp_ TA_GUARDED(mtx_) = display::kInvalidConfigStamp;
 
   const fdf::MmioBuffer framebuffer_mmio_;
   const uint32_t width_;

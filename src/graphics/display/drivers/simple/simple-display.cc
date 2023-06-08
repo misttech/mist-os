@@ -32,9 +32,12 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
+
 namespace {
 
-static constexpr uint64_t kDisplayId = 1;
+static constexpr display::DisplayId kDisplayId(1);
 
 static constexpr uint64_t kImageHandle = 0xdecafc0ffee;
 
@@ -87,7 +90,7 @@ void SimpleDisplay::DisplayControllerImplSetDisplayControllerInterface(
   intf_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
 
   added_display_args_t args = {};
-  args.display_id = kDisplayId;
+  args.display_id = display::ToBanjoDisplayId(kDisplayId);
   args.edid_present = false;
   args.panel.params.height = height_;
   args.panel.params.width = width_;
@@ -231,7 +234,7 @@ config_check_result_t SimpleDisplay::DisplayControllerImplCheckConfiguration(
     ZX_DEBUG_ASSERT(display_count == 0);
     return CONFIG_CHECK_RESULT_OK;
   }
-  ZX_DEBUG_ASSERT(display_configs[0]->display_id == kDisplayId);
+  ZX_DEBUG_ASSERT(display::ToDisplayId(display_configs[0]->display_id) == kDisplayId);
   bool success;
   if (display_configs[0]->layer_count != 1) {
     success = false;
@@ -260,13 +263,14 @@ config_check_result_t SimpleDisplay::DisplayControllerImplCheckConfiguration(
   return CONFIG_CHECK_RESULT_OK;
 }
 
-void SimpleDisplay::DisplayControllerImplApplyConfiguration(const display_config_t** display_config,
-                                                            size_t display_count,
-                                                            const config_stamp_t* config_stamp) {
+void SimpleDisplay::DisplayControllerImplApplyConfiguration(
+    const display_config_t** display_config, size_t display_count,
+    const config_stamp_t* banjo_config_stamp) {
+  ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
   has_image_ = display_count != 0 && display_config[0]->layer_count != 0;
   {
     fbl::AutoLock lock(&mtx_);
-    config_stamp_ = *config_stamp;
+    config_stamp_ = display::ToConfigStamp(*banjo_config_stamp);
   }
 }
 
@@ -495,7 +499,9 @@ SimpleDisplay::SimpleDisplay(zx_device_t* parent,
 void SimpleDisplay::OnPeriodicVSync() {
   if (intf_.is_valid()) {
     fbl::AutoLock lock(&mtx_);
-    intf_.OnDisplayVsync(kDisplayId, next_vsync_time_.get(), &config_stamp_);
+    const uint64_t banjo_display_id = display::ToBanjoDisplayId(kDisplayId);
+    const config_stamp_t banjo_config_stamp = display::ToBanjoConfigStamp(config_stamp_);
+    intf_.OnDisplayVsync(banjo_display_id, next_vsync_time_.get(), &banjo_config_stamp);
   }
   next_vsync_time_ += kVSyncInterval;
   async::PostTaskForTime(
