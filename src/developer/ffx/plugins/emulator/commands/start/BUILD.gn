@@ -21,13 +21,14 @@ if (is_host) {
       "//src/developer/ffx/config:lib",
       "//src/developer/ffx/lib/emulator_instance:lib",
       "//src/developer/ffx/lib/errors:lib",
+      "//src/developer/ffx/lib/fho:lib",
       "//src/developer/ffx/lib/pbms:lib",
       "//src/developer/ffx/plugins/emulator/commands:ffx_emulator_commands",
       "//src/developer/ffx/plugins/emulator/common:ffx_emulator_common",
       "//src/developer/ffx/plugins/emulator/configuration:ffx_emulator_config",
       "//src/developer/ffx/plugins/emulator/engines:ffx_emulator_engines",
       "//third_party/rust_crates:anyhow",
-      "//third_party/rust_crates:cfg-if",
+      "//third_party/rust_crates:async-trait",
       "//third_party/rust_crates:serde_json",
       "//third_party/rust_crates:tracing",
     ]
@@ -44,7 +45,6 @@ if (is_host) {
       "//third_party/rust_crates:async-trait",
       "//third_party/rust_crates:mockall",
       "//third_party/rust_crates:regex",
-      "//third_party/rust_crates:serial_test",
       "//third_party/rust_crates:tempfile",
     ]
   }
