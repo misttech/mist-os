@@ -34,6 +34,7 @@
 
 #include "src/graphics/display/drivers/coordinator/preferred-scanout-image-type.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -58,7 +59,7 @@ constexpr fuchsia_images2_pixel_format_enum_value_t kSupportedPixelFormats[] = {
 constexpr uint32_t kWidth = 1280;
 constexpr uint32_t kHeight = 800;
 
-constexpr uint64_t kDisplayId = 1;
+constexpr display::DisplayId kDisplayId(1);
 
 constexpr uint32_t kRefreshRateFps = 60;
 // Arbitrary slowdown for testing purposes
@@ -84,7 +85,7 @@ zx_status_t FakeDisplay::DisplayClampRgbImplSetMinimumRgb(uint8_t minimum_rgb) {
 }
 
 void FakeDisplay::PopulateAddedDisplayArgs(added_display_args_t* args) {
-  args->display_id = kDisplayId;
+  args->display_id = display::ToBanjoDisplayId(kDisplayId);
   args->edid_present = false;
   args->panel.params.height = kHeight;
   args->panel.params.width = kWidth;
@@ -273,7 +274,7 @@ config_check_result_t FakeDisplay::DisplayControllerImplCheckConfiguration(
     ZX_DEBUG_ASSERT(display_count == 0);
     return CONFIG_CHECK_RESULT_OK;
   }
-  ZX_DEBUG_ASSERT(display_configs[0]->display_id == kDisplayId);
+  ZX_DEBUG_ASSERT(display::ToDisplayId(display_configs[0]->display_id) == kDisplayId);
 
   fbl::AutoLock lock(&display_lock_);
 
@@ -718,8 +719,8 @@ void FakeDisplay::SendVsync() {
   if (controller_interface_client_.is_valid()) {
     const config_stamp_t banjo_current_config_stamp =
         display::ToBanjoConfigStamp(current_config_stamp_);
-    controller_interface_client_.OnDisplayVsync(kDisplayId, zx_clock_get_monotonic(),
-                                                &banjo_current_config_stamp);
+    controller_interface_client_.OnDisplayVsync(
+        ToBanjoDisplayId(kDisplayId), zx_clock_get_monotonic(), &banjo_current_config_stamp);
   }
 }
 

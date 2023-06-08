@@ -24,6 +24,7 @@
 #include "src/graphics/display/drivers/fake/fake-display-stack.h"
 #include "src/graphics/display/drivers/fake/sysmem-device-wrapper.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace fake_display {
@@ -603,9 +604,9 @@ TEST_F(FakeDisplaySysmemTest, Capture) {
 
   // Must match kDisplayId in fake-display.cc.
   // TODO(fxbug.dev/128486): Do not hardcode the display ID.
-  constexpr uint64_t kDisplayId = 1;
+  constexpr display::DisplayId kDisplayId(1);
   display_config_t display_config = {
-      .display_id = kDisplayId,
+      .display_id = display::ToBanjoDisplayId(kDisplayId),
       .mode = {},
 
       .cc_flags = 0u,
