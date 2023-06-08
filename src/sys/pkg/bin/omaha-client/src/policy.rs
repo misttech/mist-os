@@ -4,8 +4,7 @@
 
 use crate::{installer::InstallResult, metrics::CobaltMetricsReporter, timer::FuchsiaTimer};
 use anyhow::{anyhow, Context as _, Error};
-use async_utils::hanging_get::client::HangingGetStream;
-use fidl_fuchsia_input_interaction::{NotifierMarker, NotifierProxy, State};
+use fidl_fuchsia_input_interaction::State;
 use fidl_fuchsia_update::{CommitStatusProviderMarker, CommitStatusProviderProxy};
 use fidl_fuchsia_update_config::{OptOutMarker, OptOutPreference, OptOutProxy};
 use fidl_fuchsia_update_ext::{query_commit_status, CommitStatus};
@@ -478,21 +477,8 @@ where
     }
 }
 
-async fn watch_ui_activity(ui_activity: &Arc<Mutex<UiActivityState>>) -> Result<(), Error> {
-    let notifier_proxy = connect_to_protocol::<NotifierMarker>()?;
-    watch_ui_activity_impl(ui_activity, notifier_proxy).await
-}
-
-async fn watch_ui_activity_impl(
-    ui_activity: &Arc<Mutex<UiActivityState>>,
-    notifier_proxy: NotifierProxy,
-) -> Result<(), Error> {
-    let mut watch_activity_state_stream =
-        HangingGetStream::new(notifier_proxy, NotifierProxy::watch_state);
-
-    while let Some(state) = watch_activity_state_stream.try_next().await? {
-        *ui_activity.lock().await = UiActivityState { state };
-    }
+/// Watch for UI activity. Needs to be implemented.
+async fn watch_ui_activity(_ui_activity: &Arc<Mutex<UiActivityState>>) -> Result<(), Error> {
     Ok(())
 }
 
@@ -669,15 +655,12 @@ mod tests {
     use assert_matches::assert_matches;
     use cobalt_client::traits::AsEventCode;
     use fidl::endpoints::create_proxy_and_stream;
-    use fidl_fuchsia_input_interaction::NotifierRequest;
     use fidl_fuchsia_update::{CommitStatusProviderMarker, CommitStatusProviderRequest};
     use fidl_fuchsia_update_config::OptOutRequest;
     use fuchsia_async as fasync;
-    use fuchsia_backoff::retry_or_last_error;
     use fuchsia_zircon::{self as zx, Peered};
     use omaha_client::time::{ComplexTime, MockTimeSource, StandardTimeSource, TimeSource};
     use proptest::prelude::*;
-    use std::iter::repeat;
     use std::sync::atomic::{AtomicU8, Ordering};
     use std::{collections::VecDeque, time::Instant};
     use zx::HandleBased;
@@ -1659,49 +1642,6 @@ mod tests {
             .build();
         let ui_activity = *policy_engine.ui_activity.lock().await;
         assert_eq!(ui_activity.state, State::Invalid);
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn test_ui_activity_watch_state() {
-        let policy_engine = FuchsiaPolicyEngineBuilder::new(PolicyConfig::default())
-            .time_source(StandardTimeSource)
-            .nop_metrics_reporter()
-            .build();
-        let ui_activity = Arc::clone(&policy_engine.ui_activity);
-        assert_eq!(ui_activity.lock().await.state, State::Invalid);
-
-        let (notifier_proxy, mut stream) = create_proxy_and_stream::<NotifierMarker>().unwrap();
-        fasync::Task::local(async move {
-            let _ = &policy_engine;
-            watch_ui_activity_impl(&policy_engine.ui_activity, notifier_proxy).await.unwrap();
-        })
-        .detach();
-
-        {
-            let NotifierRequest::WatchState { responder } = stream.next().await.unwrap().unwrap();
-            responder.send(State::Idle).unwrap();
-            assert_matches!(
-                retry_or_last_error(repeat(Duration::from_millis(50)).take(20), || async {
-                    let UiActivityState { state } = *ui_activity.lock().await;
-                    (state == State::Idle).then_some(()).ok_or(state)
-                })
-                .await,
-                Ok(())
-            );
-        }
-
-        {
-            let NotifierRequest::WatchState { responder } = stream.next().await.unwrap().unwrap();
-            responder.send(State::Active).unwrap();
-            assert_matches!(
-                retry_or_last_error(repeat(Duration::from_millis(50)).take(20), || async {
-                    let UiActivityState { state } = *ui_activity.lock().await;
-                    (state == State::Active).then_some(()).ok_or(state)
-                })
-                .await,
-                Ok(())
-            );
-        }
     }
 
     #[fasync::run_singlethreaded(test)]

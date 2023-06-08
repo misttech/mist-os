@@ -443,7 +443,6 @@ impl TestEnvBuilder {
                             .path("/config/build-info")
                             .rights(fio::R_STAR_DIR),
                     )
-                    .capability(Capability::protocol::<fidl_fuchsia_input_interaction::NotifierMarker>())
                     .capability(Capability::protocol::<fidl_fuchsia_feedback::CrashReporterMarker>())
                     .capability(Capability::protocol::<
                         fidl_fuchsia_feedback::ComponentDataRegisterMarker,

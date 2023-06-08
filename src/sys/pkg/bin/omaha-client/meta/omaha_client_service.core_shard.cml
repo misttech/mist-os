@@ -55,11 +55,6 @@
             to: "#system-update-checker",
         },
         {
-            protocol: "fuchsia.input.interaction.Notifier",
-            from: "#ui",
-            to: "#system-update-checker",
-        },
-        {
             protocol: [
                 "fuchsia.net.name.Lookup",
                 "fuchsia.posix.socket.Provider",

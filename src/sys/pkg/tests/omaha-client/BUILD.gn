@@ -12,7 +12,6 @@ rustc_test("driver") {
   deps = [
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
-    "//sdk/fidl/fuchsia.input.interaction:fuchsia.input.interaction_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",

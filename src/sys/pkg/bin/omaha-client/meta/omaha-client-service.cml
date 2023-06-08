@@ -28,7 +28,6 @@
                 "fuchsia.feedback.ComponentDataRegister",
                 "fuchsia.feedback.CrashReporter",
                 "fuchsia.hardware.power.statecontrol.Admin",
-                "fuchsia.input.interaction.Notifier",
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.pkg.Cup",
                 "fuchsia.stash.Store2",
