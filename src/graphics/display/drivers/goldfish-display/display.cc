@@ -41,6 +41,7 @@
 #include "lib/fidl/cpp/wire/traits.h"
 #include "src/devices/lib/goldfish/pipe_headers/include/base.h"
 #include "src/graphics/display/drivers/goldfish-display/render_control.h"
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
@@ -578,9 +579,10 @@ zx_status_t Display::PresentDisplayConfig(display::DisplayId display_id,
                                   pending_config_stamp = display_config.config_stamp](
                                      async_dispatcher_t* dispatcher, async::WaitOnce* current_wait,
                                      zx_status_t status, const zx_packet_signal_t*) {
-    TRACE_DURATION("gfx", "Display::SyncEventHandler", "config_stamp", pending_config_stamp.value);
+    TRACE_DURATION("gfx", "Display::SyncEventHandler", "config_stamp",
+                   pending_config_stamp.value());
     if (status == ZX_ERR_CANCELED) {
-      zxlogf(INFO, "Wait for config stamp %lu cancelled.", pending_config_stamp.value);
+      zxlogf(INFO, "Wait for config stamp %lu cancelled.", pending_config_stamp.value());
       return;
     }
     ZX_DEBUG_ASSERT_MSG(status == ZX_OK, "Invalid wait status: %d\n", status);
@@ -605,8 +607,7 @@ zx_status_t Display::PresentDisplayConfig(display::DisplayId display_id,
       }
       it = device.pending_config_waits.erase(it);
     }
-    device.latest_config_stamp = {
-        .value = std::max(device.latest_config_stamp.value, pending_config_stamp.value)};
+    device.latest_config_stamp = std::max(device.latest_config_stamp, pending_config_stamp);
   });
 
   // Update host-writeable display buffers before presenting.
@@ -652,7 +653,9 @@ zx_status_t Display::PresentDisplayConfig(display::DisplayId display_id,
 
 void Display::DisplayControllerImplApplyConfiguration(const display_config_t** display_configs,
                                                       size_t display_count,
-                                                      const config_stamp_t* config_stamp) {
+                                                      const config_stamp_t* banjo_config_stamp) {
+  ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
+  display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
   for (const auto& it : devices_) {
     uint64_t handle = 0;
     for (unsigned i = 0; i < display_count; i++) {
@@ -669,16 +672,14 @@ void Display::DisplayControllerImplApplyConfiguration(const display_config_t** d
       // previously existed, we should cancel waiting events on the pending
       // color buffer and remove references to both pending and current color
       // buffers.
-      async::PostTask(
-          loop_.dispatcher(), [this, display_id = it.first, config_stamp = *config_stamp] {
-            if (devices_.find(display_id) != devices_.end()) {
-              auto& device = devices_[display_id];
-              device.pending_config_waits.clear();
-              device.incoming_config = std::nullopt;
-              device.latest_config_stamp = {
-                  .value = std::max(device.latest_config_stamp.value, config_stamp.value)};
-            }
-          });
+      async::PostTask(loop_.dispatcher(), [this, display_id = it.first, config_stamp] {
+        if (devices_.find(display_id) != devices_.end()) {
+          auto& device = devices_[display_id];
+          device.pending_config_waits.clear();
+          device.incoming_config = std::nullopt;
+          device.latest_config_stamp = std::max(device.latest_config_stamp, config_stamp);
+        }
+      });
       return;
     }
 
@@ -716,7 +717,7 @@ void Display::DisplayControllerImplApplyConfiguration(const display_config_t** d
 
     if (color_buffer) {
       async::PostTask(loop_.dispatcher(),
-                      [this, config_stamp = *config_stamp, color_buffer, display_id = it.first] {
+                      [this, config_stamp, color_buffer, display_id = it.first] {
                         devices_[display_id].incoming_config = {
                             .color_buffer = color_buffer,
                             .config_stamp = config_stamp,
@@ -846,7 +847,9 @@ void Display::FlushDisplay(async_dispatcher_t* dispatcher, display::DisplayId di
     if (dc_intf_.is_valid()) {
       zx::time now = async::Now(dispatcher);
       const uint64_t banjo_display_id = display::ToBanjoDisplayId(display_id);
-      dc_intf_.OnDisplayVsync(banjo_display_id, now.get(), &device.latest_config_stamp);
+      const config_stamp_t banjo_config_stamp =
+          display::ToBanjoConfigStamp(device.latest_config_stamp);
+      dc_intf_.OnDisplayVsync(banjo_display_id, now.get(), &banjo_config_stamp);
     }
   }
 

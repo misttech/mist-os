@@ -29,6 +29,7 @@
 
 #include "src/devices/lib/goldfish/pipe_io/pipe_io.h"
 #include "src/graphics/display/drivers/goldfish-display/render_control.h"
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
 namespace goldfish {
@@ -76,7 +77,7 @@ class Display : public DisplayType,
       size_t* layer_cfg_result_count);
   void DisplayControllerImplApplyConfiguration(const display_config_t** display_config,
                                                size_t display_count,
-                                               const config_stamp_t* config_stamp);
+                                               const config_stamp_t* banjo_config_stamp);
   void DisplayControllerImplSetEld(uint64_t display_id, const uint8_t* raw_eld_list,
                                    size_t raw_eld_count) {}  // No ELD required for non-HDA systems.
   zx_status_t DisplayControllerImplGetSysmemConnection(zx::channel connection);
@@ -144,7 +145,7 @@ class Display : public DisplayType,
 
     // The |config_stamp| value of the ApplyConfiguration() call to which this
     // DisplayConfig corresponds.
-    config_stamp_t config_stamp = {.value = INVALID_CONFIG_STAMP_VALUE};
+    display::ConfigStamp config_stamp = display::kInvalidConfigStamp;
   };
 
   struct Device {
@@ -158,7 +159,7 @@ class Display : public DisplayType,
     HostDisplayId host_display_id = kInvalidHostDisplayId;
     float scale = 1.0;
     zx::time expected_next_flush = zx::time::infinite_past();
-    config_stamp_t latest_config_stamp = {.value = INVALID_CONFIG_STAMP_VALUE};
+    display::ConfigStamp latest_config_stamp = display::kInvalidConfigStamp;
 
     // The next display config to be posted through renderControl protocol.
     std::optional<DisplayConfig> incoming_config = std::nullopt;
