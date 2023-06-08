@@ -62,7 +62,7 @@ class VirtualAudioDai : public VirtualAudioDaiDeviceType,
   void GetProperties(
       fidl::Server<fuchsia_hardware_audio::Dai>::GetPropertiesCompleter::Sync& completer) override;
   void GetHealthState(GetHealthStateCompleter::Sync& completer) override {
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
+    completer.Reply(fuchsia_hardware_audio::HealthState{}.healthy(true));
   }
   void SignalProcessingConnect(SignalProcessingConnectRequest& request,
                                SignalProcessingConnectCompleter::Sync& completer) override {

@@ -43,7 +43,10 @@ class TestDai : public TestDaiDeviceType,
     completer.Reply(builder.Build());
   }
   void GetHealthState(GetHealthStateCompleter::Sync& completer) override {
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
+    fidl::Arena arena;
+    auto health_state = fuchsia_hardware_audio::wire::HealthState::Builder(arena);
+    health_state.healthy(true);
+    completer.Reply(health_state.Build());
   }
   void SignalProcessingConnect(SignalProcessingConnectRequestView request,
                                SignalProcessingConnectCompleter::Sync& completer) override {
