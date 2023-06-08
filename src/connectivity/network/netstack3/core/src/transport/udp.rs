@@ -876,6 +876,24 @@ impl<I: IpExt, D: WeakId> From<SocketId<I>> for DatagramSocketId<Udp<I, D>> {
     }
 }
 
+impl<I: IpExt, D: WeakId> From<crate::socket::SocketId<Udp<I, D>>> for BoundId<I> {
+    fn from(id: crate::socket::SocketId<Udp<I, D>>) -> Self {
+        match id {
+            crate::socket::SocketId::Listener(id) => Self::Listening(id),
+            crate::socket::SocketId::Connection(id) => Self::Connected(id),
+        }
+    }
+}
+
+impl<I: IpExt, D: WeakId> From<DatagramSocketId<Udp<I, D>>> for SocketId<I> {
+    fn from(id: DatagramSocketId<Udp<I, D>>) -> Self {
+        match id {
+            DatagramSocketId::Unbound(id) => Self(SocketIdInner::Unbound(id)),
+            DatagramSocketId::Bound(id) => Self(SocketIdInner::Bound(id.into())),
+        }
+    }
+}
+
 /// An execution context for the UDP protocol.
 pub trait NonSyncContext<I: IcmpIpExt> {
     /// Receives an ICMP error message related to a previously-sent UDP packet.
@@ -1484,23 +1502,17 @@ pub(crate) trait BufferSocketHandler<I: IpExt, C, B: BufferMut>:
         body: B,
     ) -> Result<(), (B, SendError)>;
 
-    fn send_udp_conn_to(
+    fn send_to(
         &mut self,
         ctx: &mut C,
-        conn: ConnId<I>,
+        id: SocketId<I>,
         remote_ip: ZonedAddr<I::Addr, Self::DeviceId>,
         remote_port: NonZeroU16,
         body: B,
-    ) -> Result<(), (B, SendToError)>;
-
-    fn send_udp_listener(
-        &mut self,
-        ctx: &mut C,
-        listener: ListenerId<I>,
-        remote_ip: ZonedAddr<I::Addr, Self::DeviceId>,
-        remote_port: NonZeroU16,
-        body: B,
-    ) -> Result<(), (B, SendToError)>;
+    ) -> Result<
+        Option<SocketId<I>>,
+        (B, Either<LocalAddressError, (Option<SocketId<I>>, SendToError)>),
+    >;
 }
 
 impl<
@@ -1522,55 +1534,38 @@ impl<
         })
     }
 
-    fn send_udp_conn_to(
+    fn send_to(
         &mut self,
         ctx: &mut C,
-        conn: ConnId<I>,
+        id: SocketId<I>,
         remote_ip: ZonedAddr<I::Addr, Self::DeviceId>,
         remote_port: NonZeroU16,
         body: B,
-    ) -> Result<(), (B, SendToError)> {
-        datagram::send_conn_to(self, ctx, conn, remote_ip, remote_port, body).map_err(|s| match s {
-            datagram::SendToError::NotWriteable(body) => (body, SendToError::NotWriteable),
-            datagram::SendToError::Zone(body, e) => (body, SendToError::Zone(e)),
-            datagram::SendToError::CreateAndSend(ser, e) => (
-                ser.into_inner(),
-                match e {
-                    IpSockCreateAndSendError::Mtu => SendToError::Mtu,
-                    IpSockCreateAndSendError::Create(e) => SendToError::CreateSock(e),
-                },
-            ),
-        })
-    }
-
-    fn send_udp_listener(
-        &mut self,
-        ctx: &mut C,
-        listener: ListenerId<I>,
-        remote_ip: ZonedAddr<I::Addr, Self::DeviceId>,
-        remote_port: NonZeroU16,
-        body: B,
-    ) -> Result<(), (B, SendToError)> {
-        datagram::send_listener_to(
-            self,
-            ctx,
-            listener,
-            IpProto::Udp.into(),
-            remote_ip,
-            remote_port,
-            body,
-        )
-        .map_err(|e| match e {
-            datagram::SendToError::NotWriteable(body) => (body, SendToError::NotWriteable),
-            datagram::SendToError::Zone(body, e) => (body, SendToError::Zone(e)),
-            datagram::SendToError::CreateAndSend(ser, e) => (
-                ser.into_inner(),
-                match e {
-                    IpSockCreateAndSendError::Mtu => SendToError::Mtu,
-                    IpSockCreateAndSendError::Create(e) => SendToError::CreateSock(e),
-                },
-            ),
-        })
+    ) -> Result<
+        Option<SocketId<I>>,
+        (B, Either<LocalAddressError, (Option<SocketId<I>>, SendToError)>),
+    > {
+        datagram::send_to(self, ctx, id.into(), remote_ip, remote_port, IpProto::Udp.into(), body)
+            .map(|id| id.map(Into::into))
+            .map_err(|e| match e {
+                Either::Left((body, e)) => (body, Either::Left(e)),
+                Either::Right((new_id, e)) => {
+                    let (body, err) = match e {
+                        datagram::SendToError::NotWriteable(body) => {
+                            (body, SendToError::NotWriteable)
+                        }
+                        datagram::SendToError::Zone(body, e) => (body, SendToError::Zone(e)),
+                        datagram::SendToError::CreateAndSend(s, e) => (
+                            s.into_inner(),
+                            match e {
+                                IpSockCreateAndSendError::Mtu => SendToError::Mtu,
+                                IpSockCreateAndSendError::Create(e) => SendToError::CreateSock(e),
+                            },
+                        ),
+                    };
+                    (body, Either::Right((new_id.map(Into::into), err)))
+                }
+            })
     }
 }
 
@@ -1634,73 +1629,36 @@ pub fn send_udp_to<I: IpExt, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
 ) -> Result<Option<SocketId<I>>, (B, Either<LocalAddressError, (Option<SocketId<I>>, SendToError)>)>
 {
     let mut sync_ctx = Locked::new(sync_ctx);
-    let SocketId(id) = id.clone();
-    let (id, new_id) = match id {
-        SocketIdInner::Unbound(id) => {
-            match listen_udp_unbound(&mut sync_ctx, ctx, id, None, None) {
-                Ok(listen) => (BoundId::Listening(listen.clone()), Some(listen.into())),
-                Err(e) => return Err((body, Either::Left(e))),
-            }
-        }
-        SocketIdInner::Bound(id) => (id, None),
-    };
+    let id = id.clone();
+    #[derive(GenericOverIp)]
+    struct Error<I: Ip, B>((B, Either<LocalAddressError, (Option<SocketId<I>>, SendToError)>));
 
-    let r = match id {
-        BoundId::Connected(conn) => I::map_ip::<_, Result<_, _>>(
-            (IpInvariant((&mut sync_ctx, ctx, remote_port, body)), conn, remote_ip),
-            |(IpInvariant((sync_ctx, ctx, remote_port, body)), conn, remote_ip)| {
-                BufferSocketHandler::<Ipv4, _, _>::send_udp_conn_to(
-                    sync_ctx,
-                    ctx,
-                    conn,
-                    remote_ip,
-                    remote_port,
-                    body,
-                )
-                .map_err(IpInvariant)
-            },
-            |(IpInvariant((sync_ctx, ctx, remote_port, body)), conn, remote_ip)| {
-                BufferSocketHandler::<Ipv6, _, _>::send_udp_conn_to(
-                    sync_ctx,
-                    ctx,
-                    conn,
-                    remote_ip,
-                    remote_port,
-                    body,
-                )
-                .map_err(IpInvariant)
-            },
-        ),
-        BoundId::Listening(listener) => I::map_ip::<_, Result<_, _>>(
-            (IpInvariant((&mut sync_ctx, ctx, remote_port, body)), listener, remote_ip),
-            |(IpInvariant((sync_ctx, ctx, remote_port, body)), listener, remote_ip)| {
-                BufferSocketHandler::<Ipv4, _, _>::send_udp_listener(
-                    sync_ctx,
-                    ctx,
-                    listener,
-                    remote_ip,
-                    remote_port,
-                    body,
-                )
-                .map_err(IpInvariant)
-            },
-            |(IpInvariant((sync_ctx, ctx, remote_port, body)), listener, remote_ip)| {
-                BufferSocketHandler::<Ipv6, _, _>::send_udp_listener(
-                    sync_ctx,
-                    ctx,
-                    listener,
-                    remote_ip,
-                    remote_port,
-                    body,
-                )
-                .map_err(IpInvariant)
-            },
-        ),
-    };
-    match r {
-        Ok(()) => Ok(new_id),
-        Err(IpInvariant((body, e))) => Err((body, Either::Right((new_id, e)))),
-    }
+    I::map_ip::<_, Result<_, _>>(
+        (IpInvariant((&mut sync_ctx, ctx, remote_port, body)), id, remote_ip),
+        |(IpInvariant((sync_ctx, ctx, remote_port, body)), id, remote_ip)| {
+            BufferSocketHandler::<Ipv4, _, _>::send_to(
+                sync_ctx,
+                ctx,
+                id,
+                remote_ip,
+                remote_port,
+                body,
+            )
+            .map_err(Error)
+        },
+        |(IpInvariant((sync_ctx, ctx, remote_port, body)), id, remote_ip)| {
+            BufferSocketHandler::<Ipv6, _, _>::send_to(
+                sync_ctx,
+                ctx,
+                id,
+                remote_ip,
+                remote_port,
+                body,
+            )
+            .map_err(Error)
+        },
+    )
+    .map_err(|Error(e)| e)
 }
 
 impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>>
@@ -2760,25 +2718,31 @@ mod tests {
         assert_eq!(pkt.body, &body[..]);
 
         // Send a packet providing a local ip:
-        BufferSocketHandler::send_udp_listener(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            listener,
-            ZonedAddr::Unzoned(remote_ip),
-            NonZeroU16::new(200).unwrap(),
-            Buf::new(body.to_vec(), ..),
-        )
-        .expect("send_udp_listener failed");
+        assert_matches!(
+            BufferSocketHandler::send_to(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                listener.into(),
+                ZonedAddr::Unzoned(remote_ip),
+                NonZeroU16::new(200).unwrap(),
+                Buf::new(body.to_vec(), ..),
+            )
+            .expect("send_udp_listener failed"),
+            None
+        );
         // And send a packet that doesn't:
-        BufferSocketHandler::send_udp_listener(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            listener,
-            ZonedAddr::Unzoned(remote_ip),
-            NonZeroU16::new(200).unwrap(),
-            Buf::new(body.to_vec(), ..),
-        )
-        .expect("send_udp_listener failed");
+        assert_matches!(
+            BufferSocketHandler::send_to(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                listener.into(),
+                ZonedAddr::Unzoned(remote_ip),
+                NonZeroU16::new(200).unwrap(),
+                Buf::new(body.to_vec(), ..),
+            )
+            .expect("send_udp_listener failed"),
+            None
+        );
         let frames = sync_ctx.inner.frames();
         assert_eq!(frames.len(), 2);
         let check_frame = |(meta, frame_body): &(
@@ -3344,7 +3308,7 @@ mod tests {
     }
 
     #[ip_test]
-    fn test_send_udp_conn_to<I: Ip + TestIpExt>() {
+    fn test_send_to<I: Ip + TestIpExt>() {
         set_logger_for_test();
 
         let local_ip = local_ip::<I>();
@@ -3376,16 +3340,19 @@ mod tests {
         .expect("connect should succeed");
 
         let body = [1, 2, 3, 4, 5];
-        // Try to send something with send_udp_conn_to
-        BufferSocketHandler::send_udp_conn_to(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            conn,
-            ZonedAddr::Unzoned(other_remote_ip),
-            NonZeroU16::new(200).unwrap(),
-            Buf::new(body.to_vec(), ..),
-        )
-        .expect("send_udp_conn_to failed");
+        // Try to send something with send_to
+        assert_matches!(
+            BufferSocketHandler::send_to(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                conn.into(),
+                ZonedAddr::Unzoned(other_remote_ip),
+                NonZeroU16::new(200).unwrap(),
+                Buf::new(body.to_vec(), ..),
+            )
+            .expect("send_to failed"),
+            None
+        );
 
         // The socket should not have been affected.
         let info = SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, conn.into());
@@ -3516,16 +3483,17 @@ mod tests {
             conn: ConnId<I>,
         ) -> Result<(), NotWriteableError> {
             match remote_ip {
-                Some(remote_ip) => BufferSocketHandler::send_udp_conn_to(
+                Some(remote_ip) => BufferSocketHandler::send_to(
                     sync_ctx,
                     non_sync_ctx,
-                    conn,
+                    conn.into(),
                     remote_ip,
                     REMOTE_PORT,
                     Buf::new(Vec::new(), ..),
                 )
+                .map(|new_id| assert_matches!(new_id, None))
                 .map_err(
-                    |(_, e)| assert_matches!(e, SendToError::NotWriteable => NotWriteableError),
+                    |(_, e)| assert_matches!(e, Either::Right((None, SendToError::NotWriteable)) => NotWriteableError)
                 ),
                 None => BufferSocketHandler::send_udp_conn(
                     sync_ctx,
@@ -4186,15 +4154,18 @@ mod tests {
         // Send a packet from each socket.
         let body = [1, 2, 3, 4, 5];
         for socket in bound_on_devices {
-            BufferSocketHandler::send_udp_listener(
-                sync_ctx,
-                &mut non_sync_ctx,
-                socket,
-                ZonedAddr::Unzoned(I::get_other_remote_ip_address(1)),
-                REMOTE_PORT,
-                Buf::new(body.to_vec(), ..),
-            )
-            .expect("send should succeed");
+            assert_matches!(
+                BufferSocketHandler::send_to(
+                    sync_ctx,
+                    &mut non_sync_ctx,
+                    socket.into(),
+                    ZonedAddr::Unzoned(I::get_other_remote_ip_address(1)),
+                    REMOTE_PORT,
+                    Buf::new(body.to_vec(), ..),
+                )
+                .expect("send should succeed"),
+                None
+            );
         }
 
         let mut received_devices = sync_ctx
@@ -5902,10 +5873,10 @@ where {
                 REMOTE_PORT,
             )
             .expect("connect should succeed");
-            BufferSocketHandler::send_udp_conn_to(
+            BufferSocketHandler::send_to(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
-                id,
+                id.into(),
                 send_to_remote_addr,
                 REMOTE_PORT,
                 Buf::new(Vec::new(), ..),
@@ -5919,17 +5890,22 @@ where {
                 Some(LOCAL_PORT),
             )
             .expect("listen should succeed");
-            BufferSocketHandler::send_udp_listener(
+            BufferSocketHandler::send_to(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
-                id,
+                id.into(),
                 send_to_remote_addr,
                 REMOTE_PORT,
                 Buf::new(Vec::new(), ..),
             )
         };
 
-        assert_eq!(result.map_err(|(_buf, err)| err), expected);
+        assert_eq!(
+            result
+                .map(|new_id| assert_matches!(new_id, None))
+                .map_err(|(_buf, err)| assert_matches!(err, Either::Right((None, e)) => e)),
+            expected
+        );
     }
 
     #[test_case(true; "connected")]
@@ -5980,26 +5956,32 @@ where {
                 REMOTE_PORT,
             )
             .expect("connect should succeed");
-            BufferSocketHandler::send_udp_conn_to(
+            BufferSocketHandler::send_to(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
-                id,
+                id.into(),
                 send_to_remote_addr,
                 REMOTE_PORT,
                 Buf::new(Vec::new(), ..),
             )
         } else {
-            BufferSocketHandler::send_udp_listener(
+            BufferSocketHandler::send_to(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
-                listener,
+                listener.into(),
                 send_to_remote_addr,
                 REMOTE_PORT,
                 Buf::new(Vec::new(), ..),
             )
         };
 
-        assert_matches!(result, Err((_, SendToError::Zone(ZonedAddressError::DeviceZoneMismatch))));
+        assert_matches!(
+            result,
+            Err((
+                _,
+                Either::Right((None, SendToError::Zone(ZonedAddressError::DeviceZoneMismatch)))
+            ))
+        );
     }
 
     #[test_case(None; "removes implicit")]
@@ -6204,15 +6186,18 @@ where {
                 .expect("listen failed");
 
         let mut send_and_get_ttl = |remote_ip| {
-            BufferSocketHandler::send_udp_listener(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
-                listener,
-                ZonedAddr::Unzoned(remote_ip),
-                nonzero!(9090u16),
-                Buf::new(vec![], ..),
-            )
-            .expect("send failed");
+            assert_matches!(
+                BufferSocketHandler::send_to(
+                    &mut sync_ctx,
+                    &mut non_sync_ctx,
+                    listener.into(),
+                    ZonedAddr::Unzoned(remote_ip),
+                    nonzero!(9090u16),
+                    Buf::new(vec![], ..),
+                )
+                .expect("send failed"),
+                None
+            );
 
             let (
                 SendIpPacketMeta {
