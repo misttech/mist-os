@@ -25,6 +25,8 @@ dts_synthetic = [
   "synthetic/complex_with_alias_first.dts",
   "synthetic/empty.dts",
   "synthetic/memory_reservations.dts",
+  "synthetic/psci-hvc.dts",
+  "synthetic/psci-smc.dts",
   "synthetic/simple_with_properties.dts",
 ]
 

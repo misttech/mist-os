@@ -81,6 +81,9 @@ namespace devicetree {
 //  std::cout << " Nodes names foo: " << foo_matcher.foo_count << std::endl;
 //
 
+// True if |T| fulfills the |Matcher| contract described above. Otherwise false.
+using internal::kIsMatcher;
+
 enum class ScanState {
   // Matcher has finished collecting information, no more scans are needed.
   kDone,
@@ -125,8 +128,10 @@ constexpr bool Match(const devicetree::Devicetree& devicetree, Matchers&&... mat
     };
     ForEachMatcher(on_each_matcher, matchers..., alias_matcher);
     // Return whether we still need to visit any node in the underlying subtree.
-    return std::any_of(visit_state.begin(), visit_state.end(),
-                       [](auto& visit_state) { return visit_state.state() == ScanState::kActive; });
+    return std::any_of(visit_state.begin(), visit_state.end(), [](auto& visit_state) {
+      return visit_state.state() == ScanState::kActive ||
+             visit_state.state() == ScanState::kNeedsPathResolution;
+    });
   };
 
   // Unprune any pruned Node, as a post order visitor.

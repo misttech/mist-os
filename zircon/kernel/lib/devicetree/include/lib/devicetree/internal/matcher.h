@@ -66,6 +66,10 @@ constexpr bool CheckInterface() {
   return true;
 }
 
+template <typename Matcher>
+constexpr bool kIsMatcher = OnNodeSignature_v<Matcher> && OnWalkSignature_v<Matcher> &&
+                            OnErrorSignature_v<Matcher> && HasMaxScansMember<Matcher>::value;
+
 // All visitors have the same return type.
 template <typename Visitor, typename... Matchers>
 using VisitorResultType =
