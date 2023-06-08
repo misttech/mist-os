@@ -18,7 +18,7 @@ readonly PREBUILT_ARCH="$_FUCHSIA_RBE_CACHE_VAR_host_arch"
 # This should point to $FUCHSIA_DIR for the Fuchsia project.
 # ../../ because this script lives in build/rbe.
 # The value is an absolute path.
-project_root="$(realpath "$script_dir"/../..)"
+project_root="$default_project_root"
 project_root_rel="$(relpath . "$project_root")"
 
 # defaults

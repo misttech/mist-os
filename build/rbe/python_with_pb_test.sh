@@ -12,11 +12,12 @@ script="$0"
 # 'stem' is any executable python binary or test
 stem="$(basename "$script" .sh)"
 script_dir="$(dirname "$script")"
-script_dir_abs="$(realpath "$script_dir")"
-project_root="$(realpath "$script_dir"/../..)"
 
 source "$script_dir"/common-setup.sh
 # 'python' is defined
+
+script_dir_abs="$(normalize_path "$script_dir")"
+project_root="$default_project_root"
 
 test -f "$script_dir"/proto/api/proxy/log_pb2.py || {
   cat <<EOF

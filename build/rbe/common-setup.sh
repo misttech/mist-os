@@ -10,6 +10,7 @@
 
 # By sourcing this script, the following symbols are defined:
 #   default_project_root (variable)
+#   normalize_path (function)
 #   msg (function)
 #   relpath (function)
 #   timetrace (function)
@@ -45,8 +46,9 @@ function timetrace() {
   :
 }
 
-# Normalize path.  Following-symlinks is optional.
-function _normalize_path() {
+# Normalize path: return an absolute path without any .. in the middle.
+# Following-symlinks is optional.
+function normalize_path() {
   # $1 is the path to resolve
   if which realpath 2>&1 > /dev/null
   then realpath "$1"
@@ -61,7 +63,7 @@ function _normalize_path() {
 # This should point to $FUCHSIA_DIR for the Fuchsia project.
 # ../../ because this script lives in build/rbe.
 # The value is an absolute path.
-readonly default_project_root="$(_normalize_path "$script_dir"/../..)"
+readonly default_project_root="$(normalize_path "$script_dir"/../..)"
 test -n "$default_project_root" || {
   msg "Error: Unable to infer project root."
   exit 1
