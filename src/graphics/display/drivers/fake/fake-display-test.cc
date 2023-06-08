@@ -23,6 +23,7 @@
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/fake/fake-display-stack.h"
 #include "src/graphics/display/drivers/fake/sysmem-device-wrapper.h"
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace fake_display {
@@ -628,11 +629,10 @@ TEST_F(FakeDisplaySysmemTest, Capture) {
       &layer_cfg_result_count);
   EXPECT_EQ(config_check_result, CONFIG_CHECK_RESULT_OK);
 
-  config_stamp_t config_stamp = {
-      .value = 1u,
-  };
+  const display::ConfigStamp config_stamp(1);
+  const config_stamp_t banjo_config_stamp = display::ToBanjoConfigStamp(config_stamp);
   display()->DisplayControllerImplApplyConfiguration(display_configs.data(), display_configs.size(),
-                                                     &config_stamp);
+                                                     &banjo_config_stamp);
 
   // Start capture; wait until the capture ends.
   EXPECT_FALSE(display_capture_completion.completed().signaled());

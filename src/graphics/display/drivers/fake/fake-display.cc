@@ -33,6 +33,7 @@
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/coordinator/preferred-scanout-image-type.h"
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -303,10 +304,11 @@ config_check_result_t FakeDisplay::DisplayControllerImplCheckConfiguration(
   return CONFIG_CHECK_RESULT_OK;
 }
 
-void FakeDisplay::DisplayControllerImplApplyConfiguration(const display_config_t** display_configs,
-                                                          size_t display_count,
-                                                          const config_stamp_t* config_stamp) {
+void FakeDisplay::DisplayControllerImplApplyConfiguration(
+    const display_config_t** display_configs, size_t display_count,
+    const config_stamp_t* banjo_config_stamp) {
   ZX_DEBUG_ASSERT(display_configs);
+  ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
 
   fbl::AutoLock lock(&display_lock_);
 
@@ -317,7 +319,7 @@ void FakeDisplay::DisplayControllerImplApplyConfiguration(const display_config_t
   } else {
     current_image_to_capture_ = nullptr;
   }
-  current_config_stamp_ = *config_stamp;
+  current_config_stamp_ = display::ToConfigStamp(*banjo_config_stamp);
 }
 
 void FakeDisplay::DisplayControllerImplSetEld(uint64_t display_id, const uint8_t* raw_eld_list,
@@ -714,8 +716,10 @@ int FakeDisplay::VSyncThread() {
 void FakeDisplay::SendVsync() {
   fbl::AutoLock lock(&display_lock_);
   if (controller_interface_client_.is_valid()) {
+    const config_stamp_t banjo_current_config_stamp =
+        display::ToBanjoConfigStamp(current_config_stamp_);
     controller_interface_client_.OnDisplayVsync(kDisplayId, zx_clock_get_monotonic(),
-                                                &current_config_stamp_);
+                                                &banjo_current_config_stamp);
   }
 }
 

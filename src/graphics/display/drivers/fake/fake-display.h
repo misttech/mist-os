@@ -29,6 +29,8 @@
 #include <fbl/intrusive_double_list.h>
 #include <fbl/mutex.h>
 
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+
 namespace fake_display {
 
 class FakeDisplay;
@@ -68,7 +70,7 @@ class FakeDisplay : public DeviceType,
       size_t* layer_cfg_result_count);
   void DisplayControllerImplApplyConfiguration(const display_config_t** display_config,
                                                size_t display_count,
-                                               const config_stamp_t* config_stamp);
+                                               const config_stamp_t* banjo_config_stamp);
   void DisplayControllerImplSetEld(uint64_t display_id, const uint8_t* raw_eld_list,
                                    size_t raw_eld_count);
   zx_status_t DisplayControllerImplGetSysmemConnection(zx::channel connection);
@@ -198,8 +200,8 @@ class FakeDisplay : public DeviceType,
   // Points to the current image to be displayed and captured.
   // Stores nullptr if there is no image displaying on the fake display.
   ImageInfo* current_image_to_capture_ TA_GUARDED(display_lock_);
-  config_stamp_t current_config_stamp_ TA_GUARDED(display_lock_) = {
-      .value = INVALID_CONFIG_STAMP_VALUE};
+  display::ConfigStamp current_config_stamp_ TA_GUARDED(display_lock_) =
+      display::kInvalidConfigStamp;
 
   // Capture complete is signaled at vsync time. This counter introduces a bit of delay
   // for signal capture complete

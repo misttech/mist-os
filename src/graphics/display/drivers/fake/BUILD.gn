@@ -26,6 +26,7 @@ source_set("fake-lib") {
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
+    "//src/graphics/display/lib/api-types-cpp",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//src/lib/fsl",
