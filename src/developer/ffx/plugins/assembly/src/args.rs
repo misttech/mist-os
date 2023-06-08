@@ -319,8 +319,8 @@ pub struct ProductArgs {
 
 #[derive(Debug, Default, PartialEq)]
 pub enum PackageValidationHandling {
-    Warning,
     #[default]
+    Warning,
     Error,
 }
 
