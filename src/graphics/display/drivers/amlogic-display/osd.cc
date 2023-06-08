@@ -34,6 +34,7 @@
 #include "src/graphics/display/drivers/amlogic-display/rdma-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpp-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 
 namespace amlogic_display {
 
@@ -184,7 +185,7 @@ OsdRegisters osd1_registers = {
 
 }  // namespace
 
-config_stamp_t Osd::GetLastConfigStampApplied() { return rdma_->GetLastConfigStampApplied(); }
+display::ConfigStamp Osd::GetLastConfigStampApplied() { return rdma_->GetLastConfigStampApplied(); }
 
 Osd::Osd(uint32_t fb_width, uint32_t fb_height, uint32_t display_width, uint32_t display_height,
          inspect::Node* unused_osd_inspect_node, std::optional<fdf::MmioBuffer> vpu_mmio,
@@ -196,7 +197,7 @@ Osd::Osd(uint32_t fb_width, uint32_t fb_height, uint32_t display_width, uint32_t
       display_height_(display_height),
       rdma_(std::move(rdma)) {}
 
-void Osd::Disable(config_stamp_t config_stamp) {
+void Osd::Disable(display::ConfigStamp config_stamp) {
   rdma_->StopRdma();
   osd1_registers.ctrl_stat.ReadFrom(&(*vpu_mmio_)).set_blk_en(0).WriteTo(&(*vpu_mmio_));
   rdma_->ResetConfigStamp(config_stamp);
@@ -290,7 +291,7 @@ void Osd::SetColorCorrection(uint32_t rdma_table_idx, const display_config_t* co
 }
 
 void Osd::FlipOnVsync(uint8_t idx, const display_config_t* config,
-                      const config_stamp_t* config_stamp) {
+                      display::ConfigStamp config_stamp) {
   auto info = reinterpret_cast<ImageInfo*>(config[0].layer_list[0]->cfg.primary.image.handle);
   const int next_table_idx = rdma_->GetNextAvailableRdmaTableIndex();
   if (next_table_idx < 0) {
@@ -445,9 +446,9 @@ void Osd::FlipOnVsync(uint8_t idx, const display_config_t* config,
 
   // update last element of table which will be used to indicate whether RDMA operation was
   // completed or not
-  rdma_->SetRdmaTableValue(next_table_idx, IDX_RDMA_CFG_STAMP_HIGH, (config_stamp->value >> 32));
+  rdma_->SetRdmaTableValue(next_table_idx, IDX_RDMA_CFG_STAMP_HIGH, (config_stamp.value() >> 32));
   rdma_->SetRdmaTableValue(next_table_idx, IDX_RDMA_CFG_STAMP_LOW,
-                           (config_stamp->value & 0xFFFFFFFF));
+                           (config_stamp.value() & 0xFFFFFFFF));
 
   rdma_->FlushRdmaTable(next_table_idx);
   if (info->is_afbc) {

@@ -18,6 +18,8 @@
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
 
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+
 namespace amlogic_display {
 
 struct RdmaTable {
@@ -165,10 +167,10 @@ class RdmaEngine {
   void ResetRdmaTable();
   void SetRdmaTableValue(uint32_t table_index, uint32_t idx, uint32_t val);
   void FlushRdmaTable(uint32_t table_index);
-  void ExecRdmaTable(uint32_t next_table_idx, const config_stamp_t* config_stamp, bool use_afbc);
+  void ExecRdmaTable(uint32_t next_table_idx, display::ConfigStamp config_stamp, bool use_afbc);
   int GetNextAvailableRdmaTableIndex() __TA_EXCLUDES(rdma_lock_);
-  config_stamp_t GetLastConfigStampApplied() __TA_EXCLUDES(rdma_lock_);
-  void ResetConfigStamp(config_stamp_t config_stamp) __TA_EXCLUDES(rdma_lock_);
+  display::ConfigStamp GetLastConfigStampApplied() __TA_EXCLUDES(rdma_lock_);
+  void ResetConfigStamp(display::ConfigStamp config_stamp) __TA_EXCLUDES(rdma_lock_);
 
   // The following functions move the current RDMA state machine forward. If TryResolvePendingRdma
   // determines that RDMA has completed, it
@@ -207,8 +209,7 @@ class RdmaEngine {
   size_t end_index_used_ TA_GUARDED(rdma_lock_) = 0;
 
   bool rdma_active_ TA_GUARDED(rdma_lock_) = false;
-  config_stamp_t latest_applied_config_ TA_GUARDED(rdma_lock_) = {
-      .value = INVALID_CONFIG_STAMP_VALUE};
+  display::ConfigStamp latest_applied_config_ TA_GUARDED(rdma_lock_) = display::kInvalidConfigStamp;
 
   RdmaChannelContainer rdma_chnl_container_[kNumberOfTables];
 

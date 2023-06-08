@@ -27,6 +27,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/rdma.h"
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 
 namespace amlogic_display {
 
@@ -46,12 +47,12 @@ class Osd {
   // config, the |config_stamp| should be the client-provided stamp; otherwise
   // it should use the invalid stamp value indicating that the OSD has been
   // invalidated.
-  void Disable(config_stamp_t config_stamp = {.value = INVALID_CONFIG_STAMP_VALUE});
+  void Disable(display::ConfigStamp config_stamp = display::kInvalidConfigStamp);
   void Enable();
 
   // Schedules the given |config| to be applied by the RDMA engine when the next VSYNC interrupt
   // occurs.
-  void FlipOnVsync(uint8_t idx, const display_config_t* config, const config_stamp_t* config_stamp);
+  void FlipOnVsync(uint8_t idx, const display_config_t* config, display::ConfigStamp config_stamp);
 
   // Returns the image handle that was most recently processed by the RDMA engine. If RDMA is
   // determined to be in progress and incomplete, then the previously applied image is returned. If
@@ -59,7 +60,7 @@ class Osd {
   // updated accordingly.
   //
   // This function is used by the vsync thread to determine the latest applied config.
-  config_stamp_t GetLastConfigStampApplied();
+  display::ConfigStamp GetLastConfigStampApplied();
 
   void Dump();
   void Release();

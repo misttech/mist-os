@@ -18,6 +18,7 @@
 #include "src/graphics/display/drivers/amlogic-display/rdma-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpp-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 
 namespace amlogic_display {
 
@@ -93,7 +94,7 @@ void RdmaEngine::TryResolvePendingRdma() {
   }
 }
 
-config_stamp_t RdmaEngine::GetLastConfigStampApplied() {
+display::ConfigStamp RdmaEngine::GetLastConfigStampApplied() {
   fbl::AutoLock lock(&rdma_lock_);
   if (rdma_active_) {
     TryResolvePendingRdma();
@@ -114,7 +115,7 @@ void RdmaEngine::ProcessRdmaUsageTable() {
     if (val == rdma_usage_table_[i]) {
       // Found the last table that was written to
       last_table_index = i;
-      latest_applied_config_ = {.value = rdma_usage_table_[i]};  // save this for vsync
+      latest_applied_config_ = display::ConfigStamp(rdma_usage_table_[i]);  // save this for vsync
     }
     rdma_usage_table_[i] = kRdmaTableUnavailable;  // mark as unavailable for now
   }
@@ -226,7 +227,7 @@ void RdmaEngine::FlushRdmaTable(uint32_t table_index) {
   }
 }
 
-void RdmaEngine::ExecRdmaTable(uint32_t next_table_idx, const config_stamp_t* config_stamp,
+void RdmaEngine::ExecRdmaTable(uint32_t next_table_idx, display::ConfigStamp config_stamp,
                                bool use_afbc) {
   fbl::AutoLock lock(&rdma_lock_);
   // Write the start and end address of the table. End address is the last address that the
@@ -234,7 +235,7 @@ void RdmaEngine::ExecRdmaTable(uint32_t next_table_idx, const config_stamp_t* co
   // if rdma is already active, just update the end_addr
   if (rdma_active_) {
     end_index_used_ = static_cast<uint8_t>(next_table_idx);
-    rdma_usage_table_[next_table_idx] = config_stamp->value;
+    rdma_usage_table_[next_table_idx] = config_stamp.value();
     vpu_mmio_->Write32(
         static_cast<uint32_t>(rdma_chnl_container_[next_table_idx].phys_offset + kTableSize - 4),
         VPU_RDMA_AHB_END_ADDR(kRdmaChannel));
@@ -255,7 +256,7 @@ void RdmaEngine::ExecRdmaTable(uint32_t next_table_idx, const config_stamp_t* co
   regVal |= RDMA_ACCESS_AUTO_INT_EN(kRdmaChannel);  // VSYNC interrupt source
   regVal |= RDMA_ACCESS_AUTO_WRITE(kRdmaChannel);   // Write
   vpu_mmio_->Write32(regVal, VPU_RDMA_ACCESS_AUTO);
-  rdma_usage_table_[next_table_idx] = config_stamp->value;
+  rdma_usage_table_[next_table_idx] = config_stamp.value();
   rdma_active_ = true;
   rdma_begin_count_.Add(1);
   if (use_afbc) {
@@ -399,7 +400,7 @@ void RdmaEngine::StopRdma() {
   }
 }
 
-void RdmaEngine::ResetConfigStamp(config_stamp_t config_stamp) {
+void RdmaEngine::ResetConfigStamp(display::ConfigStamp config_stamp) {
   fbl::AutoLock lock(&rdma_lock_);
   latest_applied_config_ = config_stamp;
 }
@@ -447,7 +448,7 @@ void RdmaEngine::DumpRdmaState() {
   }
 
   DISP_INFO("start_index = %ld, end_index = %ld", start_index_used_, end_index_used_);
-  DISP_INFO("latest applied config stamp = 0x%lx", latest_applied_config_.value);
+  DISP_INFO("latest applied config stamp = 0x%lx", latest_applied_config_.value());
   DISP_INFO("\n\n=========================================\n\n");
 }
 

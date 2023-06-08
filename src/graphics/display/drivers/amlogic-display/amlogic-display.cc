@@ -34,6 +34,7 @@
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/amlogic-display/common.h"
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -427,9 +428,10 @@ config_check_result_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
 // part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
 void AmlogicDisplay::DisplayControllerImplApplyConfiguration(
     const display_config_t** display_configs, size_t display_count,
-    const config_stamp_t* config_stamp) {
+    const config_stamp_t* banjo_config_stamp) {
   ZX_DEBUG_ASSERT(display_configs);
-  ZX_DEBUG_ASSERT(config_stamp);
+  ZX_DEBUG_ASSERT(banjo_config_stamp);
+  const display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
 
   fbl::AutoLock lock(&display_lock_);
 
@@ -476,7 +478,7 @@ void AmlogicDisplay::DisplayControllerImplApplyConfiguration(
           capture_active_id_ = INVALID_ID;
         }
       }
-      osd_->Disable(*config_stamp);
+      osd_->Disable(config_stamp);
     }
   }
 
@@ -485,7 +487,8 @@ void AmlogicDisplay::DisplayControllerImplApplyConfiguration(
   if (!fully_initialized()) {
     if (dc_intf_.is_valid()) {
       if (display_count == 0 || display_configs[0]->layer_count == 0) {
-        dc_intf_.OnDisplayVsync(display_id_, zx_clock_get_monotonic(), config_stamp);
+        const config_stamp_t banjo_config_stamp_out = display::ToBanjoConfigStamp(config_stamp);
+        dc_intf_.OnDisplayVsync(display_id_, zx_clock_get_monotonic(), &banjo_config_stamp_out);
       }
     }
   }
@@ -872,14 +875,14 @@ int AmlogicDisplay::VSyncThread() {
       DISP_ERROR("VSync Interrupt Wait failed\n");
       break;
     }
-    std::optional<config_stamp_t> current_config_stamp = std::nullopt;
+    display::ConfigStamp current_config_stamp = display::kInvalidConfigStamp;
     if (fully_initialized()) {
       current_config_stamp = osd_->GetLastConfigStampApplied();
     }
     fbl::AutoLock lock(&display_lock_);
     if (dc_intf_.is_valid() && display_attached_) {
-      dc_intf_.OnDisplayVsync(display_id_, timestamp.get(),
-                              current_config_stamp.has_value() ? &*current_config_stamp : nullptr);
+      const config_stamp_t banjo_config_stamp = display::ToBanjoConfigStamp(current_config_stamp);
+      dc_intf_.OnDisplayVsync(display_id_, timestamp.get(), &banjo_config_stamp);
     }
   }
 
