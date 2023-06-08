@@ -174,8 +174,8 @@ class __TA_CAPABILITY("mutex") Lock {
   // Provides direct access to the underlying lock. Care should be taken when
   // manipulating the underlying lock. Incorrect manipulation could confuse
   // the validator, trigger lock assertions, and/or deadlock.
-  LockType& lock() { return state_.lock_; }
-  const LockType& lock() const { return state_.lock_; }
+  LockType& lock() __TA_RETURN_CAPABILITY(*this) { return state_.lock_; }
+  const LockType& lock() const __TA_RETURN_CAPABILITY(*this) { return state_.lock_; }
 
   // Returns the capability of the underlying lock. This is expected by Guard
   // as an additional static assertion target.
@@ -246,8 +246,8 @@ class __TA_CAPABILITY("mutex") Lock<GlobalReference<LockType, Reference>> {
   // Provides direct access to the underlying lock. Care should be taken when
   // manipulating the underlying lock. Incorrect manipulation could confuse
   // the validator, trigger lock assertions, and/or deadlock.
-  LockType& lock() { return Reference; }
-  const LockType& lock() const { return Reference; }
+  LockType& lock() __TA_RETURN_CAPABILITY(*this) { return Reference; }
+  const LockType& lock() const __TA_RETURN_CAPABILITY(*this) { return Reference; }
 
   // Returns the LockClassId of the lock class this lock belongs to.
   LockClassId id() const { return id_.value(); }
