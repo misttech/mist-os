@@ -35,6 +35,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -363,7 +364,7 @@ config_check_result_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
   fbl::AutoLock lock(&display_lock_);
 
   // no-op, just wait for the client to try a new config
-  if (!display_attached_ || display_configs[0]->display_id != display_id_) {
+  if (!display_attached_ || display::ToDisplayId(display_configs[0]->display_id) != display_id_) {
     return CONFIG_CHECK_RESULT_OK;
   }
 
@@ -456,7 +457,7 @@ void AmlogicDisplay::DisplayControllerImplApplyConfiguration(
     // The only way a checked configuration could now be invalid is if display was
     // unplugged. If that's the case, then the upper layers will give a new configuration
     // once they finish handling the unplug event. So just return.
-    if (!display_attached_ || display_configs[0]->display_id != display_id_) {
+    if (!display_attached_ || display::ToDisplayId(display_configs[0]->display_id) != display_id_) {
       return;
     }
 
@@ -488,7 +489,8 @@ void AmlogicDisplay::DisplayControllerImplApplyConfiguration(
     if (dc_intf_.is_valid()) {
       if (display_count == 0 || display_configs[0]->layer_count == 0) {
         const config_stamp_t banjo_config_stamp_out = display::ToBanjoConfigStamp(config_stamp);
-        dc_intf_.OnDisplayVsync(display_id_, zx_clock_get_monotonic(), &banjo_config_stamp_out);
+        dc_intf_.OnDisplayVsync(display::ToBanjoDisplayId(display_id_), zx_clock_get_monotonic(),
+                                &banjo_config_stamp_out);
       }
     }
   }
@@ -667,7 +669,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
 zx_status_t AmlogicDisplay::DisplayControllerImplSetDisplayPower(uint64_t display_id,
                                                                  bool power_on) {
   fbl::AutoLock lock(&display_lock_);
-  if (display_id != display_id_ || !display_attached_) {
+  if (display::ToDisplayId(display_id) != display_id_ || !display_attached_) {
     return ZX_ERR_NOT_FOUND;
   }
   if (power_on) {
@@ -882,7 +884,8 @@ int AmlogicDisplay::VSyncThread() {
     fbl::AutoLock lock(&display_lock_);
     if (dc_intf_.is_valid() && display_attached_) {
       const config_stamp_t banjo_config_stamp = display::ToBanjoConfigStamp(current_config_stamp);
-      dc_intf_.OnDisplayVsync(display_id_, timestamp.get(), &banjo_config_stamp);
+      dc_intf_.OnDisplayVsync(display::ToBanjoDisplayId(display_id_), timestamp.get(),
+                              &banjo_config_stamp);
     }
   }
 
@@ -908,35 +911,46 @@ int AmlogicDisplay::HpdThread() {
     fbl::AutoLock lock(&display_lock_);
 
     bool display_added = false;
-    added_display_args_t args;
-    added_display_info_t info;
-    uint64_t display_removed = INVALID_DISPLAY_ID;
+    added_display_args_t added_display_args;
+    added_display_info_t added_display_info;
+
+    bool display_removed = false;
+    display::DisplayId removed_display_id;
+
     if (hpd && !display_attached_) {
       DISP_INFO("Display is connected\n");
 
       display_attached_ = true;
       vout_->DisplayConnected();
-      vout_->PopulateAddedDisplayArgs(&args, display_id_, kSupportedBanjoPixelFormats);
+      vout_->PopulateAddedDisplayArgs(&added_display_args, display_id_,
+                                      kSupportedBanjoPixelFormats);
       display_added = true;
       hpd_gpio_.SetPolarity(GPIO_POLARITY_LOW);
     } else if (!hpd && display_attached_) {
       DISP_INFO("Display Disconnected!\n");
       vout_->DisplayDisconnected();
 
-      display_removed = display_id_;
+      display_removed = true;
+      removed_display_id = display_id_;
       display_id_++;
       display_attached_ = false;
 
       hpd_gpio_.SetPolarity(GPIO_POLARITY_HIGH);
     }
 
-    if (dc_intf_.is_valid() && (display_removed != INVALID_DISPLAY_ID || display_added)) {
-      dc_intf_.OnDisplaysChanged(&args, display_added ? 1 : 0, &display_removed,
-                                 display_removed != INVALID_DISPLAY_ID, &info,
-                                 display_added ? 1 : 0, nullptr);
+    if (dc_intf_.is_valid() && (display_removed || display_added)) {
+      const size_t added_display_count = display_added ? 1 : 0;
+      const uint64_t banjo_removed_display_id = display::ToBanjoDisplayId(removed_display_id);
+      const size_t removed_display_count = display_removed ? 1 : 0;
+
+      dc_intf_.OnDisplaysChanged(
+          /*added_display_list=*/&added_display_args, added_display_count,
+          /*removed_display_list=*/&banjo_removed_display_id, removed_display_count,
+          /*out_display_info_list=*/&added_display_info,
+          /*display_info_count=*/added_display_count, /*out_display_info_actual=*/nullptr);
       if (display_added) {
         // See if we need to change output color to RGB
-        status = vout_->OnDisplaysChanged(info);
+        status = vout_->OnDisplaysChanged(added_display_info);
       }
     }
   }

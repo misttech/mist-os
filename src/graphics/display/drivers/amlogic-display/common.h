@@ -9,6 +9,8 @@
 
 #include <hwreg/mmio.h>
 
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
+
 #define DISPLAY_MASK(start, count) (((1 << (count)) - 1) << (start))
 #define DISPLAY_SET_MASK(mask, start, count, value) \
   ((mask & ~DISPLAY_MASK(start, count)) | (((value) << (start)) & DISPLAY_MASK(start, count)))
@@ -65,7 +67,7 @@ enum CaptureState {
   CAPTURE_ERROR = 3,
 };
 
-constexpr uint8_t PANEL_DISPLAY_ID = 1;
+constexpr display::DisplayId kPanelDisplayId(1);
 
 constexpr bool kBootloaderDisplayEnabled = true;
 

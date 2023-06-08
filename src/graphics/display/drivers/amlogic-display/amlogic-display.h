@@ -36,6 +36,7 @@
 #include "src/graphics/display/drivers/amlogic-display/osd.h"
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
 namespace amlogic_display {
 
@@ -240,7 +241,7 @@ class AmlogicDisplay
   inspect::Node root_node_;
   inspect::Node osd_node_;
 
-  uint64_t display_id_ = PANEL_DISPLAY_ID;
+  display::DisplayId display_id_ = kPanelDisplayId;
   bool display_attached_ TA_GUARDED(display_lock_) = false;
 
   // Hot Plug Detection

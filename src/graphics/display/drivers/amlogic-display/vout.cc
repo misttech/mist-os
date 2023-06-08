@@ -11,6 +11,8 @@
 #include <ddktl/fidl.h>
 #include <fbl/alloc_checker.h>
 
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
+
 namespace amlogic_display {
 
 namespace {
@@ -172,11 +174,11 @@ zx_status_t Vout::RestartDisplay() {
 }
 
 void Vout::PopulateAddedDisplayArgs(
-    added_display_args_t* args, uint64_t display_id,
+    added_display_args_t* args, display::DisplayId display_id,
     cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> pixel_formats) {
   switch (type_) {
     case VoutType::kDsi:
-      args->display_id = display_id;
+      args->display_id = display::ToBanjoDisplayId(display_id);
       args->edid_present = false;
       args->panel.params.height = dsi_.height;
       args->panel.params.width = dsi_.width;
@@ -186,7 +188,7 @@ void Vout::PopulateAddedDisplayArgs(
       args->cursor_info_count = 0;
       break;
     case VoutType::kHdmi:
-      args->display_id = display_id;
+      args->display_id = display::ToBanjoDisplayId(display_id);
       args->edid_present = true;
       args->panel.i2c.ops = &i2c_impl_protocol_ops_;
       args->panel.i2c.ctx = this;

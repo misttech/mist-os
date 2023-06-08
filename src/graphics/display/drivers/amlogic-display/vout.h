@@ -16,6 +16,7 @@
 #include "clock.h"
 #include "dsi-host.h"
 #include "hdmi-host.h"
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
 namespace amlogic_display {
 
@@ -32,7 +33,7 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
   zx_status_t RestartDisplay();
 
   void PopulateAddedDisplayArgs(
-      added_display_args_t* args, uint64_t display_id,
+      added_display_args_t* args, display::DisplayId display_id,
       cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> pixel_formats);
 
   VoutType type() { return type_; }
