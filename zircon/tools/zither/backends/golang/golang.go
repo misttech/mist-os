@@ -148,7 +148,7 @@ func DescribeType(desc zither.TypeDescriptor) string {
 	switch desc.Kind {
 	case zither.TypeKindBool, zither.TypeKindInteger, zither.TypeKindSize:
 		return PrimitiveTypeName(fidlgen.PrimitiveSubtype(desc.Type))
-	case zither.TypeKindEnum, zither.TypeKindBits, zither.TypeKindStruct:
+	case zither.TypeKindEnum, zither.TypeKindBits, zither.TypeKindStruct, zither.TypeKindOverlay:
 		layout, _ := fidlgen.MustReadName(desc.Type).SplitMember()
 		return fidlgen.ToUpperCamelCase(layout.DeclarationName())
 	case zither.TypeKindAlias, zither.TypeKindHandle:

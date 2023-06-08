@@ -52,3 +52,8 @@ type OverlayWithDifferentlySizedVariants = strict overlay {
     2: b uint32;
     3: c bool;
 };
+
+type StructWithOverlayMembers = struct {
+    overlay1 OverlayWithEquallySizedVariants;
+    overlay2 OverlayWithDifferentlySizedVariants;
+};

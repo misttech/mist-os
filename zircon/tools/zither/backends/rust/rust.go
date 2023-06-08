@@ -49,11 +49,17 @@ func NewGenerator(formatter fidlgen.Formatter) *Generator {
 func (gen Generator) DeclOrder() zither.DeclOrder { return zither.SourceDeclOrder }
 
 // The basic, derived traits that unconditionally figure into each declaration.
-var defaultTraits = []string{"Copy", "Clone", "Debug", "Eq", "PartialEq"}
+var defaultTraits = []string{"Copy", "Clone"}
 
 // Some additional traits that require more computation to determine their
 // support.
 type traits struct {
+	// Whether std::fmt::Debug is supported.
+	debug bool
+
+	// Whether std::cmp::Eq and std::cmp::PartialEq are supported.
+	eq bool
+
 	// Whether zerocopy::AsBytes is supported (effectively whether instances
 	// are convertible to byte slices).
 	//
@@ -70,6 +76,12 @@ type traits struct {
 
 func (t traits) supported() []string {
 	var supported []string
+	if t.debug {
+		supported = append(supported, "Debug")
+	}
+	if t.eq {
+		supported = append(supported, "Eq", "PartialEq")
+	}
 	if t.asBytes {
 		supported = append(supported, "AsBytes")
 	}
@@ -88,22 +100,27 @@ func (gen Generator) DeclCallback(decl zither.Decl) {
 	if _, ok := extraTraits[name]; ok {
 		return // Already processed
 	}
-	t := &traits{asBytes: false, fromBytes: false}
+	t := new(traits)
 	switch decl.(type) {
 	case *zither.Enum:
+		t.debug = true
+		t.eq = true
 		t.asBytes = true
 	case *zither.Bits, *zither.Handle:
+		t.debug = true
+		t.eq = true
 		t.asBytes = true
 		t.fromBytes = true
 	case *zither.Struct:
+		t.debug = true
+		t.eq = true
 		s := decl.(*zither.Struct)
-		if s.HasPadding {
-			break
-		}
-		t.asBytes = true
-		t.fromBytes = true
+		t.asBytes = !s.HasPadding
+		t.fromBytes = !s.HasPadding
 		for _, m := range s.Members {
 			mt := getExtraTraitsOfDependency(m.Type, name)
+			t.debug = t.debug && mt.debug
+			t.eq = t.eq && mt.eq
 			t.asBytes = t.asBytes && mt.asBytes
 			t.fromBytes = t.fromBytes && mt.fromBytes
 		}
@@ -124,14 +141,14 @@ func (gen Generator) DeclCallback(decl zither.Decl) {
 }
 
 func getExtraTraitsOfDependency(dep zither.TypeDescriptor, dependent string) *traits {
-	t := &traits{asBytes: false, fromBytes: false}
+	t := new(traits)
 	switch dep.Kind {
-	case zither.TypeKindInteger, zither.TypeKindSize, zither.TypeKindStringArray:
-		t.asBytes = true
-		t.fromBytes = true
 	case zither.TypeKindBool:
+		t.debug = true
+		t.eq = true
 		t.asBytes = true
-	case zither.TypeKindEnum, zither.TypeKindBits, zither.TypeKindStruct, zither.TypeKindAlias:
+	case zither.TypeKindEnum, zither.TypeKindBits, zither.TypeKindStruct,
+		zither.TypeKindOverlay, zither.TypeKindAlias:
 		var ok bool
 		t, ok = extraTraits[dep.Type]
 		if !ok {
@@ -139,6 +156,13 @@ func getExtraTraitsOfDependency(dep zither.TypeDescriptor, dependent string) *tr
 		}
 	case zither.TypeKindArray:
 		t = getExtraTraitsOfDependency(*dep.ElementType, dependent)
+	default:
+		t.debug = true
+		t.eq = true
+		if !dep.Kind.IsPointerLike() {
+			t.asBytes = true
+			t.fromBytes = true
+		}
 	}
 	return t
 }
@@ -294,18 +318,26 @@ func ConstValue(c zither.Const) string {
 	}
 }
 
-func EnumAttributes(e zither.Enum) []string {
-	t := extraTraits[e.Name.String()]
+func layoutAttributes(decl zither.Decl) []string {
+	repr := "#[repr(C)]"
+	if e, ok := decl.(*zither.Enum); ok {
+		repr = fmt.Sprintf("#[repr(%s)]", ScalarTypeName(e.Subtype))
+	}
+
+	t := extraTraits[decl.GetName().String()]
 	supported := append(defaultTraits, t.supported()...)
 	sort.Strings(supported)
+
 	return []string{
-		fmt.Sprintf("#[repr(%s)]", ScalarTypeName(e.Subtype)),
+		repr,
 		fmt.Sprintf("#[derive(%s)]", strings.Join(supported, ", ")),
 	}
 }
 
+func EnumAttributes(e zither.Enum) []string { return layoutAttributes(&e) }
+
 func U64EnumAttributes() []string {
-	supported := append(defaultTraits, "AsBytes")
+	supported := append(defaultTraits, "AsBytes", "Debug", "Eq", "PartialEq")
 	sort.Strings(supported)
 	return []string{
 		"#[repr(u64)]",
@@ -322,26 +354,9 @@ func BitsAttributes() []string {
 	}
 }
 
-func StructAttributes(s zither.Struct) []string {
-	t := extraTraits[s.Name.String()]
-	supported := append(defaultTraits, t.supported()...)
-	sort.Strings(supported)
-	return []string{
-		"#[repr(C)]",
-		fmt.Sprintf("#[derive(%s)]", strings.Join(supported, ", ")),
-	}
-}
+func StructAttributes(s zither.Struct) []string { return layoutAttributes(&s) }
 
-func OverlayAttributes(o zither.Overlay) []string {
-	t := extraTraits[o.Name.String()]
-	// Unions do not automatically support "Eq" and "PartialEq".
-	supported := append(t.supported(), "Clone", "Copy")
-	sort.Strings(supported)
-	return []string{
-		"#[repr(C)]",
-		fmt.Sprintf("#[derive(%s)]", strings.Join(supported, ", ")),
-	}
-}
+func OverlayAttributes(o zither.Overlay) []string { return layoutAttributes(&o) }
 
 // CaseStyle represents a style of casing Rust type names.
 type CaseStyle int
@@ -376,7 +391,7 @@ func DescribeType(desc zither.TypeDescriptor, style CaseStyle) string {
 	switch desc.Kind {
 	case zither.TypeKindBool, zither.TypeKindInteger, zither.TypeKindSize:
 		return ScalarTypeName(fidlgen.PrimitiveSubtype(desc.Type))
-	case zither.TypeKindEnum, zither.TypeKindBits, zither.TypeKindStruct:
+	case zither.TypeKindEnum, zither.TypeKindBits, zither.TypeKindStruct, zither.TypeKindOverlay:
 		layout, _ := fidlgen.MustReadName(desc.Type).SplitMember()
 		return casify(layout.DeclarationName())
 	case zither.TypeKindAlias, zither.TypeKindHandle:

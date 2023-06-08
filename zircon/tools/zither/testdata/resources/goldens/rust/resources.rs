@@ -20,7 +20,7 @@ pub enum Subtype {
 pub type Handle = u32;
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(AsBytes, Clone, Copy, Debug, Eq, FromBytes, FromZeroes, PartialEq)]
 pub struct StructWithHandleMembers {
     pub untyped_handle: Handle,
     pub handle_a: Handle,

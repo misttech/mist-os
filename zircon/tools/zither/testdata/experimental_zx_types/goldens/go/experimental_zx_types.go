@@ -141,3 +141,8 @@ func (o *OverlayWithDifferentlySizedVariants) AsC() *bool {
 	}
 	return (*bool)(unsafe.Pointer(&o.variant))
 }
+
+type StructWithOverlayMembers struct {
+	Overlay1 OverlayWithEquallySizedVariants
+	Overlay2 OverlayWithDifferentlySizedVariants
+}

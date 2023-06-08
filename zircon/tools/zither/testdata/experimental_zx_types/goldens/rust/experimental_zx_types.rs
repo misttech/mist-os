@@ -180,3 +180,10 @@ impl OverlayWithDifferentlySizedVariants {
         unsafe { Some(&mut self.variant.c) }
     }
 }
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct StructWithOverlayMembers {
+    pub overlay1: OverlayWithEquallySizedVariants,
+    pub overlay2: OverlayWithDifferentlySizedVariants,
+}

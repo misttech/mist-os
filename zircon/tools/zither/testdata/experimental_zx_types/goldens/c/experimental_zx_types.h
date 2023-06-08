@@ -79,6 +79,11 @@ typedef struct {
   };
 } zither_experimental_zx_types_overlay_with_differently_sized_variants_t;
 
+typedef struct {
+  zither_experimental_zx_types_overlay_with_equally_sized_variants_t overlay1;
+  zither_experimental_zx_types_overlay_with_differently_sized_variants_t overlay2;
+} zither_experimental_zx_types_struct_with_overlay_members_t;
+
 #if defined(__cplusplus)
 }
 #endif
