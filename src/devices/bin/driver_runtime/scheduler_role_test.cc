@@ -4,6 +4,7 @@
 
 #include <lib/async/cpp/irq.h>
 #include <lib/async/cpp/wait.h>
+#include <lib/driver/testing/cpp/driver_runtime_env.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/cpp/env.h>
 #include <lib/sync/cpp/completion.h>
@@ -30,6 +31,8 @@ class ThreadPoolTest : public RuntimeTestCase {
   }
 
  protected:
+  fdf_testing::DriverRuntimeEnv managed_env;
+
   fdf::SynchronizedDispatcher dispatcher_;
   libsync::Completion shutdown_completion_;
 };

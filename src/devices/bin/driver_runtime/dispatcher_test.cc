@@ -9,6 +9,7 @@
 #include <lib/async/sequence_id.h>
 #include <lib/async/task.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
+#include <lib/driver/testing/cpp/driver_runtime_env.h>
 #include <lib/fdf/arena.h>
 #include <lib/fdf/channel.h>
 #include <lib/fdf/cpp/channel_read.h>
@@ -78,6 +79,8 @@ class DispatcherTest : public RuntimeTestCase {
     config.irq_support = true;
     return config;
   }
+
+  fdf_testing::DriverRuntimeEnv managed_env;
 
   fdf_handle_t local_ch_;
   fdf_handle_t remote_ch_;

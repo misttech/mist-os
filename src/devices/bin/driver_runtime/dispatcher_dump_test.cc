@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/driver/runtime/testing/cpp/dispatcher.h>
+#include <lib/driver/testing/cpp/driver_runtime_env.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/cpp/env.h>
 #include <lib/fdf/testing.h>
@@ -22,6 +23,9 @@ class DispatcherDumpTest : public RuntimeTestCase {
 
  protected:
   static constexpr std::string_view kDispatcherName = "synchronized";
+
+  fdf_testing::DriverRuntimeEnv managed_env;
+
   fdf::SynchronizedDispatcher dispatcher_;
   libsync::Completion shutdown_completion_;
 
