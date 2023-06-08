@@ -91,15 +91,25 @@ impl RealmProxyClient {
     // Returns an error if the connection fails.
     pub async fn connect_to_protocol<T: DiscoverableProtocolMarker>(
         &self,
-    ) -> Result<ClientEnd<T>, Error> {
+    ) -> Result<T::Proxy, Error> {
+        self.connect_to_named_protocol::<T>(T::PROTOCOL_NAME).await
+    }
+
+    // Connects to the protocol with the given name, via the proxy.
+    //
+    // Returns an error if the connection fails.
+    pub async fn connect_to_named_protocol<T: DiscoverableProtocolMarker>(
+        &self,
+        protocol_name: &str,
+    ) -> Result<T::Proxy, Error> {
         let (client, server) = create_endpoints::<T>();
         let res =
-            self.inner.connect_to_named_protocol(T::PROTOCOL_NAME, server.into_channel()).await?;
+            self.inner.connect_to_named_protocol(protocol_name, server.into_channel()).await?;
 
         if let Some(op_err) = res.err() {
             bail!("{:?}", op_err);
         }
 
-        Ok(client)
+        Ok(client.into_proxy()?)
     }
 }
