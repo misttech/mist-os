@@ -3,20 +3,33 @@
 // found in the LICENSE file.
 library fuchsia.hardware.display;
 
-// An ImageConfig accompanies image data and defines how to interpret that data.
+/// Information about the provider of an image buffer.
+///
+/// Values other than [`fuchsia.hardware.display/TYPE_SIMPLE`] and
+/// [`fuchsia.hardware.display/TYPE_CAPTURE`] are an escape hatch. The driver
+/// and image producer are responsible for agreeing on the meaning of the value,
+/// through some mechanism outside the scope of this API.
+alias ImageTypeValue = uint32;
+
+/// Default for [`fuchsia.hardware.display/ImageTypeValue`].
+const TYPE_SIMPLE ImageTypeValue = 0;
+
+// The gap between TYPE_SIMPLE and TYPE_CAPTURE can be used for
+// platform-specific / driver-specific formats. Eventually, this magic will be
+// replaced by better primitives for discovering and negotiating image
+// contracts.
+
+/// The image is used for capture.
+const TYPE_CAPTURE ImageTypeValue = 10;
+
+/// Defines how data in an image buffer is interpreted.
 type ImageConfig = struct {
-    // The width and height of the image in pixels.
+    /// Image width, in pixels.
     width uint32;
+
+    /// Image height, in pixels.
     height uint32;
 
-    // Type conveys information about what is providing the pixel data. If this
-    // is not TYPE_SIMPLE, it is up to the driver and image producer to
-    // agree on the meaning of the value through some mechanism outside the scope
-    // of this API.
     @allow_deprecated_struct_defaults
-    type uint32 = TYPE_SIMPLE;
+    type ImageTypeValue = TYPE_SIMPLE;
 };
-
-const TYPE_SIMPLE uint32 = 0;
-// Intentionally left some gap between Simple and Capture types.
-const TYPE_CAPTURE uint32 = 10; //The image is used for capture
