@@ -66,6 +66,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 #include "src/graphics/display/drivers/intel-i915/tiling.h"
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
@@ -234,7 +235,7 @@ void Controller::HandlePipeVsync(PipeId pipe_id, zx_time_t timestamp) {
 
   display::DisplayId pipe_attached_display_id = display::kInvalidDisplayId;
 
-  std::optional<config_stamp_t> vsync_config_stamp = std::nullopt;
+  display::ConfigStamp vsync_config_stamp = display::kInvalidConfigStamp;
 
   Pipe* pipe = (*pipe_manager_)[pipe_id];
   if (pipe && pipe->in_use()) {
@@ -263,8 +264,8 @@ void Controller::HandlePipeVsync(PipeId pipe_id, zx_time_t timestamp) {
 
   if (pipe_attached_display_id != display::kInvalidDisplayId) {
     const uint64_t banjo_display_id = display::ToBanjoDisplayId(pipe_attached_display_id);
-    dc_intf_.OnDisplayVsync(banjo_display_id, timestamp,
-                            vsync_config_stamp.has_value() ? &*vsync_config_stamp : nullptr);
+    const config_stamp_t banjo_config_stamp = display::ToBanjoConfigStamp(vsync_config_stamp);
+    dc_intf_.OnDisplayVsync(banjo_display_id, timestamp, &banjo_config_stamp);
   }
 }
 
@@ -1868,7 +1869,7 @@ void Controller::DisplayControllerImplSetEld(uint64_t banjo_display_id, const ui
 
 void Controller::DisplayControllerImplApplyConfiguration(
     const display_config_t** banjo_display_configs, size_t display_config_count,
-    const config_stamp_t* config_stamp) {
+    const config_stamp_t* banjo_config_stamp) {
   fbl::AutoLock lock(&display_lock_);
   display::DisplayId fake_vsync_display_ids[display_devices_.size() + 1];
   size_t fake_vsync_size = 0;
@@ -1882,6 +1883,7 @@ void Controller::DisplayControllerImplApplyConfiguration(
         FindBanjoConfig(display->id(), banjo_display_configs_span);
 
     if (banjo_display_config != nullptr) {
+      const display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
       display->ApplyConfiguration(banjo_display_config, config_stamp);
     } else {
       if (display->pipe()) {
@@ -1903,7 +1905,7 @@ void Controller::DisplayControllerImplApplyConfiguration(
     zx_time_t now = (fake_vsync_size > 0) ? zx_clock_get_monotonic() : 0;
     for (size_t i = 0; i < fake_vsync_size; i++) {
       const uint64_t banjo_display_id = display::ToBanjoDisplayId(fake_vsync_display_ids[i]);
-      dc_intf_.OnDisplayVsync(banjo_display_id, now, config_stamp);
+      dc_intf_.OnDisplayVsync(banjo_display_id, now, banjo_config_stamp);
     }
   }
 }

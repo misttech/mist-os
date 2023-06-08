@@ -20,6 +20,7 @@
 #include "src/graphics/display/drivers/intel-i915/dpll.h"
 #include "src/graphics/display/drivers/intel-i915/pipe.h"
 #include "src/graphics/display/drivers/intel-i915/power.h"
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
 namespace i915 {
@@ -56,7 +57,7 @@ class DisplayDevice : public fidl::WireServer<FidlBacklight::Device> {
   ~DisplayDevice() override;
 
   void ApplyConfiguration(const display_config_t* banjo_display_config,
-                          const config_stamp_t* config_stamp);
+                          display::ConfigStamp config_stamp);
 
   // TODO(fxbug.dev/86038): Initialization-related interactions between the Controller class and
   // DisplayDevice can currently take different paths, with Init() being called conditionally in

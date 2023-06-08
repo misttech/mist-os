@@ -106,7 +106,7 @@ class Controller : public DeviceType,
       uint32_t** layer_cfg_result, size_t* layer_cfg_result_count);
   void DisplayControllerImplApplyConfiguration(const display_config_t** banjo_display_configs,
                                                size_t display_config_count,
-                                               const config_stamp_t* config_stamp);
+                                               const config_stamp_t* banjo_config_stamp);
   void DisplayControllerImplSetEld(uint64_t banjo_display_id, const uint8_t* raw_eld_list,
                                    size_t raw_eld_count);
   zx_status_t DisplayControllerImplGetSysmemConnection(zx::channel connection);

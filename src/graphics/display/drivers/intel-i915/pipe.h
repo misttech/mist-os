@@ -25,6 +25,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-i915/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-i915/registers-transcoder.h"
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
 namespace i915 {
@@ -52,7 +53,7 @@ class Pipe {
   using SetupGttImageFunc =
       fit::function<const GttRegion&(const image_t* image, uint32_t rotation)>;
   void ApplyConfiguration(const display_config_t* banjo_display_config,
-                          const config_stamp_t* config_stamp,
+                          display::ConfigStamp config_stamp,
                           const SetupGttImageFunc& setup_gtt_image,
                           const GetImagePixelFormatFunc& get_pixel_format);
 
@@ -100,7 +101,7 @@ class Pipe {
   // Display device registers only store image handles / addresses. We should
   // convert the handles to corresponding config stamps using the existing
   // mapping updated in |ApplyConfig()|.
-  std::optional<config_stamp_t> GetVsyncConfigStamp(const std::vector<uint64_t>& image_handles);
+  display::ConfigStamp GetVsyncConfigStamp(const std::vector<uint64_t>& image_handles);
 
  protected:
   bool attached_edp() const { return attached_edp_; }
@@ -109,10 +110,11 @@ class Pipe {
  private:
   void ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* primary, bool enable_csc,
                              bool* scaler_1_claimed, registers::pipe_arming_regs* regs,
-                             config_stamp_t config_stamp, const SetupGttImageFunc& setup_gtt_image,
+                             display::ConfigStamp config_stamp,
+                             const SetupGttImageFunc& setup_gtt_image,
                              const GetImagePixelFormatFunc& get_pixel_format);
   void ConfigureCursorPlane(const cursor_layer_t* cursor, bool enable_csc,
-                            registers::pipe_arming_regs* regs, config_stamp_t config_stamp);
+                            registers::pipe_arming_regs* regs, display::ConfigStamp config_stamp);
   void SetColorConversionOffsets(bool preoffsets, const float vals[3]);
   void ResetActiveTranscoder();
   void ResetScaler();
@@ -138,19 +140,20 @@ class Pipe {
   // Unused configuration stamps, which are older than all the current config
   // stamps used in the display layers, will be evicted from the list on each
   // Vsync.
-  std::list<config_stamp_t> pending_eviction_config_stamps_;
+  std::list<display::ConfigStamp> pending_eviction_config_stamps_;
 
   // The pipe registers only store the handle (address) of the images that are
   // being displayed. We need to keep a mapping from *image handle* to the
   // latest *config stamp* where this image is used so that we can know which
   // layer has the oldest configuration.
-  std::unordered_map<uintptr_t, config_stamp_t> latest_config_stamp_with_image_;
+  std::unordered_map<uintptr_t, display::ConfigStamp> latest_config_stamp_with_image_;
 
   // If the (there can be at most one) background color layer is enabled on the
   // pipe, we need to keep the config stamp of the configuration that enables
   // the color layer, so that we can return it on a Vsync event of a frame with
   // background color.
-  std::optional<config_stamp_t> config_stamp_with_color_layer_;
+  // Set to `kInvalidConfigStamp` if there's no background color layer.
+  display::ConfigStamp config_stamp_with_color_layer_ = display::kInvalidConfigStamp;
 };
 
 class PipeSkylake : public Pipe {

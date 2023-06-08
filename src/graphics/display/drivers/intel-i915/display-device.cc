@@ -21,6 +21,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 #include "src/graphics/display/drivers/intel-i915/tiling.h"
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
 namespace i915 {
@@ -191,7 +192,7 @@ bool DisplayDevice::CheckNeedsModeset(const display_mode_t* mode) {
 }
 
 void DisplayDevice::ApplyConfiguration(const display_config_t* banjo_display_config,
-                                       const config_stamp_t* config_stamp) {
+                                       display::ConfigStamp config_stamp) {
   ZX_ASSERT(banjo_display_config);
 
   if (CheckNeedsModeset(&banjo_display_config->mode)) {

@@ -22,6 +22,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-i915/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-i915/tiling.h"
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
 namespace {
@@ -383,17 +384,17 @@ void Pipe::LoadActiveMode(display_mode_t* mode) {
 }
 
 void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
-                              const config_stamp_t* config_stamp,
+                              display::ConfigStamp config_stamp,
                               const SetupGttImageFunc& get_gtt_region_fn,
                               const GetImagePixelFormatFunc& get_pixel_format) {
   ZX_ASSERT(banjo_display_config);
-  ZX_ASSERT(config_stamp);
+  ZX_ASSERT(config_stamp != display::kInvalidConfigStamp);
 
   // The values of the config stamps in `pending_eviction_config_stamps_` must
   // be strictly increasing.
   ZX_ASSERT(pending_eviction_config_stamps_.empty() ||
-            pending_eviction_config_stamps_.back().value < config_stamp->value);
-  pending_eviction_config_stamps_.push_back(*config_stamp);
+            pending_eviction_config_stamps_.back() < config_stamp);
+  pending_eviction_config_stamps_.push_back(config_stamp);
 
   registers::pipe_arming_regs_t regs;
   registers::PipeRegs pipe_regs(pipe_id_);
@@ -451,9 +452,9 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
     bottom_color.set_r(encode_pipe_color_component(static_cast<uint8_t>(color >> 16)));
     bottom_color.set_g(encode_pipe_color_component(static_cast<uint8_t>(color >> 8)));
     bottom_color.set_b(encode_pipe_color_component(static_cast<uint8_t>(color)));
-    config_stamp_with_color_layer_ = *config_stamp;
+    config_stamp_with_color_layer_ = config_stamp;
   } else {
-    config_stamp_with_color_layer_ = std::nullopt;
+    config_stamp_with_color_layer_ = display::kInvalidConfigStamp;
   }
 
   regs.pipe_bottom_color = bottom_color.reg_value();
@@ -469,7 +470,7 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
       }
     }
     ConfigurePrimaryPlane(plane, primary, !!banjo_display_config->cc_flags, &scaler_1_claimed,
-                          &regs, *config_stamp, get_gtt_region_fn, get_pixel_format);
+                          &regs, config_stamp, get_gtt_region_fn, get_pixel_format);
   }
   cursor_layer_t* cursor = nullptr;
   if (banjo_display_config->layer_count &&
@@ -477,7 +478,7 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
           LAYER_TYPE_CURSOR) {
     cursor = &banjo_display_config->layer_list[banjo_display_config->layer_count - 1]->cfg.cursor;
   }
-  ConfigureCursorPlane(cursor, !!banjo_display_config->cc_flags, &regs, *config_stamp);
+  ConfigureCursorPlane(cursor, !!banjo_display_config->cc_flags, &regs, config_stamp);
 
   if (platform_ != registers::Platform::kTigerLake) {
     pipe_regs.CscMode().FromValue(regs.csc_mode).WriteTo(mmio_space_);
@@ -502,7 +503,8 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
 
 void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* primary,
                                  bool enable_csc, bool* scaler_1_claimed,
-                                 registers::pipe_arming_regs_t* regs, config_stamp_t config_stamp,
+                                 registers::pipe_arming_regs_t* regs,
+                                 display::ConfigStamp config_stamp,
                                  const SetupGttImageFunc& setup_gtt_image,
                                  const GetImagePixelFormatFunc& get_pixel_format) {
   registers::PipeRegs pipe_regs(pipe_id());
@@ -717,7 +719,8 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
 }
 
 void Pipe::ConfigureCursorPlane(const cursor_layer_t* cursor, bool enable_csc,
-                                registers::pipe_arming_regs_t* regs, config_stamp_t config_stamp) {
+                                registers::pipe_arming_regs_t* regs,
+                                display::ConfigStamp config_stamp) {
   registers::PipeRegs pipe_regs(pipe_id());
 
   auto cursor_ctrl = pipe_regs.CursorCtrl().ReadFrom(mmio_space_);
@@ -765,12 +768,11 @@ void Pipe::ConfigureCursorPlane(const cursor_layer_t* cursor, bool enable_csc,
   latest_config_stamp_with_image_[cursor->image.handle] = config_stamp;
 }
 
-std::optional<config_stamp_t> Pipe::GetVsyncConfigStamp(
-    const std::vector<uint64_t>& image_handles) {
-  std::optional<config_stamp_t> oldest_config_stamp = std::nullopt;
+display::ConfigStamp Pipe::GetVsyncConfigStamp(const std::vector<uint64_t>& image_handles) {
+  display::ConfigStamp oldest_config_stamp = display::kInvalidConfigStamp;
 
-  if (config_stamp_with_color_layer_) {
-    oldest_config_stamp = *config_stamp_with_color_layer_;
+  if (config_stamp_with_color_layer_ != display::kInvalidConfigStamp) {
+    oldest_config_stamp = config_stamp_with_color_layer_;
   }
   for (const uint64_t handle : image_handles) {
     auto config_it = latest_config_stamp_with_image_.find(handle);
@@ -778,39 +780,37 @@ std::optional<config_stamp_t> Pipe::GetVsyncConfigStamp(
       continue;
     }
 
-    if (oldest_config_stamp.has_value()) {
-      oldest_config_stamp = {
-          .value = std::min(oldest_config_stamp->value, config_it->second.value),
-      };
+    if (oldest_config_stamp != display::kInvalidConfigStamp) {
+      oldest_config_stamp = std::min(oldest_config_stamp, config_it->second);
     } else {
       oldest_config_stamp = config_it->second;
     }
   }
 
-  if (!oldest_config_stamp) {
+  if (oldest_config_stamp == display::kInvalidConfigStamp) {
     // Display device may carry garbage contents in the registers, for example
     // if the driver restarted. In that case none of the images stored in the
     // device register will be recognized by the driver, so we just return a
     // null config stamp to ignore it.
     zxlogf(DEBUG, "%s: NO valid images for the display.", __func__);
-    return std::nullopt;
+    return display::kInvalidConfigStamp;
   }
   if (pending_eviction_config_stamps_.empty()) {
     // Vsync signals could be sent to the driver before the first
     // ApplyConfiguration() is called. In that case the Vsync signal should be
     // just ignored by the driver, so we return a null config stamp.
     zxlogf(DEBUG, "%s: No config has been applied.", __func__);
-    return std::nullopt;
+    return display::kInvalidConfigStamp;
   }
-  if (pending_eviction_config_stamps_.front().value > oldest_config_stamp->value) {
+  if (pending_eviction_config_stamps_.front() > oldest_config_stamp) {
     zxlogf(ERROR, "%s: Device returns a config (%lu) that is already evicted.", __func__,
-           oldest_config_stamp->value);
-    return std::nullopt;
+           oldest_config_stamp.value());
+    return display::kInvalidConfigStamp;
   }
 
   // Evict all pending config stamps older than the current one from Vsync.
   while (!pending_eviction_config_stamps_.empty() &&
-         pending_eviction_config_stamps_.front().value < oldest_config_stamp->value) {
+         pending_eviction_config_stamps_.front() < oldest_config_stamp) {
     pending_eviction_config_stamps_.pop_front();
   }
 
