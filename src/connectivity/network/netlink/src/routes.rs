@@ -10,7 +10,9 @@ use std::{
     hash::{Hash, Hasher},
 };
 
+use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
+
 use futures::{pin_mut, StreamExt as _, TryStreamExt as _};
 use net_types::ip::{Ip, IpAddress, IpVersion};
 use netlink_packet_core::NetlinkMessage;
@@ -37,10 +39,10 @@ use crate::NETLINK_LOG_TAG;
 /// message requests.
 pub(crate) struct EventLoop<
     S: Sender<<NetlinkRoute as ProtocolFamily>::Message>,
-    I: Ip + fnet_routes_ext::FidlRouteIpExt,
+    I: fnet_routes_ext::FidlRouteIpExt,
 > {
     /// A 'StateProxy` to connect to the routes watcher.
-    state_proxy: <I::StateMarker as fidl::endpoints::ProtocolMarker>::Proxy,
+    state_proxy: <I::StateMarker as ProtocolMarker>::Proxy,
     /// The current set of clients of NETLINK_ROUTE protocol family.
     route_clients: ClientTable<NetlinkRoute, S>,
 }
@@ -75,7 +77,7 @@ pub(crate) enum RoutesNetstackError<I: Ip> {
 
 impl<
         S: Sender<<NetlinkRoute as ProtocolFamily>::Message>,
-        I: Ip + fnet_routes_ext::FidlRouteIpExt,
+        I: fnet_routes_ext::FidlRouteIpExt,
     > EventLoop<S, I>
 {
     /// `new` returns an `EventLoop` instance.
@@ -399,16 +401,23 @@ impl<I: Ip> TryFrom<fnet_routes_ext::InstalledRoute<I>> for NetlinkRouteMessage 
 mod tests {
     use super::*;
 
-    use assert_matches::assert_matches;
     use fidl_fuchsia_net_routes as fnet_routes;
+
+    use assert_matches::assert_matches;
+    use futures::Stream;
     use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
     use net_types::{
-        ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet},
+        ip::{GenericOverIp, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet},
         SpecifiedAddr,
     };
     use test_case::test_case;
 
     use crate::messaging::testutil::FakeSender;
+
+    const TEST_V4_SUBNET: Subnet<Ipv4Addr> = net_subnet_v4!("192.0.2.0/24");
+    const TEST_V4_NEXTHOP: Ipv4Addr = net_ip_v4!("192.0.2.1");
+    const TEST_V6_SUBNET: Subnet<Ipv6Addr> = net_subnet_v6!("2001:db8::0/32");
+    const TEST_V6_NEXTHOP: Ipv6Addr = net_ip_v6!("2001:db8::1");
 
     fn create_installed_route<I: Ip>(
         subnet: Subnet<I::Addr>,
@@ -481,18 +490,12 @@ mod tests {
 
     #[fuchsia::test]
     fn test_handle_route_watcher_event_v4() {
-        handle_route_watcher_event_helper::<Ipv4>(
-            net_subnet_v4!("192.0.2.0/24"),
-            net_ip_v4!("192.0.2.1"),
-        );
+        handle_route_watcher_event_helper::<Ipv4>(TEST_V4_SUBNET, TEST_V4_NEXTHOP);
     }
 
     #[fuchsia::test]
     fn test_handle_route_watcher_event_v6() {
-        handle_route_watcher_event_helper::<Ipv6>(
-            net_subnet_v6!("2001:db8::0/32"),
-            net_ip_v6!("2001:db8::1"),
-        );
+        handle_route_watcher_event_helper::<Ipv6>(TEST_V6_SUBNET, TEST_V6_NEXTHOP);
     }
 
     fn handle_route_watcher_event_helper<I: Ip>(subnet: Subnet<I::Addr>, next_hop: I::Addr) {
@@ -594,24 +597,15 @@ mod tests {
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
     }
 
-    #[test_case(net_subnet_v4!("192.0.2.0/24"), net_ip_v4!("192.0.2.1"))]
-    // InstalledRoute with a default subnet should not have a Destination NLA.
+    #[test_case(TEST_V4_SUBNET, TEST_V4_NEXTHOP)]
+    #[test_case(TEST_V6_SUBNET, TEST_V6_NEXTHOP)]
     #[test_case(net_subnet_v4!("0.0.0.0/0"), net_ip_v4!("0.0.0.1"))]
-    fn test_netlink_route_message_try_from_installed_route_v4(
-        subnet: Subnet<Ipv4Addr>,
-        next_hop: Ipv4Addr,
-    ) {
-        netlink_route_message_conversion_helper::<Ipv4>(subnet, next_hop);
-    }
-
-    #[test_case(net_subnet_v6!("2001:db8::0/32"), net_ip_v6!("2001:db8::1"))]
-    // InstalledRoute with a default subnet should not have a Destination NLA.
     #[test_case(net_subnet_v6!("::/0"), net_ip_v6!("::1"))]
-    fn test_netlink_route_message_try_from_installed_route_v6(
-        subnet: Subnet<Ipv6Addr>,
-        next_hop: Ipv6Addr,
+    fn test_netlink_route_message_try_from_installed_route<A: IpAddress>(
+        subnet: Subnet<A>,
+        next_hop: A,
     ) {
-        netlink_route_message_conversion_helper::<Ipv6>(subnet, next_hop);
+        netlink_route_message_conversion_helper::<A::Version>(subnet, next_hop);
     }
 
     fn netlink_route_message_conversion_helper<I: Ip>(subnet: Subnet<I::Addr>, next_hop: I::Addr) {
@@ -635,11 +629,12 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
-    #[fuchsia::test]
-    fn test_non_forward_route_conversion() {
-        let installed_route = fnet_routes_ext::InstalledRoute::<Ipv4> {
+    #[test_case(TEST_V4_SUBNET)]
+    #[test_case(TEST_V6_SUBNET)]
+    fn test_non_forward_route_conversion<A: IpAddress>(subnet: Subnet<A>) {
+        let installed_route = fnet_routes_ext::InstalledRoute::<A::Version> {
             route: fnet_routes_ext::Route {
-                destination: net_subnet_v4!("192.0.2.0/24"),
+                destination: subnet,
                 action: fnet_routes_ext::RouteAction::Unknown,
                 properties: fnet_routes_ext::RouteProperties {
                     specified_properties: fnet_routes_ext::SpecifiedRouteProperties {
@@ -661,8 +656,8 @@ mod tests {
     fn test_oversized_interface_id_route_conversion() {
         let invalid_interface_id = (u32::MAX as u64) + 1;
         let installed_route: fnet_routes_ext::InstalledRoute<Ipv4> = create_installed_route(
-            net_subnet_v4!("192.0.2.0/24"),
-            net_ip_v4!("192.0.2.1"),
+            TEST_V4_SUBNET,
+            TEST_V4_NEXTHOP,
             invalid_interface_id,
             Default::default(),
         );
@@ -693,20 +688,10 @@ mod tests {
         del_route_message.serialize(&mut buf);
     }
 
-    #[fuchsia::test]
-    fn test_new_set_with_existing_routes_v4() {
-        new_set_with_existing_routes_helper::<Ipv4>(
-            net_subnet_v4!("192.0.2.0/24"),
-            net_ip_v4!("192.0.2.1"),
-        );
-    }
-
-    #[fuchsia::test]
-    fn test_new_set_with_existing_routes_v6() {
-        new_set_with_existing_routes_helper::<Ipv6>(
-            net_subnet_v6!("2001:db8::0/32"),
-            net_ip_v6!("2001:db8::1"),
-        );
+    #[test_case(TEST_V4_SUBNET, TEST_V4_NEXTHOP)]
+    #[test_case(TEST_V6_SUBNET, TEST_V6_NEXTHOP)]
+    fn test_new_set_with_existing_routes<A: IpAddress>(subnet: Subnet<A>, next_hop: A) {
+        new_set_with_existing_routes_helper::<A::Version>(subnet, next_hop);
     }
 
     fn new_set_with_existing_routes_helper<I: Ip>(subnet: Subnet<I::Addr>, next_hop: I::Addr) {
@@ -737,5 +722,194 @@ mod tests {
         let expected: HashSet<NetlinkRouteMessage> =
             vec![netlink_route_message].into_iter().collect::<_>();
         assert_eq!(actual, expected);
+    }
+
+    struct Setup<W, I: fnet_routes_ext::FidlRouteIpExt> {
+        event_loop: EventLoop<FakeSender<NetlinkMessage<RtnlMessage>>, I>,
+        watcher_stream: W,
+    }
+
+    fn setup_with_route_clients<I: fnet_routes_ext::FidlRouteIpExt>(
+        route_clients: ClientTable<NetlinkRoute, FakeSender<NetlinkMessage<RtnlMessage>>>,
+    ) -> Setup<
+        impl Stream<Item = <<I::WatcherMarker as ProtocolMarker>::RequestStream as Stream>::Item>,
+        I,
+    > {
+        let (state_proxy, route_stream) =
+            fidl::endpoints::create_proxy_and_stream::<I::StateMarker>().unwrap();
+        let event_loop = EventLoop::<FakeSender<_>, I> { state_proxy, route_clients };
+
+        #[derive(GenericOverIp)]
+        struct StateRequestWrapper<I: Ip + fnet_routes_ext::FidlRouteIpExt> {
+            request: <<I::StateMarker as ProtocolMarker>::RequestStream as futures::TryStream>::Ok,
+        }
+
+        #[derive(GenericOverIp)]
+        struct WatcherRequestWrapper<I: Ip + fnet_routes_ext::FidlRouteIpExt> {
+            watcher: <I::WatcherMarker as ProtocolMarker>::RequestStream,
+        }
+
+        let watcher_stream = route_stream
+            .and_then(|request| {
+                let wrapper = I::map_ip(
+                    StateRequestWrapper { request },
+                    |StateRequestWrapper { request }| match request {
+                        fnet_routes::StateV4Request::GetWatcherV4 {
+                            options: _,
+                            watcher,
+                            control_handle: _,
+                        } => WatcherRequestWrapper { watcher: watcher.into_stream().unwrap() },
+                    },
+                    |StateRequestWrapper { request }| match request {
+                        fnet_routes::StateV6Request::GetWatcherV6 {
+                            options: _,
+                            watcher,
+                            control_handle: _,
+                        } => WatcherRequestWrapper { watcher: watcher.into_stream().unwrap() },
+                    },
+                );
+                futures::future::ok(wrapper)
+            })
+            .map(|res| res.expect("watcher stream error"))
+            .map(|WatcherRequestWrapper { watcher }| watcher)
+            // For testing, we only expect there to be a single connection to the watcher, so the
+            // stream is condensed into a single `WatchRequest` stream.
+            .flatten();
+
+        Setup { event_loop, watcher_stream }
+    }
+
+    fn setup<I: fnet_routes_ext::FidlRouteIpExt>() -> Setup<
+        impl Stream<Item = <<I::WatcherMarker as ProtocolMarker>::RequestStream as Stream>::Item>,
+        I,
+    > {
+        setup_with_route_clients::<I>(ClientTable::default())
+    }
+
+    async fn respond_to_watcher<
+        I: fnet_routes_ext::FidlRouteIpExt,
+        S: Stream<Item = <<I::WatcherMarker as ProtocolMarker>::RequestStream as Stream>::Item>,
+    >(
+        stream: S,
+        updates: impl IntoIterator<Item = I::WatchEvent>,
+    ) {
+        #[derive(GenericOverIp)]
+        struct HandleInputs<I: Ip + fnet_routes_ext::FidlRouteIpExt> {
+            request: <<I::WatcherMarker as ProtocolMarker>::RequestStream as Stream>::Item,
+            update: I::WatchEvent,
+        }
+        stream
+            .zip(futures::stream::iter(updates.into_iter()))
+            .for_each(|(request, update)| async move {
+                I::map_ip::<_, ()>(
+                    HandleInputs { request, update },
+                    |HandleInputs { request, update }| match request
+                        .expect("failed to receive `Watch` request")
+                    {
+                        fnet_routes::WatcherV4Request::Watch { responder } => {
+                            responder.send(&[update]).expect("failed to respond to `Watch`")
+                        }
+                    },
+                    |HandleInputs { request, update }| match request
+                        .expect("failed to receive `Watch` request")
+                    {
+                        fnet_routes::WatcherV6Request::Watch { responder } => {
+                            responder.send(&[update]).expect("failed to respond to `Watch`")
+                        }
+                    },
+                );
+            })
+            .await;
+    }
+
+    async fn respond_to_watcher_with_routes<
+        I: fnet_routes_ext::FidlRouteIpExt,
+        S: Stream<Item = <<I::WatcherMarker as ProtocolMarker>::RequestStream as Stream>::Item>,
+    >(
+        stream: S,
+        existing_routes: impl IntoIterator<Item = fnet_routes_ext::InstalledRoute<I>>,
+        new_event: Option<fnet_routes_ext::Event<I>>,
+    ) {
+        let events = existing_routes
+            .into_iter()
+            .map(|route| fnet_routes_ext::Event::<I>::Existing(route))
+            .chain(std::iter::once(fnet_routes_ext::Event::<I>::Idle))
+            .chain(new_event)
+            .map(|event| event.try_into().unwrap());
+
+        respond_to_watcher::<I, _>(stream, events).await;
+    }
+
+    #[test_case(TEST_V4_SUBNET, TEST_V4_NEXTHOP)]
+    #[test_case(TEST_V6_SUBNET, TEST_V6_NEXTHOP)]
+    #[fuchsia::test]
+    async fn test_event_loop_event_errors<A: IpAddress>(subnet: Subnet<A>, next_hop: A)
+    where
+        A::Version: fnet_routes_ext::FidlRouteIpExt,
+    {
+        let route =
+            create_installed_route(subnet, next_hop, Default::default(), Default::default());
+
+        event_loop_errors_stream_ended_helper::<A::Version>(route).await;
+        event_loop_errors_existing_after_add_helper::<A::Version>(route).await;
+        event_loop_errors_duplicate_adds_helper::<A::Version>(route).await;
+    }
+
+    async fn event_loop_errors_stream_ended_helper<I: fnet_routes_ext::FidlRouteIpExt>(
+        route: fnet_routes_ext::InstalledRoute<I>,
+    ) {
+        let Setup { event_loop, watcher_stream } = setup::<I>();
+        let event_loop_fut = event_loop.run();
+        let watcher_fut = respond_to_watcher_with_routes(watcher_stream, [route], None);
+
+        let (err, ()) = futures::join!(event_loop_fut, watcher_fut);
+        assert_matches!(
+            err,
+            EventLoopError::Fidl(RoutesFidlError::Watch(fnet_routes_ext::WatchError::Fidl(
+                fidl::Error::ClientChannelClosed { .. }
+            )))
+        );
+    }
+
+    async fn event_loop_errors_existing_after_add_helper<I: fnet_routes_ext::FidlRouteIpExt>(
+        route: fnet_routes_ext::InstalledRoute<I>,
+    ) {
+        let Setup { event_loop, watcher_stream } = setup::<I>();
+        let event_loop_fut = event_loop.run();
+        let routes_existing = [route.clone()];
+        let new_event = fnet_routes_ext::Event::Existing(route.clone());
+        let watcher_fut =
+            respond_to_watcher_with_routes(watcher_stream, routes_existing, Some(new_event));
+
+        let (err, ()) = futures::join!(event_loop_fut, watcher_fut);
+        assert_matches!(
+            err,
+            EventLoopError::Netstack(
+                RoutesNetstackError::UnexpectedEvent(
+                    fnet_routes_ext::Event::Existing(res)
+                )
+            ) => {
+                assert_eq!(res, route)
+            }
+        );
+    }
+
+    async fn event_loop_errors_duplicate_adds_helper<I: fnet_routes_ext::FidlRouteIpExt>(
+        route: fnet_routes_ext::InstalledRoute<I>,
+    ) {
+        let Setup { event_loop, watcher_stream } = setup::<I>();
+        let event_loop_fut = event_loop.run();
+        let routes_existing = [route.clone()];
+        let new_event = fnet_routes_ext::Event::Added(route.clone());
+        let watcher_fut =
+            respond_to_watcher_with_routes(watcher_stream, routes_existing, Some(new_event));
+
+        let (err, ()) = futures::join!(event_loop_fut, watcher_fut);
+        assert_matches!(
+            err,
+            EventLoopError::Netstack(RoutesNetstackError::UnexpectedRoute(res)) => {
+                assert_eq!(res, route)
+            }
+        );
     }
 }

@@ -553,6 +553,7 @@ pub trait FidlRouteIpExt: Ip {
     type WatcherMarker: fidl::endpoints::ProtocolMarker;
     /// The type of "event" returned by this IP version's watcher protocol.
     type WatchEvent: TryInto<Event<Self>, Error = FidlConversionError>
+        + TryFrom<Event<Self>, Error = NetTypeConversionError>
         + Clone
         + std::fmt::Debug
         + PartialEq
