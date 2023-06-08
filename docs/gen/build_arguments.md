@@ -7566,7 +7566,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"dPuK81TMCNKPKvF3kQtHZ06EajzWNB2C7IeuF1TAa2YC"`
+**Current value (from the default):** `"vlYlD4LtM1Zm9XCTzX2CDQZkTOpoI0v9cECjU_oSfSsC"`
 
 From //build/rust/config.gni:32
 
@@ -7680,15 +7680,24 @@ Identifier for the Core SDK.
 
 From //sdk/config.gni:7
 
-### sdk_no_host_tools
+### sdk_inside_idk_sub_build
 
-Whether to omit host tools from the generated IDKs.
-Should only be set in the args.gn files created by generate_final_idk()
+True when building an IDK cpu-specific sub-build. See //build/sdk/build_final_idk.py.
+Certain targets must not appear in the GN build graph to avoid circular dependency
+issues. Should only be set in the args.gn files created by generate_final_idl()
 actions.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:16
+From //build/sdk/config.gni:20
+
+### sdk_no_host_tools
+
+Whether to omit host tools from the generated IDKs.
+
+**Current value (from the default):** `false`
+
+From //build/sdk/config.gni:14
 
 ### select_variant
 
