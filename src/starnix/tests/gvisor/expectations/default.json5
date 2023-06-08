@@ -405,6 +405,7 @@
                 "AllInetTests/RawPacketTest.GetSocketDetachFilter/*",
                 "AllInetTests/RawPacketTest.GetSocketAcceptConn/*",
                 "AllInetTests/RawPacketTest.Receive/*",
+                "AllInetTests/RawPacketTest.SendFromLoopback/*",
                 "AllRawPacketMsgSizeTest/RawPacketMsgSizeTest.SendTooLong/*",
                 "AllRawPacketMsgSizeTest/RawPacketMsgSizeTest.SpliceTooLong/*",
 
