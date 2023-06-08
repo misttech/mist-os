@@ -68,7 +68,6 @@ pub(crate) enum LinkRequestArgs {
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum GetAddressArgs {
     /// Dump state for all addresses with the optional IP version filter.
-    #[allow(unused)]
     Dump { ip_version_filter: Option<IpVersion> },
     // TODO(https://issuetracker.google.com/283134032): Support get requests w/
     // filter.
@@ -100,7 +99,6 @@ pub(crate) struct DelAddressArgs {
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum AddressRequestArgs {
     /// RTM_GETADDR
-    #[allow(unused)]
     Get(GetAddressArgs),
     /// RTM_NEWADDR
     #[allow(unused)]
@@ -114,7 +112,6 @@ pub(crate) enum AddressRequestArgs {
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum RequestArgs {
     Link(LinkRequestArgs),
-    #[allow(unused)]
     Address(AddressRequestArgs),
 }
 
@@ -906,17 +903,23 @@ impl TryFrom<fnet_interfaces_ext::Properties> for NetlinkLinkMessage {
 /// A wrapper type for the netlink_packet_route `AddressMessage` to enable conversions
 /// from [`fnet_interfaces_ext::Properties`] and implement hashing.
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct NetlinkAddressMessage(AddressMessage);
+pub(crate) struct NetlinkAddressMessage(AddressMessage);
 
 impl NetlinkAddressMessage {
-    fn to_rtnl_new_addr(&self) -> NetlinkMessage<RtnlMessage> {
+    pub(crate) fn to_rtnl_new_addr(&self) -> NetlinkMessage<RtnlMessage> {
         let Self(message) = self;
-        RtnlMessage::NewAddress(message.clone()).into()
+        let mut message: NetlinkMessage<RtnlMessage> =
+            RtnlMessage::NewAddress(message.clone()).into();
+        message.finalize();
+        message
     }
 
-    fn to_rtnl_del_addr(&self) -> NetlinkMessage<RtnlMessage> {
+    pub(crate) fn to_rtnl_del_addr(&self) -> NetlinkMessage<RtnlMessage> {
         let Self(message) = self;
-        RtnlMessage::DelAddress(message.clone()).into()
+        let mut message: NetlinkMessage<RtnlMessage> =
+            RtnlMessage::DelAddress(message.clone()).into();
+        message.finalize();
+        message
     }
 }
 
@@ -1025,6 +1028,7 @@ pub(crate) mod testutil {
     use super::*;
 
     use assert_matches::assert_matches;
+    use fuchsia_zircon as zx;
     use futures::stream::Stream;
     use net_declare::fidl_subnet;
     use netlink_packet_core::NetlinkPayload;
@@ -1154,6 +1158,42 @@ pub(crate) mod testutil {
             }),
         ]
     }
+
+    pub(crate) fn create_address_message(
+        interface_id: u32,
+        subnet: fnet::Subnet,
+        interface_name: String,
+        flags: u32,
+    ) -> NetlinkAddressMessage {
+        let mut addr_header = AddressHeader::default();
+        let (family, addr) = match subnet.addr {
+            fnet::IpAddress::Ipv4(ip_addr) => (AF_INET, ip_addr.addr.to_vec()),
+            fnet::IpAddress::Ipv6(ip_addr) => (AF_INET6, ip_addr.addr.to_vec()),
+        };
+        addr_header.family = family as u8;
+        addr_header.prefix_len = subnet.prefix_len;
+        addr_header.flags = flags.try_into().expect("should fit into u8");
+        addr_header.index = interface_id;
+
+        let nlas = vec![
+            netlink_packet_route::address::nlas::Nla::Address(addr),
+            netlink_packet_route::address::nlas::Nla::Label(interface_name),
+            netlink_packet_route::address::nlas::Nla::Flags(flags.into()),
+        ];
+
+        let mut addr_message = AddressMessage::default();
+        addr_message.header = addr_header;
+        addr_message.nlas = nlas;
+        NetlinkAddressMessage(addr_message)
+    }
+
+    pub(crate) fn test_addr(addr: fnet::Subnet) -> fnet_interfaces::Address {
+        fnet_interfaces::Address {
+            addr: Some(addr),
+            valid_until: Some(zx::sys::ZX_TIME_INFINITE),
+            ..Default::default()
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1164,7 +1204,6 @@ mod tests {
     use fidl_fuchsia_net as fnet;
     use fnet_interfaces::AddressAssignmentState;
     use fuchsia_async::{self as fasync};
-    use fuchsia_zircon as zx;
 
     use assert_matches::assert_matches;
     use futures::{
@@ -1173,9 +1212,7 @@ mod tests {
         stream::Stream,
     };
     use net_declare::net_addr_subnet;
-    use netlink_packet_route::{
-        AddressHeader, AddressMessage, AF_INET, AF_INET6, RTNLGRP_IPV4_ROUTE,
-    };
+    use netlink_packet_route::RTNLGRP_IPV4_ROUTE;
     use pretty_assertions::assert_eq;
     use test_case::test_case;
 
@@ -1228,34 +1265,6 @@ mod tests {
                 create_address_message(interface_id, TEST_V6_ADDR, interface_name, flags),
             ),
         ])
-    }
-
-    fn create_address_message(
-        interface_id: u32,
-        subnet: fnet::Subnet,
-        interface_name: String,
-        flags: u32,
-    ) -> NetlinkAddressMessage {
-        let mut addr_header = AddressHeader::default();
-        let (family, addr) = match subnet.addr {
-            fnet::IpAddress::Ipv4(ip_addr) => (AF_INET, ip_addr.addr.to_vec()),
-            fnet::IpAddress::Ipv6(ip_addr) => (AF_INET6, ip_addr.addr.to_vec()),
-        };
-        addr_header.family = family as u8;
-        addr_header.prefix_len = subnet.prefix_len;
-        addr_header.flags = flags.try_into().expect("should fit into u8");
-        addr_header.index = interface_id;
-
-        let nlas = vec![
-            netlink_packet_route::address::nlas::Nla::Address(addr),
-            netlink_packet_route::address::nlas::Nla::Label(interface_name),
-            netlink_packet_route::address::nlas::Nla::Flags(flags.into()),
-        ];
-
-        let mut addr_message = AddressMessage::default();
-        addr_message.header = addr_header;
-        addr_message.nlas = nlas;
-        NetlinkAddressMessage(addr_message)
     }
 
     #[fuchsia::test]
@@ -1535,14 +1544,6 @@ mod tests {
             interface_properties_to_address_messages(&interface),
             Err(NetlinkAddressMessageConversionError::InvalidInterfaceId(invalid_interface_id))
         );
-    }
-
-    fn test_addr(addr: fnet::Subnet) -> fnet_interfaces::Address {
-        fnet_interfaces::Address {
-            addr: Some(addr),
-            valid_until: Some(zx::sys::ZX_TIME_INFINITE),
-            ..Default::default()
-        }
     }
 
     #[fuchsia::test]

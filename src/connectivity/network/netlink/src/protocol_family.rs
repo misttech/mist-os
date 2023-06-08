@@ -13,7 +13,7 @@ use std::fmt::Debug;
 // #![feature(async_fn_in_trait)] once it supports `Send` bounds. See
 // https://blog.rust-lang.org/inside-rust/2023/05/03/stabilizing-async-fn-in-trait.html.
 use async_trait::async_trait;
-use tracing::warn;
+use tracing::{debug, warn};
 
 use crate::{
     client::{ExternalClient, InternalClient},
@@ -55,20 +55,24 @@ pub mod route {
         channel::{mpsc, oneshot},
         sink::SinkExt as _,
     };
+    use net_types::ip::IpVersion;
 
-    use crate::interfaces;
+    use crate::{
+        interfaces,
+        netlink_packet::{new_ack, new_done, AckErrorCode, NackErrorCode},
+    };
 
     use netlink_packet_core::{NLM_F_ACK, NLM_F_DUMP};
     use netlink_packet_route::rtnl::{
         constants::{
-            RTNLGRP_DCB, RTNLGRP_DECNET_IFADDR, RTNLGRP_DECNET_ROUTE, RTNLGRP_DECNET_RULE,
-            RTNLGRP_IPV4_IFADDR, RTNLGRP_IPV4_MROUTE, RTNLGRP_IPV4_MROUTE_R, RTNLGRP_IPV4_NETCONF,
-            RTNLGRP_IPV4_ROUTE, RTNLGRP_IPV4_RULE, RTNLGRP_IPV6_IFADDR, RTNLGRP_IPV6_IFINFO,
-            RTNLGRP_IPV6_MROUTE, RTNLGRP_IPV6_MROUTE_R, RTNLGRP_IPV6_NETCONF, RTNLGRP_IPV6_PREFIX,
-            RTNLGRP_IPV6_ROUTE, RTNLGRP_IPV6_RULE, RTNLGRP_LINK, RTNLGRP_MDB, RTNLGRP_MPLS_NETCONF,
-            RTNLGRP_MPLS_ROUTE, RTNLGRP_ND_USEROPT, RTNLGRP_NEIGH, RTNLGRP_NONE, RTNLGRP_NOP2,
-            RTNLGRP_NOP4, RTNLGRP_NOTIFY, RTNLGRP_NSID, RTNLGRP_PHONET_IFADDR,
-            RTNLGRP_PHONET_ROUTE, RTNLGRP_TC,
+            AF_INET, AF_INET6, AF_UNSPEC, RTNLGRP_DCB, RTNLGRP_DECNET_IFADDR, RTNLGRP_DECNET_ROUTE,
+            RTNLGRP_DECNET_RULE, RTNLGRP_IPV4_IFADDR, RTNLGRP_IPV4_MROUTE, RTNLGRP_IPV4_MROUTE_R,
+            RTNLGRP_IPV4_NETCONF, RTNLGRP_IPV4_ROUTE, RTNLGRP_IPV4_RULE, RTNLGRP_IPV6_IFADDR,
+            RTNLGRP_IPV6_IFINFO, RTNLGRP_IPV6_MROUTE, RTNLGRP_IPV6_MROUTE_R, RTNLGRP_IPV6_NETCONF,
+            RTNLGRP_IPV6_PREFIX, RTNLGRP_IPV6_ROUTE, RTNLGRP_IPV6_RULE, RTNLGRP_LINK, RTNLGRP_MDB,
+            RTNLGRP_MPLS_NETCONF, RTNLGRP_MPLS_ROUTE, RTNLGRP_ND_USEROPT, RTNLGRP_NEIGH,
+            RTNLGRP_NONE, RTNLGRP_NOP2, RTNLGRP_NOP4, RTNLGRP_NOTIFY, RTNLGRP_NSID,
+            RTNLGRP_PHONET_IFADDR, RTNLGRP_PHONET_ROUTE, RTNLGRP_TC,
         },
         RtnlMessage,
     };
@@ -153,9 +157,12 @@ pub mod route {
                 }
             };
 
+            let is_dump = req_header.flags & NLM_F_DUMP == NLM_F_DUMP;
+            let is_ack = req_header.flags & NLM_F_ACK == NLM_F_ACK;
+
             use RtnlMessage::*;
             match req {
-                GetLink(_) if req_header.flags & NLM_F_DUMP == NLM_F_DUMP => {
+                GetLink(_) if is_dump => {
                     let (completer, waiter) = oneshot::channel();
                     interfaces_request_sink.send(interfaces::Request {
                         args: interfaces::RequestArgs::Link(
@@ -170,7 +177,37 @@ pub mod route {
                         .await
                         .expect("interfaces event loop should have handled the request")
                         .expect("link dump requests are infallible");
-                    client.send(crate::netlink_packet::new_done())
+                    client.send(new_done())
+                }
+                GetAddress(ref message) if is_dump => {
+                    let ip_version_filter = match message.header.family.into() {
+                        AF_UNSPEC => None,
+                        AF_INET => Some(IpVersion::V4),
+                        AF_INET6 => Some(IpVersion::V6),
+                        family => {
+                            debug!("invalid address family ({}) in address dump request: {:?}", family, req);
+                            client.send(new_ack(NackErrorCode::INVALID, req_header));
+                            return;
+                        }
+                    };
+
+                    let (completer, waiter) = oneshot::channel();
+                    interfaces_request_sink.send(interfaces::Request {
+                        args: interfaces::RequestArgs::Address(
+                            interfaces::AddressRequestArgs::Get(
+                                interfaces::GetAddressArgs::Dump {
+                                    ip_version_filter,
+                                },
+                            ),
+                        ),
+                        client: client.clone(),
+                        completer,
+                    }).await.expect("interface event loop should never terminate");
+                    waiter
+                        .await
+                        .expect("interfaces event loop should have handled the request")
+                        .expect("addr dump requests are infallible");
+                    client.send(new_done())
                 }
                 NewLink(_)
                 | DelLink(_)
@@ -208,12 +245,12 @@ pub mod route {
                 | NewRule(_)
                 // TODO(https://issuetracker.google.com/283134947): Implement DelRule.
                 | DelRule(_) => {
-                    if req_header.flags&NLM_F_ACK == NLM_F_ACK {
+                    if is_ack {
                         warn!(
                             "Received unsupported NETLINK_ROUTE request; responding with an Ack: {:?}",
                             req,
                         );
-                        client.send(crate::netlink_packet::new_ack(req_header))
+                        client.send(new_ack(AckErrorCode, req_header))
                     } else {
                         warn!(
                             "Received unsupported NETLINK_ROUTE request that does not expect an Ack: {:?}",
@@ -238,18 +275,18 @@ pub mod route {
                 | GetQueueDiscipline(_)
                 // TODO(https://issuetracker.google.com/283134947): Implement GetRule.
                 | GetRule(_) => {
-                    if req_header.flags&NLM_F_DUMP == NLM_F_DUMP {
+                    if is_dump {
                         warn!(
                             "Received unsupported NETLINK_ROUTE DUMP request; responding with Done: {:?}",
                             req
                         );
-                        client.send(crate::netlink_packet::new_done())
-                    } else if req_header.flags&NLM_F_ACK == NLM_F_ACK {
+                        client.send(new_done())
+                    } else if is_ack {
                         warn!(
                             "Received unsupported NETLINK_ROUTE GET request: responding with Ack {:?}",
                             req
                         );
-                        client.send(crate::netlink_packet::new_ack(req_header))
+                        client.send(new_ack(AckErrorCode, req_header))
                     } else {
                         warn!(
                             "Received unsupported NETLINK_ROUTE GET request that does not expect an Ack {:?}",
@@ -360,11 +397,12 @@ mod test {
 
     use fidl_fuchsia_net_interfaces as fnet_interfaces;
 
+    use assert_matches::assert_matches;
     use futures::{channel::mpsc, future::FutureExt as _, stream::StreamExt as _};
     use netlink_packet_core::{NetlinkHeader, NLM_F_ACK, NLM_F_DUMP};
     use netlink_packet_route::{
-        LinkMessage, RtnlMessage, TcMessage, ARPHRD_LOOPBACK, ARPHRD_PPP, IFF_LOOPBACK,
-        IFF_RUNNING, IFF_UP,
+        AddressMessage, LinkMessage, RtnlMessage, TcMessage, AF_INET, AF_INET6, AF_PACKET,
+        AF_UNSPEC, ARPHRD_LOOPBACK, ARPHRD_PPP, IFA_F_PERMANENT, IFF_LOOPBACK, IFF_RUNNING, IFF_UP,
     };
     use test_case::test_case;
 
@@ -372,13 +410,19 @@ mod test {
         client::ClientTable,
         interfaces,
         messaging::testutil::FakeSender,
-        netlink_packet::{new_ack, new_done},
+        netlink_packet::{new_ack, new_done, AckErrorCode, NackErrorCode},
         protocol_family::route::{NetlinkRoute, NetlinkRouteRequestHandler},
     };
 
-    enum ExpectedResponse {
-        Ack,
+    enum ExpectedResponse<C> {
+        Ack(C),
         Done,
+    }
+
+    fn header_with_flags(flags: u16) -> NetlinkHeader {
+        let mut header = NetlinkHeader::default();
+        header.flags = flags;
+        header
     }
 
     /// Tests that unhandled requests are treated as a no-op.
@@ -394,7 +438,7 @@ mod test {
     #[test_case(
         RtnlMessage::GetTrafficChain,
         NLM_F_ACK,
-        Some(ExpectedResponse::Ack); "get_with_ack_flag")]
+        Some(ExpectedResponse::Ack(AckErrorCode)); "get_with_ack_flag")]
     #[test_case(
         RtnlMessage::GetTrafficChain,
         NLM_F_DUMP,
@@ -414,11 +458,11 @@ mod test {
     #[test_case(
         RtnlMessage::NewTrafficChain,
         NLM_F_ACK,
-        Some(ExpectedResponse::Ack); "new_with_ack_flag")]
+        Some(ExpectedResponse::Ack(AckErrorCode)); "new_with_ack_flag")]
     #[test_case(
         RtnlMessage::NewTrafficChain,
         NLM_F_ACK | NLM_F_DUMP,
-        Some(ExpectedResponse::Ack); "new_with_ack_and_dump_flags")]
+        Some(ExpectedResponse::Ack(AckErrorCode)); "new_with_ack_and_dump_flags")]
     #[test_case(
         RtnlMessage::DelTrafficChain,
         0,
@@ -430,16 +474,16 @@ mod test {
     #[test_case(
         RtnlMessage::DelTrafficChain,
         NLM_F_ACK,
-        Some(ExpectedResponse::Ack); "del_with_ack_flag")]
+        Some(ExpectedResponse::Ack(AckErrorCode)); "del_with_ack_flag")]
     #[test_case(
         RtnlMessage::DelTrafficChain,
         NLM_F_ACK | NLM_F_DUMP,
-        Some(ExpectedResponse::Ack); "del_with_ack_and_dump_flags")]
+        Some(ExpectedResponse::Ack(AckErrorCode)); "del_with_ack_and_dump_flags")]
     #[fuchsia::test]
     async fn test_handle_unsupported_request_response(
         tc_fn: fn(TcMessage) -> RtnlMessage,
         flags: u16,
-        expected_response: Option<ExpectedResponse>,
+        expected_response: Option<ExpectedResponse<AckErrorCode>>,
     ) {
         let (interfaces_request_sink, _interfaces_request_stream) = mpsc::channel(0);
         let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>> { interfaces_request_sink };
@@ -449,11 +493,7 @@ mod test {
             &[],
         );
 
-        let header = {
-            let mut header = NetlinkHeader::default();
-            header.flags = flags;
-            header
-        };
+        let header = header_with_flags(flags);
 
         handler
             .handle_request(
@@ -466,8 +506,8 @@ mod test {
             .await;
 
         match expected_response {
-            Some(ExpectedResponse::Ack) => {
-                assert_eq!(client_sink.take_messages(), [new_ack(header)])
+            Some(ExpectedResponse::Ack(code)) => {
+                assert_eq!(client_sink.take_messages(), [new_ack(code, header)])
             }
             Some(ExpectedResponse::Done) => {
                 assert_eq!(client_sink.take_messages(), [new_done()])
@@ -478,7 +518,73 @@ mod test {
         }
     }
 
-    fn test_get_links_dump_messages() -> impl IntoIterator<Item = interfaces::NetlinkLinkMessage> {
+    async fn test_request(
+        request: NetlinkMessage<RtnlMessage>,
+    ) -> Vec<NetlinkMessage<RtnlMessage>> {
+        let (mut client_sink, mut client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
+            crate::client::testutil::CLIENT_ID_1,
+            &[],
+        );
+
+        let interfaces::testutil::Setup {
+            event_loop,
+            mut watcher_stream,
+            request_sink: interfaces_request_sink,
+            interfaces_request_stream: _,
+        } = interfaces::testutil::setup_with_route_clients({
+            let route_clients = ClientTable::default();
+            route_clients.add_client(client.clone());
+            route_clients
+        });
+
+        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>> { interfaces_request_sink };
+
+        let event_loop_fut = event_loop.run().fuse();
+        futures::pin_mut!(event_loop_fut);
+
+        let fut = interfaces::testutil::respond_to_watcher(
+            watcher_stream.by_ref(),
+            [
+                fnet_interfaces::Event::Existing(fnet_interfaces::Properties {
+                    id: Some(interfaces::testutil::LO_INTERFACE_ID),
+                    name: Some(interfaces::testutil::LO_NAME.to_string()),
+                    device_class: Some(interfaces::testutil::LOOPBACK),
+                    online: Some(true),
+                    addresses: Some(vec![
+                        interfaces::testutil::test_addr(interfaces::testutil::TEST_V4_ADDR),
+                        interfaces::testutil::test_addr(interfaces::testutil::TEST_V6_ADDR),
+                    ]),
+                    has_default_ipv4_route: Some(false),
+                    has_default_ipv6_route: Some(false),
+                    ..Default::default()
+                }),
+                fnet_interfaces::Event::Existing(fnet_interfaces::Properties {
+                    id: Some(interfaces::testutil::PPP_INTERFACE_ID),
+                    name: Some(interfaces::testutil::PPP_NAME.to_string()),
+                    device_class: Some(interfaces::testutil::PPP),
+                    online: Some(false),
+                    addresses: Some(vec![
+                        interfaces::testutil::test_addr(interfaces::testutil::TEST_V6_ADDR),
+                        interfaces::testutil::test_addr(interfaces::testutil::TEST_V4_ADDR),
+                    ]),
+                    has_default_ipv4_route: Some(false),
+                    has_default_ipv6_route: Some(false),
+                    ..Default::default()
+                }),
+                fnet_interfaces::Event::Idle(fnet_interfaces::Empty),
+            ],
+        )
+        .then(|()| handler.handle_request(request, &mut client));
+
+        futures::select! {
+            () = fut.fuse() => {},
+            err = event_loop_fut => unreachable!("eventloop should not return: {err:?}"),
+        }
+
+        client_sink.take_messages()
+    }
+
+    fn test_get_link_dump_messages() -> impl IntoIterator<Item = interfaces::NetlinkLinkMessage> {
         [
             interfaces::testutil::create_netlink_link_message(
                 interfaces::testutil::LO_INTERFACE_ID,
@@ -511,92 +617,30 @@ mod test {
     #[test_case(
         NLM_F_ACK,
         [],
-        Some(ExpectedResponse::Ack); "ack_flag")]
+        Some(ExpectedResponse::Ack(AckErrorCode)); "ack_flag")]
     #[test_case(
         NLM_F_DUMP,
-        test_get_links_dump_messages(),
+        test_get_link_dump_messages(),
         Some(ExpectedResponse::Done); "dump_flag")]
     #[test_case(
         NLM_F_DUMP | NLM_F_ACK,
-        test_get_links_dump_messages(),
+        test_get_link_dump_messages(),
         Some(ExpectedResponse::Done); "dump_and_ack_flags")]
     #[fuchsia::test]
     async fn test_get_link(
         flags: u16,
         messages: impl IntoIterator<Item = interfaces::NetlinkLinkMessage>,
-        expected_response: Option<ExpectedResponse>,
+        expected_response: Option<ExpectedResponse<AckErrorCode>>,
     ) {
-        let (mut client_sink, mut client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
-            crate::client::testutil::CLIENT_ID_1,
-            &[],
-        );
-
-        let interfaces::testutil::Setup {
-            event_loop,
-            mut watcher_stream,
-            request_sink: interfaces_request_sink,
-            interfaces_request_stream: _,
-        } = interfaces::testutil::setup_with_route_clients({
-            let route_clients = ClientTable::default();
-            route_clients.add_client(client.clone());
-            route_clients
-        });
-
-        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>> { interfaces_request_sink };
-
-        let header = {
-            let mut header = NetlinkHeader::default();
-            header.flags = flags;
-            header
-        };
-
-        let event_loop_fut = event_loop.run().fuse();
-        futures::pin_mut!(event_loop_fut);
-
-        let fut = interfaces::testutil::respond_to_watcher(
-            watcher_stream.by_ref(),
-            [
-                fnet_interfaces::Event::Existing(fnet_interfaces::Properties {
-                    id: Some(interfaces::testutil::LO_INTERFACE_ID),
-                    name: Some(interfaces::testutil::LO_NAME.to_string()),
-                    device_class: Some(interfaces::testutil::LOOPBACK),
-                    online: Some(true),
-                    addresses: Some(Vec::new()),
-                    has_default_ipv4_route: Some(false),
-                    has_default_ipv6_route: Some(false),
-                    ..Default::default()
-                }),
-                fnet_interfaces::Event::Existing(fnet_interfaces::Properties {
-                    id: Some(interfaces::testutil::PPP_INTERFACE_ID),
-                    name: Some(interfaces::testutil::PPP_NAME.to_string()),
-                    device_class: Some(interfaces::testutil::PPP),
-                    online: Some(false),
-                    addresses: Some(Vec::new()),
-                    has_default_ipv4_route: Some(false),
-                    has_default_ipv6_route: Some(false),
-                    ..Default::default()
-                }),
-                fnet_interfaces::Event::Idle(fnet_interfaces::Empty),
-            ],
-        )
-        .then(|()| {
-            handler.handle_request(
-                NetlinkMessage::new(
-                    header,
-                    NetlinkPayload::InnerMessage(RtnlMessage::GetLink(LinkMessage::default())),
-                ),
-                &mut client,
-            )
-        });
-
-        futures::select! {
-            () = fut.fuse() => {},
-            err = event_loop_fut => unreachable!("eventloop should not return: {err:?}"),
-        }
+        let header = header_with_flags(flags);
 
         pretty_assertions::assert_eq!(
             {
-                let mut messages = client_sink.take_messages();
+                let mut messages = test_request(NetlinkMessage::new(
+                    header,
+                    NetlinkPayload::InnerMessage(RtnlMessage::GetLink(LinkMessage::default())),
+                ))
+                .await;
                 if flags & NLM_F_DUMP == NLM_F_DUMP {
                     // Ignore the last message in a dump when sorting since its
                     // a done message.
@@ -609,10 +653,169 @@ mod test {
                 .into_iter()
                 .map(interfaces::NetlinkLinkMessage::into_rtnl_new_link)
                 .chain(expected_response.map(|expected_response| match expected_response {
-                    ExpectedResponse::Ack => new_ack(header),
+                    ExpectedResponse::Ack(code) => new_ack(code, header),
                     ExpectedResponse::Done => new_done(),
                 }))
                 .collect::<Vec<_>>(),
-        );
+        )
+    }
+
+    fn test_get_v4_addr_dump_messages(
+    ) -> impl IntoIterator<Item = interfaces::NetlinkAddressMessage> {
+        [
+            interfaces::testutil::create_address_message(
+                interfaces::testutil::LO_INTERFACE_ID.try_into().unwrap(),
+                interfaces::testutil::TEST_V4_ADDR,
+                interfaces::testutil::LO_NAME.to_string(),
+                IFA_F_PERMANENT,
+            ),
+            interfaces::testutil::create_address_message(
+                interfaces::testutil::PPP_INTERFACE_ID.try_into().unwrap(),
+                interfaces::testutil::TEST_V4_ADDR,
+                interfaces::testutil::PPP_NAME.to_string(),
+                IFA_F_PERMANENT,
+            ),
+        ]
+    }
+
+    fn test_get_v6_addr_dump_messages(
+    ) -> impl IntoIterator<Item = interfaces::NetlinkAddressMessage> {
+        [
+            interfaces::testutil::create_address_message(
+                interfaces::testutil::LO_INTERFACE_ID.try_into().unwrap(),
+                interfaces::testutil::TEST_V6_ADDR,
+                interfaces::testutil::LO_NAME.to_string(),
+                IFA_F_PERMANENT,
+            ),
+            interfaces::testutil::create_address_message(
+                interfaces::testutil::PPP_INTERFACE_ID.try_into().unwrap(),
+                interfaces::testutil::TEST_V6_ADDR,
+                interfaces::testutil::PPP_NAME.to_string(),
+                IFA_F_PERMANENT,
+            ),
+        ]
+    }
+
+    /// Test RTM_GETADDR.
+    #[test_case(
+        0,
+        AF_UNSPEC,
+        [],
+        None; "af_unspec_no_flags")]
+    #[test_case(
+        NLM_F_ACK,
+        AF_UNSPEC,
+        [],
+        Some(ExpectedResponse::Ack(Ok(()))); "af_unspec_ack_flag")]
+    #[test_case(
+        NLM_F_DUMP,
+        AF_UNSPEC,
+        test_get_v4_addr_dump_messages().into_iter().chain(test_get_v6_addr_dump_messages()),
+        Some(ExpectedResponse::Done); "af_unspec_dump_flag")]
+    #[test_case(
+        NLM_F_DUMP | NLM_F_ACK,
+        AF_UNSPEC,
+        test_get_v4_addr_dump_messages().into_iter().chain(test_get_v6_addr_dump_messages()),
+        Some(ExpectedResponse::Done); "af_unspec_dump_and_ack_flags")]
+    #[test_case(
+        0,
+        AF_INET,
+        [],
+        None; "af_inet_no_flags")]
+    #[test_case(
+        NLM_F_ACK,
+        AF_INET,
+        [],
+        Some(ExpectedResponse::Ack(Ok(()))); "af_inet_ack_flag")]
+    #[test_case(
+        NLM_F_DUMP,
+        AF_INET,
+        test_get_v4_addr_dump_messages(),
+        Some(ExpectedResponse::Done); "af_inet_dump_flag")]
+    #[test_case(
+        NLM_F_DUMP | NLM_F_ACK,
+        AF_INET,
+        test_get_v4_addr_dump_messages(),
+        Some(ExpectedResponse::Done); "af_inet_dump_and_ack_flags")]
+    #[test_case(
+        0,
+        AF_INET6,
+        [],
+        None; "af_inet6_no_flags")]
+    #[test_case(
+        NLM_F_ACK,
+        AF_INET6,
+        [],
+        Some(ExpectedResponse::Ack(Ok(()))); "af_inet6_ack_flag")]
+    #[test_case(
+        NLM_F_DUMP,
+        AF_INET6,
+        test_get_v6_addr_dump_messages(),
+        Some(ExpectedResponse::Done); "af_inet6_dump_flag")]
+    #[test_case(
+        NLM_F_DUMP | NLM_F_ACK,
+        AF_INET6,
+        test_get_v6_addr_dump_messages(),
+        Some(ExpectedResponse::Done); "af_inet6_dump_and_ack_flags")]
+    #[test_case(
+        0,
+        AF_PACKET,
+        [],
+        None; "af_other_no_flags")]
+    #[test_case(
+        NLM_F_ACK,
+        AF_PACKET,
+        [],
+        Some(ExpectedResponse::Ack(Ok(()))); "af_other_ack_flag")]
+    #[test_case(
+        NLM_F_DUMP,
+        AF_PACKET,
+        [],
+        Some(ExpectedResponse::Ack(Err(NackErrorCode::INVALID))); "af_other_dump_flag")]
+    #[test_case(
+        NLM_F_DUMP | NLM_F_ACK,
+        AF_PACKET,
+        [],
+        Some(ExpectedResponse::Ack(Err(NackErrorCode::INVALID))); "af_other_dump_and_ack_flags")]
+    #[fuchsia::test]
+    async fn test_get_addr(
+        flags: u16,
+        family: u16,
+        messages: impl IntoIterator<Item = interfaces::NetlinkAddressMessage>,
+        expected_response: Option<ExpectedResponse<Result<(), NackErrorCode>>>,
+    ) {
+        let header = header_with_flags(flags);
+        let address_message = {
+            let mut message = AddressMessage::default();
+            message.header.family = family.try_into().unwrap();
+            message
+        };
+
+        pretty_assertions::assert_eq!(
+            test_request(NetlinkMessage::new(
+                header,
+                NetlinkPayload::InnerMessage(RtnlMessage::GetAddress(address_message)),
+            ))
+            .await,
+            {
+                let mut messages =
+                    messages.into_iter().map(|a| a.to_rtnl_new_addr()).collect::<Vec<_>>();
+                messages.sort_by_key(|message| {
+                    assert_matches!(
+                        &message.payload,
+                        NetlinkPayload::InnerMessage(RtnlMessage::NewAddress(m)) => {
+                            (m.header.index, m.header.family)
+                        }
+                    )
+                });
+                messages
+                    .into_iter()
+                    .chain(expected_response.map(|expected_response| match expected_response {
+                        ExpectedResponse::Ack(code) => new_ack(code, header),
+                        ExpectedResponse::Done => new_done(),
+                    }))
+                    .collect::<Vec<_>>()
+            },
+        )
     }
 }
