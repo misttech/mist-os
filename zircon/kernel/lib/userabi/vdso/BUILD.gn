@@ -4,6 +4,7 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT
 
+import("//build/toolchain/ifs_extract.gni")
 import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/zircon/user_basic_redirect.gni")
 import("//build/zircon/c_utils.gni")
@@ -105,30 +106,13 @@ if (toolchain_environment == "user.basic") {
   # that userland links against.
   abi_ifs = "//src/zircon/lib/zircon/zircon.ifs"
   vdso_ifs = "$target_gen_dir/libzircon.ifs"
-  vdso_rspfile = "$target_gen_dir/libzircon.rsp"
 
-  link_output_rspfile("vdso.rsp") {
-    visibility = [ ":*" ]
-    outputs = [ vdso_rspfile ]
-    deps = [ ":libzircon" ]
-  }
-
-  toolchain_utils_action("vdso.ifs") {
+  ifs_extract("vdso.ifs") {
     visibility = [ ":*" ]
 
-    deps = [ ":vdso.rsp" ]
-
-    script = true
-    utils = [ "ifs" ]
-    sources = [ vdso_rspfile ]
     outputs = [ vdso_ifs ]
-
-    args = [
-      "--strip-ifs-target",
-      "--write-if-changed",
-      "--output-ifs=" + rebase_path(vdso_ifs, root_build_dir),
-      "@" + rebase_path(vdso_rspfile, root_build_dir),
-    ]
+    deps = [ ":libzircon" ]
+    args = [ "--strip-ifs-target" ]
   }
 
   action("verify-abi") {

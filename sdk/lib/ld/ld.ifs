@@ -1,0 +1,7 @@
+--- !ifs-v1
+IfsVersion:      3.0
+SoName:          ld.so.1
+Symbols:
+  - { Name: _ld_abi, Type: Object }
+  - { Name: _r_debug, Type: Object }
+...

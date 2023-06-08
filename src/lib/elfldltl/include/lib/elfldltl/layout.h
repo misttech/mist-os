@@ -420,6 +420,17 @@ struct Elf : private Layout<Class, Data> {
     Addr info;
     SignedField<size_type, kSwap> addend;
   };
+
+  // These are declared in svr4-abi.h rather than there.  These are not
+  // formally parts of the ELF format, but rather de facto standard ABI types
+  // from the original SVR4 implementation that introduced ELF that have been
+  // kept compatible in other implementations historically.
+
+  template <class AbiTraits>
+  struct LinkMap;
+
+  template <class AbiTraits>
+  struct RDebug;
 };
 
 template <ElfData Data = ElfData::kNative>
