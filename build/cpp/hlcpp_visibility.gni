@@ -30,6 +30,7 @@ hlcpp_visibility = [
 
   # Existing in-tree uses of HLCPP that should be removed.
   "//examples/components/config/integration_test:*",
+  "//examples/components/config_from_parent/integration_test:*",
   "//examples/components/lifecycle/cpp:*",
   "//examples/components/realm_builder/cpp:*",
   "//examples/components/routing_failed/cpp:*",
