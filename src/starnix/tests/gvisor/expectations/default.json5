@@ -569,9 +569,6 @@
                 "All/ProcPidUidGidMapTest.MapAnyIDsPrivileged/UID",
                 "All/ProcSelfUidGidMapTest.IdentityMapOwnID/GID",
 
-                // pselect_test
-                "PselectTest.SignalMaskBlocksSignal", // maybe flaky
-
                 // raw_socket_icmp
                 "RawSocketICMPTest.IPv6ChecksumNotSupported",
                 "RawSocketICMPTest.ICMPv6FilterNotSupported",
@@ -989,7 +986,6 @@
                 "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutUsecTooLarge/*",
 
                 // These tests are flaky.
-                "FcntlTest.SetFdO_ASYNC",
                 "AllInetTests/RawSocketTest.MultipleSocketReceive/*",
                 "AllInetTests/RawSocketTest.RecvBufLimitsEmptyRecvBuffer/*",
                 "AllInetTests/RawSocketTest.SendAndReceive/*",
@@ -997,9 +993,12 @@
                 "AllInetTests/SimpleTcpSocketTest.SelfConnectSendRecv/*",
                 "AllInetTests/SimpleTcpSocketTest.Shutdown*ConnectingSocket/*",
                 "ExceptionTest.IOAccessFault",
+                "FcntlTest.SetFdO_ASYNC",
                 "MountTest.BindToSelf",
+                "MountTest.BindToSelf",
+                "PselectTest.SignalMaskBlocksSignal",
                 "UnameTest.Sanity",
-                "MountTest.BindToSelf",
+
 
                 // TODO: These tests have different outcomes in socket_domain_test and
                 // socket_ip_tcp_loopback_test.
