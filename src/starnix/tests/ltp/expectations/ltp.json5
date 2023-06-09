@@ -424,12 +424,6 @@
                 "*init_module01*",
                 "*init_module02*",
                 "*initialize_if*",
-                "*inotify03*",
-                "*inotify04*",
-                "*inotify05*",
-                "*inotify06*",
-                "*inotify07*",
-                "*inotify08*",
                 "*input01*",
                 "*input02*",
                 "*input04*",
@@ -1432,6 +1426,9 @@
                 "*select03*",
                 "*setrlimit02*",
 
+                // inotify is not implemented yet. Skip, so they don't spam the output.
+                "*inotify*",
+
                 // Tests reach unexpected Abort
                 "*cgroup_fj_proc*",
                 "*cgroup_regression_fork_processes*",
@@ -1450,12 +1447,6 @@
                 "*fork_exec_loop*",
                 "*getdtablesize01*",
                 "*gettimeofday02*",
-                "*inotify01*",
-                "*inotify02*",
-                "*inotify04*",
-                "*inotify10*",
-                "*inotify11*",
-                "*inotify12*",
                 "*io_uring01*",
                 "*kill10*",
                 "*kmsg01*",
