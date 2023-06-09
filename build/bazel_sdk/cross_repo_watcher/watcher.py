@@ -2,57 +2,79 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 import argparse
+from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
-import queue
+import shutil
 import subprocess
-
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import List
+from urllib.parse import parse_qs, urlparse
 
-rule_table = {}
-trigger_queue = queue.Queue()
+
+class PubSub:
+
+    def __init__(self):
+        self.subscribers = {}
+
+    def subscribe(self, topic, config):
+        if topic not in self.subscribers:
+            self.subscribers[topic] = []
+        self.subscribers[topic].append(config)
+
+    def publish(self, topic, path):
+        for config in self.subscribers.get(topic, []):
+            repo = os.path.expanduser(config['repo'])
+            cmds = config['commands']
+            dest_path = config['listen_to'][topic]
+            publish_table = config.get('publish', {})
+
+            if dest_path == None:
+                dest_path = path
+            if dest_path != path:
+                shutil.copy(path, os.path.join(repo, dest_path))
+
+            execute_commands_in_repo(repo, cmds, dest_path)
+            # Publish downstream messages
+            for topic, message in publish_table.items():
+                pub.publish(topic, os.path.join(
+                    repo, message))
+
+
+pub = PubSub()
 
 
 class PubSubHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
-        event = self.path.strip('/')  # Extract event from the URL
-
-        trigger_queue.put(event)
+        url_parts = urlparse(self.path)
+        query_params = parse_qs(url_parts.query)
+        topic = query_params.get('event')[0]
+        message = query_params.get('message')[0]
         self.send_response(200)
         self.end_headers()
-        trigger_events()
+
+        pub.publish(topic, message)
 
 
-def execute_commands_in_repo(repo: str, commands: List[str]):
+def execute_commands_in_repo(repo: str, commands: List[str], dest_path: str):
     print(f'Run in repo: {repo}')
     for command in commands:
-        print(f'Execute command: {command}')
-        cmd = command.split()
-        result = subprocess.run(cmd, cwd=os.path.expanduser(repo))
+        cmd = command.format(dest_path=dest_path).split()
+        print(f'Execute cmd: {cmd}')
+        result = subprocess.run(cmd, cwd=repo)
 
 
-def trigger_events():
-    while not trigger_queue.empty():
-        event = trigger_queue.get()
-        print(f'Event happened: {event}')
-        if event not in rule_table:
-            print(f'Skipping not defined event: {event}')
-            continue
-        triggered_action = rule_table[event]
-        triggered_repo = triggered_action['repo']
-        triggered_commands = triggered_action['commands']
-        execute_commands_in_repo(triggered_repo, triggered_commands)
-        [trigger_queue.put(e) for e in triggered_action['triggered_events']]
-
-
-def parse_config(config_path: str):
+def register_config(config_path: str):
     if not config_path:
         return
-    global rule_table
     with open(config_path, 'r') as f:
         rule_table = json.load(f)
+
+    for _, config in rule_table.items():
+        listen_to = config['listen_to']
+        # Register config for each listened events
+        for topic in listen_to:
+            pub.subscribe(topic, config)
 
 
 def run_server():
@@ -64,7 +86,7 @@ def run_server():
     args = parser.parse_args()
 
     # Parse configuration file
-    parse_config(args.config)
+    register_config(args.config)
 
     # Start server
     server_address = ('localhost', 8000)

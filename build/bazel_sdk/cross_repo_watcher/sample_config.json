@@ -1,21 +1,63 @@
 {
-    "BUILD_WIFI_DRIVER" : {
-        "repo": "~/iwlwifi",
-        "commands": [
-            "tools/bazel build third_party/iwlwifi/platform:iwlwifi_pkg"
-        ],
-        "triggered_events": [
-            "BUILD_CORE",
-            "UNDEFINED"
-        ]
-    },
-    "BUILD_CORE" : {
+    "BUILD_BAZEL_SDK": {
         "repo": "~/fuchsia",
+        "listen_to": {
+            "start": null
+        },
+        "commands": [
+            "fx set core.x64",
+            "fx build generate_fuchsia_sdk_repository"
+        ],
+        "publish": {
+            "fuchsia_sdk": "out/default/gen/build/bazel/fuchsia_sdk"
+        }
+    },
+    "BUILD_WIFI_DRIVER": {
+        "repo": "~/iwlwifi",
+        "listen_to": {
+            "fuchsia_sdk": null
+        },
+        "commands": [
+            "tools/bazel build --override_repository=fuchsia_sdk={dest_path} third_party/iwlwifi/platform:iwlwifi_pkg"
+        ],
+        "publish": {
+            "wifi_far": "bazel-out/x86_64-fastbuild-ST-cc4c781cb071/bin/third_party/iwlwifi/platform/iwlwifi.far"
+        }
+    },
+    "BUILD_RTC_DRIVER": {
+        "repo": "~/rtc",
+        "listen_to": {
+            "fuchsia_sdk": null
+        },
+        "commands": [
+            "tools/bazel build --override_repository=fuchsia_sdk={dest_path}  third_party/rtc/platform:rtc_pkg"
+        ],
+        "publish": {
+            "rfc_far": "bazel-out/x86_64-fastbuild-ST-cc4c781cb071/bin/third_party/rtc/platform/rtc.far"
+        }
+    },
+    "BUILD_CORE": {
+        "repo": "~/fuchsia",
+        "listen_to": {
+            "wifi_far": "prebuilt/drivers/iwlwifi/iwlwifi_driver",
+            "rfc_far": "dest_2"
+        },
         "commands": [
             "fx clean",
             "fx set core.x64",
             "fx build"
         ],
-        "triggered_events": []
+        "publish": {
+            "product_bundle": "out/default/product_bundle"
+        }
+    },
+    "START_EMU": {
+        "repo": "~/fuchsia",
+        "listen_to": {
+            "product_bundle": "<dest path>"
+        },
+        "commands": [
+            "ffx emu start"
+        ]
     }
 }
