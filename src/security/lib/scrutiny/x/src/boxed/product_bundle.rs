@@ -118,10 +118,8 @@ pub(crate) struct ProductBundle(Rc<ProductBundleData>);
 
 impl ProductBundle {
     pub fn new(directory: Box<dyn api::Path>) -> Result<Self, ProductBundleError> {
-        let mut product_bundle_data_source = ds::DataSource::new(
-            vec![],
-            Box::new(data_source::ProductBundle::new(directory.clone())),
-        );
+        let mut product_bundle_data_source =
+            ds::DataSource::new(Box::new(data_source::ProductBundle::new(directory.clone())));
         let utf8_directory = Utf8PathBuf::from_path_buf(directory.as_ref().as_ref().to_path_buf())
             .map_err(|directory| ProductBundleError::InvalidDirectory { directory })?;
         let product_bundle = sdk::ProductBundle::try_load_from(&utf8_directory)
@@ -145,10 +143,9 @@ impl ProductBundle {
                 let blobs_directory: Box<dyn api::Path> = Box::new(
                     directory.as_ref().as_ref().to_path_buf().join(&repository.blobs_path),
                 );
-                let repository_data_source = ds::DataSource::new(
-                    vec![],
-                    Box::new(data_source::TufRepository::new(blobs_directory.clone())),
-                );
+                let repository_data_source = ds::DataSource::new(Box::new(
+                    data_source::TufRepository::new(blobs_directory.clone()),
+                ));
                 product_bundle_data_source.add_child(repository_data_source.clone());
                 Repository::new(name, blobs_directory, repository_data_source)
             })

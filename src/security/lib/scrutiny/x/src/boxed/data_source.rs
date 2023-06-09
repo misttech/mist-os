@@ -60,25 +60,12 @@ pub(crate) struct DataSource(Rc<RefCell<DataSourceNode>>);
 impl DataSource {
     /// Constructs the canonical instantiation of `data_source_info`, initially situated in a data
     /// source tree below `parent`, with `children`.
-    pub fn new(children: Vec<DataSource>, data_source_info: Box<dyn DataSourceInfo>) -> Self {
-        Self(Rc::new(RefCell::new(DataSourceNode { parent: None, children, data_source_info })))
-    }
-
-    /// Construct a [`Parent`] (weak) reference to this data source.
-    #[allow(dead_code)]
-    pub fn downgrade(&self) -> Parent {
-        Rc::downgrade(&self.0).into()
-    }
-
-    /// Overwrites this data source's parent with `parent`.
-    ///
-    /// # Panics
-    ///
-    /// This function may panic if multiple `&mut self` operations are performed concurrently.
-    #[allow(dead_code)]
-    pub fn set_parent(&mut self, parent: Option<Parent>) {
-        let mut node = self.0.borrow_mut();
-        node.parent = parent;
+    pub fn new(data_source_info: Box<dyn DataSourceInfo>) -> Self {
+        Self(Rc::new(RefCell::new(DataSourceNode {
+            parent: None,
+            children: vec![],
+            data_source_info,
+        })))
     }
 
     /// Empties the `children` collection for this data source.
@@ -89,7 +76,12 @@ impl DataSource {
     #[allow(dead_code)]
     pub fn clear_children(&mut self) {
         let mut node = self.0.borrow_mut();
-        node.children = vec![];
+
+        let mut children = vec![];
+        std::mem::swap(&mut children, &mut node.children);
+        for child in children.iter_mut() {
+            child.set_parent(None);
+        }
     }
 
     /// Appends a child to the `children` collection for this data source.
@@ -97,13 +89,27 @@ impl DataSource {
     /// # Panics
     ///
     /// This function may panic if multiple `&mut self` operations are performed concurrently.
-    #[allow(dead_code)]
     pub fn add_child(&mut self, mut child: DataSource) {
         {
             let mut node = self.0.borrow_mut();
             node.children.push(child.clone());
         }
         child.set_parent(Some(self.downgrade()))
+    }
+
+    /// Construct a [`Parent`] (weak) reference to this data source.
+    fn downgrade(&self) -> Parent {
+        Rc::downgrade(&self.0).into()
+    }
+
+    /// Overwrites this data source's parent with `parent`.
+    ///
+    /// # Panics
+    ///
+    /// This function may panic if multiple `&mut self` operations are performed concurrently.
+    fn set_parent(&mut self, parent: Option<Parent>) {
+        let mut node = self.0.borrow_mut();
+        node.parent = parent;
     }
 }
 
@@ -175,5 +181,59 @@ pub mod test {
         fn version(&self) -> api::DataSourceVersion {
             self.version.clone()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::api;
+    use super::super::api::DataSource as _;
+    use super::test;
+    use super::DataSource;
+
+    #[fuchsia::test]
+    fn test_add_child() {
+        let mut parent = DataSource::new(Box::new(test::DataSourceInfo::new(
+            api::DataSourceKind::TufRepository,
+            Some(Box::new("test/tuf/repo")),
+            api::DataSourceVersion::Unknown,
+        )));
+        let child = DataSource::new(Box::new(test::DataSourceInfo::new(
+            api::DataSourceKind::BlobDirectory,
+            Some(Box::new("test/tuf/repo/blobs")),
+            api::DataSourceVersion::Unknown,
+        )));
+
+        // Even though a clone of `child` is passed in, `child` wraps a `Rc<RefCell<...>>`, so the
+        // `add_child()` implementation is able to update both the `parent` children and the `child`
+        // parent references.
+        parent.add_child(child.clone());
+
+        let parent_ref: &dyn api::DataSource = &parent;
+        let child_ref: &dyn api::DataSource = &child;
+        let children = parent.children().collect::<Vec<_>>();
+        assert_eq!(children.len(), 1);
+        assert_eq!(children[0].as_ref(), child_ref);
+        assert_eq!(child.parent().expect("parent").as_ref(), parent_ref);
+    }
+
+    #[fuchsia::test]
+    fn test_clear_children() {
+        let mut parent = DataSource::new(Box::new(test::DataSourceInfo::new(
+            api::DataSourceKind::TufRepository,
+            Some(Box::new("test/tuf/repo")),
+            api::DataSourceVersion::Unknown,
+        )));
+        let child = DataSource::new(Box::new(test::DataSourceInfo::new(
+            api::DataSourceKind::BlobDirectory,
+            Some(Box::new("test/tuf/repo/blobs")),
+            api::DataSourceVersion::Unknown,
+        )));
+
+        parent.add_child(child.clone());
+        parent.clear_children();
+
+        assert_eq!(parent.children().next(), None);
+        assert_eq!(child.parent(), None);
     }
 }

@@ -741,7 +741,7 @@ mod tests {
             path: Option<Box<dyn Path>>,
             version: DataSourceVersion,
         ) -> ds::DataSource {
-            ds::DataSource::new(vec![], Box::new(dst::DataSourceInfo::new(kind, path, version)))
+            ds::DataSource::new(Box::new(dst::DataSourceInfo::new(kind, path, version)))
         }
 
         fn reference_tree() -> ds::DataSource {

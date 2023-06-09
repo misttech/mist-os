@@ -410,10 +410,8 @@ impl BlobDirectory {
             .collect::<Result<Vec<_>, _>>()?;
         blob_ids.sort();
 
-        let data_source = ds::DataSource::new(
-            vec![],
-            Box::new(data_source::BlobDirectory::new(directory.clone())),
-        );
+        let data_source =
+            ds::DataSource::new(Box::new(data_source::BlobDirectory::new(directory.clone())));
         if let Some(parent_data_source) = parent_data_source.as_mut() {
             parent_data_source.add_child(data_source.clone());
         }
