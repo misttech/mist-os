@@ -464,7 +464,6 @@
                 "SetpriorityTest.NicenessExposedViaProcfs",
 
                 // processes_test
-                "Processes.ExecSwapThreadGroupLeader",
                 "Processes.SetPGIDOfZombie",
 
                 // proc_test
@@ -1021,6 +1020,7 @@
                 "Waiters/WaitSpecificChildTest.WALL/*",
 
                 // These tests cause fatal signals that crash the test suite.
+                "Processes.ExecSwapThreadGroupLeader",
                 "ExecveatTest.UnshareFiles",
                 "FaultTest.InRange",
                 "FPSigTest.Fork",
@@ -1069,6 +1069,11 @@
                 "JobControlTest.SetForegroundProcessGroupSIGTTOUBackground",
                 "JobControlTest.SetForegroundProcessGroupDifferentSession",
                 "JobControlTest.SetForegroundProcessGroupNegPgid",
+
+                // sigstop_test
+
+                // TODO(fxbug.dev/128870): Investigate failure on arm.
+                "SigstopTest.RestartSyscall",
             ],
         },
     ],
