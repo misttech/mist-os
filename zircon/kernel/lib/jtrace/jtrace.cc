@@ -44,7 +44,11 @@ class SafeString {
     // the current log, there is a very good chance that we are in the middle of
     // a panic and unable to validate virtual addresses due to the VM locking
     // requirements.
-    if ((buf_type == TraceBufferType::Recovered) && !ValidateVaddr(str_)) {
+    //
+    // Also check for nullptr while we are at it.  It is possible for a dumped
+    // jtrace to have nullptr entries for last-per-cpu records in the case that
+    // there were never any records for a given CPU.
+    if ((str_ == nullptr) || ((buf_type == TraceBufferType::Recovered) && !ValidateVaddr(str_))) {
       snprintf(replacement_buf_, sizeof(replacement_buf_), "<Invalid %p>", str_);
       str_ = replacement_buf_;
     }
@@ -108,7 +112,8 @@ class ProductionTraceHooks final : public TraceHooks {
                 e.cpu_id, e.a, delta_usec, delta_nsec, tag.get());
     } else {
       const internal::FileFuncLineInfo* ffl_info = e.ffl_info;
-      if ((buf_type == TraceBufferType::Recovered) && !ValidateVaddr(&e.ffl_info)) {
+      if ((ffl_info == nullptr) ||
+          ((buf_type == TraceBufferType::Recovered) && !ValidateVaddr(&e.ffl_info))) {
         static constexpr internal::FileFuncLineInfo kFallback = {
             .file = "<bad FFL pointer>", .func = "<bad FFL pointer>", .line = 0};
         ffl_info = &kFallback;
