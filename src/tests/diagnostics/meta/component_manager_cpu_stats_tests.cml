@@ -12,6 +12,11 @@
             "<component_manager>:root/stats/measurements/components/<component_manager>/*:queue_times WHERE [a] Count(a) > 0",
             "<component_manager>:root/stats/measurements/components/<component_manager>/*:timestamps WHERE [a] Count(a) > 0",
 
+             // Component manager exposes cpu and queue times for bootstrap/archivist.
+            "<component_manager>:root/stats/measurements/components/bootstrap\\/archivist/*:cpu_times WHERE [a] Count(a) > 0",
+            "<component_manager>:root/stats/measurements/components/bootstrap\\/archivist/*:queue_times WHERE [a] Count(a) > 0",
+            "<component_manager>:root/stats/measurements/components/bootstrap\\/archivist/*:timestamps WHERE [a] Count(a) > 0",
+
             // Ensure that component manager has at least 2MB of space for CPU measurements and that not all of it is used.
             // "<component_manager>:root/stats/measurements/fuchsia.inspect.Stats:current_size WHERE [a] a < 2*1024*1024",
             // "<component_manager>:root/stats/measurements/fuchsia.inspect.Stats:maximum_size WHERE [a] a >= 2*1024*1024",
