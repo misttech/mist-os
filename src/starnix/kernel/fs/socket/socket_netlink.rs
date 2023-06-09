@@ -209,10 +209,16 @@ impl NetlinkSocketInner {
     }
 
     fn read_datagram(&mut self, data: &mut dyn OutputBuffer) -> Result<MessageReadInfo, Errno> {
-        let info = self.messages.read_datagram(data)?;
+        let mut info = self.messages.read_datagram(data)?;
         if info.message_length == 0 {
             return error!(EAGAIN);
         }
+
+        if self.passcred {
+            not_implemented!("TODO(http://fxbug.dev/128863): SCM_CREDENTIALS/SO_PASSCRED not fully implemented, returning unknown credentials for now");
+            info.ancillary_data.push(AncillaryData::Unix(UnixControlData::unknown_creds()));
+        }
+
         Ok(info)
     }
 
