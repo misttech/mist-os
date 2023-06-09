@@ -24,6 +24,7 @@
                 "fuchsia.lowpan.experimental.DeviceRouteExtraConnector",
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
+                "fuchsia.net.masquerade.Factory",
                 "fuchsia.net.mdns.HostNameResolver",
                 "fuchsia.net.mdns.HostNameSubscriber",
                 "fuchsia.net.mdns.ProxyHostPublisher",

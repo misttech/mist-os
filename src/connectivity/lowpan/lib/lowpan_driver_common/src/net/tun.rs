@@ -61,18 +61,13 @@ impl TunNetworkInterface {
                     base: Some(ftun::BasePortConfig {
                         id: Some(TUN_PORT_ID),
                         mtu: Some(Ipv6::MINIMUM_LINK_MTU.get()),
-                        rx_types: Some(vec![
-                            fhwnet::FrameType::Ipv6,
-                            // TODO(fxbug.dev/64292): Remove this once netstack doesn't require it.
-                            fhwnet::FrameType::Ipv4,
-                        ]),
+                        rx_types: Some(vec![fhwnet::FrameType::Ipv6, fhwnet::FrameType::Ipv4]),
                         tx_types: Some(vec![
                             fhwnet::FrameTypeSupport {
                                 type_: fhwnet::FrameType::Ipv6,
                                 features: fhwnet::FRAME_FEATURES_RAW,
                                 supported_flags: fhwnet::TxFlags::empty(),
                             },
-                            // TODO(fxbug.dev/64292): Remove this once netstack doesn't require it.
                             fhwnet::FrameTypeSupport {
                                 type_: fhwnet::FrameType::Ipv4,
                                 features: fhwnet::FRAME_FEATURES_RAW,
@@ -180,14 +175,18 @@ impl NetworkInterface for TunNetworkInterface {
         Ok(frame.data.ok_or(format_err!("data field was absent"))?)
     }
 
-    async fn inbound_packet_to_stack(&self, packet: &[u8]) -> Result<(), Error> {
+    async fn inbound_packet_to_stack(
+        &self,
+        packet: &[u8],
+        frame_type: fhwnet::FrameType,
+    ) -> Result<(), Error> {
         trace!("TunNetworkInterface: Packet sent to stack: {:?}", Ipv6PacketDebug(packet));
 
         Ok(self
             .tun_dev
             .write_frame(&ftun::Frame {
                 port: Some(TUN_PORT_ID),
-                frame_type: Some(fhwnet::FrameType::Ipv6),
+                frame_type: Some(frame_type),
                 data: Some(packet.to_vec()),
                 meta: None,
                 ..Default::default()
@@ -234,18 +233,23 @@ impl NetworkInterface for TunNetworkInterface {
         Ok(())
     }
 
-    fn add_address(&self, addr: &Subnet) -> Result<(), Error> {
+    fn add_address_from_spinel_subnet(&self, addr: &Subnet) -> Result<(), Error> {
         info!("TunNetworkInterface: Adding Address: {:?}", addr);
         let device_addr = fnet::Subnet {
             addr: fnetext::IpAddress(addr.addr.into()).into(),
             prefix_len: addr.prefix_len,
         };
+        self.add_address(device_addr)
+    }
+
+    fn add_address(&self, addr: fidl_fuchsia_net::Subnet) -> Result<(), Error> {
         let (address_state_provider, server_end) = fidl::endpoints::create_proxy::<
             fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
         >()
         .expect("create proxy");
         address_state_provider.detach()?;
 
+        let device_addr = addr;
         self.control_sync.lock().add_address(
             &device_addr,
             &fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
@@ -254,27 +258,44 @@ impl NetworkInterface for TunNetworkInterface {
 
         let subnet = fnetext::apply_subnet_mask(device_addr);
 
-        let mut routes = self.routes.lock();
-
         info!("TunNetworkInterface: Successfully added address {:?}", addr);
 
-        if let Some(addresses) = routes.get_mut(&subnet) {
-            addresses.insert(addr.addr);
-        } else {
-            let forwarding_entry = fnetstack::ForwardingEntry {
-                subnet,
-                device_id: self.id,
-                next_hop: None,
-                metric: 0,
-            };
-            self.stack_sync
-                .lock()
-                .add_forwarding_entry(&forwarding_entry, zx::Time::INFINITE)?
-                .expect("add_forwarding_entry");
-            routes.insert(subnet, HashSet::from([addr.addr]));
-            info!("TunNetworkInterface: Successfully added forwarding entry for {:?}", addr);
-        }
-
+        match subnet.addr {
+            fidl_fuchsia_net::IpAddress::Ipv4(fnet::Ipv4Address { addr: _ }) => {
+                let forwarding_entry = fnetstack::ForwardingEntry {
+                    subnet,
+                    device_id: self.id,
+                    next_hop: None,
+                    metric: 0,
+                };
+                self.stack_sync
+                    .lock()
+                    .add_forwarding_entry(&forwarding_entry, zx::Time::INFINITE)?
+                    .expect("add_forwarding_entry");
+            }
+            fidl_fuchsia_net::IpAddress::Ipv6(fnet::Ipv6Address { addr }) => {
+                let mut routes = self.routes.lock();
+                if let Some(addresses) = routes.get_mut(&subnet) {
+                    addresses.insert(addr.into());
+                } else {
+                    let forwarding_entry = fnetstack::ForwardingEntry {
+                        subnet,
+                        device_id: self.id,
+                        next_hop: None,
+                        metric: 0,
+                    };
+                    self.stack_sync
+                        .lock()
+                        .add_forwarding_entry(&forwarding_entry, zx::Time::INFINITE)?
+                        .expect("add_forwarding_entry");
+                    routes.insert(subnet, HashSet::from([addr.into()]));
+                    info!(
+                        "TunNetworkInterface: Successfully added forwarding entry for {:?}",
+                        addr
+                    );
+                }
+            }
+        };
         Ok(())
     }
 
@@ -461,6 +482,33 @@ impl NetworkInterface for TunNetworkInterface {
                     ipv6: Some(fnetifadmin::Ipv6Configuration {
                         forwarding: Some(enabled),
                         multicast_forwarding: Some(enabled),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+                zx::Time::INFINITE,
+            )
+            .map_err(anyhow::Error::new)
+            .and_then(|res| {
+                res.map_err(|e: fnetifadmin::ControlSetConfigurationError| {
+                    anyhow::anyhow!("{:?}", e)
+                })
+            })
+            .context("set configuration")?;
+
+        Ok(())
+    }
+
+    async fn set_ipv4_forwarding_enabled(&self, enabled: bool) -> Result<(), Error> {
+        // Ignore the configuration before our change was applied.
+        let _: fnetifadmin::Configuration = self
+            .control_sync
+            .lock()
+            .set_configuration(
+                &fnetifadmin::Configuration {
+                    ipv4: Some(fnetifadmin::Ipv4Configuration {
+                        forwarding: Some(enabled),
+                        multicast_forwarding: Some(false),
                         ..Default::default()
                     }),
                     ..Default::default()

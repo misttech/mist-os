@@ -87,6 +87,7 @@ impl PlatformBuilder {
 pub struct Platform {
     timer_receiver: fmpsc::Receiver<usize>,
     rcp_to_ot_frame_ready_receiver: fmpsc::Receiver<()>,
+    nat64_prefix_req_receiver: fmpsc::UnboundedReceiver<ot::NetifIndex>,
     ot_to_rcp_task: fasync::Task<()>,
     rcp_to_ot_task: fasync::Task<()>,
 }
@@ -174,6 +175,8 @@ impl Platform {
             trace!(tag = "rcp_to_ot_task", "Stream ended.");
         });
 
+        let (nat64_prefix_req_sender, nat64_prefix_req_receiver) = fmpsc::unbounded();
+
         unsafe {
             // Initialize our singleton
             PlatformBacking::set_singleton(PlatformBacking {
@@ -185,13 +188,20 @@ impl Platform {
                 trel: RefCell::new(None),
                 infra_if: InfraIfInstance::new(builder.backbone_netif_index.unwrap_or(0)),
                 is_platform_reset_requested: AtomicBool::new(false),
+                nat64: Nat64Instance::new(nat64_prefix_req_sender),
             });
 
             // Initialize the lower-level platform implementation
             otSysInit(&mut otPlatformConfig { reset_rcp: false } as *mut otPlatformConfig);
         };
 
-        Platform { timer_receiver, rcp_to_ot_frame_ready_receiver, ot_to_rcp_task, rcp_to_ot_task }
+        Platform {
+            timer_receiver,
+            rcp_to_ot_frame_ready_receiver,
+            ot_to_rcp_task,
+            rcp_to_ot_task,
+            nat64_prefix_req_receiver,
+        }
     }
 }
 
@@ -217,6 +227,7 @@ impl ot::Platform for Platform {
         self.process_poll_udp(instance, cx);
         self.process_poll_trel(instance, cx);
         self.process_poll_infra_if(instance, cx);
+        self.process_poll_nat64(instance, cx);
         self.process_poll_tasks(cx);
         if PlatformBacking::as_ref().is_platform_reset_requested.load(Ordering::SeqCst) {
             return Err(PlatformResetRequested {}.into());

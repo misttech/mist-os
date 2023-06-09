@@ -24,7 +24,11 @@ where
         }
     }
 
-    pub fn on_ot_ip6_receive(&self, msg: OtMessageBox<'_>) {
+    pub fn on_ot_ip_receive(
+        &self,
+        msg: OtMessageBox<'_>,
+        frame_type: fidl_fuchsia_hardware_network::FrameType,
+    ) {
         // NOTE: DRIVER STATE IS ALREADY LOCKED WHEN THIS IS CALLED!
         //       Calling `lock()` on the driver state will deadlock!
 
@@ -36,7 +40,9 @@ where
         // Unfortunately we must render the packet out before we can pass it along.
         let packet = msg.to_vec();
 
-        if let Err(err) = self.net_if.inbound_packet_to_stack(&packet).now_or_never().transpose() {
+        if let Err(err) =
+            self.net_if.inbound_packet_to_stack(&packet, frame_type).now_or_never().transpose()
+        {
             error!("Unable to send packet to netstack: {:?}", err);
         }
     }
@@ -104,7 +110,9 @@ where
                     "HACK(b/235498515): Refusing to add {:?} because it looks like an RLOC",
                     subnet.addr
                 );
-            } else if let Err(err) = self.net_if.add_address(&subnet).ignore_already_exists() {
+            } else if let Err(err) =
+                self.net_if.add_address_from_spinel_subnet(&subnet).ignore_already_exists()
+            {
                 warn!("Unable to add address `{:?}` to interface: {:?}", subnet, err);
             }
         } else {

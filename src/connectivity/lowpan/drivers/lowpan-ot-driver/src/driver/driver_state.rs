@@ -23,6 +23,8 @@ pub struct DriverState<OT> {
     pub ot_ctl: ot_ctl::OtCtl,
 
     pub detailed_logging: detailed_logging::DetailedLogging,
+
+    pub nat64: nat64::Nat64,
 }
 
 impl<OT: AsRef<ot::Instance>> AsRef<ot::Instance> for DriverState<OT> {
@@ -85,6 +87,7 @@ impl<OT> DriverState<OT> {
             srp_advertising_proxy: None,
             ot_ctl: ot_ctl::OtCtl::new(),
             detailed_logging: detailed_logging::DetailedLogging::new(),
+            nat64: nat64::Nat64::new(),
         }
     }
 }

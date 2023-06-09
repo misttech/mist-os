@@ -101,6 +101,11 @@
             to: "#lowpan-ot-driver",
             subdir: "ot-radio",
         },
+        {
+            protocol: [ "fuchsia.net.masquerade.Factory" ],
+            from: "#network",
+            to: [ "#lowpan-ot-driver" ],
+        },
 
         // offers for lowpan-monitor
         {

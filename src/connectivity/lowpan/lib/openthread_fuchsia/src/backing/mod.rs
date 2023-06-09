@@ -19,6 +19,7 @@ use tracing::{debug, error, info, trace, warn};
 
 mod alarm;
 mod infra_if;
+mod nat64;
 mod radio;
 mod reset;
 mod trel;
@@ -26,6 +27,7 @@ mod udp;
 
 pub(crate) use alarm::*;
 pub(crate) use infra_if::InfraIfInstance;
+pub(crate) use nat64::Nat64Instance;
 use openthread::ot::NetifIdentifier;
 pub(crate) use reset::PlatformResetRequested;
 pub(crate) use udp::*;
@@ -39,6 +41,7 @@ pub(super) struct PlatformBacking {
     pub(super) trel: RefCell<Option<trel::TrelInstance>>,
     pub(super) infra_if: Option<InfraIfInstance>,
     pub(super) is_platform_reset_requested: AtomicBool,
+    pub(super) nat64: Nat64Instance,
 }
 
 impl PlatformBacking {

@@ -29,7 +29,11 @@ pub trait NetworkInterface: Send + Sync {
     async fn outbound_packet_from_stack(&self) -> Result<Vec<u8>, Error>;
 
     /// Provides the given IPv6 packet to the network stack.
-    async fn inbound_packet_to_stack(&self, packet_in: &[u8]) -> Result<(), Error>;
+    async fn inbound_packet_to_stack(
+        &self,
+        packet_in: &[u8],
+        frame_type: fidl_fuchsia_hardware_network::FrameType,
+    ) -> Result<(), Error>;
 
     /// Changes the online status of the network interface. If an interface is
     /// enabled, the stack won't start handling packets until it is marked as online.
@@ -41,11 +45,17 @@ pub trait NetworkInterface: Send + Sync {
     /// This is generally controlled by the administrator.
     async fn set_enabled(&self, enabled: bool) -> Result<(), Error>;
 
+    /// Adds the given IPv6 address of Spinel::Subnet type to this interface.
+    // TODO(fxbug.dev/64704): Consider making this method async. This method is
+    //       currently synchronous so that it can be used directly from
+    //       `Driver::on_prop_value_is`, which is also synchronous.
+    fn add_address_from_spinel_subnet(&self, addr: &Subnet) -> Result<(), Error>;
+
     /// Adds the given address to this interface.
     // TODO(fxbug.dev/64704): Consider making this method async. This method is
     //       currently synchronous so that it can be used directly from
     //       `Driver::on_prop_value_is`, which is also synchronous.
-    fn add_address(&self, addr: &Subnet) -> Result<(), Error>;
+    fn add_address(&self, addr: fidl_fuchsia_net::Subnet) -> Result<(), Error>;
 
     /// Removes the given address from this interface.
     // TODO(fxbug.dev/64704): Consider making this method async. This method is
@@ -78,6 +88,9 @@ pub trait NetworkInterface: Send + Sync {
 
     /// Set the ipv6 packet forwarding for lowpan interface
     async fn set_ipv6_forwarding_enabled(&self, enabled: bool) -> Result<(), Error>;
+
+    /// Set the ipv4 packet forwarding for lowpan interface
+    async fn set_ipv4_forwarding_enabled(&self, enabled: bool) -> Result<(), Error>;
 }
 
 use futures::channel::mpsc;
@@ -114,8 +127,12 @@ impl NetworkInterface for DummyNetworkInterface {
         futures::future::pending().await
     }
 
-    async fn inbound_packet_to_stack(&self, packet: &[u8]) -> Result<(), Error> {
-        info!("Packet to Stack: {}", hex::encode(packet));
+    async fn inbound_packet_to_stack(
+        &self,
+        packet: &[u8],
+        frame_type: fidl_fuchsia_hardware_network::FrameType,
+    ) -> Result<(), Error> {
+        info!("Packet to Stack: {}, frame_type: {:?}", hex::encode(packet), frame_type);
         Ok(())
     }
 
@@ -132,7 +149,12 @@ impl NetworkInterface for DummyNetworkInterface {
         Ok(())
     }
 
-    fn add_address(&self, addr: &Subnet) -> Result<(), Error> {
+    fn add_address_from_spinel_subnet(&self, addr: &Subnet) -> Result<(), Error> {
+        info!("Address Added: {:?}", addr);
+        Ok(())
+    }
+
+    fn add_address(&self, addr: fidl_fuchsia_net::Subnet) -> Result<(), Error> {
         info!("Address Added: {:?}", addr);
         Ok(())
     }
@@ -167,6 +189,10 @@ impl NetworkInterface for DummyNetworkInterface {
     }
 
     async fn set_ipv6_forwarding_enabled(&self, _enabled: bool) -> Result<(), Error> {
+        Ok(())
+    }
+
+    async fn set_ipv4_forwarding_enabled(&self, _enabled: bool) -> Result<(), Error> {
         Ok(())
     }
 }

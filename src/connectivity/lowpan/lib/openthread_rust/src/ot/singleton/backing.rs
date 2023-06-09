@@ -25,6 +25,7 @@ pub(crate) struct InstanceBacking {
         Option<std::boxed::Box<dyn FnMut(ot::SrpServerServiceUpdateId, &ot::SrpServerHost, u32)>>,
     >,
     pub dnssd_query_sub_unsub_fn: Cell<Option<std::boxed::Box<dyn FnMut(bool, &CStr)>>>,
+    pub nat64_receive_fn: Cell<Option<std::boxed::Box<dyn FnMut(OtMessageBox<'_>)>>>,
 }
 
 impl InstanceBacking {
@@ -42,6 +43,7 @@ impl InstanceBacking {
             srp_server_service_update_fn: Cell::new(None),
             dnssd_query_sub_unsub_fn: Cell::new(None),
             multicast_listener_callback: Cell::new(None),
+            nat64_receive_fn: Cell::new(None),
         }
     }
 }

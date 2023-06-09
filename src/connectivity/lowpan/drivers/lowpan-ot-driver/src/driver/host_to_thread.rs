@@ -17,7 +17,24 @@ use packet::ParsablePacket;
 use packet_formats::icmp::mld::MldPacket;
 use packet_formats::icmp::{IcmpParseArgs, Icmpv6Packet};
 use packet_formats::ip::{IpPacket, IpProto, Ipv6Proto};
+use packet_formats::ipv4::Ipv4Packet;
 use packet_formats::ipv6::Ipv6Packet;
+
+enum IpFormat {
+    Invalid,
+    Ipv4,
+    Ipv6,
+}
+
+impl IpFormat {
+    pub fn for_packet(packet: &[u8]) -> IpFormat {
+        match packet.first().map(|x| x >> 4) {
+            Some(4) => IpFormat::Ipv4,
+            Some(6) => IpFormat::Ipv6,
+            _ => IpFormat::Invalid,
+        }
+    }
+}
 
 /// Callbacks from netstack and other on-host systems.
 impl<OT, NI, BI> OtDriver<OT, NI, BI>
@@ -199,17 +216,34 @@ where
             info!("OpenThread Send Failed: Active scan in progress.");
         } else if driver_state.ot_instance.is_energy_scan_in_progress() {
             info!("OpenThread Send Failed: Energy scan in progress.");
-        } else if let Err(err) = driver_state.ot_instance.ip6_send_data(packet.as_slice()) {
-            match err {
-                ot::Error::MessageDropped => {
-                    info!("OpenThread dropped a packet due to packet processing rules.");
+        } else {
+            let mut result = Ok(());
+            match IpFormat::for_packet(&packet) {
+                IpFormat::Ipv6 => {
+                    result = driver_state.ot_instance.ip6_send_data(packet.as_slice());
                 }
-                ot::Error::NoRoute => {
-                    info!("OpenThread dropped a packet because there was no route to host.");
+                IpFormat::Ipv4 => {
+                    result = driver_state.ot_instance.nat64_send_data_slice(packet.as_slice());
                 }
-                x => {
-                    warn!("Send packet to OpenThread failed: \"{:?}\"", x);
-                    debug!("Message Buffer Info: {:?}", driver_state.ot_instance.get_buffer_info());
+                _ => {
+                    warn!("received unkonwn version of IP packet from netstack to thread");
+                }
+            }
+            if let Err(err) = result {
+                match err {
+                    ot::Error::MessageDropped => {
+                        info!("OpenThread dropped a packet due to packet processing rules.");
+                    }
+                    ot::Error::NoRoute => {
+                        info!("OpenThread dropped a packet because there was no route to host.");
+                    }
+                    x => {
+                        warn!("Send packet to OpenThread failed: \"{:?}\"", x);
+                        debug!(
+                            "Message Buffer Info: {:?}",
+                            driver_state.ot_instance.get_buffer_info()
+                        );
+                    }
                 }
             }
         }
@@ -315,7 +349,20 @@ where
             },
 
             Err(err) => {
-                warn!("Unable to parse IPv6 packet from host: {:?}", err);
+                debug!(
+                    "Unable to parse IPv6 packet from host: {:?}, try parse as IPv4 packet",
+                    err
+                );
+
+                match Ipv4Packet::parse(&mut packet_bytes, ()) {
+                    Ok(_) => {
+                        debug!("IPv4 packet from netstack");
+                        return true;
+                    }
+                    Err(err) => {
+                        warn!("Unable to parse packet as either IPv6 nor IPv4: {:?}", err);
+                    }
+                }
 
                 // Drop the packet
                 return false;

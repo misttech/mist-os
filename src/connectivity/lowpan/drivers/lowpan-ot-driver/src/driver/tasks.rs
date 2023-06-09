@@ -226,7 +226,12 @@ where
 
         driver_state.ot_instance.ip6_set_receive_fn(Some(move |msg: OtMessageBox<'_>| {
             // NOTE: DRIVER STATE IS LOCKED WHEN THIS IS CALLED!
-            self.on_ot_ip6_receive(msg);
+            self.on_ot_ip_receive(msg, fidl_fuchsia_hardware_network::FrameType::Ipv6);
+        }));
+
+        driver_state.ot_instance.nat64_set_receive_fn(Some(move |msg: OtMessageBox<'_>| {
+            // NOTE: DRIVER STATE IS LOCKED WHEN THIS IS CALLED!
+            self.on_ot_ip_receive(msg, fidl_fuchsia_hardware_network::FrameType::Ipv4);
         }));
 
         driver_state.ot_instance.set_multicast_listener_callback(Some(

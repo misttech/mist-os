@@ -280,6 +280,23 @@ impl<'a> Message<'a> {
         }
         .ok_or(ot::MalformedOrNoBufs)
     }
+
+    /// Functional equivalent of [`otsys::otIp4NewMessage`](crate::otsys::otIp4NewMessage).
+    pub fn ip4_new<T: ot::Boxable<OtType = otInstance>>(
+        instance: &'a T,
+        settings: Option<&Settings>,
+    ) -> Result<ot::Box<Message<'a>>, ot::NoBufs> {
+        unsafe {
+            // This is safe because we own the `otMessage*` resulting from
+            // `otIp4NewMessage`. Safety is also dependent on the correctness
+            //  of the implementation of `otIp4NewMessage`.
+            ot::Box::from_ot_ptr(otIp4NewMessage(
+                instance.as_ot_ptr(),
+                settings.map(|x| x.as_ref().as_ot_ptr()).unwrap_or(null()),
+            ))
+        }
+        .ok_or(ot::NoBufs)
+    }
 }
 
 impl<'a> Message<'a> {

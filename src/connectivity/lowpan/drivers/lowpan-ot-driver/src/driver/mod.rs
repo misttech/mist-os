@@ -18,6 +18,7 @@ mod error_adapter;
 mod host_to_thread;
 mod joiner;
 mod multicast_routing_manager;
+mod nat64;
 mod ot_ctl;
 mod srp_proxy;
 mod tasks;
@@ -35,6 +36,7 @@ pub use host_to_thread::*;
 use lowpan_driver_common::net::{BackboneInterface, NetworkInterface};
 use lowpan_driver_common::AsyncCondition;
 use multicast_routing_manager::MulticastRoutingManager;
+pub use nat64::*;
 pub use srp_proxy::*;
 pub use thread_to_host::*;
 

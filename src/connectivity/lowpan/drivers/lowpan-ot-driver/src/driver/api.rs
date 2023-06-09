@@ -990,6 +990,10 @@ where
             }
         }
 
+        if let Some(nat64_enabled) = config.nat64_enabled {
+            ot.nat64_set_enabled(nat64_enabled);
+        }
+
         if let Err(e) = driver_state.detailed_logging.process_detailed_logging_set(
             config.detailed_logging_enabled,
             config.detailed_logging_level.map(|level| level.into()),

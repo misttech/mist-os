@@ -226,6 +226,11 @@ impl Config {
             .await
             .expect("Unable to enable ipv6 packet forwarding on lowpan interface");
 
+        netif
+            .set_ipv4_forwarding_enabled(true)
+            .await
+            .expect("Unable to enable ipv4 packet forwarding on lowpan interface");
+
         let backbone_netif_index = self.get_backbone_netif_index();
         let backbone_if = BackboneNetworkInterface::new(backbone_netif_index.unwrap_or(0).into());
 
@@ -281,6 +286,8 @@ where
     let mut driver = OtDriver::new(ot_instance, net_if, backbone_if);
 
     driver.start_multicast_routing_manager();
+
+    driver.init_nat64();
 
     let driver_ref = &driver;
 
