@@ -22,10 +22,3 @@ if (is_host) {
 group("tests") {
   testonly = true
 }
-
-# Run these tests on an FYI builder for the time being.
-group("fyi") {
-  testonly = true
-
-  deps = [ ":snapshot_test($host_toolchain)" ]
-}
