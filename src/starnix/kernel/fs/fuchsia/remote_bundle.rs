@@ -225,7 +225,9 @@ impl FsNodeOps for DirectoryObject {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
         let metadata = &bundle.metadata;
-        let inode_num = metadata.lookup(node.node_id, name).map_err(|_| errno!(ENOENT))?;
+        let inode_num = metadata
+            .lookup(node.node_id, name)
+            .map_err(|e| errno!(ENOENT, format!("Error: {e:?} opening {name}")))?;
         let metadata_node = metadata.get(inode_num).ok_or(errno!(EIO))?;
         let info = to_fs_node_info(inode_num, metadata_node);
 
