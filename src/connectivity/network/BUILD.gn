@@ -18,7 +18,7 @@ if (use_netstack3) {
   _netstack_package = ":netstack3"
 }
 if (enable_netstack2_tracing) {
-  _netstack2_component = "netstack:component-with-tracing"
+  _netstack2_component = "netstack:component-with-tracing-dropin"
 }
 
 fuchsia_component("component") {
@@ -154,7 +154,7 @@ group("tests") {
 
     # Ensure this target doesn't rot. This dependency can be removed if the
     # target becomes load bearing elsewhere.
-    "netstack:component-with-tracing",
+    "netstack:component-with-tracing-dropin",
     "netstack:tests",
     "netstack3:tests",
     "reachability:tests",

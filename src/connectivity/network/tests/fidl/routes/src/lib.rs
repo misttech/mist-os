@@ -151,8 +151,7 @@ async fn resolve_route<N: Netstack>(name: &str) {
             // `Resolve` initiates dynamic neighbor resolution.
             let expected_mac = match N::VERSION {
                 NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => None,
-                NetstackVersion::Netstack2
-                | NetstackVersion::Netstack2WithFastUdp
+                NetstackVersion::Netstack2 { tracing: _, fast_udp: _ }
                 | NetstackVersion::ProdNetstack2 => Some(GATEWAY_MAC),
             };
             fidl_fuchsia_net_routes::Destination {
@@ -187,8 +186,7 @@ async fn resolve_route<N: Netstack>(name: &str) {
                     )
                 )
             }
-            NetstackVersion::Netstack2
-            | NetstackVersion::Netstack2WithFastUdp
+            NetstackVersion::Netstack2 { tracing: _, fast_udp: _ }
             | NetstackVersion::ProdNetstack2 => {
                 resolve_fails(unreachable_peer).await;
             }
@@ -365,9 +363,7 @@ async fn resolve_fails_with_no_src_address<N: Netstack, I: net_types::ip::Ip>(na
         // TODO(https://fxbug.dev/120878): Expect NS3 to resolve the MAC once it
         // supports initiating neighbor resolution.
         NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => None,
-        NetstackVersion::Netstack2
-        | NetstackVersion::Netstack2WithFastUdp
-        | NetstackVersion::ProdNetstack2 => {
+        NetstackVersion::Netstack2 { tracing: _, fast_udp: _ } | NetstackVersion::ProdNetstack2 => {
             let neigh = realm
                 .connect_to_protocol::<fidl_fuchsia_net_neighbor::ControllerMarker>()
                 .expect("failed to connect to neighbor API");
@@ -490,9 +486,9 @@ fn initial_loopback_routes_v4<N: Netstack>(
                 true,
             )))
         }
-        NetstackVersion::Netstack2
-        | NetstackVersion::ProdNetstack2
-        | NetstackVersion::Netstack2WithFastUdp => Either::Right(std::iter::empty()),
+        NetstackVersion::Netstack2 { tracing: _, fast_udp: _ } | NetstackVersion::ProdNetstack2 => {
+            Either::Right(std::iter::empty())
+        }
     })
 }
 
@@ -513,9 +509,8 @@ fn initial_loopback_routes_v6<N: Netstack>(
                     true,
                 )))
             }
-            NetstackVersion::Netstack2
-            | NetstackVersion::ProdNetstack2
-            | NetstackVersion::Netstack2WithFastUdp => Either::Right(std::iter::empty()),
+            NetstackVersion::Netstack2 { tracing: _, fast_udp: _ }
+            | NetstackVersion::ProdNetstack2 => Either::Right(std::iter::empty()),
         })
 }
 

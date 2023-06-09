@@ -137,6 +137,10 @@ closed protocol Sandbox {
                             /// Required.
                             2: path string:fuchsia.component.MAX_PATH_LENGTH;
                         };
+
+                        /// A dependency on the capability to register a tracing
+                        /// provider.
+                        7: tracing_provider Empty;
                     }>:MAX;
                 };
 

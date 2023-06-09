@@ -137,9 +137,11 @@ fn check_igmp_report(
             _ => panic!("unknown IGMP version {:?}", version),
         },
         None => match netstack_version {
-            NetstackVersion::Netstack2 => check_igmpv3_report(dst_ip, payload, expected_group),
+            NetstackVersion::Netstack2 { tracing: false, fast_udp: false } => {
+                check_igmpv3_report(dst_ip, payload, expected_group)
+            }
             NetstackVersion::Netstack3 => check_igmpv2_report(dst_ip, payload, expected_group),
-            v @ (NetstackVersion::Netstack2WithFastUdp
+            v @ (NetstackVersion::Netstack2 { tracing: _, fast_udp: _ }
             | NetstackVersion::ProdNetstack2
             | NetstackVersion::ProdNetstack3) => {
                 panic!("netstack_test should only be parameterized with Netstack2 or Netstack3: got {:?}", v);

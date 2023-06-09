@@ -266,7 +266,8 @@ async fn watcher_after_state_closed<N: Netstack>(name: &str) {
         .await
         .expect("collect interfaces");
     let expected = match N::VERSION {
-        NetstackVersion::Netstack3 | NetstackVersion::Netstack2 => std::iter::once((
+        NetstackVersion::Netstack3
+        | NetstackVersion::Netstack2 { tracing: false, fast_udp: false } => std::iter::once((
             1,
             fidl_fuchsia_net_interfaces_ext::Properties {
                 id: 1.try_into().expect("should be nonzero"),
@@ -290,7 +291,7 @@ async fn watcher_after_state_closed<N: Netstack>(name: &str) {
             },
         ))
         .collect(),
-        v @ (NetstackVersion::Netstack2WithFastUdp
+        v @ (NetstackVersion::Netstack2 { tracing: _, fast_udp: _ }
         | NetstackVersion::ProdNetstack2
         | NetstackVersion::ProdNetstack3) => {
             panic!(

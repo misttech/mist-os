@@ -12,6 +12,7 @@ use {
         RealmOptions, SandboxRequest, SandboxRequestStream,
     },
     fidl_fuchsia_netemul_network as fnetemul_network, fidl_fuchsia_sys2 as fsys2,
+    fidl_fuchsia_tracing_provider as ftracing_provider,
     fuchsia_component::server::{ServiceFs, ServiceFsDir},
     fuchsia_component_test::{
         self as fcomponent, Capability, ChildOptions, LocalComponentHandles, RealmBuilder,
@@ -407,6 +408,21 @@ async fn create_realm_instance(
                                     )
                                     .await?;
                                 UniqueCapability::Storage { mount_path: mount_path.into() }
+                            }
+                            fnetemul::Capability::TracingProvider(fnetemul::Empty) => {
+                                builder
+                                    .add_route(
+                                        Route::new()
+                                            .capability(Capability::protocol::<
+                                                ftracing_provider::RegistryMarker,
+                                            >(
+                                            ))
+                                            .from(Ref::parent())
+                                            .to(&child_ref),
+                                    )
+                                    .await?;
+                                UniqueCapability::new_protocol::<ftracing_provider::RegistryMarker>(
+                                )
                             }
                         };
                         match unique_caps.entry(cap) {

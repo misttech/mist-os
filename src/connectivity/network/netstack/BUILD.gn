@@ -91,8 +91,14 @@ go_binary("bin_with_tracing") {
       go_tracing_include_dirs + udp_serde_include_dirs + netdevice_include_dirs
 }
 
-fuchsia_component("component-with-tracing") {
+fuchsia_component("component-with-tracing-dropin") {
   component_name = "netstack"
+  manifest = "meta/netstack_with_tracing.cml"
+  deps = [ ":bin_with_tracing" ]
+}
+
+fuchsia_component("component-with-tracing") {
+  component_name = "netstack-with-tracing"
   manifest = "meta/netstack_with_tracing.cml"
   deps = [ ":bin_with_tracing" ]
 }

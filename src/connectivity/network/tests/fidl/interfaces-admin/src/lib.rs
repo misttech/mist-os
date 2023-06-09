@@ -2176,13 +2176,13 @@ impl IpForwarding {
                 v6: false_if_none(self.v6),
                 v6_multicast: None,
             },
-            NetstackVersion::Netstack2 => IpForwarding {
+            NetstackVersion::Netstack2 { tracing: false, fast_udp: false } => IpForwarding {
                 v4: false_if_none(self.v4),
                 v4_multicast: false_if_none(self.v4_multicast),
                 v6: false_if_none(self.v6),
                 v6_multicast: false_if_none(self.v6_multicast),
             },
-            v @ (NetstackVersion::Netstack2WithFastUdp
+            v @ (NetstackVersion::Netstack2 { tracing: _, fast_udp: _ }
             | NetstackVersion::ProdNetstack2
             | NetstackVersion::ProdNetstack3) => {
                 panic!("netstack_test should only be parameterized with Netstack2 or Netstack3: got {:?}", v);

@@ -40,7 +40,8 @@ async fn interfaces_watcher_after_invalid_state_request<N: Netstack>(name: &str)
         .await
         .expect("failed to collect interfaces");
     let expected = match N::VERSION {
-        NetstackVersion::Netstack3 | NetstackVersion::Netstack2 => std::iter::once((
+        NetstackVersion::Netstack3
+        | NetstackVersion::Netstack2 { tracing: false, fast_udp: false } => std::iter::once((
             1,
             fidl_fuchsia_net_interfaces_ext::Properties {
                 id: nonzero_ext::nonzero!(1u64),
@@ -64,7 +65,7 @@ async fn interfaces_watcher_after_invalid_state_request<N: Netstack>(name: &str)
             },
         ))
         .collect(),
-        v @ (NetstackVersion::Netstack2WithFastUdp
+        v @ (NetstackVersion::Netstack2 { tracing: _, fast_udp: _ }
         | NetstackVersion::ProdNetstack2
         | NetstackVersion::ProdNetstack3) => panic!(
             "netstack_test should only be parameterized with Netstack2 or Netstack3: got {:?}",

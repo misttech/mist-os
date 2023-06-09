@@ -35,11 +35,12 @@ where
                 // The prod ns2 has a route for
                 // fuchsia.scheduler.ProfileProvider which is needed for tests
                 // in this suite.
-                NetstackVersion::Netstack2 => NetstackVersion::ProdNetstack2,
+                NetstackVersion::Netstack2 { tracing: false, fast_udp: false } => NetstackVersion::ProdNetstack2,
                 v @ NetstackVersion::Netstack3 => v,
-                v @ (NetstackVersion::Netstack2WithFastUdp
+                v @ (NetstackVersion::Netstack2 { tracing: _, fast_udp: _ }
                 | NetstackVersion::ProdNetstack2
-                | NetstackVersion::ProdNetstack3) => {
+                | NetstackVersion::ProdNetstack3
+                ) => {
                     panic!("netstack_test should only be parameterized with Netstack2 or Netstack3: got {:?}", v);
                 }
             }

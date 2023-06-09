@@ -42,22 +42,25 @@ use crate::Result;
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[allow(missing_docs)]
 pub enum NetstackVersion {
-    Netstack2,
+    Netstack2 { tracing: bool, fast_udp: bool },
     Netstack3,
     ProdNetstack2,
     ProdNetstack3,
-    Netstack2WithFastUdp,
 }
 
 impl NetstackVersion {
     /// Gets the Fuchsia URL for this Netstack component.
     pub fn get_url(&self) -> &'static str {
         match self {
-            NetstackVersion::Netstack2 => "#meta/netstack-debug.cm",
+            NetstackVersion::Netstack2 { tracing, fast_udp } => match (tracing, fast_udp) {
+                (false, false) => "#meta/netstack-debug.cm",
+                (false, true) => "#meta/netstack-with-fast-udp-debug.cm",
+                (true, false) => "#meta/netstack-with-tracing.cm",
+                (true, true) => "#meta/netstack-with-fast-udp-tracing.cm",
+            },
             NetstackVersion::Netstack3 => "#meta/netstack3-debug.cm",
             NetstackVersion::ProdNetstack2 => "#meta/netstack.cm",
             NetstackVersion::ProdNetstack3 => "#meta/netstack3.cm",
-            NetstackVersion::Netstack2WithFastUdp => "#meta/netstack-with-fast-udp-debug.cm",
         }
     }
 
@@ -85,9 +88,8 @@ impl NetstackVersion {
             ($($name:expr),*,) => {common_services_and!($($name),*)}
         }
         match self {
-            NetstackVersion::Netstack2
-            | NetstackVersion::ProdNetstack2
-            | NetstackVersion::Netstack2WithFastUdp => &common_services_and!(
+            NetstackVersion::Netstack2 { tracing: _, fast_udp: _ }
+            | NetstackVersion::ProdNetstack2 => &common_services_and!(
                 fnet_multicast_admin::Ipv4RoutingTableControllerMarker::PROTOCOL_NAME,
                 fnet_multicast_admin::Ipv6RoutingTableControllerMarker::PROTOCOL_NAME,
                 fnet_neighbor::ControllerMarker::PROTOCOL_NAME,
@@ -259,6 +261,12 @@ where
     }
 }
 
+impl From<KnownServiceProvider> for fnetemul::ChildDef {
+    fn from(s: KnownServiceProvider) -> Self {
+        (&s).into()
+    }
+}
+
 impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
     fn from(s: &'a KnownServiceProvider) -> Self {
         match s {
@@ -277,19 +285,22 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                             // Note also that netstack-debug does not have a use
                             // declaration for this protocol for the same
                             // reason.
-                            NetstackVersion::Netstack2
-                            | NetstackVersion::Netstack3
-                            | NetstackVersion::Netstack2WithFastUdp
-                            | NetstackVersion::ProdNetstack3 => {
+                            NetstackVersion::Netstack2 { tracing: false, fast_udp: _ } => {
                                 itertools::Either::Left(std::iter::empty())
                             }
+                            NetstackVersion::Netstack2 { tracing: true, fast_udp: _ }
+                            | NetstackVersion::Netstack3
+                            | NetstackVersion::ProdNetstack3 => {
+                                itertools::Either::Right(std::iter::once(
+                                    fnetemul::Capability::TracingProvider(fnetemul::Empty),
+                                ))
+                            }
                             NetstackVersion::ProdNetstack2 => itertools::Either::Right(
-                                [fnetemul::Capability::ChildDep(protocol_dep::<
+                                std::iter::once(fnetemul::Capability::ChildDep(protocol_dep::<
                                     fstash::SecureStoreMarker,
                                 >(
                                     constants::secure_stash::COMPONENT_NAME,
-                                ))]
-                                .into_iter(),
+                                ))),
                             ),
                         })
                         .collect(),
@@ -605,7 +616,7 @@ pub trait Netstack: Copy + Clone {
 pub enum Netstack2 {}
 
 impl Netstack for Netstack2 {
-    const VERSION: NetstackVersion = NetstackVersion::Netstack2;
+    const VERSION: NetstackVersion = NetstackVersion::Netstack2 { tracing: false, fast_udp: false };
 }
 
 /// Uninstantiable type that represents Netstack2's production implementation of
@@ -615,15 +626,6 @@ pub enum ProdNetstack2 {}
 
 impl Netstack for ProdNetstack2 {
     const VERSION: NetstackVersion = NetstackVersion::ProdNetstack2;
-}
-
-/// Uninstantiable type that represents Netstack2's implementation of a
-/// network stack with the Fast UDP feature enabled.
-#[derive(Copy, Clone)]
-pub enum Netstack2WithFastUdp {}
-
-impl Netstack for Netstack2WithFastUdp {
-    const VERSION: NetstackVersion = NetstackVersion::Netstack2WithFastUdp;
 }
 
 /// Uninstantiable type that represents Netstack3's implementation of a

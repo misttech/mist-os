@@ -45,7 +45,7 @@ use netemul::{RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _, T
 use netstack_testing_common::{
     constants::ipv6 as ipv6_consts,
     devices, ndp, ping,
-    realms::{Netstack, Netstack2, Netstack2WithFastUdp, NetstackVersion, TestSandboxExt as _},
+    realms::{KnownServiceProvider, Netstack, Netstack2, NetstackVersion, TestSandboxExt as _},
     Result,
 };
 use netstack_testing_macros::netstack_test;
@@ -135,7 +135,13 @@ async fn test_udp_socket(name: &str, protocol: UdpProtocol) {
             .create_netstack_realm::<Netstack2, _>(format!("{}_client", name))
             .expect("failed to create client realm"),
         UdpProtocol::Fast => sandbox
-            .create_netstack_realm::<Netstack2WithFastUdp, _>(format!("{}_client", name))
+            .create_realm(
+                format!("{}_client", name),
+                [KnownServiceProvider::Netstack(NetstackVersion::Netstack2 {
+                    fast_udp: true,
+                    tracing: false,
+                })],
+            )
             .expect("failed to create client realm"),
     };
 
@@ -154,7 +160,13 @@ async fn test_udp_socket(name: &str, protocol: UdpProtocol) {
             .create_netstack_realm::<Netstack2, _>(format!("{}_server", name))
             .expect("failed to create server realm"),
         UdpProtocol::Fast => sandbox
-            .create_netstack_realm::<Netstack2WithFastUdp, _>(format!("{}_server", name))
+            .create_realm(
+                format!("{}_server", name),
+                [KnownServiceProvider::Netstack(NetstackVersion::Netstack2 {
+                    fast_udp: true,
+                    tracing: false,
+                })],
+            )
             .expect("failed to create server realm"),
     };
     let server_ep = server
@@ -224,7 +236,13 @@ async fn setup_fastudp_network<'a>(
 ) {
     let net = sandbox.create_network("net").await.expect("create network");
     let netstack = sandbox
-        .create_netstack_realm::<Netstack2WithFastUdp, _>(name)
+        .create_realm(
+            name,
+            [KnownServiceProvider::Netstack(NetstackVersion::Netstack2 {
+                fast_udp: true,
+                tracing: false,
+            })],
+        )
         .expect("create netstack realm");
     let iface = netstack.join_network(&net, "ep").await.expect("failed to join network");
 
@@ -1187,7 +1205,13 @@ async fn toggle_cmsg(
 async fn udp_recv_msg_postflight_fidl(root_name: &str, test_name: &str, cmsg_type: CmsgType) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let netstack = sandbox
-        .create_netstack_realm::<Netstack2WithFastUdp, _>(format!("{}_{}", root_name, test_name))
+        .create_realm(
+            format!("{}_{}", root_name, test_name),
+            [KnownServiceProvider::Netstack(NetstackVersion::Netstack2 {
+                fast_udp: true,
+                tracing: false,
+            })],
+        )
         .expect("failed to create netstack realm");
 
     let socket_provider = netstack
@@ -2959,9 +2983,9 @@ async fn tcp_communicate_with_remote_with_zone<
 #[netstack_test]
 async fn tcp_connect_to_remote_with_zone<N: Netstack>(name: &str) {
     match N::VERSION {
-        NetstackVersion::Netstack2
-        | NetstackVersion::ProdNetstack2
-        | NetstackVersion::Netstack2WithFastUdp => (),
+        NetstackVersion::Netstack2 { tracing: _, fast_udp: _ } | NetstackVersion::ProdNetstack2 => {
+            ()
+        }
         NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => {
             // TODO(https://fxbug.dev/100759): Re-enable this once Netstack3
             // supports fallible device access.
@@ -3027,13 +3051,19 @@ async fn zx_socket_rights<N: Netstack>(name: &str, protocol: ProtocolWithZirconS
 
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let netstack = match N::VERSION {
-        NetstackVersion::Netstack2 => sandbox
-            .create_netstack_realm::<Netstack2WithFastUdp, _>(format!("{}", name))
+        NetstackVersion::Netstack2 { tracing: false, fast_udp: false } => sandbox
+            .create_realm(
+                format!("{}", name),
+                [KnownServiceProvider::Netstack(NetstackVersion::Netstack2 {
+                    fast_udp: true,
+                    tracing: false,
+                })],
+            )
             .expect("create realm"),
         NetstackVersion::Netstack3 => {
             sandbox.create_netstack_realm::<N, _>(format!("{}", name)).expect("create realm")
         }
-        v @ (NetstackVersion::Netstack2WithFastUdp
+        v @ (NetstackVersion::Netstack2 { tracing: _, fast_udp: _ }
         | NetstackVersion::ProdNetstack2
         | NetstackVersion::ProdNetstack3) => panic!(
             "netstack_test should only be parameterized with Netstack2 or Netstack3: got {:?}",
