@@ -883,6 +883,16 @@ mod tests {
     }
 
     #[test]
+    fn test_path_dirname_basename() {
+        let path = Path::new("/foo").unwrap();
+        assert_eq!((path.dirname(), path.basename()), ("/", "foo"));
+        let path = Path::new("/foo/bar").unwrap();
+        assert_eq!((path.dirname(), path.basename()), ("/foo", "bar"));
+        let path = Path::new("/foo/bar/baz").unwrap();
+        assert_eq!((path.dirname(), path.basename()), ("/foo/bar", "baz"));
+    }
+
+    #[test]
     fn test_valid_relative_path() {
         expect_ok!(RelativePath, "foo");
         expect_ok!(RelativePath, "foo/bar");
