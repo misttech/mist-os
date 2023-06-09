@@ -651,6 +651,7 @@ mod util {
     #[should_panic]
     // TODO(fxbug.dev/88496): delete the below
     #[cfg_attr(feature = "variant_asan", ignore)]
+    #[cfg_attr(feature = "variant_hwasan", ignore)]
     fn fail_duplicates_in_ordering() {
         let states = vec![State::Prepare, State::Prepare];
         let ordering = vec![StateId::Prepare, StateId::Prepare];
