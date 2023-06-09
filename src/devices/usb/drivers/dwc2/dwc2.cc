@@ -203,8 +203,10 @@ void Dwc2::HandleInEpInterrupt() {
             // In the case of #2, the core needs to prepare to retransmit the lost data (which
             // remains in the FIFO).
             HandleEp0TimeoutRecovery();
-            DIEPINT::Get(ep_num).ReadFrom(mmio).set_timeout(1).WriteTo(mmio);
-            break;
+
+            // The recovery logic currently executes a soft disconnect and core reset. We don't want
+            // to process any further interrupts.
+            return;
           }
           case Ep0State::DISCONNECTED:
           case Ep0State::IDLE:
@@ -744,25 +746,29 @@ void Dwc2::HandleEp0TransferComplete(bool is_in) {
   }
 }
 
-// Handles the case where the core experiences a timeout due to lost data or ACK.
+// Executes a soft port disconnect and issues a core reset.
+void Dwc2::SoftDisconnect() {
+  auto* mmio = get_mmio();
+
+  DCTL::Get().ReadFrom(mmio).set_sftdiscon(1).WriteTo(mmio);
+  auto grstctl = GRSTCTL::Get();
+  grstctl.ReadFrom(mmio).set_csftrst(1).WriteTo(mmio);
+  while (grstctl.ReadFrom(mmio).csftrst()) {
+    zx::nanosleep(zx::deadline_after(zx::msec(1)));
+  }
+  zx::nanosleep(zx::deadline_after(zx::msec(5)));
+}
+
+// Handles the case where the core experiences a timeout due to lost data or ACK. For the time
+// being, the recovery logic involves a soft port disconnect and controller reset. This appears to
+// the host as a unplug-replug event.
 void Dwc2::HandleEp0TimeoutRecovery() {
-  timeout_recovering_ = true;
-  ep0_state_ = Ep0State::TIMEOUT_RECOVERY;
-
-  // If the ACK was lost in transit, prepare DWC_EP0_OUT to receive ACK.
-  {
-    auto& ep_out = endpoints_[DWC_EP0_OUT];
-    fbl::AutoLock al(&ep_out->lock);
-    StartTransfer(&*ep_out, 0);
-  }
-
-  // Otherwise, if the data never made it to the host, prepare DWC_EP0_IN to retransmit.
-  {
-    auto& ep_in = endpoints_[DWC_EP0_IN];
-    ep_in->req_offset -= last_transmission_len_;
-    fbl::AutoLock al(&ep_in->lock);
-    StartTransfer(&*ep_in, last_transmission_len_);
-  }
+  fbl::AutoLock _(&lock_);
+  SetConnected(false);
+  SoftDisconnect();
+  ep0_state_ = Ep0State::DISCONNECTED;
+  zx::nanosleep(zx::deadline_after(zx::msec(50)));
+  InitController(); // Clears the GRSTCTRL.sftdiscon condition.
 }
 
 // Handles transfer complete events for endpoints other than endpoint zero

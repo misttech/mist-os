@@ -160,7 +160,7 @@ class Dwc2 : public Dwc2Type,
   void EnableEp(uint8_t ep_num, bool enable);
   void QueueNextRequest(Endpoint* ep) __TA_REQUIRES(ep->lock);
   void StartTransfer(Endpoint* ep, uint32_t length) __TA_REQUIRES(ep->lock);
-
+  void SoftDisconnect() __TA_REQUIRES(lock_);
   uint32_t ReadTransfered(Endpoint* ep);
 
   // Interrupt handlers
