@@ -631,6 +631,8 @@ Possible values of `test_type`:
 | `system` | [Legacy non hermetic realm][system-test-realm] with access to some system capabilities. |
 | `test_arch` | [Test Architecture Tests] |
 
+[Learn][create-test-realm] how to create your own test realm.
+
 ### Non-hermetic legacy test realms
 
 These are legacy test realms created before we had
@@ -847,3 +849,4 @@ offer: [
 [sys-migration-guide]: /docs/development/components/v2/migration/tests.md
 [subpackages]: /docs/concepts/components/v2/subpackaging.md
 [test-manager-as-a-service]: /docs/contribute/governance/rfcs/0202_test_manager_as_a_service.md
+[create-test-realm]: /docs/development/testing/components/create_test_realm.md
