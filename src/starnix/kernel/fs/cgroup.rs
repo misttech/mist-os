@@ -52,6 +52,7 @@ impl FsNodeOps for CgroupDirectoryNode {
     fn create_file_ops(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(Box::new(MemoryDirectoryFile::new()))
@@ -121,6 +122,7 @@ impl FsNodeOps for ControlGroupNode {
     fn create_file_ops(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(Box::new(ControlGroupFile::new(self.control_group.clone())))

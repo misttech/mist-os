@@ -206,6 +206,7 @@ impl FsNodeOps for DeviceFileNode {
     fn create_file_ops(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         unreachable!("Special nodes cannot be opened.");
@@ -226,6 +227,7 @@ impl FsNodeOps for AccessFileNode {
     fn create_file_ops(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         let seqno = {
@@ -251,6 +253,7 @@ impl FsNodeOps for Arc<SeLinuxClassDirectory> {
     fn create_file_ops(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(VecDirectory::new_file(

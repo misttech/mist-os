@@ -312,7 +312,12 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     ///
     /// The returned FileOps will be used to create a FileObject, which might
     /// be assigned an FdNumber.
-    fn create_file_ops(&self, node: &FsNode, flags: OpenFlags) -> Result<Box<dyn FileOps>, Errno>;
+    fn create_file_ops(
+        &self,
+        node: &FsNode,
+        _current_task: &CurrentTask,
+        flags: OpenFlags,
+    ) -> Result<Box<dyn FileOps>, Errno>;
 
     /// Find an existing child node and populate the child parameter. Return the node.
     ///
@@ -465,6 +470,7 @@ macro_rules! fs_node_impl_symlink {
         fn create_file_ops(
             &self,
             _node: &crate::fs::FsNode,
+            _current_task: &CurrentTask,
             _flags: crate::types::OpenFlags,
         ) -> Result<Box<dyn crate::fs::FileOps>, crate::types::Errno> {
             unreachable!("Symlink nodes cannot be opened.");
@@ -588,6 +594,7 @@ impl FsNodeOps for SpecialNode {
     fn create_file_ops(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         unreachable!("Special nodes cannot be opened.");
@@ -712,8 +719,12 @@ impl FsNode {
         self.record_locks.release_locks(owner);
     }
 
-    pub fn create_file_ops(&self, flags: OpenFlags) -> Result<Box<dyn FileOps>, Errno> {
-        self.ops().create_file_ops(self, flags)
+    pub fn create_file_ops(
+        &self,
+        current_task: &CurrentTask,
+        flags: OpenFlags,
+    ) -> Result<Box<dyn FileOps>, Errno> {
+        self.ops().create_file_ops(self, current_task, flags)
     }
 
     pub fn open(
@@ -753,7 +764,7 @@ impl FsNode {
             FileMode::IFIFO => Ok(Pipe::open(self.fifo.as_ref().unwrap(), flags)),
             // UNIX domain sockets can't be opened.
             FileMode::IFSOCK => error!(ENXIO),
-            _ => self.create_file_ops(flags),
+            _ => self.create_file_ops(current_task, flags),
         }
     }
 

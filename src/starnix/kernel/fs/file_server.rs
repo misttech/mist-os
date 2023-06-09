@@ -557,7 +557,7 @@ mod tests {
 
             let root_handle = serve_file(
                 &current_task,
-                &fs.root().open_anonymous(OpenFlags::RDWR).expect("open"),
+                &fs.root().open_anonymous(&current_task, OpenFlags::RDWR).expect("open"),
             )
             .expect("serve");
 

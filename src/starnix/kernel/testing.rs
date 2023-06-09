@@ -205,6 +205,7 @@ impl FsNodeOps for PanickingFsNode {
     fn create_file_ops(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         panic!("should not be called")

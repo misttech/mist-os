@@ -121,6 +121,7 @@ impl FsNodeOps for Arc<StaticDirectory> {
     fn create_file_ops(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(Box::new(self.clone()))

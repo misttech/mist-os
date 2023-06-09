@@ -211,7 +211,12 @@ fn get_name_str(name_bytes: &FsStr) -> Result<&str, Errno> {
 }
 
 impl FsNodeOps for RemoteNode {
-    fn create_file_ops(&self, node: &FsNode, _flags: OpenFlags) -> Result<Box<dyn FileOps>, Errno> {
+    fn create_file_ops(
+        &self,
+        node: &FsNode,
+        _current_task: &CurrentTask,
+        _flags: OpenFlags,
+    ) -> Result<Box<dyn FileOps>, Errno> {
         let zxio = (*self.zxio).clone().map_err(|status| from_status_like_fdio!(status))?;
         if node.is_dir() {
             return Ok(Box::new(RemoteDirectoryObject::new(zxio)));

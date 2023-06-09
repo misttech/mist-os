@@ -37,9 +37,14 @@ impl FileSystemOps for SdcardHackFs {
 struct SdcardHackNode(NamespaceNode);
 
 impl FsNodeOps for SdcardHackNode {
-    fn create_file_ops(&self, _node: &FsNode, flags: OpenFlags) -> Result<Box<dyn FileOps>, Errno> {
+    fn create_file_ops(
+        &self,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+        flags: OpenFlags,
+    ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(Box::new(ProxyFileOps(FileObject::new(
-            self.0.entry.node.create_file_ops(flags)?,
+            self.0.entry.node.create_file_ops(current_task, flags)?,
             self.0.clone(),
             flags,
         ))))

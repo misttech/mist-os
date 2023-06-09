@@ -125,9 +125,13 @@ impl DirEntry {
     }
 
     /// Returns a file handle to this entry, associated with an anonymous namespace.
-    pub fn open_anonymous(self: &DirEntryHandle, flags: OpenFlags) -> Result<FileHandle, Errno> {
+    pub fn open_anonymous(
+        self: &DirEntryHandle,
+        current_task: &CurrentTask,
+        flags: OpenFlags,
+    ) -> Result<FileHandle, Errno> {
         Ok(FileObject::new(
-            self.node.create_file_ops(flags)?,
+            self.node.create_file_ops(current_task, flags)?,
             NamespaceNode::new_anonymous(self.clone()),
             flags,
         ))

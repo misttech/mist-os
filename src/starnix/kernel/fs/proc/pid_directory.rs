@@ -116,6 +116,7 @@ impl FsNodeOps for FdDirectory {
     fn create_file_ops(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(VecDirectory::new_file(fds_to_directory_entries(self.task.files.get_all_fds())))
@@ -165,6 +166,7 @@ impl FsNodeOps for NsDirectory {
     fn create_file_ops(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         // For each namespace, this contains a link to the current identifier of the given namespace
@@ -244,6 +246,7 @@ impl FsNodeOps for FdInfoDirectory {
     fn create_file_ops(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(VecDirectory::new_file(fds_to_directory_entries(self.task.files.get_all_fds())))
@@ -286,6 +289,7 @@ impl FsNodeOps for TaskListDirectory {
     fn create_file_ops(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(VecDirectory::new_file(

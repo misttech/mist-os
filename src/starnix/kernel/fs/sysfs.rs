@@ -88,6 +88,7 @@ impl FsNodeOps for SysFsDirectory {
     fn create_file_ops(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(VecDirectory::new_file(
@@ -148,6 +149,7 @@ impl FsNodeOps for DeviceDirectory {
     fn create_file_ops(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         // TODO(fxb/121327): Add power and subsystem nodes.
@@ -210,6 +212,7 @@ impl FsNodeOps for CpuClassDirectory {
     fn create_file_ops(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(VecDirectory::new_file(vec![VecDirectoryEntry {

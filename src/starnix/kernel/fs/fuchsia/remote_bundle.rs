@@ -116,6 +116,7 @@ impl FsNodeOps for File {
     fn create_file_ops(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         let zxio = (*self.zxio).clone().map_err(|status| from_status_like_fdio!(status))?;
@@ -206,6 +207,7 @@ impl FsNodeOps for DirectoryObject {
     fn create_file_ops(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(Box::new(DirectoryObject))

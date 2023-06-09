@@ -174,6 +174,7 @@ impl FsNodeOps for Arc<FuseNode> {
     fn create_file_ops(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         not_implemented!("FsNodeOps::create_file_ops");

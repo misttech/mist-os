@@ -48,10 +48,15 @@ impl FileSystemOps for Arc<LayeredFs> {
 }
 
 impl FsNodeOps for Arc<LayeredFs> {
-    fn create_file_ops(&self, _node: &FsNode, flags: OpenFlags) -> Result<Box<dyn FileOps>, Errno> {
+    fn create_file_ops(
+        &self,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+        flags: OpenFlags,
+    ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(Box::new(LayeredFsRootNodeOps {
             fs: self.clone(),
-            root_file: self.base_fs.root().open_anonymous(flags)?,
+            root_file: self.base_fs.root().open_anonymous(current_task, flags)?,
         }))
     }
 
@@ -172,7 +177,7 @@ mod test {
         }
         let mut sink = DirentNameCapturer { names: vec![], offset: 0 };
         fs.root()
-            .open_anonymous(OpenFlags::RDONLY)
+            .open_anonymous(current_task, OpenFlags::RDONLY)
             .expect("open")
             .readdir(current_task, &mut sink)
             .expect("readdir");

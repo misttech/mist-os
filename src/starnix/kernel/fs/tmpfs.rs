@@ -153,6 +153,7 @@ impl FsNodeOps for TmpfsDirectory {
     fn create_file_ops(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(Box::new(MemoryDirectoryFile::new()))
@@ -279,6 +280,7 @@ impl FsNodeOps for TmpfsSpecialNode {
     fn create_file_ops(
         &self,
         _node: &FsNode,
+        _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         unreachable!("Special nodes cannot be opened.");
