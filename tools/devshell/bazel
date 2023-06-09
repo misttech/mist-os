@@ -29,10 +29,4 @@ fi
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/bazel_utils.sh || exit $?
 
-readonly BAZEL_WRAPPER="$(fx-bazel-top-dir)/bazel"
-
-# Regenerate Bazel workspace and launcher script if needed.
-# Note that this also regenerates the Ninja build plan if necessary.
-"${FUCHSIA_DIR}"/build/bazel/scripts/update_workspace.py
-
-"${BAZEL_WRAPPER}" "$@"
+fx-bazel "$@"
