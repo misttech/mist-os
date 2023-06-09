@@ -1478,3 +1478,8 @@ icu_assembly_input_bundle("intl_services") {
 assembly_input_bundle("fonts") {
   base_packages = [ "//src/fonts:pkg" ]
 }
+
+assembly_input_bundle("fonts.hermetic") {
+  # TODO(fxbug.dev/12285): Needs more base_packages.
+  base_packages = [ "//src/fonts/asset_providers:provider.package" ]
+}
