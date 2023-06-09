@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    cm_types::Name,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_sys2 as fsys,
     fuchsia_url::AbsoluteComponentUrl,
@@ -71,7 +72,7 @@ pub enum ResolveError {
 pub async fn create_instance_in_collection(
     lifecycle_controller: &fsys::LifecycleControllerProxy,
     parent: &RelativeMoniker,
-    collection: &str,
+    collection: &Name,
     child_name: &str,
     url: &AbsoluteComponentUrl,
     config_overrides: Vec<fdecl::ConfigOverride>,
@@ -114,7 +115,7 @@ pub async fn create_instance_in_collection(
 pub async fn destroy_instance_in_collection(
     lifecycle_controller: &fsys::LifecycleControllerProxy,
     parent: &RelativeMoniker,
-    collection: &str,
+    collection: &Name,
     child_name: &str,
 ) -> Result<(), DestroyError> {
     let child =
@@ -419,9 +420,17 @@ mod test {
             "fuchsia-pkg://fuchsia.com/test#meta/test.cm",
             0,
         );
-        create_instance_in_collection(&lc, &parent, "foo", "bar", &url, vec![], None)
-            .await
-            .unwrap();
+        create_instance_in_collection(
+            &lc,
+            &parent,
+            &"foo".parse().unwrap(),
+            "bar",
+            &url,
+            vec![],
+            None,
+        )
+        .await
+        .unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -444,9 +453,17 @@ mod test {
             ]),
             ..Default::default()
         };
-        create_instance_in_collection(&lc, &parent, "foo", "bar", &url, vec![], Some(child_args))
-            .await
-            .unwrap();
+        create_instance_in_collection(
+            &lc,
+            &parent,
+            &"foo".parse().unwrap(),
+            "bar",
+            &url,
+            vec![],
+            Some(child_args),
+        )
+        .await
+        .unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -455,9 +472,17 @@ mod test {
         let url =
             AbsoluteComponentUrl::parse("fuchsia-pkg://fuchsia.com/test#meta/test.cm").unwrap();
         let lc = lifecycle_create_fail(fsys::CreateError::InstanceAlreadyExists);
-        let err = create_instance_in_collection(&lc, &parent, "foo", "bar", &url, vec![], None)
-            .await
-            .unwrap_err();
+        let err = create_instance_in_collection(
+            &lc,
+            &parent,
+            &"foo".parse().unwrap(),
+            "bar",
+            &url,
+            vec![],
+            None,
+        )
+        .await
+        .unwrap_err();
         assert_matches!(err, CreateError::InstanceAlreadyExists);
     }
 
@@ -465,7 +490,7 @@ mod test {
     async fn test_destroy_child() {
         let parent = RelativeMoniker::parse_str("./core").unwrap();
         let lc = lifecycle_destroy_instance("./core", "foo", "bar");
-        destroy_instance_in_collection(&lc, &parent, "foo", "bar").await.unwrap();
+        destroy_instance_in_collection(&lc, &parent, &"foo".parse().unwrap(), "bar").await.unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

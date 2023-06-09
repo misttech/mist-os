@@ -369,7 +369,7 @@ async fn use_in_collection() {
                     source_name: "hippo_data".parse().unwrap(),
                     source: OfferSource::Parent,
                     target_name: "hippo_data".parse().unwrap(),
-                    target: OfferTarget::Collection("coll".to_string()),
+                    target: OfferTarget::Collection("coll".parse().unwrap()),
                     rights: Some(fio::R_STAR_DIR),
                     subdir: None,
                     dependency_type: DependencyType::Strong,
@@ -379,7 +379,7 @@ async fn use_in_collection() {
                     source_name: "hippo_svc".parse().unwrap(),
                     source: OfferSource::Parent,
                     target_name: "hippo_svc".parse().unwrap(),
-                    target: OfferTarget::Collection("coll".to_string()),
+                    target: OfferTarget::Collection("coll".parse().unwrap()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
@@ -2000,7 +2000,7 @@ async fn use_with_destroyed_parent() {
                     source: OfferSource::Self_,
                     source_name: "foo_svc".parse().unwrap(),
                     target_name: "foo_svc".parse().unwrap(),
-                    target: OfferTarget::Collection("coll".to_string()),
+                    target: OfferTarget::Collection("coll".parse().unwrap()),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
@@ -2610,7 +2610,12 @@ async fn verify_service_route(
     for child_moniker in &child_monikers {
         let coll = child_moniker.collection().unwrap();
         let name = child_moniker.name();
-        test.create_dynamic_child(&agg_moniker, coll, ChildDeclBuilder::new_lazy_child(name)).await;
+        test.create_dynamic_child(
+            &agg_moniker,
+            coll.as_str(),
+            ChildDeclBuilder::new_lazy_child(name),
+        )
+        .await;
         test.start_instance_and_wait_start(&agg_moniker.child(child_moniker.clone()))
             .await
             .unwrap();
@@ -2665,7 +2670,7 @@ async fn offer_service_from_collection() {
             ComponentDeclBuilder::new()
                 .use_realm()
                 .offer(OfferDecl::Service(OfferServiceDecl {
-                    source: OfferSource::Collection("coll".into()),
+                    source: OfferSource::Collection("coll".parse().unwrap()),
                     source_name: "foo".parse().unwrap(),
                     source_instance_filter: None,
                     renamed_instances: None,
@@ -2726,7 +2731,7 @@ async fn offer_service_from_collections() {
         .into_iter()
         .map(|coll| {
             OfferDecl::Service(OfferServiceDecl {
-                source: OfferSource::Collection(coll.into()),
+                source: OfferSource::Collection(coll.parse().unwrap()),
                 source_name: "foo".parse().unwrap(),
                 source_instance_filter: None,
                 renamed_instances: None,
@@ -2801,7 +2806,7 @@ async fn offer_service_from_collections_multilevel() {
         .into_iter()
         .map(|coll| {
             OfferDecl::Service(OfferServiceDecl {
-                source: OfferSource::Collection(coll.into()),
+                source: OfferSource::Collection(coll.parse().unwrap()),
                 source_name: "foo".parse().unwrap(),
                 source_instance_filter: None,
                 renamed_instances: None,
@@ -2897,7 +2902,7 @@ async fn expose_service_from_collection() {
             ComponentDeclBuilder::new()
                 .use_realm()
                 .expose(ExposeDecl::Service(ExposeServiceDecl {
-                    source: ExposeSource::Collection("coll".into()),
+                    source: ExposeSource::Collection("coll".parse().unwrap()),
                     source_name: "foo".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     target_name: "foo".parse().unwrap(),
@@ -2956,7 +2961,7 @@ async fn expose_service_from_collections() {
         .into_iter()
         .map(|coll| {
             ExposeDecl::Service(ExposeServiceDecl {
-                source: ExposeSource::Collection(coll.into()),
+                source: ExposeSource::Collection(coll.parse().unwrap()),
                 source_name: "foo".parse().unwrap(),
                 target: ExposeTarget::Parent,
                 target_name: "foo".parse().unwrap(),
@@ -3033,7 +3038,7 @@ async fn expose_service_from_collections_multilevel() {
         .into_iter()
         .map(|coll| {
             ExposeDecl::Service(ExposeServiceDecl {
-                source: ExposeSource::Collection(coll.into()),
+                source: ExposeSource::Collection(coll.parse().unwrap()),
                 source_name: "foo".parse().unwrap(),
                 target: ExposeTarget::Parent,
                 target_name: "foo".parse().unwrap(),
@@ -3119,7 +3124,7 @@ async fn list_service_instances_from_collections() {
         .into_iter()
         .map(|coll| {
             OfferDecl::Service(OfferServiceDecl {
-                source: OfferSource::Collection(coll.into()),
+                source: OfferSource::Collection(coll.parse().unwrap()),
                 source_name: "foo".parse().unwrap(),
                 source_instance_filter: None,
                 renamed_instances: None,
@@ -3293,7 +3298,7 @@ async fn use_service_from_sibling_collection() {
                     availability: Availability::Required,
                 }))
                 .expose(ExposeDecl::Service(ExposeServiceDecl {
-                    source: ExposeSource::Collection("coll".to_string()),
+                    source: ExposeSource::Collection("coll".parse().unwrap()),
                     source_name: "my.service.Service".parse().unwrap(),
                     target_name: "my.service.Service".parse().unwrap(),
                     target: ExposeTarget::Parent,

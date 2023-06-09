@@ -1266,7 +1266,10 @@ where
     match offer.source() {
         OfferSource::Child(child) => {
             let child_component = {
-                let child_moniker = ChildMoniker::try_new(&child.name, child.collection.as_ref())?;
+                let child_moniker = ChildMoniker::try_new(
+                    child.name.as_str(),
+                    child.collection.as_ref().map(|s| s.as_str()),
+                )?;
                 component.lock_resolved_state().await?.get_child(&child_moniker).ok_or_else(
                     || RoutingError::OfferFromChildInstanceNotFound {
                         child_moniker,
@@ -1607,10 +1610,10 @@ fn target_matches_moniker(target: &OfferTarget, child_moniker: &ChildMoniker) ->
     match target {
         OfferTarget::Child(target_ref) => {
             target_ref.name == child_moniker.name()
-                && target_ref.collection.as_ref().map(|c| c.as_str()) == child_moniker.collection()
+                && target_ref.collection.as_ref() == child_moniker.collection()
         }
         OfferTarget::Collection(target_collection) => {
-            Some(target_collection.as_str()) == child_moniker.collection()
+            Some(target_collection) == child_moniker.collection()
         }
     }
 }
@@ -1789,7 +1792,7 @@ mod tests {
             .map(|i| OfferServiceDecl {
                 source: OfferSource::Parent,
                 source_name: format!("foo_source_{}", i).parse().unwrap(),
-                target: OfferTarget::Collection("coll".into()),
+                target: OfferTarget::Collection("coll".parse().unwrap()),
                 target_name: "foo_target".parse().unwrap(),
                 source_instance_filter: None,
                 renamed_instances: None,
@@ -1797,7 +1800,7 @@ mod tests {
             })
             .collect();
         let collection_offer = OfferServiceDecl {
-            source: OfferSource::Collection("coll".into()),
+            source: OfferSource::Collection("coll".parse().unwrap()),
             source_name: "foo_source".parse().unwrap(),
             target: OfferTarget::Child(ChildRef { name: "target".into(), collection: None }),
             target_name: "foo_target".parse().unwrap(),
@@ -1836,7 +1839,7 @@ mod tests {
             })
             .collect();
         let collection_expose = ExposeServiceDecl {
-            source: ExposeSource::Collection("coll".into()),
+            source: ExposeSource::Collection("coll".parse().unwrap()),
             source_name: "foo_source".parse().unwrap(),
             target: ExposeTarget::Parent,
             target_name: "foo_target".parse().unwrap(),

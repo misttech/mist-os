@@ -91,7 +91,7 @@ async fn get_all_collections_of_instance(
         }
 
         collections.push(Collection {
-            name: collection.name,
+            name: collection.name.to_string(),
             moniker: moniker.clone(),
             durability: collection.durability.into(),
             environment: collection.environment,

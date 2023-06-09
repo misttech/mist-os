@@ -342,7 +342,7 @@ pub(crate) fn allowlist_entry_matches(
             AllowlistMatcher::AnyDescendant => return true,
             AllowlistMatcher::AnyDescendantInCollection(expected_collection) => {
                 if let Some(collection) = cur_child.collection() {
-                    if collection == expected_collection.as_str() {
+                    if collection == expected_collection {
                         // This child is in a collection and the name matches.
                         // Because we allow any descendant, return true immediately.
                         return true;
@@ -357,7 +357,7 @@ pub(crate) fn allowlist_entry_matches(
             }
             AllowlistMatcher::AnyChildInCollection(expected_collection) => {
                 if let Some(collection) = cur_child.collection() {
-                    if collection != expected_collection.as_str() {
+                    if collection != expected_collection {
                         // This child is in a collection but the name does not match.
                         return false;
                     }

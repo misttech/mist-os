@@ -574,7 +574,7 @@ pub struct CollectionServiceRoute {
     pub source_moniker: AbsoluteMoniker,
 
     /// All collections over which the aggregated service is exposed.
-    pub collections: Vec<FlyStr>,
+    pub collections: Vec<Name>,
 
     /// Name of the service exposed from the collection.
     pub service_name: Name,
@@ -1110,14 +1110,14 @@ mod tests {
                         availability: Availability::Required,
                     }))
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
-                        source: ExposeSource::Collection("coll1".to_string()),
+                        source: ExposeSource::Collection("coll1".parse().unwrap()),
                         source_name: "my.service.Service".parse().unwrap(),
                         target_name: "my.service.Service".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
-                        source: ExposeSource::Collection("coll2".to_string()),
+                        source: ExposeSource::Collection("coll2".parse().unwrap()),
                         source_name: "my.service.Service".parse().unwrap(),
                         target_name: "my.service.Service".parse().unwrap(),
                         target: ExposeTarget::Parent,
@@ -1279,7 +1279,7 @@ mod tests {
 
         let route = CollectionServiceRoute {
             source_moniker: AbsoluteMoniker::root(),
-            collections: vec!["coll1".into(), "coll2".into()],
+            collections: vec!["coll1".parse().unwrap(), "coll2".parse().unwrap()],
             service_name: "my.service.Service".parse().unwrap(),
         };
 
@@ -1507,7 +1507,7 @@ mod tests {
 
         let route = CollectionServiceRoute {
             source_moniker: AbsoluteMoniker::root(),
-            collections: vec!["coll1".into()],
+            collections: vec!["coll1".parse().unwrap()],
             service_name: "my.service.Service".parse().unwrap(),
         };
 
@@ -1583,7 +1583,7 @@ mod tests {
 
         let route = CollectionServiceRoute {
             source_moniker: AbsoluteMoniker::root(),
-            collections: vec!["coll1".into(), "coll2".into()],
+            collections: vec!["coll1".parse().unwrap(), "coll2".parse().unwrap()],
             service_name: "my.service.Service".parse().unwrap(),
         };
 

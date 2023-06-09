@@ -5,6 +5,7 @@
 use {
     crate::lifecycle::{ActionError, CreateError, DestroyError, ResolveError, StartError},
     anyhow::{format_err, Error},
+    cm_types::Name,
     moniker::AbsoluteMoniker,
 };
 
@@ -55,7 +56,7 @@ pub fn format_action_error(moniker: &AbsoluteMoniker, err: ActionError) -> Error
 pub fn format_create_error(
     moniker: &AbsoluteMoniker,
     parent: &AbsoluteMoniker,
-    collection: &str,
+    collection: &Name,
     err: CreateError,
 ) -> Error {
     match err {

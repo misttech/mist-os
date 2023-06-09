@@ -11,6 +11,7 @@ use {
     async_trait::async_trait,
     cm_moniker::{InstancedAbsoluteMoniker, InstancedChildMoniker},
     cm_rust::{CapabilityDecl, CollectionDecl, ComponentDecl, ExposeDecl, OfferDecl, UseDecl},
+    cm_types::Name,
     config_encoder::ConfigFields,
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, ChildMonikerBase},
     routing::{
@@ -103,7 +104,7 @@ impl ComponentInstanceForAnalyzer {
         let instanced_moniker = parent.instanced_moniker.child(
             InstancedChildMoniker::try_new(
                 child.child_moniker.name(),
-                child.child_moniker.collection(),
+                child.child_moniker.collection().map(|c| c.as_str()),
                 0,
             )
             .expect("child moniker is guaranteed to be valid"),
@@ -244,7 +245,7 @@ impl ResolvedInstanceInterface for ComponentInstanceForAnalyzer {
     }
 
     // This is a static model with no notion of a collection.
-    fn children_in_collection(&self, _collection: &str) -> Vec<(ChildMoniker, Arc<Self>)> {
+    fn children_in_collection(&self, _collection: &Name) -> Vec<(ChildMoniker, Arc<Self>)> {
         vec![]
     }
 

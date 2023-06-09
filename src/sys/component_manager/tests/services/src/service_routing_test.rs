@@ -266,7 +266,7 @@ async fn destroy_provider(branch: &ScopedInstance, child_moniker: &str) -> Resul
             &parent_moniker,
             &fdecl::ChildRef {
                 name: child_moniker.name().into(),
-                collection: child_moniker.collection().map(|c| c.into()),
+                collection: child_moniker.collection().map(|c| c.to_string()),
             },
         )
         .await?

@@ -140,7 +140,7 @@ async fn new_realm(
         .unwrap();
     let mut realm_decl = builder.get_realm_decl().await.unwrap();
     realm_decl.collections.push(cm_rust::CollectionDecl {
-        name: "dynamic_children".to_string(),
+        name: "dynamic_children".parse().unwrap(),
         durability: fdecl::Durability::Transient,
         environment: None,
         allowed_offers: cm_types::AllowedOffers::StaticAndDynamic,
@@ -150,7 +150,9 @@ async fn new_realm(
     realm_decl.offers = realm_decl
         .offers
         .into_iter()
-        .filter(|o| o.target() != &cm_rust::OfferTarget::Collection("dynamic_children".to_string()))
+        .filter(|o| {
+            o.target() != &cm_rust::OfferTarget::Collection("dynamic_children".parse().unwrap())
+        })
         .collect();
     builder.replace_realm_decl(realm_decl).await.unwrap();
 

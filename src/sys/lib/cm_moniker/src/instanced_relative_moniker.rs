@@ -39,7 +39,7 @@ impl InstancedRelativeMoniker {
             .path()
             .iter()
             .map(|c| {
-                InstancedChildMoniker::try_new(c.name(), c.collection(), 0)
+                InstancedChildMoniker::try_new(c.name(), c.collection().map(|c| c.as_str()), 0)
                     .expect("down path moniker is guaranteed to be valid")
             })
             .collect();

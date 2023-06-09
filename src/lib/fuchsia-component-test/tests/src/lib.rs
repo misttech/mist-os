@@ -641,7 +641,7 @@ async fn mock_component_with_a_relative_dynamic_child() -> Result<(), Error> {
         .await?;
     let mut echo_client_decl = builder.get_component_decl(&echo_client).await?;
     echo_client_decl.collections.push(cm_rust::CollectionDecl {
-        name: collection_name.clone(),
+        name: collection_name.parse().unwrap(),
         durability: fcdecl::Durability::Transient,
         environment: None,
         allowed_offers: cm_types::AllowedOffers::StaticOnly,
@@ -655,7 +655,7 @@ async fn mock_component_with_a_relative_dynamic_child() -> Result<(), Error> {
     echo_client_decl.offers.push(cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
         source: cm_rust::OfferSource::Self_,
         source_name: "fidl.examples.routing.echo.Echo".parse().unwrap(),
-        target: cm_rust::OfferTarget::Collection(collection_name.clone()),
+        target: cm_rust::OfferTarget::Collection(collection_name.parse().unwrap()),
         target_name: "fidl.examples.routing.echo.Echo".parse().unwrap(),
         dependency_type: cm_rust::DependencyType::Strong,
         availability: cm_rust::Availability::Required,

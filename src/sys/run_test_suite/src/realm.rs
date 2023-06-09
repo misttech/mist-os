@@ -118,7 +118,7 @@ fn validate_and_get_offers(
     let mut offers = vec![];
     for offer in manifest.offers {
         if let cm_rust::OfferTarget::Collection(collection) = &offer.target() {
-            if collection != test_collection {
+            if collection.as_str() != test_collection {
                 continue;
             }
 
@@ -135,7 +135,7 @@ fn validate_and_get_offers(
                         .as_ref()
                         .map(|s| {
                             s.iter().any(|s| match s {
-                                cm_rust::EventScope::Collection(s) => s == test_collection,
+                                cm_rust::EventScope::Collection(s) => s.as_str() == test_collection,
                                 _ => false,
                             })
                         })
@@ -227,7 +227,10 @@ mod test {
         let offers = realm.offers.into_iter().map(|o| o.fidl_into_native()).collect::<Vec<_>>();
         assert_eq!(offers.len(), 4, "{:?}", offers); // LogSink is offered to all children.
         offers.iter().for_each(|o| {
-            assert_eq!(o.target(), &cm_rust::OfferTarget::Collection("echo_test_coll".to_string()))
+            assert_eq!(
+                o.target(),
+                &cm_rust::OfferTarget::Collection("echo_test_coll".parse().unwrap())
+            )
         });
         assert!(offers.iter().any(|o| *o.target_name() == CAPABILITY_REQUESTED_EVENT));
         assert!(offers.iter().any(|o| *o.target_name() == DIR_READY_EVENT));
@@ -249,7 +252,7 @@ mod test {
         offers.iter().for_each(|o| {
             assert_eq!(
                 o.target(),
-                &cm_rust::OfferTarget::Collection("hermetic_test_coll".to_string())
+                &cm_rust::OfferTarget::Collection("hermetic_test_coll".parse().unwrap())
             )
         });
         assert!(offers.iter().any(|o| *o.target_name() == CAPABILITY_REQUESTED_EVENT));

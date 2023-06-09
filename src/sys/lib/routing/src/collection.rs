@@ -45,7 +45,7 @@ pub(super) struct CollectionAggregateServiceProvider<C: ComponentInstanceInterfa
     pub phantom_expose: std::marker::PhantomData<E>,
 
     /// Names of the collections within `collection_component` that are being aggregated.
-    pub collections: Vec<String>,
+    pub collections: Vec<Name>,
 
     /// Name of the capability as exposed by children in the collection.
     pub capability_name: Name,
@@ -85,7 +85,7 @@ where
         let mut child_components = vec![];
         for collection in &self.collections {
             child_components
-                .extend(component.lock_resolved_state().await?.children_in_collection(&collection));
+                .extend(component.lock_resolved_state().await?.children_in_collection(collection));
         }
         for (moniker, child_component) in child_components {
             let child_exposes = child_component.lock_resolved_state().await.map(|c| c.exposes());
@@ -113,7 +113,7 @@ where
         instance: &ChildMoniker,
     ) -> Result<CapabilitySource<C>, RoutingError> {
         if instance.collection().is_none()
-            || !self.collections.contains(&instance.collection().unwrap().to_string())
+            || !self.collections.contains(instance.collection().unwrap())
         {
             return Err(RoutingError::UnexpectedChildInAggregate {
                 child_moniker: instance.clone(),

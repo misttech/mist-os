@@ -87,6 +87,7 @@ impl fmt::Debug for InstancedAbsoluteMoniker {
 mod tests {
     use {
         super::*,
+        cm_types::Name,
         moniker::{AbsoluteMonikerBase, ChildMonikerBase, MonikerError},
     };
 
@@ -104,7 +105,7 @@ mod tests {
         assert_eq!(false, m.is_root());
         assert_eq!("/a:1/coll:b:2", format!("{}", m));
         assert_eq!(m, InstancedAbsoluteMoniker::try_from(vec!["a:1", "coll:b:2"]).unwrap());
-        assert_eq!(m.leaf().map(|m| m.collection()).flatten(), Some("coll"));
+        assert_eq!(m.leaf().map(|m| m.collection()).flatten(), Some(&Name::new("coll").unwrap()));
         assert_eq!(m.leaf().map(|m| m.name()), Some("b"));
         assert_eq!(m.leaf().map(|m| m.instance()), Some(2));
         assert_eq!(m.leaf(), Some(&InstancedChildMoniker::try_from("coll:b:2").unwrap()));

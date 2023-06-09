@@ -1364,7 +1364,7 @@ impl ResolvedInstanceState {
     /// Returns a vector of the children in `collection`.
     pub fn children_in_collection(
         &self,
-        collection: &str,
+        collection: &Name,
     ) -> Vec<(ChildMoniker, Arc<ComponentInstance>)> {
         self.children()
             .filter(move |(m, _)| match m.collection() {
@@ -1407,12 +1407,12 @@ impl ResolvedInstanceState {
             let source_matches = offer.source()
                 == &cm_rust::OfferSource::Child(cm_rust::ChildRef {
                     name: moniker.name().to_string().into(),
-                    collection: moniker.collection().map(|c| c.to_string().into()),
+                    collection: moniker.collection().map(|c| c.clone()),
                 });
             let target_matches = offer.target()
                 == &cm_rust::OfferTarget::Child(cm_rust::ChildRef {
                     name: moniker.name().to_string().into(),
-                    collection: moniker.collection().map(|c| c.to_string().into()),
+                    collection: moniker.collection().map(|c| c.clone()),
                 });
             !source_matches && !target_matches
         });
@@ -1529,7 +1529,8 @@ impl ResolvedInstanceState {
         );
         let dynamic_offers =
             self.validate_and_convert_dynamic_offers(dynamic_offers, child, collection)?;
-        let child_moniker = ChildMoniker::try_new(&child.name, collection.map(|c| &c.name))?;
+        let child_moniker =
+            ChildMoniker::try_new(child.name.as_str(), collection.map(|c| c.name.as_str()))?;
         if self.get_child(&child_moniker).is_some() {
             return Err(AddChildError::InstanceAlreadyExists {
                 moniker: component.abs_moniker().clone(),
@@ -1669,7 +1670,7 @@ impl ResolvedInstanceInterface for ResolvedInstanceState {
 
     fn children_in_collection(
         &self,
-        collection: &str,
+        collection: &Name,
     ) -> Vec<(ChildMoniker, Arc<ComponentInstance>)> {
         ResolvedInstanceState::children_in_collection(self, collection)
     }
@@ -2749,7 +2750,7 @@ pub mod tests {
                 dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                     source: Some(fdecl::Ref::Child(fdecl::ChildRef {
                         name: "a".into(),
-                        collection: Some("coll_1".into()),
+                        collection: Some("coll_1".parse().unwrap()),
                     })),
                     source_name: Some("dyn_offer_source_name".to_string()),
                     target_name: Some("dyn_offer_target_name".to_string()),
@@ -2766,11 +2767,11 @@ pub mod tests {
         let example_dynamic_offer = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Child(ChildRef {
                 name: "a".into(),
-                collection: Some("coll_1".into()),
+                collection: Some("coll_1".parse().unwrap()),
             }),
             target: OfferTarget::Child(ChildRef {
                 name: "b".into(),
-                collection: Some("coll_1".into()),
+                collection: Some("coll_1".parse().unwrap()),
             }),
             source_name: "dyn_offer_source_name".parse().unwrap(),
             target_name: "dyn_offer_target_name".parse().unwrap(),
@@ -2860,7 +2861,7 @@ pub mod tests {
                 dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                     source: Some(fdecl::Ref::Child(fdecl::ChildRef {
                         name: "a".into(),
-                        collection: Some("coll_2".into()),
+                        collection: Some("coll_2".parse().unwrap()),
                     })),
                     source_name: Some("dyn_offer2_source_name".to_string()),
                     target_name: Some("dyn_offer2_target_name".to_string()),
@@ -2876,11 +2877,11 @@ pub mod tests {
         let example_dynamic_offer2 = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Child(ChildRef {
                 name: "a".into(),
-                collection: Some("coll_2".into()),
+                collection: Some("coll_2".parse().unwrap()),
             }),
             target: OfferTarget::Child(ChildRef {
                 name: "b".into(),
-                collection: Some("coll_1".into()),
+                collection: Some("coll_1".parse().unwrap()),
             }),
             source_name: "dyn_offer2_source_name".parse().unwrap(),
             target_name: "dyn_offer2_target_name".parse().unwrap(),
@@ -2928,7 +2929,7 @@ pub mod tests {
     #[fuchsia::test]
     async fn creating_dynamic_child_with_offer_cycle_fails() {
         let example_offer = OfferDecl::Service(OfferServiceDecl {
-            source: OfferSource::Collection("coll".to_string()),
+            source: OfferSource::Collection("coll".parse().unwrap()),
             source_name: "foo".parse().unwrap(),
             source_instance_filter: None,
             renamed_instances: None,
@@ -2982,11 +2983,11 @@ pub mod tests {
     #[fuchsia::test]
     async fn creating_cycle_between_collections_fails() {
         let static_collection_offer = OfferDecl::Service(OfferServiceDecl {
-            source: OfferSource::Collection("coll1".to_string()),
+            source: OfferSource::Collection("coll1".parse().unwrap()),
             source_name: "foo".parse().unwrap(),
             source_instance_filter: None,
             renamed_instances: None,
-            target: OfferTarget::Collection("coll2".to_string()),
+            target: OfferTarget::Collection("coll2".parse().unwrap()),
             target_name: "foo".parse().unwrap(),
             availability: Availability::Required,
         });
@@ -3018,7 +3019,7 @@ pub mod tests {
                     dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                         source: Some(fdecl::Ref::Child(fdecl::ChildRef {
                             name: "dynamic_src".into(),
-                            collection: Some("coll2".into()),
+                            collection: Some("coll2".parse().unwrap()),
                         })),
                         source_name: Some("bar".to_string()),
                         target_name: Some("bar".to_string()),
@@ -3093,7 +3094,7 @@ pub mod tests {
                         target_name: Some("foo".to_string()),
                         target: Some(fdecl::Ref::Child(fdecl::ChildRef {
                             name: "dynamic_child".into(),
-                            collection: Some("coll".into()),
+                            collection: Some("coll".parse().unwrap()),
                         })),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
@@ -3221,7 +3222,7 @@ pub mod tests {
             "root",
             ComponentDeclBuilder::new()
                 .add_collection(CollectionDecl {
-                    name: "col".to_string(),
+                    name: "col".parse().unwrap(),
                     durability: fdecl::Durability::Transient,
                     environment: None,
                     allowed_offers: cm_types::AllowedOffers::StaticAndDynamic,
@@ -3247,7 +3248,7 @@ pub mod tests {
             .decl
             .collections
             .iter()
-            .find(|c| &c.name == "col")
+            .find(|c| c.name.as_str() == "col")
             .expect("unable to find collection decl")
             .clone();
 
@@ -3292,7 +3293,7 @@ pub mod tests {
                 source_name: "fuchsia.example.Echo".parse().unwrap(),
                 target: OfferTarget::Child(ChildRef {
                     name: "foo".into(),
-                    collection: Some("col".into()),
+                    collection: Some("col".parse().unwrap()),
                 }),
                 target_name: "fuchsia.example.Echo".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
@@ -3317,7 +3318,7 @@ pub mod tests {
                 source_name: "fuchsia.example.Echo".parse().unwrap(),
                 target: OfferTarget::Child(ChildRef {
                     name: "foo".into(),
-                    collection: Some("col".into()),
+                    collection: Some("col".parse().unwrap()),
                 }),
                 target_name: "fuchsia.example.Echo".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
@@ -3330,7 +3331,7 @@ pub mod tests {
                     fdecl::Offer::Protocol(fdecl::OfferProtocol {
                         source: Some(fdecl::Ref::Child(fdecl::ChildRef {
                             name: "doesnt-exist".to_string(),
-                            collection: Some("col".to_string()),
+                            collection: Some("col".parse().unwrap()),
                         })),
                         source_name: Some("fuchsia.example.Echo".to_string()),
                         target: None,
@@ -3346,12 +3347,12 @@ pub mod tests {
                 if offer == OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Child(ChildRef {
                         name: "doesnt-exist".into(),
-                        collection: Some("col".into()),
+                        collection: Some("col".parse().unwrap()),
                     }),
                     source_name: "fuchsia.example.Echo".parse().unwrap(),
                     target: OfferTarget::Child(ChildRef {
                         name: "foo".into(),
-                        collection: Some("col".into()),
+                        collection: Some("col".parse().unwrap()),
                     }),
                     target_name: "fuchsia.example.Echo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,

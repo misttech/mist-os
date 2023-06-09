@@ -314,7 +314,7 @@ impl RouteValidator {
                 let component = component.upgrade()?;
                 let route = CollectionServiceRoute {
                     source_moniker: component.abs_moniker.clone(),
-                    collections: collections.iter().map(|c| c.into()).collect(),
+                    collections: collections.clone(),
                     service_name: capability.source_name().clone(),
                 };
                 let state = component.lock_state().await;
@@ -1173,7 +1173,7 @@ mod tests {
     #[fuchsia::test]
     async fn route_service() {
         let offer_from_collection_decl = OfferDecl::Service(OfferServiceDecl {
-            source: OfferSource::Collection("coll".into()),
+            source: OfferSource::Collection("coll".parse().unwrap()),
             source_name: "my_service".parse().unwrap(),
             target: OfferTarget::static_child("target".into()),
             target_name: "my_service".parse().unwrap(),

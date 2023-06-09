@@ -96,7 +96,7 @@ pub async fn add_eager_child(
 pub async fn add_collection(test_realm: &SubRealmBuilder, name: &str) -> Result<(), Error> {
     let mut decl = test_realm.get_realm_decl().await?;
     decl.collections.push(cm_rust::CollectionDecl {
-        name: name.into(),
+        name: name.parse().unwrap(),
         durability: fdecl::Durability::Transient,
         environment: None,
         allowed_offers: cm_types::AllowedOffers::StaticOnly,

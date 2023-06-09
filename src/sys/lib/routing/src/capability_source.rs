@@ -64,7 +64,7 @@ pub enum CapabilitySource<C: ComponentInstanceInterface> {
         capability: AggregateCapability,
         component: WeakComponentInstanceInterface<C>,
         aggregate_capability_provider: Box<dyn CollectionAggregateCapabilityProvider<C>>,
-        collections: Vec<String>,
+        collections: Vec<Name>,
     },
     OfferAggregate {
         capability: AggregateCapability,
@@ -162,7 +162,7 @@ impl<C: ComponentInstanceInterface> fmt::Display for CapabilitySource<C> {
                     format!(
                         "{} from collections '{}' of component '{}'",
                         capability,
-                        collections.join(","),
+                        collections.iter().map(|c| c.as_str()).collect::<Vec<_>>().join(","),
                         &component.abs_moniker
                     )
                 }

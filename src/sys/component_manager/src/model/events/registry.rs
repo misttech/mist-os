@@ -346,7 +346,7 @@ impl EventRegistry {
             route.push(ComponentEventRoute {
                 component: ChildRef {
                     name: FlyStr::new(moniker.name()),
-                    collection: moniker.collection().map(|value| FlyStr::new(value)),
+                    collection: moniker.collection().cloned(),
                 },
                 scope: event_decl.scope,
             });
@@ -356,10 +356,7 @@ impl EventRegistry {
                 component: if let Some(moniker) = component.component.child_moniker() {
                     ChildRef {
                         name: FlyStr::new(moniker.name.to_string()),
-                        collection: moniker
-                            .collection
-                            .as_ref()
-                            .map(|value| FlyStr::new(value.as_str())),
+                        collection: moniker.collection.clone(),
                     }
                 } else {
                     ChildRef { name: FlyStr::new("<root>"), collection: None }

@@ -58,8 +58,8 @@ impl ChildMonikerBase for InstancedChildMoniker {
         self.name.as_str()
     }
 
-    fn collection(&self) -> Option<&str> {
-        self.collection.as_ref().map(|c| c.as_str())
+    fn collection(&self) -> Option<&Name> {
+        self.collection.as_ref()
     }
 }
 
@@ -92,14 +92,14 @@ impl InstancedChildMoniker {
 
     /// Converts this child moniker into an instanced moniker.
     pub fn from_child_moniker(m: &ChildMoniker, instance: IncarnationId) -> Self {
-        Self::try_new(m.name(), m.collection(), instance)
+        Self::try_new(m.name(), m.collection().map(|c| c.as_str()), instance)
             .expect("child moniker is guaranteed to be valid")
     }
 
     /// Convert an InstancedChildMoniker to an allocated ChildMoniker
     /// without an InstanceId
     pub fn without_instance_id(&self) -> ChildMoniker {
-        ChildMoniker::try_new(self.name(), self.collection())
+        ChildMoniker::try_new(self.name(), self.collection().map(|c| c.as_str()))
             .expect("moniker is guaranteed to be valid")
     }
 
@@ -156,7 +156,7 @@ impl fmt::Debug for InstancedChildMoniker {
 mod tests {
     use {
         super::*,
-        cm_types::{MAX_LONG_NAME_LENGTH, MAX_NAME_LENGTH},
+        cm_types::{Name, MAX_LONG_NAME_LENGTH, MAX_NAME_LENGTH},
     };
 
     #[test]
@@ -172,7 +172,7 @@ mod tests {
 
         let m = InstancedChildMoniker::try_new("test", Some("coll"), 42).unwrap();
         assert_eq!("test", m.name());
-        assert_eq!(Some("coll"), m.collection());
+        assert_eq!(Some(&Name::new("coll").unwrap()), m.collection());
         assert_eq!(42, m.instance());
         assert_eq!("coll:test:42", format!("{}", m));
         assert_eq!(m, InstancedChildMoniker::try_from("coll:test:42").unwrap());
@@ -190,7 +190,7 @@ mod tests {
         ))
         .expect("valid moniker");
         assert_eq!(max_name_length_part, m.name());
-        assert_eq!(Some(max_coll_length_part.as_str()), m.collection());
+        assert_eq!(Some(&Name::new(max_coll_length_part).unwrap()), m.collection());
         assert_eq!(42, m.instance());
 
         assert!(InstancedChildMoniker::parse("").is_err(), "cannot be empty");

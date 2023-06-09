@@ -199,6 +199,7 @@ impl fmt::Debug for AbsoluteMoniker {
 mod tests {
     use super::*;
     use crate::relative_moniker::RelativeMoniker;
+    use cm_types::Name;
 
     #[test]
     fn absolute_monikers() {
@@ -215,7 +216,7 @@ mod tests {
         assert_eq!(false, m.is_root());
         assert_eq!("/a/coll:b", format!("{}", m));
         assert_eq!(m, AbsoluteMoniker::try_from(vec!["a", "coll:b"]).unwrap());
-        assert_eq!(m.leaf().map(|m| m.collection()).flatten(), Some("coll"));
+        assert_eq!(m.leaf().map(|m| m.collection()).flatten(), Some(&Name::new("coll").unwrap()));
         assert_eq!(m.leaf().map(|m| m.name()), Some("b"));
         assert_eq!(m.leaf(), Some(&ChildMoniker::try_from("coll:b").unwrap()));
     }

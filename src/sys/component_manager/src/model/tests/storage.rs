@@ -140,14 +140,14 @@ async fn use_in_collection_from_parent() {
                 }))
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Self_,
-                    target: OfferTarget::Collection("coll".to_string()),
+                    target: OfferTarget::Collection("coll".parse().unwrap()),
                     source_name: "data".parse().unwrap(),
                     target_name: "data".parse().unwrap(),
                     availability: Availability::Required,
                 }))
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Self_,
-                    target: OfferTarget::Collection("coll".to_string()),
+                    target: OfferTarget::Collection("coll".parse().unwrap()),
                     source_name: "cache".parse().unwrap(),
                     target_name: "cache".parse().unwrap(),
                     availability: Availability::Required,
@@ -335,14 +335,14 @@ async fn use_in_collection_from_grandparent() {
                 }))
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Parent,
-                    target: OfferTarget::Collection("coll".to_string()),
+                    target: OfferTarget::Collection("coll".parse().unwrap()),
                     source_name: "data".parse().unwrap(),
                     target_name: "data".parse().unwrap(),
                     availability: Availability::Required,
                 }))
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Parent,
-                    target: OfferTarget::Collection("coll".to_string()),
+                    target: OfferTarget::Collection("coll".parse().unwrap()),
                     source_name: "cache".parse().unwrap(),
                     target_name: "cache".parse().unwrap(),
                     availability: Availability::Required,
@@ -925,7 +925,7 @@ async fn storage_persistence_relative_moniker_path() {
                 }))
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Parent,
-                    target: OfferTarget::Collection("persistent_coll".to_string()),
+                    target: OfferTarget::Collection("persistent_coll".parse().unwrap()),
                     source_name: "data".parse().unwrap(),
                     target_name: "data".parse().unwrap(),
                     availability: Availability::Required,
@@ -1108,7 +1108,7 @@ async fn storage_persistence_instance_id_path() {
                 }))
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Parent,
-                    target: OfferTarget::Collection("persistent_coll".to_string()),
+                    target: OfferTarget::Collection("persistent_coll".parse().unwrap()),
                     source_name: "data".parse().unwrap(),
                     target_name: "data".parse().unwrap(),
                     availability: Availability::Required,
@@ -1282,7 +1282,7 @@ async fn storage_persistence_inheritance() {
                 }))
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Parent,
-                    target: OfferTarget::Collection("persistent_coll".to_string()),
+                    target: OfferTarget::Collection("persistent_coll".parse().unwrap()),
                     source_name: "data".parse().unwrap(),
                     target_name: "data".parse().unwrap(),
                     availability: Availability::Required,
@@ -1317,7 +1317,7 @@ async fn storage_persistence_inheritance() {
                 }))
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Parent,
-                    target: OfferTarget::Collection("lower_coll".to_string()),
+                    target: OfferTarget::Collection("lower_coll".parse().unwrap()),
                     source_name: "data".parse().unwrap(),
                     target_name: "data".parse().unwrap(),
                     availability: Availability::Required,
@@ -1541,7 +1541,7 @@ async fn storage_persistence_disablement() {
                 }))
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Parent,
-                    target: OfferTarget::Collection("persistent_coll".to_string()),
+                    target: OfferTarget::Collection("persistent_coll".parse().unwrap()),
                     source_name: "data".parse().unwrap(),
                     target_name: "data".parse().unwrap(),
                     availability: Availability::Required,
@@ -1576,7 +1576,7 @@ async fn storage_persistence_disablement() {
                 }))
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Parent,
-                    target: OfferTarget::Collection("non_persistent_coll".to_string()),
+                    target: OfferTarget::Collection("non_persistent_coll".parse().unwrap()),
                     source_name: "data".parse().unwrap(),
                     target_name: "data".parse().unwrap(),
                     availability: Availability::Required,

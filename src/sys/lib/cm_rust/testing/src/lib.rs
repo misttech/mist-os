@@ -247,7 +247,7 @@ impl CollectionDeclBuilder {
     /// Creates a new builder.
     pub fn new() -> Self {
         CollectionDeclBuilder(cm_rust::CollectionDecl {
-            name: String::new(),
+            name: "coll".parse().unwrap(),
             durability: fdecl::Durability::Transient,
             environment: None,
             allowed_offers: cm_types::AllowedOffers::StaticOnly,
@@ -268,7 +268,7 @@ impl CollectionDeclBuilder {
 
     /// Sets the CollectionDecl's name.
     pub fn name(mut self, name: &str) -> Self {
-        self.0.name = name.to_string();
+        self.0.name = name.parse().expect("invalid name");
         self
     }
 

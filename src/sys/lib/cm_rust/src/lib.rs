@@ -869,7 +869,7 @@ pub struct ChildDecl {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ChildRef {
     pub name: FlyStr,
-    pub collection: Option<FlyStr>,
+    pub collection: Option<Name>,
 }
 
 impl std::fmt::Display for ChildRef {
@@ -884,20 +884,24 @@ impl std::fmt::Display for ChildRef {
 
 impl FidlIntoNative<ChildRef> for fdecl::ChildRef {
     fn fidl_into_native(self) -> ChildRef {
-        ChildRef { name: self.name.into(), collection: self.collection.map(Into::into) }
+        // cm_fidl_validator should have already validated this
+        ChildRef { name: self.name.into(), collection: self.collection.map(|c| c.parse().unwrap()) }
     }
 }
 
 impl NativeIntoFidl<fdecl::ChildRef> for ChildRef {
     fn native_into_fidl(self) -> fdecl::ChildRef {
-        fdecl::ChildRef { name: self.name.into(), collection: self.collection.map(Into::into) }
+        fdecl::ChildRef {
+            name: self.name.into(),
+            collection: self.collection.map(|c| c.to_string()),
+        }
     }
 }
 
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::Collection")]
 pub struct CollectionDecl {
-    pub name: String,
+    pub name: Name,
     pub durability: fdecl::Durability,
     pub environment: Option<String>,
 
@@ -1922,7 +1926,7 @@ impl NativeIntoFidl<fdecl::Ref> for UseSource {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum EventScope {
     Child(ChildRef),
-    Collection(String),
+    Collection(Name),
 }
 
 impl FidlIntoNative<EventScope> for fdecl::Ref {
@@ -1935,7 +1939,10 @@ impl FidlIntoNative<EventScope> for fdecl::Ref {
                     EventScope::Child(ChildRef { name: c.name.into(), collection: None })
                 }
             }
-            fdecl::Ref::Collection(collection) => EventScope::Collection(collection.name),
+            fdecl::Ref::Collection(collection) => {
+                // cm_fidl_validator should have already validated this
+                EventScope::Collection(collection.name.parse().unwrap())
+            }
             _ => panic!("invalid EventScope variant"),
         }
     }
@@ -1945,7 +1952,9 @@ impl NativeIntoFidl<fdecl::Ref> for EventScope {
     fn native_into_fidl(self) -> fdecl::Ref {
         match self {
             EventScope::Child(child) => fdecl::Ref::Child(child.native_into_fidl()),
-            EventScope::Collection(name) => fdecl::Ref::Collection(fdecl::CollectionRef { name }),
+            EventScope::Collection(name) => {
+                fdecl::Ref::Collection(fdecl::CollectionRef { name: name.native_into_fidl() })
+            }
         }
     }
 }
@@ -1956,7 +1965,7 @@ pub enum OfferSource {
     Framework,
     Parent,
     Child(ChildRef),
-    Collection(String),
+    Collection(Name),
     Self_,
     Capability(Name),
     Void,
@@ -1988,7 +1997,8 @@ impl FidlIntoNative<OfferSource> for fdecl::Ref {
             fdecl::Ref::Parent(_) => OfferSource::Parent,
             fdecl::Ref::Self_(_) => OfferSource::Self_,
             fdecl::Ref::Child(c) => OfferSource::Child(c.fidl_into_native()),
-            fdecl::Ref::Collection(c) => OfferSource::Collection(c.name),
+            // cm_fidl_validator should have already validated this
+            fdecl::Ref::Collection(c) => OfferSource::Collection(c.name.parse().unwrap()),
             fdecl::Ref::Framework(_) => OfferSource::Framework,
             // cm_fidl_validator should have already validated this
             fdecl::Ref::Capability(c) => OfferSource::Capability(c.name.parse().unwrap()),
@@ -2004,7 +2014,9 @@ impl NativeIntoFidl<fdecl::Ref> for OfferSource {
             OfferSource::Parent => fdecl::Ref::Parent(fdecl::ParentRef {}),
             OfferSource::Self_ => fdecl::Ref::Self_(fdecl::SelfRef {}),
             OfferSource::Child(c) => fdecl::Ref::Child(c.native_into_fidl()),
-            OfferSource::Collection(name) => fdecl::Ref::Collection(fdecl::CollectionRef { name }),
+            OfferSource::Collection(name) => {
+                fdecl::Ref::Collection(fdecl::CollectionRef { name: name.native_into_fidl() })
+            }
             OfferSource::Framework => fdecl::Ref::Framework(fdecl::FrameworkRef {}),
             OfferSource::Capability(name) => {
                 fdecl::Ref::Capability(fdecl::CapabilityRef { name: name.to_string() })
@@ -2019,7 +2031,7 @@ impl NativeIntoFidl<fdecl::Ref> for OfferSource {
 pub enum ExposeSource {
     Self_,
     Child(String),
-    Collection(String),
+    Collection(Name),
     Framework,
     Capability(Name),
     Void,
@@ -2043,7 +2055,8 @@ impl FidlIntoNative<ExposeSource> for fdecl::Ref {
         match self {
             fdecl::Ref::Self_(_) => ExposeSource::Self_,
             fdecl::Ref::Child(c) => ExposeSource::Child(c.name),
-            fdecl::Ref::Collection(c) => ExposeSource::Collection(c.name),
+            // cm_fidl_validator should have already validated this
+            fdecl::Ref::Collection(c) => ExposeSource::Collection(c.name.parse().unwrap()),
             fdecl::Ref::Framework(_) => ExposeSource::Framework,
             // cm_fidl_validator should have already validated this
             fdecl::Ref::Capability(c) => ExposeSource::Capability(c.name.parse().unwrap()),
@@ -2060,7 +2073,9 @@ impl NativeIntoFidl<fdecl::Ref> for ExposeSource {
             ExposeSource::Child(child_name) => {
                 fdecl::Ref::Child(fdecl::ChildRef { name: child_name, collection: None })
             }
-            ExposeSource::Collection(name) => fdecl::Ref::Collection(fdecl::CollectionRef { name }),
+            ExposeSource::Collection(name) => {
+                fdecl::Ref::Collection(fdecl::CollectionRef { name: name.native_into_fidl() })
+            }
             ExposeSource::Framework => fdecl::Ref::Framework(fdecl::FrameworkRef {}),
             ExposeSource::Capability(name) => {
                 fdecl::Ref::Capability(fdecl::CapabilityRef { name: name.to_string() })
@@ -2180,7 +2195,7 @@ impl NativeIntoFidl<fdecl::Ref> for RegistrationSource {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum OfferTarget {
     Child(ChildRef),
-    Collection(String),
+    Collection(Name),
 }
 impl OfferTarget {
     pub fn static_child(name: String) -> Self {
@@ -2201,7 +2216,8 @@ impl FidlIntoNative<OfferTarget> for fdecl::Ref {
     fn fidl_into_native(self) -> OfferTarget {
         match self {
             fdecl::Ref::Child(c) => OfferTarget::Child(c.fidl_into_native()),
-            fdecl::Ref::Collection(c) => OfferTarget::Collection(c.name),
+            // cm_fidl_validator should have already validated this
+            fdecl::Ref::Collection(c) => OfferTarget::Collection(c.name.parse().unwrap()),
             _ => panic!("invalid OfferTarget variant"),
         }
     }
@@ -2212,7 +2228,9 @@ impl NativeIntoFidl<fdecl::Ref> for OfferTarget {
         match self {
             OfferTarget::Child(c) => fdecl::Ref::Child(c.native_into_fidl()),
             OfferTarget::Collection(collection_name) => {
-                fdecl::Ref::Collection(fdecl::CollectionRef { name: collection_name })
+                fdecl::Ref::Collection(fdecl::CollectionRef {
+                    name: collection_name.native_into_fidl(),
+                })
             }
         }
     }
@@ -2843,7 +2861,7 @@ mod tests {
                         }),
                         UseDecl::EventStream(UseEventStreamDecl {
                             source: UseSource::Child("netstack".to_string()),
-                            scope: Some(vec![EventScope::Child(ChildRef{ name: "a".into(), collection: None}), EventScope::Collection("b".to_string())]),
+                            scope: Some(vec![EventScope::Child(ChildRef{ name: "a".into(), collection: None}), EventScope::Collection("b".parse().unwrap())]),
                             source_name: "stopped".parse().unwrap(),
                             target_path: "/svc/test".parse().unwrap(),
                             filter: None,
@@ -2880,14 +2898,14 @@ mod tests {
                             target_name: "pkg".parse().unwrap(),
                         }),
                         ExposeDecl::Service(ExposeServiceDecl {
-                            source: ExposeSource::Collection("modular".to_string()),
+                            source: ExposeSource::Collection("modular".parse().unwrap()),
                             source_name: "netstack1".parse().unwrap(),
                             target_name: "mynetstack".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             availability: Availability::Required,
                         }),
                         ExposeDecl::Service(ExposeServiceDecl {
-                            source: ExposeSource::Collection("modular".to_string()),
+                            source: ExposeSource::Collection("modular".parse().unwrap()),
                             source_name: "netstack2".parse().unwrap(),
                             target_name: "mynetstack".parse().unwrap(),
                             target: ExposeTarget::Parent,
@@ -2906,7 +2924,7 @@ mod tests {
                         OfferDecl::Directory(OfferDirectoryDecl {
                             source: OfferSource::Parent,
                             source_name: "dir".parse().unwrap(),
-                            target: OfferTarget::Collection("modular".to_string()),
+                            target: OfferTarget::Collection("modular".parse().unwrap()),
                             target_name: "data".parse().unwrap(),
                             rights: Some(fio::Operations::CONNECT),
                             subdir: None,
@@ -2916,7 +2934,7 @@ mod tests {
                         OfferDecl::Storage(OfferStorageDecl {
                             source_name: "cache".parse().unwrap(),
                             source: OfferSource::Self_,
-                            target: OfferTarget::Collection("modular".to_string()),
+                            target: OfferTarget::Collection("modular".parse().unwrap()),
                             target_name: "cache".parse().unwrap(),
                             availability: Availability::Required,
                         }),
@@ -3029,7 +3047,7 @@ mod tests {
                     ],
                     collections: vec![
                         CollectionDecl {
-                            name: "modular".to_string(),
+                            name: "modular".parse().unwrap(),
                             durability: fdecl::Durability::Transient,
                             environment: None,
                             allowed_offers: cm_types::AllowedOffers::StaticOnly,
@@ -3037,7 +3055,7 @@ mod tests {
                             persistent_storage: None,
                         },
                         CollectionDecl {
-                            name: "tests".to_string(),
+                            name: "tests".parse().unwrap(),
                             durability: fdecl::Durability::Transient,
                             environment: Some("test_env".to_string()),
                             allowed_offers: cm_types::AllowedOffers::StaticAndDynamic,
@@ -3139,7 +3157,7 @@ mod tests {
                 ExposeSource::Self_,
                 ExposeSource::Child("foo".to_string()),
                 ExposeSource::Framework,
-                ExposeSource::Collection("foo".to_string()),
+                ExposeSource::Collection("foo".parse().unwrap()),
             ],
             result_type = ExposeSource,
         },
@@ -3163,7 +3181,7 @@ mod tests {
                 OfferSource::Framework,
                 OfferSource::Capability("foo".parse().unwrap()),
                 OfferSource::Parent,
-                OfferSource::Collection("foo".to_string()),
+                OfferSource::Collection("foo".parse().unwrap()),
                 OfferSource::Void,
             ],
             result_type = OfferSource,
@@ -3314,7 +3332,7 @@ mod tests {
                     children: vec![],
                     collections: vec![
                         CollectionDecl {
-                            name: "modular".to_string(),
+                            name: "modular".parse().unwrap(),
                             durability: fdecl::Durability::Transient,
                             environment: None,
                             allowed_offers: cm_types::AllowedOffers::StaticOnly,
@@ -3322,7 +3340,7 @@ mod tests {
                             persistent_storage: None,
                         },
                         CollectionDecl {
-                            name: "tests".to_string(),
+                            name: "tests".parse().unwrap(),
                             durability: fdecl::Durability::Transient,
                             environment: Some("test_env".to_string()),
                             allowed_offers: cm_types::AllowedOffers::StaticOnly,
@@ -3330,7 +3348,7 @@ mod tests {
                             persistent_storage: Some(false),
                         },
                         CollectionDecl {
-                            name: "dyn_offers".to_string(),
+                            name: "dyn_offers".parse().unwrap(),
                             durability: fdecl::Durability::Transient,
                             environment: None,
                             allowed_offers: cm_types::AllowedOffers::StaticAndDynamic,
@@ -3338,7 +3356,7 @@ mod tests {
                             persistent_storage: Some(true),
                         },
                         CollectionDecl {
-                            name: "long_child_names".to_string(),
+                            name: "long_child_names".parse().unwrap(),
                             durability: fdecl::Durability::Transient,
                             environment: None,
                             allowed_offers: cm_types::AllowedOffers::StaticOnly,

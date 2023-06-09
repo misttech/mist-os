@@ -309,7 +309,7 @@ impl RealmCapabilityHost {
             .children()
             .filter_map(|(m, _)| match m.collection() {
                 Some(c) => {
-                    if c == collection.name {
+                    if c.as_str() == &collection.name {
                         Some(fdecl::ChildRef {
                             name: m.name().to_string(),
                             collection: m.collection().map(|s| s.to_string()),

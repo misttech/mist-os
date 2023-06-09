@@ -99,7 +99,7 @@ impl DriverTestRealmBuilder for RealmBuilder {
             source: cm_rust::OfferSource::Parent,
             source_name: P::PROTOCOL_NAME.parse().unwrap(),
             target_name: P::PROTOCOL_NAME.parse().unwrap(),
-            target: cm_rust::OfferTarget::Collection("realm_builder".to_string()),
+            target: cm_rust::OfferTarget::Collection("realm_builder".parse().unwrap()),
             dependency_type: cm_rust::DependencyType::Strong,
             availability: cm_rust::Availability::Required,
         }));

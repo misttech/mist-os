@@ -286,7 +286,7 @@ impl<'a> OpenRequest<'a> {
 
                 let route = CollectionServiceRoute {
                     source_moniker: source_component_instance.abs_moniker.clone(),
-                    collections: collections.iter().map(|c| c.into()).collect(),
+                    collections: collections.clone(),
                     service_name: capability.source_name().clone(),
                 };
 

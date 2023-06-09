@@ -24,7 +24,7 @@ pub async fn resolve_raw_config_overrides(
     let leaf = moniker.leaf().ok_or_else(|| ConfigResolveError::BadMoniker(moniker.clone()))?;
     let collection =
         leaf.collection().ok_or_else(|| ConfigResolveError::BadMoniker(moniker.clone()))?;
-    let child_location = fsys::ChildLocation::Collection(collection.to_owned());
+    let child_location = fsys::ChildLocation::Collection(collection.to_string());
     let manifest = resolve_declaration(realm_query, &parent, &child_location, url).await?;
     let config = manifest.config.as_ref().ok_or(ConfigResolveError::MissingConfigSchema)?;
 

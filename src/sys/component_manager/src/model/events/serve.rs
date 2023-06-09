@@ -8,6 +8,7 @@ use {
         hooks::{EventPayload, EventType, HasEventType},
     },
     cm_rust::{ChildRef, EventScope},
+    cm_types::Name,
     cm_util::io::clone_dir,
     fidl::endpoints::{Proxy, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
@@ -70,18 +71,16 @@ fn is_moniker_valid_within_scope(moniker: &ExtendedMoniker, route: &[ComponentEv
 fn event_filter_contains_ref(
     filter: &Option<Vec<EventScope>>,
     name: &str,
-    collection: Option<&str>,
+    collection: Option<&Name>,
 ) -> bool {
     filter.as_ref().map_or(true, |value| {
         value
             .iter()
             .map(|value| match value {
                 EventScope::Child(ChildRef { collection: child_coll, name: child_name }) => {
-                    collection == child_coll.as_ref().map(|str| str.as_str()) && child_name == name
+                    collection == child_coll.as_ref() && child_name == name
                 }
-                EventScope::Collection(collection_name) => {
-                    Some(collection_name.as_str()) == collection
-                }
+                EventScope::Collection(collection_name) => Some(collection_name) == collection,
             })
             .any(|val| val)
     })
@@ -112,7 +111,7 @@ fn validate_component_instance(
             }
             let child_ref = ChildRef {
                 name: FlyStr::new(event_part.name()),
-                collection: event_part.collection().map(|value| FlyStr::new(value)),
+                collection: event_part.collection().cloned(),
             };
             if child_ref != component.component {
                 // Reject due to path mismatch
@@ -126,11 +125,7 @@ fn validate_component_instance(
     }
     match (active_scope, event_iter.next()) {
         (Some(scopes), Some(event)) => {
-            if !event_filter_contains_ref(
-                &Some(scopes),
-                event.name(),
-                event.collection.as_ref().map(|value| value.as_str()),
-            ) {
+            if !event_filter_contains_ref(&Some(scopes), event.name(), event.collection.as_ref()) {
                 return false;
             }
         }
@@ -469,7 +464,7 @@ mod tests {
             },
             ComponentEventRoute {
                 component: ChildRef { name: "root".into(), collection: None },
-                scope: Some(vec![EventScope::Collection("coll".to_string())]),
+                scope: Some(vec![EventScope::Collection("coll".parse().unwrap())]),
             },
         ];
         assert!(!validate_and_filter_event(&mut moniker, &route));
@@ -488,7 +483,7 @@ mod tests {
             },
             ComponentEventRoute {
                 component: ChildRef { name: "core".into(), collection: None },
-                scope: Some(vec![EventScope::Collection("test_manager".to_string())]),
+                scope: Some(vec![EventScope::Collection("test_manager".parse().unwrap())]),
             },
             ComponentEventRoute {
                 component: ChildRef { name: "test_manager".into(), collection: None },
@@ -598,11 +593,11 @@ mod tests {
             },
             ComponentEventRoute {
                 component: ChildRef { name: "a".into(), collection: None },
-                scope: Some(vec![EventScope::Collection("b".to_string())]),
+                scope: Some(vec![EventScope::Collection("b".parse().unwrap())]),
             },
             ComponentEventRoute {
                 component: ChildRef { name: "b".into(), collection: None },
-                scope: Some(vec![EventScope::Collection("c".to_string())]),
+                scope: Some(vec![EventScope::Collection("c".parse().unwrap())]),
             },
             ComponentEventRoute {
                 component: ChildRef { name: "c".into(), collection: None },
@@ -639,7 +634,7 @@ mod tests {
             },
             ComponentEventRoute {
                 component: ChildRef { name: "b".into(), collection: None },
-                scope: Some(vec![EventScope::Collection("c".to_string())]),
+                scope: Some(vec![EventScope::Collection("c".parse().unwrap())]),
             },
             ComponentEventRoute {
                 component: ChildRef { name: "c".into(), collection: None },
@@ -665,15 +660,15 @@ mod tests {
             },
             ComponentEventRoute {
                 component: ChildRef { name: "core".into(), collection: None },
-                scope: Some(vec![EventScope::Collection("test_manager".to_string())]),
+                scope: Some(vec![EventScope::Collection("test_manager".parse().unwrap())]),
             },
             ComponentEventRoute {
                 component: ChildRef { name: "test_manager".into(), collection: None },
-                scope: Some(vec![EventScope::Collection("test_wrapper".to_string())]),
+                scope: Some(vec![EventScope::Collection("test_wrapper".parse().unwrap())]),
             },
             ComponentEventRoute {
                 component: ChildRef { name: "test_wrapper".into(), collection: None },
-                scope: Some(vec![EventScope::Collection("test_root".to_string())]),
+                scope: Some(vec![EventScope::Collection("test_root".parse().unwrap())]),
             },
         ];
         assert_eq!(super::validate_and_filter_event(&mut event, &route), false);
@@ -705,12 +700,12 @@ mod tests {
             },
             ComponentEventRoute {
                 component: ChildRef { name: "test_manager".into(), collection: None },
-                scope: Some(vec![EventScope::Collection("tests".to_string())]),
+                scope: Some(vec![EventScope::Collection("tests".parse().unwrap())]),
             },
             ComponentEventRoute {
                 component: ChildRef {
                     name: "auto-3fc01a79864c741".into(),
-                    collection: Some("tests".into()),
+                    collection: Some("tests".parse().unwrap()),
                 },
                 scope: Some(vec![EventScope::Child(ChildRef {
                     name: "test_wrapper".into(),
@@ -720,7 +715,7 @@ mod tests {
             ComponentEventRoute {
                 component: ChildRef { name: "test_wrapper".into(), collection: None },
                 scope: Some(vec![
-                    EventScope::Collection("test".to_string()),
+                    EventScope::Collection("test".parse().unwrap()),
                     EventScope::Child(ChildRef { name: "enclosing_env".into(), collection: None }),
                     EventScope::Child(ChildRef {
                         name: "hermetic_resolver".into(),
@@ -729,7 +724,10 @@ mod tests {
                 ]),
             },
             ComponentEventRoute {
-                component: ChildRef { name: "test_root".into(), collection: Some("test".into()) },
+                component: ChildRef {
+                    name: "test_root".into(),
+                    collection: Some("test".parse().unwrap()),
+                },
                 scope: None,
             },
         ];

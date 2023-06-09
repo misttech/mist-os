@@ -728,7 +728,7 @@ async fn get_realm(
 
     // Add the collection to hold the test. This lets us individually destroy the test.
     test_wrapper_decl.collections.push(cm_rust::CollectionDecl {
-        name: TEST_ROOT_COLLECTION.to_string(),
+        name: TEST_ROOT_COLLECTION.parse().unwrap(),
         durability: fdecl::Durability::Transient,
         environment: Some(TEST_ENVIRONMENT_NAME.into()),
         allowed_offers: cm_types::AllowedOffers::StaticOnly,

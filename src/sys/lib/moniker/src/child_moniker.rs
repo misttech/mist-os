@@ -16,7 +16,7 @@ pub trait ChildMonikerBase: Eq + PartialOrd + Clone + fmt::Display {
 
     fn name(&self) -> &str;
 
-    fn collection(&self) -> Option<&str>;
+    fn collection(&self) -> Option<&Name>;
 }
 
 /// An child moniker locally identifies a child component instance using the name assigned by
@@ -50,8 +50,8 @@ impl ChildMonikerBase for ChildMoniker {
         self.name.as_str()
     }
 
-    fn collection(&self) -> Option<&str> {
-        self.collection.as_ref().map(|c| c.as_str())
+    fn collection(&self) -> Option<&Name> {
+        self.collection.as_ref()
     }
 }
 
@@ -129,7 +129,7 @@ mod tests {
 
         let m = ChildMoniker::try_new("test", Some("coll")).unwrap();
         assert_eq!("test", m.name());
-        assert_eq!(Some("coll"), m.collection());
+        assert_eq!(Some(&Name::new("coll").unwrap()), m.collection());
         assert_eq!("coll:test", format!("{}", m));
         assert_eq!(m, ChildMoniker::try_from("coll:test").unwrap());
 
@@ -138,7 +138,7 @@ mod tests {
         let max_moniker_length = format!("{}:{}", max_coll_length_part, max_name_length_part);
         let m = ChildMoniker::parse(max_moniker_length).expect("valid moniker");
         assert_eq!(&max_name_length_part, m.name());
-        assert_eq!(Some(max_coll_length_part.as_str()), m.collection());
+        assert_eq!(Some(&Name::new(max_coll_length_part).unwrap()), m.collection());
 
         assert!(ChildMoniker::parse("").is_err(), "cannot be empty");
         assert!(ChildMoniker::parse(":").is_err(), "cannot be empty with colon");

@@ -14,6 +14,7 @@ use {
     async_trait::async_trait,
     cm_moniker::InstancedAbsoluteMoniker,
     cm_rust::{CapabilityDecl, CollectionDecl, ExposeDecl, OfferDecl, OfferSource, UseDecl},
+    cm_types::Name,
     derivative::Derivative,
     moniker::{AbsoluteMoniker, ChildMoniker, ExtendedMoniker},
     std::{
@@ -98,8 +99,10 @@ pub trait ResolvedInstanceInterface: Send + Sync {
     fn get_child(&self, moniker: &ChildMoniker) -> Option<Arc<Self::Component>>;
 
     /// Returns a vector of the live children in `collection`.
-    fn children_in_collection(&self, collection: &str)
-        -> Vec<(ChildMoniker, Arc<Self::Component>)>;
+    fn children_in_collection(
+        &self,
+        collection: &Name,
+    ) -> Vec<(ChildMoniker, Arc<Self::Component>)>;
 
     /// Returns the resolver-ready location of the component, which is either
     /// an absolute component URL or a relative path URL with context.
@@ -123,7 +126,10 @@ pub trait ResolvedInstanceInterfaceExt: ResolvedInstanceInterface {
             | OfferSource::Parent
             | OfferSource::Void => true,
             OfferSource::Child(cm_rust::ChildRef { name, collection }) => {
-                let child_moniker = match ChildMoniker::try_new(name, collection.as_ref()) {
+                let child_moniker = match ChildMoniker::try_new(
+                    name.as_str(),
+                    collection.as_ref().map(|c| c.as_str()),
+                ) {
                     Ok(m) => m,
                     Err(_) => return false,
                 };
@@ -179,7 +185,7 @@ where
 
     fn children_in_collection(
         &self,
-        collection: &str,
+        collection: &Name,
     ) -> Vec<(ChildMoniker, Arc<Self::Component>)> {
         T::Target::children_in_collection(&*self, collection)
     }

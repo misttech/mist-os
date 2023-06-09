@@ -17,7 +17,6 @@ use {
         UseProtocolDecl, UseServiceDecl, UseSource,
     },
     cm_types::Name,
-    flyweights::FlyStr,
     futures::future::select_all,
     moniker::{ChildMoniker, ChildMonikerBase},
     std::collections::{HashMap, HashSet},
@@ -325,11 +324,10 @@ pub trait Component {
     /// returns `None` if none match. In the case of dynamic children, it's
     /// possible for multiple children to match a given `name` and `collection`,
     /// but at most one of them can be live.
-    fn find_child(&self, name: &str, collection: Option<&FlyStr>) -> Option<Child> {
-        self.children().into_iter().find(|child| {
-            child.moniker.name() == name
-                && child.moniker.collection() == collection.as_ref().map(|c| c.as_str())
-        })
+    fn find_child(&self, name: &str, collection: Option<&Name>) -> Option<Child> {
+        self.children()
+            .into_iter()
+            .find(|child| child.moniker.name() == name && child.moniker.collection() == collection)
     }
 }
 
@@ -1453,7 +1451,7 @@ mod tests {
             .add_transient_collection("coll")
             .offer(OfferDecl::Directory(OfferDirectoryDecl {
                 source: OfferSource::Child(ChildRef { name: "childA".into(), collection: None }),
-                target: OfferTarget::Collection("coll".to_string()),
+                target: OfferTarget::Collection("coll".parse().unwrap()),
                 source_name: "some_dir".parse().unwrap(),
                 target_name: "some_dir".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
@@ -1475,11 +1473,11 @@ mod tests {
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Child(ChildRef {
                         name: "dyn1".into(),
-                        collection: Some("coll".into()),
+                        collection: Some("coll".parse().unwrap()),
                     }),
                     target: OfferTarget::Child(ChildRef {
                         name: "dyn2".into(),
-                        collection: Some("coll".into()),
+                        collection: Some("coll".parse().unwrap()),
                     }),
                     source_name: "test.protocol".parse().unwrap(),
                     target_name: "test.protocol".parse().unwrap(),
@@ -1489,11 +1487,11 @@ mod tests {
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Child(ChildRef {
                         name: "dyn1".into(),
-                        collection: Some("coll".into()),
+                        collection: Some("coll".parse().unwrap()),
                     }),
                     target: OfferTarget::Child(ChildRef {
                         name: "dyn3".into(),
-                        collection: Some("coll".into()),
+                        collection: Some("coll".parse().unwrap()),
                     }),
                     source_name: "test.protocol".parse().unwrap(),
                     target_name: "test.protocol".parse().unwrap(),
@@ -1546,11 +1544,11 @@ mod tests {
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Child(ChildRef {
                         name: "dyn1".into(),
-                        collection: Some("coll1".into()),
+                        collection: Some("coll1".parse().unwrap()),
                     }),
                     target: OfferTarget::Child(ChildRef {
                         name: "dyn1".into(),
-                        collection: Some("coll2".into()),
+                        collection: Some("coll2".parse().unwrap()),
                     }),
                     source_name: "test.protocol".parse().unwrap(),
                     target_name: "test.protocol".parse().unwrap(),
@@ -1560,11 +1558,11 @@ mod tests {
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Child(ChildRef {
                         name: "dyn2".into(),
-                        collection: Some("coll2".into()),
+                        collection: Some("coll2".parse().unwrap()),
                     }),
                     target: OfferTarget::Child(ChildRef {
                         name: "dyn1".into(),
-                        collection: Some("coll1".into()),
+                        collection: Some("coll1".parse().unwrap()),
                     }),
                     source_name: "test.protocol".parse().unwrap(),
                     target_name: "test.protocol".parse().unwrap(),
@@ -1604,7 +1602,7 @@ mod tests {
                 source: OfferSource::Parent,
                 target: OfferTarget::Child(ChildRef {
                     name: "dyn1".into(),
-                    collection: Some("coll".into()),
+                    collection: Some("coll".parse().unwrap()),
                 }),
                 source_name: "test.protocol".parse().unwrap(),
                 target_name: "test.protocol".parse().unwrap(),
@@ -1639,7 +1637,7 @@ mod tests {
                 source: OfferSource::Self_,
                 target: OfferTarget::Child(ChildRef {
                     name: "dyn1".into(),
-                    collection: Some("coll".into()),
+                    collection: Some("coll".parse().unwrap()),
                 }),
                 source_name: "test.protocol".parse().unwrap(),
                 target_name: "test.protocol".parse().unwrap(),
@@ -1679,7 +1677,7 @@ mod tests {
                 source: OfferSource::Child(ChildRef { name: "childA".into(), collection: None }),
                 target: OfferTarget::Child(ChildRef {
                     name: "dyn1".into(),
-                    collection: Some("coll".into()),
+                    collection: Some("coll".parse().unwrap()),
                 }),
                 source_name: "test.protocol".parse().unwrap(),
                 target_name: "test.protocol".parse().unwrap(),
@@ -2178,7 +2176,7 @@ mod tests {
     fn test_service_from_collection() {
         let decl = ComponentDecl {
             collections: vec![CollectionDecl {
-                name: "coll".to_string(),
+                name: "coll".parse().unwrap(),
                 durability: fdecl::Durability::Transient,
                 environment: None,
                 allowed_offers: cm_types::AllowedOffers::StaticOnly,
@@ -2194,7 +2192,7 @@ mod tests {
                 config_overrides: None,
             }],
             offers: vec![OfferDecl::Service(OfferServiceDecl {
-                source: OfferSource::Collection("coll".to_string()),
+                source: OfferSource::Collection("coll".parse().unwrap()),
                 source_name: "service_capability".parse().unwrap(),
                 target: OfferTarget::Child(ChildRef {
                     name: "static_child".into(),
@@ -2229,7 +2227,7 @@ mod tests {
     fn test_service_from_collection_with_multiple_instances() {
         let decl = ComponentDecl {
             collections: vec![CollectionDecl {
-                name: "coll".to_string(),
+                name: "coll".parse().unwrap(),
                 durability: fdecl::Durability::Transient,
                 environment: None,
                 allowed_offers: cm_types::AllowedOffers::StaticOnly,
@@ -2245,7 +2243,7 @@ mod tests {
                 config_overrides: None,
             }],
             offers: vec![OfferDecl::Service(OfferServiceDecl {
-                source: OfferSource::Collection("coll".to_string()),
+                source: OfferSource::Collection("coll".parse().unwrap()),
                 source_name: "service_capability".parse().unwrap(),
                 target: OfferTarget::Child(ChildRef {
                     name: "static_child".into(),
@@ -2290,7 +2288,7 @@ mod tests {
         let decl = ComponentDecl {
             collections: vec![
                 CollectionDecl {
-                    name: c1_name.clone(),
+                    name: c1_name.parse().unwrap(),
                     durability: fdecl::Durability::Transient,
                     environment: None,
                     allowed_offers: cm_types::AllowedOffers::StaticOnly,
@@ -2298,7 +2296,7 @@ mod tests {
                     persistent_storage: Some(false),
                 },
                 CollectionDecl {
-                    name: c2_name.clone(),
+                    name: c2_name.parse().unwrap(),
                     durability: fdecl::Durability::Transient,
                     environment: None,
                     allowed_offers: cm_types::AllowedOffers::StaticOnly,
@@ -2307,9 +2305,9 @@ mod tests {
                 },
             ],
             offers: vec![OfferDecl::Service(OfferServiceDecl {
-                source: OfferSource::Collection(c1_name.clone()),
+                source: OfferSource::Collection(c1_name.parse().unwrap()),
                 source_name: cap_name.clone().parse().unwrap(),
-                target: OfferTarget::Collection(c2_name.clone()),
+                target: OfferTarget::Collection(c2_name.parse().unwrap()),
                 target_name: cap_name.clone().parse().unwrap(),
                 source_instance_filter: None,
                 renamed_instances: None,
@@ -2892,7 +2890,7 @@ mod tests {
                     .offer(cm_rust::OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Child(ChildRef { name: "c".into(), collection: None }),
                         source_name: "static_offer_source".parse().unwrap(),
-                        target: OfferTarget::Collection("coll".to_string()),
+                        target: OfferTarget::Collection("coll".parse().unwrap()),
                         target_name: "static_offer_target".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -2915,7 +2913,7 @@ mod tests {
                 dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                     source: Some(fdecl::Ref::Child(fdecl::ChildRef {
                         name: "a".into(),
-                        collection: Some("coll".into()),
+                        collection: Some("coll".parse().unwrap()),
                     })),
                     source_name: Some("dyn_offer_source_name".to_string()),
                     target_name: Some("dyn_offer_target_name".to_string()),

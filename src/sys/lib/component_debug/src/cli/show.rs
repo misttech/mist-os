@@ -137,7 +137,7 @@ async fn get_instance_by_query(
                         };
 
                         let collections =
-                            manifest.collections.into_iter().map(|c| c.name).collect();
+                            manifest.collections.into_iter().map(|c| c.name.to_string()).collect();
 
                         Some(ShowCmdResolvedInfo {
                             resolved_url,
