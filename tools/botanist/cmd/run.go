@@ -199,7 +199,9 @@ func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.Fuch
 		}
 		cmd.Stdout = daemonLog
 		logger.Debugf(ctx, "%s", cmd.Args)
-		daemonCtx, daemonCancel := context.WithCancel(ctx)
+		// Use a new context so that the subprocess can only be terminated by
+		// a direct call to the cancel function.
+		daemonCtx, daemonCancel := context.WithCancel(context.Background())
 		if err := cmd.Start(); err != nil {
 			return cleanup, err
 		}
@@ -699,6 +701,17 @@ func (r *RunCommand) Execute(ctx context.Context, f *flag.FlagSet, _ ...interfac
 		defer func() {
 			if err := osmisc.CopyDir(tmpOutDir, testOutDir); err != nil {
 				logger.Errorf(ctx, "failed to copy outputs to %s: %s", testOutDir, err)
+				// TODO(fxbug.dev/128608): If we fail to copy outputs, at least copy
+				// the ffx logs over so we can debug. Remove when attached bug is
+				// fixed.
+				if r.ffxPath != "" {
+					ffxLogsDir := filepath.Join("ffx_outputs", "ffx_logs")
+					if _, err := os.Stat(filepath.Join(testOutDir, ffxLogsDir)); os.IsNotExist(err) {
+						if err := osmisc.CopyDir(filepath.Join(tmpOutDir, ffxLogsDir), filepath.Join(testOutDir, ffxLogsDir)); err != nil {
+							logger.Errorf(ctx, "failed to copy ffx logs to %s: %s", filepath.Join(testOutDir, ffxLogsDir), err)
+						}
+					}
+				}
 			}
 			if err := os.Setenv(testrunnerconstants.TestOutDirEnvKey, testOutDir); err != nil {
 				logger.Errorf(ctx, "failed to reset %s to %s: %s", testrunnerconstants.TestOutDirEnvKey, testOutDir, err)
