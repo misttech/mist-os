@@ -146,8 +146,8 @@ static void topology_cpu_init() {
   lk_init_secondary_cpus(arch_max_num_cpus() - 1);
 
   for (auto* node : system_topology::GetSystemTopology().processors()) {
-    if (node->entity_type != ZBI_TOPOLOGY_ENTITY_PROCESSOR ||
-        node->entity.processor.architecture != ZBI_TOPOLOGY_ARCHITECTURE_RISCV64) {
+    if (node->entity_type != ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR ||
+        node->entity.processor.architecture != ZBI_TOPOLOGY_ARCHITECTURE_V2_RISCV64) {
       panic("Invalid processor node.");
     }
 
@@ -166,15 +166,15 @@ static void topology_cpu_init() {
 }
 
 // clang-format off
-static constexpr zbi_topology_node_t fallback_topology = {
-  .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+static constexpr zbi_topology_node_v2_t fallback_topology = {
+  .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
   .parent_index = ZBI_TOPOLOGY_NO_PARENT,
   .entity = {
     .processor = {
       .logical_ids = {0},
       .logical_id_count = 1,
       .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
-      .architecture = ZBI_TOPOLOGY_ARCHITECTURE_RISCV64,
+      .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_RISCV64,
       .architecture_info = {
         .riscv64 = {
           .hart_id = 0,

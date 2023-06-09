@@ -110,7 +110,7 @@ pub fn zbi_container_header(length: u32) -> zbi_header_t {
 
 #[repr(C)]
 #[derive(Copy, Clone, FromZeroes, FromBytes)]
-/// Defines the Rust version of `zbi_topology_node_t` in
+/// Defines the Rust version of `zbi_topology_node_v2_t` in
 /// sdk/lib/zbi-format/include/lib/zbi-format/zbi.h.
 pub struct ZbiTopologyNode {
     // Should be one of ZbiTopologyEntityType.
@@ -246,7 +246,7 @@ mod tests {
             cache_id: u32,
         ) -> usize;
 
-        pub fn serialize_zbi_topology_numa_region_t(
+        pub fn serialize_zbi_topology_numa_region_v2_t(
             buffer: &[u8; MAX_SERIALIZATION_BUFFER_SIZE],
             start_address: u64,
             end_address: u64,
@@ -257,7 +257,7 @@ mod tests {
             performance_class: u8,
         ) -> usize;
 
-        pub fn serialize_zbi_topology_processor_t(
+        pub fn serialize_zbi_topology_processor_v2_t(
             buffer: &[u8; MAX_SERIALIZATION_BUFFER_SIZE],
             logical_ids: &[u16; 4],
             logical_id_count: u8,
@@ -266,7 +266,7 @@ mod tests {
             architecture_info: ArchitectureInfo,
         ) -> usize;
 
-        pub fn serialize_zbi_topology_node_t(
+        pub fn serialize_zbi_topology_node_v2_t(
             buffer: &[u8; MAX_SERIALIZATION_BUFFER_SIZE],
             entity_type: u8,
             parent_index: u16,
@@ -336,7 +336,7 @@ mod tests {
 
         let buffer = [0 as u8; MAX_SERIALIZATION_BUFFER_SIZE];
         let size =
-            unsafe { serialize_zbi_topology_numa_region_t(&buffer, start_address, end_address) };
+            unsafe { serialize_zbi_topology_numa_region_v2_t(&buffer, start_address, end_address) };
         assert_eq!(size, std::mem::size_of::<ZbiTopologyNumaRegion>());
 
         let numa_region = ZbiTopologyNumaRegion { start_address, end_address };
@@ -372,7 +372,7 @@ mod tests {
 
         let mut buffer = [0 as u8; MAX_SERIALIZATION_BUFFER_SIZE];
         let mut size = unsafe {
-            serialize_zbi_topology_processor_t(
+            serialize_zbi_topology_processor_v2_t(
                 &buffer,
                 &logical_ids,
                 logical_id_count,
@@ -395,7 +395,7 @@ mod tests {
         buffer = [0 as u8; MAX_SERIALIZATION_BUFFER_SIZE];
         architecture_info = ArchitectureInfo { x64: x64_info };
         size = unsafe {
-            serialize_zbi_topology_processor_t(
+            serialize_zbi_topology_processor_v2_t(
                 &buffer,
                 &logical_ids,
                 logical_id_count,
@@ -417,7 +417,7 @@ mod tests {
 
         buffer = [0 as u8; MAX_SERIALIZATION_BUFFER_SIZE];
         size = unsafe {
-            serialize_zbi_topology_processor_t(
+            serialize_zbi_topology_processor_v2_t(
                 &buffer,
                 &logical_ids,
                 logical_id_count,
@@ -450,7 +450,7 @@ mod tests {
 
         let mut buffer = [0 as u8; MAX_SERIALIZATION_BUFFER_SIZE];
         let mut size = unsafe {
-            serialize_zbi_topology_node_t(
+            serialize_zbi_topology_node_v2_t(
                 &buffer,
                 ZbiTopologyEntityType::ZbiTopologyEntityProcessor as u8,
                 parent_index,
@@ -470,7 +470,7 @@ mod tests {
         entity = Entity { cluster: cluster };
         buffer = [0 as u8; MAX_SERIALIZATION_BUFFER_SIZE];
         size = unsafe {
-            serialize_zbi_topology_node_t(
+            serialize_zbi_topology_node_v2_t(
                 &buffer,
                 ZbiTopologyEntityType::ZbiTopologyEntityCluster as u8,
                 parent_index,
@@ -490,7 +490,7 @@ mod tests {
         entity = Entity { numa_region: numa_region };
         buffer = [0 as u8; MAX_SERIALIZATION_BUFFER_SIZE];
         size = unsafe {
-            serialize_zbi_topology_node_t(
+            serialize_zbi_topology_node_v2_t(
                 &buffer,
                 ZbiTopologyEntityType::ZbiTopologyEntityNumaRegion as u8,
                 parent_index,
@@ -510,7 +510,7 @@ mod tests {
         entity = Entity { cache: cache };
         buffer = [0 as u8; MAX_SERIALIZATION_BUFFER_SIZE];
         size = unsafe {
-            serialize_zbi_topology_node_t(
+            serialize_zbi_topology_node_v2_t(
                 &buffer,
                 ZbiTopologyEntityType::ZbiTopologyEntityCache as u8,
                 parent_index,

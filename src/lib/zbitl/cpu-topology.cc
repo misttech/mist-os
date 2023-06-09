@@ -11,33 +11,33 @@ namespace zbitl {
 fit::result<std::string_view, CpuTopologyTable> CpuTopologyTable::FromPayload(
     uint32_t item_type, zbitl::ByteView payload) {
   switch (item_type) {
-    case ZBI_TYPE_CPU_TOPOLOGY:
+    case ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V2:
       if (payload.size_bytes() == 0) {
-        return fit::error("ZBI_TYPE_CPU_TOPOLOGY payload is empty");
+        return fit::error("ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V2 payload is empty");
       }
-      if (payload.size_bytes() % sizeof(zbi_topology_node_t) == 0) {
+      if (payload.size_bytes() % sizeof(zbi_topology_node_v2_t) == 0) {
         CpuTopologyTable result;
         result.table_ = cpp20::span{
-            reinterpret_cast<const zbi_topology_node_t*>(payload.data()),
-            payload.size_bytes() / sizeof(zbi_topology_node_t),
+            reinterpret_cast<const zbi_topology_node_v2_t*>(payload.data()),
+            payload.size_bytes() / sizeof(zbi_topology_node_v2_t),
         };
         return fit::ok(result);
       }
-      return fit::error("ZBI_TYPE_CPU_TOPOLOGY payload not a multiple of entry size");
+      return fit::error("ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V2 payload not a multiple of entry size");
 
-    case ZBI_TYPE_CPU_CONFIG:
+    case ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V1:
       if (payload.size_bytes() >= sizeof(zbi_cpu_config_t)) {
         auto conf = reinterpret_cast<const zbi_cpu_config_t*>(payload.data());
         const size_t conf_size =
             sizeof(zbi_cpu_config_t) + (conf->cluster_count * sizeof(zbi_cpu_cluster_t));
         if (payload.size_bytes() < conf_size) {
-          return fit::error("ZBI_TYPE_CPU_CONFIG too small for cluster count");
+          return fit::error("ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V1 too small for cluster count");
         }
         CpuTopologyTable result;
         result.table_ = conf;
         return fit::ok(result);
       }
-      return fit::error("ZBI_TYPE_CPU_CONFIG too small for header");
+      return fit::error("ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V1 too small for header");
 
     default:
       return fit::error("invalid ZBI item type for CpuTopologyTable");
@@ -51,15 +51,15 @@ fit::result<std::string_view, CpuTopologyTable> CpuTopologyTable::FromPayload(
 struct CpuTopologyTable::Dispatch {
   // Set up with the modern table format, just use the input as is.
 
-  static size_t TableSize(cpp20::span<const zbi_topology_node_t> nodes) { return nodes.size(); }
+  static size_t TableSize(cpp20::span<const zbi_topology_node_v2_t> nodes) { return nodes.size(); }
 
-  static iterator TableBegin(cpp20::span<const zbi_topology_node_t> nodes) {
+  static iterator TableBegin(cpp20::span<const zbi_topology_node_v2_t> nodes) {
     iterator result;
     result.it_ = nodes.begin();
     return result;
   }
 
-  static iterator TableEnd(cpp20::span<const zbi_topology_node_t> nodes) {
+  static iterator TableEnd(cpp20::span<const zbi_topology_node_v2_t> nodes) {
     iterator result;
     result.it_ = nodes.end();
     return result;
@@ -123,13 +123,13 @@ struct CpuTopologyTable::Dispatch {
     }
   }
 
-  static zbi_topology_node_t GetNode(const ConvertingIterator& it) {
+  static zbi_topology_node_v2_t GetNode(const ConvertingIterator& it) {
     ZX_ASSERT_MSG(it.logical_id_, "cannot dereference default-constructed or end iterator");
 
     // First there's a node for the cluster itself.
     if (!it.cpu_idx_) {
-      return zbi_topology_node_t{
-          .entity_type = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+      return zbi_topology_node_v2_t{
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_CLUSTER,
           .parent_index = ZBI_TOPOLOGY_NO_PARENT,
           // We don't have this data so it is a guess that little cores are
           // first.
@@ -138,8 +138,8 @@ struct CpuTopologyTable::Dispatch {
     }
 
     // Then there's a node for each CPU.
-    return zbi_topology_node_t{
-        .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+    return zbi_topology_node_v2_t{
+        .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
         .parent_index = static_cast<uint16_t>(it.cluster_node_idx_),
         .entity =
             {
@@ -147,7 +147,7 @@ struct CpuTopologyTable::Dispatch {
                     {
                         .logical_ids = {*it.logical_id_},
                         .logical_id_count = 1,
-                        .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                        .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                         .architecture_info =
                             {
                                 .arm64 =
@@ -180,7 +180,7 @@ CpuTopologyTable::ConvertingIterator& CpuTopologyTable::ConvertingIterator::oper
   return *this;
 }
 
-zbi_topology_node_t CpuTopologyTable::ConvertingIterator::operator*() const {
+zbi_topology_node_v2_t CpuTopologyTable::ConvertingIterator::operator*() const {
   return Dispatch::GetNode(*this);
 }
 

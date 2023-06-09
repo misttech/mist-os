@@ -204,9 +204,9 @@ static zx_status_t build_data_zbi(const fuchsia::virtualization::GuestConfig& cf
   auto cpu_config = reinterpret_cast<zbi_cpu_config_t*>(cpu_buffer);
   cpu_config->cluster_count = 1;
   cpu_config->clusters[0].cpu_count = cfg.cpus();
-  status = LogIfZbiError(
-      image.Append(zbi_header_t{.type = ZBI_TYPE_CPU_CONFIG}, zbitl::AsBytes(cpu_buffer)),
-      "Failed to append CPU configuration");
+  status = LogIfZbiError(image.Append(zbi_header_t{.type = ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V1},
+                                      zbitl::AsBytes(cpu_buffer)),
+                         "Failed to append CPU configuration");
   if (status != ZX_OK) {
     return status;
   }

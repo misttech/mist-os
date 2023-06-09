@@ -5,7 +5,7 @@
 #ifndef SRC_SYS_LIB_FUCHSIA_ZBI_ABI_TEST_LIB_H_
 #define SRC_SYS_LIB_FUCHSIA_ZBI_ABI_TEST_LIB_H_
 
-#include <lib/zbi-format/cpu.h>
+#include <lib/zbi-format/internal/deprecated-cpu.h>
 
 #include <cstring>
 
@@ -16,9 +16,9 @@ using architecture_info_t = union {
 };
 
 using entity_t = union {
-  zbi_topology_processor_t processor;
+  zbi_topology_processor_v2_t processor;
   zbi_topology_cluster_t cluster;
-  zbi_topology_numa_region_t numa_region;
+  zbi_topology_numa_region_v2_t numa_region;
   zbi_topology_cache_t cache;
 };
 
@@ -31,18 +31,18 @@ size_t serialize_zbi_topology_arm64_info_t(uint8_t buffer[], uint8_t cluster_1_i
 
 size_t serialize_zbi_topology_cache_t(uint8_t buffer[], uint32_t cache_id);
 
-size_t serialize_zbi_topology_numa_region_t(uint8_t buffer[], uint64_t start_address,
-                                            uint64_t end_address);
+size_t serialize_zbi_topology_numa_region_v2_t(uint8_t buffer[], uint64_t start_address,
+                                               uint64_t end_address);
 
 size_t serialize_zbi_topology_cluster_t(uint8_t buffer[], uint8_t performance_class);
 
-size_t serialize_zbi_topology_processor_t(uint8_t buffer[], uint16_t logical_ids[],
-                                          uint8_t logical_id_count, uint16_t flags,
-                                          uint8_t architecture,
-                                          architecture_info_t architecture_info);
+size_t serialize_zbi_topology_processor_v2_t(uint8_t buffer[], uint16_t logical_ids[],
+                                             uint8_t logical_id_count, uint16_t flags,
+                                             uint8_t architecture,
+                                             architecture_info_t architecture_info);
 
-size_t serialize_zbi_topology_node_t(uint8_t buffer[], uint8_t entity_type, uint16_t parent_index,
-                                     entity_t entity);
+size_t serialize_zbi_topology_node_v2_t(uint8_t buffer[], uint8_t entity_type,
+                                        uint16_t parent_index, entity_t entity);
 }
 
 #endif  // SRC_SYS_LIB_FUCHSIA_ZBI_ABI_TEST_LIB_H_

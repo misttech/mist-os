@@ -136,16 +136,6 @@ typedef uint32_t zbi_type_t;
 #define ZBI_TYPE_DRV_BOARD_INFO \
   ((zbi_type_t)(1230193261u))  // 0x49534200 | TYPE_DRIVER_METADATA_PREFIX
 
-// Legacy CPU configuration. See zbi_cpu_config_t for a description of the payload.
-//
-// 'CPUC'
-#define ZBI_TYPE_CPU_CONFIG ((zbi_type_t)(0x43555043u))
-
-// CPU configuration. See zbi_topology_node_t for a description of the payload.
-//
-// 'TOPO'
-#define ZBI_TYPE_CPU_TOPOLOGY ((zbi_type_t)(0x544f504fu))
-
 // Device memory configuration. See zbi_mem_range_t for a description of the
 // payload.
 //

@@ -6,8 +6,8 @@
 #define ZIRCON_KERNEL_TARGET_ARM64_BOARD_MOTMOT_BOOT_SHIM_CONFIG_H_
 
 #include <lib/zbi-format/board.h>
-#include <lib/zbi-format/cpu.h>
 #include <lib/zbi-format/driver-config.h>
+#include <lib/zbi-format/internal/deprecated-cpu.h>
 #include <lib/zbi-format/memory.h>
 #include <lib/zbi-format/zbi.h>
 
@@ -95,10 +95,10 @@ static const zbi_platform_id_t platform_id = {
     .board_name = "motmot",
 };
 
-static void add_cluster(zbi_topology_node_t* node, uint8_t performance_class) {
+static void add_cluster(zbi_topology_node_v2_t* node, uint8_t performance_class) {
   // clang-format off
-  *node = (zbi_topology_node_t) {
-    .entity_type = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+  *node = (zbi_topology_node_v2_t) {
+    .entity_type = ZBI_TOPOLOGY_ENTITY_V2_CLUSTER,
     .parent_index = ZBI_TOPOLOGY_NO_PARENT,
     .entity = {
       .cluster = {
@@ -109,20 +109,20 @@ static void add_cluster(zbi_topology_node_t* node, uint8_t performance_class) {
   // clang-format on
 }
 
-static void add_cpu(zbi_topology_node_t* node, size_t cpu_num, size_t parent_index) {
+static void add_cpu(zbi_topology_node_v2_t* node, size_t cpu_num, size_t parent_index) {
   // 0, 0x100, 0x200, ...
   uint32_t mpidr = (uint32_t)cpu_num << 8;
 
   // clang-format off
-  *node = (zbi_topology_node_t) {
-    .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+  *node = (zbi_topology_node_v2_t) {
+    .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
     .parent_index = (uint16_t)parent_index,
     .entity = {
       .processor = {
         .logical_ids = { (uint16_t)cpu_num },
         .logical_id_count = 1,
         .flags = (cpu_num == 0) ? ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY : (zbi_topology_processor_flags_t)0,
-        .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+        .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
         .architecture_info = {
           .arm64 = {
             .cluster_1_id = (mpidr >> 8) & 0xff,
@@ -140,7 +140,7 @@ static void add_cpu(zbi_topology_node_t* node, size_t cpu_num, size_t parent_ind
 }
 
 static void add_cpu_topology(zbi_header_t* zbi) {
-  zbi_topology_node_t nodes[3 + 8];
+  zbi_topology_node_v2_t nodes[3 + 8];
   size_t index = 0;
   size_t cpu_num = 0;
 
@@ -173,8 +173,8 @@ static void add_cpu_topology(zbi_header_t* zbi) {
     add_cpu(&nodes[index++], cpu_num, big_index);
   }
 
-  append_boot_item(zbi, ZBI_TYPE_CPU_TOPOLOGY, sizeof(zbi_topology_node_t), &nodes,
-                   sizeof(zbi_topology_node_t) * countof(nodes));
+  append_boot_item(zbi, ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V2, sizeof(zbi_topology_node_v2_t), &nodes,
+                   sizeof(zbi_topology_node_v2_t) * countof(nodes));
 }
 
 static void append_board_boot_item(zbi_header_t* bootdata) {

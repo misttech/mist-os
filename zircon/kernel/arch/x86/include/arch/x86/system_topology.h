@@ -10,7 +10,7 @@
 #include <lib/acpi_lite.h>
 #include <lib/arch/x86/apic-id.h>
 #include <lib/arch/x86/cache.h>
-#include <lib/zbi-format/cpu.h>
+#include <lib/zbi-format/internal/deprecated-cpu.h>
 
 #include <fbl/vector.h>
 #include <ktl/forward.h>
@@ -23,14 +23,14 @@ zx_status_t GenerateFlatTopology(const arch::ApicIdDecoder& decoder,  //
                                  uint32_t primary_apic_id,            //
                                  const arch::CpuCacheInfo& cache_info,
                                  const acpi_lite::AcpiParserInterface& parser,
-                                 fbl::Vector<zbi_topology_node_t>* topology);
+                                 fbl::Vector<zbi_topology_node_v2_t>* topology);
 }  // namespace internal
 
 // Generates the system topology.
 // Exposed for testing.
 template <typename CpuidIoProvider>
 zx_status_t GenerateFlatTopology(CpuidIoProvider&& io, const acpi_lite::AcpiParserInterface& parser,
-                                 fbl::Vector<zbi_topology_node_t>* topology) {
+                                 fbl::Vector<zbi_topology_node_v2_t>* topology) {
   const uint32_t primary_apic_id = arch::GetApicId(io);
   const arch::ApicIdDecoder decoder(io);
   const arch::CpuCacheInfo cache_info(ktl::forward<CpuidIoProvider>(io));

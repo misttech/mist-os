@@ -127,9 +127,9 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
         break;
       }
 
-      case ZBI_TYPE_CPU_CONFIG:
-      case ZBI_TYPE_CPU_TOPOLOGY:
-        // Normalize either item type into zbi_topology_node_t[] for handoff.
+      case ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V1:
+      case ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V2:
+        // Normalize either item type into zbi_topology_node_v2_t[] for handoff.
         if (auto table = zbitl::CpuTopologyTable::FromPayload(header->type, payload);
             table.is_ok()) {
           ktl::span handoff_table = New(handoff()->cpu_topology, ac, table->size());

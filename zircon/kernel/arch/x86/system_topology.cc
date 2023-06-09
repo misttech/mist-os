@@ -44,10 +44,10 @@ zx_status_t GrowVector(size_t new_size, fbl::Vector<T>* vector) {
 class Core {
  public:
   explicit Core() {
-    node_.entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR;
+    node_.entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR;
     node_.parent_index = ZBI_TOPOLOGY_NO_PARENT;
     node_.entity.processor.logical_id_count = 0;
-    node_.entity.processor.architecture = ZBI_TOPOLOGY_ARCHITECTURE_X64;
+    node_.entity.processor.architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_X64;
     node_.entity.processor.architecture_info.x64.apic_id_count = 0;
   }
 
@@ -64,16 +64,16 @@ class Core {
 
   void SetFlatParent(uint16_t parent_index) { node_.parent_index = parent_index; }
 
-  const zbi_topology_node_t& node() const { return node_; }
+  const zbi_topology_node_v2_t& node() const { return node_; }
 
  private:
-  zbi_topology_node_t node_;
+  zbi_topology_node_v2_t node_;
 };
 
 class SharedCache {
  public:
   explicit SharedCache(uint32_t id) {
-    node_.entity_type = ZBI_TOPOLOGY_ENTITY_CACHE;
+    node_.entity_type = ZBI_TOPOLOGY_ENTITY_V2_CACHE;
     node_.parent_index = ZBI_TOPOLOGY_NO_PARENT;
     node_.entity.cache.cache_id = id;
   }
@@ -99,19 +99,19 @@ class SharedCache {
 
   void SetFlatParent(uint16_t parent_index) { node_.parent_index = parent_index; }
 
-  zbi_topology_node_t& node() { return node_; }
+  zbi_topology_node_v2_t& node() { return node_; }
 
   fbl::Vector<ktl::unique_ptr<Core>>& cores() { return cores_; }
 
  private:
-  zbi_topology_node_t node_;
+  zbi_topology_node_v2_t node_;
   fbl::Vector<ktl::unique_ptr<Core>> cores_;
 };
 
 class Die {
  public:
   Die() {
-    node_.entity_type = ZBI_TOPOLOGY_ENTITY_DIE;
+    node_.entity_type = ZBI_TOPOLOGY_ENTITY_V2_DIE;
     node_.parent_index = ZBI_TOPOLOGY_NO_PARENT;
   }
 
@@ -155,7 +155,7 @@ class Die {
 
   void SetFlatParent(uint16_t parent_index) { node_.parent_index = parent_index; }
 
-  zbi_topology_node_t& node() { return node_; }
+  zbi_topology_node_v2_t& node() { return node_; }
 
   fbl::Vector<ktl::unique_ptr<SharedCache>>& caches() { return caches_; }
 
@@ -166,7 +166,7 @@ class Die {
   const ktl::optional<acpi_lite::AcpiNumaDomain>& numa() const { return numa_; }
 
  private:
-  zbi_topology_node_t node_;
+  zbi_topology_node_v2_t node_;
   fbl::Vector<ktl::unique_ptr<SharedCache>> caches_;
   fbl::Vector<ktl::unique_ptr<Core>> cores_;
   ktl::optional<acpi_lite::AcpiNumaDomain> numa_;
@@ -331,9 +331,9 @@ zx_status_t AttachNumaInformation(const acpi_lite::AcpiParserInterface& parser,
       });
 }
 
-zbi_topology_node_t ToFlatNode(const acpi_lite::AcpiNumaDomain& numa) {
-  zbi_topology_node_t flat;
-  flat.entity_type = ZBI_TOPOLOGY_ENTITY_NUMA_REGION;
+zbi_topology_node_v2_t ToFlatNode(const acpi_lite::AcpiNumaDomain& numa) {
+  zbi_topology_node_v2_t flat;
+  flat.entity_type = ZBI_TOPOLOGY_ENTITY_V2_NUMA_REGION;
   flat.parent_index = ZBI_TOPOLOGY_NO_PARENT;
   if (numa.memory_count > 0) {
     const auto& mem = numa.memory[0];
@@ -344,7 +344,7 @@ zbi_topology_node_t ToFlatNode(const acpi_lite::AcpiNumaDomain& numa) {
 }
 
 zx_status_t FlattenTree(const fbl::Vector<ktl::unique_ptr<Package>>& packages,
-                        fbl::Vector<zbi_topology_node_t>* flat) {
+                        fbl::Vector<zbi_topology_node_v2_t>* flat) {
   fbl::AllocChecker checker;
   for (auto& pkg : packages) {
     if (!pkg) {
@@ -427,15 +427,15 @@ zx_status_t FlattenTree(const fbl::Vector<ktl::unique_ptr<Package>>& packages,
 }
 
 // clang-format off
-static constexpr zbi_topology_node_t kFallbackTopology = {
-    .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+static constexpr zbi_topology_node_v2_t kFallbackTopology = {
+    .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
     .parent_index = ZBI_TOPOLOGY_NO_PARENT,
     .entity = {
       .processor = {
         .logical_ids = {0},
         .logical_id_count = 1,
         .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
-        .architecture = ZBI_TOPOLOGY_ARCHITECTURE_X64,
+        .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_X64,
         .architecture_info = {
           .x64 = {
             .apic_ids = {0},
@@ -448,7 +448,7 @@ static constexpr zbi_topology_node_t kFallbackTopology = {
 // clang-format on
 
 zx_status_t GenerateAndInitSystemTopology(const acpi_lite::AcpiParserInterface& parser) {
-  fbl::Vector<zbi_topology_node_t> topology;
+  fbl::Vector<zbi_topology_node_v2_t> topology;
 
   const auto status = x86::GenerateFlatTopology(arch::BootCpuidIo{}, parser, &topology);
   if (status != ZX_OK) {
@@ -468,7 +468,7 @@ zx_status_t GenerateFlatTopology(const arch::ApicIdDecoder& decoder,  //
                                  uint32_t primary_apic_id,            //
                                  const arch::CpuCacheInfo& cache_info,
                                  const acpi_lite::AcpiParserInterface& parser,
-                                 fbl::Vector<zbi_topology_node_t>* topology) {
+                                 fbl::Vector<zbi_topology_node_v2_t>* topology) {
   fbl::Vector<ktl::unique_ptr<Package>> pkgs;
   auto status = GenerateTree(decoder, primary_apic_id, cache_info, parser, &pkgs);
   if (status != ZX_OK) {

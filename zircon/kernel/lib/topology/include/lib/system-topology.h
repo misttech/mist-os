@@ -8,7 +8,7 @@
 #define ZIRCON_KERNEL_LIB_TOPOLOGY_INCLUDE_LIB_SYSTEM_TOPOLOGY_H_
 
 #include <lib/lazy_init/lazy_init.h>
-#include <lib/zbi-format/cpu.h>
+#include <lib/zbi-format/internal/deprecated-cpu.h>
 #include <zircon/types.h>
 
 #include <fbl/vector.h>
@@ -25,13 +25,13 @@
 
 namespace system_topology {
 // A single node in the topology graph. The union and types here mirror the flat structure,
-// zbi_topology_node_t.
+// zbi_topology_node_v2_t.
 struct Node {
   uint8_t entity_type;
   union {
-    zbi_topology_processor_t processor;
+    zbi_topology_processor_v2_t processor;
     zbi_topology_cluster_t cluster;
-    zbi_topology_numa_region_t numa_region;
+    zbi_topology_numa_region_v2_t numa_region;
     zbi_topology_cache_t cache;
   } entity;
   Node* parent;
@@ -58,7 +58,7 @@ class Graph {
   //
   // Returns ZX_ERR_NO_MEMORY if dynamic memory allocation fails.
   // Returns ZX_ERR_INVALID_ARGS if validation of the flat topology fails.
-  static zx_status_t InitializeSystemTopology(const zbi_topology_node_t* nodes, size_t count);
+  static zx_status_t InitializeSystemTopology(const zbi_topology_node_v2_t* nodes, size_t count);
 
   // Initializes the given topology Graph instance from the given flat
   // topology. Performs validation on the flat topology before updating the
@@ -67,7 +67,7 @@ class Graph {
   //
   // Returns ZX_ERR_NO_MEMORY if dynamic memory allocation fails.
   // Returns ZX_ERR_INVALID_ARGS if validation of the flat topology fails.
-  static zx_status_t Initialize(Graph* graph, const zbi_topology_node_t* nodes, size_t count);
+  static zx_status_t Initialize(Graph* graph, const zbi_topology_node_v2_t* nodes, size_t count);
 
   // Graph instances are default constructible to empty.
   Graph() = default;
@@ -122,7 +122,7 @@ class Graph {
   //   - there are no cycles.
   //   - It is stored in a "depth first" ordering, with parents adjacent to
   //   their children.
-  static bool Validate(const zbi_topology_node_t* nodes, size_t count);
+  static bool Validate(const zbi_topology_node_v2_t* nodes, size_t count);
 
   ktl::unique_ptr<Node[]> nodes_;
   fbl::Vector<Node*> processors_;

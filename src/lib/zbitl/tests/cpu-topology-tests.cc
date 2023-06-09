@@ -38,35 +38,35 @@ class CpuConfigPayload {
 
 class CpuTopologyPayload {
  public:
-  explicit CpuTopologyPayload(cpp20::span<const zbi_topology_node_t> nodes) : nodes_(nodes) {}
+  explicit CpuTopologyPayload(cpp20::span<const zbi_topology_node_v2_t> nodes) : nodes_(nodes) {}
 
   cpp20::span<const std::byte> as_bytes() const { return cpp20::as_bytes(nodes_); }
 
  private:
-  cpp20::span<const zbi_topology_node_t> nodes_;
+  cpp20::span<const zbi_topology_node_v2_t> nodes_;
 };
 
-void ExpectArmNodesAreEqual(const zbi_topology_node_t& expected_node,
-                            const zbi_topology_node_t& actual_node) {
+void ExpectArmNodesAreEqual(const zbi_topology_node_v2_t& expected_node,
+                            const zbi_topology_node_v2_t& actual_node) {
   ASSERT_EQ(expected_node.entity_type, actual_node.entity_type);
   EXPECT_EQ(expected_node.parent_index, actual_node.parent_index);
   switch (actual_node.entity_type) {
-    case ZBI_TOPOLOGY_ENTITY_CLUSTER: {
+    case ZBI_TOPOLOGY_ENTITY_V2_CLUSTER: {
       const zbi_topology_cluster_t& actual = actual_node.entity.cluster;
       const zbi_topology_cluster_t& expected = expected_node.entity.cluster;
       EXPECT_EQ(expected.performance_class, actual.performance_class);
       break;
     }
-    case ZBI_TOPOLOGY_ENTITY_PROCESSOR: {
-      const zbi_topology_processor_t& actual = actual_node.entity.processor;
-      const zbi_topology_processor_t& expected = expected_node.entity.processor;
+    case ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR: {
+      const zbi_topology_processor_v2_t& actual = actual_node.entity.processor;
+      const zbi_topology_processor_v2_t& expected = expected_node.entity.processor;
       ASSERT_EQ(expected.logical_id_count, actual.logical_id_count);
       for (size_t j = 0; j < actual.logical_id_count; ++j) {
         EXPECT_EQ(expected.logical_ids[j], actual.logical_ids[j]) << "logical_ids[" << j << "])";
       }
       EXPECT_EQ(actual.flags, expected.flags);
-      ASSERT_EQ(actual.architecture, ZBI_TOPOLOGY_ARCHITECTURE_ARM64);
-      ASSERT_EQ(expected.architecture, ZBI_TOPOLOGY_ARCHITECTURE_ARM64);
+      ASSERT_EQ(actual.architecture, ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64);
+      ASSERT_EQ(expected.architecture, ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64);
 
       const zbi_topology_arm64_info_t& actual_info = actual.architecture_info.arm64;
       const zbi_topology_arm64_info_t& expected_info = expected.architecture_info.arm64;
@@ -81,13 +81,13 @@ void ExpectArmNodesAreEqual(const zbi_topology_node_t& expected_node,
 }
 
 void ExpectTableHasArmNodes(const zbitl::CpuTopologyTable& table,
-                            cpp20::span<const zbi_topology_node_t> nodes) {
+                            cpp20::span<const zbi_topology_node_v2_t> nodes) {
   EXPECT_EQ(table.size(), nodes.size());
   EXPECT_EQ(table.size(), static_cast<size_t>(std::distance(table.begin(), table.end())));
   auto it = table.begin();
   for (size_t i = 0; i < nodes.size(); ++i, ++it) {
-    const zbi_topology_node_t& expected = nodes[i];
-    const zbi_topology_node_t actual = *it;
+    const zbi_topology_node_v2_t& expected = nodes[i];
+    const zbi_topology_node_v2_t actual = *it;
     ASSERT_NO_FATAL_FAILURE(ExpectArmNodesAreEqual(expected, actual)) << i;
   }
 }
@@ -103,16 +103,17 @@ TEST(CpuTopologyTableTests, BadType) {
 TEST(CpuTopologyTableTests, NoCores) {
   // CONFIG: empty payload.
   {
-    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_CPU_CONFIG, {});
+    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V1, {});
     ASSERT_TRUE(result.is_error());
     std::string_view error = std::move(result).error_value();
-    EXPECT_EQ("ZBI_TYPE_CPU_CONFIG too small for header", error);
+    EXPECT_EQ("ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V1 too small for header", error);
   }
 
   // CONFIG: empty cluster.
   {
     CpuConfigPayload payload({});
-    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_CPU_CONFIG, payload.as_bytes());
+    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V1,
+                                                       payload.as_bytes());
     ASSERT_FALSE(result.is_error()) << result.error_value();
     const auto table = std::move(result).value();
     ASSERT_NO_FATAL_FAILURE(ExpectTableHasArmNodes(table, {}));
@@ -120,23 +121,23 @@ TEST(CpuTopologyTableTests, NoCores) {
 
   // TOPOLOGY: empty payload.
   {
-    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_CPU_TOPOLOGY, {});
+    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V2, {});
     ASSERT_TRUE(result.is_error());
     std::string_view error = std::move(result).error_value();
-    EXPECT_EQ("ZBI_TYPE_CPU_TOPOLOGY payload is empty", error);
+    EXPECT_EQ("ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V2 payload is empty", error);
   }
 }
 
 TEST(CpuTopologyTableTests, SingleArmCore) {
   constexpr zbi_cpu_cluster_t kConfig[] = {{.cpu_count = 1}};
-  constexpr zbi_topology_node_t kNodes[] = {
+  constexpr zbi_topology_node_v2_t kNodes[] = {
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_CLUSTER,
           .parent_index = ZBI_TOPOLOGY_NO_PARENT,
           .entity = {.cluster = {.performance_class = 0}},
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
           .parent_index = 0,
           .entity =
               {
@@ -144,7 +145,7 @@ TEST(CpuTopologyTableTests, SingleArmCore) {
                       {
                           .logical_ids = {0},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                           .architecture_info =
                               {
                                   .arm64 =
@@ -161,14 +162,16 @@ TEST(CpuTopologyTableTests, SingleArmCore) {
 
   {
     CpuConfigPayload payload({kConfig});
-    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_CPU_CONFIG, payload.as_bytes());
+    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V1,
+                                                       payload.as_bytes());
     ASSERT_FALSE(result.is_error()) << result.error_value();
     const auto table = std::move(result).value();
     ASSERT_NO_FATAL_FAILURE(ExpectTableHasArmNodes(table, {kNodes}));
   }
   {
     CpuTopologyPayload payload({kNodes});
-    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_CPU_TOPOLOGY, payload.as_bytes());
+    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V2,
+                                                       payload.as_bytes());
     ASSERT_FALSE(result.is_error()) << result.error_value();
     const auto table = std::move(result).value();
     ASSERT_NO_FATAL_FAILURE(ExpectTableHasArmNodes(table, {kNodes}));
@@ -177,14 +180,14 @@ TEST(CpuTopologyTableTests, SingleArmCore) {
 
 TEST(CpuTopologyTableTests, TwoArmCoresAcrossOneCluster) {
   constexpr zbi_cpu_cluster_t kConfig[] = {{.cpu_count = 2}};
-  constexpr zbi_topology_node_t kNodes[] = {
+  constexpr zbi_topology_node_v2_t kNodes[] = {
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_CLUSTER,
           .parent_index = ZBI_TOPOLOGY_NO_PARENT,
           .entity = {.cluster = {.performance_class = 0}},
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
           .parent_index = 0,
           .entity =
               {
@@ -192,7 +195,7 @@ TEST(CpuTopologyTableTests, TwoArmCoresAcrossOneCluster) {
                       {
                           .logical_ids = {0},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                           .architecture_info =
                               {
                                   .arm64 =
@@ -206,7 +209,7 @@ TEST(CpuTopologyTableTests, TwoArmCoresAcrossOneCluster) {
               },
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
           .parent_index = 0,
           .entity =
               {
@@ -214,7 +217,7 @@ TEST(CpuTopologyTableTests, TwoArmCoresAcrossOneCluster) {
                       {
                           .logical_ids = {1},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                           .architecture_info =
                               {
                                   .arm64 =
@@ -231,14 +234,16 @@ TEST(CpuTopologyTableTests, TwoArmCoresAcrossOneCluster) {
 
   {
     CpuConfigPayload payload({kConfig});
-    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_CPU_CONFIG, payload.as_bytes());
+    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V1,
+                                                       payload.as_bytes());
     ASSERT_FALSE(result.is_error()) << result.error_value();
     const auto table = std::move(result).value();
     ASSERT_NO_FATAL_FAILURE(ExpectTableHasArmNodes(table, {kNodes}));
   }
   {
     CpuTopologyPayload payload({kNodes});
-    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_CPU_TOPOLOGY, payload.as_bytes());
+    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V2,
+                                                       payload.as_bytes());
     ASSERT_FALSE(result.is_error()) << result.error_value();
     const auto table = std::move(result).value();
     ASSERT_NO_FATAL_FAILURE(ExpectTableHasArmNodes(table, {kNodes}));
@@ -247,14 +252,14 @@ TEST(CpuTopologyTableTests, TwoArmCoresAcrossOneCluster) {
 
 TEST(CpuTopologyTableTests, FourArmCoresAcrossOneCluster) {
   constexpr zbi_cpu_cluster_t kConfig[] = {{.cpu_count = 4}};
-  constexpr zbi_topology_node_t kNodes[] = {
+  constexpr zbi_topology_node_v2_t kNodes[] = {
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_CLUSTER,
           .parent_index = ZBI_TOPOLOGY_NO_PARENT,
           .entity = {.cluster = {.performance_class = 0}},
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
           .parent_index = 0,
           .entity =
               {
@@ -262,7 +267,7 @@ TEST(CpuTopologyTableTests, FourArmCoresAcrossOneCluster) {
                       {
                           .logical_ids = {0},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                           .architecture_info =
                               {
                                   .arm64 =
@@ -276,7 +281,7 @@ TEST(CpuTopologyTableTests, FourArmCoresAcrossOneCluster) {
               },
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
           .parent_index = 0,
           .entity =
               {
@@ -284,7 +289,7 @@ TEST(CpuTopologyTableTests, FourArmCoresAcrossOneCluster) {
                       {
                           .logical_ids = {1},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                           .architecture_info =
                               {
                                   .arm64 =
@@ -298,7 +303,7 @@ TEST(CpuTopologyTableTests, FourArmCoresAcrossOneCluster) {
               },
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
           .parent_index = 0,
           .entity =
               {
@@ -306,7 +311,7 @@ TEST(CpuTopologyTableTests, FourArmCoresAcrossOneCluster) {
                       {
                           .logical_ids = {2},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                           .architecture_info =
                               {
                                   .arm64 =
@@ -320,7 +325,7 @@ TEST(CpuTopologyTableTests, FourArmCoresAcrossOneCluster) {
               },
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
           .parent_index = 0,
           .entity =
               {
@@ -328,7 +333,7 @@ TEST(CpuTopologyTableTests, FourArmCoresAcrossOneCluster) {
                       {
                           .logical_ids = {3},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                           .architecture_info =
                               {
                                   .arm64 =
@@ -345,14 +350,16 @@ TEST(CpuTopologyTableTests, FourArmCoresAcrossOneCluster) {
 
   {
     CpuConfigPayload payload({kConfig});
-    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_CPU_CONFIG, payload.as_bytes());
+    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V1,
+                                                       payload.as_bytes());
     ASSERT_FALSE(result.is_error()) << result.error_value();
     const auto table = std::move(result).value();
     ASSERT_NO_FATAL_FAILURE(ExpectTableHasArmNodes(table, {kNodes}));
   }
   {
     CpuTopologyPayload payload({kNodes});
-    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_CPU_TOPOLOGY, payload.as_bytes());
+    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V2,
+                                                       payload.as_bytes());
     ASSERT_FALSE(result.is_error()) << result.error_value();
     const auto table = std::move(result).value();
     ASSERT_NO_FATAL_FAILURE(ExpectTableHasArmNodes(table, {kNodes}));
@@ -361,14 +368,14 @@ TEST(CpuTopologyTableTests, FourArmCoresAcrossOneCluster) {
 
 TEST(CpuTopologyTableTests, TwoArmCoresAcrossTwoClusters) {
   constexpr zbi_cpu_cluster_t kConfig[] = {{.cpu_count = 1}, {.cpu_count = 1}};
-  constexpr zbi_topology_node_t kNodes[] = {
+  constexpr zbi_topology_node_v2_t kNodes[] = {
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_CLUSTER,
           .parent_index = ZBI_TOPOLOGY_NO_PARENT,
           .entity = {.cluster = {.performance_class = 0}},
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
           .parent_index = 0,
           .entity =
               {
@@ -376,7 +383,7 @@ TEST(CpuTopologyTableTests, TwoArmCoresAcrossTwoClusters) {
                       {
                           .logical_ids = {0},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                           .architecture_info =
                               {
                                   .arm64 =
@@ -390,12 +397,12 @@ TEST(CpuTopologyTableTests, TwoArmCoresAcrossTwoClusters) {
               },
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_CLUSTER,
           .parent_index = ZBI_TOPOLOGY_NO_PARENT,
           .entity = {.cluster = {.performance_class = 1}},
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
           .parent_index = 2,
           .entity =
               {
@@ -403,7 +410,7 @@ TEST(CpuTopologyTableTests, TwoArmCoresAcrossTwoClusters) {
                       {
                           .logical_ids = {1},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                           .architecture_info =
                               {
                                   .arm64 =
@@ -420,14 +427,16 @@ TEST(CpuTopologyTableTests, TwoArmCoresAcrossTwoClusters) {
 
   {
     CpuConfigPayload payload({kConfig});
-    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_CPU_CONFIG, payload.as_bytes());
+    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V1,
+                                                       payload.as_bytes());
     ASSERT_FALSE(result.is_error()) << result.error_value();
     const auto table = std::move(result).value();
     ASSERT_NO_FATAL_FAILURE(ExpectTableHasArmNodes(table, {kNodes}));
   }
   {
     CpuTopologyPayload payload({kNodes});
-    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_CPU_TOPOLOGY, payload.as_bytes());
+    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V2,
+                                                       payload.as_bytes());
     ASSERT_FALSE(result.is_error()) << result.error_value();
     const auto table = std::move(result).value();
     ASSERT_NO_FATAL_FAILURE(ExpectTableHasArmNodes(table, {kNodes}));
@@ -436,14 +445,14 @@ TEST(CpuTopologyTableTests, TwoArmCoresAcrossTwoClusters) {
 
 TEST(CpuTopologyTableTests, SixArmCoresAcrossThreeClusters) {
   constexpr zbi_cpu_cluster_t kConfig[] = {{.cpu_count = 1}, {.cpu_count = 3}, {.cpu_count = 2}};
-  constexpr zbi_topology_node_t kNodes[] = {
+  constexpr zbi_topology_node_v2_t kNodes[] = {
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_CLUSTER,
           .parent_index = ZBI_TOPOLOGY_NO_PARENT,
           .entity = {.cluster = {.performance_class = 0}},
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
           .parent_index = 0,
           .entity =
               {
@@ -451,7 +460,7 @@ TEST(CpuTopologyTableTests, SixArmCoresAcrossThreeClusters) {
                       {
                           .logical_ids = {0},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                           .architecture_info =
                               {
                                   .arm64 =
@@ -465,12 +474,12 @@ TEST(CpuTopologyTableTests, SixArmCoresAcrossThreeClusters) {
               },
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_CLUSTER,
           .parent_index = ZBI_TOPOLOGY_NO_PARENT,
           .entity = {.cluster = {.performance_class = 1}},
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
           .parent_index = 2,
           .entity =
               {
@@ -478,7 +487,7 @@ TEST(CpuTopologyTableTests, SixArmCoresAcrossThreeClusters) {
                       {
                           .logical_ids = {1},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                           .architecture_info =
                               {
                                   .arm64 =
@@ -492,7 +501,7 @@ TEST(CpuTopologyTableTests, SixArmCoresAcrossThreeClusters) {
               },
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
           .parent_index = 2,
           .entity =
               {
@@ -500,7 +509,7 @@ TEST(CpuTopologyTableTests, SixArmCoresAcrossThreeClusters) {
                       {
                           .logical_ids = {2},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                           .architecture_info =
                               {
                                   .arm64 =
@@ -514,7 +523,7 @@ TEST(CpuTopologyTableTests, SixArmCoresAcrossThreeClusters) {
               },
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
           .parent_index = 2,
           .entity =
               {
@@ -522,7 +531,7 @@ TEST(CpuTopologyTableTests, SixArmCoresAcrossThreeClusters) {
                       {
                           .logical_ids = {3},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                           .architecture_info =
                               {
                                   .arm64 =
@@ -536,12 +545,12 @@ TEST(CpuTopologyTableTests, SixArmCoresAcrossThreeClusters) {
               },
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_CLUSTER,
           .parent_index = ZBI_TOPOLOGY_NO_PARENT,
           .entity = {.cluster = {.performance_class = 2}},
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
           .parent_index = 6,
           .entity =
               {
@@ -549,7 +558,7 @@ TEST(CpuTopologyTableTests, SixArmCoresAcrossThreeClusters) {
                       {
                           .logical_ids = {4},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                           .architecture_info =
                               {
                                   .arm64 =
@@ -563,7 +572,7 @@ TEST(CpuTopologyTableTests, SixArmCoresAcrossThreeClusters) {
               },
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
           .parent_index = 6,
           .entity =
               {
@@ -571,7 +580,7 @@ TEST(CpuTopologyTableTests, SixArmCoresAcrossThreeClusters) {
                       {
                           .logical_ids = {5},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                           .architecture_info =
                               {
                                   .arm64 =
@@ -588,14 +597,16 @@ TEST(CpuTopologyTableTests, SixArmCoresAcrossThreeClusters) {
 
   {
     CpuConfigPayload payload({kConfig});
-    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_CPU_CONFIG, payload.as_bytes());
+    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V1,
+                                                       payload.as_bytes());
     ASSERT_FALSE(result.is_error()) << result.error_value();
     const auto table = std::move(result).value();
     ASSERT_NO_FATAL_FAILURE(ExpectTableHasArmNodes(table, {kNodes}));
   }
   {
     CpuTopologyPayload payload({kNodes});
-    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_CPU_TOPOLOGY, payload.as_bytes());
+    auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V2,
+                                                       payload.as_bytes());
     ASSERT_FALSE(result.is_error()) << result.error_value();
     const auto table = std::move(result).value();
     ASSERT_NO_FATAL_FAILURE(ExpectTableHasArmNodes(table, {kNodes}));
@@ -604,14 +615,14 @@ TEST(CpuTopologyTableTests, SixArmCoresAcrossThreeClusters) {
 
 TEST(CpuTopologyTableTests, Sherlock) {
   // The CPU topology of the Sherlock board.
-  constexpr zbi_topology_node_t kSherlockNodes[] = {
+  constexpr zbi_topology_node_v2_t kSherlockNodes[] = {
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_CLUSTER,
           .parent_index = 0,
           .entity = {.cluster = {.performance_class = 0}},
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
           .parent_index = 0,
           .entity =
               {
@@ -620,7 +631,7 @@ TEST(CpuTopologyTableTests, Sherlock) {
                           .logical_ids = {0},
                           .logical_id_count = 1,
                           .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
-                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                           .architecture_info =
                               {
                                   .arm64 =
@@ -634,7 +645,7 @@ TEST(CpuTopologyTableTests, Sherlock) {
               },
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
           .parent_index = 0,
           .entity =
               {
@@ -643,7 +654,7 @@ TEST(CpuTopologyTableTests, Sherlock) {
                           .logical_ids = {1},
                           .logical_id_count = 1,
                           .flags = 0,
-                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                           .architecture_info =
                               {
                                   .arm64 =
@@ -657,12 +668,12 @@ TEST(CpuTopologyTableTests, Sherlock) {
               },
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_CLUSTER,
           .parent_index = 0,
           .entity = {.cluster = {.performance_class = 1}},
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
           .parent_index = 3,
           .entity =
               {
@@ -671,7 +682,7 @@ TEST(CpuTopologyTableTests, Sherlock) {
                           .logical_ids = {2},
                           .logical_id_count = 1,
                           .flags = 0,
-                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                           .architecture_info =
                               {
                                   .arm64 =
@@ -685,7 +696,7 @@ TEST(CpuTopologyTableTests, Sherlock) {
               },
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
           .parent_index = 3,
           .entity =
               {
@@ -694,7 +705,7 @@ TEST(CpuTopologyTableTests, Sherlock) {
                           .logical_ids = {3},
                           .logical_id_count = 1,
                           .flags = 0,
-                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                           .architecture_info =
                               {
                                   .arm64 =
@@ -708,7 +719,7 @@ TEST(CpuTopologyTableTests, Sherlock) {
               },
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
           .parent_index = 3,
           .entity =
               {
@@ -717,7 +728,7 @@ TEST(CpuTopologyTableTests, Sherlock) {
                           .logical_ids = {4},
                           .logical_id_count = 1,
                           .flags = 0,
-                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                           .architecture_info =
                               {
                                   .arm64 =
@@ -731,7 +742,7 @@ TEST(CpuTopologyTableTests, Sherlock) {
               },
       },
       {
-          .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+          .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
           .parent_index = 3,
           .entity =
               {
@@ -740,7 +751,7 @@ TEST(CpuTopologyTableTests, Sherlock) {
                           .logical_ids = {5},
                           .logical_id_count = 1,
                           .flags = 0,
-                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                           .architecture_info =
                               {
                                   .arm64 =
@@ -756,7 +767,8 @@ TEST(CpuTopologyTableTests, Sherlock) {
   };
 
   CpuTopologyPayload payload({kSherlockNodes});
-  auto result = zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_CPU_TOPOLOGY, payload.as_bytes());
+  auto result =
+      zbitl::CpuTopologyTable::FromPayload(ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V2, payload.as_bytes());
   ASSERT_FALSE(result.is_error()) << result.error_value();
   const auto table = std::move(result).value();
   ASSERT_NO_FATAL_FAILURE(ExpectTableHasArmNodes(table, {kSherlockNodes}));

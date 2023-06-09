@@ -133,16 +133,6 @@ type Type = flexible enum : uint32 {
     /// mBSI
     DRV_BOARD_INFO = 0x49534200 | TYPE_DRIVER_METADATA_PREFIX;
 
-    /// Legacy CPU configuration. See zbi_cpu_config_t for a description of the payload.
-    ///
-    /// 'CPUC'
-    CPU_CONFIG = 0x43555043;
-
-    /// CPU configuration. See zbi_topology_node_t for a description of the payload.
-    ///
-    /// 'TOPO'
-    CPU_TOPOLOGY = 0x544f504f;
-
     /// Device memory configuration. See zbi_mem_range_t for a description of the
     /// payload.
     ///

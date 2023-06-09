@@ -8,8 +8,8 @@
 #define ZIRCON_KERNEL_TARGET_ARM64_BOARD_QEMU_BOOT_SHIM_CONFIG_H_
 
 #include <lib/zbi-format/board.h>
-#include <lib/zbi-format/cpu.h>
 #include <lib/zbi-format/driver-config.h>
+#include <lib/zbi-format/internal/deprecated-cpu.h>
 #include <lib/zbi-format/memory.h>
 #include <lib/zbi-format/zbi.h>
 
@@ -78,7 +78,7 @@ static int saved_gic_version = -1;
 static void set_gic_version(int gic_version) { saved_gic_version = gic_version; }
 
 static void add_cpu_topology(zbi_header_t* zbi) {
-  zbi_topology_node_t nodes[MAX_CPU_COUNT];
+  zbi_topology_node_v2_t nodes[MAX_CPU_COUNT];
 
   // clamp to the max cpu
   if (cpu_count > MAX_CPU_COUNT) {
@@ -87,15 +87,15 @@ static void add_cpu_topology(zbi_header_t* zbi) {
 
   // clang-format off
   for (size_t index = 0; index < cpu_count; index++) {
-    nodes[index] = (zbi_topology_node_t){
-        .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+    nodes[index] = (zbi_topology_node_v2_t){
+        .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
         .parent_index = ZBI_TOPOLOGY_NO_PARENT,
         .entity = {
           .processor = {
             .logical_ids = {(uint16_t)index},
             .logical_id_count = 1,
             .flags = (index == 0) ? ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY : (zbi_topology_processor_flags_t)0,
-            .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+            .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
             .architecture_info = {
               .arm64 = {
                 // qemu seems to put 16 cores per aff0 level, max 32 cores.
@@ -110,9 +110,9 @@ static void add_cpu_topology(zbi_header_t* zbi) {
   }
   // clang-format on
 
-  const uint32_t length = (uint32_t)(sizeof(zbi_topology_node_t) * cpu_count);
-  append_boot_item(zbi, ZBI_TYPE_CPU_TOPOLOGY,
-                   sizeof(zbi_topology_node_t),  // Extra
+  const uint32_t length = (uint32_t)(sizeof(zbi_topology_node_v2_t) * cpu_count);
+  append_boot_item(zbi, ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V2,
+                   sizeof(zbi_topology_node_v2_t),  // Extra
                    &nodes, length);
 }
 

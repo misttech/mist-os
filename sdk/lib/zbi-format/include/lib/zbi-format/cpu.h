@@ -18,14 +18,6 @@ typedef uint16_t zbi_topology_processor_flags_t;
 // not have one.
 #define ZBI_TOPOLOGY_PROCESSOR_FLAGS_INTERRUPT ((zbi_topology_processor_flags_t)(1u << 1))
 
-typedef uint8_t zbi_topology_architecture_t;
-
-// Intended primarily for testing.
-#define ZBI_TOPOLOGY_ARCHITECTURE_UNDEFINED ((zbi_topology_architecture_t)(0u))
-#define ZBI_TOPOLOGY_ARCHITECTURE_X64 ((zbi_topology_architecture_t)(1u))
-#define ZBI_TOPOLOGY_ARCHITECTURE_ARM64 ((zbi_topology_architecture_t)(2u))
-#define ZBI_TOPOLOGY_ARCHITECTURE_RISCV64 ((zbi_topology_architecture_t)(3u))
-
 typedef struct {
   // Cluster ids for each level, one being closest to the cpu.
   // These map to aff1, aff2, and aff3 values in the ARM registers.
@@ -54,22 +46,6 @@ typedef struct {
 } zbi_topology_riscv64_info_t;
 
 typedef struct {
-  uint16_t logical_ids[ZBI_MAX_SMT];
-  uint8_t logical_id_count;
-
-  zbi_topology_processor_flags_t flags;
-
-  // If UNDEFINED then nothing will be set in arch_info.
-  zbi_topology_architecture_t architecture;
-  union {
-    zbi_topology_arm64_info_t arm64;
-    zbi_topology_x64_info_t x64;
-    zbi_topology_riscv64_info_t riscv64;
-  } architecture_info;
-
-} zbi_topology_processor_t;
-
-typedef struct {
   // Relative performance level of this processor in the system. The value is
   // interpreted as the performance of this processor relative to the maximum
   // performance processor in the system. No specific values are required for
@@ -96,38 +72,6 @@ typedef struct {
   uint32_t cache_id;
 } zbi_topology_cache_t;
 
-typedef struct {
-  // Starting and ending memory addresses of this numa region.
-  uint64_t start_address;
-  uint64_t end_address;
-} zbi_topology_numa_region_t;
-
-typedef uint8_t zbi_topology_entity_type_t;
-
-// Unused default.
-#define ZBI_TOPOLOGY_ENTITY_UNDEFINED ((zbi_topology_entity_type_t)(0u))
-#define ZBI_TOPOLOGY_ENTITY_PROCESSOR ((zbi_topology_entity_type_t)(1u))
-#define ZBI_TOPOLOGY_ENTITY_CLUSTER ((zbi_topology_entity_type_t)(2u))
-#define ZBI_TOPOLOGY_ENTITY_CACHE ((zbi_topology_entity_type_t)(3u))
-#define ZBI_TOPOLOGY_ENTITY_DIE ((zbi_topology_entity_type_t)(4u))
-#define ZBI_TOPOLOGY_ENTITY_SOCKET ((zbi_topology_entity_type_t)(5u))
-#define ZBI_TOPOLOGY_ENTITY_POWER_PLANE ((zbi_topology_entity_type_t)(6u))
-#define ZBI_TOPOLOGY_ENTITY_NUMA_REGION ((zbi_topology_entity_type_t)(7u))
-
 #define ZBI_TOPOLOGY_NO_PARENT ((uint16_t)(0xffffu))
-
-// The ZBI_TYPE_CPU_TOPOLOGY consists of an array of zbi_topology_node_t,
-// giving a flattened tree-like description of the CPU configuration
-// according to the zbi_topology_entity_type_t hierarchy.
-typedef struct {
-  zbi_topology_entity_type_t entity_type;
-  uint16_t parent_index;
-  union {
-    zbi_topology_processor_t processor;
-    zbi_topology_cluster_t cluster;
-    zbi_topology_numa_region_t numa_region;
-    zbi_topology_cache_t cache;
-  } entity;
-} zbi_topology_node_t;
 
 #endif  // LIB_ZBI_FORMAT_CPU_H_

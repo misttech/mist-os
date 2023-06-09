@@ -5,6 +5,7 @@
 #ifndef SRC_LIB_ZBITL_INCLUDE_LIB_ZBITL_ITEM_H_
 #define SRC_LIB_ZBITL_INCLUDE_LIB_ZBITL_ITEM_H_
 
+#include <lib/zbi-format/internal/deprecated-cpu.h>
 #include <lib/zbi-format/zbi.h>
 
 #include <array>
@@ -18,10 +19,7 @@ namespace zbitl {
 // <lib/zbi-format/zbi.h>.
 //
 // TODO(fxbug.dev/127846): Consider some way of generating this.
-//
-// TODO(fxbug.dev/111453): `std::array kItemTypes = {...}` once item types are
-// defined as uint32_t literals.
-constexpr std::array<uint32_t, 33> kItemTypes = {
+inline constexpr std::array kItemTypes = {
     ZBI_TYPE_CONTAINER,
     ZBI_TYPE_KERNEL_X64,
     ZBI_TYPE_KERNEL_ARM64,
@@ -35,8 +33,8 @@ constexpr std::array<uint32_t, 33> kItemTypes = {
     ZBI_TYPE_CRASHLOG,
     ZBI_TYPE_NVRAM,
     ZBI_TYPE_PLATFORM_ID,
-    ZBI_TYPE_CPU_CONFIG,
-    ZBI_TYPE_CPU_TOPOLOGY,
+    ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V1,
+    ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V2,
     ZBI_TYPE_MEM_CONFIG,
     ZBI_TYPE_KERNEL_DRIVER,
     ZBI_TYPE_ACPI_RSDP,

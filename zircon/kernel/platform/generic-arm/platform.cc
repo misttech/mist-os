@@ -113,15 +113,15 @@ static void halt_other_cpus(void) {
 }
 
 // Difference on SMT systems is that the AFF0 (cpu_id) level is implicit and not stored in the info.
-static uint64_t ToSmtMpid(const zbi_topology_processor_t& processor, uint8_t cpu_id) {
-  DEBUG_ASSERT(processor.architecture == ZBI_TOPOLOGY_ARCHITECTURE_ARM64);
+static uint64_t ToSmtMpid(const zbi_topology_processor_v2_t& processor, uint8_t cpu_id) {
+  DEBUG_ASSERT(processor.architecture == ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64);
   const auto& info = processor.architecture_info.arm64;
   return (uint64_t)info.cluster_3_id << 32 | info.cluster_2_id << 16 | info.cluster_1_id << 8 |
          cpu_id;
 }
 
-static uint64_t ToMpid(const zbi_topology_processor_t& processor) {
-  DEBUG_ASSERT(processor.architecture == ZBI_TOPOLOGY_ARCHITECTURE_ARM64);
+static uint64_t ToMpid(const zbi_topology_processor_v2_t& processor) {
+  DEBUG_ASSERT(processor.architecture == ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64);
   const auto& info = processor.architecture_info.arm64;
   return (uint64_t)info.cluster_3_id << 32 | info.cluster_2_id << 16 | info.cluster_1_id << 8 |
          info.cpu_id;
@@ -163,8 +163,8 @@ static zx_status_t platform_start_cpu(cpu_num_t cpu_id, uint64_t mpid) {
 
 static void topology_cpu_init(void) {
   for (auto* node : system_topology::GetSystemTopology().processors()) {
-    if (node->entity_type != ZBI_TOPOLOGY_ENTITY_PROCESSOR ||
-        node->entity.processor.architecture != ZBI_TOPOLOGY_ARCHITECTURE_ARM64) {
+    if (node->entity_type != ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR ||
+        node->entity.processor.architecture != ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64) {
       panic("Invalid processor node.");
     }
 
@@ -243,13 +243,13 @@ static void process_mem_ranges(ktl::span<const zbi_mem_range_t> ranges) {
   }
 }
 
-static constexpr zbi_topology_node_t fallback_topology = {
-    .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+static constexpr zbi_topology_node_v2_t fallback_topology = {
+    .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
     .parent_index = ZBI_TOPOLOGY_NO_PARENT,
     .entity = {.processor = {.logical_ids = {0},
                              .logical_id_count = 1,
                              .flags = 0,
-                             .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                             .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                              .architecture_info = {.arm64 = {
                                                        .cluster_1_id = 0,
                                                        .cluster_2_id = 0,

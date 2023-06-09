@@ -33,8 +33,8 @@
 #include <lib/debuglog.h>
 #include <lib/lazy_init/lazy_init.h>
 #include <lib/system-topology.h>
-#include <lib/zbi-format/cpu.h>
 #include <lib/zbi-format/driver-config.h>
+#include <lib/zbi-format/internal/deprecated-cpu.h>
 #include <lib/zbi-format/zbi.h>
 #include <mexec.h>
 #include <platform.h>
@@ -445,7 +445,7 @@ static void traverse_topology(uint32_t) {
         }
 
         // Given a level of topology, return true if the two cpus have a shared parent node.
-        auto is_shared_at_level = [&](zbi_topology_entity_type_t type) -> bool {
+        auto is_shared_at_level = [&](zbi_topology_entity_type_v2_t type) -> bool {
           const Node* from_level_node = nullptr;
           for (const Node* node = from_node->parent; node != nullptr; node = node->parent) {
             if (node->entity_type == type) {
@@ -465,19 +465,19 @@ static void traverse_topology(uint32_t) {
         };
 
         // If we've detected the same cache node, then we are level 1
-        if (is_shared_at_level(ZBI_TOPOLOGY_ENTITY_CACHE)) {
+        if (is_shared_at_level(ZBI_TOPOLOGY_ENTITY_V2_CACHE)) {
           lowest_sharing_level = ktl::min(lowest_sharing_level, 1u);
           return 1;
         }
 
         // If we're on the same die, we're level 2
-        if (is_shared_at_level(ZBI_TOPOLOGY_ENTITY_DIE)) {
+        if (is_shared_at_level(ZBI_TOPOLOGY_ENTITY_V2_DIE)) {
           lowest_sharing_level = ktl::min(lowest_sharing_level, 2u);
           return 2;
         }
 
         // If we're on the same socket, we're level 3
-        if (is_shared_at_level(ZBI_TOPOLOGY_ENTITY_SOCKET)) {
+        if (is_shared_at_level(ZBI_TOPOLOGY_ENTITY_V2_SOCKET)) {
           lowest_sharing_level = ktl::min(lowest_sharing_level, 3u);
           return 3;
         }

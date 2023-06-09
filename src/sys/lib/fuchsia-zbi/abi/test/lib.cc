@@ -35,10 +35,10 @@ size_t serialize_zbi_topology_cache_t(uint8_t buffer[], uint32_t cache_id) {
   return size;
 }
 
-size_t serialize_zbi_topology_numa_region_t(uint8_t buffer[], uint64_t start_address,
-                                            uint64_t end_address) {
-  zbi_topology_numa_region_t node = {.start_address = start_address, .end_address = end_address};
-  size_t size = sizeof(zbi_topology_numa_region_t);
+size_t serialize_zbi_topology_numa_region_v2_t(uint8_t buffer[], uint64_t start_address,
+                                               uint64_t end_address) {
+  zbi_topology_numa_region_v2_t node = {.start_address = start_address, .end_address = end_address};
+  size_t size = sizeof(zbi_topology_numa_region_v2_t);
   std::memcpy(buffer, &node, size);
   return size;
 }
@@ -50,11 +50,11 @@ size_t serialize_zbi_topology_cluster_t(uint8_t buffer[], uint8_t performance_cl
   return size;
 }
 
-size_t serialize_zbi_topology_processor_t(uint8_t buffer[], uint16_t logical_ids[],
-                                          uint8_t logical_id_count, uint16_t flags,
-                                          uint8_t architecture,
-                                          architecture_info_t architecture_info) {
-  zbi_topology_processor_t node = {
+size_t serialize_zbi_topology_processor_v2_t(uint8_t buffer[], uint16_t logical_ids[],
+                                             uint8_t logical_id_count, uint16_t flags,
+                                             uint8_t architecture,
+                                             architecture_info_t architecture_info) {
+  zbi_topology_processor_v2_t node = {
       .logical_ids = {logical_ids[0], logical_ids[1], logical_ids[2], logical_ids[3]}};
   node.logical_id_count = logical_id_count;
   node.flags = flags;
@@ -67,26 +67,26 @@ size_t serialize_zbi_topology_processor_t(uint8_t buffer[], uint16_t logical_ids
     assert(node.architecture == ZBI_TOPOLOGY_ARCHITECTURE_UNDEFINED);
   }
 
-  size_t size = sizeof(zbi_topology_processor_t);
+  size_t size = sizeof(zbi_topology_processor_v2_t);
   std::memcpy(buffer, &node, size);
   return size;
 }
 
-size_t serialize_zbi_topology_node_t(uint8_t buffer[], uint8_t entity_type, uint16_t parent_index,
-                                     entity_t entity) {
-  zbi_topology_node_t node = {.entity_type = entity_type, .parent_index = parent_index};
+size_t serialize_zbi_topology_node_v2_t(uint8_t buffer[], uint8_t entity_type,
+                                        uint16_t parent_index, entity_t entity) {
+  zbi_topology_node_v2_t node = {.entity_type = entity_type, .parent_index = parent_index};
 
-  if (node.entity_type == ZBI_TOPOLOGY_ENTITY_PROCESSOR) {
+  if (node.entity_type == ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR) {
     node.entity.processor = entity.processor;
-  } else if (node.entity_type == ZBI_TOPOLOGY_ENTITY_CLUSTER) {
+  } else if (node.entity_type == ZBI_TOPOLOGY_ENTITY_V2_CLUSTER) {
     node.entity.cluster = entity.cluster;
-  } else if (node.entity_type == ZBI_TOPOLOGY_ENTITY_NUMA_REGION) {
+  } else if (node.entity_type == ZBI_TOPOLOGY_ENTITY_V2_NUMA_REGION) {
     node.entity.numa_region = entity.numa_region;
-  } else if (node.entity_type == ZBI_TOPOLOGY_ENTITY_CACHE) {
+  } else if (node.entity_type == ZBI_TOPOLOGY_ENTITY_V2_CACHE) {
     node.entity.cache = entity.cache;
   }
 
-  size_t size = sizeof(zbi_topology_node_t);
+  size_t size = sizeof(zbi_topology_node_v2_t);
   std::memcpy(buffer, &node, size);
   return size;
 }

@@ -1,11 +1,11 @@
 {
   "pkg/zbi-format/include/lib/zbi-format/board.h": "f89f4a6adca0adac4ed86db75af2cbff",
-  "pkg/zbi-format/include/lib/zbi-format/cpu.h": "d1b95053bb275c31f341e7ded697da89",
+  "pkg/zbi-format/include/lib/zbi-format/cpu.h": "be6b9ece5bd7c75ade49477d507f73d3",
   "pkg/zbi-format/include/lib/zbi-format/driver-config.h": "4f369e61f82291792a72dd4fa7ca87f3",
   "pkg/zbi-format/include/lib/zbi-format/graphics.h": "665c232f934de8af76526e86b569d221",
   "pkg/zbi-format/include/lib/zbi-format/kernel.h": "8d043d0287db2e392d184def7d49506f",
   "pkg/zbi-format/include/lib/zbi-format/memory.h": "44a8d1c6f183d98ac5a9b655a1a33a35",
   "pkg/zbi-format/include/lib/zbi-format/partition.h": "5a0e49f2d7c624fa4b98a32bf5697c44",
   "pkg/zbi-format/include/lib/zbi-format/reboot.h": "8c3a7426b225da5c0559a39e8fd97c12",
-  "pkg/zbi-format/include/lib/zbi-format/zbi.h": "830f4830d9716356fdf8dd929e776eea"
+  "pkg/zbi-format/include/lib/zbi-format/zbi.h": "e649d9566940416c60c12dd424f97dfc"
 }

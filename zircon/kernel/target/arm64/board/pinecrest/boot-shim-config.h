@@ -8,8 +8,8 @@
 #define ZIRCON_KERNEL_TARGET_ARM64_BOARD_PINECREST_BOOT_SHIM_CONFIG_H_
 
 #include <lib/zbi-format/board.h>
-#include <lib/zbi-format/cpu.h>
 #include <lib/zbi-format/driver-config.h>
+#include <lib/zbi-format/internal/deprecated-cpu.h>
 #include <lib/zbi-format/memory.h>
 #include <lib/zbi-format/zbi.h>
 
@@ -57,11 +57,11 @@ static const zbi_platform_id_t platform_id = {
 
 static void add_cpu_topology(zbi_header_t* zbi) {
 #define TOPOLOGY_CPU_COUNT 4
-  zbi_topology_node_t nodes[TOPOLOGY_CPU_COUNT];
+  zbi_topology_node_v2_t nodes[TOPOLOGY_CPU_COUNT];
 
   for (uint8_t index = 0; index < TOPOLOGY_CPU_COUNT; index++) {
-    nodes[index] = (zbi_topology_node_t){
-        .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+    nodes[index] = (zbi_topology_node_v2_t){
+        .entity_type = ZBI_TOPOLOGY_ENTITY_V2_PROCESSOR,
         .parent_index = ZBI_TOPOLOGY_NO_PARENT,
         .entity =
             {
@@ -71,7 +71,7 @@ static void add_cpu_topology(zbi_header_t* zbi) {
                         .logical_id_count = 1,
                         .flags = index == 0 ? ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY
                                             : (zbi_topology_processor_flags_t)0,
-                        .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                        .architecture = ZBI_TOPOLOGY_ARCHITECTURE_V2_ARM64,
                         .architecture_info =
                             {
                                 .arm64 =
@@ -85,8 +85,8 @@ static void add_cpu_topology(zbi_header_t* zbi) {
     };
   }
 
-  append_boot_item(zbi, ZBI_TYPE_CPU_TOPOLOGY, sizeof(zbi_topology_node_t), &nodes,
-                   sizeof(zbi_topology_node_t) * TOPOLOGY_CPU_COUNT);
+  append_boot_item(zbi, ZBI_TYPE_DEPRECATED_CPU_TOPOLOGY_V2, sizeof(zbi_topology_node_v2_t), &nodes,
+                   sizeof(zbi_topology_node_v2_t) * TOPOLOGY_CPU_COUNT);
 }
 
 static void append_board_boot_item(zbi_header_t* bootdata) {
