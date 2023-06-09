@@ -70,7 +70,7 @@ type ClientCompositionOpcode = strict enum : uint8 {
 type ClientCompositionOp = struct {
     /// display_id and layer_id uniquely identify the subject of the
     /// opcode.
-    display_id DisplayId;
+    display_id DisplayIdValue;
     /// layer_id is 0 for whole-display issues like unsupported color
     /// conversion and gamma tables.
     layer_id uint64;
