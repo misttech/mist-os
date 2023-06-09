@@ -489,8 +489,8 @@ where
         let local_child_svc_dir = vfs::pseudo_directory! {};
 
         let mut boot_arguments_service = MockBootArgumentsService::new(HashMap::new());
-        if let Some(hash) = system_image {
-            boot_arguments_service.insert_pkgfs_boot_arg(hash)
+        if let Some(hash) = &system_image {
+            boot_arguments_service.insert_pkgfs_boot_arg(*hash)
         }
         let boot_arguments_service = Arc::new(boot_arguments_service);
         local_child_svc_dir
@@ -686,6 +686,12 @@ where
                     .await
                     .unwrap();
             }
+        }
+
+        if system_image.is_none() {
+            let () = builder.init_mutable_config_from_package(&pkg_cache).await.unwrap();
+            let () =
+                builder.set_config_value_bool(&pkg_cache, "use_system_image", false).await.unwrap();
         }
 
         builder

@@ -135,11 +135,16 @@ async fn separate_blobs_url() {
     env.stop().await;
 }
 
+// `alter_env` is called immediately before resolving `pkg`.
+// The backing blobfs is empty before the resolve.
 async fn verify_resolve_with_altered_env(
     pkg: Package,
     alter_env: impl FnOnce(&TestEnv, &Package),
 ) -> () {
-    let env = TestEnvBuilder::new().build().await;
+    let env = TestEnvBuilder::new()
+        .blobfs_and_system_image_hash(blobfs_ramdisk::BlobfsRamdisk::start().await.unwrap(), None)
+        .build()
+        .await;
 
     let mut startup_blobs = env.blobfs.list_blobs().unwrap();
 
@@ -157,6 +162,18 @@ async fn verify_resolve_with_altered_env(
 
     let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
 
+    // Verify nothing in the setup added any blobs to blobfs.
+    assert_eq!(
+        env.blobfs
+            .root_dir()
+            .unwrap()
+            .list_dir(".")
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_str().unwrap().to_owned())
+            .collect::<Vec<_>>(),
+        Vec::<String>::new()
+    );
+
     alter_env(&env, &pkg);
 
     let pkg_url = format!("fuchsia-pkg://test/{}", pkg.name());
@@ -172,6 +189,7 @@ async fn verify_resolve_with_altered_env(
     env.stop().await;
 }
 
+// The backing blobfs is empty before the resolve.
 fn verify_resolve(pkg: Package) -> impl Future<Output = ()> {
     verify_resolve_with_altered_env(pkg, |_, _| {})
 }

@@ -8,7 +8,7 @@
 //! Typesafe wrappers around the /blob filesystem.
 
 use {
-    fidl::endpoints::ServerEnd,
+    fidl::endpoints::{Proxy as _, ServerEnd},
     fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
     fuchsia_hash::{Hash, ParseHashError},
     fuchsia_zircon::{self as zx, AsHandleRef as _, Status},
@@ -18,7 +18,6 @@ use {
     tracing::warn,
 };
 
-pub mod blob;
 pub mod mock;
 pub use mock::Mock;
 
@@ -43,6 +42,20 @@ pub enum BlobfsError {
 
     #[error("FIDL error")]
     Fidl(#[from] fidl::Error),
+}
+
+/// An error encountered while creating a blob
+#[derive(Debug, Error)]
+#[allow(missing_docs)]
+pub enum CreateError {
+    #[error("the blob already exists or is being concurrently written")]
+    AlreadyExists,
+
+    #[error("while creating the blob")]
+    Io(#[source] fuchsia_fs::node::OpenError),
+
+    #[error("while converting the proxy into a client end")]
+    ConvertToClientEnd,
 }
 
 /// Blobfs client
@@ -203,12 +216,40 @@ impl Client {
     }
 
     /// Open a new blob for write.
+    pub async fn open_blob_proxy_for_write(
+        &self,
+        blob: &Hash,
+        blob_type: fpkg::BlobType,
+    ) -> Result<fio::FileProxy, CreateError> {
+        let flags = fio::OpenFlags::CREATE
+            | fio::OpenFlags::RIGHT_WRITABLE
+            | fio::OpenFlags::RIGHT_READABLE;
+
+        let path = match blob_type {
+            fpkg::BlobType::Uncompressed => blob.to_string(),
+            fpkg::BlobType::Delivery => format!("v1-{blob}"),
+        };
+        fuchsia_fs::directory::open_file(&self.proxy, &path, flags).await.map_err(|e| match e {
+            fuchsia_fs::node::OpenError::OpenError(Status::ACCESS_DENIED) => {
+                CreateError::AlreadyExists
+            }
+            other => CreateError::Io(other),
+        })
+    }
+
+    /// Open a new blob for write.
     pub async fn open_blob_for_write(
         &self,
         blob: &Hash,
         blob_type: fpkg::BlobType,
-    ) -> Result<blob::Blob<blob::NeedsTruncate>, blob::CreateError> {
-        blob::create(&self.proxy, blob, blob_type).await
+    ) -> Result<fidl::endpoints::ClientEnd<fio::FileMarker>, CreateError> {
+        Ok(self
+            .open_blob_proxy_for_write(blob, blob_type)
+            .await?
+            .into_channel()
+            .map_err(|_: fio::FileProxy| CreateError::ConvertToClientEnd)?
+            .into_zx_channel()
+            .into())
     }
 
     /// Returns whether blobfs has a blob with the given hash.
@@ -480,68 +521,96 @@ mod tests {
         blobfs.stop().await.unwrap();
     }
 
-    /// Wrapper for a blob and its hash. This lets the tests retain ownership of the Blob struct,
+    async fn resize(blob: &fio::FileProxy, size: usize) {
+        let () = blob.resize(size as u64).await.unwrap().map_err(Status::from_raw).unwrap();
+    }
+
+    async fn write(blob: &fio::FileProxy, bytes: &[u8]) {
+        assert_eq!(
+            blob.write(bytes).await.unwrap().map_err(Status::from_raw).unwrap(),
+            bytes.len() as u64
+        );
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn write_uncompressed_blob() {
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
+        let client = Client::for_ramdisk(&blobfs);
+
+        let content = [3; 1024];
+        let hash = MerkleTree::from_reader(&content[..]).unwrap().root();
+
+        let proxy =
+            client.open_blob_proxy_for_write(&hash, fpkg::BlobType::Uncompressed).await.unwrap();
+
+        let () = resize(&proxy, content.len()).await;
+        let () = write(&proxy, &content).await;
+
+        assert!(client.has_blob(&hash).await);
+
+        blobfs.stop().await.unwrap();
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn write_delivery_blob() {
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
+        let client = Client::for_ramdisk(&blobfs);
+
+        let content = [3; 1024];
+        let hash = MerkleTree::from_reader(&content[..]).unwrap().root();
+        let delivery_content =
+            fuchsia_pkg_testing::generate_delivery_blob(&content, 1).await.unwrap();
+
+        let proxy =
+            client.open_blob_proxy_for_write(&hash, fpkg::BlobType::Delivery).await.unwrap();
+
+        let () = resize(&proxy, delivery_content.len()).await;
+        let () = write(&proxy, &delivery_content).await;
+
+        assert!(client.has_blob(&hash).await);
+
+        blobfs.stop().await.unwrap();
+    }
+
+    /// Wrapper for a blob and its hash. This lets the tests retain ownership of the Blob,
     /// which is important because it ensures blobfs will not close partially written blobs for the
     /// duration of the test.
-    struct TestBlob<S> {
-        _blob: blob::Blob<S>,
+    struct TestBlob {
+        _blob: fio::FileProxy,
         hash: Hash,
     }
 
-    async fn open_blob_only(client: &Client, blob: &[u8; 1024]) -> TestBlob<blob::NeedsTruncate> {
+    async fn open_blob_only(client: &Client, blob: &[u8; 1024]) -> TestBlob {
         let hash = MerkleTree::from_reader(&blob[..]).unwrap().root();
-        let blob = client.open_blob_for_write(&hash, fpkg::BlobType::Uncompressed).await.unwrap();
-        TestBlob { _blob: blob, hash }
+        let _blob =
+            client.open_blob_proxy_for_write(&hash, fpkg::BlobType::Uncompressed).await.unwrap();
+        TestBlob { _blob, hash }
     }
 
-    async fn open_and_truncate_blob(
-        client: &Client,
-        blob: &[u8; 1024],
-    ) -> TestBlob<blob::NeedsData> {
-        let hash = MerkleTree::from_reader(&blob[..]).unwrap().root();
-        let blob = client
-            .open_blob_for_write(&hash, fpkg::BlobType::Uncompressed)
-            .await
-            .unwrap()
-            .truncate(blob.len() as u64)
-            .await
-            .unwrap()
-            .unwrap_needs_data();
-        TestBlob { _blob: blob, hash }
+    async fn open_and_truncate_blob(client: &Client, content: &[u8; 1024]) -> TestBlob {
+        let hash = MerkleTree::from_reader(&content[..]).unwrap().root();
+        let _blob =
+            client.open_blob_proxy_for_write(&hash, fpkg::BlobType::Uncompressed).await.unwrap();
+        let () = resize(&_blob, content.len()).await;
+        TestBlob { _blob, hash }
     }
 
-    async fn partially_write_blob(client: &Client, blob: &[u8; 1024]) -> TestBlob<blob::NeedsData> {
-        let hash = MerkleTree::from_reader(&blob[..]).unwrap().root();
-        let blob = client
-            .open_blob_for_write(&hash, fpkg::BlobType::Uncompressed)
-            .await
-            .unwrap()
-            .truncate(blob.len() as u64)
-            .await
-            .unwrap()
-            .unwrap_needs_data()
-            .write(&blob[..512])
-            .await
-            .unwrap()
-            .unwrap_more_to_write();
-        TestBlob { _blob: blob, hash }
+    async fn partially_write_blob(client: &Client, content: &[u8; 1024]) -> TestBlob {
+        let hash = MerkleTree::from_reader(&content[..]).unwrap().root();
+        let _blob =
+            client.open_blob_proxy_for_write(&hash, fpkg::BlobType::Uncompressed).await.unwrap();
+        let () = resize(&_blob, content.len()).await;
+        let () = write(&_blob, &content[..512]).await;
+        TestBlob { _blob, hash }
     }
 
-    async fn fully_write_blob(client: &Client, blob: &[u8; 1024]) -> TestBlob<blob::AtEof> {
-        let hash = MerkleTree::from_reader(&blob[..]).unwrap().root();
-        let blob = client
-            .open_blob_for_write(&hash, fpkg::BlobType::Uncompressed)
-            .await
-            .unwrap()
-            .truncate(blob.len() as u64)
-            .await
-            .unwrap()
-            .unwrap_needs_data()
-            .write(&blob[..])
-            .await
-            .unwrap()
-            .unwrap_done();
-        TestBlob { _blob: blob, hash }
+    async fn fully_write_blob(client: &Client, content: &[u8; 1024]) -> TestBlob {
+        let hash = MerkleTree::from_reader(&content[..]).unwrap().root();
+        let _blob =
+            client.open_blob_proxy_for_write(&hash, fpkg::BlobType::Uncompressed).await.unwrap();
+        let () = resize(&_blob, content.len()).await;
+        let () = write(&_blob, content).await;
+        TestBlob { _blob, hash }
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -768,7 +837,7 @@ mod tests {
 
         assert_matches!(
             blobfs.open_blob_for_write(&Hash::from([0; 32]), fpkg::BlobType::Uncompressed).await,
-            Err(blob::CreateError::AlreadyExists)
+            Err(CreateError::AlreadyExists)
         );
     }
 }

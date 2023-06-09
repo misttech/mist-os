@@ -32,11 +32,9 @@ rustc_library("blobfs") {
     "//src/sys/pkg/testing/blobfs-ramdisk",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:maplit",
-    "//third_party/rust_crates:rand",
   ]
 
   sources = [
-    "src/blob.rs",
     "src/lib.rs",
     "src/mock.rs",
   ]

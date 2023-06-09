@@ -387,6 +387,30 @@ async fn open_resize_wait_for_signal() -> Result<(), Error> {
 }
 
 #[fuchsia_async::run_singlethreaded(test)]
+async fn empty_blob_readable_after_resize() {
+    let empty_hash = MerkleTree::from_reader(&[][..]).unwrap().root().to_string();
+
+    let blobfs_server = BlobfsRamdisk::start().await.unwrap();
+    let root_dir = blobfs_server.root_dir_proxy().unwrap();
+
+    let (blob0, _) =
+        open_blob(&root_dir, &empty_hash, fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE)
+            .await
+            .unwrap();
+    let () = blob0.resize(0).await.unwrap().map_err(Status::from_raw).unwrap();
+
+    let (blob1, event) =
+        open_blob(&root_dir, &empty_hash, fio::OpenFlags::RIGHT_READABLE).await.unwrap();
+    assert_matches!(
+        event.wait_handle(zx::Signals::all(), zx::Time::after(zx::Duration::from_seconds(0))),
+        Ok(zx::Signals::USER_0)
+    );
+    verify_blob(&blob1, &[]).await.unwrap();
+
+    blobfs_server.stop().await.unwrap();
+}
+
+#[fuchsia_async::run_singlethreaded(test)]
 async fn open_missing_fails() -> Result<(), Error> {
     let blobfs_server = BlobfsRamdisk::start().await?;
     let root_dir = blobfs_server.root_dir_proxy()?;

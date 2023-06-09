@@ -86,6 +86,15 @@ type OpenBlobError = strict enum {
     INTERNAL = 4;
 };
 
+/// Error type for [`NeededBlobs.BlobWritten`].
+type BlobWrittenError = strict enum {
+    /// Client called BlobWritten but blob was not readable in blobfs.
+    NOT_WRITTEN = 1;
+
+    /// Client called BlobWritten for a blob it has not yet opened.
+    UNOPENED_BLOB = 2;
+};
+
 /// Represents the transaction for caching a particular package.
 ///
 /// Server expects client to follow the normal operation sequence defined below.
@@ -98,10 +107,12 @@ type OpenBlobError = strict enum {
 ///
 /// Normal operation sequence:
 /// 1. Clients should start by requesting to `OpenMetaBlob()`, and fetch and write
-/// the metadata blob if needed.
+/// the metadata blob if needed, calling `BlobWritten()` when done to indicate the
+/// write is complete.
 /// 2. `GetMissingBlobs()` should be used to determine which blobs need to be
 /// fetched and written.
-/// 3. Each of the missing blobs needs to be written using `OpenBlob()`.
+/// 3. Each of the missing blobs needs to be written using `OpenBlob()` and
+/// `BlobWritten()` should be called after each blob is written.
 ///
 /// Clients must not make multiple `Open[Meta]Blob()` calls for the same `BlobId`
 /// at the same time, even across different `NeededBlobs` connections. I.e.
@@ -120,25 +131,23 @@ protocol NeededBlobs {
     /// If the package was already cached, server will close the channel with a
     /// `ZX_OK` epitaph.
     ///
-    /// + request `file` resolves to an opened writable file which must be
-    ///   truncated to the correct size by the caller (if it's an uncompressed
-    ///   blob) and then written from start to finish (seeks are not supported).
-    ///   A corrupt blob is indicated by a `Write()` (usually the final write)
-    ///   failing with `ZX_ERR_IO_DATA_INTEGRITY`. On error or a response of
-    ///   `false`, `file` will be closed by the server.
     /// + request `blob_type` the type of the blob to be written. Will be
     ///   removed once the transition to offline compression is complete.
-    /// - response `needed` `true` if the blob is still needed and should be
-    ///   written by the client. On `false`, the blob now exists, does not need
-    ///   to be written by the client, and `file` will be closed.
+    /// - response `file` is the handle used to write the blob
+    ///     If `file` is absent, the blob is already cached and so does not
+    ///     need to be written.
+    ///     If `file` is present, the blob is still needed and should be
+    ///     written by the client. `file` must be truncated to the correct size
+    ///     (if it is an uncompressed blob) and then written from start to finish
+    ///     (seeks are not supported). A corrupt blob is indicated by a `Write()`
+    ///     (usually the final write) failing with `ZX_ERR_IO_DATA_INTEGRITY`.
     /// * error an OpenBlobError indicating failure. Clients may retry this
     ///   request, though the server end may abort this cache operation on
     ///   errors it considers to be fatal.
-    OpenMetaBlob(resource struct {
-        file server_end:fuchsia.io.File;
+    OpenMetaBlob(struct {
         blob_type BlobType;
-    }) -> (struct {
-        needed bool;
+    }) -> (resource struct {
+        file client_end:<fuchsia.io.File, optional>;
     }) error OpenBlobError;
 
     /// Returns an iterator of blobs that are not present on the system that
@@ -165,27 +174,39 @@ protocol NeededBlobs {
     /// Opens a blob for writing.
     ///
     /// + request `blob_id` the blob id describing this blob.
-    /// + request `file` resolves to an opened writable file which must be
-    ///   truncated to the correct size by the caller (if it's an uncompressed
-    ///   blob) and then written from start to finish (seeks are not supported).
-    ///   A corrupt blob is indicated by a `Write()` (usually the final write)
-    ///   failing with `ZX_ERR_IO_DATA_INTEGRITY`. On error or a response of
-    ///   `false`, `file` will be closed by the server.
     /// + request `blob_type` the type of the blob to be written. Will be
     ///   removed once the transition to offline compression is complete.
-    /// - response `needed` `true` if the blob is still needed and should be
-    ///   written by the client. On `false`, the blob now exists, does not need
-    ///   to be written by the client, and `file` will be closed.
+    /// - response `file` is the handle used to write the blob
+    ///     If `file` is absent, the blob is already cached and so does not
+    ///     need to be written.
+    ///     If `file` is present, the blob is still needed and should be
+    ///     written by the client. `file` must be truncated to the correct size
+    ///     (if it is an uncompressed blob) and then written from start to finish
+    ///     (seeks are not supported). A corrupt blob is indicated by a `Write()`
+    ///     (usually the final write) failing with `ZX_ERR_IO_DATA_INTEGRITY`.
     /// * error an OpenBlobError indicating failure. Clients may retry this
     ///   request, though the server end may abort this cache operation on
     ///   errors it considers to be fatal.
-    OpenBlob(resource struct {
+    OpenBlob(struct {
         blob_id BlobId;
-        file server_end:fuchsia.io.File;
         blob_type BlobType;
-    }) -> (struct {
-        needed bool;
+    }) -> (resource struct {
+        file client_end:<fuchsia.io.File, optional>;
     }) error OpenBlobError;
+
+    /// Indicates that a blob opened by `Open[Meta]Blob` has been successfully
+    /// written.
+    ///
+    /// A client should call this once the last `Write` call to the `file`
+    /// returned by `Open[Meta]Blob` has completed successfully.
+    ///
+    /// + request `blob_id` the blob id describing this blob.
+    /// * error a BlobWrittenError indicating failure. Clients may retry the
+    ///   `Open[Meta]Blob` request that prompted this call, though the server
+    ///   end may abort this cache operation on errors it considers to be fatal.
+    BlobWritten(struct {
+        blob_id BlobId;
+    }) -> () error BlobWrittenError;
 
     /// Aborts this caching operation for the package.
     ///

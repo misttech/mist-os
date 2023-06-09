@@ -17,7 +17,7 @@ pub use iter::*;
 /// The size of a hash in bytes.
 pub const HASH_SIZE: usize = 32;
 
-/// A SHA-256 hash.
+/// A 32 byte hash.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Hash([u8; HASH_SIZE]);
 

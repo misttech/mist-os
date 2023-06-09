@@ -4,8 +4,8 @@
 
 use {
     crate::{
-        get_and_verify_packages, get_missing_blobs, replace_retained_packages, write_blob,
-        write_meta_far, write_needed_blobs, TestEnv,
+        blob_written, get_and_verify_packages, get_missing_blobs, replace_retained_packages,
+        write_blob, write_meta_far, write_needed_blobs, TestEnv,
     },
     assert_matches::assert_matches,
     fidl_fuchsia_io as fio,
@@ -235,13 +235,14 @@ async fn dynamic_index_needed_blobs() {
 
     let (meta_far, _) = pkg.contents();
 
-    let (meta_blob, meta_blob_server_end) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-    assert!(needed_blobs
-        .open_meta_blob(meta_blob_server_end, fpkg::BlobType::Uncompressed)
+    let meta_blob = needed_blobs
+        .open_meta_blob(fpkg::BlobType::Uncompressed)
         .await
         .unwrap()
-        .unwrap());
+        .unwrap()
+        .unwrap()
+        .into_proxy()
+        .unwrap();
 
     let hierarchy = env.inspect_hierarchy().await;
 
@@ -260,6 +261,7 @@ async fn dynamic_index_needed_blobs() {
     );
 
     let () = write_blob(&meta_far.contents, meta_blob).await.unwrap();
+    let () = blob_written(&needed_blobs, BlobId::from(meta_far.merkle).into()).await;
     env.wait_for_and_return_inspect_state(tree_assertion!(
         "root": contains {
             "index": contains {
@@ -335,15 +337,17 @@ async fn dynamic_index_package_hash_update() {
 
     let (meta_far, _) = pkg.contents();
 
-    let (meta_blob, meta_blob_server_end) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-    assert!(needed_blobs
-        .open_meta_blob(meta_blob_server_end, fpkg::BlobType::Uncompressed)
+    let meta_blob = needed_blobs
+        .open_meta_blob(fpkg::BlobType::Uncompressed)
         .await
         .unwrap()
-        .unwrap());
+        .unwrap()
+        .unwrap()
+        .into_proxy()
+        .unwrap();
 
     let () = write_blob(&meta_far.contents, meta_blob).await.unwrap();
+    let () = blob_written(&needed_blobs, meta_far.merkle).await;
 
     assert_eq!(get_missing_blobs(&needed_blobs).await, vec![]);
     let () = get_fut.await.unwrap().unwrap();
@@ -437,7 +441,7 @@ async fn package_cache_get() {
     fn contains_missing_blob_stats(
         hierarchy: &DiagnosticsHierarchy,
         remaining: u64,
-        writing: u64,
+        open: u64,
         written: u64,
     ) {
         assert_data_tree!(
@@ -447,7 +451,7 @@ async fn package_cache_get() {
                     "get": {
                         "0" : contains {
                             "known_remaining": remaining,
-                            "writing": writing,
+                            "open": open,
                             "written": written,
                         }
                     }
@@ -505,14 +509,15 @@ async fn package_cache_get() {
     let blob = missing_blobs_iter.next().unwrap();
 
     let buf = contents.remove(&blob.blob_id.into()).unwrap();
-    let (content_blob, content_blob_server_end) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
 
-    assert!(needed_blobs
-        .open_blob(&blob.blob_id, content_blob_server_end, fpkg::BlobType::Uncompressed)
+    let content_blob = needed_blobs
+        .open_blob(&blob.blob_id, fpkg::BlobType::Uncompressed)
         .await
         .unwrap()
-        .unwrap());
+        .unwrap()
+        .unwrap()
+        .into_proxy()
+        .unwrap();
 
     // Content blob open for writing.
 
@@ -520,6 +525,7 @@ async fn package_cache_get() {
     contains_missing_blob_stats(&hierarchy, 2, 1, 0);
 
     let () = write_blob(&buf, content_blob).await.unwrap();
+    let () = blob_written(&needed_blobs, BlobId::from(blob.blob_id).into()).await;
 
     // Content blob written.
 
@@ -529,17 +535,15 @@ async fn package_cache_get() {
     let blob = missing_blobs_iter.next().unwrap();
 
     let buf = contents.remove(&blob.blob_id.into()).unwrap();
-    let (content_blob, content_blob_server_end) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
 
-    assert_eq!(
-        true,
-        needed_blobs
-            .open_blob(&blob.blob_id, content_blob_server_end, fpkg::BlobType::Uncompressed)
-            .await
-            .unwrap()
-            .unwrap()
-    );
+    let content_blob = needed_blobs
+        .open_blob(&blob.blob_id, fpkg::BlobType::Uncompressed)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap()
+        .into_proxy()
+        .unwrap();
 
     // Last content blob open for writing.
 
@@ -547,6 +551,7 @@ async fn package_cache_get() {
     contains_missing_blob_stats(&hierarchy, 1, 1, 1);
 
     let () = write_blob(&buf, content_blob).await.unwrap();
+    let () = blob_written(&needed_blobs, BlobId::from(blob.blob_id).into()).await;
 
     // Last content blob written.
 

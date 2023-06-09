@@ -330,12 +330,10 @@ impl ToResolveError for pkg::cache::TruncateBlobError {
 
 impl ToResolveError for pkg::cache::WriteBlobError {
     fn to_resolve_error(&self) -> pkg::ResolveError {
+        use pkg::cache::WriteBlobError::*;
         match self {
-            pkg::cache::WriteBlobError::Overwrite => pkg::ResolveError::Io,
-            pkg::cache::WriteBlobError::Corrupt => pkg::ResolveError::Io,
-            pkg::cache::WriteBlobError::NoSpace => pkg::ResolveError::NoSpace,
-            pkg::cache::WriteBlobError::UnexpectedResponse(_) => pkg::ResolveError::Io,
-            pkg::cache::WriteBlobError::Fidl(_) => pkg::ResolveError::Io,
+            Overwrite | Corrupt | UnexpectedResponse(_) | Fidl(_) => pkg::ResolveError::Io,
+            NoSpace => pkg::ResolveError::NoSpace,
         }
     }
 }
@@ -360,6 +358,7 @@ impl ToResolveError for FetchError {
             Http { .. } => pkg::ResolveError::UnavailableBlob,
             Truncate(e) => e.to_resolve_error(),
             Write(e) => e.to_resolve_error(),
+            BlobWritten(_) => pkg::ResolveError::Internal,
             NoMirrors => pkg::ResolveError::Internal,
             BlobUrl(_) => pkg::ResolveError::Internal,
             FidlError(_) => pkg::ResolveError::Internal,
@@ -836,26 +835,30 @@ async fn read_local_blob(
     }
 
     inspect.state(inspect::LocalMirror::TruncateBlob);
-    let mut dest = dest.truncate(info.content_size).await.map_err(FetchError::Truncate)?;
+    let dest = match dest.truncate(info.content_size).await.map_err(FetchError::Truncate)? {
+        pkg::cache::TruncateBlobSuccess::AllWritten(dest) => dest,
+        pkg::cache::TruncateBlobSuccess::NeedsData(mut dest) => loop {
+            inspect.state(inspect::LocalMirror::ReadBlob);
+            let data = local_file
+                .read(fio::MAX_BUF)
+                .await
+                .map_err(FetchError::FidlError)?
+                .map_err(Status::from_raw)
+                .map_err(FetchError::IoError)?;
+            if data.is_empty() {
+                return Err(FetchError::BlobTooSmall { uri: merkle.to_string() });
+            }
+            inspect.state(inspect::LocalMirror::WriteBlob);
+            dest = match dest.write(&data).await.map_err(FetchError::Write)? {
+                pkg::cache::BlobWriteSuccess::NeedsData(dest) => dest,
+                pkg::cache::BlobWriteSuccess::AllWritten(dest) => break dest,
+            };
+            inspect.write_bytes(data.len());
+        },
+    };
 
-    loop {
-        inspect.state(inspect::LocalMirror::ReadBlob);
-        let data = local_file
-            .read(fio::MAX_BUF)
-            .await
-            .map_err(FetchError::FidlError)?
-            .map_err(Status::from_raw)
-            .map_err(FetchError::IoError)?;
-        if data.is_empty() {
-            return Err(FetchError::BlobTooSmall { uri: merkle.to_string() });
-        }
-        inspect.state(inspect::LocalMirror::WriteBlob);
-        dest = match dest.write(&data).await.map_err(FetchError::Write)? {
-            pkg::cache::BlobWriteSuccess::MoreToWrite(blob) => blob,
-            pkg::cache::BlobWriteSuccess::Done => break,
-        };
-        inspect.write_bytes(data.len());
-    }
+    let () = dest.blob_written().await.map_err(FetchError::BlobWritten)?;
+
     Ok(())
 }
 
@@ -890,64 +893,70 @@ async fn download_blob(
     inspect.expected_size_bytes(expected_len);
 
     inspect.state(inspect::Http::TruncateBlob);
-    let mut dest = dest.truncate(expected_len).await.map_err(FetchError::Truncate)?;
-
-    inspect.state(inspect::Http::ReadHttpBody);
     let mut written = 0u64;
+    let dest = match dest.truncate(expected_len).await.map_err(FetchError::Truncate)? {
+        pkg::cache::TruncateBlobSuccess::AllWritten(dest) => dest,
+        pkg::cache::TruncateBlobSuccess::NeedsData(mut dest) => {
+            futures::pin_mut!(content);
+            loop {
+                inspect.state(inspect::Http::ReadHttpBody);
+                let Some(chunk) = content.try_next().await? else {
+                    return Err(FetchError::BlobTooSmall { uri: uri.to_string() });
+                };
 
-    futures::pin_mut!(content);
-    while let Some(chunk) = content.try_next().await? {
-        if written + chunk.len() as u64 > expected_len {
-            return Err(FetchError::BlobTooLarge { uri: uri.to_string() });
+                if written + chunk.len() as u64 > expected_len {
+                    return Err(FetchError::BlobTooLarge { uri: uri.to_string() });
+                }
+                ftrace::async_instant!(
+                    trace_id,
+                    "app",
+                    "read_chunk_from_hyper",
+                    "size" => chunk.len() as u64
+                );
+
+                inspect.state(inspect::Http::WriteBlob);
+                dest = match dest
+                    .write_with_trace_callbacks(
+                        &chunk,
+                        |size: u64| {
+                            ftrace::async_begin(
+                                trace_id,
+                                ftrace::cstr!("app"),
+                                ftrace::cstr!("waiting_for_pkg_cache_to_ack_write"),
+                                &[ftrace::ArgValue::of("size", size)],
+                            )
+                        },
+                        || {
+                            ftrace::async_end(
+                                trace_id,
+                                ftrace::cstr!("app"),
+                                ftrace::cstr!("waiting_for_pkg_cache_to_ack_write"),
+                                &[],
+                            )
+                        },
+                    )
+                    .await
+                    .map_err(FetchError::Write)?
+                {
+                    pkg::cache::BlobWriteSuccess::NeedsData(blob) => {
+                        written += chunk.len() as u64;
+                        blob
+                    }
+                    pkg::cache::BlobWriteSuccess::AllWritten(blob) => {
+                        written += chunk.len() as u64;
+                        break blob;
+                    }
+                };
+                inspect.write_bytes(chunk.len());
+            }
         }
-        ftrace::async_instant!(
-            trace_id,
-            "app",
-            "read_chunk_from_hyper",
-            "size" => chunk.len() as u64
-        );
-
-        inspect.state(inspect::Http::WriteBlob);
-        dest = match dest
-            .write_with_trace_callbacks(
-                &chunk,
-                |size: u64| {
-                    ftrace::async_begin(
-                        trace_id,
-                        ftrace::cstr!("app"),
-                        ftrace::cstr!("waiting_for_pkg_cache_to_ack_write"),
-                        &[ftrace::ArgValue::of("size", size)],
-                    )
-                },
-                || {
-                    ftrace::async_end(
-                        trace_id,
-                        ftrace::cstr!("app"),
-                        ftrace::cstr!("waiting_for_pkg_cache_to_ack_write"),
-                        &[],
-                    )
-                },
-            )
-            .await
-            .map_err(FetchError::Write)?
-        {
-            pkg::cache::BlobWriteSuccess::MoreToWrite(blob) => {
-                written += chunk.len() as u64;
-                blob
-            }
-            pkg::cache::BlobWriteSuccess::Done => {
-                written += chunk.len() as u64;
-                break;
-            }
-        };
-        inspect.state(inspect::Http::ReadHttpBody);
-        inspect.write_bytes(chunk.len());
-    }
+    };
     inspect.state(inspect::Http::WriteComplete);
-
     if expected_len != written {
         return Err(FetchError::BlobTooSmall { uri: uri.to_string() });
     }
+
+    let () = dest.blob_written().await.map_err(FetchError::BlobWritten)?;
 
     Ok(expected_len)
 }
@@ -980,6 +989,9 @@ pub enum FetchError {
 
     #[error("failed to write blob data")]
     Write(#[source] pkg::cache::WriteBlobError),
+
+    #[error("error when telling pkg-cache the blob has been written")]
+    BlobWritten(#[source] pkg::cache::BlobWrittenError),
 
     #[error("hyper error while fetching {uri}")]
     Hyper {
@@ -1106,6 +1118,7 @@ impl From<&FetchError> for metrics::FetchBlobMigratedMetricDimensionResult {
             BlobTooLarge { .. } => EventCodes::BlobTooLarge,
             Truncate { .. } => EventCodes::Truncate,
             Write { .. } => EventCodes::Write,
+            BlobWritten { .. } => EventCodes::BlobWritten,
             Hyper { .. } => EventCodes::Hyper,
             Http { .. } => EventCodes::Http,
             BlobUrl { .. } => EventCodes::BlobUrl,
@@ -1155,6 +1168,7 @@ impl FetchError {
             | BlobTooLarge { .. }
             | Truncate { .. }
             | Write { .. }
+            | BlobWritten { .. }
             | BlobUrl { .. }
             | FidlError { .. }
             | IoError { .. }
@@ -1169,10 +1183,12 @@ impl FetchError {
         match self {
             CreateBlob(pkg::cache::OpenBlobError::Fidl(e))
             | Truncate(pkg::cache::TruncateBlobError::Fidl(e))
-            | Write(pkg::cache::WriteBlobError::Fidl(e)) => Some(e),
+            | Write(pkg::cache::WriteBlobError::Fidl(e))
+            | BlobWritten(pkg::cache::BlobWrittenError::Fidl(e)) => Some(e),
             CreateBlob(_)
             | Truncate(_)
             | Write(_)
+            | BlobWritten(_)
             | FidlError { .. }
             | Hyper { .. }
             | Http { .. }

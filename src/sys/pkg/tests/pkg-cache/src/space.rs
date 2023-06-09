@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{get_missing_blobs, write_blob, TestEnv},
+    crate::{blob_written, get_missing_blobs, write_blob, TestEnv},
     assert_matches::assert_matches,
     blobfs_ramdisk::{BlobfsRamdisk, Ramdisk},
     fidl_fuchsia_io as fio, fidl_fuchsia_paver as fpaver,
@@ -40,29 +40,32 @@ async fn do_fetch(package_cache: &fpkg::PackageCacheProxy, pkg: &Package) {
         .map(|(hash, bytes)| (BlobId::from(hash), bytes))
         .collect::<HashMap<_, Vec<u8>>>();
 
-    let (meta_blob, meta_blob_server_end) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-    let res = needed_blobs
-        .open_meta_blob(meta_blob_server_end, fpkg::BlobType::Uncompressed)
+    let meta_blob = needed_blobs
+        .open_meta_blob(fpkg::BlobType::Uncompressed)
         .await
         .unwrap()
+        .unwrap()
+        .unwrap()
+        .into_proxy()
         .unwrap();
-    assert!(res);
     let () = write_blob(&meta_far.contents, meta_blob).await.unwrap();
+    let () = blob_written(&needed_blobs, meta_far.merkle).await;
 
     let missing_blobs = get_missing_blobs(&needed_blobs).await;
     for blob in missing_blobs {
         let buf = contents.remove(&blob.blob_id.into()).unwrap();
 
-        let (content_blob, content_blob_server_end) =
-            fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-        assert!(needed_blobs
-            .open_blob(&blob.blob_id, content_blob_server_end, fpkg::BlobType::Uncompressed)
+        let content_blob = needed_blobs
+            .open_blob(&blob.blob_id, fpkg::BlobType::Uncompressed)
             .await
             .unwrap()
-            .unwrap());
+            .unwrap()
+            .unwrap()
+            .into_proxy()
+            .unwrap();
 
         let () = write_blob(&buf, content_blob).await.unwrap();
+        let () = blob_written(&needed_blobs, BlobId::from(blob.blob_id).into()).await;
     }
 
     let () = get_fut.await.unwrap().unwrap();
@@ -201,15 +204,16 @@ async fn gc_dynamic_index_protected() {
         .map(|(hash, bytes)| (BlobId::from(hash), bytes))
         .collect::<HashMap<_, Vec<u8>>>();
 
-    let (meta_blob, meta_blob_server_end) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-    let res = needed_blobs
-        .open_meta_blob(meta_blob_server_end, fpkg::BlobType::Uncompressed)
+    let meta_blob = needed_blobs
+        .open_meta_blob(fpkg::BlobType::Uncompressed)
         .await
         .unwrap()
+        .unwrap()
+        .unwrap()
+        .into_proxy()
         .unwrap();
-    assert!(res);
     let () = write_blob(&meta_far.contents, meta_blob).await.unwrap();
+    let () = blob_written(&needed_blobs, meta_far.merkle).await;
 
     // Ensure that the new meta.far is persisted despite having missing blobs, and the "old" blobs
     // are not removed.
@@ -222,15 +226,17 @@ async fn gc_dynamic_index_protected() {
     for blob in missing_blobs {
         let buf = contents.remove(&blob.blob_id.into()).unwrap();
 
-        let (content_blob, content_blob_server_end) =
-            fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-        assert!(needed_blobs
-            .open_blob(&blob.blob_id, content_blob_server_end, fpkg::BlobType::Uncompressed)
+        let content_blob = needed_blobs
+            .open_blob(&blob.blob_id, fpkg::BlobType::Uncompressed)
             .await
             .unwrap()
-            .unwrap());
+            .unwrap()
+            .unwrap()
+            .into_proxy()
+            .unwrap();
 
         let () = write_blob(&buf, content_blob).await.unwrap();
+        let () = blob_written(&needed_blobs, BlobId::from(blob.blob_id).into()).await;
 
         // Run a GC to try to reap blobs protected by meta far.
         assert_matches!(env.proxies.space_manager.gc().await, Ok(Ok(())));
@@ -339,15 +345,16 @@ async fn gc_updated_static_package() {
         .map(|(hash, bytes)| (BlobId::from(hash), bytes))
         .collect::<HashMap<_, Vec<u8>>>();
 
-    let (meta_blob, meta_blob_server_end) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-    let res = needed_blobs
-        .open_meta_blob(meta_blob_server_end, fpkg::BlobType::Uncompressed)
+    let meta_blob = needed_blobs
+        .open_meta_blob(fpkg::BlobType::Uncompressed)
         .await
         .unwrap()
+        .unwrap()
+        .unwrap()
+        .into_proxy()
         .unwrap();
-    assert!(res);
     let () = write_blob(&meta_far.contents, meta_blob).await.unwrap();
+    let () = blob_written(&needed_blobs, meta_far.merkle).await;
 
     // Ensure that the new meta.far is persisted despite having missing blobs, and the "old" blobs
     // are not removed.
@@ -360,15 +367,17 @@ async fn gc_updated_static_package() {
     for blob in missing_blobs {
         let buf = contents.remove(&blob.blob_id.into()).unwrap();
 
-        let (content_blob, content_blob_server_end) =
-            fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-        assert!(needed_blobs
-            .open_blob(&blob.blob_id, content_blob_server_end, fpkg::BlobType::Uncompressed)
+        let content_blob = needed_blobs
+            .open_blob(&blob.blob_id, fpkg::BlobType::Uncompressed)
             .await
             .unwrap()
-            .unwrap());
+            .unwrap()
+            .unwrap()
+            .into_proxy()
+            .unwrap();
 
         let () = write_blob(&buf, content_blob).await.unwrap();
+        let () = blob_written(&needed_blobs, BlobId::from(blob.blob_id).into()).await;
 
         // Run a GC to try to reap blobs protected by meta far.
         assert_matches!(env.proxies.space_manager.gc().await, Ok(Ok(())));
@@ -451,14 +460,14 @@ async fn blob_write_fails_when_out_of_space() {
         .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
         .map_ok(|res| res.map_err(Status::from_raw));
 
-    let (meta_blob, meta_blob_server_end) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-    let res = needed_blobs
-        .open_meta_blob(meta_blob_server_end, fpkg::BlobType::Uncompressed)
+    let meta_blob = needed_blobs
+        .open_meta_blob(fpkg::BlobType::Uncompressed)
         .await
         .unwrap()
+        .unwrap()
+        .unwrap()
+        .into_proxy()
         .unwrap();
-    assert!(res);
 
     let (meta_far, _contents) = pkg.contents();
     assert_eq!(write_blob(&meta_far.contents, meta_blob).await, Err(Status::NO_SPACE));
@@ -514,14 +523,16 @@ async fn subpackage_blobs_protected_from_gc(gc_protection: GcProtection) {
 
     // Write the meta.far.
     let meta_far = superpackage.contents().0;
-    let (meta_blob, meta_blob_server_end) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-    assert!(needed_blobs
-        .open_meta_blob(meta_blob_server_end, fpkg::BlobType::Uncompressed)
+    let meta_blob = needed_blobs
+        .open_meta_blob(fpkg::BlobType::Uncompressed)
         .await
         .unwrap()
-        .unwrap());
+        .unwrap()
+        .unwrap()
+        .into_proxy()
+        .unwrap();
     let () = write_blob(&meta_far.contents, meta_blob).await.unwrap();
+    let () = blob_written(&needed_blobs, meta_far.merkle).await;
 
     // Get the missing blobs iterator.
     let (blob_iterator, blob_iterator_server_end) =
@@ -543,18 +554,19 @@ async fn subpackage_blobs_protected_from_gc(gc_protection: GcProtection) {
 
     // Write the subpackage meta.far.
     let subpackage_meta_far = subpackage.contents().0;
-    let (subpackage_meta_blob, subpackage_meta_blob_server_end) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-    assert!(needed_blobs
+    let subpackage_meta_blob = needed_blobs
         .open_blob(
             &BlobId::from(*subpackage.meta_far_merkle_root()).into(),
-            subpackage_meta_blob_server_end,
             fpkg::BlobType::Uncompressed,
         )
         .await
         .unwrap()
-        .unwrap());
+        .unwrap()
+        .unwrap()
+        .into_proxy()
+        .unwrap();
     let () = write_blob(&subpackage_meta_far.contents, subpackage_meta_blob).await.unwrap();
+    let () = blob_written(&needed_blobs, subpackage_meta_far.merkle).await;
 
     // Subpackage meta.far should now be in blobfs.
     assert!(env.blobfs.list_blobs().unwrap().contains(subpackage.meta_far_merkle_root()));
@@ -584,18 +596,19 @@ async fn subpackage_blobs_protected_from_gc(gc_protection: GcProtection) {
     assert!(!env.blobfs.list_blobs().unwrap().contains(&subpackage_content_files[0].0));
 
     // Write a subpackage content blob.
-    let (subpackage_content_blob_a, subpackage_content_blob_a_server_end) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-    assert!(needed_blobs
+    let subpackage_content_blob_a = needed_blobs
         .open_blob(
             &BlobId::from(subpackage_content_files[0].0).into(),
-            subpackage_content_blob_a_server_end,
             fpkg::BlobType::Uncompressed,
         )
         .await
         .unwrap()
-        .unwrap());
+        .unwrap()
+        .unwrap()
+        .into_proxy()
+        .unwrap();
     let () = write_blob(&subpackage_content_files[0].1, subpackage_content_blob_a).await.unwrap();
+    let () = blob_written(&needed_blobs, BlobId::from(subpackage_content_files[0].0).into()).await;
 
     // Subpackage content blob should now be in blobfs.
     assert!(env.blobfs.list_blobs().unwrap().contains(&subpackage_content_files[0].0));
@@ -605,18 +618,19 @@ async fn subpackage_blobs_protected_from_gc(gc_protection: GcProtection) {
     assert!(env.blobfs.list_blobs().unwrap().contains(&subpackage_content_files[0].0));
 
     // Write the other subpackage content blob.
-    let (subpackage_content_blob_b, subpackage_content_blob_b_server_end) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-    assert!(needed_blobs
+    let subpackage_content_blob_b = needed_blobs
         .open_blob(
             &BlobId::from(subpackage_content_files[1].0).into(),
-            subpackage_content_blob_b_server_end,
             fpkg::BlobType::Uncompressed,
         )
         .await
         .unwrap()
-        .unwrap());
+        .unwrap()
+        .unwrap()
+        .into_proxy()
+        .unwrap();
     let () = write_blob(&subpackage_content_files[1].1, subpackage_content_blob_b).await.unwrap();
+    let () = blob_written(&needed_blobs, BlobId::from(subpackage_content_files[1].0).into()).await;
 
     // Other subpackage content blob should now be in blobfs.
     assert!(env.blobfs.list_blobs().unwrap().contains(&subpackage_content_files[1].0));

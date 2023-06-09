@@ -4,12 +4,13 @@
 
 use {
     crate::{
-        get_and_verify_package, get_and_verify_packages, get_missing_blobs, write_blob, TestEnv,
+        blob_written, get_and_verify_package, get_and_verify_packages, get_missing_blobs,
+        write_blob, TestEnv,
     },
     assert_matches::assert_matches,
     fidl_fuchsia_io as fio,
     fidl_fuchsia_pkg::{self as fpkg, BlobInfo, BlobInfoIteratorMarker, NeededBlobsMarker},
-    fidl_fuchsia_pkg_ext::BlobId,
+    fidl_fuchsia_pkg_ext::{self as fpkg_ext, BlobId},
     fuchsia_merkle::MerkleTree,
     fuchsia_pkg_testing::{Package, PackageBuilder, SystemImageBuilder},
     fuchsia_zircon::Status,
@@ -61,15 +62,17 @@ async fn get_single_package_with_no_content_blobs() {
 
     let (meta_far, _) = pkg.contents();
 
-    let (meta_blob, meta_blob_server_end) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-    assert!(needed_blobs
-        .open_meta_blob(meta_blob_server_end, fpkg::BlobType::Uncompressed)
+    let meta_blob = needed_blobs
+        .open_meta_blob(fpkg::BlobType::Uncompressed)
         .await
         .unwrap()
-        .unwrap());
+        .unwrap()
+        .unwrap()
+        .into_proxy()
+        .unwrap();
 
     let () = write_blob(&meta_far.contents, meta_blob).await.unwrap();
+    let () = blob_written(&needed_blobs, meta_far.merkle).await;
 
     assert_eq!(get_missing_blobs(&needed_blobs).await, vec![]);
 
@@ -148,10 +151,8 @@ async fn get_and_hold_directory() {
         .map_ok(|res| res.map_err(Status::from_raw));
 
     // `OpenMetaBlob()` for already cached package closes the channel with with a `ZX_OK` epitaph.
-    let (_meta_blob, meta_blob_server_end) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
     assert_matches!(
-        needed_blobs.open_meta_blob(meta_blob_server_end, fpkg::BlobType::Uncompressed).await,
+        needed_blobs.open_meta_blob(fpkg::BlobType::Uncompressed).await,
         Err(fidl::Error::ClientChannelClosed { status: Status::OK, .. })
     );
 
@@ -209,35 +210,26 @@ async fn handles_partially_written_pkg() {
     let meta_blob_info = BlobInfo { blob_id: BlobId::from(meta_far_hash).into(), length: 0 };
 
     // Write the meta far to blobfs.
-    let _ = blobfs
-        .open_blob_for_write(&meta_far_hash, fpkg::BlobType::Uncompressed)
-        .await
-        .unwrap()
-        .truncate(meta_far_data.len() as u64)
-        .await
-        .unwrap()
-        .unwrap_needs_data()
-        .write(&meta_far_data)
-        .await
-        .unwrap()
-        .unwrap_done();
+    let () = crate::write_blob(
+        &meta_far_data,
+        blobfs
+            .open_blob_proxy_for_write(&meta_far_hash, fpkg::BlobType::Uncompressed)
+            .await
+            .unwrap(),
+    )
+    .await
+    .unwrap();
 
     // Write a content blob to blobfs.
     {
         let data = &b"some contents"[..];
         let hash = MerkleTree::from_reader(data).unwrap().root();
-        let _ = blobfs
-            .open_blob_for_write(&hash, fpkg::BlobType::Uncompressed)
-            .await
-            .unwrap()
-            .truncate(data.len() as u64)
-            .await
-            .unwrap()
-            .unwrap_needs_data()
-            .write(data)
-            .await
-            .unwrap()
-            .unwrap_done();
+        let () = crate::write_blob(
+            data,
+            blobfs.open_blob_proxy_for_write(&hash, fpkg::BlobType::Uncompressed).await.unwrap(),
+        )
+        .await
+        .unwrap();
     }
 
     // Perform a Get(), expecting to only write the 1 remaining content blob.
@@ -250,18 +242,19 @@ async fn handles_partially_written_pkg() {
 
         assert_matches!(get.open_meta_blob(fpkg::BlobType::Uncompressed).await.unwrap(), None);
         let missing = get.get_missing_blobs().try_concat().await.unwrap();
-        assert_eq!(
-            missing,
-            vec![fidl_fuchsia_pkg_ext::BlobInfo { blob_id: hash.into(), length: 0 }]
-        );
+        assert_eq!(missing, vec![fpkg_ext::BlobInfo { blob_id: hash.into(), length: 0 }]);
 
         let blob = get.open_blob(hash.into(), fpkg::BlobType::Uncompressed).await.unwrap().unwrap();
         let (blob, closer) = (blob.blob, blob.closer);
-        let blob = blob.truncate(data.len() as u64).await.unwrap();
-        assert_matches!(
-            blob.write(data).await.unwrap(),
-            fidl_fuchsia_pkg_ext::cache::BlobWriteSuccess::Done
-        );
+        let blob = match blob.truncate(data.len() as u64).await.unwrap() {
+            fpkg_ext::cache::TruncateBlobSuccess::NeedsData(blob) => blob,
+            fpkg_ext::cache::TruncateBlobSuccess::AllWritten(_) => panic!("not the empty blob"),
+        };
+        let blob = match blob.write(data).await.unwrap() {
+            fpkg_ext::cache::BlobWriteSuccess::NeedsData(_) => panic!("blob should be written"),
+            fpkg_ext::cache::BlobWriteSuccess::AllWritten(blob) => blob,
+        };
+        let () = blob.blob_written().await.unwrap();
         closer.close().await;
 
         get.finish().await.unwrap()
@@ -302,10 +295,8 @@ async fn get_package_already_present_on_fs() {
         .map_ok(|res| res.map_err(Status::from_raw));
 
     // `OpenMetaBlob()` for already cached package closes the channel with with a `ZX_OK` epitaph.
-    let (_meta_blob, meta_blob_server_end) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
     assert_matches!(
-        needed_blobs.open_meta_blob(meta_blob_server_end, fpkg::BlobType::Uncompressed).await,
+        needed_blobs.open_meta_blob(fpkg::BlobType::Uncompressed).await,
         Err(fidl::Error::ClientChannelClosed { status: Status::OK, .. })
     );
 

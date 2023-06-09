@@ -63,7 +63,13 @@ impl Client {
             Some(pkg_dir_server_end),
         );
 
-        Ok(Get { get_fut, pkg_dir, needed_blobs, pkg_present: SharedBoolEvent::new() })
+        Ok(Get {
+            get_fut,
+            pkg_dir,
+            needed_blobs,
+            pkg_present: SharedBoolEvent::new(),
+            meta_far: meta_far_blob.blob_id,
+        })
     }
 
     /// Uses PackageCache.Get to obtain the package directory of a package that is already cached
@@ -141,14 +147,13 @@ impl SharedBoolEvent {
 async fn open_blob(
     needed_blobs: &fpkg::NeededBlobsProxy,
     kind: OpenKind,
+    blob_id: BlobId,
     blob_type: fpkg::BlobType,
     pkg_present: Option<&SharedBoolEvent>,
 ) -> Result<Option<NeededBlob>, OpenBlobError> {
-    let (blob, blob_server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>()?;
-
     let open_fut = match kind {
-        OpenKind::Meta => needed_blobs.open_meta_blob(blob_server_end, blob_type),
-        OpenKind::Content(hash) => needed_blobs.open_blob(&hash.into(), blob_server_end, blob_type),
+        OpenKind::Meta => needed_blobs.open_meta_blob(blob_type),
+        OpenKind::Content => needed_blobs.open_blob(&blob_id.into(), blob_type),
     };
     match open_fut.await {
         Err(fidl::Error::ClientChannelClosed { status: Status::OK, .. }) => {
@@ -158,10 +163,16 @@ async fn open_blob(
             Ok(None)
         }
         res => {
-            if res?? {
+            if let Some(blob) = res?? {
+                let proxy = blob.into_proxy()?;
                 Ok(Some(NeededBlob {
-                    blob: Blob { proxy: Clone::clone(&blob), state: NeedsTruncate },
-                    closer: BlobCloser { proxy: blob, closed: false },
+                    blob: Blob {
+                        proxy: Clone::clone(&proxy),
+                        needed_blobs: needed_blobs.clone(),
+                        blob_id,
+                        state: NeedsTruncate,
+                    },
+                    closer: BlobCloser { proxy, closed: false },
                 }))
             } else {
                 Ok(None)
@@ -173,7 +184,7 @@ async fn open_blob(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum OpenKind {
     Meta,
-    Content(BlobId),
+    Content,
 }
 
 /// A deferred call to [`Get::open_meta_blob`] or [`Get::open_blob`].
@@ -181,6 +192,7 @@ enum OpenKind {
 pub struct DeferredOpenBlob {
     needed_blobs: fpkg::NeededBlobsProxy,
     kind: OpenKind,
+    blob_id: BlobId,
     pkg_present: Option<SharedBoolEvent>,
 }
 
@@ -191,7 +203,8 @@ impl DeferredOpenBlob {
         &self,
         blob_type: fpkg::BlobType,
     ) -> Result<Option<NeededBlob>, OpenBlobError> {
-        open_blob(&self.needed_blobs, self.kind, blob_type, self.pkg_present.as_ref()).await
+        open_blob(&self.needed_blobs, self.kind, self.blob_id, blob_type, self.pkg_present.as_ref())
+            .await
     }
     fn proxy_cmp_key(&self) -> u32 {
         use fidl::{endpoints::Proxy, AsHandleRef};
@@ -218,6 +231,7 @@ pub struct Get {
     needed_blobs: fpkg::NeededBlobsProxy,
     pkg_dir: PackageDirectory,
     pkg_present: SharedBoolEvent,
+    meta_far: BlobId,
 }
 
 impl Get {
@@ -227,6 +241,7 @@ impl Get {
         DeferredOpenBlob {
             needed_blobs: self.needed_blobs.clone(),
             kind: OpenKind::Meta,
+            blob_id: self.meta_far,
             pkg_present: Some(self.pkg_present.clone()),
         }
     }
@@ -237,7 +252,14 @@ impl Get {
         &mut self,
         blob_type: fpkg::BlobType,
     ) -> Result<Option<NeededBlob>, OpenBlobError> {
-        open_blob(&self.needed_blobs, OpenKind::Meta, blob_type, Some(&self.pkg_present)).await
+        open_blob(
+            &self.needed_blobs,
+            OpenKind::Meta,
+            self.meta_far,
+            blob_type,
+            Some(&self.pkg_present),
+        )
+        .await
     }
 
     fn start_get_missing_blobs(
@@ -283,7 +305,8 @@ impl Get {
     pub fn make_open_blob(&mut self, content_blob: BlobId) -> DeferredOpenBlob {
         DeferredOpenBlob {
             needed_blobs: self.needed_blobs.clone(),
-            kind: OpenKind::Content(content_blob),
+            kind: OpenKind::Content,
+            blob_id: content_blob,
             pkg_present: None,
         }
     }
@@ -295,7 +318,7 @@ impl Get {
         content_blob: BlobId,
         blob_type: fpkg::BlobType,
     ) -> Result<Option<NeededBlob>, OpenBlobError> {
-        open_blob(&self.needed_blobs, OpenKind::Content(content_blob), blob_type, None).await
+        open_blob(&self.needed_blobs, OpenKind::Content, content_blob, blob_type, None).await
     }
 
     /// Notifies the endpoint that all blobs have been written and wait for the response to the
@@ -355,14 +378,26 @@ impl Drop for BlobCloser {
     }
 }
 
+/// The successful result of truncating a blob.
+#[derive(Debug)]
+pub enum TruncateBlobSuccess {
+    /// The blob contents need to be written.
+    NeedsData(Blob<NeedsData>),
+
+    /// The blob is fully written (it was the empty blob) and now a
+    /// fuchsia.pkg.NeededBlobs.BlobWritten message should be sent.
+    AllWritten(Blob<NeedsBlobWritten>),
+}
+
 /// The successful result of writing some data to a blob.
 #[derive(Debug)]
 pub enum BlobWriteSuccess {
     /// There is still more data to write.
-    MoreToWrite(Blob<NeedsData>),
+    NeedsData(Blob<NeedsData>),
 
-    /// The blob is fully written.
-    Done,
+    /// The blob is fully written and now a fuchsia.pkg.NeededBlobs.BlobWritten
+    /// message should be sent.
+    AllWritten(Blob<NeedsBlobWritten>),
 }
 
 /// State for a blob that can be truncated.
@@ -376,16 +411,24 @@ pub struct NeedsData {
     written: u64,
 }
 
+/// State for a blob that has been fully written but that needs a
+/// fuchsia.pkg.NeededBlobs.BlobWritten message sent to pkg-cache.
+#[derive(Debug)]
+pub struct NeedsBlobWritten;
+
 /// A blob in the process of being written.
 #[derive(Debug)]
+#[must_use]
 pub struct Blob<S> {
     proxy: fio::FileProxy,
+    needed_blobs: fpkg::NeededBlobsProxy,
+    blob_id: BlobId,
     state: S,
 }
 
 impl Blob<NeedsTruncate> {
     /// Truncates the blob to the given size. On success, the blob enters the writable state.
-    pub async fn truncate(self, size: u64) -> Result<Blob<NeedsData>, TruncateBlobError> {
+    pub async fn truncate(self, size: u64) -> Result<TruncateBlobSuccess, TruncateBlobError> {
         let () =
             self.proxy.resize(size).await?.map_err(Status::from_raw).map_err(
                 |status| match status {
@@ -394,24 +437,23 @@ impl Blob<NeedsTruncate> {
                 },
             )?;
 
-        Ok(Blob { proxy: self.proxy, state: NeedsData { size, written: 0 } })
-    }
+        let Self { proxy, needed_blobs, blob_id, state: _ } = self;
 
-    /// Creates a new blob/closer client backed by the returned request stream. This constructor
-    /// should not be used outside of tests.
-    ///
-    /// # Panics
-    ///
-    /// Panics on error
-    pub fn new_test() -> (Self, BlobCloser, fio::FileRequestStream) {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fio::FileMarker>().unwrap();
-
-        (
-            Blob { proxy: Clone::clone(&proxy), state: NeedsTruncate },
-            BlobCloser { proxy, closed: false },
-            stream,
-        )
+        Ok(if size == 0 {
+            TruncateBlobSuccess::AllWritten(Blob {
+                proxy,
+                needed_blobs,
+                blob_id,
+                state: NeedsBlobWritten,
+            })
+        } else {
+            TruncateBlobSuccess::NeedsData(Blob {
+                proxy,
+                needed_blobs,
+                blob_id,
+                state: NeedsData { size, written: 0 },
+            })
+        })
     }
 }
 
@@ -447,16 +489,20 @@ impl Blob<NeedsData> {
         while !buf.is_empty() {
             // Don't try to write more than MAX_BUF bytes at a time.
             let limit = buf.len().min(fio::MAX_BUF as usize);
-
             let written = self.write_some(&buf[..limit], &after_write, &after_write_ack).await?;
-
             buf = &buf[written..];
         }
 
         if self.state.written == self.state.size {
-            Ok(BlobWriteSuccess::Done)
+            let Self { proxy, needed_blobs, blob_id, state: _ } = self;
+            Ok(BlobWriteSuccess::AllWritten(Blob {
+                proxy,
+                needed_blobs,
+                blob_id,
+                state: NeedsBlobWritten,
+            }))
         } else {
-            Ok(BlobWriteSuccess::MoreToWrite(self))
+            Ok(BlobWriteSuccess::NeedsData(self))
         }
     }
 
@@ -497,6 +543,13 @@ impl Blob<NeedsData> {
 
         self.state.written += actual;
         Ok(actual as usize)
+    }
+}
+
+impl Blob<NeedsBlobWritten> {
+    /// Tells pkg-cache that the blob has been successfully written and can now be read.
+    pub async fn blob_written(self) -> Result<(), BlobWrittenError> {
+        Ok(self.needed_blobs.blob_written(&self.blob_id.into()).await??)
     }
 }
 
@@ -544,13 +597,13 @@ pub enum OpenBlobError {
     Fidl(#[from] fidl::Error),
 }
 
-impl From<fidl_fuchsia_pkg::OpenBlobError> for OpenBlobError {
-    fn from(e: fidl_fuchsia_pkg::OpenBlobError) -> Self {
+impl From<fpkg::OpenBlobError> for OpenBlobError {
+    fn from(e: fpkg::OpenBlobError) -> Self {
         match e {
-            fidl_fuchsia_pkg::OpenBlobError::OutOfSpace => OpenBlobError::OutOfSpace,
-            fidl_fuchsia_pkg::OpenBlobError::ConcurrentWrite => OpenBlobError::ConcurrentWrite,
-            fidl_fuchsia_pkg::OpenBlobError::UnspecifiedIo => OpenBlobError::UnspecifiedIo,
-            fidl_fuchsia_pkg::OpenBlobError::Internal => OpenBlobError::Internal,
+            fpkg::OpenBlobError::OutOfSpace => OpenBlobError::OutOfSpace,
+            fpkg::OpenBlobError::ConcurrentWrite => OpenBlobError::ConcurrentWrite,
+            fpkg::OpenBlobError::UnspecifiedIo => OpenBlobError::UnspecifiedIo,
+            fpkg::OpenBlobError::Internal => OpenBlobError::Internal,
         }
     }
 }
@@ -600,11 +653,34 @@ pub enum WriteBlobError {
     Fidl(#[from] fidl::Error),
 }
 
+/// An error encountered while sending the BlobWritten message.
+#[derive(Debug, thiserror::Error)]
+#[allow(missing_docs)]
+pub enum BlobWrittenError {
+    #[error("pkg-cache could not find the blob after it was successfully written")]
+    MissingAfterWritten,
+
+    #[error("NeededBlobs.BlobWritten was called before the blob was opened")]
+    UnopenedBlob,
+
+    #[error("transport error")]
+    Fidl(#[from] fidl::Error),
+}
+
+impl From<fpkg::BlobWrittenError> for BlobWrittenError {
+    fn from(e: fpkg::BlobWrittenError) -> Self {
+        match e {
+            fpkg::BlobWrittenError::NotWritten => BlobWrittenError::MissingAfterWritten,
+            fpkg::BlobWrittenError::UnopenedBlob => BlobWrittenError::UnopenedBlob,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use fidl::prelude::*;
+    use fidl::endpoints::{ClientEnd, ControlHandle as _, RequestStream as _};
     use fidl_fuchsia_pkg::{
         BlobInfoIteratorRequest, NeededBlobsRequest, NeededBlobsRequestStream,
         PackageCacheGetResponder, PackageCacheMarker, PackageCacheOpenResponder,
@@ -708,10 +784,10 @@ mod tests {
 
         async fn expect_open_meta_blob(
             mut self,
-            res: Result<bool, fidl_fuchsia_pkg::OpenBlobError>,
+            res: Result<Option<ClientEnd<fio::FileMarker>>, fpkg::OpenBlobError>,
         ) -> Self {
             match self.stream.next().await {
-                Some(Ok(NeededBlobsRequest::OpenMetaBlob { file: _, blob_type, responder })) => {
+                Some(Ok(NeededBlobsRequest::OpenMetaBlob { blob_type, responder })) => {
                     assert_eq!(blob_type, fpkg::BlobType::Uncompressed);
                     responder.send(res).unwrap();
                 }
@@ -723,15 +799,10 @@ mod tests {
         async fn expect_open_blob(
             mut self,
             expected_blob_id: BlobId,
-            res: Result<bool, fidl_fuchsia_pkg::OpenBlobError>,
+            res: Result<Option<ClientEnd<fio::FileMarker>>, fpkg::OpenBlobError>,
         ) -> Self {
             match self.stream.next().await {
-                Some(Ok(NeededBlobsRequest::OpenBlob {
-                    blob_id,
-                    file: _,
-                    blob_type,
-                    responder,
-                })) => {
+                Some(Ok(NeededBlobsRequest::OpenBlob { blob_id, blob_type, responder })) => {
                     assert_eq!(BlobId::from(blob_id), expected_blob_id);
                     assert_eq!(blob_type, fpkg::BlobType::Uncompressed);
                     responder.send(res).unwrap();
@@ -966,17 +1037,17 @@ mod tests {
         let ((), ()) = future::join(
             async {
                 pending_get
-                    .expect_open_meta_blob(Ok(false))
+                    .expect_open_meta_blob(Ok(None))
                     .await
-                    .expect_open_meta_blob(Ok(true))
+                    .expect_open_meta_blob(Ok(Some(fidl::endpoints::create_endpoints().0)))
                     .await
-                    .expect_open_meta_blob(Ok(false))
+                    .expect_open_meta_blob(Ok(None))
                     .await
-                    .expect_open_meta_blob(Ok(true))
+                    .expect_open_meta_blob(Ok(Some(fidl::endpoints::create_endpoints().0)))
                     .await
-                    .expect_open_meta_blob(Err(fidl_fuchsia_pkg::OpenBlobError::OutOfSpace))
+                    .expect_open_meta_blob(Err(fpkg::OpenBlobError::OutOfSpace))
                     .await
-                    .expect_open_meta_blob(Err(fidl_fuchsia_pkg::OpenBlobError::UnspecifiedIo))
+                    .expect_open_meta_blob(Err(fpkg::OpenBlobError::UnspecifiedIo))
                     .await;
             },
             async {
@@ -1016,20 +1087,17 @@ mod tests {
         let ((), ()) = future::join(
             async {
                 pending_get
-                    .expect_open_blob(blob_id(2), Ok(false))
+                    .expect_open_blob(blob_id(2), Ok(None))
                     .await
-                    .expect_open_blob(blob_id(2), Ok(true))
+                    .expect_open_blob(blob_id(2), Ok(Some(fidl::endpoints::create_endpoints().0)))
                     .await
-                    .expect_open_blob(blob_id(10), Ok(false))
+                    .expect_open_blob(blob_id(10), Ok(None))
                     .await
-                    .expect_open_blob(blob_id(11), Ok(true))
+                    .expect_open_blob(blob_id(11), Ok(Some(fidl::endpoints::create_endpoints().0)))
                     .await
-                    .expect_open_blob(blob_id(12), Err(fidl_fuchsia_pkg::OpenBlobError::OutOfSpace))
+                    .expect_open_blob(blob_id(12), Err(fpkg::OpenBlobError::OutOfSpace))
                     .await
-                    .expect_open_blob(
-                        blob_id(13),
-                        Err(fidl_fuchsia_pkg::OpenBlobError::UnspecifiedIo),
-                    )
+                    .expect_open_blob(blob_id(13), Err(fpkg::OpenBlobError::UnspecifiedIo))
                     .await;
             },
             async {
@@ -1161,24 +1229,36 @@ mod tests {
     }
 
     struct MockNeededBlob {
-        stream: fio::FileRequestStream,
+        blob: fio::FileRequestStream,
+        needed_blobs: fpkg::NeededBlobsRequestStream,
     }
 
     impl MockNeededBlob {
+        fn mock_hash() -> BlobId {
+            [7; 32].into()
+        }
+
         fn new() -> (NeededBlob, Self) {
-            let (proxy, stream) =
+            let (blob_proxy, blob) =
                 fidl::endpoints::create_proxy_and_stream::<fio::FileMarker>().unwrap();
+            let (needed_blobs_proxy, needed_blobs) =
+                fidl::endpoints::create_proxy_and_stream::<fpkg::NeededBlobsMarker>().unwrap();
             (
                 NeededBlob {
-                    blob: Blob { proxy: Clone::clone(&proxy), state: NeedsTruncate },
-                    closer: BlobCloser { proxy, closed: false },
+                    blob: Blob {
+                        proxy: Clone::clone(&blob_proxy),
+                        needed_blobs: needed_blobs_proxy,
+                        blob_id: Self::mock_hash(),
+                        state: NeedsTruncate,
+                    },
+                    closer: BlobCloser { proxy: blob_proxy, closed: false },
                 },
-                Self { stream },
+                Self { blob, needed_blobs },
             )
         }
 
         async fn fail_truncate(mut self) -> Self {
-            match self.stream.next().await {
+            match self.blob.next().await {
                 Some(Ok(fio::FileRequest::Resize { length: _, responder })) => {
                     responder.send(Err(Status::NO_SPACE.into_raw())).unwrap();
                 }
@@ -1188,7 +1268,7 @@ mod tests {
         }
 
         async fn expect_truncate(mut self, expected_length: u64) -> Self {
-            match self.stream.next().await {
+            match self.blob.next().await {
                 Some(Ok(fio::FileRequest::Resize { length, responder })) => {
                     assert_eq!(length, expected_length);
                     responder.send(Ok(())).unwrap();
@@ -1199,7 +1279,7 @@ mod tests {
         }
 
         async fn fail_write(mut self) -> Self {
-            match self.stream.next().await {
+            match self.blob.next().await {
                 Some(Ok(fio::FileRequest::Write { data: _, responder })) => {
                     responder.send(Err(Status::NO_SPACE.into_raw())).unwrap();
                 }
@@ -1209,7 +1289,7 @@ mod tests {
         }
 
         async fn expect_write(mut self, expected_payload: &[u8]) -> Self {
-            match self.stream.next().await {
+            match self.blob.next().await {
                 Some(Ok(fio::FileRequest::Write { data, responder })) => {
                     assert_eq!(data, expected_payload);
                     responder.send(Ok(data.len() as u64)).unwrap();
@@ -1224,7 +1304,7 @@ mod tests {
             expected_payload: &[u8],
             bytes_to_consume: u64,
         ) -> Self {
-            match self.stream.next().await {
+            match self.blob.next().await {
                 Some(Ok(fio::FileRequest::Write { data, responder })) => {
                     assert_eq!(data, expected_payload);
                     responder.send(Ok(bytes_to_consume)).unwrap();
@@ -1235,17 +1315,79 @@ mod tests {
         }
 
         async fn expect_close(mut self) {
-            match self.stream.next().await {
+            match self.blob.next().await {
                 Some(Ok(fio::FileRequest::Close { responder })) => {
                     responder.send(Ok(())).unwrap();
                 }
                 r => panic!("Unexpected request: {:?}", r),
             }
         }
+
+        async fn expect_blob_written(mut self) -> Self {
+            match self.needed_blobs.next().await {
+                Some(Ok(fpkg::NeededBlobsRequest::BlobWritten { blob_id, responder })) => {
+                    assert_eq!(blob_id, Self::mock_hash().into());
+                    responder.send(Ok(())).unwrap();
+                }
+                r => panic!("Unexpected request: {:?}", r),
+            }
+            self
+        }
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn trivial_blob_write() {
+    async fn empty_blob_write() {
+        let (NeededBlob { blob, closer }, blob_server) = MockNeededBlob::new();
+
+        let ((), ()) = future::join(
+            async {
+                blob_server
+                    .expect_truncate(0)
+                    .await
+                    .expect_blob_written()
+                    .await
+                    .expect_close()
+                    .await;
+            },
+            async {
+                let blob = match blob.truncate(0).await.unwrap() {
+                    TruncateBlobSuccess::AllWritten(blob) => blob,
+                    other => panic!("empty blob shouldn't need bytes {other:?}"),
+                };
+                let () = blob.blob_written().await.unwrap();
+                closer.close().await;
+            },
+        )
+        .await;
+    }
+
+    impl TruncateBlobSuccess {
+        fn unwrap_needs_data(self) -> Blob<NeedsData> {
+            match self {
+                TruncateBlobSuccess::NeedsData(blob) => blob,
+                TruncateBlobSuccess::AllWritten(_) => panic!("blob should need data"),
+            }
+        }
+    }
+
+    impl BlobWriteSuccess {
+        fn unwrap_needs_data(self) -> Blob<NeedsData> {
+            match self {
+                BlobWriteSuccess::NeedsData(blob) => blob,
+                BlobWriteSuccess::AllWritten(_) => panic!("blob should need data"),
+            }
+        }
+
+        fn unwrap_all_written(self) -> Blob<NeedsBlobWritten> {
+            match self {
+                BlobWriteSuccess::NeedsData(_) => panic!("blob should be completely written"),
+                BlobWriteSuccess::AllWritten(blob) => blob,
+            }
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn small_blob_write() {
         let (NeededBlob { blob, closer }, blob_server) = MockNeededBlob::new();
 
         let ((), ()) = future::join(
@@ -1255,12 +1397,15 @@ mod tests {
                     .await
                     .expect_write(b"test")
                     .await
+                    .expect_blob_written()
+                    .await
                     .expect_close()
                     .await;
             },
             async {
-                let blob = blob.truncate(4).await.unwrap();
-                assert_matches!(blob.write(b"test").await.unwrap(), BlobWriteSuccess::Done);
+                let blob = blob.truncate(4).await.unwrap().unwrap_needs_data();
+                let blob = blob.write(b"test").await.unwrap().unwrap_all_written();
+                let () = blob.blob_written().await.unwrap();
                 closer.close().await;
             },
         )
@@ -1292,7 +1437,7 @@ mod tests {
                 blob_server.expect_truncate(4).await.fail_write().await;
             },
             async {
-                let blob = blob.truncate(4).await.unwrap();
+                let blob = blob.truncate(4).await.unwrap().unwrap_needs_data();
                 assert_matches!(blob.write(b"test").await, Err(WriteBlobError::NoSpace));
                 closer.close().await;
             },
@@ -1312,11 +1457,14 @@ mod tests {
                     .expect_write_partial(b"abc123", 3)
                     .await
                     .expect_write(b"123")
+                    .await
+                    .expect_blob_written()
                     .await;
             },
             async {
-                let blob = blob.truncate(6).await.unwrap();
-                assert_matches!(blob.write(b"abc123").await.unwrap(), BlobWriteSuccess::Done);
+                let blob = blob.truncate(6).await.unwrap().unwrap_needs_data();
+                let blob = blob.write(b"abc123").await.unwrap().unwrap_all_written();
+                let () = blob.blob_written().await.unwrap();
                 closer.close().await;
             },
         )
@@ -1335,15 +1483,15 @@ mod tests {
                     .expect_write(b"abc")
                     .await
                     .expect_write(b"123")
+                    .await
+                    .expect_blob_written()
                     .await;
             },
             async {
-                let blob = blob.truncate(6).await.unwrap();
-                let blob = match blob.write(b"abc").await.unwrap() {
-                    BlobWriteSuccess::MoreToWrite(blob) => blob,
-                    BlobWriteSuccess::Done => unreachable!(),
-                };
-                assert_matches!(blob.write(b"123").await.unwrap(), BlobWriteSuccess::Done);
+                let blob = blob.truncate(6).await.unwrap().unwrap_needs_data();
+                let blob = blob.write(b"abc").await.unwrap().unwrap_needs_data();
+                let blob = blob.write(b"123").await.unwrap().unwrap_all_written();
+                let () = blob.blob_written().await.unwrap();
                 closer.close().await;
             },
         )
@@ -1366,13 +1514,16 @@ mod tests {
                     .expect_write(&[1u8; CHUNK_SIZE])
                     .await
                     .expect_write(&[2u8; CHUNK_SIZE])
+                    .await
+                    .expect_blob_written()
                     .await;
             },
             async {
                 let payload =
                     (0..3).flat_map(|n| std::iter::repeat(n).take(CHUNK_SIZE)).collect::<Vec<u8>>();
-                let blob = blob.truncate(3 * CHUNK_SIZE as u64).await.unwrap();
-                assert_matches!(blob.write(&payload).await.unwrap(), BlobWriteSuccess::Done);
+                let blob = blob.truncate(3 * CHUNK_SIZE as u64).await.unwrap().unwrap_needs_data();
+                let blob = blob.write(&payload).await.unwrap().unwrap_all_written();
+                let () = blob.blob_written().await.unwrap();
                 closer.close().await;
             },
         )
@@ -1406,7 +1557,11 @@ mod tests {
 
         let ((), ()) = future::join(
             async {
-                server.expect_get(blob_info(2)).await.expect_open_meta_blob(Ok(true)).await;
+                server
+                    .expect_get(blob_info(2))
+                    .await
+                    .expect_open_meta_blob(Ok(Some(fidl::endpoints::create_endpoints().0)))
+                    .await;
             },
             async move {
                 assert_matches!(
@@ -1427,7 +1582,7 @@ mod tests {
                 server
                     .expect_get(blob_info(2))
                     .await
-                    .expect_open_meta_blob(Ok(false))
+                    .expect_open_meta_blob(Ok(None))
                     .await
                     .expect_get_missing_blobs_client_closes_channel(vec![vec![BlobInfo {
                         blob_id: [0; 32].into(),

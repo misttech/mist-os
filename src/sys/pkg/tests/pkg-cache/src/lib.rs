@@ -108,14 +108,15 @@ async fn get_and_verify_package(
 }
 
 pub async fn write_meta_far(needed_blobs: &fpkg::NeededBlobsProxy, meta_far: BlobContents) {
-    let (meta_blob, meta_blob_server_end) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-    assert!(needed_blobs
-        .open_meta_blob(meta_blob_server_end, fpkg::BlobType::Uncompressed)
-        .await
-        .unwrap()
-        .unwrap());
-    write_blob(&meta_far.contents, meta_blob).await.unwrap();
+    let meta_blob =
+        needed_blobs.open_meta_blob(fpkg::BlobType::Uncompressed).await.unwrap().unwrap().unwrap();
+    let () = write_blob(&meta_far.contents, meta_blob.into_proxy().unwrap()).await.unwrap();
+    let () = blob_written(needed_blobs, meta_far.merkle).await;
+}
+
+pub async fn blob_written(needed_blobs: &fpkg::NeededBlobsProxy, hash: Hash) {
+    let () =
+        needed_blobs.blob_written(&fpkg_ext::BlobId::from(hash).into()).await.unwrap().unwrap();
 }
 
 pub async fn write_needed_blobs(
@@ -132,13 +133,14 @@ pub async fn write_needed_blobs(
             break;
         }
         for blob_info in chunk {
-            let (blob_proxy, blob_server_end) =
-                fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-            assert!(needed_blobs
-                .open_blob(&blob_info.blob_id, blob_server_end, fpkg::BlobType::Uncompressed)
+            let blob_proxy = needed_blobs
+                .open_blob(&blob_info.blob_id, fpkg::BlobType::Uncompressed)
                 .await
                 .unwrap()
-                .unwrap());
+                .unwrap()
+                .unwrap()
+                .into_proxy()
+                .unwrap();
             let () = write_blob(
                 available_blobs
                     .remove(&fpkg_ext::BlobId::from(blob_info.blob_id).into())
@@ -148,6 +150,8 @@ pub async fn write_needed_blobs(
             )
             .await
             .unwrap();
+            let () =
+                blob_written(needed_blobs, fpkg_ext::BlobId::from(blob_info.blob_id).into()).await;
         }
     }
 }
@@ -189,26 +193,21 @@ async fn verify_package_cached(
         .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
         .map_ok(|res| res.map_err(Status::from_raw));
 
-    let (_meta_blob, meta_blob_server_end) =
-        fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-
     // If the package is active in the dynamic index, the server will send a `ZX_OK` epitaph then
     // close the channel.
     // If all the blobs are cached but the package is not active in the dynamic index the server
     // will reply with `Ok(false)`, meaning that the metadata blob is cached and GetMissingBlobs
     // needs to be performed (but the iterator obtained with GetMissingBlobs should be empty).
-    let epitaph_received =
-        match needed_blobs.open_meta_blob(meta_blob_server_end, fpkg::BlobType::Uncompressed).await
-        {
-            Err(fidl::Error::ClientChannelClosed { status: Status::OK, .. }) => true,
-            Ok(Ok(false)) => false,
-            Ok(r) => {
-                panic!("Meta blob not cached: unexpected response {r:?}")
-            }
-            Err(e) => {
-                panic!("Meta blob not cached: unexpected FIDL error {e:?}")
-            }
-        };
+    let epitaph_received = match needed_blobs.open_meta_blob(fpkg::BlobType::Uncompressed).await {
+        Err(fidl::Error::ClientChannelClosed { status: Status::OK, .. }) => true,
+        Ok(Ok(None)) => false,
+        Ok(r) => {
+            panic!("Meta blob not cached: unexpected response {r:?}")
+        }
+        Err(e) => {
+            panic!("Meta blob not cached: unexpected FIDL error {e:?}")
+        }
+    };
 
     let (blob_iterator, blob_iterator_server_end) =
         fidl::endpoints::create_proxy::<fpkg::BlobInfoIteratorMarker>().unwrap();
