@@ -1,0 +1,31 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "inspect_test_runner",
+            url: "fuchsia-pkg://fuchsia.com/inspect-test-runner#meta/inspect-test-runner.cm",
+        },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.diagnostics.ArchiveAccessor",
+            from: "parent",
+            as: "fuchsia.diagnostics.RealArchiveAccessor",
+            to: [ "#inspect_test_runner" ],
+        },
+        {
+            protocol: "fuchsia.diagnostics.FeedbackArchiveAccessor",
+            from: "parent",
+            as: "fuchsia.diagnostics.RealFeedbackArchiveAccessor",
+            to: [ "#inspect_test_runner" ],
+        },
+        {
+            protocol: "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
+            from: "parent",
+            as: "fuchsia.diagnostics.RealLegacyMetricsArchiveAccessor",
+            to: [ "#inspect_test_runner" ],
+        },
+    ],
+}

@@ -1,0 +1,57 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/sys/testing/meta/lib-loader-cache.shard.cml",
+        "//src/sys/testing/meta/runner-memfs.shard.cml",
+        "//src/sys/testing/meta/test-memfs.shard.cml",
+    ],
+    children: [
+        {
+            name: "starnix_test_runners",
+            url: "fuchsia-pkg://fuchsia.com/starnix-test-runners#meta/starnix_test_runners.cm",
+        },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.kernel.VmexResource",
+                "fuchsia.posix.socket.Provider",
+                "fuchsia.posix.socket.raw.Provider",
+                "fuchsia.process.Launcher",
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.tracing.provider.Registry",
+                "fuchsia.ui.composition.Allocator",
+                "fuchsia.ui.composition.Flatland",
+                "fuchsia.ui.input3.Keyboard",
+                "fuchsia.ui.scenic.Scenic",
+                "fuchsia.vulkan.loader.Loader",
+            ],
+            from: "parent",
+            to: [ "#starnix_test_runners" ],
+        },
+        {
+            protocol: "fuchsia.test.runner.LibraryLoaderCacheBuilder",
+            from: "#lib_loader_cache",
+            to: [ "#starnix_test_runners" ],
+        },
+        {
+            storage: "memfs_data",
+            from: "self",
+            as: "data",
+            to: [ "#starnix_test_runners" ],
+        },
+        {
+            storage: "tmp",
+            from: "self",
+            to: [ "#starnix_test_runners" ],
+        },
+        {
+            directory: "dev-gpu",
+            from: "parent",
+            to: [ "#starnix_test_runners" ],
+            rights: [ "r*" ],
+        },
+    ],
+}

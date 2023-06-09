@@ -5,242 +5,33 @@
 // This realm installs various testing collections.
 {
     include: [
+        // Optional: Include optional runners.
+        "//src/sys/testing/meta/fuzz-test-runner.shard.cml",
+        "//src/sys/testing/meta/inspect-test-runner.shard.cml",
+        "//src/sys/testing/meta/netemul-test-runner.shard.cml",
+        "//src/sys/testing/meta/standard-test-runners.shard.cml",
+        "//src/sys/testing/meta/starnix-test-runner.shard.cml",
+        "//src/sys/testing/meta/stress-test-runner.shard.cml",
+
+        // Required: Include various test collections/realms.
         "//src/sys/testing/meta/system-tests.shard.cml",
         "//src/sys/testing/meta/test-arch-tests.shard.cml",
+
+        // Required: Include other required shards.
         "sys/component/realm_builder.shard.cml",
         "syslog/client.shard.cml",
     ],
-    children: [
-        {
-            name: "elf_test_runner",
-            url: "fuchsia-pkg://fuchsia.com/elf-test-runner#meta/elf-test-runner.cm",
-        },
-        {
-            name: "elf_test_ambient_exec_runner",
-            url: "fuchsia-pkg://fuchsia.com/elf-test-ambient-exec-runner#meta/elf-test-ambient-exec-runner.cm",
-        },
-        {
-            name: "elf_test_create_raw_processes_runner",
-            url: "fuchsia-pkg://fuchsia.com/elf-test-create-raw-processes-runner#meta/elf-test-create-raw-processes-runner.cm",
-        },
-        {
-            name: "fuzz_test_runner",
-            url: "fuchsia-pkg://fuchsia.com/fuzz-test-runner#meta/fuzz-test-runner.cm",
-        },
-        {
-            name: "gtest_runner",
-            url: "fuchsia-pkg://fuchsia.com/gtest-runner#meta/gtest-runner.cm",
-        },
-        {
-            name: "gunit_runner",
-            url: "fuchsia-pkg://fuchsia.com/gunit-runner#meta/gunit-runner.cm",
-        },
-        {
-            name: "legacy_test_runner",
-            url: "fuchsia-pkg://fuchsia.com/legacy-test-runner#meta/legacy-test-runner.cm",
-        },
-        {
-            name: "lib_loader_cache",
-            url: "fuchsia-pkg://fuchsia.com/lib_loader_runner_cache#meta/lib_loader_runner_cache.cm",
-        },
-        {
-            name: "netemul_test_runner",
-            url: "fuchsia-pkg://fuchsia.com/netemul-test-runner#meta/netemul-test-runner.cm",
-        },
-        {
-            name: "rust_test_next_vdso_runner",
-            url: "fuchsia-pkg://fuchsia.com/rust-test-next-vdso-runner#meta/rust-test-next-vdso-runner.cm",
-        },
-        {
-            name: "rust_test_runner",
-            url: "fuchsia-pkg://fuchsia.com/rust-test-runner#meta/rust-test-runner.cm",
-        },
-        {
-            name: "starnix_test_runners",
-            url: "fuchsia-pkg://fuchsia.com/starnix-test-runners#meta/starnix_test_runners.cm",
-        },
-        {
-            name: "go_test_runner",
-            url: "fuchsia-pkg://fuchsia.com/go-test-runner#meta/go-test-runner.cm",
-        },
-        {
-            name: "inspect_test_runner",
-            url: "fuchsia-pkg://fuchsia.com/inspect-test-runner#meta/inspect-test-runner.cm",
-        },
-        {
-            name: "stress_test_runner",
-            url: "fuchsia-pkg://fuchsia.com/stress-test-runner#meta/stress-test-runner.cm",
-        },
-        {
-            name: "runner_memfs",
-            url: "fuchsia-pkg://fuchsia.com/test_manager#meta/memfs.cm",
-        },
-        {
-            name: "test_tmpfs",
-            url: "fuchsia-pkg://fuchsia.com/test_manager#meta/memfs.cm",
-        },
-        {
-            name: "fxfs_data",
-            url: "fuchsia-pkg://fuchsia.com/test_manager#meta/fxfs_backed_data_for_tests.cm",
-        },
-    ],
-    capabilities: [
-        {
-            storage: "memfs_data",
-            from: "#runner_memfs",
-            backing_dir: "memfs",
-            storage_id: "static_instance_id_or_moniker",
-        },
-        {
-            storage: "tmp",
-            from: "#test_tmpfs",
-            subdir: "tmp",
-            backing_dir: "memfs",
-            storage_id: "static_instance_id_or_moniker",
-        },
-        {
-            storage: "cache",
-            from: "#test_tmpfs",
-            subdir: "cache",
-            backing_dir: "memfs",
-            storage_id: "static_instance_id_or_moniker",
-        },
-        {
-            directory: "fxfs_data",
-            rights: [ "rw*" ],
-            path: "/data_for_test",
-        },
-        {
-            storage: "fxfs_tests_data",
-            from: "#fxfs_data",
-            backing_dir: "fxfs_data",
-            storage_id: "static_instance_id_or_moniker",
-        },
-    ],
-    offer: [
-        {
-            storage: "data",
-            from: "parent",
-            to: "#fxfs_data",
-        },
-        {
-            protocol: [
-                "fuchsia.sys.Environment",
-                "fuchsia.sys.Loader",
-            ],
-            from: "parent",
-            to: [
-                "#legacy_test_runner",
-
-                // TODO(https://fxbug.dev/87164): when these legacy capabilities used by the
-                // realm builder server can be optional, don't offer them to the
-                // netemul_test_runner.
-                "#netemul_test_runner",
-            ],
-            availability: "optional",
-        },
-        {
-            protocol: [
-                "fuchsia.kernel.VmexResource",
-                "fuchsia.posix.socket.Provider",
-                "fuchsia.posix.socket.raw.Provider",
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.tracing.provider.Registry",
-                "fuchsia.ui.composition.Allocator",
-                "fuchsia.ui.composition.Flatland",
-                "fuchsia.ui.input3.Keyboard",
-                "fuchsia.ui.scenic.Scenic",
-                "fuchsia.vulkan.loader.Loader",
-            ],
-            from: "parent",
-            to: [ "#starnix_test_runners" ],
-        },
-        {
-            protocol: "fuchsia.process.Launcher",
-            from: "parent",
-            to: [
-                "#elf_test_ambient_exec_runner",
-                "#elf_test_create_raw_processes_runner",
-                "#elf_test_runner",
-                "#fuzz_test_runner",
-                "#go_test_runner",
-                "#gtest_runner",
-                "#gunit_runner",
-                "#netemul_test_runner",
-                "#rust_test_next_vdso_runner",
-                "#rust_test_runner",
-                "#starnix_test_runners",
-            ],
-        },
-        {
-            protocol: "fuchsia.test.runner.LibraryLoaderCacheBuilder",
-            from: "#lib_loader_cache",
-            to: [
-                "#elf_test_ambient_exec_runner",
-                "#elf_test_create_raw_processes_runner",
-                "#elf_test_runner",
-                "#fuzz_test_runner",
-                "#go_test_runner",
-                "#gtest_runner",
-                "#gunit_runner",
-                "#rust_test_next_vdso_runner",
-                "#rust_test_runner",
-                "#starnix_test_runners",
-            ],
-        },
-        {
-            protocol: "fuchsia.fuzzer.Registrar",
-            from: "parent",
-            to: "#fuzz_test_runner",
-        },
-        {
-            protocol: "fuchsia.diagnostics.ArchiveAccessor",
-            from: "parent",
-            as: "fuchsia.diagnostics.RealArchiveAccessor",
-            to: [ "#inspect_test_runner" ],
-        },
-        {
-            protocol: "fuchsia.diagnostics.FeedbackArchiveAccessor",
-            from: "parent",
-            as: "fuchsia.diagnostics.RealFeedbackArchiveAccessor",
-            to: [ "#inspect_test_runner" ],
-        },
-        {
-            protocol: "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
-            from: "parent",
-            as: "fuchsia.diagnostics.RealLegacyMetricsArchiveAccessor",
-            to: [ "#inspect_test_runner" ],
-        },
-        {
-            storage: "memfs_data",
-            from: "self",
-            as: "data",
-            to: [
-                "#gtest_runner",
-                "#gunit_runner",
-                "#rust_test_next_vdso_runner",
-                "#rust_test_runner",
-                "#starnix_test_runners",
-            ],
-        },
-        {
-            storage: "tmp",
-            from: "self",
-            to: [ "#starnix_test_runners" ],
-        },
-        {
-            directory: "dev-gpu",
-            from: "parent",
-            to: [ "#starnix_test_runners" ],
-            rights: [ "r*" ],
-        },
-    ],
     expose: [
+        // Required: Expose Realm protocol so that test manager can launch tests
+        // in the realm.
         {
             protocol: "fuchsia.component.Realm",
             from: "framework",
         },
     ],
+
+    // TODO(fxbug.dev/112381): Move to corresponding runner and collection
+    // files.
     environments: [
         {
             name: "test-env",
@@ -293,10 +84,6 @@
                 {
                     runner: "go_test_runner",
                     from: "#go_test_runner",
-                },
-                {
-                    runner: "legacy_test_runner",
-                    from: "#legacy_test_runner",
                 },
                 {
                     runner: "stress_test_runner",
