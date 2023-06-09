@@ -699,7 +699,10 @@ mod test {
             },
             messages
                 .into_iter()
-                .map(|l| l.into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER))
+                .map(|l| l.into_rtnl_new_link(
+                    UNSPECIFIED_SEQUENCE_NUMBER,
+                    flags & NLM_F_DUMP == NLM_F_DUMP
+                ))
                 .chain(expected_response.map(|expected_response| match expected_response {
                     ExpectedResponse::Ack(code) => new_ack(code, header),
                     ExpectedResponse::Done => new_done(header),
@@ -848,7 +851,12 @@ mod test {
             {
                 let mut messages = messages
                     .into_iter()
-                    .map(|a| a.to_rtnl_new_addr(UNSPECIFIED_SEQUENCE_NUMBER))
+                    .map(|a| {
+                        a.to_rtnl_new_addr(
+                            UNSPECIFIED_SEQUENCE_NUMBER,
+                            flags & NLM_F_DUMP == NLM_F_DUMP,
+                        )
+                    })
                     .collect::<Vec<_>>();
                 messages.sort_by_key(|message| {
                     assert_matches!(

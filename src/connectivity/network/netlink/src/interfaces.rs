@@ -31,7 +31,7 @@ use futures::{
     pin_mut, StreamExt as _, TryStreamExt as _,
 };
 use net_types::ip::{AddrSubnetEither, IpVersion};
-use netlink_packet_core::NetlinkMessage;
+use netlink_packet_core::{NetlinkMessage, NLM_F_MULTIPART};
 use netlink_packet_route::{
     AddressHeader, AddressMessage, LinkHeader, LinkMessage, RtnlMessage, AF_INET, AF_INET6,
     AF_UNSPEC, ARPHRD_ETHER, ARPHRD_LOOPBACK, ARPHRD_PPP, ARPHRD_VOID, IFA_F_PERMANENT,
@@ -528,7 +528,7 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
                         .values()
                         .filter_map(NetlinkLinkMessage::optionally_from)
                         .for_each(|message| {
-                            client.send(message.into_rtnl_new_link(sequence_number))
+                            client.send(message.into_rtnl_new_link(sequence_number, true))
                         });
                     Ok(())
                 }
@@ -551,7 +551,7 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
                                 })
                             })
                             .for_each(|message| {
-                                client.send(message.to_rtnl_new_addr(sequence_number))
+                                client.send(message.to_rtnl_new_addr(sequence_number, true))
                             });
                         Ok(())
                     }
@@ -619,7 +619,7 @@ fn update_addresses<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
         };
 
         let message = match kind {
-            UpdateKind::New => addr.to_rtnl_new_addr(UNSPECIFIED_SEQUENCE_NUMBER),
+            UpdateKind::New => addr.to_rtnl_new_addr(UNSPECIFIED_SEQUENCE_NUMBER, false),
             UpdateKind::Del => addr.to_rtnl_del_addr(UNSPECIFIED_SEQUENCE_NUMBER),
         };
 
@@ -679,7 +679,7 @@ fn handle_interface_watcher_event<S: Sender<<NetlinkRoute as ProtocolFamily>::In
         fnet_interfaces_ext::UpdateResult::Added(properties) => {
             if let Some(message) = NetlinkLinkMessage::optionally_from(properties) {
                 route_clients.send_message_to_group(
-                    message.into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER),
+                    message.into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false),
                     ModernGroup(RTNLGRP_LINK),
                 )
             }
@@ -721,7 +721,7 @@ fn handle_interface_watcher_event<S: Sender<<NetlinkRoute as ProtocolFamily>::In
             if online.is_some() {
                 if let Some(message) = NetlinkLinkMessage::optionally_from(current) {
                     route_clients.send_message_to_group(
-                        message.into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER),
+                        message.into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false),
                         ModernGroup(RTNLGRP_LINK),
                     )
                 }
@@ -793,10 +793,17 @@ impl NetlinkLinkMessage {
         }
     }
 
-    pub(crate) fn into_rtnl_new_link(self, sequence_number: u32) -> NetlinkMessage<RtnlMessage> {
+    pub(crate) fn into_rtnl_new_link(
+        self,
+        sequence_number: u32,
+        is_dump: bool,
+    ) -> NetlinkMessage<RtnlMessage> {
         let Self(message) = self;
         let mut msg: NetlinkMessage<RtnlMessage> = RtnlMessage::NewLink(message).into();
         msg.header.sequence_number = sequence_number;
+        if is_dump {
+            msg.header.flags |= NLM_F_MULTIPART;
+        }
         msg.finalize();
         msg
     }
@@ -922,11 +929,18 @@ impl TryFrom<fnet_interfaces_ext::Properties> for NetlinkLinkMessage {
 pub(crate) struct NetlinkAddressMessage(AddressMessage);
 
 impl NetlinkAddressMessage {
-    pub(crate) fn to_rtnl_new_addr(&self, sequence_number: u32) -> NetlinkMessage<RtnlMessage> {
+    pub(crate) fn to_rtnl_new_addr(
+        &self,
+        sequence_number: u32,
+        is_dump: bool,
+    ) -> NetlinkMessage<RtnlMessage> {
         let Self(message) = self;
         let mut message: NetlinkMessage<RtnlMessage> =
             RtnlMessage::NewAddress(message.clone()).into();
         message.header.sequence_number = sequence_number;
+        if is_dump {
+            message.header.flags |= NLM_F_MULTIPART;
+        }
         message.finalize();
         message
     }
@@ -1583,7 +1597,7 @@ mod tests {
     #[test]
     fn test_into_rtnl_new_link_is_serializable() {
         let link = create_netlink_link_message(0, 0, 0, vec![]);
-        let new_link_message = link.into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER);
+        let new_link_message = link.into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false);
         let mut buf = vec![0; new_link_message.buffer_len()];
         // Serialize will panic if `new_route_message` is malformed.
         new_link_message.serialize(&mut buf);
@@ -1729,14 +1743,14 @@ mod tests {
             0,
             create_nlas(WLAN_NAME.to_string(), ARPHRD_ETHER, false),
         )
-        .into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER);
+        .into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false);
         let lo_link = create_netlink_link_message(
             LO_INTERFACE_ID,
             ARPHRD_LOOPBACK,
             IFF_UP | IFF_RUNNING | IFF_LOOPBACK,
             create_nlas(LO_NAME.to_string(), ARPHRD_LOOPBACK, true),
         )
-        .into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER);
+        .into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false);
         let eth_link = create_netlink_link_message(
             ETH_INTERFACE_ID,
             ARPHRD_ETHER,
@@ -1755,7 +1769,7 @@ mod tests {
             WLAN_NAME.to_string(),
             IFA_F_PERMANENT,
         )
-        .to_rtnl_new_addr(UNSPECIFIED_SEQUENCE_NUMBER);
+        .to_rtnl_new_addr(UNSPECIFIED_SEQUENCE_NUMBER, false);
         let eth_v4_addr = create_address_message(
             ETH_INTERFACE_ID.try_into().unwrap(),
             TEST_V4_ADDR,
@@ -1781,14 +1795,14 @@ mod tests {
             WLAN_NAME.to_string(),
             IFA_F_PERMANENT,
         )
-        .to_rtnl_new_addr(UNSPECIFIED_SEQUENCE_NUMBER);
+        .to_rtnl_new_addr(UNSPECIFIED_SEQUENCE_NUMBER, false);
         let lo_v6_addr = create_address_message(
             LO_INTERFACE_ID.try_into().unwrap(),
             TEST_V6_ADDR,
             LO_NAME.to_string(),
             IFA_F_PERMANENT,
         )
-        .to_rtnl_new_addr(UNSPECIFIED_SEQUENCE_NUMBER);
+        .to_rtnl_new_addr(UNSPECIFIED_SEQUENCE_NUMBER, false);
         let eth_v6_addr = create_address_message(
             ETH_INTERFACE_ID.try_into().unwrap(),
             TEST_V6_ADDR,
@@ -1942,14 +1956,14 @@ mod tests {
                     IFF_UP | IFF_RUNNING | IFF_LOOPBACK,
                     create_nlas(LO_NAME.to_string(), ARPHRD_LOOPBACK, true),
                 )
-                .into_rtnl_new_link(TEST_SEQUENCE_NUMBER),
+                .into_rtnl_new_link(TEST_SEQUENCE_NUMBER, true),
                 create_netlink_link_message(
                     ETH_INTERFACE_ID,
                     ARPHRD_ETHER,
                     0,
                     create_nlas(ETH_NAME.to_string(), ARPHRD_ETHER, false),
                 )
-                .into_rtnl_new_link(TEST_SEQUENCE_NUMBER),
+                .into_rtnl_new_link(TEST_SEQUENCE_NUMBER, true),
             ],
         );
     }
@@ -1988,7 +2002,7 @@ mod tests {
                                     name.to_string(),
                                     IFA_F_PERMANENT,
                                 )
-                                .to_rtnl_new_addr(TEST_SEQUENCE_NUMBER)
+                                .to_rtnl_new_addr(TEST_SEQUENCE_NUMBER, true)
                             })
                     })
                     .flatten()
