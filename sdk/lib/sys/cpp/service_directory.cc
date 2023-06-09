@@ -18,11 +18,30 @@ zx::channel OpenServiceRoot() {
   }
   auto deferred = fit::defer([out]() { fdio_ns_free_flat_ns(out); });
   const fdio_flat_namespace_t& ns = *out;
+
+  // Look for /svc in the namespace. If that fails, try to connect directly via
+  // the entry at /. Since the namespace can't contain paths where one shadows
+  // another, at most one of these entries exists.
+  // TODO(https://fxbug.dev/101092): Replace this with a call to
+  // fdio_service_connect("/svc", ...) once nothing is trying to open /svc with
+  // rights.
   for (size_t i = 0; i < ns.count; ++i) {
-    if (std::string_view{ns.path[i]} == "/svc") {
+    std::string_view path{ns.path[i]};
+    if (path == "/svc") {
       return zx::channel{std::exchange(ns.handle[i], ZX_HANDLE_INVALID)};
     }
+    if (path == "/") {
+      zx::channel request, service_root;
+      if (zx::channel::create(0, &request, &service_root) != ZX_OK) {
+        return {};
+      }
+      if (fdio_service_connect_at(ns.handle[i], "/svc", request.release()) != ZX_OK) {
+        return {};
+      }
+      return service_root;
+    }
   }
+
   return {};
 }
 
