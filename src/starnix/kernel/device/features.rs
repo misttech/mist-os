@@ -7,6 +7,7 @@ use crate::{
     fs::{
         devtmpfs::dev_tmp_fs,
         kobject::{KObjectDeviceAttribute, KType},
+        sysfs::SysFsDirectory,
         SpecialNode,
     },
     logging::log_warn,
@@ -33,14 +34,20 @@ pub fn run_features(entries: &Vec<String>, current_task: &CurrentTask) -> Result
                 let mut device_registry = kernel.device_registry.write();
 
                 // Add framebuffer and input devices in the kobject tree.
-                let graphics_class =
-                    device_registry.virtual_bus().get_or_create_child(b"graphics", KType::Class);
+                let graphics_class = device_registry.virtual_bus().get_or_create_child(
+                    b"graphics",
+                    KType::Class,
+                    SysFsDirectory::new,
+                );
                 device_registry.add_device(
                     graphics_class,
                     KObjectDeviceAttribute::new(b"fb0", b"fb0", DeviceType::FB0),
                 );
-                let input_class =
-                    device_registry.virtual_bus().get_or_create_child(b"input", KType::Class);
+                let input_class = device_registry.virtual_bus().get_or_create_child(
+                    b"input",
+                    KType::Class,
+                    SysFsDirectory::new,
+                );
                 device_registry.add_device(
                     input_class,
                     KObjectDeviceAttribute::new(
@@ -67,8 +74,11 @@ pub fn run_features(entries: &Vec<String>, current_task: &CurrentTask) -> Result
             "magma" => {
                 let magma_type = DeviceType::new(STARNIX_MAJOR, STARNIX_MINOR_MAGMA);
                 let mut device_registry = current_task.kernel().device_registry.write();
-                let starnix_class =
-                    device_registry.virtual_bus().get_or_create_child(b"starnix", KType::Class);
+                let starnix_class = device_registry.virtual_bus().get_or_create_child(
+                    b"starnix",
+                    KType::Class,
+                    SysFsDirectory::new,
+                );
                 device_registry.add_device(
                     starnix_class,
                     KObjectDeviceAttribute::new(b"magma0", b"magma0", magma_type),

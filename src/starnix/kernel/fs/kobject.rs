@@ -9,7 +9,10 @@ use std::{
 };
 
 use crate::{
-    fs::buffers::{InputBuffer, OutputBuffer},
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        sysfs::SysFsDirectory,
+    },
     lock::Mutex,
     task::*,
     types::*,
@@ -31,23 +34,6 @@ pub enum KType {
         name: Option<FsString>,
         device_type: DeviceType,
     },
-}
-
-impl std::fmt::Display for KType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            KType::Root => write!(f, "Root"),
-            KType::Bus => write!(f, "Bus"),
-            KType::Class => write!(f, "Class"),
-            KType::Device { name, device_type } => {
-                let name = match name {
-                    Some(name) => String::from_utf8(name.to_vec()).unwrap(),
-                    None => String::from("Unknown"),
-                };
-                write!(f, "Device (\"{name}\" {device_type})")
-            }
-        }
-    }
 }
 
 /// Attributes that are used to create a KType::Device kobject.
@@ -78,7 +64,6 @@ impl KObjectDeviceAttribute {
     }
 }
 
-#[derive(Debug)]
 pub struct KObject {
     /// The name that will appear in sysfs.
     ///
@@ -99,8 +84,13 @@ pub struct KObject {
     ///
     /// It controls what happens to the kobject when being created and destroyed.
     ktype: KType,
+
+    /// Function to create the associated `FsNodeOps`.
+    create_fs_node_ops: CreateFsNodeOps,
 }
 pub type KObjectHandle = Arc<KObject>;
+
+type CreateFsNodeOps = Box<dyn Fn(Weak<KObject>) -> Box<dyn FsNodeOps> + Send + Sync>;
 
 impl KObject {
     pub fn new_root() -> KObjectHandle {
@@ -109,15 +99,26 @@ impl KObject {
             parent: None,
             children: Default::default(),
             ktype: KType::Root,
+            create_fs_node_ops: Box::new(|kobject| Box::new(SysFsDirectory::new(kobject))),
         })
     }
 
-    fn new(name: &FsStr, parent: KObjectHandle, ktype: KType) -> KObjectHandle {
+    fn new<F, N>(
+        name: &FsStr,
+        parent: KObjectHandle,
+        ktype: KType,
+        create_fs_node_ops: F,
+    ) -> KObjectHandle
+    where
+        F: Fn(Weak<KObject>) -> N + Send + Sync + 'static,
+        N: FsNodeOps,
+    {
         Arc::new(Self {
             name: name.to_vec(),
             parent: Some(Arc::downgrade(&parent)),
             children: Default::default(),
             ktype,
+            create_fs_node_ops: Box::new(move |kobject| Box::new(create_fs_node_ops(kobject))),
         })
     }
 
@@ -136,6 +137,13 @@ impl KObject {
     /// The type of object that embeds a kobject.
     pub fn ktype(&self) -> KType {
         self.ktype.clone()
+    }
+
+    /// Returns the associated `FsNodeOps`.
+    ///
+    /// The `create_fs_node_ops` function will be called with a weak pointer to kobject itself.
+    pub fn ops(self: &KObjectHandle) -> Box<dyn FsNodeOps> {
+        self.create_fs_node_ops.as_ref()(Arc::downgrade(self))
     }
 
     /// Get the full path from the root.
@@ -162,12 +170,21 @@ impl KObject {
     }
 
     /// Gets the child if exists, creates a new child if not.
-    pub fn get_or_create_child(self: &KObjectHandle, name: &FsStr, ktype: KType) -> KObjectHandle {
+    pub fn get_or_create_child<F, N>(
+        self: &KObjectHandle,
+        name: &FsStr,
+        ktype: KType,
+        create_fs_node_ops: F,
+    ) -> KObjectHandle
+    where
+        F: Fn(Weak<KObject>) -> N + Send + Sync + 'static,
+        N: FsNodeOps,
+    {
         let mut children = self.children.lock();
         match children.get(name).cloned() {
             Some(child) => child,
             None => {
-                let child = KObject::new(name, self.clone(), ktype);
+                let child = KObject::new(name, self.clone(), ktype, create_fs_node_ops);
                 children.insert(name.to_vec(), child.clone());
                 child
             }
@@ -180,9 +197,12 @@ impl KObject {
     }
 }
 
-impl std::fmt::Display for KObject {
+impl std::fmt::Debug for KObject {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "name: \"{}\", ktype: {}", String::from_utf8(self.name()).unwrap(), self.ktype())
+        f.debug_struct("KObject")
+            .field("name", &String::from_utf8_lossy(&self.name()))
+            .field("ktype", &self.ktype())
+            .finish()
     }
 }
 
@@ -325,6 +345,7 @@ pub struct UEventContext {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fs::sysfs::DeviceDirectory;
 
     #[::fuchsia::test]
     fn kobject_create_child() {
@@ -332,7 +353,7 @@ mod tests {
         assert!(root.parent().is_none());
 
         assert!(!root.has_child(b"virtual"));
-        root.get_or_create_child(b"virtual", KType::Bus);
+        root.get_or_create_child(b"virtual", KType::Bus, SysFsDirectory::new);
         assert!(root.has_child(b"virtual"));
     }
 
@@ -340,11 +361,12 @@ mod tests {
     fn kobject_path() {
         let root = KObject::new_root();
         let device = root
-            .get_or_create_child(b"virtual", KType::Bus)
-            .get_or_create_child(b"mem", KType::Class)
+            .get_or_create_child(b"virtual", KType::Bus, SysFsDirectory::new)
+            .get_or_create_child(b"mem", KType::Class, SysFsDirectory::new)
             .get_or_create_child(
                 b"null",
                 KType::Device { name: Some(b"null".to_vec()), device_type: DeviceType::NULL },
+                DeviceDirectory::new,
             );
         assert_eq!(device.path(), b"/virtual/mem/null".to_vec());
     }
@@ -352,9 +374,9 @@ mod tests {
     #[::fuchsia::test]
     fn kobject_get_children_names() {
         let root = KObject::new_root();
-        root.get_or_create_child(b"virtual", KType::Bus);
-        root.get_or_create_child(b"cpu", KType::Bus);
-        root.get_or_create_child(b"power", KType::Bus);
+        root.get_or_create_child(b"virtual", KType::Bus, SysFsDirectory::new);
+        root.get_or_create_child(b"cpu", KType::Bus, SysFsDirectory::new);
+        root.get_or_create_child(b"power", KType::Bus, SysFsDirectory::new);
 
         let names = root.get_children_names();
         assert!(names.iter().any(|name| *name == b"virtual".to_vec()));

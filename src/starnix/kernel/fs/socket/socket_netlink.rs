@@ -686,7 +686,7 @@ impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
                 message
             }
             _ => {
-                log_error!("This kobject ({}) is not a device type.", kobject);
+                log_error!("This kobject ({:?}) is not a device type.", kobject);
                 return;
             }
         };

@@ -6,7 +6,11 @@ use crate::{
     device::loopback::create_loop_device,
     device::mem::create_mem_device,
     device::misc::create_misc_device,
-    fs::{kobject::*, FileOps, FsNode},
+    fs::{
+        kobject::*,
+        sysfs::{DeviceDirectory, SysFsDirectory},
+        FileOps, FsNode,
+    },
     lock::RwLock,
     logging::log_error,
     task::*,
@@ -121,7 +125,7 @@ impl DeviceRegistry {
 
     /// Returns the virtual bus kobject where all virtual and pseudo devices are stored.
     pub fn virtual_bus(&self) -> KObjectHandle {
-        self.root_kobject.get_or_create_child(b"virtual", KType::Bus)
+        self.root_kobject.get_or_create_child(b"virtual", KType::Bus, SysFsDirectory::new)
     }
 
     /// Adds a single device kobject in the tree.
@@ -130,7 +134,7 @@ impl DeviceRegistry {
             KType::Device { name: Some(dev_attr.device_name), device_type: dev_attr.device_type };
         self.dispatch_uevent(
             UEventAction::Add,
-            class.get_or_create_child(&dev_attr.kobject_name, ktype),
+            class.get_or_create_child(&dev_attr.kobject_name, ktype, DeviceDirectory::new),
         );
     }
 
@@ -147,7 +151,7 @@ impl DeviceRegistry {
 
         // MEM class.
         self.add_devices(
-            virtual_bus.get_or_create_child(b"mem", KType::Class),
+            virtual_bus.get_or_create_child(b"mem", KType::Class, SysFsDirectory::new),
             KObjectDeviceAttribute::new_from_vec(vec![
                 (b"null", b"null", DeviceType::NULL),
                 (b"zero", b"zero", DeviceType::ZERO),
@@ -160,7 +164,7 @@ impl DeviceRegistry {
 
         // MISC class.
         self.add_devices(
-            virtual_bus.get_or_create_child(b"misc", KType::Class),
+            virtual_bus.get_or_create_child(b"misc", KType::Class, SysFsDirectory::new),
             KObjectDeviceAttribute::new_from_vec(vec![
                 (b"hwrng", b"hwrng", DeviceType::HW_RANDOM),
                 (b"fuse", b"fuse", DeviceType::FUSE),
@@ -170,7 +174,7 @@ impl DeviceRegistry {
 
         // TTY class.
         self.add_devices(
-            virtual_bus.get_or_create_child(b"tty", KType::Class),
+            virtual_bus.get_or_create_child(b"tty", KType::Class, SysFsDirectory::new),
             KObjectDeviceAttribute::new_from_vec(vec![
                 (b"tty", b"tty", DeviceType::TTY),
                 (b"ptmx", b"ptmx", DeviceType::PTMX),

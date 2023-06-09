@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 use super::*;
 
-use std::sync::Arc;
-
 use crate::{
     auth::FsCred,
     fs::{cgroup::CgroupDirectoryNode, kobject::*},
     task::*,
     types::*,
 };
+
+use std::sync::{Arc, Weak};
 
 struct SysFs;
 impl FileSystemOps for SysFs {
@@ -41,15 +41,17 @@ impl SysFs {
 
         dir.entry(
             b"devices",
-            SysFsDirectory::new(kernel.device_registry.write().root_kobject()),
+            SysFsDirectory::new(Arc::downgrade(&kernel.device_registry.write().root_kobject())),
             mode!(IFDIR, 0o755),
         );
+        // TODO(fxbug.dev/121327): Temporary fix of flakeness in tcp_socket_test.
+        // Remove after regitry.rs refactor is in place.
         kernel
             .device_registry
             .write()
             .root_kobject()
-            .get_or_create_child(b"system", KType::Bus)
-            .get_or_create_child(b"cpu", KType::Class);
+            .get_or_create_child(b"system", KType::Bus, SysFsDirectory::new)
+            .get_or_create_child(b"cpu", KType::Class, CpuClassDirectory::new);
 
         dir.build_root();
         fs
@@ -60,13 +62,23 @@ pub fn sys_fs(kern: &Arc<Kernel>, options: FileSystemOptions) -> &FileSystemHand
     kern.sys_fs.get_or_init(|| SysFs::new_fs(kern, options))
 }
 
-struct SysFsDirectory {
-    kobject: KObjectHandle,
+trait SysFsOps: FsNodeOps {
+    fn kobject(&self) -> KObjectHandle;
+}
+
+pub struct SysFsDirectory {
+    kobject: Weak<KObject>,
 }
 
 impl SysFsDirectory {
-    pub fn new(kobject: KObjectHandle) -> Self {
+    pub fn new(kobject: Weak<KObject>) -> Self {
         Self { kobject }
+    }
+}
+
+impl SysFsOps for SysFsDirectory {
+    fn kobject(&self) -> KObjectHandle {
+        self.kobject.clone().upgrade().expect("Weak references to kobject must always be valid")
     }
 }
 
@@ -79,7 +91,7 @@ impl FsNodeOps for SysFsDirectory {
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(VecDirectory::new_file(
-            self.kobject
+            self.kobject()
                 .get_children_names()
                 .into_iter()
                 .map(|name| VecDirectoryEntry {
@@ -97,40 +109,36 @@ impl FsNodeOps for SysFsDirectory {
         _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        match self.kobject.get_child(name) {
-            Some(child_kobject) => match child_kobject.ktype() {
-                KType::Device { .. } => Ok(node.fs().create_node(
-                    DeviceDirectory::new(child_kobject),
-                    FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
-                )),
-                KType::Class if name == b"cpu" => Ok(node.fs().create_node(
-                    ClassDirectory::new(),
-                    FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
-                )),
-                _ => Ok(node.fs().create_node(
-                    SysFsDirectory::new(child_kobject),
-                    FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
-                )),
-            },
+        match self.kobject().get_child(name) {
+            Some(child_kobject) => Ok(node.fs().create_node_box(
+                child_kobject.ops(),
+                FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
+            )),
             None => error!(ENOENT),
         }
     }
 }
 
-struct DeviceDirectory {
-    kobject: KObjectHandle,
+pub struct DeviceDirectory {
+    kobject: Weak<KObject>,
 }
 
 impl DeviceDirectory {
-    pub fn new(kobject: KObjectHandle) -> Self {
+    pub fn new(kobject: Weak<KObject>) -> Self {
         Self { kobject }
     }
 
     fn device_type(&self) -> Result<DeviceType, Errno> {
-        match self.kobject.ktype() {
+        match self.kobject().ktype() {
             KType::Device { device_type, .. } => Ok(device_type),
             _ => error!(ENODEV),
         }
+    }
+}
+
+impl SysFsOps for DeviceDirectory {
+    fn kobject(&self) -> KObjectHandle {
+        self.kobject.clone().upgrade().expect("Weak references to kobject must always be valid")
     }
 }
 
@@ -172,7 +180,7 @@ impl FsNodeOps for DeviceDirectory {
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             )),
             b"uevent" => Ok(node.fs().create_node(
-                UEventFsNode::new(self.kobject.clone()),
+                UEventFsNode::new(self.kobject()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
             )),
             _ => error!(ENOENT),
@@ -180,15 +188,23 @@ impl FsNodeOps for DeviceDirectory {
     }
 }
 
-struct ClassDirectory {}
+struct CpuClassDirectory {
+    kobject: Weak<KObject>,
+}
 
-impl ClassDirectory {
-    pub fn new() -> Self {
-        Self {}
+impl CpuClassDirectory {
+    pub fn new(kobject: Weak<KObject>) -> Self {
+        Self { kobject }
     }
 }
 
-impl FsNodeOps for ClassDirectory {
+impl SysFsOps for CpuClassDirectory {
+    fn kobject(&self) -> KObjectHandle {
+        self.kobject.clone().upgrade().expect("Weak references to kobject must always be valid")
+    }
+}
+
+impl FsNodeOps for CpuClassDirectory {
     fs_node_impl_dir_readonly!();
 
     fn create_file_ops(
@@ -196,7 +212,6 @@ impl FsNodeOps for ClassDirectory {
         _node: &FsNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        // TODO(fxbug.dev/121327): A workaround before binding FsNodeOps to each kobject.
         Ok(VecDirectory::new_file(vec![VecDirectoryEntry {
             entry_type: DirectoryEntryType::REG,
             name: b"online".to_vec(),
