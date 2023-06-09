@@ -608,7 +608,7 @@ impl<T: MulAssign + AddAssign + PartialOrd + Add<Output = T> + Copy + Default + 
     }
 
     /// Inserts the list of values to the histogram for asserting them.
-    pub fn insert_values(&mut self, values: Vec<T>) {
+    pub fn insert_values(&mut self, values: impl IntoIterator<Item = T>) {
         match self.format {
             ArrayFormat::ExponentialHistogram => {
                 for value in values {
