@@ -2,10 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load("@fuchsia_sdk//:generated_constants.bzl", sdk_constants = "constants")
+load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_cpu_select")
 load("@fuchsia_sdk//fuchsia/private/assembly:assembly_bundle.bzl", "assembly_bundle")
 load("//build/bazel/assembly:platform_aib.bzl", "platform_aib")
 load("//build/bazel/assembly:platform_aibs.bzl", "platform_aibs")
-load("//:bundles/assembly/platform_aib_names.bzl", "BRINGUP_PLATFORM_AIB_NAMES", "ENG_PLATFORM_AIB_NAMES", "USERDEBUG_PLATFORM_AIB_NAMES", "USER_PLATFORM_AIB_NAMES")
+load("//:bundles/assembly/platform_aib_names.bzl", "BRINGUP_PLATFORM_AIB_NAMES", "ENG_PLATFORM_AIB_NAMES", "ENG_PLATFORM_AIB_NAMES_RISCV64", "USERDEBUG_PLATFORM_AIB_NAMES", "USERDEBUG_PLATFORM_AIB_NAMES_RISCV64", "USER_PLATFORM_AIB_NAMES", "USER_PLATFORM_AIB_NAMES_RISCV64")
 
 package(default_visibility = [
     "//build/bazel/assembly:__subpackages__",
@@ -58,10 +60,19 @@ platform_aibs(
 
 platform_aibs(
     name = "platform_user",
-    aib_dirs = [
-        "@legacy_ninja_build_outputs//:obj/bundles/assembly/{}".format(aib)
-        for aib in USER_PLATFORM_AIB_NAMES
-    ],
+    aib_dirs = fuchsia_cpu_select(
+        {
+            "riscv64": [
+                "@legacy_ninja_build_outputs//:obj/bundles/assembly/{}".format(aib)
+                for aib in USER_PLATFORM_AIB_NAMES_RISCV64
+            ],
+        },
+        sdk_constants.target_cpus,
+        default = [
+            "@legacy_ninja_build_outputs//:obj/bundles/assembly/{}".format(aib)
+            for aib in USER_PLATFORM_AIB_NAMES
+        ],
+    ),
     # NOTE: Including `bazel_migration` has no real effect because it's not
     # recognized by `ffx assembly`. It's here to help development and debugging.
     aibs = [":bazel_migration"],
@@ -69,10 +80,19 @@ platform_aibs(
 
 platform_aibs(
     name = "platform_userdebug",
-    aib_dirs = [
-        "@legacy_ninja_build_outputs//:obj/bundles/assembly/{}".format(aib)
-        for aib in USERDEBUG_PLATFORM_AIB_NAMES
-    ],
+    aib_dirs = fuchsia_cpu_select(
+        {
+            "riscv64": [
+                "@legacy_ninja_build_outputs//:obj/bundles/assembly/{}".format(aib)
+                for aib in USERDEBUG_PLATFORM_AIB_NAMES_RISCV64
+            ],
+        },
+        sdk_constants.target_cpus,
+        default = [
+            "@legacy_ninja_build_outputs//:obj/bundles/assembly/{}".format(aib)
+            for aib in USERDEBUG_PLATFORM_AIB_NAMES
+        ],
+    ),
     # NOTE: Including `bazel_migration` has no real effect because it's not
     # recognized by `ffx assembly`. It's here to help development and debugging.
     aibs = [":bazel_migration"],
@@ -80,10 +100,19 @@ platform_aibs(
 
 platform_aibs(
     name = "platform_eng",
-    aib_dirs = [
-        "@legacy_ninja_build_outputs//:obj/bundles/assembly/{}".format(aib)
-        for aib in ENG_PLATFORM_AIB_NAMES
-    ],
+    aib_dirs = fuchsia_cpu_select(
+        {
+            "riscv64": [
+                "@legacy_ninja_build_outputs//:obj/bundles/assembly/{}".format(aib)
+                for aib in ENG_PLATFORM_AIB_NAMES_RISCV64
+            ],
+        },
+        sdk_constants.target_cpus,
+        default = [
+            "@legacy_ninja_build_outputs//:obj/bundles/assembly/{}".format(aib)
+            for aib in ENG_PLATFORM_AIB_NAMES
+        ],
+    ),
     # NOTE: Including `bazel_migration` has no real effect because it's not
     # recognized by `ffx assembly`. It's here to help development and debugging.
     aibs = [":bazel_migration"],

@@ -33,7 +33,7 @@ BOOTSTRAP_ENG_PLATFORM_AIB_NAMES = [
 BRINGUP_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + BOOTSTRAP_ENG_PLATFORM_AIB_NAMES
 
 # The names of all of the platform's 'testonly=false' Assembly Input Bundles
-USER_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
+USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "audio_device_registry",
     "common_minimal",
     "common_minimal_userdebug",
@@ -63,23 +63,34 @@ USER_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "ui_legacy_package_user_and_userdebug",
     "ui_package_user_and_userdebug",
     "ui_user_and_userdebug",
-    "virtualization_support",
     "wlan_base",
     "wlan_contemporary_privacy_only_support",
     "wlan_fullmac_support",
     "wlan_legacy_privacy_support",
     "wlan_softmac_support",
 ]
+USER_PLATFORM_AIB_NAMES_EXCLUDED_FROM_RISCV64 = [
+    # The following are not currently supported on RISC-V. They must be added
+    # separately to each list that (indirectly) builds on
+    # USER_PLATFORM_AIB_NAMES_RISCV64.
 
-USERDEBUG_PLATFORM_AIB_NAMES = USER_PLATFORM_AIB_NAMES + [
+    # TODO(fxbug.dev/128551): Move to the list above once build errors are
+    # resolved and/or define a formal mechanism for AIBs to vary across
+    # architectures.
+    "virtualization_support",
+]
+USER_PLATFORM_AIB_NAMES = USER_PLATFORM_AIB_NAMES_RISCV64 + USER_PLATFORM_AIB_NAMES_EXCLUDED_FROM_RISCV64
+
+USERDEBUG_PLATFORM_AIB_NAMES_RISCV64 = USER_PLATFORM_AIB_NAMES_RISCV64 + [
     "core_realm_development_access",
     "core_realm_development_access_rcs_no_usb",
     "core_realm_development_access_rcs_usb",
     "radar_proxy_with_injector",
 ]
+USERDEBUG_PLATFORM_AIB_NAMES = USERDEBUG_PLATFORM_AIB_NAMES_RISCV64 + USER_PLATFORM_AIB_NAMES_EXCLUDED_FROM_RISCV64
 
 # The names of all of the platform's Assembly Input Bundles.
-ENG_PLATFORM_AIB_NAMES = BOOTSTRAP_ENG_PLATFORM_AIB_NAMES + USERDEBUG_PLATFORM_AIB_NAMES + [
+ENG_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_ENG_PLATFORM_AIB_NAMES + USERDEBUG_PLATFORM_AIB_NAMES_RISCV64 + [
     "audio_dev_support",
     "common_minimal_eng",
     "core_realm_eng",
@@ -90,3 +101,4 @@ ENG_PLATFORM_AIB_NAMES = BOOTSTRAP_ENG_PLATFORM_AIB_NAMES + USERDEBUG_PLATFORM_A
     "ui_legacy_package_eng",
     "ui_package_eng",
 ]
+ENG_PLATFORM_AIB_NAMES = ENG_PLATFORM_AIB_NAMES_RISCV64 + USER_PLATFORM_AIB_NAMES_EXCLUDED_FROM_RISCV64
