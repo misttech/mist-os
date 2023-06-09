@@ -2,7 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {crate::input_device, async_trait::async_trait, std::any::Any, std::rc::Rc};
+use {
+    crate::input_device,
+    async_trait::async_trait,
+    fuchsia_inspect::{self, health::Reporter},
+    std::any::Any,
+    std::rc::Rc,
+};
 
 pub trait AsRcAny {
     fn as_rc_any(self: Rc<Self>) -> Rc<dyn Any>;
@@ -106,14 +112,52 @@ where
     }
 }
 
+pub struct InputHandlerStatus {
+    /// A node that contains the state below.
+    _inspect_node: fuchsia_inspect::Node,
+
+    /// The number of unhandled events received by the handler.
+    _events_received_count: fuchsia_inspect::UintProperty,
+
+    /// The number of reports handled by the handler.
+    _events_handled_count: fuchsia_inspect::UintProperty,
+
+    /// The event time the last received InputEvent was received.
+    _last_received_timestamp_ns: fuchsia_inspect::UintProperty,
+
+    // This node records the health status of the `InputHandler`.
+    _health_node: fuchsia_inspect::health::Node,
+}
+
+impl InputHandlerStatus {
+    pub fn new(node: &fuchsia_inspect::Node, name: &str, _generates_events: bool) -> Self {
+        let handler_node = node.create_child(name);
+        let events_received_count = handler_node.create_uint("events_received_count", 0);
+        let events_handled_count = handler_node.create_uint("events_handled_count", 0);
+        let last_received_timestamp_ns = handler_node.create_uint("last_received_timestamp_ns", 0);
+        let mut health_node = fuchsia_inspect::health::Node::new(&handler_node);
+        health_node.set_starting_up();
+        Self {
+            _inspect_node: handler_node,
+            _events_received_count: events_received_count,
+            _events_handled_count: events_handled_count,
+            _last_received_timestamp_ns: last_received_timestamp_ns,
+            _health_node: health_node,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use {
         super::{async_trait, InputHandler, UnhandledInputHandler},
-        crate::input_device::{
-            Handled, InputDeviceDescriptor, InputDeviceEvent, InputEvent, UnhandledInputEvent,
+        crate::{
+            input_device::{
+                Handled, InputDeviceDescriptor, InputDeviceEvent, InputEvent, UnhandledInputEvent,
+            },
+            input_handler::InputHandlerStatus,
         },
-        fuchsia_zircon as zx,
+        fuchsia_inspect, fuchsia_zircon as zx,
         futures::{channel::mpsc, StreamExt as _},
         pretty_assertions::assert_eq,
         test_case::test_case,
@@ -256,5 +300,31 @@ mod tests {
 
         let handler = std::rc::Rc::new(NeuralInputHandler {});
         assert_eq!(handler.get_name(), "NeuralInputHandler");
+    }
+
+    #[fuchsia::test]
+    async fn input_handler_status_initialized_with_correct_properties() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let input_pipeline_node = inspector.root().create_child("input_pipeline");
+        let input_handlers_node = input_pipeline_node.create_child("input_handlers");
+        let _input_handler_status =
+            InputHandlerStatus::new(&input_handlers_node, "test_handler", false);
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_pipeline: {
+                input_handlers: {
+                    test_handler: {
+                        events_received_count: 0u64,
+                        events_handled_count: 0u64,
+                        last_received_timestamp_ns: 0u64,
+                        "fuchsia.inspect.Health": {
+                            status: "STARTING_UP",
+                            // Timestamp value is unpredictable and not relevant in this context,
+                            // so we only assert that the property is present.
+                            start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                        },
+                    }
+                }
+            }
+        });
     }
 }
