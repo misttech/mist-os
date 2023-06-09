@@ -7,7 +7,7 @@ use super::*;
 use crate::{
     fs::{buffers::*, fuchsia::*, *},
     mm::MemoryAccessorExt,
-    syscalls::{SyscallResult, SUCCESS},
+    syscalls::*,
     task::*,
     types::*,
 };
@@ -278,10 +278,11 @@ impl SocketOps for InetSocket {
         _socket: &Socket,
         current_task: &CurrentTask,
         request: u32,
-        user_addr: UserAddress,
+        arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         // TODO(fxbug.dev/128604): Remove hardcoded constant
         const DEFAULT_IFACE_NAME: &[u8; 16usize] = b"sta-iface-name\0\0";
+        let user_addr = UserAddress::from_arg(arg);
         match request {
             SIOCGIFINDEX => {
                 let in_ifreq: ifreq = current_task.mm.read_object(UserRef::new(user_addr))?;

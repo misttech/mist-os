@@ -11,7 +11,7 @@ use crate::{
     lock::Mutex,
     logging::*,
     mm::MemoryAccessorExt,
-    syscalls::{SyscallResult, SUCCESS},
+    syscalls::*,
     task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
     types::*,
 };
@@ -230,8 +230,9 @@ impl FileOps for Arc<InputFile> {
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
-        user_addr: UserAddress,
+        arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
+        let user_addr = UserAddress::from_arg(arg);
         match request {
             uapi::EVIOCGVERSION => {
                 current_task.mm.write_object(UserRef::new(user_addr), &self.driver_version)?;
@@ -881,7 +882,9 @@ mod test {
         );
 
         // Invoke ioctl() for axis details.
-        input_file.ioctl(&file_object, &current_task, ioctl_op, address).expect("ioctl() failed");
+        input_file
+            .ioctl(&file_object, &current_task, ioctl_op, address.into())
+            .expect("ioctl() failed");
 
         // Extract minimum and maximum fields for validation.
         let axis_info = current_task

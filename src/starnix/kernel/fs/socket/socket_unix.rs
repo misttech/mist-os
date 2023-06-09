@@ -10,7 +10,7 @@ use crate::{
     fs::{buffers::*, *},
     lock::Mutex,
     mm::MemoryAccessorExt,
-    syscalls::{SyscallResult, SUCCESS},
+    syscalls::*,
     task::*,
     types::*,
 };
@@ -739,8 +739,9 @@ impl SocketOps for UnixSocket {
         socket: &Socket,
         current_task: &CurrentTask,
         request: u32,
-        user_addr: UserAddress,
+        arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
+        let user_addr = UserAddress::from_arg(arg);
         match request {
             FIONREAD if socket.socket_type == SocketType::Stream => {
                 let length: i32 =

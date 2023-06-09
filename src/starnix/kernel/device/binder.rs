@@ -22,7 +22,7 @@ use crate::{
         MemoryAccessor, MemoryAccessorExt, ProtectionFlags,
     },
     mutable_state::Guard,
-    syscalls::{SyscallResult, SUCCESS},
+    syscalls::*,
     task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, WaitQueue, Waiter},
     types::*,
 };
@@ -178,10 +178,10 @@ impl FileOps for BinderConnection {
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
-        user_addr: UserAddress,
+        arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         let proc = self.proc(current_task)?;
-        self.driver.ioctl(current_task, &proc, request, user_addr)
+        self.driver.ioctl(current_task, &proc, request, arg)
     }
 
     fn get_vmo(
@@ -261,11 +261,11 @@ impl RemoteBinderConnection {
         &self,
         current_task: &CurrentTask,
         request: u32,
-        user_arg: UserAddress,
+        arg: SyscallArg,
     ) -> Result<(), Errno> {
         self.binder_connection
             .driver
-            .ioctl(current_task, &self.binder_process, request, user_arg)
+            .ioctl(current_task, &self.binder_process, request, arg)
             .map(|_| ())
     }
 
@@ -2582,10 +2582,10 @@ impl BinderDriver {
         current_task: &CurrentTask,
         binder_proc: &Arc<BinderProcess>,
         request: u32,
-        user_arg: UserAddress,
+        arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         trace_duration!(trace_category_starnix!(), trace_name_binder_ioctl!(), "request" => request);
-
+        let user_arg = UserAddress::from_arg(arg);
         let binder_thread = binder_proc.lock().find_or_register_thread(current_task.get_tid());
         match request {
             uapi::BINDER_VERSION => {

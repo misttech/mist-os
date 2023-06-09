@@ -218,7 +218,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         _file: &FileObject,
         _current_task: &CurrentTask,
         request: u32,
-        _user_addr: UserAddress,
+        _arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         default_ioctl(request)
     }
@@ -502,7 +502,7 @@ impl FileOps for OPathOps {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _request: u32,
-        _user_addr: UserAddress,
+        _arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         error!(EBADF)
     }
@@ -588,7 +588,7 @@ impl FileOps for ProxyFileOps {
             _file: &FileObject,
             _current_task: &CurrentTask,
             request: u32,
-            _user_addr: UserAddress,
+            _arg: SyscallArg,
         ) -> Result<SyscallResult, Errno>;
         fn fcntl(
             &self,
@@ -990,9 +990,9 @@ impl FileObject {
         &self,
         current_task: &CurrentTask,
         request: u32,
-        user_addr: UserAddress,
+        arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        self.ops().ioctl(self, current_task, request, user_addr)
+        self.ops().ioctl(self, current_task, request, arg)
     }
 
     pub fn fcntl(

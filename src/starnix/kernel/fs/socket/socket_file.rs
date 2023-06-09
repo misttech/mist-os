@@ -6,7 +6,7 @@ use fuchsia_zircon as zx;
 
 use crate::{
     fs::{buffers::*, socket::*, *},
-    syscalls::SyscallResult,
+    syscalls::*,
     task::*,
     types::*,
 };
@@ -66,9 +66,9 @@ impl FileOps for SocketFile {
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
-        user_addr: UserAddress,
+        arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        self.socket.ioctl(current_task, request, user_addr)
+        self.socket.ioctl(current_task, request, arg)
     }
 
     fn close(&self, _file: &FileObject) {

@@ -8,7 +8,7 @@ use crate::{
         *,
     },
     logging::log,
-    syscalls::SyscallResult,
+    syscalls::*,
     task::*,
     types::*,
 };
@@ -54,7 +54,7 @@ impl FileOps for SyslogFile {
         _file: &FileObject,
         _current_task: &CurrentTask,
         request: u32,
-        _user_addr: UserAddress,
+        _arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         default_ioctl(request)
     }

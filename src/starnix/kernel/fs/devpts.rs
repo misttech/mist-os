@@ -319,8 +319,9 @@ impl FileOps for DevPtmxFile {
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
-        user_addr: UserAddress,
+        arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
+        let user_addr = UserAddress::from_arg(arg);
         match request {
             TIOCGPTN => {
                 // Get the therminal id.
@@ -340,7 +341,7 @@ impl FileOps for DevPtmxFile {
                 self.terminal.write().locked = value != 0;
                 Ok(SUCCESS)
             }
-            _ => shared_ioctl(&self.terminal, true, _file, current_task, request, user_addr),
+            _ => shared_ioctl(&self.terminal, true, _file, current_task, request, arg),
         }
     }
 }
@@ -409,9 +410,9 @@ impl FileOps for DevPtsFile {
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
-        user_addr: UserAddress,
+        arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        shared_ioctl(&self.terminal, false, file, current_task, request, user_addr)
+        shared_ioctl(&self.terminal, false, file, current_task, request, arg)
     }
 }
 
@@ -422,8 +423,9 @@ fn shared_ioctl(
     file: &FileObject,
     current_task: &CurrentTask,
     request: u32,
-    user_addr: UserAddress,
+    arg: SyscallArg,
 ) -> Result<SyscallResult, Errno> {
+    let user_addr = UserAddress::from_arg(arg);
     match request {
         FIONREAD => {
             // Get the main terminal available bytes for reading.
@@ -433,7 +435,7 @@ fn shared_ioctl(
         }
         TIOCSCTTY => {
             // Make the given terminal the controlling terminal of the calling process.
-            let steal = !user_addr.is_null();
+            let steal = bool::from_arg(arg);
             current_task.thread_group.set_controlling_terminal(
                 current_task,
                 terminal,
@@ -563,7 +565,7 @@ mod tests {
         let address = map_memory(task, UserAddress::default(), std::mem::size_of::<T>() as u64);
         let address_ref = UserRef::<T>::new(address);
         task.mm.write_object(address_ref, value)?;
-        file.ioctl(task, command, address)?;
+        file.ioctl(task, command, address.into())?;
         task.mm.read_object(address_ref)
     }
 
@@ -573,7 +575,7 @@ mod tests {
         steal: bool,
     ) -> Result<SyscallResult, Errno> {
         #[allow(clippy::bool_to_int_with_if)]
-        file.ioctl(task, TIOCSCTTY, UserAddress::from(if steal { 1 } else { 0 }))
+        file.ioctl(task, TIOCSCTTY, steal.into())
     }
 
     fn open_file_with_flags(
@@ -703,10 +705,10 @@ mod tests {
         let fs = dev_pts_fs(&kernel, Default::default());
 
         let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
-        assert_eq!(ptmx.ioctl(&task, 42, UserAddress::default()), error!(EINVAL));
+        assert_eq!(ptmx.ioctl(&task, 42, Default::default()), error!(EINVAL));
 
         let pts_file = open_file(&task, fs, b"0").expect("open file");
-        assert_eq!(pts_file.ioctl(&task, 42, UserAddress::default()), error!(EINVAL));
+        assert_eq!(pts_file.ioctl(&task, 42, Default::default()), error!(EINVAL));
     }
 
     #[::fuchsia::test]

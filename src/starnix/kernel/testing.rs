@@ -18,9 +18,8 @@ use crate::{
         syscalls::{do_mmap, sys_mremap},
         MemoryAccessor, MemoryManager, PAGE_SIZE,
     },
-    syscalls::SyscallResult,
+    syscalls::*,
     task::*,
-    types::*,
 };
 
 /// Create a FileSystemHandle for use in testing.
@@ -250,7 +249,7 @@ impl FileOps for PanickingFile {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _request: u32,
-        _user_addr: UserAddress,
+        _arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         panic!("ioctl called on TestFile")
     }

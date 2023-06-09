@@ -210,8 +210,9 @@ impl FileOps for MagmaFile {
         _file: &FileObject,
         current_task: &CurrentTask,
         _request: u32,
-        user_addr: UserAddress,
+        arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
+        let user_addr = UserAddress::from_arg(arg);
         let (command, command_type) = read_magma_command_and_type(current_task, user_addr)?;
         let response_address = UserAddress::from(command.response_address);
 

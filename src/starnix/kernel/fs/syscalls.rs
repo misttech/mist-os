@@ -1107,7 +1107,7 @@ pub fn sys_ioctl(
     current_task: &CurrentTask,
     fd: FdNumber,
     request: u32,
-    user_addr: UserAddress,
+    arg: SyscallArg,
 ) -> Result<SyscallResult, Errno> {
     let file = current_task.files.get(fd)?;
     match request {
@@ -1115,7 +1115,7 @@ pub fn sys_ioctl(
             file.update_file_flags(OpenFlags::NONBLOCK, OpenFlags::NONBLOCK);
             Ok(SUCCESS)
         }
-        _ => file.ioctl(current_task, request, user_addr),
+        _ => file.ioctl(current_task, request, arg),
     }
 }
 

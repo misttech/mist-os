@@ -12,7 +12,7 @@ use crate::{
     lock::RwLock,
     logging::*,
     mm::{MemoryAccessorExt, ProtectionFlags},
-    syscalls::{SyscallResult, SUCCESS},
+    syscalls::*,
     task::CurrentTask,
     types::*,
 };
@@ -107,8 +107,9 @@ impl FileOps for Arc<Framebuffer> {
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
-        user_addr: UserAddress,
+        arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
+        let user_addr = UserAddress::from_arg(arg);
         match request {
             FBIOGET_FSCREENINFO => {
                 let info = self.info.read();

@@ -20,6 +20,30 @@ impl SyscallArg {
     }
 }
 
+impl From<UserAddress> for SyscallArg {
+    fn from(value: UserAddress) -> Self {
+        Self::from_raw(value.ptr() as u64)
+    }
+}
+
+impl From<u64> for SyscallArg {
+    fn from(value: u64) -> Self {
+        Self::from_raw(value)
+    }
+}
+
+impl From<usize> for SyscallArg {
+    fn from(value: usize) -> Self {
+        Self::from_raw(value as u64)
+    }
+}
+
+impl From<bool> for SyscallArg {
+    fn from(value: bool) -> Self {
+        Self::from_raw(if value { 1 } else { 0 })
+    }
+}
+
 impl std::fmt::LowerHex for SyscallArg {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::LowerHex::fmt(&self.0, f)
@@ -37,6 +61,7 @@ where
         T::from_arg(self)
     }
 }
+
 pub trait FromSyscallArg {
     fn from_arg(arg: SyscallArg) -> Self;
 }
@@ -49,6 +74,7 @@ macro_rules! impl_from_syscall_arg {
 }
 
 impl_from_syscall_arg! { for SyscallArg: arg => arg }
+impl_from_syscall_arg! { for bool: arg => arg.raw() != 0 }
 impl_from_syscall_arg! { for i32: arg => arg.raw() as Self }
 impl_from_syscall_arg! { for i64: arg => arg.raw() as Self }
 impl_from_syscall_arg! { for u32: arg => arg.raw() as Self }
@@ -65,6 +91,6 @@ impl_from_syscall_arg! { for WdNumber: arg => Self::from_raw(arg.raw() as i32) }
 
 impl<T> FromSyscallArg for UserRef<T> {
     fn from_arg(arg: SyscallArg) -> UserRef<T> {
-        Self::new(UserAddress::from(arg.raw()))
+        Self::new(arg.into_arg())
     }
 }

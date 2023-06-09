@@ -11,7 +11,7 @@ use crate::{
     lock::Mutex,
     logging::{log_error, log_warn},
     mm::{DesiredAddress, MappedVmo, MappingOptions, MemoryAccessorExt, ProtectionFlags},
-    syscalls::{SyscallResult, SUCCESS},
+    syscalls::*,
     task::{CurrentTask, ThreadGroup, WaitQueue, Waiter},
     types::{
         errno,
@@ -114,9 +114,9 @@ impl FileOps for RemoteBinderFileOps {
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
-        user_addr: UserAddress,
+        arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        self.0.ioctl(current_task, request, user_addr)
+        self.0.ioctl(current_task, request, arg)
     }
 
     fn get_vmo(
@@ -361,8 +361,9 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         self: &Arc<Self>,
         current_task: &CurrentTask,
         request: u32,
-        user_addr: UserAddress,
+        arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
+        let user_addr = UserAddress::from_arg(arg);
         match request {
             uapi::REMOTE_BINDER_START => self.start(current_task, user_addr.into())?,
             uapi::REMOTE_BINDER_WAIT => self.wait(current_task, user_addr.into())?,
@@ -850,8 +851,11 @@ mod tests {
                 std::mem::size_of::<uapi::remote_binder_wait_command>() as u64,
             );
 
-            let start_result =
-                remote_binder_handle.ioctl(&task, uapi::REMOTE_BINDER_START, start_command_address);
+            let start_result = remote_binder_handle.ioctl(
+                &task,
+                uapi::REMOTE_BINDER_START,
+                start_command_address.into(),
+            );
             if must_interrupt(&start_result).is_none() {
                 panic!("Unexpected result for start ioctl: {start_result:?}");
             }
@@ -859,7 +863,7 @@ mod tests {
                 let result = remote_binder_handle.ioctl(
                     &task,
                     uapi::REMOTE_BINDER_WAIT,
-                    wait_command_address,
+                    wait_command_address.into(),
                 );
                 if must_interrupt(&result).is_none() {
                     break result;

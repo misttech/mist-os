@@ -12,7 +12,7 @@ use crate::{
     fs::{buffers::*, *},
     lock::Mutex,
     mm::MemoryAccessorExt,
-    syscalls::SyscallResult,
+    syscalls::*,
     task::*,
     types::{as_any::*, *},
 };
@@ -161,7 +161,7 @@ pub trait SocketOps: Send + Sync + AsAny {
         _socket: &Socket,
         _current_task: &CurrentTask,
         request: u32,
-        _address: UserAddress,
+        _arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         default_ioctl(request)
     }
@@ -346,9 +346,9 @@ impl Socket {
         &self,
         current_task: &CurrentTask,
         request: u32,
-        address: UserAddress,
+        arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        self.ops.ioctl(self, current_task, request, address)
+        self.ops.ioctl(self, current_task, request, arg)
     }
 
     pub fn bind(

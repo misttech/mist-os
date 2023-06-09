@@ -209,8 +209,9 @@ impl Pipe {
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
-        user_addr: UserAddress,
+        arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
+        let user_addr = UserAddress::from_arg(arg);
         match request {
             FIONREAD => {
                 let addr = UserRef::<i32>::new(user_addr);
@@ -385,9 +386,9 @@ impl FileOps for PipeFileObject {
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
-        user_addr: UserAddress,
+        arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        self.pipe.lock().ioctl(file, current_task, request, user_addr)
+        self.pipe.lock().ioctl(file, current_task, request, arg)
     }
 }
 
