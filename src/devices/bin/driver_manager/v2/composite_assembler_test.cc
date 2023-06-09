@@ -40,7 +40,6 @@ class CompositeAssemblerTest : public gtest::TestLoopFixture {
   void SetUp() override {
     devfs.emplace(root_devnode);
     node = CreateNode("parent");
-    node->AddToDevfsForTesting(root_devnode.value());
   }
 
  public:
@@ -49,6 +48,7 @@ class CompositeAssemblerTest : public gtest::TestLoopFixture {
         std::make_shared<dfv2::Node>(name, std::vector<dfv2::Node*>(), &node_manager, dispatcher(),
                                      inspect.CreateDevice(name, zx::vmo(), 0));
     new_node->AddToDevfsForTesting(root_devnode.value());
+    new_node->devfs_device().publish();
     return new_node;
   }
 
@@ -416,4 +416,44 @@ TEST_F(CompositeAssemblerTest, InspectNodes) {
     ASSERT_NE(inspect_fragment, nullptr);
     EXPECT_EQ(std::string("parent"), inspect_fragment->value());
   }
+}
+
+// Create a composite node and verify that its device controller is reachable.
+TEST_F(CompositeAssemblerTest, ConnectToDeviceController) {
+  fuchsia_device_manager::CompositeDeviceDescriptor descriptor;
+  fuchsia_device_manager::DeviceFragment fragment;
+  fragment.name() = kFragmentName;
+  fragment.parts().emplace_back();
+  fragment.parts()[0].match_program().emplace_back();
+  fragment.parts()[0].match_program()[0] = fuchsia_device_manager::BindInstruction BI_MATCH();
+  descriptor.fragments().push_back(fragment);
+
+  descriptor.props().emplace_back();
+  descriptor.props()[0].id() = kPropId;
+  descriptor.props()[0].value() = kPropValue;
+
+  manager.AddCompositeDevice(std::string(kCompositeName), descriptor);
+
+  ASSERT_TRUE(manager.BindNode(node));
+
+  fs::SynchronousVfs vfs(dispatcher());
+  auto dev_res = devfs->Connect(vfs);
+  ASSERT_TRUE(dev_res.is_ok());
+  fidl::WireClient<fuchsia_io::Directory> root{std::move(*dev_res), dispatcher()};
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
+  ASSERT_FALSE(endpoints.is_error());
+  ASSERT_TRUE(root->Open(fuchsia_io::OpenFlags::kNotDirectory, {},
+                         "parent/device-1/device_controller",
+                         fidl::ServerEnd<fuchsia_io::Node>(endpoints->server.TakeChannel()))
+                  .ok());
+
+  fidl::WireClient<fuchsia_device::Controller> device_controller{std::move(endpoints->client),
+                                                                 dispatcher()};
+  device_controller->GetTopologicalPath().ThenExactlyOnce(
+      [](fidl::WireUnownedResult<fuchsia_device::Controller::GetTopologicalPath>& reply) {
+        ASSERT_TRUE(reply.ok());
+        ASSERT_TRUE(reply->is_ok());
+        ASSERT_EQ(reply.value()->path.get(), "parent/device-1");
+      });
+  RunLoopUntilIdle();
 }

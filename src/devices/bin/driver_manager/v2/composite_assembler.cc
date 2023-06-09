@@ -254,10 +254,8 @@ void CompositeDeviceAssembler::TryToAssemble() {
     strong_parents.push_back(std::move(node));
   }
 
-  // The devnode_connect_callback for legacy composites in DFv2 is not supported.
-  auto node =
-      Node::CreateCompositeNode(name_, std::move(parents), parents_names, std::move(properties_),
-                                node_manager_, std::nullopt, dispatcher_);
+  auto node = Node::CreateCompositeNode(name_, std::move(parents), parents_names,
+                                        std::move(properties_), node_manager_, dispatcher_);
   if (node.is_error()) {
     return;
   }

@@ -344,9 +344,7 @@ Node::Node(std::string_view name, std::vector<Node*> parents, NodeManager* node_
 zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
     std::string_view node_name, std::vector<Node*> parents, std::vector<std::string> parents_names,
     std::vector<fuchsia_driver_framework::wire::NodeProperty> properties,
-    NodeManager* driver_binder,
-    std::optional<Devnode::PassThrough::ConnectCallback> devnode_connect_callback,
-    async_dispatcher_t* dispatcher, uint32_t primary_index) {
+    NodeManager* driver_binder, async_dispatcher_t* dispatcher, uint32_t primary_index) {
   ZX_ASSERT(!parents.empty());
   if (primary_index >= parents.size()) {
     LOGF(ERROR, "Primary node index is out of bounds");
@@ -402,13 +400,9 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
   ZX_ASSERT_MSG(primary->devfs_device_.topological_node().has_value(), "%s",
                 composite->MakeTopologicalPath().c_str());
 
-  Devnode::Target target;
-  if (devnode_connect_callback.has_value()) {
-    target = Devnode::PassThrough(std::move(devnode_connect_callback.value()));
-  }
-
-  primary->devfs_device_.topological_node().value().add_child(
-      composite->name_, std::nullopt, std::move(target), composite->devfs_device_);
+  primary->devfs_device_.topological_node().value().add_child(composite->name_, std::nullopt,
+                                                              composite->CreateDevfsPassthrough(),
+                                                              composite->devfs_device_);
   composite->devfs_device_.publish();
   return zx::ok(std::move(composite));
 }
@@ -1142,6 +1136,91 @@ void Node::SetAndPublishInspect() {
     LOGF(ERROR, "%s: Failed to publish inspect: %s", MakeTopologicalPath().c_str(),
          result.status_string());
   }
+}
+
+void Node::ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
+                               ConnectToDeviceFidlCompleter::Sync& completer) {
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+
+void Node::ConnectToController(ConnectToControllerRequestView request,
+                               ConnectToControllerCompleter::Sync& completer) {
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+
+void Node::Bind(BindRequestView request, BindCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void Node::Rebind(RebindRequestView request, RebindCompleter::Sync& completer) {
+  std::optional<std::string> url;
+  if (!request->driver.is_null() && !request->driver.empty()) {
+    url = std::string(request->driver.get());
+  }
+
+  RestartNode(url, [completer = completer.ToAsync()](zx::result<> result) mutable {
+    if (result.is_ok()) {
+      completer.ReplySuccess();
+    } else {
+      completer.ReplyError(result.error_value());
+    }
+  });
+}
+
+void Node::UnbindChildren(UnbindChildrenCompleter::Sync& completer) {
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+
+void Node::ScheduleUnbind(ScheduleUnbindCompleter::Sync& completer) {
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+void Node::GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) {
+  completer.ReplySuccess(fidl::StringView::FromExternal(MakeTopologicalPath()));
+}
+
+void Node::GetMinDriverLogSeverity(GetMinDriverLogSeverityCompleter::Sync& completer) {
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+
+void Node::GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) {
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+
+void Node::SetMinDriverLogSeverity(SetMinDriverLogSeverityRequestView request,
+                                   SetMinDriverLogSeverityCompleter::Sync& completer) {
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+
+void Node::SetPerformanceState(SetPerformanceStateRequestView request,
+                               SetPerformanceStateCompleter::Sync& completer) {
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+
+Devnode::Target Node::CreateDevfsPassthrough() {
+  return Devnode::PassThrough(
+      [node = weak_from_this(), node_name = name_](zx::channel server_end,
+                                                   Devnode::PassThrough::ConnectionType type) {
+        if (type.include_device || type.include_node) {
+          LOGF(WARNING, "Cannot include device or node for %s.", node_name.c_str());
+        }
+
+        if (!type.include_controller) {
+          LOGF(ERROR, "Controller not requested for %s.", node_name.c_str());
+          return ZX_ERR_NOT_SUPPORTED;
+        }
+
+        std::shared_ptr locked_node = node.lock();
+        if (!locked_node) {
+          LOGF(ERROR, "Node was freed before it was used for %s.", node_name.c_str());
+          return ZX_ERR_BAD_STATE;
+        }
+
+        locked_node->dev_controller_bindings_.AddBinding(
+            locked_node->dispatcher_,
+            fidl::ServerEnd<fuchsia_device::Controller>{std::move(server_end)}, locked_node.get(),
+            fidl::kIgnoreBindingClosure);
+        return ZX_OK;
+      });
 }
 
 }  // namespace dfv2

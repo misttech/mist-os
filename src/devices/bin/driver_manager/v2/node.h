@@ -113,6 +113,7 @@ enum class NodeState {
 class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
              public fidl::WireServer<fuchsia_driver_framework::Node>,
              public fidl::WireServer<fuchsia_component_runner::ComponentController>,
+             public fidl::WireServer<fuchsia_device::Controller>,
              public fidl::WireAsyncEventHandler<fuchsia_driver_host::Driver>,
              public std::enable_shared_from_this<Node> {
  public:
@@ -127,9 +128,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
       std::string_view node_name, std::vector<Node*> parents,
       std::vector<std::string> parents_names,
       std::vector<fuchsia_driver_framework::wire::NodeProperty> properties,
-      NodeManager* driver_binder,
-      std::optional<Devnode::PassThrough::ConnectCallback> devnode_connect_callback,
-      async_dispatcher_t* dispatcher, uint32_t primary_index = 0);
+      NodeManager* driver_binder, async_dispatcher_t* dispatcher, uint32_t primary_index = 0);
 
   void OnBind() const;
 
@@ -236,6 +235,23 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
     std::string driver_url;
   };
 
+  // fidl::WireServer<fuchsia_device::Controller>
+  void ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
+                           ConnectToDeviceFidlCompleter::Sync& completer) override;
+  void ConnectToController(ConnectToControllerRequestView request,
+                           ConnectToControllerCompleter::Sync& completer) override;
+  void Bind(BindRequestView request, BindCompleter::Sync& completer) override;
+  void Rebind(RebindRequestView request, RebindCompleter::Sync& completer) override;
+  void UnbindChildren(UnbindChildrenCompleter::Sync& completer) override;
+  void ScheduleUnbind(ScheduleUnbindCompleter::Sync& completer) override;
+  void GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) override;
+  void GetMinDriverLogSeverity(GetMinDriverLogSeverityCompleter::Sync& completer) override;
+  void GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) override;
+  void SetMinDriverLogSeverity(SetMinDriverLogSeverityRequestView request,
+                               SetMinDriverLogSeverityCompleter::Sync& completer) override;
+  void SetPerformanceState(SetPerformanceStateRequestView request,
+                           SetPerformanceStateCompleter::Sync& completer) override;
+
   // This is called when fuchsia_driver_framework::Driver is closed.
   void on_fidl_error(fidl::UnbindInfo error) override;
   // fidl::WireServer<fuchsia_component_runner::ComponentController>
@@ -282,6 +298,10 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // Set the inspect data and publish it. This should be called once as the node is being created.
   void SetAndPublishInspect();
 
+  // Creates a passthrough for the associated devfs node that will connect to
+  // the device controller of this node.
+  Devnode::Target CreateDevfsPassthrough();
+
   std::string name_;
 
   // If this is a composite device, this stores the list of each parent's names.
@@ -320,6 +340,8 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
 
   // This represents the node's presence in devfs, both it's topological path and it's class path.
   DevfsDevice devfs_device_;
+
+  fidl::ServerBindingGroup<fuchsia_device::Controller> dev_controller_bindings_;
 };
 
 }  // namespace dfv2

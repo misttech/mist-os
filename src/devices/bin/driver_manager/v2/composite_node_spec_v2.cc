@@ -8,47 +8,11 @@
 
 namespace dfv2 {
 
-void CompositeNodeDeviceController::Serve(fidl::ServerEnd<fuchsia_device::Controller> server_end) {
-  device_controller_bindings_.AddBinding(dispatcher_, std::move(server_end), this,
-                                         fidl::kIgnoreBindingClosure);
-}
-
-void CompositeNodeDeviceController::Rebind(RebindRequestView request,
-                                           RebindCompleter::Sync& completer) {
-  std::optional completed_composite = node_spec_.completed_composite_node();
-  if (!completed_composite.has_value()) {
-    LOGF(WARNING, "Composite has not completed yet.");
-    completer.ReplyError(ZX_ERR_BAD_STATE);
-    return;
-  }
-
-  std::shared_ptr locked_node = completed_composite->lock();
-  if (!locked_node) {
-    LOGF(WARNING, "Node was freed before it was used.");
-    completer.ReplyError(ZX_ERR_BAD_STATE);
-    return;
-  }
-
-  std::optional<std::string> url;
-  if (!request->driver.is_null() && !request->driver.empty()) {
-    url = std::string(request->driver.get());
-  }
-
-  locked_node->RestartNode(url, [completer = completer.ToAsync()](zx::result<> result) mutable {
-    if (result.is_ok()) {
-      completer.ReplySuccess();
-    } else {
-      completer.ReplyError(result.error_value());
-    }
-  });
-}
-
 CompositeNodeSpecV2::CompositeNodeSpecV2(CompositeNodeSpecCreateInfo create_info,
                                          async_dispatcher_t* dispatcher, NodeManager* node_manager)
     : CompositeNodeSpec(std::move(create_info)),
       parent_set_collector_(std::nullopt),
       dispatcher_(dispatcher),
-      device_controller_(std::make_shared<CompositeNodeDeviceController>(*this, dispatcher_)),
       node_manager_(node_manager) {}
 
 zx::result<std::optional<DeviceOrNode>> CompositeNodeSpecV2::BindParentImpl(
@@ -95,24 +59,8 @@ zx::result<std::optional<DeviceOrNode>> CompositeNodeSpecV2::BindParentImpl(
   auto node_name = std::string(info.name().get());
 
   // Create a composite node for the composite node spec with our complete parent set.
-  auto composite = Node::CreateCompositeNode(
-      node_name, std::move(*completed_parents), node_names, {}, node_manager_,
-      [device_controller = device_controller()](zx::channel server_end,
-                                                Devnode::PassThrough::ConnectionType type) {
-        if (type.include_device || type.include_node) {
-          LOGF(WARNING, "Cannot include device or node.");
-        }
-
-        if (!type.include_controller) {
-          LOGF(ERROR, "Controller not requested.");
-          return ZX_ERR_NOT_SUPPORTED;
-        }
-
-        device_controller->Serve(
-            fidl::ServerEnd<fuchsia_device::Controller>(std::move(server_end)));
-        return ZX_OK;
-      },
-      dispatcher_, info.primary_index());
+  auto composite = Node::CreateCompositeNode(node_name, std::move(*completed_parents), node_names,
+                                             {}, node_manager_, dispatcher_, info.primary_index());
   if (composite.is_error()) {
     // If we are returning an error we should clear out what we have.
     parent_set_collector_->RemoveNode(info.node_index());
