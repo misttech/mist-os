@@ -19,6 +19,7 @@
 #include <zircon/threads.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cinttypes>
 #include <cstdint>
 #include <iterator>
@@ -122,7 +123,7 @@ zx_status_t FakeDisplay::InitSysmemAllocatorClient() {
 
 void FakeDisplay::DisplayControllerImplSetDisplayControllerInterface(
     const display_controller_interface_protocol_t* intf) {
-  fbl::AutoLock lock(&display_lock_);
+  fbl::AutoLock interface_lock(&interface_lock_);
   controller_interface_client_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
   added_display_args_t args;
   PopulateAddedDisplayArgs(&args);
@@ -276,8 +277,6 @@ config_check_result_t FakeDisplay::DisplayControllerImplCheckConfiguration(
   }
   ZX_DEBUG_ASSERT(display::ToDisplayId(display_configs[0]->display_id) == kDisplayId);
 
-  fbl::AutoLock lock(&display_lock_);
-
   bool success;
   if (display_configs[0]->layer_count != 1) {
     success = display_configs[0]->layer_count == 0;
@@ -310,17 +309,36 @@ void FakeDisplay::DisplayControllerImplApplyConfiguration(
     const config_stamp_t* banjo_config_stamp) {
   ZX_DEBUG_ASSERT(display_configs);
   ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
-
-  fbl::AutoLock lock(&display_lock_);
-
-  if (display_count == 1 && display_configs[0]->layer_count) {
-    // Only support one display.
-    current_image_to_capture_ =
-        reinterpret_cast<ImageInfo*>(display_configs[0]->layer_list[0]->cfg.primary.image.handle);
-  } else {
-    current_image_to_capture_ = nullptr;
+  {
+    fbl::AutoLock lock(&image_lock_);
+    if (display_count == 1 && display_configs[0]->layer_count) {
+      // Only support one display.
+      current_image_to_capture_ =
+          reinterpret_cast<ImageInfo*>(display_configs[0]->layer_list[0]->cfg.primary.image.handle);
+    } else {
+      current_image_to_capture_ = nullptr;
+    }
   }
-  current_config_stamp_ = display::ToConfigStamp(*banjo_config_stamp);
+
+  // The `current_config_stamp_` is stored by ApplyConfiguration() on the
+  // display coordinator's controller loop thread, and loaded only by the
+  // driver Vsync thread to notify coordinator for a new frame being displayed.
+  // After that, captures will be triggered on the controller loop thread by
+  // StartCapture(), which is synchronized with the capture thread (via mutex).
+  //
+  // Thus, for `current_config_stamp_`, there's no need for acquire-release
+  // memory model (to synchronize `current_image_to_capture_` changes between
+  // controller loop thread and Vsync thread), and relaxed memory order should
+  // be sufficient to guarantee that both value changes in ApplyConfiguration()
+  // will be visible to the capture thread for captures triggered after the
+  // Vsync with this config stamp.
+  //
+  // As long as a client requests a capture after it sees the Vsync event of a
+  // given config, the captured contents can only be contents applied no earlier
+  // than that config (which can be that config itself, or a config applied
+  // after that config).
+  const display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
+  current_config_stamp_.store(config_stamp, std::memory_order_relaxed);
 }
 
 void FakeDisplay::DisplayControllerImplSetEld(uint64_t display_id, const uint8_t* raw_eld_list,
@@ -606,9 +624,11 @@ zx_status_t FakeDisplay::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
 }
 
 zx_status_t FakeDisplay::SetupDisplayInterface() {
-  fbl::AutoLock lock(&display_lock_);
-
-  current_image_to_capture_ = nullptr;
+  fbl::AutoLock interface_lock(&interface_lock_);
+  {
+    fbl::AutoLock image_lock(&image_lock_);
+    current_image_to_capture_ = nullptr;
+  }
 
   if (controller_interface_client_.is_valid()) {
     added_display_args_t args;
@@ -631,13 +651,19 @@ int FakeDisplay::CaptureThread() {
       break;
     }
     {
-      fbl::AutoLock lock(&capture_lock_);
+      // `current_capture_target_image_` is a pointer to ImageInfo stored in
+      // `imported_captures_` (guarded by `capture_lock_`). So `capture_lock_`
+      // must be locked while the capture image is being used.
+      fbl::AutoLock capture_lock(&capture_lock_);
       if (capture_interface_client_.is_valid() && (current_capture_target_image_ != nullptr) &&
           ++capture_complete_signal_count_ >= kNumOfVsyncsForCapture) {
         {
           ImageInfo& dst = *current_capture_target_image_;
 
-          fbl::AutoLock lock(&display_lock_);
+          // `current_image_to_capture_` is a pointer to ImageInfo stored in
+          // `imported_images_` (guarded by `image_lock_`). So `image_lock_`
+          // must be locked while the source image is being used.
+          fbl::AutoLock image_lock(&image_lock_);
           if (current_image_to_capture_ != nullptr) {
             // We have a valid image being displayed. Let's capture it.
             ImageInfo& src = *current_image_to_capture_;
@@ -715,10 +741,14 @@ int FakeDisplay::VSyncThread() {
 }
 
 void FakeDisplay::SendVsync() {
-  fbl::AutoLock lock(&display_lock_);
+  fbl::AutoLock interface_lock(&interface_lock_);
   if (controller_interface_client_.is_valid()) {
+    // See the discussion in `DisplayControllerImplApplyConfiguration()` about
+    // the reason we use relaxed memory order here.
+    const display::ConfigStamp current_config_stamp =
+        current_config_stamp_.load(std::memory_order_relaxed);
     const config_stamp_t banjo_current_config_stamp =
-        display::ToBanjoConfigStamp(current_config_stamp_);
+        display::ToBanjoConfigStamp(current_config_stamp);
     controller_interface_client_.OnDisplayVsync(
         ToBanjoDisplayId(kDisplayId), zx_clock_get_monotonic(), &banjo_current_config_stamp);
   }

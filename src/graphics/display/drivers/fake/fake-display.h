@@ -94,7 +94,7 @@ class FakeDisplay : public DeviceType,
   void DdkRelease();
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out_protocol);
   void DdkChildPreRelease(void* child_ctx) {
-    fbl::AutoLock lock(&display_lock_);
+    fbl::AutoLock lock(&interface_lock_);
     controller_interface_client_ = ddk::DisplayControllerInterfaceProtocolClient();
   }
 
@@ -131,7 +131,7 @@ class FakeDisplay : public DeviceType,
 
   zx_status_t SetupDisplayInterface();
   int VSyncThread();
-  int CaptureThread() __TA_EXCLUDES(capture_lock_, display_lock_);
+  int CaptureThread() __TA_EXCLUDES(capture_lock_, image_lock_);
   void PopulateAddedDisplayArgs(added_display_args_t* args);
 
   // Initializes the sysmem Allocator client used to import incoming buffer
@@ -177,10 +177,14 @@ class FakeDisplay : public DeviceType,
   thrd_t vsync_thread_;
   thrd_t capture_thread_;
 
-  // Locks used by the display driver
-  mutable fbl::Mutex display_lock_;  // General display state (i.e. display_id)
-  mutable fbl::Mutex image_lock_;    // Guards `imported_images`_`
-  mutable fbl::Mutex capture_lock_;  // General capture state
+  // Guards display coordinator interface.
+  mutable fbl::Mutex interface_lock_;
+
+  // Guards imported images and references to imported images.
+  mutable fbl::Mutex image_lock_;
+
+  // Guards imported capture buffers, capture interface and state.
+  mutable fbl::Mutex capture_lock_;
 
   // Points to the next capture target image to capture displayed contents into.
   // Stores nullptr if capture is not going to be performed.
@@ -199,9 +203,10 @@ class FakeDisplay : public DeviceType,
 
   // Points to the current image to be displayed and captured.
   // Stores nullptr if there is no image displaying on the fake display.
-  ImageInfo* current_image_to_capture_ TA_GUARDED(display_lock_);
-  display::ConfigStamp current_config_stamp_ TA_GUARDED(display_lock_) =
-      display::kInvalidConfigStamp;
+  ImageInfo* current_image_to_capture_ TA_GUARDED(image_lock_);
+
+  // The most recently applied config stamp.
+  std::atomic<display::ConfigStamp> current_config_stamp_ = display::kInvalidConfigStamp;
 
   // Capture complete is signaled at vsync time. This counter introduces a bit of delay
   // for signal capture complete
@@ -215,7 +220,7 @@ class FakeDisplay : public DeviceType,
 
   // Display controller related data
   ddk::DisplayControllerInterfaceProtocolClient controller_interface_client_
-      TA_GUARDED(display_lock_);
+      TA_GUARDED(interface_lock_);
 
   // Display Capture interface protocol
   ddk::DisplayCaptureInterfaceProtocolClient capture_interface_client_ TA_GUARDED(capture_lock_);
