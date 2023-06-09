@@ -47,18 +47,18 @@ class Core {
     node_.entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR;
     node_.parent_index = ZBI_TOPOLOGY_NO_PARENT;
     node_.entity.processor.logical_id_count = 0;
-    node_.entity.processor.architecture = ZBI_TOPOLOGY_ARCH_X86;
-    node_.entity.processor.architecture_info.x86.apic_id_count = 0;
+    node_.entity.processor.architecture = ZBI_TOPOLOGY_ARCHITECTURE_X64;
+    node_.entity.processor.architecture_info.x64.apic_id_count = 0;
   }
 
   void SetPrimary(bool primary) {
-    node_.entity.processor.flags = (primary) ? ZBI_TOPOLOGY_PROCESSOR_PRIMARY : 0;
+    node_.entity.processor.flags = (primary) ? ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY : 0;
   }
 
   void AddThread(uint16_t logical_id, uint32_t apic_id) {
     auto& processor = node_.entity.processor;
     processor.logical_ids[processor.logical_id_count++] = logical_id;
-    processor.architecture_info.x86.apic_ids[processor.architecture_info.x86.apic_id_count++] =
+    processor.architecture_info.x64.apic_ids[processor.architecture_info.x64.apic_id_count++] =
         apic_id;
   }
 
@@ -434,10 +434,10 @@ static constexpr zbi_topology_node_t kFallbackTopology = {
       .processor = {
         .logical_ids = {0},
         .logical_id_count = 1,
-        .flags = ZBI_TOPOLOGY_PROCESSOR_PRIMARY,
-        .architecture = ZBI_TOPOLOGY_ARCH_X86,
+        .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
+        .architecture = ZBI_TOPOLOGY_ARCHITECTURE_X64,
         .architecture_info = {
-          .x86 = {
+          .x64 = {
             .apic_ids = {0},
             .apic_id_count = 1,
           }

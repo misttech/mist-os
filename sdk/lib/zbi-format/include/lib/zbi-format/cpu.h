@@ -9,23 +9,22 @@
 
 #define ZBI_MAX_SMT 4
 
-// These are Used in the flags field of zbi_topology_processor_t.
+typedef uint16_t zbi_topology_processor_flags_t;
 
 // This is the processor that boots the system and the last to be shutdown.
-#define ZBI_TOPOLOGY_PROCESSOR_PRIMARY 0b1
+#define ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY ((zbi_topology_processor_flags_t)(1u << 0))
 
 // This is the processor that handles all interrupts, some architectures will
 // not have one.
-#define ZBI_TOPOLOGY_PROCESSOR_INTERRUPT 0b10
+#define ZBI_TOPOLOGY_PROCESSOR_FLAGS_INTERRUPT ((zbi_topology_processor_flags_t)(1u << 1))
 
-#define ZBI_TOPOLOGY_NO_PARENT 0xFFFF
+typedef uint8_t zbi_topology_architecture_t;
 
-typedef enum {
-  ZBI_TOPOLOGY_ARCH_UNDEFINED = 0,  // Intended primarily for testing.
-  ZBI_TOPOLOGY_ARCH_X86 = 1,
-  ZBI_TOPOLOGY_ARCH_ARM = 2,
-  ZBI_TOPOLOGY_ARCH_RISCV = 3,
-} zbi_topology_architecture_t;
+// Intended primarily for testing.
+#define ZBI_TOPOLOGY_ARCHITECTURE_UNDEFINED ((zbi_topology_architecture_t)(0u))
+#define ZBI_TOPOLOGY_ARCHITECTURE_X64 ((zbi_topology_architecture_t)(1u))
+#define ZBI_TOPOLOGY_ARCHITECTURE_ARM64 ((zbi_topology_architecture_t)(2u))
+#define ZBI_TOPOLOGY_ARCHITECTURE_RISCV64 ((zbi_topology_architecture_t)(3u))
 
 typedef struct {
   // Cluster ids for each level, one being closest to the cpu.
@@ -41,32 +40,31 @@ typedef struct {
   // In GIC v3+ this is not necessary as the processors are addressed by their
   // affinity routing (all cluster ids followed by cpu_id).
   uint8_t gic_id;
-} zbi_topology_arm_info_t;
+} zbi_topology_arm64_info_t;
 
 typedef struct {
   // Indexes here correspond to the logical_ids index for the thread.
   uint32_t apic_ids[ZBI_MAX_SMT];
   uint32_t apic_id_count;
-} zbi_topology_x86_info_t;
+} zbi_topology_x64_info_t;
 
 typedef struct {
   // ID that represents this CPU in SBI.
   uint64_t hart_id;
-} zbi_topology_riscv_info_t;
+} zbi_topology_riscv64_info_t;
 
 typedef struct {
   uint16_t logical_ids[ZBI_MAX_SMT];
   uint8_t logical_id_count;
 
-  uint16_t flags;
+  zbi_topology_processor_flags_t flags;
 
-  // Should be one of zbi_topology_arm_info_t.
   // If UNDEFINED then nothing will be set in arch_info.
-  uint8_t architecture;
+  zbi_topology_architecture_t architecture;
   union {
-    zbi_topology_arm_info_t arm;
-    zbi_topology_x86_info_t x86;
-    zbi_topology_riscv_info_t riscv;
+    zbi_topology_arm64_info_t arm64;
+    zbi_topology_x64_info_t x64;
+    zbi_topology_riscv64_info_t riscv64;
   } architecture_info;
 
 } zbi_topology_processor_t;
@@ -104,23 +102,25 @@ typedef struct {
   uint64_t end_address;
 } zbi_topology_numa_region_t;
 
-typedef enum {
-  ZBI_TOPOLOGY_ENTITY_UNDEFINED = 0,  // Unused default.
-  ZBI_TOPOLOGY_ENTITY_PROCESSOR = 1,
-  ZBI_TOPOLOGY_ENTITY_CLUSTER = 2,
-  ZBI_TOPOLOGY_ENTITY_CACHE = 3,
-  ZBI_TOPOLOGY_ENTITY_DIE = 4,
-  ZBI_TOPOLOGY_ENTITY_SOCKET = 5,
-  ZBI_TOPOLOGY_ENTITY_POWER_PLANE = 6,
-  ZBI_TOPOLOGY_ENTITY_NUMA_REGION = 7,
-} zbi_topology_entity_type_t;
+typedef uint8_t zbi_topology_entity_type_t;
+
+// Unused default.
+#define ZBI_TOPOLOGY_ENTITY_UNDEFINED ((zbi_topology_entity_type_t)(0u))
+#define ZBI_TOPOLOGY_ENTITY_PROCESSOR ((zbi_topology_entity_type_t)(1u))
+#define ZBI_TOPOLOGY_ENTITY_CLUSTER ((zbi_topology_entity_type_t)(2u))
+#define ZBI_TOPOLOGY_ENTITY_CACHE ((zbi_topology_entity_type_t)(3u))
+#define ZBI_TOPOLOGY_ENTITY_DIE ((zbi_topology_entity_type_t)(4u))
+#define ZBI_TOPOLOGY_ENTITY_SOCKET ((zbi_topology_entity_type_t)(5u))
+#define ZBI_TOPOLOGY_ENTITY_POWER_PLANE ((zbi_topology_entity_type_t)(6u))
+#define ZBI_TOPOLOGY_ENTITY_NUMA_REGION ((zbi_topology_entity_type_t)(7u))
+
+#define ZBI_TOPOLOGY_NO_PARENT ((uint16_t)(0xffffu))
 
 // The ZBI_TYPE_CPU_TOPOLOGY consists of an array of zbi_topology_node_t,
 // giving a flattened tree-like description of the CPU configuration
 // according to the zbi_topology_entity_type_t hierarchy.
 typedef struct {
-  // Should be one of zbi_topology_entity_type_t.
-  uint8_t entity_type;
+  zbi_topology_entity_type_t entity_type;
   uint16_t parent_index;
   union {
     zbi_topology_processor_t processor;

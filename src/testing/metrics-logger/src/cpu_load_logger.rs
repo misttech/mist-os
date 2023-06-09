@@ -347,7 +347,7 @@ pub mod tests {
         assert_matches::assert_matches,
         fidl_fuchsia_kernel::{CpuStats, PerCpuStats},
         fuchsia_zbi_abi::{
-            ArchitectureInfo, Entity, ZbiTopologyArchitecture, ZbiTopologyArmInfo,
+            ArchitectureInfo, Entity, ZbiTopologyArchitecture, ZbiTopologyArm64Info,
             ZbiTopologyCluster, ZbiTopologyEntityType, ZbiTopologyNode, ZbiTopologyProcessor,
         },
         futures::{task::Poll, FutureExt, TryStreamExt},
@@ -373,9 +373,9 @@ pub mod tests {
                     logical_ids: [logical_id, 0, 0, 0],
                     logical_id_count: 1,
                     flags: 0,
-                    architecture: ZbiTopologyArchitecture::ZbiTopologyArchArm as u8,
+                    architecture: ZbiTopologyArchitecture::ZbiTopologyArchArm64 as u8,
                     architecture_info: ArchitectureInfo {
-                        arm: ZbiTopologyArmInfo {
+                        arm64: ZbiTopologyArm64Info {
                             cluster_1_id: 0,
                             cluster_2_id: 0,
                             cluster_3_id: 0,

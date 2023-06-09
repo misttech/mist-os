@@ -6,24 +6,24 @@
 
 #include <assert.h>
 
-size_t serialize_zbi_topology_x86_info_t(uint8_t buffer[], uint32_t apic_ids[4],
+size_t serialize_zbi_topology_x64_info_t(uint8_t buffer[], uint32_t apic_ids[4],
                                          uint32_t apic_id_count) {
-  zbi_topology_x86_info_t node = {.apic_ids = {apic_ids[0], apic_ids[1], apic_ids[2], apic_ids[3]},
+  zbi_topology_x64_info_t node = {.apic_ids = {apic_ids[0], apic_ids[1], apic_ids[2], apic_ids[3]},
                                   .apic_id_count = apic_id_count};
-  size_t size = sizeof(zbi_topology_x86_info_t);
+  size_t size = sizeof(zbi_topology_x64_info_t);
   std::memcpy(buffer, &node, size);
   return size;
 }
 
-size_t serialize_zbi_topology_arm_info_t(uint8_t buffer[], uint8_t cluster_1_id,
-                                         uint8_t cluster_2_id, uint8_t cluster_3_id, uint8_t cpu_id,
-                                         uint8_t gic_id) {
-  zbi_topology_arm_info_t node = {.cluster_1_id = cluster_1_id,
-                                  .cluster_2_id = cluster_2_id,
-                                  .cluster_3_id = cluster_3_id,
-                                  .cpu_id = cpu_id,
-                                  .gic_id = gic_id};
-  size_t size = sizeof(zbi_topology_arm_info_t);
+size_t serialize_zbi_topology_arm64_info_t(uint8_t buffer[], uint8_t cluster_1_id,
+                                           uint8_t cluster_2_id, uint8_t cluster_3_id,
+                                           uint8_t cpu_id, uint8_t gic_id) {
+  zbi_topology_arm64_info_t node = {.cluster_1_id = cluster_1_id,
+                                    .cluster_2_id = cluster_2_id,
+                                    .cluster_3_id = cluster_3_id,
+                                    .cpu_id = cpu_id,
+                                    .gic_id = gic_id};
+  size_t size = sizeof(zbi_topology_arm64_info_t);
   std::memcpy(buffer, &node, size);
   return size;
 }
@@ -59,12 +59,12 @@ size_t serialize_zbi_topology_processor_t(uint8_t buffer[], uint16_t logical_ids
   node.logical_id_count = logical_id_count;
   node.flags = flags;
   node.architecture = architecture;
-  if (node.architecture == zbi_topology_architecture_t::ZBI_TOPOLOGY_ARCH_ARM) {
-    node.architecture_info.arm = architecture_info.arm;
-  } else if (node.architecture == zbi_topology_architecture_t::ZBI_TOPOLOGY_ARCH_X86) {
-    node.architecture_info.x86 = architecture_info.x86;
+  if (node.architecture == ZBI_TOPOLOGY_ARCHITECTURE_ARM64) {
+    node.architecture_info.arm64 = architecture_info.arm64;
+  } else if (node.architecture == ZBI_TOPOLOGY_ARCHITECTURE_X64) {
+    node.architecture_info.x64 = architecture_info.x64;
   } else {
-    assert(node.architecture == zbi_topology_architecture_t::ZBI_TOPOLOGY_ARCH_UNDEFINED);
+    assert(node.architecture == ZBI_TOPOLOGY_ARCHITECTURE_UNDEFINED);
   }
 
   size_t size = sizeof(zbi_topology_processor_t);
@@ -76,13 +76,13 @@ size_t serialize_zbi_topology_node_t(uint8_t buffer[], uint8_t entity_type, uint
                                      entity_t entity) {
   zbi_topology_node_t node = {.entity_type = entity_type, .parent_index = parent_index};
 
-  if (node.entity_type == zbi_topology_entity_type_t::ZBI_TOPOLOGY_ENTITY_PROCESSOR) {
+  if (node.entity_type == ZBI_TOPOLOGY_ENTITY_PROCESSOR) {
     node.entity.processor = entity.processor;
-  } else if (node.entity_type == zbi_topology_entity_type_t::ZBI_TOPOLOGY_ENTITY_CLUSTER) {
+  } else if (node.entity_type == ZBI_TOPOLOGY_ENTITY_CLUSTER) {
     node.entity.cluster = entity.cluster;
-  } else if (node.entity_type == zbi_topology_entity_type_t::ZBI_TOPOLOGY_ENTITY_NUMA_REGION) {
+  } else if (node.entity_type == ZBI_TOPOLOGY_ENTITY_NUMA_REGION) {
     node.entity.numa_region = entity.numa_region;
-  } else if (node.entity_type == zbi_topology_entity_type_t::ZBI_TOPOLOGY_ENTITY_CACHE) {
+  } else if (node.entity_type == ZBI_TOPOLOGY_ENTITY_CACHE) {
     node.entity.cache = entity.cache;
   }
 

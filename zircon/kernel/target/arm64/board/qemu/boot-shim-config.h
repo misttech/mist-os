@@ -7,6 +7,12 @@
 #ifndef ZIRCON_KERNEL_TARGET_ARM64_BOARD_QEMU_BOOT_SHIM_CONFIG_H_
 #define ZIRCON_KERNEL_TARGET_ARM64_BOARD_QEMU_BOOT_SHIM_CONFIG_H_
 
+#include <lib/zbi-format/board.h>
+#include <lib/zbi-format/cpu.h>
+#include <lib/zbi-format/driver-config.h>
+#include <lib/zbi-format/memory.h>
+#include <lib/zbi-format/zbi.h>
+
 #define HAS_DEVICE_TREE 1
 #define USE_DEVICE_TREE_CPU_COUNT 1
 #define USE_DEVICE_TREE_GIC_VERSION 1
@@ -88,10 +94,10 @@ static void add_cpu_topology(zbi_header_t* zbi) {
           .processor = {
             .logical_ids = {(uint16_t)index},
             .logical_id_count = 1,
-            .flags = (index == 0) ? ZBI_TOPOLOGY_PROCESSOR_PRIMARY : 0,
-            .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+            .flags = (index == 0) ? ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY : (zbi_topology_processor_flags_t)0,
+            .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
             .architecture_info = {
-              .arm = {
+              .arm64 = {
                 // qemu seems to put 16 cores per aff0 level, max 32 cores.
                 .cluster_1_id = (uint8_t)(index / 16),
                 .cpu_id = (index % 16),

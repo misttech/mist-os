@@ -11,8 +11,8 @@
 
 extern "C" {
 using architecture_info_t = union {
-  zbi_topology_arm_info_t arm;
-  zbi_topology_x86_info_t x86;
+  zbi_topology_arm64_info_t arm64;
+  zbi_topology_x64_info_t x64;
 };
 
 using entity_t = union {
@@ -22,12 +22,12 @@ using entity_t = union {
   zbi_topology_cache_t cache;
 };
 
-size_t serialize_zbi_topology_x86_info_t(uint8_t buffer[], uint32_t apic_ids[],
+size_t serialize_zbi_topology_x64_info_t(uint8_t buffer[], uint32_t apic_ids[],
                                          uint32_t apic_id_count);
 
-size_t serialize_zbi_topology_arm_info_t(uint8_t buffer[], uint8_t cluster_1_id,
-                                         uint8_t cluster_2_id, uint8_t cluster_3_id, uint8_t cpu_id,
-                                         uint8_t gic_id);
+size_t serialize_zbi_topology_arm64_info_t(uint8_t buffer[], uint8_t cluster_1_id,
+                                           uint8_t cluster_2_id, uint8_t cluster_3_id,
+                                           uint8_t cpu_id, uint8_t gic_id);
 
 size_t serialize_zbi_topology_cache_t(uint8_t buffer[], uint32_t cache_id);
 

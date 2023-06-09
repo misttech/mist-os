@@ -114,15 +114,15 @@ static void halt_other_cpus(void) {
 
 // Difference on SMT systems is that the AFF0 (cpu_id) level is implicit and not stored in the info.
 static uint64_t ToSmtMpid(const zbi_topology_processor_t& processor, uint8_t cpu_id) {
-  DEBUG_ASSERT(processor.architecture == ZBI_TOPOLOGY_ARCH_ARM);
-  const auto& info = processor.architecture_info.arm;
+  DEBUG_ASSERT(processor.architecture == ZBI_TOPOLOGY_ARCHITECTURE_ARM64);
+  const auto& info = processor.architecture_info.arm64;
   return (uint64_t)info.cluster_3_id << 32 | info.cluster_2_id << 16 | info.cluster_1_id << 8 |
          cpu_id;
 }
 
 static uint64_t ToMpid(const zbi_topology_processor_t& processor) {
-  DEBUG_ASSERT(processor.architecture == ZBI_TOPOLOGY_ARCH_ARM);
-  const auto& info = processor.architecture_info.arm;
+  DEBUG_ASSERT(processor.architecture == ZBI_TOPOLOGY_ARCHITECTURE_ARM64);
+  const auto& info = processor.architecture_info.arm64;
   return (uint64_t)info.cluster_3_id << 32 | info.cluster_2_id << 16 | info.cluster_1_id << 8 |
          info.cpu_id;
 }
@@ -164,7 +164,7 @@ static zx_status_t platform_start_cpu(cpu_num_t cpu_id, uint64_t mpid) {
 static void topology_cpu_init(void) {
   for (auto* node : system_topology::GetSystemTopology().processors()) {
     if (node->entity_type != ZBI_TOPOLOGY_ENTITY_PROCESSOR ||
-        node->entity.processor.architecture != ZBI_TOPOLOGY_ARCH_ARM) {
+        node->entity.processor.architecture != ZBI_TOPOLOGY_ARCHITECTURE_ARM64) {
       panic("Invalid processor node.");
     }
 
@@ -249,8 +249,8 @@ static constexpr zbi_topology_node_t fallback_topology = {
     .entity = {.processor = {.logical_ids = {0},
                              .logical_id_count = 1,
                              .flags = 0,
-                             .architecture = ZBI_TOPOLOGY_ARCH_ARM,
-                             .architecture_info = {.arm = {
+                             .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
+                             .architecture_info = {.arm64 = {
                                                        .cluster_1_id = 0,
                                                        .cluster_2_id = 0,
                                                        .cluster_3_id = 0,
@@ -275,7 +275,7 @@ static void init_topology(uint level) {
   // TODO(fxbug.dev/32903) Print the whole topology of the system.
   if (DPRINTF_ENABLED_FOR_LEVEL(INFO)) {
     for (auto* proc : system_topology::GetSystemTopology().processors()) {
-      auto& info = proc->entity.processor.architecture_info.arm;
+      auto& info = proc->entity.processor.architecture_info.arm64;
       dprintf(INFO, "System topology: CPU %u:%u:%u:%u\n", info.cluster_3_id, info.cluster_2_id,
               info.cluster_1_id, info.cpu_id);
     }
@@ -634,8 +634,9 @@ void topology_init() {
     }
     DEBUG_ASSERT(to_node != nullptr);
 
-    const zbi_topology_arm_info_t& from_info = from_node->entity.processor.architecture_info.arm;
-    const zbi_topology_arm_info_t& to_info = to_node->entity.processor.architecture_info.arm;
+    const zbi_topology_arm64_info_t& from_info =
+        from_node->entity.processor.architecture_info.arm64;
+    const zbi_topology_arm64_info_t& to_info = to_node->entity.processor.architecture_info.arm64;
 
     // Return the maximum cache depth not shared when multithreaded.
     if (cpu_id_is_thread_id) {

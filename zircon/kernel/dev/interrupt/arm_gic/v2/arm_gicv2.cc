@@ -314,9 +314,9 @@ static void gic_init_percpu() {
       system_topology::Graph::GetSystemTopology().ProcessorByLogicalId(logical_num, &node);
   if (status == ZX_OK) {
     DEBUG_ASSERT(node->entity_type == ZBI_TOPOLOGY_ENTITY_PROCESSOR &&
-                 node->entity.processor.architecture == ZBI_TOPOLOGY_ARCH_ARM);
+                 node->entity.processor.architecture == ZBI_TOPOLOGY_ARCHITECTURE_ARM64);
     mask_translator.SetGicIdForLogicalId(logical_num,
-                                         node->entity.processor.architecture_info.arm.gic_id);
+                                         node->entity.processor.architecture_info.arm64.gic_id);
   } else {
     printf("arm_gicv2: unable to get logical processor %u in topology, status: %d\n", logical_num,
            status);

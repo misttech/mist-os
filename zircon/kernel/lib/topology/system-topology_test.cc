@@ -43,7 +43,7 @@ bool test_flat_to_heap_simple() {
   system_topology::Node* node;
   ASSERT_EQ(ZX_OK, graph.ProcessorByLogicalId(1, &node));
   ASSERT_EQ(ZBI_TOPOLOGY_ENTITY_PROCESSOR, node->entity_type);
-  ASSERT_EQ(ZBI_TOPOLOGY_PROCESSOR_PRIMARY, node->entity.processor.flags);
+  ASSERT_EQ(ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY, node->entity.processor.flags);
   ASSERT_EQ(ZBI_TOPOLOGY_ENTITY_CLUSTER, node->parent->entity_type);
   ASSERT_EQ(1, node->parent->entity.cluster.performance_class);
 
@@ -195,8 +195,8 @@ FlatTopo SimpleTopology() {
       .entity = {.processor = {
                      .logical_ids = {logical_processor++, logical_processor++},
                      .logical_id_count = 2,
-                     .flags = ZBI_TOPOLOGY_PROCESSOR_PRIMARY,
-                     .architecture = ZBI_TOPOLOGY_ARCH_UNDEFINED,
+                     .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
+                     .architecture = ZBI_TOPOLOGY_ARCHITECTURE_UNDEFINED,
                      .architecture_info = {},
                  }}};
 
@@ -207,25 +207,27 @@ FlatTopo SimpleTopology() {
                                            .performance_class = 0,
                                        }}};
 
-  nodes[index++] = (zbi_topology_node_t){.entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
-                                         .parent_index = little_cluster,
-                                         .entity = {.processor = {
-                                                        .logical_ids = {logical_processor++},
-                                                        .logical_id_count = 1,
-                                                        .flags = 0,
-                                                        .architecture = ZBI_TOPOLOGY_ARCH_UNDEFINED,
-                                                        .architecture_info = {},
-                                                    }}};
+  nodes[index++] =
+      (zbi_topology_node_t){.entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                            .parent_index = little_cluster,
+                            .entity = {.processor = {
+                                           .logical_ids = {logical_processor++},
+                                           .logical_id_count = 1,
+                                           .flags = 0,
+                                           .architecture = ZBI_TOPOLOGY_ARCHITECTURE_UNDEFINED,
+                                           .architecture_info = {},
+                                       }}};
 
-  nodes[index++] = (zbi_topology_node_t){.entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
-                                         .parent_index = little_cluster,
-                                         .entity = {.processor = {
-                                                        .logical_ids = {logical_processor++},
-                                                        .logical_id_count = 1,
-                                                        .flags = 0,
-                                                        .architecture = ZBI_TOPOLOGY_ARCH_UNDEFINED,
-                                                        .architecture_info = {},
-                                                    }}};
+  nodes[index++] =
+      (zbi_topology_node_t){.entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                            .parent_index = little_cluster,
+                            .entity = {.processor = {
+                                           .logical_ids = {logical_processor++},
+                                           .logical_id_count = 1,
+                                           .flags = 0,
+                                           .architecture = ZBI_TOPOLOGY_ARCHITECTURE_UNDEFINED,
+                                           .architecture_info = {},
+                                       }}};
 
   topo.node_count = index;
   return topo;
@@ -258,30 +260,32 @@ FlatTopo HierarchicalTopology() {
       .entity = {.processor = {
                      .logical_ids = {logical_processor++, logical_processor++},
                      .logical_id_count = 2,
-                     .flags = ZBI_TOPOLOGY_PROCESSOR_PRIMARY,
-                     .architecture = ZBI_TOPOLOGY_ARCH_UNDEFINED,
+                     .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
+                     .architecture = ZBI_TOPOLOGY_ARCHITECTURE_UNDEFINED,
                      .architecture_info = {},
                  }}};
 
-  nodes[index++] = (zbi_topology_node_t){.entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
-                                         .parent_index = little_cluster,
-                                         .entity = {.processor = {
-                                                        .logical_ids = {logical_processor++},
-                                                        .logical_id_count = 1,
-                                                        .flags = 0,
-                                                        .architecture = ZBI_TOPOLOGY_ARCH_UNDEFINED,
-                                                        .architecture_info = {},
-                                                    }}};
+  nodes[index++] =
+      (zbi_topology_node_t){.entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                            .parent_index = little_cluster,
+                            .entity = {.processor = {
+                                           .logical_ids = {logical_processor++},
+                                           .logical_id_count = 1,
+                                           .flags = 0,
+                                           .architecture = ZBI_TOPOLOGY_ARCHITECTURE_UNDEFINED,
+                                           .architecture_info = {},
+                                       }}};
 
-  nodes[index++] = (zbi_topology_node_t){.entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
-                                         .parent_index = little_cluster,
-                                         .entity = {.processor = {
-                                                        .logical_ids = {logical_processor++},
-                                                        .logical_id_count = 1,
-                                                        .flags = 0,
-                                                        .architecture = ZBI_TOPOLOGY_ARCH_UNDEFINED,
-                                                        .architecture_info = {},
-                                                    }}};
+  nodes[index++] =
+      (zbi_topology_node_t){.entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                            .parent_index = little_cluster,
+                            .entity = {.processor = {
+                                           .logical_ids = {logical_processor++},
+                                           .logical_id_count = 1,
+                                           .flags = 0,
+                                           .architecture = ZBI_TOPOLOGY_ARCHITECTURE_UNDEFINED,
+                                           .architecture_info = {},
+                                       }}};
 
   topo.node_count = index;
   return topo;
@@ -311,7 +315,7 @@ void AddCCX(uint16_t parent, zbi_topology_node_t* nodes, uint16_t* index,
                        .logical_ids = {(*logical_processor)++, (*logical_processor)++},
                        .logical_id_count = 2,
                        .flags = 0,
-                       .architecture = ZBI_TOPOLOGY_ARCH_UNDEFINED,
+                       .architecture = ZBI_TOPOLOGY_ARCHITECTURE_UNDEFINED,
                        .architecture_info = {},
                    }}};
   }

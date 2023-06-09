@@ -136,8 +136,8 @@ pub enum ZbiTopologyEntityType {
 #[derive(FromPrimitive, ToPrimitive)]
 pub enum ZbiTopologyArchitecture {
     ZbiTopologyArchUndefined = 0,
-    ZbiTopologyArchX86 = 1,
-    ZbiTopologyArchArm = 2,
+    ZbiTopologyArchX64 = 1,
+    ZbiTopologyArchArm64 = 2,
 }
 
 #[repr(C)]
@@ -165,8 +165,8 @@ pub struct ZbiTopologyProcessor {
 #[repr(C)]
 #[derive(Copy, Clone, FromZeroes, FromBytes)]
 pub union ArchitectureInfo {
-    pub arm: ZbiTopologyArmInfo,
-    pub x86: ZbiTopologyX86Info,
+    pub arm64: ZbiTopologyArm64Info,
+    pub x64: ZbiTopologyX64Info,
 }
 
 #[repr(C)]
@@ -194,7 +194,7 @@ pub struct ZbiTopologyCache {
 
 #[repr(C)]
 #[derive(Copy, Clone, FromZeroes, FromBytes)]
-pub struct ZbiTopologyArmInfo {
+pub struct ZbiTopologyArm64Info {
     // Cluster ids for each level, one being closest to the cpu.
     // These map to aff1, aff2, and aff3 values in the ARM registers.
     pub cluster_1_id: u8,
@@ -212,7 +212,7 @@ pub struct ZbiTopologyArmInfo {
 
 #[repr(C)]
 #[derive(Copy, Clone, FromZeroes, FromBytes)]
-pub struct ZbiTopologyX86Info {
+pub struct ZbiTopologyX64Info {
     // Indexes here correspond to the logical_ids index for the thread.
     pub apic_ids: [u32; ZBI_MAX_SMT],
     pub apic_id_count: u32,
@@ -226,13 +226,13 @@ mod tests {
 
     #[link(name = "test-lib")]
     extern "C" {
-        pub fn serialize_zbi_topology_x86_info_t(
+        pub fn serialize_zbi_topology_x64_info_t(
             buffer: &[u8; MAX_SERIALIZATION_BUFFER_SIZE],
             apic_ids: &[u32; 4],
             apic_id_count: u32,
         ) -> usize;
 
-        pub fn serialize_zbi_topology_arm_info_t(
+        pub fn serialize_zbi_topology_arm64_info_t(
             buffer: &[u8; MAX_SERIALIZATION_BUFFER_SIZE],
             cluster_1_id: u8,
             cluster_2_id: u8,
@@ -279,16 +279,16 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn zbi_topology_x86_info_in_sync() {
+    fn zbi_topology_x64_info_in_sync() {
         let apic_ids = [0, 1, 3, 4];
         let apic_id_count = 4;
 
         let buffer = [0 as u8; MAX_SERIALIZATION_BUFFER_SIZE];
-        let size = unsafe { serialize_zbi_topology_x86_info_t(&buffer, &apic_ids, apic_id_count) };
-        assert_eq!(size, std::mem::size_of::<ZbiTopologyX86Info>());
+        let size = unsafe { serialize_zbi_topology_x64_info_t(&buffer, &apic_ids, apic_id_count) };
+        assert_eq!(size, std::mem::size_of::<ZbiTopologyX64Info>());
 
-        let x86_info = ZbiTopologyX86Info { apic_ids, apic_id_count };
-        assert_eq!(unsafe { as_u8_slice(&x86_info) }, &buffer[0..size]);
+        let x64_info = ZbiTopologyX64Info { apic_ids, apic_id_count };
+        assert_eq!(unsafe { as_u8_slice(&x64_info) }, &buffer[0..size]);
     }
 
     #[fuchsia::test]
@@ -301,7 +301,7 @@ mod tests {
 
         let buffer = [0 as u8; MAX_SERIALIZATION_BUFFER_SIZE];
         let size = unsafe {
-            serialize_zbi_topology_arm_info_t(
+            serialize_zbi_topology_arm64_info_t(
                 &buffer,
                 cluster_1_id,
                 cluster_2_id,
@@ -310,10 +310,10 @@ mod tests {
                 gic_id,
             )
         };
-        assert_eq!(size, std::mem::size_of::<ZbiTopologyArmInfo>());
+        assert_eq!(size, std::mem::size_of::<ZbiTopologyArm64Info>());
 
         let arm_info =
-            ZbiTopologyArmInfo { cluster_1_id, cluster_2_id, cluster_3_id, cpu_id, gic_id };
+            ZbiTopologyArm64Info { cluster_1_id, cluster_2_id, cluster_3_id, cpu_id, gic_id };
         assert_eq!(unsafe { as_u8_slice(&arm_info) }, &buffer[0..size]);
     }
 
@@ -360,15 +360,15 @@ mod tests {
         let logical_ids = [0, 1, 3, 4];
         let logical_id_count = 4;
         let flags = 1;
-        let arm_info = ZbiTopologyArmInfo {
+        let arm_info = ZbiTopologyArm64Info {
             cluster_1_id: 1,
             cluster_2_id: 1,
             cluster_3_id: 0,
             cpu_id: 0,
             gic_id: 1,
         };
-        let x86_info = ZbiTopologyX86Info { apic_ids: [0, 1, 3, 4], apic_id_count: 4 };
-        let mut architecture_info = ArchitectureInfo { arm: arm_info };
+        let x64_info = ZbiTopologyX64Info { apic_ids: [0, 1, 3, 4], apic_id_count: 4 };
+        let mut architecture_info = ArchitectureInfo { arm64: arm_info };
 
         let mut buffer = [0 as u8; MAX_SERIALIZATION_BUFFER_SIZE];
         let mut size = unsafe {
@@ -377,7 +377,7 @@ mod tests {
                 &logical_ids,
                 logical_id_count,
                 flags,
-                ZbiTopologyArchitecture::ZbiTopologyArchArm as u8,
+                ZbiTopologyArchitecture::ZbiTopologyArchArm64 as u8,
                 architecture_info,
             )
         };
@@ -388,32 +388,32 @@ mod tests {
         arm_processor.logical_ids = logical_ids;
         arm_processor.logical_id_count = logical_id_count;
         arm_processor.flags = flags;
-        arm_processor.architecture = ZbiTopologyArchitecture::ZbiTopologyArchArm as u8;
-        arm_processor.architecture_info.arm = arm_info;
+        arm_processor.architecture = ZbiTopologyArchitecture::ZbiTopologyArchArm64 as u8;
+        arm_processor.architecture_info.arm64 = arm_info;
         assert_eq!(unsafe { as_u8_slice(&arm_processor) }, &buffer[0..size]);
 
         buffer = [0 as u8; MAX_SERIALIZATION_BUFFER_SIZE];
-        architecture_info = ArchitectureInfo { x86: x86_info };
+        architecture_info = ArchitectureInfo { x64: x64_info };
         size = unsafe {
             serialize_zbi_topology_processor_t(
                 &buffer,
                 &logical_ids,
                 logical_id_count,
                 flags,
-                ZbiTopologyArchitecture::ZbiTopologyArchX86 as u8,
+                ZbiTopologyArchitecture::ZbiTopologyArchX64 as u8,
                 architecture_info,
             )
         };
         assert_eq!(size, std::mem::size_of::<ZbiTopologyProcessor>());
 
         // Ensure that the padding introduced by union are all zeroed.
-        let mut x86_processor: ZbiTopologyProcessor = unsafe { std::mem::zeroed() };
-        x86_processor.logical_ids = logical_ids;
-        x86_processor.logical_id_count = logical_id_count;
-        x86_processor.flags = flags;
-        x86_processor.architecture = ZbiTopologyArchitecture::ZbiTopologyArchX86 as u8;
-        x86_processor.architecture_info.x86 = x86_info;
-        assert_eq!(unsafe { as_u8_slice(&x86_processor) }, &buffer[0..size]);
+        let mut x64_processor: ZbiTopologyProcessor = unsafe { std::mem::zeroed() };
+        x64_processor.logical_ids = logical_ids;
+        x64_processor.logical_id_count = logical_id_count;
+        x64_processor.flags = flags;
+        x64_processor.architecture = ZbiTopologyArchitecture::ZbiTopologyArchX64 as u8;
+        x64_processor.architecture_info.x64 = x64_info;
+        assert_eq!(unsafe { as_u8_slice(&x64_processor) }, &buffer[0..size]);
 
         buffer = [0 as u8; MAX_SERIALIZATION_BUFFER_SIZE];
         size = unsafe {

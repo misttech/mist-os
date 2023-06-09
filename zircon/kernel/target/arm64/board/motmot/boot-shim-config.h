@@ -5,6 +5,12 @@
 #ifndef ZIRCON_KERNEL_TARGET_ARM64_BOARD_MOTMOT_BOOT_SHIM_CONFIG_H_
 #define ZIRCON_KERNEL_TARGET_ARM64_BOARD_MOTMOT_BOOT_SHIM_CONFIG_H_
 
+#include <lib/zbi-format/board.h>
+#include <lib/zbi-format/cpu.h>
+#include <lib/zbi-format/driver-config.h>
+#include <lib/zbi-format/memory.h>
+#include <lib/zbi-format/zbi.h>
+
 #define HAS_DEVICE_TREE 1
 #define USE_DEVICE_TREE_CPU_COUNT 0
 #define USE_DEVICE_TREE_GIC_VERSION 0
@@ -115,10 +121,10 @@ static void add_cpu(zbi_topology_node_t* node, size_t cpu_num, size_t parent_ind
       .processor = {
         .logical_ids = { (uint16_t)cpu_num },
         .logical_id_count = 1,
-        .flags = (cpu_num == 0) ? ZBI_TOPOLOGY_PROCESSOR_PRIMARY : 0,
-        .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+        .flags = (cpu_num == 0) ? ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY : (zbi_topology_processor_flags_t)0,
+        .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
         .architecture_info = {
-          .arm = {
+          .arm64 = {
             .cluster_1_id = (mpidr >> 8) & 0xff,
             .cpu_id = mpidr & 0xff,
             .gic_id = 0, // unused with GICv3

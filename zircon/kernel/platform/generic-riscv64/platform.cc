@@ -147,18 +147,18 @@ static void topology_cpu_init() {
 
   for (auto* node : system_topology::GetSystemTopology().processors()) {
     if (node->entity_type != ZBI_TOPOLOGY_ENTITY_PROCESSOR ||
-        node->entity.processor.architecture != ZBI_TOPOLOGY_ARCH_RISCV) {
+        node->entity.processor.architecture != ZBI_TOPOLOGY_ARCHITECTURE_RISCV64) {
       panic("Invalid processor node.");
     }
 
     const auto& processor = node->entity.processor;
     for (uint8_t i = 0; i < processor.logical_id_count; i++) {
       // Skip the current (boot) hart, we are only starting secondary harts.
-      if (processor.flags == ZBI_TOPOLOGY_PROCESSOR_PRIMARY) {
+      if (processor.flags == ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY) {
         continue;
       }
       // Try to start the hart.
-      const uint64_t hart_id = processor.architecture_info.riscv.hart_id;
+      const uint64_t hart_id = processor.architecture_info.riscv64.hart_id;
       DEBUG_ASSERT(hart_id <= UINT32_MAX);
       riscv64_start_cpu(processor.logical_ids[i], static_cast<uint32_t>(hart_id));
     }
@@ -173,10 +173,10 @@ static constexpr zbi_topology_node_t fallback_topology = {
     .processor = {
       .logical_ids = {0},
       .logical_id_count = 1,
-      .flags = ZBI_TOPOLOGY_PROCESSOR_PRIMARY,
-      .architecture = ZBI_TOPOLOGY_ARCH_RISCV,
+      .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
+      .architecture = ZBI_TOPOLOGY_ARCHITECTURE_RISCV64,
       .architecture_info = {
-        .riscv = {
+        .riscv64 = {
           .hart_id = 0,
         }
       }
@@ -202,7 +202,7 @@ static void init_topology(uint level) {
   // TODO(fxbug.dev/32903) Print the whole topology of the system.
   if (DPRINTF_ENABLED_FOR_LEVEL(INFO)) {
     for (auto* proc : system_topology::GetSystemTopology().processors()) {
-      auto& info = proc->entity.processor.architecture_info.riscv;
+      auto& info = proc->entity.processor.architecture_info.riscv64;
       dprintf(INFO, "System topology: CPU Hart %lu\n", info.hart_id);
     }
   }

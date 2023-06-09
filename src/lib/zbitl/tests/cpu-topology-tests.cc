@@ -65,11 +65,11 @@ void ExpectArmNodesAreEqual(const zbi_topology_node_t& expected_node,
         EXPECT_EQ(expected.logical_ids[j], actual.logical_ids[j]) << "logical_ids[" << j << "])";
       }
       EXPECT_EQ(actual.flags, expected.flags);
-      ASSERT_EQ(actual.architecture, ZBI_TOPOLOGY_ARCH_ARM);
-      ASSERT_EQ(expected.architecture, ZBI_TOPOLOGY_ARCH_ARM);
+      ASSERT_EQ(actual.architecture, ZBI_TOPOLOGY_ARCHITECTURE_ARM64);
+      ASSERT_EQ(expected.architecture, ZBI_TOPOLOGY_ARCHITECTURE_ARM64);
 
-      const zbi_topology_arm_info_t& actual_info = actual.architecture_info.arm;
-      const zbi_topology_arm_info_t& expected_info = expected.architecture_info.arm;
+      const zbi_topology_arm64_info_t& actual_info = actual.architecture_info.arm64;
+      const zbi_topology_arm64_info_t& expected_info = expected.architecture_info.arm64;
       EXPECT_EQ(expected_info.cluster_1_id, actual_info.cluster_1_id);
       EXPECT_EQ(expected_info.cluster_2_id, actual_info.cluster_2_id);
       EXPECT_EQ(expected_info.cluster_3_id, actual_info.cluster_3_id);
@@ -144,10 +144,10 @@ TEST(CpuTopologyTableTests, SingleArmCore) {
                       {
                           .logical_ids = {0},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                           .architecture_info =
                               {
-                                  .arm =
+                                  .arm64 =
                                       {
                                           .cluster_1_id = 0,
                                           .cpu_id = 0,
@@ -192,10 +192,10 @@ TEST(CpuTopologyTableTests, TwoArmCoresAcrossOneCluster) {
                       {
                           .logical_ids = {0},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                           .architecture_info =
                               {
-                                  .arm =
+                                  .arm64 =
                                       {
                                           .cluster_1_id = 0,
                                           .cpu_id = 0,
@@ -214,10 +214,10 @@ TEST(CpuTopologyTableTests, TwoArmCoresAcrossOneCluster) {
                       {
                           .logical_ids = {1},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                           .architecture_info =
                               {
-                                  .arm =
+                                  .arm64 =
                                       {
                                           .cluster_1_id = 0,
                                           .cpu_id = 1,
@@ -262,10 +262,10 @@ TEST(CpuTopologyTableTests, FourArmCoresAcrossOneCluster) {
                       {
                           .logical_ids = {0},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                           .architecture_info =
                               {
-                                  .arm =
+                                  .arm64 =
                                       {
                                           .cluster_1_id = 0,
                                           .cpu_id = 0,
@@ -284,10 +284,10 @@ TEST(CpuTopologyTableTests, FourArmCoresAcrossOneCluster) {
                       {
                           .logical_ids = {1},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                           .architecture_info =
                               {
-                                  .arm =
+                                  .arm64 =
                                       {
                                           .cluster_1_id = 0,
                                           .cpu_id = 1,
@@ -306,10 +306,10 @@ TEST(CpuTopologyTableTests, FourArmCoresAcrossOneCluster) {
                       {
                           .logical_ids = {2},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                           .architecture_info =
                               {
-                                  .arm =
+                                  .arm64 =
                                       {
                                           .cluster_1_id = 0,
                                           .cpu_id = 2,
@@ -328,10 +328,10 @@ TEST(CpuTopologyTableTests, FourArmCoresAcrossOneCluster) {
                       {
                           .logical_ids = {3},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                           .architecture_info =
                               {
-                                  .arm =
+                                  .arm64 =
                                       {
                                           .cluster_1_id = 0,
                                           .cpu_id = 3,
@@ -376,10 +376,10 @@ TEST(CpuTopologyTableTests, TwoArmCoresAcrossTwoClusters) {
                       {
                           .logical_ids = {0},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                           .architecture_info =
                               {
-                                  .arm =
+                                  .arm64 =
                                       {
                                           .cluster_1_id = 0,
                                           .cpu_id = 0,
@@ -403,10 +403,10 @@ TEST(CpuTopologyTableTests, TwoArmCoresAcrossTwoClusters) {
                       {
                           .logical_ids = {1},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                           .architecture_info =
                               {
-                                  .arm =
+                                  .arm64 =
                                       {
                                           .cluster_1_id = 1,
                                           .cpu_id = 0,
@@ -451,10 +451,10 @@ TEST(CpuTopologyTableTests, SixArmCoresAcrossThreeClusters) {
                       {
                           .logical_ids = {0},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                           .architecture_info =
                               {
-                                  .arm =
+                                  .arm64 =
                                       {
                                           .cluster_1_id = 0,
                                           .cpu_id = 0,
@@ -478,10 +478,10 @@ TEST(CpuTopologyTableTests, SixArmCoresAcrossThreeClusters) {
                       {
                           .logical_ids = {1},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                           .architecture_info =
                               {
-                                  .arm =
+                                  .arm64 =
                                       {
                                           .cluster_1_id = 1,
                                           .cpu_id = 0,
@@ -500,10 +500,10 @@ TEST(CpuTopologyTableTests, SixArmCoresAcrossThreeClusters) {
                       {
                           .logical_ids = {2},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                           .architecture_info =
                               {
-                                  .arm =
+                                  .arm64 =
                                       {
                                           .cluster_1_id = 1,
                                           .cpu_id = 1,
@@ -522,10 +522,10 @@ TEST(CpuTopologyTableTests, SixArmCoresAcrossThreeClusters) {
                       {
                           .logical_ids = {3},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                           .architecture_info =
                               {
-                                  .arm =
+                                  .arm64 =
                                       {
                                           .cluster_1_id = 1,
                                           .cpu_id = 2,
@@ -549,10 +549,10 @@ TEST(CpuTopologyTableTests, SixArmCoresAcrossThreeClusters) {
                       {
                           .logical_ids = {4},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                           .architecture_info =
                               {
-                                  .arm =
+                                  .arm64 =
                                       {
                                           .cluster_1_id = 2,
                                           .cpu_id = 0,
@@ -571,10 +571,10 @@ TEST(CpuTopologyTableTests, SixArmCoresAcrossThreeClusters) {
                       {
                           .logical_ids = {5},
                           .logical_id_count = 1,
-                          .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                           .architecture_info =
                               {
-                                  .arm =
+                                  .arm64 =
                                       {
                                           .cluster_1_id = 2,
                                           .cpu_id = 1,
@@ -619,11 +619,11 @@ TEST(CpuTopologyTableTests, Sherlock) {
                       {
                           .logical_ids = {0},
                           .logical_id_count = 1,
-                          .flags = ZBI_TOPOLOGY_PROCESSOR_PRIMARY,
-                          .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                          .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                           .architecture_info =
                               {
-                                  .arm =
+                                  .arm64 =
                                       {
                                           .cluster_1_id = 0,
                                           .cpu_id = 0,
@@ -643,10 +643,10 @@ TEST(CpuTopologyTableTests, Sherlock) {
                           .logical_ids = {1},
                           .logical_id_count = 1,
                           .flags = 0,
-                          .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                           .architecture_info =
                               {
-                                  .arm =
+                                  .arm64 =
                                       {
                                           .cluster_1_id = 0,
                                           .cpu_id = 1,
@@ -671,10 +671,10 @@ TEST(CpuTopologyTableTests, Sherlock) {
                           .logical_ids = {2},
                           .logical_id_count = 1,
                           .flags = 0,
-                          .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                           .architecture_info =
                               {
-                                  .arm =
+                                  .arm64 =
                                       {
                                           .cluster_1_id = 1,
                                           .cpu_id = 0,
@@ -694,10 +694,10 @@ TEST(CpuTopologyTableTests, Sherlock) {
                           .logical_ids = {3},
                           .logical_id_count = 1,
                           .flags = 0,
-                          .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                           .architecture_info =
                               {
-                                  .arm =
+                                  .arm64 =
                                       {
                                           .cluster_1_id = 1,
                                           .cpu_id = 1,
@@ -717,10 +717,10 @@ TEST(CpuTopologyTableTests, Sherlock) {
                           .logical_ids = {4},
                           .logical_id_count = 1,
                           .flags = 0,
-                          .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                           .architecture_info =
                               {
-                                  .arm =
+                                  .arm64 =
                                       {
                                           .cluster_1_id = 1,
                                           .cpu_id = 2,
@@ -740,10 +740,10 @@ TEST(CpuTopologyTableTests, Sherlock) {
                           .logical_ids = {5},
                           .logical_id_count = 1,
                           .flags = 0,
-                          .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                          .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                           .architecture_info =
                               {
-                                  .arm =
+                                  .arm64 =
                                       {
                                           .cluster_1_id = 1,
                                           .cpu_id = 3,

@@ -147,10 +147,10 @@ struct CpuTopologyTable::Dispatch {
                     {
                         .logical_ids = {*it.logical_id_},
                         .logical_id_count = 1,
-                        .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                        .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                         .architecture_info =
                             {
-                                .arm =
+                                .arm64 =
                                     {
                                         .cluster_1_id = it.cluster_idx_,
                                         .cpu_id = *it.cpu_idx_,

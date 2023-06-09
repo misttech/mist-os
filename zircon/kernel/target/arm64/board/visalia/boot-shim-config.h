@@ -63,11 +63,12 @@ static void add_cpu_topology(zbi_header_t* zbi) {
                     {
                         .logical_ids = {index},
                         .logical_id_count = 1,
-                        .flags = (uint16_t)(index == 0 ? ZBI_TOPOLOGY_PROCESSOR_PRIMARY : 0),
-                        .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                        .flags = index == 0 ? ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY
+                                            : (zbi_topology_processor_flags_t)0,
+                        .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                         .architecture_info =
                             {
-                                .arm =
+                                .arm64 =
                                     {
                                         .cpu_id = index,
                                         .gic_id = index,

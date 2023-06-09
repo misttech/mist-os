@@ -7,6 +7,12 @@
 #ifndef ZIRCON_KERNEL_TARGET_ARM64_BOARD_PINECREST_BOOT_SHIM_CONFIG_H_
 #define ZIRCON_KERNEL_TARGET_ARM64_BOARD_PINECREST_BOOT_SHIM_CONFIG_H_
 
+#include <lib/zbi-format/board.h>
+#include <lib/zbi-format/cpu.h>
+#include <lib/zbi-format/driver-config.h>
+#include <lib/zbi-format/memory.h>
+#include <lib/zbi-format/zbi.h>
+
 #define HAS_DEVICE_TREE 0
 
 static const zbi_mem_range_t mem_config[] = {
@@ -63,11 +69,12 @@ static void add_cpu_topology(zbi_header_t* zbi) {
                     {
                         .logical_ids = {index},
                         .logical_id_count = 1,
-                        .flags = (uint16_t)(index == 0 ? ZBI_TOPOLOGY_PROCESSOR_PRIMARY : 0),
-                        .architecture = ZBI_TOPOLOGY_ARCH_ARM,
+                        .flags = index == 0 ? ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY
+                                            : (zbi_topology_processor_flags_t)0,
+                        .architecture = ZBI_TOPOLOGY_ARCHITECTURE_ARM64,
                         .architecture_info =
                             {
-                                .arm =
+                                .arm64 =
                                     {
                                         .cpu_id = index,
                                         .gic_id = index,

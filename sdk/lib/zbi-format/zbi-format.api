@@ -1,6 +1,6 @@
 {
   "pkg/zbi-format/include/lib/zbi-format/board.h": "f89f4a6adca0adac4ed86db75af2cbff",
-  "pkg/zbi-format/include/lib/zbi-format/cpu.h": "581eb775c9b169871ff0209b07613af4",
+  "pkg/zbi-format/include/lib/zbi-format/cpu.h": "d1b95053bb275c31f341e7ded697da89",
   "pkg/zbi-format/include/lib/zbi-format/driver-config.h": "4f369e61f82291792a72dd4fa7ca87f3",
   "pkg/zbi-format/include/lib/zbi-format/graphics.h": "665c232f934de8af76526e86b569d221",
   "pkg/zbi-format/include/lib/zbi-format/kernel.h": "8d043d0287db2e392d184def7d49506f",

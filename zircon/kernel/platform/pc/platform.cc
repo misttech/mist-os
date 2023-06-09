@@ -351,8 +351,8 @@ static void traverse_topology(uint32_t) {
   bsp_apic_id_index = 0;
   for (const auto* processor_node : system_topology::GetSystemTopology().processors()) {
     const auto& processor = processor_node->entity.processor;
-    for (size_t i = 0; i < processor.architecture_info.x86.apic_id_count; i++) {
-      const uint32_t apic_id = processor.architecture_info.x86.apic_ids[i];
+    for (size_t i = 0; i < processor.architecture_info.x64.apic_id_count; i++) {
+      const uint32_t apic_id = processor.architecture_info.x64.apic_ids[i];
       const bool keep = (i < 1) || use_ht;
       const size_t index = cpu_index++;
 
