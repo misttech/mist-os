@@ -7,7 +7,6 @@
 
 pub(crate) mod address;
 pub mod datagram;
-pub(crate) mod posix;
 
 use alloc::collections::HashMap;
 use core::{
@@ -32,7 +31,7 @@ use crate::{
     device::{StrongId, WeakId},
     error::{ExistsError, NotFoundError},
     ip::IpExt,
-    socket::address::{ConnAddr, ListenerAddr, ListenerIpAddr},
+    socket::address::{AddrVecIter, ConnAddr, ListenerAddr, ListenerIpAddr},
 };
 
 /// Determines whether the provided address is underspecified by itself.
@@ -333,6 +332,24 @@ where
                 unreachable!("found conn state for listen addr")
             }
         }
+    }
+}
+
+impl<A: SocketMapAddrSpec> IterShadows for AddrVec<A> {
+    type IterShadows = AddrVecIter<A>;
+
+    fn iter_shadows(&self) -> Self::IterShadows {
+        let (socket_ip_addr, device) = match self.clone() {
+            AddrVec::Conn(ConnAddr { ip, device }) => (ip.into(), device),
+            AddrVec::Listen(ListenerAddr { ip, device }) => (ip.into(), device),
+        };
+        let mut iter = match device {
+            Some(device) => AddrVecIter::with_device(socket_ip_addr, device),
+            None => AddrVecIter::without_device(socket_ip_addr),
+        };
+        // Skip the first element, which is always `*self`.
+        assert_eq!(iter.next().as_ref(), Some(self));
+        iter
     }
 }
 

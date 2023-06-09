@@ -4,7 +4,7 @@
 
 //! The User Datagram Protocol (UDP).
 
-use alloc::collections::hash_map::DefaultHasher;
+use alloc::{collections::hash_map::DefaultHasher, vec::Vec};
 use core::{
     convert::Infallible as Never,
     fmt::Debug,
@@ -38,7 +38,7 @@ use crate::{
     context::{CounterContext, InstantContext, RngContext, TracingContext},
     data_structures::{
         id_map_collection::IdMapCollectionKey,
-        socketmap::{IterShadows as _, SocketMap, Tagged as _},
+        socketmap::{IterShadows as _, SocketMap, Tagged},
     },
     device::{AnyDevice, DeviceId, DeviceIdContext, Id, WeakDeviceId, WeakId},
     error::{LocalAddressError, SocketError, ZonedAddressError},
@@ -59,9 +59,9 @@ use crate::{
             SockCreationError, SocketHopLimits, SocketInfo as DatagramSocketInfo,
             UnboundSocketState,
         },
-        posix::{PosixAddrState, PosixAddrVecTag, PosixSharingOptions, ToPosixSharingOptions},
-        AddrVec, Bound, BoundSocketMap, Connection, ConvertSocketTypeState, InsertError, Listener,
-        SocketAddrType, SocketMapConflictPolicy, SocketMapStateSpec,
+        AddrVec, Bound, BoundSocketMap, Connection, ConvertSocketTypeState, IncompatibleError,
+        InsertError, Listener, RemoveResult, SocketAddrType, SocketMapAddrStateSpec,
+        SocketMapConflictPolicy, SocketMapStateSpec,
     },
     sync::RwLock,
     trace_duration, transport, SyncCtx,
@@ -133,7 +133,7 @@ impl<I: IpExt, D: WeakId> Default for UdpState<I, D> {
     }
 }
 
-/// Uninstantiatable type for implementing PosixSocketMapSpec.
+/// Uninstantiatable type for implementing [`DatagramSocketSpec`].
 struct Udp<I, D>(PhantomData<(I, D)>, Never);
 
 /// Produces an iterator over eligible receiving socket addresses.
@@ -142,11 +142,11 @@ fn iter_receiving_addrs<I: Ip + IpExt, D: WeakId>(
     addr: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
     device: D,
 ) -> impl Iterator<Item = AddrVec<IpPortSpec<I, D>>> {
-    crate::socket::posix::PosixAddrVecIter::with_device(addr, device)
+    crate::socket::address::AddrVecIter::with_device(addr.into(), device)
 }
 
 fn check_posix_sharing<I: IpExt, D: WeakId>(
-    new_sharing: PosixSharingOptions,
+    new_sharing: Sharing,
     dest: AddrVec<IpPortSpec<I, D>>,
     socketmap: &SocketMap<AddrVec<IpPortSpec<I, D>>, Bound<Udp<I, D>>>,
 ) -> Result<(), InsertError> {
@@ -189,10 +189,10 @@ fn check_posix_sharing<I: IpExt, D: WeakId>(
     // rely on the fact that the tag values in the socket map have different
     // values for entries with and without device IDs specified.
     fn conflict_exists<I: IpExt, D: WeakId>(
-        new_sharing: PosixSharingOptions,
+        new_sharing: Sharing,
         socketmap: &SocketMap<AddrVec<IpPortSpec<I, D>>, Bound<Udp<I, D>>>,
         addr: impl Into<AddrVec<IpPortSpec<I, D>>>,
-        mut is_conflicting: impl FnMut(&PosixAddrVecTag) -> bool,
+        mut is_conflicting: impl FnMut(&AddrVecTag) -> bool,
     ) -> bool {
         socketmap.descendant_counts(&addr.into()).any(|(tag, _): &(_, NonZeroUsize)| {
             is_conflicting(tag)
@@ -214,7 +214,7 @@ fn check_posix_sharing<I: IpExt, D: WeakId>(
                 new_sharing,
                 socketmap,
                 ListenerAddr { ip: ListenerIpAddr { addr: None, identifier }, device: None },
-                |PosixAddrVecTag { has_device, addr_type, sharing: _ }| {
+                |AddrVecTag { has_device, addr_type, sharing: _ }| {
                     !*has_device
                         && match addr_type {
                             SocketAddrType::SpecificListener | SocketAddrType::Connected => true,
@@ -236,7 +236,7 @@ fn check_posix_sharing<I: IpExt, D: WeakId>(
                 new_sharing,
                 socketmap,
                 ListenerAddr { ip: ListenerIpAddr { addr: Some(ip), identifier }, device: None },
-                |PosixAddrVecTag { has_device, addr_type, sharing: _ }| {
+                |AddrVecTag { has_device, addr_type, sharing: _ }| {
                     !*has_device
                         && match addr_type {
                             SocketAddrType::Connected => true,
@@ -259,7 +259,7 @@ fn check_posix_sharing<I: IpExt, D: WeakId>(
                 new_sharing,
                 socketmap,
                 ListenerAddr { ip: ListenerIpAddr { addr: None, identifier }, device: None },
-                |PosixAddrVecTag { has_device, addr_type, sharing: _ }| {
+                |AddrVecTag { has_device, addr_type, sharing: _ }| {
                     *has_device
                         && match addr_type {
                             SocketAddrType::AnyListener => true,
@@ -289,7 +289,7 @@ fn check_posix_sharing<I: IpExt, D: WeakId>(
                     },
                     device: None,
                 },
-                |PosixAddrVecTag { has_device, addr_type, sharing: _ }| {
+                |AddrVecTag { has_device, addr_type, sharing: _ }| {
                     *has_device
                         && match addr_type {
                             SocketAddrType::SpecificListener => true,
@@ -316,7 +316,7 @@ fn check_posix_sharing<I: IpExt, D: WeakId>(
                     ip: ListenerIpAddr { addr: None, identifier: local_identifier },
                     device: None,
                 },
-                |PosixAddrVecTag { has_device, addr_type, sharing: _ }| {
+                |AddrVecTag { has_device, addr_type, sharing: _ }| {
                     *has_device
                         && match addr_type {
                             SocketAddrType::AnyListener => true,
@@ -345,23 +345,22 @@ impl<I: IpExt, D: Id> SocketMapStateSpec for Udp<I, D> {
     type ListenerState = ListenerState<I::Addr, D>;
     type ConnState = ConnState<I, D>;
 
-    type AddrVecTag = PosixAddrVecTag;
+    type AddrVecTag = AddrVecTag;
 
-    type ListenerSharingState = PosixSharingOptions;
-    type ConnSharingState = PosixSharingOptions;
+    type ListenerSharingState = Sharing;
+    type ConnSharingState = Sharing;
 
-    type ListenerAddrState = PosixAddrState<Self::ListenerId>;
+    type ListenerAddrState = AddrState<Self::ListenerId>;
 
-    type ConnAddrState = PosixAddrState<Self::ConnId>;
+    type ConnAddrState = AddrState<Self::ConnId>;
 }
 
-impl<AA, I: IpExt, D: WeakId> SocketMapConflictPolicy<AA, PosixSharingOptions, IpPortSpec<I, D>>
-    for Udp<I, D>
+impl<AA, I: IpExt, D: WeakId> SocketMapConflictPolicy<AA, Sharing, IpPortSpec<I, D>> for Udp<I, D>
 where
     AA: Into<AddrVec<IpPortSpec<I, D>>> + Clone,
 {
     fn check_insert_conflicts(
-        new_sharing_state: &PosixSharingOptions,
+        new_sharing_state: &Sharing,
         addr: &AA,
         socketmap: &SocketMap<AddrVec<IpPortSpec<I, D>>, Bound<Self>>,
     ) -> Result<(), InsertError> {
@@ -371,7 +370,7 @@ where
 
 impl<I: IpExt, D: WeakId> DatagramSocketStateSpec for Udp<I, D> {
     type UnboundId = UnboundId<I>;
-    type UnboundSharingState = PosixSharingOptions;
+    type UnboundSharingState = Sharing;
 }
 
 impl<I: IpExt, D: WeakId> DatagramSocketSpec<IpPortSpec<I, D>> for Udp<I, D> {
@@ -404,14 +403,182 @@ struct SocketSelectorParams<I: Ip, A: AsRef<I::Addr>> {
     _ip: IpVersionMarker<I>,
 }
 
-impl<T> PosixAddrState<T> {
+#[derive(Debug, Eq, PartialEq)]
+pub(crate) enum AddrState<T> {
+    Exclusive(T),
+    ReusePort(Vec<T>),
+}
+
+impl<'a, A: IpAddress, LI> From<&'a ListenerIpAddr<A, LI>> for SocketAddrType {
+    fn from(ListenerIpAddr { addr, identifier: _ }: &'a ListenerIpAddr<A, LI>) -> Self {
+        match addr {
+            Some(_) => SocketAddrType::SpecificListener,
+            None => SocketAddrType::AnyListener,
+        }
+    }
+}
+
+impl<'a, A: IpAddress, LI, RI> From<&'a ConnIpAddr<A, LI, RI>> for SocketAddrType {
+    fn from(_: &'a ConnIpAddr<A, LI, RI>) -> Self {
+        SocketAddrType::Connected
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) enum Sharing {
+    Exclusive,
+    ReusePort,
+}
+
+impl Default for Sharing {
+    fn default() -> Self {
+        Self::Exclusive
+    }
+}
+
+impl Sharing {
+    pub(crate) fn is_shareable_with_new_state(&self, new_state: Sharing) -> bool {
+        match (self, new_state) {
+            (Sharing::Exclusive, Sharing::Exclusive) => false,
+            (Sharing::Exclusive, Sharing::ReusePort) => false,
+            (Sharing::ReusePort, Sharing::Exclusive) => false,
+            (Sharing::ReusePort, Sharing::ReusePort) => true,
+        }
+    }
+
+    pub(crate) fn is_reuse_port(&self) -> bool {
+        match self {
+            Sharing::Exclusive => false,
+            Sharing::ReusePort => true,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) struct AddrVecTag {
+    pub(crate) has_device: bool,
+    pub(crate) addr_type: SocketAddrType,
+    pub(crate) sharing: Sharing,
+}
+
+impl<T, A: IpAddress, D, LI> Tagged<ListenerAddr<A, D, LI>> for AddrState<T> {
+    type Tag = AddrVecTag;
+
+    fn tag(&self, address: &ListenerAddr<A, D, LI>) -> Self::Tag {
+        let ListenerAddr { ip, device } = address;
+        AddrVecTag {
+            has_device: device.is_some(),
+            addr_type: ip.into(),
+            sharing: self.to_sharing_options(),
+        }
+    }
+}
+
+impl<T, A: IpAddress, D, LI, RI> Tagged<ConnAddr<A, D, LI, RI>> for AddrState<T> {
+    type Tag = AddrVecTag;
+
+    fn tag(&self, address: &ConnAddr<A, D, LI, RI>) -> Self::Tag {
+        let ConnAddr { ip, device } = address;
+        AddrVecTag {
+            has_device: device.is_some(),
+            addr_type: ip.into(),
+            sharing: self.to_sharing_options(),
+        }
+    }
+}
+
+pub(crate) trait ToSharingOptions {
+    fn to_sharing_options(&self) -> Sharing;
+}
+
+impl ToSharingOptions for AddrVecTag {
+    fn to_sharing_options(&self) -> Sharing {
+        let AddrVecTag { has_device: _, addr_type: _, sharing } = self;
+        *sharing
+    }
+}
+
+impl<T> ToSharingOptions for AddrState<T> {
+    fn to_sharing_options(&self) -> Sharing {
+        match self {
+            AddrState::Exclusive(_) => Sharing::Exclusive,
+            AddrState::ReusePort(_) => Sharing::ReusePort,
+        }
+    }
+}
+
+impl<T> ToSharingOptions for (T, Sharing) {
+    fn to_sharing_options(&self) -> Sharing {
+        let (_state, sharing) = self;
+        *sharing
+    }
+}
+
+impl<I: Debug + Eq> SocketMapAddrStateSpec for AddrState<I> {
+    type Id = I;
+    type SharingState = Sharing;
+    type Inserter<'a> = &'a mut Vec<I> where I: 'a;
+
+    fn new(new_sharing_state: &Sharing, id: I) -> Self {
+        match new_sharing_state {
+            Sharing::Exclusive => Self::Exclusive(id),
+            Sharing::ReusePort => Self::ReusePort(Vec::from([id])),
+        }
+    }
+
+    fn contains_id(&self, id: &Self::Id) -> bool {
+        match self {
+            Self::Exclusive(x) => id == x,
+            Self::ReusePort(ids) => ids.contains(id),
+        }
+    }
+
+    fn try_get_inserter<'a, 'b>(
+        &'b mut self,
+        new_sharing_state: &'a Sharing,
+    ) -> Result<&'b mut Vec<I>, IncompatibleError> {
+        match (self, new_sharing_state) {
+            (AddrState::Exclusive(_), _) | (AddrState::ReusePort(_), Sharing::Exclusive) => {
+                Err(IncompatibleError)
+            }
+            (AddrState::ReusePort(ids), Sharing::ReusePort) => Ok(ids),
+        }
+    }
+
+    fn could_insert(
+        &self,
+        new_sharing_state: &Self::SharingState,
+    ) -> Result<(), IncompatibleError> {
+        match (self, new_sharing_state) {
+            (AddrState::Exclusive(_), _) | (_, Sharing::Exclusive) => Err(IncompatibleError),
+            (AddrState::ReusePort(_), Sharing::ReusePort) => Ok(()),
+        }
+    }
+
+    fn remove_by_id(&mut self, id: I) -> RemoveResult {
+        match self {
+            AddrState::Exclusive(_) => RemoveResult::IsLast,
+            AddrState::ReusePort(ids) => {
+                let index = ids.iter().position(|i| i == &id).expect("couldn't find ID to remove");
+                assert_eq!(ids.swap_remove(index), id);
+                if ids.is_empty() {
+                    RemoveResult::IsLast
+                } else {
+                    RemoveResult::Success
+                }
+            }
+        }
+    }
+}
+
+impl<T> AddrState<T> {
     fn select_receiver<I: Ip, A: AsRef<I::Addr> + Hash>(
         &self,
         selector: SocketSelectorParams<I, A>,
     ) -> &T {
         match self {
-            PosixAddrState::Exclusive(id) => id,
-            PosixAddrState::ReusePort(ids) => {
+            AddrState::Exclusive(id) => id,
+            AddrState::ReusePort(ids) => {
                 let mut hasher = DefaultHasher::new();
                 selector.hash(&mut hasher);
                 let index: usize = hasher.finish() as usize % ids.len();
@@ -422,8 +589,8 @@ impl<T> PosixAddrState<T> {
 
     fn collect_all_ids(&self) -> impl Iterator<Item = &'_ T> {
         match self {
-            PosixAddrState::Exclusive(id) => Either::Left(core::iter::once(id)),
-            PosixAddrState::ReusePort(ids) => Either::Right(ids.iter()),
+            AddrState::Exclusive(id) => Either::Left(core::iter::once(id)),
+            AddrState::ReusePort(ids) => Either::Right(ids.iter()),
         }
     }
 }
@@ -1281,11 +1448,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
 
             let UnboundSocketState { device: _, sharing, ip_options: _ } =
                 unbound.get_mut(id.into()).expect("unbound UDP socket not found");
-            *sharing = if reuse_port {
-                PosixSharingOptions::ReusePort
-            } else {
-                PosixSharingOptions::Exclusive
-            };
+            *sharing = if reuse_port { Sharing::ReusePort } else { Sharing::Exclusive };
         })
     }
 
@@ -6428,65 +6591,63 @@ where {
     }
 
     #[test_case([
-        (listen(ip_v4!("0.0.0.0"), 1), PosixSharingOptions::Exclusive),
-        (listen(ip_v4!("0.0.0.0"), 2), PosixSharingOptions::Exclusive)],
+        (listen(ip_v4!("0.0.0.0"), 1), Sharing::Exclusive),
+        (listen(ip_v4!("0.0.0.0"), 2), Sharing::Exclusive)],
             Ok(()); "listen_any_ip_different_port")]
     #[test_case([
-        (listen(ip_v4!("0.0.0.0"), 1), PosixSharingOptions::Exclusive),
-        (listen(ip_v4!("0.0.0.0"), 1), PosixSharingOptions::Exclusive)],
+        (listen(ip_v4!("0.0.0.0"), 1), Sharing::Exclusive),
+        (listen(ip_v4!("0.0.0.0"), 1), Sharing::Exclusive)],
             Err(InsertError::Exists); "any_ip_same_port")]
     #[test_case([
-        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::Exclusive),
-        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::Exclusive)],
+        (listen(ip_v4!("1.1.1.1"), 1), Sharing::Exclusive),
+        (listen(ip_v4!("1.1.1.1"), 1), Sharing::Exclusive)],
             Err(InsertError::Exists); "listen_same_specific_ip")]
     #[test_case([
-        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::ReusePort),
-        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::ReusePort)],
+        (listen(ip_v4!("1.1.1.1"), 1), Sharing::ReusePort),
+        (listen(ip_v4!("1.1.1.1"), 1), Sharing::ReusePort)],
             Ok(()); "listen_same_specific_ip_reuse_port")]
     #[test_case([
-        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::Exclusive),
-        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::ReusePort)],
+        (listen(ip_v4!("1.1.1.1"), 1), Sharing::Exclusive),
+        (listen(ip_v4!("1.1.1.1"), 1), Sharing::ReusePort)],
             Err(InsertError::Exists); "listen_same_specific_ip_exclusive_reuse_port")]
     #[test_case([
-        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::ReusePort),
-        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::Exclusive)],
+        (listen(ip_v4!("1.1.1.1"), 1), Sharing::ReusePort),
+        (listen(ip_v4!("1.1.1.1"), 1), Sharing::Exclusive)],
             Err(InsertError::Exists); "listen_same_specific_ip_reuse_port_exclusive")]
     #[test_case([
-        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::ReusePort),
-        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), PosixSharingOptions::ReusePort)],
+        (listen(ip_v4!("1.1.1.1"), 1), Sharing::ReusePort),
+        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), Sharing::ReusePort)],
             Ok(()); "conn_shadows_listener_reuse_port")]
     #[test_case([
-        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::Exclusive),
-        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), PosixSharingOptions::Exclusive)],
+        (listen(ip_v4!("1.1.1.1"), 1), Sharing::Exclusive),
+        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), Sharing::Exclusive)],
             Err(InsertError::ShadowAddrExists); "conn_shadows_listener_exclusive")]
     #[test_case([
-        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::Exclusive),
-        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), PosixSharingOptions::ReusePort)],
+        (listen(ip_v4!("1.1.1.1"), 1), Sharing::Exclusive),
+        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), Sharing::ReusePort)],
             Err(InsertError::ShadowAddrExists); "conn_shadows_listener_exclusive_reuse_port")]
     #[test_case([
-        (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::ReusePort),
-        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), PosixSharingOptions::Exclusive)],
+        (listen(ip_v4!("1.1.1.1"), 1), Sharing::ReusePort),
+        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), Sharing::Exclusive)],
             Err(InsertError::ShadowAddrExists); "conn_shadows_listener_reuse_port_exclusive")]
     #[test_case([
-        (listen_device(ip_v4!("1.1.1.1"), 1, FakeWeakDeviceId(FakeDeviceId)), PosixSharingOptions::Exclusive),
-        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), PosixSharingOptions::Exclusive)],
+        (listen_device(ip_v4!("1.1.1.1"), 1, FakeWeakDeviceId(FakeDeviceId)), Sharing::Exclusive),
+        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), Sharing::Exclusive)],
             Err(InsertError::IndirectConflict); "conn_indirect_conflict_specific_listener")]
     #[test_case([
-        (listen_device(ip_v4!("0.0.0.0"), 1, FakeWeakDeviceId(FakeDeviceId)), PosixSharingOptions::Exclusive),
-        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), PosixSharingOptions::Exclusive)],
+        (listen_device(ip_v4!("0.0.0.0"), 1, FakeWeakDeviceId(FakeDeviceId)), Sharing::Exclusive),
+        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), Sharing::Exclusive)],
             Err(InsertError::IndirectConflict); "conn_indirect_conflict_any_listener")]
     #[test_case([
-        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), PosixSharingOptions::Exclusive),
-        (listen_device(ip_v4!("1.1.1.1"), 1, FakeWeakDeviceId(FakeDeviceId)), PosixSharingOptions::Exclusive)],
+        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), Sharing::Exclusive),
+        (listen_device(ip_v4!("1.1.1.1"), 1, FakeWeakDeviceId(FakeDeviceId)), Sharing::Exclusive)],
             Err(InsertError::IndirectConflict); "specific_listener_indirect_conflict_conn")]
     #[test_case([
-        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), PosixSharingOptions::Exclusive),
-        (listen_device(ip_v4!("0.0.0.0"), 1, FakeWeakDeviceId(FakeDeviceId)), PosixSharingOptions::Exclusive)],
+        (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 2), Sharing::Exclusive),
+        (listen_device(ip_v4!("0.0.0.0"), 1, FakeWeakDeviceId(FakeDeviceId)), Sharing::Exclusive)],
             Err(InsertError::IndirectConflict); "any_listener_indirect_conflict_conn")]
     fn bind_sequence<
-        C: IntoIterator<
-            Item = (AddrVec<IpPortSpec<Ipv4, FakeWeakDeviceId<FakeDeviceId>>>, PosixSharingOptions),
-        >,
+        C: IntoIterator<Item = (AddrVec<IpPortSpec<Ipv4, FakeWeakDeviceId<FakeDeviceId>>>, Sharing)>,
     >(
         spec: C,
         expected: Result<(), InsertError>,
@@ -6519,21 +6680,21 @@ where {
     }
 
     #[test_case([
-            (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::Exclusive),
-            (listen(ip_v4!("2.2.2.2"), 2), PosixSharingOptions::Exclusive),
+            (listen(ip_v4!("1.1.1.1"), 1), Sharing::Exclusive),
+            (listen(ip_v4!("2.2.2.2"), 2), Sharing::Exclusive),
         ]; "distinct")]
     #[test_case([
-            (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::ReusePort),
-            (listen(ip_v4!("1.1.1.1"), 1), PosixSharingOptions::ReusePort),
+            (listen(ip_v4!("1.1.1.1"), 1), Sharing::ReusePort),
+            (listen(ip_v4!("1.1.1.1"), 1), Sharing::ReusePort),
         ]; "listen_reuse_port")]
     #[test_case([
-            (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 3), PosixSharingOptions::ReusePort),
-            (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 3), PosixSharingOptions::ReusePort),
+            (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 3), Sharing::ReusePort),
+            (conn(ip_v4!("1.1.1.1"), 1, ip_v4!("2.2.2.2"), 3), Sharing::ReusePort),
         ]; "conn_reuse_port")]
     fn remove_sequence<I>(spec: I)
     where
         I: IntoIterator<
-            Item = (AddrVec<IpPortSpec<Ipv4, FakeWeakDeviceId<FakeDeviceId>>>, PosixSharingOptions),
+            Item = (AddrVec<IpPortSpec<Ipv4, FakeWeakDeviceId<FakeDeviceId>>>, Sharing),
         >,
         I::IntoIter: ExactSizeIterator,
     {

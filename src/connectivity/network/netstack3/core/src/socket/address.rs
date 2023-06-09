@@ -60,6 +60,39 @@ impl<I: Ip + IpExt, D: WeakId> SocketMapAddrSpec for IpPortSpec<I, D> {
     type LocalIdentifier = NonZeroU16;
 }
 
+impl<A: SocketMapAddrSpec> From<ListenerIpAddr<A::IpAddr, A::LocalIdentifier>> for IpAddrVec<A> {
+    fn from(listener: ListenerIpAddr<A::IpAddr, A::LocalIdentifier>) -> Self {
+        IpAddrVec::Listener(listener)
+    }
+}
+
+impl<A: SocketMapAddrSpec> From<ConnIpAddr<A::IpAddr, A::LocalIdentifier, A::RemoteIdentifier>>
+    for IpAddrVec<A>
+{
+    fn from(conn: ConnIpAddr<A::IpAddr, A::LocalIdentifier, A::RemoteIdentifier>) -> Self {
+        IpAddrVec::Connected(conn)
+    }
+}
+
+impl<A: SocketMapAddrSpec> From<ListenerAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier>>
+    for AddrVec<A>
+{
+    fn from(listener: ListenerAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier>) -> Self {
+        AddrVec::Listen(listener)
+    }
+}
+
+impl<A: SocketMapAddrSpec>
+    From<ConnAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier, A::RemoteIdentifier>>
+    for AddrVec<A>
+{
+    fn from(
+        conn: ConnAddr<A::IpAddr, A::WeakDeviceId, A::LocalIdentifier, A::RemoteIdentifier>,
+    ) -> Self {
+        AddrVec::Conn(conn)
+    }
+}
+
 /// An address vector containing the portions of a socket address that are
 /// visible in an IP packet.
 #[derive(Derivative)]
