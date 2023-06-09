@@ -182,7 +182,7 @@ impl TestStack {
         >()
         .expect("create proxy");
         let mut sender = self.ctx.interfaces_watcher_sink.clone();
-        sender.add_watcher(rs).await.expect("add watcher");
+        sender.add_watcher(rs, None).await.expect("add watcher");
         watcher
     }
 

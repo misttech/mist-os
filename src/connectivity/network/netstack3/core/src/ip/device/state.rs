@@ -716,12 +716,12 @@ impl<I> Default for Ipv4AddrConfig<I> {
 #[derive(Debug)]
 pub(crate) struct Ipv4AddressEntry<Instant> {
     pub(crate) addr_sub: AddrSubnet<Ipv4Addr>,
-    pub(crate) config: Ipv4AddrConfig<Instant>,
+    pub(crate) state: RwLock<Ipv4AddressState<Instant>>,
 }
 
 impl<Instant> Ipv4AddressEntry<Instant> {
     pub(crate) fn new(addr_sub: AddrSubnet<Ipv4Addr>, config: Ipv4AddrConfig<Instant>) -> Self {
-        Self { addr_sub, config }
+        Self { addr_sub, state: RwLock::new(Ipv4AddressState { config }) }
     }
 
     pub(crate) fn addr_sub(&self) -> &AddrSubnet<Ipv4Addr> {
@@ -731,6 +731,27 @@ impl<Instant> Ipv4AddressEntry<Instant> {
     pub(crate) fn addr(&self) -> SpecifiedAddr<Ipv4Addr> {
         self.addr_sub.addr()
     }
+}
+
+impl<I: Instant> RwLockFor<crate::lock_ordering::Ipv4DeviceAddressState> for Ipv4AddressEntry<I> {
+    type Data = Ipv4AddressState<I>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Ipv4AddressState<I>>
+        where
+            Self: 'l;
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Ipv4AddressState<I>>
+        where
+            Self: 'l;
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
+        self.state.read()
+    }
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
+        self.state.write()
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Ipv4AddressState<Instant> {
+    pub(crate) config: Ipv4AddrConfig<Instant>,
 }
 
 /// Configuration for an IPv6 address assigned via SLAAC.

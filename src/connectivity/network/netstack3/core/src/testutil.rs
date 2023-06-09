@@ -986,6 +986,13 @@ impl<I: Ip> From<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, I, FakeInstant>>
             IpDeviceEvent::EnabledChanged { device, ip_enabled } => {
                 IpDeviceEvent::EnabledChanged { device: device.downgrade(), ip_enabled }
             }
+            IpDeviceEvent::AddressPropertiesChanged { device, addr, valid_until } => {
+                IpDeviceEvent::AddressPropertiesChanged {
+                    device: device.downgrade(),
+                    addr,
+                    valid_until,
+                }
+            }
         }
     }
 }

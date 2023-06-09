@@ -22,10 +22,6 @@
                 "get_set_forwarding_ns3*multicast*",
                 "get_set_forwarding_loopback_ns3::set_ip_false_and_multicast_ip_true",
                 "get_set_forwarding_loopback_ns3::set_multicast*",
-
-                // TODO(https://fxbug.dev/106959): Should pass against Netstack3 once
-                // updating adddress lifetimes is supported.
-                "update_address_lifetimes_ns3",
             ],
         },
     ],

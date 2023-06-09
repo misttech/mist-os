@@ -106,7 +106,9 @@ pub(crate) struct Ctx {
     pub sync_ctx: Arc<SyncCtx<BindingsNonSyncCtxImpl>>,
 }
 
-use crate::bindings::util::TryIntoFidlWithContext as _;
+use crate::bindings::{
+    interfaces_watcher::AddressPropertiesUpdate, util::TryIntoFidlWithContext as _,
+};
 
 /// Extends the methods available to [`DeviceId`].
 trait DeviceIdExt {
@@ -119,6 +121,21 @@ impl DeviceIdExt for DeviceId<BindingsNonSyncCtxImpl> {
         match self {
             DeviceId::Ethernet(d) => DeviceSpecificInfo::Netdevice(d.external_state()),
             DeviceId::Loopback(d) => DeviceSpecificInfo::Loopback(d.external_state()),
+        }
+    }
+}
+
+/// Extends the methods available to [`Lifetime`].
+trait LifetimeExt {
+    /// Converts `self` to `zx::Time`.
+    fn into_zx_time(self) -> zx::Time;
+}
+
+impl LifetimeExt for Lifetime<StackTime> {
+    fn into_zx_time(self) -> zx::Time {
+        match self {
+            Lifetime::Finite(StackTime(time)) => time.into_zx(),
+            Lifetime::Infinite => zx::Time::INFINITE,
         }
     }
 }
@@ -447,10 +464,7 @@ impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsNonSyncCtxImpl>, I, Stac
     fn on_event(&mut self, event: IpDeviceEvent<DeviceId<BindingsNonSyncCtxImpl>, I, StackTime>) {
         match event {
             IpDeviceEvent::AddressAdded { device, addr, state, valid_until } => {
-                let valid_until = match valid_until {
-                    Lifetime::Infinite => zx::Time::INFINITE,
-                    Lifetime::Finite(StackTime(time)) => time.into_zx(),
-                };
+                let valid_until = valid_until.into_zx_time();
 
                 self.notify_interface_update(
                     &device,
@@ -485,6 +499,14 @@ impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsNonSyncCtxImpl>, I, Stac
             IpDeviceEvent::EnabledChanged { device, ip_enabled } => {
                 self.notify_interface_update(&device, InterfaceUpdate::OnlineChanged(ip_enabled))
             }
+            IpDeviceEvent::AddressPropertiesChanged { device, addr, valid_until } => self
+                .notify_interface_update(
+                    &device,
+                    InterfaceUpdate::AddressPropertiesChanged {
+                        addr: addr.to_ip_addr(),
+                        update: AddressPropertiesUpdate { valid_until: valid_until.into_zx_time() },
+                    },
+                ),
         };
     }
 }

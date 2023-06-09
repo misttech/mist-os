@@ -1566,17 +1566,24 @@ async fn test_readded_address_present<N: Netstack>(name: &str) {
     );
 }
 
-// TODO(https://fxbug.dev/113056): Enable this test against NS3 when the
-// divergence in behavior has been addressed (currently NS3 does not hide
-// any addresses while an interface is offline).
-//
+#[derive(Debug)]
+enum LifetimeToUpdate {
+    Preferred,
+    Valid,
+}
+
 // Regression test which asserts that property changes on an address that is
 // hidden from clients of interface watcher (because the interface is offline)
 // does not cause null changes to be emitted via interface watcher.
 #[netstack_test]
-async fn test_lifetime_change_on_hidden_addr(name: &str) {
+#[test_case(LifetimeToUpdate::Preferred ; "updating preferred lifetime")]
+#[test_case(LifetimeToUpdate::Valid ; "updating valid lifetime")]
+async fn test_lifetime_change_on_hidden_addr<N: Netstack>(
+    name: &str,
+    lifetime_to_update: LifetimeToUpdate,
+) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let realm = sandbox.create_netstack_realm::<Netstack2, _>(name).expect("create realm");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
     let interface = sandbox
         .create_endpoint(name)
         .await
@@ -1614,18 +1621,31 @@ async fn test_lifetime_change_on_hidden_addr(name: &str) {
         )
         .expect("Control.AddAddress FIDL error");
 
-    let deprecated_properties = fidl_fuchsia_net_interfaces_admin::AddressProperties {
-        preferred_lifetime_info: Some(
-            fidl_fuchsia_net_interfaces::PreferredLifetimeInfo::Deprecated(
-                fidl_fuchsia_net_interfaces::Empty,
-            ),
-        ),
-        ..Default::default()
+    match lifetime_to_update {
+        LifetimeToUpdate::Preferred => {
+            let deprecated_properties = fidl_fuchsia_net_interfaces_admin::AddressProperties {
+                preferred_lifetime_info: Some(
+                    fidl_fuchsia_net_interfaces::PreferredLifetimeInfo::Deprecated(
+                        fidl_fuchsia_net_interfaces::Empty,
+                    ),
+                ),
+                ..Default::default()
+            };
+            address_state_provider
+                .update_address_properties(&deprecated_properties)
+                .await
+                .expect("FIDL error deprecating address");
+        }
+        LifetimeToUpdate::Valid => {
+            address_state_provider
+                .update_address_properties(&fidl_fuchsia_net_interfaces_admin::AddressProperties {
+                    valid_lifetime_end: Some(123),
+                    ..Default::default()
+                })
+                .await
+                .expect("FIDL error deprecating address");
+        }
     };
-    address_state_provider
-        .update_address_properties(&deprecated_properties)
-        .await
-        .expect("FIDL error deprecating address");
 
     assert!(interface.control().enable().await.expect("terminal error").expect("enable interface"));
 

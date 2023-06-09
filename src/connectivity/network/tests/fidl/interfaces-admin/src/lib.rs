@@ -8,6 +8,7 @@ use assert_matches::assert_matches;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_ext::IntoExt;
+use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as finterfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_root as fnet_root;
@@ -151,7 +152,9 @@ async fn update_address_lifetimes<N: Netstack>(name: &str) {
     let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
         .expect("event stream from state")
         .fuse();
+
     futures::pin_mut!(event_stream);
+
     let mut if_state = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(interface.id());
     async fn wait_for_lifetimes(
         event_stream: impl futures::Stream<
@@ -184,6 +187,60 @@ async fn update_address_lifetimes<N: Netstack>(name: &str) {
         .await
         .expect("failed to observe address with default (infinite) lifetimes");
 
+    let no_interest_event_stream = {
+        let (watcher, server) =
+            fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces::WatcherMarker>()
+                .expect("should succeed");
+        let () = interface_state
+            .get_watcher(
+                // Register interest in no fields.
+                &fnet_interfaces::WatcherOptions {
+                    address_properties_interest: None,
+                    ..Default::default()
+                },
+                server,
+            )
+            .expect("should succeed");
+        futures::stream::try_unfold(watcher, |watcher| async {
+            Ok::<_, fidl::Error>(Some((watcher.watch().await?, watcher)))
+        })
+    };
+
+    futures::pin_mut!(no_interest_event_stream);
+
+    // We should observe two Existing events, one for loopback and one for the
+    // test interface. (The order is not guaranteed).
+
+    let mut seen_existing_ids = Vec::new();
+
+    for _ in 0..2 {
+        seen_existing_ids.push(assert_matches!(
+            no_interest_event_stream
+                .try_next()
+                .await
+                .expect("should succeed")
+                .expect("should not have ended"),
+            fnet_interfaces::Event::Existing(fnet_interfaces::Properties {
+                id: Some(id),
+                ..
+            }) => id
+        ));
+    }
+
+    seen_existing_ids.sort();
+
+    const LOCALHOST_ID: u64 = 1;
+    assert_eq!(seen_existing_ids, [LOCALHOST_ID, interface.id()]);
+
+    assert_matches!(
+        no_interest_event_stream
+            .try_next()
+            .await
+            .expect("should succeed")
+            .expect("should not have ended"),
+        fnet_interfaces::Event::Idle(fnet_interfaces::Empty)
+    );
+
     {
         const VALID_UNTIL: zx::sys::zx_time_t = 123_000_000_000;
         addr_state_provider
@@ -199,6 +256,26 @@ async fn update_address_lifetimes<N: Netstack>(name: &str) {
             .await
             .expect("failed to observe address with updated lifetimes");
     }
+
+    drop(addr_state_provider);
+
+    // Should observe address removal without ever observing address lifetime update.
+    let addresses = assert_matches!(
+        no_interest_event_stream
+            .try_next()
+            .await
+            .expect("should succeed")
+            .expect("should not have ended"),
+        fnet_interfaces::Event::Changed(fnet_interfaces::Properties {
+            id: Some(id),
+            addresses: Some(addresses),
+            ..
+        }) if id == interface.id() => addresses
+    );
+
+    assert!(addresses
+        .iter()
+        .all(|fnet_interfaces::Address { addr, .. }| addr.clone() != Some(ADDR)));
 }
 
 #[netstack_test]

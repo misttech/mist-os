@@ -1114,6 +1114,18 @@ where
             sync_ctx, device_id, addr_id, cb,
         )
     }
+
+    fn with_ip_address_state_mut<O, F: FnOnce(&mut I::AddressState<C::Instant>) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
+        addr_id: &Self::AddressId,
+        cb: F,
+    ) -> O {
+        let Self { config: _, sync_ctx } = self;
+        device::IpDeviceAddressContext::<I, C>::with_ip_address_state_mut(
+            sync_ctx, device_id, addr_id, cb,
+        )
+    }
 }
 
 impl<'a, Config, I: IpDeviceIpExt, C: NonSyncContext, L> device::IpDeviceStateContext<I, C>

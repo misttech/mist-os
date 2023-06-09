@@ -156,3 +156,15 @@ impl From<NoRouteError> for SocketError {
         SocketError::Remote(RemoteAddressError::NoRoute)
     }
 }
+
+/// Error type for setting properties on IP addresses.
+#[derive(Error, Debug, PartialEq)]
+pub enum SetIpAddressPropertiesError {
+    /// The address we tried to set properties on was not found.
+    #[error("{0}")]
+    NotFound(#[from] NotFoundError),
+
+    /// We tried to set properties on a non-manually-configured address.
+    #[error("tried to set properties on a non-manually-configured address")]
+    NotManual,
+}

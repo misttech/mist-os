@@ -34,7 +34,7 @@ use crate::{
         CounterContext, EventContext, InstantContext, RngContext, TimerContext, TimerHandler,
     },
     device::Id as _,
-    error::{ExistsError, NotFoundError, NotSupportedError},
+    error::{ExistsError, NotFoundError, NotSupportedError, SetIpAddressPropertiesError},
     ip::{
         device::{
             dad::{DadEvent, DadHandler, DadTimerId},
@@ -46,10 +46,11 @@ use crate::{
             slaac::{SlaacConfiguration, SlaacHandler, SlaacTimerId},
             state::{
                 DelIpv6AddrReason, IpDeviceAddresses, IpDeviceConfiguration, IpDeviceFlags,
-                IpDeviceState, IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4DeviceConfiguration,
-                Ipv4DeviceConfigurationAndFlags, Ipv4DeviceState, Ipv6AddrConfig,
-                Ipv6AddrManualConfig, Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration,
-                Ipv6DeviceConfigurationAndFlags, Ipv6DeviceState, Lifetime,
+                IpDeviceState, IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4AddressState,
+                Ipv4DeviceConfiguration, Ipv4DeviceConfigurationAndFlags, Ipv4DeviceState,
+                Ipv6AddrConfig, Ipv6AddrManualConfig, Ipv6AddressFlags, Ipv6AddressState,
+                Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags, Ipv6DeviceState,
+                Lifetime,
             },
         },
         gmp::{
@@ -256,7 +257,7 @@ impl IpDeviceIpExt for Ipv4 {
     type AssignedWitness = SpecifiedAddr<Ipv4Addr>;
     type AddressConfig<I> = Ipv4AddrConfig<I>;
     type ManualAddressConfig<I> = Ipv4AddrConfig<I>;
-    type AddressState<I> = ();
+    type AddressState<I> = Ipv4AddressState<I>;
 }
 
 impl IpDeviceIpExt for Ipv6 {
@@ -332,6 +333,15 @@ pub enum IpDeviceEvent<DeviceId, I: Ip, Instant> {
         addr: SpecifiedAddr<I::Addr>,
         /// The new address state.
         state: IpAddressState,
+    },
+    /// Address properties changed.
+    AddressPropertiesChanged {
+        /// The device.
+        device: DeviceId,
+        /// The address whose properties were changed.
+        addr: SpecifiedAddr<I::Addr>,
+        /// The new `valid_until` lifetime.
+        valid_until: Lifetime<Instant>,
     },
     /// IP was enabled/disabled on the device
     EnabledChanged {
@@ -464,6 +474,13 @@ pub(crate) trait IpDeviceAddressContext<I: IpDeviceIpExt, C: InstantContext>:
     IpDeviceAddressIdContext<I>
 {
     fn with_ip_address_state<O, F: FnOnce(&I::AddressState<C::Instant>) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
+        addr_id: &Self::AddressId,
+        cb: F,
+    ) -> O;
+
+    fn with_ip_address_state_mut<O, F: FnOnce(&mut I::AddressState<C::Instant>) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         addr_id: &Self::AddressId,
@@ -1520,6 +1537,63 @@ fn add_ipv6_addr_subnet_with_config<
     Ok(addr_id)
 }
 
+pub(crate) fn set_ipv4_addr_properties<
+    SC: IpDeviceConfigurationContext<Ipv4, C>,
+    C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
+>(
+    sync_ctx: &mut SC,
+    ctx: &mut C,
+    device: &SC::DeviceId,
+    address: SpecifiedAddr<Ipv4Addr>,
+    next_valid_until: Lifetime<C::Instant>,
+) -> Result<(), SetIpAddressPropertiesError> {
+    let address_id = sync_ctx.get_address_id(device, address)?;
+    sync_ctx.with_ip_address_state_mut(
+        device,
+        &address_id,
+        |Ipv4AddressState { config: Ipv4AddrConfig { valid_until } }| {
+            if core::mem::replace(valid_until, next_valid_until) != next_valid_until {
+                ctx.on_event(IpDeviceEvent::AddressPropertiesChanged {
+                    device: device.clone(),
+                    addr: address,
+                    valid_until: next_valid_until,
+                });
+            }
+        },
+    );
+    Ok(())
+}
+
+pub(crate) fn set_ipv6_addr_properties<
+    SC: IpDeviceConfigurationContext<Ipv6, C>,
+    C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
+>(
+    sync_ctx: &mut SC,
+    ctx: &mut C,
+    device: &SC::DeviceId,
+    address: SpecifiedAddr<Ipv6Addr>,
+    next_valid_until: Lifetime<C::Instant>,
+) -> Result<(), SetIpAddressPropertiesError> {
+    let address_id = sync_ctx.get_address_id(device, address)?;
+    sync_ctx.with_ip_address_state_mut(
+        device,
+        &address_id,
+        |Ipv6AddressState { config, flags: _ }| match config {
+            Ipv6AddrConfig::Slaac(_) => Err(SetIpAddressPropertiesError::NotManual),
+            Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { valid_until }) => {
+                if core::mem::replace(valid_until, next_valid_until) != next_valid_until {
+                    ctx.on_event(IpDeviceEvent::AddressPropertiesChanged {
+                        device: device.clone(),
+                        addr: address,
+                        valid_until: next_valid_until,
+                    });
+                }
+                Ok(())
+            }
+        },
+    )
+}
+
 /// Removes an IPv4 address and associated subnet from this device.
 pub(crate) fn del_ipv4_addr<
     SC: IpDeviceConfigurationContext<Ipv4, C>,
@@ -2161,6 +2235,9 @@ mod tests {
     use super::*;
 
     use alloc::vec;
+    use core::time::Duration;
+
+    use assert_matches::assert_matches;
     use fakealloc::collections::HashSet;
     use ip_test_macro::ip_test;
 
@@ -2169,6 +2246,7 @@ mod tests {
     use net_types::{ip::Ipv6, LinkLocalAddr};
 
     use crate::{
+        context::testutil::FakeInstant,
         device::{ethernet, update_ipv4_configuration, update_ipv6_configuration, DeviceId},
         ip::{
             device::{state::Lifetime, testutil::UpdateIpDeviceConfigurationAndFlagsTestIpExt},
@@ -2259,6 +2337,35 @@ mod tests {
         );
         // Verify that a redundant "enable" does not generate any events.
         set_ipv4_enabled(&mut non_sync_ctx, true, true);
+        assert_eq!(non_sync_ctx.take_events()[..], []);
+
+        let valid_until = Lifetime::Finite(FakeInstant::from(Duration::from_secs(1)));
+        set_ipv4_addr_properties(
+            &mut Locked::new(sync_ctx),
+            &mut non_sync_ctx,
+            &device_id,
+            ipv4_addr_subnet.addr(),
+            valid_until,
+        )
+        .expect("set properties should succeed");
+        assert_eq!(
+            non_sync_ctx.take_events()[..],
+            [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressPropertiesChanged {
+                device: weak_device_id.clone(),
+                addr: ipv4_addr_subnet.addr(),
+                valid_until
+            })]
+        );
+
+        // Verify that a redundant "set properties" does not generate any events.
+        set_ipv4_addr_properties(
+            &mut Locked::new(sync_ctx),
+            &mut non_sync_ctx,
+            &device_id,
+            ipv4_addr_subnet.addr(),
+            valid_until,
+        )
+        .expect("set properties should succeed");
         assert_eq!(non_sync_ctx.take_events()[..], []);
 
         set_ipv4_enabled(&mut non_sync_ctx, false, true);
@@ -2402,6 +2509,19 @@ mod tests {
             ]
         );
 
+        // Because the added address is from SLAAC, setting its lifetime should fail.
+        let valid_until = Lifetime::Finite(FakeInstant::from(Duration::from_secs(1)));
+        assert_matches!(
+            set_ipv6_addr_properties(
+                &mut Locked::new(sync_ctx),
+                &mut non_sync_ctx,
+                &device_id,
+                ll_addr.addr().into(),
+                valid_until,
+            ),
+            Err(SetIpAddressPropertiesError::NotManual)
+        );
+
         let test_disable_device = |sync_ctx: &mut &FakeSyncCtx,
                                    non_sync_ctx: &mut FakeNonSyncCtx,
                                    expected_prev| {
@@ -2482,6 +2602,35 @@ mod tests {
                 })
             ]
         );
+
+        set_ipv6_addr_properties(
+            &mut Locked::new(sync_ctx),
+            &mut non_sync_ctx,
+            &device_id,
+            ll_addr.addr().into(),
+            valid_until,
+        )
+        .expect("set properties should succeed");
+        assert_eq!(
+            non_sync_ctx.take_events()[..],
+            [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressPropertiesChanged {
+                device: weak_device_id.clone(),
+                addr: ll_addr.addr().into(),
+                valid_until
+            })]
+        );
+
+        // Verify that a redundant "set properties" does not generate any events.
+        set_ipv6_addr_properties(
+            &mut Locked::new(sync_ctx),
+            &mut non_sync_ctx,
+            &device_id,
+            ll_addr.addr().into(),
+            valid_until,
+        )
+        .expect("set properties should succeed");
+        assert_eq!(non_sync_ctx.take_events()[..], []);
+
         test_disable_device(&mut sync_ctx, &mut non_sync_ctx, true);
         // The address was manually added, don't expect it to be removed.
         assert_eq!(

@@ -57,16 +57,16 @@ use crate::{
         socket::HeldSockets,
         state::IpLinkDeviceState,
     },
-    error::{ExistsError, NotFoundError, NotSupportedError},
+    error::{ExistsError, NotFoundError, NotSupportedError, SetIpAddressPropertiesError},
     ip::{
         device::{
             integration::SyncCtxWithIpDeviceConfiguration,
             nud::{BufferNudHandler, DynamicNeighborUpdateSource, NudHandler, NudIpHandler},
             state::{
                 AddrSubnetAndManualConfigEither, AssignedAddress as _, DualStackIpDeviceState,
-                IpDeviceFlags, Ipv4AddressEntry, Ipv4DeviceConfiguration,
+                IpDeviceFlags, Ipv4AddressEntry, Ipv4AddressState, Ipv4DeviceConfiguration,
                 Ipv4DeviceConfigurationAndFlags, Ipv6AddressEntry, Ipv6AddressState, Ipv6DadState,
-                Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags,
+                Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags, Lifetime,
             },
             BufferIpDeviceContext, DelIpv6Addr, DualStackDeviceContext, DualStackDeviceStateRef,
             IpDeviceAddressContext, IpDeviceAddressIdContext, IpDeviceConfigurationContext,
@@ -545,16 +545,31 @@ impl<NonSyncCtx: NonSyncContext, L> IpDeviceAddressIdContext<Ipv4>
     type AddressId = StrongRc<Ipv4AddressEntry<NonSyncCtx::Instant>>;
 }
 
-impl<NonSyncCtx: NonSyncContext, L> IpDeviceAddressContext<Ipv4, NonSyncCtx>
-    for Locked<&SyncCtx<NonSyncCtx>, L>
+impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::Ipv4DeviceAddressState>>
+    IpDeviceAddressContext<Ipv4, NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
 {
-    fn with_ip_address_state<O, F: FnOnce(&()) -> O>(
+    fn with_ip_address_state<O, F: FnOnce(&Ipv4AddressState<NonSyncCtx::Instant>) -> O>(
         &mut self,
-        _device_id: &Self::DeviceId,
-        _addr_id: &Self::AddressId,
+        _: &Self::DeviceId,
+        addr_id: &Self::AddressId,
         cb: F,
     ) -> O {
-        cb(&())
+        let mut entry = Locked::<_, L>::new_locked(addr_id.deref());
+        let let_binding_needed_for_lifetimes =
+            cb(&entry.read_lock::<crate::lock_ordering::Ipv4DeviceAddressState>());
+        let_binding_needed_for_lifetimes
+    }
+
+    fn with_ip_address_state_mut<O, F: FnOnce(&mut Ipv4AddressState<NonSyncCtx::Instant>) -> O>(
+        &mut self,
+        _: &Self::DeviceId,
+        addr_id: &Self::AddressId,
+        cb: F,
+    ) -> O {
+        let mut entry = Locked::<_, L>::new_locked(addr_id.deref());
+        let let_binding_needed_for_lifetimes =
+            cb(&mut entry.write_lock::<crate::lock_ordering::Ipv4DeviceAddressState>());
+        let_binding_needed_for_lifetimes
     }
 }
 
@@ -599,7 +614,8 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAdd
         assert!(PrimaryRc::ptr_eq(&primary, &addr));
         core::mem::drop(addr);
 
-        let Ipv4AddressEntry { addr_sub, config } = PrimaryRc::unwrap(primary);
+        let Ipv4AddressEntry { addr_sub, state } = PrimaryRc::unwrap(primary);
+        let Ipv4AddressState { config } = state.into_inner();
         (addr_sub, config)
     }
 
@@ -955,6 +971,17 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::Ipv6DeviceA
     ) -> O {
         let mut entry = Locked::<_, L>::new_locked(addr_id.deref());
         let x = cb(&entry.read_lock::<crate::lock_ordering::Ipv6DeviceAddressState>());
+        x
+    }
+
+    fn with_ip_address_state_mut<O, F: FnOnce(&mut Ipv6AddressState<NonSyncCtx::Instant>) -> O>(
+        &mut self,
+        _device_id: &Self::DeviceId,
+        addr_id: &Self::AddressId,
+        cb: F,
+    ) -> O {
+        let mut entry = Locked::<_, L>::new_locked(addr_id.deref());
+        let x = cb(&mut entry.write_lock::<crate::lock_ordering::Ipv6DeviceAddressState>());
         x
     }
 }
@@ -2062,6 +2089,39 @@ pub(crate) fn add_ip_addr_subnet<NonSyncCtx: NonSyncContext>(
         AddrSubnetAndManualConfigEither::V6(addr_sub, config) => {
             crate::ip::device::add_ipv6_addr_subnet(&mut sync_ctx, ctx, device, addr_sub, config)
         }
+    }
+}
+
+/// Sets properties on an IP address.
+pub fn set_ip_addr_properties<NonSyncCtx: NonSyncContext, A: IpAddress>(
+    sync_ctx: &SyncCtx<NonSyncCtx>,
+    ctx: &mut NonSyncCtx,
+    device: &DeviceId<NonSyncCtx>,
+    address: SpecifiedAddr<A>,
+    next_valid_until: Lifetime<NonSyncCtx::Instant>,
+) -> Result<(), SetIpAddressPropertiesError> {
+    trace!(
+        "set_ip_addr_properties: setting valid_until={:?} for addr={}",
+        next_valid_until,
+        address
+    );
+    let mut sync_ctx = Locked::new(sync_ctx);
+
+    match address.into() {
+        IpAddr::V4(address) => crate::ip::device::set_ipv4_addr_properties(
+            &mut sync_ctx,
+            ctx,
+            device,
+            address,
+            next_valid_until,
+        ),
+        IpAddr::V6(address) => crate::ip::device::set_ipv6_addr_properties(
+            &mut sync_ctx,
+            ctx,
+            device,
+            address,
+            next_valid_until,
+        ),
     }
 }
 

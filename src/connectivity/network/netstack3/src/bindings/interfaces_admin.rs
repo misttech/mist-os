@@ -1181,6 +1181,7 @@ async fn run_address_state_provider(
             // ref so that they don't get dropped after the main loop exits
             // (before the senders are removed from `ctx`).
             match address_state_provider_main_loop(
+                ctx.clone(),
                 address,
                 id,
                 control_handle,
@@ -1253,6 +1254,7 @@ enum AddressNeedsExplicitRemovalFromCore {
 }
 
 async fn address_state_provider_main_loop(
+    ctx: Ctx,
     address: SpecifiedAddr<IpAddr>,
     id: BindingId,
     control_handle: fnet_interfaces_admin::AddressStateProviderControlHandle,
@@ -1308,7 +1310,10 @@ async fn address_state_provider_main_loop(
                 }
                 Ok(Some(request)) => {
                     let e = match dispatch_address_state_provider_request(
+                        ctx.clone(),
                         request,
+                        address,
+                        id,
                         &mut detached,
                         &mut watch_state,
                     ) {
@@ -1461,16 +1466,61 @@ impl AddressAssignmentWatcherState {
 
 /// Serves a `fuchsia.net.interfaces.admin/AddressStateProvider` request.
 fn dispatch_address_state_provider_request(
+    ctx: Ctx,
     req: fnet_interfaces_admin::AddressStateProviderRequest,
+    address: SpecifiedAddr<IpAddr>,
+    id: BindingId,
     detached: &mut bool,
     watch_state: &mut AddressAssignmentWatcherState,
 ) -> Result<(), AddressStateProviderError> {
     tracing::debug!("serving {:?}", req);
     match req {
         fnet_interfaces_admin::AddressStateProviderRequest::UpdateAddressProperties {
-            address_properties: _,
-            responder: _,
-        } => todo!("https://fxbug.dev/105011 Support updating address properties"),
+            address_properties:
+                fnet_interfaces_admin::AddressProperties {
+                    valid_lifetime_end: valid_lifetime_end_nanos,
+                    preferred_lifetime_info,
+                    ..
+                },
+            responder,
+        } => {
+            if preferred_lifetime_info.is_some() {
+                tracing::warn!("Updating preferred lifetime info is not yet supported (https://fxbug.dev/105011)");
+            }
+            let Ctx { sync_ctx, mut non_sync_ctx } = ctx;
+            let device_id = non_sync_ctx.devices.get_core_id(id).expect("interface not found");
+            let result = match address.into() {
+                IpAddr::V4(address) => netstack3_core::device::set_ip_addr_properties(
+                    &sync_ctx,
+                    &mut non_sync_ctx,
+                    &device_id,
+                    address,
+                    valid_lifetime_end_nanos
+                        .map(|nanos| Lifetime::Finite(StackTime(fasync::Time::from_nanos(nanos))))
+                        .unwrap_or(Lifetime::Infinite),
+                ),
+                IpAddr::V6(address) => netstack3_core::device::set_ip_addr_properties(
+                    &sync_ctx,
+                    &mut non_sync_ctx,
+                    &device_id,
+                    address,
+                    valid_lifetime_end_nanos
+                        .map(|nanos| Lifetime::Finite(StackTime(fasync::Time::from_nanos(nanos))))
+                        .unwrap_or(Lifetime::Infinite),
+                ),
+            };
+            match result {
+                Ok(()) => responder.send().map_err(AddressStateProviderError::Fidl),
+                Err(netstack3_core::error::SetIpAddressPropertiesError::NotFound(
+                    netstack3_core::error::NotFoundError,
+                )) => {
+                    panic!("address not found")
+                }
+                Err(netstack3_core::error::SetIpAddressPropertiesError::NotManual) => {
+                    panic!("address not manual")
+                }
+            }
+        }
         fnet_interfaces_admin::AddressStateProviderRequest::WatchAddressAssignmentState {
             responder,
         } => watch_state.on_new_watch_req(responder),
