@@ -14,6 +14,10 @@ PyObject *add_ir_path(PyObject *self, PyObject *path_obj);
 extern PyMethodDef add_ir_path_py_def;
 PyObject *get_method_ordinal(PyObject *self, PyObject *args, PyObject *kwds);
 extern PyMethodDef get_method_ordinal_py_def;
+PyObject *get_ir_path(PyObject *self, PyObject *library_name);
+extern PyMethodDef get_ir_path_py_def;
+PyObject *add_ir_paths(PyObject *self, PyObject *path_list);
+extern PyMethodDef add_ir_paths_py_def;
 
 }  // namespace ir
 

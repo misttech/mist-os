@@ -50,7 +50,9 @@ extern zx_status_t ffx_socket_read(ffx_lib_context_t* ctx, zx_handle_t handle, c
 extern zx_status_t ffx_socket_write(ffx_lib_context_t* ctx, zx_handle_t handle, const char* buf,
                                     uint64_t buf_len);
 
-// This can only be called once per lifetime of the lib context.
+// Opens a file descriptor that delivers zircon handle numbers that are ready to be read.
+// There can only be one file descriptor for the lifetime of a library module, so all calls to this
+// function will return the same file descriptor number.
 extern int32_t ffx_open_handle_notifier(ffx_lib_context_t* ctx);
 
 #ifdef __cplusplus

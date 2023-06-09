@@ -62,10 +62,6 @@ PyObject *FidlChannel_write(FidlChannel *self, PyObject *buf) {
     PyErr_SetString(PyExc_TypeError, "Second item in tuple should be a list of handles");
     return nullptr;
   }
-  if (PyObject_CheckBuffer(bytes) != 1) {
-    PyErr_SetString(PyExc_TypeError, "First item in tuple should be a bytearray");
-    return nullptr;
-  }
   Py_ssize_t handles_len = PyList_Size(handles);
   if (handles_len < 0) {
     return nullptr;

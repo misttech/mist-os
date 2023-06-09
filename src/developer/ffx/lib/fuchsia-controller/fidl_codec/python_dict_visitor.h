@@ -52,16 +52,12 @@ class PythonDictVisitor : public fidl_codec::Visitor {
 
   void VisitUnionValue(const fidl_codec::UnionValue* node, const fidl_codec::Type* type) override {
     auto res = py::Object(PyDict_New());
-    auto key = py::Object(PyUnicode_FromString(node->member().name().c_str()));
-    if (key == nullptr) {
-      return;
-    }
     PythonDictVisitor visitor;
     node->value()->Visit(&visitor, node->member().type());
     if (visitor.result() == nullptr) {
       return;
     }
-    PyDict_SetItem(res.get(), key.take(), visitor.result());
+    PyDict_SetItemString(res.get(), node->member().name().c_str(), visitor.result());
     result_ = res.take();
   }
 
@@ -73,13 +69,12 @@ class PythonDictVisitor : public fidl_codec::Visitor {
       if (it == node->fields().end()) {
         continue;
       }
-      auto key = py::Object(PyUnicode_FromString(member->name().c_str()));
       PythonDictVisitor visitor;
       it->second->Visit(&visitor, member->type());
       if (visitor.result() == nullptr) {
         return;
       }
-      PyDict_SetItem(res.get(), key.take(), visitor.result());
+      PyDict_SetItemString(res.get(), member->name().c_str(), visitor.result());
     }
     result_ = res.take();
   }
@@ -119,13 +114,9 @@ class PythonDictVisitor : public fidl_codec::Visitor {
         if (it == node->members().end()) {
           continue;
         }
-        auto key = py::Object(PyUnicode_FromString(member->name().c_str()));
-        if (key == nullptr) {
-          return;
-        }
         if (it->second == nullptr || it->second->IsNull()) {
           Py_IncRef(Py_None);
-          PyDict_SetItem(res.get(), key.take(), Py_None);
+          PyDict_SetItemString(res.get(), member->name().c_str(), Py_None);
           continue;
         }
         PythonDictVisitor visitor;
@@ -133,7 +124,7 @@ class PythonDictVisitor : public fidl_codec::Visitor {
         if (visitor.result() == nullptr) {
           return;
         }
-        PyDict_SetItem(res.get(), key.take(), visitor.result());
+        PyDict_SetItemString(res.get(), member->name().c_str(), visitor.result());
       }
     }
     result_ = res.take();
@@ -170,7 +161,7 @@ class PythonDictVisitor : public fidl_codec::Visitor {
                         const fidl_codec::Type* for_type) override {
     // TODO(fxbug.dev/124288): Use the handle disposition properly. This is leaving it
     // mostly blank, only copying the handle value explicitly.
-    result_ = PyLong_FromUnsignedLong(handle->handle().handle);
+    result_ = PyLong_FromUnsignedLongLong(handle->handle().handle);
   }
 
   PyObject* result_{nullptr};

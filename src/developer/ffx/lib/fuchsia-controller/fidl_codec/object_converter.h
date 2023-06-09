@@ -6,7 +6,6 @@
 #define SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_FIDL_CODEC_OBJECT_CONVERTER_H_
 
 #include <iostream>
-#include <sstream>
 #include <string>
 
 #include "src/lib/fidl_codec/type_visitor.h"

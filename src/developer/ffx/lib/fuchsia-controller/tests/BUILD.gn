@@ -17,13 +17,35 @@ host_test_data("fuchsia_controller_test_base") {
     get_label_info(
             "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.test($fidl_toolchain)",
             "target_gen_dir") + "/fuchsia.controller.test.fidl.json",
+    get_label_info(
+            "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.othertest($fidl_toolchain)",
+            "target_gen_dir") + "/fuchsia.controller.othertest.fidl.json",
+    get_label_info("//zircon/vdso/zx($fidl_toolchain)", "target_gen_dir") +
+        "/zx.fidl.json",
   ]
   deps = [
     "//src/developer/ffx:test_data",
     "//src/developer/ffx/lib/fuchsia-controller:fidl_codec",
     "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py",
     "//src/developer/ffx/lib/fuchsia-controller:lib",
+    "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.othertest($fidl_toolchain)",
     "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.test($fidl_toolchain)",
+  ]
+}
+
+host_test_data("fuchsia_controller_fidl_test_data") {
+  sources = [
+    get_label_info("//src/lib/fidl_codec:fidl($fidl_toolchain)",
+                   "target_gen_dir") + "/fidl.fidl.json",
+    get_label_info("//src/lib/fidl_codec:fidl-composed($fidl_toolchain)",
+                   "target_gen_dir") + "/fidl-composed.fidl.json",
+    get_label_info("//src/lib/fidl_codec:fidl-sys($fidl_toolchain)",
+                   "target_gen_dir") + "/fidl-sys.fidl.json",
+  ]
+  deps = [
+    "//src/lib/fidl_codec:fidl($fidl_toolchain)",
+    "//src/lib/fidl_codec:fidl-composed($fidl_toolchain)",
+    "//src/lib/fidl_codec:fidl-sys($fidl_toolchain)",
   ]
 }
 
@@ -44,5 +66,16 @@ python_host_test("fuchsia_controller_errors_test") {
   main_source = "errors.py"
   libraries =
       [ "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py" ]
-  deps = [ ":fuchsia_controller_test_base" ]
+}
+
+python_host_test("fuchsia_controller_importing_test") {
+  main_source = "importing.py"
+  libraries = [
+    "//src/developer/ffx/lib/fuchsia-controller:fidl_codec",
+    "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
+  ]
+  deps = [
+    ":fuchsia_controller_fidl_test_data",
+    ":fuchsia_controller_test_base",
+  ]
 }

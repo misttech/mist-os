@@ -233,6 +233,13 @@ closed protocol FidlCodecTestProtocol {
         i int32;
     });
 
+    strict TableToBool(struct {
+        setattr ValueTable;
+        i int32;
+    }) -> (struct {
+        finally bool;
+    });
+
     strict Handle(resource struct {
         ch zx.Handle:CHANNEL;
     });
@@ -325,6 +332,9 @@ type U8U16Xunion = flexible union {
 
 const MAX_SEQUENCE_LENGTH uint8 = 255;
 const MAX_STRING_LENGTH uint16 = 1024;
+const ALWAYS_TRUE bool = true;
+const PI float32 = 3.14159265;
+const BITS DefaultEnum = DefaultEnum.X;
 
 type DataElement = strict union {
     1: int8 int8;

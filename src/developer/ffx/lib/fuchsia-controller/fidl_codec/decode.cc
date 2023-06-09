@@ -4,6 +4,7 @@
 
 #include "decode.h"
 
+#include <cinttypes>
 #include <iostream>
 #include <vector>
 
@@ -68,9 +69,8 @@ PyObject *decode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds,  /
   const std::vector<const fidl_codec::ProtocolMethod *> *methods =
       mod::get_module_state()->loader->GetByOrdinal(header->ordinal);
   if (methods == nullptr || methods->empty()) {
-    std::stringstream ss;
-    ss << "Unable to find any methods for method ordinal: " << header->ordinal;
-    PyErr_SetString(PyExc_LookupError, ss.str().c_str());
+    PyErr_Format(PyExc_LookupError, "Unable to find any methods for method ordinal: %" PRIu64,
+                 header->ordinal);
     return nullptr;
   }
   // What is the approach here if there's more than one method?

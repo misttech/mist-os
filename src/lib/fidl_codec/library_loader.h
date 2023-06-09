@@ -53,6 +53,8 @@ struct LibraryReadError {
     kParseError,
   };
   ErrorValue value;
+  // Unset unless `value` == kIoError.
+  int errno_value;
   rapidjson::ParseResult parse_result;
 };
 
@@ -501,6 +503,11 @@ class Library {
 
   LibraryLoader* enclosing_loader() const { return enclosing_loader_; }
   const std::string& name() const { return name_; }
+
+  // The source file path from which this library has been loaded. Will be returned as it was
+  // entered when `AddPath` or `AddContent` was called, so if it is a relative path or absolute path
+  // it will remain as such.
+  const std::string& source() const { return source_; }
   const std::vector<std::unique_ptr<Protocol>>& protocols() const { return protocols_; }
 
   // Decode all the values from the JSON definition.
@@ -568,13 +575,15 @@ class Library {
   ~Library();
 
  private:
-  Library(LibraryLoader* enclosing_loader, rapidjson::Document& json_definition);
+  Library(std::string source, LibraryLoader* enclosing_loader,
+          rapidjson::Document& json_definition);
 
   LibraryLoader* enclosing_loader_;
   rapidjson::Document json_definition_;
   bool decoded_ = false;
   bool has_errors_ = false;
   std::string name_;
+  std::string source_;
   std::vector<std::unique_ptr<Protocol>> protocols_;
   std::map<std::string, std::unique_ptr<Payloadable>> payloadables_;
   std::map<std::string, std::unique_ptr<Enum>> enums_;
@@ -610,8 +619,9 @@ class LibraryLoader {
   void AddPath(const std::string& path, LibraryReadError* err);
 
   // Adds a single library to this Loader given its content (the JSON text).
-  // Sets err as appropriate.
-  void AddContent(const std::string& content, LibraryReadError* err);
+  // Sets err as appropriate. The optional `source` field denotes the location from which the
+  // file was loaded, and is expected to be formatted as a file system path.
+  void AddContent(const std::string& content, LibraryReadError* err, std::string source = "");
 
   // Adds a method ordinal to the ordinal map.
   void AddMethod(const ProtocolMethod* method);

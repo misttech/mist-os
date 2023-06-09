@@ -8,3 +8,8 @@ fidl("fuchsia.controller.test") {
   sources = [ "fuchsia_controller.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }
+
+fidl("fuchsia.controller.othertest") {
+  sources = [ "fuchsia_controller_other.test.fidl" ]
+  public_deps = [ ":fuchsia.controller.test" ]
+}

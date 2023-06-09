@@ -4,6 +4,7 @@
 
 import("//build/python/python_binary.gni")
 import("//build/python/python_c_extension.gni")
+import("//build/python/python_library.gni")
 import("//build/rust/rustc_staticlib.gni")
 
 assert(is_host)
@@ -94,9 +95,25 @@ python_c_extension("fuchsia_controller_py") {
   ]
 }
 
+python_library("fidl_bindings") {
+  library_name = "fidl"
+  source_root = "python/fidl"
+  library_deps = [
+    ":fidl_codec",
+    ":fuchsia_controller_py",
+  ]
+  sources = [
+    "__init__.py",
+    "_import.py",
+    "_ipc.py",
+    "_library.py",
+  ]
+}
+
 python_binary("example") {
   main_source = "python/example.py"
   deps = [
+    ":fidl_bindings",
     ":fidl_codec",
     ":fuchsia_controller_py",
     "//src/developer/ffx:ffx_tool",
@@ -123,6 +140,9 @@ group("tests") {
   # TODO(fxbug.dev/127523): This test fails on mac builders. This is most likely because of the
   # infra machines running OSX 10.15
   if (host_os != "mac") {
-    deps += [ "tests:fuchsia_controller_errors_test" ]
+    deps += [
+      "tests:fuchsia_controller_errors_test",
+      "tests:fuchsia_controller_importing_test",
+    ]
   }
 }

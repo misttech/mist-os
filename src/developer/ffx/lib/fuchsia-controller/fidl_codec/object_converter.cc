@@ -6,6 +6,8 @@
 
 #include <zircon/types.h>
 
+#include <cinttypes>
+
 #include "py_wrapper.h"
 #include "src/developer/ffx/lib/fuchsia-controller/abi/convert.h"
 
@@ -148,7 +150,7 @@ void ObjectConverter::VisitUnionType(const fidl_codec::UnionType* type) {
     }
     auto child_value = py::Object(GetAttr(obj_, member->name()));
     if (child_value == nullptr) {
-      return;
+      continue;
     }
     if (child_value == Py_None) {
       continue;
@@ -159,14 +161,11 @@ void ObjectConverter::VisitUnionType(const fidl_codec::UnionType* type) {
     }
     return;
   }
-
   PyErr_SetString(PyExc_TypeError, "Unkown union variant.");
 }
 
 void ObjectConverter::VisitType(const fidl_codec::Type* type) {
-  std::stringstream ss;
-  ss << "Unknown FIDL type " << type->Name() << ".";
-  PyErr_SetString(PyExc_TypeError, ss.str().c_str());
+  PyErr_Format(PyExc_TypeError, "Unknown FIDL type: '%s'.", type->Name().c_str());
 }
 
 void ObjectConverter::VisitFloat() {
@@ -190,9 +189,7 @@ void ObjectConverter::VisitList(const fidl_codec::ElementSequenceType* type,
 
   auto size = PyList_Size(obj_);
   if (count && static_cast<uint32_t>(size) != *count) {
-    std::stringstream ss;
-    ss << "Expected array of size " << *count << ".";
-    PyErr_SetString(PyExc_RuntimeError, ss.str().c_str());
+    PyErr_Format(PyExc_RuntimeError, "Expected array of size %" PRIu32, *count);
     return;
   }
 
@@ -237,21 +234,20 @@ void ObjectConverter::VisitInt32Type(const fidl_codec::Int32Type* type) { VisitI
 void ObjectConverter::VisitInt64Type(const fidl_codec::Int64Type* type) { VisitInteger(true); }
 
 void ObjectConverter::VisitEnumType(const fidl_codec::EnumType* type) {
-  Py_ssize_t size;
-  const char* str = PyUnicode_AsUTF8AndSize(obj_, &size);
-  if (str == nullptr) {
+  auto as_int = convert::PyLong_AsU64(obj_);
+  if (as_int == convert::MINUS_ONE_U64 && PyErr_Occurred()) {
     return;
   }
-  auto name = std::string(str, size);
   for (const auto& member : type->enum_definition().members()) {
-    if (name == member.name()) {
+    if (member.absolute_value() == as_int) {
       result_ =
           std::make_unique<fidl_codec::IntegerValue>(member.absolute_value(), member.negative());
+      return;
     }
   }
-  std::stringstream ss;
-  ss << "Unexpected enum value: " << name;
-  PyErr_SetString(PyExc_TypeError, ss.str().c_str());
+  auto str = py::Object(PyObject_Str(obj_));
+  PyErr_Format(PyExc_TypeError, "Unexpected enum value: %s == %" PRIu64,
+               PyUnicode_AsUTF8(str.get()), as_int);
 }
 
 void ObjectConverter::VisitBitsType(const fidl_codec::BitsType* type) {

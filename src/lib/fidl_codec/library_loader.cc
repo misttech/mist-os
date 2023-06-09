@@ -535,8 +535,11 @@ ProtocolMethod* Protocol::GetMethodByName(std::string_view name) const {
   return nullptr;
 }
 
-Library::Library(LibraryLoader* enclosing_loader, rapidjson::Document& json_definition)
-    : enclosing_loader_(enclosing_loader), json_definition_(std::move(json_definition)) {
+Library::Library(std::string source, LibraryLoader* enclosing_loader,
+                 rapidjson::Document& json_definition)
+    : enclosing_loader_(enclosing_loader),
+      json_definition_(std::move(json_definition)),
+      source_(std::move(source)) {
   if (!json_definition_.HasMember("struct_declarations")) {
     FieldNotFound("library", name_, "struct_declarations");
   } else if (!json_definition_.HasMember("external_struct_declarations")) {
@@ -846,9 +849,10 @@ void LibraryLoader::AddPath(const std::string& path, LibraryReadError* err) {
   std::string content(std::istreambuf_iterator<char>(infile), {});
   if (infile.fail()) {
     err->value = LibraryReadError ::kIoError;
+    err->errno_value = errno;
     return;
   }
-  AddContent(content, err);
+  AddContent(content, err, path);
   if (err->value != LibraryReadError::kOk) {
     FX_LOGS_OR_CAPTURE(ERROR) << path << ": JSON parse error: "
                               << rapidjson::GetParseError_En(err->parse_result.Code())
@@ -857,7 +861,8 @@ void LibraryLoader::AddPath(const std::string& path, LibraryReadError* err) {
   }
 }
 
-void LibraryLoader::AddContent(const std::string& content, LibraryReadError* err) {
+void LibraryLoader::AddContent(const std::string& content, LibraryReadError* err,
+                               std::string source) {
   rapidjson::Document document;
   err->parse_result = document.Parse<rapidjson::kParseNumbersAsStringsFlag>(content.c_str());
   // TODO: This would be a good place to validate that the resulting JSON
@@ -870,7 +875,7 @@ void LibraryLoader::AddContent(const std::string& content, LibraryReadError* err
   std::string library_name = document["name"].GetString();
   if (representations_.find(library_name) == representations_.end()) {
     representations_.emplace(std::piecewise_construct, std::forward_as_tuple(library_name),
-                             std::forward_as_tuple(new Library(this, document)));
+                             std::forward_as_tuple(new Library(std::move(source), this, document)));
   }
   err->value = LibraryReadError::kOk;
 }

@@ -7,7 +7,6 @@ use crate::ext_buffer::ExtBuffer;
 use anyhow::Result;
 use async_lock::Mutex as AsyncMutex;
 use byteorder::{NativeEndian, WriteBytesExt};
-use errors::ffx_error;
 use fuchsia_async::{LocalExecutor, Task};
 use fuchsia_zircon_types as zx_types;
 use futures_lite::AsyncWriteExt;
@@ -53,15 +52,10 @@ impl LibContext {
 
     pub(crate) async fn notifier_descriptor(&self) -> Result<RawFd> {
         let mut notifier = self.notifier.lock().await;
-        if notifier.is_some() {
-            return Err(ffx_error!(
-                "Only one handle notification descriptor can be open at a time"
-            )
-            .into());
+        if !notifier.is_some() {
+            *notifier = Some(LibNotifier::new().await?);
         }
-        let (n, fd) = LibNotifier::new().await?;
-        *notifier = Some(n);
-        Ok(fd)
+        Ok(notifier.as_ref().unwrap().receiver())
     }
 
     pub(crate) async fn notification_sender(
@@ -106,6 +100,7 @@ fn new_command_thread(
 pub(crate) struct LibNotifier {
     pipe_reader_task: Task<()>,
     handle_notification_sender: async_channel::Sender<zx_types::zx_handle_t>,
+    pipe_rx: RawFd,
 }
 
 fn unix_stream(fd: RawFd) -> Result<async_net::unix::UnixStream, std::io::Error> {
@@ -116,7 +111,7 @@ fn unix_stream(fd: RawFd) -> Result<async_net::unix::UnixStream, std::io::Error>
 impl LibNotifier {
     // This function isn't actually async, but it should be called inside an
     // executor to ensure spawned tasks are scheduled correctly.
-    async fn new() -> Result<(Self, RawFd)> {
+    async fn new() -> Result<Self> {
         let (pipe_rx, pipe_tx) = nix::unistd::pipe()?;
         let mut stream = unix_stream(pipe_tx)?;
         let (tx, rx) = async_channel::unbounded::<zx_types::zx_handle_t>();
@@ -133,7 +128,11 @@ impl LibNotifier {
                 }
             }
         });
-        Ok((Self { handle_notification_sender: tx, pipe_reader_task }, pipe_rx))
+        Ok(Self { handle_notification_sender: tx, pipe_reader_task, pipe_rx })
+    }
+
+    fn receiver(&self) -> RawFd {
+        self.pipe_rx
     }
 
     fn sender(&self) -> async_channel::Sender<zx_types::zx_handle_t> {

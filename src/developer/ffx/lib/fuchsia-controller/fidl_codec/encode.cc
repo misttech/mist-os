@@ -5,7 +5,6 @@
 #include "encode.h"
 
 #include <iostream>
-#include <sstream>
 #include <string>
 
 #include "ir.h"
@@ -58,9 +57,7 @@ std::unique_ptr<fidl_codec::Value> ConvertObject(ConversionArgs args) {
   }
   auto type = library->TypeFromIdentifier(false, type_name_str);
   if (type == nullptr) {
-    std::stringstream ss;
-    ss << "Unrecognized type: " << type;
-    PyErr_SetString(PyExc_RuntimeError, ss.str().c_str());
+    PyErr_Format(PyExc_RuntimeError, "Unrecognized type: '%s'", type_name_c_str);
     return nullptr;
   }
   return converter::ObjectConverter::Convert(args.obj, type.get());
