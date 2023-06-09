@@ -566,8 +566,6 @@ pub fn interrupt_thread(thread: &zx::Thread) {
         // zx_restricted_kick() could return ZX_ERR_BAD_STATE if the target thread is already in the
         // DYING or DEAD states. That's fine since it means that the task is in the process of
         // tearing down, so allow it.
-        // TODO(https://fxbug.dev/128449): Update this if we change the syscall to return ZX_OK in
-        // this case.
         assert_eq!(status, zx::sys::ZX_ERR_BAD_STATE);
     }
 }
