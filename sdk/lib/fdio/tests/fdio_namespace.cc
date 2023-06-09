@@ -10,6 +10,7 @@
 #include <lib/zxio/zxio.h>
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <zircon/errors.h>
 #include <zircon/processargs.h>
 
 #include <fbl/unique_fd.h>
@@ -164,6 +165,31 @@ TEST(NamespaceTest, ConnectOversizedPathComponent) {
   EXPECT_STATUS(fdio_ns_open(ns, long_path_component.c_str(), 0u, ch0.release()), ZX_ERR_BAD_PATH);
 
   ASSERT_OK(fdio_ns_destroy(ns));
+}
+
+TEST(NamespaceTest, BindShadowingFails) {
+  constexpr std::tuple<const char*, const char*, zx_status_t> test_cases[] = {
+      {"/", "/foo", ZX_ERR_NOT_SUPPORTED},
+      {"/foo", "/", ZX_ERR_NOT_SUPPORTED},
+      {"/foo", "/foo/bar", ZX_ERR_NOT_SUPPORTED},
+      {"/foo/bar", "/foo", ZX_ERR_ALREADY_EXISTS},
+  };
+  for (const auto& [first, second, expected] : test_cases) {
+    SCOPED_TRACE(std::string(first) + ", " + std::string(second));
+
+    fdio_ns_t* ns;
+    ASSERT_OK(fdio_ns_create(&ns));
+    auto destroy = fit::defer([ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
+
+    zx::channel ch0, ch1;
+    ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
+
+    ASSERT_OK(fdio_ns_bind(ns, first, ch0.release()));
+
+    zx::channel ch2, ch3;
+    ASSERT_OK(zx::channel::create(0, &ch2, &ch3));
+    EXPECT_STATUS(fdio_ns_bind(ns, second, ch2.release()), expected);
+  }
 }
 
 TEST(NamespaceTest, LocalBinding) {
