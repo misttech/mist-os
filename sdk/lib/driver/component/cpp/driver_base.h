@@ -115,6 +115,8 @@ class DriverBase {
   // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
   std::unique_ptr<Logger> logger_;
 
+  // Client to the `fuchsia.driver.framework/Node` protocol provided by the driver framework.
+  // This can be used to add children to the node that the driver is bound to.
   fidl::ClientEnd<fuchsia_driver_framework::Node>& node() {
     auto& node = start_args_.node();
     ZX_ASSERT(node.has_value());
@@ -135,30 +137,46 @@ class DriverBase {
     return StructuredConfig::TakeFromStartArgs(start_args_);
   }
 
+  // The name of the driver that is given to the DriverBase constructor.
   std::string_view name() const { return name_; }
 
   DriverContext& context() { return driver_context_; }
   const DriverContext& context() const { return driver_context_; }
 
-  fdf::UnownedSynchronizedDispatcher& driver_dispatcher() { return driver_dispatcher_; }
+  // Used to access the incoming namespace of the driver. This allows connecting to both zircon and
+  // driver transport incoming services.
+  const std::shared_ptr<Namespace>& incoming() const { return driver_context_.incoming(); }
+
+  // The `/svc` directory in the incoming namespace.
+  fidl::UnownedClientEnd<fuchsia_io::Directory> svc() const { return driver_context_.svc(); }
+
+  // Used to access the outgoing directory that the driver is serving. Can be used to add both
+  // zircon and driver transport outgoing services.
+  std::shared_ptr<OutgoingDirectory>& outgoing() { return driver_context_.outgoing(); }
+
+  // The unowned synchronized driver dispatcher that the driver is started with.
   const fdf::UnownedSynchronizedDispatcher& driver_dispatcher() const { return driver_dispatcher_; }
 
-  async_dispatcher_t* dispatcher() { return dispatcher_; }
-  const async_dispatcher_t* dispatcher() const { return dispatcher_; }
+  // The async_dispatcher_t interface of the synchronized driver dispatcher that the driver
+  // is started with.
+  async_dispatcher_t* dispatcher() const { return dispatcher_; }
 
-  std::optional<fuchsia_data::Dictionary>& program() { return start_args_.program(); }
+  // The program dictionary in the start args.
+  // This is the `program` entry in the cml of the driver.
   const std::optional<fuchsia_data::Dictionary>& program() const { return start_args_.program(); }
 
-  std::optional<std::string>& url() { return start_args_.url(); }
+  // The url field in the start args.
+  // This is the URL of the package containing the driver. This is purely informational,
+  // used only to provide data for inspect.
   const std::optional<std::string>& url() const { return start_args_.url(); }
 
-  std::optional<std::string>& node_name() { return start_args_.node_name(); }
+  // The node_name field in the start args.
+  // This is the name of the node that the driver is bound to.
   const std::optional<std::string>& node_name() const { return start_args_.node_name(); }
 
-  std::optional<std::vector<fuchsia_driver_framework::NodeSymbol>>& symbols() {
-    return start_args_.symbols();
-  }
-
+  // The symbols field in the start args.
+  // These come from the driver that added |node|, and are filtered to the symbols requested in the
+  // bind program.
   const std::optional<std::vector<fuchsia_driver_framework::NodeSymbol>>& symbols() const {
     return start_args_.symbols();
   }

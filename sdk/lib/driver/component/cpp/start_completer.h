@@ -29,14 +29,23 @@ class StartCompleter {
 
   ~StartCompleter();
 
-  void set_driver(std::unique_ptr<DriverBase> driver) { driver_ = std::move(driver); }
-
   // Complete the Start async operation. Safe to call from any thread.
+  // Invoking this method will move ownership of `driver_` into the driver framework,
+  // extending it's lifetime until the driver's stop hook is invoked. This method is
+  // destructive and should not be invoked more than once.
   void operator()(zx::result<> result);
+
+  // This will make the completer take temporary ownership of the driver pointer.
+  // It will release its ownership of the driver once the |operator()| has been called.
+  // This is used by the internal driver factory. It should NOT be called by the user (driver).
+  void set_driver(std::unique_ptr<DriverBase> driver) { driver_ = std::move(driver); }
 
  private:
   StartCompleteCallback* complete_;
   void* cookie_;
+
+  // The completer will take temporary ownership of the driver pointer.
+  // It will release its ownership of the driver once the |operator()| has been called.
   std::unique_ptr<DriverBase> driver_;
 };
 

@@ -372,7 +372,7 @@ void Driver::PrepareStop(fdf::PrepareStopCompleter completer) {
 }
 
 zx::result<> Driver::LoadDriver(zx::vmo loader_vmo, zx::vmo driver_vmo) {
-  std::string& url_str = url().value();
+  const std::string& url_str = url().value();
 
   // Replace loader service to load the DFv1 driver, load the driver,
   // then place the original loader service back.
@@ -493,7 +493,7 @@ zx::result<> Driver::TryRunUnitTests() {
 }
 
 zx::result<> Driver::StartDriver() {
-  std::string& url_str = url().value();
+  const std::string& url_str = url().value();
   if (record_->ops->init != nullptr) {
     // If provided, run init.
     zx_status_t status = record_->ops->init(&context_);
