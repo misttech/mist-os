@@ -449,11 +449,14 @@ async def _stream_subprocess(
         if not quiet:
             print(line, file=pipe)
 
-    await asyncio.wait(
-        [   # Forward stdout, stderr while capturing them.
-            _read_stream(p.stdout, lambda l: tee(l, out_text, stdout or sys.stdout)),
-            _read_stream(p.stderr, lambda l: tee(l, err_text, stderr or sys.stderr)),
-        ])
+    out_task = asyncio.create_task(
+        _read_stream(
+            p.stdout, lambda l: tee(l, out_text, stdout or sys.stdout)))
+    err_task = asyncio.create_task(
+        _read_stream(
+            p.stderr, lambda l: tee(l, err_text, stderr or sys.stderr)))
+    # Forward stdout, stderr while capturing them.
+    await asyncio.wait([out_task, err_task])
 
     return SubprocessResult(
         returncode=await p.wait(),
