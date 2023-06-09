@@ -1455,11 +1455,7 @@ impl SubRealmBuilder {
         let child_ref: ChildRef = child_ref.into();
         child_ref.check_scope(&self.realm_path)?;
         self.realm_proxy
-            .set_config_value(
-                &child_ref.name,
-                key,
-                &cm_rust::ConfigValueSpec::native_into_fidl_todo_fxb_126609(value),
-            )
+            .set_config_value(&child_ref.name, key, &value.native_into_fidl())
             .await?
             .map_err(Into::into)
     }
@@ -2190,7 +2186,7 @@ mod tests {
         super::*,
         assert_matches::assert_matches,
         fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_config as fconfig,
+        fidl_fuchsia_component as fcomponent,
         futures::{channel::mpsc, future::pending, FutureExt, SinkExt, StreamExt, TryStreamExt},
     };
 
@@ -2666,7 +2662,7 @@ mod tests {
         SetConfigValue {
             name: String,
             key: String,
-            value: fconfig::ValueSpec,
+            value: fdecl::ConfigValueSpec,
         },
     }
 
@@ -3052,29 +3048,29 @@ mod tests {
 
         assert_matches!(
             receive_server_requests.next().await,
-            Some(ServerRequest::SetConfigValue { name, key, value: fconfig::ValueSpec {
-                value: Some(fconfig::Value::Single(fconfig::SingleValue::Bool(boolean))), ..
+            Some(ServerRequest::SetConfigValue { name, key, value: fdecl::ConfigValueSpec {
+                value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Bool(boolean))), ..
             }}) if &name == "a" && &key == "test_bool" && boolean == false
         );
 
         assert_matches!(
             receive_server_requests.next().await,
-            Some(ServerRequest::SetConfigValue { name, key, value: fconfig::ValueSpec {
-                value: Some(fconfig::Value::Single(fconfig::SingleValue::Int16(int16))), ..
+            Some(ServerRequest::SetConfigValue { name, key, value: fdecl::ConfigValueSpec {
+                value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Int16(int16))), ..
             }}) if &name == "a" && &key == "test_int16" && int16 == -2
         );
 
         assert_matches!(
             receive_server_requests.next().await,
-            Some(ServerRequest::SetConfigValue { name, key, value: fconfig::ValueSpec {
-                value: Some(fconfig::Value::Single(fconfig::SingleValue::String(string))), ..
+            Some(ServerRequest::SetConfigValue { name, key, value: fdecl::ConfigValueSpec {
+                value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::String(string))), ..
             }}) if &name == "a" && &key == "test_string" && &string == "test"
         );
 
         assert_matches!(
             receive_server_requests.next().await,
-            Some(ServerRequest::SetConfigValue { name, key, value: fconfig::ValueSpec {
-                value: Some(fconfig::Value::Vector(fconfig::VectorValue::StringVector(string_vector))), ..
+            Some(ServerRequest::SetConfigValue { name, key, value: fdecl::ConfigValueSpec {
+                value: Some(fdecl::ConfigValue::Vector(fdecl::ConfigVectorValue::StringVector(string_vector))), ..
             }}) if &name == "a" && &key == "test_string_vector" && string_vector == vec!["hello", "fuchsia"]
         );
 

@@ -11,7 +11,7 @@ pub use crate::util::check_url;
 use {
     crate::{error::*, util::*},
     directed_graph::DirectedGraph,
-    fidl_fuchsia_component_config as fconfig, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_component_decl as fdecl,
     itertools::Itertools,
     std::{
         collections::{BTreeSet, HashMap, HashSet},
@@ -88,56 +88,6 @@ pub fn validate_value_spec(spec: &fdecl::ConfigValueSpec) -> Result<(), ErrorLis
     }
 }
 
-// TODO(https://fxbug.dev/126609)
-fn validate_value_spec_todo_fxb_126609(spec: &fconfig::ValueSpec) -> Result<(), ErrorList> {
-    let mut errors = vec![];
-    if let Some(value) = &spec.value {
-        match value {
-            fconfig::Value::Single(s) => match s {
-                fconfig::SingleValue::Bool(_)
-                | fconfig::SingleValue::Uint8(_)
-                | fconfig::SingleValue::Uint16(_)
-                | fconfig::SingleValue::Uint32(_)
-                | fconfig::SingleValue::Uint64(_)
-                | fconfig::SingleValue::Int8(_)
-                | fconfig::SingleValue::Int16(_)
-                | fconfig::SingleValue::Int32(_)
-                | fconfig::SingleValue::Int64(_)
-                | fconfig::SingleValue::String(_) => {}
-                fconfig::SingleValueUnknown!() => {
-                    errors.push(Error::invalid_field(DeclType::ValueSpec, "value"));
-                }
-            },
-            fconfig::Value::Vector(l) => match l {
-                fconfig::VectorValue::BoolVector(_)
-                | fconfig::VectorValue::Uint8Vector(_)
-                | fconfig::VectorValue::Uint16Vector(_)
-                | fconfig::VectorValue::Uint32Vector(_)
-                | fconfig::VectorValue::Uint64Vector(_)
-                | fconfig::VectorValue::Int8Vector(_)
-                | fconfig::VectorValue::Int16Vector(_)
-                | fconfig::VectorValue::Int32Vector(_)
-                | fconfig::VectorValue::Int64Vector(_)
-                | fconfig::VectorValue::StringVector(_) => {}
-                fconfig::VectorValueUnknown!() => {
-                    errors.push(Error::invalid_field(DeclType::ValueSpec, "value"));
-                }
-            },
-            fconfig::ValueUnknown!() => {
-                errors.push(Error::invalid_field(DeclType::ValueSpec, "value"));
-            }
-        }
-    } else {
-        errors.push(Error::missing_field(DeclType::ValueSpec, "value"));
-    }
-
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(ErrorList::new(errors))
-    }
-}
-
 /// Validates Configuration Values Data.
 ///
 /// The Value Data may ultimately originate from a CVF file, or be directly constructed by the
@@ -166,37 +116,6 @@ pub fn validate_values_data(data: &fdecl::ConfigValuesData) -> Result<(), ErrorL
         }
     } else {
         errors.push(Error::missing_field(DeclType::ConfigValuesData, "checksum"));
-    }
-
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(ErrorList::new(errors))
-    }
-}
-
-// TODO(https://fxbug.dev/126609) delete
-pub fn validate_values_data_todo_fxb_126609(data: &fconfig::ValuesData) -> Result<(), ErrorList> {
-    let mut errors = vec![];
-    if let Some(values) = &data.values {
-        for spec in values {
-            if let Err(mut e) = validate_value_spec_todo_fxb_126609(spec) {
-                errors.append(&mut e.errs);
-            }
-        }
-    } else {
-        errors.push(Error::missing_field(DeclType::ValuesData, "values"));
-    }
-
-    if let Some(checksum) = &data.checksum {
-        match checksum {
-            fdecl::ConfigChecksum::Sha256(_) => {}
-            fdecl::ConfigChecksumUnknown!() => {
-                errors.push(Error::invalid_field(DeclType::ValuesData, "checksum"));
-            }
-        }
-    } else {
-        errors.push(Error::missing_field(DeclType::ValuesData, "checksum"));
     }
 
     if errors.is_empty() {

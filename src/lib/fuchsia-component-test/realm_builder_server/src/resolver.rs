@@ -6,11 +6,11 @@ use {
     crate::ConfigOverridePolicy,
     anyhow::{Context, Error},
     cm_fidl_validator,
+    cm_rust::NativeIntoFidl,
     fidl::endpoints::{create_endpoints, ServerEnd},
     fidl::Vmo,
-    fidl_fuchsia_component_config as fconfig, fidl_fuchsia_component_decl as fcdecl,
-    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio,
-    fidl_fuchsia_mem as fmem, fuchsia_async as fasync,
+    fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_resolution as fresolution,
+    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_async as fasync,
     futures::{
         lock::{Mutex, MutexGuard},
         TryStreamExt,
@@ -146,19 +146,19 @@ impl Registry {
         values_data: Option<fmem::Data>,
         config_value_replacements: &HashMap<usize, cm_rust::ConfigValueSpec>,
     ) -> Result<fmem::Data, Error> {
-        let mut values_data: fconfig::ValuesData = if let Some(v) = values_data {
+        let mut values_data: fcdecl::ConfigValuesData = if let Some(v) = values_data {
             let bytes = mem_util::bytes_from_data(&v)?;
             let values_data = fidl::unpersist(&bytes)?;
-            cm_fidl_validator::validate_values_data_todo_fxb_126609(&values_data)?;
+            cm_fidl_validator::validate_values_data(&values_data)?;
             values_data
         } else {
             // make a boilerplate ValuesData that our replacements can fill
             let num_expected_values =
                 schema.fields.as_ref().context("schema must have fields")?.len();
             let blank_values = (0..num_expected_values)
-                .map(|_| fconfig::ValueSpec { value: None, ..Default::default() })
+                .map(|_| fcdecl::ConfigValueSpec { value: None, ..Default::default() })
                 .collect::<Vec<_>>();
-            fconfig::ValuesData {
+            fcdecl::ConfigValuesData {
                 checksum: schema.checksum.clone(),
                 values: Some(blank_values),
                 ..Default::default()
@@ -172,11 +172,10 @@ impl Registry {
                 .expect("either validated or constructed above")
                 .get_mut(*index)
                 .expect("Config Value File and Schema should have the same number of fields!");
-            *value = replacement.clone().native_into_fidl_todo_fxb_126609();
+            *value = replacement.clone().native_into_fidl();
         }
 
-        cm_fidl_validator::validate_values_data_todo_fxb_126609(&values_data)
-            .context("ensuring all values are populated")?;
+        cm_fidl_validator::validate_values_data(&values_data)?;
 
         let data = fidl::persist(&values_data)?;
         let data = fmem::Data::Bytes(data);

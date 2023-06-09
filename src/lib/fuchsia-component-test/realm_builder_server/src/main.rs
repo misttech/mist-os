@@ -6,9 +6,9 @@ use {
     anyhow::{self, Context},
     cm_rust::{FidlIntoNative, NativeIntoFidl, OfferDeclCommon},
     fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy, ServerEnd},
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_config as fconfig,
-    fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_component_test as ftest, fidl_fuchsia_data as fdata,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fcdecl,
+    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_component_test as ftest,
+    fidl_fuchsia_data as fdata,
     fidl_fuchsia_inspect::InspectSinkMarker,
     fidl_fuchsia_io as fio,
     fidl_fuchsia_logger::LogSinkMarker,
@@ -709,7 +709,7 @@ impl Realm {
         &self,
         name: String,
         key: String,
-        value_spec: fconfig::ValueSpec,
+        value_spec: fcdecl::ConfigValueSpec,
     ) -> Result<(), RealmBuilderError> {
         let child_node = self.realm_node.get_sub_realm(&name).await?;
 
@@ -720,12 +720,9 @@ impl Realm {
 
         let decl = child_node.get_decl().await;
         let config = decl.config.ok_or(RealmBuilderError::NoConfigSchema(name.clone()))?;
-
-        // TODO(https://fxbug.dev/126609) re-enable once fuchsia.component.config is being removed
-        // cm_fidl_validator::validate_value_spec(&value_spec)
-        //     .map_err(|e| RealmBuilderError::ConfigValueInvalid(key.clone(), anyhow::anyhow!(e)))?;
-
-        let value_spec = cm_rust::ConfigValueSpec::fidl_into_native_todo_fxb_126609(value_spec);
+        cm_fidl_validator::validate_value_spec(&value_spec)
+            .map_err(|e| RealmBuilderError::ConfigValueInvalid(key.clone(), anyhow::anyhow!(e)))?;
+        let value_spec = value_spec.fidl_into_native();
         for (index, field) in config.fields.iter().enumerate() {
             if field.key == key {
                 config_encoder::ConfigField::resolve(value_spec.value.clone(), &field).map_err(

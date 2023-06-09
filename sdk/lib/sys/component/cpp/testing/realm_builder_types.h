@@ -330,9 +330,15 @@ class ConfigValue {
   // Friend class needed in order to invoke |TakeAsFidl|.
   friend class Realm;
 
+#if __Fuchsia_API_level__ < 13
   fuchsia::component::config::ValueSpec TakeAsFidl();
   explicit ConfigValue(fuchsia::component::config::ValueSpec spec);
   fuchsia::component::config::ValueSpec spec;
+#elif __Fuchsia_API_level__ >= 13
+  fuchsia::component::decl::ConfigValueSpec TakeAsFidl();
+  explicit ConfigValue(fuchsia::component::decl::ConfigValueSpec spec);
+  fuchsia::component::decl::ConfigValueSpec spec;
+#endif
 };
 
 }  // namespace component_testing

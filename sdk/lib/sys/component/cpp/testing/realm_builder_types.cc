@@ -25,6 +25,7 @@ namespace {
 
 constexpr char kSvcDirectoryPath[] = "/svc";
 
+#if __Fuchsia_API_level__ < 13
 #define ZX_SYS_COMPONENT_REPLACE_CONFIG_SINGLE_VALUE_DEF(MethodName, Type, FidlType) \
   ConfigValue ConfigValue::MethodName(Type value) {                                  \
     fuchsia::component::config::ValueSpec spec;                                      \
@@ -44,6 +45,27 @@ constexpr char kSvcDirectoryPath[] = "/svc";
     spec.set_value(fuchsia::component::config::Value::WithVector(              \
         fuchsia::component::config::VectorValue::FidlType(std::move(value)))); \
   }
+#elif __Fuchsia_API_level__ >= 13
+#define ZX_SYS_COMPONENT_REPLACE_CONFIG_SINGLE_VALUE_DEF(MethodName, Type, FidlType) \
+  ConfigValue ConfigValue::MethodName(Type value) {                                  \
+    fuchsia::component::decl::ConfigValueSpec spec;                                  \
+    spec.set_value(fuchsia::component::decl::ConfigValue::WithSingle(                \
+        fuchsia::component::decl::ConfigSingleValue::FidlType(std::move(value))));   \
+    return ConfigValue(std::move(spec));                                             \
+  }
+
+#define ZX_SYS_COMPONENT_REPLACE_CONFIG_SINGLE_VALUE_CTOR_DEF(Type, FidlType)      \
+  ConfigValue::ConfigValue(Type value) {                                           \
+    spec.set_value(fuchsia::component::decl::ConfigValue::WithSingle(              \
+        fuchsia::component::decl::ConfigSingleValue::FidlType(std::move(value)))); \
+  }
+
+#define ZX_SYS_COMPONENT_REPLACE_CONFIG_VECTOR_VALUE_CTOR_DEF(Type, FidlType)      \
+  ConfigValue::ConfigValue(Type value) {                                           \
+    spec.set_value(fuchsia::component::decl::ConfigValue::WithVector(              \
+        fuchsia::component::decl::ConfigVectorValue::FidlType(std::move(value)))); \
+  }
+#endif
 
 // Checks that path doesn't contain leading nor trailing slashes.
 bool IsValidPath(std::string_view path) {
@@ -168,12 +190,17 @@ ZX_SYS_COMPONENT_REPLACE_CONFIG_VECTOR_VALUE_CTOR_DEF(std::vector<int32_t>, With
 ZX_SYS_COMPONENT_REPLACE_CONFIG_VECTOR_VALUE_CTOR_DEF(std::vector<int64_t>, WithInt64Vector)
 ZX_SYS_COMPONENT_REPLACE_CONFIG_VECTOR_VALUE_CTOR_DEF(std::vector<std::string>, WithStringVector)
 
+#if __Fuchsia_API_level__ < 13
 ConfigValue::ConfigValue(fuchsia::component::config::ValueSpec spec) : spec(std::move(spec)) {}
+fuchsia::component::config::ValueSpec ConfigValue::TakeAsFidl() { return std::move(spec); }
+#elif __Fuchsia_API_level__ >= 13
+ConfigValue::ConfigValue(fuchsia::component::decl::ConfigValueSpec spec) : spec(std::move(spec)) {}
+fuchsia::component::decl::ConfigValueSpec ConfigValue::TakeAsFidl() { return std::move(spec); }
+#endif
 ConfigValue& ConfigValue::operator=(ConfigValue&& other) noexcept {
   spec = std::move(other.spec);
   return *this;
 }
 ConfigValue::ConfigValue(ConfigValue&& other) noexcept : spec(std::move(other.spec)) {}
-fuchsia::component::config::ValueSpec ConfigValue::TakeAsFidl() { return std::move(spec); }
 
 }  // namespace component_testing
