@@ -63,6 +63,7 @@ pub mod route {
     use crate::{
         interfaces,
         netlink_packet::{new_ack, new_done, AckErrorCode, NackErrorCode},
+        routes,
     };
 
     use netlink_packet_core::{NLM_F_ACK, NLM_F_DUMP};
@@ -135,6 +136,10 @@ pub mod route {
         S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
     > {
         pub(crate) interfaces_request_sink: mpsc::Sender<interfaces::Request<S>>,
+        #[allow(unused)]
+        pub(crate) v4_routes_request_sink: mpsc::Sender<routes::Request<S>>,
+        #[allow(unused)]
+        pub(crate) v6_routes_request_sink: mpsc::Sender<routes::Request<S>>,
     }
 
     #[async_trait]
@@ -146,7 +151,11 @@ pub mod route {
             req: NetlinkMessage<RtnlMessage>,
             client: &mut InternalClient<NetlinkRoute, S>,
         ) {
-            let Self { interfaces_request_sink } = self;
+            let Self {
+                interfaces_request_sink,
+                v4_routes_request_sink: _v4_routes_request_sink,
+                v6_routes_request_sink: _v6_routes_request_sink,
+            } = self;
 
             let (req_header, payload) = req.into_parts();
             let req = match payload {
@@ -504,7 +513,14 @@ mod test {
         expected_response: Option<ExpectedResponse<AckErrorCode>>,
     ) {
         let (interfaces_request_sink, _interfaces_request_stream) = mpsc::channel(0);
-        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>> { interfaces_request_sink };
+        let (v4_routes_request_sink, _v4_routes_request_stream) = mpsc::channel(0);
+        let (v6_routes_request_sink, _v6_routes_request_stream) = mpsc::channel(0);
+
+        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>> {
+            interfaces_request_sink,
+            v4_routes_request_sink,
+            v6_routes_request_sink,
+        };
 
         let (mut client_sink, mut client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
             crate::client::testutil::CLIENT_ID_1,
@@ -554,8 +570,14 @@ mod test {
             route_clients.add_client(client.clone());
             route_clients
         });
+        let (v4_routes_request_sink, _v4_routes_request_stream) = mpsc::channel(0);
+        let (v6_routes_request_sink, _v6_routes_request_stream) = mpsc::channel(0);
 
-        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>> { interfaces_request_sink };
+        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>> {
+            interfaces_request_sink,
+            v4_routes_request_sink,
+            v6_routes_request_sink,
+        };
 
         let event_loop_fut = event_loop.run().fuse();
         futures::pin_mut!(event_loop_fut);

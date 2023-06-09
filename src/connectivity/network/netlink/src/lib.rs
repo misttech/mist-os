@@ -131,6 +131,8 @@ async fn run_netlink_worker<P: SenderReceiverProvider>(params: NetlinkWorkerPara
 
     let route_clients = ClientTable::default();
     let (interfaces_request_sink, interfaces_request_stream) = mpsc::channel(1);
+    let (v4_routes_request_sink, v4_routes_request_stream) = mpsc::channel(1);
+    let (v6_routes_request_sink, v6_routes_request_stream) = mpsc::channel(1);
 
     let _: Vec<()> = futures::future::join_all([
         // Accept new NETLINK_ROUTE clients.
@@ -140,7 +142,11 @@ async fn run_netlink_worker<P: SenderReceiverProvider>(params: NetlinkWorkerPara
                 connect_new_clients::<NetlinkRoute, _, _>(
                     route_clients,
                     route_client_receiver,
-                    NetlinkRouteRequestHandler { interfaces_request_sink },
+                    NetlinkRouteRequestHandler {
+                        interfaces_request_sink,
+                        v4_routes_request_sink,
+                        v6_routes_request_sink,
+                    },
                 )
                 .await;
                 panic!("route_client_receiver stream unexpectedly finished")
@@ -153,7 +159,7 @@ async fn run_netlink_worker<P: SenderReceiverProvider>(params: NetlinkWorkerPara
                 let worker = match routes::EventLoop::<
                     P::Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
                     Ipv4,
-                >::new(route_clients)
+                >::new(route_clients, v4_routes_request_stream)
                 {
                     Ok(worker) => worker,
                     Err(EventLoopError::Fidl(e)) => {
@@ -175,7 +181,7 @@ async fn run_netlink_worker<P: SenderReceiverProvider>(params: NetlinkWorkerPara
                 let worker = match routes::EventLoop::<
                     P::Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
                     Ipv6,
-                >::new(route_clients)
+                >::new(route_clients, v6_routes_request_stream)
                 {
                     Ok(worker) => worker,
                     Err(EventLoopError::Fidl(e)) => {
