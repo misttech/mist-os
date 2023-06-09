@@ -75,8 +75,13 @@ foreach(lib_type, lib_types) {
     sources = crypto_sources
     public = crypto_headers
     public_configs = [ ":boringssl_config" ]
-    configs += [ ":internal_config" ]
-
+    configs += [
+      ":internal_config",
+      ":export_symbols",
+    ]
+    if (is_host && lib_type == "static") {
+      configs -= [ ":export_symbols" ]
+    }
     if (is_fuchsia) {
       # TODO(https://fxbug.dev/60545): profile instrumentation significantly affects performance.
       configs += [ "//build/config:no_profile" ]
@@ -99,9 +104,17 @@ foreach(lib_type, lib_types) {
     sources = ssl_sources
     public = ssl_headers
     public_configs = [ ":boringssl_config" ]
-    configs += [ ":internal_config" ]
+    configs += [
+      ":internal_config",
+      ":export_symbols",
+    ]
+    # For this and the crypto lib, do not export symbols if building a binary for the host if
+    # building a static library. This prevents potential name conflicts if this is statically
+    # included in a .so and the .so is then used via dlopen.
+    if (is_linux && lib_type == "static") {
+      configs -= [ ":export_symbols" ]
+    }
     deps = [ ":crypto-${lib_type}" ]
-
     if (is_fuchsia) {
       # boringssl should always be optimized for speed because otherwise performance is significantly
       # worse, impacting pave and boot times on debug builds (fxb/55456)
@@ -170,7 +183,10 @@ if (!is_kernel) {
   executable("bssl") {
     visibility = [ ":*" ]
     sources = tool_sources
-    configs += [ "//third_party/boringssl:internal_config" ]
+    configs += [
+      ":internal_config",
+      ":export_symbols",
+    ]
     deps = [
       ":crypto",
       ":ssl",
@@ -349,11 +365,14 @@ config("boringssl_config") {
   }
 }
 
+config("export_symbols") {
+  defines = [ "BORINGSSL_IMPLEMENTATION" ]
+}
+
 config("internal_config") {
   visibility = [ ":*" ]
   defines = [
     "BORINGSSL_ALLOW_CXX_RUNTIME",
-    "BORINGSSL_IMPLEMENTATION",
     "BORINGSSL_NO_STATIC_INITIALIZER",
     "BORINGSSL_SHARED_LIBRARY",
     "OPENSSL_SMALL",
@@ -377,7 +396,10 @@ config("test_config") {
     "src/crypto/test",
     "src/ssl/test",
   ]
-  configs = [ ":internal_config" ]
+  configs = [
+    ":internal_config",
+    ":export_symbols",
+  ]
 }
 
 config("fuzz_config") {
@@ -386,5 +408,8 @@ config("fuzz_config") {
   # BoringSSL explicitly decided against using the common LLVM fuzzing macro:
   # https://boringssl-review.googlesource.com/c/boringssl/+/31244
   defines = [ "BORINGSSL_UNSAFE_DETERMINISTIC_MODE" ]
-  configs = [ ":internal_config" ]
+  configs = [
+    ":internal_config",
+    ":export_symbols",
+  ]
 }
