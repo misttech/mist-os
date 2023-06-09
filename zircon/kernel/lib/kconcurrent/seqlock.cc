@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 
 #include <lib/arch/intrin.h>
+#include <lib/concurrent/seqlock.inc.h>
 #include <platform.h>
-
-#include <lib/concurrent/seqlock.inc>
 
 namespace internal {
 

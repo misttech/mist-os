@@ -9,7 +9,7 @@ library_headers("headers") {
     "lib/concurrent/common.h",
     "lib/concurrent/copy.h",
     "lib/concurrent/seqlock.h",
-    "lib/concurrent/seqlock.inc",
+    "lib/concurrent/seqlock.inc.h",
   ]
 }
 

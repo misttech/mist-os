@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#pragma once
+#ifndef LIB_CONCURRENT_SEQLOCK_INC_H_
+#define LIB_CONCURRENT_SEQLOCK_INC_H_
 
 #include <lib/concurrent/seqlock.h>
 
@@ -10,7 +11,8 @@ namespace concurrent {
 namespace internal {
 
 template <typename Osal, SyncOpt kSyncOpt>
-typename SeqLock<Osal, kSyncOpt>::ReadTransactionToken SeqLock<Osal, kSyncOpt>::BeginReadTransaction() {
+typename SeqLock<Osal, kSyncOpt>::ReadTransactionToken
+SeqLock<Osal, kSyncOpt>::BeginReadTransaction() {
   SequenceNumber seq_num;
 
   while (((seq_num = seq_num_.load(std::memory_order_acquire)) & 0x1) != 0) {
@@ -22,13 +24,13 @@ typename SeqLock<Osal, kSyncOpt>::ReadTransactionToken SeqLock<Osal, kSyncOpt>::
 
 template <typename Osal, SyncOpt kSyncOpt>
 bool SeqLock<Osal, kSyncOpt>::TryBeginReadTransaction(ReadTransactionToken& out_token,
-                                            zx_duration_t timeout) {
+                                                      zx_duration_t timeout) {
   return TryBeginReadTransactionDeadline(out_token, Osal::GetClockMonotonic() + timeout);
 }
 
 template <typename Osal, SyncOpt kSyncOpt>
 bool SeqLock<Osal, kSyncOpt>::TryBeginReadTransactionDeadline(ReadTransactionToken& out_token,
-                                                    zx_time_t deadline) {
+                                                              zx_time_t deadline) {
   while (((out_token.seq_num_ = seq_num_.load(std::memory_order_acquire)) & 0x1) != 0) {
     if (Osal::GetClockMonotonic() >= deadline) {
       return false;
@@ -66,8 +68,7 @@ void SeqLock<Osal, kSyncOpt>::Acquire() {
 
     // Attempt to increment the even number we observed to be an odd number,
     // with Acquire semantics on the RMW if we succeed.
-    if (seq_num_.compare_exchange_strong(expected, expected + 1,
-                                         std::memory_order_acquire,
+    if (seq_num_.compare_exchange_strong(expected, expected + 1, std::memory_order_acquire,
                                          std::memory_order_relaxed)) {
       // If we are using fence-to-fence synchronization, this is the place we
       // need to put our release fence.
@@ -100,8 +101,7 @@ bool SeqLock<Osal, kSyncOpt>::TryAcquireDeadline(zx_time_t deadline) {
 
     // Attempt to increment the even number we observed to be an odd number,
     // with Acquire semantics on the RMW if we succeed.
-    if (seq_num_.compare_exchange_strong(expected, expected + 1,
-                                         std::memory_order_acquire,
+    if (seq_num_.compare_exchange_strong(expected, expected + 1, std::memory_order_acquire,
                                          std::memory_order_relaxed)) {
       // If we are using fence-to-fence synchronization, this is the place we
       // need to put our release fence.
@@ -129,3 +129,5 @@ void SeqLock<Osal, kSyncOpt>::Release() {
 
 }  // namespace internal
 }  // namespace concurrent
+
+#endif  // LIB_CONCURRENT_SEQLOCK_INC_H_

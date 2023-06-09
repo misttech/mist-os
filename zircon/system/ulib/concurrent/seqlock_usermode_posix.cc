@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 
 #include <assert.h>
+#include <lib/concurrent/seqlock.inc.h>
 #include <time.h>
-
-#include <lib/concurrent/seqlock.inc>
 
 namespace concurrent {
 namespace internal {
