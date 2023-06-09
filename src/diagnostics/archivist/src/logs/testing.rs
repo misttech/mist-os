@@ -5,7 +5,7 @@
 use crate::{
     events::types::{Event, EventPayload, LogSinkRequestedPayload},
     identity::ComponentIdentity,
-    logs::{repository::LogsRepository, servers::LogServer},
+    logs::{repository::LogsRepository, serial::SerialConfig, servers::LogServer},
 };
 use async_trait::async_trait;
 use diagnostics_log_encoding::{encode::Encoder, Record};
@@ -82,7 +82,8 @@ impl TestHarness {
 
     async fn make(hold_sinks: bool) -> Self {
         let inspector = Inspector::default();
-        let log_manager = LogsRepository::new(1_000_000, inspector.root()).await;
+        let log_manager =
+            LogsRepository::new(1_000_000, SerialConfig::default(), inspector.root()).await;
         let log_server = LogServer::new(Arc::clone(&log_manager));
 
         let (log_proxy, log_stream) =
@@ -407,7 +408,7 @@ pub async fn debuglog_test(
     debug_log: TestDebugLog,
 ) -> Inspector {
     let inspector = Inspector::default();
-    let lm = LogsRepository::new(1_000_000, inspector.root()).await;
+    let lm = LogsRepository::new(1_000_000, SerialConfig::default(), inspector.root()).await;
     let log_server = LogServer::new(Arc::clone(&lm));
     let (log_proxy, log_stream) = fidl::endpoints::create_proxy_and_stream::<LogMarker>().unwrap();
     log_server.spawn(log_stream);

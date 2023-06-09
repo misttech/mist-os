@@ -46,6 +46,27 @@
                 max_size: 256,
             },
         },
+
+        // Selectors for the components whose logs will be forwarded to serial.
+        allow_serial_logs: {
+            type: "vector",
+            max_count: 512,
+            element: {
+                type: "string",
+                max_size: 50,
+            },
+        },
+
+        // Instructs the archivist to not send logs containing any of these tags to serial even if
+        // the component emitting these logs was configured to have its logs sent to serial.
+        deny_serial_log_tags: {
+            type: "vector",
+            max_count: 512,
+            element: {
+                type: "string",
+                max_size: 50,
+            },
+        },
     },
 }
 

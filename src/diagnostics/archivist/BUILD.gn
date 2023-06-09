@@ -124,6 +124,7 @@ rustc_library("lib") {
     "src/logs/mod.rs",
     "src/logs/multiplex.rs",
     "src/logs/repository.rs",
+    "src/logs/serial.rs",
     "src/logs/servers/log.rs",
     "src/logs/servers/log_settings.rs",
     "src/logs/servers/mod.rs",

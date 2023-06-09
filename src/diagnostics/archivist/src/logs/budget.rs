@@ -172,6 +172,7 @@ mod tests {
                 std::iter::empty(),
                 fuchsia_inspect::component::inspector().root(),
                 manager.handle(),
+                None,
             )
             .await,
         );
@@ -181,6 +182,7 @@ mod tests {
                 std::iter::empty(),
                 fuchsia_inspect::component::inspector().root(),
                 manager.handle(),
+                None,
             )
             .await,
         );

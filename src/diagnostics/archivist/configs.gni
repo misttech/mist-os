@@ -23,6 +23,8 @@ default_config = {
   maximum_concurrent_snapshots_per_reader = 4
   num_threads = 4
   pipelines_path = "/config/data"
+  allow_serial_logs = []
+  deny_serial_log_tags = []
 }
 
 # LINT.ThenChange(/src/lib/assembly/platform_configuration/src/subsystems/diagnostics.rs)

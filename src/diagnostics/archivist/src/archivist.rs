@@ -12,7 +12,7 @@ use crate::{
         types::*,
     },
     inspect::{repository::InspectRepository, servers::*},
-    logs::{repository::LogsRepository, servers::*, KernelDebugLog},
+    logs::{repository::LogsRepository, serial::SerialConfig, servers::*, KernelDebugLog},
     pipeline::Pipeline,
 };
 use archivist_config::Config;
@@ -79,12 +79,19 @@ impl Archivist {
     /// Creates new instance, sets up inspect and adds 'archive' directory to output folder.
     /// Also installs `fuchsia.diagnostics.Archive` service.
     /// Call `install_log_services`
-    pub async fn new(config: &Config) -> Self {
+    pub async fn new(config: Config) -> Self {
         // Initialize the pipelines that the archivist will expose.
-        let pipelines = Self::init_pipelines(config);
+        let pipelines = Self::init_pipelines(&config);
+
+        // Initialize the core event router
+        let mut event_router =
+            EventRouter::new(component::inspector().root().create_child("events"));
+        let incoming_external_event_producers =
+            Self::initialize_external_event_sources(&mut event_router, &config).await;
 
         let logs_repo = LogsRepository::new(
             config.logs_max_cached_original_bytes,
+            SerialConfig::new(config.allow_serial_logs, config.deny_serial_log_tags),
             component::inspector().root(),
         )
         .await;
@@ -103,12 +110,8 @@ impl Archivist {
         let log_server = Arc::new(LogServer::new(Arc::clone(&logs_repo)));
         let log_settings_server = Arc::new(LogSettingsServer::new(Arc::clone(&logs_repo)));
 
-        // Initialize the core event router and the external event providers containing incoming
-        // diagnostics directories and log sink connections.
-        let mut event_router =
-            EventRouter::new(component::inspector().root().create_child("events"));
-        let incoming_external_event_producers =
-            Self::initialize_external_event_sources(&mut event_router, config).await;
+        // Initialize the external event providers containing incoming diagnostics directories and
+        // log sink connections.
         event_router.add_consumer(ConsumerConfig {
             consumer: &logs_repo,
             events: vec![EventType::LogSinkRequested],
@@ -443,9 +446,11 @@ mod tests {
             num_threads: 1,
             pipelines_path: DEFAULT_PIPELINES_PATH.into(),
             bind_services: vec![],
+            allow_serial_logs: vec![],
+            deny_serial_log_tags: vec![],
         };
 
-        let mut archivist = Archivist::new(&config).await;
+        let mut archivist = Archivist::new(config).await;
 
         // Install a couple of iunattributed sources for the purposes of the test.
         let mut source = UnattributedSource::<LogSinkMarker>::default();

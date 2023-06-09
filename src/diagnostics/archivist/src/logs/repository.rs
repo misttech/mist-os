@@ -13,6 +13,7 @@ use crate::{
         container::LogsArtifactsContainer,
         debuglog::{DebugLog, DebugLogBridge, KERNEL_IDENTITY},
         multiplex::{Multiplexer, MultiplexerHandle},
+        serial::SerialConfig,
     },
     trie,
 };
@@ -53,13 +54,19 @@ pub struct LogsRepository {
 impl LogsRepository {
     pub async fn new(
         logs_max_cached_original_bytes: u64,
+        serial_config: SerialConfig,
         parent: &fuchsia_inspect::Node,
     ) -> Arc<Self> {
         let (remover_snd, remover_rcv) = mpsc::unbounded();
         let logs_budget = BudgetManager::new(logs_max_cached_original_bytes as usize, remover_snd);
         let (log_sender, log_receiver) = mpsc::unbounded();
         let this = Arc::new(LogsRepository {
-            mutable_state: RwLock::new(LogsRepositoryState::new(logs_budget, log_receiver, parent)),
+            mutable_state: RwLock::new(LogsRepositoryState::new(
+                logs_budget,
+                log_receiver,
+                serial_config,
+                parent,
+            )),
             log_sender: Arc::new(RwLock::new(log_sender)),
             component_removal_task: Mutex::new(None),
         });
@@ -205,6 +212,7 @@ impl LogsRepository {
     pub(crate) async fn default() -> Arc<Self> {
         LogsRepository::new(
             crate::constants::LEGACY_DEFAULT_MAXIMUM_CACHED_LOGS_BYTES,
+            SerialConfig::default(),
             &Default::default(),
         )
         .await
@@ -249,12 +257,16 @@ pub struct LogsRepositoryState {
 
     /// The task draining klog and routing to syslog.
     drain_klog_task: Option<fasync::Task<()>>,
+
+    /// The serial configuration to be used.
+    serial_config: SerialConfig,
 }
 
 impl LogsRepositoryState {
     fn new(
         logs_budget: BudgetManager,
         log_receiver: mpsc::UnboundedReceiver<fasync::Task<()>>,
+        serial_config: SerialConfig,
         parent: &fuchsia_inspect::Node,
     ) -> Self {
         Self {
@@ -265,6 +277,7 @@ impl LogsRepositoryState {
             logs_multiplexers: MultiplexerBroker::new(),
             interest_registrations: BTreeMap::new(),
             drain_klog_task: None,
+            serial_config,
         }
     }
 
@@ -278,12 +291,14 @@ impl LogsRepositoryState {
 
         match self.logs_data_store.get(&trie_key) {
             None => {
+                let serial_config = self.serial_config.for_component(&identity);
                 let container = Arc::new(
                     LogsArtifactsContainer::new(
                         identity,
                         self.interest_registrations.values().flat_map(|s| s.iter()),
                         &self.inspect_node,
                         self.logs_budget.handle(),
+                        serial_config,
                     )
                     .await,
                 );

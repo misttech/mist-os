@@ -61,7 +61,10 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
                 maximum_concurrent_snapshots_per_reader,
             )?
             .field("num_threads", num_threads)?
-            .field("pipelines_path", "/config/data")?;
+            .field("pipelines_path", "/config/data")?
+            // TODO(fxbug.dev/100486): fill this when we are ready to switch.
+            .field("allow_serial_logs", Vec::<String>::new())?
+            .field("deny_serial_log_tags", Vec::<String>::new())?;
         // LINT.ThenChange(/src/diagnostics/archivist/configs.gni)
 
         let exception_handler_available =
@@ -129,6 +132,8 @@ mod tests {
             archivist_fields.get("pipelines_path"),
             Some(&Value::String("/config/data".to_string()))
         );
+        assert_eq!(archivist_fields.get("allow_serial_logs"), Some(&Value::Array(vec![])));
+        assert_eq!(archivist_fields.get("deny_serial_log_tags"), Some(&Value::Array(vec![])));
     }
 
     #[test]

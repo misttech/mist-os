@@ -47,7 +47,10 @@ async fn async_main(config: Config) -> Result<(), Error> {
         .root()
         .record_child("config", |config_node| config.record_inspect(config_node));
 
-    let mut archivist = Archivist::new(&config).await;
+    let router_options = RouterOptions {
+        validate: config.enable_event_source || config.enable_component_event_provider,
+    };
+    let mut archivist = Archivist::new(config).await;
     archivist.set_lifecycle_request_stream(component_lifecycle::take_lifecycle_request_stream());
     debug!("Archivist initialized from configuration.");
 
@@ -57,14 +60,7 @@ async fn async_main(config: Config) -> Result<(), Error> {
 
     let mut fs = ServiceFs::new();
     fs.serve_connection(fidl::endpoints::ServerEnd::new(zx::Channel::from(startup_handle)))?;
-    archivist
-        .run(
-            fs,
-            RouterOptions {
-                validate: config.enable_event_source || config.enable_component_event_provider,
-            },
-        )
-        .await?;
+    archivist.run(fs, router_options).await?;
 
     Ok(())
 }
