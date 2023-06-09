@@ -850,10 +850,10 @@ void Controller::DisplayControllerImplSetDisplayControllerInterface(
   fbl::AutoLock lock(&display_lock_);
   dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
 
-  if (ready_for_callback_ && display_devices_.size()) {
-    uint32_t size = static_cast<uint32_t>(display_devices_.size());
-    DisplayDevice* added_displays[size + 1];
-    for (unsigned i = 0; i < size; i++) {
+  if (ready_for_callback_ && !display_devices_.is_empty()) {
+    const size_t size = display_devices_.size();
+    DisplayDevice* added_displays[size];
+    for (size_t i = 0; i < size; i++) {
       added_displays[i] = display_devices_[i].get();
     }
     cpp20::span<DisplayDevice*> added(added_displays, size);
@@ -1601,8 +1601,9 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
     return CONFIG_CHECK_RESULT_OK;
   }
 
-  display::DisplayId pipe_alloc[PipeIds<registers::Platform::kKabyLake>().size()];
-  if (!CalculatePipeAllocation(banjo_display_configs_span, pipe_alloc)) {
+  std::array<display::DisplayId, PipeIds<registers::Platform::kKabyLake>().size()>
+      display_allocated_to_pipe;
+  if (!CalculatePipeAllocation(banjo_display_configs_span, display_allocated_to_pipe)) {
     return CONFIG_CHECK_RESULT_TOO_MANY;
   }
 
@@ -1698,7 +1699,7 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
             // Verify that there are enough scaler resources
             // Verify that the scaler input isn't too large or too small
             // Verify that the required scaling ratio isn't too large
-            bool using_c = pipe_alloc[PipeId::PIPE_C] == display->id();
+            bool using_c = display_allocated_to_pipe[PipeId::PIPE_C] == display->id();
             if ((total_scalers_needed + scalers_needed) >
                     (using_c ? registers::PipeScalerControlSkylake::kPipeCScalersAvailable
                              : registers::PipeScalerControlSkylake::kPipeABScalersAvailable) ||
@@ -1787,17 +1788,20 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
 
 bool Controller::CalculatePipeAllocation(
     cpp20::span<const display_config_t*> banjo_display_configs,
-    display::DisplayId alloc[PipeIds<registers::Platform::kKabyLake>().size()]) {
-  if (banjo_display_configs.size() > PipeIds<registers::Platform::kKabyLake>().size()) {
+    cpp20::span<display::DisplayId> display_allocated_to_pipe) {
+  ZX_DEBUG_ASSERT(display_allocated_to_pipe.size() ==
+                  PipeIds<registers::Platform::kKabyLake>().size());
+  if (banjo_display_configs.size() > display_allocated_to_pipe.size()) {
     return false;
   }
-  memset(alloc, 0, sizeof(display::DisplayId) * PipeIds<registers::Platform::kKabyLake>().size());
+  std::fill(display_allocated_to_pipe.begin(), display_allocated_to_pipe.end(),
+            display::kInvalidDisplayId);
   // Keep any allocated pipes on the same display
   for (const display_config_t* banjo_display_config : banjo_display_configs) {
     display::DisplayId display_id = display::ToDisplayId(banjo_display_config->display_id);
     DisplayDevice* display = FindDevice(display_id);
     if (display != nullptr && display->pipe() != nullptr) {
-      alloc[display->pipe()->pipe_id()] = display_id;
+      display_allocated_to_pipe[display->pipe()->pipe_id()] = display_id;
     }
   }
   // Give unallocated pipes to displays that need them
@@ -1805,10 +1809,9 @@ bool Controller::CalculatePipeAllocation(
     display::DisplayId display_id = display::ToDisplayId(banjo_display_config->display_id);
     DisplayDevice* display = FindDevice(display_id);
     if (display != nullptr && display->pipe() == nullptr) {
-      for (unsigned pipe_num = 0; pipe_num < PipeIds<registers::Platform::kKabyLake>().size();
-           pipe_num++) {
-        if (!alloc[pipe_num]) {
-          alloc[pipe_num] = display_id;
+      for (unsigned pipe_num = 0; pipe_num < display_allocated_to_pipe.size(); pipe_num++) {
+        if (!display_allocated_to_pipe[pipe_num]) {
+          display_allocated_to_pipe[pipe_num] = display_id;
           break;
         }
       }
@@ -2154,10 +2157,10 @@ void Controller::DdkInit(ddk::InitTxn txn) {
 
   {
     fbl::AutoLock lock(&display_lock_);
-    uint32_t size = static_cast<uint32_t>(display_devices_.size());
-    if (size && dc_intf_.is_valid()) {
-      DisplayDevice* added_displays[size + 1];
-      for (unsigned i = 0; i < size; i++) {
+    if ((!display_devices_.is_empty()) && dc_intf_.is_valid()) {
+      const size_t size = display_devices_.size();
+      DisplayDevice* added_displays[size];
+      for (size_t i = 0; i < size; i++) {
         added_displays[i] = display_devices_[i].get();
       }
       cpp20::span<DisplayDevice*> added(added_displays, size);

@@ -84,7 +84,7 @@ TEST_F(PipeManagerTest, SkylakeAllocatePipe) {
   PipeManager* pm = controller_.pipe_manager();
 
   // Allocate pipe for DP display.
-  display::DisplayId kDisplay1Id{1u};
+  display::DisplayId kDisplay1Id(1);
   std::unique_ptr<DisplayDevice> display1 = std::make_unique<FakeDisplay>(
       controller(), kDisplay1Id, DdiId::DDI_B, DisplayDevice::Type::kDp);
   Pipe* pipe1 = pm->RequestPipe(*display1);
@@ -98,7 +98,7 @@ TEST_F(PipeManagerTest, SkylakeAllocatePipe) {
   // Allocate pipe for eDP display.
   controller()->igd_opregion_for_testing()->SetIsEdpForTesting(DdiId::DDI_A, true);
 
-  display::DisplayId kDisplay2Id{2u};
+  display::DisplayId kDisplay2Id(2);
   std::unique_ptr<DisplayDevice> display2 = std::make_unique<FakeDisplay>(
       controller(), kDisplay2Id, DdiId::DDI_A, DisplayDevice::Type::kEdp);
   Pipe* pipe2 = pm->RequestPipe(*display2);

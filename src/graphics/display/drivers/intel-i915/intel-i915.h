@@ -260,9 +260,8 @@ class Controller : public DeviceType,
   bool CheckDisplayLimits(cpp20::span<const display_config_t*> banjo_display_configs,
                           uint32_t** layer_cfg_results) __TA_REQUIRES(display_lock_);
 
-  bool CalculatePipeAllocation(
-      cpp20::span<const display_config_t*> banjo_display_configs,
-      display::DisplayId alloc[PipeIds<registers::Platform::kKabyLake>().size()])
+  bool CalculatePipeAllocation(cpp20::span<const display_config_t*> banjo_display_configs,
+                               cpp20::span<display::DisplayId> display_allocated_to_pipe)
       __TA_REQUIRES(display_lock_);
 
   // The number of DBUF (Data Buffer) blocks that can be allocated to planes.
