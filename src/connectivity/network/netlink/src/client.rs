@@ -6,6 +6,7 @@
 
 use std::{
     fmt::{Display, Formatter},
+    num::NonZeroU32,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, Mutex,
@@ -36,12 +37,14 @@ struct InnerClient<F: ProtocolFamily> {
     id: ClientId,
     /// The client's current multicast group memberships.
     group_memberships: Mutex<MulticastGroupMemberships<F>>,
+    /// The client's assigned port number.
+    port_number: Mutex<Option<NonZeroU32>>,
 }
 
 impl<F: ProtocolFamily> Display for InnerClient<F> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let InnerClient { id: ClientId(id), group_memberships: _ } = self;
-        write!(f, "Client[{}, {}]", id, F::NAME)
+        let InnerClient { id: ClientId(id), group_memberships: _, port_number } = self;
+        write!(f, "Client[{}/{:?}, {}]", id, *port_number.lock().unwrap(), F::NAME)
     }
 }
 
@@ -70,7 +73,10 @@ impl<F: ProtocolFamily, S: Sender<F::InnerMessage>> InternalClient<F, S> {
     }
 
     /// Sends the given message to the external half of this client.
-    pub(crate) fn send(&mut self, message: NetlinkMessage<F::InnerMessage>) {
+    pub(crate) fn send(&mut self, mut message: NetlinkMessage<F::InnerMessage>) {
+        if let Some(port_number) = *self.inner.port_number.lock().unwrap() {
+            message.header.port_number = port_number.into();
+        }
         self.sender.send(message)
     }
 }
@@ -90,6 +96,10 @@ impl<F: ProtocolFamily> Display for ExternalClient<F> {
 }
 
 impl<F: ProtocolFamily> ExternalClient<F> {
+    pub(crate) fn set_port_number(&self, v: NonZeroU32) {
+        *self.inner.port_number.lock().unwrap() = Some(v);
+    }
+
     /// Adds the given multicast group membership.
     pub(crate) fn add_membership(&self, group: ModernGroup) -> Result<(), InvalidModernGroupError> {
         let res = self.inner.group_memberships.lock().unwrap().add_membership(group);
@@ -145,6 +155,7 @@ pub(crate) fn new_client_pair<F: ProtocolFamily, S: Sender<F::InnerMessage>>(
     let inner = Arc::new(InnerClient {
         id,
         group_memberships: Mutex::new(MulticastGroupMemberships::new()),
+        port_number: Mutex::default(),
     });
     (ExternalClient { inner: inner.clone() }, InternalClient { inner, sender: sender })
 }
@@ -235,8 +246,11 @@ mod tests {
 
     use std::collections::HashSet;
 
+    use assert_matches::assert_matches;
+    use test_case::test_case;
+
     use crate::{
-        messaging::testutil::FakeSender,
+        messaging::testutil::{fake_sender_with_sink, FakeSender},
         protocol_family::testutil::{
             new_fake_netlink_message, FakeProtocolFamily, MODERN_GROUP1, MODERN_GROUP2,
         },
@@ -315,5 +329,28 @@ mod tests {
             // indicating that the generator returned a non-unique ID.
             assert!(ids.insert(generator.new_id()));
         }
+    }
+
+    #[test_case(0; "pid_0")]
+    #[test_case(1; "pid_1")]
+    fn test_set_port_number(port_number: u32) {
+        let (sender, mut sink) = fake_sender_with_sink();
+        let (external_client, mut internal_client) =
+            new_client_pair::<FakeProtocolFamily, _>(testutil::CLIENT_ID_1, sender);
+
+        if let Some(port_number) = NonZeroU32::new(port_number) {
+            external_client.set_port_number(port_number)
+        }
+
+        let message = new_fake_netlink_message();
+        assert_eq!(message.header.port_number, 0);
+        internal_client.send(message);
+
+        assert_matches!(
+            &sink.take_messages()[..],
+            [message] => {
+                assert_eq!(message.header.port_number, port_number);
+            }
+        )
     }
 }

@@ -54,6 +54,8 @@ pub mod route {
 
     use super::*;
 
+    use std::num::NonZeroU32;
+
     use futures::{
         channel::{mpsc, oneshot},
         sink::SinkExt as _,
@@ -317,6 +319,12 @@ pub mod route {
     pub struct NetlinkRouteClient(pub(crate) ExternalClient<NetlinkRoute>);
 
     impl NetlinkRouteClient {
+        /// Sets the PID assigned to the client.
+        pub fn set_pid(&self, pid: NonZeroU32) {
+            let NetlinkRouteClient(client) = self;
+            client.set_port_number(pid)
+        }
+
         /// Adds the given multicast group membership.
         pub fn add_membership(&self, group: ModernGroup) -> Result<(), InvalidModernGroupError> {
             let NetlinkRouteClient(client) = self;

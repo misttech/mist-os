@@ -4,7 +4,7 @@
 
 use super::*;
 
-use std::{marker::PhantomData, sync::Arc};
+use std::{marker::PhantomData, num::NonZeroU32, sync::Arc};
 
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use netlink::{
@@ -819,7 +819,17 @@ impl SocketOps for RouteNetlinkSocket {
             | SocketAddress::Vsock(_) => return error!(EINVAL),
             SocketAddress::Netlink(NetlinkAddress { pid: _, groups }) => groups,
         };
-        inner.lock().bind(current_task, socket_address)?;
+        let pid = {
+            let mut inner = inner.lock();
+            inner.bind(current_task, socket_address)?;
+            inner
+                .address
+                .as_ref()
+                .and_then(|NetlinkAddress { pid, groups: _ }| NonZeroU32::new(*pid))
+        };
+        if let Some(pid) = pid {
+            client.set_pid(pid);
+        }
         match client.set_legacy_memberships(LegacyGroups(multicast_groups)) {
             Err(InvalidLegacyGroupsError {}) => error!(EPERM),
             Ok(()) => Ok(()),
