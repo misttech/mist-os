@@ -255,6 +255,7 @@ class PageQueues {
   struct Counts {
     ktl::array<size_t, kNumReclaim> reclaim = {0};
     size_t reclaim_dont_need = 0;
+    size_t pager_backed_dirty = 0;
     size_t anonymous = 0;
     size_t wired = 0;
     size_t anonymous_zero_fork = 0;
@@ -263,8 +264,8 @@ class PageQueues {
 
     bool operator==(const Counts& other) const {
       return reclaim == other.reclaim && reclaim_dont_need == other.reclaim_dont_need &&
-             anonymous == other.anonymous && wired == other.wired &&
-             anonymous_zero_fork == other.anonymous_zero_fork &&
+             pager_backed_dirty == other.pager_backed_dirty && anonymous == other.anonymous &&
+             wired == other.wired && anonymous_zero_fork == other.anonymous_zero_fork &&
              failed_reclaim == other.failed_reclaim && high_priority == other.high_priority;
     }
     bool operator!=(const Counts& other) const { return !(*this == other); }

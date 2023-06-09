@@ -3402,6 +3402,7 @@ static bool vmo_dirty_pages_test() {
   ASSERT_OK(vmo->DirtyPages(0, PAGE_SIZE));
   EXPECT_FALSE(pmm_page_queues()->DebugPageIsPagerBacked(page));
   EXPECT_TRUE(pmm_page_queues()->DebugPageIsPagerBackedDirty(page));
+  EXPECT_GT(pmm_page_queues()->QueueCounts().pager_backed_dirty, 0u);
 
   // Should not be able to evict a dirty page.
   ASSERT_FALSE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow,

@@ -411,6 +411,7 @@ void PageQueues::Dump() {
   size_t counts[kNumReclaim] = {};
   size_t inactive_count;
   size_t failed_reclaim;
+  size_t dirty;
   zx_time_t last_age_time;
   AgeReason last_age_reason;
   ActiveInactiveCounts activeinactive;
@@ -420,6 +421,7 @@ void PageQueues::Dump() {
     lru_gen = lru_gen_.load(ktl::memory_order_relaxed);
     failed_reclaim = page_queue_counts_[PageQueueFailedReclaim].load(ktl::memory_order_relaxed);
     inactive_count = page_queue_counts_[PageQueueReclaimDontNeed].load(ktl::memory_order_relaxed);
+    dirty = page_queue_counts_[PageQueuePagerBackedDirty].load(ktl::memory_order_relaxed);
     for (uint32_t i = 0; i < kNumReclaim; i++) {
       counts[i] = page_queue_counts_[PageQueueReclaimBase + i].load(ktl::memory_order_relaxed);
     }
@@ -464,10 +466,10 @@ void PageQueues::Dump() {
          " set %ld.%lds ago due to \"%s\", LRU generation is %" PRIu64 "\n",
          mru_gen, age_time.tv_sec, age_time.tv_nsec, string_from_age_reason(last_age_reason),
          lru_gen);
-  printf(
-      "pq: Pager buckets %s evict first: %zu, %s active/inactive totals: %zu/%zu failed reclaim: %zu\n",
-      buf, inactive_count, activeinactive.cached ? "cached" : "live", activeinactive.active,
-      activeinactive.inactive, failed_reclaim);
+  printf("pq: Pager buckets %s evict first: %zu\n", buf, inactive_count);
+  printf("pq: %s active/inactive totals: %zu/%zu dirty: %zu failed reclaim: %zu\n",
+         activeinactive.cached ? "cached" : "live", activeinactive.active, activeinactive.inactive,
+         dirty, failed_reclaim);
 }
 
 // This runs the aging thread. Aging, unlike lru processing, scanning or eviction, requires very
@@ -1225,6 +1227,8 @@ PageQueues::Counts PageQueues::QueueCounts() const {
   }
   counts.reclaim_dont_need =
       page_queue_counts_[PageQueueReclaimDontNeed].load(ktl::memory_order_relaxed);
+  counts.pager_backed_dirty =
+      page_queue_counts_[PageQueuePagerBackedDirty].load(ktl::memory_order_relaxed);
   counts.anonymous = page_queue_counts_[PageQueueAnonymous].load(ktl::memory_order_relaxed);
   counts.wired = page_queue_counts_[PageQueueWired].load(ktl::memory_order_relaxed);
   counts.anonymous_zero_fork =
