@@ -1,0 +1,18 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+# Tests that we want to run in an FYI builder.
+# We do not want failures from these tests to break the tree.
+
+group("pye2e") {
+  testonly = true
+  public_deps = [
+    "//src/testing/end_to_end/examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
+    "//src/tests/end_to_end/snapshot:snapshot_test($host_toolchain)",
+  ]
+}
+
+group("pye2e_fyi") {
+  testonly = true
+  public_deps = [ ":pye2e" ]
+}
