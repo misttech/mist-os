@@ -1429,10 +1429,14 @@ zx_status_t iwl_mvm_up(struct iwl_mvm* mvm) {
   /* reset quota debouncing buffer - 0xff will yield invalid data */
   memset(&mvm->last_quota_cmd, 0xff, sizeof(mvm->last_quota_cmd));
 
-  ret = iwl_mvm_send_dqa_cmd(mvm);
-  if (ret != ZX_OK) {
-    IWL_ERR(mvm, "send DQA command failed: %s\n", zx_status_get_string(ret));
-    goto error;
+  // Enable the command queue in the firmware. See DQA (Dynamic Queue Allocation) command
+  // in mvm/sta.h for the full description.
+  if (fw_has_capa(&mvm->fw->ucode_capa, IWL_UCODE_TLV_CAPA_DQA_SUPPORT)) {
+    ret = iwl_mvm_send_dqa_cmd(mvm);
+    if (ret != ZX_OK) {
+      IWL_ERR(mvm, "send DQA command failed: %s\n", zx_status_get_string(ret));
+      goto error;
+    }
   }
 
   /* Add auxiliary station for scanning */
