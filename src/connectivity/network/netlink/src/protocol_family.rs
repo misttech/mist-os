@@ -173,6 +173,7 @@ pub mod route {
                                 interfaces::GetLinkArgs::Dump,
                             ),
                         ),
+                        sequence_number: req_header.sequence_number,
                         client: client.clone(),
                         completer,
                     }).await.expect("interface event loop should never terminate");
@@ -180,7 +181,7 @@ pub mod route {
                         .await
                         .expect("interfaces event loop should have handled the request")
                         .expect("link dump requests are infallible");
-                    client.send(new_done())
+                    client.send(new_done(req_header))
                 }
                 GetAddress(ref message) if is_dump => {
                     let ip_version_filter = match message.header.family.into() {
@@ -203,6 +204,7 @@ pub mod route {
                                 },
                             ),
                         ),
+                        sequence_number: req_header.sequence_number,
                         client: client.clone(),
                         completer,
                     }).await.expect("interface event loop should never terminate");
@@ -210,7 +212,7 @@ pub mod route {
                         .await
                         .expect("interfaces event loop should have handled the request")
                         .expect("addr dump requests are infallible");
-                    client.send(new_done())
+                    client.send(new_done(req_header))
                 }
                 NewLink(_)
                 | DelLink(_)
@@ -283,7 +285,7 @@ pub mod route {
                             "Received unsupported NETLINK_ROUTE DUMP request; responding with Done: {:?}",
                             req
                         );
-                        client.send(new_done())
+                        client.send(new_done(req_header))
                     } else if is_ack {
                         warn!(
                             "Received unsupported NETLINK_ROUTE GET request: responding with Ack {:?}",
@@ -424,7 +426,9 @@ mod test {
         client::ClientTable,
         interfaces,
         messaging::testutil::FakeSender,
-        netlink_packet::{new_ack, new_done, AckErrorCode, NackErrorCode},
+        netlink_packet::{
+            new_ack, new_done, AckErrorCode, NackErrorCode, UNSPECIFIED_SEQUENCE_NUMBER,
+        },
         protocol_family::route::{NetlinkRoute, NetlinkRouteRequestHandler},
     };
 
@@ -524,7 +528,7 @@ mod test {
                 assert_eq!(client_sink.take_messages(), [new_ack(code, header)])
             }
             Some(ExpectedResponse::Done) => {
-                assert_eq!(client_sink.take_messages(), [new_done()])
+                assert_eq!(client_sink.take_messages(), [new_done(header)])
             }
             None => {
                 assert_eq!(client_sink.take_messages(), [])
@@ -665,10 +669,10 @@ mod test {
             },
             messages
                 .into_iter()
-                .map(interfaces::NetlinkLinkMessage::into_rtnl_new_link)
+                .map(|l| l.into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER))
                 .chain(expected_response.map(|expected_response| match expected_response {
                     ExpectedResponse::Ack(code) => new_ack(code, header),
-                    ExpectedResponse::Done => new_done(),
+                    ExpectedResponse::Done => new_done(header),
                 }))
                 .collect::<Vec<_>>(),
         )
@@ -812,8 +816,10 @@ mod test {
             ))
             .await,
             {
-                let mut messages =
-                    messages.into_iter().map(|a| a.to_rtnl_new_addr()).collect::<Vec<_>>();
+                let mut messages = messages
+                    .into_iter()
+                    .map(|a| a.to_rtnl_new_addr(UNSPECIFIED_SEQUENCE_NUMBER))
+                    .collect::<Vec<_>>();
                 messages.sort_by_key(|message| {
                     assert_matches!(
                         &message.payload,
@@ -826,7 +832,7 @@ mod test {
                     .into_iter()
                     .chain(expected_response.map(|expected_response| match expected_response {
                         ExpectedResponse::Ack(code) => new_ack(code, header),
-                        ExpectedResponse::Done => new_done(),
+                        ExpectedResponse::Done => new_done(header),
                     }))
                     .collect::<Vec<_>>()
             },

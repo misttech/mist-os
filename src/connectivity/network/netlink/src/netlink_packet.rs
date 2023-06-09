@@ -10,6 +10,8 @@ use netlink_packet_core::{
 };
 use netlink_packet_utils::{Emitable as _, Parseable as _};
 
+pub(crate) const UNSPECIFIED_SEQUENCE_NUMBER: u32 = 0;
+
 /// The error code used by `Ack` messages.
 const ACK_ERROR_CODE: i32 = 0;
 
@@ -97,20 +99,21 @@ pub(crate) fn new_ack<T: NetlinkSerializable>(
         req_header,
     ));
     // Note that the following header fields are unset as they don't appear to
-    // be used by any of our clients: `flags`, `sequence_number`, `port_number`.
-    let mut message = NetlinkMessage::new(NetlinkHeader::default(), payload);
+    // be used by any of our clients: `flags`.
+    let mut resp_header = NetlinkHeader::default();
+    resp_header.sequence_number = req_header.sequence_number;
+    let mut message = NetlinkMessage::new(resp_header, payload);
     // Sets the header `length` and `message_type` based on the payload.
     message.finalize();
     message
 }
 
-// Returns a `Done` message.
-pub(crate) fn new_done<T: NetlinkSerializable>() -> NetlinkMessage<T> {
+/// Returns a `Done` message.
+pub(crate) fn new_done<T: NetlinkSerializable>(req_header: NetlinkHeader) -> NetlinkMessage<T> {
     let payload = NetlinkPayload::<T>::Done;
     let mut resp_header = NetlinkHeader::default();
-    // Note that the following header fields are unset as they don't appear to
-    // be used by any of our clients: `sequence_number`, `port_number`.
-    resp_header.flags = NLM_F_MULTIPART;
+    resp_header.sequence_number = req_header.sequence_number;
+    resp_header.flags |= NLM_F_MULTIPART;
     let mut message = NetlinkMessage::new(resp_header, payload);
     // Sets the header `length` and `message_type` based on the payload.
     message.finalize();
@@ -160,21 +163,21 @@ mod tests {
         assert_eq!(NackErrorCode::new(code).map(IntoAckErrorCode::into_code), expected_code);
     }
 
-    #[test_case(AckErrorCode, 0; "ack_error_code")]
-    #[test_case(NackErrorCode::new(1).unwrap(), 1; "nack_error_code_1")]
-    #[test_case(NackErrorCode::new(i32::MAX).unwrap(), i32::MAX; "nack_error_code_max")]
-    #[test_case(NackErrorCode::new(i32::MIN).unwrap(), i32::MIN; "nack_error_code_min")]
-    #[test_case(TestAckCode(0), 0; "test_ack_code_0")]
-    #[test_case(TestAckCode(1), 1; "test_ack_code_1")]
-    #[test_case(TestAckCode(i32::MAX), i32::MAX; "test_ack_code_i32_max")]
-    #[test_case(TestAckCode(i32::MIN), i32::MIN; "test_ack_code_i32_min")]
-    fn test_new_ack(code: impl IntoAckErrorCode, expected_code: i32) {
+    #[test_case(0, AckErrorCode, 0; "ack_error_code")]
+    #[test_case(1, NackErrorCode::new(1).unwrap(), 1; "nack_error_code_1")]
+    #[test_case(2, NackErrorCode::new(i32::MAX).unwrap(), i32::MAX; "nack_error_code_max")]
+    #[test_case(3, NackErrorCode::new(i32::MIN).unwrap(), i32::MIN; "nack_error_code_min")]
+    #[test_case(4, TestAckCode(0), 0; "test_ack_code_0")]
+    #[test_case(5, TestAckCode(1), 1; "test_ack_code_1")]
+    #[test_case(6, TestAckCode(i32::MAX), i32::MAX; "test_ack_code_i32_max")]
+    #[test_case(7, TestAckCode(i32::MIN), i32::MIN; "test_ack_code_i32_min")]
+    fn test_new_ack(sequence_number: u32, code: impl IntoAckErrorCode, expected_code: i32) {
         // Header with arbitrary values
         let mut expected_header = NetlinkHeader::default();
         expected_header.length = 0x01234567;
         expected_header.message_type = 0x89AB;
         expected_header.flags = 0xCDEF;
-        expected_header.sequence_number = 0x55555555;
+        expected_header.sequence_number = sequence_number;
         expected_header.port_number = 0x00000000;
 
         let ack = new_ack::<RtnlMessage>(code, expected_header);
@@ -184,6 +187,7 @@ mod tests {
 
         let (header, payload) = ack.into_parts();
         assert_eq!(header.message_type, NLMSG_ERROR);
+        assert_eq!(header.sequence_number, sequence_number);
         assert_matches!(
             payload,
             NetlinkPayload::Ack(ErrorMessage{ code, header, .. }) => {
@@ -196,14 +200,19 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_new_done() {
-        let done = new_done::<RtnlMessage>();
+    #[test_case(0; "seq_0")]
+    #[test_case(1; "seq_1")]
+    fn test_new_done(sequence_number: u32) {
+        let mut req_header = NetlinkHeader::default();
+        req_header.sequence_number = sequence_number;
+
+        let done = new_done::<RtnlMessage>(req_header);
         // `serialize` will panic if the message is malformed.
         let mut buf = vec![0; done.buffer_len()];
         done.serialize(&mut buf);
 
         let (header, payload) = done.into_parts();
+        assert_eq!(header.sequence_number, sequence_number);
         assert_eq!(header.message_type, NLMSG_DONE);
         assert_eq!(header.flags, NLM_F_MULTIPART);
         assert_eq!(payload, NetlinkPayload::Done);
