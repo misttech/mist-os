@@ -14,6 +14,21 @@ config("ring-config") {
   if (current_cpu == "riscv64") {
     # TODO(fxbug.dev/127877): this shouldn't be needed
     cflags += [ "-Wno-option-ignored" ]
+
+    # The current version of ring being used does not support RISC-V.
+    # TODO(fxbug.dev/128647): Remove once ring has proper RISC-V support
+    cflags += [
+      # There are no assembly files. This may not be necessary but is accurate.
+      "-DOPENSSL_NO_ASM",
+
+      # Define an architecture that is supported to avoid "Unknown target CPU"
+      # and other compile errors.
+      "-D__aarch64__",
+
+      # The above causes this inaccurate symbol to be defined. This might not
+      # have any effect.
+      "-UOPENSSL_AARCH64",
+    ]
   }
 }
 
@@ -56,6 +71,10 @@ static_library("ring-core") {
       ":ring-mont5-elf",
       ":ring-p256",
     ]
+  }
+
+  if (current_cpu == "riscv64") {
+    deps += [ ":ring-core-asm-stubs" ]
   }
 }
 
@@ -326,4 +345,12 @@ static_library("ring-cpu-intel") {
   configs += [ ":ring-config" ]
 
   sources = [ "$ring_crate/crypto/cpu-intel.c" ]
+}
+
+static_library("ring-core-asm-stubs") {
+  visibility = [ ":*" ]
+  include_dirs = [ "$ring_crate/include" ]
+  configs += [ ":ring-config" ]
+
+  sources = [ "fipsmodule_stubs.c" ]
 }
