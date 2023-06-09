@@ -1,9 +1,8 @@
 # Heapdump memory profiler
 
 Memory profiling tool that can capture snapshots of live allocations at any
-point in time and export them in a pprof-compatible protobuf format.
-
-**Note**: Development of this tool is still work in progress.
+point in time and export them in a
+[pprof](https://github.com/google/pprof)-compatible protobuf format.
 
 ## How to use
 
@@ -24,12 +23,10 @@ point in time and export them in a pprof-compatible protobuf format.
 ffx profile heapdump snapshot --by-name example.cm --output-file my_snapshot.pb
 ```
 
-* Use [pprof](https://github.com/google/pprof) to analyze the memory profile you
-  acquired:
+* Use the `fx pprof` command to analyze the memory profile you acquired:
 
 ```
-export PPROF_BINARY_PATH=~/fuchsia/out/default/.build-id:~/fuchsia/prebuilt/third_party/clang/linux-x64/lib/debug/.build-id:~/fuchsia/prebuilt/third_party/rust/linux-x64/lib/debug/.build-id
-pprof -http=":" my_snapshot.pb
+fx pprof -http=":" my_snapshot.pb
 ```
 
 ## Quickstart: Running the example
@@ -43,8 +40,7 @@ ffx component run /core/ffx-laboratory:example fuchsia-pkg://fuchsia.com/heapdum
 
 # Take a live snapshot and process it with pprof.
 ffx profile heapdump snapshot --by-name heapdump-example.cm --output-file my_snapshot.pb
-export PPROF_BINARY_PATH=...  # see previous section
-pprof -http=":" my_snapshot.pb
+fx pprof -http=":" my_snapshot.pb
 ```
 
 ## Design
