@@ -746,8 +746,6 @@
                 "*readlink03*",
                 "*readlinkat02*",
                 "*readv02*",
-                "*reboot01*",
-                "*reboot02*",
                 "*recv01*",
                 "*recvfrom01*",
                 "*recvmsg01*",

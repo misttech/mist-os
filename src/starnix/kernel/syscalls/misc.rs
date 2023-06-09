@@ -152,8 +152,25 @@ pub fn sys_reboot(
     if !current_task.creds().has_capability(CAP_SYS_BOOT) {
         return error!(EPERM);
     }
-    // TODO(tbodt): only shut down the current Kernel rather than panicking the entire process
-    panic!("starnix reboot({cmd:#x})");
+
+    match cmd {
+        // CAD on/off commands turn Ctrl-Alt-Del keystroke on or off without halting the system.
+        LINUX_REBOOT_CMD_CAD_ON | LINUX_REBOOT_CMD_CAD_OFF => Ok(()),
+
+        // `kexec_load()` is not supported.
+        LINUX_REBOOT_CMD_KEXEC => error!(ENOSYS),
+
+        // Suspend is not implemented.
+        LINUX_REBOOT_CMD_SW_SUSPEND => error!(ENOSYS),
+
+        LINUX_REBOOT_CMD_HALT | LINUX_REBOOT_CMD_RESTART | LINUX_REBOOT_CMD_RESTART2 => {
+            // TODO(fxbug.dev/128397): only shut down the current Kernel rather than panicking
+            // the entire process.
+            panic!("starnix reboot({cmd:#x})")
+        }
+
+        _ => error!(EINVAL),
+    }
 }
 
 pub fn sys_sched_yield(_current_task: &CurrentTask) -> Result<(), Errno> {
