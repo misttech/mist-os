@@ -350,14 +350,25 @@ bool VersionSelection::Insert(Platform platform, Version version) {
   return inserted;
 }
 
+bool VersionSelection::Contains(const Platform& platform) const {
+  ZX_ASSERT_MSG(!platform.is_anonymous(), "anonymous platforms do not allow version selection");
+  return map_.count(platform) != 0;
+}
+
 Version VersionSelection::Lookup(const Platform& platform) const {
-  if (!platform.is_anonymous()) {
-    const auto iter = map_.find(platform);
-    if (iter != map_.end()) {
-      return iter->second;
-    }
+  if (platform.is_anonymous()) {
+    return Version::Head();
   }
-  return Version::Head();
+  const auto iter = map_.find(platform);
+  ZX_ASSERT_MSG(iter != map_.end(), "no version was inserted for platform '%s'",
+                platform.name().c_str());
+  return iter->second;
+}
+
+void VersionSelection::ForEach(const fit::function<void(const Platform&, Version)>& fn) const {
+  for (const auto& [platform, version] : map_) {
+    fn(platform, version);
+  }
 }
 
 }  // namespace fidl

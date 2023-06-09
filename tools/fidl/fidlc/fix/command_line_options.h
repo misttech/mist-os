@@ -17,6 +17,7 @@ struct CommandLineOptions {
   std::string fix;
   std::vector<std::string> deps;
   std::vector<std::string> experiments;
+  std::vector<std::string> available;
 };
 
 // Parses the given command line into options and params.

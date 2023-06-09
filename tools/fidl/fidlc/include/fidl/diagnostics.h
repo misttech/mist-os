@@ -450,6 +450,10 @@ constexpr ErrorDef<199> ErrOverlayMemberMustBeValue("overlays may not contain re
                                                     {.documented = false});
 constexpr ErrorDef<200> ErrOverlayMustNotContainReserved(
     "overlays may not contain reserved members", {.documented = false});
+constexpr ErrorDef<201, std::vector<std::string_view>, Platform, Platform>
+    ErrPlatformVersionNotSelected(
+        "library '{}' belongs to platform '{}', but no version was selected for it; "
+        "please choose a version N by passing `--available {}:N`");
 
 // To add a new error:
 //
@@ -658,6 +662,7 @@ static constexpr const DiagnosticDef *kAllDiagnosticDefs[] = {
     /* fi-0198 */ &ErrOverlayMustBeValue,
     /* fi-0199 */ &ErrOverlayMemberMustBeValue,
     /* fi-0200 */ &ErrOverlayMustNotContainReserved,
+    /* fi-0201 */ &ErrPlatformVersionNotSelected,
 };
 
 // In reporter.h we assert that reported error IDs are <= kNumDiagnosticDefs.

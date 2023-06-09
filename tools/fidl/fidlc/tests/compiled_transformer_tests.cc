@@ -13,6 +13,7 @@
 #include "tools/fidl/fidlc/include/fidl/reporter.h"
 #include "tools/fidl/fidlc/include/fidl/source_file.h"
 #include "tools/fidl/fidlc/include/fidl/transformer.h"
+#include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 #include "tools/fidl/fidlc/tests/error_test.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
@@ -28,6 +29,8 @@ void GoodTransform(const std::string& library, std::vector<std::string> deps,
                 "Only classes derived from |CompiledTransformer| may be used by |GoodTransform()|");
   Reporter reporter;
   ExperimentalFlags experimental_flags;
+  VersionSelection version_selection;
+  version_selection.Insert(Platform::Parse("example").value(), Version::Head());
   const SourceFile library_source_file = SourceFile("library.fidl", library);
   std::vector<SourceFile> dep_source_files;
   for (size_t i = 0; i < deps.size(); i++) {
@@ -40,7 +43,8 @@ void GoodTransform(const std::string& library, std::vector<std::string> deps,
     deps_input.push_back({&dep_source_file});
   }
 
-  auto transformer = T(library_input, deps_input, experimental_flags, &reporter);
+  auto transformer =
+      T(library_input, deps_input, &version_selection, experimental_flags, &reporter);
   bool prepared = transformer.Prepare();
   for (const auto& error : transformer.GetErrors()) {
     ADD_FAILURE("transformer failure: %s\n", error.msg.c_str());
@@ -81,16 +85,19 @@ void GoodTransform(const std::string& library, const std::string& expect) {
 class NoopStandaloneTransformer final : public CompiledTransformer {
  public:
   NoopStandaloneTransformer(const std::vector<const SourceFile*>& library_source_files,
-                            const ExperimentalFlags& experimental_flags, Reporter* reporter)
-      : CompiledTransformer(library_source_files, experimental_flags, reporter) {}
+                            const ExperimentalFlags& experimental_flags,
+                            const VersionSelection* version_selection, Reporter* reporter)
+      : CompiledTransformer(library_source_files, version_selection, experimental_flags, reporter) {
+  }
 };
 
 TEST(CompiledTransformerTests, BadStandaloneCompileFailure) {
   TestLibrary library;
   library.AddSource("bad.fidl", "library example; using missing;");
   ExperimentalFlags experimental_flags;
-  auto transformer =
-      NoopStandaloneTransformer(library.source_files(), experimental_flags, library.reporter());
+  VersionSelection version_selection;
+  auto transformer = NoopStandaloneTransformer(library.source_files(), experimental_flags,
+                                               &version_selection, library.reporter());
   EXPECT_FALSE(transformer.Prepare());
   EXPECT_TRUE(transformer.HasErrors());
 
@@ -108,9 +115,10 @@ class NoopWithDependencyTransformer final : public CompiledTransformer {
   NoopWithDependencyTransformer(
       const std::vector<const SourceFile*>& library_source_files,
       const std::vector<std::vector<const SourceFile*>>& dependencies_source_files,
-      const ExperimentalFlags& experimental_flags, Reporter* reporter)
-      : CompiledTransformer(library_source_files, dependencies_source_files, experimental_flags,
-                            reporter) {}
+      const VersionSelection* version_selection, const ExperimentalFlags& experimental_flags,
+      Reporter* reporter)
+      : CompiledTransformer(library_source_files, dependencies_source_files, version_selection,
+                            experimental_flags, reporter) {}
 };
 
 TEST(CompiledTransformerTests, BadDependencyCompileFailure) {
@@ -119,8 +127,10 @@ TEST(CompiledTransformerTests, BadDependencyCompileFailure) {
   TestLibrary dep(&shared, "dep.fidl", "library dependency; using missing;");
   TestLibrary target(&shared, "target.fidl", "library target; using dependency;");
   ExperimentalFlags experimental_flags;
-  auto transformer = NoopWithDependencyTransformer(target.source_files(), {dep.source_files()},
-                                                   experimental_flags, &reporter);
+  VersionSelection version_selection;
+  auto transformer =
+      NoopWithDependencyTransformer(target.source_files(), {dep.source_files()}, &version_selection,
+                                    experimental_flags, &reporter);
   EXPECT_FALSE(transformer.Prepare());
   EXPECT_TRUE(transformer.HasErrors());
 
@@ -148,9 +158,10 @@ class InliningValueTransformer final : public CompiledTransformer {
   InliningValueTransformer(
       const std::vector<const SourceFile*>& source_files,
       const std::vector<std::vector<const SourceFile*>>& dependencies_source_files,
-      const ExperimentalFlags& experimental_flags, Reporter* reporter)
-      : CompiledTransformer(source_files, dependencies_source_files, experimental_flags, reporter) {
-  }
+      const VersionSelection* version_selection, const ExperimentalFlags& experimental_flags,
+      Reporter* reporter)
+      : CompiledTransformer(source_files, dependencies_source_files, version_selection,
+                            experimental_flags, reporter) {}
 
  private:
   void WhenConstDeclaration(raw::ConstDeclaration* el, TokenSlice& token_slice,
@@ -347,9 +358,10 @@ class DirtyVersionedDeclTransformer final : public CompiledTransformer {
   DirtyVersionedDeclTransformer(
       const std::vector<const SourceFile*>& source_files,
       const std::vector<std::vector<const SourceFile*>>& dependencies_source_files,
-      const ExperimentalFlags& experimental_flags, Reporter* reporter)
-      : CompiledTransformer(source_files, dependencies_source_files, experimental_flags, reporter) {
-  }
+      const VersionSelection* version_selection, const ExperimentalFlags& experimental_flags,
+      Reporter* reporter)
+      : CompiledTransformer(source_files, dependencies_source_files, version_selection,
+                            experimental_flags, reporter) {}
 
  private:
   void WhenStructDeclaration(raw::Layout*, TokenSlice&, const VersionedEntry<flat::Struct>*) final {

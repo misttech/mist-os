@@ -16,6 +16,7 @@
 #include "tools/fidl/fidlc/include/fidl/parser.h"
 #include "tools/fidl/fidlc/include/fidl/reporter.h"
 #include "tools/fidl/fidlc/include/fidl/transformer.h"
+#include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 
 namespace fidl::fix {
 
@@ -101,7 +102,7 @@ TransformResult CompiledFix::Transform(Reporter* reporter) {
   }
 
   return Execute(GetCompiledTransformer(library_source_files, dependency_source_files,
-                                        experimental_flags_, reporter),
+                                        version_selection_, experimental_flags_, reporter),
                  library_source_files, reporter);
 };
 
@@ -215,8 +216,9 @@ class EmptyStructResponseTransformer final : public fix::CompiledTransformer {
   EmptyStructResponseTransformer(
       const std::vector<const SourceFile*> library_source_files,
       const std::vector<std::vector<const SourceFile*>>& dependencies_source_files,
-      const fidl::ExperimentalFlags& experimental_flags, Reporter* reporter)
-      : fix::CompiledTransformer(library_source_files, dependencies_source_files,
+      const fidl::ExperimentalFlags& experimental_flags,
+      const fidl::VersionSelection* version_selection, Reporter* reporter)
+      : fix::CompiledTransformer(library_source_files, dependencies_source_files, version_selection,
                                  experimental_flags, reporter) {}
 
  private:
@@ -308,9 +310,11 @@ class EmptyStructResponseTransformer final : public fix::CompiledTransformer {
 std::unique_ptr<CompiledTransformer> EmptyStructResponseFix::GetCompiledTransformer(
     const std::vector<const SourceFile*>& library_source_files,
     const std::vector<std::vector<const SourceFile*>>& dependencies_source_files,
+    const fidl::VersionSelection* version_selection,
     const fidl::ExperimentalFlags& experimental_flags, Reporter* reporter) {
   return std::make_unique<EmptyStructResponseTransformer>(
-      library_source_files, dependencies_source_files, experimental_flags_, reporter);
+      library_source_files, dependencies_source_files, experimental_flags, version_selection,
+      reporter);
 }
 
 }  // namespace fidl::fix

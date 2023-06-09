@@ -12,6 +12,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/experimental_flags.h"
 #include "tools/fidl/fidlc/include/fidl/source_manager.h"
+#include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 
 namespace fidl {
 
@@ -21,10 +22,12 @@ class ProgramInvocation {
  public:
   ProgramInvocation() = default;
   ProgramInvocation(std::string binary_path, const ExperimentalFlags experimental_flags,
+                    const VersionSelection* version_selection,
                     const std::vector<fidl::SourceManager>* source_managers)
       : populated_(true),
         binary_path_(std::move(binary_path)),
         experimental_flags_(experimental_flags),
+        version_selection_(version_selection),
         source_managers_(source_managers) {}
 
   ProgramInvocation(const ProgramInvocation&) = delete;
@@ -46,6 +49,23 @@ class ProgramInvocation {
             empty = false;
           }
         });
+    return out.str();
+  }
+
+  std::string VersionSelectionAsString(const std::string& prefix,
+                                       const std::string& seperator) const {
+    if (version_selection_ == nullptr) {
+      return "";
+    }
+    std::ostringstream out;
+    bool empty = true;
+    version_selection_->ForEach([&](const Platform& platform, Version version) {
+      if (!empty) {
+        out << seperator;
+      }
+      out << prefix << platform.name() << ":" << version.ToString();
+      empty = false;
+    });
     return out.str();
   }
 
@@ -95,6 +115,7 @@ class ProgramInvocation {
   const bool populated_ = false;
   const std::string binary_path_;
   const ExperimentalFlags experimental_flags_;
+  const VersionSelection* version_selection_ = nullptr;
 
   // Stores file path sets in the order that they are passed to fidlc. The last entry in this vector
   // is always the library being compiled, while the remaining entries are its ordered dependencies.

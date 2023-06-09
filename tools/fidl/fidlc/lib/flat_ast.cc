@@ -207,7 +207,7 @@ std::unique_ptr<Library> Library::CreateRootLibrary() {
   // compile it as well. That would require addressing circularity issues.
   auto library = std::make_unique<Library>();
   library->name = {"fidl"};
-  library->platform = Platform::Parse("fidl").value();
+  library->platform = Platform::Anonymous();
   library->availability.Init({.added = Version::Head()});
   library->availability.Inherit(Availability::Unbounded());
   auto insert = [&](const char* name, Builtin::Identity id) {

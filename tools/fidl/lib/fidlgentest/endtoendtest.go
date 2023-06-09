@@ -36,6 +36,7 @@ type EndToEndTest struct {
 	wd         string
 	deps       []string
 	experiment []string
+	available  []string
 }
 
 var fidlc = flag.String("fidlc", "", "Path to fidlc.")
@@ -43,6 +44,12 @@ var fidlc = flag.String("fidlc", "", "Path to fidlc.")
 // WithDependency adds the source text for a dependency.
 func (t EndToEndTest) WithDependency(content string) EndToEndTest {
 	t.deps = append(t.deps, content)
+	return t
+}
+
+// WithAvailable adds an --available flag to select a version for a platform.
+func (t EndToEndTest) WithAvailable(platform string, version string) EndToEndTest {
+	t.available = append(t.available, platform+":"+version)
 	return t
 }
 
@@ -98,6 +105,10 @@ func (t EndToEndTest) Multiple(contents []string) fidlgen.Root {
 			t.Fatal(err)
 		}
 		params = append(params, "--files", f.Name())
+	}
+
+	for _, a := range t.available {
+		params = append(params, "--available", a)
 	}
 
 	for _, e := range t.experiment {

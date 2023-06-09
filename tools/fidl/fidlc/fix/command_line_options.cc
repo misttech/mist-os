@@ -26,6 +26,10 @@ const char kExperiments[] = R"(  --experimental=<experiment-name>
       fixes require one or more such flags to be enabled. The flag may be
       passed multiple times:
         fidl-fix --fix=foo --experimental=a --experimental=b lib.fidl)";
+const char kAvailable[] = R"(  --available=<platform>:<version>
+   -a If present, this flag selects a version for a platform. The flag may be
+      passed multiple times:
+        fidl-fix --fix=foo --available=bar:1 --available=baz:2 lib.fidl)";
 const char kDep[] = R"(  --dep=<dep1[,depN...]>
    -d If present, each `--dep` options specifies a comma-separated list of
       files representing a single dependency library. Dependencies should be
@@ -59,6 +63,7 @@ cmdline::Status ParseCommandLine(int argc, const char* argv[], CommandLineOption
 
   parser.AddSwitch("fix", 'f', help::kFix, &CommandLineOptions::fix);
   parser.AddSwitch("experimental", 'e', help::kExperiments, &CommandLineOptions::experiments);
+  parser.AddSwitch("available", 'a', help::kAvailable, &CommandLineOptions::available);
   parser.AddSwitch("dep", 'd', help::kDep, &CommandLineOptions::deps);
 
   // Special --help switch which doesn't exist in the options structure.

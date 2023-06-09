@@ -398,7 +398,7 @@ TEST(AttributesTests, GoodNotTooCloseUnofficialAttribute) {
 // were other compilation errors.
 TEST(AttributesTests, WarnOnCloseAttributeWithOtherErrors) {
   TestLibrary library(R"FIDL(
-@available(added=1)
+@available(platform="foo", added=1)
 library fidl.test;
 
 @available(added=1, removed=2)
@@ -409,6 +409,7 @@ type Foo = struct {};
 type Foo = resource struct {};
 
 )FIDL");
+  library.SelectVersion("foo", "1");
   ASSERT_FALSE(library.Compile());
   ASSERT_EQ(library.errors().size(), 1);
   EXPECT_ERR(library.errors()[0], fidl::ErrNameOverlap);
@@ -959,6 +960,7 @@ TEST(AttributesTests, BadSingleSchemaArgumentIsNamed) {
 TEST(AttributesTests, BadSingleSchemaArgumentIsNotNamed) {
   TestLibrary library;
   library.AddFile("bad/fi-0126.test.fidl");
+  library.SelectVersion("test", "HEAD");
   // Here we are demonstrating ErrAttributeArgNotNamed. There is another error
   // because @available is the only attribute that takes multiple arguments, and
   // omitting the required "added" causes another error.

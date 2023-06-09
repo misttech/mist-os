@@ -12,6 +12,7 @@
 #include "tools/fidl/fidlc/include/fidl/reporter.h"
 #include "tools/fidl/fidlc/include/fidl/source_file.h"
 #include "tools/fidl/fidlc/include/fidl/source_manager.h"
+#include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 #include "tools/fidl/fidlc/tests/error_test.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
@@ -64,7 +65,11 @@ void GoodCompiledFix(const ExperimentalFlags experimental_flags, const std::stri
         std::make_unique<SourceFile>("dep_" + std::to_string(i) + ".fidl", deps[i]));
   }
 
-  auto fix = T(std::move(library_manager), std::move(deps_managers), experimental_flags);
+  VersionSelection version_selection;
+  version_selection.Insert(Platform::Parse("example").value(), Version::Head());
+
+  auto fix = T(std::move(library_manager), std::move(deps_managers), &version_selection,
+               experimental_flags);
   EXPECT_EQ(fix.ValidateFlags(), Status::kOk);
 
   auto result = fix.Transform(&reporter);
@@ -624,25 +629,31 @@ closed protocol MyProtocol {
 
 TEST(FixTests, BadEmptyStructResponseFixMissingBothExperiments) {
   ExperimentalFlags experimental_flags;
+  VersionSelection version_selection;
+  version_selection.Insert(Platform::Parse("example").value(), Version::Head());
   auto manager = std::make_unique<SourceManager>();
   manager->AddSourceFile(std::make_unique<SourceFile>("valid.fidl", "library example;"));
-  auto fix = EmptyStructResponseFix(std::move(manager), {}, experimental_flags);
+  auto fix = EmptyStructResponseFix(std::move(manager), {}, &version_selection, experimental_flags);
   EXPECT_EQ(fix.ValidateFlags(), Status::kErrorOther);
 }
 
 TEST(FixTests, BadEmptyStructResponseFixMissingSimpleEmptyResponseExperiment) {
   auto experimental_flags = ExperimentalFlags(ExperimentalFlags::Flag::kUnknownInteractions);
+  VersionSelection version_selection;
+  version_selection.Insert(Platform::Parse("example").value(), Version::Head());
   auto manager = std::make_unique<SourceManager>();
   manager->AddSourceFile(std::make_unique<SourceFile>("valid.fidl", "library example;"));
-  auto fix = EmptyStructResponseFix(std::move(manager), {}, experimental_flags);
+  auto fix = EmptyStructResponseFix(std::move(manager), {}, &version_selection, experimental_flags);
   EXPECT_EQ(fix.ValidateFlags(), Status::kErrorOther);
 }
 
 TEST(FixTests, BadEmptyStructResponseFixMissingUnknownInteractionsExperiment) {
   auto experimental_flags = ExperimentalFlags(ExperimentalFlags::Flag::kSimpleEmptyResponseSyntax);
+  VersionSelection version_selection;
+  version_selection.Insert(Platform::Parse("example").value(), Version::Head());
   auto manager = std::make_unique<SourceManager>();
   manager->AddSourceFile(std::make_unique<SourceFile>("valid.fidl", "library example;"));
-  auto fix = EmptyStructResponseFix(std::move(manager), {}, experimental_flags);
+  auto fix = EmptyStructResponseFix(std::move(manager), {}, &version_selection, experimental_flags);
   EXPECT_EQ(fix.ValidateFlags(), Status::kErrorOther);
 }
 
@@ -764,6 +775,8 @@ open protocol MyProtocol {
 TEST(FixTests, BadEmptyStructResponseFixStrictWithErrorVersionedPayload) {
   Reporter reporter;
   reporter.ignore_fixables();
+  VersionSelection version_selection;
+  version_selection.Insert(Platform::Parse("example").value(), Version::Head());
   auto library_manager = std::make_unique<SourceManager>();
   library_manager->AddSourceFile(
       std::make_unique<SourceFile>(kBadFileName, R"FIDL(@available(added=1)
@@ -777,7 +790,7 @@ open protocol MyProtocol {
 )FIDL"));
 
   auto fix =
-      EmptyStructResponseFix(std::move(library_manager), {},
+      EmptyStructResponseFix(std::move(library_manager), {}, &version_selection,
                              ExperimentalFlags({ExperimentalFlags::Flag::kSimpleEmptyResponseSyntax,
                                                 ExperimentalFlags::Flag::kUnknownInteractions}));
   EXPECT_EQ(fix.ValidateFlags(), Status::kOk);
@@ -850,6 +863,8 @@ open protocol MyProtocol {
 TEST(FixTests, BadEmptyStructResponseFixFlexibleWithErrorVersionedPayload) {
   Reporter reporter;
   reporter.ignore_fixables();
+  VersionSelection version_selection;
+  version_selection.Insert(Platform::Parse("example").value(), Version::Head());
   auto library_manager = std::make_unique<SourceManager>();
   library_manager->AddSourceFile(
       std::make_unique<SourceFile>(kBadFileName, R"FIDL(@available(added=1)
@@ -863,7 +878,7 @@ open protocol MyProtocol {
 )FIDL"));
 
   auto fix =
-      EmptyStructResponseFix(std::move(library_manager), {},
+      EmptyStructResponseFix(std::move(library_manager), {}, &version_selection,
                              ExperimentalFlags({ExperimentalFlags::Flag::kSimpleEmptyResponseSyntax,
                                                 ExperimentalFlags::Flag::kUnknownInteractions}));
   EXPECT_EQ(fix.ValidateFlags(), Status::kOk);
@@ -936,6 +951,8 @@ open protocol MyProtocol {
 TEST(FixTests, BadEmptyStructResponseFixFlexibleNoErrorVersionedPayload) {
   Reporter reporter;
   reporter.ignore_fixables();
+  VersionSelection version_selection;
+  version_selection.Insert(Platform::Parse("example").value(), Version::Head());
   auto library_manager = std::make_unique<SourceManager>();
   library_manager->AddSourceFile(
       std::make_unique<SourceFile>(kBadFileName, R"FIDL(@available(added=1)
@@ -949,7 +966,7 @@ open protocol MyProtocol {
 )FIDL"));
 
   auto fix =
-      EmptyStructResponseFix(std::move(library_manager), {},
+      EmptyStructResponseFix(std::move(library_manager), {}, &version_selection,
                              ExperimentalFlags({ExperimentalFlags::Flag::kSimpleEmptyResponseSyntax,
                                                 ExperimentalFlags::Flag::kUnknownInteractions}));
   EXPECT_EQ(fix.ValidateFlags(), Status::kOk);

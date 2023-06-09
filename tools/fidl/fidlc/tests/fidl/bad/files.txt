@@ -209,3 +209,4 @@ fi-0194-a.test.fidl
 fi-0194-b.test.fidl
 fi-0196-a.test.fidl
 fi-0196-b.test.fidl
+fi-0201.test.fidl

@@ -22,6 +22,7 @@
 #include "tools/fidl/fidlc/include/fidl/source_manager.h"
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 #include "tools/fidl/fidlc/include/fidl/utils.h"
+#include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 
 namespace fidl {
 
@@ -30,10 +31,11 @@ using utils::identity_t;
 class Reporter {
  public:
   Reporter() = default;
-  Reporter(std::string binary_path, const ExperimentalFlags experimental_flags,
+  Reporter(std::string binary_path, ExperimentalFlags experimental_flags,
+           const VersionSelection* version_selection,
            const std::vector<SourceManager>* source_managers)
-      : program_invocation_(
-            ProgramInvocation(std::move(binary_path), experimental_flags, source_managers)) {}
+      : program_invocation_(ProgramInvocation(std::move(binary_path), experimental_flags,
+                                              version_selection, source_managers)) {}
 
   Reporter(const Reporter&) = delete;
 

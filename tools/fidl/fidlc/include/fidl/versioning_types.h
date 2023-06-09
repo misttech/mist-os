@@ -5,6 +5,7 @@
 #ifndef TOOLS_FIDL_FIDLC_INCLUDE_FIDL_VERSIONING_TYPES_H_
 #define TOOLS_FIDL_FIDLC_INCLUDE_FIDL_VERSIONING_TYPES_H_
 
+#include <lib/fit/function.h>
 #include <zircon/assert.h>
 
 #include <map>
@@ -354,9 +355,15 @@ class VersionSelection final {
   // on success, and false if a version was already inserted for this platform.
   bool Insert(Platform platform, Version version);
 
-  // Returns the version for the given platform. Defaults to HEAD if no version
-  // was inserted for this platform.
+  // Returns true if a version was inserted for the given platform.
+  bool Contains(const Platform& platform) const;
+
+  // Returns the version for the given platform. Always returns HEAD for
+  // anonymous platforms. Panics if nothing was inserted for a named platform.
   Version Lookup(const Platform& platform) const;
+
+  // Runs a function on each selected (platform, version) pair.
+  void ForEach(const fit::function<void(const Platform&, Version)>& fn) const;
 
  private:
   std::map<Platform, Version, Platform::Compare> map_;

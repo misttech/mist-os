@@ -739,14 +739,18 @@ class CompiledTransformer : public internal::Transformer {
  public:
   CompiledTransformer(const std::vector<const SourceFile*>& library_source_files,
                       const std::vector<std::vector<const SourceFile*>>& dependencies_source_files,
+                      const fidl::VersionSelection* version_selection,
                       const fidl::ExperimentalFlags& experimental_flags, Reporter* reporter)
       : Transformer(library_source_files, experimental_flags, reporter),
+        version_selection_(version_selection),
         virtual_file_("generated"),
         all_libraries_(reporter, &virtual_file_),
         dependencies_source_files_(dependencies_source_files) {}
   CompiledTransformer(const std::vector<const SourceFile*>& library_source_files,
+                      const fidl::VersionSelection* version_selection,
                       const fidl::ExperimentalFlags& experimental_flags, Reporter* reporter)
-      : CompiledTransformer(library_source_files, {}, experimental_flags, reporter) {}
+      : CompiledTransformer(library_source_files, {}, version_selection, experimental_flags,
+                            reporter) {}
 
   // This operation readies the passed in source files for transformation. It performs all of the
   // same operations as |ParsedTransformer::Prepare()|, but then it also compiles the files and
@@ -869,7 +873,7 @@ class CompiledTransformer : public internal::Transformer {
   void OnValueLayoutMember(const std::unique_ptr<raw::ValueLayoutMember>&) override final;
 
   // Mutable internal state, meant to be populated by the |Prepare()| step.
-  fidl::VersionSelection version_selection_;
+  const fidl::VersionSelection* version_selection_;
   fidl::VirtualSourceFile virtual_file_;
   fidl::flat::Libraries all_libraries_;
   std::unique_ptr<SourceMap> source_map_ = nullptr;

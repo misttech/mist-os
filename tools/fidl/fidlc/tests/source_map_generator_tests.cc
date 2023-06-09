@@ -171,6 +171,7 @@ type Versioned = flexible bits : uint32 {
 };
 
 )FIDL");
+  library.SelectVersion("example", "HEAD");
   ASSERT_COMPILED(library);
   std::unique_ptr<fidl::raw::File> ast;
   ASSERT_TRUE(library.Parse(&ast));
@@ -384,6 +385,7 @@ type Versioned = flexible enum : uint32 {
 };
 
 )FIDL");
+  library.SelectVersion("example", "HEAD");
   ASSERT_COMPILED(library);
   std::unique_ptr<fidl::raw::File> ast;
   ASSERT_TRUE(library.Parse(&ast));
@@ -514,6 +516,7 @@ protocol Versioned {
 };
 
 )FIDL");
+  library.SelectVersion("example", "HEAD");
   ASSERT_COMPILED(library);
   std::unique_ptr<fidl::raw::File> ast;
   ASSERT_TRUE(library.Parse(&ast));
@@ -666,6 +669,7 @@ resource_definition Versioned : uint32 {
 };
 
 )FIDL");
+  library.SelectVersion("example", "HEAD");
   ASSERT_COMPILED(library);
   std::unique_ptr<fidl::raw::File> ast;
   ASSERT_TRUE(library.Parse(&ast));
@@ -784,6 +788,7 @@ service Versioned {
 };
 
 )FIDL");
+  library.SelectVersion("example", "HEAD");
   ASSERT_COMPILED(library);
   std::unique_ptr<fidl::raw::File> ast;
   ASSERT_TRUE(library.Parse(&ast));
@@ -892,6 +897,7 @@ type Versioned = struct {
 };
 
 )FIDL");
+  library.SelectVersion("example", "HEAD");
   ASSERT_COMPILED(library);
   std::unique_ptr<fidl::raw::File> ast;
   ASSERT_TRUE(library.Parse(&ast));
@@ -1039,6 +1045,7 @@ type Versioned = table {
 };
 
 )FIDL");
+  library.SelectVersion("example", "HEAD");
   ASSERT_COMPILED(library);
   std::unique_ptr<fidl::raw::File> ast;
   ASSERT_TRUE(library.Parse(&ast));
@@ -1189,6 +1196,7 @@ type Versioned = union {
 };
 
 )FIDL");
+  library.SelectVersion("example", "HEAD");
   ASSERT_COMPILED(library);
   std::unique_ptr<fidl::raw::File> ast;
   ASSERT_TRUE(library.Parse(&ast));

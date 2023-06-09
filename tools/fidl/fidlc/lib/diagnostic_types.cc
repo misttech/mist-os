@@ -327,11 +327,12 @@ std::string Diagnostic::Format(const ProgramInvocation& program_invocation) cons
     fixme << "\n\n  This is a fixable error.\n"
           << "  Please run the following command to update your FIDL files and fix the issue:\n\n"
           << "    [[[ FIXME ]]]\n\n"
-          << "    >>> " << program_invocation.binary_path().c_str()
+          << "    >>> " << program_invocation.binary_path()
           << "/fidl-fix --fix=" << Fixable::Get(fixable.value()).name
-          << program_invocation.ExperimentsAsString(" --experimental=", " ").c_str()
-          << program_invocation.DependenciesAsString(" --dep=", ",").c_str() << " "
-          << program_invocation.LibraryFilesAsString(" ").value().c_str() << "\n\n"
+          << program_invocation.ExperimentsAsString(" --experimental=", " ")
+          << program_invocation.VersionSelectionAsString(" --available=", " ")
+          << program_invocation.DependenciesAsString(" --dep=", ",") << " "
+          << program_invocation.LibraryFilesAsString(" ").value() << "\n\n"
           << "    [[[ /FIXME ]]]\n\n";
     out << fixme.str();
   }

@@ -395,6 +395,8 @@ void substitute(std::string& str, std::string_view placeholder, std::string_view
 
 TEST(AvailabilityInterleavingTests, OtherLibrary) {
   SharedAmongstLibraries shared;
+  shared.SelectVersion("foo", "HEAD");
+  shared.SelectVersion("bar", "HEAD");
   TestLibrary dependency(&shared);
   dependency.AddFile("bad/fi-0056-a.test.fidl");
   ASSERT_COMPILED(dependency);
@@ -419,6 +421,7 @@ const TARGET bool = false;
     substitute(fidl, "${source_available}", attributes.source_available);
     substitute(fidl, "${target_available}", attributes.target_available);
     TestLibrary library(fidl);
+    library.SelectVersion("example", "HEAD");
     ASSERT_NO_FAILURES(test_case.CompileAndAssert(library), "code: %.*s, fidl:\n\n%s",
                        static_cast<int>(test_case.code.size()), test_case.code.data(),
                        fidl.c_str());
@@ -428,6 +431,7 @@ const TARGET bool = false;
 TEST(AvailabilityInterleavingTests, SameLibrarySingleInstance) {
   TestLibrary library;
   library.AddFile("bad/fi-0055.test.fidl");
+  library.SelectVersion("test", "HEAD");
   ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidReferenceToDeprecated);
 }
 
@@ -437,6 +441,7 @@ TEST(AvailabilityInterleavingTests, SameLibrarySingleInstance) {
 void TestExternalLibrary(const TestCase& test_case, std::string example_fidl,
                          std::string dependency_fidl) {
   SharedAmongstLibraries shared;
+  shared.SelectVersion("platform", "HEAD");
   auto attributes = test_case.Format();
   substitute(dependency_fidl, "${target_available}", attributes.target_available);
   TestLibrary dependency(&shared, "dependency.fidl", dependency_fidl);

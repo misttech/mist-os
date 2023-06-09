@@ -1618,7 +1618,7 @@ const FOO string = "foo";
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			c := fidlgentest.EndToEndTest{T: t}
+			c := fidlgentest.EndToEndTest{T: t}.WithAvailable("example", "HEAD")
 			r := c.Single(test.fidl)
 			s := Summarize(r)
 			actual := s.IsEmptyLibrary()

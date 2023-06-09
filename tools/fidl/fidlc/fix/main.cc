@@ -22,6 +22,7 @@
 #include "tools/fidl/fidlc/include/fidl/fixes.h"
 #include "tools/fidl/fidlc/include/fidl/reporter.h"
 #include "tools/fidl/fidlc/include/fidl/source_manager.h"
+#include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 
 namespace {
 
@@ -113,8 +114,31 @@ int main(int argc, char* argv[]) {
   for (const auto& experiment : options.experiments) {
     if (!experimental_flags.EnableFlagByName(experiment)) {
       FailWithUsage(fidl::fix::Status::kErrorOther, argv[0], "Unknown --experimental: %s\n",
-                    std::string_view(experiment));
+                    experiment.c_str());
     }
+  }
+
+  // Process --available flags.
+  fidl::VersionSelection version_selection;
+  for (const auto& available : options.available) {
+    const auto colon_idx = available.find(':');
+    if (colon_idx == std::string::npos) {
+      FailWithUsage(fidl::fix::Status::kErrorOther, argv[0], "Invalid --available argument: %s\n",
+                    available.c_str());
+    }
+    const auto platform_str = available.substr(0, colon_idx);
+    const auto version_str = available.substr(colon_idx + 1);
+    const auto platform = fidl::Platform::Parse(platform_str);
+    const auto version = fidl::Version::Parse(version_str);
+    if (!platform.has_value()) {
+      FailWithUsage(fidl::fix::Status::kErrorOther, argv[0], "Invalid platform name: %s\n",
+                    platform_str.data());
+    }
+    if (!version.has_value()) {
+      FailWithUsage(fidl::fix::Status::kErrorOther, argv[0], "Invalid version: %s\n",
+                    version_str.data());
+    }
+    version_selection.Insert(platform.value(), version.value());
   }
 
   std::unique_ptr<fidl::fix::Fix> fix;

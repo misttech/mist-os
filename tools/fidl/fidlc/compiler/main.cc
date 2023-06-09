@@ -510,7 +510,7 @@ int main(int argc, char* argv[]) {
     auto path = std::filesystem::path(json_path).replace_extension("index.json");
     outputs.emplace_back(Behavior::kIndex, path);
   }
-  fidl::Reporter reporter(binary_path, experimental_flags, &source_managers);
+  fidl::Reporter reporter(binary_path, experimental_flags, &version_selection, &source_managers);
   fidl::VirtualSourceFile virtual_file("generated");
   reporter.set_warnings_as_errors(warnings_as_errors);
   auto status = compile(&reporter, library_name, dep_file_path, source_list, outputs,

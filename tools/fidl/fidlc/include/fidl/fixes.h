@@ -17,6 +17,7 @@
 #include "tools/fidl/fidlc/include/fidl/reporter.h"
 #include "tools/fidl/fidlc/include/fidl/source_manager.h"
 #include "tools/fidl/fidlc/include/fidl/transformer.h"
+#include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 
 namespace fidl::fix {
 
@@ -109,9 +110,10 @@ class CompiledFix : public Fix {
  public:
   CompiledFix(const Fixable fixable, std::unique_ptr<SourceManager> library,
               std::vector<std::unique_ptr<fidl::SourceManager>> dependencies,
-              const ExperimentalFlags experimental_flags)
+              const VersionSelection* version_selection, const ExperimentalFlags experimental_flags)
       : Fix(fixable, std::move(library), experimental_flags),
-        dependencies_(std::move(dependencies)) {}
+        dependencies_(std::move(dependencies)),
+        version_selection_(version_selection) {}
 
   TransformResult Transform(Reporter* reporter) final;
 
@@ -122,6 +124,7 @@ class CompiledFix : public Fix {
   virtual std::unique_ptr<CompiledTransformer> GetCompiledTransformer(
       const std::vector<const SourceFile*>& library_source_files,
       const std::vector<std::vector<const SourceFile*>>& dependencies_source_files,
+      const fidl::VersionSelection* version_selection,
       const fidl::ExperimentalFlags& experimental_flags, Reporter* reporter) = 0;
 
  private:
@@ -130,6 +133,7 @@ class CompiledFix : public Fix {
   using Fix::library_;
 
   const std::vector<std::unique_ptr<fidl::SourceManager>> dependencies_;
+  const VersionSelection* version_selection_;
 };
 
 // A fix that does nothing. This is retained both for testing purposes, and to ensure there is
@@ -165,15 +169,17 @@ class EmptyStructResponseFix final : public CompiledFix {
  public:
   EmptyStructResponseFix(std::unique_ptr<SourceManager> library,
                          std::vector<std::unique_ptr<fidl::SourceManager>> dependencies,
+                         const VersionSelection* version_selection,
                          const ExperimentalFlags experimental_flags)
       : CompiledFix(Fixable::Get(Fixable::Kind::kEmptyStructResponse), std::move(library),
-                    std::move(dependencies), experimental_flags) {}
+                    std::move(dependencies), version_selection, experimental_flags) {}
   ~EmptyStructResponseFix() = default;
 
  protected:
   std::unique_ptr<CompiledTransformer> GetCompiledTransformer(
       const std::vector<const SourceFile*>& source_files,
       const std::vector<std::vector<const SourceFile*>>& dependencies_source_files,
+      const fidl::VersionSelection* version_selection,
       const fidl::ExperimentalFlags& experimental_flags, Reporter* reporter) final;
 };
 

@@ -9,6 +9,7 @@
 #include "tools/fidl/fidlc/include/fidl/fixables.h"
 #include "tools/fidl/fidlc/include/fidl/reporter.h"
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
+#include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 #include "tools/fidl/fidlc/include/fidl/virtual_source_file.h"
 
 namespace {
@@ -141,9 +142,10 @@ TEST(ReporterTests, MakeWarningThenReportIt) {
 
 TEST(ReporterTests, ReportFixableErrorFormatParams) {
   std::vector<fidl::SourceManager> sources = FakeSources(1, 2);
-  fidl::ExperimentalFlags experimental_flags = fidl::ExperimentalFlags();
+  fidl::ExperimentalFlags experimental_flags;
+  fidl::VersionSelection version_selection;
   experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kNoop);
-  Reporter reporter(kFakeBinaryLocation, experimental_flags, &sources);
+  Reporter reporter(kFakeBinaryLocation, experimental_flags, &version_selection, &sources);
   SourceSpan span("fixable span text", *sources.back().sources().back().get());
   reporter.Fail(FixableErrTest, span, "param1", "param2");
 
@@ -168,9 +170,10 @@ TEST(ReporterTests, ReportFixableErrorFormatParams) {
 
 TEST(ReporterTests, MakeFixableErrorThenReportIt) {
   std::vector<fidl::SourceManager> sources = FakeSources(0, 3);
-  fidl::ExperimentalFlags experimental_flags = fidl::ExperimentalFlags();
+  fidl::ExperimentalFlags experimental_flags;
+  fidl::VersionSelection version_selection;
   experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kNoop);
-  Reporter reporter(kFakeBinaryLocation, experimental_flags, &sources);
+  Reporter reporter(kFakeBinaryLocation, experimental_flags, &version_selection, &sources);
   SourceSpan span("fixable span text", *sources.back().sources().back().get());
   std::unique_ptr<Diagnostic> diag =
       Diagnostic::MakeError(FixableErrTest, span, "param1", "param2");
@@ -196,9 +199,10 @@ TEST(ReporterTests, MakeFixableErrorThenReportIt) {
 
 TEST(ReporterTests, ReportFixableWarningFormatParams) {
   std::vector<fidl::SourceManager> sources = FakeSources(1, 2);
-  fidl::ExperimentalFlags experimental_flags = fidl::ExperimentalFlags();
+  fidl::ExperimentalFlags experimental_flags;
+  fidl::VersionSelection version_selection;
   experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kNoop);
-  Reporter reporter(kFakeBinaryLocation, experimental_flags, &sources);
+  Reporter reporter(kFakeBinaryLocation, experimental_flags, &version_selection, &sources);
   SourceSpan span("fixable span text", *sources.back().sources().back().get());
   reporter.Warn(FixableWarnTest, span, "param1", "param2");
 
@@ -224,9 +228,10 @@ TEST(ReporterTests, ReportFixableWarningFormatParams) {
 
 TEST(ReporterTests, MakeFixableWarningThenReportIt) {
   std::vector<fidl::SourceManager> sources = FakeSources(0, 3);
-  fidl::ExperimentalFlags experimental_flags = fidl::ExperimentalFlags();
+  fidl::ExperimentalFlags experimental_flags;
+  fidl::VersionSelection version_selection;
   experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kNoop);
-  Reporter reporter(kFakeBinaryLocation, experimental_flags, &sources);
+  Reporter reporter(kFakeBinaryLocation, experimental_flags, &version_selection, &sources);
   SourceSpan span("fixable span text", *sources.back().sources().back().get());
   std::unique_ptr<Diagnostic> diag =
       Diagnostic::MakeWarning(FixableWarnTest, span, "param1", "param2");

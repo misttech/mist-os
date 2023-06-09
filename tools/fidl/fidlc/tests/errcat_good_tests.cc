@@ -251,12 +251,14 @@ TEST(ErrcatGoodTests, Good0035) {
 TEST(ErrcatGoodTests, Good0036) {
   TestLibrary library;
   library.AddFile("good/fi-0036.test.fidl");
+  library.SelectVersion("test", "HEAD");
   ASSERT_COMPILED(library);
 }
 
 TEST(ErrcatGoodTests, Good0037) {
   TestLibrary library;
   library.AddFile("good/fi-0037.test.fidl");
+  library.SelectVersion("test", "HEAD");
   ASSERT_COMPILED(library);
 }
 
@@ -438,11 +440,14 @@ TEST(ErrcatGoodTests, Good0054) {
 TEST(ErrcatGoodTests, Good0055) {
   TestLibrary library;
   library.AddFile("good/fi-0055.test.fidl");
+  library.SelectVersion("test", "HEAD");
   ASSERT_COMPILED(library);
 }
 
 TEST(ErrcatGoodTests, Good0056) {
   SharedAmongstLibraries shared;
+  shared.SelectVersion("foo", "HEAD");
+  shared.SelectVersion("bar", "HEAD");
   TestLibrary dependency(&shared);
   dependency.AddFile("good/fi-0056-a.test.fidl");
   ASSERT_COMPILED(dependency);
@@ -1051,6 +1056,7 @@ TEST(ErrcatGoodTests, Good0125) {
 TEST(ErrcatGoodTests, Good0126) {
   TestLibrary library;
   library.AddFile("good/fi-0126.test.fidl");
+  library.SelectVersion("test", "HEAD");
   ASSERT_COMPILED(library);
 }
 
@@ -1069,12 +1075,14 @@ TEST(ErrcatGoodTests, Good0128) {
 TEST(ErrcatGoodTests, Good0129a) {
   TestLibrary library;
   library.AddFile("good/fi-0129-a.test.fidl");
+  library.SelectVersion("test", "HEAD");
   ASSERT_COMPILED(library);
 }
 
 TEST(ErrcatGoodTests, Good0129b) {
   TestLibrary library;
   library.AddFile("good/fi-0129-b.test.fidl");
+  library.SelectVersion("test", "HEAD");
   ASSERT_COMPILED(library);
 }
 
@@ -1141,48 +1149,56 @@ TEST(ErrcatGoodTests, Good0146) {
 TEST(ErrcatGoodTests, Good0147) {
   TestLibrary library;
   library.AddFile("good/fi-0147.test.fidl");
+  library.SelectVersion("test", "HEAD");
   ASSERT_COMPILED(library);
 }
 
 TEST(ErrcatGoodTests, Good0148a) {
   TestLibrary library;
   library.AddFile("good/fi-0148-a.test.fidl");
+  library.SelectVersion("test", "HEAD");
   ASSERT_COMPILED(library);
 }
 
 TEST(ErrcatGoodTests, Good0148b) {
   TestLibrary library;
   library.AddFile("good/fi-0148-b.test.fidl");
+  library.SelectVersion("test", "HEAD");
   ASSERT_COMPILED(library);
 }
 
 TEST(ErrcatGoodTests, Good0149a) {
   TestLibrary library;
   library.AddFile("good/fi-0149-a.test.fidl");
+  library.SelectVersion("foo", "HEAD");
   ASSERT_COMPILED(library);
 }
 
 TEST(ErrcatGoodTests, Good0149b) {
   TestLibrary library;
   library.AddFile("good/fi-0149-b.test.fidl");
+  library.SelectVersion("test", "HEAD");
   ASSERT_COMPILED(library);
 }
 
 TEST(ErrcatGoodTests, Good0150a) {
   TestLibrary library;
   library.AddFile("good/fi-0150-a.test.fidl");
+  library.SelectVersion("test", "HEAD");
   ASSERT_COMPILED(library);
 }
 
 TEST(ErrcatGoodTests, Good0150b) {
   TestLibrary library;
   library.AddFile("good/fi-0150-b.test.fidl");
+  library.SelectVersion("foo", "HEAD");
   ASSERT_COMPILED(library);
 }
 
 TEST(ErrcatGoodTests, Good0151a) {
   TestLibrary library;
   library.AddFile("good/fi-0151-a.test.fidl");
+  library.SelectVersion("test", "HEAD");
   ASSERT_COMPILED(library);
 }
 
@@ -1195,30 +1211,35 @@ TEST(ErrcatGoodTests, Good0151b) {
 TEST(ErrcatGoodTests, Good0152) {
   TestLibrary library;
   library.AddFile("good/fi-0152.test.fidl");
+  library.SelectVersion("foo", "HEAD");
   ASSERT_COMPILED(library);
 }
 
 TEST(ErrcatGoodTests, Good0153) {
   TestLibrary library;
   library.AddFile("good/fi-0153.test.fidl");
+  library.SelectVersion("test", "HEAD");
   ASSERT_COMPILED(library);
 }
 
 TEST(ErrcatGoodTests, Good0154a) {
   TestLibrary library;
   library.AddFile("good/fi-0154-a.test.fidl");
+  library.SelectVersion("test", "HEAD");
   ASSERT_COMPILED(library);
 }
 
 TEST(ErrcatGoodTests, Good0154b) {
   TestLibrary library;
   library.AddFile("good/fi-0154-b.test.fidl");
+  library.SelectVersion("test", "HEAD");
   ASSERT_COMPILED(library);
 }
 
 TEST(ErrcatGoodTests, Good0155) {
   TestLibrary library;
   library.AddFile("good/fi-0155.test.fidl");
+  library.SelectVersion("test", "HEAD");
   ASSERT_COMPILED(library);
 }
 
@@ -1382,24 +1403,28 @@ TEST(ErrcatGoodTests, Good0181) {
 TEST(ErrcatGoodTests, Good0182a) {
   TestLibrary library;
   library.AddFile("good/fi-0182-a.test.fidl");
+  library.SelectVersion("test", "HEAD");
   ASSERT_COMPILED(library);
 }
 
 TEST(ErrcatGoodTests, Good0182b) {
   TestLibrary library;
   library.AddFile("good/fi-0182-b.test.fidl");
+  library.SelectVersion("test", "HEAD");
   ASSERT_COMPILED(library);
 }
 
 TEST(ErrcatGoodTests, Good0183a) {
   TestLibrary library;
   library.AddFile("good/fi-0183-a.test.fidl");
+  library.SelectVersion("test", "HEAD");
   ASSERT_COMPILED(library);
 }
 
 TEST(ErrcatGoodTests, Good0183b) {
   TestLibrary library;
   library.AddFile("good/fi-0183-b.test.fidl");
+  library.SelectVersion("test", "HEAD");
   ASSERT_COMPILED(library);
 }
 
@@ -1506,6 +1531,13 @@ TEST(ErrcatGoodTests, Good0196b) {
   TestLibrary library;
   library.AddFile("good/fi-0196-b.test.fidl");
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kAllowOverflowing);
+  ASSERT_COMPILED(library);
+}
+
+TEST(ErrcatTests, Good0201) {
+  TestLibrary library;
+  library.AddFile("good/fi-0201.test.fidl");
+  library.SelectVersion("foo", "1");
   ASSERT_COMPILED(library);
 }
 

@@ -85,7 +85,7 @@ bool CompiledTransformer::Prepare() {
       continue;
     }
 
-    fidl::flat::Compiler compiler(&all_libraries_, &version_selection_,
+    fidl::flat::Compiler compiler(&all_libraries_, version_selection_,
                                   fidl::ordinals::GetGeneratedOrdinal64, experimental_flags_);
     if (!CompileLibrary(source_file_set, experimental_flags_, &compiler, reporter())) {
       AddError("Failed to compile dependency at least partially contained in " +
@@ -98,7 +98,7 @@ bool CompiledTransformer::Prepare() {
   }
 
   // Compile the target library.
-  fidl::flat::Compiler compiler(&all_libraries_, &version_selection_,
+  fidl::flat::Compiler compiler(&all_libraries_, version_selection_,
                                 fidl::ordinals::GetGeneratedOrdinal64, experimental_flags_);
   if (!CompileLibrary(source_files_, experimental_flags_, &compiler, reporter())) {
     AddError("Failed to compile library at least partially contained in " +
