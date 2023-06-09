@@ -240,6 +240,18 @@ function fx-config-read {
   _FX_LOCK_FILE="${FUCHSIA_BUILD_DIR}.build_lock"
 }
 
+function _query_product_bundle_path {
+  local -r manifest_path="${FUCHSIA_BUILD_DIR}/product_bundles.json"
+  local -r paths="$(fx-command-run jq --raw-output '.[] | .path' ${manifest_path})"
+  # Currently product_bundles.json should always contain one and only one
+  # product bundle.
+  if [[ ${#paths[@]} -gt 1 ]]; then
+    fx-error "Expecting exactly 1 product bundle in ${manifest_path}, found ${#paths[@]}"
+    exit 1
+  fi
+  printf %s "${paths[0]}"
+}
+
 function fx-change-build-dir {
   local build_dir="$1"
 
@@ -261,6 +273,12 @@ function fx-change-build-dir {
   # Set relevant variables in the ffx build-level config file
   json-config-set "${FUCHSIA_BUILD_DIR}.json" "repository.default" "$(ffx-default-repository-name)"
   json-config-set "${FUCHSIA_BUILD_DIR}.json" "sdk.root" '$BUILD_DIR'
+
+  local -r pb_path="$(_query_product_bundle_path)"
+  # Only set product bundle path if a product bundle is produced by the build.
+  if [[ -n "${pb_path}" ]]; then
+    json-config-set "${FUCHSIA_BUILD_DIR}.json" "product.path" "${pb_path}"
+  fi
 }
 
 function ffx-default-repository-name {
