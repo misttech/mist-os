@@ -7,6 +7,11 @@ pub(crate) mod blob;
 pub(crate) mod data_source;
 pub(crate) mod hash;
 pub(crate) mod product_bundle;
+pub(crate) mod scrutiny;
 pub(crate) mod zbi;
 
+// Directly expose all API types from top-level crate.
 pub use api::*;
+
+// Expose select types needed to instantiate scrutiny objects.
+pub use scrutiny::Scrutiny;

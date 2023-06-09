@@ -31,7 +31,7 @@ pub enum SystemSlot {
 
 /// Errors that may be encountered in [`ProductBundle::new`].
 #[derive(Debug, Error)]
-pub enum ProductBundleError {
+pub enum Error {
     #[error("product bundle directory path is not a valid UTF8 string: {directory:?}")]
     InvalidDirectory { directory: PathBuf },
     #[error("failed to deserialize product bundle: {error}")]
@@ -117,23 +117,21 @@ mod data_source {
 pub(crate) struct ProductBundle(Rc<ProductBundleData>);
 
 impl ProductBundle {
-    pub fn new(directory: Box<dyn api::Path>) -> Result<Self, ProductBundleError> {
+    pub fn new(directory: Box<dyn api::Path>) -> Result<Self, Error> {
         let mut product_bundle_data_source =
             ds::DataSource::new(Box::new(data_source::ProductBundle::new(directory.clone())));
         let utf8_directory = Utf8PathBuf::from_path_buf(directory.as_ref().as_ref().to_path_buf())
-            .map_err(|directory| ProductBundleError::InvalidDirectory { directory })?;
+            .map_err(|directory| Error::InvalidDirectory { directory })?;
         let product_bundle = sdk::ProductBundle::try_load_from(&utf8_directory)
-            .map_err(|error| ProductBundleError::DeserializationFailure { error })?;
+            .map_err(|error| Error::DeserializationFailure { error })?;
         let product_bundle = match product_bundle {
             sdk::ProductBundle::V1(_) => {
-                return Err(ProductBundleError::InvalidVerison { version: "V1".to_string() });
+                return Err(Error::InvalidVerison { version: "V1".to_string() });
             }
             sdk::ProductBundle::V2(product_bundle) => product_bundle,
         };
         let update_package_hash: Box<dyn api::Hash> = Box::new(Hash::from(
-            product_bundle
-                .update_package_hash
-                .ok_or_else(|| ProductBundleError::MissingUpdatePackage)?,
+            product_bundle.update_package_hash.ok_or_else(|| Error::MissingUpdatePackage)?,
         ));
         let repositories = product_bundle
             .repositories
@@ -161,6 +159,10 @@ impl ProductBundle {
 
     pub fn directory(&self) -> &Box<dyn api::Path> {
         &self.0.directory
+    }
+
+    pub fn data_source(&self) -> &Box<dyn api::DataSource> {
+        &self.0.data_source
     }
 
     pub fn update_package_hash(&self) -> &Box<dyn api::Hash> {
@@ -375,8 +377,8 @@ pub mod test {
 mod tests {
     use super::super::api;
     use super::test;
+    use super::Error;
     use super::ProductBundle;
-    use super::ProductBundleError;
     use super::Repository;
     // use camino::Utf8PathBuf;
     use super::super::hash::Hash;
@@ -414,7 +416,7 @@ mod tests {
         match ProductBundle::new(path("/definitely/does/not/exist"))
             .expect_err("product bundle from bad path")
         {
-            ProductBundleError::DeserializationFailure { .. } => {}
+            Error::DeserializationFailure { .. } => {}
             _ => {
                 panic!("expected product bundle error when specifying path that does not exist");
             }
@@ -426,7 +428,7 @@ mod tests {
         let temp_dir = TempDir::new().expect("create temporary directory");
         let temp_dir_path = path(temp_dir.path().to_path_buf());
         match ProductBundle::new(temp_dir_path).expect_err("product bundle with no manifest") {
-            ProductBundleError::DeserializationFailure { .. } => {}
+            Error::DeserializationFailure { .. } => {}
             _ => {
                 panic!("expected product bundle error when failing to load JSON");
             }
@@ -462,7 +464,7 @@ mod tests {
             })
         ).expect("write product bundle manifest");
         match ProductBundle::new(temp_dir_path).expect_err("product bundle with invalid version") {
-            ProductBundleError::InvalidVerison { .. } => {}
+            Error::InvalidVerison { .. } => {}
             _ => {
                 panic!("expected invalid version error when failing to generate JSON");
             }

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::blob::BlobDirectoryError;
 use dyn_clone::clone_trait_object;
 use dyn_clone::DynClone;
 use std::cmp;
@@ -65,7 +66,7 @@ pub trait Scrutiny {
     fn data_sources(&self) -> Box<dyn Iterator<Item = Box<dyn DataSource>>>;
 
     /// Iterate over all blobs from all system data sources.
-    fn blobs(&self) -> Box<dyn Iterator<Item = Box<dyn Blob>>>;
+    fn blobs(&self) -> Result<Box<dyn Iterator<Item = Box<dyn Blob>>>, ScrutinyBlobsError>;
 
     /// Iterate over all packages from all system data sources.
     fn packages(&self) -> Box<dyn Iterator<Item = Box<dyn Package>>>;
@@ -90,6 +91,12 @@ pub trait Scrutiny {
     fn component_instance_capabilities(
         &self,
     ) -> Box<dyn Iterator<Item = Box<dyn ComponentInstanceCapability>>>;
+}
+
+#[derive(Debug, Error)]
+pub enum ScrutinyBlobsError {
+    #[error("error iterating over blobs in directory: {0}")]
+    Directory(#[from] BlobDirectoryError),
 }
 
 /// High-level metadata about the system inspected by a [`Scrutiny`] instance.

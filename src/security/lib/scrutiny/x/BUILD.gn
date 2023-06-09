@@ -20,6 +20,7 @@ if (is_host) {
       "src/boxed/hash.rs",
       "src/boxed/mod.rs",
       "src/boxed/product_bundle.rs",
+      "src/boxed/scrutiny.rs",
       "src/boxed/zbi.rs",
       "src/component.rs",
       "src/component_capability.rs",
