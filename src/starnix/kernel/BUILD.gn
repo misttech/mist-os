@@ -270,6 +270,7 @@ rustc_binary("starnix_kernel_bin") {
     "syscalls/decls.rs",
     "syscalls/misc.rs",
     "syscalls/mod.rs",
+    "syscalls/syscall_arg.rs",
     "syscalls/syscall_result.rs",
     "syscalls/table.rs",
     "syscalls/time.rs",

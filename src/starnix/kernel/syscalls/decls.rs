@@ -6,6 +6,7 @@
 
 use paste::paste;
 
+use crate::syscalls::SyscallArg;
 use crate::types::*;
 
 /// Helper for for_each_syscall! that adds any architecture-specific syscalls.
@@ -433,12 +434,12 @@ impl std::fmt::Debug for SyscallDecl {
 /// with.
 pub struct Syscall {
     pub decl: SyscallDecl,
-    pub arg0: u64,
-    pub arg1: u64,
-    pub arg2: u64,
-    pub arg3: u64,
-    pub arg4: u64,
-    pub arg5: u64,
+    pub arg0: SyscallArg,
+    pub arg1: SyscallArg,
+    pub arg2: SyscallArg,
+    pub arg3: SyscallArg,
+    pub arg4: SyscallArg,
+    pub arg5: SyscallArg,
 }
 
 impl std::fmt::Debug for Syscall {

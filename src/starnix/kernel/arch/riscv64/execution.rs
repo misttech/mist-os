@@ -2,8 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::syscalls::decls::{Syscall, SyscallDecl};
-use crate::task::CurrentTask;
+use crate::{
+    syscalls::{
+        decls::{Syscall, SyscallDecl},
+        SyscallArg,
+    },
+    task::CurrentTask,
+};
 
 /// Generates CFI directives so the unwinder will be redirected to unwind the stack provided in
 /// `state`.
@@ -33,12 +38,12 @@ impl Syscall {
     pub fn new(syscall_decl: SyscallDecl, current_task: &CurrentTask) -> Syscall {
         Syscall {
             decl: syscall_decl,
-            arg0: current_task.registers.a0,
-            arg1: current_task.registers.a1,
-            arg2: current_task.registers.a2,
-            arg3: current_task.registers.a3,
-            arg4: current_task.registers.a4,
-            arg5: current_task.registers.a5,
+            arg0: SyscallArg::from_raw(current_task.registers.a0),
+            arg1: SyscallArg::from_raw(current_task.registers.a1),
+            arg2: SyscallArg::from_raw(current_task.registers.a2),
+            arg3: SyscallArg::from_raw(current_task.registers.a3),
+            arg4: SyscallArg::from_raw(current_task.registers.a4),
+            arg5: SyscallArg::from_raw(current_task.registers.a5),
         }
     }
 }

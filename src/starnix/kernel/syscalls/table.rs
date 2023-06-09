@@ -6,9 +6,8 @@ use paste::paste;
 
 use crate::{
     arch::syscalls::*,
-    fs::{FdNumber, WdNumber},
-    syscalls::{decls::Syscall, CurrentTask, SyscallResult},
-    types::*,
+    syscalls::{decls::Syscall, syscall_arg::*, CurrentTask, SyscallResult},
+    types::Errno,
 };
 
 macro_rules! syscall_match {
@@ -284,47 +283,5 @@ pub fn dispatch_syscall(
         waitid[5],
         write[3],
         writev[3],
-    }
-}
-
-trait IntoSyscallArg<T> {
-    fn into_arg(self) -> T;
-}
-impl<T> IntoSyscallArg<T> for u64
-where
-    T: FromSyscallArg,
-{
-    fn into_arg(self) -> T {
-        T::from_arg(self)
-    }
-}
-trait FromSyscallArg {
-    fn from_arg(arg: u64) -> Self;
-}
-macro_rules! impl_from_syscall_arg {
-    { for $ty:ty: $arg:ident => $($body:tt)* } => {
-        impl FromSyscallArg for $ty {
-            fn from_arg($arg: u64) -> Self { $($body)* }
-        }
-    }
-}
-
-impl_from_syscall_arg! { for i32: arg => arg as Self }
-impl_from_syscall_arg! { for i64: arg => arg as Self }
-impl_from_syscall_arg! { for u32: arg => arg as Self }
-impl_from_syscall_arg! { for usize: arg => arg as Self }
-impl_from_syscall_arg! { for u64: arg => arg as Self }
-impl_from_syscall_arg! { for UserAddress: arg => Self::from(arg) }
-impl_from_syscall_arg! { for UserCString: arg => Self::new(arg.into_arg()) }
-
-impl_from_syscall_arg! { for FdNumber: arg => Self::from_raw(arg as i32) }
-impl_from_syscall_arg! { for FileMode: arg => Self::from_bits(arg as u32) }
-impl_from_syscall_arg! { for DeviceType: arg => Self::from_bits(arg) }
-impl_from_syscall_arg! { for UncheckedSignal: arg => Self::new(arg) }
-impl_from_syscall_arg! { for WdNumber: arg => Self::from_raw(arg as i32) }
-
-impl<T> FromSyscallArg for UserRef<T> {
-    fn from_arg(arg: u64) -> UserRef<T> {
-        Self::new(UserAddress::from(arg))
     }
 }

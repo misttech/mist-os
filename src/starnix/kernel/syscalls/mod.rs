@@ -3,9 +3,11 @@
 // found in the LICENSE file.
 
 pub mod decls;
+mod syscall_arg;
 mod syscall_result;
 pub mod table;
 
+pub use syscall_arg::*;
 pub use syscall_result::*;
 
 // Here we reexport common items needed for syscall implementations. This way you can quickly get

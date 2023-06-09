@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use crate::{
-    syscalls::decls::{Syscall, SyscallDecl},
+    syscalls::{
+        decls::{Syscall, SyscallDecl},
+        SyscallArg,
+    },
     task::CurrentTask,
 };
 
@@ -68,12 +71,12 @@ impl Syscall {
     pub fn new(syscall_decl: SyscallDecl, current_task: &CurrentTask) -> Syscall {
         Syscall {
             decl: syscall_decl,
-            arg0: current_task.registers.rdi,
-            arg1: current_task.registers.rsi,
-            arg2: current_task.registers.rdx,
-            arg3: current_task.registers.r10,
-            arg4: current_task.registers.r8,
-            arg5: current_task.registers.r9,
+            arg0: SyscallArg::from_raw(current_task.registers.rdi),
+            arg1: SyscallArg::from_raw(current_task.registers.rsi),
+            arg2: SyscallArg::from_raw(current_task.registers.rdx),
+            arg3: SyscallArg::from_raw(current_task.registers.r10),
+            arg4: SyscallArg::from_raw(current_task.registers.r8),
+            arg5: SyscallArg::from_raw(current_task.registers.r9),
         }
     }
 }

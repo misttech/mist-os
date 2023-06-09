@@ -140,12 +140,12 @@ impl SeccompFilterContainer {
                 arch: arch_val,
                 instruction_pointer: task.registers.instruction_pointer_register(),
                 args: [
-                    syscall.arg0,
-                    syscall.arg1,
-                    syscall.arg2,
-                    syscall.arg3,
-                    syscall.arg4,
-                    syscall.arg5,
+                    syscall.arg0.raw(),
+                    syscall.arg1.raw(),
+                    syscall.arg2.raw(),
+                    syscall.arg3.raw(),
+                    syscall.arg4.raw(),
+                    syscall.arg5.raw(),
                 ],
             };
 
