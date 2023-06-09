@@ -129,8 +129,8 @@ async fn process_audio_requests(
             StreamConfigRequest::GetHealthState { responder } => {
                 responder.send(&HealthState::default())?;
             }
-            StreamConfigRequest::SignalProcessingConnect { protocol: _, control_handle } => {
-                control_handle.shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
+            StreamConfigRequest::SignalProcessingConnect { protocol, control_handle: _ } => {
+                let _ = protocol.close_with_epitaph(zx::Status::NOT_SUPPORTED);
             }
             StreamConfigRequest::GetProperties { responder } => {
                 let prop = StreamProperties {
