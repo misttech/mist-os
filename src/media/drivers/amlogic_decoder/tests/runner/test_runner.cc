@@ -115,35 +115,17 @@ class TestDeviceBase {
     return zx::ok();
   }
 
-  zx::result<> BindDriver(std::string_view path) const {
-    // Rebinding the device immediately after unbinding it sometimes causes the new device to be
-    // created before the old one is released, which can cause problems since the old device can
-    // hold onto interrupts and other resources. Delay recreation to make that less likely.
-    // TODO(fxbug.dev/39852): Remove when the driver framework bug is fixed.
-    constexpr uint32_t kRecreateDelayMs = 1000;
-    zx::nanosleep(zx::deadline_after(zx::msec(kRecreateDelayMs)));
-
-    constexpr uint32_t kMaxRetryCount = 5;
-    uint32_t retry_count = 0;
-    while (retry_count++ < kMaxRetryCount) {
-      // Don't use rebind because we need the recreate delay above. Also, the parent device may have
-      // other children that shouldn't be unbound.
-      const fidl::WireResult result =
-          fidl::WireCall(client_end_)->Bind(fidl::StringView::FromExternal(path));
-      if (!result.ok()) {
-        return zx::error(result.status());
-      }
-      const fit::result response = result.value();
-      if (response.is_error()) {
-        if (zx_status_t status = response.error_value(); status != ZX_ERR_ALREADY_BOUND) {
-          return zx::error(status);
-        }
-        zx::nanosleep(zx::deadline_after(zx::msec(10)));
-        continue;
-      }
-      return zx::ok();
+  zx::result<> RebindDriver(std::string_view path) const {
+    const fidl::WireResult result =
+        fidl::WireCall(client_end_)->Rebind(fidl::StringView::FromExternal(path));
+    if (!result.ok()) {
+      return zx::error(result.status());
     }
-    return zx::error(ZX_ERR_TIMED_OUT);
+    const fit::result response = result.value();
+    if (response.is_error()) {
+      return zx::error(response.error_value());
+    }
+    return zx::ok();
   }
 
   zx::result<> Unbind() const {
@@ -186,9 +168,8 @@ TEST(TestRunner, DISABLED_RunTests) {
   zx::result parent_device = test_device1.value().GetParentDevice();
   ASSERT_OK(parent_device.status_value());
 
-  ASSERT_OK(parent_device.value().UnbindChildren().status_value());
   ASSERT_OK(parent_device.value()
-                .BindDriver("/system/driver/amlogic_video_decoder_test.so")
+                .RebindDriver("/system/driver/amlogic_video_decoder_test.so")
                 .status_value());
 
   zx::result test_device2 =
@@ -208,11 +189,8 @@ TEST(TestRunner, DISABLED_RunTests) {
   const fidl::WireResponse response = result.value();
   ASSERT_OK(response.result);
 
-  // UnbindChildren seems to block for some reason.
-  ASSERT_OK(test_device2.value().Unbind().status_value());
-
   // Try to rebind the correct driver.
-  ASSERT_OK(parent_device.value().BindDriver({}).status_value());
+  ASSERT_OK(parent_device.value().RebindDriver({}).status_value());
 }
 
 // Test that unbinding and rebinding the driver works.
@@ -227,10 +205,8 @@ TEST(TestRunner, Rebind) {
   zx::result parent_device = test_device1.value().GetParentDevice();
   ASSERT_OK(parent_device.status_value());
 
-  ASSERT_OK(parent_device.value().UnbindChildren().status_value());
-
   // Use autobind to bind same driver.
-  ASSERT_OK(parent_device.value().BindDriver({}).status_value());
+  ASSERT_OK(parent_device.value().RebindDriver({}).status_value());
 }
 
 }  // namespace test
