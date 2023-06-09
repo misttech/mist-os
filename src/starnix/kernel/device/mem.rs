@@ -6,7 +6,6 @@ use fuchsia_zircon::{self as zx, cprng_draw};
 
 use crate::{
     auth::FsCred,
-    device::DeviceOps,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         *,
@@ -232,22 +231,18 @@ impl FileOps for DevKmsg {
     }
 }
 
-pub struct MemDevice;
-impl DeviceOps for MemDevice {
-    fn open(
-        &self,
-        _current_task: &CurrentTask,
-        id: DeviceType,
-        _node: &FsNode,
-        _flags: OpenFlags,
-    ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(match id.minor() {
-            3 => Box::new(DevNull),
-            5 => Box::new(DevZero),
-            7 => Box::new(DevFull),
-            8 | 9 => Box::new(DevRandom),
-            11 => Box::new(DevKmsg),
-            _ => return error!(ENODEV),
-        })
-    }
+pub fn create_mem_device(
+    _current_task: &CurrentTask,
+    id: DeviceType,
+    _node: &FsNode,
+    _flags: OpenFlags,
+) -> Result<Box<dyn FileOps>, Errno> {
+    Ok(match id.minor() {
+        3 => Box::new(DevNull),
+        5 => Box::new(DevZero),
+        7 => Box::new(DevFull),
+        8 | 9 => Box::new(DevRandom),
+        11 => Box::new(DevKmsg),
+        _ => return error!(ENODEV),
+    })
 }

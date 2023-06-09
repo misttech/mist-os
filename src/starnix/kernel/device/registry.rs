@@ -4,7 +4,7 @@
 
 use crate::{
     device::loopback::create_loop_device,
-    device::mem::MemDevice,
+    device::mem::create_mem_device,
     device::misc::create_misc_device,
     fs::{kobject::*, FileOps, FsNode},
     lock::RwLock,
@@ -107,7 +107,7 @@ impl DeviceRegistry {
     /// Creates a `DeviceRegistry` and populates it with common drivers such as /dev/null.
     pub fn new_with_common_devices() -> Self {
         let mut registry: DeviceRegistry = Self::default();
-        registry.register_chrdev_major(MemDevice, MEM_MAJOR).unwrap();
+        registry.register_chrdev_major(create_mem_device, MEM_MAJOR).unwrap();
         registry.register_chrdev_major(create_misc_device, MISC_MAJOR).unwrap();
         registry.register_blkdev_major(create_loop_device, LOOP_MAJOR).unwrap();
         registry.add_common_devices();
@@ -309,10 +309,10 @@ mod tests {
     #[::fuchsia::test]
     fn registry_fails_to_add_duplicate_device() {
         let mut registry = DeviceRegistry::default();
-        registry.register_chrdev_major(MemDevice, MEM_MAJOR).expect("registers once");
-        registry.register_chrdev_major(MemDevice, 123).expect("registers unique");
+        registry.register_chrdev_major(create_mem_device, MEM_MAJOR).expect("registers once");
+        registry.register_chrdev_major(create_mem_device, 123).expect("registers unique");
         registry
-            .register_chrdev_major(MemDevice, MEM_MAJOR)
+            .register_chrdev_major(create_mem_device, MEM_MAJOR)
             .expect_err("fail to register duplicate");
     }
 
@@ -321,7 +321,7 @@ mod tests {
         let (_kernel, current_task) = create_kernel_and_task();
 
         let mut registry = DeviceRegistry::default();
-        registry.register_chrdev_major(MemDevice, MEM_MAJOR).unwrap();
+        registry.register_chrdev_major(create_mem_device, MEM_MAJOR).unwrap();
 
         let node = FsNode::new_root(PanickingFsNode);
 
