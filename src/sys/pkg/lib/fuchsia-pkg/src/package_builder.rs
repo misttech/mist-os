@@ -330,6 +330,11 @@ impl PackageBuilder {
         self.abi_revision = Some(AbiRevision::new(abi_revision));
     }
 
+    /// Set the name of the package.
+    pub fn name(&mut self, name: impl AsRef<str>) {
+        self.name = name.as_ref().to_string();
+    }
+
     /// Set a different name for the package to be published by (and to be
     /// included in the generated PackageManifest), than the one embedded in the
     /// package itself.

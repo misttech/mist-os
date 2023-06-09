@@ -71,13 +71,13 @@ if (is_host) {
       "DEFAULT_INIT_X64_PATH=" + rebase_path(_default_init_x64_path, "src"),
     ]
   }
-}
 
-group("tests") {
-  testonly = true
-  deps = [
-    # NOTE: create_container_package does not have any test yet. By listing it here, we can at least
-    # verify that it compiles in CQ.
-    ":create_container_package_bin($host_toolchain)",
-  ]
+  group("tests") {
+    testonly = true
+    deps = [
+      # NOTE: create_container_package does not have any test yet. By listing it here, we can at least
+      # verify that it compiles in CQ.
+      ":create_container_package_bin",
+    ]
+  }
 }
