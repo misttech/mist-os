@@ -58,6 +58,10 @@ pub(crate) enum RequestArgs {
     Route(RouteRequestArgs),
 }
 
+/// An error encountered while handling a [`Request`].
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum RequestError {}
+
 /// A request associated with routes.
 pub(crate) struct Request<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> {
     /// The resource and operation-specific argument(s) for this request.
@@ -65,7 +69,7 @@ pub(crate) struct Request<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessa
     /// The client that made the request.
     pub client: InternalClient<NetlinkRoute, S>,
     /// A completer that will have the result of the request sent over.
-    pub completer: oneshot::Sender<()>,
+    pub completer: oneshot::Sender<Result<(), RequestError>>,
 }
 
 /// Contains the asynchronous work related to RTM_ROUTE messages.
@@ -222,26 +226,30 @@ impl<
         route_messages: &HashSet<NetlinkRouteMessage>,
         Request { args, mut client, completer }: Request<S>,
     ) {
-        debug!("got request {args:?} from {client}");
+        debug!("handling request {args:?} from {client}");
 
-        match &args {
+        let result = match &args {
             RequestArgs::Route(RouteRequestArgs::Get(args)) => match args {
                 GetRouteArgs::Dump => {
                     route_messages
                         .clone()
                         .into_iter()
                         .for_each(|message| client.send(message.into_rtnl_new_route()));
+                    Ok(())
                 }
             },
-        }
+        };
 
-        debug!("handled request {args:?} from {client}");
+        debug!("handled request {args:?} from {client} with result = {result:?}");
 
-        match completer.send(()) {
+        match completer.send(result) {
             Ok(()) => (),
-            Err(()) => {
+            Err(result) => {
                 // Not treated as a hard error because the socket may have been closed.
-                warn!("failed to send completion event to socket ({client}) handler");
+                warn!(
+                    "failed to send result ({:?}) to {} after handling request {:?}",
+                    result, client, args
+                )
             }
         }
     }
@@ -1074,7 +1082,7 @@ mod tests {
                 waiter
             });
         futures::select! {
-            res = fut.fuse() => assert_eq!(res, Ok(())),
+            res = fut.fuse() => assert_eq!(res, Ok(Ok(()))),
             err = event_loop_fut => unreachable!("eventloop should not return: {err:?}"),
         }
         let address_family = match A::Version::VERSION {
