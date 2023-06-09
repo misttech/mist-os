@@ -297,6 +297,20 @@ pub(crate) enum SocketState<A: SocketMapAddrSpec, S: SocketMapStateSpec> {
     ),
 }
 
+/// An "address vector" type that can hold any address in a [`SocketMap`].
+///
+/// This is a "vector" in the mathematical sense, in that it denotes an address
+/// in a space. Here, the space is the possible addresses to which a socket
+/// receiving IP packets can be bound.
+///
+/// `AddrVec`s are used as keys for the `SocketMap` type. Since an incoming
+/// packet can match more than one address, for each incoming packet there is a
+/// set of possible `AddrVec` keys whose entries (sockets) in a `SocketMap`
+/// might receive the packet.
+///
+/// This set of keys can be ordered by precedence as described in the
+/// documentation for [`AddrVecIter`]. Calling [`IterShadows::iter_shadows`] on
+/// an instance will produce the sequence of addresses it has precedence over.
 #[derive(Derivative)]
 #[derivative(
     Debug(bound = ""),
