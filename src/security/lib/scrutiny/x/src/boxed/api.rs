@@ -124,7 +124,15 @@ pub trait System {
 pub trait Zbi {
     /// Iterate over (path, contents) pairs of files in this ZBI's bootfs. See
     /// https://fuchsia.dev/fuchsia-src/concepts/process/userboot#bootfs for details.
-    fn bootfs(&self) -> Box<dyn Iterator<Item = (Box<dyn Path>, Box<dyn Blob>)>>;
+    fn bootfs(&self) -> Result<Box<dyn Iterator<Item = (Box<dyn Path>, Box<dyn Blob>)>>, ZbiError>;
+}
+
+#[derive(Debug, Error)]
+pub enum ZbiError {
+    #[error("failed to hash blobfs blob at bootfs path {bootfs_path:?}: {error}")]
+    Hash { bootfs_path: Box<dyn Path>, error: std::io::Error },
+    #[error("failed to parse bootfs image in zbi at path {path:?}: {error}")]
+    ParseBootfs { path: Box<dyn Path>, error: anyhow::Error },
 }
 
 /// Kernel command-line flags. See https://fuchsia.dev/fuchsia-src/reference/kernel/kernel_cmdline

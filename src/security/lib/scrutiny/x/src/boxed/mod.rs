@@ -7,5 +7,6 @@ pub(crate) mod blob;
 pub(crate) mod data_source;
 pub(crate) mod hash;
 pub(crate) mod product_bundle;
+pub(crate) mod zbi;
 
 pub use api::*;
