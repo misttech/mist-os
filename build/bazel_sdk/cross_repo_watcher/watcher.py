@@ -5,6 +5,7 @@ import argparse
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
+import requests
 import shutil
 import subprocess
 from typing import List
@@ -77,14 +78,7 @@ def register_config(config_path: str):
             pub.subscribe(topic, config)
 
 
-def run_server():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--config',
-        help='A path to the config file.',
-    )
-    args = parser.parse_args()
-
+def start_server(args: argparse.Namespace):
     # Parse configuration file
     register_config(args.config)
 
@@ -95,5 +89,50 @@ def run_server():
     httpd.serve_forever()
 
 
+def publish_event(args: argparse.Namespace):
+    response = requests.get(
+        f'http://localhost:8000/?event={args.event}&message={args.message}')
+    print(response)
+
+
+def parse_arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    subparser = parser.add_subparsers(help='available commands')
+
+    # Define start command
+    parser_start = subparser.add_parser(
+        'start',
+        help='Start a pubsub server that listen to the events',
+    )
+    parser_start.add_argument(
+        '--config',
+        help='A path to the config file.',
+    )
+    parser_start.set_defaults(func=start_server)
+
+    # Define publish command
+    parser_start = subparser.add_parser(
+        'publish',
+        help='Publish an event',
+    )
+    parser_start.add_argument(
+        'event',
+        help='Event name published.',
+    )
+    parser_start.add_argument(
+        '--message',
+        help='Addional message for the published event.',
+        default='any',
+    )
+    parser_start.set_defaults(func=publish_event)
+
+    return parser.parse_args()
+
+
+def main():
+    args = parse_arguments()
+    args.func(args)
+
+
 if __name__ == '__main__':
-    run_server()
+    main()
