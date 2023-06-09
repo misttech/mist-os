@@ -1354,6 +1354,30 @@ build_api_module("product_bundles") {
   }
 }
 
+# Some tools make assumptions about this when trying to look up product bundles
+# produced by the build, so adding a check to prevent unexpected failures, until
+# we figure out how to support multiple PBs in the future.
+action("check_product_bundles_manifest") {
+  testonly = true
+
+  outs = get_target_outputs(":product_bundles")
+  _jq = "//prebuilt/third_party/jq/${host_platform}/bin/jq"
+  _pb_manifest = outs[0]
+  inputs = [
+    _jq,
+    _pb_manifest,
+  ]
+  outputs = [ "${root_build_dir}/$target_name.stamp" ]
+
+  script = "//build/check_product_bundles_manifest.sh"
+  args = [
+    rebase_path(_jq, root_build_dir),
+    rebase_path(_pb_manifest, root_build_dir),
+    rebase_path(outputs[0], root_build_dir),
+  ]
+  deps = [ ":product_bundles" ]
+}
+
 # licenses.json enumerates the output artifacts of //tools/check-licenses
 # which need to be saved after completion of a check-licenses run.
 #
@@ -1429,6 +1453,10 @@ group("default") {
     "//bundles:boot_tests",
     "//sdk",
   ]
+
+  if (!use_bringup_assembly) {
+    deps += [ "//:check_product_bundles_manifest" ]
+  }
 
   # SDK-only builds must not attempt to build images.
   if (has_board) {
