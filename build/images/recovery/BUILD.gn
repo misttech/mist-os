@@ -139,10 +139,8 @@ if (is_fuchsia) {
   }
 
   core_realm_definition("core-eng") {
-    # TODO(fxbug.dev/102390): deprecate appmgr from this product config
     deps =
-        _core_realm_deps + appmgr_core_shards + core_realm_testing_aib_shards +
-        [
+        _core_realm_deps + core_realm_testing_aib_shards + [
           # required for SL4F
           "//src/developer:default-laboratory-env-core-shard",
           "//src/developer/memory/monitor:memory_monitor_core_shard",

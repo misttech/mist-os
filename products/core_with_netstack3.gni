@@ -4,14 +4,6 @@
 
 import("//products/common/core.gni")
 
-# TODO(fxbug.dev/102390): deprecate appmgr from core.
-
-# TODO(fxbug.dev/108016): Use appmgr_base_packages once no more chromium cmx
-# components are running.
-import("//src/sys/appmgr/appmgr.gni")
-legacy_base_package_labels += appmgr_with_sysmgr_base_packages
-core_realm_shards += appmgr_core_shards
-
 product_bootfs_labels += [
   "//bundles/drivers:usb-peripheral-stack",
   "//src/sys/component_manager:component_manager_bootfs_config",
