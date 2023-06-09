@@ -19,7 +19,7 @@ FAKE_VERSION_HISTORY_FILE_CONTENT = """{
         "api_levels": {
             "1" : {
                 "abi_revision": "0x1",
-                "status": "current"
+                "status": "in-development"
             }
         }
     },
@@ -126,9 +126,15 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
         pv = self._get_platform_version()
         self.assertNotEqual(NEW_API_LEVEL, pv['in_development_api_level'])
 
+        # First update version_history. The platform_version file is derived
+        # from it.
         self.assertTrue(
-            update_platform_version.update_platform_version(
-                NEW_API_LEVEL, update_platform_version.PLATFORM_VERSION_PATH))
+            update_platform_version.update_version_history(
+                NEW_API_LEVEL, update_platform_version.VERSION_HISTORY_PATH))
+
+        update_platform_version.update_platform_version(
+            update_platform_version.VERSION_HISTORY_PATH,
+            update_platform_version.PLATFORM_VERSION_PATH)
 
         pv = self._get_platform_version()
         self.assertEqual(NEW_API_LEVEL, pv['in_development_api_level'])
@@ -160,6 +166,95 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
             update_platform_version.copy_compatibility_test_goldens(
                 self.test_dir, NEW_API_LEVEL))
         self.assertTrue(filecmp.cmp(self.fake_src_file, self.fake_dst_file))
+
+
+class TestVersionHistoryToPlatformVersion(unittest.TestCase):
+
+    def _wrap_api_levels(self, api_levels_dict):
+        return {
+            "data":
+                {
+                    "name": "Platform version map",
+                    "type": "version_history",
+                    "api_levels": api_levels_dict,
+                },
+            "schema_id":
+                "https://fuchsia.dev/schema/version_history-22rnd667.json"
+        }
+
+    def test_only_one(self):
+        res = update_platform_version.version_history_to_platform_version(
+            self._wrap_api_levels(
+                {"1": {
+                    "abi_revision": "0x1",
+                    "status": "supported"
+                }}))
+        self.assertEqual(
+            res,
+            dict(in_development_api_level=1, supported_fuchsia_api_levels=[1]))
+
+    def test_api_frozen(self):
+        res = update_platform_version.version_history_to_platform_version(
+            self._wrap_api_levels(
+                {
+                    "1": {
+                        "abi_revision": "0x1",
+                        "status": "supported"
+                    },
+                    "2": {
+                        "abi_revision": "0x2",
+                        "status": "supported"
+                    }
+                }))
+        self.assertEqual(
+            res,
+            dict(
+                in_development_api_level=2, supported_fuchsia_api_levels=[1,
+                                                                          2]))
+
+    def test_steady_state(self):
+        res = update_platform_version.version_history_to_platform_version(
+            self._wrap_api_levels(
+                {
+                    "1": {
+                        "abi_revision": "0x1",
+                        "status": "supported"
+                    },
+                    "2": {
+                        "abi_revision": "0x2",
+                        "status": "in-development"
+                    }
+                }))
+        self.assertEqual(
+            res,
+            dict(in_development_api_level=2, supported_fuchsia_api_levels=[1]))
+
+    def test_unsupported(self):
+        res = update_platform_version.version_history_to_platform_version(
+            self._wrap_api_levels(
+                {
+                    "1": {
+                        "abi_revision": "0x1",
+                        "status": "unsupported"
+                    },
+                    "2": {
+                        "abi_revision": "0x2",
+                        "status": "supported"
+                    },
+                    "3": {
+                        "abi_revision": "0x3",
+                        "status": "supported"
+                    },
+                    "4": {
+                        "abi_revision": "0x4",
+                        "status": "in-development"
+                    },
+                }))
+        self.assertEqual(
+            res,
+            dict(
+                in_development_api_level=4, supported_fuchsia_api_levels=[2,
+                                                                          3]))
 
 
 if __name__ == '__main__':

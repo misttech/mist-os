@@ -21,31 +21,55 @@ from pathlib import Path
 _API_COMPATIBILITY_WINDOW_SIZE = 2
 
 
-def update_platform_version(fuchsia_api_level, platform_version_path):
-    """Updates platform_version.json to set the in_development_api_level to the given
-    Fuchsia API level.
-    """
+def update_platform_version(version_history_path, platform_version_path):
+    """Updates platform_version.json to be consistent with version_history.json."""
     try:
-        with open(platform_version_path, "r+") as f:
-            platform_version = json.load(f)
-            platform_version["in_development_api_level"] = fuchsia_api_level
-            # Generates a list of supported API levels that contains at most
-            # _API_COMPATIBILITY_WINDOW_SIZE elements.
-            platform_version["supported_fuchsia_api_levels"] = list(
-                range(
-                    max(fuchsia_api_level - _API_COMPATIBILITY_WINDOW_SIZE, 1),
-                    fuchsia_api_level))
-            f.seek(0)
-            json.dump(platform_version, f)
-            f.truncate()
-        return True
-    except FileNotFoundError:
-        print(
-            """error: Unable to open '{path}'.
-Did you run this script from the root of the source tree?""".format(
-                path=platform_version_path),
-            file=sys.stderr)
-        return False
+        with open(version_history_path) as f:
+            version_history = json.load(f)
+
+        new_platform_version = version_history_to_platform_version(
+            version_history)
+
+        with open(platform_version_path, 'w') as f:
+            json.dump(new_platform_version, f)
+
+    except FileNotFoundError as e:
+        raise Exception("Did you run this from the source tree root?") from e
+
+
+def version_history_to_platform_version(version_history):
+    """Given a JSON object for `version_history.json`, generate a corresponding one for
+    `platform_version.json`"""
+    versions = version_history['data']['api_levels']
+
+    in_development_api_levels = [
+        int(level)
+        for level, data in versions.items()
+        if data['status'] == 'in-development'
+    ]
+    supported_levels = [
+        int(level)
+        for level, data in versions.items()
+        if data['status'] == 'supported'
+    ]
+
+    if len(in_development_api_levels) == 0:
+        # This is a kind of weird state: when there's no in-development API
+        # level, this is the API freeze. However, `platform_version.json`
+        # assumes that there's always an `in_development_api_level`, so we pick
+        # the largest supported level to fill that role.
+        # We'll remove `platform_version.json` soon enough, so whatever.
+        in_development_api_level = max(supported_levels)
+    elif len(in_development_api_levels) == 1:
+        in_development_api_level = in_development_api_levels[0]
+    else:
+        raise Exception(
+            """error: expected no more than 1 in-development API level in version_history.json;
+            found {}""".format(len(in_development_api_levels)))
+
+    return dict(
+        in_development_api_level=in_development_api_level,
+        supported_fuchsia_api_levels=supported_levels)
 
 
 def update_fidl_compatibility_doc(
@@ -197,9 +221,8 @@ def main():
                                   args.sdk_version_history):
         return 1
 
-    if not update_platform_version(args.fuchsia_api_level,
-                                   args.platform_version_json):
-        return 1
+    update_platform_version(
+        args.sdk_version_history, args.platform_version_json)
 
     if not update_fidl_compatibility_doc(args.fuchsia_api_level,
                                          args.fidl_compatibility_doc_path):
