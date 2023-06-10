@@ -86,7 +86,7 @@ void DriverHost::Start(StartRequest& request, StartCompleter::Sync& completer) {
   LoadDriver(std::move(request.start_args()), loop_.dispatcher(), std::move(callback));
 }
 
-void DriverHost::GetProcessKoid(GetProcessKoidCompleter::Sync& completer) {
+void DriverHost::GetProcessInfo(GetProcessInfoCompleter::Sync& completer) {
   zx_info_handle_basic_t info;
   zx_status_t status =
       zx::process::self()->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
@@ -94,8 +94,24 @@ void DriverHost::GetProcessKoid(GetProcessKoidCompleter::Sync& completer) {
     FX_SLOG(ERROR, "Failed to get info about process handle",
             KV("status_str", zx_status_get_string(status)));
     completer.Reply(zx::error(status));
+    return;
   }
-  completer.Reply(zx::ok(info.koid));
+  uint64_t process_koid = info.koid;
+
+  status =
+      zx::job::default_job()->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  if (status != ZX_OK) {
+    FX_SLOG(ERROR, "Failed to get info about job handle",
+            KV("status_str", zx_status_get_string(status)));
+    completer.Reply(zx::error(status));
+    return;
+  }
+  uint64_t job_koid = info.koid;
+
+  completer.Reply(zx::ok(fuchsia_driver_host::ProcessInfo{{
+      .job_koid = job_koid,
+      .process_koid = process_koid,
+  }}));
 }
 
 void DriverHost::InstallLoader(InstallLoaderRequest& request,

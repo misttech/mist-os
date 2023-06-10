@@ -6,7 +6,6 @@
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_DRIVER_HOST_H_
 
 #include <fidl/fuchsia.device.manager/cpp/wire.h>
-#include <lib/async/cpp/wait.h>
 #include <lib/fit/function.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/job.h>
@@ -83,7 +82,7 @@ class DriverHost final : public dfv2::DriverHost,
              fuchsia_component_runner::wire::ComponentStartInfo start_info,
              fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) override;
 
-  virtual zx::result<uint64_t> GetProcessKoid() const override { return zx::ok(koid_); }
+  zx::result<uint64_t> GetProcessKoid() const override { return zx::ok(koid_); }
 
   Coordinator* coordinator_;
 

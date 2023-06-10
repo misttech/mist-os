@@ -5,7 +5,9 @@
 #ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_V2_DRIVER_HOST_H_
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_V2_DRIVER_HOST_H_
 
+#include <fidl/fuchsia.driver.host/cpp/fidl.h>
 #include <fidl/fuchsia.driver.host/cpp/wire.h>
+#include <lib/vfs/cpp/pseudo_dir.h>
 
 #include <fbl/intrusive_double_list.h>
 
@@ -36,12 +38,19 @@ class DriverHostComponent final
              fuchsia_component_runner::wire::ComponentStartInfo start_info,
              fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) override;
 
+  zx::result<fuchsia_driver_host::ProcessInfo> GetProcessInfo() const;
   zx::result<uint64_t> GetProcessKoid() const override;
+  zx::result<uint64_t> GetJobKoid() const;
 
   zx::result<> InstallLoader(fidl::ClientEnd<fuchsia_ldsvc::Loader> loader_client) const;
 
  private:
+  void InitializeElfDir();
+
   fidl::WireSharedClient<fuchsia_driver_host::DriverHost> driver_host_;
+  mutable std::optional<fuchsia_driver_host::ProcessInfo> process_info_;
+  vfs::PseudoDir runtime_dir_;
+  async_dispatcher_t* dispatcher_;
 };
 
 zx::result<> SetEncodedConfig(

@@ -31,6 +31,12 @@ protocol Driver {
     Stop();
 };
 
+/// Information about the driver host. Used for debugging.
+type ProcessInfo = struct {
+    job_koid uint64;
+    process_koid uint64;
+};
+
 /// Protocol through which a driver host can be managed.
 @discoverable
 protocol DriverHost {
@@ -40,10 +46,8 @@ protocol DriverHost {
         driver server_end:Driver;
     }) -> () error zx.Status;
 
-    /// Returns the process KOID of the driver host.
-    GetProcessKoid() -> (struct {
-        koid uint64;
-    }) error zx.Status;
+    /// Returns the job and process KOIDs of the driver host.
+    GetProcessInfo() -> (ProcessInfo) error zx.Status;
 
     /// Provides a loader service which should be installed via
     /// `dl_set_loader_service`.
