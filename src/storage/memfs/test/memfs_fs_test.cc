@@ -7,27 +7,44 @@
 
 #include "src/lib/storage/fs_management/cpp/mount.h"
 #include "src/storage/fs_test/fs_test.h"
-#include "src/storage/memfs/scoped_memfs.h"
+#include "src/storage/memfs/memfs.h"
+#include "src/storage/memfs/vnode_dir.h"
 
 namespace {
 
 class MemfsInstance : public fs_test::FilesystemInstance {
  public:
-  MemfsInstance() : loop_(&kAsyncLoopConfigNeverAttachToThread) {
-    ZX_ASSERT(loop_.StartThread() == ZX_OK);
-  }
+  MemfsInstance() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
+  ~MemfsInstance() override { Shutdown(); }
 
   zx::result<> Format(const fs_test::TestFilesystemOptions&) override {
-    zx::result<ScopedMemfs> memfs = ScopedMemfs::Create(loop_.dispatcher());
-    if (memfs.is_error())
-      return memfs.take_error();
-    memfs_ = std::make_unique<ScopedMemfs>(std::move(*memfs));
+    Shutdown();
+
+    zx::result result = memfs::Memfs::Create(loop_.dispatcher(), "<tmp>");
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    auto& [memfs, root] = result.value();
+
+    zx::result server = fidl::CreateEndpoints(&root_);
+    if (server.is_error()) {
+      return server.take_error();
+    }
+
+    if (zx_status_t status = memfs->ServeDirectory(std::move(root), std::move(server.value()));
+        status != ZX_OK) {
+      return zx::error(status);
+    }
+    if (zx_status_t status = loop_.StartThread(); status != ZX_OK) {
+      return zx::error(status);
+    }
+    memfs_ = std::move(memfs);
     return zx::ok();
   }
 
   zx::result<> Mount(const std::string& mount_path,
                      const fs_management::MountOptions& options) override {
-    if (!memfs_->root()) {
+    if (!root_) {
       // Already mounted.
       return zx::error(ZX_ERR_BAD_STATE);
     }
@@ -37,7 +54,7 @@ class MemfsInstance : public fs_test::FilesystemInstance {
       return status;
     }
     return zx::make_result(fdio_ns_bind(ns, fs_test::StripTrailingSlash(mount_path).c_str(),
-                                        memfs_->root().TakeChannel().release()));
+                                        root_.TakeChannel().release()));
   }
 
   zx::result<> Unmount(const std::string& mount_path) override {
@@ -51,8 +68,16 @@ class MemfsInstance : public fs_test::FilesystemInstance {
   fs_management::SingleVolumeFilesystemInterface* fs() override { return nullptr; }
 
  private:
+  void Shutdown() {
+    loop_.Quit();
+    loop_.JoinThreads();
+    zx_status_t status = loop_.ResetQuit();
+    ZX_ASSERT_MSG(status == ZX_OK, "%s", zx_status_get_string(status));
+  }
+
+  fidl::ClientEnd<fuchsia_io::Directory> root_;
+  std::unique_ptr<memfs::Memfs> memfs_;
   async::Loop loop_;
-  std::unique_ptr<ScopedMemfs> memfs_;  // Must be torn down before the loop_.
 };
 
 class MemfsFilesystem : public fs_test::FilesystemImpl<MemfsFilesystem> {

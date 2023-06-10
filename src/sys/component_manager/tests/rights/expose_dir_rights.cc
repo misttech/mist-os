@@ -9,24 +9,31 @@
 #include <lib/zx/channel.h>
 
 #include "src/lib/storage/vfs/cpp/remote_dir.h"
-#include "src/storage/memfs/scoped_memfs.h"
+#include "src/storage/memfs/memfs.h"
+#include "src/storage/memfs/vnode_dir.h"
 
 int main(int argc, char* argv[]) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  async::Loop memfs_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  if (memfs_loop.StartThread() != ZX_OK) {
-    fprintf(stderr, "Failed to start memfs loop\n");
+  zx::result result = memfs::Memfs::Create(loop.dispatcher(), "<tmp>");
+  if (result.is_error()) {
+    fprintf(stderr, "Failed to create memfs: %s\n", result.status_string());
     return -1;
   }
+  auto& [memfs, root] = result.value();
 
-  zx::result<ScopedMemfs> memfs = ScopedMemfs::Create(memfs_loop.dispatcher());
-  if (memfs.is_error()) {
-    fprintf(stderr, "Failed to create memfs: %s\n", memfs.status_string());
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    fprintf(stderr, "Failed to create memfs endpoints: %s\n", endpoints.status_string());
     return -1;
   }
+  auto& [memfs_dir, server] = endpoints.value();
 
-  const fidl::ClientEnd<fuchsia_io::Directory>& memfs_dir = memfs.value().root();
+  if (zx_status_t status = memfs->ServeDirectory(std::move(root), std::move(server));
+      status != ZX_OK) {
+    fprintf(stderr, "Failed to server memfs directory: %s\n", zx_status_get_string(status));
+    return -1;
+  }
 
   svc::Outgoing outgoing(loop.dispatcher());
 

@@ -16,7 +16,8 @@
 #include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
 
-#include "src/storage/memfs/scoped_memfs.h"
+#include "src/storage/memfs/memfs.h"
+#include "src/storage/memfs/vnode_dir.h"
 
 namespace fio = fuchsia_io;
 
@@ -67,14 +68,19 @@ class Harness {
   void Setup() {
     ASSERT_EQ(loop_.StartThread(), ZX_OK);
 
-    zx::result<ScopedMemfs> memfs = ScopedMemfs::Create(loop_.dispatcher());
-    ASSERT_TRUE(memfs.is_ok());
-    memfs_ = std::make_unique<ScopedMemfs>(std::move(*memfs));
-    memfs_->set_cleanup_timeout(zx::sec(3));
+    zx::result result = memfs::Memfs::Create(loop_.dispatcher(), "<tmp>");
+    ASSERT_OK(result);
+    auto& [memfs, root] = result.value();
+
+    zx::result endpoints = fidl::CreateEndpoints<fio::Directory>();
+    ASSERT_OK(endpoints);
+    auto& [client, server] = endpoints.value();
+
+    ASSERT_OK(memfs->ServeDirectory(std::move(root), std::move(server)));
+    memfs_ = std::move(memfs);
 
     fbl::unique_fd dir;
-    ASSERT_EQ(fdio_fd_create(memfs_->root().TakeChannel().release(), dir.reset_and_get_address()),
-              ZX_OK);
+    ASSERT_EQ(fdio_fd_create(client.TakeChannel().release(), dir.reset_and_get_address()), ZX_OK);
     fd_.reset(openat(dir.get(), "my-file", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR));
     ASSERT_TRUE(fd_);
   }
@@ -83,7 +89,7 @@ class Harness {
 
  private:
   async::Loop loop_ = async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  std::unique_ptr<ScopedMemfs> memfs_;  // Must be after the loop_ for proper tear-down.
+  std::unique_ptr<memfs::Memfs> memfs_;  // Must be after the loop_ for proper tear-down.
   fbl::unique_fd fd_;
 };
 

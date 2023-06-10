@@ -11,32 +11,14 @@
 #include <lib/zx/result.h>
 
 // A wrapper around the C API that sets up and tears down memfs.
-//
-// There are two modes of operation:
-//
-//  - Call ScopedMemfs::Create() and then use the root() channel to talk to the root directory of
-//    the filesystem. This will give a memfs instance not mounted in any location. You can also
-//    choose to mount it in your namespace manually.
-//
-//  - The more common mode is to use ScopedMemfs::CreateMountedAt() which will automatically mount
-//    the new memfs instance at the given path in your local namespace. This will be unmounted on
-//    cleanup.
-//
-// Memfs will run on the given dispatcher. This must be a different thread from that of the
-// ScopedMemfs object because the destructor will synchronize with memfs' cleanup and if this is
-// the same thread it will deadlock.
 class ScopedMemfs {
  public:
-  static zx::result<ScopedMemfs> Create(async_dispatcher_t* dispatcher) {
-    memfs_filesystem_t* fs;
-    zx::channel root;
-    zx_status_t status = memfs_create_filesystem(dispatcher, &fs, root.reset_and_get_address());
-    if (status != ZX_OK) {
-      return zx::error(status);
-    }
-    return zx::ok(ScopedMemfs(fs, fidl::ClientEnd<fuchsia_io::Directory>(std::move(root))));
-  }
-
+  // Create and automatically mount a memfs instance at the given path in the local namespace. This
+  // will be unmounted on cleanup.
+  //
+  // Memfs will run on the given dispatcher. This must be a different thread from that of the
+  // ScopedMemfs object because the destructor will synchronize with memfs' cleanup and if this is
+  // the same thread it will deadlock.
   static zx::result<ScopedMemfs> CreateMountedAt(async_dispatcher_t* dispatcher, const char* path) {
     memfs_filesystem_t* fs;
     zx_status_t status = memfs_install_at(dispatcher, path, &fs);
