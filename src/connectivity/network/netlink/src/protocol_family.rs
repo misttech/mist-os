@@ -151,7 +151,7 @@ pub mod route {
         message: &AddressMessage,
         client: &impl Display,
         req: &RtnlMessage,
-    ) -> Option<(NonZeroU32, AddrSubnetEither)> {
+    ) -> Option<interfaces::AddressAndInterfaceArgs> {
         let interface_id = match NonZeroU32::new(message.header.index) {
             Some(interface_id) => interface_id,
             None => {
@@ -163,7 +163,7 @@ pub mod route {
             }
         };
 
-        let addr_bytes = message.nlas.iter().find_map(|nla| match nla {
+        let address_bytes = message.nlas.iter().find_map(|nla| match nla {
             AddressNla::Local(bytes) => Some(bytes),
             nla => {
                 warn!(
@@ -173,8 +173,8 @@ pub mod route {
                 None
             }
         });
-        let addr_bytes = match addr_bytes {
-            Some(addr_bytes) => addr_bytes,
+        let address_bytes = match address_bytes {
+            Some(address_bytes) => address_bytes,
             None => {
                 debug!("missing `Local` NLA in address add request from {}: {:?}", client, req);
                 return None;
@@ -184,22 +184,22 @@ pub mod route {
         let addr = match message.header.family.into() {
             AF_INET => {
                 const BYTES: usize = Ipv4Addr::BYTES as usize;
-                if addr_bytes.len() < BYTES {
+                if address_bytes.len() < BYTES {
                     return None;
                 }
 
                 let mut bytes = [0; BYTES as usize];
-                bytes.copy_from_slice(&addr_bytes[..BYTES]);
+                bytes.copy_from_slice(&address_bytes[..BYTES]);
                 IpAddr::V4(bytes.into())
             }
             AF_INET6 => {
                 const BYTES: usize = Ipv6Addr::BYTES as usize;
-                if addr_bytes.len() < BYTES {
+                if address_bytes.len() < BYTES {
                     return None;
                 }
 
                 let mut bytes = [0; BYTES];
-                bytes.copy_from_slice(&addr_bytes[..BYTES]);
+                bytes.copy_from_slice(&address_bytes[..BYTES]);
                 IpAddr::V6(bytes.into())
             }
             family => {
@@ -211,7 +211,7 @@ pub mod route {
             }
         };
 
-        let addr = match AddrSubnetEither::new(addr, message.header.prefix_len) {
+        let address = match AddrSubnetEither::new(addr, message.header.prefix_len) {
             Ok(address) => address,
             Err(
                 AddrSubnetError::PrefixTooLong
@@ -223,7 +223,7 @@ pub mod route {
             }
         };
 
-        Some((interface_id, addr))
+        Some(interfaces::AddressAndInterfaceArgs { address, interface_id })
     }
 
     #[async_trait]
@@ -311,7 +311,7 @@ pub mod route {
                     client.send(new_done(req_header))
                 }
                 NewAddress(ref message) => {
-                    let (interface_id, address) = match extract_if_id_and_addr_from_addr_message(
+                    let address_and_interface_id = match extract_if_id_and_addr_from_addr_message(
                         message,
                         client,
                         &req,
@@ -327,8 +327,7 @@ pub mod route {
                         args: interfaces::RequestArgs::Address(
                             interfaces::AddressRequestArgs::New(
                                 interfaces::NewAddressArgs {
-                                    address,
-                                    interface_id,
+                                    address_and_interface_id,
                                 },
                             ),
                         ),
@@ -942,8 +941,10 @@ mod test {
             interface_id: interface_id_as_u32(interface_id),
             expected_request_args: Some(RequestAndResponse {
                 request: interfaces::NewAddressArgs {
-                    address: addr,
-                    interface_id: NonZeroU32::new(interface_id_as_u32(interface_id)).unwrap(),
+                    address_and_interface_id: interfaces::AddressAndInterfaceArgs {
+                        address: addr,
+                        interface_id: NonZeroU32::new(interface_id_as_u32(interface_id)).unwrap(),
+                    },
                 },
                 response,
             }),

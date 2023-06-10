@@ -74,24 +74,25 @@ pub(crate) enum GetAddressArgs {
     // filter.
 }
 
+/// The address and interface ID arguments for address requests.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct AddressAndInterfaceArgs {
+    pub address: AddrSubnetEither,
+    pub interface_id: NonZeroU32,
+}
+
 /// Arguments for an RTM_NEWADDR [`Request`].
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct NewAddressArgs {
-    /// The address to be added.
-    pub address: AddrSubnetEither,
-    /// The ID of the interface the address should be added to.
-    pub interface_id: NonZeroU32,
+    /// The address to be added and the interface to add it to.
+    pub address_and_interface_id: AddressAndInterfaceArgs,
 }
 
 /// Arguments for an RTM_DELADDR [`Request`].
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct DelAddressArgs {
-    /// The address to be removed.
-    #[allow(unused)]
-    pub address: AddrSubnetEither,
-    /// The ID of the interface the address should be removed from.
-    #[allow(unused)]
-    pub interface_id: NonZeroU32,
+    /// The address to be removed and the interface to remove it from.
+    pub address_and_interface_id: AddressAndInterfaceArgs,
 }
 
 /// [`Request`] arguments associated with addresses.
@@ -389,7 +390,9 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
 
     async fn handle_new_address_request(
         interfaces_proxy: &fnet_root::InterfacesProxy,
-        NewAddressArgs { address, interface_id }: NewAddressArgs,
+        NewAddressArgs {
+            address_and_interface_id: AddressAndInterfaceArgs { address, interface_id },
+        }: NewAddressArgs,
     ) -> Result<(), RequestError> {
         let control = Self::get_interface_control(interfaces_proxy, interface_id);
 
@@ -489,7 +492,9 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
 
     async fn handle_del_address_request(
         interfaces_proxy: &fnet_root::InterfacesProxy,
-        DelAddressArgs { address, interface_id }: DelAddressArgs,
+        DelAddressArgs {
+            address_and_interface_id: AddressAndInterfaceArgs { address, interface_id },
+        }: DelAddressArgs,
     ) -> Result<(), RequestError> {
         let control = Self::get_interface_control(interfaces_proxy, interface_id);
 
@@ -2087,17 +2092,16 @@ mod tests {
         is_new: bool,
     ) {
         let interface_id = NonZeroU32::new(LO_INTERFACE_ID.try_into().unwrap()).unwrap();
+        let address_and_interface_id = AddressAndInterfaceArgs { address, interface_id };
         pretty_assertions::assert_eq!(
             test_request(
                 if is_new {
                     RequestArgs::Address(AddressRequestArgs::New(NewAddressArgs {
-                        address,
-                        interface_id,
+                        address_and_interface_id,
                     }))
                 } else {
                     RequestArgs::Address(AddressRequestArgs::Del(DelAddressArgs {
-                        address,
-                        interface_id,
+                        address_and_interface_id,
                     }))
                 },
                 |interfaces_request_stream| async {
@@ -2141,16 +2145,15 @@ mod tests {
         mut control_request_handler: F,
     ) -> TestRequestResult {
         let interface_id = NonZeroU32::new(ETH_INTERFACE_ID.try_into().unwrap()).unwrap();
+        let address_and_interface_id = AddressAndInterfaceArgs { address, interface_id };
         test_request(
             if is_new {
                 RequestArgs::Address(AddressRequestArgs::New(NewAddressArgs {
-                    address,
-                    interface_id,
+                    address_and_interface_id,
                 }))
             } else {
                 RequestArgs::Address(AddressRequestArgs::Del(DelAddressArgs {
-                    address,
-                    interface_id,
+                    address_and_interface_id,
                 }))
             },
             |interfaces_request_stream| async {
