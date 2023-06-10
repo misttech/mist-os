@@ -113,7 +113,7 @@ pub async fn get_accessor_selectors(
     let mut result = vec![];
     let instances = get_all_instances(realm_query).await?;
     for instance in instances {
-        match get_manifest(&instance.moniker, realm_query).await {
+        match get_resolved_declaration(&instance.moniker, realm_query).await {
             Ok(decl) => {
                 for capability in decl.capabilities {
                     let capability_name = capability.name().to_string();

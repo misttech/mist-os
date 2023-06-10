@@ -8,7 +8,7 @@ use {
         capability,
         cli::*,
         config::{resolve_raw_config_overrides, RawConfigOverride},
-        realm::{get_manifest, resolve_declaration},
+        realm::{get_resolved_declaration, resolve_declaration},
         route::{DeclType, RouteReport},
     },
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys,
@@ -232,7 +232,9 @@ async fn expected_foo_manifest() -> cm_rust::ComponentDecl {
 async fn get_manifest_static_instance() {
     let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
     let manifest =
-        get_manifest(&AbsoluteMoniker::parse_str("/foo").unwrap(), &realm_query).await.unwrap();
+        get_resolved_declaration(&AbsoluteMoniker::parse_str("/foo").unwrap(), &realm_query)
+            .await
+            .unwrap();
     assert_eq!(manifest, expected_foo_manifest().await);
 }
 

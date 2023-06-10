@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    crate::realm::{get_all_instances, get_manifest, GetAllInstancesError, GetManifestError},
+    crate::realm::{
+        get_all_instances, get_resolved_declaration, GetAllInstancesError, GetManifestError,
+    },
     cm_rust::{ComponentDecl, SourceName},
     fidl_fuchsia_sys2 as fsys,
     moniker::AbsoluteMoniker,
@@ -35,7 +37,7 @@ pub async fn get_all_route_segments(
     let mut segments = vec![];
 
     for instance in instances {
-        match get_manifest(&instance.moniker, realm_query).await {
+        match get_resolved_declaration(&instance.moniker, realm_query).await {
             Ok(decl) => {
                 let mut component_segments = get_segments(&instance.moniker, decl, &query);
                 segments.append(&mut component_segments)

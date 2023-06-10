@@ -176,7 +176,8 @@ pub async fn parse_provided_realm(
         .await
         .map_err(RealmError::InstanceNotResolved)?;
 
-    let manifest = component_debug::realm::get_manifest(&abs_moniker, &realm_query).await?;
+    let manifest =
+        component_debug::realm::get_resolved_declaration(&abs_moniker, &realm_query).await?;
 
     let offers = validate_and_get_offers(manifest, test_collection)?;
 

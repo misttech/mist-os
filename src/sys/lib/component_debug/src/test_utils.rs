@@ -88,6 +88,15 @@ pub fn serve_realm_query(
                         responder.send(Err(fsys::GetInstanceError::InstanceNotFound)).unwrap();
                     }
                 }
+                fsys::RealmQueryRequest::GetResolvedDeclaration { moniker, responder } => {
+                    eprintln!("GetResolvedDeclaration call for {}", moniker);
+                    if let Some(manifest) = manifests.get(&moniker) {
+                        let iterator = serve_manifest_bytes_iterator(manifest.clone());
+                        responder.send(Ok(iterator)).unwrap();
+                    } else {
+                        responder.send(Err(fsys::GetManifestError::InstanceNotFound)).unwrap();
+                    }
+                }
                 fsys::RealmQueryRequest::GetManifest { moniker, responder } => {
                     eprintln!("GetManifest call for {}", moniker);
                     if let Some(manifest) = manifests.get(&moniker) {

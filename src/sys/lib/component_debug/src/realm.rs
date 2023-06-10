@@ -363,11 +363,12 @@ pub async fn get_all_instances(
     Ok(instances?)
 }
 
-pub async fn get_manifest(
+pub async fn get_resolved_declaration(
     moniker: &AbsoluteMoniker,
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<ComponentDecl, GetManifestError> {
     let moniker_str = format!(".{}", moniker.to_string());
+    // TODO(https://fxbug.dev/127340) switch to get_resolved_declaration once OK for ffx compat
     let iterator = match realm_query.get_manifest(&moniker_str).await? {
         Ok(iterator) => Ok(iterator),
         Err(fsys::GetManifestError::InstanceNotFound) => {
@@ -684,7 +685,7 @@ mod tests {
         );
 
         let moniker = AbsoluteMoniker::parse_str("/my_foo").unwrap();
-        let manifest = get_manifest(&moniker, &query).await.unwrap();
+        let manifest = get_resolved_declaration(&moniker, &query).await.unwrap();
 
         assert_eq!(manifest.uses.len(), 1);
         assert_eq!(manifest.exposes.len(), 1);

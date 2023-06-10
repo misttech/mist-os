@@ -7,8 +7,9 @@ use {
         cli::list::get_instances_matching_filter,
         cmx,
         realm::{
-            get_config_fields, get_manifest, get_merkle_root, get_outgoing_capabilities,
-            get_runtime, ConfigField, ExecutionInfo, Instance, InstanceType, ResolvedInfo, Runtime,
+            get_config_fields, get_merkle_root, get_outgoing_capabilities,
+            get_resolved_declaration, get_runtime, ConfigField, ExecutionInfo, Instance,
+            InstanceType, ResolvedInfo, Runtime,
         },
     },
     ansi_term::Colour,
@@ -102,7 +103,8 @@ async fn get_instance_by_query(
                 let resolved_info = match instance.resolved_info {
                     Some(ResolvedInfo { execution_info, resolved_url }) => {
                         // Get the manifest
-                        let manifest = get_manifest(&instance.moniker, &realm_query).await?;
+                        let manifest =
+                            get_resolved_declaration(&instance.moniker, &realm_query).await?;
                         let structured_config =
                             get_config_fields(&instance.moniker, &realm_query).await?;
                         let merkle_root =

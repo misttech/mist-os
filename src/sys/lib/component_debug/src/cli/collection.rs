@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::realm::{get_all_instances, get_manifest, Durability},
+    crate::realm::{get_all_instances, get_resolved_declaration, Durability},
     anyhow::{bail, Result},
     cm_rust::{OfferDeclCommon, OfferTarget},
     fidl_fuchsia_sys2 as fsys,
@@ -73,7 +73,7 @@ async fn get_all_collections_of_instance(
     moniker: &AbsoluteMoniker,
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<Vec<Collection>> {
-    let manifest = get_manifest(moniker, realm_query).await?;
+    let manifest = get_resolved_declaration(moniker, realm_query).await?;
     let mut collections = vec![];
 
     for collection in manifest.collections {

@@ -125,7 +125,13 @@ impl RealmQuery {
                     responder.send(result.as_ref().map_err(|e| *e))
                 }
                 fsys::RealmQueryRequest::GetManifest { moniker, responder } => {
-                    let result = get_manifest(&self.model, &scope_moniker, &moniker).await;
+                    let result =
+                        get_resolved_declaration(&self.model, &scope_moniker, &moniker).await;
+                    responder.send(result)
+                }
+                fsys::RealmQueryRequest::GetResolvedDeclaration { moniker, responder } => {
+                    let result =
+                        get_resolved_declaration(&self.model, &scope_moniker, &moniker).await;
                     responder.send(result)
                 }
                 fsys::RealmQueryRequest::ResolveDeclaration {
@@ -323,7 +329,7 @@ pub async fn get_instance(
 }
 
 /// Encode the component manifest of an instance into a standalone persistable FIDL format.
-pub async fn get_manifest(
+pub async fn get_resolved_declaration(
     model: &Arc<Model>,
     scope_moniker: &AbsoluteMoniker,
     moniker_str: &str,
@@ -886,7 +892,7 @@ mod tests {
 
         model.start().await;
 
-        let iterator = query.get_manifest("./").await.unwrap().unwrap();
+        let iterator = query.get_resolved_declaration("./").await.unwrap().unwrap();
         let iterator = iterator.into_proxy().unwrap();
 
         let mut bytes = vec![];

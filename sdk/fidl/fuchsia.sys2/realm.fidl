@@ -211,6 +211,15 @@ protocol RealmQuery {
     /// is sent across using an iterator. Some manifests are too large to send over a
     /// Zircon channel and we can't use a VMO because we need an approach that is
     /// compatible with overnet.
+    @available(added=13)
+    GetResolvedDeclaration(struct {
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+    }) -> (resource struct {
+        iterator client_end:ManifestBytesIterator;
+    }) error GetManifestError;
+
+    // TODO(https://fxbug.dev/127340) delete once no longer required for ffx compat window
+    /// Prefer `GetResolvedDeclaration` if available for your target API level.
     @available(added=11)
     GetManifest(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;

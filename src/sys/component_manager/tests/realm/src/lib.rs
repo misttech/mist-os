@@ -10,7 +10,7 @@ use fidl_fuchsia_sys2 as fsys;
 use fuchsia_component::client::*;
 
 async fn get_manifest(query: &fsys::RealmQueryProxy, moniker: &str) -> fcdecl::Component {
-    let iterator = query.get_manifest(moniker).await.unwrap().unwrap();
+    let iterator = query.get_resolved_declaration(moniker).await.unwrap().unwrap();
     let iterator = iterator.into_proxy().unwrap();
 
     let mut bytes = vec![];
@@ -73,7 +73,7 @@ pub async fn echo_server() {
     assert_eq!(url, "#meta/echo_server.cm");
     assert!(instance.resolved_info.is_none());
 
-    let err = query.get_manifest("./echo_server").await.unwrap().unwrap_err();
+    let err = query.get_resolved_declaration("./echo_server").await.unwrap().unwrap_err();
     assert_eq!(err, fsys::GetManifestError::InstanceNotResolved);
 
     let err = query.get_structured_config("./echo_server").await.unwrap().unwrap_err();

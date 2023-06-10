@@ -270,6 +270,28 @@ impl MockRealmQuery {
 
                     responder.send(Ok(client_end)).unwrap();
                 }
+                fsys2::RealmQueryRequest::GetResolvedDeclaration { moniker, responder, .. } => {
+                    assert!(moniker.starts_with("./"));
+                    let query_moniker = &moniker[2..];
+                    let res = self.mapping.get(query_moniker).unwrap();
+                    let manifest = res.make_manifest();
+                    let manifest = fidl::encoding::persist(&manifest).unwrap();
+                    let (client_end, server_end) =
+                        create_endpoints::<fsys2::ManifestBytesIteratorMarker>();
+
+                    fuchsia_async::Task::spawn(async move {
+                        let mut stream = server_end.into_stream().unwrap();
+                        let fsys2::ManifestBytesIteratorRequest::Next { responder } =
+                            stream.next().await.unwrap().unwrap();
+                        responder.send(manifest.as_slice()).unwrap();
+                        let fsys2::ManifestBytesIteratorRequest::Next { responder } =
+                            stream.next().await.unwrap().unwrap();
+                        responder.send(&[]).unwrap();
+                    })
+                    .detach();
+
+                    responder.send(Ok(client_end)).unwrap();
+                }
                 fsys2::RealmQueryRequest::GetAllInstances { responder } => {
                     let instances: Vec<fsys2::Instance> =
                         self.mapping.values().map(|m| m.to_instance()).collect();
