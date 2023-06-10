@@ -14,12 +14,14 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <future>
+
 #include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
 
 #include "src/lib/fxl/strings/substitute.h"
 #include "src/lib/storage/vfs/cpp/remote_dir.h"
-#include "src/storage/memfs/scoped_memfs.h"
+#include "src/storage/memfs/mounted_memfs.h"
 
 namespace {
 constexpr char kTmpfsPath[] = "/fshost-flock-tmp";
@@ -32,15 +34,20 @@ class FlockTest : public zxtest::Test {
   FlockTest() : memfs_loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
 
   void SetUp() override {
-    ASSERT_EQ(memfs_loop_.StartThread(), ZX_OK);
+    ASSERT_OK(memfs_loop_.StartThread());
 
-    zx::result<ScopedMemfs> memfs =
-        ScopedMemfs::CreateMountedAt(memfs_loop_.dispatcher(), kTmpfsPath);
-    ASSERT_TRUE(memfs.is_ok());
-    memfs_ = std::make_unique<ScopedMemfs>(std::move(*memfs));
+    zx::result memfs = MountedMemfs::Create(memfs_loop_.dispatcher(), kTmpfsPath);
+    ASSERT_OK(memfs);
+    memfs_.emplace(std::move(memfs.value()));
   }
 
-  void TearDown() override { memfs_.reset(); }
+  void TearDown() override {
+    if (std::optional memfs = std::exchange(memfs_, std::nullopt); memfs.has_value()) {
+      std::promise<zx_status_t> promise;
+      memfs.value()->Shutdown([&promise](zx_status_t status) { promise.set_value(status); });
+      ASSERT_OK(promise.get_future().get(), );
+    }
+  }
 
  protected:
   fbl::RefPtr<fs::RemoteDir> GetRemoteDir() {
@@ -89,7 +96,7 @@ class FlockTest : public zxtest::Test {
   bool use_first_fd_;
 
   async::Loop memfs_loop_;
-  std::unique_ptr<ScopedMemfs> memfs_;
+  std::optional<MountedMemfs> memfs_;
 };
 
 TEST_F(FlockTest, FlockOnDir) {

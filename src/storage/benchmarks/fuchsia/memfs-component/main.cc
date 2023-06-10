@@ -89,7 +89,6 @@ class MemfsHandler {
   std::mutex mutex_;
   OutgoingDirectory& outgoing_directory_ __TA_GUARDED(mutex_);
 
-  // TODO(fxbug.dev/95299) Switch back to ScopedMemfs when it supports client side streams.
   std::unique_ptr<memfs::Memfs> memfs_ __TA_GUARDED(mutex_);
 };
 

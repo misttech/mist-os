@@ -13,6 +13,8 @@
 #include <lib/sync/completion.h>
 
 #include <cstdint>
+#include <future>
+#include <utility>
 
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
@@ -22,7 +24,7 @@
 #include "src/lib/files/path.h"
 #include "src/lib/fxl/strings/join_strings.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
-#include "src/storage/memfs/scoped_memfs.h"
+#include "src/storage/memfs/mounted_memfs.h"
 
 class StorageMetricsTest : public ::testing::Test {
  public:
@@ -37,9 +39,9 @@ class StorageMetricsTest : public ::testing::Test {
     testing::Test::SetUp();
     ASSERT_EQ(ZX_OK, loop_.StartThread());
 
-    zx::result<ScopedMemfs> memfs = ScopedMemfs::CreateMountedAt(loop_.dispatcher(), kTestRoot);
-    ASSERT_TRUE(memfs.is_ok());
-    memfs_ = std::make_unique<ScopedMemfs>(std::move(*memfs));
+    zx::result memfs = MountedMemfs::Create(loop_.dispatcher(), kTestRoot);
+    ASSERT_TRUE(memfs.is_ok()) << memfs.status_string();
+    memfs_.emplace(std::move(memfs.value()));
 
     files::CreateDirectory(kPersistentPath);
     files::CreateDirectory(kCachePath);
@@ -50,10 +52,13 @@ class StorageMetricsTest : public ::testing::Test {
     metrics_ = std::make_unique<StorageMetrics>(std::move(watch),
                                                 inspector_.GetRoot().CreateChild(kInspectNodeName));
   }
-  // Set up the async loop, create memfs, install memfs at /hippo_storage
+
   void TearDown() override {
-    memfs_->set_cleanup_timeout(zx::sec(5));
-    memfs_.reset();
+    if (std::optional memfs = std::exchange(memfs_, std::nullopt); memfs.has_value()) {
+      std::promise<zx_status_t> promise;
+      memfs.value()->Shutdown([&promise](zx_status_t status) { promise.set_value(status); });
+      ASSERT_EQ(promise.get_future().get(), ZX_OK);
+    }
   }
 
   // Grabs a new Hierarchy snapshot from Inspect.
@@ -117,7 +122,7 @@ class StorageMetricsTest : public ::testing::Test {
 
  private:
   async::Loop loop_;
-  std::unique_ptr<ScopedMemfs> memfs_;
+  std::optional<MountedMemfs> memfs_;
 };
 
 // Basic test with two components.

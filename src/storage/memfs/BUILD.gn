@@ -87,10 +87,11 @@ zx_library("memfs") {
 
 # A C++ wrapper around the C "memfs" shared library that handles setup and tear-down.
 source_set("cpp") {
-  public = [ "scoped_memfs.h" ]
+  public = [ "mounted_memfs.h" ]
+  sources = [ "mounted_memfs.cc" ]
 
   public_deps = [
-    ":memfs",
+    ":lib",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
   ]
 }

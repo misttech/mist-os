@@ -10,6 +10,8 @@
 #include <lib/fdio/namespace.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include <future>
+
 #include <gtest/gtest.h>
 #include <src/lib/files/file.h>
 #include <src/lib/files/path.h>
@@ -17,7 +19,7 @@
 #include "src/developer/memory/metrics/capture.h"
 #include "src/developer/memory/metrics/tests/test_utils.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
-#include "src/storage/memfs/scoped_memfs.h"
+#include "src/storage/memfs/mounted_memfs.h"
 
 using namespace memory;
 
@@ -37,10 +39,9 @@ class HighWaterUnitTest : public gtest::RealLoopFixture {
     // Install memfs on a different async loop thread to resolve some deadlock when doing blocking
     // file operations on our test loop.
     memfs_loop_.StartThread();
-    zx::result<ScopedMemfs> memfs =
-        ScopedMemfs::CreateMountedAt(memfs_loop_.dispatcher(), kMemfsDir);
-    ASSERT_TRUE(memfs.is_ok());
-    data_ = std::make_unique<ScopedMemfs>(std::move(*memfs));
+    zx::result memfs = MountedMemfs::Create(memfs_loop_.dispatcher(), kMemfsDir);
+    ASSERT_TRUE(memfs.is_ok()) << memfs.status_string();
+    memfs_.emplace(std::move(memfs.value()));
 
     memfs_dir_ = open(kMemfsDir, O_RDONLY | O_DIRECTORY);
     ASSERT_LT(0, memfs_dir_);
@@ -50,13 +51,17 @@ class HighWaterUnitTest : public gtest::RealLoopFixture {
     RealLoopFixture::TearDown();
 
     close(memfs_dir_);
-    data_.reset();
+    if (std::optional memfs = std::exchange(memfs_, std::nullopt); memfs.has_value()) {
+      std::promise<zx_status_t> promise;
+      memfs.value()->Shutdown([&promise](zx_status_t status) { promise.set_value(status); });
+      ASSERT_EQ(promise.get_future().get(), ZX_OK);
+    }
     memfs_loop_.Shutdown();
   }
 
   //  private:
   async::Loop memfs_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
-  std::unique_ptr<ScopedMemfs> data_;
+  std::optional<MountedMemfs> memfs_;
 };
 
 TEST_F(HighWaterUnitTest, Basic) {
