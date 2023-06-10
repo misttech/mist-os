@@ -15,6 +15,7 @@ use {
         stream_util::StreamUtil,
     },
     anyhow::{anyhow, Context as _},
+    fidl::Peered,
     fidl_fuchsia_io as fio, fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync,
     futures::{
         future::{join_all, BoxFuture, FutureExt, TryFutureExt},
@@ -78,10 +79,10 @@ where
                 let directory = directory.into_proxy()?;
                 let result =
                     artifacts::copy_custom_artifact_directory(directory, directory_artifact).await;
-                // Dropping token here explicitly rather than using RAII, because the compiler
-                // appeared to be dropping the token early when a un-destructured DirectoryAndToken
-                // was captured by this async block and allowed to go out of scope naturally.
-                drop(token);
+                // TODO(fxbug.dev/84882): Remove this signal once Overnet
+                // supports automatically signalling EVENTPAIR_CLOSED when the
+                // handle is closed.
+                let _ = token.signal_peer(fidl::Signals::empty(), fidl::Signals::USER_0);
                 result
             }
             .map_ok(|()| None)
