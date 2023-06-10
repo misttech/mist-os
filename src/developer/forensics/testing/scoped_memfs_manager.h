@@ -7,13 +7,15 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/memfs/memfs.h>
 #include <lib/sync/completion.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include <map>
+#include <future>
 #include <string>
+#include <unordered_map>
 #include <vector>
+
+#include "src/storage/memfs/mounted_memfs.h"
 
 namespace forensics::testing {
 
@@ -23,16 +25,16 @@ class ScopedMemFsManager {
   ScopedMemFsManager() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
 
   ~ScopedMemFsManager() {
-    std::vector<std::string> paths;
-    paths.reserve(filesystems_.size());
+    std::vector<std::promise<zx_status_t>> promises;
+    promises.reserve(filesystems_.size());
 
-    // Store the paths because Destroy mutates |filesystems_|.
-    for (const auto& [path, _] : filesystems_) {
-      paths.push_back(path);
+    for (const auto& [_, memfs] : filesystems_) {
+      std::promise<zx_status_t>& promise = promises.emplace_back();
+      memfs->Shutdown([&promise](zx_status_t status) { promise.set_value(status); });
     }
 
-    for (const auto& path : paths) {
-      Destroy(path);
+    for (auto& promise : promises) {
+      FX_CHECK(promise.get_future().get() == ZX_OK);
     }
 
     loop_.Shutdown();
@@ -47,20 +49,22 @@ class ScopedMemFsManager {
       FX_CHECK(loop_.StartThread("forensics-scoped-memfs-manager") == ZX_OK);
       started_ = true;
     }
-    FX_CHECK(memfs_install_at(loop_.dispatcher(), path.c_str(), &filesystems_[path]) == ZX_OK);
+    zx::result memfs = MountedMemfs::Create(loop_.dispatcher(), path.c_str());
+    FX_CHECK(memfs.is_ok()) << memfs.status_string();
+    filesystems_.emplace(path, std::move(memfs.value()));
   }
 
   // Destroy the memfs backed directory at |path| in the component's namespace.
   void Destroy(const std::string& path) {
-    FX_CHECK(Contains(path));
-    sync_completion_t wait;
-    memfs_free_filesystem(filesystems_[path], &wait);
-    FX_CHECK(sync_completion_wait(&wait, ZX_TIME_INFINITE) == 0);
-    filesystems_.erase(path);
+    auto nh = filesystems_.extract(path);
+    FX_CHECK(!nh.empty());
+    std::promise<zx_status_t> promise;
+    nh.mapped()->Shutdown([&promise](zx_status_t status) { promise.set_value(status); });
+    FX_CHECK(promise.get_future().get() == ZX_OK);
   }
 
  private:
-  std::map<std::string, memfs_filesystem_t*> filesystems_;
+  std::unordered_map<std::string, MountedMemfs> filesystems_;
   async::Loop loop_;
   bool started_{false};
 };

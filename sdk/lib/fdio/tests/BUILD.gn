@@ -117,7 +117,7 @@ test("fdio-test") {
       "//sdk/lib/zxio",
       "//src/connectivity/network/netstack/udp_serde",
       "//src/connectivity/network/tests/socket:util",
-      "//src/storage/memfs",
+      "//src/storage/memfs:cpp",
       "//zircon/system/ulib/async:async-cpp",
       "//zircon/system/ulib/async-loop:async-loop-cpp",
       "//zircon/system/ulib/async-loop:async-loop-default",

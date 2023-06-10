@@ -346,7 +346,6 @@ sdk_molecule("core_lib") {
     "//src/lib/fidl/cpp:cpp_sdk",
     "//src/lib/fidl/cpp:hlcpp_conversion_sdk",
     "//src/lib/fidl/cpp:natural_ostream_sdk",
-    "//src/storage/memfs:memfs_sdk",
     "//zircon/system/ulib/async:async-cpp_sdk",
     "//zircon/system/ulib/async:async_sdk",
     "//zircon/system/ulib/async-default:async-default_sdk",

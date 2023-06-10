@@ -105,7 +105,6 @@ _sdk_versioned_shared_libraries_list = [
   "//sdk/lib/fdio:fdio",
   "//sdk/lib/svc:svc",
   "//src/devices/bin/driver_runtime:driver_runtime",
-  "//src/storage/memfs:memfs",
   "//third_party/Vulkan-Loader:libvulkan",
   "//zircon/system/ulib/async-default:async-default",
   "//zircon/system/ulib/syslog:syslog",

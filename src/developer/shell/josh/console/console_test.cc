@@ -6,14 +6,16 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/memfs/memfs.h>
 #include <stdlib.h>
 
 #include <array>
 #include <fstream>
+#include <future>
 #include <string>
 
 #include <gtest/gtest.h>
+
+#include "src/storage/memfs/mounted_memfs.h"
 
 namespace shell {
 
@@ -29,9 +31,10 @@ class ConsoleTest : public ::testing::Test {
 
  protected:
   void SetUp() override {
-    loop_ = new async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-    ASSERT_EQ(loop_->StartThread(), ZX_OK);
-    ASSERT_EQ(ZX_OK, memfs_install_at(loop_->dispatcher(), "/test_tmp", &fs_));
+    ASSERT_EQ(loop_.StartThread(), ZX_OK);
+    zx::result memfs = MountedMemfs::Create(loop_.dispatcher(), "/test_tmp");
+    ASSERT_TRUE(memfs.is_ok()) << memfs.status_string();
+    memfs_.emplace(std::move(memfs.value()));
 
     // Make sure file creation is OK so memfs is running OK.
     char tmpfs_test_file[] = "/test_tmp/write.test.XXXXXX";
@@ -40,14 +43,13 @@ class ConsoleTest : public ::testing::Test {
 
   void TearDown() override {
     // Synchronously clean up.
-    sync_completion_t unmounted;
-    memfs_free_filesystem(fs_, &unmounted);
-    sync_completion_wait(&unmounted, zx::duration::infinite().get());
-    fs_ = nullptr;
+    if (std::optional memfs = std::exchange(memfs_, std::nullopt); memfs.has_value()) {
+      std::promise<zx_status_t> promise;
+      memfs.value()->Shutdown([&promise](zx_status_t status) { promise.set_value(status); });
+      ASSERT_EQ(promise.get_future().get(), ZX_OK);
+    }
 
-    loop_->Shutdown();
-    delete loop_;
-    loop_ = nullptr;
+    loop_.Shutdown();
   }
 
   void AssertJsArgsEq(int argc, const char **argv, std::string_view expect_list) {
@@ -80,8 +82,8 @@ class ConsoleTest : public ::testing::Test {
     ASSERT_EQ(0, shell::ConsoleMain(real_argc, real_argv));
   }
 
-  async::Loop *loop_;
-  memfs_filesystem_t *fs_;
+  async::Loop loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  std::optional<MountedMemfs> memfs_;
 };
 
 // Sanity check test to make sure Hello World works.

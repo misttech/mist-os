@@ -18,7 +18,7 @@ class MountedMemfs {
   MountedMemfs(MountedMemfs&&) = default;
   ~MountedMemfs() { [[maybe_unused]] zx_status_t status = fdio_ns_unbind(ns_, path_.c_str()); }
 
-  const std::unique_ptr<memfs::Memfs>& operator->() { return memfs_; }
+  const std::unique_ptr<memfs::Memfs>& operator->() const { return memfs_; }
 
   // Create and automatically mount a memfs instance at the given path in the local namespace. This
   // will be unmounted on cleanup.

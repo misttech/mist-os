@@ -231,7 +231,6 @@ group("deprecated_zx_wrapper_allowlist") {
     "//src/storage/lib/disk_inspector:*",
     "//src/storage/lib/paver:*",
     "//src/storage/lib/watchdog:*",
-    "//src/storage/memfs:*",
     "//src/ui/input/testing/fake-hidbus-ifc:*",
     "//src/ui/input/testing/mock-hidbus-ifc:*",
     "//third_party/android/platform/external/avb:*",

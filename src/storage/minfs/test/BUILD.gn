@@ -107,7 +107,6 @@ test("minfs-power") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
     "//src/lib/fxl/test:gtest_main",
     "//src/storage/fs_test",
-    "//src/storage/memfs",
     "//src/storage/minfs",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/async",

@@ -6,15 +6,16 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/memfs/memfs.h>
 
 #include <filesystem>
 #include <fstream>
+#include <future>
 #include <string>
 
 #include <gtest/gtest.h>
 
 #include "src/developer/shell/josh/lib/js_testing_utils.h"
+#include "src/storage/memfs/mounted_memfs.h"
 #include "third_party/quickjs/quickjs.h"
 
 namespace fs = std::filesystem;
@@ -32,9 +33,10 @@ class RuntimeTest : public JsTest {
       FAIL();
     }
 
-    loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigNoAttachToCurrentThread);
-    ASSERT_EQ(loop_->StartThread(), ZX_OK);
-    ASSERT_EQ(ZX_OK, memfs_install_at(loop_->dispatcher(), "/test_tmp", &fs_));
+    ASSERT_EQ(loop_.StartThread(), ZX_OK);
+    zx::result memfs = MountedMemfs::Create(loop_.dispatcher(), "/test_tmp");
+    ASSERT_TRUE(memfs.is_ok()) << memfs.status_string();
+    memfs_.emplace(std::move(memfs.value()));
 
     // Make sure file creation is OK so memfs is running OK.
     char tmpfs_test_file[] = "/test_tmp/runtime.test.XXXXXX";
@@ -43,18 +45,19 @@ class RuntimeTest : public JsTest {
 
   void TearDown() override {
     // Synchronously clean up.
-    sync_completion_t unmounted;
-    memfs_free_filesystem(fs_, &unmounted);
-    sync_completion_wait(&unmounted, zx::duration::infinite().get());
-    fs_ = nullptr;
+    if (std::optional memfs = std::exchange(memfs_, std::nullopt); memfs.has_value()) {
+      std::promise<zx_status_t> promise;
+      memfs.value()->Shutdown([&promise](zx_status_t status) { promise.set_value(status); });
+      ASSERT_EQ(promise.get_future().get(), ZX_OK);
+    }
 
-    loop_->Shutdown();
+    loop_.Shutdown();
 
     JsTest::TearDown();
   }
 
-  std::unique_ptr<async::Loop> loop_;
-  memfs_filesystem_t *fs_;
+  async::Loop loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  std::optional<MountedMemfs> memfs_;
 };
 
 TEST_F(RuntimeTest, TestNonExistsStartupScriptsDir) {
@@ -154,7 +157,7 @@ TEST_F(RuntimeTest, TestStartupScripts) {
         }
         file.close();
     )"));
-  loop_->RunUntilIdle();
+  loop_.RunUntilIdle();
 }
 
 }  // namespace shell

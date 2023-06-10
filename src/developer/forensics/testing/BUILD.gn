@@ -32,7 +32,7 @@ source_set("scoped_memfs_manager") {
 
   public_deps = [
     "//sdk/lib/syslog/cpp",
-    "//src/storage/memfs",
+    "//src/storage/memfs:cpp",
     "//zircon/system/ulib/async-loop",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

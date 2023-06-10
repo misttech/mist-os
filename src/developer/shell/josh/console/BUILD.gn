@@ -59,7 +59,7 @@ source_set("tests") {
   ]
   deps = [
     ":console",
-    "//src/storage/memfs",
+    "//src/storage/memfs:cpp",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/async-loop",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

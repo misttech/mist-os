@@ -4,17 +4,18 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/memfs/memfs.h>
 #include <stdlib.h>
 
 #include <array>
 #include <fstream>
+#include <future>
 #include <string>
 
 #include <gtest/gtest.h>
 
 #include "js_testing_utils.h"
 #include "src/developer/shell/josh/console/console.h"
+#include "src/storage/memfs/mounted_memfs.h"
 
 namespace shell {
 
@@ -57,8 +58,8 @@ TEST_F(NsTest, ListFiles) {
   InitBuiltins("/pkg/data/fidling", "/pkg/data/lib");
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_EQ(loop.StartThread(), ZX_OK);
-  memfs_filesystem_t* fs;
-  ASSERT_EQ(ZX_OK, memfs_install_at(loop.dispatcher(), "/ns_test_tmp", &fs));
+  zx::result memfs = MountedMemfs::Create(loop.dispatcher(), "/ns_test_tmp");
+  ASSERT_TRUE(memfs.is_ok()) << memfs.status_string();
 
   std::string test_string = R"(
       globalThis.resultOne = ns.ls("/ns_test_tmp");
@@ -118,9 +119,9 @@ TEST_F(NsTest, ListFiles) {
   )";
   ASSERT_EVAL(ctx_, test_string);
 
-  sync_completion_t unmounted;
-  memfs_free_filesystem(fs, &unmounted);
-  sync_completion_wait(&unmounted, zx::duration::infinite().get());
+  std::promise<zx_status_t> promise;
+  memfs.value()->Shutdown([&promise](zx_status_t status) { promise.set_value(status); });
+  ASSERT_EQ(promise.get_future().get(), ZX_OK);
 
   loop.Shutdown();
 }

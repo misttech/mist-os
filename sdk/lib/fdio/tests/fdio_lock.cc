@@ -13,7 +13,7 @@
 // use this will hang or not work reliably.
 //
 // Uncomment if /proc/<process_id>/task/<thread_id>/wchan works.
-//#define LINUX_HAS_WCHAN (1)
+// #define LINUX_HAS_WCHAN (1)
 #ifdef LINUX_HAS_WCHAN
 
 #include <sys/types.h>
@@ -35,17 +35,13 @@
 
 #include <algorithm>
 #include <functional>
+#include <future>
 #include <memory>
 #include <semaphore>
 #include <thread>
 #include <vector>
 
 #include <zxtest/zxtest.h>
-
-// These tests are deterministic, but rely
-// on polling. We need to wait durings polls
-// so as not to thrash the CPU.
-constexpr long POLL_TIME_NS = 5000000L;
 
 #ifdef __Fuchsia__
 
@@ -54,16 +50,23 @@ constexpr long POLL_TIME_NS = 5000000L;
 #include <lib/async/cpp/task.h>
 #include <lib/fdio/fdio.h>
 #include <lib/fdio/unsafe.h>
-#include <lib/memfs/memfs.h>
 #include <lib/zxio/types.h>
 #include <lib/zxio/zxio.h>
 #include <zircon/process.h>
 
-const std::string flock_root("/flock_test");
-#else
+#include "src/storage/memfs/mounted_memfs.h"
 
-const std::string flock_root("/tmp");
+static constexpr char flock_root[] = "/flock_test";
+#else
+static constexpr char flock_root[] = "/tmp";
 #endif
+
+namespace {
+
+// These tests are deterministic, but rely
+// on polling. We need to wait durings polls
+// so as not to thrash the CPU.
+constexpr int64_t POLL_TIME_NS = 5000000L;
 
 const ssize_t FILE_SIZE = 1024;
 
@@ -135,7 +138,7 @@ class LockThread {
 #else
   void registerThreadInfo() {}
   // all tests run with this pollForBlock fail
-  void pollForBlock() {
+  static void pollForBlock() {
     (void)POLL_TIME_NS;
     ASSERT_EQ(true, false);
   }
@@ -159,25 +162,26 @@ class TempFile {
   std::vector<int> fds_;
   bool use_first_fd_;
 #ifdef __Fuchsia__
-  memfs_filesystem_t* memfs_;
+  std::optional<MountedMemfs> memfs_;
   async::Loop loop_;
 #endif
 
  public:
   TempFile() : TempFile(FILE_SIZE) {}
-  TempFile(ssize_t size)
+  explicit TempFile(ssize_t size)
       : file_name_(flock_root + std::string("/flock_smoke")),
         size_(size)
 #ifdef __Fuchsia__
         ,
-        memfs_(nullptr),
         loop_(&kAsyncLoopConfigNoAttachToCurrentThread)
 #endif
   {
 
 #ifdef __Fuchsia__
-    ASSERT_EQ(loop_.StartThread(), ZX_OK);
-    ASSERT_EQ(memfs_install_at(loop_.dispatcher(), flock_root.c_str(), &memfs_), ZX_OK);
+    ASSERT_OK(loop_.StartThread());
+    zx::result memfs = MountedMemfs::Create(loop_.dispatcher(), flock_root);
+    ASSERT_OK(memfs);
+    memfs_.emplace(std::move(memfs.value()));
 #endif
     int fd = open(file_name_.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
     use_first_fd_ = true;  // first |GetFd| gets this one
@@ -194,10 +198,11 @@ class TempFile {
     unlink(file_name_.c_str());
 
 #ifdef __Fuchsia__
-    sync_completion_t unmounted;
-    memfs_free_filesystem(memfs_, &unmounted);
-    memfs_ = nullptr;
-    ASSERT_EQ(sync_completion_wait(&unmounted, zx::duration::infinite().get()), ZX_OK);
+    if (std::optional memfs = std::exchange(memfs_, std::nullopt); memfs.has_value()) {
+      std::promise<zx_status_t> promise;
+      memfs.value()->Shutdown([&promise](zx_status_t status) { promise.set_value(status); });
+      ASSERT_OK(promise.get_future().get(), );
+    }
 
     loop_.Shutdown();
 #endif
@@ -412,3 +417,5 @@ TEST(LockingTest, FlockCloseUnlocks) {
   EXPECT_EQ(0, close(fd_a));
 }
 #endif
+
+}  // namespace

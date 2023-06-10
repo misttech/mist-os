@@ -14,7 +14,6 @@
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
 #include <lib/fdio/vfs.h>
-#include <lib/memfs/memfs.h>
 #include <limits.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -23,10 +22,13 @@
 #include <zircon/processargs.h>
 #include <zircon/syscalls.h>
 
+#include <future>
 #include <utility>
 
 #include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
+
+#include "src/storage/memfs/mounted_memfs.h"
 
 namespace {
 
@@ -36,8 +38,8 @@ TEST(FidlTests, TestFidlBasic) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
-  memfs_filesystem_t* fs;
-  ASSERT_OK(memfs_install_at(loop.dispatcher(), "/fidltmp", &fs));
+  zx::result memfs = MountedMemfs::Create(loop.dispatcher(), "/fidltmp");
+  ASSERT_OK(memfs);
   fbl::unique_fd fd(open("/fidltmp", O_DIRECTORY | O_RDONLY));
   ASSERT_GE(fd.get(), 0);
 
@@ -69,9 +71,9 @@ TEST(FidlTests, TestFidlBasic) {
   ASSERT_FALSE(describe_result.value().has_observer());
   endpoints->client.TakeChannel().reset();
 
-  sync_completion_t unmounted;
-  memfs_free_filesystem(fs, &unmounted);
-  sync_completion_wait(&unmounted, zx::duration::infinite().get());
+  std::promise<zx_status_t> promise;
+  memfs.value()->Shutdown([&promise](zx_status_t status) { promise.set_value(status); });
+  ASSERT_EQ(promise.get_future().get(), ZX_OK);
 
   loop.Shutdown();
 }
@@ -80,8 +82,8 @@ TEST(FidlTests, TestFidlOpenReadOnly) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
-  memfs_filesystem_t* fs;
-  ASSERT_OK(memfs_install_at(loop.dispatcher(), "/fidltmp-ro", &fs));
+  zx::result memfs = MountedMemfs::Create(loop.dispatcher(), "/fidltmp-ro");
+  ASSERT_OK(memfs);
   fbl::unique_fd fd(open("/fidltmp-ro", O_DIRECTORY | O_RDONLY));
   ASSERT_GE(fd.get(), 0);
 
@@ -103,9 +105,9 @@ TEST(FidlTests, TestFidlOpenReadOnly) {
   ASSERT_EQ(result->flags, fio::wire::OpenFlags::kRightReadable);
   endpoints->client.TakeChannel().reset();
 
-  sync_completion_t unmounted;
-  memfs_free_filesystem(fs, &unmounted);
-  sync_completion_wait(&unmounted, zx::duration::infinite().get());
+  std::promise<zx_status_t> promise;
+  memfs.value()->Shutdown([&promise](zx_status_t status) { promise.set_value(status); });
+  ASSERT_EQ(promise.get_future().get(), ZX_OK);
 
   loop.Shutdown();
 }
@@ -133,8 +135,8 @@ TEST(FidlTests, TestFidlQueryFilesystem) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread());
 
-  memfs_filesystem_t* fs;
-  ASSERT_OK(memfs_install_at(loop.dispatcher(), "/fidltmp-basic", &fs));
+  zx::result memfs = MountedMemfs::Create(loop.dispatcher(), "/fidltmp-basic");
+  ASSERT_OK(memfs);
   fbl::unique_fd fd(open("/fidltmp-basic", O_DIRECTORY | O_RDONLY));
   ASSERT_GE(fd.get(), 0);
 
@@ -146,9 +148,9 @@ TEST(FidlTests, TestFidlQueryFilesystem) {
   ASSERT_EQ(info.total_bytes, UINT64_MAX);
   ASSERT_EQ(info.used_bytes, 0);
 
-  sync_completion_t unmounted;
-  memfs_free_filesystem(fs, &unmounted);
-  sync_completion_wait(&unmounted, zx::duration::infinite().get());
+  std::promise<zx_status_t> promise;
+  memfs.value()->Shutdown([&promise](zx_status_t status) { promise.set_value(status); });
+  ASSERT_EQ(promise.get_future().get(), ZX_OK);
 
   loop.Shutdown();
 }

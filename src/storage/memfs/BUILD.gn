@@ -16,7 +16,6 @@ template("memfs_lib") {
     ]
     sources = [
       "dnode.cc",
-      "include/lib/memfs/memfs.h",
       "memfs.cc",
       "vnode.cc",
       "vnode_dir.cc",
@@ -57,42 +56,16 @@ memfs_lib("lib-with-client-side-streams") {
   defines = [ "MEMFS_ENABLE_CLIENT_SIDE_STREAMS" ]
 }
 
-# libmemfs.so: The C ABI client library.
-#
-# Used to create local temporary filesystems.
-zx_library("memfs") {
-  sdk = "shared"
-  sdk_publishable = true
-  sdk_headers = [ "lib/memfs/memfs.h" ]
-
-  sources = [ "memfs_api.cc" ]
-  public_deps = [
-    # <lib/memfs/memfs.h> has #include <lib/async/dispatcher.h>.
-    "//zircon/system/ulib/async",
-
-    # <lib/memfs/memfs.h> has #include <lib/sync/completion.h>.
-    "//zircon/system/ulib/sync",
-  ]
-  deps = [
-    ":lib",
-    "//sdk/lib/fdio",
-    "//src/lib/storage/vfs/cpp",
-    "//zircon/system/ulib/fbl",
-  ]
-  runtime_deps = [
-    "//sdk/lib/fdio:fdio_sdk",
-    "//zircon/system/ulib/trace-engine:trace-engine_sdk",
-  ]
-}
-
 # A C++ wrapper around the C "memfs" shared library that handles setup and tear-down.
 source_set("cpp") {
   public = [ "mounted_memfs.h" ]
   sources = [ "mounted_memfs.cc" ]
 
+  deps = [ "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire" ]
+
   public_deps = [
     ":lib",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    "//zircon/system/ulib/zx",
   ]
 }
 

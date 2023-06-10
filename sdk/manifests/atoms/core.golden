@@ -208,7 +208,6 @@
 //src/lib/vulkan:vulkan_layers
 //src/storage/bin/fvm:fvm_sdk
 //src/storage/blobfs/tools:blobfs_sdk
-//src/storage/memfs:memfs_sdk_manifest
 //src/storage/minfs/tools:minfs_sdk
 //src/storage/tools/blobfs-compression:blobfs-compression_sdk
 //src/sys/pkg/bin/far:bin_sdk

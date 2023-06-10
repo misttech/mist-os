@@ -12,7 +12,6 @@
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
-#include <lib/memfs/memfs.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/vmo.h>
 #include <sys/stat.h>
