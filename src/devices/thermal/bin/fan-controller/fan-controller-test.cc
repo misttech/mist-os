@@ -221,8 +221,6 @@ class FanControllerTest : public zxtest::Test {
   uint32_t next_device_number_ = 0;
   fs::SynchronousVfs vfs_{fs_loop_.dispatcher()};
   // Note this _must_ be RefPtrs since vfs_ will try to AdoptRef on the raw pointer passed to it.
-  //
-  // TODO(fxbug.dev/35505): Migrate to //sdk/lib/vfs/cpp once that supports watching on PseudoDir.
   fbl::RefPtr<fs::PseudoDir> dir_{fbl::MakeRefCounted<fs::PseudoDir>()};
 };
 

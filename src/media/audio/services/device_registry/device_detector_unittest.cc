@@ -198,8 +198,6 @@ class DeviceDetectorTest : public gtest::TestLoopFixture {
   fs::SynchronousVfs vfs_{dispatcher()};
 
   // Note these _must_ be RefPtrs since vfs_ will try to AdoptRef on the raw pointer passed to it.
-  //
-  // TODO(fxbug.dev/35505): Migrate to //sdk/lib/vfs/cpp once that supports watching on PseudoDir.
   fbl::RefPtr<fs::PseudoDir> input_dir_{fbl::MakeRefCounted<fs::PseudoDir>()};
   fbl::RefPtr<fs::PseudoDir> output_dir_{fbl::MakeRefCounted<fs::PseudoDir>()};
 };
