@@ -15,8 +15,8 @@ class MyDriver : public DriverBase {
       : DriverBase("my_driver", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {
-    // context().incoming()->Connect(...);
-    // context().outgoing()->AddService(...);
+    // incoming()->Connect(...);
+    // outgoing()->AddService(...);
     FDF_LOG(INFO, "hello world!");
     return zx::ok();
   }
@@ -41,8 +41,8 @@ class AnotherDriver : public DriverBase {
   using DriverBase::DriverBase;
 
   zx::result<> Start() override {
-    // context().incoming()->Connect(...);
-    // context().outgoing()->AddService(...);
+    // incoming()->Connect(...);
+    // outgoing()->AddService(...);
     FDF_LOG(INFO, "foobar!");
     return zx::ok();
   }

@@ -38,8 +38,9 @@ zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AddChild(
 }
 
 zx::result<> SendAck(fdf::Logger& logger, std::string_view node_name,
-                     const fdf::DriverContext& context, std::string_view driver_name) {
-  auto connect_result = context.incoming()->Connect<ft::Waiter>();
+                     const std::shared_ptr<fdf::Namespace>& incoming,
+                     std::string_view driver_name) {
+  auto connect_result = incoming->Connect<ft::Waiter>();
   if (connect_result.is_error()) {
     FDF_LOGL(ERROR, logger, "Failed to connect to ft::Waiter: %s", connect_result.status_string());
     return connect_result.take_error();

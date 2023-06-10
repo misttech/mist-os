@@ -48,18 +48,17 @@ class InputReportDriver : public fdf::DriverBase {
     input_report_.emplace(std::move(hiddev));
 
     // Expose the driver's inspect data.
-    exposed_inspector_.emplace(inspect::ComponentInspector(
-        context().outgoing()->component(), dispatcher(), input_report_->Inspector()));
+    exposed_inspector_.emplace(inspect::ComponentInspector(outgoing()->component(), dispatcher(),
+                                                           input_report_->Inspector()));
 
     // Start the inner DFv1 driver.
     input_report_->Start();
 
     // Export our InputReport protocol.
-    auto status =
-        context().outgoing()->component().AddUnmanagedProtocol<fuchsia_input_report::InputDevice>(
-            input_report_bindings_.CreateHandler(&input_report_.value(), dispatcher(),
-                                                 fidl::kIgnoreBindingClosure),
-            kDeviceName);
+    auto status = outgoing()->component().AddUnmanagedProtocol<fuchsia_input_report::InputDevice>(
+        input_report_bindings_.CreateHandler(&input_report_.value(), dispatcher(),
+                                             fidl::kIgnoreBindingClosure),
+        kDeviceName);
     if (status.is_error()) {
       return status.take_error();
     }

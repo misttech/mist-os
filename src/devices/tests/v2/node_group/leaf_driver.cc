@@ -29,7 +29,7 @@ class LeafDriver : public fdf::DriverBase {
   }
 
   void RunAsync() {
-    auto connect_result = context().incoming()->Connect<ft::Waiter>();
+    auto connect_result = incoming()->Connect<ft::Waiter>();
     if (connect_result.is_error()) {
       FDF_LOG(ERROR, "Failed to start leaf driver: %s", connect_result.status_string());
       node().reset();
@@ -49,7 +49,7 @@ class LeafDriver : public fdf::DriverBase {
 
  private:
   zx::result<uint32_t> GetNumber(std::string_view instance) {
-    auto device = context().incoming()->Connect<ft::Service::Device>(instance);
+    auto device = incoming()->Connect<ft::Service::Device>(instance);
     if (device.status_value() != ZX_OK) {
       FDF_LOG(ERROR, "Failed to connect to %s: %s", instance.data(), device.status_string());
       return device.take_error();

@@ -46,8 +46,7 @@ class RootDriver : public fdf::DriverBase,
     ft::Service::InstanceHandler handler(
         {.setter = std::move(setter), .getter = std::move(getter)});
 
-    zx::result<> status =
-        context().outgoing()->AddService<ft::Service>(std::move(handler), kChildName);
+    zx::result<> status = outgoing()->AddService<ft::Service>(std::move(handler), kChildName);
     if (status.is_error()) {
       FDF_LOG(ERROR, "Failed to add service %s", status.status_string());
     }

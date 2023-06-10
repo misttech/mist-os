@@ -91,7 +91,7 @@ class MagmaDriverBase : public fdf::DriverBase,
   virtual zx::result<> MagmaStart() = 0;
 
   zx::result<zx::resource> GetInfoResource() {
-    auto info_resource = context().incoming()->template Connect<fuchsia_kernel::InfoResource>();
+    auto info_resource = incoming()->template Connect<fuchsia_kernel::InfoResource>();
 
     if (info_resource.is_error()) {
       MAGMA_DMESSAGE("Error requesting info resource: %s", info_resource.status_string());
@@ -279,14 +279,13 @@ class MagmaDriverBase : public fdf::DriverBase,
     std::lock_guard lock(magma_mutex_);
     auto inspector = magma_driver()->DuplicateInspector();
     if (inspector) {
-      auto res =
-          context().outgoing()->component().template AddUnmanagedProtocolAt<fuchsia_inspect::Tree>(
-              "diagnostics", [inspector = std::move(*inspector)](
-                                 fidl::ServerEnd<fuchsia_inspect::Tree> server_end) {
-                inspect::TreeServer::StartSelfManagedServer(
-                    inspector, {}, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                    std::move(server_end));
-              });
+      auto res = outgoing()->component().template AddUnmanagedProtocolAt<fuchsia_inspect::Tree>(
+          "diagnostics",
+          [inspector = std::move(*inspector)](fidl::ServerEnd<fuchsia_inspect::Tree> server_end) {
+            inspect::TreeServer::StartSelfManagedServer(
+                inspector, {}, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                std::move(server_end));
+          });
       if (!res.is_ok()) {
         return res.take_error();
       }
@@ -295,8 +294,7 @@ class MagmaDriverBase : public fdf::DriverBase,
   }
 
   zx::result<> InitializeProfileProvider() {
-    auto profile_provider =
-        context().incoming()->template Connect<fuchsia_scheduler::ProfileProvider>();
+    auto profile_provider = incoming()->template Connect<fuchsia_scheduler::ProfileProvider>();
 
     if (profile_provider.is_error()) {
       MAGMA_DMESSAGE("Error requesting profile provider: %s", profile_provider.status_string());

@@ -49,9 +49,8 @@ zx::result<> TestDriver::ExportDevfsNodeSync() {
 }
 
 zx::result<> TestDriver::ServeDriverService() {
-  zx::result result =
-      context().outgoing()->AddService<fuchsia_driver_component_test::DriverService>(
-          GetInstanceHandlerDriver());
+  zx::result result = outgoing()->AddService<fuchsia_driver_component_test::DriverService>(
+      GetInstanceHandlerDriver());
   if (result.is_error()) {
     return result.take_error();
   }
@@ -60,9 +59,8 @@ zx::result<> TestDriver::ServeDriverService() {
 }
 
 zx::result<> TestDriver::ServeZirconService() {
-  zx::result result =
-      context().outgoing()->AddService<fuchsia_driver_component_test::ZirconService>(
-          GetInstanceHandlerZircon());
+  zx::result result = outgoing()->AddService<fuchsia_driver_component_test::ZirconService>(
+      GetInstanceHandlerZircon());
   if (result.is_error()) {
     return result.take_error();
   }
@@ -72,7 +70,7 @@ zx::result<> TestDriver::ServeZirconService() {
 
 zx::result<> TestDriver::ValidateIncomingDriverService() {
   zx::result driver_connect_result =
-      context().incoming()->Connect<fuchsia_driver_component_test::DriverService::Device>();
+      incoming()->Connect<fuchsia_driver_component_test::DriverService::Device>();
   if (driver_connect_result.is_error()) {
     FDF_LOG(ERROR, "Couldn't connect to DriverService.");
     return driver_connect_result.take_error();
@@ -97,7 +95,7 @@ zx::result<> TestDriver::ValidateIncomingDriverService() {
 
 zx::result<> TestDriver::ValidateIncomingZirconService() {
   zx::result zircon_connect_result =
-      context().incoming()->Connect<fuchsia_driver_component_test::ZirconService::Device>();
+      incoming()->Connect<fuchsia_driver_component_test::ZirconService::Device>();
   if (zircon_connect_result.is_error()) {
     FDF_LOG(ERROR, "Couldn't connect to ZirconService.");
     return zircon_connect_result.take_error();

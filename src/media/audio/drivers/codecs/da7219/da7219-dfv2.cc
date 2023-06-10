@@ -11,7 +11,7 @@
 namespace audio::da7219 {
 
 zx::result<zx::interrupt> Driver::GetIrq() const {
-  auto acpi_client = context().incoming()->Connect<fuchsia_hardware_acpi::Service::Device>("acpi");
+  auto acpi_client = incoming()->Connect<fuchsia_hardware_acpi::Service::Device>("acpi");
   if (!acpi_client.is_ok()) {
     return acpi_client.take_error();
   }
@@ -27,7 +27,7 @@ zx::result<zx::interrupt> Driver::GetIrq() const {
 }
 
 zx::result<> Driver::Start() {
-  zx::result i2c = context().incoming()->Connect<fuchsia_hardware_i2c::Service::Device>("i2c000");
+  zx::result i2c = incoming()->Connect<fuchsia_hardware_i2c::Service::Device>("i2c000");
   if (!i2c.is_ok()) {
     DA7219_LOG(ERROR, "Could not get I2C client: %s", i2c.status_string());
     return i2c.take_error();
@@ -84,8 +84,8 @@ zx::result<> Driver::Serve(std::string_view name, bool is_input) {
       handler.add_codec_connector(fit::bind_member<&ServerConnector::BindConnector>(connector));
   ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
 
-  result = context().outgoing()->AddService<fuchsia_hardware_audio::CodecConnectorService>(
-      std::move(handler), name);
+  result = outgoing()->AddService<fuchsia_hardware_audio::CodecConnectorService>(std::move(handler),
+                                                                                 name);
   if (result.is_error()) {
     FDF_SLOG(ERROR, "Failed to add service", KV("status", result.status_string()));
     return result.take_error();

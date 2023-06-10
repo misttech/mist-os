@@ -17,7 +17,7 @@ class NodeGroupDriver : public fdf::DriverBase {
       : fdf::DriverBase("node_group", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {
-    auto connect_result = context().incoming()->Connect<fcdt::Waiter>();
+    auto connect_result = incoming()->Connect<fcdt::Waiter>();
     if (connect_result.is_error()) {
       FDF_LOG(ERROR, "Failed to start node-group driver: %s", connect_result.status_string());
       node().reset();

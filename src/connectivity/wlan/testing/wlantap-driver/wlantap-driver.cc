@@ -56,8 +56,8 @@ class WlantapDriver : public fdf::DriverBase {
  private:
   void Serve(fidl::ServerEnd<fuchsia_wlan_tap::WlantapCtl> server) {
     // Give the dispatcher ownership of server_impl
-    auto server_impl = std::make_unique<WlantapCtlServer>(
-        WlantapDriverContext(&logger(), context().outgoing(), &node_));
+    auto server_impl =
+        std::make_unique<WlantapCtlServer>(WlantapDriverContext(&logger(), outgoing(), &node_));
     fidl::BindServer(dispatcher(), std::move(server), std::move(server_impl));
   }
 

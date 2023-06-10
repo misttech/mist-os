@@ -23,7 +23,7 @@ class RootDriver : public fdf::DriverBase {
   zx::result<> Start() override {
     node_.Bind(std::move(node()), dispatcher());
     child_ = compat::DeviceServer("v1", 0, "root/v1");
-    auto status = child_->Serve(dispatcher(), &context().outgoing()->component());
+    auto status = child_->Serve(dispatcher(), &outgoing()->component());
     if (status != ZX_OK) {
       FDF_LOG(ERROR, "Failed to serve compat device server: %s", zx_status_get_string(status));
       node_.AsyncTeardown();

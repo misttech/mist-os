@@ -40,7 +40,7 @@ class RootDriver : public fdf::DriverBase {
       return spec_result.take_error();
     }
 
-    return helpers::SendAck(logger(), node_name().value_or("None"), context(), name());
+    return helpers::SendAck(logger(), node_name().value_or("None"), incoming(), name());
   }
 
  private:
@@ -93,8 +93,7 @@ class RootDriver : public fdf::DriverBase {
         }},
     }};
 
-    auto cnm_client =
-        context().incoming()->Connect<fuchsia_driver_framework::CompositeNodeManager>();
+    auto cnm_client = incoming()->Connect<fuchsia_driver_framework::CompositeNodeManager>();
     if (cnm_client.is_error()) {
       FDF_LOG(ERROR, "Failed to connect to CompositeNodeManager: %s",
               zx_status_get_string(cnm_client.error_value()));

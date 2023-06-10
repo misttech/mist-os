@@ -20,13 +20,13 @@ class LeafDriver : public fdf::DriverBase {
       : fdf::DriverBase("leaf", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {
-    auto handshake = context().incoming()->Connect<ft::Service::Device>();
+    auto handshake = incoming()->Connect<ft::Service::Device>();
     if (handshake.is_error()) {
       return handshake.take_error();
     }
     handshake_.Bind(*std::move(handshake), dispatcher());
 
-    auto waiter = context().incoming()->Connect<ft::Waiter>();
+    auto waiter = incoming()->Connect<ft::Waiter>();
     if (waiter.is_error()) {
       return waiter.take_error();
     }

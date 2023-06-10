@@ -62,8 +62,8 @@ class Driver : public fdf::DriverBase {
   // them publicly since they are protected in DriverBase.
   async_dispatcher_t* dispatcher() { return Base::dispatcher(); }
   const async_dispatcher_t* dispatcher() const { return Base::dispatcher(); }
-  const fdf::Namespace& driver_namespace() { return *context().incoming(); }
-  fdf::OutgoingDirectory& outgoing() { return *context().outgoing(); }
+  const fdf::Namespace& driver_namespace() { return *incoming(); }
+  fdf::OutgoingDirectory& outgoing() { return *Base::outgoing(); }
 
   uint32_t GetNextDeviceId() { return next_device_id_++; }
 

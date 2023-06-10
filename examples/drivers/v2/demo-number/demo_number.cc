@@ -52,7 +52,7 @@ class DemoNumber : public fdf::DriverBase {
     });
 
     if (zx::result result =
-            context().outgoing()->AddService<fuchsia_hardware_demo::Service>(std::move(handler));
+            outgoing()->AddService<fuchsia_hardware_demo::Service>(std::move(handler));
         result.is_error()) {
       FDF_SLOG(ERROR, "Failed to add Demo service", KV("status", result.status_string()));
       return result.take_error();

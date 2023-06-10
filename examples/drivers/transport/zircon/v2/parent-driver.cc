@@ -53,8 +53,7 @@ class ParentZirconTransportDriver : public fdf::DriverBase {
     fuchsia_examples_gizmo::Service::InstanceHandler handler(
         {.device = std::move(protocol_handler)});
 
-    auto result =
-        context().outgoing()->AddService<fuchsia_examples_gizmo::Service>(std::move(handler));
+    auto result = outgoing()->AddService<fuchsia_examples_gizmo::Service>(std::move(handler));
     if (result.is_error()) {
       FDF_SLOG(ERROR, "Failed to add service", KV("status", result.status_string()));
       return result.take_error();
@@ -127,8 +126,7 @@ class ParentZirconTransportDriver : public fdf::DriverBase {
         .testing = fit::bind_member<&ParentZirconTransportDriver::Serve>(this),
     });
 
-    auto result =
-        context().outgoing()->AddService<fuchsia_gizmo_protocol::Service>(std::move(handler));
+    auto result = outgoing()->AddService<fuchsia_gizmo_protocol::Service>(std::move(handler));
     if (result.is_error()) {
       FDF_SLOG(ERROR, "Failed to add service", KV("status", result.status_string()));
       return result.take_error();

@@ -254,7 +254,7 @@ void Driver::Start(fdf::StartCompleter completer) {
   {
     std::scoped_lock lock(kDriverGlobalsLock);
     if (!kRootResource.is_valid()) {
-      zx::result resource = GetRootResource(*context().incoming());
+      zx::result resource = GetRootResource(*incoming());
       // We don't log on error here because every compat driver will try and access this,
       // but most aren't expected to have it available.
       if (resource.is_ok()) {
@@ -264,14 +264,14 @@ void Driver::Start(fdf::StartCompleter completer) {
     }
   }
 
-  zx::result loader_vmo = LoadVmo(*context().incoming(), kLibDriverPath, kOpenFlags);
+  zx::result loader_vmo = LoadVmo(*incoming(), kLibDriverPath, kOpenFlags);
   if (loader_vmo.is_error()) {
     FDF_LOG(ERROR, "Failed to open loader vmo: %s", loader_vmo.status_string());
     completer(loader_vmo.take_error());
     return;
   }
 
-  zx::result driver_vmo = LoadVmo(*context().incoming(), driver_path_.c_str(), kOpenFlags);
+  zx::result driver_vmo = LoadVmo(*incoming(), driver_path_.c_str(), kOpenFlags);
   if (driver_vmo.is_error()) {
     FDF_LOG(ERROR, "Failed to open driver vmo: %s", driver_vmo.status_string());
     completer(loader_vmo.take_error());
@@ -347,8 +347,7 @@ zx_status_t Driver::RunOnDispatcher(fit::callback<zx_status_t()> task) {
 }
 
 void Driver::PrepareStop(fdf::PrepareStopCompleter completer) {
-  zx::result client =
-      this->context().incoming()->Connect<fuchsia_device_manager::SystemStateTransition>();
+  zx::result client = this->incoming()->Connect<fuchsia_device_manager::SystemStateTransition>();
   if (client.is_error()) {
     FDF_SLOG(ERROR, "failed to connect to fuchsia.device.manager/SystemStateTransition",
              KV("status", client.status_value()));
@@ -442,8 +441,7 @@ zx::result<> Driver::LoadDriver(zx::vmo loader_vmo, zx::vmo driver_vmo) {
   }
 
   // Create our logger.
-  zx::result logger_result =
-      fdf::Logger::Create(*context().incoming(), dispatcher(), note->payload.name);
+  zx::result logger_result = fdf::Logger::Create(*incoming(), dispatcher(), note->payload.name);
   if (logger_result.is_error()) {
     return logger_result.take_error();
   }
@@ -519,7 +517,7 @@ zx::result<> Driver::StartDriver() {
     }
   } else {
     // Else, run create and return.
-    auto client_end = context().incoming()->Connect<fboot::Items>();
+    auto client_end = incoming()->Connect<fboot::Items>();
     if (client_end.is_error()) {
       return zx::error(client_end.status_value());
     }
@@ -541,7 +539,7 @@ zx::result<> Driver::StartDriver() {
 fpromise::promise<void, zx_status_t> Driver::ConnectToParentDevices() {
   bridge<void, zx_status_t> bridge;
   compat::ConnectToParentDevices(
-      dispatcher(), context().incoming().get(),
+      dispatcher(), incoming().get(),
       [this, completer = std::move(bridge.completer)](
           zx::result<std::vector<compat::ParentDevice>> devices) mutable {
         if (devices.is_error()) {
@@ -635,7 +633,7 @@ zx::result<zx::vmo> Driver::LoadFirmware(Device* device, const char* filename, s
   std::string full_filename = "/pkg/lib/firmware/";
   full_filename.append(filename);
   fpromise::result connect_result = fpromise::run_single_threaded(
-      fdf::Open(*context().incoming(), dispatcher(), full_filename.c_str(), kOpenFlags));
+      fdf::Open(*incoming(), dispatcher(), full_filename.c_str(), kOpenFlags));
   if (connect_result.is_error()) {
     return zx::error(connect_result.take_error());
   }
@@ -675,7 +673,7 @@ zx_status_t Driver::AddDevice(Device* parent, device_add_args_t* args, zx_device
 }
 
 zx::result<> Driver::SetProfileByRole(zx::unowned_thread thread, std::string_view role) {
-  auto profile_client = context().incoming()->Connect<fuchsia_scheduler::ProfileProvider>();
+  auto profile_client = incoming()->Connect<fuchsia_scheduler::ProfileProvider>();
   if (profile_client.is_error()) {
     return profile_client.take_error();
   }
@@ -700,7 +698,7 @@ zx::result<> Driver::SetProfileByRole(zx::unowned_thread thread, std::string_vie
 }
 
 zx::result<std::string> Driver::GetVariable(const char* name) {
-  auto boot_args = context().incoming()->Connect<fuchsia_boot::Arguments>();
+  auto boot_args = incoming()->Connect<fuchsia_boot::Arguments>();
   if (boot_args.is_error()) {
     return boot_args.take_error();
   }

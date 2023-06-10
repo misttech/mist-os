@@ -15,7 +15,7 @@ zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AddChild(
     std::string_view child_test_property);
 
 zx::result<> SendAck(fdf::Logger& logger, std::string_view node_name,
-                     const fdf::DriverContext& context, std::string_view driver_name);
+                     const std::shared_ptr<fdf::Namespace>& incoming, std::string_view driver_name);
 
 }  // namespace reload_test_driver_helpers
 

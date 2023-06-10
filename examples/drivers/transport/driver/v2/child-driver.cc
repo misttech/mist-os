@@ -34,8 +34,7 @@ class ChildDriverTransportDriver : public fdf::DriverBase {
         .testing = fit::bind_member<&ChildDriverTransportDriver::Serve>(this),
     });
 
-    auto result =
-        context().outgoing()->AddService<fuchsia_gizmo_protocol::Service>(std::move(handler));
+    auto result = outgoing()->AddService<fuchsia_gizmo_protocol::Service>(std::move(handler));
     if (result.is_error()) {
       FDF_SLOG(ERROR, "Failed to add service", KV("status", result.status_string()));
       return result.take_error();
@@ -56,7 +55,7 @@ class ChildDriverTransportDriver : public fdf::DriverBase {
 
   // Connect to the parent's offered service.
   zx::result<> ConnectGizmoService() {
-    auto connect_result = context().incoming()->Connect<fuchsia_examples_gizmo::Service::Device>();
+    auto connect_result = incoming()->Connect<fuchsia_examples_gizmo::Service::Device>();
     if (connect_result.is_error()) {
       FDF_SLOG(ERROR, "Failed to connect gizmo device protocol.",
                KV("status", connect_result.status_string()));

@@ -37,7 +37,7 @@ class MaliDriver : public MagmaDriverBaseType {
     }
     magma::PlatformBusMapper::SetInfoResource(std::move(*info_resource));
 
-    parent_device_ = ParentDeviceDFv2::Create(context().incoming());
+    parent_device_ = ParentDeviceDFv2::Create(incoming());
     if (!parent_device_) {
       MAGMA_LOG(ERROR, "Failed to create ParentDeviceDFv2");
       return zx::error(ZX_ERR_INTERNAL);

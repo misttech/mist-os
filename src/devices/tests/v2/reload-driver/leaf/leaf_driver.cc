@@ -14,7 +14,7 @@ class LeafDriver : public fdf::DriverBase {
       : fdf::DriverBase("leaf", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {
-    return helpers::SendAck(logger(), node_name().value_or("None"), context(), name());
+    return helpers::SendAck(logger(), node_name().value_or("None"), incoming(), name());
   }
 };
 

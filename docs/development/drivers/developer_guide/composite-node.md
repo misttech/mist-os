@@ -487,7 +487,7 @@ To add the composite node specification to the `CompositeNodeManager`, you need
 to connect to the service:
 
 ```
-auto client = context().incoming()->Connect<fdf::CompositeNodeManager>();
+auto client = incoming()->Connect<fdf::CompositeNodeManager>();
 
 if (client.is_error()) {
   FDF_LOG(ERROR, "Failed to connect to CompositeNodeManager: %s",

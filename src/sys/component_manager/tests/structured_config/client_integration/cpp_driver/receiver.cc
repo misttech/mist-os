@@ -26,7 +26,7 @@ class ReceiverDriver : public fdf::DriverBase, public fidl::WireServer<scr::Conf
     };
     scrs::ConfigService::InstanceHandler handler({.puppet = std::move(puppet)});
 
-    auto result = context().outgoing()->AddService<scrs::ConfigService>(std::move(handler));
+    auto result = outgoing()->AddService<scrs::ConfigService>(std::move(handler));
     ZX_ASSERT(result.is_ok());
 
     // Serve the inspect data
@@ -34,7 +34,7 @@ class ReceiverDriver : public fdf::DriverBase, public fidl::WireServer<scr::Conf
     config_.RecordInspect(&config_node);
     inspector_.emplace(std::move(config_node));
     exposed_inspector_.emplace(
-        inspect::ComponentInspector(context().outgoing()->component(), dispatcher(), inspector_));
+        inspect::ComponentInspector(outgoing()->component(), dispatcher(), inspector_));
 
     return zx::ok();
   }

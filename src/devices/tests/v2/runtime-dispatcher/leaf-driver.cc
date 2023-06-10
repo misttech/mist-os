@@ -22,7 +22,7 @@ class LeafDriver : public fdf::DriverBase {
     // Test we can block on the dispatcher thread.
     ZX_ASSERT(ZX_OK == DoHandshakeSynchronously());
 
-    auto waiter = context().incoming()->Connect<ft::Waiter>();
+    auto waiter = incoming()->Connect<ft::Waiter>();
     if (waiter.is_error()) {
       node().reset();
       return waiter.take_error();
@@ -43,7 +43,7 @@ class LeafDriver : public fdf::DriverBase {
     ZX_ASSERT((*driver_dispatcher()->options() & FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS) ==
               FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS);
 
-    auto result = context().incoming()->Connect<ft::Handshake>();
+    auto result = incoming()->Connect<ft::Handshake>();
     if (result.is_error()) {
       return result.status_value();
     }

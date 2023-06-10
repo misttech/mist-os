@@ -57,7 +57,7 @@ class RootDriver : public fdf::DriverBase, public fdf::Server<ft::Root> {
     };
     ft::Service::InstanceHandler handler({.root = std::move(root)});
 
-    auto status = context().outgoing()->AddService<ft::Service>(std::move(handler));
+    auto status = outgoing()->AddService<ft::Service>(std::move(handler));
     if (status.is_error()) {
       return status.status_value();
     }
@@ -65,8 +65,8 @@ class RootDriver : public fdf::DriverBase, public fdf::Server<ft::Root> {
     if (endpoints.is_error()) {
       return endpoints.status_value();
     }
-    auto serve = context().outgoing()->Serve(
-        fidl::ServerEnd<fuchsia_io::Directory>(endpoints->server.TakeChannel()));
+    auto serve =
+        outgoing()->Serve(fidl::ServerEnd<fuchsia_io::Directory>(endpoints->server.TakeChannel()));
     if (serve.is_error()) {
       return serve.status_value();
     }
@@ -83,7 +83,7 @@ class RootDriver : public fdf::DriverBase, public fdf::Server<ft::Root> {
     child_ = compat::DeviceServer(
         "v1", 0, "root/v1",
         compat::ServiceOffersV1("v1", std::move(vfs_client_), std::move(service_offers)));
-    zx_status_t status = child_->Serve(dispatcher(), context().outgoing().get());
+    zx_status_t status = child_->Serve(dispatcher(), outgoing().get());
     if (status != ZX_OK) {
       return fit::error(fdf::NodeError::kInternal);
     }

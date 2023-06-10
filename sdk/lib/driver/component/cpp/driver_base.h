@@ -46,8 +46,8 @@ extern bool logger_wait_for_initial_interest;
 //       : fdf::DriverBase("my_driver", std::move(start_args), std::move(driver_dispatcher)) {}
 //
 //   zx::result<> Start() override {
-//     context().incoming()->Connect(...);
-//     context().outgoing()->AddService(...);
+//     incoming()->Connect(...);
+//     outgoing()->AddService(...);
 //     FDF_LOG(INFO, "hello world!");
 //     node_client_.Bind(std::move(node()), dispatcher());
 //
@@ -83,7 +83,7 @@ class DriverBase {
   virtual ~DriverBase() = default;
 
   // This method will be called by the factory to start the driver. This is when
-  // the driver should setup the outgoing directory through `context().outgoing()->Add...` calls.
+  // the driver should setup the outgoing directory through `outgoing()->Add...` calls.
   // Do not call Serve, as it has already been called by the |DriverBase| constructor.
   // Child nodes can be created here synchronously or asynchronously as long as all of the
   // protocols being offered to the child has been added to the outgoing directory first.
@@ -139,9 +139,6 @@ class DriverBase {
 
   // The name of the driver that is given to the DriverBase constructor.
   std::string_view name() const { return name_; }
-
-  DriverContext& context() { return driver_context_; }
-  const DriverContext& context() const { return driver_context_; }
 
   // Used to access the incoming namespace of the driver. This allows connecting to both zircon and
   // driver transport incoming services.

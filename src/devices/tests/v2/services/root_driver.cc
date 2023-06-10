@@ -25,7 +25,7 @@ class RootDriver : public fdf::DriverBase,
     };
     ft::Device::InstanceHandler handler({.control = std::move(control), .data = std::move(data)});
 
-    auto result = context().outgoing()->AddService<ft::Device>(std::move(handler));
+    auto result = outgoing()->AddService<ft::Device>(std::move(handler));
     if (result.is_error()) {
       FDF_LOG(ERROR, "Failed to add Device service: %s", result.status_string());
       return result.take_error();

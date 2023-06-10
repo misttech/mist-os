@@ -29,7 +29,7 @@ class RootDriver : public fdf::DriverBase, public fidl::WireServer<ft::Handshake
       fidl::BindServer(dispatcher(), std::move(server_end), this);
     };
     zx::result<> status =
-        context().outgoing()->component().AddUnmanagedProtocol<ft::Handshake>(std::move(service));
+        outgoing()->component().AddUnmanagedProtocol<ft::Handshake>(std::move(service));
     if (status.is_error()) {
       return status;
     }

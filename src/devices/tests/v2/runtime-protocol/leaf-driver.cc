@@ -38,19 +38,19 @@ class LeafDriver : public fdf::DriverBase {
         node_(fidl::WireSharedClient(std::move(node()), dispatcher())) {}
 
   zx::result<> Start() override {
-    auto setter_client = context().incoming()->Connect<ft::Service::Setter>();
+    auto setter_client = incoming()->Connect<ft::Service::Setter>();
     if (setter_client.is_error()) {
       return setter_client.take_error();
     }
     setter_.Bind(*std::move(setter_client), driver_dispatcher()->get());
 
-    auto getter_client = context().incoming()->Connect<ft::Service::Getter>();
+    auto getter_client = incoming()->Connect<ft::Service::Getter>();
     if (getter_client.is_error()) {
       return getter_client.take_error();
     }
     getter_.Bind(*std::move(getter_client), driver_dispatcher()->get());
 
-    auto waiter_client = context().incoming()->Connect<ft::Waiter>();
+    auto waiter_client = incoming()->Connect<ft::Waiter>();
     if (waiter_client.is_error()) {
       return waiter_client.take_error();
     }

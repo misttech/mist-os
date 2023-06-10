@@ -188,8 +188,7 @@ class RootDriver : public fdf::DriverBase {
         fidl::BindServer(dispatcher(), std::move(server_end), &this->left_server_);
       };
       ft::Service::InstanceHandler handler({.device = std::move(device)});
-      zx::result<> status =
-          context().outgoing()->AddService<ft::Service>(std::move(handler), kLeftName);
+      zx::result<> status = outgoing()->AddService<ft::Service>(std::move(handler), kLeftName);
       if (status.is_error()) {
         FDF_LOG(ERROR, "Failed to add service %s", status.status_string());
       }
@@ -201,8 +200,7 @@ class RootDriver : public fdf::DriverBase {
         fidl::BindServer(dispatcher(), std::move(server_end), &this->right_server_);
       };
       ft::Service::InstanceHandler handler({.device = std::move(device)});
-      zx::result<> status =
-          context().outgoing()->AddService<ft::Service>(std::move(handler), kRightName);
+      zx::result<> status = outgoing()->AddService<ft::Service>(std::move(handler), kRightName);
       if (status.is_error()) {
         FDF_LOG(ERROR, "Failed to add service %s", status.status_string());
       }
@@ -214,15 +212,14 @@ class RootDriver : public fdf::DriverBase {
         fidl::BindServer(dispatcher(), std::move(server_end), &this->optional_server_);
       };
       ft::Service::InstanceHandler handler({.device = std::move(device)});
-      zx::result<> status =
-          context().outgoing()->AddService<ft::Service>(std::move(handler), kOptionalName);
+      zx::result<> status = outgoing()->AddService<ft::Service>(std::move(handler), kOptionalName);
       if (status.is_error()) {
         FDF_LOG(ERROR, "Failed to add service %s", status.status_string());
       }
     }
 
     // Setup the node group manager client.
-    auto dgm_client = context().incoming()->Connect<fdf::CompositeNodeManager>();
+    auto dgm_client = incoming()->Connect<fdf::CompositeNodeManager>();
     if (dgm_client.is_error()) {
       FDF_LOG(ERROR, "Failed to connect to NodeGroupManager: %s",
               zx_status_get_string(dgm_client.error_value()));
