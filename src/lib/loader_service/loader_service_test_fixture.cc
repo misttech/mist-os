@@ -19,9 +19,7 @@
 #include <string_view>
 
 #include "lib/stdcompat/string_view.h"
-
-#define ASSERT_OK(expr) ASSERT_EQ(ZX_OK, expr) << zx_status_get_string(expr)
-#define EXPECT_OK(expr) EXPECT_EQ(ZX_OK, expr) << zx_status_get_string(expr)
+#include "src/lib/testing/predicates/status.h"
 
 namespace loader {
 namespace test {
@@ -52,8 +50,11 @@ void LoaderServiceTest::CreateTestDirectory(const std::vector<TestDirectoryEntry
                                             fbl::unique_fd* root_fd) {
   ASSERT_FALSE(vfs_);
   ASSERT_FALSE(root_dir_);
-
-  ASSERT_OK(memfs::Memfs::Create(fs_loop_.dispatcher(), "<tmp>", &vfs_, &root_dir_));
+  zx::result result = memfs::Memfs::Create(fs_loop_.dispatcher(), "<tmp>");
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  auto& [vfs, root_dir] = result.value();
+  vfs_ = std::move(vfs);
+  root_dir_ = std::move(root_dir);
 
   for (const auto& entry : config) {
     ASSERT_NO_FATAL_FAILURE(AddDirectoryEntry(root_dir_, entry));

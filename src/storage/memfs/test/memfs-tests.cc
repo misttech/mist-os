@@ -27,17 +27,16 @@ constexpr uint64_t kMaxFileSize = std::numeric_limits<zx_off_t>::max() - (1ull <
 TEST(MemfsTest, DirectoryLifetime) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  std::unique_ptr<Memfs> vfs;
-  fbl::RefPtr<VnodeDir> root;
-  ASSERT_OK(Memfs::Create(loop.dispatcher(), "<tmp>", &vfs, &root));
+  zx::result result = memfs::Memfs::Create(loop.dispatcher(), "<tmp>");
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
 }
 
 TEST(MemfsTest, CreateFile) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  std::unique_ptr<Memfs> vfs;
-  fbl::RefPtr<VnodeDir> root;
-  ASSERT_OK(Memfs::Create(loop.dispatcher(), "<tmp>", &vfs, &root));
+  zx::result result = memfs::Memfs::Create(loop.dispatcher(), "<tmp>");
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  auto& [vfs, root] = result.value();
   fbl::RefPtr<fs::Vnode> file;
   ASSERT_OK(root->Create("foobar", S_IFREG, &file));
   auto directory = static_cast<fbl::RefPtr<fs::Vnode>>(root);
@@ -56,9 +55,9 @@ TEST(MemfsTest, CreateFile) {
 TEST(MemfsTest, SubdirectoryUpdateTime) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  std::unique_ptr<Memfs> vfs;
-  fbl::RefPtr<VnodeDir> root;
-  ASSERT_OK(Memfs::Create(loop.dispatcher(), "<tmp>", &vfs, &root));
+  zx::result result = memfs::Memfs::Create(loop.dispatcher(), "<tmp>");
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  auto& [vfs, root] = result.value();
   fbl::RefPtr<fs::Vnode> index;
   ASSERT_OK(root->Create("index", S_IFREG, &index));
   fbl::RefPtr<fs::Vnode> subdirectory;
@@ -83,9 +82,9 @@ TEST(MemfsTest, SubdirectoryUpdateTime) {
 TEST(MemfsTest, SubPageContentSize) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  std::unique_ptr<Memfs> vfs;
-  fbl::RefPtr<VnodeDir> root;
-  ASSERT_OK(Memfs::Create(loop.dispatcher(), "<tmp>", &vfs, &root));
+  zx::result result = memfs::Memfs::Create(loop.dispatcher(), "<tmp>");
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  auto& [vfs, root] = result.value();
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
@@ -120,9 +119,9 @@ TEST(MemfsTest, SubPageContentSize) {
 TEST(MemfsTest, LocalClone) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  std::unique_ptr<Memfs> vfs;
-  fbl::RefPtr<VnodeDir> root;
-  ASSERT_OK(Memfs::Create(loop.dispatcher(), "<tmp>", &vfs, &root));
+  zx::result result = memfs::Memfs::Create(loop.dispatcher(), "<tmp>");
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  auto& [vfs, root] = result.value();
 
   zx_off_t vmo_size = zx_system_get_page_size() * static_cast<zx_off_t>(2);
   zx_off_t vmo_offset = vmo_size / 2;
@@ -165,9 +164,9 @@ TEST(MemfsTest, LocalClone) {
 TEST(MemfsTest, TruncateZerosTail) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  std::unique_ptr<Memfs> vfs;
-  fbl::RefPtr<VnodeDir> root;
-  ASSERT_OK(Memfs::Create(loop.dispatcher(), "<tmp>", &vfs, &root));
+  zx::result result = memfs::Memfs::Create(loop.dispatcher(), "<tmp>");
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  auto& [vfs, root] = result.value();
 
   fbl::RefPtr<fs::Vnode> file;
   ASSERT_OK(root->Create("file", S_IFREG, &file));
@@ -200,9 +199,9 @@ TEST(MemfsTest, TruncateZerosTail) {
 TEST(MemfsTest, WriteMaxFileSize) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  std::unique_ptr<Memfs> vfs;
-  fbl::RefPtr<VnodeDir> root;
-  ASSERT_OK(Memfs::Create(loop.dispatcher(), "<tmp>", &vfs, &root));
+  zx::result result = memfs::Memfs::Create(loop.dispatcher(), "<tmp>");
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  auto& [vfs, root] = result.value();
 
   fbl::RefPtr<fs::Vnode> file;
   ASSERT_OK(root->Create("file", S_IFREG, &file));
@@ -229,9 +228,9 @@ TEST(MemfsTest, WriteMaxFileSize) {
 TEST(MemfsTest, TruncateToMaxFileSize) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  std::unique_ptr<Memfs> vfs;
-  fbl::RefPtr<VnodeDir> root;
-  ASSERT_OK(Memfs::Create(loop.dispatcher(), "<tmp>", &vfs, &root));
+  zx::result result = memfs::Memfs::Create(loop.dispatcher(), "<tmp>");
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  auto& [vfs, root] = result.value();
 
   fbl::RefPtr<fs::Vnode> file;
   ASSERT_OK(root->Create("file", S_IFREG, &file));

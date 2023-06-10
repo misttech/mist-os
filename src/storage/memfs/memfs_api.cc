@@ -25,12 +25,11 @@ struct memfs_filesystem {
     if (fs_endpoints.is_error())
       return fs_endpoints.take_error();
 
-    std::unique_ptr<memfs::Memfs> memfs;
-    fbl::RefPtr<memfs::VnodeDir> root;
-    if (zx_status_t status = memfs::Memfs::Create(dispatcher, "<tmp>", &memfs, &root);
-        status != ZX_OK) {
-      return zx::error(status);
+    zx::result result = memfs::Memfs::Create(dispatcher, "<tmp>");
+    if (result.is_error()) {
+      return result.take_error();
     }
+    auto& [memfs, root] = result.value();
 
     if (zx_status_t status =
             memfs->ServeDirectory(std::move(root), std::move(fs_endpoints->server));

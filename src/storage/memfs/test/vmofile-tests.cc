@@ -70,9 +70,9 @@ TEST(VmofileTests, test_vmofile_basic) {
   zx::result directory_endpoints = fidl::CreateEndpoints<fio::Directory>();
   ASSERT_OK(directory_endpoints.status_value());
 
-  std::unique_ptr<memfs::Memfs> vfs;
-  fbl::RefPtr<memfs::VnodeDir> root;
-  ASSERT_OK(memfs::Memfs::Create(dispatcher, "<tmp>", &vfs, &root));
+  zx::result result = memfs::Memfs::Create(dispatcher, "<tmp>");
+  ASSERT_OK(result);
+  auto& [vfs, root] = result.value();
 
   zx::vmo read_only_vmo;
   ASSERT_OK(zx::vmo::create(64, 0, &read_only_vmo));
@@ -163,23 +163,25 @@ TEST(VmofileTests, test_vmofile_exec) {
   zx::result directory_endpoints = fidl::CreateEndpoints<fio::Directory>();
   ASSERT_OK(directory_endpoints.status_value());
 
-  std::unique_ptr<memfs::Memfs> vfs;
-  fbl::RefPtr<memfs::VnodeDir> root;
-  ASSERT_OK(memfs::Memfs::Create(dispatcher, "<tmp>", &vfs, &root));
+  zx::result result = memfs::Memfs::Create(dispatcher, "<tmp>");
+  ASSERT_OK(result);
+  auto& [vfs, root] = result.value();
 
   zx::vmo read_exec_vmo;
   ASSERT_OK(zx::vmo::create(64, 0, &read_exec_vmo));
   ASSERT_OK(read_exec_vmo.write("hello, world!", 0, 13));
 
-  zx::result client_end = component::Connect<fuchsia_kernel::VmexResource>();
-  ASSERT_OK(client_end.status_value());
-  fidl::WireResult result = fidl::WireCall(client_end.value())->Get();
-  ASSERT_TRUE(result.ok(), "%s", result.FormatDescription().c_str());
-  auto& response = result.value();
+  {
+    zx::result client_end = component::Connect<fuchsia_kernel::VmexResource>();
+    ASSERT_OK(client_end.status_value());
+    fidl::WireResult result = fidl::WireCall(client_end.value())->Get();
+    ASSERT_TRUE(result.ok(), "%s", result.FormatDescription().c_str());
+    auto& response = result.value();
 
-  ASSERT_OK(read_exec_vmo.replace_as_executable(response.resource, &read_exec_vmo));
-  ASSERT_OK(vfs->CreateFromVmo(root.get(), "read_exec", read_exec_vmo.get(), 0, 13));
-  ASSERT_OK(vfs->ServeDirectory(std::move(root), std::move(directory_endpoints->server)));
+    ASSERT_OK(read_exec_vmo.replace_as_executable(response.resource, &read_exec_vmo));
+    ASSERT_OK(vfs->CreateFromVmo(root.get(), "read_exec", read_exec_vmo.get(), 0, 13));
+    ASSERT_OK(vfs->ServeDirectory(std::move(root), std::move(directory_endpoints->server)));
+  }
 
   zx::result node_endpoints = fidl::CreateEndpoints<fio::Node>();
   ASSERT_OK(node_endpoints.status_value());

@@ -50,9 +50,9 @@ zx::result<fs::FilesystemInfo> Memfs::GetFilesystemInfo() {
   return zx::ok(info);
 }
 
-zx_status_t Memfs::Create(async_dispatcher_t* dispatcher, std::string_view fs_name,
-                          std::unique_ptr<memfs::Memfs>* out_vfs, fbl::RefPtr<VnodeDir>* out_root) {
-  auto fs = std::unique_ptr<memfs::Memfs>(new memfs::Memfs(dispatcher));
+zx::result<std::pair<std::unique_ptr<Memfs>, fbl::RefPtr<VnodeDir>>> Memfs::Create(
+    async_dispatcher_t* dispatcher, std::string_view fs_name) {
+  std::unique_ptr<Memfs> fs(new Memfs(dispatcher));
 
   fbl::RefPtr<VnodeDir> root = fbl::MakeRefCounted<VnodeDir>(*fs);
   std::unique_ptr<Dnode> dn = Dnode::Create(fs_name, root);
@@ -61,15 +61,14 @@ zx_status_t Memfs::Create(async_dispatcher_t* dispatcher, std::string_view fs_na
   fs->root_ = std::move(dn);
 
   if (zx::result<> result = fs->Init(); result.is_error()) {
-    return result.status_value();
+    return result.take_error();
   }
 
-  if (zx_status_t status = zx::event::create(0, &fs->fs_id_); status != ZX_OK)
-    return status;
+  if (zx_status_t status = zx::event::create(0, &fs->fs_id_); status != ZX_OK) {
+    return zx::error(status);
+  }
 
-  *out_root = std::move(root);
-  *out_vfs = std::move(fs);
-  return ZX_OK;
+  return zx::ok(std::make_pair(std::move(fs), std::move(root)));
 }
 
 Memfs::Memfs(async_dispatcher_t* dispatcher) : fs::PagedVfs(dispatcher) {}

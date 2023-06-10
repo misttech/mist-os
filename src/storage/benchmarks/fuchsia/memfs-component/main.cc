@@ -52,11 +52,12 @@ class MemfsHandler {
     if (endpoints.is_error()) {
       return endpoints.take_error();
     }
-    fbl::RefPtr<memfs::VnodeDir> root;
-    if (zx_status_t status = memfs::Memfs::Create(loop_.dispatcher(), "memfs", &memfs_, &root);
-        status != ZX_OK) {
-      return zx::error(status);
+    zx::result result = memfs::Memfs::Create(loop_.dispatcher(), "memfs");
+    if (result.is_error()) {
+      return result.take_error();
     }
+    auto& [memfs, root] = result.value();
+    memfs_ = std::move(memfs);
     memfs_->ServeDirectory(root, std::move(endpoints->server));
 
     return outgoing_directory_.AddDirectory(std::move(endpoints->client), kFsRoot);

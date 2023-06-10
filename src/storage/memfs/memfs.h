@@ -28,8 +28,11 @@ uint64_t GetPageSize();
 
 class Memfs : public fs::PagedVfs {
  public:
-  static zx_status_t Create(async_dispatcher_t* dispatcher, std::string_view fs_name,
-                            std::unique_ptr<Memfs>* out_vfs, fbl::RefPtr<VnodeDir>* out_root);
+  Memfs(const Memfs&) = delete;
+  Memfs& operator=(const Memfs&) = delete;
+
+  static zx::result<std::pair<std::unique_ptr<Memfs>, fbl::RefPtr<VnodeDir>>> Create(
+      async_dispatcher_t* dispatcher, std::string_view fs_name);
 
   ~Memfs() override;
 

@@ -42,7 +42,10 @@ source_set("loader_service_test_fixture") {
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
   ]
-  deps = [ "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire" ]
+  deps = [
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
+    "//src/lib/testing/predicates",
+  ]
 }
 
 executable("loader_service_test") {

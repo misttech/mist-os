@@ -20,13 +20,11 @@
 int main() {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  fbl::RefPtr<memfs::VnodeDir> tmp_vnode;
-  std::unique_ptr<memfs::Memfs> tmp;
-  zx_status_t status = memfs::Memfs::Create(loop.dispatcher(), "<tmp>", &tmp, &tmp_vnode);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Memfs::Create failed: " << zx_status_get_string(status);
-    return EXIT_FAILURE;
+  zx::result result = memfs::Memfs::Create(loop.dispatcher(), "<tmp>");
+  if (result.is_error()) {
+    FX_PLOGS(FATAL, result.status_value()) << "Memfs::Create failed";
   }
+  auto& [tmp, tmp_vnode] = result.value();
 
   auto outgoing_dir = fbl::MakeRefCounted<fs::PseudoDir>();
   outgoing_dir->AddEntry("root", tmp_vnode);
