@@ -665,7 +665,7 @@ impl InnerState {
             let block = self.heap.container.block_at(index);
             (block.link_content_index()?, block.block_type())
         };
-        let content = self.load_key_string(content_block_index)?.into();
+        let content = self.load_key_string(content_block_index)?;
         self.delete_value(index)?;
         // Free the name or string reference block used for content.
         match content_block_type {
@@ -677,7 +677,7 @@ impl InnerState {
             }
         }
 
-        self.callbacks.remove(&content);
+        self.callbacks.remove(content.as_str());
         Ok(())
     }
 
@@ -752,7 +752,7 @@ impl InnerState {
         &mut self,
         value: StringReference,
     ) -> Result<BlockIndex, Error> {
-        let string_reference = value.into();
+        let string_reference = value;
         match self.string_reference_block_indexes.get(&string_reference) {
             Some(index) => Ok(*index),
             None => {
@@ -1555,15 +1555,15 @@ mod tests {
         let core_state = get_state(4096); // allocates HEADER
         {
             let mut state = core_state.try_lock().expect("lock state");
-            let sf = StringReference::from("a reference-counted canonical name");
+            let sf = "a reference-counted canonical name";
             assert_eq!(state.stats().allocated_blocks, 1);
 
             let mut collected = vec![];
             for _ in 0..100 {
-                collected.push(state.create_node(sf.clone(), 0.into()).unwrap());
+                collected.push(state.create_node(sf.into(), 0.into()).unwrap());
             }
 
-            assert!(state.inner_lock.string_reference_block_indexes.get(&sf).is_some());
+            assert!(state.inner_lock.string_reference_block_indexes.get(sf).is_some());
 
             assert_eq!(state.stats().allocated_blocks, 102);
             let block = state.get_block(collected[0]);
@@ -1571,16 +1571,16 @@ mod tests {
             assert_eq!(sf_block.string_reference_count().unwrap(), 100);
 
             collected.into_iter().for_each(|b| {
-                assert!(state.inner_lock.string_reference_block_indexes.get(&sf).is_some());
+                assert!(state.inner_lock.string_reference_block_indexes.get(sf).is_some());
                 assert!(state.free_value(b).is_ok())
             });
 
-            assert!(state.inner_lock.string_reference_block_indexes.get(&sf).is_none());
+            assert!(state.inner_lock.string_reference_block_indexes.get(sf).is_none());
 
-            let node_index = state.create_node(sf.clone(), 0.into()).unwrap();
-            assert!(state.inner_lock.string_reference_block_indexes.get(&sf).is_some());
+            let node_index = state.create_node(sf.into(), 0.into()).unwrap();
+            assert!(state.inner_lock.string_reference_block_indexes.get(sf).is_some());
             assert!(state.free_value(node_index).is_ok());
-            assert!(state.inner_lock.string_reference_block_indexes.get(&sf).is_none());
+            assert!(state.inner_lock.string_reference_block_indexes.get(sf).is_none());
         }
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
@@ -2281,8 +2281,8 @@ mod tests {
                 .unwrap();
 
             // Verify the callback was properly saved.
-            assert!(state_guard.callbacks().get(&"link-name-0".into()).is_some());
-            let callback = state_guard.callbacks().get(&"link-name-0".into()).unwrap();
+            assert!(state_guard.callbacks().get("link-name-0").is_some());
+            let callback = state_guard.callbacks().get("link-name-0").unwrap();
             match callback().await {
                 Ok(inspector) => {
                     let hierarchy =
@@ -2335,7 +2335,7 @@ mod tests {
             assert!(state_guard.free_lazy_node(block_index).is_ok());
 
             // Verify the callback was cleared on free link.
-            assert!(state_guard.callbacks().get(&"link-name-0".into()).is_none());
+            assert!(state_guard.callbacks().get("link-name-0").is_none());
         }
         let snapshot = Snapshot::try_from(state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::borrow::Cow;
+use std::borrow::{Borrow, Cow};
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -19,6 +19,12 @@ impl Deref for StringReference {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
+        self.as_ref()
+    }
+}
+
+impl Borrow<str> for StringReference {
+    fn borrow(&self) -> &str {
         self.as_ref()
     }
 }
