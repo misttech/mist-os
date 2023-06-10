@@ -684,7 +684,7 @@ void Display::DisplayControllerImplApplyConfiguration(const display_config_t** d
     }
 
     auto color_buffer = reinterpret_cast<ColorBuffer*>(handle);
-    if (color_buffer && color_buffer->host_color_buffer_id != kInvalidHostColorBufferId) {
+    if (color_buffer && color_buffer->host_color_buffer_id == kInvalidHostColorBufferId) {
       zx::vmo vmo;
 
       zx_status_t status = color_buffer->vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo);

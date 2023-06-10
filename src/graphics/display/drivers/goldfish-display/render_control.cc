@@ -167,8 +167,8 @@ zx::result<HostColorBufferId> RenderControl::CreateColorBuffer(uint32_t width, u
   };
 
   PipeIo::WriteSrc src[] = {{.data = ToByteSpan(cmd)}};
-  auto result = pipe_io_->Call<HostColorBufferId>(src, 1, true);
-  return result.is_ok() ? zx::ok(HostColorBufferId(result.value()[0]))
+  auto result = pipe_io_->Call<uint32_t>(src, 1, true);
+  return result.is_ok() ? zx::ok(ToHostColorBufferId(result.value()[0]))
                         : zx::result<HostColorBufferId>(result.take_error());
 }
 
