@@ -29,7 +29,7 @@ use crate::{
 };
 use ::gcs::client::{Client, FileProgress, ProgressResponse, ProgressResult};
 use anyhow::{bail, Context, Result};
-use camino::Utf8Path;
+use camino::{Utf8Path, Utf8PathBuf};
 use errors::ffx_bail;
 use fms::Entries;
 use futures::TryStreamExt as _;
@@ -67,6 +67,8 @@ pub enum AuthFlowChoice {
     Oob,
     Pkce,
 }
+
+const PRODUCT_BUNDLE_PATH_KEY: &str = "product.path";
 
 /// Convert common cli switches to AuthFlowChoice.
 pub fn select_auth(oob_auth: bool, auth_flow: &AuthFlowChoice) -> &AuthFlowChoice {
@@ -113,21 +115,28 @@ pub enum ListingMode {
     RemovableBundles,
 }
 
-pub fn is_local_product_bundle(product_bundle: &str) -> bool {
-    Utf8Path::new(product_bundle).exists()
+pub fn is_local_product_bundle<P: AsRef<Path>>(product_bundle: P) -> bool {
+    product_bundle.as_ref().exists()
 }
 
 /// Load a product bundle by name, uri, or local path.
 /// This is capable of loading both v1 and v2 ProductBundles.
+///
+/// If a build config value is set for product.path and the product bundle
+/// is None, this method will use the value that is set in the build config as
+/// the path. If the path is absolute it will be used as is, otherwise it will
+/// be relative to the build_dir.
 pub async fn load_product_bundle(
     _sdk: &ffx_config::Sdk,
     product_bundle: &Option<String>,
     _mode: ListingMode,
 ) -> Result<ProductBundle> {
     tracing::debug!("Loading a product bundle: {:?}", product_bundle);
+    let env = ffx_config::global_env_context().expect("cannot get global_env_context");
+    let build_dir = env.build_dir().map(Utf8Path::from_path).flatten().unwrap_or(Utf8Path::new(""));
 
     //  If `product_bundle` is a local path, load it directly.
-    if let Some(path) = product_bundle.as_ref().filter(|s| is_local_product_bundle(s)) {
+    if let Some(path) = local_product_bundle_path(product_bundle, build_dir).await {
         return ProductBundle::try_load_from(path);
     }
 
@@ -150,6 +159,39 @@ pub async fn load_product_bundle(
     }
     #[cfg(not(feature = "build_pb_v1"))]
     bail!("A path to a product bundle v2 is required because `build_pb_v1` was false");
+}
+
+/// Checks to see if the product bundle is valid. If not product bundle is set then
+/// we will check the config domains to see if a "product.path" key is present.
+/// If the product bundle does not exist then None is returned.
+#[allow(dead_code)]
+async fn local_product_bundle_path(
+    product_bundle: &Option<impl AsRef<Utf8Path>>,
+    build_dir: impl AsRef<Utf8Path>,
+) -> Option<Utf8PathBuf> {
+    match product_bundle {
+        Some(p) => Some(Utf8PathBuf::from(p.as_ref())),
+        None => ffx_config::get::<String, &str>(PRODUCT_BUNDLE_PATH_KEY)
+            .await
+            .ok()
+            .map(Utf8PathBuf::from),
+    }
+    .map(|s| resolve_product_bundle_path(s, build_dir))
+    .filter(|s| is_local_product_bundle(s))
+}
+
+/// Resolves the product bundle relative to the build_dir. If product_bundle is
+/// absolute return it as is otherwise rebase off of the build_dir.
+fn resolve_product_bundle_path(
+    product_bundle: impl AsRef<Utf8Path>,
+    build_dir: impl AsRef<Utf8Path>,
+) -> Utf8PathBuf {
+    let path = product_bundle.as_ref();
+    if path.is_absolute() {
+        return path.into();
+    } else {
+        return build_dir.as_ref().join(path);
+    }
 }
 
 /// For each non-local URL in ffx CONFIG_METADATA, fetch updated info.
@@ -635,6 +677,54 @@ mod tests {
         pbm_file.write_all(PRODUCT_BUNDLE_JSON.as_bytes()).expect("write pbm file");
 
         temp_dir
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_local_product_bundle_path() {
+        let _env = ffx_config::test_init().await.unwrap();
+        let test_dir = TempDir::new().expect("output directory");
+        let build_dir =
+            Utf8Path::from_path(test_dir.path()).expect("cannot convert builddir to Utf8Path");
+
+        let empty_pb: Option<String> = None;
+        // If no product bundle path provided and no config return None
+        let pb = local_product_bundle_path(&empty_pb, build_dir).await;
+        assert_eq!(pb, None);
+
+        // If pb provided but invalid path return None
+        let pb = local_product_bundle_path(&Some(build_dir.join("__invalid__")), build_dir).await;
+        assert_eq!(pb, None);
+
+        // If pb provided and absolute and valid return Some(abspath)
+        let pb = local_product_bundle_path(&Some(build_dir), build_dir).await;
+        assert_eq!(pb, Some(build_dir.into()));
+
+        // If pb provided and relative and valid return Some(build_dir + relpath)
+        let relpath = "foo";
+        std::fs::File::create(build_dir.join(relpath)).expect("create relative dir");
+
+        let pb = local_product_bundle_path(&Some(relpath), build_dir).await;
+        assert_eq!(pb, Some(build_dir.join(relpath)));
+
+        // If pb provided and relative and invalid return None
+        let pb = local_product_bundle_path(&Some("invalid"), build_dir).await;
+        assert_eq!(pb, None);
+
+        // Can handle an empty build path
+        let pb = local_product_bundle_path(&Some(build_dir), "").await;
+        assert_eq!(pb, Some(build_dir.into()));
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_resolve_product_bundle_path() {
+        let build_dir = "/out";
+
+        // if absolute path then return it as is.
+        let abspb = "/some/abs/path";
+        assert_eq!(resolve_product_bundle_path(abspb, build_dir), Utf8Path::new(abspb));
+
+        // if relative return the path relative to the build dir
+        assert_eq!(resolve_product_bundle_path("foo", build_dir), Utf8Path::new("/out/foo"));
     }
 
     #[test]
