@@ -54,13 +54,15 @@ pub mod route {
 
     use super::*;
 
-    use std::num::NonZeroU32;
+    use std::{fmt::Display, num::NonZeroU32};
 
     use futures::{
         channel::{mpsc, oneshot},
         sink::SinkExt as _,
     };
-    use net_types::ip::IpVersion;
+    use net_types::ip::{
+        AddrSubnetEither, AddrSubnetError, IpAddr, IpAddress as _, IpVersion, Ipv4Addr, Ipv6Addr,
+    };
 
     use crate::{
         interfaces,
@@ -70,6 +72,7 @@ pub mod route {
 
     use netlink_packet_core::{NLM_F_ACK, NLM_F_DUMP};
     use netlink_packet_route::rtnl::{
+        address::{nlas::Nla as AddressNla, AddressMessage},
         constants::{
             AF_INET, AF_INET6, AF_UNSPEC, RTNLGRP_DCB, RTNLGRP_DECNET_IFADDR, RTNLGRP_DECNET_ROUTE,
             RTNLGRP_DECNET_RULE, RTNLGRP_IPV4_IFADDR, RTNLGRP_IPV4_MROUTE, RTNLGRP_IPV4_MROUTE_R,
@@ -144,6 +147,85 @@ pub mod route {
         pub(crate) v6_routes_request_sink: mpsc::Sender<routes::Request<S>>,
     }
 
+    fn extract_if_id_and_addr_from_addr_message(
+        message: &AddressMessage,
+        client: &impl Display,
+        req: &RtnlMessage,
+    ) -> Option<(NonZeroU32, AddrSubnetEither)> {
+        let interface_id = match NonZeroU32::new(message.header.index) {
+            Some(interface_id) => interface_id,
+            None => {
+                debug!(
+                    "unspecified interface ID in address add request from {}: {:?}",
+                    client, req,
+                );
+                return None;
+            }
+        };
+
+        let addr_bytes = message.nlas.iter().find_map(|nla| match nla {
+            AddressNla::Local(bytes) => Some(bytes),
+            nla => {
+                warn!(
+                    "unexpected Address NLA in add request from {}: {:?}; req = {:?}",
+                    client, nla, req,
+                );
+                None
+            }
+        });
+        let addr_bytes = match addr_bytes {
+            Some(addr_bytes) => addr_bytes,
+            None => {
+                debug!("missing `Local` NLA in address add request from {}: {:?}", client, req);
+                return None;
+            }
+        };
+
+        let addr = match message.header.family.into() {
+            AF_INET => {
+                const BYTES: usize = Ipv4Addr::BYTES as usize;
+                if addr_bytes.len() < BYTES {
+                    return None;
+                }
+
+                let mut bytes = [0; BYTES as usize];
+                bytes.copy_from_slice(&addr_bytes[..BYTES]);
+                IpAddr::V4(bytes.into())
+            }
+            AF_INET6 => {
+                const BYTES: usize = Ipv6Addr::BYTES as usize;
+                if addr_bytes.len() < BYTES {
+                    return None;
+                }
+
+                let mut bytes = [0; BYTES];
+                bytes.copy_from_slice(&addr_bytes[..BYTES]);
+                IpAddr::V6(bytes.into())
+            }
+            family => {
+                debug!(
+                    "invalid address family ({}) in address add request from {}: {:?}",
+                    family, client, req,
+                );
+                return None;
+            }
+        };
+
+        let addr = match AddrSubnetEither::new(addr, message.header.prefix_len) {
+            Ok(address) => address,
+            Err(
+                AddrSubnetError::PrefixTooLong
+                | AddrSubnetError::NotUnicastInSubnet
+                | AddrSubnetError::InvalidWitness,
+            ) => {
+                debug!("invalid address in address add request from {}: {:?}", client, req);
+                return None;
+            }
+        };
+
+        Some((interface_id, addr))
+    }
+
     #[async_trait]
     impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>
         NetlinkFamilyRequestHandler<NetlinkRoute, S> for NetlinkRouteRequestHandler<S>
@@ -200,7 +282,10 @@ pub mod route {
                         AF_INET => Some(IpVersion::V4),
                         AF_INET6 => Some(IpVersion::V6),
                         family => {
-                            debug!("invalid address family ({}) in address dump request: {:?}", family, req);
+                            debug!(
+                                "invalid address family ({}) in address dump request from {}: {:?}",
+                                family, client, req,
+                            );
                             client.send(new_ack(NackErrorCode::INVALID, req_header));
                             return;
                         }
@@ -225,6 +310,39 @@ pub mod route {
                         .expect("addr dump requests are infallible");
                     client.send(new_done(req_header))
                 }
+                NewAddress(ref message) => {
+                    let (interface_id, address) = match extract_if_id_and_addr_from_addr_message(
+                        message,
+                        client,
+                        &req,
+                    ) {
+                        Some(s) => s,
+                        None => {
+                            return client.send(new_ack(NackErrorCode::INVALID, req_header));
+                        }
+                    };
+
+                    let (completer, waiter) = oneshot::channel();
+                    interfaces_request_sink.send(interfaces::Request {
+                        args: interfaces::RequestArgs::Address(
+                            interfaces::AddressRequestArgs::New(
+                                interfaces::NewAddressArgs {
+                                    address,
+                                    interface_id,
+                                },
+                            ),
+                        ),
+                        sequence_number: req_header.sequence_number,
+                        client: client.clone(),
+                        completer,
+                    }).await.expect("interface event loop should never terminate");
+                    let result = waiter
+                        .await
+                        .expect("interfaces event loop should have handled the request");
+                    if is_ack || result.is_err() {
+                        client.send(new_ack(result, req_header))
+                    }
+                }
                 NewLink(_)
                 | DelLink(_)
                 | NewLinkProp(_)
@@ -245,8 +363,6 @@ pub mod route {
                 | DelNeighbour(_)
                 // TODO(https://issuetracker.google.com/283136220): Implement SetLink.
                 | SetLink(_)
-                // TODO(https://issuetracker.google.com/283134942): Implement NewAddress.
-                | NewAddress(_)
                 // TODO(https://issuetracker.google.com/283134942): Implement DelAddress.
                 | DelAddress(_)
                 // TODO(https://issuetracker.google.com/283136222): Implement NewRoute.
@@ -428,13 +544,19 @@ pub(crate) mod testutil {
 mod test {
     use super::*;
 
+    use std::num::NonZeroU32;
+
     use assert_matches::assert_matches;
     use futures::{channel::mpsc, future::FutureExt as _, stream::StreamExt as _};
-    use net_types::ip::IpVersion;
+    use net_declare::net_addr_subnet;
+    use net_types::{
+        ip::{AddrSubnetEither, IpVersion},
+        Witness as _,
+    };
     use netlink_packet_core::{NetlinkHeader, NLM_F_ACK, NLM_F_DUMP};
     use netlink_packet_route::{
-        AddressMessage, LinkMessage, RtnlMessage, TcMessage, AF_INET, AF_INET6, AF_PACKET,
-        AF_UNSPEC,
+        rtnl::address::nlas::Nla as AddressNla, AddressMessage, LinkMessage, RtnlMessage,
+        TcMessage, AF_INET, AF_INET6, AF_PACKET, AF_UNSPEC,
     };
     use test_case::test_case;
 
@@ -556,9 +678,14 @@ mod test {
         }
     }
 
+    struct RequestAndResponse<R> {
+        request: R,
+        response: Result<(), interfaces::RequestError>,
+    }
+
     async fn test_request(
         request: NetlinkMessage<RtnlMessage>,
-        expected_request: Option<interfaces::RequestArgs>,
+        req_and_resp: Option<RequestAndResponse<interfaces::RequestArgs>>,
     ) -> Vec<NetlinkMessage<RtnlMessage>> {
         let (mut client_sink, mut client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
             crate::client::testutil::CLIENT_ID_1,
@@ -577,12 +704,12 @@ mod test {
 
         let ((), ()) = futures::future::join(handler.handle_request(request, &mut client), async {
             let next = interfaces_request_stream.next();
-            match expected_request {
-                Some(expected_request) => {
+            match req_and_resp {
+                Some(RequestAndResponse { request, response }) => {
                     let interfaces::Request { args, sequence_number: _, client: _, completer } =
                         next.await.expect("handler should send request");
-                    assert_eq!(args, expected_request);
-                    completer.send(Ok(())).expect("handler should be alive");
+                    assert_eq!(args, request);
+                    completer.send(response).expect("handler should be alive");
                 }
                 None => assert_matches!(next.now_or_never(), None),
             }
@@ -623,8 +750,10 @@ mod test {
                     header,
                     NetlinkPayload::InnerMessage(RtnlMessage::GetLink(LinkMessage::default())),
                 ),
-                expected_request_args
-                    .map(|a| interfaces::RequestArgs::Link(interfaces::LinkRequestArgs::Get(a))),
+                expected_request_args.map(|a| RequestAndResponse {
+                    request: interfaces::RequestArgs::Link(interfaces::LinkRequestArgs::Get(a)),
+                    response: Ok(()),
+                }),
             )
             .await,
             expected_response
@@ -752,9 +881,12 @@ mod test {
                     header,
                     NetlinkPayload::InnerMessage(RtnlMessage::GetAddress(address_message)),
                 ),
-                expected_request_args.map(|a| interfaces::RequestArgs::Address(
-                    interfaces::AddressRequestArgs::Get(a)
-                )),
+                expected_request_args.map(|a| RequestAndResponse {
+                    request: interfaces::RequestArgs::Address(interfaces::AddressRequestArgs::Get(
+                        a
+                    )),
+                    response: Ok(()),
+                }),
             )
             .await,
             expected_response
@@ -764,6 +896,305 @@ mod test {
                     ExpectedResponse::Done => new_done(header),
                 })
                 .collect::<Vec<_>>(),
+        )
+    }
+
+    struct TestNewAddrCase {
+        flags: u16,
+        family: u16,
+        nlas: Vec<AddressNla>,
+        prefix_len: u8,
+        interface_id: u32,
+        expected_request_args: Option<RequestAndResponse<interfaces::NewAddressArgs>>,
+        expected_response: Option<Result<(), NackErrorCode>>,
+    }
+
+    fn bytes_from_addr(a: AddrSubnetEither) -> Vec<u8> {
+        match a {
+            AddrSubnetEither::V4(a) => a.addr().get().ipv4_bytes().to_vec(),
+            AddrSubnetEither::V6(a) => a.addr().get().ipv6_bytes().to_vec(),
+        }
+    }
+
+    fn prefix_from_addr(a: AddrSubnetEither) -> u8 {
+        let (_addr, prefix) = a.addr_prefix();
+        prefix
+    }
+
+    fn interface_id_as_u32(id: u64) -> u32 {
+        id.try_into().unwrap()
+    }
+
+    fn valid_new_addr_request(
+        ack: bool,
+        addr: AddrSubnetEither,
+        interface_id: u64,
+        response: Result<(), interfaces::RequestError>,
+    ) -> TestNewAddrCase {
+        TestNewAddrCase {
+            flags: if ack { NLM_F_ACK } else { 0 },
+            family: match addr {
+                AddrSubnetEither::V4(_) => AF_INET,
+                AddrSubnetEither::V6(_) => AF_INET6,
+            },
+            nlas: vec![AddressNla::Local(bytes_from_addr(addr))],
+            prefix_len: prefix_from_addr(addr),
+            interface_id: interface_id_as_u32(interface_id),
+            expected_request_args: Some(RequestAndResponse {
+                request: interfaces::NewAddressArgs {
+                    address: addr,
+                    interface_id: NonZeroU32::new(interface_id_as_u32(interface_id)).unwrap(),
+                },
+                response,
+            }),
+            expected_response: ack.then_some(Ok(())),
+        }
+    }
+
+    fn invalid_new_addr_request(
+        ack: bool,
+        addr: AddrSubnetEither,
+        interface_id: u64,
+    ) -> TestNewAddrCase {
+        TestNewAddrCase {
+            expected_request_args: None,
+            expected_response: Some(Err(NackErrorCode::INVALID)),
+            ..valid_new_addr_request(ack, addr, interface_id, Ok(()))
+        }
+    }
+
+    // Test RTM_NEWADDR
+    #[test_case(
+        valid_new_addr_request(
+            true,
+            interfaces::testutil::test_addr_subnet_v4(),
+            interfaces::testutil::LO_INTERFACE_ID,
+            Ok(())); "v4_ok_ack")]
+    #[test_case(
+        valid_new_addr_request(
+            true,
+            interfaces::testutil::test_addr_subnet_v6(),
+            interfaces::testutil::LO_INTERFACE_ID,
+            Ok(())); "v6_ok_ack")]
+    #[test_case(
+        valid_new_addr_request(
+            false,
+            interfaces::testutil::test_addr_subnet_v4(),
+            interfaces::testutil::ETH_INTERFACE_ID,
+            Ok(())); "v4_ok_no_ack")]
+    #[test_case(
+        valid_new_addr_request(
+            false,
+            interfaces::testutil::test_addr_subnet_v6(),
+            interfaces::testutil::ETH_INTERFACE_ID,
+            Ok(())); "v6_ok_no_ack")]
+    #[test_case(
+        TestNewAddrCase {
+            expected_response: Some(Err(NackErrorCode::INVALID)),
+            ..valid_new_addr_request(
+                true,
+                interfaces::testutil::test_addr_subnet_v4(),
+                interfaces::testutil::LO_INTERFACE_ID,
+                Err(interfaces::RequestError::InvalidRequest),
+            )
+        }; "v4_invalid_response_ack")]
+    #[test_case(
+        TestNewAddrCase {
+            expected_response: Some(Err(NackErrorCode::new(libc::EEXIST).unwrap())),
+            ..valid_new_addr_request(
+                false,
+                interfaces::testutil::test_addr_subnet_v6(),
+                interfaces::testutil::LO_INTERFACE_ID,
+                Err(interfaces::RequestError::AlreadyExists),
+            )
+        }; "v6_exist_response_no_ack")]
+    #[test_case(
+        TestNewAddrCase {
+            expected_response: Some(Err(NackErrorCode::new(libc::ENODEV).unwrap())),
+            ..valid_new_addr_request(
+                false,
+                interfaces::testutil::test_addr_subnet_v6(),
+                interfaces::testutil::WLAN_INTERFACE_ID,
+                Err(interfaces::RequestError::UnrecognizedInterface),
+            )
+        }; "v6_unrecognized_interface_response_no_ack")]
+    #[test_case(
+        TestNewAddrCase {
+            expected_response: Some(Err(NackErrorCode::new(libc::EADDRNOTAVAIL).unwrap())),
+            ..valid_new_addr_request(
+                true,
+                interfaces::testutil::test_addr_subnet_v4(),
+                interfaces::testutil::ETH_INTERFACE_ID,
+                Err(interfaces::RequestError::AddressNotFound),
+            )
+        }; "v4_not_found_response_ck")]
+    #[test_case(
+        TestNewAddrCase {
+            interface_id: 0,
+            ..invalid_new_addr_request(
+                true,
+                interfaces::testutil::test_addr_subnet_v6(),
+                interfaces::testutil::LO_INTERFACE_ID,
+            )
+        }; "zero_interface_id_ack")]
+    #[test_case(
+        TestNewAddrCase {
+            interface_id: 0,
+            ..invalid_new_addr_request(
+                false,
+                interfaces::testutil::test_addr_subnet_v4(),
+                interfaces::testutil::WLAN_INTERFACE_ID,
+            )
+        }; "zero_interface_id_no_ack")]
+    #[test_case(
+        TestNewAddrCase {
+            nlas: Vec::new(),
+            ..invalid_new_addr_request(
+                true,
+                interfaces::testutil::test_addr_subnet_v4(),
+                interfaces::testutil::WLAN_INTERFACE_ID,
+            )
+        }; "no_nlas_ack")]
+    #[test_case(
+        TestNewAddrCase {
+            nlas: Vec::new(),
+            ..invalid_new_addr_request(
+                false,
+                interfaces::testutil::test_addr_subnet_v6(),
+                interfaces::testutil::WLAN_INTERFACE_ID,
+            )
+        }; "no_nlas_no_ack")]
+    #[test_case(
+        TestNewAddrCase {
+            nlas: vec![AddressNla::Flags(0)],
+            ..invalid_new_addr_request(
+                true,
+                interfaces::testutil::test_addr_subnet_v4(),
+                interfaces::testutil::WLAN_INTERFACE_ID,
+            )
+        }; "missing_local_nla_ack")]
+    #[test_case(
+        TestNewAddrCase {
+            nlas: vec![AddressNla::Flags(0)],
+            ..invalid_new_addr_request(
+                false,
+                interfaces::testutil::test_addr_subnet_v6(),
+                interfaces::testutil::WLAN_INTERFACE_ID,
+            )
+        }; "missing_local_nla_no_ack")]
+    #[test_case(
+        TestNewAddrCase {
+            nlas: vec![AddressNla::Local(Vec::new())],
+            ..invalid_new_addr_request(
+                true,
+                interfaces::testutil::test_addr_subnet_v4(),
+                interfaces::testutil::WLAN_INTERFACE_ID,
+            )
+        }; "invalid_local_nla_ack")]
+    #[test_case(
+        TestNewAddrCase {
+            nlas: vec![AddressNla::Local(Vec::new())],
+            ..invalid_new_addr_request(
+                false,
+                interfaces::testutil::test_addr_subnet_v6(),
+                interfaces::testutil::WLAN_INTERFACE_ID,
+            )
+        }; "invalid_local_nla_no_ack")]
+    #[test_case(
+        TestNewAddrCase {
+            prefix_len: 0,
+            ..valid_new_addr_request(
+                true,
+                net_addr_subnet!("192.0.2.123/0"),
+                interfaces::testutil::WLAN_INTERFACE_ID,
+                Ok(()),
+            )
+        }; "zero_prefix_len_ack")]
+    #[test_case(
+        TestNewAddrCase {
+            prefix_len: 0,
+            ..valid_new_addr_request(
+                false,
+                net_addr_subnet!("2001:db8::1324/0"),
+                interfaces::testutil::WLAN_INTERFACE_ID,
+                Ok(()),
+            )
+        }; "zero_prefix_len_no_ack")]
+    #[test_case(
+        TestNewAddrCase {
+            prefix_len: u8::MAX,
+            ..invalid_new_addr_request(
+                true,
+                interfaces::testutil::test_addr_subnet_v4(),
+                interfaces::testutil::WLAN_INTERFACE_ID,
+            )
+        }; "invalid_prefix_len_ack")]
+    #[test_case(
+        TestNewAddrCase {
+            prefix_len: u8::MAX,
+            ..invalid_new_addr_request(
+                false,
+                interfaces::testutil::test_addr_subnet_v6(),
+                interfaces::testutil::WLAN_INTERFACE_ID,
+            )
+        }; "invalid_prefix_len_no_ack")]
+    #[test_case(
+        TestNewAddrCase {
+            family: AF_UNSPEC,
+            ..invalid_new_addr_request(
+                true,
+                interfaces::testutil::test_addr_subnet_v4(),
+                interfaces::testutil::LO_INTERFACE_ID,
+            )
+        }; "invalid_family_ack")]
+    #[test_case(
+        TestNewAddrCase {
+            family: AF_UNSPEC,
+            ..invalid_new_addr_request(
+                false,
+                interfaces::testutil::test_addr_subnet_v6(),
+                interfaces::testutil::PPP_INTERFACE_ID,
+            )
+        }; "invalid_family_no_ack")]
+    #[fuchsia::test]
+    async fn test_new_addr(test_case: TestNewAddrCase) {
+        let TestNewAddrCase {
+            flags,
+            family,
+            nlas,
+            prefix_len,
+            interface_id,
+            expected_request_args,
+            expected_response,
+        } = test_case;
+
+        let header = header_with_flags(flags);
+        let address_message = {
+            let mut message = AddressMessage::default();
+            message.header.family = family.try_into().unwrap();
+            message.header.index = interface_id;
+            message.header.prefix_len = prefix_len;
+            message.nlas = nlas;
+            message
+        };
+
+        pretty_assertions::assert_eq!(
+            test_request(
+                NetlinkMessage::new(
+                    header,
+                    NetlinkPayload::InnerMessage(RtnlMessage::NewAddress(address_message)),
+                ),
+                expected_request_args.map(|RequestAndResponse { request, response }| {
+                    RequestAndResponse {
+                        request: interfaces::RequestArgs::Address(
+                            interfaces::AddressRequestArgs::New(request),
+                        ),
+                        response,
+                    }
+                }),
+            )
+            .await,
+            expected_response.into_iter().map(|code| new_ack(code, header)).collect::<Vec<_>>(),
         )
     }
 }

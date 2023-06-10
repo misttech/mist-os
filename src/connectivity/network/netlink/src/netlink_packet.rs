@@ -63,7 +63,7 @@ pub(crate) struct NackErrorCode(i32);
 impl NackErrorCode {
     pub(crate) const INVALID: Self = const_unwrap::const_unwrap_option(Self::new(libc::EINVAL));
 
-    const fn new(code: i32) -> Option<Self> {
+    pub(crate) const fn new(code: i32) -> Option<Self> {
         if code == ACK_ERROR_CODE {
             None
         } else {

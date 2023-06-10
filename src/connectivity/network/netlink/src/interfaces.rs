@@ -9,7 +9,7 @@
 use std::{
     collections::{BTreeMap, HashMap},
     hash::Hash,
-    num::NonZeroU64,
+    num::{NonZeroU32, NonZeroU64},
 };
 
 use fidl_fuchsia_hardware_network as fhwnet;
@@ -44,7 +44,7 @@ use crate::{
     errors::EventLoopError,
     messaging::Sender,
     multicast_groups::ModernGroup,
-    netlink_packet::UNSPECIFIED_SEQUENCE_NUMBER,
+    netlink_packet::{IntoAckErrorCode, UNSPECIFIED_SEQUENCE_NUMBER},
     protocol_family::{route::NetlinkRoute, ProtocolFamily},
     NETLINK_LOG_TAG,
 };
@@ -78,11 +78,9 @@ pub(crate) enum GetAddressArgs {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct NewAddressArgs {
     /// The address to be added.
-    #[allow(unused)]
     pub address: AddrSubnetEither,
     /// The ID of the interface the address should be added to.
-    #[allow(unused)]
-    pub interface_id: u32,
+    pub interface_id: NonZeroU32,
 }
 
 /// Arguments for an RTM_DELADDR [`Request`].
@@ -93,7 +91,7 @@ pub(crate) struct DelAddressArgs {
     pub address: AddrSubnetEither,
     /// The ID of the interface the address should be removed from.
     #[allow(unused)]
-    pub interface_id: u32,
+    pub interface_id: NonZeroU32,
 }
 
 /// [`Request`] arguments associated with addresses.
@@ -102,7 +100,6 @@ pub(crate) enum AddressRequestArgs {
     /// RTM_GETADDR
     Get(GetAddressArgs),
     /// RTM_NEWADDR
-    #[allow(unused)]
     New(NewAddressArgs),
     /// RTM_DELADDR
     #[allow(unused)]
@@ -122,12 +119,23 @@ pub(crate) enum RequestError {
     InvalidRequest,
     UnrecognizedInterface,
     AlreadyExists,
-    NotFound,
+    AddressNotFound,
+}
+
+impl IntoAckErrorCode for RequestError {
+    fn into_code(self) -> i32 {
+        match self {
+            RequestError::InvalidRequest => libc::EINVAL,
+            RequestError::UnrecognizedInterface => libc::ENODEV,
+            RequestError::AlreadyExists => libc::EEXIST,
+            RequestError::AddressNotFound => libc::EADDRNOTAVAIL,
+        }
+    }
 }
 
 fn map_existing_interface_terminal_error(
     e: TerminalError<InterfaceRemovedReason>,
-    interface_id: u32,
+    interface_id: NonZeroU32,
 ) -> RequestError {
     match e {
         TerminalError::Fidl(e) => {
@@ -135,7 +143,7 @@ fn map_existing_interface_terminal_error(
             // chandle to an interface that does not exist.
             if !e.is_closed() {
                 error!(
-                    "unexpected interface terminal error for interface ({}): {:?}",
+                    "unexpected interface terminal error for interface ({:?}): {:?}",
                     interface_id, e,
                 )
             }
@@ -147,7 +155,7 @@ fn map_existing_interface_terminal_error(
                 // These errors are only expected when the interface fails to
                 // be installed.
                 unreachable!(
-                    "unexpected interface removed reason {:?} for interface ({})",
+                    "unexpected interface removed reason {:?} for interface ({:?})",
                     reason, interface_id,
                 )
             }
@@ -163,7 +171,7 @@ fn map_existing_interface_terminal_error(
                 // was removed so just assume that the unrecognized reason is
                 // valid and return the same error as if it was removed with
                 // `PortClosed`/`User` reasons.
-                error!("unrecognized removal reason {:?} from interface {}", reason, interface_id)
+                error!("unrecognized removal reason {:?} from interface {:?}", reason, interface_id)
             }
         },
     }
@@ -369,12 +377,12 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
 
     fn get_interface_control(
         interfaces_proxy: &fnet_root::InterfacesProxy,
-        interface_id: u32,
+        interface_id: NonZeroU32,
     ) -> fnet_interfaces_ext::admin::Control {
         let (control, server_end) = fnet_interfaces_ext::admin::Control::create_endpoints()
             .expect("create Control endpoints");
         interfaces_proxy
-            .get_admin(interface_id.into(), server_end)
+            .get_admin(interface_id.get().into(), server_end)
             .expect("send get admin request");
         control
     }
@@ -493,7 +501,7 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
                 if did_remove {
                     Ok(())
                 } else {
-                    Err(RequestError::NotFound)
+                    Err(RequestError::AddressNotFound)
                 }
             }
             Err(e) => {
@@ -1063,7 +1071,7 @@ pub(crate) mod testutil {
     use assert_matches::assert_matches;
     use fuchsia_zircon as zx;
     use futures::stream::Stream;
-    use net_declare::fidl_subnet;
+    use net_declare::{fidl_subnet, net_addr_subnet};
     use netlink_packet_core::NetlinkPayload;
 
     use crate::messaging::testutil::FakeSender;
@@ -1089,6 +1097,16 @@ pub(crate) mod testutil {
         fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {});
     pub(crate) const TEST_V4_ADDR: fnet::Subnet = fidl_subnet!("192.0.2.1/24");
     pub(crate) const TEST_V6_ADDR: fnet::Subnet = fidl_subnet!("2001:db8::1/32");
+
+    // AddrSubnetEither does not have any const methods so we need a method.
+    pub(crate) fn test_addr_subnet_v4() -> AddrSubnetEither {
+        net_addr_subnet!("192.0.2.1/24")
+    }
+
+    // AddrSubnetEither does not have any const methods so we need a method.
+    pub(crate) fn test_addr_subnet_v6() -> AddrSubnetEither {
+        net_addr_subnet!("2001:db8::1/32")
+    }
 
     pub(crate) struct Setup<W> {
         pub event_loop: EventLoop<FakeSender<RtnlMessage>>,
@@ -1244,7 +1262,6 @@ mod tests {
         sink::SinkExt as _,
         stream::Stream,
     };
-    use net_declare::net_addr_subnet;
     use netlink_packet_route::RTNLGRP_IPV4_ROUTE;
     use pretty_assertions::assert_eq;
     use test_case::test_case;
@@ -2013,64 +2030,54 @@ mod tests {
         );
     }
 
-    // AddrSubnetEither does not have any const methods so we need a method.
-    fn addr_subnet_v4() -> AddrSubnetEither {
-        net_addr_subnet!("192.0.2.1/24")
-    }
-
-    // AddrSubnetEither does not have any const methods so we need a method.
-    fn addr_subnet_v6() -> AddrSubnetEither {
-        net_addr_subnet!("2001:db8::1/32")
-    }
-
     /// Tests RTM_NEWADDR and RTM_DEL_ADDR when the interface is removed,
     /// indicated by the closure of the admin Control's server-end.
     #[test_case(
-        addr_subnet_v4(),
+        test_addr_subnet_v4(),
         None,
         true; "v4_no_terminal_new")]
     #[test_case(
-        addr_subnet_v6(),
+        test_addr_subnet_v6(),
         None,
         true; "v6_no_terminal_new")]
     #[test_case(
-        addr_subnet_v4(),
+        test_addr_subnet_v4(),
         Some(InterfaceRemovedReason::PortClosed),
         true; "v4_port_closed_terminal_new")]
     #[test_case(
-        addr_subnet_v6(),
+        test_addr_subnet_v6(),
         Some(InterfaceRemovedReason::PortClosed),
         true; "v6_port_closed_terminal_new")]
     #[test_case(
-        addr_subnet_v4(),
+        test_addr_subnet_v4(),
         Some(InterfaceRemovedReason::User),
         true; "v4_user_terminal_new")]
     #[test_case(
-        addr_subnet_v6(),
+        test_addr_subnet_v6(),
         Some(InterfaceRemovedReason::User),
         true; "v6_user_terminal_new")]
     #[test_case(
-        addr_subnet_v4(),
+        test_addr_subnet_v4(),
         None,
         false; "v4_no_terminal_del")]
     #[test_case(
-        addr_subnet_v6(),
+        test_addr_subnet_v6(),
         None,
         false; "v6_no_terminal_del")]
     #[test_case(
-        addr_subnet_v4(),
+        test_addr_subnet_v4(),
         Some(InterfaceRemovedReason::PortClosed),
         false; "v4_port_closed_terminal_del")]
     #[test_case(
-        addr_subnet_v6(),
+        test_addr_subnet_v6(),
         Some(InterfaceRemovedReason::PortClosed),
         false; "v6_port_closed_terminal_del")]
     #[test_case(
-        addr_subnet_v4(),
+        test_addr_subnet_v4(),
         Some(InterfaceRemovedReason::User),
         false; "v4_user_terminal_del")]
     #[test_case(
-        addr_subnet_v6(),
+        test_addr_subnet_v6(),
         Some(InterfaceRemovedReason::User),
         false; "v6_user_terminal_del")]
     #[fuchsia::test]
@@ -2079,7 +2086,7 @@ mod tests {
         removal_reason: Option<InterfaceRemovedReason>,
         is_new: bool,
     ) {
-        let interface_id = LO_INTERFACE_ID.try_into().unwrap();
+        let interface_id = NonZeroU32::new(LO_INTERFACE_ID.try_into().unwrap()).unwrap();
         pretty_assertions::assert_eq!(
             test_request(
                 if is_new {
@@ -2133,7 +2140,7 @@ mod tests {
         is_new: bool,
         mut control_request_handler: F,
     ) -> TestRequestResult {
-        let interface_id = ETH_INTERFACE_ID.try_into().unwrap();
+        let interface_id = NonZeroU32::new(ETH_INTERFACE_ID.try_into().unwrap()).unwrap();
         test_request(
             if is_new {
                 RequestArgs::Address(AddressRequestArgs::New(NewAddressArgs {
@@ -2200,8 +2207,8 @@ mod tests {
 
     /// Tests RTM_NEWADDR when the ASP is dropped immediately (doesn't handle
     /// any request).
-    #[test_case(addr_subnet_v4(); "v4")]
-    #[test_case(addr_subnet_v6(); "v6")]
+    #[test_case(test_addr_subnet_v4(); "v4")]
+    #[test_case(test_addr_subnet_v6(); "v6")]
     #[fuchsia::test]
     async fn test_new_addr_drop_asp_immediately(address: AddrSubnetEither) {
         pretty_assertions::assert_eq!(
@@ -2228,22 +2235,22 @@ mod tests {
     /// Tests RTM_NEWADDR when the ASP is closed with an unexpected terminal
     /// event.
     #[test_case(
-        addr_subnet_v4(),
+        test_addr_subnet_v4(),
         AddressRemovalReason::DadFailed; "v4_dad_failed")]
     #[test_case(
-        addr_subnet_v6(),
+        test_addr_subnet_v6(),
         AddressRemovalReason::DadFailed; "v6_dad_failed")]
     #[test_case(
-        addr_subnet_v4(),
+        test_addr_subnet_v4(),
         AddressRemovalReason::InterfaceRemoved; "v4_interface_removed")]
     #[test_case(
-        addr_subnet_v6(),
+        test_addr_subnet_v6(),
         AddressRemovalReason::InterfaceRemoved; "v6_interface_removed")]
     #[test_case(
-        addr_subnet_v4(),
+        test_addr_subnet_v4(),
         AddressRemovalReason::UserRemoved; "v4_user_removed")]
     #[test_case(
-        addr_subnet_v6(),
+        test_addr_subnet_v6(),
         AddressRemovalReason::UserRemoved; "v6_user_removed")]
     #[should_panic(expected = "expected netstack to send initial state before removing")]
     #[fuchsia::test]
@@ -2256,19 +2263,19 @@ mod tests {
 
     /// Tests RTM_NEWADDR when the ASP is gracefully closed with a terminal event.
     #[test_case(
-        addr_subnet_v4(),
+        test_addr_subnet_v4(),
         AddressRemovalReason::Invalid,
         RequestError::InvalidRequest; "v4_invalid")]
     #[test_case(
-        addr_subnet_v6(),
+        test_addr_subnet_v6(),
         AddressRemovalReason::Invalid,
         RequestError::InvalidRequest; "v6_invalid")]
     #[test_case(
-        addr_subnet_v4(),
+        test_addr_subnet_v4(),
         AddressRemovalReason::AlreadyAssigned,
         RequestError::AlreadyExists; "v4_exists")]
     #[test_case(
-        addr_subnet_v6(),
+        test_addr_subnet_v6(),
         AddressRemovalReason::AlreadyAssigned,
         RequestError::AlreadyExists; "v6_exists")]
     #[fuchsia::test]
@@ -2307,8 +2314,8 @@ mod tests {
 
     /// Test RTM_NEWADDR when the ASP is dropped immediately after handling the
     /// Detach request (no assignment state update or terminal event).
-    #[test_case(addr_subnet_v4(); "v4")]
-    #[test_case(addr_subnet_v6(); "v6")]
+    #[test_case(test_addr_subnet_v4(); "v4")]
+    #[test_case(test_addr_subnet_v6(); "v6")]
     #[fuchsia::test]
     async fn test_new_addr_drop_asp_after_detach(address: AddrSubnetEither) {
         pretty_assertions::assert_eq!(
@@ -2321,8 +2328,8 @@ mod tests {
     }
 
     /// Test RTM_NEWADDR when the ASP yields an assignment state update.
-    #[test_case(addr_subnet_v4(); "v4")]
-    #[test_case(addr_subnet_v6(); "v6")]
+    #[test_case(test_addr_subnet_v4(); "v4")]
+    #[test_case(test_addr_subnet_v6(); "v6")]
     #[fuchsia::test]
     async fn test_new_addr_with_state_update(address: AddrSubnetEither) {
         pretty_assertions::assert_eq!(
@@ -2343,22 +2350,22 @@ mod tests {
 
     /// Test RTM_DELADDR when the interface is closed with an unexpected reaosn.
     #[test_case(
-        addr_subnet_v4(),
+        test_addr_subnet_v4(),
         InterfaceRemovedReason::DuplicateName; "v4_duplicate_name")]
     #[test_case(
-        addr_subnet_v6(),
+        test_addr_subnet_v6(),
         InterfaceRemovedReason::DuplicateName; "v6_duplicate_name")]
     #[test_case(
-        addr_subnet_v4(),
+        test_addr_subnet_v4(),
         InterfaceRemovedReason::PortAlreadyBound; "v4_port_already_bound")]
     #[test_case(
-        addr_subnet_v6(),
+        test_addr_subnet_v6(),
         InterfaceRemovedReason::PortAlreadyBound; "v6_port_already_bound")]
     #[test_case(
-        addr_subnet_v4(),
+        test_addr_subnet_v4(),
         InterfaceRemovedReason::BadPort; "v4_bad_port")]
     #[test_case(
-        addr_subnet_v6(),
+        test_addr_subnet_v6(),
         InterfaceRemovedReason::BadPort; "v6_bad_port")]
     #[should_panic(expected = "unexpected interface removed reason")]
     #[fuchsia::test]
@@ -2385,27 +2392,27 @@ mod tests {
 
     /// Test RTM_DELADDR with all interesting responses to remove address.
     #[test_case(
-        addr_subnet_v4(),
+        test_addr_subnet_v4(),
         Ok(true),
         Ok(()); "v4_did_remove")]
     #[test_case(
-        addr_subnet_v6(),
+        test_addr_subnet_v6(),
         Ok(true),
         Ok(()); "v6_did_remove")]
     #[test_case(
-        addr_subnet_v4(),
+        test_addr_subnet_v4(),
         Ok(false),
-        Err(RequestError::NotFound); "v4_did_not_remove")]
+        Err(RequestError::AddressNotFound); "v4_did_not_remove")]
     #[test_case(
-        addr_subnet_v6(),
+        test_addr_subnet_v6(),
         Ok(false),
-        Err(RequestError::NotFound); "v6_did_not_remove")]
+        Err(RequestError::AddressNotFound); "v6_did_not_remove")]
     #[test_case(
-        addr_subnet_v4(),
+        test_addr_subnet_v4(),
         Err(fnet_interfaces_admin::ControlRemoveAddressError::unknown()),
         Err(RequestError::InvalidRequest); "v4_unrecognized_error")]
     #[test_case(
-        addr_subnet_v6(),
+        test_addr_subnet_v6(),
         Err(fnet_interfaces_admin::ControlRemoveAddressError::unknown()),
         Err(RequestError::InvalidRequest); "v6_unrecognized_error")]
     #[fuchsia::test]
