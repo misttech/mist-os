@@ -913,6 +913,10 @@ impl NamespaceNode {
             return error!(ENOTDIR);
         }
 
+        if basename.len() > NAME_MAX as usize {
+            return error!(ENAMETOOLONG);
+        }
+
         let child = if basename == b"." || basename == b"" {
             self.clone()
         } else if basename == b".." {
