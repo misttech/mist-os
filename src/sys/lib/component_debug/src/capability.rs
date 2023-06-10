@@ -4,7 +4,7 @@
 
 use {
     crate::realm::{
-        get_all_instances, get_resolved_declaration, GetAllInstancesError, GetManifestError,
+        get_all_instances, get_resolved_declaration, GetAllInstancesError, GetDeclarationError,
     },
     cm_rust::{ComponentDecl, SourceName},
     fidl_fuchsia_sys2 as fsys,
@@ -21,10 +21,10 @@ pub enum FindInstancesError {
     GetAllInstancesError(#[from] GetAllInstancesError),
 
     #[error("failed to get manifest for {moniker}: {err}")]
-    GetManifestError {
+    GetDeclarationError {
         moniker: AbsoluteMoniker,
         #[source]
-        err: GetManifestError,
+        err: GetDeclarationError,
     },
 }
 
@@ -42,9 +42,9 @@ pub async fn get_all_route_segments(
                 let mut component_segments = get_segments(&instance.moniker, decl, &query);
                 segments.append(&mut component_segments)
             }
-            Err(GetManifestError::InstanceNotResolved(_)) => continue,
+            Err(GetDeclarationError::InstanceNotResolved(_)) => continue,
             Err(err) => {
-                return Err(FindInstancesError::GetManifestError {
+                return Err(FindInstancesError::GetDeclarationError {
                     moniker: instance.moniker.clone(),
                     err,
                 })

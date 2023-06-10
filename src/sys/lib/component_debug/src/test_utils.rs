@@ -94,7 +94,7 @@ pub fn serve_realm_query(
                         let iterator = serve_manifest_bytes_iterator(manifest.clone());
                         responder.send(Ok(iterator)).unwrap();
                     } else {
-                        responder.send(Err(fsys::GetManifestError::InstanceNotFound)).unwrap();
+                        responder.send(Err(fsys::GetDeclarationError::InstanceNotFound)).unwrap();
                     }
                 }
                 fsys::RealmQueryRequest::GetManifest { moniker, responder } => {
@@ -103,7 +103,7 @@ pub fn serve_realm_query(
                         let iterator = serve_manifest_bytes_iterator(manifest.clone());
                         responder.send(Ok(iterator)).unwrap();
                     } else {
-                        responder.send(Err(fsys::GetManifestError::InstanceNotFound)).unwrap();
+                        responder.send(Err(fsys::GetDeclarationError::InstanceNotFound)).unwrap();
                     }
                 }
                 fsys::RealmQueryRequest::GetStructuredConfig { moniker, responder } => {

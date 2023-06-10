@@ -333,30 +333,30 @@ pub async fn get_resolved_declaration(
     model: &Arc<Model>,
     scope_moniker: &AbsoluteMoniker,
     moniker_str: &str,
-) -> Result<ClientEnd<fsys::ManifestBytesIteratorMarker>, fsys::GetManifestError> {
+) -> Result<ClientEnd<fsys::ManifestBytesIteratorMarker>, fsys::GetDeclarationError> {
     // Construct the complete moniker using the scope moniker and the relative moniker string.
-    let relative_moniker =
-        RelativeMoniker::try_from(moniker_str).map_err(|_| fsys::GetManifestError::BadMoniker)?;
+    let relative_moniker = RelativeMoniker::try_from(moniker_str)
+        .map_err(|_| fsys::GetDeclarationError::BadMoniker)?;
     let moniker = scope_moniker.descendant(&relative_moniker);
 
     // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
-    let instance = model.find(&moniker).await.ok_or(fsys::GetManifestError::InstanceNotFound)?;
+    let instance = model.find(&moniker).await.ok_or(fsys::GetDeclarationError::InstanceNotFound)?;
 
     let state = instance.lock_state().await;
 
     let decl = match &*state {
         InstanceState::Resolved(r) => r.decl().clone().native_into_fidl(),
-        _ => return Err(fsys::GetManifestError::InstanceNotResolved),
+        _ => return Err(fsys::GetDeclarationError::InstanceNotResolved),
     };
 
     let bytes = fidl::persist(&decl).map_err(|error| {
         warn!(%moniker, %error, "RealmQuery failed to encode manifest");
-        fsys::GetManifestError::EncodeFailed
+        fsys::GetDeclarationError::EncodeFailed
     })?;
 
     // Attach the iterator task to the scope root.
     let scope_root =
-        model.find(scope_moniker).await.ok_or(fsys::GetManifestError::InstanceNotFound)?;
+        model.find(scope_moniker).await.ok_or(fsys::GetDeclarationError::InstanceNotFound)?;
 
     let (client_end, server_end) =
         fidl::endpoints::create_endpoints::<fsys::ManifestBytesIteratorMarker>();
@@ -375,22 +375,22 @@ async fn resolve_declaration(
     parent_moniker_str: &str,
     child_location: &fsys::ChildLocation,
     url: &str,
-) -> Result<ClientEnd<fsys::ManifestBytesIteratorMarker>, fsys::GetManifestError> {
+) -> Result<ClientEnd<fsys::ManifestBytesIteratorMarker>, fsys::GetDeclarationError> {
     // Construct the complete moniker using the scope moniker and the relative moniker string.
     let parent_relative_moniker = RelativeMoniker::try_from(parent_moniker_str)
-        .map_err(|_| fsys::GetManifestError::BadMoniker)?;
+        .map_err(|_| fsys::GetDeclarationError::BadMoniker)?;
     let parent_moniker = scope_moniker.descendant(&parent_relative_moniker);
 
     let collection = match child_location {
         fsys::ChildLocation::Collection(coll) => coll.to_owned(),
-        _ => return Err(fsys::GetManifestError::BadChildLocation),
+        _ => return Err(fsys::GetDeclarationError::BadChildLocation),
     };
 
     trace!(parent=%parent_moniker, %collection, %url, "getting manifest for url in collection");
 
     // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
     let instance =
-        model.find(&parent_moniker).await.ok_or(fsys::GetManifestError::InstanceNotFound)?;
+        model.find(&parent_moniker).await.ok_or(fsys::GetDeclarationError::InstanceNotFound)?;
 
     let (address, environment) = {
         // this lock needs to be dropped before we try to call resolve, since routing the resolver
@@ -399,19 +399,20 @@ async fn resolve_declaration(
             InstanceState::Resolved(r) => {
                 trace!("found parent, and it is resolved");
                 let address = if url.starts_with("#") {
-                    r.address_for_relative_url(url).map_err(|_| fsys::GetManifestError::BadUrl)?
+                    r.address_for_relative_url(url)
+                        .map_err(|_| fsys::GetDeclarationError::BadUrl)?
                 } else {
                     ComponentAddress::from_absolute_url(&url)
-                        .map_err(|_| fsys::GetManifestError::BadUrl)?
+                        .map_err(|_| fsys::GetDeclarationError::BadUrl)?
                 };
                 let collections = r.collections();
                 let collection_decl = collections
                     .iter()
                     .find(|c| c.name == collection)
-                    .ok_or(fsys::GetManifestError::BadChildLocation)?;
+                    .ok_or(fsys::GetDeclarationError::BadChildLocation)?;
                 (address, r.environment_for_collection(&instance, &collection_decl))
             }
-            _ => return Err(fsys::GetManifestError::InstanceNotResolved),
+            _ => return Err(fsys::GetDeclarationError::InstanceNotResolved),
         }
     };
 
@@ -424,17 +425,17 @@ async fn resolve_declaration(
     let resolved = environment
         .resolve(&address)
         .await
-        .map_err(|_| fsys::GetManifestError::InstanceNotResolved)?;
+        .map_err(|_| fsys::GetDeclarationError::InstanceNotResolved)?;
 
     trace!("encoding manifest as persistent FIDL bytes");
     let bytes = fidl::encoding::persist(&resolved.decl.native_into_fidl()).map_err(|error| {
         warn!(parent=%parent_moniker, %error, "RealmQuery failed to encode manifest");
-        fsys::GetManifestError::EncodeFailed
+        fsys::GetDeclarationError::EncodeFailed
     })?;
 
     // Attach the iterator task to the scope root.
     let scope_root =
-        model.find(scope_moniker).await.ok_or(fsys::GetManifestError::InstanceNotFound)?;
+        model.find(scope_moniker).await.ok_or(fsys::GetDeclarationError::InstanceNotFound)?;
 
     let (client_end, server_end) =
         fidl::endpoints::create_endpoints::<fsys::ManifestBytesIteratorMarker>();

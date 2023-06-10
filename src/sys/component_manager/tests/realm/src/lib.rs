@@ -74,7 +74,7 @@ pub async fn echo_server() {
     assert!(instance.resolved_info.is_none());
 
     let err = query.get_resolved_declaration("./echo_server").await.unwrap().unwrap_err();
-    assert_eq!(err, fsys::GetManifestError::InstanceNotResolved);
+    assert_eq!(err, fsys::GetDeclarationError::InstanceNotResolved);
 
     let err = query.get_structured_config("./echo_server").await.unwrap().unwrap_err();
     assert_eq!(err, fsys::GetStructuredConfigError::InstanceNotResolved);

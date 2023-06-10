@@ -117,7 +117,7 @@ pub enum GetMerkleRootError {
 }
 
 #[derive(Debug, Error)]
-pub enum GetManifestError {
+pub enum GetDeclarationError {
     #[error(transparent)]
     Fidl(#[from] fidl::Error),
 
@@ -366,22 +366,22 @@ pub async fn get_all_instances(
 pub async fn get_resolved_declaration(
     moniker: &AbsoluteMoniker,
     realm_query: &fsys::RealmQueryProxy,
-) -> Result<ComponentDecl, GetManifestError> {
+) -> Result<ComponentDecl, GetDeclarationError> {
     let moniker_str = format!(".{}", moniker.to_string());
     // TODO(https://fxbug.dev/127340) switch to get_resolved_declaration once OK for ffx compat
     let iterator = match realm_query.get_manifest(&moniker_str).await? {
         Ok(iterator) => Ok(iterator),
-        Err(fsys::GetManifestError::InstanceNotFound) => {
-            Err(GetManifestError::InstanceNotFound(moniker.clone()))
+        Err(fsys::GetDeclarationError::InstanceNotFound) => {
+            Err(GetDeclarationError::InstanceNotFound(moniker.clone()))
         }
-        Err(fsys::GetManifestError::InstanceNotResolved) => {
-            Err(GetManifestError::InstanceNotResolved(moniker.clone()))
+        Err(fsys::GetDeclarationError::InstanceNotResolved) => {
+            Err(GetDeclarationError::InstanceNotResolved(moniker.clone()))
         }
-        Err(fsys::GetManifestError::BadMoniker) => {
-            Err(GetManifestError::BadMoniker(moniker.clone()))
+        Err(fsys::GetDeclarationError::BadMoniker) => {
+            Err(GetDeclarationError::BadMoniker(moniker.clone()))
         }
-        Err(fsys::GetManifestError::EncodeFailed) => Err(GetManifestError::EncodeFailed),
-        Err(_) => Err(GetManifestError::UnknownError),
+        Err(fsys::GetDeclarationError::EncodeFailed) => Err(GetDeclarationError::EncodeFailed),
+        Err(_) => Err(GetDeclarationError::UnknownError),
     }?;
 
     let bytes = drain_manifest_bytes_iterator(iterator.into_proxy().unwrap()).await?;
@@ -411,24 +411,26 @@ pub async fn resolve_declaration(
     parent: &AbsoluteMoniker,
     child_location: &fsys::ChildLocation,
     url: &str,
-) -> Result<ComponentDecl, GetManifestError> {
+) -> Result<ComponentDecl, GetDeclarationError> {
     let iterator = realm_query
         .resolve_declaration(&format!(".{}", parent), child_location, url)
         .await?
         .map_err(|e| match e {
-            fsys::GetManifestError::InstanceNotFound => {
-                GetManifestError::InstanceNotFound(parent.clone())
+            fsys::GetDeclarationError::InstanceNotFound => {
+                GetDeclarationError::InstanceNotFound(parent.clone())
             }
-            fsys::GetManifestError::InstanceNotResolved => {
-                GetManifestError::InstanceNotResolved(parent.clone())
+            fsys::GetDeclarationError::InstanceNotResolved => {
+                GetDeclarationError::InstanceNotResolved(parent.clone())
             }
-            fsys::GetManifestError::BadMoniker => GetManifestError::BadMoniker(parent.clone()),
-            fsys::GetManifestError::EncodeFailed => GetManifestError::EncodeFailed,
-            fsys::GetManifestError::BadChildLocation => {
-                GetManifestError::BadChildLocation(child_location.to_owned())
+            fsys::GetDeclarationError::BadMoniker => {
+                GetDeclarationError::BadMoniker(parent.clone())
             }
-            fsys::GetManifestError::BadUrl => GetManifestError::BadUrl(url.to_owned()),
-            _ => GetManifestError::UnknownError,
+            fsys::GetDeclarationError::EncodeFailed => GetDeclarationError::EncodeFailed,
+            fsys::GetDeclarationError::BadChildLocation => {
+                GetDeclarationError::BadChildLocation(child_location.to_owned())
+            }
+            fsys::GetDeclarationError::BadUrl => GetDeclarationError::BadUrl(url.to_owned()),
+            _ => GetDeclarationError::UnknownError,
         })?;
 
     let bytes = drain_manifest_bytes_iterator(iterator.into_proxy().unwrap()).await?;

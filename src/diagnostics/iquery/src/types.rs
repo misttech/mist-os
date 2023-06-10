@@ -69,7 +69,7 @@ pub enum Error {
     InvalidFilePattern(String),
 
     #[error(transparent)]
-    GetManifestError(#[from] component_debug::realm::GetManifestError),
+    GetManifestError(#[from] component_debug::realm::GetDeclarationError),
 
     #[error(transparent)]
     GetAllInstancesError(#[from] component_debug::realm::GetAllInstancesError),

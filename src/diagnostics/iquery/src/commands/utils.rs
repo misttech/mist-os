@@ -132,8 +132,8 @@ pub async fn get_accessor_selectors(
                     }
                 }
             }
-            Err(GetManifestError::InstanceNotFound(_))
-            | Err(GetManifestError::InstanceNotResolved(_)) => continue,
+            Err(GetDeclarationError::InstanceNotFound(_))
+            | Err(GetDeclarationError::InstanceNotResolved(_)) => continue,
             Err(err) => return Err(err.into()),
         }
     }

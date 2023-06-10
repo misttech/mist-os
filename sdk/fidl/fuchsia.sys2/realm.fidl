@@ -30,7 +30,7 @@ type GetInstanceError = flexible enum {
 };
 
 /// Errors that can be returned by the GetManifest call.
-type GetManifestError = flexible enum {
+type GetDeclarationError = flexible enum {
     /// Could not find an instance matching the given moniker.
     INSTANCE_NOT_FOUND = 1;
 
@@ -216,7 +216,7 @@ protocol RealmQuery {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> (resource struct {
         iterator client_end:ManifestBytesIterator;
-    }) error GetManifestError;
+    }) error GetDeclarationError;
 
     // TODO(https://fxbug.dev/127340) delete once no longer required for ffx compat window
     /// Prefer `GetResolvedDeclaration` if available for your target API level.
@@ -225,7 +225,7 @@ protocol RealmQuery {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> (resource struct {
         iterator client_end:ManifestBytesIterator;
-    }) error GetManifestError;
+    }) error GetDeclarationError;
 
     /// Gets the manifest of a component URL as if it were a child of the specified parent
     /// without actually creating or starting that component.
@@ -241,7 +241,7 @@ protocol RealmQuery {
         url fuchsia.url.Url;
     }) -> (resource struct {
         iterator client_end:ManifestBytesIterator;
-    }) error GetManifestError;
+    }) error GetDeclarationError;
 
     /// Gets the structured config of an instance identified by its relative moniker.
     @available(added=13)

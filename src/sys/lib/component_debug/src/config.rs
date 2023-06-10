@@ -73,7 +73,7 @@ pub enum ConfigResolveError {
     FailedToGetManifest(
         #[source]
         #[from]
-        crate::realm::GetManifestError,
+        crate::realm::GetDeclarationError,
     ),
 
     #[error("Provided component URL points to a manifest without a config schema.")]

@@ -53,7 +53,7 @@ pub enum RealmError {
     ConnectExposedDir(fsys::OpenError),
 
     #[error(transparent)]
-    GetManifest(#[from] component_debug::realm::GetManifestError),
+    GetManifest(#[from] component_debug::realm::GetDeclarationError),
 }
 
 pub struct Realm {
