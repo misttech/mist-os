@@ -5,7 +5,7 @@
 //! A module for managing individual clients (aka sockets) of Netlink.
 
 use std::{
-    fmt::{Display, Formatter},
+    fmt::{Debug, Display, Formatter},
     num::NonZeroU32,
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -57,6 +57,12 @@ pub(crate) struct InternalClient<F: ProtocolFamily, S: Sender<F::InnerMessage>> 
     inner: Arc<InnerClient<F>>,
     /// The [`Sender`] of messages from Netlink to the Client.
     sender: S,
+}
+
+impl<F: ProtocolFamily, S: Sender<F::InnerMessage>> Debug for InternalClient<F, S> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
+    }
 }
 
 impl<F: ProtocolFamily, S: Sender<F::InnerMessage>> Display for InternalClient<F, S> {

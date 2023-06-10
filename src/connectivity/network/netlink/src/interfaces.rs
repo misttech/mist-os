@@ -50,7 +50,7 @@ use crate::{
 };
 
 /// Arguments for an RTM_GETLINK [`Request`].
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum GetLinkArgs {
     /// Dump state for all the links.
     Dump,
@@ -59,14 +59,14 @@ pub(crate) enum GetLinkArgs {
 }
 
 /// [`Request`] arguments associated with links.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum LinkRequestArgs {
     /// RTM_GETLINK
     Get(GetLinkArgs),
 }
 
 /// Arguments for an RTM_GETADDR [`Request`].
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum GetAddressArgs {
     /// Dump state for all addresses with the optional IP version filter.
     Dump { ip_version_filter: Option<IpVersion> },
@@ -75,7 +75,7 @@ pub(crate) enum GetAddressArgs {
 }
 
 /// Arguments for an RTM_NEWADDR [`Request`].
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct NewAddressArgs {
     /// The address to be added.
     #[allow(unused)]
@@ -86,7 +86,7 @@ pub(crate) struct NewAddressArgs {
 }
 
 /// Arguments for an RTM_DELADDR [`Request`].
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct DelAddressArgs {
     /// The address to be removed.
     #[allow(unused)]
@@ -97,7 +97,7 @@ pub(crate) struct DelAddressArgs {
 }
 
 /// [`Request`] arguments associated with addresses.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum AddressRequestArgs {
     /// RTM_GETADDR
     Get(GetAddressArgs),
@@ -110,7 +110,7 @@ pub(crate) enum AddressRequestArgs {
 }
 
 /// The argument(s) for a [`Request`].
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum RequestArgs {
     Link(LinkRequestArgs),
     Address(AddressRequestArgs),
@@ -172,6 +172,7 @@ fn map_existing_interface_terminal_error(
 }
 
 /// A request associated with links or addresses.
+#[derive(Debug)]
 pub(crate) struct Request<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> {
     /// The resource and operation-specific argument(s) for this request.
     pub args: RequestArgs,
