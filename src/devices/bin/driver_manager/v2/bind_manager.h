@@ -18,6 +18,12 @@ namespace dfv2 {
 
 class DriverRunner;
 
+struct BindRequest {
+  std::weak_ptr<Node> node;
+  std::string driver_url_suffix;
+  std::shared_ptr<BindResultTracker> tracker;
+};
+
 // Bridge class for driver manager related interactions.
 class BindManagerBridge {
  public:
@@ -55,16 +61,28 @@ class BindManager {
   std::vector<fuchsia_driver_development::wire::CompositeInfo> GetCompositeListInfo(
       fidl::AnyArena& arena) const;
 
+  // Exposed for testing.
   size_t NumOrphanedNodes() const { return orphaned_nodes_.size(); }
+
+ protected:
+  // Exposed for testing.
+  const std::unordered_map<std::string, std::weak_ptr<Node>>& orphaned_nodes() const {
+    return orphaned_nodes_;
+  }
+
+  // Exposed for testing.
+  bool bind_all_ongoing() const { return bind_all_ongoing_; }
+
+  // Exposed for testing.
+  std::vector<BindRequest> pending_bind_requests() const { return pending_bind_requests_; }
+
+  // Exposed for testing.
+  const std::vector<NodeBindingInfoResultCallback>& pending_orphan_rebind_callbacks() const {
+    return pending_orphan_rebind_callbacks_;
+  }
 
  private:
   using BindMatchCompleteCallback = fit::callback<void()>;
-
-  struct BindRequest {
-    std::weak_ptr<Node> node;
-    std::string driver_url_suffix;
-    std::shared_ptr<BindResultTracker> tracker;
-  };
 
   // Should only be called when |bind_all_ongoing_| is true.
   void BindInternal(

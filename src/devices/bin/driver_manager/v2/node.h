@@ -221,6 +221,11 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
     symbols_ = std::move(symbols);
   }
 
+  // Exposed for testing.
+  void set_properties(std::vector<fuchsia_driver_framework::wire::NodeProperty> properties) {
+    properties_ = std::move(properties);
+  }
+
  private:
   struct DriverComponent {
     DriverComponent(Node& node, std::string url,

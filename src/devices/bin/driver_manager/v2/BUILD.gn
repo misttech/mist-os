@@ -90,6 +90,28 @@ fuchsia_unittest_component("driver-runner-test") {
   deps = [ ":driver_runner_test" ]
 }
 
+executable("bind_manager_test") {
+  testonly = true
+  sources = [
+    "tests/bind_manager_test.cc",
+    "tests/bind_manager_test_base.cc",
+    "tests/bind_manager_test_base.h",
+  ]
+
+  deps = [
+    ":driver_runner",
+    "//sdk/fidl/fuchsia.driver.index:fuchsia.driver.index_cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
+    "//zircon/system/ulib/zircon-internal",
+  ]
+}
+
+fuchsia_unittest_component("bind-manager-test") {
+  deps = [ ":bind_manager_test" ]
+}
+
 executable("composite_assembler_test") {
   testonly = true
   sources = [ "composite_assembler_test.cc" ]
@@ -165,9 +187,10 @@ fuchsia_test_package("driver-runner-tests") {
   }
 
   test_components = [
+    ":bind-manager-test",
+    ":composite-assembler-test",
     ":composite-node-spec-v2-test",
     ":driver-runner-test",
-    ":composite-assembler-test",
     ":node-removal-tracker-test",
     ":node-test",
   ]
