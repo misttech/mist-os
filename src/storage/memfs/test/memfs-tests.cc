@@ -2,16 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <dirent.h>
+#include <fcntl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/fdio/fd.h>
 #include <lib/zx/stream.h>
 #include <lib/zx/vmo.h>
+#include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
+#include <future>
 #include <limits>
 
+#include <fbl/unique_fd.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -23,6 +30,262 @@ namespace memfs {
 namespace {
 
 constexpr uint64_t kMaxFileSize = std::numeric_limits<zx_off_t>::max() - (1ull << 17) + 1;
+
+TEST(MemfsTests, TestMemfsBasic) {
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+
+  // Create a memfs filesystem, acquire a file descriptor
+  zx::result result = memfs::Memfs::Create(loop.dispatcher(), "<tmp>");
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  auto& [memfs, root] = result.value();
+  auto shutdown = fit::defer([&memfs = memfs]() {
+    std::promise<zx_status_t> promise;
+    memfs->Shutdown([&promise](zx_status_t status) { promise.set_value(status); });
+    ASSERT_EQ(promise.get_future().get(), ZX_OK);
+  });
+
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
+  auto& [client, server] = endpoints.value();
+
+  ASSERT_EQ(memfs->ServeDirectory(std::move(root), std::move(server)), ZX_OK);
+  ASSERT_EQ(loop.StartThread(), ZX_OK);
+
+  fbl::unique_fd fd;
+  ASSERT_EQ(fdio_fd_create(client.TakeChannel().release(), fd.reset_and_get_address()), ZX_OK);
+
+  // Access files within the filesystem.
+  DIR* d = fdopendir(fd.get());
+  ASSERT_NE(d, nullptr);
+  auto close_dir = fit::defer([d]() { ASSERT_EQ(closedir(d), 0) << strerror(errno); });
+
+  // Create a file
+  constexpr char filename[] = "file-a";
+  {
+    fbl::unique_fd fd(openat(dirfd(d), filename, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR));
+    ASSERT_TRUE(fd.is_valid()) << strerror(errno);
+    constexpr char data[] = "hello";
+    constexpr ssize_t datalen = sizeof(data);
+    ASSERT_EQ(write(fd.get(), data, datalen), datalen);
+    ASSERT_EQ(lseek(fd.get(), 0, SEEK_SET), 0);
+    char buf[32];
+    ASSERT_EQ(read(fd.get(), buf, sizeof(buf)), datalen);
+    ASSERT_EQ(memcmp(buf, data, datalen), 0);
+  }
+
+  // Readdir the file
+  struct dirent* de;
+  ASSERT_NE((de = readdir(d)), nullptr);
+  ASSERT_EQ(strcmp(de->d_name, "."), 0);
+  ASSERT_NE((de = readdir(d)), nullptr);
+  ASSERT_EQ(strcmp(de->d_name, filename), 0);
+  ASSERT_EQ(readdir(d), nullptr);
+}
+
+TEST(MemfsTests, TestMemfsAppend) {
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+
+  // Create a memfs filesystem, acquire a file descriptor
+  zx::result result = memfs::Memfs::Create(loop.dispatcher(), "<tmp>");
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  auto& [memfs, root] = result.value();
+  auto shutdown = fit::defer([&memfs = memfs]() {
+    std::promise<zx_status_t> promise;
+    memfs->Shutdown([&promise](zx_status_t status) { promise.set_value(status); });
+    ASSERT_EQ(promise.get_future().get(), ZX_OK);
+  });
+
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
+  auto& [client, server] = endpoints.value();
+
+  ASSERT_EQ(memfs->ServeDirectory(std::move(root), std::move(server)), ZX_OK);
+  ASSERT_EQ(loop.StartThread(), ZX_OK);
+
+  fbl::unique_fd fd;
+  ASSERT_EQ(fdio_fd_create(client.TakeChannel().release(), fd.reset_and_get_address()), ZX_OK);
+
+  // Access files within the filesystem.
+  DIR* d = fdopendir(fd.get());
+  ASSERT_NE(d, nullptr);
+  auto close_dir = fit::defer([d]() { ASSERT_EQ(closedir(d), 0) << strerror(errno); });
+
+  // Create a file
+  constexpr char filename[] = "file-a";
+  {
+    fbl::unique_fd fd(openat(dirfd(d), filename, O_CREAT | O_RDWR | O_APPEND, S_IRUSR | S_IWUSR));
+    ASSERT_TRUE(fd.is_valid()) << strerror(errno);
+    {
+      constexpr char data[] = "hello";
+      constexpr ssize_t datalen = sizeof(data) - 1;
+      ASSERT_EQ(write(fd.get(), data, datalen), datalen);
+    }
+    ASSERT_EQ(lseek(fd.get(), 0, SEEK_SET), 0);
+    {
+      constexpr char data[] = ", world";
+      constexpr ssize_t datalen = sizeof(data) - 1;
+      ASSERT_EQ(write(fd.get(), data, datalen), datalen);
+    }
+    ASSERT_EQ(lseek(fd.get(), 0, SEEK_CUR), 12);
+    ASSERT_EQ(lseek(fd.get(), 0, SEEK_SET), 0);
+    {
+      constexpr char data[] = "hello, world";
+      constexpr ssize_t datalen = sizeof(data) - 1;
+      char buf[32];
+      ASSERT_EQ(read(fd.get(), buf, sizeof(buf)), datalen);
+      ASSERT_EQ(memcmp(buf, data, datalen), 0);
+    }
+  }
+}
+
+TEST(MemfsTests, TestMemfsCloseDuringAccess) {
+  for (int i = 0; i < 100; i++) {
+    async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+
+    // Create a memfs filesystem, acquire a file descriptor
+    zx::result result = memfs::Memfs::Create(loop.dispatcher(), "<tmp>");
+    ASSERT_TRUE(result.is_ok()) << result.status_string();
+    auto& [memfs, root] = result.value();
+    auto shutdown = fit::defer([&memfs = memfs]() {
+      std::promise<zx_status_t> promise;
+      memfs->Shutdown([&promise](zx_status_t status) { promise.set_value(status); });
+      ASSERT_EQ(promise.get_future().get(), ZX_OK);
+    });
+
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
+    auto& [client, server] = endpoints.value();
+
+    ASSERT_EQ(memfs->ServeDirectory(std::move(root), std::move(server)), ZX_OK);
+    ASSERT_EQ(loop.StartThread(), ZX_OK);
+
+    fbl::unique_fd fd;
+    ASSERT_EQ(fdio_fd_create(client.TakeChannel().release(), fd.reset_and_get_address()), ZX_OK);
+
+    // Access files within the filesystem.
+    DIR* d = fdopendir(fd.get());
+    ASSERT_NE(d, nullptr);
+    auto close_dir = fit::defer([d]() { ASSERT_EQ(closedir(d), 0) << strerror(errno); });
+
+    // Create the file.
+    constexpr char filename[] = "foo";
+    {
+      fbl::unique_fd fd(openat(dirfd(d), filename, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR));
+      ASSERT_TRUE(fd.is_valid()) << strerror(errno);
+    }
+
+    std::thread worker([d, filename]() {
+      for (size_t i = 0;; ++i) {
+        fbl::unique_fd fd(openat(dirfd(d), filename, O_RDWR));
+        if (!fd.is_valid()) {
+          ASSERT_EQ(errno, EPIPE) << "fd=" << fd.get() << "\n"
+                                  << "i=" << i << "\n"
+                                  << strerror(errno);
+          break;
+        }
+        if (close(fd.get()) != 0) {
+          ASSERT_EQ(errno, EPIPE) << "fd=" << fd.get() << "\n"
+                                  << "i=" << i << "\n"
+                                  << strerror(errno);
+          break;
+        }
+      }
+    });
+
+    shutdown.call();
+
+    worker.join();
+
+    // Now that the filesystem has terminated, we should be
+    // unable to access it.
+    ASSERT_LT(openat(dirfd(d), filename, O_RDWR), 0);
+    ASSERT_EQ(errno, EPIPE) << "Expected connection to remote server to be closed: "
+                            << strerror(errno);
+  }
+}
+
+TEST(MemfsTests, TestMemfsOverflow) {
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  ASSERT_EQ(loop.StartThread(), ZX_OK);
+
+  // Create a memfs filesystem, acquire a file descriptor
+  zx::result result = memfs::Memfs::Create(loop.dispatcher(), "<tmp>");
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  auto& [memfs, root] = result.value();
+  auto shutdown = fit::defer([&memfs = memfs]() {
+    std::promise<zx_status_t> promise;
+    memfs->Shutdown([&promise](zx_status_t status) { promise.set_value(status); });
+    ASSERT_EQ(promise.get_future().get(), ZX_OK);
+  });
+
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
+  auto& [client, server] = endpoints.value();
+
+  ASSERT_EQ(memfs->ServeDirectory(std::move(root), std::move(server)), ZX_OK);
+  ASSERT_EQ(loop.StartThread(), ZX_OK);
+
+  fbl::unique_fd root_fd;
+  ASSERT_EQ(fdio_fd_create(client.TakeChannel().release(), root_fd.reset_and_get_address()), ZX_OK);
+
+  // Access files within the filesystem.
+  DIR* d = fdopendir(root_fd.get());
+  ASSERT_NE(d, nullptr);
+  auto close_dir = fit::defer([d]() { ASSERT_EQ(closedir(d), 0) << strerror(errno); });
+
+  // Issue writes to the file in an order that previously would have triggered
+  // an overflow in the memfs write path.
+  //
+  // Values provided mimic the bug reported by syzkaller (fxbug.dev/33581).
+  uint8_t buf[4096];
+  memset(buf, 'a', sizeof(buf));
+  fbl::unique_fd fd(openat(dirfd(d), "file", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR));
+  ASSERT_TRUE(fd.is_valid()) << strerror(errno);
+  ASSERT_EQ(pwrite(fd.get(), buf, 199, 0), 199);
+  ASSERT_EQ(pwrite(fd.get(), buf, 226, 0xfffffffffffff801), -1);
+  ASSERT_EQ(errno, EINVAL) << strerror(errno);
+}
+
+TEST(MemfsTests, TestMemfsDetachLinkedFilesystem) {
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  ASSERT_EQ(loop.StartThread(), ZX_OK);
+
+  // Create a memfs filesystem, acquire a file descriptor
+  zx::result result = memfs::Memfs::Create(loop.dispatcher(), "<tmp>");
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  auto& [memfs, root] = result.value();
+  auto shutdown = fit::defer([&memfs = memfs]() {
+    std::promise<zx_status_t> promise;
+    memfs->Shutdown([&promise](zx_status_t status) { promise.set_value(status); });
+    ASSERT_EQ(promise.get_future().get(), ZX_OK);
+  });
+
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
+  auto& [client, server] = endpoints.value();
+
+  ASSERT_EQ(memfs->ServeDirectory(std::move(root), std::move(server)), ZX_OK);
+  ASSERT_EQ(loop.StartThread(), ZX_OK);
+
+  fbl::unique_fd root_fd;
+  ASSERT_EQ(fdio_fd_create(client.TakeChannel().release(), root_fd.reset_and_get_address()), ZX_OK);
+
+  // Access files within the filesystem.
+  DIR* d = fdopendir(root_fd.get());
+  ASSERT_NE(d, nullptr);
+  auto close_dir = fit::defer([d]() { ASSERT_EQ(closedir(d), 0) << strerror(errno); });
+
+  // Leave a regular file.
+  fbl::unique_fd fd(openat(dirfd(d), "file", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR));
+  ASSERT_TRUE(fd.is_valid()) << strerror(errno);
+
+  // Leave an empty subdirectory.
+  ASSERT_EQ(0, mkdirat(dirfd(d), "empty-subdirectory", 0));
+
+  // Leave a subdirectory with children.
+  ASSERT_EQ(0, mkdirat(dirfd(d), "subdirectory", 0));
+  ASSERT_EQ(0, mkdirat(dirfd(d), "subdirectory/child", 0));
+}
 
 TEST(MemfsTest, DirectoryLifetime) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);

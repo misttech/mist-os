@@ -115,21 +115,6 @@ struct memfs_filesystem {
   std::string mounted_path_;        // Empty if not mounted.
 };
 
-zx_status_t memfs_create_filesystem(async_dispatcher_t* dispatcher, memfs_filesystem_t** out_fs,
-                                    zx_handle_t* out_root) {
-  ZX_DEBUG_ASSERT(dispatcher != nullptr);
-  ZX_DEBUG_ASSERT(out_fs != nullptr);
-  ZX_DEBUG_ASSERT(out_root != nullptr);
-
-  zx::result<memfs_filesystem> setup_or = memfs_filesystem::Create(dispatcher);
-  if (setup_or.is_error())
-    return setup_or.error_value();
-
-  *out_root = setup_or->root().release();
-  *out_fs = new memfs_filesystem_t(std::move(*setup_or));
-  return ZX_OK;
-}
-
 zx_status_t memfs_install_at(async_dispatcher_t* dispatcher, const char* path,
                              memfs_filesystem_t** out_fs) {
   ZX_DEBUG_ASSERT(dispatcher);
