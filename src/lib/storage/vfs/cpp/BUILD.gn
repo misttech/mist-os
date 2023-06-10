@@ -122,25 +122,6 @@ static_library("cpp") {
   }
 }
 
-static_library("inotify_test_base") {
-  testonly = true
-  public = [ "inotify_test_base.h" ]
-  sources = [ "inotify_test_base.cc" ]
-  deps = [
-    "//sdk/lib/fdio",
-    "//sdk/lib/fidl",
-    "//src/lib/fxl",
-    "//src/lib/storage/vfs/cpp",
-    "//src/storage/memfs:cpp",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
-  ]
-}
-
 source_set("test_support") {
   public = [ "dir_test_util.h" ]
   public_deps = [ ":cpp" ]
