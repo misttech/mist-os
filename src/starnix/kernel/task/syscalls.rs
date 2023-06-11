@@ -5,7 +5,7 @@
 use fuchsia_zircon::AsHandleRef;
 
 use static_assertions::const_assert;
-use std::{ffi::CString, sync::Arc};
+use std::{cmp, ffi::CString, sync::Arc};
 use zerocopy::AsBytes;
 
 use crate::{
@@ -83,19 +83,32 @@ fn read_c_string_vector(
     mm: &MemoryManager,
     user_vector: UserRef<UserCString>,
     buf: &mut [u8],
-) -> Result<Vec<CString>, Errno> {
+    vec_limit: usize,
+) -> Result<(Vec<CString>, usize), Errno> {
     let mut user_current = user_vector;
     let mut vector: Vec<CString> = vec![];
+    let mut vec_size: usize = 0;
     loop {
         let user_string = mm.read_object(user_current)?;
         if user_string.is_null() {
             break;
         }
-        let string = mm.read_c_string(user_string, buf)?;
-        vector.push(CString::new(string).map_err(|_| errno!(EINVAL))?);
+        let string = mm.read_c_string(user_string, buf).map_err(|e| {
+            if e == errno!(ENAMETOOLONG) {
+                errno!(E2BIG)
+            } else {
+                e
+            }
+        })?;
+        let cstring = CString::new(string).map_err(|_| errno!(EINVAL))?;
+        vec_size = vec_size.checked_add(cstring.as_bytes_with_nul().len()).ok_or(errno!(E2BIG))?;
+        if vec_size > vec_limit {
+            return error!(E2BIG);
+        }
+        vector.push(cstring);
         user_current = user_current.next();
     }
-    Ok(vector)
+    Ok((vector, vec_size))
 }
 
 pub fn sys_execve(
@@ -119,17 +132,27 @@ pub fn sys_execveat(
         return error!(EINVAL);
     }
 
-    let mut buf = [0u8; PATH_MAX as usize];
-    // TODO: What is the maximum size for an argument?
-    let argv = if user_argv.is_null() {
-        Vec::new()
+    // Calculate the limit for argv and environ size as 1/4 of the stack size, floored at 32 pages.
+    // See the Limits sections in https://man7.org/linux/man-pages/man2/execve.2.html
+    const PAGE_LIMIT: usize = 32;
+    let page_limit_size: usize = PAGE_LIMIT * *PAGE_SIZE as usize;
+    let rlimit = current_task.thread_group.get_rlimit(Resource::STACK);
+    let stack_limit = rlimit / 4;
+    let argv_env_limit = cmp::max(page_limit_size, stack_limit as usize);
+
+    // The limit per argument or environment variable is 32 pages.
+    // See the Limits sections in https://man7.org/linux/man-pages/man2/execve.2.html
+    let mut buf = vec![0u8; page_limit_size];
+    let (argv, argv_size) = if user_argv.is_null() {
+        (Vec::new(), 0)
     } else {
-        read_c_string_vector(&current_task.mm, user_argv, &mut buf)?
+        read_c_string_vector(&current_task.mm, user_argv, &mut buf, argv_env_limit)?
     };
-    let environ = if user_environ.is_null() {
-        Vec::new()
+
+    let (environ, _) = if user_environ.is_null() {
+        (Vec::new(), 0)
     } else {
-        read_c_string_vector(&current_task.mm, user_environ, &mut buf)?
+        read_c_string_vector(&current_task.mm, user_environ, &mut buf, argv_env_limit - argv_size)?
     };
 
     let path = current_task.mm.read_c_string(user_path, &mut buf)?;
@@ -1185,7 +1208,7 @@ pub fn sys_unshare(current_task: &CurrentTask, flags: u32) -> Result<(), Errno> 
 mod tests {
     use super::*;
     use crate::{mm::syscalls::sys_munmap, testing::*};
-    use std::u64;
+    use std::{mem, u64};
 
     #[::fuchsia::test]
     async fn test_prctl_set_vma_anon_name() {
@@ -1525,5 +1548,36 @@ mod tests {
         assert_eq!(creds.euid, 43);
         assert_eq!(creds.uid, 41);
         assert_eq!(creds.saved_uid, 43);
+    }
+
+    #[::fuchsia::test]
+    async fn test_read_c_string_vector() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let mm = &current_task.mm;
+
+        let arg_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let arg = b"test-arg\0";
+        mm.write_memory(arg_addr, arg).expect("failed to write test arg");
+        let arg_usercstr = UserCString::new(arg_addr);
+        let null_usercstr = UserCString::default();
+
+        let argv_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        mm.write_object(argv_addr.into(), &arg_usercstr).expect("failed to write UserCString");
+        mm.write_object((argv_addr + mem::size_of::<UserCString>()).into(), &null_usercstr)
+            .expect("failed to write UserCString");
+        let argv_userref = UserRef::new(argv_addr);
+        let mut buf = vec![0u8; 100];
+
+        // The arguments size limit should include the null terminator.
+        assert!(read_c_string_vector(mm, argv_userref, &mut buf, arg.len()).is_ok());
+        assert_eq!(
+            read_c_string_vector(
+                mm,
+                argv_userref,
+                &mut buf,
+                std::str::from_utf8(arg).unwrap().trim_matches('\0').len()
+            ),
+            error!(E2BIG)
+        );
     }
 }

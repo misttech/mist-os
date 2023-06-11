@@ -12,6 +12,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <cerrno>
 #include <cstdint>
 
 #include <gtest/gtest.h>
@@ -336,4 +337,53 @@ TEST(Task, ParentCantModifyChild) {
   signal_helper.restoreSigmask();
 
   delete heap_variable;
+}
+
+constexpr size_t kVecSize = 100;
+constexpr size_t kPageLimit = 32;
+
+TEST(Task, ExecveArgumentExceedsMaxArgStrlen) {
+  ForkHelper helper;
+  helper.RunInForkedProcess([] {
+    size_t arg_size = kPageLimit * sysconf(_SC_PAGESIZE);
+    std::vector<char> arg(arg_size + 1, 'a');
+    arg[arg_size] = '\0';
+    char* argv[] = {arg.data(), nullptr};
+    char* envp[] = {nullptr};
+    EXPECT_NE(execve("/proc/self/exe", argv, envp), 0);
+    EXPECT_EQ(errno, E2BIG);
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+
+TEST(Task, ExecveArgvExceedsLimit) {
+  ForkHelper helper;
+  helper.RunInForkedProcess([] {
+    size_t arg_size = kPageLimit * sysconf(_SC_PAGESIZE);
+    std::vector<char> arg(arg_size, 'a');
+    arg[arg_size - 1] = '\0';
+    char* argv[kVecSize];
+    std::fill_n(argv, kVecSize - 1, arg.data());
+    argv[kVecSize - 1] = nullptr;
+    char* envp[] = {nullptr};
+    EXPECT_NE(execve("/proc/self/exe", argv, envp), 0);
+    EXPECT_EQ(errno, E2BIG);
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+
+TEST(Task, ExecveArgvEnvExceedLimit) {
+  ForkHelper helper;
+  helper.RunInForkedProcess([] {
+    size_t arg_size = kPageLimit * sysconf(_SC_PAGESIZE);
+    std::vector<char> string(arg_size, 'a');
+    string[arg_size - 1] = '\0';
+    char* argv[] = {string.data(), nullptr};
+    char* envp[kVecSize];
+    std::fill_n(envp, kVecSize - 1, string.data());
+    envp[kVecSize - 1] = nullptr;
+    EXPECT_NE(execve("/proc/self/exe", argv, envp), 0);
+    EXPECT_EQ(errno, E2BIG);
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
 }
