@@ -18,7 +18,7 @@ use futures::{
     pin_mut, StreamExt as _, TryStreamExt as _,
 };
 use net_types::ip::{Ip, IpAddress, IpVersion};
-use netlink_packet_core::NetlinkMessage;
+use netlink_packet_core::{NetlinkMessage, NLM_F_MULTIPART};
 use netlink_packet_route::{
     RouteHeader, RouteMessage, RtnlMessage, AF_INET, AF_INET6, RTNLGRP_IPV4_ROUTE,
     RTNLGRP_IPV6_ROUTE, RTN_UNICAST, RTPROT_UNSPEC, RT_SCOPE_UNIVERSE, RT_TABLE_UNSPEC,
@@ -31,6 +31,7 @@ use crate::{
     errors::EventLoopError,
     messaging::Sender,
     multicast_groups::ModernGroup,
+    netlink_packet::UNSPECIFIED_SEQUENCE_NUMBER,
     protocol_family::{route::NetlinkRoute, ProtocolFamily},
 };
 
@@ -66,6 +67,11 @@ pub(crate) enum RequestError {}
 pub(crate) struct Request<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> {
     /// The resource and operation-specific argument(s) for this request.
     pub args: RequestArgs,
+    /// The request's sequence number.
+    ///
+    /// This value will be copied verbatim into any message sent as a result of
+    /// this request.
+    pub sequence_number: u32,
     /// The client that made the request.
     pub client: InternalClient<NetlinkRoute, S>,
     /// A completer that will have the result of the request sent over.
@@ -224,17 +230,16 @@ impl<
 
     fn handle_request(
         route_messages: &HashSet<NetlinkRouteMessage>,
-        Request { args, mut client, completer }: Request<S>,
+        Request { args, sequence_number, mut client, completer }: Request<S>,
     ) {
         debug!("handling request {args:?} from {client}");
 
         let result = match &args {
             RequestArgs::Route(RouteRequestArgs::Get(args)) => match args {
                 GetRouteArgs::Dump => {
-                    route_messages
-                        .clone()
-                        .into_iter()
-                        .for_each(|message| client.send(message.into_rtnl_new_route()));
+                    route_messages.clone().into_iter().for_each(|message| {
+                        client.send(message.into_rtnl_new_route(sequence_number, true))
+                    });
                     Ok(())
                 }
             },
@@ -245,7 +250,8 @@ impl<
         match completer.send(result) {
             Ok(()) => (),
             Err(result) => {
-                // Not treated as a hard error because the socket may have been closed.
+                // Not treated as a hard error because the socket may have been
+                // closed.
                 warn!(
                     "failed to send result ({:?}) to {} after handling request {:?}",
                     result, client, args
@@ -281,7 +287,7 @@ fn handle_route_watcher_event<I: Ip, S: Sender<<NetlinkRoute as ProtocolFamily>:
                 if !route_messages.insert(route_message.clone()) {
                     return Err(RouteEventHandlerError::AlreadyExistingRouteAddition(route));
                 }
-                Some(route_message.into_rtnl_new_route())
+                Some(route_message.into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false))
             } else {
                 None
             }
@@ -357,9 +363,17 @@ impl NetlinkRouteMessage {
     }
 
     /// Wrap the inner [`RouteMessage`] in an [`RtnlMessage::NewRoute`].
-    fn into_rtnl_new_route(self) -> NetlinkMessage<RtnlMessage> {
+    fn into_rtnl_new_route(
+        self,
+        sequence_number: u32,
+        is_dump: bool,
+    ) -> NetlinkMessage<RtnlMessage> {
         let NetlinkRouteMessage(message) = self;
         let mut msg: NetlinkMessage<RtnlMessage> = RtnlMessage::NewRoute(message).into();
+        msg.header.sequence_number = sequence_number;
+        if is_dump {
+            msg.header.flags |= NLM_F_MULTIPART;
+        }
         msg.finalize();
         msg
     }
@@ -525,6 +539,7 @@ mod tests {
     const INTERFACE_ID2: u32 = 2;
     const LOWER_METRIC: u32 = 0;
     const HIGHER_METRIC: u32 = 100;
+    const TEST_SEQUENCE_NUMBER: u32 = 1234;
 
     fn create_installed_route<I: Ip>(
         subnet: Subnet<I::Addr>,
@@ -653,7 +668,9 @@ mod tests {
         assert_eq!(route_messages, HashSet::from_iter([expected_route_message1.clone()]));
         assert_eq!(
             &right_sink.take_messages()[..],
-            &[expected_route_message1.clone().into_rtnl_new_route()]
+            &[expected_route_message1
+                .clone()
+                .into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false)]
         );
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
 
@@ -677,7 +694,9 @@ mod tests {
         );
         assert_eq!(
             &right_sink.take_messages()[..],
-            &[expected_route_message2.clone().into_rtnl_new_route()]
+            &[expected_route_message2
+                .clone()
+                .into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false)]
         );
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
 
@@ -775,7 +794,7 @@ mod tests {
     #[test]
     fn test_into_rtnl_new_route_is_serializable() {
         let route = create_netlink_route_message(0, 0, vec![]);
-        let new_route_message = route.into_rtnl_new_route();
+        let new_route_message = route.into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false);
         let mut buf = vec![0; new_route_message.buffer_len()];
         // Serialize will panic if `new_route_message` is malformed.
         new_route_message.serialize(&mut buf);
@@ -1074,6 +1093,7 @@ mod tests {
         let fut = request_sink
             .send(Request {
                 args: RequestArgs::Route(RouteRequestArgs::Get(GetRouteArgs::Dump)),
+                sequence_number: TEST_SEQUENCE_NUMBER,
                 client: route_client.clone(),
                 completer,
             })
@@ -1126,7 +1146,7 @@ mod tests {
                         LOWER_METRIC,
                     )
                 )
-                .into_rtnl_new_route(),
+                .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
                 create_netlink_route_message(
                     address_family,
                     subnet.prefix(),
@@ -1137,7 +1157,7 @@ mod tests {
                         HIGHER_METRIC,
                     )
                 )
-                .into_rtnl_new_route(),
+                .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
             ],
         );
         assert_eq!(&other_sink.take_messages()[..], &[]);
