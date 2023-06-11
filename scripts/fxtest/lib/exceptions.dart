@@ -50,19 +50,6 @@ class HashFileNotFoundException implements Exception {
   String toString() => message;
 }
 
-class PackageManifestListException implements Exception {
-  String file;
-  final String message;
-  PackageManifestListException(this.message, [this.file = '']);
-
-  @override
-  String toString() => '$file: $message';
-}
-
-class PackageManifestListParseException extends PackageManifestListException {
-  PackageManifestListParseException(String message) : super(message);
-}
-
 class PackageRepositoryException implements Exception {
   String file;
   final String message;

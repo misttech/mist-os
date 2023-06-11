@@ -165,13 +165,16 @@ class TestBundle {
       return null;
     }
 
-    Map<String, dynamic> manifestListJson =
-        jsonDecode(await File(path).readAsString());
+    // Read all the manifests.
+    Set<String> manifests = {};
 
-    PackageManifestList manifestList =
-        PackageManifestList.fromJson(manifestListJson);
+    await File(path)
+        .openRead()
+        .transform(utf8.decoder)
+        .transform(LineSplitter())
+        .forEach((line) => manifests.add(line.trim()));
 
-    return manifestList.manifests;
+    return manifests;
   }
 
   static bool hasDevicePackages(List<TestBundle> testBundles) {
