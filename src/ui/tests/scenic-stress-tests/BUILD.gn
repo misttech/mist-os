@@ -139,8 +139,8 @@ fuchsia_unittest_package("scenic-stress-tests-short") {
   }
 }
 
-fuchsia_unittest_package("scenic-stress-test-flatland") {
-  manifest = "meta/scenic_stressor_flatland.cml"
+source_set("stress-test-flatland") {
+  testonly = true
   deps = [
     ":scenic-stressor-flatland-bin",
     "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-component",
@@ -153,6 +153,11 @@ fuchsia_unittest_package("scenic-stress-test-flatland") {
   } else {
     deps += [ "//src/ui/lib/escher/shaders:escher_shaders_spirv_resources" ]
   }
+}
+
+fuchsia_unittest_package("scenic-stress-test-flatland") {
+  manifest = "meta/scenic_stressor_flatland.cml"
+  deps = [ ":stress-test-flatland" ]
 
   test_specs = {
     log_settings = {
@@ -169,10 +174,35 @@ fuchsia_unittest_package("scenic-stress-test-flatland") {
   }
 }
 
+fuchsia_unittest_package("scenic-stress-test-flatland-short") {
+  manifest = "meta/scenic_stressor_flatland_short.cml"
+  deps = [ ":stress-test-flatland" ]
+
+  if (escher_use_runtime_glsl) {
+    deps += [ "//src/ui/lib/escher/shaders:escher_shaders_resources" ]
+  } else {
+    deps += [ "//src/ui/lib/escher/shaders:escher_shaders_spirv_resources" ]
+  }
+
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+    environments = [
+      {
+        dimensions = {
+          device_type = "AEMU"
+        }
+      },
+    ]
+  }
+}
+
 group("tests") {
   testonly = true
   deps = [
     ":scenic-stress-test-flatland",
+    ":scenic-stress-test-flatland-short",
     ":scenic-stress-tests",
     ":scenic-stress-tests-short",
   ]
