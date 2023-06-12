@@ -20,7 +20,7 @@
         ],
         "classifierThreshold": 0.8,
         "classifierLicensePaths": [
-            "tools/check-licenses/assets"
+            "tools/check-licenses/assets/patterns"
         ],
         "extensions": {
             ".gyp": true,
