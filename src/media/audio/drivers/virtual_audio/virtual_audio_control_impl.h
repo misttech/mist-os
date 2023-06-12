@@ -4,7 +4,7 @@
 #ifndef SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_CONTROL_IMPL_H_
 #define SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_CONTROL_IMPL_H_
 
-#include <fidl/fuchsia.virtualaudio/cpp/wire.h>
+#include <fidl/fuchsia.virtualaudio/cpp/fidl.h>
 #include <lib/ddk/device.h>
 
 #include <memory>
@@ -25,6 +25,8 @@ class VirtualAudioControlImpl : public fidl::WireServer<fuchsia_virtualaudio::Co
   VirtualAudioControlImpl() = default;
 
   // Implements virtualaudio.Control.
+  void GetDefaultConfiguration(GetDefaultConfigurationRequestView request,
+                               GetDefaultConfigurationCompleter::Sync& completer) override;
   void AddDevice(AddDeviceRequestView request, AddDeviceCompleter::Sync& completer) override;
   void GetNumDevices(GetNumDevicesCompleter::Sync& completer) override;
   void RemoveAll(RemoveAllCompleter::Sync& completer) override;

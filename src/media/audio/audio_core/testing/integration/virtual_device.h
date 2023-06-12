@@ -27,6 +27,7 @@ class VirtualDevice {
  public:
   static constexpr uint32_t kNotifyMs = 10;
   static constexpr uint32_t kDriverTransferBytes = 0;
+  static constexpr auto kInternalDelay = zx::msec(0);
   static constexpr auto kExternalDelay = zx::msec(0);
 
   struct PlugProperties {
@@ -38,7 +39,7 @@ class VirtualDevice {
 
   struct ClockProperties {
     int32_t domain;
-    int32_t initial_rate_adjustment_ppm;
+    int32_t rate_adjustment_ppm;
   };
 
   ~VirtualDevice();

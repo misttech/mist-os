@@ -39,6 +39,7 @@ const ASF_RANGE_FLAG_FPS_CONTINUOUS: u16 = 1 << 0;
 
 // If this changes, so too must the astro audio_core_config.
 const AUDIO_OUTPUT_ID: [u8; 16] = [0x01; 16];
+const AUDIO_INPUT_ID: [u8; 16] = [0x02; 16];
 
 fn get_sample_size(format: u32) -> Result<u32, Error> {
     Ok(match format {
@@ -355,27 +356,44 @@ impl VirtualOutput {
         let frames_high = 2000 * frames_1ms;
         let frames_modulo = 1 * frames_1ms;
 
-        let config = fidl_fuchsia_virtualaudio::Configuration {
-            device_type: Some(fidl_fuchsia_virtualaudio::DeviceType::StreamConfig),
-            is_input: Some(false),
-            unique_id: Some(AUDIO_OUTPUT_ID),
-            driver_transfer_bytes: Some(0),
-            external_delay: Some(0),
-            supported_formats: Some(vec![fidl_fuchsia_virtualaudio::FormatRange {
-                sample_format_flags: get_zircon_sample_format(self.sample_format),
-                min_frame_rate: self.frames_per_second,
-                max_frame_rate: self.frames_per_second,
-                min_channels: self.channels,
-                max_channels: self.channels,
-                rate_family_flags: ASF_RANGE_FLAG_FPS_CONTINUOUS,
-            }]),
-            ring_buffer_constraints: Some(fidl_fuchsia_virtualaudio::RingBufferConstraints {
-                min_frames: frames_low,
-                max_frames: frames_high,
-                modulo_frames: frames_modulo,
-            }),
-            ..Default::default()
-        };
+        let mut config = vad_control
+            .get_default_configuration(
+                fidl_fuchsia_virtualaudio::DeviceType::StreamConfig,
+                &fidl_fuchsia_virtualaudio::Direction {
+                    is_input: Some(false),
+                    ..Default::default()
+                },
+                zx::Time::INFINITE,
+            )?
+            .map_err(|status| anyhow!("GetDefaultConfiguration returned error {:?}", status))?;
+        config.unique_id = Some(AUDIO_OUTPUT_ID);
+
+        match config.device_specific.as_mut().ok_or(format_err!("device_specific not in config"))? {
+            fidl_fuchsia_virtualaudio::DeviceSpecific::StreamConfig(ref mut stream_config) => {
+                let ring_buffer = stream_config
+                    .ring_buffer
+                    .as_mut()
+                    .ok_or(format_err!("ring buffer not in StreamConfig config"))?;
+                ring_buffer.supported_formats =
+                    Some(vec![fidl_fuchsia_virtualaudio::FormatRange {
+                        sample_format_flags: get_zircon_sample_format(self.sample_format),
+                        min_frame_rate: self.frames_per_second,
+                        max_frame_rate: self.frames_per_second,
+                        min_channels: self.channels,
+                        max_channels: self.channels,
+                        rate_family_flags: ASF_RANGE_FLAG_FPS_CONTINUOUS,
+                    }]);
+                ring_buffer.ring_buffer_constraints =
+                    Some(fidl_fuchsia_virtualaudio::RingBufferConstraints {
+                        min_frames: frames_low,
+                        max_frames: frames_high,
+                        modulo_frames: frames_modulo,
+                    });
+            }
+            fidl_fuchsia_virtualaudio::DeviceSpecificUnknown!() => {
+                return Err(format_err!("device_specific in config is not StreamConfig"))
+            }
+        }
 
         // Create the output.
         let (va_output_client, va_output_server) =
@@ -749,26 +767,44 @@ impl VirtualInput {
         let frames_high = 2000 * frames_1ms;
         let frames_modulo = 1 * frames_1ms;
 
-        let config = fidl_fuchsia_virtualaudio::Configuration {
-            device_type: Some(fidl_fuchsia_virtualaudio::DeviceType::StreamConfig),
-            is_input: Some(true),
-            driver_transfer_bytes: Some(0),
-            external_delay: Some(0),
-            supported_formats: Some(vec![fidl_fuchsia_virtualaudio::FormatRange {
-                sample_format_flags: get_zircon_sample_format(self.sample_format),
-                min_frame_rate: self.frames_per_second,
-                max_frame_rate: self.frames_per_second,
-                min_channels: self.channels,
-                max_channels: self.channels,
-                rate_family_flags: ASF_RANGE_FLAG_FPS_CONTINUOUS,
-            }]),
-            ring_buffer_constraints: Some(fidl_fuchsia_virtualaudio::RingBufferConstraints {
-                min_frames: frames_low,
-                max_frames: frames_high,
-                modulo_frames: frames_modulo,
-            }),
-            ..Default::default()
-        };
+        let mut config = vad_control
+            .get_default_configuration(
+                fidl_fuchsia_virtualaudio::DeviceType::StreamConfig,
+                &fidl_fuchsia_virtualaudio::Direction {
+                    is_input: Some(true),
+                    ..Default::default()
+                },
+                zx::Time::INFINITE,
+            )?
+            .map_err(|status| anyhow!("GetDefaultConfiguration returned error {:?}", status))?;
+        config.unique_id = Some(AUDIO_INPUT_ID);
+
+        match config.device_specific.as_mut().ok_or(format_err!("device_specific not in config"))? {
+            fidl_fuchsia_virtualaudio::DeviceSpecific::StreamConfig(ref mut stream_config) => {
+                let ring_buffer = stream_config
+                    .ring_buffer
+                    .as_mut()
+                    .ok_or(format_err!("ring buffer not in StreamConfig config"))?;
+                ring_buffer.supported_formats =
+                    Some(vec![fidl_fuchsia_virtualaudio::FormatRange {
+                        sample_format_flags: get_zircon_sample_format(self.sample_format),
+                        min_frame_rate: self.frames_per_second,
+                        max_frame_rate: self.frames_per_second,
+                        min_channels: self.channels,
+                        max_channels: self.channels,
+                        rate_family_flags: ASF_RANGE_FLAG_FPS_CONTINUOUS,
+                    }]);
+                ring_buffer.ring_buffer_constraints =
+                    Some(fidl_fuchsia_virtualaudio::RingBufferConstraints {
+                        min_frames: frames_low,
+                        max_frames: frames_high,
+                        modulo_frames: frames_modulo,
+                    });
+            }
+            fidl_fuchsia_virtualaudio::DeviceSpecificUnknown!() => {
+                return Err(format_err!("device_specific in config is not StreamConfig"))
+            }
+        }
 
         // Create the input.
         let (va_input_client, va_input_server) =

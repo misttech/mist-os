@@ -132,32 +132,65 @@ void DeviceHost::AddVirtualDevices() {
                                             controller_.NewRequest().TakeChannel().release());
   ASSERT_EQ(status, ZX_OK) << "fdio_service_connect failed";
 
-  uint32_t num_inputs = -1, num_outputs = -1;
-  status = controller_->GetNumDevices(&num_inputs, &num_outputs);
+  uint32_t num_inputs = -1, num_outputs = -1, num_unspecified_direction = -1;
+  status = controller_->GetNumDevices(&num_inputs, &num_outputs, &num_unspecified_direction);
   ASSERT_EQ(status, ZX_OK) << "GetNumDevices failed";
   ASSERT_TRUE(controller_.is_bound()) << "virtualaudio::Control did not stay bound";
   ASSERT_EQ(num_inputs, 0u) << num_inputs << " virtual_audio inputs already exist (should be 0)";
   ASSERT_EQ(num_outputs, 0u) << num_outputs << " virtual_audio outputs already exist (should be 0)";
+  ASSERT_EQ(num_unspecified_direction, 0u)
+      << num_outputs
+      << " virtual_audio devices with unspecified direction already exist (should be 0)";
 
-  fuchsia::virtualaudio::Configuration input_config;
+  // Input StreamConfig.
+  fuchsia::virtualaudio::Direction input_direction;
+  input_direction.set_is_input(true);
+  fuchsia::virtualaudio::Control_GetDefaultConfiguration_Result input_config_result;
+  status = controller_->GetDefaultConfiguration(fuchsia::virtualaudio::DeviceType::STREAM_CONFIG,
+                                                std::move(input_direction), &input_config_result);
+  ASSERT_EQ(status, ZX_OK)
+      << "virtualaudio::Control::GetDefaultConfiguration (StreamConfig input) failed";
+  ASSERT_FALSE(input_config_result.is_err())
+      << "Failed to GetDefaultConfiguration for StreamConfig input device: "
+      << input_config_result.err();
+
+  ASSERT_EQ(status, ZX_OK) << "GetDefaultConfiguration for StreamConfig input failed";
+  fuchsia::virtualaudio::Configuration input_config =
+      std::move(input_config_result.response().config);
   fuchsia::virtualaudio::Control_AddDevice_Result input_result;
-  input_config.set_is_input(true);
   status = controller_->AddDevice(
       std::move(input_config), input_device_.NewRequest(device_loop_.dispatcher()), &input_result);
-  ASSERT_EQ(status, ZX_OK) << "virtualaudio::Control::AddDevice (input) failed";
-  ASSERT_FALSE(input_result.is_err()) << "Failed to add input device: " << input_result.err();
-  input_device_.set_error_handler(
-      [](zx_status_t error) { FAIL() << "virtualaudio::Device (input) disconnected: " << error; });
+  ASSERT_EQ(status, ZX_OK) << "virtualaudio::Control::AddDevice (StreamConfig input) failed";
+  ASSERT_FALSE(input_result.is_err())
+      << "Failed to add StreamConfig input device: " << input_result.err();
+  input_device_.set_error_handler([](zx_status_t error) {
+    FAIL() << "virtualaudio::Device (StreamConfig input) disconnected: " << error;
+  });
 
-  fuchsia::virtualaudio::Configuration output_config;
+  // Output StreamConfig.
+  fuchsia::virtualaudio::Direction output_direction;
+  output_direction.set_is_input(false);
+  fuchsia::virtualaudio::Control_GetDefaultConfiguration_Result output_config_result;
+  status = controller_->GetDefaultConfiguration(fuchsia::virtualaudio::DeviceType::STREAM_CONFIG,
+                                                std::move(output_direction), &output_config_result);
+  ASSERT_EQ(status, ZX_OK)
+      << "virtualaudio::Control::GetDefaultConfiguration (StreamConfig output) failed";
+  ASSERT_FALSE(input_config_result.is_err())
+      << "Failed to GetDefaultConfiguration for StreamConfig output device: "
+      << input_config_result.err();
+  fuchsia::virtualaudio::Configuration output_config =
+      std::move(output_config_result.response().config);
+
   fuchsia::virtualaudio::Control_AddDevice_Result output_result;
   status =
       controller_->AddDevice(std::move(output_config),
                              output_device_.NewRequest(device_loop_.dispatcher()), &output_result);
-  ASSERT_EQ(status, ZX_OK) << "virtualaudio::Control::AddOutput failed";
-  ASSERT_FALSE(output_result.is_err()) << "Failed to add output device: " << output_result.err();
-  output_device_.set_error_handler(
-      [](zx_status_t error) { FAIL() << "virtualaudio::Device (output) disconnected: " << error; });
+  ASSERT_EQ(status, ZX_OK) << "virtualaudio::Control::AddOutput for StreamConfig failed";
+  ASSERT_FALSE(output_result.is_err())
+      << "Failed to add StreamConfig output device: " << output_result.err();
+  output_device_.set_error_handler([](zx_status_t error) {
+    FAIL() << "virtualaudio::Device (StreamConfig output) disconnected: " << error;
+  });
 }
 
 // Create testcase instances for each device entry.
@@ -190,11 +223,12 @@ zx_status_t DeviceHost::QuitDeviceLoop() {
       zx_status_t status = controller_->RemoveAll();
       ASSERT_EQ(status, ZX_OK) << "Final RemoveAll failed";
 
-      uint32_t input_count = -1, output_count = -1;
+      uint32_t input_count = -1, output_count = -1, unspecified_direction_count = -1;
       do {
-        status = controller_->GetNumDevices(&input_count, &output_count);
+        status =
+            controller_->GetNumDevices(&input_count, &output_count, &unspecified_direction_count);
         ASSERT_EQ(status, ZX_OK) << "After final RemoveAll, GetNumDevices failed";
-      } while (input_count != 0 || output_count != 0);
+      } while (input_count != 0 || output_count != 0 || unspecified_direction_count != 0);
     }
 
     device_loop_.RunUntilIdle();

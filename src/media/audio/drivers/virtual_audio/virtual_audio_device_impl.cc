@@ -15,10 +15,26 @@ namespace virtual_audio {
 
 // static
 fit::result<fuchsia_virtualaudio::Error, std::shared_ptr<VirtualAudioDeviceImpl>>
-VirtualAudioDeviceImpl::Create(const Config& cfg,
+VirtualAudioDeviceImpl::Create(const fuchsia_virtualaudio::Configuration& cfg,
                                fidl::ServerEnd<fuchsia_virtualaudio::Device> server,
                                zx_device_t* dev_node, async_dispatcher_t* fidl_dispatcher) {
-  auto device = std::make_shared<VirtualAudioDeviceImpl>(cfg.is_input, fidl_dispatcher);
+  std::optional<bool> is_input;
+  switch (cfg.device_specific()->Which()) {
+    case fuchsia_virtualaudio::DeviceSpecific::Tag::kStreamConfig:
+      is_input = cfg.device_specific()->stream_config()->is_input();
+      break;
+    case fuchsia_virtualaudio::DeviceSpecific::Tag::kDai:
+      is_input = cfg.device_specific()->dai()->is_input();
+      break;
+    case fuchsia_virtualaudio::DeviceSpecific::Tag::kComposite:
+      [[fallthrough]];
+    case fuchsia_virtualaudio::DeviceSpecific::Tag::kCodec:
+      [[fallthrough]];
+    default:
+      zxlogf(ERROR, "Device type creation not supported");
+      return fit::error(fuchsia_virtualaudio::Error::kInternal);
+  }
+  auto device = std::make_shared<VirtualAudioDeviceImpl>(std::move(is_input), fidl_dispatcher);
 
   // The `device` shared_ptr is held until the server is unbound (i.e. until the channel is closed).
   device->binding_ = fidl::BindServer(
@@ -37,19 +53,20 @@ VirtualAudioDeviceImpl::Create(const Config& cfg,
         }
       });
 
-  switch (cfg.device_type) {
-    case fuchsia_virtualaudio::DeviceType::kStreamConfig:
+  switch (cfg.device_specific()->Which()) {
+    case fuchsia_virtualaudio::DeviceSpecific::Tag::kStreamConfig:
       device->driver_ = std::make_unique<VirtualAudioStreamWrapper>(cfg, device, dev_node);
       break;
-    case fuchsia_virtualaudio::DeviceType::kDai:
+    case fuchsia_virtualaudio::DeviceSpecific::Tag::kDai:
       device->driver_ = std::make_unique<VirtualAudioDai>(cfg, device, dev_node);
       break;
-    case fuchsia_virtualaudio::DeviceType::kCodec:
+    case fuchsia_virtualaudio::DeviceSpecific::Tag::kComposite:
+      [[fallthrough]];
+    case fuchsia_virtualaudio::DeviceSpecific::Tag::kCodec:
       [[fallthrough]];
     default:
       zxlogf(ERROR, "Device type creation not supported");
       return fit::error(fuchsia_virtualaudio::Error::kInternal);
-      break;
   }
   // Ensure the driver was created successfully.
   if (!device->driver_) {
@@ -60,8 +77,9 @@ VirtualAudioDeviceImpl::Create(const Config& cfg,
   return fit::ok(device);
 }
 
-VirtualAudioDeviceImpl::VirtualAudioDeviceImpl(bool is_input, async_dispatcher_t* fidl_dispatcher)
-    : is_input_(is_input), fidl_dispatcher_(fidl_dispatcher) {}
+VirtualAudioDeviceImpl::VirtualAudioDeviceImpl(std::optional<bool> is_input,
+                                               async_dispatcher_t* fidl_dispatcher)
+    : is_input_(std::move(is_input)), fidl_dispatcher_(fidl_dispatcher) {}
 
 VirtualAudioDeviceImpl::~VirtualAudioDeviceImpl() {
   // The driver should have been unbound by our on_unbound handler.
