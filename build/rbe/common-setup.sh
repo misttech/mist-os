@@ -94,7 +94,7 @@ test -n "$default_project_root" || {
 readonly HOST_PLATFORM="${_FUCHSIA_RBE_CACHE_VAR_host_os}-${_FUCHSIA_RBE_CACHE_VAR_host_arch}"
 
 # Point to our prebuilt python3.
-readonly python="$default_project_root"/prebuilt/third_party/python3/"$HOST_PLATFORM"/bin/python3
+readonly python="$default_project_root"/prebuilt/third_party/python3.11/"$HOST_PLATFORM"/bin/python3
 
 function _check_realpath_works_for_relative_paths() {
   if which realpath
@@ -118,7 +118,7 @@ function _check_realpath_works_for_relative_paths() {
     export _FUCHSIA_RBE_CACHE_VAR_relpath_uses=realpath
   else
     test -x "$python" || {
-      echo "*** Python interpreter not found at expected location: $python."
+      msg "*** Python interpreter not found at expected location: $python."
       exit 1
     }
     export _FUCHSIA_RBE_CACHE_VAR_relpath_uses="$python"
