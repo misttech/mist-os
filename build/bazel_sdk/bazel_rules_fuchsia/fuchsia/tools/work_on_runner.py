@@ -4,11 +4,12 @@
 # found in the LICENSE file.
 
 import argparse
-import subprocess
-import os
 import json
-import time
+import os
+import re
 import signal
+import subprocess
+import time
 
 
 class FfxRunner():
@@ -89,6 +90,7 @@ class Context():
         self.pb_path = os.path.join(
             self.out_dir, "product_bundles", f"{self.pb_name}.{self.sdk_id}")
         self.force_pb_download = args.force
+        self.keep_build_config = args.keep_build_config
         self.target = Context.get_target(args, self._ffx_runner)
 
     def ffx(self):
@@ -140,15 +142,30 @@ class SetDefaults(Step):
         self.original_target = None
 
     def run(self, ctx):
+        build_config_file = SetDefaults.find_build_config_path(ctx)
+        if build_config_file is None:
+            return StepEarlyExit("cannot find build config file. do you have a fuchsia_env.toml file?")
+
+        ctx.log(f"Writing build config entry to {build_config_file}")
+
+        try:
+            with open(build_config_file, "r") as f:
+                build_config = json.load(f)
+        except:
+            build_config = {}
+
+        def set_nested_key(key, value):
+            local_config = build_config
+            keys = key.split(".")
+            for k in keys[:-1]:
+                local_config = local_config.setdefault(k, {})
+            local_config[keys[-1]] = value
+
         ctx.log(f"Setting ffx configs to true {self.config_keys}.")
         for key in self.config_keys:
-            try:
-                self.original_config_entries[key] = ctx.ffx().run(
-                    "config", "get", key)
-            except:
-                self.original_config_entries[key] = None
+            set_nested_key(key, "true")
 
-            ctx.ffx().run("config", "set", key, "true")
+        set_nested_key("product.path", ctx.pb_path)
 
         try:
             self.original_target = ctx.ffx().run("target", "default", "get")
@@ -156,26 +173,70 @@ class SetDefaults(Step):
             self.original_target = None
 
         ctx.log(f"Setting {ctx.target} as default target")
-        ctx.ffx().run("target", "default", "set", ctx.target)
+        set_nested_key("target.default", ctx.target)
 
         ctx.log(
             f"Setting 'devhost.fuchsia.com' as the default package repository")
-        ctx.ffx().run("repository", "default", "set", "devhost.fuchsia.com")
+        set_nested_key("repository.default", "devhost.fuchsia.com")
+
+        json_object = json.dumps(build_config, indent=4)
+        with open(build_config_file, "w") as f:
+            f.write(json_object)
 
     def cleanup(self, ctx):
-        ctx.log("Setting ffx config values back to original values")
-        for key, value in self.original_config_entries.items():
-            if value:
-                ctx.ffx().run("config", "set", key, value)
-            else:
-                ctx.ffx().run("config", "remove", key)
+        if ctx.keep_build_config:
+            return
+        try:
+            os.remove(SetDefaults.find_build_config_path(ctx))
+        except:
+            pass
 
-        if self.original_target and len(self.original_target) > 0:
-            ctx.log(f"Setting default target back to {self.original_target}")
-            ctx.ffx().run("target", "default", "set", self.original_target)
+
+    def find_build_config_path(ctx):
+        # tomllib was introduced in python 3.11 which is too new for most of our
+        # repos. If it is not available fall back to a regex
+        try:
+            import tomllib
+            loader = SetDefaults.build_config_from_toml
+        except ImportError:
+            loader = SetDefaults.build_config_from_regex
+
+        cwd = os.path.normpath(ctx.cwd)
+        while cwd != "/":
+            config_file = os.path.join(cwd, "fuchsia_env.toml")
+            if os.path.exists(config_file):
+                break
+            # move up a directory and reset our config_file
+            cwd = os.path.dirname(cwd)
+            config_file = None
+
+        if config_file:
+            return loader(ctx, config_file)
         else:
-            ctx.log("Unsetting default target")
-            ctx.ffx().run("target", "default", "unset")
+            return None
+
+    def build_config_from_toml(ctx, file):
+        import tomllib
+        with open(file, "rb") as f:
+            data = tomllib.load(f)
+            try:
+                config_path = data['fuchsia']['config']['build_config_path']
+                if os.path.isabs(config_path):
+                    return config_path
+                else:
+                    return os.path.join(os.path.dirname(file), config_path)
+            except Exception as e:
+                ctx.log('fuchsia_env.toml file does not contain fuchsia.config.build_config_path entry')
+        return None
+
+    def build_config_from_regex(ctx, file):
+        regex = re.compile("build_config_path = \"(.*)\"")
+        with open(file, 'r') as f:
+          for line in f:
+              m = regex.match(line)
+              if m:
+                  return m.group(1)
+        return None
 
 
 class FetchProductBundle(Step):
@@ -202,19 +263,12 @@ class FetchProductBundle(Step):
                 f"Skipping download. Product bundle already exists at {ctx.pb_path}"
             )
 
-        # Write the path to the product bundle in the out dir
-        with open(self.pb_config_path(ctx), 'w') as f:
-            f.write(ctx.pb_path)
-
         # Register the product bundle repository
         ctx.ffx().run("repository", "server", "start")
         ctx.ffx().run("repository", "add", ctx.pb_path)
 
     def cleanup(self, ctx):
-        try:
-            os.remove(self.pb_config_path(ctx))
-        except:
-            pass
+        pass
 
     def _download_needed(self, ctx):
         if os.path.exists(ctx.pb_path):
@@ -360,6 +414,13 @@ def main():
     parser.add_argument(
         '--force',
         help='force downloading the product bundle',
+        required=False,
+        default=False,
+        action='store_true')
+
+    parser.add_argument(
+        '--keep-build-config',
+        help='do not clean up the build configuration when exiting',
         required=False,
         default=False,
         action='store_true')
