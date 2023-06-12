@@ -41,9 +41,8 @@ void riscv64_init_percpu() {
   // set up the default sstatus for the current cpu
   riscv64_csr_write(RISCV64_CSR_SSTATUS, 0);
 
-  // mask all exceptions, just in case
-  riscv64_csr_clear(RISCV64_CSR_SIE,
-                    RISCV64_CSR_SIE_SIE | RISCV64_CSR_SIE_TIE | RISCV64_CSR_SIE_EIE);
+  // enable software interrupts and external interrupts, disable everything else
+  riscv64_csr_write(RISCV64_CSR_SIE, RISCV64_CSR_SIE_SIE | RISCV64_CSR_SIE_EIE);
 
   // enable all of the counters
   riscv64_csr_write(RISCV64_CSR_SCOUNTEREN, RISCV64_CSR_SCOUNTEREN_CY | RISCV64_CSR_SCOUNTEREN_TM |
@@ -64,6 +63,9 @@ void arch_early_init() {
   riscv64_sbi_early_init();
   riscv64_mmu_early_init();
   riscv64_mmu_early_init_percpu();
+
+  // mark the boot cpu online
+  mp_set_curr_cpu_online(true);
 }
 
 void arch_prevm_init() {}
@@ -79,12 +81,7 @@ void arch_init() TA_NO_THREAD_SAFETY_ANALYSIS {
 }
 
 void arch_late_init_percpu() {
-  // enable software interrupts, used for inter-processor-interrupts
-  riscv64_csr_set(RISCV64_CSR_SIE, RISCV64_CSR_SIE_SIE);
-
-  // enable external interrupts
-  riscv64_csr_set(RISCV64_CSR_SIE, RISCV64_CSR_SIE_EIE);
-
+  // per cpu on each secondary (and the boot cpu a second time)
   mp_set_curr_cpu_online(true);
 }
 
