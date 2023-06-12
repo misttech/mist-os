@@ -11,7 +11,7 @@ use crate::{
         FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SymlinkTarget, XattrOp,
     },
     lock::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard},
-    logging::{log_error, not_implemented},
+    logging::{log_error, log_trace, not_implemented},
     syscalls::{SyscallArg, SyscallResult},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
     types::{
@@ -285,13 +285,39 @@ impl FileOps for FuseFileObject {
 
     fn write(
         &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: usize,
-        _data: &mut dyn InputBuffer,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        not_implemented!("FileOps::write");
-        error!(ENOTSUP)
+        let node = self.get_fuse_node(file)?;
+        let content = data.peek_all()?;
+        let response = self.connection.execute_operation(
+            current_task,
+            node,
+            FuseOperation::Write(
+                uapi::fuse_write_in {
+                    fh: self.open_out.fh,
+                    offset: offset.try_into().map_err(|_| errno!(EINVAL))?,
+                    size: content.len().try_into().map_err(|_| errno!(EINVAL))?,
+                    write_flags: 0,
+                    lock_owner: 0,
+                    flags: 0,
+                    padding: 0,
+                },
+                content,
+            ),
+        )?;
+        let write_out = if let FuseResponse::Write(write_out) = response {
+            write_out
+        } else {
+            return error!(EINVAL);
+        };
+
+        let written = write_out.size as usize;
+
+        data.advance(written)?;
+        Ok(written)
     }
 
     fn seek(
@@ -345,6 +371,8 @@ impl FsNodeOps for Arc<FuseNode> {
         current_task: &CurrentTask,
         flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
+        // The node already exists. The creation has been handled before calling this method.
+        let flags = flags & !(OpenFlags::CREAT | OpenFlags::EXCL);
         let response =
             self.connection.execute_operation(current_task, self, FuseOperation::Open(flags))?;
         let open_out = if let FuseResponse::Open(open_out) = response {
@@ -744,6 +772,7 @@ impl FuseMutableState {
         self.waiters.notify_value_event(header.unique);
         let operation = self.operations.get_mut(&header.unique).ok_or_else(|| errno!(EINVAL))?;
         if header.error < 0 {
+            log_trace!("Fuse: {operation:?} -> {header:?}");
             let code = i16::try_from(-header.error).unwrap_or(EINVAL.error_code() as i16);
             let errno = errno_from_code!(code);
             operation.response =
@@ -754,6 +783,7 @@ impl FuseMutableState {
                 return error!(EINVAL);
             }
             let response = operation.operation.parse_response(buffer)?;
+            log_trace!("Fuse: {operation:?} -> {response:?}");
             if operation.operation.is_async() {
                 operation.operation.handle_async(response)?;
             } else {
@@ -836,6 +866,7 @@ enum FuseOperation {
     Open(OpenFlags),
     Read(uapi::fuse_read_in),
     Release(uapi::fuse_open_out),
+    Write(uapi::fuse_write_in, Vec<u8>),
 }
 
 impl FuseOperation {
@@ -862,7 +893,7 @@ impl FuseOperation {
             }
             Self::Lookup(name) => data.write_all(name.as_bytes()),
             Self::Open(open_flags) => {
-                let message = uapi::fuse_open_in { flags: 0, open_flags: open_flags.bits() };
+                let message = uapi::fuse_open_in { flags: open_flags.bits(), open_flags: 0 };
                 data.write_all(message.as_bytes())
             }
             Self::Mknod(mknod_in, name) => {
@@ -880,6 +911,11 @@ impl FuseOperation {
                 };
                 data.write_all(message.as_bytes())
             }
+            Self::Write(fuse_write_in, content) => {
+                let mut len = data.write_all(fuse_write_in.as_bytes())?;
+                len += data.write_all(content)?;
+                Ok(len)
+            }
         }
     }
 
@@ -894,6 +930,7 @@ impl FuseOperation {
             Self::Open(_) => uapi::fuse_opcode_FUSE_OPEN,
             Self::Read(_) => uapi::fuse_opcode_FUSE_READ,
             Self::Release(_) => uapi::fuse_opcode_FUSE_RELEASE,
+            Self::Write(_, _) => uapi::fuse_opcode_FUSE_WRITE,
         }
     }
 
@@ -910,6 +947,9 @@ impl FuseOperation {
             Self::Open(_) => std::mem::size_of::<uapi::fuse_open_in>() as u32,
             Self::Read(_) => std::mem::size_of::<uapi::fuse_read_in>() as u32,
             Self::Release(_) => std::mem::size_of::<uapi::fuse_release_in>() as u32,
+            Self::Write(_, content) => {
+                (std::mem::size_of::<uapi::fuse_write_in>() + content.len()) as u32
+            }
         }
     }
 
@@ -943,6 +983,9 @@ impl FuseOperation {
             }
             Self::Read(_) => Ok(FuseResponse::Read(buffer)),
             Self::Release(_) | Self::Flush(_) => Ok(FuseResponse::None),
+            Self::Write(_, _) => {
+                Ok(FuseResponse::Write(Self::to_response::<uapi::fuse_write_out>(&buffer)))
+            }
             Self::Interrupt(_) => {
                 panic!("Response for operation without one");
             }
@@ -994,5 +1037,6 @@ enum FuseResponse {
     Init(uapi::fuse_init_out),
     Open(uapi::fuse_open_out),
     Read(Vec<u8>),
+    Write(uapi::fuse_write_out),
     None,
 }

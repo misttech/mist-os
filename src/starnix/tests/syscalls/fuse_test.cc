@@ -165,4 +165,12 @@ TEST_F(FuseTest, Mknod) {
   ASSERT_TRUE(fd.is_valid());
 }
 
+TEST_F(FuseTest, Write) {
+  ASSERT_TRUE(Mount());
+  std::string filename = GetMountDir() + "/file";
+  ScopedFD fd(open(filename.c_str(), O_WRONLY | O_CREAT));
+  ASSERT_TRUE(fd.is_valid());
+  EXPECT_EQ(write(fd.get(), "hello\n", 6), 6);
+}
+
 #endif  // SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_
