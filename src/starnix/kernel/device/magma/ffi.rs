@@ -100,7 +100,7 @@ pub fn create_image(
     connection: &Arc<MagmaConnection>,
 ) -> Result<BufferInfo, Errno> {
     let create_info_address = UserAddress::from(control.create_info);
-    let create_info_ptr = current_task.mm.read_object(UserRef::new(create_info_address))?;
+    let create_info_ptr: u64 = current_task.mm.read_object(UserRef::new(create_info_address))?;
 
     let create_info_address = UserAddress::from(create_info_ptr);
     let create_info = current_task.mm.read_object(UserRef::new(create_info_address))?;

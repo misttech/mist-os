@@ -211,7 +211,7 @@ impl Pipe {
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        let user_addr = UserAddress::from_arg(arg);
+        let user_addr = UserAddress::from(arg);
         match request {
             FIONREAD => {
                 let addr = UserRef::<i32>::new(user_addr);

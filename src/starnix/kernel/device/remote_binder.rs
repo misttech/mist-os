@@ -363,7 +363,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        let user_addr = UserAddress::from_arg(arg);
+        let user_addr = UserAddress::from(arg);
         match request {
             uapi::REMOTE_BINDER_START => self.start(current_task, user_addr.into())?,
             uapi::REMOTE_BINDER_WAIT => self.wait(current_task, user_addr.into())?,

@@ -109,7 +109,7 @@ impl FileOps for Arc<Framebuffer> {
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        let user_addr = UserAddress::from_arg(arg);
+        let user_addr = UserAddress::from(arg);
         match request {
             FBIOGET_FSCREENINFO => {
                 let info = self.info.read();

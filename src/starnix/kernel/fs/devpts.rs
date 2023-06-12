@@ -321,7 +321,7 @@ impl FileOps for DevPtmxFile {
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        let user_addr = UserAddress::from_arg(arg);
+        let user_addr = UserAddress::from(arg);
         match request {
             TIOCGPTN => {
                 // Get the therminal id.
@@ -425,7 +425,7 @@ fn shared_ioctl(
     request: u32,
     arg: SyscallArg,
 ) -> Result<SyscallResult, Errno> {
-    let user_addr = UserAddress::from_arg(arg);
+    let user_addr = UserAddress::from(arg);
     match request {
         FIONREAD => {
             // Get the main terminal available bytes for reading.
@@ -435,7 +435,7 @@ fn shared_ioctl(
         }
         TIOCSCTTY => {
             // Make the given terminal the controlling terminal of the calling process.
-            let steal = bool::from_arg(arg);
+            let steal = bool::from(arg);
             current_task.thread_group.set_controlling_terminal(
                 current_task,
                 terminal,

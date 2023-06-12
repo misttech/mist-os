@@ -6,7 +6,7 @@ use paste::paste;
 
 use crate::{
     arch::syscalls::*,
-    syscalls::{decls::Syscall, syscall_arg::*, CurrentTask, SyscallResult},
+    syscalls::{decls::Syscall, CurrentTask, SyscallResult},
     types::Errno,
 };
 
@@ -32,12 +32,12 @@ macro_rules! syscall_match {
     };
 
     (@call $current_task:ident; $args:ident; $func:ident [0]) => ($func($current_task));
-    (@call $current_task:ident; $args:ident; $func:ident [1]) => ($func($current_task, $args.0.into_arg()));
-    (@call $current_task:ident; $args:ident; $func:ident [2]) => ($func($current_task, $args.0.into_arg(), $args.1.into_arg()));
-    (@call $current_task:ident; $args:ident; $func:ident [3]) => ($func($current_task, $args.0.into_arg(), $args.1.into_arg(), $args.2.into_arg()));
-    (@call $current_task:ident; $args:ident; $func:ident [4]) => ($func($current_task, $args.0.into_arg(), $args.1.into_arg(), $args.2.into_arg(), $args.3.into_arg()));
-    (@call $current_task:ident; $args:ident; $func:ident [5]) => ($func($current_task, $args.0.into_arg(), $args.1.into_arg(), $args.2.into_arg(), $args.3.into_arg(), $args.4.into_arg()));
-    (@call $current_task:ident; $args:ident; $func:ident [6]) => ($func($current_task, $args.0.into_arg(), $args.1.into_arg(), $args.2.into_arg(), $args.3.into_arg(), $args.4.into_arg(), $args.5.into_arg()));
+    (@call $current_task:ident; $args:ident; $func:ident [1]) => ($func($current_task, $args.0.into()));
+    (@call $current_task:ident; $args:ident; $func:ident [2]) => ($func($current_task, $args.0.into(), $args.1.into()));
+    (@call $current_task:ident; $args:ident; $func:ident [3]) => ($func($current_task, $args.0.into(), $args.1.into(), $args.2.into()));
+    (@call $current_task:ident; $args:ident; $func:ident [4]) => ($func($current_task, $args.0.into(), $args.1.into(), $args.2.into(), $args.3.into()));
+    (@call $current_task:ident; $args:ident; $func:ident [5]) => ($func($current_task, $args.0.into(), $args.1.into(), $args.2.into(), $args.3.into(), $args.4.into()));
+    (@call $current_task:ident; $args:ident; $func:ident [6]) => ($func($current_task, $args.0.into(), $args.1.into(), $args.2.into(), $args.3.into(), $args.4.into(), $args.5.into()));
 }
 
 pub fn dispatch_syscall(

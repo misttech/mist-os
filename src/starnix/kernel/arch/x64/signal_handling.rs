@@ -176,16 +176,16 @@ mod tests {
         testing::*,
     };
 
-    const SYSCALL_INSTRUCTION_ADDRESS: UserAddress = UserAddress::from(100);
+    const SYSCALL_INSTRUCTION_ADDRESS: UserAddress = UserAddress::const_from(100);
     const SYSCALL_NUMBER: u64 = 42;
     const SYSCALL_ARGS: (u64, u64, u64, u64, u64, u64) = (20, 21, 22, 23, 24, 25);
-    const SA_RESTORER_ADDRESS: UserAddress = UserAddress::from(0xDEADBEEF);
-    const SA_HANDLER_ADDRESS: UserAddress = UserAddress::from(0x00BADDAD);
+    const SA_RESTORER_ADDRESS: UserAddress = UserAddress::const_from(0xDEADBEEF);
+    const SA_HANDLER_ADDRESS: UserAddress = UserAddress::const_from(0x00BADDAD);
 
-    const SYSCALL2_INSTRUCTION_ADDRESS: UserAddress = UserAddress::from(200);
+    const SYSCALL2_INSTRUCTION_ADDRESS: UserAddress = UserAddress::const_from(200);
     const SYSCALL2_NUMBER: u64 = 84;
     const SYSCALL2_ARGS: (u64, u64, u64, u64, u64, u64) = (30, 31, 32, 33, 34, 35);
-    const SA_HANDLER2_ADDRESS: UserAddress = UserAddress::from(0xBADDAD00);
+    const SA_HANDLER2_ADDRESS: UserAddress = UserAddress::const_from(0xBADDAD00);
 
     #[::fuchsia::test]
     async fn syscall_restart_adjusts_instruction_pointer_and_rax() {

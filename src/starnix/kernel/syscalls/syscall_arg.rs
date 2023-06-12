@@ -50,30 +50,14 @@ impl std::fmt::LowerHex for SyscallArg {
     }
 }
 
-pub trait IntoSyscallArg<T> {
-    fn into_arg(self) -> T;
-}
-impl<T> IntoSyscallArg<T> for SyscallArg
-where
-    T: FromSyscallArg,
-{
-    fn into_arg(self) -> T {
-        T::from_arg(self)
-    }
-}
-
-pub trait FromSyscallArg {
-    fn from_arg(arg: SyscallArg) -> Self;
-}
 macro_rules! impl_from_syscall_arg {
     { for $ty:ty: $arg:ident => $($body:tt)* } => {
-        impl FromSyscallArg for $ty {
-            fn from_arg($arg: SyscallArg) -> Self { $($body)* }
+        impl From<SyscallArg> for $ty {
+            fn from($arg: SyscallArg) -> Self { $($body)* }
         }
     }
 }
 
-impl_from_syscall_arg! { for SyscallArg: arg => arg }
 impl_from_syscall_arg! { for bool: arg => arg.raw() != 0 }
 impl_from_syscall_arg! { for i32: arg => arg.raw() as Self }
 impl_from_syscall_arg! { for i64: arg => arg.raw() as Self }
@@ -81,7 +65,7 @@ impl_from_syscall_arg! { for u32: arg => arg.raw() as Self }
 impl_from_syscall_arg! { for usize: arg => arg.raw() as Self }
 impl_from_syscall_arg! { for u64: arg => arg.raw() as Self }
 impl_from_syscall_arg! { for UserAddress: arg => Self::from(arg.raw()) }
-impl_from_syscall_arg! { for UserCString: arg => Self::new(arg.into_arg()) }
+impl_from_syscall_arg! { for UserCString: arg => Self::new(arg.into()) }
 
 impl_from_syscall_arg! { for FdNumber: arg => Self::from_raw(arg.raw() as i32) }
 impl_from_syscall_arg! { for FileMode: arg => Self::from_bits(arg.raw() as u32) }
@@ -89,8 +73,8 @@ impl_from_syscall_arg! { for DeviceType: arg => Self::from_bits(arg.raw()) }
 impl_from_syscall_arg! { for UncheckedSignal: arg => Self::new(arg.raw()) }
 impl_from_syscall_arg! { for WdNumber: arg => Self::from_raw(arg.raw() as i32) }
 
-impl<T> FromSyscallArg for UserRef<T> {
-    fn from_arg(arg: SyscallArg) -> UserRef<T> {
-        Self::new(arg.into_arg())
+impl<T> From<SyscallArg> for UserRef<T> {
+    fn from(arg: SyscallArg) -> UserRef<T> {
+        Self::new(arg.into())
     }
 }

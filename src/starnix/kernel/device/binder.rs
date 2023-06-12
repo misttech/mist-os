@@ -2585,7 +2585,7 @@ impl BinderDriver {
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         trace_duration!(trace_category_starnix!(), trace_name_binder_ioctl!(), "request" => request);
-        let user_arg = UserAddress::from_arg(arg);
+        let user_arg = UserAddress::from(arg);
         let binder_thread = binder_proc.lock().find_or_register_thread(current_task.get_tid());
         match request {
             uapi::BINDER_VERSION => {
@@ -3828,7 +3828,7 @@ pub mod tests {
     use memoffset::offset_of;
     use zerocopy::FromZeroes;
 
-    const BASE_ADDR: UserAddress = UserAddress::from(0x0000000000000100);
+    const BASE_ADDR: UserAddress = UserAddress::const_from(0x0000000000000100);
     const VMO_LENGTH: usize = 4096;
 
     struct TranslateHandlesTestFixture {
@@ -4403,8 +4403,8 @@ pub mod tests {
         let proc = driver.create_local_process(1);
 
         const LOCAL_BINDER_OBJECT: LocalBinderObject = LocalBinderObject {
-            weak_ref_addr: UserAddress::from(0x0000000000000010),
-            strong_ref_addr: UserAddress::from(0x0000000000000100),
+            weak_ref_addr: UserAddress::const_from(0x0000000000000010),
+            strong_ref_addr: UserAddress::const_from(0x0000000000000100),
         };
 
         let object = BinderObject::new(&proc, LOCAL_BINDER_OBJECT, 0);
@@ -4833,8 +4833,8 @@ pub mod tests {
             receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
         const BINDER_OBJECT: LocalBinderObject = LocalBinderObject {
-            weak_ref_addr: UserAddress::from(0x0000000000000010),
-            strong_ref_addr: UserAddress::from(0x0000000000000100),
+            weak_ref_addr: UserAddress::const_from(0x0000000000000010),
+            strong_ref_addr: UserAddress::const_from(0x0000000000000100),
         };
 
         const DATA_PREAMBLE: &[u8; 5] = b"stuff";
@@ -6160,7 +6160,7 @@ pub mod tests {
         mmap_shared_memory(&driver, &receiver_task, &receiver_proc);
 
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
-        const OBJECT_ADDR: UserAddress = UserAddress::from(0x01);
+        const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
         let object = register_binder_object(&receiver_proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
         let (_, handle) = sender_proc.lock().handles.insert_for_transaction(object.clone());
 
@@ -6277,7 +6277,7 @@ pub mod tests {
         mmap_shared_memory(&driver, &receiver_task, &receiver_proc);
 
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
-        const OBJECT_ADDR: UserAddress = UserAddress::from(0x01);
+        const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
         let object = register_binder_object(&receiver_proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
         let (_, handle) = sender_proc.lock().handles.insert_for_transaction(object.clone());
 
@@ -6354,7 +6354,7 @@ pub mod tests {
         let test = TranslateHandlesTestFixture::new();
 
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
-        const OBJECT_ADDR: UserAddress = UserAddress::from(0x01);
+        const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
         let object = register_binder_object(&test.receiver_proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
         let (_, handle) = test.sender_proc.lock().handles.insert_for_transaction(object);
 
@@ -6406,7 +6406,7 @@ pub mod tests {
         let test = TranslateHandlesTestFixture::new();
 
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
-        const OBJECT_ADDR: UserAddress = UserAddress::from(0x01);
+        const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
         let object = register_binder_object(&test.receiver_proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
         let (_, handle) = test.sender_proc.lock().handles.insert_for_transaction(object);
 
@@ -6458,7 +6458,7 @@ pub mod tests {
         let test = TranslateHandlesTestFixture::new();
 
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
-        const OBJECT_ADDR: UserAddress = UserAddress::from(0x01);
+        const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
         let object = register_binder_object(&test.receiver_proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
         let (_, handle) = test.sender_proc.lock().handles.insert_for_transaction(object);
 

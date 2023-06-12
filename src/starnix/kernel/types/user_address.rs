@@ -23,7 +23,7 @@ impl UserAddress {
 
     // TODO(lindkvist): Remove this in favor of marking the From<u64> trait const once feature is
     // stabilized.
-    pub const fn from(value: u64) -> Self {
+    pub const fn const_from(value: u64) -> Self {
         UserAddress(value)
     }
 

@@ -232,7 +232,7 @@ impl FileOps for Arc<InputFile> {
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        let user_addr = UserAddress::from_arg(arg);
+        let user_addr = UserAddress::from(arg);
         match request {
             uapi::EVIOCGVERSION => {
                 current_task.mm.write_object(UserRef::new(user_addr), &self.driver_version)?;

@@ -17,8 +17,7 @@ use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
 use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_zircon as zx;
 use static_assertions::const_assert_eq;
-use std::ffi::CStr;
-use std::sync::Arc;
+use std::{ffi::CStr, sync::Arc};
 use syncio::{ControlMessage, RecvMessageInfo, ServiceConnector, Zxio};
 
 /// Connects to `fuchsia_posix_socket::Provider` or
@@ -282,7 +281,7 @@ impl SocketOps for InetSocket {
     ) -> Result<SyscallResult, Errno> {
         // TODO(fxbug.dev/128604): Remove hardcoded constant
         const DEFAULT_IFACE_NAME: &[u8; 16usize] = b"sta-iface-name\0\0";
-        let user_addr = UserAddress::from_arg(arg);
+        let user_addr = UserAddress::from(arg);
         match request {
             SIOCGIFINDEX => {
                 let in_ifreq: ifreq = current_task.mm.read_object(UserRef::new(user_addr))?;
