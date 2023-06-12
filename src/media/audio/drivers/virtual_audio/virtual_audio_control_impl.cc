@@ -11,6 +11,7 @@
 
 #include <ddktl/fidl.h>
 
+#include "src/media/audio/drivers/virtual_audio/virtual_audio_composite.h"
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_dai.h"
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_device_impl.h"
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_stream.h"
@@ -114,6 +115,9 @@ void VirtualAudioControlImpl::GetDefaultConfiguration(
     case fuchsia_virtualaudio::wire::DeviceType::kDai:
       completer.ReplySuccess(
           fidl::ToWire(arena, VirtualAudioDai::GetDefaultConfig(request->direction.is_input())));
+      break;
+    case fuchsia_virtualaudio::wire::DeviceType::kComposite:
+      completer.ReplySuccess(fidl::ToWire(arena, VirtualAudioComposite::GetDefaultConfig()));
       break;
     default:
       ZX_ASSERT_MSG(0, "Unknown device type");
