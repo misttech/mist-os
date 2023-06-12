@@ -149,10 +149,6 @@ impl WindowSize {
         }
     }
 
-    pub(crate) fn from_u16(wnd: u16) -> Self {
-        Self(wnd.into())
-    }
-
     pub(super) fn saturating_add(self, rhs: u32) -> Self {
         Self::from_u32(u32::from(self).saturating_add(rhs)).unwrap_or(Self::MAX)
     }
@@ -163,6 +159,14 @@ impl WindowSize {
 
     pub(super) fn checked_sub(self, diff: usize) -> Option<Self> {
         usize::from(self).checked_sub(diff).and_then(Self::new)
+    }
+
+    /// The window scale that needs to be advertised during the handshake.
+    pub(super) fn scale(self) -> WindowScale {
+        let WindowSize(size) = self;
+        let effective_bits = u8::try_from(32 - u32::leading_zeros(size)).unwrap();
+        let scale = WindowScale(effective_bits.saturating_sub(16));
+        scale
     }
 }
 
@@ -187,6 +191,68 @@ impl From<WindowSize> for usize {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
+/// This type is a witness for a valid window scale exponent value.
+///
+/// Per RFC 7323 Section 2.2, the restriction is as follows:
+///   The maximum scale exponent is limited to 14 for a maximum permissible
+///   receive window size of 1 GiB (2^(14+16)).
+pub(crate) struct WindowScale(u8);
+
+impl WindowScale {
+    pub(super) const MAX: WindowScale = WindowScale(14);
+
+    /// Creates a new `WindowScale`.
+    ///
+    /// Returns `None` if the input exceeds the maximum possible value.
+    pub(super) fn new(ws: u8) -> Option<Self> {
+        (ws <= Self::MAX.get()).then_some(WindowScale(ws))
+    }
+
+    pub(super) fn get(&self) -> u8 {
+        let Self(ws) = self;
+        *ws
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+/// Window size that is used in the window field of a TCP segment.
+///
+/// For connections with window scaling enabled, the receiver has to scale this
+/// value back to get the real window size advertised by the peer.
+pub(crate) struct UnscaledWindowSize(u16);
+
+impl ops::Shl<WindowScale> for UnscaledWindowSize {
+    type Output = WindowSize;
+
+    fn shl(self, WindowScale(scale): WindowScale) -> Self::Output {
+        let UnscaledWindowSize(size) = self;
+        // `scale` is guaranteed to be <= 14, so the result must fit in a u32.
+        WindowSize::from_u32(u32::from(size) << scale).unwrap()
+    }
+}
+
+impl ops::Shr<WindowScale> for WindowSize {
+    type Output = UnscaledWindowSize;
+
+    fn shr(self, WindowScale(scale): WindowScale) -> Self::Output {
+        let WindowSize(size) = self;
+        UnscaledWindowSize(u16::try_from(size >> scale).unwrap_or(u16::MAX))
+    }
+}
+
+impl From<u16> for UnscaledWindowSize {
+    fn from(value: u16) -> Self {
+        Self(value)
+    }
+}
+
+impl From<UnscaledWindowSize> for u16 {
+    fn from(UnscaledWindowSize(value): UnscaledWindowSize) -> Self {
+        value
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use proptest::{
@@ -196,8 +262,9 @@ mod tests {
         test_runner::Config,
     };
     use proptest_support::failed_seeds;
+    use test_case::test_case;
 
-    use super::{SeqNum, WindowSize};
+    use super::*;
     use crate::transport::tcp::segment::MAX_PAYLOAD_AND_CONTROL_LEN;
 
     fn arb_seqnum() -> impl Strategy<Value = SeqNum> {
@@ -216,6 +283,15 @@ mod tests {
                 })
             })
         })
+    }
+
+    #[test_case(WindowSize::new(1).unwrap() => (UnscaledWindowSize::from(1), WindowScale::default()))]
+    #[test_case(WindowSize::new(65535).unwrap() => (UnscaledWindowSize::from(65535), WindowScale::default()))]
+    #[test_case(WindowSize::new(65536).unwrap() => (UnscaledWindowSize::from(32768), WindowScale::new(1).unwrap()))]
+    #[test_case(WindowSize::new(65537).unwrap() => (UnscaledWindowSize::from(32768), WindowScale::new(1).unwrap()))]
+    fn window_scale(size: WindowSize) -> (UnscaledWindowSize, WindowScale) {
+        let scale = size.scale();
+        (size >> scale, scale)
     }
 
     proptest! {

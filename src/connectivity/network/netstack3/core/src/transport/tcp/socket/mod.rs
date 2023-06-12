@@ -6258,7 +6258,7 @@ mod tests {
                 |Sockets { inactive: _, port_alloc: _, socketmap: _, bound_state }| {
                 let (conn, _sharing, _addr) =
                     local.get_from_bound_state(bound_state).expect("failed to get connection");
-                assert_matches!(conn.state, State::TimeWait(TimeWait {last_seq,last_ack, last_wnd: _, expiry }) => (last_seq, last_ack, expiry))
+                assert_matches!(conn.state, State::TimeWait(TimeWait {last_seq,last_ack, last_wnd: _, expiry, last_wnd_scale: _ }) => (last_seq, last_ack, expiry))
             })
         });
 

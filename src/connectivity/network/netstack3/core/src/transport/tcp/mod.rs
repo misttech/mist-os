@@ -35,6 +35,7 @@ use crate::{
     sync::Mutex,
     transport::tcp::{
         self,
+        seqnum::{UnscaledWindowSize, WindowSize},
         socket::{isn::IsnGenerator, Sockets},
         state::DEFAULT_MAX_SYN_RETRIES,
     },
@@ -254,6 +255,16 @@ impl BufferSizes {
     fn into_optional(&self) -> OptionalBufferSizes {
         let Self { send, receive } = self;
         OptionalBufferSizes { send: Some(*send), receive: Some(*receive) }
+    }
+
+    fn rwnd(&self) -> WindowSize {
+        let Self { send: _, receive } = *self;
+        WindowSize::new(receive).unwrap_or(WindowSize::MAX)
+    }
+
+    fn rwnd_unscaled(&self) -> UnscaledWindowSize {
+        let Self { send: _, receive } = *self;
+        UnscaledWindowSize::from(u16::try_from(receive).unwrap_or(u16::MAX))
     }
 }
 

@@ -14,7 +14,7 @@ use packet_formats::tcp::options::TcpOption;
 
 use crate::transport::tcp::{
     buffer::SendPayload,
-    seqnum::{SeqNum, WindowSize},
+    seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize},
     Control, Mss,
 };
 
@@ -26,7 +26,7 @@ pub(crate) struct Segment<P: Payload> {
     /// The acknowledge number of the segment. [`None`] if not present.
     pub(crate) ack: Option<SeqNum>,
     /// The advertised window size.
-    pub(crate) wnd: WindowSize,
+    pub(crate) wnd: UnscaledWindowSize,
     /// The carried data and its control flag.
     pub(crate) contents: Contents<P>,
     /// Options carried by this segment.
@@ -36,13 +36,17 @@ pub(crate) struct Segment<P: Payload> {
 #[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
 pub(crate) struct Options {
     pub(crate) mss: Option<Mss>,
+    pub(crate) window_scale: Option<WindowScale>,
 }
 
 impl Options {
     pub(crate) fn iter(
         &self,
     ) -> impl Iterator<Item = TcpOption<'static>> + core::fmt::Debug + Clone {
-        self.mss.map(|mss| TcpOption::Mss(mss.get().get())).into_iter()
+        self.mss
+            .map(|mss| TcpOption::Mss(mss.get().get()))
+            .into_iter()
+            .chain(self.window_scale.map(|ws| TcpOption::WindowScale(ws.get())).into_iter())
     }
 
     pub(crate) fn from_iter<'a>(iter: impl IntoIterator<Item = TcpOption<'a>>) -> Self {
@@ -52,9 +56,22 @@ impl Options {
                 TcpOption::Mss(mss) => {
                     options.mss = NonZeroU16::new(mss).map(Mss);
                 }
+                TcpOption::WindowScale(ws) => {
+                    // Per RFC 7323 Section 2.3:
+                    //   If a Window Scale option is received with a shift.cnt
+                    //   value larger than 14, the TCP SHOULD log the error but
+                    //   MUST use 14 instead of the specified value.
+                    if ws > WindowScale::MAX.get() {
+                        tracing::info!(
+                            "received an out-of-range window scale: {}, want < {}",
+                            ws,
+                            WindowScale::MAX.get()
+                        );
+                    }
+                    options.window_scale = Some(WindowScale::new(ws).unwrap_or(WindowScale::MAX));
+                }
                 // TODO(https://fxbug.dev/121882): We don't support these yet.
-                TcpOption::WindowScale(_)
-                | TcpOption::SackPermitted
+                TcpOption::SackPermitted
                 | TcpOption::Sack(_)
                 | TcpOption::Timestamp { ts_val: _, ts_echo_reply: _ } => {}
             }
@@ -107,7 +124,7 @@ impl<P: Payload> Segment<P> {
         seq: SeqNum,
         ack: Option<SeqNum>,
         control: Option<Control>,
-        wnd: WindowSize,
+        wnd: UnscaledWindowSize,
         data: P,
         options: Options,
     ) -> (Self, usize) {
@@ -142,7 +159,7 @@ impl<P: Payload> Segment<P> {
         seq: SeqNum,
         ack: Option<SeqNum>,
         control: Option<Control>,
-        wnd: WindowSize,
+        wnd: UnscaledWindowSize,
         data: P,
     ) -> (Self, usize) {
         Self::with_data_options(seq, ack, control, wnd, data, Options::default())
@@ -245,7 +262,7 @@ impl Segment<()> {
         seq: SeqNum,
         ack: Option<SeqNum>,
         control: Option<Control>,
-        wnd: WindowSize,
+        wnd: UnscaledWindowSize,
     ) -> Self {
         Self::with_options(seq, ack, control, wnd, Options::default())
     }
@@ -254,7 +271,7 @@ impl Segment<()> {
         seq: SeqNum,
         ack: Option<SeqNum>,
         control: Option<Control>,
-        wnd: WindowSize,
+        wnd: UnscaledWindowSize,
         options: Options,
     ) -> Self {
         // All of the checks on lengths are optimized out:
@@ -265,28 +282,33 @@ impl Segment<()> {
     }
 
     /// Creates an ACK segment.
-    pub(super) fn ack(seq: SeqNum, ack: SeqNum, wnd: WindowSize) -> Self {
+    pub(super) fn ack(seq: SeqNum, ack: SeqNum, wnd: UnscaledWindowSize) -> Self {
         Segment::new(seq, Some(ack), None, wnd)
     }
 
     /// Creates a SYN segment.
-    pub(super) fn syn(seq: SeqNum, wnd: WindowSize, options: Options) -> Self {
+    pub(super) fn syn(seq: SeqNum, wnd: UnscaledWindowSize, options: Options) -> Self {
         Segment::with_options(seq, None, Some(Control::SYN), wnd, options)
     }
 
     /// Creates a SYN-ACK segment.
-    pub(super) fn syn_ack(seq: SeqNum, ack: SeqNum, wnd: WindowSize, options: Options) -> Self {
+    pub(super) fn syn_ack(
+        seq: SeqNum,
+        ack: SeqNum,
+        wnd: UnscaledWindowSize,
+        options: Options,
+    ) -> Self {
         Segment::with_options(seq, Some(ack), Some(Control::SYN), wnd, options)
     }
 
     /// Creates a RST segment.
     pub(super) fn rst(seq: SeqNum) -> Self {
-        Segment::new(seq, None, Some(Control::RST), WindowSize::ZERO)
+        Segment::new(seq, None, Some(Control::RST), UnscaledWindowSize::from(0))
     }
 
     /// Creates a RST-ACK segment.
     pub(super) fn rst_ack(seq: SeqNum, ack: SeqNum) -> Self {
-        Segment::new(seq, Some(ack), Some(Control::RST), WindowSize::ZERO)
+        Segment::new(seq, Some(ack), Some(Control::RST), UnscaledWindowSize::from(0))
     }
 }
 
@@ -403,7 +425,7 @@ mod test {
             SeqNum::new(1),
             Some(SeqNum::new(1)),
             control,
-            WindowSize::ZERO,
+            UnscaledWindowSize::from(0),
             data,
         );
         assert_eq!(truncated, 0);
@@ -479,7 +501,7 @@ mod test {
             SeqNum::new(0),
             None,
             control,
-            WindowSize::ZERO,
+            UnscaledWindowSize::from(0),
             TestPayload::new(len),
         );
         (seg.contents.data.len(), seg.contents.control, truncated)
@@ -681,7 +703,7 @@ mod test {
             SeqNum::new(seg_seq),
             None,
             control,
-            WindowSize::ZERO,
+            UnscaledWindowSize::from(0),
             TestPayload(0..data_len),
         );
         assert_eq!(discarded, 0);

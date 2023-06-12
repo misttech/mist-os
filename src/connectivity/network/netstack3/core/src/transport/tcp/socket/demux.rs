@@ -37,7 +37,7 @@ use crate::{
     transport::tcp::{
         buffer::SendPayload,
         segment::{Options, Segment},
-        seqnum::WindowSize,
+        seqnum::UnscaledWindowSize,
         socket::{
             do_send_inner, isn::IsnGenerator, Acceptor, Connection, ConnectionId,
             ConnectionStatusUpdate, Listener, ListenerAddrState, ListenerId, ListenerSharingState,
@@ -319,7 +319,14 @@ where
     //   (2) returns to TIME-WAIT state if the SYN turns out to be an old
     //       duplicate.
     if *defunct && incoming.contents.control() == Some(Control::SYN) && incoming.ack.is_none() {
-        if let State::TimeWait(TimeWait { last_seq: _, last_ack, last_wnd: _, expiry: _ }) = state {
+        if let State::TimeWait(TimeWait {
+            last_seq: _,
+            last_ack,
+            last_wnd: _,
+            last_wnd_scale: _,
+            expiry: _,
+        }) = state
+        {
             if !incoming.seq.before(*last_ack) {
                 return ConnectionIncomingSegmentDisposition::ReuseCandidateForListener(conn_id);
             }
@@ -681,7 +688,7 @@ impl<'a> TryFrom<TcpSegment<&'a [u8]>> for Segment<&'a [u8]> {
             from.seq_num().into(),
             from.ack_num().map(Into::into),
             control,
-            WindowSize::from_u16(from.window_size()),
+            UnscaledWindowSize::from(from.window_size()),
             from.into_body(),
             options,
         );
@@ -707,7 +714,7 @@ where
         remote_port,
         seq.into(),
         ack.map(Into::into),
-        u16::try_from(u32::from(wnd)).unwrap_or(u16::MAX),
+        u16::from(wnd),
     );
     match contents.control() {
         None => {}
@@ -749,7 +756,7 @@ mod test {
                 SEQ,
                 Some(ACK),
                 None,
-                WindowSize::DEFAULT,
+                UnscaledWindowSize::from(u16::MAX),
                 if split {
                     let (first, second) = Self::FAKE_DATA.split_at(Self::FAKE_DATA.len() / 2);
                     SendPayload::Straddle(first, second)
@@ -763,9 +770,9 @@ mod test {
     }
 
     #[ip_test]
-    #[test_case(Segment::syn(SEQ, WindowSize::DEFAULT, Options { mss: None }).into(), &[]; "syn")]
-    #[test_case(Segment::syn(SEQ, WindowSize::DEFAULT, Options { mss: Some(Mss(nonzero_ext::nonzero!(1440 as u16))) }).into(), &[]; "syn with mss")]
-    #[test_case(Segment::ack(SEQ, ACK, WindowSize::DEFAULT).into(), &[]; "ack")]
+    #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: None, window_scale: None }).into(), &[]; "syn")]
+    #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: Some(Mss(nonzero_ext::nonzero!(1440 as u16))), window_scale: None }).into(), &[]; "syn with mss")]
+    #[test_case(Segment::ack(SEQ, ACK, UnscaledWindowSize::from(u16::MAX)).into(), &[]; "ack")]
     #[test_case(Segment::with_fake_data(false), Segment::FAKE_DATA; "contiguous data")]
     #[test_case(Segment::with_fake_data(true), Segment::FAKE_DATA; "split data")]
     fn tcp_serialize_segment<I: Ip + TestIpExt>(
@@ -795,7 +802,10 @@ mod test {
         assert_eq!(parsed_segment.src_port(), SOURCE_PORT);
         assert_eq!(parsed_segment.dst_port(), DEST_PORT);
         assert_eq!(parsed_segment.seq_num(), u32::from(SEQ));
-        assert_eq!(WindowSize::from_u16(parsed_segment.window_size()), WindowSize::DEFAULT);
+        assert_eq!(
+            UnscaledWindowSize::from(parsed_segment.window_size()),
+            UnscaledWindowSize::from(u16::MAX)
+        );
         assert_eq!(options.iter().count(), parsed_segment.iter_options().count());
         for (orig, parsed) in options.iter().zip(parsed_segment.iter_options()) {
             assert_eq!(orig, parsed);
