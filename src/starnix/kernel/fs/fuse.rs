@@ -6,16 +6,19 @@ use crate::{
     auth::FsCred,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, fs_args, CacheMode, FdEvents, FdNumber, FileObject, FileOps,
-        FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
-        FsNodeInfo, FsNodeOps, FsStr, FsString, SymlinkTarget, XattrOp,
+        fileops_impl_nonseekable, fs_args, CacheMode, DirentSink, FdEvents, FdNumber, FileObject,
+        FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode,
+        FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SymlinkTarget, XattrOp,
     },
-    lock::{Mutex, RwLock, RwLockReadGuard},
+    lock::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard},
     logging::{log_error, not_implemented},
-    task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
+    syscalls::{SyscallArg, SyscallResult},
+    task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
     types::{
-        errno, errno::EINTR, errno_from_code, error, statfs, time_from_timespec, uapi, DeviceType,
-        Errno, FileMode, OpenFlags,
+        errno,
+        errno::{EINTR, EINVAL, ENOSYS},
+        errno_from_code, error, off_t, statfs, time_from_timespec, uapi, DeviceType, Errno,
+        FileMode, OpenFlags,
     },
 };
 use std::{
@@ -170,15 +173,149 @@ impl FuseNode {
     }
 }
 
+struct FuseFileObject {
+    connection: Arc<FuseConnection>,
+    /// The response to the open calls from the userspace process.
+    open_out: uapi::fuse_open_out,
+
+    /// The current kernel. This is a temporary measure to access a task on close and flush.
+    // TODO(https://fxbug.dev/128843): Remove this.
+    kernel: Arc<Kernel>,
+}
+
+impl FuseFileObject {
+    /// Returns the `FuseNode` associated with the opened file.
+    fn get_fuse_node<'a>(&self, file: &'a FileObject) -> Result<&'a Arc<FuseNode>, Errno> {
+        file.node().downcast_ops::<Arc<FuseNode>>().ok_or_else(|| errno!(ENOENT))
+    }
+}
+
+impl FileOps for FuseFileObject {
+    fn close(&self, file: &FileObject) {
+        let node = if let Ok(node) = self.get_fuse_node(file) {
+            node
+        } else {
+            log_error!("Unexpected file type");
+            return;
+        };
+        // TODO(https://fxbug.dev/128843): This should receives a CurrentTask instead of relying on
+        // the system task.
+        if let Err(e) = self.connection.execute_operation(
+            self.kernel.kthreads.system_task(),
+            node,
+            FuseOperation::Release(self.open_out),
+        ) {
+            log_error!("Error when relasing fh: {e:?}");
+        }
+    }
+
+    fn flush(&self, file: &FileObject) {
+        let node = if let Ok(node) = self.get_fuse_node(file) {
+            node
+        } else {
+            log_error!("Unexpected file type");
+            return;
+        };
+        // TODO(https://fxbug.dev/128843): This should receives a CurrentTask instead of relying on
+        // the system task.
+        if let Err(e) = self.connection.execute_operation(
+            self.kernel.kthreads.system_task(),
+            node,
+            FuseOperation::Flush(self.open_out),
+        ) {
+            log_error!("Error when flushing fh: {e:?}");
+        }
+    }
+
+    fn is_seekable(&self) -> bool {
+        true
+    }
+
+    fn read(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        _data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
+        not_implemented!("FileOps::read");
+        error!(ENOTSUP)
+    }
+
+    fn write(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        _data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        not_implemented!("FileOps::write");
+        error!(ENOTSUP)
+    }
+
+    fn seek(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _current_offset: off_t,
+        _whence: SeekTarget,
+    ) -> Result<off_t, Errno> {
+        not_implemented!("FileOps::seek");
+        error!(ENOTSUP)
+    }
+
+    fn readdir(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _sink: &mut dyn DirentSink,
+    ) -> Result<(), Errno> {
+        not_implemented!("FileOps::seek");
+        error!(ENOTDIR)
+    }
+
+    fn ioctl(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _request: u32,
+        _arg: SyscallArg,
+    ) -> Result<SyscallResult, Errno> {
+        not_implemented!("FileOps::ioctl");
+        error!(ENOTDIR)
+    }
+
+    fn fcntl(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _cmd: u32,
+        _arg: u64,
+    ) -> Result<SyscallResult, Errno> {
+        not_implemented!("FileOps::fcntl");
+        error!(ENOTDIR)
+    }
+}
+
 impl FsNodeOps for Arc<FuseNode> {
     fn create_file_ops(
         &self,
         _node: &FsNode,
-        _current_task: &CurrentTask,
-        _flags: OpenFlags,
+        current_task: &CurrentTask,
+        flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        not_implemented!("FsNodeOps::create_file_ops");
-        error!(ENOTSUP)
+        let response =
+            self.connection.execute_operation(current_task, self, FuseOperation::Open(flags))?;
+        let open_out = if let FuseResponse::Open(open_out) = response {
+            open_out
+        } else {
+            return error!(EINVAL);
+        };
+        Ok(Box::new(FuseFileObject {
+            connection: self.connection.clone(),
+            open_out,
+            kernel: current_task.kernel().clone(),
+        }))
     }
 
     fn lookup(
@@ -287,10 +424,19 @@ impl FsNodeOps for Arc<FuseNode> {
     fn update_info<'a>(
         &self,
         _node: &FsNode,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
-        Ok(info.read())
+        let response =
+            self.connection.execute_operation(current_task, self, FuseOperation::GetAttr)?;
+        let attr = if let FuseResponse::Attr(attr) = response {
+            attr
+        } else {
+            return error!(EINVAL);
+        };
+        let mut info = info.write();
+        FuseNode::update_node_info(&mut info, attr.attr)?;
+        Ok(RwLockWriteGuard::downgrade(info))
     }
 
     fn get_xattr(&self, _node: &FsNode, _name: &FsStr) -> Result<FsString, Errno> {
@@ -344,16 +490,20 @@ impl FuseConnection {
     ) -> Result<FuseResponse, Errno> {
         let waiter = Waiter::new();
         let is_async = operation.is_async();
-        let unique_id = self.state.lock().queue_operation(task, node, operation, Some(&waiter))?;
+        let mut state = self.state.lock();
+        if let Some(result) = operation.short_circuit(&state.operations_state) {
+            return result;
+        }
+        let unique_id = state.queue_operation(task, node, operation, Some(&waiter))?;
         if is_async {
             return Ok(FuseResponse::None);
         }
         let mut first_loop = true;
         loop {
-            if let Some(response) = self.state.lock().get_response(unique_id) {
+            if let Some(response) = state.get_response(unique_id) {
                 return response;
             }
-            match waiter.wait(task) {
+            match MutexGuard::unlocked(&mut state, || waiter.wait(task)) {
                 Ok(()) => {}
                 Err(e) if e == EINTR => {
                     // If interrupted by another process, send an interrupt command to the server
@@ -393,6 +543,17 @@ impl FuseConnection {
     }
 }
 
+/// A per connection state for operations that can be shortcircuited.
+///
+/// For a number of Fuse operation, Fuse protocol specifies that if they fail in a specific way,
+/// they should not be sent to the server again and must be handled in a predefined way. This
+/// structure keep track of these operations for a given connection.
+#[derive(Debug, Default)]
+struct OperationsState {
+    /// Whether flush calls must be discarded and considered successful.
+    discard_flush: bool,
+}
+
 #[derive(Debug, Default)]
 struct FuseMutableState {
     /// Whether the mount has been disconnected.
@@ -411,6 +572,8 @@ struct FuseMutableState {
 
     /// Queue to notify of new messages.
     waiters: WaitQueue,
+
+    operations_state: OperationsState,
 }
 
 impl FuseMutableState {
@@ -538,11 +701,11 @@ impl FuseMutableState {
         }
         self.waiters.notify_value_event(header.unique);
         let operation = self.operations.get_mut(&header.unique).ok_or_else(|| errno!(EINVAL))?;
-        if header.error != 0 {
-            operation.response = Some(Err(errno_from_code!(header
-                .error
-                .try_into()
-                .map_err(|e: std::num::TryFromIntError| errno!(EINVAL, e))?)));
+        if header.error < 0 {
+            let code = i16::try_from(-header.error).unwrap_or(EINVAL.error_code() as i16);
+            let errno = errno_from_code!(code);
+            operation.response =
+                Some(operation.operation.handle_error(&mut self.operations_state, errno));
         } else {
             let mut buffer = vec![0u8; remainder];
             if data.read(&mut buffer)? != remainder {
@@ -622,14 +785,24 @@ bitflags::bitflags! {
 
 #[derive(Debug)]
 enum FuseOperation {
+    Flush(uapi::fuse_open_out),
+    GetAttr,
     Init,
     Interrupt(u64),
     Lookup(FsString),
+    Open(OpenFlags),
+    Release(uapi::fuse_open_out),
 }
 
 impl FuseOperation {
     fn serialize(&self, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
         match self {
+            Self::Flush(open_in) => {
+                let message =
+                    uapi::fuse_flush_in { fh: open_in.fh, unused: 0, padding: 0, lock_owner: 0 };
+                data.write_all(message.as_bytes())
+            }
+            Self::GetAttr => Ok(0),
             Self::Init => {
                 let message = uapi::fuse_init_in {
                     major: uapi::FUSE_KERNEL_VERSION,
@@ -647,22 +820,43 @@ impl FuseOperation {
                 let len = data.write_all(name.as_bytes())?;
                 Ok(data.write_all(&[0])? + len)
             }
+            Self::Open(open_flags) => {
+                let message = uapi::fuse_open_in { flags: 0, open_flags: open_flags.bits() };
+                data.write_all(message.as_bytes())
+            }
+            Self::Release(open_in) => {
+                let message = uapi::fuse_release_in {
+                    fh: open_in.fh,
+                    flags: 0,
+                    release_flags: 0,
+                    lock_owner: 0,
+                };
+                data.write_all(message.as_bytes())
+            }
         }
     }
 
     fn opcode(&self) -> u32 {
         match self {
+            Self::Flush(_) => uapi::fuse_opcode_FUSE_FLUSH,
+            Self::GetAttr => uapi::fuse_opcode_FUSE_GETATTR,
             Self::Init => uapi::fuse_opcode_FUSE_INIT,
             Self::Interrupt(_) => uapi::fuse_opcode_FUSE_INTERRUPT,
             Self::Lookup(_) => uapi::fuse_opcode_FUSE_LOOKUP,
+            Self::Open(_) => uapi::fuse_opcode_FUSE_OPEN,
+            Self::Release(_) => uapi::fuse_opcode_FUSE_RELEASE,
         }
     }
 
     fn len(&self) -> u32 {
         match self {
+            Self::Flush(_) => std::mem::size_of::<uapi::fuse_flush_in>() as u32,
+            Self::GetAttr => 0,
             Self::Init => std::mem::size_of::<uapi::fuse_init_in>() as u32,
             Self::Interrupt(_) => std::mem::size_of::<uapi::fuse_interrupt_in>() as u32,
             Self::Lookup(name) => (name.as_bytes().len() + 1) as u32,
+            Self::Open(_) => std::mem::size_of::<uapi::fuse_open_in>() as u32,
+            Self::Release(_) => std::mem::size_of::<uapi::fuse_release_in>() as u32,
         }
     }
 
@@ -684,10 +878,17 @@ impl FuseOperation {
     fn parse_response(&self, buffer: &[u8]) -> Result<FuseResponse, Errno> {
         debug_assert!(self.has_response());
         match self {
+            Self::GetAttr => {
+                Ok(FuseResponse::Attr(Self::to_response::<uapi::fuse_attr_out>(buffer)))
+            }
             Self::Init => Ok(FuseResponse::Init(Self::to_response::<uapi::fuse_init_out>(buffer))),
             Self::Lookup(_) => {
                 Ok(FuseResponse::Entry(Self::to_response::<uapi::fuse_entry_out>(buffer)))
             }
+            Self::Open(_) => {
+                Ok(FuseResponse::Open(Self::to_response::<uapi::fuse_open_out>(buffer)))
+            }
+            Self::Release(_) | Self::Flush(_) => Ok(FuseResponse::None),
             Self::Interrupt(_) => {
                 panic!("Response for operation without one");
             }
@@ -702,11 +903,41 @@ impl FuseOperation {
         }
         Ok(())
     }
+
+    /// Short circuit calling the userspace daemon if required.
+    ///
+    /// Returns None if the userspace daemon needs to be called. Returns Some(response) otherwise.
+    fn short_circuit(&self, state: &OperationsState) -> Option<Result<FuseResponse, Errno>> {
+        match self {
+            Self::Flush(_) if state.discard_flush => Some(Ok(FuseResponse::None)),
+            _ => None,
+        }
+    }
+
+    /// Handles an error from the userspace daemon.
+    ///
+    /// Given the `errno` returned by the userspace daemon, returns the response the caller should
+    /// see. This can also update the `OperationState` to allow shortcircuit on future requests.
+    fn handle_error(
+        &self,
+        state: &mut OperationsState,
+        errno: Errno,
+    ) -> Result<FuseResponse, Errno> {
+        match self {
+            Self::Flush(_) if errno == ENOSYS => {
+                state.discard_flush = true;
+                Ok(FuseResponse::None)
+            }
+            _ => Err(errno),
+        }
+    }
 }
 
 #[derive(Debug)]
 enum FuseResponse {
-    Init(uapi::fuse_init_out),
+    Attr(uapi::fuse_attr_out),
     Entry(uapi::fuse_entry_out),
+    Init(uapi::fuse_init_out),
+    Open(uapi::fuse_open_out),
     None,
 }

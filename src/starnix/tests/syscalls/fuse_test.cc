@@ -29,11 +29,11 @@ class FuseTest : public ::testing::Test {
   void SetUp() override {}
 
   void TearDown() override {
-    if (mount_dir_) {
-      if (umount(mount_dir_->c_str()) != 0) {
+    if (base_dir_) {
+      if (umount(GetMountDir().c_str()) != 0) {
         FAIL() << "Unable to umount: " << strerror(errno);
       }
-      mount_dir_.reset();
+      base_dir_.reset();
     }
   }
 
@@ -45,6 +45,8 @@ class FuseTest : public ::testing::Test {
       return "/data/fuse-overlayfs";
     }
   }
+
+  std::string GetMountDir() { return *base_dir_ + "/merge"; }
 
   testing::AssertionResult MkDir(const std::string& directory) {
     if (mkdir(directory.c_str(), 0700) != 0) {
@@ -93,7 +95,7 @@ class FuseTest : public ::testing::Test {
     if (child_pid <= 0) {
       return testing::AssertionFailure() << "Unable to fork to start the fuse server process";
     }
-    mount_dir_ = mergedir;
+    base_dir_ = base_dir;
 
     std::string witness = mergedir + "/" + witness_name;
     for (int i = 0; i < 20 && access(witness.c_str(), R_OK) != 0; ++i) {
@@ -106,9 +108,32 @@ class FuseTest : public ::testing::Test {
   }
 
   ForkHelper fork_helper_;
-  std::optional<std::string> mount_dir_;
+  std::optional<std::string> base_dir_;
 };
 
 TEST_F(FuseTest, Mount) { ASSERT_TRUE(Mount()); }
+
+TEST_F(FuseTest, Stats) {
+  ASSERT_TRUE(Mount());
+  std::string mounted_witness = GetMountDir() + "/witness";
+  std::string original_witness = *base_dir_ + "/lower/witness";
+  ScopedFD fd(open(mounted_witness.c_str(), O_RDONLY));
+  ASSERT_TRUE(fd.is_valid());
+  struct stat mounted_stats;
+  ASSERT_EQ(fstat(fd.get(), &mounted_stats), 0);
+  fd = ScopedFD(open(original_witness.c_str(), O_RDONLY));
+  ASSERT_TRUE(fd.is_valid());
+  struct stat original_stats;
+  ASSERT_EQ(fstat(fd.get(), &original_stats), 0);
+  fd.reset();
+
+  // Check that the stat of the mounted file are the same as the origin one,
+  // except for the fs id.
+  ASSERT_NE(mounted_stats.st_dev, original_stats.st_dev);
+  // Clobber st_dev and check the rest of the data is the same.
+  mounted_stats.st_dev = 0;
+  original_stats.st_dev = 0;
+  ASSERT_EQ(memcmp(&mounted_stats, &original_stats, sizeof(struct stat)), 0);
+}
 
 #endif  // SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_
