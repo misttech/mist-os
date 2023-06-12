@@ -30,7 +30,8 @@ pub struct Peer {
     _id: PeerId,
     _config: HandsFreeFeatureSupport,
     _profile_svc: bredr::ProfileProxy,
-    /// The processing task for data received from the remote peer over RFCOMM.
+    /// The processing task for data received from the remote peer over RFCOMM
+    /// or FIDL APIs.
     /// This value is None if there is no RFCOMM channel present.
     /// If set, there is no guarantee that the RFCOMM channel is open.
     rfcomm_task: Option<fasync::Task<()>>,

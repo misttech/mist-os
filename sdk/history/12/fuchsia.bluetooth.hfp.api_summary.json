@@ -249,6 +249,51 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.hfp/HandsFree.WatchPeerConnected",
+        "ordinal": "2073066718276336703",
+        "type": "() -> (fuchsia.bluetooth.hfp/HandsFree_WatchPeerConnected_Result result)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.bluetooth.hfp/HandsFree"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.hfp/HandsFree_WatchPeerConnected_Response.handle",
+        "ordinal": "2",
+        "type": "client_end:fuchsia.bluetooth.hfp/PeerHandler"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.hfp/HandsFree_WatchPeerConnected_Response.id",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth/PeerId"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.hfp/HandsFree_WatchPeerConnected_Response",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.bluetooth.hfp/HandsFree_WatchPeerConnected_Result.err",
+        "ordinal": "2",
+        "type": "int32"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.bluetooth.hfp/HandsFree_WatchPeerConnected_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth.hfp/HandsFree_WatchPeerConnected_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.bluetooth.hfp/HandsFree_WatchPeerConnected_Result",
+        "resourceness": "resource",
+        "strictness": "strict"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.bluetooth.hfp/HeadsetGain.SetMicrophoneGain",
         "ordinal": "9069041175594200974",
         "type": "(uint8 requested)"

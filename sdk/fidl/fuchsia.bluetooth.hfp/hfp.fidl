@@ -53,7 +53,7 @@ type CallAction = strict union {
     3: redial_last RedialLast;
     /// Request to transfer an active call to the headset rather than initiating
     /// a new outgoing call. A call must already be in progress on the Audio
-    /// Gateway in order for a transfer of audio to the Handsfree device to take
+    /// Gateway in order for a transfer of audio to the Hands-Free device to take
     /// place. See HFP v1.8 Section 4.16.
     4: transfer_active TransferActive;
 };
@@ -96,20 +96,38 @@ protocol CallManager {
     }) -> ();
 };
 
-/// The Call Manager will serve a call handler protocol for each connected
-/// headset that it chooses to manage calls through.
+@available(added=12)
+@discoverable
+protocol HandsFree {
+    /// Hanging get that waits for a a peer that supports the HFP Audio Gateway
+    /// role to connect.
+    ///
+    /// `id` is the unique identifier associated with the peer.
+    ///
+    /// `handle` is the channel that the client should use to manage the peer.
+    /// If the call manager does not intend to handle a given peer. it must
+    /// close the handle,
+    WatchPeerConnected() -> (resource struct {
+        id bt.PeerId;
+        handle client_end:PeerHandler;
+    }) error zx.Status;
+};
+
+/// The call manager or the hands-free server component will serve a call
+/// handler protocol for each connected headset that it chooses to manage calls
+/// through.
 ///
 /// If the peer handler is closed by either channel endpoint, all protocols
-/// associated with this peer handler are closed. This includes any Call,
-/// and HeadsetGain protocols. Channels closed by a server end will include an
+/// associated with this peer handler are closed. This includes any Call, and
+/// HeadsetGain protocols. Channels closed by a server end will include an
 /// epitaph `ZX_ERR_HANDLE_CLOSED` in this situation.
 protocol PeerHandler {
     /// Hanging get to provide the Hfp service with an `update` on the
     /// `NetworkInformation`. Any fields in `update` that are not present will
     /// be treated as unmodified by the update.
     ///
-    /// The call manager _should_ provide a fully populated `update` when it is
-    /// called for the first time.
+    /// The call manager or audio gateway peer _should_ provide a fully
+    /// populated `update` when it is called for the first time.
     ///
     /// The most up-to-date `NetworkInformation` is used during the connection
     /// initialization process of the peer, and updates are propagated to the
@@ -118,38 +136,42 @@ protocol PeerHandler {
         update NetworkInformation;
     });
 
-    /// Hanging get which returns when a new call Client is initiated by the
-    /// call manager or an ongoing call is transferred to the headset.
-    /// `RequestOutgoingCall` can be called before or after `WatchNextCall`.
+    /// Hanging get which returns when a new call is initiated by the call
+    /// manager or audio gateway peer, or an ongoing call is transferred to the
+    /// headset.  `RequestOutgoingCall` can be called before or after
+    /// `WatchNextCall`.
     WatchNextCall() -> (resource struct {
         call NextCall;
     });
 
-    /// Used to request an outgoing call be initiated by the call manager.
-    /// `RequestOutgoingCall` shall complete after the outgoing call has been
-    /// initiated and the corresponding `Call` protocol has been returned via a
-    /// `WatchNextCall` result.
+    /// Used to request an outgoing call be initiated by the call manager or
+    /// audio gateway peer.  `RequestOutgoingCall` shall complete after the
+    /// outgoing call has been initiated and the corresponding `Call` protocol
+    /// has been returned via a `WatchNextCall` result.
     ///
     /// An error is returned if the call could not be placed as requested.
-    /// ZX_ERR_NOT_SUPPORTED can be used if the system does not support
-    /// the requested action.
-    /// ZX_ERR_ALREADY_EXISTS can be used if there is already a call in progress
-    /// and the system does not support additional calls.
+    ///
+    /// - ZX_ERR_NOT_SUPPORTED can be used if the system does not support the
+    ///   requested action.
+    ///
+    /// - ZX_ERR_ALREADY_EXISTS can be used if there is alreadya call in
+    ///   progress and the system does not support additional calls.
     RequestOutgoingCall(struct {
         action CallAction;
     }) -> () error zx.Status;
 
-    /// Request the name of the network operator for the call manager. A null
-    /// value is returned if there is no operator name available.
+    /// Request the name of the network operator for the call manager or audio
+    /// gateway peer. A null value is returned if there is no operator name
+    /// available.
     QueryOperator() -> (struct {
         operator string:<16, optional>;
     });
 
-    /// Request subscriber numbers from the call manager. There can be zero
-    /// or more numbers returned. Sending more than 128 numbers is not supported
-    /// at this time.
-    // The length of `numbers` is constrained to keep the message size below
-    // the maximum channel message size of 64KiB.
+    /// Request subscriber numbers from the call manager or audio gateway peer.
+    /// There can be zero or more numbers returned. Sending more than 128
+    /// numbers is not supported at this time.
+    // The length of `numbers` is constrained to keep the message size below the
+    // maximum channel message size of 64KiB.
     SubscriberNumberInformation() -> (struct {
         numbers vector<Number>:128;
     });
@@ -347,12 +369,12 @@ protocol Call {
     /// the call state set to TRANSFERRED_TO_AG.
     RequestTransferAudio();
 
-    /// Send a code that the call manager should transmit to its network
-    /// connection. The request returns after the code has been transmitted to
-    /// the network.
+    /// Send a code that the call manager or remote audio gateway peer should
+    /// transmit to its network connection. The request returns after the code
+    /// has been transmitted to the network.
     ///
-    /// Can return an error if the call manager failed to transmit the code to
-    /// the network.
+    /// Can return an error if the call manager or peer failed to transmit the
+    /// code to the network.
     SendDtmfCode(struct {
         code DtmfCode;
     }) -> () error zx.Status;

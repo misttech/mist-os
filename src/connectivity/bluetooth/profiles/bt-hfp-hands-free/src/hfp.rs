@@ -4,7 +4,9 @@
 
 use anyhow::{format_err, Error};
 use fidl_fuchsia_bluetooth_bredr as bredr;
+use fidl_fuchsia_bluetooth_hfp as fidl_hfp;
 use fuchsia_bluetooth::types::PeerId;
+use futures::channel::mpsc;
 use futures::StreamExt;
 use profile_client::{ProfileClient, ProfileEvent};
 use std::collections::hash_map::{Entry, HashMap};
@@ -27,6 +29,7 @@ impl Hfp {
         profile_client: ProfileClient,
         profile_svc: bredr::ProfileProxy,
         config: HandsFreeFeatureSupport,
+        _hfp_stream_receiver: mpsc::Receiver<fidl_hfp::HandsFreeRequestStream>,
     ) -> Self {
         Self { profile_client, profile_svc, config, peers: HashMap::new() }
     }
@@ -69,7 +72,9 @@ mod tests {
                 .expect("Create new profile connection");
         let profile = register(proxy.clone(), HandsFreeFeatureSupport::default())
             .expect("ProfileClient Success.");
-        let hfp = Hfp::new(profile, proxy, HandsFreeFeatureSupport::default());
+        let (_call_client_sender, call_client_receiver) = mpsc::channel(0);
+        let hfp =
+            Hfp::new(profile, proxy, HandsFreeFeatureSupport::default(), call_client_receiver);
         let request = stream.next().await.unwrap().expect("FIDL request is OK");
         let (_responder, receiver) = match request {
             Advertise { receiver, responder, .. } => (responder, receiver.into_proxy().unwrap()),
@@ -88,7 +93,9 @@ mod tests {
                 .expect("Create new profile connection");
         let profile = register(proxy.clone(), HandsFreeFeatureSupport::default())
             .expect("ProfileClient Success.");
-        let hfp = Hfp::new(profile, proxy, HandsFreeFeatureSupport::default());
+        let (_call_client_sender, call_client_receiver) = mpsc::channel(0);
+        let hfp =
+            Hfp::new(profile, proxy, HandsFreeFeatureSupport::default(), call_client_receiver);
         let request = stream.next().await.unwrap().expect("FIDL request is OK");
         match request {
             Advertise { responder, .. } => {

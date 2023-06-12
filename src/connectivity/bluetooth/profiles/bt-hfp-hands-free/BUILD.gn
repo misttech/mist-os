@@ -14,9 +14,12 @@ rustc_binary("bin") {
   deps = [
     ":hfp_hands_free_profile_config",
     "//sdk/fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_rust",
+    "//sdk/fidl/fuchsia.bluetooth.hfp:fuchsia.bluetooth.hfp_rust",
     "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
     "//src/connectivity/bluetooth/lib/profile-client",
     "//src/connectivity/lib/at-commands",
+    "//src/lib/diagnostics/inspect/runtime/rust",
+    "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
@@ -35,6 +38,7 @@ rustc_binary("bin") {
   sources = [
     "src/config.rs",
     "src/features.rs",
+    "src/fidl_service.rs",
     "src/hfp.rs",
     "src/main.rs",
     "src/peer.rs",
