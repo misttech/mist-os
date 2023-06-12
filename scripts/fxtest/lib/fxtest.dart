@@ -13,6 +13,7 @@ export 'exceptions.dart';
 export 'execution_handle.dart';
 export 'matching/matching.dart';
 export 'output/output.dart';
+export 'package_manifest_list.dart';
 export 'package_repository.dart';
 export 'package_url.dart';
 export 'rebuilder.dart';

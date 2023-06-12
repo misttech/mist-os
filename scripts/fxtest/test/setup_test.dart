@@ -417,7 +417,7 @@ void main() {
     final fxEnv = FakeFxEnv(fuchsiaDir: fakeDir.path);
     File('${fxEnv.outputDir}/all_package_manifests.list')
       ..createSync(recursive: true)
-      ..writeAsStringSync("");
+      ..writeAsStringSync('{"version":"1","content":{"manifests":[]}}');
 
     var testsConfig = TestsConfig.fromRawArgs(
       rawArgs: [],
