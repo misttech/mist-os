@@ -41,46 +41,6 @@ group("tests") {
   }
 }
 
-# TODO(fxbug.dev/102390): Delete all these tests
-group("legacy_tests") {
-  testonly = true
-
-  deps = [
-    ":appmgr-cpu-stats-tests",
-    ":appmgr-log-tests",
-  ]
-}
-
-fuchsia_unittest_package("appmgr-log-tests") {
-  manifest = "meta/appmgr_log_tests.cml"
-
-  test_specs = {
-    environments = [
-      emu_env,
-      {
-        dimensions = {
-          device_type = "Astro"
-        }
-      },
-    ]
-  }
-}
-
-fuchsia_unittest_package("appmgr-cpu-stats-tests") {
-  manifest = "meta/appmgr_cpu_stats_tests.cml"
-
-  test_specs = {
-    environments = [
-      emu_env,
-      {
-        dimensions = {
-          device_type = "Astro"
-        }
-      },
-    ]
-  }
-}
-
 fuchsia_unittest_package("fshost-metrics-tests") {
   manifest = "meta/fshost_metrics_tests.cml"
 

@@ -36,14 +36,3 @@ group("tests") {
     "tools:tests",
   ]
 }
-
-# TODO(fxbug.dev/102390): Delete all these tests
-group("legacy_tests") {
-  testonly = true
-  deps = [
-    "appmgr:legacy_tests",
-    "test_manager:legacy_tests",
-    "//src/modular/bin/basemgr:legacy_tests",
-    "//src/tests/diagnostics:legacy_tests",
-  ]
-}

@@ -71,27 +71,6 @@ rustc_test("test_manager_specified_realm_bin") {
   sources = [ "src/specified_realm_test.rs" ]
 }
 
-rustc_test("test_manager_legacy_test_bin") {
-  edition = "2021"
-  name = "test_manager_legacy_test"
-  source_root = "src/legacy_tests.rs"
-  deps = [
-    "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_rust",
-    "//src/lib/fuchsia",
-    "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-component",
-    "//src/sys/test_manager:test_lib",
-    "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:pretty_assertions",
-  ]
-
-  sources = [ "src/legacy_tests.rs" ]
-
-  inputs = [
-    "//src/sys/test_runners/gtest/test_data/sample_tests_golden_events.rsf",
-  ]
-}
-
 fuchsia_test_component("test_manager_test_component") {
   component_name = "test_manager_test"
   manifest = "meta/test_manager_test.cml"
@@ -158,36 +137,6 @@ fuchsia_test_package("test_manager_stress_test") {
   deps = [ "test_data:debug_data_spam_test" ]
 
   subpackages = [ "//src/sys/test_manager:pkg" ]
-}
-
-fuchsia_test_component("test_manager_legacy_test_component") {
-  component_name = "test_manager_legacy_test"
-  manifest = "meta/test_manager_legacy_test.cml"
-  deps = [ ":test_manager_legacy_test_bin" ]
-  test_type = "test_arch"
-}
-
-fuchsia_test_package("test_manager_legacy_test") {
-  test_components = [ ":test_manager_legacy_test_component" ]
-  deps = [ "test_data:test_data_v1" ]
-
-  subpackages = [ "//src/sys/test_manager:pkg" ]
-
-  # There's expected error logs that happen during the test such as not resolving an instance when
-  # testing that we fail to execute a test with an unknown URL.
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-}
-
-group("legacy_tests") {
-  testonly = true
-  deps = [
-    ":test_manager_legacy_test",
-    "//src/sys/test_runners/gtest/test_data:gtest-runner-example-tests",
-  ]
 }
 
 group("tests") {

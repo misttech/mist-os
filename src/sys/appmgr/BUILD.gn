@@ -168,50 +168,6 @@ executable("bin") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("unittest_bin") {
-  testonly = true
-
-  output_name = "appmgr_unittests"
-
-  sources = [
-    "allow_list_unittest.cc",
-    "component_controller_unittest.cc",
-    "component_id_index_unittest.cc",
-    "cpu_watcher_unittest.cc",
-    "hub/hub_holder_unittest.cc",
-    "log_connector_impl_unittest.cc",
-    "moniker_unittest.cc",
-    "namespace_builder_unittest.cc",
-    "namespace_unittest.cc",
-    "policy_checker_unittest.cc",
-    "scheme_map_unittest.cc",
-    "service_provider_dir_unittest.cc",
-    "storage_metrics_unittest.cc",
-    "storage_unittest.cc",
-    "util_unittest.cc",
-  ]
-
-  deps = [
-    ":appmgr_for_test",
-    ":lib",
-    "//sdk/fidl/fuchsia.sys.internal:fuchsia.sys.internal_hlcpp",
-    "//sdk/lib/fit-promise",
-    "//sdk/lib/sys/cpp",
-    "//sdk/lib/sys/cpp/testing:unit",
-    "//sdk/lib/vfs/cpp",
-    "//src/lib/fxl/test:gtest_main",
-    "//src/lib/testing/loop_fixture",
-    "//src/storage/memfs:cpp",
-    "//src/testing/fidl:placeholders_hlcpp",
-    "//third_party/googletest:gmock",
-    "//zircon/system/public",
-    "//zircon/system/ulib/zx",
-  ]
-
-  # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
-}
-
 fuchsia_package_with_single_component("appmgr") {
   manifest = "meta/appmgr.cml"
   deps = [ ":bin" ]
@@ -254,28 +210,4 @@ executable("test_component_using_storage_bin") {
 fuchsia_component("test_component_using_storage") {
   deps = [ ":test_component_using_storage_bin" ]
   manifest = "meta/test_component_using_storage.cmx"
-}
-
-fuchsia_unittest_package("appmgr_unittests") {
-  deps = [
-    ":test_component_using_storage",
-    ":unittest_bin",
-    "//third_party/sbase:sleep_bin",
-  ]
-
-  manifest = "meta/appmgr_unittests.cmx"
-
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-}
-
-group("legacy_tests") {
-  testonly = true
-  deps = [
-    ":appmgr_unittests",
-    "integration_tests",
-  ]
 }
