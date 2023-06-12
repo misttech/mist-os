@@ -31,6 +31,7 @@
       {
         "name": "AllProjectsMustHaveALicense",
         "allowlist": {
+          "prebuilt/drivers/wlan/intel/iwlwifi": true,
           "prebuilt/audio/config": true,
           "prebuilt/audio/config/tas2770": true,
           "prebuilt/camera/arm/gdc/configs": true,

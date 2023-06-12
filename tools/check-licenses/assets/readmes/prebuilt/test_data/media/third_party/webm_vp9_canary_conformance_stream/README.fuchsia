@@ -2,6 +2,7 @@ Name: VP9 Decoder Performance Tests
 URL: https://www.webmproject.org/vp9/levels/
 LICENSE: https://www.webmproject.org/license/
 License File: LICENSE
+Description:
 
 These are VP9 decode conformance test files.
 
