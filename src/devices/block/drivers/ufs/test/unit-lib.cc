@@ -12,30 +12,6 @@
 
 namespace ufs {
 
-namespace {
-// Recursively unbind and release all devices.
-zx_status_t ProcessDeviceRemoval(MockDevice *device) {
-  device->UnbindOp();
-  // deleting children, so use a while loop:
-  while (!device->children().empty()) {
-    // Only stop the dispatcher before calling the final ReleaseOp.
-    auto status = ProcessDeviceRemoval(device->children().back().get());
-    if (status != ZX_OK) {
-      return status;
-    }
-  }
-  if (device->HasUnbindOp()) {
-    zx_status_t status = device->WaitUntilUnbindReplyCalled();
-    if (status != ZX_OK) {
-      return status;
-    }
-  }
-
-  device->ReleaseOp();
-  return ZX_OK;
-}
-}  // namespace
-
 void UfsTest::SetUp() {
   fake_root_ = MockDevice::FakeRootParent();
 
@@ -66,7 +42,10 @@ void UfsTest::RunInit() {
   ASSERT_OK(device_->InitReplyCallStatus());
 }
 
-void UfsTest::TearDown() { ProcessDeviceRemoval(device_); }
+void UfsTest::TearDown() {
+  device_async_remove(device_);
+  EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(device_));
+}
 
 zx::result<> UfsTest::SendCommand(uint8_t slot, TransferRequestDescriptorDataDirection ddir,
                                   uint16_t resp_offset, uint16_t resp_len, uint16_t prdt_offset,

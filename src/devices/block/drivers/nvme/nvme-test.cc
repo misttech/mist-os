@@ -18,29 +18,6 @@
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace nvme {
-namespace {
-// Recursively unbind and release all devices.
-zx_status_t ProcessDeviceRemoval(MockDevice* device) {
-  device->UnbindOp();
-  // deleting children, so use a while loop:
-  while (!device->children().empty()) {
-    // Only stop the dispatcher before calling the final ReleaseOp.
-    auto status = ProcessDeviceRemoval(device->children().back().get());
-    if (status != ZX_OK) {
-      return status;
-    }
-  }
-  if (device->HasUnbindOp()) {
-    zx_status_t status = device->WaitUntilUnbindReplyCalled();
-    if (status != ZX_OK) {
-      return status;
-    }
-  }
-
-  device->ReleaseOp();
-  return ZX_OK;
-}
-}  // namespace
 
 class NvmeTest : public inspect::InspectTestHelper, public zxtest::Test {
  public:
@@ -73,7 +50,10 @@ class NvmeTest : public inspect::InspectTestHelper, public zxtest::Test {
     ASSERT_OK(device_->InitReplyCallStatus());
   }
 
-  void TearDown() override { ProcessDeviceRemoval(device_); }
+  void TearDown() override {
+    device_async_remove(device_);
+    EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(device_));
+  }
 
   void CheckStringPropertyPrefix(const inspect::NodeValue& node, const std::string& property,
                                  const char* expected) {
