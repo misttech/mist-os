@@ -57,7 +57,6 @@ USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "omaha_client",
     "radar_proxy_without_injector",
     "session_manager",
-    "starnix_support",
     "ui",
     "ui_legacy",
     "ui_legacy_package_user_and_userdebug",
@@ -73,6 +72,9 @@ USER_PLATFORM_AIB_NAMES_EXCLUDED_FROM_RISCV64 = [
     # The following are not currently supported on RISC-V. They must be added
     # separately to each list that (indirectly) builds on
     # USER_PLATFORM_AIB_NAMES_RISCV64.
+
+    # TODO(fxbug.dev/128554): Move to the list above once build errors are resolved.
+    "starnix_support",
 
     # TODO(fxbug.dev/128551): Move to the list above once build errors are
     # resolved and/or define a formal mechanism for AIBs to vary across

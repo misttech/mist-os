@@ -100,8 +100,6 @@ user_platform_aib_names =
       # Session
       "session_manager",
 
-      "starnix_support",
-
       # ICU-specific version of intl_services
       "intl_services.icu_default_${icu_git_info.default}",
       "intl_services.icu_latest_${icu_git_info.latest}",
@@ -121,9 +119,14 @@ user_platform_aib_names =
       "fan",
     ]
 
-# TODO(fxbug.dev/128551): Move to the list above once build errors are resolved.
 if (current_cpu != "riscv64") {
-  user_platform_aib_names += [ "virtualization_support" ]
+  user_platform_aib_names += [
+    # TODO(fxbug.dev/128554):: Move to the list above once build errors are resolved.
+    "starnix_support",
+
+    # TODO(fxbug.dev/128551): Move to the list above once build errors are resolved.
+    "virtualization_support",
+  ]
 }
 
 # LINT.ThenChange(platform_aib_names.bzl)
