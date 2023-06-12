@@ -16,13 +16,14 @@
 
 static constexpr size_t kStateVmoSize = PAGE_SIZE;
 
-zx::result<ktl::unique_ptr<RestrictedState>> RestrictedState::Create() {
+zx::result<ktl::unique_ptr<RestrictedState>> RestrictedState::Create(
+    fbl::RefPtr<AttributionObject> attribution_object) {
   // Create a VMO.
   static constexpr uint32_t kVmoOptions = 0;
   static constexpr uint32_t kPmmAllocFlags = PMM_ALLOC_FLAG_ANY | PMM_ALLOC_FLAG_CAN_WAIT;
   fbl::RefPtr<VmObjectPaged> state_vmo;
-  zx_status_t status =
-      VmObjectPaged::Create(kPmmAllocFlags, kVmoOptions, kStateVmoSize, &state_vmo);
+  zx_status_t status = VmObjectPaged::Create(kPmmAllocFlags, kVmoOptions, kStateVmoSize,
+                                             ktl::move(attribution_object), &state_vmo);
   if (status != ZX_OK) {
     return zx::error_result(status);
   }

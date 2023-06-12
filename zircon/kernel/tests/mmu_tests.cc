@@ -505,7 +505,8 @@ static bool test_large_region_atomic() {
     fbl::RefPtr<VmObjectPaged> vmo;
 
     zx_status_t status =
-        VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kAlwaysPinned, alloc_size, &vmo);
+        VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kAlwaysPinned, alloc_size,
+                              AttributionObject::GetKernelAttribution(), &vmo);
     ASSERT_OK(status);
 
     const uint arch_rw_flags = ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE;

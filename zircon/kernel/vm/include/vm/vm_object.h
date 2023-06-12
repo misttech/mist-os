@@ -550,7 +550,9 @@ class VmObject : public VmHierarchyBase,
   // create a copy-on-write clone vmo at the page-aligned offset and length
   // note: it's okay to start or extend past the size of the parent
   virtual zx_status_t CreateClone(Resizability resizable, CloneType type, uint64_t offset,
-                                  uint64_t size, bool copy_name, fbl::RefPtr<VmObject>* child_vmo) {
+                                  uint64_t size, bool copy_name,
+                                  fbl::RefPtr<AttributionObject> attribution_object,
+                                  fbl::RefPtr<VmObject>* child_vmo) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 

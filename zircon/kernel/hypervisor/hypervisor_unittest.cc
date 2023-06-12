@@ -46,7 +46,8 @@ static zx::result<hypervisor::GuestPhysicalAspace> create_gpas() {
 }
 
 static zx_status_t create_vmo(size_t vmo_size, fbl::RefPtr<VmObjectPaged>* vmo) {
-  return VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, vmo_size, vmo);
+  return VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, vmo_size,
+                               AttributionObject::GetKernelAttribution(), vmo);
 }
 
 static zx_status_t commit_vmo(fbl::RefPtr<VmObjectPaged> vmo) {

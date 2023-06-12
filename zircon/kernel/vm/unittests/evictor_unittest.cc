@@ -142,14 +142,16 @@ static zx_status_t create_precommitted_pager_backed_vmo(uint64_t size,
   }
 
   fbl::RefPtr<VmObjectPaged> vmo;
-  zx_status_t status = VmObjectPaged::CreateExternal(ktl::move(src), 0u, size, &vmo);
+  zx_status_t status = VmObjectPaged::CreateExternal(
+      ktl::move(src), 0u, size, AttributionObject::GetKernelAttribution(), &vmo);
   if (status != ZX_OK) {
     return status;
   }
 
   // Create an aux VMO to transfer pages into the pager-backed vmo.
   fbl::RefPtr<VmObjectPaged> aux_vmo;
-  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, size, &aux_vmo);
+  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, size,
+                                 AttributionObject::GetKernelAttribution(), &aux_vmo);
   if (status != ZX_OK) {
     return status;
   }
@@ -265,8 +267,8 @@ static bool evictor_pager_backed_test() {
 static zx_status_t create_committed_unlocked_discardable_vmo(uint64_t size,
                                                              fbl::RefPtr<VmObjectPaged>* vmo_out) {
   fbl::RefPtr<VmObjectPaged> vmo;
-  zx_status_t status =
-      VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kDiscardable, size, &vmo);
+  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kDiscardable, size,
+                                             AttributionObject::GetKernelAttribution(), &vmo);
   if (status != ZX_OK) {
     return status;
   }

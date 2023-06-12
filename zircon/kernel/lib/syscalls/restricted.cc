@@ -50,7 +50,8 @@ zx_status_t sys_restricted_bind_state(uint32_t options, user_out_handle* out) {
   }
 
   // Create it.
-  zx::result<ktl::unique_ptr<RestrictedState>> result = RestrictedState::Create();
+  zx::result<ktl::unique_ptr<RestrictedState>> result =
+      RestrictedState::Create(up->attribution_object());
   if (result.is_error()) {
     return result.error_value();
   }

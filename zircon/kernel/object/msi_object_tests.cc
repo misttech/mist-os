@@ -223,10 +223,12 @@ bool interrupt_vmo_test() {
   {
     fbl::RefPtr<VmObjectPaged> vmo, vmo_noncontig;
     size_t vmo_size = sizeof(MsiCapability);
+    ASSERT_EQ(ZX_OK, VmObjectPaged::CreateContiguous(
+                         PMM_ALLOC_FLAG_ANY, vmo_size,
+                         /*alignment_log2=*/0, AttributionObject::GetKernelAttribution(), &vmo));
     ASSERT_EQ(ZX_OK,
-              VmObjectPaged::CreateContiguous(PMM_ALLOC_FLAG_ANY, vmo_size, /*options=*/0, &vmo));
-    ASSERT_EQ(ZX_OK,
-              VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, /*options=*/0, vmo_size, &vmo_noncontig));
+              VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, /*options=*/0, vmo_size,
+                                    AttributionObject::GetKernelAttribution(), &vmo_noncontig));
 
     // This should fail because the VMO is non-contiguous.
     ASSERT_EQ(ZX_ERR_INVALID_ARGS,

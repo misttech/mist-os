@@ -97,7 +97,8 @@ zx_status_t sys_pager_create_vmo(zx_handle_t pager, uint32_t options, zx_handle_
   }
 
   fbl::RefPtr<VmObjectPaged> vmo;
-  status = VmObjectPaged::CreateExternal(ktl::move(src), vmo_options, size, &vmo);
+  status = VmObjectPaged::CreateExternal(ktl::move(src), vmo_options, size,
+                                         up->attribution_object(), &vmo);
   if (status != ZX_OK) {
     return status;
   }

@@ -82,12 +82,14 @@ KernelMappedVmo gSancovPcVmo, gSancovCountsVmo;
 
 void InitSancov(uint level) {
   fbl::RefPtr<VmObjectPaged> vmo;
-  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, DataSize(), &vmo);
+  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, DataSize(),
+                                             AttributionObject::GetKernelAttribution(), &vmo);
   ZX_ASSERT(status == ZX_OK);
   status = gSancovPcVmo.Init(ktl::move(vmo), 0, DataSize(), "sancov-pc-table");
   ZX_ASSERT(status == ZX_OK);
 
-  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, DataSize(), &vmo);
+  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, DataSize(),
+                                 AttributionObject::GetKernelAttribution(), &vmo);
   ZX_ASSERT(status == ZX_OK);
   status = gSancovCountsVmo.Init(ktl::move(vmo), 0, DataSize(), "sancov-pc-counts-table");
   ZX_ASSERT(status == ZX_OK);

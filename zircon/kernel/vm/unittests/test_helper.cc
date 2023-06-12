@@ -20,7 +20,8 @@ zx_status_t AllocUser(VmAspace* aspace, const char* name, size_t size, user_inou
   }
 
   fbl::RefPtr<VmObjectPaged> vmo;
-  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, size, &vmo);
+  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, size,
+                                             AttributionObject::GetKernelAttribution(), &vmo);
   if (status != ZX_OK) {
     return status;
   }
@@ -56,7 +57,8 @@ zx_status_t make_uncommitted_pager_vmo(size_t num_pages, bool trap_dirty, bool r
 
   fbl::RefPtr<VmObjectPaged> vmo;
   zx_status_t status = VmObjectPaged::CreateExternal(
-      ktl::move(src), resizable ? VmObjectPaged::kResizable : 0, num_pages * PAGE_SIZE, &vmo);
+      ktl::move(src), resizable ? VmObjectPaged::kResizable : 0, num_pages * PAGE_SIZE,
+      AttributionObject::GetKernelAttribution(), &vmo);
   if (status != ZX_OK) {
     return status;
   }
@@ -80,7 +82,8 @@ zx_status_t make_committed_pager_vmo(size_t num_pages, bool trap_dirty, bool res
   }
 
   fbl::RefPtr<VmObjectPaged> aux_vmo;
-  status = VmObjectPaged::Create(0, 0, num_pages * PAGE_SIZE, &aux_vmo);
+  status = VmObjectPaged::Create(0, 0, num_pages * PAGE_SIZE,
+                                 AttributionObject::GetKernelAttribution(), &aux_vmo);
   if (status != ZX_OK) {
     return status;
   }

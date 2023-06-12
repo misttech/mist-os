@@ -785,7 +785,8 @@ static bool pq_add_remove() {
 
   // Need a VMO to claim our pages are in
   fbl::RefPtr<VmObjectPaged> vmo;
-  zx_status_t status = VmObjectPaged::Create(0, 0, PAGE_SIZE, &vmo);
+  zx_status_t status =
+      VmObjectPaged::Create(0, 0, PAGE_SIZE, AttributionObject::GetKernelAttribution(), &vmo);
   ASSERT_EQ(ZX_OK, status);
 
   // Put the page in each queue and make sure it shows up
@@ -844,7 +845,8 @@ static bool pq_move_queues() {
 
   // Need a VMO to claim our pages are in
   fbl::RefPtr<VmObjectPaged> vmo;
-  zx_status_t status = VmObjectPaged::Create(0, 0, PAGE_SIZE, &vmo);
+  zx_status_t status =
+      VmObjectPaged::Create(0, 0, PAGE_SIZE, AttributionObject::GetKernelAttribution(), &vmo);
   ASSERT_EQ(ZX_OK, status);
 
   // Move the page between queues.
@@ -910,7 +912,8 @@ static bool pq_move_self_queue() {
 
   // Need a VMO to claim our pages are in
   fbl::RefPtr<VmObjectPaged> vmo;
-  zx_status_t status = VmObjectPaged::Create(0, 0, PAGE_SIZE, &vmo);
+  zx_status_t status =
+      VmObjectPaged::Create(0, 0, PAGE_SIZE, AttributionObject::GetKernelAttribution(), &vmo);
   ASSERT_EQ(ZX_OK, status);
 
   // Move the page into the queue it is already in.

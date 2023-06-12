@@ -40,7 +40,8 @@ InstrumentationDataVmo LlvmProfdataVmo() {
 
   // Create a VMO to hold the whole profdata dump.
   fbl::RefPtr<VmObjectPaged> vmo;
-  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, profdata.size_bytes(), &vmo);
+  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, profdata.size_bytes(),
+                                             AttributionObject::GetKernelAttribution(), &vmo);
   ZX_ASSERT(status == ZX_OK);
 
   // First fill in just the fixed data, by mapping the whole VMO into the

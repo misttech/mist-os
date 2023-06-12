@@ -138,9 +138,12 @@ zx_status_t KernelStack::Init() {
   // mapped addresses.
   // Using a single VMO reduces bookkeeping memory overhead with no downside, since all stacks have
   // exactly the same lifetime.
+  // TODO(fxbug.dev/128913): VMOs containing kernel stacks for user threads should be linked to the
+  // attribution objects of the corresponding processes.
   fbl::RefPtr<VmObjectPaged> stack_vmo;
   zx_status_t status =
-      VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kAlwaysPinned, vmo_size, &stack_vmo);
+      VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kAlwaysPinned, vmo_size,
+                            AttributionObject::GetKernelAttribution(), &stack_vmo);
   if (status != ZX_OK) {
     LTRACEF("error allocating kernel stacks for thread\n");
     return status;

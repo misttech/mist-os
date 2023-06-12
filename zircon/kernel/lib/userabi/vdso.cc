@@ -373,7 +373,8 @@ void VDso::CreateVariant(Variant variant, KernelHandle<VmObjectDispatcher>* vmo_
   }
 
   fbl::RefPtr<VmObject> new_vmo;
-  zx_status_t status = vmo()->CreateChild(ZX_VMO_CHILD_SNAPSHOT, 0, size(), false, &new_vmo);
+  zx_status_t status = vmo()->CreateChild(ZX_VMO_CHILD_SNAPSHOT, 0, size(), false,
+                                          AttributionObject::GetKernelAttribution(), &new_vmo);
   ASSERT(status == ZX_OK);
 
   VDsoMutator mutator{new_vmo};

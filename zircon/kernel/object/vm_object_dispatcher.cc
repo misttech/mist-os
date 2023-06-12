@@ -391,8 +391,9 @@ zx_status_t VmObjectDispatcher::SetMappingCachePolicy(uint32_t cache_policy) {
   return vmo_->SetMappingCachePolicy(cache_policy);
 }
 
-zx_status_t VmObjectDispatcher::CreateChild(uint32_t options, uint64_t offset, uint64_t size,
-                                            bool copy_name, fbl::RefPtr<VmObject>* child_vmo) {
+zx_status_t VmObjectDispatcher::CreateChild(
+    uint32_t options, uint64_t offset, uint64_t size, bool copy_name,
+    const fbl::RefPtr<AttributionObject>& attribution_object, fbl::RefPtr<VmObject>* child_vmo) {
   canary_.Assert();
 
   LTRACEF("options 0x%x offset %#" PRIx64 " size %#" PRIx64 "\n", options, offset, size);
@@ -448,5 +449,5 @@ zx_status_t VmObjectDispatcher::CreateChild(uint32_t options, uint64_t offset, u
   if (options)
     return ZX_ERR_INVALID_ARGS;
 
-  return vmo_->CreateClone(resizable, type, offset, size, copy_name, child_vmo);
+  return vmo_->CreateClone(resizable, type, offset, size, copy_name, attribution_object, child_vmo);
 }

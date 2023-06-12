@@ -1097,7 +1097,8 @@ zx_status_t VmAddressRegion::ReserveSpace(const char* name, vaddr_t base, size_t
   // physical pages and we would never modify the PTE except for the permission change bellow
   // caused by Protect.
   fbl::RefPtr<VmObjectPaged> vmo;
-  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, 0, &vmo);
+  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, 0,
+                                             AttributionObject::GetKernelAttribution(), &vmo);
   if (status != ZX_OK) {
     return status;
   }

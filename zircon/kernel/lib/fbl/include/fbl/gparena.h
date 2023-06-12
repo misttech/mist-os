@@ -160,7 +160,8 @@ class __OWNER(void) GPArena {
     const size_t mem_sz = ROUNDUP(max_count * ObjectSize, PAGE_SIZE);
 
     fbl::RefPtr<VmObjectPaged> vmo;
-    zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, mem_sz, &vmo);
+    zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, mem_sz,
+                                               AttributionObject::GetKernelAttribution(), &vmo);
     if (status != ZX_OK) {
       return status;
     }

@@ -154,8 +154,9 @@ void gdt_setup() {
   constexpr size_t gdt_size = 0x10000;
 
   fbl::RefPtr<VmObjectPaged> vmo;
-  zx_status_t status = VmObjectPaged::Create(
-      PMM_ALLOC_FLAG_ANY, /*options*/ VmObjectPaged::kAlwaysPinned, gdt_size, &vmo);
+  zx_status_t status =
+      VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, /*options*/ VmObjectPaged::kAlwaysPinned, gdt_size,
+                            AttributionObject::GetKernelAttribution(), &vmo);
   ASSERT(status == ZX_OK);
 
   status = vmo->Write(_temp_gdt, 0, gdt_real_size);  // Copy the temporary gdt.

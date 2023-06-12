@@ -26,7 +26,8 @@ Handle* MakePhysVmo(const PhysVmo& phys_vmo) {
 
   // Create a VMO to hold the whole dump.
   fbl::RefPtr<VmObjectPaged> vmo;
-  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, contents.size_bytes(), &vmo);
+  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, contents.size_bytes(),
+                                             AttributionObject::GetKernelAttribution(), &vmo);
   ZX_ASSERT(status == ZX_OK);
 
   status = vmo->Write(contents.data(), 0, contents.size_bytes());

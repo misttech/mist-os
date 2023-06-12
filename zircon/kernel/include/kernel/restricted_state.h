@@ -20,6 +20,7 @@
 // Per thread state to support restricted mode.
 // Intentionally kept simple to keep the amount of kernel/thread.h dependencies to a minimum.
 
+class AttributionObject;
 class VmObjectPaged;
 class VmMapping;
 
@@ -32,7 +33,8 @@ class VmMapping;
 // since there is no internal locking for efficiency reasons.
 class RestrictedState {
  public:
-  static zx::result<ktl::unique_ptr<RestrictedState>> Create();
+  static zx::result<ktl::unique_ptr<RestrictedState>> Create(
+      fbl::RefPtr<AttributionObject> attribution_object);
 
   ~RestrictedState();
   DISALLOW_COPY_ASSIGN_AND_MOVE(RestrictedState);

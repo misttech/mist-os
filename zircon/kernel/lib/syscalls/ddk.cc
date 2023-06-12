@@ -92,7 +92,8 @@ zx_status_t sys_vmo_create_contiguous(zx_handle_t bti, size_t size, uint32_t ali
 
   // create a vm object
   fbl::RefPtr<VmObjectPaged> vmo;
-  status = VmObjectPaged::CreateContiguous(PMM_ALLOC_FLAG_ANY, size, align_log2_arg, &vmo);
+  status = VmObjectPaged::CreateContiguous(PMM_ALLOC_FLAG_ANY, size, align_log2_arg,
+                                           up->attribution_object(), &vmo);
   if (status != ZX_OK) {
     return status;
   }

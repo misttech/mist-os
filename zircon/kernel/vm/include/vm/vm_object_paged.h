@@ -41,13 +41,16 @@ class VmObjectPaged final : public VmObject {
   static constexpr uint32_t kCanBlockOnPageRequests = (1u << 31);
 
   static zx_status_t Create(uint32_t pmm_alloc_flags, uint32_t options, uint64_t size,
+                            fbl::RefPtr<AttributionObject> attribution_object,
                             fbl::RefPtr<VmObjectPaged>* vmo);
 
   // Create a VMO backed by a contiguous range of physical memory.  The
   // returned vmo has all of its pages committed, and does not allow
   // decommitting them.
   static zx_status_t CreateContiguous(uint32_t pmm_alloc_flags, uint64_t size,
-                                      uint8_t alignment_log2, fbl::RefPtr<VmObjectPaged>* vmo);
+                                      uint8_t alignment_log2,
+                                      fbl::RefPtr<AttributionObject> attribution_object,
+                                      fbl::RefPtr<VmObjectPaged>* vmo);
 
   // Creates a VMO from wired pages.
   //
@@ -59,9 +62,11 @@ class VmObjectPaged final : public VmObject {
   // the pages. If exclusive is true, then [data, data + size) will be unmapped from the
   // kernel address space (unless they lie in the physmap).
   static zx_status_t CreateFromWiredPages(const void* data, size_t size, bool exclusive,
+                                          fbl::RefPtr<AttributionObject> attribution_object,
                                           fbl::RefPtr<VmObjectPaged>* vmo);
 
   static zx_status_t CreateExternal(fbl::RefPtr<PageSource> src, uint32_t options, uint64_t size,
+                                    fbl::RefPtr<AttributionObject> attribution_object,
                                     fbl::RefPtr<VmObjectPaged>* vmo);
 
   zx_status_t Resize(uint64_t size) override;
@@ -221,7 +226,8 @@ class VmObjectPaged final : public VmObject {
   }
 
   zx_status_t CreateClone(Resizability resizable, CloneType type, uint64_t offset, uint64_t size,
-                          bool copy_name, fbl::RefPtr<VmObject>* child_vmo) override;
+                          bool copy_name, fbl::RefPtr<AttributionObject> attribution_object,
+                          fbl::RefPtr<VmObject>* child_vmo) override;
 
   zx_status_t CacheOp(uint64_t offset, uint64_t len, CacheOpType type) override;
 
@@ -326,9 +332,11 @@ class VmObjectPaged final : public VmObject {
   VmObjectPaged(uint32_t options, fbl::RefPtr<VmHierarchyState> root_state);
 
   static zx_status_t CreateCommon(uint32_t pmm_alloc_flags, uint32_t options, uint64_t size,
+                                  fbl::RefPtr<AttributionObject> attribution_object,
                                   fbl::RefPtr<VmObjectPaged>* vmo);
   static zx_status_t CreateWithSourceCommon(fbl::RefPtr<PageSource> src, uint32_t pmm_alloc_flags,
                                             uint32_t options, uint64_t size,
+                                            fbl::RefPtr<AttributionObject> attribution_object,
                                             fbl::RefPtr<VmObjectPaged>* obj);
 
   // private destructor, only called from refptr

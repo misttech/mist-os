@@ -436,7 +436,8 @@ zx_status_t VmAspace::AllocContiguous(const char* name, size_t size, void** ptr,
 
   // create a vm object to back it
   fbl::RefPtr<VmObjectPaged> vmo;
-  zx_status_t status = VmObjectPaged::CreateContiguous(PMM_ALLOC_FLAG_ANY, size, align_pow2, &vmo);
+  zx_status_t status = VmObjectPaged::CreateContiguous(
+      PMM_ALLOC_FLAG_ANY, size, align_pow2, AttributionObject::GetKernelAttribution(), &vmo);
   if (status != ZX_OK) {
     return status;
   }
@@ -459,7 +460,8 @@ zx_status_t VmAspace::Alloc(const char* name, size_t size, void** ptr, uint8_t a
 
   // allocate a vm object to back it
   fbl::RefPtr<VmObjectPaged> vmo;
-  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, size, &vmo);
+  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, size,
+                                             AttributionObject::GetKernelAttribution(), &vmo);
   if (status != ZX_OK) {
     return status;
   }
