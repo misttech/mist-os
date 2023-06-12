@@ -15,41 +15,65 @@ namespace display {
 
 namespace {
 
-TEST(DisplayId, Equality) {
-  constexpr DisplayId kOne(1);
-  constexpr DisplayId kAnotherOne(1);
-  constexpr DisplayId kTwo(2);
+constexpr DisplayId kOne(1);
+constexpr DisplayId kAnotherOne(1);
+constexpr DisplayId kTwo(2);
 
+constexpr uint64_t kLargeIdValue = uint64_t{1} << 63;
+constexpr DisplayId kLargeId(kLargeIdValue);
+
+TEST(DisplayIdTest, EqualityIsReflexive) {
   EXPECT_EQ(kOne, kOne);
+  EXPECT_EQ(kAnotherOne, kAnotherOne);
+  EXPECT_EQ(kTwo, kTwo);
+}
+
+TEST(DisplayIdTest, EqualityIsSymmetric) {
   EXPECT_EQ(kOne, kAnotherOne);
+  EXPECT_EQ(kAnotherOne, kOne);
+}
+
+TEST(DisplayIdTest, EqualityForDifferentValues) {
   EXPECT_NE(kOne, kTwo);
-
-  EXPECT_NE(kOne, kInvalidDisplayId);
-  EXPECT_NE(kTwo, kInvalidDisplayId);
-  EXPECT_EQ(kInvalidDisplayId, kInvalidDisplayId);
+  EXPECT_NE(kAnotherOne, kTwo);
+  EXPECT_NE(kTwo, kOne);
+  EXPECT_NE(kTwo, kAnotherOne);
 }
 
-TEST(DisplayId, BanjoConversion) {
-  EXPECT_EQ(ToDisplayId(1), DisplayId(1));
-  EXPECT_EQ(ToDisplayId(1).value(), uint64_t{1});
-  EXPECT_EQ(ToBanjoDisplayId(DisplayId(1)), uint64_t{1});
-
-  const uint64_t kLargeDisplayIdValue = uint64_t{1} << 63;
-  EXPECT_EQ(ToDisplayId(kLargeDisplayIdValue).value(), kLargeDisplayIdValue);
-  EXPECT_EQ(ToBanjoDisplayId(DisplayId(kLargeDisplayIdValue)), kLargeDisplayIdValue);
-
-  EXPECT_EQ(ToDisplayId(INVALID_DISPLAY_ID), kInvalidDisplayId);
-  EXPECT_EQ(ToDisplayId(INVALID_DISPLAY_ID).value(), INVALID_DISPLAY_ID);
-  EXPECT_EQ(ToBanjoDisplayId(kInvalidDisplayId), INVALID_DISPLAY_ID);
+TEST(DisplayIdTest, ToFidlDisplayId) {
+  EXPECT_EQ(1u, ToFidlDisplayId(kOne));
+  EXPECT_EQ(2u, ToFidlDisplayId(kTwo));
+  EXPECT_EQ(kLargeIdValue, ToFidlDisplayId(kLargeId));
 }
 
-TEST(DisplayId, FidlConversion) {
-  EXPECT_EQ(ToFidlDisplayId(DisplayId(1)), uint64_t{1});
+TEST(DisplayIdTest, ToBanjoDisplayId) {
+  EXPECT_EQ(1u, ToBanjoDisplayId(kOne));
+  EXPECT_EQ(2u, ToBanjoDisplayId(kTwo));
+  EXPECT_EQ(kLargeIdValue, ToBanjoDisplayId(kLargeId));
+}
 
-  const uint64_t kLargeDisplayIdValue = uint64_t{1} << 63;
-  EXPECT_EQ(ToFidlDisplayId(DisplayId(kLargeDisplayIdValue)), kLargeDisplayIdValue);
+TEST(DisplayIdTest, ToDisplayIdWithFidlValue) {
+  EXPECT_EQ(kOne, ToDisplayId(1));
+  EXPECT_EQ(kTwo, ToDisplayId(2));
+  EXPECT_EQ(kLargeId, ToDisplayId(kLargeIdValue));
+}
 
-  EXPECT_EQ(ToFidlDisplayId(kInvalidDisplayId), fuchsia_hardware_display::wire::kInvalidDispId);
+TEST(DisplayIdTest, ToDisplayIdWithBanjoValue) {
+  EXPECT_EQ(kOne, ToDisplayId(1));
+  EXPECT_EQ(kTwo, ToDisplayId(2));
+  EXPECT_EQ(kLargeId, ToDisplayId(kLargeIdValue));
+}
+
+TEST(DisplayIdTest, FidlConversionRoundtrip) {
+  EXPECT_EQ(kOne, ToDisplayId(ToFidlDisplayId(kOne)));
+  EXPECT_EQ(kTwo, ToDisplayId(ToFidlDisplayId(kTwo)));
+  EXPECT_EQ(kLargeId, ToDisplayId(ToFidlDisplayId(kLargeId)));
+}
+
+TEST(DisplayIdTest, BanjoConversionRoundtrip) {
+  EXPECT_EQ(kOne, ToDisplayId(ToBanjoDisplayId(kOne)));
+  EXPECT_EQ(kTwo, ToDisplayId(ToBanjoDisplayId(kTwo)));
+  EXPECT_EQ(kLargeId, ToDisplayId(ToBanjoDisplayId(kLargeId)));
 }
 
 }  // namespace
