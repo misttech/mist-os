@@ -17,13 +17,19 @@ mod stub;
 #[cfg(all(not(target_os = "fuchsia"), target_arch = "wasm32"))]
 use self::stub as implementation;
 
+// Exports common to all target os.
 pub use implementation::{
     executor::{Duration, LocalExecutor, SendExecutor, TestExecutor, Time},
     task::{unblock, Task},
     timer::Timer,
 };
 
-// Fuchsia specific exports
+#[cfg(not(target_arch = "wasm32"))]
+mod task_group;
+#[cfg(not(target_arch = "wasm32"))]
+pub use task_group::*;
+
+// Fuchsia specific exports.
 #[cfg(target_os = "fuchsia")]
 pub use self::fuchsia::{
     executor::{EHandle, PacketReceiver, ReceiverRegistration, WaitState},

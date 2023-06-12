@@ -37,6 +37,7 @@ rustc_library("fuchsia-async") {
     "src/net/mod.rs",
     "src/runtime/mod.rs",
     "src/runtime/stub.rs",
+    "src/runtime/task_group.rs",
     "src/test_support.rs",
   ]
   if (is_fuchsia) {
@@ -46,6 +47,7 @@ rustc_library("fuchsia-async") {
       "//third_party/rust_crates:libc",
       "//third_party/rust_crates:parking_lot",
       "//third_party/rust_crates:socket2",
+      "//third_party/rust_crates:thiserror",
       "//third_party/rust_crates:zerocopy",
     ]
     if (fuchsia_async_trace_level_logging) {
@@ -89,6 +91,7 @@ rustc_library("fuchsia-async") {
         "//third_party/rust_crates:blocking",
         "//third_party/rust_crates:easy-parallel",
         "//third_party/rust_crates:futures-lite",
+        "//third_party/rust_crates:thiserror",
       ]
       sources += [ "src/net/portable/udp.rs" ]
     }

@@ -9,7 +9,7 @@ use std::task::{Context, Poll};
 
 /// A handle to a future that is owned and polled by the executor.
 ///
-/// Once a task is created, the executor will poll it until completion,
+/// Once a task is created, the executor will poll it until done,
 /// even if the task handle itself is not polled.
 ///
 /// When a task is dropped its future will no longer be polled by the
@@ -28,13 +28,14 @@ impl Task<()> {
     ///
     /// *Note*: this is usually not what you want. This API severs the control flow from the
     /// caller, making it impossible to return values (including errors). If your goal is to run
-    /// multiple futures concurrently, consider if futures combinators such as
+    /// multiple futures concurrently, consider using [`TaskGroup`] or other futures combinators
+    /// such as:
     ///
     /// * [`futures::future::join`]
     /// * [`futures::future::select`]
     /// * [`futures::select`]
     ///
-    /// their error-aware variants
+    /// or their error-aware variants
     ///
     /// * [`futures::future::try_join`]
     /// * [`futures::future::try_select`]
