@@ -3,6 +3,19 @@
 // found in the LICENSE file.
 library fuchsia.hardware.display;
 
+/// Identifies a layer resource owned by a Display Coordinator client.
+///
+/// [`fuchsia.hardware.display/INVALID_DISP_ID`] represents an invalid value.
+///
+/// Values are managed by [`fuchsia.hardware.display/Coordinator`] clients, to
+/// facilitate feed-forward dataflow.
+///
+/// Valid values uniquely identify "live" layers within a Display Coordinator
+/// connection. The identifier of a layer destroyed via
+/// [`fuchsia.hardware.display/Coordinator.DestroyLayer`] can be reused in a
+/// subsequent [`fuchsia.hardware.display/Coordinator.CreateLayer`] call.
+alias LayerIdValue = uint64;
+
 // Rotations are applied counter-clockwise, and are applied before reflections.  Note: this doesn't
 // affect the output region on the physical display; use the layer's `dest_frame` for that.  In
 // other words, if you have a 600x300 image that you want to rotate 90 degrees without changing the
@@ -71,8 +84,10 @@ type ClientCompositionOp = struct {
     /// display_id and layer_id uniquely identify the subject of the
     /// opcode.
     display_id DisplayIdValue;
-    /// layer_id is 0 for whole-display issues like unsupported color
-    /// conversion and gamma tables.
-    layer_id uint64;
+
+    /// Invalid for issues that aren't scoped to a specific layer, such as
+    /// unsupported color conversion tables.
+    layer_id LayerIdValue;
+
     opcode ClientCompositionOpcode;
 };
