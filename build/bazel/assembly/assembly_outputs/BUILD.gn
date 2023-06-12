@@ -56,9 +56,11 @@ if (use_bringup_assembly) {
 group("verifications") {
   testonly = true
   deps = []
-  if (use_bringup_assembly) {
-    deps += [ ":verify_bringup" ]
-  } else if (build_info_product == "minimal") {
-    deps += [ ":verify_fuchsia" ]
+  if (!use_bazel_images_only) {
+    if (use_bringup_assembly) {
+      deps += [ ":verify_bringup" ]
+    } else if (build_info_product == "minimal") {
+      deps += [ ":verify_fuchsia" ]
+    }
   }
 }

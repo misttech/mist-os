@@ -273,7 +273,8 @@ group("default-images") {
       ]
     }
 
-    # TODO(https://fxbug.dev/125008): Support size checking in Bazel assembly.
+    # Size checkers and elf_sizes.json are implemented in Bazel directly, so we
+    # don't need to include GN targets.
     if (size_checker_input != {
         }) {
       deps += [ "size_checker:run_product_size_checker" ]
