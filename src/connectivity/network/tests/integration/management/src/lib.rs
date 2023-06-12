@@ -166,33 +166,30 @@ async fn test_oir_interface_name_conflict<M: Manager, N: Netstack>(name: &str) {
     let interface_state = realm
         .connect_to_protocol::<fnet_interfaces::StateMarker>()
         .expect("connect to fuchsia.net.interfaces/State service");
-    let interfaces_stream =
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
-            .expect("get interface event stream")
-            .map(|r| r.expect("watcher error"))
-            .filter_map(|event| {
-                futures::future::ready(match event {
-                    fidl_fuchsia_net_interfaces::Event::Added(
-                        fidl_fuchsia_net_interfaces::Properties { id, name, .. },
-                    )
-                    | fidl_fuchsia_net_interfaces::Event::Existing(
-                        fidl_fuchsia_net_interfaces::Properties { id, name, .. },
-                    ) => Some((
-                        id.expect("missing interface ID"),
-                        name.expect("missing interface name"),
-                    )),
-                    fidl_fuchsia_net_interfaces::Event::Removed(id) => {
-                        let _: u64 = id;
-                        None
-                    }
-                    fidl_fuchsia_net_interfaces::Event::Idle(
-                        fidl_fuchsia_net_interfaces::Empty {},
-                    )
-                    | fidl_fuchsia_net_interfaces::Event::Changed(
-                        fidl_fuchsia_net_interfaces::Properties { .. },
-                    ) => None,
-                })
-            });
+    let interfaces_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+        &interface_state,
+        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+    )
+    .expect("get interface event stream")
+    .map(|r| r.expect("watcher error"))
+    .filter_map(|event| {
+        futures::future::ready(match event {
+            fidl_fuchsia_net_interfaces::Event::Added(
+                fidl_fuchsia_net_interfaces::Properties { id, name, .. },
+            )
+            | fidl_fuchsia_net_interfaces::Event::Existing(
+                fidl_fuchsia_net_interfaces::Properties { id, name, .. },
+            ) => Some((id.expect("missing interface ID"), name.expect("missing interface name"))),
+            fidl_fuchsia_net_interfaces::Event::Removed(id) => {
+                let _: u64 = id;
+                None
+            }
+            fidl_fuchsia_net_interfaces::Event::Idle(fidl_fuchsia_net_interfaces::Empty {})
+            | fidl_fuchsia_net_interfaces::Event::Changed(
+                fidl_fuchsia_net_interfaces::Properties { .. },
+            ) => None,
+        })
+    });
     let interfaces_stream = futures::stream::select(
         interfaces_stream,
         futures::stream::once(wait_for_netmgr.map(|r| panic!("network manager exited {:?}", r))),
@@ -348,9 +345,11 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
         let interface_state = realm
             .connect_to_protocol::<fnet_interfaces::StateMarker>()
             .expect("connect to fuchsia.net.interfaces/State service");
-        let event_stream =
-            fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
-                .expect("get interface event stream");
+        let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+            &interface_state,
+            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .expect("get interface event stream");
         futures::pin_mut!(event_stream);
         let mut if_map = HashMap::<u64, _>::new();
         let (wlan_ap_id, wlan_ap_name) = fidl_fuchsia_net_interfaces_ext::wait_interface(
@@ -369,7 +368,12 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
                                 |&fidl_fuchsia_net_interfaces_ext::Address {
                                      addr: fnet::Subnet { addr, prefix_len: _ },
                                      valid_until: _,
+                                     assignment_state,
                                  }| {
+                                    assert_eq!(
+                                        assignment_state,
+                                        fnet_interfaces::AddressAssignmentState::Assigned
+                                    );
                                     addr == INTERFACE_ADDR.into_ext()
                                 },
                             ))
@@ -474,12 +478,21 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
                                 |&fidl_fuchsia_net_interfaces_ext::Address {
                                      addr: fnet::Subnet { addr, prefix_len: _ },
                                      valid_until: _,
-                                 }| match addr {
-                                    fnet::IpAddress::Ipv4(fnet::Ipv4Address { addr }) => {
-                                        NETWORK_ADDR_SUBNET
-                                            .contains(&net_types_ip::Ipv4Addr::new(addr))
+                                     assignment_state,
+                                 }| {
+                                    assert_eq!(
+                                        assignment_state,
+                                        fnet_interfaces::AddressAssignmentState::Assigned
+                                    );
+                                    match addr {
+                                        fnet::IpAddress::Ipv4(fnet::Ipv4Address { addr }) => {
+                                            NETWORK_ADDR_SUBNET
+                                                .contains(&net_types_ip::Ipv4Addr::new(addr))
+                                        }
+                                        fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr: _ }) => {
+                                            false
+                                        }
                                     }
-                                    fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr: _ }) => false,
                                 },
                             ))
                         .then_some(*id)

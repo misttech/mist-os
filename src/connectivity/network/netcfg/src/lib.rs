@@ -651,19 +651,23 @@ fn start_dhcpv6_client(
         |&fnet_interfaces_ext::Address {
              addr: fnet::Subnet { addr, prefix_len: _ },
              valid_until: _,
-         }| match addr {
-            fnet::IpAddress::Ipv6(address) => {
-                if address.is_unicast_link_local() {
-                    Some(fnet::Ipv6SocketAddress {
-                        address,
-                        port: fnet_dhcpv6::DEFAULT_CLIENT_PORT,
-                        zone_index: id.get(),
-                    })
-                } else {
-                    None
+             assignment_state,
+         }| {
+            assert_eq!(assignment_state, fnet_interfaces::AddressAssignmentState::Assigned);
+            match addr {
+                fnet::IpAddress::Ipv6(address) => {
+                    if address.is_unicast_link_local() {
+                        Some(fnet::Ipv6SocketAddress {
+                            address,
+                            port: fnet_dhcpv6::DEFAULT_CLIENT_PORT,
+                            zone_index: id.get(),
+                        })
+                    } else {
+                        None
+                    }
                 }
+                fnet::IpAddress::Ipv4(_) => None,
             }
-            fnet::IpAddress::Ipv4(_) => None,
         },
     ) {
         sockaddr
@@ -923,10 +927,12 @@ impl<'a> NetCfg<'a> {
             self.create_device_stream().await.context("create netdevice stream")?.fuse();
         futures::pin_mut!(netdev_stream);
 
-        let if_watcher_event_stream =
-            fnet_interfaces_ext::event_stream_from_state(&self.interface_state)
-                .context("error creating interface watcher event stream")?
-                .fuse();
+        let if_watcher_event_stream = fnet_interfaces_ext::event_stream_from_state(
+            &self.interface_state,
+            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .context("error creating interface watcher event stream")?
+        .fuse();
         futures::pin_mut!(if_watcher_event_stream);
 
         let (dns_server_watcher, dns_server_watcher_req) =
@@ -1511,7 +1517,12 @@ impl<'a> NetCfg<'a> {
                                 |&fnet_interfaces_ext::Address {
                                      addr: fnet::Subnet { addr, prefix_len: _ },
                                      valid_until: _,
+                                     assignment_state,
                                  }| {
+                                    assert_eq!(
+                                        assignment_state,
+                                        fnet_interfaces::AddressAssignmentState::Assigned
+                                    );
                                     addr == fnet::IpAddress::Ipv6(address)
                                 },
                             ) {
@@ -2946,22 +2957,23 @@ mod tests {
         zone_index: 0,
     });
 
+    fn test_addr(addr: fnet::Subnet) -> fnet_interfaces::Address {
+        fnet_interfaces::Address {
+            addr: Some(addr),
+            valid_until: Some(fuchsia_zircon::Time::INFINITE.into_nanos()),
+            assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
+            ..Default::default()
+        }
+    }
+
     fn ipv6addrs(a: Option<fnet::Ipv6SocketAddress>) -> Vec<fnet_interfaces::Address> {
         // The DHCPv6 client will only use a link-local address but we include a global address
         // and expect it to not be used.
-        std::iter::once(fnet_interfaces::Address {
-            addr: Some(GLOBAL_ADDR),
-            valid_until: Some(fuchsia_zircon::Time::INFINITE.into_nanos()),
-            ..Default::default()
-        })
-        .chain(a.map(|fnet::Ipv6SocketAddress { address, port: _, zone_index: _ }| {
-            fnet_interfaces::Address {
-                addr: Some(fnet::Subnet { addr: fnet::IpAddress::Ipv6(address), prefix_len: 64 }),
-                valid_until: Some(fuchsia_zircon::Time::INFINITE.into_nanos()),
-                ..Default::default()
-            }
-        }))
-        .collect()
+        std::iter::once(test_addr(GLOBAL_ADDR))
+            .chain(a.map(|fnet::Ipv6SocketAddress { address, port: _, zone_index: _ }| {
+                test_addr(fnet::Subnet { addr: fnet::IpAddress::Ipv6(address), prefix_len: 64 })
+            }))
+            .collect()
     }
 
     /// Handle receiving a netstack interface changed event.
@@ -3544,16 +3556,7 @@ mod tests {
             handle_update(
                 &mut netcfg,
                 None,
-                Some(
-                    addresses
-                        .into_iter()
-                        .map(|address| fnet_interfaces::Address {
-                            addr: Some(address),
-                            valid_until: Some(fuchsia_zircon::sys::ZX_TIME_INFINITE),
-                            ..Default::default()
-                        })
-                        .collect(),
-                ),
+                Some(addresses.into_iter().map(test_addr).collect()),
                 &mut dns_watchers,
             )
             .await;

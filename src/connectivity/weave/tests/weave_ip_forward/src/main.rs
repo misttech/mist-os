@@ -78,8 +78,11 @@ async fn run_fuchsia_node() -> Result<(), Error> {
     let stack =
         client::connect_to_protocol::<StackMarker>().context("failed to connect to netstack")?;
 
-    let stream = fnet_interfaces_ext::event_stream_from_state(&interface_state)
-        .context("failed to get interface stream")?;
+    let stream = fnet_interfaces_ext::event_stream_from_state(
+        &interface_state,
+        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+    )
+    .context("failed to get interface stream")?;
     let intf = fnet_interfaces_ext::existing(stream, HashMap::new())
         .await
         .context("failed to get existing interfaces")?;

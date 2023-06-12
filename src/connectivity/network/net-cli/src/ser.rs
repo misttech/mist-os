@@ -128,9 +128,13 @@ impl From<(fidl_fuchsia_net_interfaces_ext::Properties, Option<fidl_fuchsia_net:
             online,
             addresses: addresses
                 .into_iter()
-                .map(|fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until: _ }| {
-                    addr.into()
-                })
+                .map(
+                    |fidl_fuchsia_net_interfaces_ext::Address {
+                         addr,
+                         valid_until: _,
+                         assignment_state: _,
+                     }| { addr.into() },
+                )
                 .into(),
             mac: mac.map(Into::into),
         }

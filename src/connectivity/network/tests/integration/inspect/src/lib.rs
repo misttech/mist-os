@@ -54,14 +54,24 @@ impl AddressMatcher {
         let set = props
             .addresses
             .iter()
-            .map(|&fidl_fuchsia_net_interfaces_ext::Address { addr: subnet, valid_until: _ }| {
-                let fidl_fuchsia_net::Subnet { addr, prefix_len: _ } = subnet;
-                let prefix = match addr {
-                    fidl_fuchsia_net::IpAddress::Ipv4(_) => "ipv4",
-                    fidl_fuchsia_net::IpAddress::Ipv6(_) => "ipv6",
-                };
-                format!("[{}] {}", prefix, fidl_fuchsia_net_ext::Subnet::from(subnet))
-            })
+            .map(
+                |&fidl_fuchsia_net_interfaces_ext::Address {
+                     addr: subnet,
+                     valid_until: _,
+                     assignment_state,
+                 }| {
+                    assert_eq!(
+                        assignment_state,
+                        fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned
+                    );
+                    let fidl_fuchsia_net::Subnet { addr, prefix_len: _ } = subnet;
+                    let prefix = match addr {
+                        fidl_fuchsia_net::IpAddress::Ipv4(_) => "ipv4",
+                        fidl_fuchsia_net::IpAddress::Ipv6(_) => "ipv6",
+                    };
+                    format!("[{}] {}", prefix, fidl_fuchsia_net_ext::Subnet::from(subnet))
+                },
+            )
             .collect::<std::collections::HashSet<_>>();
 
         Self { set: std::rc::Rc::new(std::cell::RefCell::new(set)) }
@@ -138,8 +148,11 @@ async fn inspect_nic<N: Netstack>(name: &str) {
     // Wait for the world to stabilize and capture the state to verify inspect
     // data.
     let (loopback_props, netdev_props) = fidl_fuchsia_net_interfaces_ext::wait_interface(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interfaces_state)
-            .expect("failed to create event stream"),
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+            &interfaces_state,
+            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .expect("failed to create event stream"),
         &mut HashMap::<u64, _>::new(),
         |if_map| {
             let loopback =
@@ -164,9 +177,16 @@ async fn inspect_nic<N: Netstack>(name: &str) {
                      fidl_fuchsia_net_interfaces_ext::Address {
                          addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
                          valid_until: _,
-                     }| match addr {
-                        fidl_fuchsia_net::IpAddress::Ipv4(_) => (v4_count + 1, v6_count),
-                        fidl_fuchsia_net::IpAddress::Ipv6(_) => (v4_count, v6_count + 1),
+                         assignment_state,
+                     }| {
+                        assert_eq!(
+                            *assignment_state,
+                            fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned
+                        );
+                        match addr {
+                            fidl_fuchsia_net::IpAddress::Ipv4(_) => (v4_count + 1, v6_count),
+                            fidl_fuchsia_net::IpAddress::Ipv6(_) => (v4_count, v6_count + 1),
+                        }
                     },
                 );
                 if v4_count > 0 && v6_count >= EXPECTED_NUM_IPV6_ADDRESSES {

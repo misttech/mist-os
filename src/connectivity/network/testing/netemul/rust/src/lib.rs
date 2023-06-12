@@ -391,7 +391,10 @@ impl<'a> TestRealm<'a> {
             .connect_to_protocol::<fnet_interfaces::StateMarker>()
             .context("failed to connect to fuchsia.net.interfaces/State")?;
         let () = fnet_interfaces_ext::wait_interface_with_id(
-            fnet_interfaces_ext::event_stream_from_state(&interface_state)?,
+            fnet_interfaces_ext::event_stream_from_state(
+                &interface_state,
+                fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+            )?,
             &mut fnet_interfaces_ext::InterfaceState::Unknown(interface.id()),
             |&fnet_interfaces_ext::Properties { online, .. }| online.then_some(()),
         )
@@ -629,8 +632,11 @@ impl<'a> TestRealm<'a> {
         let interface_state = self
             .connect_to_protocol::<fnet_interfaces::StateMarker>()
             .context("connect to protocol")?;
-        fnet_interfaces_ext::event_stream_from_state(&interface_state)
-            .context("get interface event stream")
+        fnet_interfaces_ext::event_stream_from_state(
+            &interface_state,
+            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .context("get interface event stream")
     }
 }
 
@@ -1041,11 +1047,14 @@ impl<'a> TestInterface<'a> {
             })
     }
 
-    /// Gets the interface's properties.
+    /// Gets the interface's properties with assigned addresses.
     async fn get_properties(&self) -> Result<fnet_interfaces_ext::Properties> {
         let interface_state = self.realm.connect_to_protocol::<fnet_interfaces::StateMarker>()?;
         let properties = fnet_interfaces_ext::existing(
-            fnet_interfaces_ext::event_stream_from_state(&interface_state)?,
+            fnet_interfaces_ext::event_stream_from_state(
+                &interface_state,
+                fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+            )?,
             fnet_interfaces_ext::InterfaceState::Unknown(self.id),
         )
         .await
@@ -1089,13 +1098,18 @@ impl<'a> TestInterface<'a> {
     }
 
     /// Gets a stream of interface events yielded by calling watch on a new watcher.
+    ///
+    /// The returned watcher will only return assigned addresses.
     pub fn get_interface_event_stream(
         &self,
     ) -> Result<impl futures::Stream<Item = std::result::Result<fnet_interfaces::Event, fidl::Error>>>
     {
         let interface_state = self.realm.connect_to_protocol::<fnet_interfaces::StateMarker>()?;
-        fnet_interfaces_ext::event_stream_from_state(&interface_state)
-            .context("event stream from state")
+        fnet_interfaces_ext::event_stream_from_state(
+            &interface_state,
+            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .context("event stream from state")
     }
 
     async fn set_dhcp_client_enabled(&self, enable: bool) -> Result<()> {

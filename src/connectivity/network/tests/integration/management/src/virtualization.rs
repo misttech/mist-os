@@ -435,8 +435,11 @@ async fn virtualization<N: Netstack>(name: &str, sub_name: &str, steps: &[Step])
                 if step.may_reconstruct_bridge() {
                     let mut interfaces_map = HashMap::<u64, _>::new();
                     let bridge_id = fnet_interfaces_ext::wait_interface(
-                        fnet_interfaces_ext::event_stream_from_state(&host_interfaces_state)
-                            .expect("initialize interface event stream"),
+                        fnet_interfaces_ext::event_stream_from_state(
+                            &host_interfaces_state,
+                            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+                        )
+                        .expect("initialize interface event stream"),
                         &mut interfaces_map,
                         |interfaces_map| {
                             interfaces_map.values().find_map(

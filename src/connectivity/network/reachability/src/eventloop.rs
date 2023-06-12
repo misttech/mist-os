@@ -233,9 +233,12 @@ impl EventLoop {
             // TODO(https://fxbug.dev/110445): Don't register interest in
             // valid-until. Note that the event stream returned by the extension
             // crate is created from a watcher with interest in all fields.
-            fnet_interfaces_ext::event_stream_from_state(&interface_state)
-                .context("get interface event stream")?
-                .fuse()
+            fnet_interfaces_ext::event_stream_from_state(
+                &interface_state,
+                fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+            )
+            .context("get interface event stream")?
+            .fuse()
         };
 
         let neigh_watcher_stream = {
@@ -476,9 +479,19 @@ impl EventLoop {
                         let previous = addresses
                             .iter()
                             .filter_map(|fnet_interfaces::Address { addr, .. }| addr.as_ref());
-                        let current = current_addresses
-                            .iter()
-                            .map(|fnet_interfaces_ext::Address { addr, valid_until: _ }| addr);
+                        let current = current_addresses.iter().map(
+                            |fnet_interfaces_ext::Address {
+                                 addr,
+                                 valid_until: _,
+                                 assignment_state,
+                             }| {
+                                assert_eq!(
+                                    *assignment_state,
+                                    fnet_interfaces::AddressAssignmentState::Assigned
+                                );
+                                addr
+                            },
+                        );
                         previous.ne(current)
                     })
                 {
@@ -644,7 +657,9 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address, Subnet};
-    use fidl_fuchsia_net_interfaces::{Address, Event, PreferredLifetimeInfo, Properties};
+    use fidl_fuchsia_net_interfaces::{
+        Address, AddressAssignmentState, Event, PreferredLifetimeInfo, Properties,
+    };
     use futures::task::Poll;
     use net_declare::{fidl_ip, std_ip_v4, std_ip_v6};
 
@@ -683,6 +698,7 @@ mod tests {
             addr: Some(v4_subnet),
             valid_until: Some(123_000_000_000),
             preferred_lifetime_info: Some(PreferredLifetimeInfo::PreferredUntil(123_000_000_000)),
+            assignment_state: Some(AddressAssignmentState::Assigned),
             ..Default::default()
         };
 
@@ -726,6 +742,7 @@ mod tests {
             addr: Some(v6_subnet),
             valid_until: Some(123_000_000_000),
             preferred_lifetime_info: Some(PreferredLifetimeInfo::PreferredUntil(123_000_000_000)),
+            assignment_state: Some(AddressAssignmentState::Assigned),
             ..Default::default()
         };
 

@@ -82,9 +82,16 @@ async fn create_realm<'a>(
                 |&fidl_fuchsia_net_interfaces_ext::Address {
                      addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
                      valid_until: _,
-                 }| match addr {
-                    fidl_fuchsia_net::IpAddress::Ipv4(_) => None,
-                    addr @ fidl_fuchsia_net::IpAddress::Ipv6(_) => Some(addr),
+                     assignment_state,
+                 }| {
+                    assert_eq!(
+                        assignment_state,
+                        fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned
+                    );
+                    match addr {
+                        fidl_fuchsia_net::IpAddress::Ipv4(_) => None,
+                        addr @ fidl_fuchsia_net::IpAddress::Ipv6(_) => Some(addr),
+                    }
                 },
             )
         },

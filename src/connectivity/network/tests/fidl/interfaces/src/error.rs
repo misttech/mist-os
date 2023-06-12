@@ -22,8 +22,11 @@ async fn interfaces_watcher_after_invalid_state_request<N: Netstack>(name: &str)
     let interfaces_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("failed to connect fuchsia.net.interfaces/State");
-    let stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interfaces_state)
-        .expect("get interface event stream");
+    let stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+        &interfaces_state,
+        fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+    )
+    .expect("get interface event stream");
 
     // Writes some garbage into the channel and verify an error on the State
     // doesn't cause trouble using an obtained Watcher.
@@ -54,10 +57,14 @@ async fn interfaces_watcher_after_invalid_state_request<N: Netstack>(name: &str)
                     fidl_fuchsia_net_interfaces_ext::Address {
                         addr: fidl_subnet!("127.0.0.1/8"),
                         valid_until: zx::sys::ZX_TIME_INFINITE,
+                        assignment_state:
+                            fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned,
                     },
                     fidl_fuchsia_net_interfaces_ext::Address {
                         addr: fidl_subnet!("::1/128"),
                         valid_until: zx::sys::ZX_TIME_INFINITE,
+                        assignment_state:
+                            fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned,
                     },
                 ],
                 has_default_ipv4_route: false,

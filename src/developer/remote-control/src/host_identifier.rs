@@ -40,11 +40,14 @@ impl HostIdentifier {
     }
 
     pub async fn identify(&self) -> Result<rcs::IdentifyHostResponse, rcs::IdentifyHostError> {
-        let stream = fnet_interfaces_ext::event_stream_from_state(&self.interface_state_proxy)
-            .map_err(|e| {
-                error!(%e, "Getting interface watcher failed");
-                rcs::IdentifyHostError::ListInterfacesFailed
-            })?;
+        let stream = fnet_interfaces_ext::event_stream_from_state(
+            &self.interface_state_proxy,
+            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .map_err(|e| {
+            error!(%e, "Getting interface watcher failed");
+            rcs::IdentifyHostError::ListInterfacesFailed
+        })?;
         let ilist = fnet_interfaces_ext::existing(stream, std::collections::HashMap::new())
             .await
             .map_err(|e| {
@@ -82,9 +85,19 @@ impl HostIdentifier {
                      has_default_ipv4_route: _,
                      has_default_ipv6_route: _,
                  }| {
-                    addresses
-                        .into_iter()
-                        .map(|fnet_interfaces_ext::Address { addr, valid_until: _ }| addr)
+                    addresses.into_iter().filter_map(
+                        |fnet_interfaces_ext::Address {
+                             addr,
+                             valid_until: _,
+                             assignment_state,
+                         }| {
+                            match assignment_state {
+                                fnet_interfaces::AddressAssignmentState::Assigned => Some(addr),
+                                fnet_interfaces::AddressAssignmentState::Tentative
+                                | fnet_interfaces::AddressAssignmentState::Unavailable => None,
+                            }
+                        },
+                    )
                 },
             )
             .collect::<Vec<_>>();

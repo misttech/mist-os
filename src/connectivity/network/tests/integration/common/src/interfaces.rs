@@ -31,7 +31,10 @@ pub async fn wait_for_non_loopback_interface_up<
 ) -> Result<(u64, String)> {
     let mut if_map = HashMap::new();
     let wait_for_interface = fidl_fuchsia_net_interfaces_ext::wait_interface(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(interface_state)?,
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+            interface_state,
+            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )?,
         &mut if_map,
         |if_map| {
             if_map.iter().find_map(
@@ -154,7 +157,12 @@ pub async fn wait_for_v4_and_v6_ll(
              &fidl_fuchsia_net_interfaces_ext::Address {
                  addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
                  valid_until: _,
+                 assignment_state,
              }| {
+                assert_eq!(
+                    assignment_state,
+                    fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned
+                );
                 match addr {
                     fidl_fuchsia_net::IpAddress::Ipv4(fidl_fuchsia_net::Ipv4Address { addr }) => {
                         (Some(net_types::ip::Ipv4Addr::from(addr)), v6)
@@ -193,7 +201,12 @@ pub async fn wait_for_v6_ll(
             |&fidl_fuchsia_net_interfaces_ext::Address {
                  addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
                  valid_until: _,
+                 assignment_state,
              }| {
+                assert_eq!(
+                    assignment_state,
+                    fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned
+                );
                 match addr {
                     fidl_fuchsia_net::IpAddress::Ipv4(fidl_fuchsia_net::Ipv4Address {
                         addr: _,
@@ -210,7 +223,8 @@ pub async fn wait_for_v6_ll(
     .context("wait for IPv6 link-local address")
 }
 
-/// Wait until the given interface has a set of addresses that matches the given predicate.
+/// Wait until the given interface has a set of assigned addresses that matches
+/// the given predicate.
 pub async fn wait_for_addresses<T, F>(
     interfaces_state: &fidl_fuchsia_net_interfaces::StateProxy,
     id: u64,
@@ -221,8 +235,11 @@ where
 {
     let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(u64::from(id));
     fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interfaces_state)
-            .context("get interface event stream")?,
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+            &interfaces_state,
+            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .context("get interface event stream")?,
         &mut state,
         |fidl_fuchsia_net_interfaces_ext::Properties {
              addresses,
@@ -246,8 +263,11 @@ pub async fn wait_for_online(
 ) -> Result<()> {
     let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(u64::from(id));
     fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interfaces_state)
-            .context("get interface event stream")?,
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+            &interfaces_state,
+            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .context("get interface event stream")?,
         &mut state,
         |fidl_fuchsia_net_interfaces_ext::Properties {
              online,

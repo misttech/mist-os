@@ -96,8 +96,11 @@ async fn install_and_get_ipv6_addrs_for_endpoint<N: Netstack>(
         .expect("failed to connect to fuchsia.net.interfaces/State service");
     let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(id.into());
     let ipv6_addresses = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
-            .expect("creating interface event stream"),
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+            &interface_state,
+            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .expect("creating interface event stream"),
         &mut state,
         |fidl_fuchsia_net_interfaces_ext::Properties {
              id: _,
@@ -110,12 +113,22 @@ async fn install_and_get_ipv6_addrs_for_endpoint<N: Netstack>(
          }| {
             let ipv6_addresses = addresses
                 .iter()
-                .filter_map(|fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until: _ }| {
-                    match addr.addr {
-                        net::IpAddress::Ipv6(net::Ipv6Address { .. }) => Some(addr),
-                        net::IpAddress::Ipv4(net::Ipv4Address { .. }) => None,
-                    }
-                })
+                .filter_map(
+                    |fidl_fuchsia_net_interfaces_ext::Address {
+                         addr,
+                         valid_until: _,
+                         assignment_state,
+                     }| {
+                        assert_eq!(
+                            *assignment_state,
+                            fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned
+                        );
+                        match addr.addr {
+                            net::IpAddress::Ipv6(net::Ipv6Address { .. }) => Some(addr),
+                            net::IpAddress::Ipv4(net::Ipv4Address { .. }) => None,
+                        }
+                    },
+                )
                 .copied()
                 .collect::<Vec<_>>();
             if ipv6_addresses.is_empty() {
@@ -382,8 +395,11 @@ async fn slaac_with_privacy_extensions<N: Netstack>(
         .expect("failed to connect to fuchsia.net.interfaces/State");
     let expected_addrs = 2;
     fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
-            .expect("error getting interface state event stream"),
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+            &interface_state,
+            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .expect("error getting interface state event stream"),
         &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(iface.id()),
         |fidl_fuchsia_net_interfaces_ext::Properties { addresses, .. }| {
             if addresses
@@ -392,7 +408,12 @@ async fn slaac_with_privacy_extensions<N: Netstack>(
                     |&fidl_fuchsia_net_interfaces_ext::Address {
                          addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
                          valid_until: _,
+                         assignment_state,
                      }| {
+                        assert_eq!(
+                            assignment_state,
+                            fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned
+                        );
                         match addr {
                             net::IpAddress::Ipv4(net::Ipv4Address { .. }) => None,
                             net::IpAddress::Ipv6(net::Ipv6Address { addr }) => {
@@ -497,7 +518,12 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
                 |fidl_fuchsia_net_interfaces_ext::Address {
                      addr: fidl_fuchsia_net::Subnet { addr, prefix_len },
                      valid_until: _,
+                     assignment_state,
                  }| {
+                    assert_eq!(
+                        *assignment_state,
+                        fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned
+                    );
                     *prefix_len == ipv6_consts::LINK_LOCAL_SUBNET_PREFIX
                         && match addr {
                             fidl_fuchsia_net::IpAddress::Ipv4(fidl_fuchsia_net::Ipv4Address {
@@ -606,7 +632,12 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
             |&fidl_fuchsia_net_interfaces_ext::Address {
                  addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
                  valid_until: _,
+                 assignment_state,
              }| {
+                assert_eq!(
+                    assignment_state,
+                    fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned
+                );
                 match addr {
                     net::IpAddress::Ipv4(net::Ipv4Address { .. }) => false,
                     net::IpAddress::Ipv6(net::Ipv6Address { addr }) => {
@@ -850,8 +881,11 @@ async fn slaac_regeneration_after_dad_failure<N: Netstack>(name: &str) {
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("failed to connect to fuchsia.net.interfaces/State");
     let () = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
-            .expect("error getting interfaces state event stream"),
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+            &interface_state,
+            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .expect("error getting interfaces state event stream"),
         &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(iface.id()),
         |fidl_fuchsia_net_interfaces_ext::Properties { addresses, .. }| {
             // We have to make sure 2 things:
@@ -864,7 +898,12 @@ async fn slaac_regeneration_after_dad_failure<N: Netstack>(name: &str) {
                  &fidl_fuchsia_net_interfaces_ext::Address {
                      addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
                      valid_until: _,
+                     assignment_state,
                  }| {
+                    assert_eq!(
+                        assignment_state,
+                        fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned
+                    );
                     match addr {
                         net::IpAddress::Ipv4(net::Ipv4Address { .. }) => {}
                         net::IpAddress::Ipv6(net::Ipv6Address { addr }) => {
@@ -1200,8 +1239,11 @@ async fn sending_ra_with_autoconf_flag_triggers_slaac<N: Netstack>(name: &str) {
     send_ra(&fake_router, ra, &options, src_ip).await.expect("RA sent");
 
     fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interfaces_state)
-            .expect("creating interface event stream"),
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+            &interfaces_state,
+            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .expect("creating interface event stream"),
         &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(iface.id()),
         |fidl_fuchsia_net_interfaces_ext::Properties {
              id: _,
@@ -1216,7 +1258,12 @@ async fn sending_ra_with_autoconf_flag_triggers_slaac<N: Netstack>(name: &str) {
                 |fidl_fuchsia_net_interfaces_ext::Address {
                      addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
                      valid_until: _,
+                     assignment_state,
                  }| {
+                    assert_eq!(
+                        *assignment_state,
+                        fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned
+                    );
                     let addr = match addr {
                         fidl_fuchsia_net::IpAddress::Ipv4(fidl_fuchsia_net::Ipv4Address {
                             ..

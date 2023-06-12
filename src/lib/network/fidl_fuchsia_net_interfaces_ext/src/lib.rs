@@ -59,6 +59,8 @@ pub struct Address {
     // TODO(https://fxbug.dev/75531): Replace with zx::Time once there is support for custom
     // conversion functions.
     pub valid_until: zx::zx_time_t,
+    /// The address's assignment state.
+    pub assignment_state: fnet_interfaces::AddressAssignmentState,
 }
 
 /// Helper struct implementing Address validation.
@@ -66,7 +68,9 @@ pub struct AddressValidator;
 
 impl Validate<Address> for AddressValidator {
     type Error = String;
-    fn validate(Address { addr: _, valid_until }: &Address) -> Result<(), Self::Error> {
+    fn validate(
+        Address { addr: _, valid_until, assignment_state: _ }: &Address,
+    ) -> Result<(), Self::Error> {
         if *valid_until <= 0 {
             return Err(format!("non-positive value for valid_until={}", *valid_until));
         }
@@ -505,10 +509,22 @@ where
     .map_err(|acc| WatcherOperationError::UnexpectedEnd { final_state: acc })
 }
 
+/// The kind of addresses included from the watcher.
+pub enum IncludedAddresses {
+    /// All addresses are returned from the watcher.
+    All,
+    /// Only assigned addresses are returned rom the watcher.
+    OnlyAssigned,
+}
+
 /// Initialize a watcher with interest in all fields and return its events as a
 /// stream.
+///
+/// If `include_non_assigned_addresses` is true, then all addresses will be
+/// returned, not just assigned addresses.
 pub fn event_stream_from_state(
     interface_state: &fnet_interfaces::StateProxy,
+    included_addresses: IncludedAddresses,
 ) -> Result<impl Stream<Item = Result<fnet_interfaces::Event, fidl::Error>>, WatcherCreationError> {
     let (watcher, server) = ::fidl::endpoints::create_proxy::<fnet_interfaces::WatcherMarker>()
         .map_err(WatcherCreationError::CreateProxy)?;
@@ -522,6 +538,10 @@ pub fn event_stream_from_state(
                     fnet_interfaces::AddressPropertiesInterest::VALID_UNTIL
                         | fnet_interfaces::AddressPropertiesInterest::PREFERRED_LIFETIME_INFO,
                 ),
+                include_non_assigned_addresses: Some(match included_addresses {
+                    IncludedAddresses::All => true,
+                    IncludedAddresses::OnlyAssigned => false,
+                }),
                 ..Default::default()
             },
             server,
@@ -593,6 +613,7 @@ mod tests {
         fnet_interfaces::Address {
             addr: Some(addr),
             valid_until: Some(valid_until),
+            assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
             ..Default::default()
         }
     }
@@ -839,12 +860,15 @@ mod tests {
     #[test]
     fn test_address_validator() {
         let valid = fidl_address(ADDR, 42);
-        let fidl_fuchsia_net_interfaces::Address { addr, valid_until, .. } = valid.clone();
+        let fidl_fuchsia_net_interfaces::Address { addr, valid_until, assignment_state, .. } =
+            valid.clone();
         assert_eq!(
             Address::try_from(valid).expect("failed to create address from valid fidl table"),
             Address {
                 addr: addr.expect("addr field missing from valid address"),
-                valid_until: valid_until.expect("valid_until field missing from valid address")
+                valid_until: valid_until.expect("valid_until field missing from valid address"),
+                assignment_state: assignment_state
+                    .expect("assignment_state missing from valid address"),
             }
         );
         let invalid = fidl_address(ADDR, 0);

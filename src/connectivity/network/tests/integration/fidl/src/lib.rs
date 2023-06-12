@@ -171,8 +171,11 @@ async fn disable_interface_loopback<N: Netstack>(name: &str) {
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("connect to protocol");
 
-    let stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
-        .expect("get interface event stream");
+    let stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+        &interface_state,
+        fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+    )
+    .expect("get interface event stream");
     futures::pin_mut!(stream);
 
     let loopback_id = assert_matches::assert_matches!(

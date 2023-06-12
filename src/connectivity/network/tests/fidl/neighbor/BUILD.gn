@@ -9,6 +9,7 @@ rustc_test("neighbor") {
   output_name = "netstack_neighbor_fidl_test"
   deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
+    "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
     "//sdk/fidl/fuchsia.net.neighbor:fuchsia.net.neighbor_rust",
     "//src/connectivity/lib/net-declare",

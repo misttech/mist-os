@@ -116,7 +116,12 @@ async fn interface_disruption<N: Netstack>(name: &str, ip_supported: IpSupported
                     |&fnet_interfaces_ext::Address {
                          addr: fnet::Subnet { addr, prefix_len: _ },
                          valid_until: _,
+                         assignment_state,
                      }| {
+                        assert_eq!(
+                            assignment_state,
+                            fnet_interfaces::AddressAssignmentState::Assigned
+                        );
                         match addr {
                             fnet::IpAddress::Ipv4(fnet::Ipv4Address { addr: _ }) => None,
                             fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr }) => {
@@ -197,8 +202,11 @@ async fn interface_disruption<N: Netstack>(name: &str, ip_supported: IpSupported
     let wait_for_dhcpv4 = || async {
         let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(client_if.id());
         let fnet::Subnet { addr, prefix_len: _ } = fnet_interfaces_ext::wait_interface_with_id(
-            fnet_interfaces_ext::event_stream_from_state(&client_interfaces_state)
-                .expect("get interface event stream"),
+            fnet_interfaces_ext::event_stream_from_state(
+                &client_interfaces_state,
+                fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+            )
+            .expect("get interface event stream"),
             &mut state,
             |fnet_interfaces_ext::Properties {
                  addresses,
@@ -213,7 +221,11 @@ async fn interface_disruption<N: Netstack>(name: &str, ip_supported: IpSupported
                     return None;
                 }
                 addresses.iter().find_map(
-                    |&fnet_interfaces_ext::Address { addr, valid_until: _ }| {
+                    |&fnet_interfaces_ext::Address { addr, valid_until: _, assignment_state }| {
+                        assert_eq!(
+                            assignment_state,
+                            fnet_interfaces::AddressAssignmentState::Assigned
+                        );
                         (addr == dhcpv4::DEFAULT_TEST_CONFIG.expected_acquired()).then_some(addr)
                     },
                 )

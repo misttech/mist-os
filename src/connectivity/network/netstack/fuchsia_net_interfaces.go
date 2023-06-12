@@ -60,10 +60,11 @@ func hasAllSecondaryProperties(addr interfaces.Address) bool {
 var _ interfaces.WatcherWithCtx = (*interfaceWatcherImpl)(nil)
 
 type interfaceWatcherImpl struct {
-	cancelServe  context.CancelFunc
-	ready        chan struct{}
-	addrInterest interfaces.AddressPropertiesInterest
-	mu           struct {
+	cancelServe                 context.CancelFunc
+	ready                       chan struct{}
+	addrInterest                interfaces.AddressPropertiesInterest
+	includeNonAssignedAddresses bool
+	mu                          struct {
 		sync.Mutex
 		isHanging bool
 		queue     []interfaces.Event
@@ -92,39 +93,102 @@ func (wi *interfaceWatcherImpl) onEvent(e interfaces.Event) {
 	}
 }
 
-// filterAddressProperties returns a list of addresses with disinterested
-// properties cleared.
+// filterAddressesAndProperties returns a list of addresses with disinterested
+// addresses and properties cleared.
 //
 // Does not modify addresses and returns a new slice.
-func (wi *interfaceWatcherImpl) filterAddressProperties(addresses []interfaces.Address) []interfaces.Address {
-	rtn := append([]interfaces.Address(nil), addresses...)
+func (wi *interfaceWatcherImpl) filterAddressesAndProperties(addresses []interfaces.Address) []interfaces.Address {
+	rtn := make([]interfaces.Address, 0, len(addresses))
 	clearValidUntil := !wi.addrInterest.HasBits(interfaces.AddressPropertiesInterestValidUntil)
 	clearPreferredLifetimeInfo := !wi.addrInterest.HasBits(interfaces.AddressPropertiesInterestPreferredLifetimeInfo)
-	if !clearValidUntil && !clearPreferredLifetimeInfo {
-		return rtn
-	}
-	for i := range rtn {
-		addr := &rtn[i]
+	for _, addr := range addresses {
+		if !wi.includeNonAssignedAddresses {
+			switch state := addr.GetAssignmentState(); state {
+			case interfaces.AddressAssignmentStateAssigned:
+			case interfaces.AddressAssignmentStateTentative, interfaces.AddressAssignmentStateUnavailable:
+				// If the address is not assigned and the watcher does not want us to
+				// include non-assigned addresses, skip the address.
+				continue
+			default:
+				panic(fmt.Sprintf("unexpected assignment state = %d", state))
+			}
+		}
+
 		if clearValidUntil {
 			addr.ClearValidUntil()
 		}
 		if clearPreferredLifetimeInfo {
 			addr.ClearPreferredLifetimeInfo()
 		}
+		rtn = append(rtn, addr)
 	}
 	return rtn
+}
+
+type assignmentStateChange int
+
+const (
+	_ assignmentStateChange = iota
+	assignmentStateChangeInvolvingAssigned
+	assignmentStateChangeNotInvolvingAssigned
+	assignmentStateUnchangedAtAssigned
+	assignmentStateUnchangedAtNonassigned
+)
+
+type changedAddressProperties struct {
+	// When the address is added/removed, the interested properties field is
+	// always zero since the only interesting event during such events in the
+	// assignment state change.
+	//
+	// Note that we repurpose interfaces.AddressPropertiesInterest to hold the
+	// fields that has changed instead of any specific watcher's interest in
+	// address properties. This is so that we can easily check if the set of
+	// changed properties intersects with a watcher's set of interested
+	// properties.
+	properties      interfaces.AddressPropertiesInterest
+	assignmentState assignmentStateChange
+}
+
+func (c *changedAddressProperties) anyOfInterest(includeAllAddresses bool, includeProperties interfaces.AddressPropertiesInterest) bool {
+	switch c.assignmentState {
+	case assignmentStateChangeInvolvingAssigned:
+		// All watchers receive updates if the state transitioned from/to assigned.
+		return true
+	case assignmentStateChangeNotInvolvingAssigned:
+		// This is change where the previous and new state are both not assigned.
+		// This change is only of interest to the watcher if they are interested
+		// in all addresses. Note that the other address properties don't matter
+		// here since if the address is not of interest to watchers, then property
+		// changes aren't either for such addresses.
+		return includeAllAddresses
+	case assignmentStateUnchangedAtNonassigned:
+		// If the addresses remained at an unassigned state and the watcher is not
+		// interested in those addresses, then the properties are not of interest
+		// either.
+		if !includeAllAddresses {
+			return false
+		}
+		fallthrough
+	case assignmentStateUnchangedAtAssigned:
+		// All watchers are interested in changes to assigned addresses so if the
+		// properties changed, then it is of interest to the watcher.
+		return c.properties&includeProperties != 0
+	default:
+		panic(fmt.Sprintf("unexpected assignment state change = %d", c.assignmentState))
+	}
 }
 
 // onAddressesChanged handles an address for this watcher client.
 //
 // Does not modify addresses.
-func (wi *interfaceWatcherImpl) onAddressesChanged(nicid tcpip.NICID, addresses []interfaces.Address, removedOrAdded bool, propertiesChanged interfaces.AddressPropertiesInterest) {
-	if !removedOrAdded && (propertiesChanged&wi.addrInterest == 0) {
+func (wi *interfaceWatcherImpl) onAddressesChanged(nicid tcpip.NICID, addresses []interfaces.Address, changes changedAddressProperties) {
+	if !changes.anyOfInterest(wi.includeNonAssignedAddresses, wi.addrInterest) {
+		// No changes of interest happened to the address.
 		return
 	}
 	var changed interfaces.Properties
 	changed.SetId(uint64(nicid))
-	changed.SetAddresses(wi.filterAddressProperties(addresses))
+	changed.SetAddresses(wi.filterAddressesAndProperties(addresses))
 	wi.onEvent(interfaces.EventWithChanged(changed))
 }
 
@@ -353,27 +417,8 @@ type addressProperties struct {
 	state     stack.AddressAssignmentState
 }
 
-func diffAddressProperties(properties1, properties2 addressProperties) interfaces.AddressPropertiesInterest {
-	var bitflag interfaces.AddressPropertiesInterest
-	if properties1.lifetimes.ValidUntil != properties2.lifetimes.ValidUntil {
-		bitflag |= interfaces.AddressPropertiesInterestValidUntil
-	}
-	if properties1.lifetimes.Deprecated != properties2.lifetimes.Deprecated ||
-		properties1.lifetimes.PreferredUntil != properties2.lifetimes.PreferredUntil {
-		bitflag |= interfaces.AddressPropertiesInterestPreferredLifetimeInfo
-	}
-	return bitflag
-}
-
-// isAddressVisible returns whether an address should be visible to clients.
-//
-// Returns true iff the address is IPv4 or the address is IPv6 and assigned.
-// In particular, IPv6 addresses are not visible to clients while the interface
-// they are assigned to is offline, or they are tentative (yet to pass DAD).
-//
-// TODO(https://fxbug.dev/113056): Expose the address assignment state via
-// the API directly instead of hiding addresses in disabled/tentative state.
-func isAddressVisible(state stack.AddressAssignmentState) bool {
+// isAddressAssigned returns whether an address is considered assigned.
+func isAddressAssigned(state stack.AddressAssignmentState) bool {
 	switch state {
 	case stack.AddressAssigned:
 		return true
@@ -398,21 +443,19 @@ type interfaceProperties struct {
 func addressMapToSlice(addressMap map[tcpip.ProtocolAddress]addressProperties) []interfaces.Address {
 	var addressSlice []interfaces.Address
 	for protocolAddr, properties := range addressMap {
-		if isAddressVisible(properties.state) {
-			var addr interfaces.Address
-			addr.SetAddr(fidlconv.ToNetSubnet(protocolAddr.AddressWithPrefix))
-			addr.SetValidUntil(int64(toZxTimeInfiniteIfZero(properties.lifetimes.ValidUntil)))
-			info := func() interfaces.PreferredLifetimeInfo {
-				if properties.lifetimes.Deprecated {
-					return interfaces.PreferredLifetimeInfoWithDeprecated(interfaces.Empty{})
-				} else {
-					return interfaces.PreferredLifetimeInfoWithPreferredUntil(int64(toZxTimeInfiniteIfZero(properties.lifetimes.PreferredUntil)))
-				}
-			}()
-			addr.SetPreferredLifetimeInfo(info)
-
-			addressSlice = append(addressSlice, addr)
-		}
+		var addr interfaces.Address
+		addr.SetAddr(fidlconv.ToNetSubnet(protocolAddr.AddressWithPrefix))
+		addr.SetValidUntil(int64(toZxTimeInfiniteIfZero(properties.lifetimes.ValidUntil)))
+		info := func() interfaces.PreferredLifetimeInfo {
+			if properties.lifetimes.Deprecated {
+				return interfaces.PreferredLifetimeInfoWithDeprecated(interfaces.Empty{})
+			} else {
+				return interfaces.PreferredLifetimeInfoWithPreferredUntil(int64(toZxTimeInfiniteIfZero(properties.lifetimes.PreferredUntil)))
+			}
+		}()
+		addr.SetPreferredLifetimeInfo(info)
+		addr.SetAssignmentState(fidlconv.ToAddressAssignmentState(properties.state))
+		addressSlice = append(addressSlice, addr)
 	}
 
 	sort.Slice(addressSlice, func(i, j int) bool {
@@ -432,21 +475,51 @@ type fidlInterfaceWatcherStats struct {
 	count atomic.Int64
 }
 
-func addressesChangeType(previouslyKnown bool, prevProperties, nextProperties addressProperties) (interfaces.AddressPropertiesInterest, bool) {
-	nextVisible := isAddressVisible(nextProperties.state)
+func addedRemovedAddressChangeType(properties addressProperties) changedAddressProperties {
+	var assignmentState assignmentStateChange
+	if isAddressAssigned(properties.state) {
+		assignmentState = assignmentStateChangeInvolvingAssigned
+	} else {
+		assignmentState = assignmentStateChangeNotInvolvingAssigned
+	}
+	return changedAddressProperties{assignmentState: assignmentState}
+}
+
+func addressesChangeType(previouslyKnown bool, prevProperties, nextProperties addressProperties) changedAddressProperties {
 	if !previouslyKnown {
-		return 0, nextVisible
+		// If the address was previously unknown, treat the "previous" assignment
+		// state like it was some imaginary state indicating "not added".
+		return addedRemovedAddressChangeType(nextProperties)
 	}
-	if prevProperties == nextProperties {
-		return 0, false
+
+	var properties interfaces.AddressPropertiesInterest
+	if prevProperties.lifetimes.ValidUntil != nextProperties.lifetimes.ValidUntil {
+		properties |= interfaces.AddressPropertiesInterestValidUntil
 	}
-	if prevVisible := isAddressVisible(prevProperties.state); prevVisible != nextVisible {
-		return 0, true
+	if prevProperties.lifetimes.Deprecated != nextProperties.lifetimes.Deprecated ||
+		prevProperties.lifetimes.PreferredUntil != nextProperties.lifetimes.PreferredUntil {
+		properties |= interfaces.AddressPropertiesInterestPreferredLifetimeInfo
 	}
-	if !nextVisible {
-		return 0, false
+
+	assignmentState := func() assignmentStateChange {
+		if prevProperties.state == nextProperties.state {
+			if isAddressAssigned(nextProperties.state) {
+				return assignmentStateUnchangedAtAssigned
+			}
+			return assignmentStateUnchangedAtNonassigned
+		}
+
+		if isAddressAssigned(prevProperties.state) || isAddressAssigned(nextProperties.state) {
+			return assignmentStateChangeInvolvingAssigned
+		}
+
+		return assignmentStateChangeNotInvolvingAssigned
+	}()
+
+	return changedAddressProperties{
+		properties:      properties,
+		assignmentState: assignmentState,
 	}
-	return diffAddressProperties(prevProperties, nextProperties), false
 }
 
 func interfaceWatcherEventLoop(
@@ -593,16 +666,16 @@ func interfaceWatcherEventLoop(
 
 				// Due to the frequency of lifetime changes in certain environments, don't
 				// log when the only difference is in address lifetimes in assigned state.
-				if !found || nextProperties.state != prevProperties.state || nextProperties.state != stack.AddressAssigned {
+				if !found || nextProperties.state != prevProperties.state {
 					syslog.InfoTf(watcherProtocolName, "address changed event: %s", event)
 				}
 
-				propertyChangedBitflag, addedOrRemoved := addressesChangeType(found, prevProperties, nextProperties)
-				if propertyChangedBitflag == 0 && !addedOrRemoved {
+				changes := addressesChangeType(found, prevProperties, nextProperties)
+				if !changes.anyOfInterest(true, interfaces.AddressPropertiesInterest_Mask) {
 					break
 				}
 				for w := range watchers {
-					w.onAddressesChanged(event.nicid, addresses, addedOrRemoved, propertyChangedBitflag)
+					w.onAddressesChanged(event.nicid, addresses, changes)
 				}
 			case *addressRemoved:
 				syslog.InfoTf(watcherProtocolName, "address removed event: %s", event)
@@ -620,19 +693,20 @@ func interfaceWatcherEventLoop(
 				properties.SetAddresses(addresses)
 				propertiesMap[event.nicid] = properties
 
-				if !isAddressVisible(addrProperties.state) {
-					break
-				}
+				// Treat the new assignment state as if it was some imaginary state
+				// indicating "not added".
+				changes := addedRemovedAddressChangeType(addrProperties)
 				for w := range watchers {
-					w.onAddressesChanged(event.nicid, addresses, true /* addedOrRemoved */, interfaces.AddressPropertiesInterest(0))
+					w.onAddressesChanged(event.nicid, addresses, changes)
 				}
 			}
 		case watcher := <-watcherChan:
 			watcherCtx, cancel := context.WithCancel(ctx)
 			impl := interfaceWatcherImpl{
-				ready:        make(chan struct{}, 1),
-				cancelServe:  cancel,
-				addrInterest: watcher.options.GetAddressPropertiesInterestWithDefault(0),
+				ready:                       make(chan struct{}, 1),
+				cancelServe:                 cancel,
+				addrInterest:                watcher.options.GetAddressPropertiesInterestWithDefault(0),
+				includeNonAssignedAddresses: watcher.options.GetIncludeNonAssignedAddressesWithDefault(false),
 			}
 			impl.mu.queue = make([]interfaces.Event, 0, maxInterfaceWatcherQueueLen)
 
@@ -641,7 +715,7 @@ func interfaceWatcherEventLoop(
 				// addresses so that updates to the current interface state
 				// don't accidentally change enqueued events.
 				properties := properties.Properties
-				properties.SetAddresses(impl.filterAddressProperties(properties.GetAddresses()))
+				properties.SetAddresses(impl.filterAddressesAndProperties(properties.GetAddresses()))
 				impl.onEvent(interfaces.EventWithExisting(properties))
 			}
 			impl.mu.queue = append(impl.mu.queue, interfaces.EventWithIdle(interfaces.Empty{}))

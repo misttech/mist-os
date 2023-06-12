@@ -5,20 +5,21 @@
 #![cfg(test)]
 
 use anyhow::Context as _;
+use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fuchsia_async::{self as fasync, TimeoutExt as _};
 use fuchsia_zircon as zx;
-use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
+use futures::{FutureExt as _, Stream, StreamExt as _, TryStreamExt as _};
 use itertools::Itertools as _;
 use net_declare::{fidl_ip, fidl_subnet, std_ip};
 use net_types::ip::IpVersion;
 use netemul::{RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _};
-use netstack_testing_common::Result;
 use netstack_testing_common::{
     interfaces,
     realms::{Netstack, Netstack2, NetstackVersion, TestSandboxExt as _},
+    Result,
 };
 use netstack_testing_macros::netstack_test;
 use std::collections::{HashMap, HashSet};
@@ -63,10 +64,14 @@ async fn watcher_existing<N: Netstack>(name: &str) {
                                 fidl_fuchsia_net_interfaces_ext::Address {
                                     addr: fidl_subnet!("127.0.0.1/8"),
                                     valid_until: zx::sys::ZX_TIME_INFINITE,
+                                    assignment_state:
+                                        fnet_interfaces::AddressAssignmentState::Assigned,
                                 },
                                 fidl_fuchsia_net_interfaces_ext::Address {
                                     addr: fidl_subnet!("::1/128"),
                                     valid_until: zx::sys::ZX_TIME_INFINITE,
+                                    assignment_state:
+                                        fnet_interfaces::AddressAssignmentState::Assigned,
                                 },
                             ],
                             has_default_ipv4_route: false,
@@ -95,6 +100,7 @@ async fn watcher_existing<N: Netstack>(name: &str) {
                     addresses.contains(&fidl_fuchsia_net_interfaces_ext::Address {
                         addr: *addr,
                         valid_until: zx::sys::ZX_TIME_INFINITE,
+                        assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
                     }) && *online
                         && name == rhs_name
                         && id == &rhs_id.get()
@@ -200,8 +206,11 @@ async fn watcher_existing<N: Netstack>(name: &str) {
     // interface watcher to observe the interface that is added most recently to
     // be offline. Guard against this by waiting for all interfaces to be online.
     fidl_fuchsia_net_interfaces_ext::wait_interface(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interfaces_state)
-            .expect("get interface event stream"),
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+            &interfaces_state,
+            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .expect("get interface event stream"),
         &mut HashMap::<u64, _>::new(),
         |properties_map| {
             (properties_map
@@ -229,8 +238,11 @@ async fn watcher_existing<N: Netstack>(name: &str) {
     .expect("waiting for all interfaces to be online");
 
     let mut interfaces = fidl_fuchsia_net_interfaces_ext::existing(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interfaces_state)
-            .expect("get interface event stream"),
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+            &interfaces_state,
+            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .expect("get interface event stream"),
         HashMap::<u64, _>::new(),
     )
     .await
@@ -256,9 +268,11 @@ async fn watcher_after_state_closed<N: Netstack>(name: &str) {
         let interfaces_state = realm
             .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
             .expect("connect to protocol");
-        let event_stream =
-            fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interfaces_state)
-                .expect("get interface event stream");
+        let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+            &interfaces_state,
+            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .expect("get interface event stream");
         event_stream
     };
 
@@ -280,10 +294,12 @@ async fn watcher_after_state_closed<N: Netstack>(name: &str) {
                     fidl_fuchsia_net_interfaces_ext::Address {
                         addr: fidl_subnet!("127.0.0.1/8"),
                         valid_until: zx::sys::ZX_TIME_INFINITE,
+                        assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
                     },
                     fidl_fuchsia_net_interfaces_ext::Address {
                         addr: fidl_subnet!("::1/128"),
                         valid_until: zx::sys::ZX_TIME_INFINITE,
+                        assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
                     },
                 ],
                 has_default_ipv4_route: false,
@@ -316,8 +332,11 @@ async fn test_add_remove_interface<N: Netstack>(name: &str) {
     let interface_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("connect to protocol");
-    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
-        .expect("get interface event stream");
+    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+        &interface_state,
+        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+    )
+    .expect("get interface event stream");
     futures::pin_mut!(event_stream);
 
     let mut if_map = HashMap::<u64, _>::new();
@@ -340,6 +359,127 @@ async fn test_add_remove_interface<N: Netstack>(name: &str) {
     .expect("observe interface deletion");
 }
 
+/// Tests that including all addresses includes temporary and unavailable
+/// addresses.
+#[netstack_test]
+async fn test_include_all_addresses<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+
+    let interface_state = realm
+        .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
+        .expect("connect to protocol");
+    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+        &interface_state,
+        fidl_fuchsia_net_interfaces_ext::IncludedAddresses::All,
+    )
+    .expect("get interface event stream");
+    futures::pin_mut!(event_stream);
+
+    let device = sandbox.create_endpoint(name).await.expect("create endpoint");
+    device.set_link_up(true).await.expect("send link up");
+    let iface = device.into_interface_in_realm(&realm).await.expect("add device");
+    let id = iface.id();
+
+    let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(id);
+    fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
+        event_stream.by_ref(),
+        &mut state,
+        |_| Some(()),
+    )
+    .await
+    .expect("observe interface addition");
+
+    const IPV6_ADDRESS: fidl_fuchsia_net::Subnet = fidl_subnet!("a::1/64");
+
+    async fn want_until_address_state(
+        want_assignment_state: fidl_fuchsia_net_interfaces::AddressAssignmentState,
+        state: &mut fidl_fuchsia_net_interfaces_ext::InterfaceState,
+        event_stream: impl Stream<
+            Item = std::result::Result<fidl_fuchsia_net_interfaces::Event, fidl::Error>,
+        >,
+    ) {
+        fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
+            event_stream,
+            state,
+            |fidl_fuchsia_net_interfaces_ext::Properties {
+                 id: _,
+                 name: _,
+                 device_class: _,
+                 online: _,
+                 has_default_ipv4_route: _,
+                 has_default_ipv6_route: _,
+                 addresses,
+             }| {
+                addresses
+                    .iter()
+                    .any(
+                        |fidl_fuchsia_net_interfaces_ext::Address {
+                             addr,
+                             valid_until: _,
+                             assignment_state,
+                         }| {
+                            *addr == IPV6_ADDRESS && *assignment_state == want_assignment_state
+                        },
+                    )
+                    .then_some(())
+            },
+        )
+        .await
+        .expect("observe address change")
+    }
+
+    // Address should appear as unavailable when it is added on a disabled
+    // interface.
+    {
+        let (address_state_provider, server) = fidl::endpoints::create_proxy::<
+            fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
+        >()
+        .expect("create proxy");
+        address_state_provider.detach().expect("detach address lifetime");
+        iface
+            .control()
+            .add_address(
+                &mut IPV6_ADDRESS.clone(),
+                fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+                server,
+            )
+            .expect("send add address request");
+    }
+    want_until_address_state(
+        fidl_fuchsia_net_interfaces::AddressAssignmentState::Unavailable,
+        &mut state,
+        event_stream.by_ref(),
+    )
+    .await;
+
+    // We should see the address transition from unavailable to tentative then
+    // assigned when the interface is assigned.
+    assert!(iface.control().enable().await.expect("send enable").expect("enable interface"));
+    want_until_address_state(
+        fidl_fuchsia_net_interfaces::AddressAssignmentState::Tentative,
+        &mut state,
+        event_stream.by_ref(),
+    )
+    .await;
+    want_until_address_state(
+        fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned,
+        &mut state,
+        event_stream.by_ref(),
+    )
+    .await;
+
+    // We should see the address transition from assigned to unavailable when
+    // the interface is disabled.
+    assert!(iface.control().disable().await.expect("send enable").expect("enable interface"));
+    want_until_address_state(
+        fidl_fuchsia_net_interfaces::AddressAssignmentState::Unavailable,
+        &mut state,
+        event_stream.by_ref(),
+    )
+    .await;
+}
+
 /// Tests that adding/removing a default route causes an interface changed event.
 #[netstack_test]
 async fn test_add_remove_default_route<N: Netstack, I: net_types::ip::Ip>(name: &str) {
@@ -355,8 +495,11 @@ async fn test_add_remove_default_route<N: Netstack, I: net_types::ip::Ip>(name: 
     let interface_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("connect to protocol");
-    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
-        .expect("get interface event stream");
+    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+        &interface_state,
+        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+    )
+    .expect("get interface event stream");
     futures::pin_mut!(event_stream);
     let mut if_map = HashMap::<u64, _>::new();
     fidl_fuchsia_net_interfaces_ext::wait_interface(event_stream.by_ref(), &mut if_map, |if_map| {
@@ -439,8 +582,11 @@ async fn test_close_interface<N: Netstack>(test_name: &str, sub_test_name: &str,
     let interface_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("connect to protocol");
-    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
-        .expect("get interface event stream");
+    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+        &interface_state,
+        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+    )
+    .expect("get interface event stream");
     futures::pin_mut!(event_stream);
     let mut if_map = HashMap::<u64, _>::new();
     let () = fidl_fuchsia_net_interfaces_ext::wait_interface(
@@ -471,8 +617,11 @@ async fn test_down_close_race<N: Netstack>(name: &str) {
     let interface_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("connect to protocol");
-    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
-        .expect("event stream from state");
+    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+        &interface_state,
+        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+    )
+    .expect("event stream from state");
     futures::pin_mut!(event_stream);
     let mut if_map = HashMap::<u64, _>::new();
 
@@ -538,8 +687,11 @@ async fn test_close_data_race<N: Netstack>(name: &str) {
     let interface_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("connect to protocol");
-    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
-        .expect("get interface event stream");
+    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+        &interface_state,
+        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+    )
+    .expect("get interface event stream");
     futures::pin_mut!(event_stream);
     let mut if_map = HashMap::<u64, _>::new();
     for _ in 0..10u64 {
@@ -648,10 +800,13 @@ async fn test_remove_enabled_interface<N: Netstack>(name: &str) {
         .expect("install in realm");
     ep.set_link_up(true).await.expect("bring link up");
 
-    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
-        .expect("get interface event stream")
-        .map(|r| r.expect("watcher error"))
-        .fuse();
+    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+        &interface_state,
+        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+    )
+    .expect("get interface event stream")
+    .map(|r| r.expect("watcher error"))
+    .fuse();
     futures::pin_mut!(event_stream);
 
     // Consume the watcher until we see the idle event.
@@ -715,10 +870,13 @@ async fn test_watcher_online_edges<N: Netstack>(name: &str) {
     let interface_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("connect to protocol");
-    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
-        .expect("get interface event stream")
-        .map(|r| r.expect("watcher error"))
-        .fuse();
+    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+        &interface_state,
+        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+    )
+    .expect("get interface event stream")
+    .map(|r| r.expect("watcher error"))
+    .fuse();
     futures::pin_mut!(event_stream);
 
     // Consume the watcher until we see the idle event.
@@ -1080,9 +1238,12 @@ async fn addresses_while_offline(name: &str, addr_with_prefix: fidl_fuchsia_net:
     let interface_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("connect to protocol");
-    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
-        .expect("event stream from state")
-        .fuse();
+    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+        &interface_state,
+        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+    )
+    .expect("event stream from state")
+    .fuse();
     futures::pin_mut!(event_stream);
     let mut if_state = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(interface.id());
 
@@ -1091,8 +1252,9 @@ async fn addresses_while_offline(name: &str, addr_with_prefix: fidl_fuchsia_net:
         want: fidl_fuchsia_net::Subnet,
     ) -> bool {
         addresses.into_iter().any(
-            |&fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until }| {
+            |&fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until, assignment_state }| {
                 assert_eq!(valid_until, zx::sys::ZX_TIME_INFINITE);
+                assert_eq!(assignment_state, fnet_interfaces::AddressAssignmentState::Assigned);
                 addr == want
             },
         )
@@ -1320,6 +1482,7 @@ async fn watcher(name: &str) {
                                 prefix_len: _,
                             },
                             valid_until: _,
+                            assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
                         }
                     );
                     addr
@@ -1398,6 +1561,7 @@ async fn watcher(name: &str) {
         .chain(std::iter::once(fidl_fuchsia_net_interfaces_ext::Address {
             addr: subnet,
             valid_until: zx::sys::ZX_TIME_INFINITE,
+            assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
         }))
         .collect();
     assert_eq!(addresses_changed(next(&mut blocking_stream).await), want);
@@ -1559,7 +1723,14 @@ async fn test_readded_address_present<N: Netstack>(name: &str) {
     let addresses = interface.get_addrs().await.expect("get addresses");
     assert!(
         addresses.iter().any(
-            |&fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until: _ }| { addr == SRC_IP }
+            |&fidl_fuchsia_net_interfaces_ext::Address {
+                 addr,
+                 valid_until: _,
+                 assignment_state,
+             }| {
+                assert_eq!(assignment_state, fnet_interfaces::AddressAssignmentState::Assigned);
+                addr == SRC_IP
+            }
         ),
         "{:?} missing from addresses {:?}",
         SRC_IP,
@@ -1664,9 +1835,19 @@ async fn test_lifetime_change_on_hidden_addr<N: Netstack>(
          }| {
             addresses
                 .iter()
-                .any(|fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until: _ }| {
-                    *addr == ADDR
-                })
+                .any(
+                    |fidl_fuchsia_net_interfaces_ext::Address {
+                         addr,
+                         valid_until: _,
+                         assignment_state,
+                     }| {
+                        assert_eq!(
+                            *assignment_state,
+                            fnet_interfaces::AddressAssignmentState::Assigned
+                        );
+                        *addr == ADDR
+                    },
+                )
                 .then_some(())
         },
     )

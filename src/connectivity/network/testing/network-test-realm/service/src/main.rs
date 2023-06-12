@@ -237,7 +237,11 @@ async fn wait_for_any_ip_address(
     connector: &HermeticNetworkConnector,
 ) -> Result<(), fntr::Error> {
     let state_proxy = connector.connect_to_protocol::<fnet_interfaces::StateMarker>()?;
-    let stream = fnet_interfaces_ext::event_stream_from_state(&state_proxy).map_err(|e| {
+    let stream = fnet_interfaces_ext::event_stream_from_state(
+        &state_proxy,
+        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+    )
+    .map_err(|e| {
         error!("failed to read interface stream: {:?}", e);
         fntr::Error::Internal
     })?;
@@ -265,7 +269,11 @@ async fn find_interface_id_and_status(
     connector: &impl Connector,
 ) -> Result<(u64, bool), fntr::Error> {
     let state_proxy = connector.connect_to_protocol::<fnet_interfaces::StateMarker>()?;
-    let stream = fnet_interfaces_ext::event_stream_from_state(&state_proxy).map_err(|e| {
+    let stream = fnet_interfaces_ext::event_stream_from_state(
+        &state_proxy,
+        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+    )
+    .map_err(|e| {
         error!("failed to read interface stream: {:?}", e);
         fntr::Error::Internal
     })?;

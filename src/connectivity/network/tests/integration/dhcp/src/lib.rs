@@ -93,9 +93,11 @@ async fn assert_client_acquires_addr<D: DhcpClient>(
     let client_interface_state = client_realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("failed to connect to client fuchsia.net.interfaces/State");
-    let event_stream =
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&client_interface_state)
-            .expect("event stream from state");
+    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+        &client_interface_state,
+        fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+    )
+    .expect("event stream from state");
     futures::pin_mut!(event_stream);
 
     let mut properties =
@@ -163,7 +165,15 @@ async fn assert_client_acquires_addr<D: DhcpClient>(
                      name: _,
                  }| {
                     if addresses.iter().any(
-                        |&fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until: _ }| {
+                        |&fidl_fuchsia_net_interfaces_ext::Address {
+                             addr,
+                             valid_until: _,
+                             assignment_state,
+                         }| {
+                            assert_eq!(
+                                assignment_state,
+                                fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned
+                            );
                             addr == expected_acquired
                         },
                     ) {
@@ -203,7 +213,15 @@ async fn assert_interface_assigned_addr(
              name: _,
          }| {
             addresses.iter().find_map(
-                |&fidl_fuchsia_net_interfaces_ext::Address { addr: subnet, valid_until }| {
+                |&fidl_fuchsia_net_interfaces_ext::Address {
+                     addr: subnet,
+                     valid_until,
+                     assignment_state,
+                 }| {
+                    assert_eq!(
+                        assignment_state,
+                        fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned
+                    );
                     let fidl_fuchsia_net::Subnet { addr, prefix_len: _ } = subnet;
                     match addr {
                         fidl_fuchsia_net::IpAddress::Ipv4(_) => {

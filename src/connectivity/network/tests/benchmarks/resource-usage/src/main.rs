@@ -87,8 +87,11 @@ async fn run_benchmark<W: Workload, N: Netstack>(
             .connect_to_protocol::<fnet_interfaces::StateMarker>()
             .expect("connect to protocol");
         fnet_interfaces_ext::existing(
-            fnet_interfaces_ext::event_stream_from_state(&interfaces_state)
-                .expect("get interface event stream"),
+            fnet_interfaces_ext::event_stream_from_state(
+                &interfaces_state,
+                fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+            )
+            .expect("get interface event stream"),
             HashMap::<u64, _>::new(),
         )
         .await

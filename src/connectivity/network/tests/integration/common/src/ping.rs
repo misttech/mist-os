@@ -94,7 +94,12 @@ impl<'a> Node<'a> {
                  &fidl_fuchsia_net_interfaces_ext::Address {
                      addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
                      valid_until: _,
+                     assignment_state,
                  }| {
+                    assert_eq!(
+                        assignment_state,
+                        fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned
+                    );
                     match addr {
                         fidl_fuchsia_net::IpAddress::Ipv4(fidl_fuchsia_net::Ipv4Address {
                             addr,

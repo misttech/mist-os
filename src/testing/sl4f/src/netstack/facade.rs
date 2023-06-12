@@ -91,7 +91,17 @@ impl From<(fidl_fuchsia_net_interfaces_ext::Properties, Option<fidl_fuchsia_net:
         };
         let (ipv4_addresses, ipv6_addresses) =
             addresses.into_iter().partition_map::<_, _, _, std::net::Ipv4Addr, std::net::Ipv6Addr>(
-                |fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until: _ }| {
+                |fidl_fuchsia_net_interfaces_ext::Address {
+                     addr,
+                     valid_until: _,
+                     assignment_state,
+                 }| {
+                    // Event stream is created with `IncludedAddresses::OnlyAssigned`.
+                    assert_eq!(
+                        assignment_state,
+                        fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned,
+                        "Support for unassigned addresses have not been implemented",
+                    );
                     let fidl_fuchsia_net_ext::Subnet { addr, prefix_len: _ } = addr.into();
                     let fidl_fuchsia_net_ext::IpAddress(addr) = addr;
                     match addr {
@@ -220,7 +230,12 @@ impl NetstackFacade {
     pub async fn list_interfaces(&self) -> Result<Vec<Properties>, Error> {
         let interfaces_state = self.get_interfaces_state().await?;
         let debug_interfaces = self.get_debug_interfaces().await?;
-        let stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(interfaces_state)?;
+        // Only `OnlyAssigned` is implemented; additional work is required to
+        // support unassigned addresses.
+        let stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+            interfaces_state,
+            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )?;
         let response = fidl_fuchsia_net_interfaces_ext::existing(
             stream,
             std::collections::HashMap::<u64, _>::new(),

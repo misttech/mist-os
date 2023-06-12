@@ -282,7 +282,10 @@ async fn do_if<C: NetCliDepsConnector>(
                 connect_with_context::<fdebug::InterfacesMarker, _>(connector).await?;
             let interface_state =
                 connect_with_context::<finterfaces::StateMarker, _>(connector).await?;
-            let stream = finterfaces_ext::event_stream_from_state(&interface_state)?;
+            let stream = finterfaces_ext::event_stream_from_state(
+                &interface_state,
+                finterfaces_ext::IncludedAddresses::OnlyAssigned,
+            )?;
             let mut response = finterfaces_ext::existing(stream, HashMap::new()).await?;
             if let Some(name_pattern) = name_pattern {
                 let () = shortlist_interfaces(&name_pattern, &mut response);
@@ -317,7 +320,10 @@ async fn do_if<C: NetCliDepsConnector>(
                 connect_with_context::<fdebug::InterfacesMarker, _>(connector).await?;
             let interface_state =
                 connect_with_context::<finterfaces::StateMarker, _>(connector).await?;
-            let stream = finterfaces_ext::event_stream_from_state(&interface_state)?;
+            let stream = finterfaces_ext::event_stream_from_state(
+                &interface_state,
+                finterfaces_ext::IncludedAddresses::OnlyAssigned,
+            )?;
             let response =
                 finterfaces_ext::existing(stream, finterfaces_ext::InterfaceState::Unknown(id))
                     .await?;
@@ -638,7 +644,10 @@ async fn do_if<C: NetCliDepsConnector>(
             let build_name_to_id_map = || async {
                 let interface_state =
                     connect_with_context::<finterfaces::StateMarker, _>(connector).await?;
-                let stream = finterfaces_ext::event_stream_from_state(&interface_state)?;
+                let stream = finterfaces_ext::event_stream_from_state(
+                    &interface_state,
+                    finterfaces_ext::IncludedAddresses::OnlyAssigned,
+                )?;
                 let response = finterfaces_ext::existing(stream, HashMap::new()).await?;
                 Ok::<HashMap<String, u64>, Error>(
                     response
@@ -2342,13 +2351,20 @@ mac             -
                             addresses: Some(
                                 addresses
                                     .into_iter()
-                                    .map(|finterfaces_ext::Address { addr, valid_until }| {
-                                        finterfaces::Address {
-                                            addr: Some(addr),
-                                            valid_until: Some(valid_until),
-                                            ..Default::default()
-                                        }
-                                    })
+                                    .map(
+                                        |finterfaces_ext::Address {
+                                             addr,
+                                             valid_until,
+                                             assignment_state,
+                                         }| {
+                                            finterfaces::Address {
+                                                addr: Some(addr),
+                                                valid_until: Some(valid_until),
+                                                assignment_state: Some(assignment_state),
+                                                ..Default::default()
+                                            }
+                                        },
+                                    )
                                     .collect(),
                             ),
                             has_default_ipv4_route: Some(has_default_ipv4_route),

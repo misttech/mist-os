@@ -46,15 +46,28 @@ pub fn is_globally_routable(
         return false;
     }
     addresses.iter().any(
-        |Address { addr: fnet::Subnet { addr, prefix_len: _ }, valid_until: _ }| match addr {
-            fnet::IpAddress::Ipv4(fnet::Ipv4Address { addr }) => {
-                has_default_ipv4_route && !net_types::ip::Ipv4Addr::new(*addr).is_link_local()
-            }
-            fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr }) => {
-                has_default_ipv6_route
-                    && net_types::ip::Ipv6Addr::from_bytes(*addr).scope()
-                        == net_types::ip::Ipv6Scope::Global
-            }
+        |Address {
+             addr: fnet::Subnet { addr, prefix_len: _ },
+             valid_until: _,
+             assignment_state,
+         }| {
+            let assigned = match assignment_state {
+                fnet_interfaces::AddressAssignmentState::Assigned => true,
+                fnet_interfaces::AddressAssignmentState::Tentative
+                | fnet_interfaces::AddressAssignmentState::Unavailable => false,
+            };
+            assigned
+                && match addr {
+                    fnet::IpAddress::Ipv4(fnet::Ipv4Address { addr }) => {
+                        has_default_ipv4_route
+                            && !net_types::ip::Ipv4Addr::new(*addr).is_link_local()
+                    }
+                    fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr }) => {
+                        has_default_ipv6_route
+                            && net_types::ip::Ipv6Addr::from_bytes(*addr).scope()
+                                == net_types::ip::Ipv6Scope::Global
+                    }
+                }
         },
     )
 }
@@ -160,21 +173,25 @@ mod tests {
                 fnet_interfaces::Address {
                     addr: Some(IPV4_GLOBAL),
                     valid_until: Some(zx::ZX_TIME_INFINITE),
+                    assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
                     ..Default::default()
                 },
                 fnet_interfaces::Address {
                     addr: Some(IPV4_LINK_LOCAL),
                     valid_until: Some(zx::ZX_TIME_INFINITE),
+                    assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
                     ..Default::default()
                 },
                 fnet_interfaces::Address {
                     addr: Some(IPV6_GLOBAL),
                     valid_until: Some(zx::ZX_TIME_INFINITE),
+                    assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
                     ..Default::default()
                 },
                 fnet_interfaces::Address {
                     addr: Some(IPV6_LINK_LOCAL),
                     valid_until: Some(zx::ZX_TIME_INFINITE),
+                    assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
                     ..Default::default()
                 },
             ]),
@@ -206,22 +223,38 @@ mod tests {
             ..valid_interface(ID).try_into()?
         }));
         assert!(!is_globally_routable(&Properties {
-            addresses: vec![Address { addr: IPV4_GLOBAL, valid_until: zx::ZX_TIME_INFINITE }],
+            addresses: vec![Address {
+                addr: IPV4_GLOBAL,
+                valid_until: zx::ZX_TIME_INFINITE,
+                assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
+            }],
             has_default_ipv4_route: false,
             ..valid_interface(ID).try_into()?
         }));
         assert!(!is_globally_routable(&Properties {
-            addresses: vec![Address { addr: IPV6_GLOBAL, valid_until: zx::ZX_TIME_INFINITE }],
+            addresses: vec![Address {
+                addr: IPV6_GLOBAL,
+                valid_until: zx::ZX_TIME_INFINITE,
+                assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
+            }],
             has_default_ipv6_route: false,
             ..valid_interface(ID).try_into()?
         }));
         assert!(!is_globally_routable(&Properties {
-            addresses: vec![Address { addr: IPV6_LINK_LOCAL, valid_until: zx::ZX_TIME_INFINITE }],
+            addresses: vec![Address {
+                addr: IPV6_LINK_LOCAL,
+                valid_until: zx::ZX_TIME_INFINITE,
+                assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
+            }],
             has_default_ipv6_route: true,
             ..valid_interface(ID).try_into()?
         }));
         assert!(!is_globally_routable(&Properties {
-            addresses: vec![Address { addr: IPV4_LINK_LOCAL, valid_until: zx::ZX_TIME_INFINITE }],
+            addresses: vec![Address {
+                addr: IPV4_LINK_LOCAL,
+                valid_until: zx::ZX_TIME_INFINITE,
+                assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
+            }],
             has_default_ipv4_route: true,
             ..valid_interface(ID).try_into()?
         }));
@@ -229,13 +262,21 @@ mod tests {
         // These combinations are globally routable.
         assert!(is_globally_routable(&valid_interface(ID).try_into()?));
         assert!(is_globally_routable(&Properties {
-            addresses: vec![Address { addr: IPV4_GLOBAL, valid_until: zx::ZX_TIME_INFINITE }],
+            addresses: vec![Address {
+                addr: IPV4_GLOBAL,
+                valid_until: zx::ZX_TIME_INFINITE,
+                assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
+            }],
             has_default_ipv4_route: true,
             has_default_ipv6_route: false,
             ..valid_interface(ID).try_into()?
         }));
         assert!(is_globally_routable(&Properties {
-            addresses: vec![Address { addr: IPV6_GLOBAL, valid_until: zx::ZX_TIME_INFINITE }],
+            addresses: vec![Address {
+                addr: IPV6_GLOBAL,
+                valid_until: zx::ZX_TIME_INFINITE,
+                assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
+            }],
             has_default_ipv4_route: false,
             has_default_ipv6_route: true,
             ..valid_interface(ID).try_into()?

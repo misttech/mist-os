@@ -45,6 +45,7 @@ func testIpv4Address() interfaces.Address {
 	addr.SetAddr(testIpv4Subnet())
 	addr.SetValidUntil(int64(zx.TimensecInfinite))
 	addr.SetPreferredLifetimeInfo(interfaces.PreferredLifetimeInfoWithPreferredUntil(int64(zx.TimensecInfinite)))
+	addr.SetAssignmentState(interfaces.AddressAssignmentStateAssigned)
 	return addr
 }
 
@@ -279,6 +280,7 @@ func TestInterfacesWatcher(t *testing.T) {
 		address.SetAddr(fidlconv.ToNetSubnet(protocolAddr.AddressWithPrefix))
 		address.SetValidUntil(int64(zx.TimensecInfinite))
 		address.SetPreferredLifetimeInfo(interfaces.PreferredLifetimeInfoWithPreferredUntil(int64(zx.TimensecInfinite)))
+		address.SetAssignmentState(interfaces.AddressAssignmentStateAssigned)
 		addressAdded.SetAddresses([]interfaces.Address{address})
 		if err := verifyWatchResults(interfaces.EventWithChanged(addressAdded)); err != nil {
 			t.Fatal(err)
@@ -331,6 +333,7 @@ func TestInterfacesWatcher(t *testing.T) {
 	})
 	address.SetValidUntil(initUpdatedAt.Add(leaseLength.Duration()).MonotonicNano())
 	address.SetPreferredLifetimeInfo(interfaces.PreferredLifetimeInfoWithPreferredUntil(int64(zx.TimensecInfinite)))
+	address.SetAssignmentState(interfaces.AddressAssignmentStateAssigned)
 	dhcpAddressAdded.SetAddresses([]interfaces.Address{address})
 	if err := verifyWatchResults(interfaces.EventWithChanged(dhcpAddressAdded)); err != nil {
 		t.Fatal(err)
@@ -679,6 +682,7 @@ func TestInterfacesWatcherAddressState(t *testing.T) {
 					wantAddress.SetAddr(fidlconv.ToNetSubnet(protocolAddr.AddressWithPrefix))
 					wantAddress.SetValidUntil(int64(zx.TimensecInfinite))
 					wantAddress.SetPreferredLifetimeInfo(interfaces.PreferredLifetimeInfoWithPreferredUntil(int64(zx.TimensecInfinite)))
+					wantAddress.SetAssignmentState(interfaces.AddressAssignmentStateAssigned)
 					var propertiesWithAddress interfaces.Properties
 					propertiesWithAddress.SetId(uint64(ifs.nicid))
 					propertiesWithAddress.SetAddresses([]interfaces.Address{wantAddress})
@@ -747,8 +751,7 @@ func TestAddressesChangeType(t *testing.T) {
 		name                           string
 		previouslyKnown                bool
 		prevProperties, nextProperties addressProperties
-		wantPropertiesDiff             interfaces.AddressPropertiesInterest
-		wantAddedOrRemoved             bool
+		wantChanges                    changedAddressProperties
 	}{
 		{
 			name:            "not previously known and visible",
@@ -757,8 +760,10 @@ func TestAddressesChangeType(t *testing.T) {
 			nextProperties: addressProperties{
 				state: stack.AddressAssigned,
 			},
-			wantPropertiesDiff: interfaces.AddressPropertiesInterest(0),
-			wantAddedOrRemoved: true,
+			wantChanges: changedAddressProperties{
+				properties:      interfaces.AddressPropertiesInterest(0),
+				assignmentState: assignmentStateChangeInvolvingAssigned,
+			},
 		},
 		{
 			name:            "not previously known and not visible",
@@ -767,8 +772,10 @@ func TestAddressesChangeType(t *testing.T) {
 			nextProperties: addressProperties{
 				state: stack.AddressDisabled,
 			},
-			wantPropertiesDiff: interfaces.AddressPropertiesInterest(0),
-			wantAddedOrRemoved: false,
+			wantChanges: changedAddressProperties{
+				properties:      interfaces.AddressPropertiesInterest(0),
+				assignmentState: assignmentStateChangeNotInvolvingAssigned,
+			},
 		},
 		{
 			name:            "invisible to visible",
@@ -779,8 +786,10 @@ func TestAddressesChangeType(t *testing.T) {
 			nextProperties: addressProperties{
 				state: stack.AddressAssigned,
 			},
-			wantPropertiesDiff: interfaces.AddressPropertiesInterest(0),
-			wantAddedOrRemoved: true,
+			wantChanges: changedAddressProperties{
+				properties:      interfaces.AddressPropertiesInterest(0),
+				assignmentState: assignmentStateChangeInvolvingAssigned,
+			},
 		},
 		{
 			name:            "visible to invisible",
@@ -791,8 +800,10 @@ func TestAddressesChangeType(t *testing.T) {
 			nextProperties: addressProperties{
 				state: stack.AddressDisabled,
 			},
-			wantPropertiesDiff: interfaces.AddressPropertiesInterest(0),
-			wantAddedOrRemoved: true,
+			wantChanges: changedAddressProperties{
+				properties:      interfaces.AddressPropertiesInterest(0),
+				assignmentState: assignmentStateChangeInvolvingAssigned,
+			},
 		},
 		{
 			name:            "invisible property change",
@@ -809,8 +820,10 @@ func TestAddressesChangeType(t *testing.T) {
 					Deprecated: false,
 				},
 			},
-			wantPropertiesDiff: interfaces.AddressPropertiesInterest(0),
-			wantAddedOrRemoved: false,
+			wantChanges: changedAddressProperties{
+				properties:      interfaces.AddressPropertiesInterestPreferredLifetimeInfo,
+				assignmentState: assignmentStateUnchangedAtNonassigned,
+			},
 		},
 		{
 			name:            "visible property change",
@@ -827,30 +840,24 @@ func TestAddressesChangeType(t *testing.T) {
 					Deprecated: false,
 				},
 			},
-			wantPropertiesDiff: interfaces.AddressPropertiesInterestPreferredLifetimeInfo,
-			wantAddedOrRemoved: false,
+			wantChanges: changedAddressProperties{
+				properties:      interfaces.AddressPropertiesInterestPreferredLifetimeInfo,
+				assignmentState: assignmentStateUnchangedAtAssigned,
+			},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			gotPropertiesDiff, gotAddedOrRemoved := addressesChangeType(tc.previouslyKnown, tc.prevProperties, tc.nextProperties)
-			if gotPropertiesDiff != tc.wantPropertiesDiff {
-				t.Errorf(
-					"got addressChangeType(%t, %#v, %#v): got (%s, _), want (%s, _)",
+			if gotChanges := addressesChangeType(
+				tc.previouslyKnown,
+				tc.prevProperties,
+				tc.nextProperties,
+			); gotChanges != tc.wantChanges {
+				t.Errorf("got addressChangeType(%t, %#v, %#v) = %#v, want = %#v",
 					tc.previouslyKnown,
 					tc.prevProperties,
 					tc.nextProperties,
-					gotPropertiesDiff,
-					tc.wantPropertiesDiff,
-				)
-			}
-			if gotAddedOrRemoved != tc.wantAddedOrRemoved {
-				t.Errorf(
-					"got addressChangeType(%t, %#v, %#v): got (_, %t), want (_, %t)",
-					tc.previouslyKnown,
-					tc.prevProperties,
-					tc.nextProperties,
-					gotAddedOrRemoved,
-					tc.wantAddedOrRemoved,
+					gotChanges,
+					tc.wantChanges,
 				)
 			}
 		})

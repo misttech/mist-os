@@ -8,8 +8,8 @@ use super::{devices::BindingId, util::IntoFidl};
 use fidl::prelude::*;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces::{
-    self as finterfaces, StateRequest, StateRequestStream, WatcherOptions, WatcherRequest,
-    WatcherRequestStream, WatcherWatchResponder,
+    self as finterfaces, StateRequest, StateRequestStream, WatcherRequest, WatcherRequestStream,
+    WatcherWatchResponder,
 };
 use fidl_fuchsia_net_interfaces_ext as finterfaces_ext;
 use fuchsia_zircon as zx;
@@ -29,6 +29,12 @@ pub(crate) enum Error {
     Fidl(#[from] fidl::Error),
 }
 
+#[cfg_attr(test, derive(Default))]
+pub struct WatcherOptions {
+    address_properties_interest: finterfaces::AddressPropertiesInterest,
+    include_non_assigned_addresses: bool,
+}
+
 /// Serves the `fuchsia.net.interfaces/State` protocol.
 pub(crate) async fn serve(
     stream: StateRequestStream,
@@ -39,12 +45,25 @@ pub(crate) async fn serve(
         .try_fold(sink, |mut sink, req| async move {
             let _ = &req;
             let StateRequest::GetWatcher {
-                options: WatcherOptions { address_properties_interest, .. },
+                options:
+                    finterfaces::WatcherOptions {
+                        address_properties_interest,
+                        include_non_assigned_addresses,
+                        ..
+                    },
                 watcher,
                 control_handle: _,
             } = req;
             let watcher = watcher.into_stream()?;
-            sink.add_watcher(watcher, address_properties_interest).await?;
+            sink.add_watcher(
+                watcher,
+                WatcherOptions {
+                    address_properties_interest: address_properties_interest
+                        .unwrap_or(finterfaces::AddressPropertiesInterest::default()),
+                    include_non_assigned_addresses: include_non_assigned_addresses.unwrap_or(false),
+                },
+            )
+            .await?;
             Ok(sink)
         })
         .map_ok(|_: WorkerWatcherSink| ())
@@ -66,7 +85,10 @@ impl EventQueue {
     /// Creates a new event queue containing all the interfaces in `state`
     /// wrapped in a [`finterfaces::Event::Existing`] followed by a
     /// [`finterfaces::Event::Idle`].
-    fn from_state(state: &HashMap<BindingId, InterfaceState>) -> Result<Self, zx::Status> {
+    fn from_state(
+        state: &HashMap<BindingId, InterfaceState>,
+        include_non_assigned_addresses: bool,
+    ) -> Result<Self, zx::Status> {
         // NB: Leave room for idle event.
         if state.len() >= MAX_EVENTS {
             return Err(zx::Status::BUFFER_TOO_SMALL);
@@ -80,7 +102,7 @@ impl EventQueue {
                 has_default_ipv6_route,
                 online,
             } = state;
-            finterfaces::Event::Existing(
+            let mut event = finterfaces::Event::Existing(
                 finterfaces_ext::Properties {
                     id: *id,
                     name: name.clone(),
@@ -91,7 +113,9 @@ impl EventQueue {
                     has_default_ipv6_route: *has_default_ipv6_route,
                 }
                 .into(),
-            )
+            );
+            filter_addresses(&mut event, include_non_assigned_addresses);
+            event
         };
         Ok(Self {
             events: state
@@ -126,7 +150,7 @@ impl EventQueue {
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub(crate) struct Watcher {
     stream: WatcherRequestStream,
-    address_properties_interest: finterfaces::AddressPropertiesInterest,
+    options: WatcherOptions,
     events: EventQueue,
     responder: Option<WatcherWatchResponder>,
 }
@@ -163,9 +187,42 @@ impl Future for Watcher {
     }
 }
 
+fn filter_addresses(event: &mut finterfaces::Event, include_non_assigned_addresses: bool) {
+    let addresses = match event {
+        finterfaces::Event::Existing(finterfaces::Properties { addresses, .. })
+        | finterfaces::Event::Added(finterfaces::Properties { addresses, .. })
+        | finterfaces::Event::Changed(finterfaces::Properties { addresses, .. }) => {
+            addresses.as_mut()
+        }
+        finterfaces::Event::Idle(finterfaces::Empty {}) => None,
+        finterfaces::Event::Removed(id) => {
+            let _: &mut u64 = id;
+            None
+        }
+    };
+
+    if let Some(addresses) = addresses {
+        addresses.retain(|finterfaces::Address { assignment_state, .. }| {
+            match assignment_state.expect("required field") {
+                finterfaces::AddressAssignmentState::Assigned => true,
+                finterfaces::AddressAssignmentState::Unavailable
+                | finterfaces::AddressAssignmentState::Tentative => include_non_assigned_addresses,
+            }
+        })
+    }
+}
+
 impl Watcher {
-    fn push(&mut self, event: finterfaces::Event) {
-        let Self { stream, events, responder, address_properties_interest: _ } = self;
+    fn push(&mut self, mut event: finterfaces::Event) {
+        let Self {
+            stream,
+            events,
+            responder,
+            options:
+                WatcherOptions { address_properties_interest: _, include_non_assigned_addresses },
+        } = self;
+
+        filter_addresses(&mut event, *include_non_assigned_addresses);
 
         if let Some(responder) = responder.take() {
             match responder.send(&event) {
@@ -236,13 +293,7 @@ struct AddressProperties {
 #[cfg_attr(test, derive(Clone, Eq, PartialEq))]
 pub struct AddressState {
     pub valid_until: zx::Time,
-    // Whether or not the Address should be published to clients. This is a
-    // rough proxy of the address's [`IpAddressState`]: `Assigned` addresses are
-    // visible whereas `Tentative` addresses are not. Note that when addresses
-    // become `Unavailable` they should retain their previous visibility:
-    // visible if the address was previously `Assigned` and invisible if
-    // previously `Tentative`.
-    pub visible: bool,
+    pub assignment_state: IpAddressState,
 }
 
 #[derive(Debug)]
@@ -322,7 +373,13 @@ pub enum WorkerError {
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum ChangedAddressProperties {
     InterestNotApplicable,
-    Changed(finterfaces::AddressPropertiesInterest),
+    PropertiesChanged {
+        address_properties: finterfaces::AddressPropertiesInterest,
+        is_assigned: bool,
+    },
+    AssignmentStateChanged {
+        involves_assigned: bool,
+    },
 }
 
 pub struct Worker {
@@ -331,6 +388,13 @@ pub struct Worker {
 }
 /// Arbitrarily picked constant to force backpressure on FIDL requests.
 const WATCHER_CHANNEL_CAPACITY: usize = 32;
+
+fn is_assigned(state: IpAddressState) -> bool {
+    match state {
+        IpAddressState::Assigned => true,
+        IpAddressState::Unavailable | IpAddressState::Tentative => false,
+    }
+}
 
 impl Worker {
     pub fn new() -> (Worker, WorkerWatcherSink, WorkerInterfaceSink) {
@@ -402,33 +466,66 @@ impl Worker {
                 },
                 Action::Sink(Some(SinkAction::NewWatcher(NewWatcher {
                     watcher: stream,
-                    address_properties_interest,
-                }))) => match EventQueue::from_state(&interface_state) {
-                    Ok(events) => current_watchers.push(Watcher {
-                        stream,
-                        address_properties_interest,
-                        events,
-                        responder: None,
-                    }),
-                    Err(status) => {
-                        tracing::warn!("failed to construct events for watcher: {}", status);
-                        stream.control_handle().shutdown_with_epitaph(status);
+                    options:
+                        options @ WatcherOptions {
+                            address_properties_interest: _,
+                            include_non_assigned_addresses,
+                        },
+                }))) => {
+                    match EventQueue::from_state(&interface_state, include_non_assigned_addresses) {
+                        Ok(events) => current_watchers.push(Watcher {
+                            stream,
+                            options,
+                            events,
+                            responder: None,
+                        }),
+                        Err(status) => {
+                            tracing::warn!("failed to construct events for watcher: {}", status);
+                            stream.control_handle().shutdown_with_epitaph(status);
+                        }
                     }
-                },
+                }
                 Action::Sink(Some(SinkAction::Event(e))) => {
                     tracing::debug!("consuming event {:?}", e);
+
+                    let is_address_visible = |involves_assigned, include_non_assigned_addresses| {
+                        // The address is visible if the change involves an
+                        // assigned address since all watchers receive updates
+                        // involving an assigned address. If the address change
+                        // involves state(s) that are not considered assigned,
+                        // then the change is only visible to watchers that
+                        // request addresses that are not assigned.
+                        involves_assigned || include_non_assigned_addresses
+                    };
 
                     if let Some((event, changed_address_properties)) =
                         Self::consume_event(&mut interface_state, e)?
                     {
                         current_watchers.iter_mut().for_each(|watcher| {
+                            let WatcherOptions {
+                                address_properties_interest,
+                                include_non_assigned_addresses,
+                            } = &watcher.options;
+
                             let should_push = match &changed_address_properties {
                                 ChangedAddressProperties::InterestNotApplicable => true,
-                                ChangedAddressProperties::Changed(changed_address_properties) => {
-                                    watcher
-                                        .address_properties_interest
-                                        .intersects(changed_address_properties.clone())
+                                ChangedAddressProperties::PropertiesChanged {
+                                    address_properties,
+                                    is_assigned,
+                                } => {
+                                    address_properties_interest
+                                        .intersects(address_properties.clone())
+                                        && is_address_visible(
+                                            *is_assigned,
+                                            *include_non_assigned_addresses,
+                                        )
                                 }
+                                ChangedAddressProperties::AssignmentStateChanged {
+                                    involves_assigned,
+                                } => is_address_visible(
+                                    *involves_assigned,
+                                    *include_non_assigned_addresses,
+                                ),
                             };
 
                             // TODO(https://fxbug.dev/110587): Mask address properties fields
@@ -512,40 +609,32 @@ impl Worker {
                     InterfaceUpdate::AddressAdded { addr, assignment_state, valid_until } => {
                         let (addr, prefix_len) = addr.addr_prefix();
                         let addr = *addr;
-                        let visible = match assignment_state {
-                            IpAddressState::Assigned => true,
-                            IpAddressState::Unavailable | IpAddressState::Tentative => false,
-                        };
                         match addresses.insert(
                             addr,
                             AddressProperties {
                                 prefix_len,
-                                state: AddressState { visible, valid_until },
+                                state: AddressState { assignment_state, valid_until },
                             },
                         ) {
                             Some(AddressProperties { .. }) => {
                                 Err(WorkerError::AssignExistingAddr { interface: id, addr })
                             }
-                            None => {
-                                if visible {
-                                    Ok(Some((
-                                        finterfaces::Event::Changed(finterfaces::Properties {
-                                            id: Some(id.get()),
-                                            addresses: Some(Self::collect_addresses(addresses)),
-                                            ..Default::default()
-                                        }),
-                                        ChangedAddressProperties::InterestNotApplicable,
-                                    )))
-                                } else {
-                                    Ok(None)
-                                }
-                            }
+                            None => Ok(Some((
+                                finterfaces::Event::Changed(finterfaces::Properties {
+                                    id: Some(id.get()),
+                                    addresses: Some(Self::collect_addresses(addresses)),
+                                    ..Default::default()
+                                }),
+                                ChangedAddressProperties::AssignmentStateChanged {
+                                    involves_assigned: is_assigned(assignment_state),
+                                },
+                            ))),
                         }
                     }
                     InterfaceUpdate::AddressAssignmentStateChanged { addr, new_state } => {
                         let AddressProperties {
                             prefix_len: _,
-                            state: AddressState { visible, valid_until: _ },
+                            state: AddressState { assignment_state, valid_until: _ },
                         } = addresses.get_mut(&addr).ok_or_else(|| {
                             WorkerError::UpdateStateOnNonexistentAddr {
                                 interface: id,
@@ -553,47 +642,39 @@ impl Worker {
                                 state: new_state,
                             }
                         })?;
-                        let new_visibility = match new_state {
-                            IpAddressState::Assigned => true,
-                            IpAddressState::Tentative => false,
-                            // Keep the old visibility when addresses become
-                            // `Unavailable`. If the address was `Assigned`, it
-                            // will remain visible, and if the address was
-                            // `Tentative` it will remain invisible.
-                            IpAddressState::Unavailable => *visible,
-                        };
 
-                        if *visible == new_visibility {
+                        if *assignment_state == new_state {
                             return Ok(None);
                         }
-                        *visible = new_visibility;
+
+                        let involves_assigned =
+                            is_assigned(*assignment_state) || is_assigned(new_state);
+
+                        *assignment_state = new_state;
+
                         Ok(Some((
                             finterfaces::Event::Changed(finterfaces::Properties {
                                 id: Some(id.get()),
                                 addresses: Some(Self::collect_addresses(addresses)),
                                 ..Default::default()
                             }),
-                            ChangedAddressProperties::InterestNotApplicable,
+                            ChangedAddressProperties::AssignmentStateChanged { involves_assigned },
                         )))
                     }
                     InterfaceUpdate::AddressRemoved(addr) => match addresses.remove(&addr) {
                         Some(AddressProperties {
                             prefix_len: _,
-                            state: AddressState { visible, valid_until: _ },
-                        }) => {
-                            if visible {
-                                Ok(Some((
-                                    finterfaces::Event::Changed(finterfaces::Properties {
-                                        id: Some(id.get()),
-                                        addresses: (Some(Self::collect_addresses(addresses))),
-                                        ..Default::default()
-                                    }),
-                                    ChangedAddressProperties::InterestNotApplicable,
-                                )))
-                            } else {
-                                Ok(None)
-                            }
-                        }
+                            state: AddressState { assignment_state, valid_until: _ },
+                        }) => Ok(Some((
+                            finterfaces::Event::Changed(finterfaces::Properties {
+                                id: Some(id.get()),
+                                addresses: (Some(Self::collect_addresses(addresses))),
+                                ..Default::default()
+                            }),
+                            ChangedAddressProperties::AssignmentStateChanged {
+                                involves_assigned: is_assigned(assignment_state),
+                            },
+                        ))),
                         None => Err(WorkerError::UnassignNonexistentAddr { interface: id, addr }),
                     },
                     InterfaceUpdate::DefaultRouteChanged {
@@ -639,24 +720,23 @@ impl Worker {
                         addr,
                         update: update @ AddressPropertiesUpdate { valid_until: new_valid_until },
                     } => {
-                        let AddressState { visible, valid_until } = match addresses.get_mut(&addr) {
-                            Some(AddressProperties { prefix_len: _, state }) => state,
-                            None => {
-                                return Err(WorkerError::UpdatePropertiesOnNonexistentAddr {
-                                    interface: id,
-                                    addr,
-                                    update,
-                                })
-                            }
-                        };
+                        let AddressState { assignment_state, valid_until } =
+                            match addresses.get_mut(&addr) {
+                                Some(AddressProperties { prefix_len: _, state }) => state,
+                                None => {
+                                    return Err(WorkerError::UpdatePropertiesOnNonexistentAddr {
+                                        interface: id,
+                                        addr,
+                                        update,
+                                    })
+                                }
+                            };
 
                         if new_valid_until == core::mem::replace(valid_until, new_valid_until) {
                             return Ok(None);
                         }
 
-                        if !*visible {
-                            return Ok(None);
-                        }
+                        let is_assigned = is_assigned(*assignment_state);
 
                         Ok(Some((
                             finterfaces::Event::Changed(finterfaces::Properties {
@@ -667,9 +747,11 @@ impl Worker {
                             // TODO(https://fxbug.dev/105574): once preferred lifetimes
                             // are supported, we need to respect (dis)interest in them
                             // too.
-                            ChangedAddressProperties::Changed(
-                                finterfaces::AddressPropertiesInterest::VALID_UNTIL,
-                            ),
+                            ChangedAddressProperties::PropertiesChanged {
+                                address_properties:
+                                    finterfaces::AddressPropertiesInterest::VALID_UNTIL,
+                                is_assigned,
+                            },
                         )))
                     }
                 }
@@ -682,25 +764,20 @@ impl Worker {
     ) -> Vec<T> {
         let mut addrs = addrs
             .iter()
-            .filter_map(
+            .map(
                 |(
                     addr,
-                    AddressProperties { prefix_len, state: AddressState { valid_until, visible } },
+                    AddressProperties {
+                        prefix_len,
+                        state: AddressState { valid_until, assignment_state },
+                    },
                 )| {
-                    if *visible {
-                        Some(
-                            finterfaces_ext::Address {
-                                addr: fnet::Subnet {
-                                    addr: addr.into_fidl(),
-                                    prefix_len: *prefix_len,
-                                },
-                                valid_until: valid_until.into_nanos(),
-                            }
-                            .into(),
-                        )
-                    } else {
-                        None
+                    finterfaces_ext::Address {
+                        addr: fnet::Subnet { addr: addr.into_fidl(), prefix_len: *prefix_len },
+                        valid_until: valid_until.into_nanos(),
+                        assignment_state: assignment_state.into_fidl(),
                     }
+                    .into()
                 },
             )
             .collect::<Vec<T>>();
@@ -734,7 +811,7 @@ impl SortableInterfaceAddress for finterfaces::Address {
 
 struct NewWatcher {
     watcher: finterfaces::WatcherRequestStream,
-    address_properties_interest: finterfaces::AddressPropertiesInterest,
+    options: WatcherOptions,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -751,14 +828,10 @@ impl WorkerWatcherSink {
     pub async fn add_watcher(
         &mut self,
         watcher: finterfaces::WatcherRequestStream,
-        address_properties_interest: Option<finterfaces::AddressPropertiesInterest>,
+        options: WatcherOptions,
     ) -> Result<(), WorkerClosedError> {
         self.sender
-            .send(NewWatcher {
-                watcher,
-                address_properties_interest: address_properties_interest
-                    .unwrap_or(finterfaces::AddressPropertiesInterest::default()),
-            })
+            .send(NewWatcher { watcher, options })
             .await
             .map_err(|_: mpsc::SendError| WorkerClosedError {})
     }
@@ -805,7 +878,10 @@ mod tests {
     use fixture::fixture;
     use futures::{Future, Stream};
     use itertools::Itertools as _;
-    use net_types::ip::{AddrSubnet, IpAddress as _, Ipv6, Ipv6Addr};
+    use net_types::{
+        ip::{AddrSubnet, IpAddress as _, Ipv6, Ipv6Addr},
+        Witness as _,
+    };
     use nonzero_ext::nonzero;
     use std::convert::{TryFrom as _, TryInto as _};
     use test_case::test_case;
@@ -815,7 +891,7 @@ mod tests {
             let (watcher, stream) =
                 fidl::endpoints::create_proxy_and_stream::<finterfaces::WatcherMarker>()
                     .expect("create proxy");
-            self.add_watcher(stream, None)
+            self.add_watcher(stream, WatcherOptions::default())
                 .now_or_never()
                 .expect("unexpected backpressure on sink")
                 .expect("failed to send watcher to worker");
@@ -915,6 +991,7 @@ mod tests {
                     addresses: Some(vec![finterfaces_ext::Address {
                         addr: addr1.clone().into_fidl(),
                         valid_until: ADDR_VALID_UNTIL.into_nanos(),
+                        assignment_state: finterfaces::AddressAssignmentState::Assigned,
                     }
                     .into()]),
                     ..base_properties.clone()
@@ -974,7 +1051,8 @@ mod tests {
                     online: true,
                     addresses: vec![finterfaces_ext::Address {
                         addr: addr1.into_fidl(),
-                        valid_until: ADDR_VALID_UNTIL.into_nanos()
+                        valid_until: ADDR_VALID_UNTIL.into_nanos(),
+                        assignment_state: finterfaces::AddressAssignmentState::Assigned,
                     }
                     .into()],
                     has_default_ipv4_route: true,
@@ -1127,7 +1205,11 @@ mod tests {
 
     #[test_case(IpAddressState::Assigned, true; "assigned")]
     #[test_case(IpAddressState::Unavailable, false; "unavailable")]
-    fn consume_changed_address_added(assignment_state: IpAddressState, expected_visible: bool) {
+    #[test_case(IpAddressState::Tentative, false; "tentative")]
+    fn consume_changed_address_add_and_removed(
+        assignment_state: IpAddressState,
+        involves_assigned: bool,
+    ) {
         let addr = AddrSubnetEither::V6(
             AddrSubnet::new(*Ipv6::LOOPBACK_IPV6_ADDRESS, Ipv6Addr::BYTES * 8).unwrap(),
         );
@@ -1136,46 +1218,77 @@ mod tests {
 
         let mut state = HashMap::from([(id, initial_state)]);
 
-        let event = InterfaceEvent::Changed {
-            id,
-            event: InterfaceUpdate::AddressAdded {
-                addr: addr.clone(),
-                assignment_state,
-                valid_until,
-            },
-        };
-
         let (ip_addr, prefix_len) = addr.addr_prefix();
 
-        let expected_response = expected_visible.then_some((
-            finterfaces::Event::Changed(finterfaces::Properties {
-                id: Some(id.get()),
-                addresses: Some(vec![finterfaces_ext::Address {
-                    addr: addr.clone().into_fidl(),
-                    valid_until: valid_until.into_nanos(),
-                }
-                .into()]),
-                ..Default::default()
-            }),
-            ChangedAddressProperties::InterestNotApplicable,
-        ));
-
         // Add address.
-        assert_eq!(Worker::consume_event(&mut state, event.clone()), Ok(expected_response));
+        {
+            let event = InterfaceEvent::Changed {
+                id,
+                event: InterfaceUpdate::AddressAdded {
+                    addr: addr.clone(),
+                    assignment_state,
+                    valid_until,
+                },
+            };
+            assert_eq!(
+                Worker::consume_event(&mut state, event.clone()),
+                Ok(Some((
+                    finterfaces::Event::Changed(finterfaces::Properties {
+                        id: Some(id.get()),
+                        addresses: Some(vec![finterfaces_ext::Address {
+                            addr: addr.clone().into_fidl(),
+                            valid_until: valid_until.into_nanos(),
+                            assignment_state: assignment_state.into_fidl(),
+                        }
+                        .into()]),
+                        ..Default::default()
+                    }),
+                    ChangedAddressProperties::AssignmentStateChanged { involves_assigned },
+                ))),
+            );
+            // Check state is updated.
+            assert_eq!(
+                state.get(&id).expect("missing interface entry").addresses.get(&*ip_addr),
+                Some(&AddressProperties {
+                    prefix_len,
+                    state: AddressState { valid_until: valid_until, assignment_state }
+                })
+            );
+            // Can't add again.
+            assert_eq!(
+                Worker::consume_event(&mut state, event),
+                Err(WorkerError::AssignExistingAddr { addr: *ip_addr, interface: id })
+            );
+        }
 
-        // Check state is updated.
-        assert_eq!(
-            state.get(&id).expect("missing interface entry").addresses.get(&*ip_addr),
-            Some(&AddressProperties {
-                prefix_len,
-                state: AddressState { valid_until: valid_until, visible: expected_visible }
-            })
-        );
-        // Can't add again.
-        assert_eq!(
-            Worker::consume_event(&mut state, event),
-            Err(WorkerError::AssignExistingAddr { addr: *ip_addr, interface: id })
-        );
+        // Remove address.
+        {
+            let event = InterfaceEvent::Changed {
+                id,
+                event: InterfaceUpdate::AddressRemoved(ip_addr.get()),
+            };
+            assert_eq!(
+                Worker::consume_event(&mut state, event.clone()),
+                Ok(Some((
+                    finterfaces::Event::Changed(finterfaces::Properties {
+                        id: Some(id.get()),
+                        addresses: Some(Vec::new()),
+                        ..Default::default()
+                    }),
+                    ChangedAddressProperties::AssignmentStateChanged { involves_assigned },
+                )))
+            );
+            // Check state is updated.
+            assert_eq!(
+                state.get(&id).expect("missing interface entry").addresses.get(&ip_addr),
+                None
+            );
+            // Can't remove again.
+            assert_eq!(
+                Worker::consume_event(&mut state, event),
+                Err(WorkerError::UnassignNonexistentAddr { interface: id, addr: ip_addr.get() })
+            );
+        }
     }
 
     #[test]
@@ -1198,21 +1311,46 @@ mod tests {
         };
 
         // Add address, no event should be generated.
-        assert_eq!(Worker::consume_event(&mut state, event.clone()), Ok(None));
+        assert_eq!(
+            Worker::consume_event(&mut state, event.clone()),
+            Ok(Some((
+                finterfaces::Event::Changed(finterfaces::Properties {
+                    id: Some(id.get()),
+                    addresses: Some(vec![finterfaces_ext::Address {
+                        addr: addr.into_fidl(),
+                        valid_until: valid_until.into_nanos(),
+                        assignment_state: finterfaces::AddressAssignmentState::Tentative,
+                    }
+                    .into()]),
+                    ..Default::default()
+                }),
+                ChangedAddressProperties::AssignmentStateChanged { involves_assigned: false },
+            ))),
+        );
         let (ip_addr, prefix_len) = addr.addr_prefix();
         // Check state is updated.
         assert_eq!(
             state.get(&id).expect("missing interface entry").addresses.get(&*ip_addr),
             Some(&AddressProperties {
                 prefix_len,
-                state: AddressState { valid_until, visible: false }
+                state: AddressState { valid_until, assignment_state: IpAddressState::Tentative }
             })
         );
 
         let event =
             InterfaceEvent::Changed { id, event: InterfaceUpdate::AddressRemoved(*ip_addr) };
         // Remove address, no event should be generated.
-        assert_eq!(Worker::consume_event(&mut state, event), Ok(None));
+        assert_eq!(
+            Worker::consume_event(&mut state, event.clone()),
+            Ok(Some((
+                finterfaces::Event::Changed(finterfaces::Properties {
+                    id: Some(id.get()),
+                    addresses: Some(Vec::new()),
+                    ..Default::default()
+                }),
+                ChangedAddressProperties::AssignmentStateChanged { involves_assigned: false },
+            ))),
+        );
 
         // Check state is updated.
         assert_eq!(state.get(&id).expect("missing interface entry").addresses.get(&*ip_addr), None);
@@ -1227,8 +1365,10 @@ mod tests {
         let (addr, prefix_len) = subnet.addr_prefix();
         let addr = *addr;
         let valid_until = zx::Time::from_nanos(1234);
-        let address_properties =
-            AddressProperties { prefix_len, state: AddressState { valid_until, visible: false } };
+        let address_properties = AddressProperties {
+            prefix_len,
+            state: AddressState { valid_until, assignment_state: IpAddressState::Tentative },
+        };
         let (id, initial_state) = iface1_initial_state();
         let initial_state = InterfaceState {
             addresses: HashMap::from([(addr, address_properties)]),
@@ -1239,42 +1379,61 @@ mod tests {
         // Tentative -> Assigned becomes Tentative -> Unavailable -> Assigned.
         // This allows us to verify that changes to Unavailable do not influence
         // the events observed by the client.
-        let maybe_change_state_to_unavailable = |state: &mut HashMap<_, InterfaceState>| {
-            if !intersperse_unavailable {
-                return;
-            }
-            let event = InterfaceEvent::Changed {
-                id,
-                event: InterfaceUpdate::AddressAssignmentStateChanged {
-                    addr,
-                    new_state: IpAddressState::Unavailable,
-                },
+        let maybe_change_state_to_unavailable =
+            |state: &mut HashMap<_, InterfaceState>, involves_assigned| {
+                if !intersperse_unavailable {
+                    return;
+                }
+                let event = InterfaceEvent::Changed {
+                    id,
+                    event: InterfaceUpdate::AddressAssignmentStateChanged {
+                        addr,
+                        new_state: IpAddressState::Unavailable,
+                    },
+                };
+                // Changing state to Unavailable should never generate an event.
+                assert_eq!(
+                    Worker::consume_event(state, event),
+                    Ok(Some((
+                        finterfaces::Event::Changed(finterfaces::Properties {
+                            id: Some(id.get()),
+                            addresses: Some(vec![finterfaces_ext::Address {
+                                addr: subnet.into_fidl(),
+                                valid_until: valid_until.into_nanos(),
+                                assignment_state: finterfaces::AddressAssignmentState::Unavailable,
+                            }
+                            .into()]),
+                            ..Default::default()
+                        }),
+                        ChangedAddressProperties::AssignmentStateChanged { involves_assigned },
+                    ))),
+                );
+                // Check state is updated.
+                assert_eq!(
+                    state.get(&id).expect("missing interface entry").addresses.get(&addr),
+                    Some(&AddressProperties {
+                        prefix_len,
+                        state: AddressState {
+                            valid_until,
+                            assignment_state: IpAddressState::Unavailable,
+                        }
+                    }),
+                );
             };
-            let old_state = state
-                .get(&id)
-                .expect("missing_interface entry")
-                .addresses
-                .get(&addr)
-                .expect("missing address entry")
-                .clone();
-            // Changing state to Unavailable should never generate an event.
-            assert_eq!(Worker::consume_event(state, event), Ok(None));
-            // Check state is not updated.
-            assert_eq!(
-                state.get(&id).expect("missing interface entry").addresses.get(&addr),
-                Some(&old_state)
-            );
-        };
 
-        // Invisible address does not show up initially.
         assert_eq!(
             Worker::collect_addresses::<finterfaces::Address>(&initial_state.addresses),
-            vec![]
+            [finterfaces::Address {
+                addr: Some(subnet.into_fidl()),
+                valid_until: Some(valid_until.into_nanos()),
+                assignment_state: Some(finterfaces::AddressAssignmentState::Tentative),
+                ..Default::default()
+            }],
         );
 
         let mut state = HashMap::from([(id, initial_state)]);
 
-        maybe_change_state_to_unavailable(&mut state);
+        maybe_change_state_to_unavailable(&mut state, false);
 
         let event = InterfaceEvent::Changed {
             id,
@@ -1285,20 +1444,22 @@ mod tests {
         };
 
         // State switch causes event.
+        let expected_event = (
+            finterfaces::Event::Changed(finterfaces::Properties {
+                id: Some(id.get()),
+                addresses: Some(vec![finterfaces_ext::Address {
+                    addr: subnet.into_fidl(),
+                    valid_until: valid_until.into_nanos(),
+                    assignment_state: finterfaces::AddressAssignmentState::Assigned,
+                }
+                .into()]),
+                ..Default::default()
+            }),
+            ChangedAddressProperties::AssignmentStateChanged { involves_assigned: true },
+        );
         assert_eq!(
             Worker::consume_event(&mut state, event.clone()),
-            Ok(Some((
-                finterfaces::Event::Changed(finterfaces::Properties {
-                    id: Some(id.get()),
-                    addresses: Some(vec![finterfaces_ext::Address {
-                        addr: subnet.into_fidl(),
-                        valid_until: valid_until.into_nanos()
-                    }
-                    .into()]),
-                    ..Default::default()
-                }),
-                ChangedAddressProperties::InterestNotApplicable
-            )))
+            Ok(Some(expected_event.clone())),
         );
 
         // Check state is updated.
@@ -1306,16 +1467,17 @@ mod tests {
             state.get(&id).expect("missing interface entry").addresses.get(&addr),
             Some(&AddressProperties {
                 prefix_len,
-                state: AddressState { valid_until, visible: true },
+                state: AddressState { valid_until, assignment_state: IpAddressState::Assigned },
             })
         );
 
-        maybe_change_state_to_unavailable(&mut state);
+        maybe_change_state_to_unavailable(&mut state, true);
+        assert_eq!(
+            Worker::consume_event(&mut state, event),
+            Ok(intersperse_unavailable.then_some(expected_event)),
+        );
 
-        // Sending again will not produce an event, because no change.
-        assert_eq!(Worker::consume_event(&mut state, event), Ok(None));
-
-        maybe_change_state_to_unavailable(&mut state);
+        maybe_change_state_to_unavailable(&mut state, true);
 
         // Switch the state back to tentative, which will trigger removal.
         let event = InterfaceEvent::Changed {
@@ -1325,16 +1487,24 @@ mod tests {
                 new_state: IpAddressState::Tentative,
             },
         };
+        let expected_event = (
+            finterfaces::Event::Changed(finterfaces::Properties {
+                id: Some(id.get()),
+                addresses: Some(vec![finterfaces_ext::Address {
+                    addr: subnet.into_fidl(),
+                    valid_until: valid_until.into_nanos(),
+                    assignment_state: finterfaces::AddressAssignmentState::Tentative,
+                }
+                .into()]),
+                ..Default::default()
+            }),
+            ChangedAddressProperties::AssignmentStateChanged {
+                involves_assigned: !intersperse_unavailable,
+            },
+        );
         assert_eq!(
             Worker::consume_event(&mut state, event.clone()),
-            Ok(Some((
-                finterfaces::Event::Changed(finterfaces::Properties {
-                    id: Some(id.get()),
-                    addresses: Some(Vec::new()),
-                    ..Default::default()
-                }),
-                ChangedAddressProperties::InterestNotApplicable
-            )))
+            Ok(Some(expected_event.clone())),
         );
 
         // Check state is updated.
@@ -1342,16 +1512,17 @@ mod tests {
             state.get(&id).expect("missing interface entry").addresses.get(&addr),
             Some(&AddressProperties {
                 prefix_len,
-                state: AddressState { valid_until, visible: false },
+                state: AddressState { valid_until, assignment_state: IpAddressState::Tentative },
             })
         );
 
-        maybe_change_state_to_unavailable(&mut state);
+        maybe_change_state_to_unavailable(&mut state, false);
+        assert_eq!(
+            Worker::consume_event(&mut state, event),
+            Ok(intersperse_unavailable.then_some(expected_event)),
+        );
 
-        // Sending again will not produce an event, because no change.
-        assert_eq!(Worker::consume_event(&mut state, event), Ok(None));
-
-        maybe_change_state_to_unavailable(&mut state);
+        maybe_change_state_to_unavailable(&mut state, false);
     }
 
     #[test_case(IpAddressState::Assigned; "assigned")]
@@ -1371,7 +1542,10 @@ mod tests {
                 *ip_addr,
                 AddressProperties {
                     prefix_len,
-                    state: AddressState { valid_until, visible: false }
+                    state: AddressState {
+                        valid_until,
+                        assignment_state: IpAddressState::Unavailable
+                    }
                 }
             ),
             None
@@ -1384,73 +1558,32 @@ mod tests {
             event: InterfaceUpdate::AddressAssignmentStateChanged { addr: *addr.addr(), new_state },
         };
 
-        let (expected_visibility, expected_event) = match new_state {
+        let expected_event = match new_state {
             // Changing from `Unavailable` to `Unavailable` is a No-Op.
-            IpAddressState::Unavailable => (false, None),
-            // Changing from `Unavailable` to `Assigned` makes the address
-            // visible for the first time.
-            IpAddressState::Assigned => (
-                true,
-                Some((
-                    finterfaces::Event::Changed(finterfaces::Properties {
-                        id: Some(id.get()),
-                        addresses: Some(vec![finterfaces_ext::Address {
-                            addr: addr.into_fidl(),
-                            valid_until: valid_until.into_nanos(),
-                        }
-                        .into()]),
-                        ..Default::default()
-                    }),
-                    ChangedAddressProperties::InterestNotApplicable,
-                )),
-            ),
-            // Changing from `Unavailable` to `Tentative` is a no-op.
-            IpAddressState::Tentative => (false, None),
+            IpAddressState::Unavailable => None,
+            new_state @ (IpAddressState::Assigned | IpAddressState::Tentative) => Some((
+                finterfaces::Event::Changed(finterfaces::Properties {
+                    id: Some(id.get()),
+                    addresses: Some(vec![finterfaces_ext::Address {
+                        addr: addr.into_fidl(),
+                        valid_until: valid_until.into_nanos(),
+                        assignment_state: new_state.into_fidl(),
+                    }
+                    .into()]),
+                    ..Default::default()
+                }),
+                ChangedAddressProperties::AssignmentStateChanged {
+                    involves_assigned: is_assigned(new_state),
+                },
+            )),
         };
         assert_eq!(Worker::consume_event(&mut state, event), Ok(expected_event));
         assert_eq!(
             state.get(&id).expect("missing interface entry").addresses.get(&addr.addr()),
             Some(&AddressProperties {
                 prefix_len,
-                state: AddressState { valid_until, visible: expected_visibility },
+                state: AddressState { valid_until, assignment_state: new_state },
             })
-        );
-    }
-
-    #[test]
-    fn consume_changed_address_removed() {
-        let addr = (*Ipv6::LOOPBACK_IPV6_ADDRESS).into();
-        let address_properties = AddressProperties {
-            prefix_len: Ipv6Addr::BYTES * 8,
-            state: AddressState { valid_until: zx::Time::INFINITE, visible: true },
-        };
-        let (id, initial_state) = iface1_initial_state();
-        let initial_state = InterfaceState {
-            addresses: HashMap::from([(addr, address_properties)]),
-            ..initial_state
-        };
-        let mut state = HashMap::from([(id, initial_state)]);
-
-        let event = InterfaceEvent::Changed { id, event: InterfaceUpdate::AddressRemoved(addr) };
-
-        // Remove address.
-        assert_eq!(
-            Worker::consume_event(&mut state, event.clone()),
-            Ok(Some((
-                finterfaces::Event::Changed(finterfaces::Properties {
-                    id: Some(id.get()),
-                    addresses: Some(Vec::new()),
-                    ..Default::default()
-                }),
-                ChangedAddressProperties::InterestNotApplicable
-            )))
-        );
-        // Check state is updated.
-        assert_eq!(state.get(&id).expect("missing interface entry").addresses.get(&addr), None);
-        // Can't remove again.
-        assert_eq!(
-            Worker::consume_event(&mut state, event),
-            Err(WorkerError::UnassignNonexistentAddr { interface: id, addr })
         );
     }
 
@@ -1747,7 +1880,7 @@ mod tests {
             stream,
             events: EventQueue { events: Default::default() },
             responder: None,
-            address_properties_interest: finterfaces::AddressPropertiesInterest::default(),
+            options: WatcherOptions::default(),
         };
         let mut watch_fut = proxy.watch();
         assert_matches!(executor.run_until_stalled(&mut watch_fut), std::task::Poll::Pending);

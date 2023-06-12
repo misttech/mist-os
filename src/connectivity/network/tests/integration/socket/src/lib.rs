@@ -948,20 +948,30 @@ async fn udp_send_msg_preflight_autogen_addr_invalidation(name: &str) {
 
     // Wait for an address to be auto generated.
     let autogen_address = fnet_interfaces_ext::wait_interface_with_id(
-        fnet_interfaces_ext::event_stream_from_state(&interfaces_state)
-            .expect("create event stream"),
+        fnet_interfaces_ext::event_stream_from_state(
+            &interfaces_state,
+            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .expect("create event stream"),
         &mut fnet_interfaces_ext::InterfaceState::Unknown(iface.id()),
         |fnet_interfaces_ext::Properties { addresses, .. }| {
             addresses.into_iter().find_map(
                 |fnet_interfaces_ext::Address {
                      addr: fnet::Subnet { addr, prefix_len: _ },
                      valid_until: _,
-                 }| match addr {
-                    fnet::IpAddress::Ipv4(_) => None,
-                    fnet::IpAddress::Ipv6(addr @ fnet::Ipv6Address { addr: bytes }) => {
-                        ipv6_consts::GLOBAL_PREFIX
-                            .contains(&net_types::ip::Ipv6Addr::from_bytes(*bytes))
-                            .then_some(*addr)
+                     assignment_state,
+                 }| {
+                    assert_eq!(
+                        *assignment_state,
+                        fnet_interfaces::AddressAssignmentState::Assigned
+                    );
+                    match addr {
+                        fnet::IpAddress::Ipv4(_) => None,
+                        fnet::IpAddress::Ipv6(addr @ fnet::Ipv6Address { addr: bytes }) => {
+                            ipv6_consts::GLOBAL_PREFIX
+                                .contains(&net_types::ip::Ipv6Addr::from_bytes(*bytes))
+                                .then_some(*addr)
+                        }
                     }
                 },
             )
@@ -982,17 +992,27 @@ async fn udp_send_msg_preflight_autogen_addr_invalidation(name: &str) {
 
     // Wait for the address to be invalidated and removed.
     fnet_interfaces_ext::wait_interface_with_id(
-        fnet_interfaces_ext::event_stream_from_state(&interfaces_state)
-            .expect("create event stream"),
+        fnet_interfaces_ext::event_stream_from_state(
+            &interfaces_state,
+            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .expect("create event stream"),
         &mut fnet_interfaces_ext::InterfaceState::Unknown(iface.id()),
         |fnet_interfaces_ext::Properties { addresses, .. }| {
             (!addresses.into_iter().any(
                 |fnet_interfaces_ext::Address {
                      addr: fnet::Subnet { addr, prefix_len: _ },
                      valid_until: _,
-                 }| match addr {
-                    fnet::IpAddress::Ipv4(_) => false,
-                    fnet::IpAddress::Ipv6(addr) => addr == &autogen_address,
+                     assignment_state,
+                 }| {
+                    assert_eq!(
+                        *assignment_state,
+                        fnet_interfaces::AddressAssignmentState::Assigned
+                    );
+                    match addr {
+                        fnet::IpAddress::Ipv4(_) => false,
+                        fnet::IpAddress::Ipv6(addr) => addr == &autogen_address,
+                    }
                 },
             ))
             .then_some(())
@@ -2819,8 +2839,11 @@ async fn get_bound_device_errors_after_device_deleted<N: Netstack>(name: &str) {
     let interface_state =
         host.connect_to_protocol::<fnet_interfaces::StateMarker>().expect("connect to protocol");
 
-    let stream = fnet_interfaces_ext::event_stream_from_state(&interface_state)
-        .expect("error getting interface state event stream");
+    let stream = fnet_interfaces_ext::event_stream_from_state(
+        &interface_state,
+        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+    )
+    .expect("error getting interface state event stream");
     futures::pin_mut!(stream);
     let mut state = std::collections::HashMap::<u64, _>::new();
 

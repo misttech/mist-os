@@ -888,6 +888,7 @@ mod tests {
                                                     .map(|addr| fnet_interfaces::Address {
                                                         addr,
                                                         valid_until: Some(1),
+                                                        assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
                                                         ..Default::default()
                                                     })
                                                     .collect(),

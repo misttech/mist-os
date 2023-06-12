@@ -263,8 +263,11 @@ async fn main() -> Result<(), Error> {
     let interface_state_service = fuchsia_component::client::connect_to_protocol::<StateMarker>()
         .context("failed to connect to fuchsia.net.interfaces/State")?;
     let internet_reachable = fidl_fuchsia_net_interfaces_ext::wait_for_reachability(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state_service)
-            .context("failed to create network interface event stream")?,
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+            &interface_state_service,
+            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .context("failed to create network interface event stream")?,
     )
     .map(|r| r.context("reachability status stream error"));
 

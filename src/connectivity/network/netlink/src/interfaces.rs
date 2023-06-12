@@ -268,7 +268,10 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
     pub(crate) async fn run(self) -> EventLoopError<InterfacesFidlError, InterfacesNetstackError> {
         let EventLoop { interfaces_proxy, state_proxy, route_clients, request_stream } = self;
         let if_event_stream = {
-            let stream_res = fnet_interfaces_ext::event_stream_from_state(&state_proxy);
+            let stream_res = fnet_interfaces_ext::event_stream_from_state(
+                &state_proxy,
+                fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+            );
 
             match stream_res {
                 Ok(stream) => stream.fuse(),
@@ -1016,7 +1019,10 @@ fn interface_properties_to_address_messages(
             |fnet_interfaces_ext::Address {
                  addr: fnet::Subnet { addr, prefix_len },
                  valid_until: _,
+                 assignment_state,
              }| {
+                assert_eq!(*assignment_state, fnet_interfaces::AddressAssignmentState::Assigned);
+
                 let mut addr_header = AddressHeader::default();
 
                 let (family, addr_bytes) = match addr {
@@ -1247,6 +1253,7 @@ pub(crate) mod testutil {
         fnet_interfaces::Address {
             addr: Some(addr),
             valid_until: Some(zx::sys::ZX_TIME_INFINITE),
+            assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
             ..Default::default()
         }
     }
@@ -1300,8 +1307,16 @@ mod tests {
         online: bool,
     ) -> fnet_interfaces_ext::Properties {
         let addresses = vec![
-            fnet_interfaces_ext::Address { addr: TEST_V4_ADDR, valid_until: Default::default() },
-            fnet_interfaces_ext::Address { addr: TEST_V6_ADDR, valid_until: Default::default() },
+            fnet_interfaces_ext::Address {
+                addr: TEST_V4_ADDR,
+                valid_until: Default::default(),
+                assignment_state: AddressAssignmentState::Assigned,
+            },
+            fnet_interfaces_ext::Address {
+                addr: TEST_V6_ADDR,
+                valid_until: Default::default(),
+                assignment_state: AddressAssignmentState::Assigned,
+            },
         ];
         create_interface(id, name, device_class, online, addresses)
     }
@@ -1433,13 +1448,20 @@ mod tests {
                 addresses: Some(
                     addresses
                         .into_iter()
-                        .map(|fnet_interfaces_ext::Address { addr, valid_until }| {
-                            fnet_interfaces::Address {
-                                addr: Some(addr),
-                                valid_until: Some(valid_until),
-                                ..Default::default()
-                            }
-                        })
+                        .map(
+                            |fnet_interfaces_ext::Address {
+                                 addr,
+                                 valid_until,
+                                 assignment_state,
+                             }| {
+                                fnet_interfaces::Address {
+                                    addr: Some(addr),
+                                    valid_until: Some(valid_until),
+                                    assignment_state: Some(assignment_state),
+                                    ..Default::default()
+                                }
+                            },
+                        )
                         .collect(),
                 ),
                 has_default_ipv4_route: Some(has_default_ipv4_route),

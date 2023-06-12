@@ -516,8 +516,11 @@ mod helpers {
         >()
         .expect("failed to connect to interfaces state service");
         fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-            fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
-                .expect("failed to create event stream"),
+            fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+                &interface_state,
+                fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
+            )
+            .expect("failed to create event stream"),
             &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(interface_id),
             |&fidl_fuchsia_net_interfaces_ext::Properties {
                  id: _,

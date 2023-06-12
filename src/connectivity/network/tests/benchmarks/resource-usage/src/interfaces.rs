@@ -28,8 +28,11 @@ impl crate::Workload for Interfaces {
 
         // Install several interfaces backed by network-tun.
         let interfaces = {
-            let stream = fnet_interfaces_ext::event_stream_from_state(&interfaces_state)
-                .expect("get interface event stream");
+            let stream = fnet_interfaces_ext::event_stream_from_state(
+                &interfaces_state,
+                fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+            )
+            .expect("get interface event stream");
             futures::pin_mut!(stream);
             let mut if_state =
                 fnet_interfaces_ext::existing(stream.by_ref(), HashMap::<u64, _>::new())
@@ -62,8 +65,11 @@ impl crate::Workload for Interfaces {
             .await;
 
         // Wait for the interfaces we installed to be removed.
-        let stream = fnet_interfaces_ext::event_stream_from_state(&interfaces_state)
-            .expect("get interface event stream");
+        let stream = fnet_interfaces_ext::event_stream_from_state(
+            &interfaces_state,
+            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .expect("get interface event stream");
         futures::pin_mut!(stream);
         let mut interfaces =
             fnet_interfaces_ext::existing(stream.by_ref(), HashMap::<u64, _>::new())
@@ -131,8 +137,11 @@ async fn install_interface(
 
 async fn stress_interface(interface: Interface, interfaces_state: &fnet_interfaces::StateProxy) {
     let Interface { id, addr, control, tun_device, .. } = interface;
-    let stream = fnet_interfaces_ext::event_stream_from_state(&interfaces_state)
-        .expect("get interface event stream");
+    let stream = fnet_interfaces_ext::event_stream_from_state(
+        &interfaces_state,
+        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+    )
+    .expect("get interface event stream");
     futures::pin_mut!(stream);
     let mut state = fnet_interfaces_ext::InterfaceState::Unknown(id);
 
