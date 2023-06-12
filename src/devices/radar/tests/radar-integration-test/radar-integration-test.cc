@@ -101,19 +101,6 @@ class RadarIntegrationTest : public zxtest::Test {
 
     ~EventHandler() override { client_torn_down_promise_.set_value(); }
 
-    // TODO(fxbug.dev/99924): Remove this after all servers have switched to OnBurst2.
-    void OnBurst(fidl::WireEvent<BurstReader::OnBurst>* event) override {
-      if (burst_handler_) {
-        if (event->result.is_response()) {
-          const auto burst = fidl::ObjectView<fuchsia_hardware_radar::wire::Burst>::FromExternal(
-              &event->result.response().burst);
-          burst_handler_(BurstRequest::WithBurst(burst));
-        } else if (event->result.is_err()) {
-          burst_handler_(BurstRequest::WithError(event->result.err()));
-        }
-      }
-    }
-
     void OnBurst2(fidl::WireEvent<BurstReader::OnBurst2>* event) override {
       if (burst_handler_) {
         burst_handler_(*event);

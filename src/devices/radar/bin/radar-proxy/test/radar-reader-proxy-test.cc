@@ -236,15 +236,15 @@ struct BurstReaderClient : fidl::AsyncEventHandler<fuchsia_hardware_radar::Radar
                     async_dispatcher_t* dispatcher, std::function<void(uint32_t)> callback)
       : client(std::move(client_end), dispatcher, this), burst_callback(std::move(callback)) {}
 
-  void OnBurst(fidl::Event<fuchsia_hardware_radar::RadarBurstReader::OnBurst>& event) override {
-    if (event.result().response()) {
+  void OnBurst2(fidl::Event<fuchsia_hardware_radar::RadarBurstReader::OnBurst2>& event) override {
+    if (event.burst()) {
       burst_count++;
       if (burst_callback) {
-        burst_callback(event.result().response()->burst().vmo_id());
-        EXPECT_TRUE(client->UnlockVmo(event.result().response()->burst().vmo_id()).is_ok());
+        burst_callback(event.burst()->vmo_id());
+        EXPECT_TRUE(client->UnlockVmo(event.burst()->vmo_id()).is_ok());
       }
     } else {
-      error_status = event.result().err().value();
+      error_status = event.error().value();
     }
   }
 

@@ -60,7 +60,6 @@ class RadarUtil : public fidl::WireAsyncEventHandler<fuchsia_hardware_radar::Rad
   zx_status_t Run();
   zx_status_t ReadBursts();
 
-  void OnBurst(fidl::WireEvent<BurstReader::OnBurst>* event) override;
   void OnBurst2(fidl::WireEvent<BurstReader::OnBurst2>* event) override;
   void on_fidl_error(fidl::UnbindInfo info) override {}
 

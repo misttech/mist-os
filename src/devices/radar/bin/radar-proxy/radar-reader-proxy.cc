@@ -183,41 +183,6 @@ void RadarReaderProxy::on_fidl_error(const fidl::UnbindInfo info) {
   HandleFatalError(info.status());
 }
 
-// TODO(fxbug.dev/99924): Remove this after all servers have switched to OnBurst2.
-void RadarReaderProxy::OnBurst(
-    fidl::Event<fuchsia_hardware_radar::RadarBurstReader::OnBurst>& event) {
-  ZX_DEBUG_ASSERT(burst_properties_);
-
-  const auto& response = event.result().response();
-
-  // Make sure to unlock the VMO even if we are injecting bursts and don't need the data.
-  const auto unlock_vmo = fit::defer([&]() {
-    if (response && response->burst().vmo_id() < vmo_pool_.size() && radar_client_) {
-      if (auto result = radar_client_->UnlockVmo(response->burst().vmo_id()); result.is_error()) {
-        HandleFatalError(result.error_value().status());
-      }
-    }
-  });
-
-  if (inject_bursts_) {
-    return;
-  }
-
-  if (!response || response->burst().vmo_id() >= vmo_pool_.size()) {
-    for (auto& instance : instances_) {
-      instance->SendError(
-          event.result().err().value_or(fuchsia_hardware_radar::StatusCode::kVmoNotFound));
-    }
-    return;
-  }
-
-  last_burst_timestamp_ = zx::time(response->burst().timestamp());
-
-  const uint32_t vmo_id = response->burst().vmo_id();
-  const cpp20::span<const uint8_t> burst_data{vmo_pool_[vmo_id].start(), burst_properties_->size()};
-  SendBurst(burst_data, last_burst_timestamp_);
-}
-
 void RadarReaderProxy::OnBurst2(
     fidl::Event<fuchsia_hardware_radar::RadarBurstReader::OnBurst2>& event) {
   ZX_DEBUG_ASSERT(burst_properties_);
