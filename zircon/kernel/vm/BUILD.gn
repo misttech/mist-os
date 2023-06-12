@@ -97,6 +97,9 @@ zx_library("vm") {
 
     # "pmm_arena.h" has #include <lib/zx/result.h>.
     "//zircon/system/ulib/zx:headers",
+
+    # <kernel/attribution.h> has #include <lib/kconcurrent/*.h>.
+    "//zircon/kernel/lib/kconcurrent:headers",
   ]
   public_configs = [
     # <vm/physical_page_provider.h> has #include <object/port_dispatcher.h>.

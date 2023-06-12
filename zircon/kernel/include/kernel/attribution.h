@@ -7,7 +7,7 @@
 #ifndef ZIRCON_KERNEL_INCLUDE_KERNEL_ATTRIBUTION_H_
 #define ZIRCON_KERNEL_INCLUDE_KERNEL_ATTRIBUTION_H_
 
-#include <lib/relaxed_atomic.h>
+#include <lib/kconcurrent/seqlock.h>
 
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
@@ -121,51 +121,81 @@ class AttributionObject : public fbl::RefCounted<AttributionObject>, public Attr
   // total_resident_pages_allocated_ is unconditionally incremented.
   // private_resident_pages_allocated_ is only incremented when
   // `is_shared` is false.
-  void AddPages(size_t page_count, bool is_shared) {
-    total_resident_pages_allocated_.fetch_add(page_count);
+  void AddPages(size_t page_count, bool is_shared) TA_EXCL(seq_lock_) {
+    SeqLockGuard<ExclusiveIrqSave> guard{&seq_lock_};
+    Stats stats = stats_.unsynchronized_get();
+
+    stats.total_resident_pages_allocated_ += page_count;
 
     if (!is_shared) {
-      private_resident_pages_allocated_.fetch_add(page_count);
+      stats.private_resident_pages_allocated_ += page_count;
     }
+
+    stats_.Update(stats);
   }
 
   // Increment deallocation counters by page_count.
   // total_resident_pages_deallocated_ is unconditionally incremented.
   // private_resident_pages_deallocated_ is only incremented when
   // `is_shared` is false.
-  void RemovePages(size_t page_count, bool is_shared) {
-    total_resident_pages_deallocated_.fetch_add(page_count);
+  void RemovePages(size_t page_count, bool is_shared) TA_EXCL(seq_lock_) {
+    SeqLockGuard<ExclusiveIrqSave> guard{&seq_lock_};
+    Stats stats = stats_.unsynchronized_get();
+
+    stats.total_resident_pages_deallocated_ += page_count;
 
     if (!is_shared) {
-      private_resident_pages_deallocated_.fetch_add(page_count);
+      stats.private_resident_pages_deallocated_ += page_count;
     }
+
+    stats_.Update(stats);
   }
 
-  zx_info_memory_attribution_t ToInfoEntry() const {
+  zx_info_memory_attribution_t ToInfoEntry() const TA_EXCL(seq_lock_) {
+    Stats stats;
+
+    bool transaction_success;
+    do {
+      SeqLockGuard<SharedNoIrqSave> guard{&seq_lock_, transaction_success};
+      stats_.Read(stats);
+    } while (!transaction_success);
+
     return zx_info_memory_attribution_t{
         .process_koid = owning_koid_,
-        .private_resident_pages_allocated = private_resident_pages_allocated_.load(),
-        .private_resident_pages_deallocated = private_resident_pages_deallocated_.load(),
-        .total_resident_pages_allocated = total_resident_pages_allocated_.load(),
-        .total_resident_pages_deallocated = total_resident_pages_deallocated_.load(),
+        .private_resident_pages_allocated = stats.private_resident_pages_allocated_,
+        .private_resident_pages_deallocated = stats.private_resident_pages_deallocated_,
+        .total_resident_pages_allocated = stats.total_resident_pages_allocated_,
+        .total_resident_pages_deallocated = stats.total_resident_pages_deallocated_,
     };
   }
 
  private:
-  // Total number of pages made resident for VmObjectPageds
-  // that are uniquely owned by owning_koid_.
-  RelaxedAtomic<uint64_t> private_resident_pages_allocated_{0};
-  // Total number of pages that have been released from
-  // VmObjectPageds that are uniquely owned by owning_koid_.
-  RelaxedAtomic<uint64_t> private_resident_pages_deallocated_{0};
-  // Total number of pages made resident for any VmObjectPaged
-  // being attributed to owning_koid_.
-  RelaxedAtomic<uint64_t> total_resident_pages_allocated_{0};
-  // Total number of pages that have been released from any
-  // VmObjectPageds being attributed to owning_koid_.
-  RelaxedAtomic<uint64_t> total_resident_pages_deallocated_{0};
+  struct Stats {
+    // Total number of pages made resident for VmObjectPageds
+    // that are uniquely owned by owning_koid_.
+    uint64_t private_resident_pages_allocated_ = 0;
+
+    // Total number of pages that have been released from
+    // VmObjectPageds that are uniquely owned by owning_koid_.
+    uint64_t private_resident_pages_deallocated_ = 0;
+
+    // Total number of pages made resident for any VmObjectPaged
+    // being attributed to owning_koid_.
+    uint64_t total_resident_pages_allocated_ = 0;
+
+    // Total number of pages that have been released from any
+    // VmObjectPageds being attributed to owning_koid_.
+    uint64_t total_resident_pages_deallocated_ = 0;
+  };
+
   // The koid of the process that this attribution object is tracking.
   zx_koid_t owning_koid_;
+
+  // The attribution stats, protected by their SeqLock.
+  mutable DECLARE_SEQLOCK_FENCE_SYNC(AttributionObject) seq_lock_;
+  template <typename Policy>
+  using SeqLockGuard = Guard<decltype(seq_lock_)::LockType, Policy>;
+  TA_GUARDED(seq_lock_) SeqLockPayload<Stats, decltype(seq_lock_)> stats_;
 
 #if KERNEL_BASED_MEMORY_ATTRIBUTION
   // The attribution object used to track resident memory

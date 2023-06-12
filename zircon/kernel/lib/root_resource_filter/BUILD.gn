@@ -15,6 +15,7 @@ zx_library("root_resource_filter") {
     "//zircon/kernel/lib/init",
     "//zircon/kernel/lib/page_cache",
     "//zircon/kernel/phys:handoff",
+    "//zircon/kernel/vm:headers",
     "//zircon/system/ulib/region-alloc",
   ]
 }
