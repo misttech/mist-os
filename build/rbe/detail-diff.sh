@@ -21,7 +21,7 @@ clang_dir_local="$project_root_rel"/prebuilt/third_party/clang/"$HOST_PLATFORM"
 objdump="$clang_dir_local"/bin/llvm-objdump
 readelf="$clang_dir_local"/bin/llvm-readelf
 dwarfdump="$clang_dir_local"/bin/llvm-dwarfdump
-
+nm="$clang_dir_local"/bin/llvm-nm
 
 # Diff two files, run through a command: diff -u <(command $1) <(command $2)
 # Usage: diff_with command [options] -- input1 input2
@@ -77,7 +77,7 @@ function binary_diff() {
   echo
 
   echo "nm-diff (first $diff_limit lines):"
-  diff_with nm -- "$1" "$2" | head -n "$diff_limit"
+  diff_with "$nm" -- "$1" "$2" | head -n "$diff_limit"
   echo
 
   echo "strings-diff (first $diff_limit lines):"
