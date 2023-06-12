@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::constants::{
-        ENCLOSING_ENV_REALM_NAME, HERMETIC_RESOLVER_REALM_NAME, TEST_ROOT_COLLECTION,
-        WRAPPER_REALM_NAME,
-    },
+    crate::constants::{HERMETIC_RESOLVER_REALM_NAME, TEST_ROOT_COLLECTION, WRAPPER_REALM_NAME},
     anyhow::{format_err, Error},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_test as ftest,
     fuchsia_component_test::{
@@ -82,7 +79,6 @@ pub(crate) async fn apply_offers(
                 let mut test_root_event_stream = event_stream.clone();
                 test_root_event_stream.scope = Some(vec![
                     Ref::collection(TEST_ROOT_COLLECTION).into(),
-                    Ref::child(ENCLOSING_ENV_REALM_NAME).into(),
                     Ref::child(HERMETIC_RESOLVER_REALM_NAME).into(),
                 ]);
                 (

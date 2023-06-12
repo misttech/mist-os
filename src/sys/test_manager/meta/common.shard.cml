@@ -64,10 +64,6 @@
             url: "gunit-runner#meta/gunit-runner.cm",
         },
         {
-            name: "legacy_test_runner",
-            url: "legacy-test-runner#meta/legacy-test-runner.cm",
-        },
-        {
             name: "lib_loader_cache",
             url: "lib_loader_runner_cache#meta/lib_loader_runner_cache.cm",
         },
@@ -127,8 +123,13 @@
             durability: "transient",
         },
         {
+            name: "tier-2-tests",
+            environment: "#test-env",
+            durability: "transient",
+        },
+        {
             name: "system-tests",
-            environment: "#legacy-test-env",
+            environment: "#test-env",
             durability: "transient",
         },
         {
@@ -182,11 +183,7 @@
             from: "framework",
         },
         {
-            protocol: [
-                "fuchsia.element.GraphicalPresenter",
-                "fuchsia.sys.Environment",
-                "fuchsia.sys.Loader",
-            ],
+            protocol: [ "fuchsia.element.GraphicalPresenter" ],
             availability: "optional",
         },
 
@@ -357,20 +354,31 @@
             to: "#system-tests",
         },
         {
-            protocol: [
-                "fuchsia.sys.Environment",
-                "fuchsia.sys.Loader",
-            ],
+            protocol: "fuchsia.logger.LogSink",
             from: "parent",
             to: [
-                "#legacy_test_runner",
-
-                // TODO(https://fxbug.dev/87164): when these legacy capabilities used by the
-                // realm builder server can be optional, don't offer them to the
-                // netemul_test_runner.
+                "#debug_data",
+                "#early_boot_instrumentation",
+                "#elf_test_ambient_exec_runner",
+                "#elf_test_runner",
+                "#fuzz_test_runner",
+                "#go_test_runner",
+                "#gtest_runner",
+                "#gunit_runner",
+                "#inspect_test_runner",
+                "#lib_loader_cache",
                 "#netemul_test_runner",
+                "#runner_memfs",
+                "#rust_test_runner",
+                "#starnix_test_runners",
+                "#stress_test_runner",
+                "#test_tmpfs",
             ],
-            availability: "optional",
+        },
+        {
+            protocol: [ "fuchsia.tracing.provider.Registry" ],
+            from: "parent",
+            to: [ "#starnix_test_runners" ],
         },
         {
             protocol: [

@@ -182,26 +182,6 @@ rustc_test("hanging_test_bin") {
   sources = [ "hanging_test.rs" ]
 }
 
-rustc_test("v2_test_runs_v1_component_bin") {
-  testonly = true
-  name = "v2_test_runs_v1_component"
-  edition = "2021"
-  source_root = "v2_test_runs_v1_component.rs"
-
-  deps = [
-    "//examples/components/routing/fidl:echo_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//sdk/fidl/fuchsia.sys:fuchsia.sys_rust",
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia",
-    "//src/lib/fuchsia-component",
-    "//src/lib/fuchsia-fs",
-    "//third_party/rust_crates:futures",
-  ]
-
-  sources = [ "v2_test_runs_v1_component.rs" ]
-}
-
 rustc_test("noop_test_bin") {
   testonly = true
   name = "noop_test"
@@ -258,12 +238,6 @@ fuchsia_component("hanging_test") {
   testonly = true
   deps = [ ":hanging_test_bin" ]
   manifest = "meta/hanging_test.cml"
-}
-
-fuchsia_component("v2_test_runs_v1_component") {
-  testonly = true
-  deps = [ ":v2_test_runs_v1_component_bin" ]
-  manifest = "meta/v2_test_runs_v1_component.cml"
 }
 
 fuchsia_component("custom_artifact_realm_test") {
@@ -435,16 +409,6 @@ group("test_data") {
     ":simple_system_realm_test",
     ":test-with-stderr",
     "//examples/components/routing/rust/echo_server:echo_server_cmp",
-    "//examples/tests/rust:custom_artifact_user_cmp",
-  ]
-}
-
-group("test_data_v1") {
-  testonly = true
-  public_deps = [
-    ":debug_data_test_v1",
-    ":logging-component",
-    ":v2_test_runs_v1_component",
     "//examples/tests/rust:custom_artifact_user_cmp",
   ]
 }

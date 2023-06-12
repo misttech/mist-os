@@ -7,7 +7,7 @@
     collections: [
         {
             name: "google-tests",
-            environment: "#legacy-test-env",
+            environment: "#test-env",
             durability: "transient",
         },
     ],

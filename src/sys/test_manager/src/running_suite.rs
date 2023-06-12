@@ -6,12 +6,11 @@ use {
     crate::{
         above_root_capabilities::AboveRootCapabilitiesForTest,
         constants::{
-            CUSTOM_ARTIFACTS_CAPABILITY_NAME, ENCLOSING_ENV_REALM_NAME,
-            HERMETIC_RESOLVER_REALM_NAME, TEST_ENVIRONMENT_NAME, TEST_ROOT_COLLECTION,
-            TEST_ROOT_REALM_NAME, WRAPPER_REALM_NAME,
+            CUSTOM_ARTIFACTS_CAPABILITY_NAME, HERMETIC_RESOLVER_REALM_NAME, TEST_ENVIRONMENT_NAME,
+            TEST_ROOT_COLLECTION, TEST_ROOT_REALM_NAME, WRAPPER_REALM_NAME,
         },
         debug_data_processor::{serve_debug_data_publisher, DebugDataSender},
-        diagnostics, enclosing_env,
+        diagnostics,
         error::LaunchTestError,
         facet,
         offers::apply_offers,
@@ -26,8 +25,7 @@ use {
     fidl::endpoints::{create_proxy, ClientEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_resolution::ResolverProxy,
-    fidl_fuchsia_debugdata as fdebugdata, fidl_fuchsia_diagnostics as fdiagnostics,
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys as fv1sys, fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     fidl_fuchsia_test as ftest, fidl_fuchsia_test_manager as ftest_manager,
     ftest::Invocation,
     ftest_manager::{CaseStatus, LaunchError, SuiteEvent as FidlSuiteEvent, SuiteStatus},
@@ -832,53 +830,6 @@ async fn get_realm(
         )
         .await?;
 
-    let enclosing_env = wrapper_realm
-        .add_local_child(
-            ENCLOSING_ENV_REALM_NAME,
-            move |handles| {
-                Box::pin(enclosing_env::gen_enclosing_env(
-                    handles,
-                    hermetic_test_package_name.clone(),
-                    other_allowed_packages.clone(),
-                ))
-            },
-            ChildOptions::new(),
-        )
-        .await?;
-
-    // archivist to enclosing env
-    wrapper_realm
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .capability(Capability::protocol_by_name("fuchsia.inspect.InspectSink"))
-                .from(&archivist)
-                .to(&enclosing_env),
-        )
-        .await?;
-
-    // enclosing env to test root
-    wrapper_realm
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol::<fv1sys::EnvironmentMarker>())
-                .capability(Capability::protocol::<fv1sys::LauncherMarker>())
-                .capability(Capability::protocol::<fv1sys::LoaderMarker>())
-                .from(&enclosing_env)
-                .to(test_root.clone()),
-        )
-        .await?;
-
-    // debug to enclosing env
-    wrapper_realm
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol::<fdebugdata::PublisherMarker>())
-                .from(&debug_data)
-                .to(&enclosing_env),
-        )
-        .await?;
-
     // wrapper realm to parent
     wrapper_realm
         .add_route(
@@ -895,14 +846,10 @@ async fn get_realm(
         .add_route(
             Route::new()
                 .capability(
-                    Capability::event_stream("capability_requested")
-                        .with_scope(test_root.clone())
-                        .with_scope(&enclosing_env),
+                    Capability::event_stream("capability_requested").with_scope(test_root.clone()),
                 )
                 .capability(
-                    Capability::event_stream("directory_ready")
-                        .with_scope(test_root.clone())
-                        .with_scope(&enclosing_env),
+                    Capability::event_stream("directory_ready").with_scope(test_root.clone()),
                 )
                 .from(Ref::parent())
                 .to(&archivist),

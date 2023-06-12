@@ -9,7 +9,7 @@
     collections: [
         {
             name: "devices-tests",
-            environment: "#legacy-test-env",
+            environment: "#test-env",
             durability: "transient",
         },
     ],

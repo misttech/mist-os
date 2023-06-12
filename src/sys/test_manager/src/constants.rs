@@ -9,7 +9,6 @@ pub const TEST_ROOT_REALM_NAME: &'static str = "test_root";
 pub const TEST_ROOT_COLLECTION: &'static str = "test";
 pub const WRAPPER_REALM_NAME: &'static str = "test_wrapper";
 pub const HERMETIC_RESOLVER_REALM_NAME: &'static str = "hermetic_resolver";
-pub const ENCLOSING_ENV_REALM_NAME: &'static str = "enclosing_env";
 
 pub const KERNEL_DEBUG_DATA_FOR_SCP: &'static str = "/tmp/kernel_debug";
 pub const DEBUG_DATA_FOR_SCP: &'static str = "/tmp/debug";

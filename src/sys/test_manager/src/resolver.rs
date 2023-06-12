@@ -7,14 +7,14 @@ use {
     diagnostics_log as flog,
     fidl::endpoints::ProtocolMarker,
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_logger as flogger,
-    fidl_fuchsia_sys as fv1sys, fuchsia_async as fasync,
+    fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_component_test::LocalComponentHandles,
-    fuchsia_url::{AbsoluteComponentUrl, ComponentUrl, PackageUrl},
+    fuchsia_url::{ComponentUrl, PackageUrl},
     futures::{StreamExt, TryStreamExt},
     itertools::Itertools,
     std::{collections::HashSet, sync::Arc},
-    tracing::{error, warn},
+    tracing::warn,
 };
 
 type LogSubscriber = dyn tracing::Subscriber + std::marker::Send + std::marker::Sync + 'static;
@@ -188,70 +188,9 @@ pub async fn serve_hermetic_resolver(
     Ok(())
 }
 
-async fn hermetic_loader(
-    component_url_str: &str,
-    hermetic_test_package_name: &String,
-    other_allowed_packages: &AllowedPackages,
-    loader_service: fv1sys::LoaderProxy,
-) -> Option<Box<fv1sys::Package>> {
-    let component_url = match AbsoluteComponentUrl::parse(component_url_str) {
-        Ok(u) => u,
-        Err(e) => {
-            warn!("Invalid component url {}: {}", component_url_str, e);
-            return None;
-        }
-    };
-    let package_name = component_url.package_url().name();
-
-    if hermetic_test_package_name != package_name.as_ref()
-        && !other_allowed_packages.pkgs.contains(package_name.as_ref())
-    {
-        error!(
-                "failed to resolve component {}: package {} is not in the test package allowlist: '{}, {}'
-                \nSee https://fuchsia.dev/fuchsia-src/development/testing/components/test_runner_framework?hl=en#hermetic-resolver
-                for more information.",
-                &component_url_str, package_name, hermetic_test_package_name, other_allowed_packages.pkgs.iter().join(", ")
-            );
-        return None;
-    }
-
-    match loader_service.load_url(component_url_str).await {
-        Ok(r) => r,
-        Err(e) => {
-            warn!("can't communicate with global loader: {}", e);
-            None
-        }
-    }
-}
-
-pub async fn serve_hermetic_loader(
-    mut stream: fv1sys::LoaderRequestStream,
-    hermetic_test_package_name: Arc<String>,
-    other_allowed_packages: AllowedPackages,
-    loader_service: fv1sys::LoaderProxy,
-) {
-    while let Some(fv1sys::LoaderRequest::LoadUrl { url, responder }) =
-        stream.try_next().await.expect("failed to serve loader")
-    {
-        let result = hermetic_loader(
-            &url,
-            &hermetic_test_package_name,
-            &other_allowed_packages,
-            loader_service.clone(),
-        )
-        .await
-        .map(|p| *p);
-
-        if let Err(e) = responder.send(result) {
-            warn!("Failed sending load response for {}: {}", url, e);
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy_and_stream;
     use maplit::hashset;
 
@@ -287,33 +226,6 @@ mod tests {
                     }
                     .expect("failed sending response");
                 }
-            }
-        }
-    }
-
-    async fn respond_to_loader_requests(stream: &mut fv1sys::LoaderRequestStream) {
-        let request = stream
-            .next()
-            .await
-            .expect("did not get next request")
-            .expect("error getting next request");
-        match request {
-            fv1sys::LoaderRequest::LoadUrl { url, responder } => {
-                match url.as_str() {
-                    "fuchsia-pkg://fuchsia.com/package-one#meta/comp.cm"
-                    | "fuchsia-pkg://fuchsia.com/package-three#meta/comp.cm"
-                    | "fuchsia-pkg://fuchsia.com/package-four#meta/comp.cm"
-                    | "fuchsia-pkg://fuchsia.com/package-five#meta/comp.cm" => {
-                        responder.send(Some(fv1sys::Package {
-                            data: None,
-                            directory: None,
-                            resolved_url: url,
-                        }))
-                    }
-                    "fuchsia-pkg://fuchsia.com/package-two#meta/comp.cm" => responder.send(None),
-                    _ => responder.send(None),
-                }
-                .expect("failed sending response");
             }
         }
     }
@@ -537,182 +449,5 @@ mod tests {
             hermetic_resolver_proxy.resolve("invalid_url").await.unwrap(),
             Err(fresolution::ResolverError::InvalidArgs)
         );
-    }
-
-    mod loader {
-        use super::*;
-
-        #[fuchsia::test]
-        async fn test_successful_loader() {
-            let pkg_name = "package-one".to_string();
-
-            let (loader_proxy, mut loader_request_stream) =
-                create_proxy_and_stream::<fv1sys::LoaderMarker>()
-                    .expect("failed to create mock loader proxy");
-            let (proxy, stream) = create_proxy_and_stream::<fv1sys::LoaderMarker>().unwrap();
-
-            let _loader_task = fasync::Task::spawn(async move {
-                respond_to_loader_requests(&mut loader_request_stream).await;
-                drop(loader_request_stream);
-            });
-
-            let _serve_task = fasync::Task::spawn(serve_hermetic_loader(
-                stream,
-                pkg_name.into(),
-                AllowedPackages::zero_allowed_pkgs(),
-                loader_proxy,
-            ));
-
-            assert_matches!(
-                proxy.load_url("fuchsia-pkg://fuchsia.com/package-one#meta/comp.cm").await.unwrap(),
-                Some(_)
-            );
-        }
-
-        #[fuchsia::test]
-        async fn drop_connection_on_load() {
-            let pkg_name = "package-one".to_string();
-
-            let (loader_proxy, mut loader_request_stream) =
-                create_proxy_and_stream::<fv1sys::LoaderMarker>()
-                    .expect("failed to create mock loader proxy");
-            let (proxy, stream) = create_proxy_and_stream::<fv1sys::LoaderMarker>().unwrap();
-
-            let loader_task = fasync::Task::spawn(async move {
-                respond_to_loader_requests(&mut loader_request_stream).await;
-                drop(loader_request_stream);
-            });
-
-            let _serve_task = fasync::Task::spawn(serve_hermetic_loader(
-                stream,
-                pkg_name.into(),
-                AllowedPackages::zero_allowed_pkgs(),
-                loader_proxy,
-            ));
-
-            let _ = proxy.load_url("fuchsia-pkg://fuchsia.com/package-one#meta/comp.cm");
-            drop(proxy);
-            loader_task.await;
-        }
-
-        // Logging disabled as this outputs ERROR log, which will fail the test.
-        #[fuchsia::test(logging = false)]
-        async fn test_package_not_allowed() {
-            let (loader_proxy, _) = create_proxy_and_stream::<fv1sys::LoaderMarker>()
-                .expect("failed to create mock loader proxy");
-
-            let (proxy, stream) = create_proxy_and_stream::<fv1sys::LoaderMarker>().unwrap();
-
-            let _serve_task = fasync::Task::spawn(serve_hermetic_loader(
-                stream,
-                "package-two".to_string().into(),
-                AllowedPackages::zero_allowed_pkgs(),
-                loader_proxy,
-            ));
-
-            assert_eq!(
-                proxy.load_url("fuchsia-pkg://fuchsia.com/package-one#meta/comp.cm").await.unwrap(),
-                None
-            );
-        }
-
-        #[fuchsia::test]
-        async fn test_failed_loader() {
-            let (loader_proxy, mut loader_request_stream) =
-                create_proxy_and_stream::<fv1sys::LoaderMarker>()
-                    .expect("failed to create mock loader proxy");
-            let _loader_task = fasync::Task::spawn(async move {
-                respond_to_loader_requests(&mut loader_request_stream).await;
-                drop(loader_request_stream);
-            });
-
-            let pkg_name = "package-two".to_string();
-
-            let (proxy, stream) = create_proxy_and_stream::<fv1sys::LoaderMarker>().unwrap();
-
-            let _serve_task = fasync::Task::spawn(serve_hermetic_loader(
-                stream,
-                pkg_name.into(),
-                AllowedPackages::zero_allowed_pkgs(),
-                loader_proxy,
-            ));
-
-            assert_eq!(
-                proxy.load_url("fuchsia-pkg://fuchsia.com/package-two#meta/comp.cm").await.unwrap(),
-                None
-            );
-        }
-
-        // Logging disabled as this outputs ERROR log, which will fail the test.
-        #[fuchsia::test(logging = false)]
-        async fn other_packages_allowed() {
-            let list = hashset!("package-three".to_string(), "package-four".to_string());
-            let (loader_proxy, mut loader_request_stream) =
-                create_proxy_and_stream::<fv1sys::LoaderMarker>()
-                    .expect("failed to create mock loader proxy");
-            let _loader_task = fasync::Task::spawn(async move {
-                for _ in 0..4 {
-                    respond_to_loader_requests(&mut loader_request_stream).await;
-                }
-                drop(loader_request_stream);
-            });
-
-            let pkg_name = "package-five".to_string();
-
-            let (proxy, stream) = create_proxy_and_stream::<fv1sys::LoaderMarker>().unwrap();
-
-            let _serve_task = fasync::Task::spawn(serve_hermetic_loader(
-                stream,
-                pkg_name.into(),
-                AllowedPackages::from_iter(list),
-                loader_proxy,
-            ));
-
-            assert_eq!(
-                proxy.load_url("fuchsia-pkg://fuchsia.com/package-one#meta/comp.cm").await.unwrap(),
-                None
-            );
-
-            assert_matches!(
-                proxy
-                    .load_url("fuchsia-pkg://fuchsia.com/package-five#meta/comp.cm")
-                    .await
-                    .unwrap(),
-                Some(_)
-            );
-            assert_matches!(
-                proxy
-                    .load_url("fuchsia-pkg://fuchsia.com/package-three#meta/comp.cm")
-                    .await
-                    .unwrap(),
-                Some(_)
-            );
-            assert_matches!(
-                proxy
-                    .load_url("fuchsia-pkg://fuchsia.com/package-four#meta/comp.cm")
-                    .await
-                    .unwrap(),
-                Some(_)
-            );
-        }
-
-        #[fuchsia::test]
-        async fn test_invalid_url_loader() {
-            let (loader_proxy, _) = create_proxy_and_stream::<fv1sys::LoaderMarker>()
-                .expect("failed to create mock loader proxy");
-
-            let pkg_name = "package-two".to_string();
-
-            let (proxy, stream) = create_proxy_and_stream::<fv1sys::LoaderMarker>().unwrap();
-
-            let _serve_task = fasync::Task::spawn(serve_hermetic_loader(
-                stream,
-                pkg_name.into(),
-                AllowedPackages::zero_allowed_pkgs(),
-                loader_proxy,
-            ));
-
-            assert_eq!(proxy.load_url("invalid_url").await.unwrap(), None);
-        }
     }
 }

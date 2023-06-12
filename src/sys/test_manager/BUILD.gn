@@ -57,7 +57,6 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
-    "//sdk/fidl/fuchsia.sys:fuchsia.sys_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//sdk/fidl/fuchsia.test:fuchsia.test_rust",
     "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_rust",
@@ -67,7 +66,6 @@ rustc_library("lib") {
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/diagnostics/reader/rust",
-    "//src/lib/fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
@@ -105,7 +103,6 @@ rustc_library("lib") {
     "src/debug_data_processor.rs",
     "src/debug_data_server.rs",
     "src/diagnostics.rs",
-    "src/enclosing_env.rs",
     "src/error.rs",
     "src/facet.rs",
     "src/lib.rs",
@@ -213,7 +210,6 @@ fuchsia_package("pkg") {
     "//src/sys/test_runners/gtest:gtest-runner",
     "//src/sys/test_runners/gunit:gunit-runner",
     "//src/sys/test_runners/inspect:inspect-test-runner",
-    "//src/sys/test_runners/legacy_test:legacy-test-runner",
     "//src/sys/test_runners/lib_loader_cache:lib_loader_runner_cache",
     "//src/sys/test_runners/rust:rust-test-next-vdso-runner",
     "//src/sys/test_runners/rust:rust-test-runner",
@@ -224,11 +220,6 @@ fuchsia_package("pkg") {
 
 core_shard("test_manager_core_shard") {
   shard_file = "meta/test_manager.core_shard.cml"
-}
-
-# TODO(fxbug.dev/102390): delete the below when there are no cmx tests.
-core_shard("test_manager_cmx_support_core_shard") {
-  shard_file = "meta/test_manager_cmx_support.core_shard.cml"
 }
 
 fuchsia_unittest_package("test-manager-unittests") {
