@@ -23,6 +23,11 @@ fn init_devtmpfs(current_task: &CurrentTask) -> FileSystemHandle {
             .unwrap();
     };
 
+    let mkblk = |name, device_type| {
+        root.create_node(current_task, name, mode!(IFBLK, 0o666), device_type, FsCred::root())
+            .unwrap();
+    };
+
     let mkdir = |name| {
         root.create_node(current_task, name, mode!(IFDIR, 0o755), DeviceType::NONE, FsCred::root())
             .unwrap();
@@ -37,6 +42,17 @@ fn init_devtmpfs(current_task: &CurrentTask) -> FileSystemHandle {
     mkchr(b"fuse", DeviceType::FUSE);
     mkchr(b"loop-control", DeviceType::LOOP_CONTROL);
     root.create_symlink(current_task, b"fd", b"/proc/self/fd", FsCred::root()).unwrap();
+
+    // TODO(fxbug.dev/128697): These devtmpfs entries should be populated automatically by
+    // the loop-control device once devtmpfs is integrated with kobjects.
+    mkblk(b"loop0", DeviceType::new(LOOP_MAJOR, 0));
+    mkblk(b"loop1", DeviceType::new(LOOP_MAJOR, 1));
+    mkblk(b"loop2", DeviceType::new(LOOP_MAJOR, 2));
+    mkblk(b"loop3", DeviceType::new(LOOP_MAJOR, 3));
+    mkblk(b"loop4", DeviceType::new(LOOP_MAJOR, 4));
+    mkblk(b"loop5", DeviceType::new(LOOP_MAJOR, 5));
+    mkblk(b"loop6", DeviceType::new(LOOP_MAJOR, 6));
+    mkblk(b"loop7", DeviceType::new(LOOP_MAJOR, 7));
 
     mkdir(b"shm");
 
