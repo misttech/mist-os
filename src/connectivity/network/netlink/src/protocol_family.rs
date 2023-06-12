@@ -281,7 +281,7 @@ pub mod route {
                         .await
                         .expect("interfaces event loop should have handled the request")
                         .expect("link dump requests are infallible");
-                    client.send(new_done(req_header))
+                    client.send_unicast(new_done(req_header))
                 }
                 GetAddress(ref message) if is_dump => {
                     let ip_version_filter = match message.header.family.into() {
@@ -293,7 +293,7 @@ pub mod route {
                                 "invalid address family ({}) in address dump request from {}: {:?}",
                                 family, client, req,
                             );
-                            client.send(new_ack(NackErrorCode::INVALID, req_header));
+                            client.send_unicast(new_ack(NackErrorCode::INVALID, req_header));
                             return;
                         }
                     };
@@ -315,7 +315,7 @@ pub mod route {
                         .await
                         .expect("interfaces event loop should have handled the request")
                         .expect("addr dump requests are infallible");
-                    client.send(new_done(req_header))
+                    client.send_unicast(new_done(req_header))
                 }
                 NewAddress(ref message) => {
                     let address_and_interface_id = match extract_if_id_and_addr_from_addr_message(
@@ -326,7 +326,7 @@ pub mod route {
                     ) {
                         Some(s) => s,
                         None => {
-                            return client.send(new_ack(NackErrorCode::INVALID, req_header));
+                            return client.send_unicast(new_ack(NackErrorCode::INVALID, req_header));
                         }
                     };
 
@@ -347,7 +347,7 @@ pub mod route {
                         .await
                         .expect("interfaces event loop should have handled the request");
                     if is_ack || result.is_err() {
-                        client.send(new_ack(result, req_header))
+                        client.send_unicast(new_ack(result, req_header))
                     }
                 }
                 DelAddress(ref message) => {
@@ -359,7 +359,7 @@ pub mod route {
                     ) {
                         Some(s) => s,
                         None => {
-                            return client.send(new_ack(NackErrorCode::INVALID, req_header));
+                            return client.send_unicast(new_ack(NackErrorCode::INVALID, req_header));
                         }
                     };
 
@@ -380,7 +380,7 @@ pub mod route {
                         .await
                         .expect("interfaces event loop should have handled the request");
                     if is_ack || result.is_err() {
-                        client.send(new_ack(result, req_header))
+                        client.send_unicast(new_ack(result, req_header))
                     }
                 }
                 NewLink(_)
@@ -420,7 +420,7 @@ pub mod route {
                             "Received unsupported NETLINK_ROUTE request; responding with an Ack: {:?}",
                             req,
                         );
-                        client.send(new_ack(AckErrorCode, req_header))
+                        client.send_unicast(new_ack(AckErrorCode, req_header))
                     } else {
                         warn!(
                             "Received unsupported NETLINK_ROUTE request that does not expect an Ack: {:?}",
@@ -450,13 +450,13 @@ pub mod route {
                             "Received unsupported NETLINK_ROUTE DUMP request; responding with Done: {:?}",
                             req
                         );
-                        client.send(new_done(req_header))
+                        client.send_unicast(new_done(req_header))
                     } else if is_ack {
                         warn!(
                             "Received unsupported NETLINK_ROUTE GET request: responding with Ack {:?}",
                             req
                         );
-                        client.send(new_ack(AckErrorCode, req_header))
+                        client.send_unicast(new_ack(AckErrorCode, req_header))
                     } else {
                         warn!(
                             "Received unsupported NETLINK_ROUTE GET request that does not expect an Ack {:?}",
@@ -566,7 +566,7 @@ pub(crate) mod testutil {
             req: NetlinkMessage<FakeNetlinkInnerMessage>,
             client: &mut InternalClient<FakeProtocolFamily, S>,
         ) {
-            client.send(req)
+            client.send_unicast(req)
         }
     }
 
@@ -600,7 +600,7 @@ mod test {
 
     use crate::{
         interfaces,
-        messaging::testutil::FakeSender,
+        messaging::testutil::{FakeSender, SentMessage},
         netlink_packet::{new_ack, new_done, AckErrorCode, NackErrorCode},
         protocol_family::route::{NetlinkRoute, NetlinkRouteRequestHandler},
     };
@@ -705,10 +705,13 @@ mod test {
 
         match expected_response {
             Some(ExpectedResponse::Ack(code)) => {
-                assert_eq!(client_sink.take_messages(), [new_ack(code, header)])
+                assert_eq!(
+                    client_sink.take_messages(),
+                    [SentMessage::unicast(new_ack(code, header))]
+                )
             }
             Some(ExpectedResponse::Done) => {
-                assert_eq!(client_sink.take_messages(), [new_done(header)])
+                assert_eq!(client_sink.take_messages(), [SentMessage::unicast(new_done(header))])
             }
             None => {
                 assert_eq!(client_sink.take_messages(), [])
@@ -724,7 +727,7 @@ mod test {
     async fn test_request(
         request: NetlinkMessage<RtnlMessage>,
         req_and_resp: Option<RequestAndResponse<interfaces::RequestArgs>>,
-    ) -> Vec<NetlinkMessage<RtnlMessage>> {
+    ) -> Vec<SentMessage<RtnlMessage>> {
         let (mut client_sink, mut client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
             crate::client::testutil::CLIENT_ID_1,
             &[],
@@ -797,10 +800,10 @@ mod test {
             expected_response
                 .into_iter()
                 .map(|expected_response| {
-                    match expected_response {
+                    SentMessage::unicast(match expected_response {
                         ExpectedResponse::Ack(code) => new_ack(code, header),
                         ExpectedResponse::Done => new_done(header),
-                    }
+                    })
                 })
                 .collect::<Vec<_>>(),
         )
@@ -929,10 +932,10 @@ mod test {
             .await,
             expected_response
                 .into_iter()
-                .map(|expected_response| match expected_response {
+                .map(|expected_response| SentMessage::unicast(match expected_response {
                     ExpectedResponse::Ack(code) => new_ack(code, header),
                     ExpectedResponse::Done => new_done(header),
-                })
+                }))
                 .collect::<Vec<_>>(),
         )
     }
@@ -1472,7 +1475,10 @@ mod test {
                 }),
             )
             .await,
-            expected_response.into_iter().map(|code| new_ack(code, header)).collect::<Vec<_>>(),
+            expected_response
+                .into_iter()
+                .map(|code| SentMessage::unicast(new_ack(code, header)))
+                .collect::<Vec<_>>(),
         )
     }
 }

@@ -9,7 +9,10 @@ use std::{marker::PhantomData, num::NonZeroU32, sync::Arc};
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use netlink::{
     messaging::{Sender, SenderReceiverProvider},
-    multicast_groups::{InvalidLegacyGroupsError, LegacyGroups},
+    multicast_groups::{
+        InvalidLegacyGroupsError, LegacyGroups, ModernGroup, NoMappingFromModernToLegacyGroupError,
+        SingleLegacyGroup,
+    },
     protocol_family::route::NetlinkRouteClient,
     NewClientError, NETLINK_LOG_TAG,
 };
@@ -724,15 +727,30 @@ impl<M> NetlinkToClientSender<M> {
 impl<M: Clone + NetlinkSerializable + Send + Sync + 'static> Sender<M>
     for NetlinkToClientSender<M>
 {
-    fn send(&mut self, message: NetlinkMessage<M>) {
+    fn send(&mut self, message: NetlinkMessage<M>, group: Option<ModernGroup>) {
         // Serialize the message
         let mut buf = vec![0; message.buffer_len()];
         message.emit(&mut buf);
         let mut buf: VecInputBuffer = buf.into();
         // Write the message into the inner socket buffer.
         let NetlinkToClientSender { _message_type: _, inner } = self;
-        let _bytes_written: usize =
-            inner.lock().write_to_queue(&mut buf, None, &mut Vec::new()).unwrap_or_else(|e| {
+        let _bytes_written: usize = inner
+            .lock()
+            .write_to_queue(
+                &mut buf,
+                Some(NetlinkAddress {
+                    // All messages come from the "kernel" which has PID of 0.
+                    pid: 0,
+                    // If this is a multicast message, set the group the multicast
+                    // message is from.
+                    groups: group
+                        .map(SingleLegacyGroup::try_from)
+                        .and_then(Result::<_, NoMappingFromModernToLegacyGroupError>::ok)
+                        .map_or(0, |g| g.inner()),
+                }),
+                &mut Vec::new(),
+            )
+            .unwrap_or_else(|e| {
                 log_warn!(
                     tag = NETLINK_LOG_TAG,
                     "Failed to write message into buffer for socket. Errno: {:?}",
@@ -964,6 +982,8 @@ mod tests {
     #[test_case(false; "insufficient_capacity")]
     #[allow(clippy::unused_init)]
     fn test_netlink_to_client_sender(sufficient_capacity: bool) {
+        const MODERN_GROUP: u32 = 5;
+
         let mut message: NetlinkMessage<RtnlMessage> =
             RtnlMessage::NewRoute(RouteMessage::default()).into();
         message.finalize();
@@ -984,11 +1004,19 @@ mod tests {
         }));
 
         let mut sender = NetlinkToClientSender::<RtnlMessage>::new(socket_inner.clone());
-        sender.send(message);
-
+        sender.send(message, Some(ModernGroup(MODERN_GROUP)));
         let message = socket_inner.lock().read_message();
+
+        let data = message.map(|Message { data, address, ancillary_data: _ }| {
+            assert_eq!(
+                address,
+                Some(SocketAddress::Netlink(NetlinkAddress { pid: 0, groups: 1 << MODERN_GROUP }))
+            );
+            data
+        });
+
         assert_eq!(
-            message.map(|m| NetlinkMessage::<RtnlMessage>::deserialize(m.data.bytes())
+            data.map(|data| NetlinkMessage::<RtnlMessage>::deserialize(data.bytes())
                 .expect("message should deserialize into RtnlMessage")),
             expected_message
         )

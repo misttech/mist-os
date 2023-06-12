@@ -78,12 +78,21 @@ impl<F: ProtocolFamily, S: Sender<F::InnerMessage>> InternalClient<F, S> {
         self.inner.group_memberships.lock().unwrap().member_of_group(group)
     }
 
-    /// Sends the given message to the external half of this client.
-    pub(crate) fn send(&mut self, mut message: NetlinkMessage<F::InnerMessage>) {
+    /// Sends the given unicast message to the external half of this client.
+    pub(crate) fn send_unicast(&mut self, message: NetlinkMessage<F::InnerMessage>) {
+        self.send(message, None)
+    }
+
+    /// Sends the given multicast message to the external half of this client.
+    fn send_multicast(&mut self, message: NetlinkMessage<F::InnerMessage>, group: ModernGroup) {
+        self.send(message, Some(group))
+    }
+
+    fn send(&mut self, mut message: NetlinkMessage<F::InnerMessage>, group: Option<ModernGroup>) {
         if let Some(port_number) = *self.inner.port_number.lock().unwrap() {
             message.header.port_number = port_number.into();
         }
-        self.sender.send(message)
+        self.sender.send(message, group)
     }
 }
 
@@ -201,7 +210,7 @@ impl<F: ProtocolFamily, S: Sender<F::InnerMessage>> ClientTable<F, S> {
     ) {
         let count = self.clients.lock().unwrap().iter_mut().fold(0, |count, client| {
             if client.member_of_group(group) {
-                client.send(message.clone());
+                client.send_multicast(message.clone(), group);
                 count + 1
             } else {
                 count
@@ -256,7 +265,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::{
-        messaging::testutil::{fake_sender_with_sink, FakeSender},
+        messaging::testutil::{fake_sender_with_sink, FakeSender, SentMessage},
         protocol_family::testutil::{
             new_fake_netlink_message, FakeProtocolFamily, MODERN_GROUP1, MODERN_GROUP2,
         },
@@ -315,14 +324,26 @@ mod tests {
         assert_eq!(&sink_both_groups.take_messages()[..], &[]);
 
         clients.send_message_to_group(new_fake_netlink_message(), MODERN_GROUP1);
-        assert_eq!(&sink_group1.take_messages()[..], &[new_fake_netlink_message()]);
+        assert_eq!(
+            &sink_group1.take_messages()[..],
+            &[SentMessage::multicast(new_fake_netlink_message(), MODERN_GROUP1)]
+        );
         assert_eq!(&sink_group2.take_messages()[..], &[]);
-        assert_eq!(&sink_both_groups.take_messages()[..], &[new_fake_netlink_message()]);
+        assert_eq!(
+            &sink_both_groups.take_messages()[..],
+            &[SentMessage::multicast(new_fake_netlink_message(), MODERN_GROUP1)]
+        );
 
         clients.send_message_to_group(new_fake_netlink_message(), MODERN_GROUP2);
         assert_eq!(&sink_group1.take_messages()[..], &[]);
-        assert_eq!(&sink_group2.take_messages()[..], &[new_fake_netlink_message()]);
-        assert_eq!(&sink_both_groups.take_messages()[..], &[new_fake_netlink_message()]);
+        assert_eq!(
+            &sink_group2.take_messages()[..],
+            &[SentMessage::multicast(new_fake_netlink_message(), MODERN_GROUP2)]
+        );
+        assert_eq!(
+            &sink_both_groups.take_messages()[..],
+            &[SentMessage::multicast(new_fake_netlink_message(), MODERN_GROUP2)]
+        );
     }
 
     #[test]
@@ -350,12 +371,13 @@ mod tests {
 
         let message = new_fake_netlink_message();
         assert_eq!(message.header.port_number, 0);
-        internal_client.send(message);
+        internal_client.send_unicast(message);
 
         assert_matches!(
             &sink.take_messages()[..],
-            [message] => {
+            [SentMessage { message, group }] => {
                 assert_eq!(message.header.port_number, port_number);
+                assert_eq!(*group, None);
             }
         )
     }

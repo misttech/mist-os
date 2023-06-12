@@ -7,12 +7,17 @@
 use futures::Stream;
 use netlink_packet_core::{NetlinkMessage, NetlinkSerializable};
 
+use crate::multicast_groups::ModernGroup;
+
 /// A type capable of sending messages, `M`, from Netlink to a client.
 pub trait Sender<M>: Clone + Send + Sync + 'static {
     /// Sends the given message to the client.
     ///
+    /// If the message is a multicast, `group` will hold a `Some`; `None` for
+    /// unicast messages.
+    ///
     /// Implementors must ensure this call does not block.
-    fn send(&mut self, message: NetlinkMessage<M>);
+    fn send(&mut self, message: NetlinkMessage<M>, group: Option<ModernGroup>);
 }
 
 /// A type capable of receiving messages, `M`, from a client to Netlink.
@@ -39,24 +44,40 @@ pub(crate) mod testutil {
         sync::{Arc, Mutex},
     };
 
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub(crate) struct SentMessage<M> {
+        pub message: NetlinkMessage<M>,
+        pub group: Option<ModernGroup>,
+    }
+
+    impl<M> SentMessage<M> {
+        pub(crate) fn unicast(message: NetlinkMessage<M>) -> Self {
+            Self { message, group: None }
+        }
+
+        pub(crate) fn multicast(message: NetlinkMessage<M>, group: ModernGroup) -> Self {
+            Self { message, group: Some(group) }
+        }
+    }
+
     #[derive(Clone, Debug, Default)]
     pub(crate) struct FakeSender<M> {
-        sent_messages: Arc<Mutex<Vec<NetlinkMessage<M>>>>,
+        sent_messages: Arc<Mutex<Vec<SentMessage<M>>>>,
     }
 
     impl<M: Clone + Send + NetlinkSerializable + 'static> Sender<M> for FakeSender<M> {
-        fn send(&mut self, message: NetlinkMessage<M>) {
-            self.sent_messages.lock().unwrap().push(message)
+        fn send(&mut self, message: NetlinkMessage<M>, group: Option<ModernGroup>) {
+            self.sent_messages.lock().unwrap().push(SentMessage { message, group })
         }
     }
 
     pub(crate) struct FakeSenderSink<M> {
-        messages: Arc<Mutex<Vec<NetlinkMessage<M>>>>,
+        messages: Arc<Mutex<Vec<SentMessage<M>>>>,
     }
 
     impl<M> FakeSenderSink<M> {
-        pub(crate) fn take_messages(&mut self) -> Vec<NetlinkMessage<M>> {
-            self.messages.lock().unwrap().drain(..).collect()
+        pub(crate) fn take_messages(&mut self) -> Vec<SentMessage<M>> {
+            core::mem::take(&mut *self.messages.lock().unwrap())
         }
     }
 

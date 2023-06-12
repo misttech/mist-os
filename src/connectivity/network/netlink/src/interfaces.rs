@@ -542,7 +542,7 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
                         .values()
                         .filter_map(NetlinkLinkMessage::optionally_from)
                         .for_each(|message| {
-                            client.send(message.into_rtnl_new_link(sequence_number, true))
+                            client.send_unicast(message.into_rtnl_new_link(sequence_number, true))
                         });
                     Ok(())
                 }
@@ -565,7 +565,7 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
                                 })
                             })
                             .for_each(|message| {
-                                client.send(message.to_rtnl_new_addr(sequence_number, true))
+                                client.send_unicast(message.to_rtnl_new_addr(sequence_number, true))
                             });
                         Ok(())
                     }
@@ -1079,7 +1079,7 @@ pub(crate) mod testutil {
     use net_declare::{fidl_subnet, net_addr_subnet};
     use netlink_packet_core::NetlinkPayload;
 
-    use crate::messaging::testutil::FakeSender;
+    use crate::messaging::testutil::{FakeSender, SentMessage};
 
     pub(crate) const LO_INTERFACE_ID: u64 = 1;
     pub(crate) const LO_NAME: &str = "lo";
@@ -1169,10 +1169,10 @@ pub(crate) mod testutil {
             .await
     }
 
-    pub(crate) fn sort_link_messages(messages: &mut [NetlinkMessage<RtnlMessage>]) {
+    pub(crate) fn sort_link_messages(messages: &mut [SentMessage<RtnlMessage>]) {
         messages.sort_by_key(|message| {
             assert_matches!(
-                &message.payload,
+                &message.message.payload,
                 NetlinkPayload::InnerMessage(RtnlMessage::NewLink(m)) => {
                     m.header.index
                 }
@@ -1271,7 +1271,7 @@ mod tests {
     use pretty_assertions::assert_eq;
     use test_case::test_case;
 
-    use crate::messaging::testutil::FakeSender;
+    use crate::messaging::testutil::{FakeSender, SentMessage};
 
     const TEST_SEQUENCE_NUMBER: u32 = 1234;
 
@@ -1760,86 +1760,116 @@ mod tests {
                 fidl::Error::ClientChannelClosed { .. },
             ))
         );
-        let wlan_link = create_netlink_link_message(
-            WLAN_INTERFACE_ID,
-            ARPHRD_ETHER,
-            0,
-            create_nlas(WLAN_NAME.to_string(), ARPHRD_ETHER, false),
-        )
-        .into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false);
-        let lo_link = create_netlink_link_message(
-            LO_INTERFACE_ID,
-            ARPHRD_LOOPBACK,
-            IFF_UP | IFF_RUNNING | IFF_LOOPBACK,
-            create_nlas(LO_NAME.to_string(), ARPHRD_LOOPBACK, true),
-        )
-        .into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false);
-        let eth_link = create_netlink_link_message(
-            ETH_INTERFACE_ID,
-            ARPHRD_ETHER,
-            0,
-            create_nlas(ETH_NAME.to_string(), ARPHRD_ETHER, false),
-        )
-        .into_rtnl_del_link(UNSPECIFIED_SEQUENCE_NUMBER);
+        let wlan_link = SentMessage::multicast(
+            create_netlink_link_message(
+                WLAN_INTERFACE_ID,
+                ARPHRD_ETHER,
+                0,
+                create_nlas(WLAN_NAME.to_string(), ARPHRD_ETHER, false),
+            )
+            .into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false),
+            ModernGroup(RTNLGRP_LINK),
+        );
+        let lo_link = SentMessage::multicast(
+            create_netlink_link_message(
+                LO_INTERFACE_ID,
+                ARPHRD_LOOPBACK,
+                IFF_UP | IFF_RUNNING | IFF_LOOPBACK,
+                create_nlas(LO_NAME.to_string(), ARPHRD_LOOPBACK, true),
+            )
+            .into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false),
+            ModernGroup(RTNLGRP_LINK),
+        );
+        let eth_link = SentMessage::multicast(
+            create_netlink_link_message(
+                ETH_INTERFACE_ID,
+                ARPHRD_ETHER,
+                0,
+                create_nlas(ETH_NAME.to_string(), ARPHRD_ETHER, false),
+            )
+            .into_rtnl_del_link(UNSPECIFIED_SEQUENCE_NUMBER),
+            ModernGroup(RTNLGRP_LINK),
+        );
         assert_eq!(
             &link_sink.take_messages()[..],
             &[wlan_link.clone(), lo_link.clone(), eth_link.clone(),],
         );
 
-        let wlan_v4_addr = create_address_message(
-            WLAN_INTERFACE_ID.try_into().unwrap(),
-            TEST_V4_ADDR,
-            WLAN_NAME.to_string(),
-            IFA_F_PERMANENT,
-        )
-        .to_rtnl_new_addr(UNSPECIFIED_SEQUENCE_NUMBER, false);
-        let eth_v4_addr = create_address_message(
-            ETH_INTERFACE_ID.try_into().unwrap(),
-            TEST_V4_ADDR,
-            ETH_NAME.to_string(),
-            IFA_F_PERMANENT,
-        )
-        .to_rtnl_del_addr(UNSPECIFIED_SEQUENCE_NUMBER);
-        let ppp_v4_addr = create_address_message(
-            PPP_INTERFACE_ID.try_into().unwrap(),
-            TEST_V4_ADDR,
-            PPP_NAME.to_string(),
-            IFA_F_PERMANENT,
-        )
-        .to_rtnl_del_addr(UNSPECIFIED_SEQUENCE_NUMBER);
+        let wlan_v4_addr = SentMessage::multicast(
+            create_address_message(
+                WLAN_INTERFACE_ID.try_into().unwrap(),
+                TEST_V4_ADDR,
+                WLAN_NAME.to_string(),
+                IFA_F_PERMANENT,
+            )
+            .to_rtnl_new_addr(UNSPECIFIED_SEQUENCE_NUMBER, false),
+            ModernGroup(RTNLGRP_IPV4_IFADDR),
+        );
+        let eth_v4_addr = SentMessage::multicast(
+            create_address_message(
+                ETH_INTERFACE_ID.try_into().unwrap(),
+                TEST_V4_ADDR,
+                ETH_NAME.to_string(),
+                IFA_F_PERMANENT,
+            )
+            .to_rtnl_del_addr(UNSPECIFIED_SEQUENCE_NUMBER),
+            ModernGroup(RTNLGRP_IPV4_IFADDR),
+        );
+        let ppp_v4_addr = SentMessage::multicast(
+            create_address_message(
+                PPP_INTERFACE_ID.try_into().unwrap(),
+                TEST_V4_ADDR,
+                PPP_NAME.to_string(),
+                IFA_F_PERMANENT,
+            )
+            .to_rtnl_del_addr(UNSPECIFIED_SEQUENCE_NUMBER),
+            ModernGroup(RTNLGRP_IPV4_IFADDR),
+        );
         assert_eq!(
             &addr4_sink.take_messages()[..],
             &[wlan_v4_addr.clone(), eth_v4_addr.clone(), ppp_v4_addr.clone(),],
         );
 
-        let wlan_v6_addr = create_address_message(
-            WLAN_INTERFACE_ID.try_into().unwrap(),
-            TEST_V6_ADDR,
-            WLAN_NAME.to_string(),
-            IFA_F_PERMANENT,
-        )
-        .to_rtnl_new_addr(UNSPECIFIED_SEQUENCE_NUMBER, false);
-        let lo_v6_addr = create_address_message(
-            LO_INTERFACE_ID.try_into().unwrap(),
-            TEST_V6_ADDR,
-            LO_NAME.to_string(),
-            IFA_F_PERMANENT,
-        )
-        .to_rtnl_new_addr(UNSPECIFIED_SEQUENCE_NUMBER, false);
-        let eth_v6_addr = create_address_message(
-            ETH_INTERFACE_ID.try_into().unwrap(),
-            TEST_V6_ADDR,
-            ETH_NAME.to_string(),
-            IFA_F_PERMANENT,
-        )
-        .to_rtnl_del_addr(UNSPECIFIED_SEQUENCE_NUMBER);
-        let ppp_v6_addr = create_address_message(
-            PPP_INTERFACE_ID.try_into().unwrap(),
-            TEST_V6_ADDR,
-            PPP_NAME.to_string(),
-            IFA_F_PERMANENT,
-        )
-        .to_rtnl_del_addr(UNSPECIFIED_SEQUENCE_NUMBER);
+        let wlan_v6_addr = SentMessage::multicast(
+            create_address_message(
+                WLAN_INTERFACE_ID.try_into().unwrap(),
+                TEST_V6_ADDR,
+                WLAN_NAME.to_string(),
+                IFA_F_PERMANENT,
+            )
+            .to_rtnl_new_addr(UNSPECIFIED_SEQUENCE_NUMBER, false),
+            ModernGroup(RTNLGRP_IPV6_IFADDR),
+        );
+        let lo_v6_addr = SentMessage::multicast(
+            create_address_message(
+                LO_INTERFACE_ID.try_into().unwrap(),
+                TEST_V6_ADDR,
+                LO_NAME.to_string(),
+                IFA_F_PERMANENT,
+            )
+            .to_rtnl_new_addr(UNSPECIFIED_SEQUENCE_NUMBER, false),
+            ModernGroup(RTNLGRP_IPV6_IFADDR),
+        );
+        let eth_v6_addr = SentMessage::multicast(
+            create_address_message(
+                ETH_INTERFACE_ID.try_into().unwrap(),
+                TEST_V6_ADDR,
+                ETH_NAME.to_string(),
+                IFA_F_PERMANENT,
+            )
+            .to_rtnl_del_addr(UNSPECIFIED_SEQUENCE_NUMBER),
+            ModernGroup(RTNLGRP_IPV6_IFADDR),
+        );
+        let ppp_v6_addr = SentMessage::multicast(
+            create_address_message(
+                PPP_INTERFACE_ID.try_into().unwrap(),
+                TEST_V6_ADDR,
+                PPP_NAME.to_string(),
+                IFA_F_PERMANENT,
+            )
+            .to_rtnl_del_addr(UNSPECIFIED_SEQUENCE_NUMBER),
+            ModernGroup(RTNLGRP_IPV6_IFADDR),
+        );
         assert_eq!(
             &addr6_sink.take_messages()[..],
             &[wlan_v6_addr.clone(), lo_v6_addr.clone(), eth_v6_addr.clone(), ppp_v6_addr.clone(),],
@@ -1875,7 +1905,7 @@ mod tests {
 
     #[derive(Debug, PartialEq)]
     struct TestRequestResult {
-        messages: Vec<NetlinkMessage<RtnlMessage>>,
+        messages: Vec<SentMessage<RtnlMessage>>,
         waiter_result: Result<(), RequestError>,
     }
 
@@ -1973,20 +2003,24 @@ mod tests {
         assert_eq!(
             messages,
             [
-                create_netlink_link_message(
-                    LO_INTERFACE_ID,
-                    ARPHRD_LOOPBACK,
-                    IFF_UP | IFF_RUNNING | IFF_LOOPBACK,
-                    create_nlas(LO_NAME.to_string(), ARPHRD_LOOPBACK, true),
-                )
-                .into_rtnl_new_link(TEST_SEQUENCE_NUMBER, true),
-                create_netlink_link_message(
-                    ETH_INTERFACE_ID,
-                    ARPHRD_ETHER,
-                    0,
-                    create_nlas(ETH_NAME.to_string(), ARPHRD_ETHER, false),
-                )
-                .into_rtnl_new_link(TEST_SEQUENCE_NUMBER, true),
+                SentMessage::unicast(
+                    create_netlink_link_message(
+                        LO_INTERFACE_ID,
+                        ARPHRD_LOOPBACK,
+                        IFF_UP | IFF_RUNNING | IFF_LOOPBACK,
+                        create_nlas(LO_NAME.to_string(), ARPHRD_LOOPBACK, true),
+                    )
+                    .into_rtnl_new_link(TEST_SEQUENCE_NUMBER, true)
+                ),
+                SentMessage::unicast(
+                    create_netlink_link_message(
+                        ETH_INTERFACE_ID,
+                        ARPHRD_ETHER,
+                        0,
+                        create_nlas(ETH_NAME.to_string(), ARPHRD_ETHER, false),
+                    )
+                    .into_rtnl_new_link(TEST_SEQUENCE_NUMBER, true)
+                ),
             ],
         );
     }
@@ -2019,13 +2053,15 @@ mod tests {
                                 })
                             })
                             .map(move |addr| {
-                                create_address_message(
-                                    id.try_into().unwrap(),
-                                    addr,
-                                    name.to_string(),
-                                    IFA_F_PERMANENT,
+                                SentMessage::unicast(
+                                    create_address_message(
+                                        id.try_into().unwrap(),
+                                        addr,
+                                        name.to_string(),
+                                        IFA_F_PERMANENT,
+                                    )
+                                    .to_rtnl_new_addr(TEST_SEQUENCE_NUMBER, true),
                                 )
-                                .to_rtnl_new_addr(TEST_SEQUENCE_NUMBER, true)
                             })
                     })
                     .flatten()

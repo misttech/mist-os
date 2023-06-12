@@ -37,6 +37,9 @@ use tracing::warn;
 
 use crate::NETLINK_LOG_TAG;
 
+// Safe "as" conversion because u32::BITS (32) will fit into any usize.
+const U32_BITS_USIZE: usize = u32::BITS as usize;
+
 /// A modern (non-legacy) multicast group. Interpreted as a single group.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct ModernGroup(pub u32);
@@ -48,6 +51,26 @@ impl Into<usize> for ModernGroup {
     }
 }
 
+/// An error indicating that a modern group has no mapping to a legacy
+/// group.
+#[derive(Debug)]
+pub struct NoMappingFromModernToLegacyGroupError;
+
+impl TryFrom<ModernGroup> for SingleLegacyGroup {
+    type Error = NoMappingFromModernToLegacyGroupError;
+
+    fn try_from(
+        ModernGroup(group): ModernGroup,
+    ) -> Result<SingleLegacyGroup, NoMappingFromModernToLegacyGroupError> {
+        let group = 1 << group;
+        if group == 0 {
+            Err(NoMappingFromModernToLegacyGroupError)
+        } else {
+            Ok(SingleLegacyGroup(group))
+        }
+    }
+}
+
 /// A set of legacy multicast groups. Interpreted as a bit mask, where each set
 /// bit corresponds to a different group membership.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -55,10 +78,11 @@ pub struct LegacyGroups(pub u32);
 
 /// A single legacy multicast group membership. At most 1 bit is set.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct SingleLegacyGroup(u32);
+pub struct SingleLegacyGroup(u32);
 
 impl SingleLegacyGroup {
-    pub(crate) fn inner(&self) -> u32 {
+    /// Returns the group number as a `u32`.
+    pub fn inner(&self) -> u32 {
         let SingleLegacyGroup(inner) = self;
         *inner
     }
@@ -66,7 +90,7 @@ impl SingleLegacyGroup {
 
 /// Error returned when attempting to convert a u32 into [`SingleLegacyGroup`].
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct MultipleBitsSetError;
+pub struct MultipleBitsSetError;
 
 impl TryFrom<u32> for SingleLegacyGroup {
     type Error = MultipleBitsSetError;
@@ -161,8 +185,6 @@ impl<F: MulticastCapableNetlinkFamily> MulticastGroupMemberships<F> {
         LegacyGroups(requested_groups): LegacyGroups,
     ) -> Result<(), InvalidLegacyGroupsError> {
         let MulticastGroupMemberships { family: _, memberships } = self;
-        // Safe "as" conversion because u32::BITS (32) will fit into any usize.
-        const U32_BITS_USIZE: usize = u32::BITS as usize;
         #[derive(Clone, Copy)]
         enum Mutation {
             None,

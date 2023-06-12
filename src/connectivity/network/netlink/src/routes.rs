@@ -238,7 +238,7 @@ impl<
             RequestArgs::Route(RouteRequestArgs::Get(args)) => match args {
                 GetRouteArgs::Dump => {
                     route_messages.clone().into_iter().for_each(|message| {
-                        client.send(message.into_rtnl_new_route(sequence_number, true))
+                        client.send_unicast(message.into_rtnl_new_route(sequence_number, true))
                     });
                     Ok(())
                 }
@@ -526,7 +526,7 @@ mod tests {
     use netlink_packet_route::RTNLGRP_LINK;
     use test_case::test_case;
 
-    use crate::messaging::testutil::FakeSender;
+    use crate::messaging::testutil::{FakeSender, SentMessage};
 
     const TEST_V4_SUBNET: Subnet<Ipv4Addr> = net_subnet_v4!("192.0.2.0/24");
     const TEST_V4_NEXTHOP: Ipv4Addr = net_ip_v4!("192.0.2.1");
@@ -668,9 +668,12 @@ mod tests {
         assert_eq!(route_messages, HashSet::from_iter([expected_route_message1.clone()]));
         assert_eq!(
             &right_sink.take_messages()[..],
-            &[expected_route_message1
-                .clone()
-                .into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false)]
+            &[SentMessage::multicast(
+                expected_route_message1
+                    .clone()
+                    .into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false),
+                right_group
+            )]
         );
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
 
@@ -694,9 +697,12 @@ mod tests {
         );
         assert_eq!(
             &right_sink.take_messages()[..],
-            &[expected_route_message2
-                .clone()
-                .into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false)]
+            &[SentMessage::multicast(
+                expected_route_message2
+                    .clone()
+                    .into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false),
+                right_group
+            )]
         );
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
 
@@ -707,7 +713,10 @@ mod tests {
         assert_eq!(route_messages, HashSet::from_iter([expected_route_message2.clone()]));
         assert_eq!(
             &right_sink.take_messages()[..],
-            &[expected_route_message1.clone().into_rtnl_del_route()]
+            &[SentMessage::multicast(
+                expected_route_message1.clone().into_rtnl_del_route(),
+                right_group
+            )]
         );
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
 
@@ -1116,7 +1125,7 @@ mod tests {
                 let mut messages = route_sink.take_messages();
                 messages.sort_by_key(|message| {
                     assert_matches!(
-                        &message.payload,
+                        &message.message.payload,
                         NetlinkPayload::InnerMessage(RtnlMessage::NewRoute(m)) => {
                             // We expect there to be exactly one Oif NLA present
                             // for the given inputs.
@@ -1136,28 +1145,32 @@ mod tests {
                 messages
             },
             [
-                create_netlink_route_message(
-                    address_family,
-                    subnet.prefix(),
-                    create_nlas::<A::Version>(
-                        Some(subnet),
-                        Some(next_hop1),
-                        INTERFACE_ID1,
-                        LOWER_METRIC,
+                SentMessage::unicast(
+                    create_netlink_route_message(
+                        address_family,
+                        subnet.prefix(),
+                        create_nlas::<A::Version>(
+                            Some(subnet),
+                            Some(next_hop1),
+                            INTERFACE_ID1,
+                            LOWER_METRIC,
+                        )
                     )
-                )
-                .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
-                create_netlink_route_message(
-                    address_family,
-                    subnet.prefix(),
-                    create_nlas::<A::Version>(
-                        Some(subnet),
-                        Some(next_hop2),
-                        INTERFACE_ID2,
-                        HIGHER_METRIC,
+                    .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true)
+                ),
+                SentMessage::unicast(
+                    create_netlink_route_message(
+                        address_family,
+                        subnet.prefix(),
+                        create_nlas::<A::Version>(
+                            Some(subnet),
+                            Some(next_hop2),
+                            INTERFACE_ID2,
+                            HIGHER_METRIC,
+                        )
                     )
-                )
-                .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true),
+                    .into_rtnl_new_route(TEST_SEQUENCE_NUMBER, true)
+                ),
             ],
         );
         assert_eq!(&other_sink.take_messages()[..], &[]);

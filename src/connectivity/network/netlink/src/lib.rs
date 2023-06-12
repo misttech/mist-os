@@ -284,8 +284,11 @@ mod tests {
 
     use futures::channel::mpsc;
 
-    use crate::protocol_family::testutil::{
-        new_fake_netlink_message, FakeNetlinkRequestHandler, FakeProtocolFamily,
+    use crate::{
+        messaging::testutil::SentMessage,
+        protocol_family::testutil::{
+            new_fake_netlink_message, FakeNetlinkRequestHandler, FakeProtocolFamily,
+        },
     };
 
     #[fasync::run_singlethreaded(test)]
@@ -315,7 +318,10 @@ mod tests {
             res = could_send_fut => res.expect("should be able to send without error"),
             () = client_task => panic!("client task unexpectedly finished"),
         );
-        assert_eq!(&client_sink.take_messages()[..], &[new_fake_netlink_message()]);
+        assert_eq!(
+            &client_sink.take_messages()[..],
+            &[SentMessage::unicast(new_fake_netlink_message())]
+        );
 
         // Close the sender, and expect the Task to exit.
         req_sender.close_channel();
@@ -367,7 +373,10 @@ mod tests {
             res = could_send_fut => res.expect("should be able to send without error"),
             () = client_acceptor_fut => panic!("client acceptor unexpectedly finished"),
         );
-        assert_eq!(&client_sink2.take_messages()[..], &[new_fake_netlink_message()]);
+        assert_eq!(
+            &client_sink2.take_messages()[..],
+            &[SentMessage::unicast(new_fake_netlink_message())]
+        );
 
         // Close the two clients, and verify the acceptor fut is still pending.
         req_sender1.close_channel();
