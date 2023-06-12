@@ -22,6 +22,7 @@ async fn inspect_parent_override() -> anyhow::Result<()> {
     let expected_greeting = "parent component";
     let realm = connect_to_protocol::<RealmMarker>()?;
 
+    // [START create_child]
     let child_decl = Child {
         name: Some(child_name.to_string()),
         url: Some(String::from(CHILD_URL)),
@@ -42,6 +43,7 @@ async fn inspect_parent_override() -> anyhow::Result<()> {
         .await
         .context("sending create child message")?
         .map_err(|e| anyhow::format_err!("creating child: {e:?}"))?;
+    // [END create_child]
 
     let exposed_dir = open_childs_exposed_directory(child_name, Some(COLLECTION_NAME.to_string()))
         .await

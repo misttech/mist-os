@@ -8,7 +8,10 @@ their manifest. Benefits of using structured configuration include:
 * Components read their configuration with statically-typed libraries.
 * Component Framework only starts components with valid configuration.
 * Configuration can be viewed at runtime with `ffx` tooling.
-* Values can be set at runtime in tests with RealmBuilder.
+* Values can be set at runtime.
+
+For more details on the implementation and behavior of structured configuration, see its
+[reference](/docs/reference/components/structured_config.md).
 
 To use structured configuration in your component, you must update build rules, declare a schema,
 define values, and generate a client library.
@@ -233,10 +236,99 @@ core/ffx-laboratory\:config_example:
         greeting = World
 ```
 
-## Testing with Realm Builder
+## Runtime values from outside the component
+
+By default, components will only receive configuration values from a
+[`.cvf` file][cvf] returned by their resolver, usually from their package. In
+order to have those values replaced by another component, they must have a
+`mutability` property which opts them in to particular sources of mutation:
+
+```json5
+    config: {
+        greeting: {
+            // ...
+            mutability: [ /* ... */ ],
+        },
+    },
+```
+
+Note: Once a component opts-in to having a configuration value mutated, it
+must take care to [evolve][sc-evolution] its schema in coordination with any
+external providers of that configuration.
+
+[cvf]: /docs/reference/components/structured_config.md#configuration-value-files
+[sc-evolution]: /docs/development/components/configuration/evolving_structured_config.md
+
+### Providing values from parent components
+
+Parent components can provide values to children launched in a collection when
+the child has opted in to receiving them.
+
+Note: It is not yet possible to provide configuration values to statically
+declared children in CML. Please star https://fxbug.dev/126578 for updates.
+
+First, the child must add a `mutability` property to the appropriate
+configuration field:
+
+```json5
+{
+    ...
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/config_from_parent/rust/meta/config_example.cml" region_tag="config" %}
+}
+```
+
+When launching the child with the `Realm` protocol, pass config values as
+overrides:
+
+* {C++}
+
+  ```cpp
+  {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/config_from_parent/integration_test/cpp/test.cc" region_tag="create_child" adjust_indentation="auto" %}
+  ```
+
+* {Rust}
+
+  ```rust
+  {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/config_from_parent/integration_test/rust/lib.rs" region_tag="create_child" adjust_indentation="auto" %}
+  ```
+
+See the [full example](/examples/components/config_from_parent) for details.
+
+#### Providing values with `ffx component`
+
+When creating a component with `ffx component create` or running it with
+`ffx component run`, you can override configuration values as if you're acting
+as the parent component.
+
+If you run the above configuration example without any overrides you can see it
+print the default configuration to its logs:
+
+```
+$ ffx component run /core/ffx-laboratory:hello-default-value fuchsia-pkg://fuchsia.com/rust_config_from_parent_example#meta/config_example.cm --follow-logs
+...
+[02655.273631][ffx-laboratory:hello-default-value] INFO: Hello, World! (from Rust)
+```
+
+Passing `--config` allows you to override that greeting:
+
+```
+$ ffx component run /core/ffx-laboratory:hello-from-parent fuchsia-pkg://fuchsia.com/rust_config_from_parent_example#meta/config_example.cm --config 'greeting="parent component"' --follow-logs
+...
+[02622.752978][ffx-laboratory:hello-from-parent] INFO: Hello, parent component! (from Rust)`
+```
+
+Each configuration field is specified as `KEY=VALUE` where `KEY` must be a field
+in the component's config schema which has `mutability: [ "parent" ]` and
+`VALUE` is a string that can be parsed as JSON matching the type of the field.
+
+### Testing with Realm Builder
 
 You can use [Realm Builder][rb-feature-matrix] to dynamically replace the configuration values of
-a component.
+a component regardless of the configuration field's `mutability`.
+
+Note: This currently only works for components in the same package as the test.
+Please star https://fxbug.dev/102211 for updates on supporting this feature for
+subpackaged components.
 
 * {C++}
 

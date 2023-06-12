@@ -60,6 +60,7 @@ TEST_F(IntegrationTest, ParentValuesObserved) {
   fidl::Client realm(std::move(*client_end), dispatcher());
   ZX_ASSERT(realm.is_valid());
 
+  // [START create_child]
   fuchsia_component_decl::Child child_decl;
   child_decl.name(child_name);
   child_decl.url(kChildUrl);
@@ -85,6 +86,7 @@ TEST_F(IntegrationTest, ParentValuesObserved) {
         QuitLoop();
       });
   RunLoop();
+  // [END create_child]
 
   fuchsia_component_decl::ChildRef child_ref;
   child_ref.collection(kCollectionName);

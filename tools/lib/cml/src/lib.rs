@@ -1107,6 +1107,22 @@ pub struct Document {
     /// }
     /// ```
     ///
+    /// Fields are resolved from a component's package by default. To be able to change the values
+    /// at runtime a `mutability` specifier is required.
+    ///
+    /// Example:
+    ///
+    /// ```json5
+    /// config: {
+    ///     verbose: {
+    ///         type: "bool",
+    ///         mutability: [ "parent" ],
+    ///     },
+    /// },
+    /// ```
+    ///
+    /// Currently `"parent"` is the only mutability specifier supported.
+    ///
     /// Strings must define the `max_size` property as a non-zero integer.
     ///
     /// Example:
