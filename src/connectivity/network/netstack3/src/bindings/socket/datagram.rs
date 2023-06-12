@@ -34,8 +34,8 @@ use netstack3_core::{
     error::{LocalAddressError, SocketError},
     ip::{icmp, IpExt},
     socket::datagram::{
-        ConnectListenerError, MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
-        SetMulticastMembershipError, ShutdownType, SockCreationError,
+        ConnectError, MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
+        SetMulticastMembershipError, ShutdownType,
     },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
     transport::udp::{self, ExpectedConnError, ExpectedUnboundError},
@@ -375,7 +375,7 @@ impl OptionFromU16 for NonZeroU16 {
 }
 
 impl<I: IpExt> TransportState<I> for Udp {
-    type ConnectError = Either<SockCreationError, ConnectListenerError>;
+    type ConnectError = ConnectError;
     type ListenError = Either<ExpectedUnboundError, LocalAddressError>;
     type DisconnectError = ExpectedConnError;
     type ShutdownError = ExpectedConnError;
@@ -397,7 +397,7 @@ impl<I: IpExt> TransportState<I> for Udp {
         remote_ip: ZonedAddr<<I as Ip>::Addr, DeviceId<C>>,
         remote_id: Self::RemoteIdentifier,
     ) -> Result<Self::SocketId, Self::ConnectError> {
-        udp::connect_udp(sync_ctx, ctx, id, remote_ip, remote_id)
+        udp::connect(sync_ctx, ctx, id, remote_ip, remote_id)
     }
 
     fn bind<C: NonSyncContext>(

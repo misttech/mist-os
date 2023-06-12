@@ -31,7 +31,7 @@ use netstack3_core::{
         socket::{IpSockCreationError, IpSockSendError},
         ResolveRouteError,
     },
-    socket::datagram::{ConnectListenerError, SetMulticastMembershipError, SockCreationError},
+    socket::datagram::{ConnectError, SetMulticastMembershipError},
     transport::{tcp, udp},
 };
 
@@ -598,23 +598,13 @@ impl IntoErrno for udp::SendError {
     }
 }
 
-impl IntoErrno for SockCreationError {
+impl IntoErrno for ConnectError {
     fn into_errno(self) -> Errno {
         match self {
             Self::Ip(err) => err.into_errno(),
             Self::Zone(err) => err.into_errno(),
             Self::CouldNotAllocateLocalPort => Errno::Eaddrnotavail,
             Self::SockAddrConflict => Errno::Eaddrinuse,
-        }
-    }
-}
-
-impl IntoErrno for ConnectListenerError {
-    fn into_errno(self) -> Errno {
-        match self {
-            Self::Ip(err) => err.into_errno(),
-            Self::Zone(err) => err.into_errno(),
-            Self::AddressConflict => Errno::Eaddrinuse,
         }
     }
 }
