@@ -122,12 +122,12 @@ impl FileOps for LoopControlDevice {
         match request {
             LOOP_CTL_GET_FREE => Ok(self.registry.find()?.into()),
             LOOP_CTL_ADD => {
-                let minor = arg.into_arg();
+                let minor = arg.into();
                 self.registry.add(minor)?;
                 Ok(minor.into())
             }
             LOOP_CTL_REMOVE => {
-                let minor = arg.into_arg();
+                let minor = arg.into();
                 self.registry.remove(minor)?;
                 Ok(minor.into())
             }
