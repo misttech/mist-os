@@ -171,6 +171,29 @@ impl FuseNode {
         info.rdev = DeviceType::from_bits(attributes.rdev as u64);
         Ok(())
     }
+
+    /// Build a FsNodeHandle from a FuseResponse that is expected to be a FuseResponse::Entry.
+    fn fs_node_from_entry(
+        &self,
+        node: &FsNode,
+        response: FuseResponse,
+    ) -> Result<FsNodeHandle, Errno> {
+        let entry = if let FuseResponse::Entry(entry) = response {
+            entry
+        } else {
+            return error!(EINVAL);
+        };
+        if entry.nodeid == 0 {
+            return error!(ENOENT);
+        }
+        node.fs().get_or_create_node(Some(entry.nodeid), |id| {
+            let fuse_node =
+                Arc::new(FuseNode { connection: self.connection.clone(), nodeid: entry.nodeid });
+            let mut info = FsNodeInfo::default();
+            FuseNode::update_node_info(&mut info, entry.attr)?;
+            Ok(FsNode::new_uncached(Box::new(fuse_node), &node.fs(), id, info))
+        })
+    }
 }
 
 struct FuseFileObject {
@@ -347,34 +370,32 @@ impl FsNodeOps for Arc<FuseNode> {
             self,
             FuseOperation::Lookup(name.to_owned()),
         )?;
-        let entry = if let FuseResponse::Entry(entry) = response {
-            entry
-        } else {
-            return error!(EINVAL);
-        };
-        if entry.nodeid == 0 {
-            return error!(ENOENT);
-        }
-        node.fs().get_or_create_node(Some(entry.nodeid), |id| {
-            let fuse_node =
-                Arc::new(FuseNode { connection: self.connection.clone(), nodeid: entry.nodeid });
-            let mut info = FsNodeInfo::default();
-            FuseNode::update_node_info(&mut info, entry.attr)?;
-            Ok(FsNode::new_uncached(Box::new(fuse_node), &node.fs(), id, info))
-        })
+        self.fs_node_from_entry(node, response)
     }
 
     fn mknod(
         &self,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        _name: &FsStr,
-        _mode: FileMode,
-        _dev: DeviceType,
+        node: &FsNode,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        mode: FileMode,
+        dev: DeviceType,
         _owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        not_implemented!("FsNodeOps::mknod");
-        error!(ENOTSUP)
+        let response = self.connection.execute_operation(
+            current_task,
+            self,
+            FuseOperation::Mknod(
+                uapi::fuse_mknod_in {
+                    mode: mode.bits(),
+                    rdev: dev.bits() as u32,
+                    umask: current_task.fs().umask().bits(),
+                    padding: 0,
+                },
+                name.to_owned(),
+            ),
+        )?;
+        self.fs_node_from_entry(node, response)
     }
 
     fn mkdir(
@@ -811,6 +832,7 @@ enum FuseOperation {
     Init,
     Interrupt(u64),
     Lookup(FsString),
+    Mknod(uapi::fuse_mknod_in, FsString),
     Open(OpenFlags),
     Read(uapi::fuse_read_in),
     Release(uapi::fuse_open_out),
@@ -838,13 +860,15 @@ impl FuseOperation {
                 let message = uapi::fuse_interrupt_in { unique: *unique };
                 data.write_all(message.as_bytes())
             }
-            Self::Lookup(name) => {
-                let len = data.write_all(name.as_bytes())?;
-                Ok(data.write_all(&[0])? + len)
-            }
+            Self::Lookup(name) => data.write_all(name.as_bytes()),
             Self::Open(open_flags) => {
                 let message = uapi::fuse_open_in { flags: 0, open_flags: open_flags.bits() };
                 data.write_all(message.as_bytes())
+            }
+            Self::Mknod(mknod_in, name) => {
+                let mut len = data.write_all(mknod_in.as_bytes())?;
+                len += data.write_all(name.as_bytes())?;
+                Ok(len)
             }
             Self::Read(read_in) => data.write_all(read_in.as_bytes()),
             Self::Release(open_in) => {
@@ -866,6 +890,7 @@ impl FuseOperation {
             Self::Init => uapi::fuse_opcode_FUSE_INIT,
             Self::Interrupt(_) => uapi::fuse_opcode_FUSE_INTERRUPT,
             Self::Lookup(_) => uapi::fuse_opcode_FUSE_LOOKUP,
+            Self::Mknod(_, _) => uapi::fuse_opcode_FUSE_MKNOD,
             Self::Open(_) => uapi::fuse_opcode_FUSE_OPEN,
             Self::Read(_) => uapi::fuse_opcode_FUSE_READ,
             Self::Release(_) => uapi::fuse_opcode_FUSE_RELEASE,
@@ -878,7 +903,10 @@ impl FuseOperation {
             Self::GetAttr => 0,
             Self::Init => std::mem::size_of::<uapi::fuse_init_in>() as u32,
             Self::Interrupt(_) => std::mem::size_of::<uapi::fuse_interrupt_in>() as u32,
-            Self::Lookup(name) => (name.as_bytes().len() + 1) as u32,
+            Self::Lookup(name) => name.as_bytes().len() as u32,
+            Self::Mknod(_, name) => {
+                (std::mem::size_of::<uapi::fuse_mknod_in>() + name.as_bytes().len()) as u32
+            }
             Self::Open(_) => std::mem::size_of::<uapi::fuse_open_in>() as u32,
             Self::Read(_) => std::mem::size_of::<uapi::fuse_read_in>() as u32,
             Self::Release(_) => std::mem::size_of::<uapi::fuse_release_in>() as u32,
@@ -907,7 +935,7 @@ impl FuseOperation {
                 Ok(FuseResponse::Attr(Self::to_response::<uapi::fuse_attr_out>(&buffer)))
             }
             Self::Init => Ok(FuseResponse::Init(Self::to_response::<uapi::fuse_init_out>(&buffer))),
-            Self::Lookup(_) => {
+            Self::Lookup(_) | Self::Mknod(_, _) => {
                 Ok(FuseResponse::Entry(Self::to_response::<uapi::fuse_entry_out>(&buffer)))
             }
             Self::Open(_) => {
