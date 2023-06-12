@@ -233,13 +233,31 @@ impl FileOps for FuseFileObject {
 
     fn read(
         &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: usize,
-        _data: &mut dyn OutputBuffer,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        not_implemented!("FileOps::read");
-        error!(ENOTSUP)
+        let node = self.get_fuse_node(file)?;
+        let response = self.connection.execute_operation(
+            current_task,
+            node,
+            FuseOperation::Read(uapi::fuse_read_in {
+                fh: self.open_out.fh,
+                offset: offset.try_into().map_err(|_| errno!(EINVAL))?,
+                size: data.available().try_into().unwrap_or(u32::MAX),
+                read_flags: 0,
+                lock_owner: 0,
+                flags: 0,
+                padding: 0,
+            }),
+        )?;
+        let read_out = if let FuseResponse::Read(read_out) = response {
+            read_out
+        } else {
+            return error!(EINVAL);
+        };
+        data.write(&read_out)
     }
 
     fn write(
@@ -711,7 +729,7 @@ impl FuseMutableState {
             if data.read(&mut buffer)? != remainder {
                 return error!(EINVAL);
             }
-            let response = operation.operation.parse_response(&buffer)?;
+            let response = operation.operation.parse_response(buffer)?;
             if operation.operation.is_async() {
                 operation.operation.handle_async(response)?;
             } else {
@@ -791,6 +809,7 @@ enum FuseOperation {
     Interrupt(u64),
     Lookup(FsString),
     Open(OpenFlags),
+    Read(uapi::fuse_read_in),
     Release(uapi::fuse_open_out),
 }
 
@@ -824,6 +843,7 @@ impl FuseOperation {
                 let message = uapi::fuse_open_in { flags: 0, open_flags: open_flags.bits() };
                 data.write_all(message.as_bytes())
             }
+            Self::Read(read_in) => data.write_all(read_in.as_bytes()),
             Self::Release(open_in) => {
                 let message = uapi::fuse_release_in {
                     fh: open_in.fh,
@@ -844,6 +864,7 @@ impl FuseOperation {
             Self::Interrupt(_) => uapi::fuse_opcode_FUSE_INTERRUPT,
             Self::Lookup(_) => uapi::fuse_opcode_FUSE_LOOKUP,
             Self::Open(_) => uapi::fuse_opcode_FUSE_OPEN,
+            Self::Read(_) => uapi::fuse_opcode_FUSE_READ,
             Self::Release(_) => uapi::fuse_opcode_FUSE_RELEASE,
         }
     }
@@ -856,6 +877,7 @@ impl FuseOperation {
             Self::Interrupt(_) => std::mem::size_of::<uapi::fuse_interrupt_in>() as u32,
             Self::Lookup(name) => (name.as_bytes().len() + 1) as u32,
             Self::Open(_) => std::mem::size_of::<uapi::fuse_open_in>() as u32,
+            Self::Read(_) => std::mem::size_of::<uapi::fuse_read_in>() as u32,
             Self::Release(_) => std::mem::size_of::<uapi::fuse_release_in>() as u32,
         }
     }
@@ -875,19 +897,20 @@ impl FuseOperation {
         result
     }
 
-    fn parse_response(&self, buffer: &[u8]) -> Result<FuseResponse, Errno> {
+    fn parse_response(&self, buffer: Vec<u8>) -> Result<FuseResponse, Errno> {
         debug_assert!(self.has_response());
         match self {
             Self::GetAttr => {
-                Ok(FuseResponse::Attr(Self::to_response::<uapi::fuse_attr_out>(buffer)))
+                Ok(FuseResponse::Attr(Self::to_response::<uapi::fuse_attr_out>(&buffer)))
             }
-            Self::Init => Ok(FuseResponse::Init(Self::to_response::<uapi::fuse_init_out>(buffer))),
+            Self::Init => Ok(FuseResponse::Init(Self::to_response::<uapi::fuse_init_out>(&buffer))),
             Self::Lookup(_) => {
-                Ok(FuseResponse::Entry(Self::to_response::<uapi::fuse_entry_out>(buffer)))
+                Ok(FuseResponse::Entry(Self::to_response::<uapi::fuse_entry_out>(&buffer)))
             }
             Self::Open(_) => {
-                Ok(FuseResponse::Open(Self::to_response::<uapi::fuse_open_out>(buffer)))
+                Ok(FuseResponse::Open(Self::to_response::<uapi::fuse_open_out>(&buffer)))
             }
+            Self::Read(_) => Ok(FuseResponse::Read(buffer)),
             Self::Release(_) | Self::Flush(_) => Ok(FuseResponse::None),
             Self::Interrupt(_) => {
                 panic!("Response for operation without one");
@@ -939,5 +962,6 @@ enum FuseResponse {
     Entry(uapi::fuse_entry_out),
     Init(uapi::fuse_init_out),
     Open(uapi::fuse_open_out),
+    Read(Vec<u8>),
     None,
 }

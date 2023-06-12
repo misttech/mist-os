@@ -81,9 +81,13 @@ class FuseTest : public ::testing::Test {
     OK_OR_RETURN(MkDir(mergedir));
     std::string witness_name = "witness";
     {
-      ScopedFD witness(open((lowerdir + "/" + witness_name).c_str(), O_RDONLY | O_CREAT, 0600));
+      ScopedFD witness(open((lowerdir + "/" + witness_name).c_str(), O_RDWR | O_CREAT, 0600));
       if (!witness.is_valid()) {
         return testing::AssertionFailure() << "Unable to create witness file: " << strerror(errno);
+      }
+      if (write(witness.get(), "hello\n", 6) != 6) {
+        return testing::AssertionFailure()
+               << "Unable to insert data in witness file: " << strerror(errno);
       }
     }
     pid_t child_pid = fork_helper_.RunInForkedProcess([&] {
@@ -134,6 +138,16 @@ TEST_F(FuseTest, Stats) {
   mounted_stats.st_dev = 0;
   original_stats.st_dev = 0;
   ASSERT_EQ(memcmp(&mounted_stats, &original_stats, sizeof(struct stat)), 0);
+}
+
+TEST_F(FuseTest, Read) {
+  ASSERT_TRUE(Mount());
+  std::string mounted_witness = GetMountDir() + "/witness";
+  ScopedFD fd(open(mounted_witness.c_str(), O_RDONLY));
+  ASSERT_TRUE(fd.is_valid());
+  char buffer[100];
+  ASSERT_EQ(read(fd.get(), buffer, 100), 6);
+  ASSERT_EQ(strncmp(buffer, "hello\n", 6), 0);
 }
 
 #endif  // SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_
