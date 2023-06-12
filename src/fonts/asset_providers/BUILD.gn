@@ -11,10 +11,31 @@ import("//src/fonts/build/fonts.gni")
 group("asset_providers") {
   testonly = true
   deps = [
+    ":common",
     ":open-fonts-collection",
     ":small-open-fonts-collection",
   ]
 }
+
+# Hermetic font server.
+
+fuchsia_component_manifest("server.manifest") {
+  manifest = "meta/font-server.cml"
+  component_name = "font-server"
+}
+
+fuchsia_component("server.component") {
+  cm_label = ":server.manifest"
+  component_name = "font-server"
+  deps = [ "//src/fonts:font_provider" ]
+}
+
+fuchsia_package("server.package") {
+  package_name = "font-server"
+  deps = [ ":server.component" ]
+}
+
+# Hermetic asset provider.
 
 fuchsia_component_manifest("asset-provider.manifest") {
   manifest = "meta/asset-provider.cml"
@@ -26,17 +47,18 @@ fuchsia_component_manifest("asset-provider.manifest") {
 # Used by font_asset_provider.gni.
 group("common") {
   public_deps = [
+    # Package and component for the asset provider are font collection
+    # dependent.
     ":asset-provider.manifest",
-
-    # The parts of the top level provider package.
-    ":provider.component",
-    ":provider.manifest",
     ":provider.package",
+    ":server.package",
   ]
 }
 
+# Top level fonts provider component.
+
 fuchsia_component_manifest("provider.manifest") {
-  manifest = "meta/provider.cml"
+  manifest = "meta/fonts.cml"
   component_name = "fonts"
 }
 

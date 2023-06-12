@@ -28,17 +28,11 @@ import("//src/fonts/build/fonts.gni")
 # }
 # ```
 #
-# The above creates the following packages:
+# The above creates the following:
 #
 # ```
 # //src/fonts/asset_provider:open-fonts-collection.asset-provider.package
-# //src/fonts/asset_provider:open-fonts-collection.server.package
-# //src/fonts/asset_provider:provider.package
 # ```
-#
-# The `asset-provider` and `server` packages are named after the
-# `font_asset_provider` target name.  The third package is common to all
-# font asset providers.
 #
 # The above packages can then be used as a font AIB in software assembly:
 #
@@ -48,8 +42,6 @@ import("//src/fonts/build/fonts.gni")
 # assembly_input_bundle("fonts.open-fonts-collection") {
 #   base_packages = [
 #     //src/fonts/asset_provider:open-fonts-collection.asset-provider.package
-#     //src/fonts/asset_provider:open-fonts-collection.server.package
-#     //src/fonts/asset_provider:provider.package
 #   ]
 # }
 # ```
@@ -80,22 +72,6 @@ template("font_asset_provider") {
     deps = [ ":${main_target_name}.asset-provider.component" ]
   }
 
-  fuchsia_component_manifest("${main_target_name}.server.manifest") {
-    manifest = "meta/${main_target_name}.server.cml"
-    component_name = "font-server"
-  }
-
-  fuchsia_component("${main_target_name}.server.component") {
-    cm_label = ":${main_target_name}.server.manifest"
-    component_name = "font-server"
-    deps = [ "//src/fonts:font_provider" ]
-  }
-
-  fuchsia_package("${main_target_name}.server.package") {
-    package_name = "font-server"
-    deps = [ ":${main_target_name}.server.component" ]
-  }
-
   group(main_target_name) {
     forward_variables_from(invoker,
                            [
@@ -110,7 +86,6 @@ template("font_asset_provider") {
     }
     deps += [
       ":${main_target_name}.asset-provider.package",
-      ":${main_target_name}.server.package",
       "//src/fonts/asset_providers:common",
     ]
   }
