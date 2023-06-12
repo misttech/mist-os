@@ -48,6 +48,9 @@ type Allocation = table {
 
     /// Allocation timestamp.
     4: timestamp zx.Time;
+
+    /// The allocating thread.
+    5: thread_info_key uint64;
 };
 
 /// A stack trace.
@@ -64,6 +67,21 @@ type StackTrace = table {
     /// Entries are listed in reverse call order: the first entry refers to the leaf frame, and the
     /// last entry refers to the frame at the root of the call stack.
     2: program_addresses vector<uint64>:MAX;
+};
+
+/// Information on a given thread.
+///
+/// Note: Under some circumstances, more than one entry could exist for a given koid (e.g. if the
+/// thread changed its name between different allocations).
+type ThreadInfo = table {
+    /// A number that uniquely identifies this entry within the parent snapshot.
+    1: thread_info_key uint64;
+
+    /// The koid of the thread that this entry refers to.
+    2: koid zx.Koid;
+
+    /// The name of the thread that this entry refers to.
+    3: name string:zx.MAX_NAME_LEN;
 };
 
 /// An ELF build ID.
@@ -106,6 +124,7 @@ type SnapshotElement = flexible union {
     2: stack_trace StackTrace;
     3: executable_region ExecutableRegion;
     4: block_contents BlockContents;
+    5: thread_info ThreadInfo;
 };
 
 /// Protocol to transmit a snapshot as a stream of elements.

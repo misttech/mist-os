@@ -87,6 +87,12 @@ fn build_profile(snapshot: &Snapshot) -> Result<pprof::Profile> {
                     num_unit: st.intern("nanoseconds"),
                     ..Default::default()
                 },
+                pprof::Label {
+                    key: st.intern("thread"),
+                    str: st
+                        .intern(&format!("{}[{}]", info.thread_info.name, info.thread_info.koid)),
+                    ..Default::default()
+                },
             ],
             ..Default::default()
         });
@@ -105,7 +111,7 @@ pub fn export_to_pprof(snapshot: &Snapshot, dest: &mut std::fs::File) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use heapdump_snapshot::{Allocation, ExecutableRegion, StackTrace};
+    use heapdump_snapshot::{Allocation, ExecutableRegion, StackTrace, ThreadInfo};
     use maplit::hashmap;
     use std::io::{Read, Seek};
     use std::rc::Rc;
@@ -130,10 +136,14 @@ mod tests {
     // Placeholder allocations for the fake profile:
     const ALLOC_1_ADDRESS: u64 = 0x611000;
     const ALLOC_1_SIZE: i64 = 0x1800;
+    const ALLOC_1_THREAD_KOID: u64 = 1234;
+    const ALLOC_1_THREAD_NAME: &str = "thread-1";
     const ALLOC_1_STACK: &[u64] = &[LOC_1_ADDRESS, LOC_2_ADDRESS, LOC_3_ADDRESS];
     const ALLOC_1_TIMESTAMP: i64 = 8777777777778;
     const ALLOC_2_ADDRESS: u64 = 0x624000;
     const ALLOC_2_SIZE: i64 = 0x30;
+    const ALLOC_2_THREAD_KOID: u64 = 5678;
+    const ALLOC_2_THREAD_NAME: &str = "thread-2";
     const ALLOC_2_STACK: &[u64] = &[LOC_1_ADDRESS, LOC_4_ADDRESS, LOC_5_ADDRESS];
     const ALLOC_2_TIMESTAMP: i64 = 9333333333333;
 
@@ -142,12 +152,20 @@ mod tests {
             allocations: hashmap![
                 ALLOC_1_ADDRESS => Allocation {
                     size: ALLOC_1_SIZE.try_into().unwrap(),
+                    thread_info: Rc::new(ThreadInfo {
+                        koid: ALLOC_1_THREAD_KOID,
+                        name: ALLOC_1_THREAD_NAME.to_string(),
+                    }),
                     stack_trace: Rc::new(StackTrace { program_addresses: ALLOC_1_STACK.to_vec() }),
                     timestamp: ALLOC_1_TIMESTAMP,
                     contents: None,
                 },
                 ALLOC_2_ADDRESS => Allocation {
                     size: ALLOC_2_SIZE.try_into().unwrap(),
+                    thread_info: Rc::new(ThreadInfo {
+                        koid: ALLOC_2_THREAD_KOID,
+                        name: ALLOC_2_THREAD_NAME.to_string(),
+                    }),
                     stack_trace: Rc::new(StackTrace { program_addresses: ALLOC_2_STACK.to_vec() }),
                     timestamp: ALLOC_2_TIMESTAMP,
                     contents: None,
@@ -186,12 +204,13 @@ mod tests {
         assert_eq!(st(profile.sample_type[1].unit), "bytes");
         for sample in &profile.sample {
             assert_eq!(sample.value.len(), profile.sample_type.len());
-            assert_eq!(sample.label.len(), 3);
+            assert_eq!(sample.label.len(), 4);
             assert_eq!(st(sample.label[0].key), "address");
             assert_eq!(st(sample.label[1].key), "bytes");
             assert_eq!(st(sample.label[1].num_unit), "bytes");
             assert_eq!(st(sample.label[2].key), "timestamp");
             assert_eq!(st(sample.label[2].num_unit), "nanoseconds");
+            assert_eq!(st(sample.label[3].key), "thread");
         }
 
         // Identify the two allocations from their sizes (which are unique in our sample snapshot)
@@ -206,6 +225,10 @@ mod tests {
         assert_eq!(loc(allocation1.location_id[1]).address, ALLOC_1_STACK[1]);
         assert_eq!(loc(allocation1.location_id[2]).address, ALLOC_1_STACK[2]);
         assert_eq!(allocation1.label[2].num, ALLOC_1_TIMESTAMP);
+        assert_eq!(
+            st(allocation1.label[3].str),
+            format!("{}[{}]", ALLOC_1_THREAD_NAME, ALLOC_1_THREAD_KOID)
+        );
         let allocation2 = profile.sample.iter().find(|s| s.label[1].num == ALLOC_2_SIZE).unwrap();
         assert_eq!(allocation2.value[0], 1);
         assert_eq!(allocation2.value[1], ALLOC_2_SIZE);
@@ -214,6 +237,10 @@ mod tests {
         assert_eq!(loc(allocation2.location_id[0]).address, ALLOC_2_STACK[0]);
         assert_eq!(loc(allocation2.location_id[1]).address, ALLOC_2_STACK[1]);
         assert_eq!(allocation2.label[2].num, ALLOC_2_TIMESTAMP);
+        assert_eq!(
+            st(allocation2.label[3].str),
+            format!("{}[{}]", ALLOC_2_THREAD_NAME, ALLOC_2_THREAD_KOID)
+        );
 
         // Identify the mappings from their addresses and verify them.
         assert_eq!(profile.mapping.len(), 2);

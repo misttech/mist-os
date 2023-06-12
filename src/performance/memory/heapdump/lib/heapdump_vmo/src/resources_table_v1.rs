@@ -6,7 +6,7 @@ use fuchsia_zircon as zx;
 use std::alloc::Layout;
 use std::mem::{align_of, size_of, size_of_val};
 
-use crate::memory_mapped_vmo::MemoryMappedVmo;
+use crate::memory_mapped_vmo::{MemoryMappable, MemoryMappedVmo};
 
 /// An offset within the VMO.
 type Offset = u32;
@@ -41,10 +41,23 @@ impl ResourceKey {
     }
 }
 
-/// Mediates write access to a VMO containing an hash table of compressed stack traces.
+#[repr(C)]
+#[derive(Debug)]
+pub struct ThreadInfo {
+    pub koid: zx::sys::zx_koid_t,
+    pub name: [u8; zx::sys::ZX_MAX_NAME_LEN],
+}
+
+// SAFETY: ThreadInfo only contains memory-mappable types and we never parse the name in it.
+unsafe impl MemoryMappable for ThreadInfo {}
+
+/// Mediates write access to a VMO containing compressed stack traces and thread info structs.
 ///
-/// Apart from the bucket heads, all data is immutable: no entry can be modified or deleted after
-/// it has been inserted.
+/// Compressed stack traces are stored as a hash table for efficient deduplication. Thread
+/// information structures are not deduplicated (it is expected that deduplication happens at a
+/// higher level in the stack). Apart from the hash table's bucket heads, all data is immutable:
+/// neither stack traces nor thread info structs can be modified or deleted after having been
+/// inserted.
 ///
 /// Hash collisions are handled by maintaining per-bucket linked lists. Specifically, an array of
 /// list heads, one for each bucket, is stored at the beginning of the VMO. The remaining part of
@@ -200,6 +213,17 @@ impl ResourcesTableWriter {
         let resource_key = ResourceKey(offset + size_of::<Offset>() as Offset);
         Ok((resource_key, inserted))
     }
+
+    /// Appends a thread information entry and returns its offset into the VMO.
+    pub fn insert_thread_info(
+        &mut self,
+        koid: zx::sys::zx_koid_t,
+        name: &[u8; zx::sys::ZX_MAX_NAME_LEN],
+    ) -> Result<ResourceKey, crate::Error> {
+        let offset = self.allocate(Layout::new::<ThreadInfo>())?;
+        *self.storage.get_object_mut(offset as usize).unwrap() = ThreadInfo { koid, name: *name };
+        Ok(ResourceKey(offset))
+    }
 }
 
 /// Mediates read access to a VMO written by ResourcesTableWriter.
@@ -213,13 +237,19 @@ impl ResourcesTableReader {
         Ok(ResourcesTableReader { storage })
     }
 
-    /// Gets to compressed stack trace identified by `resource_key`.
+    /// Gets the compressed stack trace identified by `resource_key`.
     pub fn get_compressed_stack_trace(
         &self,
         resource_key: ResourceKey,
     ) -> Result<&[u8], crate::Error> {
         let ResourceKey(offset) = resource_key;
         get_compressed_stack_trace(&self.storage, offset as usize)
+    }
+
+    /// Gets the thread info entry identified by `resource_key`.
+    pub fn get_thread_info(&self, resource_key: ResourceKey) -> Result<&ThreadInfo, crate::Error> {
+        let ResourceKey(offset) = resource_key;
+        Ok(self.storage.get_object(offset as usize)?)
     }
 }
 
@@ -374,5 +404,24 @@ mod tests {
         }
 
         unreachable!("Inserted more than {} distinct stack traces", VMO_SIZE);
+    }
+
+    #[test]
+    fn test_thread_info() {
+        let storage = TestStorage::new(VMO_SIZE);
+        let mut writer = storage.create_writer();
+
+        // Insert a thread info struct with placeholder values (the name must be padded to the
+        // expected length).
+        const FAKE_KOID: zx::sys::zx_koid_t = 1234;
+        const FAKE_NAME: &[u8; zx::sys::ZX_MAX_NAME_LEN] =
+            b"fake-name\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+        let resource_key = writer.insert_thread_info(FAKE_KOID, FAKE_NAME).unwrap();
+
+        // Verify that it can be read back correctly.
+        let reader = storage.create_reader();
+        let thread_info = reader.get_thread_info(resource_key).unwrap();
+        assert_eq!(thread_info.koid, FAKE_KOID);
+        assert_eq!(thread_info.name, *FAKE_NAME);
     }
 }

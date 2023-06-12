@@ -50,12 +50,13 @@ impl AllocationsTable {
         &mut self,
         address: u64,
         size: u64,
+        thread_info_key: ResourceKey,
         stack_trace_key: ResourceKey,
         timestamp: i64,
     ) {
         let inserted = self
             .writer
-            .insert_allocation(address, size, stack_trace_key, timestamp)
+            .insert_allocation(address, size, thread_info_key, stack_trace_key, timestamp)
             .expect("out of space");
         assert!(inserted, "Block 0x{:x} was already allocated", address);
     }

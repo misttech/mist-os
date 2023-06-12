@@ -186,9 +186,11 @@ impl Snapshot for SnapshotV1 {
         let allocations_table = AllocationsTableReader::new(&self.allocations_vmo)?;
         let resources_table = ResourcesTableReader::new(&self.resources_vmo)?;
 
+        let mut thread_info_keys = HashSet::new();
         let mut stack_trace_keys = HashSet::new();
         for block in allocations_table.iter() {
             let block = block?;
+            thread_info_keys.insert(block.thread_info_key);
             stack_trace_keys.insert(block.stack_trace_key);
 
             streamer = streamer
@@ -196,8 +198,24 @@ impl Snapshot for SnapshotV1 {
                     fheapdump_client::Allocation {
                         address: Some(block.address),
                         size: Some(block.size),
+                        thread_info_key: Some(block.thread_info_key.into_raw() as u64),
                         stack_trace_key: Some(block.stack_trace_key.into_raw() as u64),
                         timestamp: Some(block.timestamp),
+                        ..Default::default()
+                    },
+                ))
+                .await?;
+        }
+
+        for thread_info_key in thread_info_keys {
+            let thread_info = resources_table.get_thread_info(thread_info_key)?;
+
+            streamer = streamer
+                .push_element(fheapdump_client::SnapshotElement::ThreadInfo(
+                    fheapdump_client::ThreadInfo {
+                        thread_info_key: Some(thread_info_key.into_raw() as u64),
+                        koid: Some(thread_info.koid),
+                        name: Some(convert_name_to_string(&thread_info.name)),
                         ..Default::default()
                     },
                 ))
@@ -251,6 +269,12 @@ impl Snapshot for SnapshotV1 {
 
         Ok(streamer.end_of_stream().await?)
     }
+}
+
+/// Parses a sequence of bytes as a utf-8 string, stopping at the first NUL character.
+fn convert_name_to_string(raw: &[u8]) -> String {
+    let nul_pos = raw.iter().position(|v| *v == 0).unwrap_or(raw.len());
+    String::from_utf8_lossy(&raw[..nul_pos]).to_string()
 }
 
 #[cfg(test)]
@@ -386,6 +410,10 @@ mod tests {
         assert_eq!(ex.run_singlethreaded(registry.list_processes()), []);
     }
 
+    const FAKE_THREAD_KOID: u64 = 1234;
+    const FAKE_THREAD_NAME: &[u8; zx::sys::ZX_MAX_NAME_LEN] =
+        b"fake-thread-name\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+
     // Generate a very long stack trace to verify that the pagination mechanism works.
     fn generate_fake_long_stack_trace() -> Vec<u64> {
         // Generate a stack trace such that its uncompressed size is four times bigger than
@@ -426,6 +454,8 @@ mod tests {
         let foobar_size = foobar.len() as u64;
         let foobar_stack_trace = generate_fake_long_stack_trace();
         let foobar_timestamp = 123456789;
+        let foobar_thread_info_key =
+            resources_writer.insert_thread_info(FAKE_THREAD_KOID, FAKE_THREAD_NAME).unwrap();
         let (foobar_stack_trace_key, _) = resources_writer
             .intern_compressed_stack_trace(&stack_trace_compression::compress(&foobar_stack_trace))
             .unwrap();
@@ -433,6 +463,7 @@ mod tests {
             .insert_allocation(
                 foobar_address,
                 foobar_size,
+                foobar_thread_info_key,
                 foobar_stack_trace_key,
                 foobar_timestamp,
             )
@@ -455,6 +486,8 @@ mod tests {
         // Verify that it contains our test allocation.
         let foobar_allocation = received_snapshot.allocations.remove(&foobar_address).unwrap();
         assert_eq!(foobar_allocation.size, foobar_size);
+        assert_eq!(foobar_allocation.thread_info.koid, FAKE_THREAD_KOID);
+        assert_eq!(foobar_allocation.thread_info.name, convert_name_to_string(FAKE_THREAD_NAME));
         assert_eq!(foobar_allocation.stack_trace.program_addresses, foobar_stack_trace);
         assert_eq!(foobar_allocation.timestamp, foobar_timestamp);
         if with_contents {
@@ -494,6 +527,8 @@ mod tests {
         const FAKE_ALLOCATION_SIZE: u64 = 120;
         const FAKE_ALLOCATION_STACK_TRACE: [u64; 2] = [12345, 67890];
         const FAKE_ALLOCATION_TIMESTAMP: i64 = 1122334455;
+        let thread_info_key =
+            resources_writer.insert_thread_info(FAKE_THREAD_KOID, FAKE_THREAD_NAME).unwrap();
         let (stack_trace_key, _) = resources_writer
             .intern_compressed_stack_trace(&stack_trace_compression::compress(
                 &FAKE_ALLOCATION_STACK_TRACE,
@@ -503,6 +538,7 @@ mod tests {
             .insert_allocation(
                 FAKE_ALLOCATION_ADDRESS,
                 FAKE_ALLOCATION_SIZE,
+                thread_info_key,
                 stack_trace_key,
                 FAKE_ALLOCATION_TIMESTAMP,
             )
@@ -538,6 +574,8 @@ mod tests {
         let mut snapshot_one = receive_named_snapshot_fn("snapshot-one");
         let allocation = snapshot_one.allocations.remove(&FAKE_ALLOCATION_ADDRESS).unwrap();
         assert_eq!(allocation.size, FAKE_ALLOCATION_SIZE);
+        assert_eq!(allocation.thread_info.koid, FAKE_THREAD_KOID);
+        assert_eq!(allocation.thread_info.name, convert_name_to_string(FAKE_THREAD_NAME));
         assert_eq!(allocation.stack_trace.program_addresses, FAKE_ALLOCATION_STACK_TRACE);
         assert_eq!(allocation.timestamp, FAKE_ALLOCATION_TIMESTAMP);
         assert!(snapshot_one.allocations.is_empty(), "no other allocations should exist");

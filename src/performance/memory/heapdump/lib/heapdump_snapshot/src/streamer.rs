@@ -102,6 +102,9 @@ mod tests {
     }
 
     const FAKE_TIMESTAMP: i64 = 12345678;
+    const FAKE_THREAD_KOID: u64 = 8989;
+    const FAKE_THREAD_NAME: &str = "fake-thread-name";
+    const FAKE_THREAD_KEY: u64 = 1212;
     const FAKE_STACK_TRACE_ADDRESSES: [u64; 3] = [11111, 22222, 33333];
     const FAKE_STACK_TRACE_KEY: u64 = 1234;
     const FAKE_REGION_ADDRESS: u64 = 8192;
@@ -118,9 +121,19 @@ mod tests {
             create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
-        // Transmit a snapshot with the given `allocations`, all referencing a common stack trace,
-        // and a single executable region.
+        // Transmit a snapshot with the given `allocations`, all referencing the same thread info
+        // and stack trace, with a single executable region.
         let mut streamer = Streamer::new(receiver_proxy)
+            .push_element(fheapdump_client::SnapshotElement::ThreadInfo(
+                fheapdump_client::ThreadInfo {
+                    thread_info_key: Some(FAKE_THREAD_KEY),
+                    koid: Some(FAKE_THREAD_KOID),
+                    name: Some(FAKE_THREAD_NAME.to_string()),
+                    ..Default::default()
+                },
+            ))
+            .await
+            .unwrap()
             .push_element(fheapdump_client::SnapshotElement::StackTrace(
                 fheapdump_client::StackTrace {
                     stack_trace_key: Some(FAKE_STACK_TRACE_KEY),
@@ -149,6 +162,7 @@ mod tests {
                     fheapdump_client::Allocation {
                         address: Some(*address),
                         size: Some(*size),
+                        thread_info_key: Some(FAKE_THREAD_KEY),
                         stack_trace_key: Some(FAKE_STACK_TRACE_KEY),
                         timestamp: Some(FAKE_TIMESTAMP),
                         ..Default::default()
@@ -165,6 +179,8 @@ mod tests {
         for (address, size) in &allocations {
             let allocation = received_snapshot.allocations.remove(address).unwrap();
             assert_eq!(allocation.size, *size);
+            assert_eq!(allocation.thread_info.koid, FAKE_THREAD_KOID);
+            assert_eq!(allocation.thread_info.name, FAKE_THREAD_NAME);
             assert_eq!(allocation.stack_trace.program_addresses, FAKE_STACK_TRACE_ADDRESSES);
             assert_eq!(allocation.timestamp, FAKE_TIMESTAMP);
         }

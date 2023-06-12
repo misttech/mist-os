@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
-use heapdump_vmo::resources_table_v1::{ResourceKey, ResourcesTableWriter};
+pub use heapdump_vmo::resources_table_v1::ResourceKey;
+use heapdump_vmo::resources_table_v1::ResourcesTableWriter;
 use std::sync::atomic::{fence, Ordering::Release};
 
 /// We cap the size of our backing VMO at 2 GiB, then preallocate it and map it entirely.
@@ -49,5 +50,14 @@ impl ResourcesTable {
         }
 
         resource_key
+    }
+
+    /// Inserts information about a thread.
+    pub fn insert_thread_info(
+        &mut self,
+        koid: zx::Koid,
+        name: &[u8; zx::sys::ZX_MAX_NAME_LEN],
+    ) -> ResourceKey {
+        self.writer.insert_thread_info(koid.raw_koid(), name).expect("failed to insert thread info")
     }
 }

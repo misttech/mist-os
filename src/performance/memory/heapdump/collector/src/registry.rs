@@ -349,6 +349,9 @@ mod tests {
     // A FakeSnapshot contains a single allocation with these values:
     const FAKE_ALLOCATION_ADDRESS: u64 = 1234;
     const FAKE_ALLOCATION_SIZE: u64 = 8;
+    const FAKE_ALLOCATION_THREAD_INFO_KOID: u64 = 5555;
+    const FAKE_ALLOCATION_THREAD_INFO_NAME: &str = "foobaz";
+    const FAKE_ALLOCATION_THREAD_INFO_KEY: u64 = 6789;
     const FAKE_ALLOCATION_STACK_TRACE: [u64; 6] = [11111, 22222, 33333, 22222, 44444, 55555];
     const FAKE_ALLOCATION_STACK_TRACE_KEY: u64 = 9876;
     const FAKE_ALLOCATION_TIMESTAMP: i64 = 123456789;
@@ -364,8 +367,15 @@ mod tests {
                 fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
                     address: Some(FAKE_ALLOCATION_ADDRESS),
                     size: Some(FAKE_ALLOCATION_SIZE),
+                    thread_info_key: Some(FAKE_ALLOCATION_THREAD_INFO_KEY),
                     stack_trace_key: Some(FAKE_ALLOCATION_STACK_TRACE_KEY),
                     timestamp: Some(FAKE_ALLOCATION_TIMESTAMP),
+                    ..Default::default()
+                }),
+                fheapdump_client::SnapshotElement::ThreadInfo(fheapdump_client::ThreadInfo {
+                    thread_info_key: Some(FAKE_ALLOCATION_THREAD_INFO_KEY),
+                    koid: Some(FAKE_ALLOCATION_THREAD_INFO_KOID),
+                    name: Some(FAKE_ALLOCATION_THREAD_INFO_NAME.to_string()),
                     ..Default::default()
                 }),
                 fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
@@ -407,6 +417,8 @@ mod tests {
             let allocation =
                 received_snapshot.allocations.remove(&FAKE_ALLOCATION_ADDRESS).unwrap();
             assert_eq!(allocation.size, FAKE_ALLOCATION_SIZE);
+            assert_eq!(allocation.thread_info.koid, FAKE_ALLOCATION_THREAD_INFO_KOID);
+            assert_eq!(allocation.thread_info.name, FAKE_ALLOCATION_THREAD_INFO_NAME);
             assert_eq!(allocation.stack_trace.program_addresses, FAKE_ALLOCATION_STACK_TRACE);
             assert_eq!(allocation.timestamp, FAKE_ALLOCATION_TIMESTAMP);
             if expect_contents {
