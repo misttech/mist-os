@@ -270,6 +270,10 @@ where
 
         // Enable SRP Server
         driver_state.ot_instance.srp_server_set_enabled(true);
+
+        // Disable TREL by default. TREL will be enabled dynamically
+        // by the feature experiment API.
+        driver_state.ot_instance.trel_set_enabled(false);
     }
 
     /// A single iteration of the main task loop
