@@ -56,6 +56,7 @@
 //! [`Option`]: core::option::Option
 
 mod convert;
+mod filter;
 
 use {
     anyhow::Context as _,
@@ -70,6 +71,7 @@ use {
 
 pub use crate::event::{
     convert::Try,
+    filter::{on_join_bss, on_scan, on_set_channel, on_set_country, on_start_mac, on_transmit},
     Handled::{Matched, Unmatched},
 };
 
