@@ -649,24 +649,24 @@ int main(int argc, char** argv) {
     ProfilerStart("/tmp/audio_mixer_profiler.pprof");
   }
 
-  perftest::ResultsSet* results = nullptr;
+  std::unique_ptr<perftest::ResultsSet> results;
   if (opt.perftest_json) {
-    results = new perftest::ResultsSet();
+    results.reset(new perftest::ResultsSet());
   }
 
   if (opt.enabled.count(Benchmark::Create) > 0) {
-    AudioPerformance::ProfileMixerCreation(ConfigsForMixerCreation(opt), opt.limits, results);
+    AudioPerformance::ProfileMixerCreation(ConfigsForMixerCreation(opt), opt.limits, results.get());
   }
 
   if (opt.enabled.count(Benchmark::Mix) > 0) {
     AudioPerformance::ProfileMixer(results ? ConfigsForMixerReduced(opt) : ConfigsForMixer(opt),
-                                   opt.limits, results);
+                                   opt.limits, results.get());
   }
 
   if (opt.enabled.count(Benchmark::Output) > 0) {
     AudioPerformance::ProfileOutputProducer(
         results ? ConfigsForOutputProducerReduced(opt) : ConfigsForOutputProducer(opt), opt.limits,
-        results);
+        results.get());
   }
 
   if (opt.enable_pprof) {
