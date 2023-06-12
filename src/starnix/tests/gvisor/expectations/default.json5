@@ -988,7 +988,7 @@
                 "AllInetTests/RawSocketTest.RecvBufLimitsEmptyRecvBuffer/*",
                 "AllInetTests/RawSocketTest.SendAndReceive/*",
                 "AllInetTests/RawSocketTest.SendAndReceiveViaConnect/*",
-                "AllInetTests/SimpleTcpSocketTest.SelfConnectSendRecv/*",
+                "AllInetTests/SimpleTcpSocketTest.SelfConnect*/*",
                 "AllInetTests/SimpleTcpSocketTest.Shutdown*ConnectingSocket/*",
                 "ExceptionTest.IOAccessFault",
                 "FcntlTest.SetFdO_ASYNC",
