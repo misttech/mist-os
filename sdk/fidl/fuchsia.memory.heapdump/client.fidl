@@ -7,6 +7,9 @@ using zx;
 
 const MAX_BUILD_ID_LENGTH uint32 = 32;
 
+alias StackTraceKey = uint64;
+alias ThreadInfoKey = uint64;
+
 /// The reason why a method failed.
 type CollectorError = flexible enum {
     /// The given ProcessSelector value is not supported.
@@ -44,13 +47,13 @@ type Allocation = table {
     2: size uint64;
 
     /// The stack trace of the allocation site.
-    3: stack_trace_key uint64;
+    3: stack_trace_key StackTraceKey;
 
     /// Allocation timestamp.
     4: timestamp zx.Time;
 
     /// The allocating thread.
-    5: thread_info_key uint64;
+    5: thread_info_key ThreadInfoKey;
 };
 
 /// A stack trace.
@@ -60,7 +63,7 @@ type Allocation = table {
 /// same key and reassemble them by concatenating their program addresses.
 type StackTrace = table {
     /// A number that uniquely identifies this stack trace within the parent snapshot.
-    1: stack_trace_key uint64;
+    1: stack_trace_key StackTraceKey;
 
     /// The program counters corresponding to stack each frame.
     ///
@@ -75,7 +78,7 @@ type StackTrace = table {
 /// thread changed its name between different allocations).
 type ThreadInfo = table {
     /// A number that uniquely identifies this entry within the parent snapshot.
-    1: thread_info_key uint64;
+    1: thread_info_key ThreadInfoKey;
 
     /// The koid of the thread that this entry refers to.
     2: koid zx.Koid;
