@@ -1,0 +1,27 @@
+{
+  "result": {
+    "allowlists": [
+      {
+        "name": "Unicode-TOU",
+        "matchType": "Exception",
+        "entries": [
+          {
+            "projects": [
+              "prebuilt/third_party/flutter"
+            ],
+            "bug": "",
+            "notes": []
+          },
+          {
+            "projects": [
+              "prebuilt/third_party/sky_engine"
+            ],
+            "bug": "",
+            "notes": []
+          }
+        ]
+      }
+    ]
+  }
+}
+

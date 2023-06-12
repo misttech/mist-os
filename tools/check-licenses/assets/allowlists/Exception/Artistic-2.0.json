@@ -1,0 +1,19 @@
+{
+  "result": {
+    "allowlists": [
+      {
+        "name": "Artistic-2.0",
+        "matchType": "Exception",
+        "entries": [
+          {
+            "projects": [
+              "third_party/rust_crates/forks/notify"
+            ],
+            "bug": "",
+            "notes": []
+          }
+        ]
+      }
+    ]
+  }
+}

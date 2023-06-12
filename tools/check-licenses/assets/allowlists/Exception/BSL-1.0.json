@@ -1,0 +1,24 @@
+{
+  "result": {
+    "allowlists": [
+      {
+        "name": "BSL-1.0",
+        "matchType": "Exception",
+        "entries": [
+          {
+            "projects": [
+              "prebuilt/third_party/sky_engine",
+              "third_party/rust_crates/vendor/ryu-1.0.3",
+              "third_party/mesa",
+              "third_party/zlib",
+              "prebuilt/third_party/vulkansdk/linux",
+              "prebuilt/third_party/flutter"
+            ],
+            "bug": "",
+            "notes": []
+          }
+        ]
+      }
+    ]
+  }
+}

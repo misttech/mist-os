@@ -1,0 +1,28 @@
+{
+  "result": {
+    "allowlists": [
+      {
+        "name": "0BSD",
+        "matchType": "Exception",
+        "entries": [
+          {
+            "projects": [
+              "prebuilt/third_party/cmake/linux-x64"
+            ],
+            "bug": "",
+            "notes": []
+          },
+          {
+            "projects": [
+              "prebuilt/third_party/vpython",
+              "prebuilt/third_party/python3/linux-x64",
+              "prebuilt/third_party/python3.11/linux-x64"
+            ],
+            "bug": "",
+            "notes": []
+          }
+        ]
+      }
+    ]
+  }
+}

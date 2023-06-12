@@ -1,0 +1,74 @@
+{
+  "result": {
+    "allowlists": [
+      {
+        "name": "GPL-2.0",
+        "matchType": "Restricted",
+        "entries": [
+          {
+            "projects": [
+              "prebuilt/third_party/vulkansdk/linux"
+            ],
+            "bug": "",
+            "notes": []
+          },
+          {
+            "projects": [
+              "prebuilt/third_party/firmware/vim3"
+            ],
+            "bug": "",
+            "notes": []
+          },
+          {
+            "projects": [
+              "third_party/golibs/vendor/github.com/spdx/tools-golang"
+            ],
+            "bug": "",
+            "notes": []
+          },
+          {
+            "projects": [
+              "prebuilt/third_party/rust/linux-x64"
+            ],
+            "bug": "",
+            "notes": []
+          },
+          {
+            "projects": [
+              "third_party/lz4/examples",
+              "third_party/lz4/tests",
+              "third_party/lz4/programs"
+            ],
+            "bug": "",
+            "notes": []
+          },
+          {
+            "projects": [
+              "prebuilt/starnix/fuse-overlayfs-amd64",
+              "prebuilt/starnix/fuse-overlayfs-arm64"
+            ],
+            "bug": "",
+            "notes": []
+          },
+          {
+            "projects": [
+              "prebuilt/third_party/bazel/linux-x64"
+            ],
+            "bug": "",
+            "notes": []
+          },
+          {
+            "projects": [
+              "prebuilt/third_party/web_engine_tests/arch/arm64",
+              "prebuilt/third_party/web_engine_tests/arch/x64",
+              "prebuilt/third_party/web_engine_tests_latest/arch/arm64",
+              "prebuilt/third_party/web_engine_tests_latest/arch/x64"
+            ],
+            "bug": "",
+            "notes": []
+          }
+        ]
+      }
+    ]
+  }
+}

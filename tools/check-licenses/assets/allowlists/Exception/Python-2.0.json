@@ -1,0 +1,21 @@
+{
+  "result": {
+    "allowlists": [
+      {
+        "name": "Python-2.0",
+        "matchType": "Exception",
+        "entries": [
+          {
+            "projects": [
+              "prebuilt/third_party/python3/linux-x64",
+              "prebuilt/third_party/python3.11/linux-x64",
+              "prebuilt/third_party/vpython"
+            ],
+            "bug": "",
+            "notes": []
+          }
+        ]
+      }
+    ]
+  }
+}

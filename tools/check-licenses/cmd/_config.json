@@ -30,6 +30,16 @@
                 "This is intentionally not marked as 'required',",
                 "so check-licenses won't complain when //vendor/google isn't available."
             ]
+        },
+        {
+            "paths": [
+                "{FUCHSIA_DIR}/tools/check-licenses/assets/allowlists"
+            ],
+            "notes": [
+                "Allow lists."
+            ],
+            "recursive": true,
+            "required": true
         }
     ]
 }

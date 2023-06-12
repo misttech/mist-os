@@ -1,0 +1,34 @@
+{
+  "result": {
+    "allowlists": [
+      {
+        "name": "X11-Lucent",
+        "matchType": "Exception",
+        "entries": [
+          {
+            "projects": [
+              "prebuilt/third_party/jq/linux-x64"
+            ],
+            "bug": "",
+            "notes": []
+          },
+          {
+            "projects": [
+              "third_party/iperf"
+            ],
+            "bug": "",
+            "notes": []
+          },
+          {
+            "projects": [
+              "prebuilt/firmware/media/intel-adsp-sst"
+            ],
+            "bug": "",
+            "notes": []
+          }
+        ]
+      }
+    ]
+  }
+}
+
