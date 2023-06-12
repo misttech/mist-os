@@ -5,8 +5,6 @@
 use async_trait::async_trait;
 use dhcp_client_core::deps::UdpSocketProvider;
 use fidl_fuchsia_posix as fposix;
-use fidl_fuchsia_posix_socket as fposix_socket;
-use fidl_fuchsia_posix_socket_ext as fposix_socket_ext;
 use fuchsia_async as fasync;
 
 pub(crate) struct UdpSocket {
@@ -205,48 +203,72 @@ impl dhcp_client_core::deps::Socket<std::net::SocketAddr> for UdpSocket {
     }
 }
 
-pub(crate) struct UdpSocketProviderImpl {
-    provider: fposix_socket::ProviderProxy,
-}
-
-impl UdpSocketProviderImpl {
-    pub(crate) fn new(provider: fposix_socket::ProviderProxy) -> Self {
-        Self { provider }
-    }
-}
+pub(crate) struct LibcUdpSocketProvider;
 
 #[async_trait(?Send)]
-impl UdpSocketProvider for UdpSocketProviderImpl {
+impl UdpSocketProvider for LibcUdpSocketProvider {
     type Sock = UdpSocket;
 
     async fn bind_new_udp_socket(
         &self,
         bound_addr: std::net::SocketAddr,
     ) -> Result<Self::Sock, dhcp_client_core::deps::SocketError> {
-        let Self { provider } = self;
-
-        let socket = fposix_socket_ext::datagram_socket(
-            provider,
-            fposix_socket::Domain::Ipv4,
-            fposix_socket::DatagramSocketProtocol::Udp,
-        )
-        .await
-        .map_err(|e: fidl::Error| dhcp_client_core::deps::SocketError::FailedToOpen(e.into()))?
-        .map_err(translate_io_error)?;
-
-        socket.bind(&bound_addr.into()).map_err(translate_io_error)?;
+        let socket = fasync::net::UdpSocket::bind(&bound_addr).map_err(translate_io_error)?;
         socket.set_broadcast(true).map_err(translate_io_error)?;
-
-        let socket =
-            fasync::net::UdpSocket::from_socket(socket.into()).map_err(translate_io_error)?;
-
         Ok(UdpSocket { inner: socket })
+    }
+}
+
+#[cfg(test)]
+mod testutil {
+    use super::*;
+    use fidl_fuchsia_posix_socket as fposix_socket;
+    use fidl_fuchsia_posix_socket_ext as fposix_socket_ext;
+
+    pub(crate) struct TestUdpSocketProviderImpl {
+        provider: fposix_socket::ProviderProxy,
+    }
+
+    impl TestUdpSocketProviderImpl {
+        pub(crate) fn new(provider: fposix_socket::ProviderProxy) -> Self {
+            Self { provider }
+        }
+    }
+
+    #[async_trait(?Send)]
+    impl UdpSocketProvider for TestUdpSocketProviderImpl {
+        type Sock = UdpSocket;
+
+        async fn bind_new_udp_socket(
+            &self,
+            bound_addr: std::net::SocketAddr,
+        ) -> Result<Self::Sock, dhcp_client_core::deps::SocketError> {
+            let Self { provider } = self;
+
+            let socket = fposix_socket_ext::datagram_socket(
+                provider,
+                fposix_socket::Domain::Ipv4,
+                fposix_socket::DatagramSocketProtocol::Udp,
+            )
+            .await
+            .map_err(|e: fidl::Error| dhcp_client_core::deps::SocketError::FailedToOpen(e.into()))?
+            .map_err(translate_io_error)?;
+
+            socket.bind(&bound_addr.into()).map_err(translate_io_error)?;
+            socket.set_broadcast(true).map_err(translate_io_error)?;
+
+            let socket =
+                fasync::net::UdpSocket::from_socket(socket.into()).map_err(translate_io_error)?;
+
+            Ok(UdpSocket { inner: socket })
+        }
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::udpsocket::testutil::TestUdpSocketProviderImpl;
     use dhcp_client_core::deps::{DatagramInfo, Socket as _};
     use fidl_fuchsia_net_ext as fnet_ext;
     use fidl_fuchsia_netemul_network as fnetemul_network;
@@ -313,14 +335,14 @@ mod test {
             .await
             .expect("add address should succeed");
 
-        let socket_a = UdpSocketProviderImpl::new(
+        let socket_a = TestUdpSocketProviderImpl::new(
             realm_a.connect_to_protocol::<fposix_socket::ProviderMarker>().unwrap(),
         )
         .bind_new_udp_socket(SOCKET_ADDR_A)
         .await
         .expect("get udp socket");
 
-        let socket_b = UdpSocketProviderImpl::new(
+        let socket_b = TestUdpSocketProviderImpl::new(
             realm_b.connect_to_protocol::<fposix_socket::ProviderMarker>().unwrap(),
         )
         .bind_new_udp_socket(SOCKET_ADDR_B)

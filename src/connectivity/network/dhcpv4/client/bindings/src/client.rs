@@ -63,7 +63,7 @@ pub(crate) async fn serve_client(
     mac: net_types::ethernet::Mac,
     interface_id: NonZeroU64,
     provider: &crate::packetsocket::PacketSocketProviderImpl,
-    udp_socket_provider: &crate::udpsocket::UdpSocketProviderImpl,
+    udp_socket_provider: &impl dhcp_client_core::deps::UdpSocketProvider,
     params: NewClientParams,
     requests: ClientRequestStream,
 ) -> Result<(), Error> {
@@ -374,7 +374,7 @@ impl Client {
     async fn watch_configuration(
         &mut self,
         packet_socket_provider: &crate::packetsocket::PacketSocketProviderImpl,
-        udp_socket_provider: &crate::udpsocket::UdpSocketProviderImpl,
+        udp_socket_provider: &impl dhcp_client_core::deps::UdpSocketProvider,
     ) -> Result<ClientWatchConfigurationResponse, Error> {
         let clock = Clock;
         loop {

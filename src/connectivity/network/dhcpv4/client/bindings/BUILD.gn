@@ -15,7 +15,6 @@ rustc_binary("dhcp_client") {
     "//sdk/fidl/fuchsia.net.dhcp:fuchsia.net.dhcp_rust",
     "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
     "//sdk/fidl/fuchsia.posix:fuchsia.posix_rust",
-    "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
     "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_rust",
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
@@ -38,6 +37,7 @@ rustc_binary("dhcp_client") {
     "//third_party/rust_crates:tracing",
   ]
   test_deps = [
+    "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/lib/packet-formats",
     "//src/connectivity/network/testing/netemul/network-context/fidl:network_rust",

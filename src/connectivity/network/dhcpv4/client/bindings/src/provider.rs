@@ -4,7 +4,6 @@
 use std::{cell::RefCell, collections::HashSet, num::NonZeroU64};
 
 use fidl_fuchsia_net_dhcp::{ClientExitReason, ClientProviderRequest, ClientProviderRequestStream};
-use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_packet as fpacket;
 use futures::{StreamExt as _, TryStreamExt as _};
 
@@ -61,10 +60,10 @@ struct AlreadyInUse;
 pub(crate) async fn serve_client_provider(
     stream: ClientProviderRequestStream,
     provider: fpacket::ProviderProxy,
-    udp_socket_provider: fposix_socket::ProviderProxy,
+    udp_socket_provider: &impl dhcp_client_core::deps::UdpSocketProvider,
 ) -> Result<(), Error> {
     let provider = &provider;
-    let udp_socket_provider = &udp_socket_provider;
+    let udp_socket_provider = udp_socket_provider;
     let interfaces_in_use = &InterfacesInUse::new();
 
     stream
@@ -110,8 +109,6 @@ pub(crate) async fn serve_client_provider(
                         provider.clone(),
                         interface_id,
                     );
-                    let udp_socket_provider =
-                        &crate::udpsocket::UdpSocketProviderImpl::new(udp_socket_provider.clone());
 
                     let mac = match provider.get_mac().await {
                         Ok(mac) => mac,

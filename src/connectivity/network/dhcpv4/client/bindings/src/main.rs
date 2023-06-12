@@ -14,7 +14,6 @@ mod provider;
 mod udpsocket;
 
 use fidl_fuchsia_net_dhcp::{ClientProviderMarker, ClientProviderRequestStream};
-use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_packet as fpacket;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use futures::{future, StreamExt as _, TryStreamExt as _};
@@ -47,16 +46,7 @@ async fn main() {
                                     <fpacket::ProviderMarker as fidl::endpoints::ProtocolMarker>
                                     ::DEBUG_NAME)
                             }),
-                        fuchsia_component::client::connect_to_protocol::<
-                            fposix_socket::ProviderMarker,
-                        >()
-                        .unwrap_or_else(|e| {
-                            panic!("error {e:?} while connecting to {}",
-                                    <
-                                        fposix_socket::ProviderMarker as
-                                        fidl::endpoints::ProtocolMarker
-                                    >::DEBUG_NAME)
-                        }),
+                        &crate::udpsocket::LibcUdpSocketProvider,
                     )
                     .await
                     .unwrap_or_else(|e| {
