@@ -24,7 +24,7 @@ int main(int argc, char** argv) {
   // --devfs-only: Only test devices detected in devfs; don't add/test Bluetooth audio a2dp output.
   bool devfs_only = command_line.HasOption("devfs-only");
 
-  // --no-virtual: Unless disabled via this flag, two virtual_audio instances (1 input, 1 output)
+  // --no-virtual: Unless disabled via this flag, multiple virtual_audio instances
   //   are automatically enabled (with default settings) and tested.
   bool no_virtual_audio = command_line.HasOption("no-virtual");
 
