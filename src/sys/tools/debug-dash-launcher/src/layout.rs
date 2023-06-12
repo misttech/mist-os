@@ -20,6 +20,13 @@ use vfs::{
     service::endpoint,
 };
 
+pub fn package_layout(
+    svc_dir: fio::DirectoryProxy,
+    target_dir: fio::DirectoryProxy,
+) -> Vec<fproc::NameInfo> {
+    vec![to_name_info("/svc", svc_dir), to_name_info("/pkg", target_dir)]
+}
+
 /// Returns directory handles + paths for a nested layout using the given directories.
 /// In this layout, all instance directories are nested as subdirectories of the root.
 /// e.g - namespace is under `/ns`, outgoing directory is under `/out`, etc.

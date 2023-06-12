@@ -142,6 +142,7 @@ if (is_host) {
       deps += [
         "lib:host_tests",
         "plugins:host_tests",
+        "tools:host_tests",
       ]
     }
   }
@@ -150,6 +151,9 @@ if (is_host) {
 if (is_fuchsia) {
   group("package_deps_for_host_tests") {
     testonly = true
-    deps = [ "plugins:package_deps_for_host_tests" ]
+    deps = [
+      "plugins:package_deps_for_host_tests",
+      "tools/target-package/tests:package_deps_for_host_tests",
+    ]
   }
 }

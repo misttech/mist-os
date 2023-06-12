@@ -42,6 +42,8 @@ type LauncherError = strict enum {
     PROCESS_RESOLVER = 14;
     /// Error occurred using fuchsia.kernel.VmexResource
     VMEX_RESOURCE = 15;
+    /// Error resolving the package that is to be explored.
+    RESOLVE_TARGET_PACKAGE = 16;
 };
 
 /// The namespace layout to create for the dash process.
@@ -130,6 +132,31 @@ protocol Launcher {
         command string:<MAX, optional>;
         /// The namespace layout to create for the dash process
         ns_layout DashNamespaceLayout;
+    }) -> () error LauncherError;
+
+    /// Launch a dash process with the indicated [sub]package loaded into the namespace at /pkg,
+    /// forwarding the given stdio socket.
+    ///
+    /// The dash launcher will implicitly create a PTY and transfer bytes between the PTY and
+    /// the socket.
+    ExplorePackageOverSocket(resource struct {
+        /// The absolute package URL to resolve.
+        /// If `subpackages` is empty the resolved package directory will be loaded into the dash
+        /// namespace at `/pkg`.
+        /// If `subpackages` is not empty, the package directory of the final subpackage of `url`
+        /// will be loaded into the namespace at `/pkg`.
+        url string:MAX;
+        /// The chain of subpackages, if any, of `url` to resolve, in resolution order.
+        /// If `subpackages` is not empty, the package directory of the final subpackage will be
+        /// loaded into the dash namespace at `/pkg`.
+        subpackages vector<string:MAX>:MAX;
+        /// The raw socket to connect to the dash process
+        socket zx.Handle:SOCKET;
+        /// A list of package URLs whose directories will also be loaded into the dash namespace.
+        /// The path preference is determined by the order of this vector.
+        tool_urls vector<fuchsia.url.Url>:<MAX_URLS>;
+        /// An optional inline command to run.
+        command string:<MAX, optional>;
     }) -> () error LauncherError;
 
     /// This event fires when a shell has terminated.

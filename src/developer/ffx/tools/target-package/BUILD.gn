@@ -1,0 +1,59 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/host.gni")
+import("//build/rust/rustc_library.gni")
+import("//src/developer/ffx/build/ffx_tool.gni")
+import("//src/developer/ffx/lib/version/build/ffx_apply_version.gni")
+
+rustc_library("lib") {
+  name = "ffx_tool_target_package"
+  edition = "2021"
+
+  deps = [
+    "//sdk/fidl/fuchsia.dash:fuchsia.dash_rust",
+    "//src/developer/ffx/lib/fho:lib",
+    "//src/lib/fidl/rust/fidl",
+    "//src/sys/lib/socket-to-stdio",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:futures",
+  ]
+
+  sources = [ "src/lib.rs" ]
+}
+
+ffx_tool("ffx_target_package") {
+  edition = "2021"
+  output_name = "ffx-target-package"
+  deps = [
+    ":lib",
+    "//src/developer/ffx/lib/fho:lib",
+    "//src/lib/fuchsia-async",
+  ]
+  sources = [ "src/main.rs" ]
+}
+
+group("target-package") {
+  public_deps = [
+    ":ffx_target_package",
+    ":ffx_target_package_host_tool",
+  ]
+}
+
+group("bin") {
+  public_deps = [ ":ffx_target_package_versioned" ]
+}
+
+# Target is needed for //src/developer/ffx/tools:tests but this command just uses integration
+# tests.
+group("tests") {
+  testonly = true
+}
+
+group("host_tests") {
+  testonly = true
+  deps = [ "tests:host_tests" ]
+}

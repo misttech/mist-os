@@ -8,6 +8,7 @@ import("//src/developer/ffx/config.gni")
 _tools = [
   "echo",
   "starnix",
+  "target-package",
 ]
 
 group("tools") {
@@ -41,4 +42,9 @@ group("tests") {
   if (ffx_build_dual_mode_plugins_as_subtools) {
     deps += dual_mode_subtool_tests  # from config.gni
   }
+}
+
+group("host_tests") {
+  testonly = true
+  deps = [ "target-package:host_tests" ]
 }

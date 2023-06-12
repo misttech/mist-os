@@ -17,6 +17,7 @@ use fuchsia_runtime::{HandleInfo as HandleId, HandleType};
 use fuchsia_zircon as zx;
 
 pub mod component;
+pub mod package;
 
 // -s: force input from stdin
 // -i: force interactive
@@ -36,7 +37,7 @@ async fn explore_over_handles(
 ) -> Result<zx::Process, LauncherError> {
     // In addition to tools binaries requested by the user, add the built-in binaries of the
     // debug-dash-launcher package, creating `#!resolve` trampolines for all.
-    tool_urls.push("fuchsia-pkg://fuchsia.com/debug-dash-launcher".to_string());
+    tool_urls.push("fuchsia-pkg://fuchsia.com/debug-dash-launcher".into());
     let (tools_pkg_dir, tools_path) =
         trampoline::create_trampolines_from_packages(tool_urls).await?;
     layout::add_tools_to_name_infos(tools_pkg_dir, &mut name_infos);

@@ -119,6 +119,28 @@ async fn main() -> Result<(), anyhow::Error> {
                         });
                         let _ = responder.send(result);
                     }
+                    LauncherRequest::ExplorePackageOverSocket {
+                        url,
+                        subpackages,
+                        socket,
+                        tool_urls,
+                        command,
+                        responder,
+                    } => {
+                        let result = crate::launch::package::explore_over_socket(
+                            &url,
+                            &subpackages,
+                            socket,
+                            tool_urls,
+                            command,
+                        )
+                        .await
+                        .map(|p| {
+                            info!("launched Dash for package {} {}", url, subpackages.join(" "));
+                            notify_on_process_exit(p, responder.control_handle().clone());
+                        });
+                        let _ = responder.send(result);
+                    }
                 }
             }
         })

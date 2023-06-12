@@ -67,6 +67,8 @@ group("allowed_to_use_subpackages") {
     "//examples/components/subpackages:echo_client_with_subpackaged_server",
     "//sdk/ctf:*",
     "//sdk/ctf/release:*",
+    "//src/developer/ffx/tools/target-package/tests:verify_ffx_target_package_explore_subpackage",
+    "//src/developer/ffx/tools/target-package/tests:verify_ffx_target_package_explore_superpackage",
     "//src/performance/trace_manager:trace_manager",
     "//src/sys/pkg/lib/fuchsia-pkg:package_for_archive",
     "//src/sys/test_manager:pkg",
