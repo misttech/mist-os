@@ -30,6 +30,7 @@ template("android_starnix_container") {
       deps = []
     }
 
+    depfile = "$target_gen_dir/$target_name.d"
     tool = "//src/starnix/tools/gen_android_starnix_container:gen_android_starnix_container_bin"
     tool_output_name = "gen-android-starnix-container"
 
@@ -44,16 +45,23 @@ template("android_starnix_container") {
       rebase_path(_outdir, root_build_dir),
       "--system",
       rebase_path(invoker.system, root_build_dir),
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
     ]
 
     _base_manifest =
         get_label_info(invoker.base, "target_out_dir") + "/" +
         get_label_info(invoker.base, "name") + "/package_manifest.json"
+    _base_meta_far = get_label_info(invoker.base, "target_out_dir") + "/" +
+                     get_label_info(invoker.base, "name") + "/meta.far"
     args += [
       "--base",
       rebase_path(_base_manifest, root_build_dir),
     ]
-    inputs += [ _base_manifest ]
+    inputs += [
+      _base_manifest,
+      _base_meta_far,
+    ]
     deps += [ invoker.base ]
 
     foreach(hal, invoker.hals) {

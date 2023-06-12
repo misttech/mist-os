@@ -31,6 +31,10 @@ struct Command {
     /// path to hal package archive.
     #[argh(option)]
     hal: Vec<Utf8PathBuf>,
+
+    /// path to a depfile to write.
+    #[argh(option)]
+    depfile: Option<Utf8PathBuf>,
 }
 
 fn main() -> Result<()> {
@@ -64,7 +68,7 @@ fn generate(cmd: Command) -> Result<()> {
         .with_context(|| format!("Preparing directory for system files: {}", &system_outdir))?;
     let system_files = ext4_extract(cmd.system.as_str(), system_outdir.as_str())
         .context("Extracting system files")?;
-    for (dst, src) in system_files {
+    for (dst, src) in &system_files {
         builder
             .add_file_as_blob(dst, &src)
             .with_context(|| format!("Adding blob from file: {}", &src))?;
@@ -75,6 +79,23 @@ fn generate(cmd: Command) -> Result<()> {
     let manifest_path = cmd.outdir.join("package_manifest.json");
     builder.manifest_path(manifest_path);
     builder.build(&cmd.outdir, &metafar_path).context("Building starnix container")?;
+
+    if let Some(depfile) = cmd.depfile {
+        let mut deps: Vec<String> = vec![
+            cmd.outdir.join("meta.far"),
+            cmd.outdir.join("meta/fuchsia.abi/abi-revision"),
+            cmd.outdir.join("meta/fuchsia.pkg/subpackages"),
+            cmd.outdir.join("meta/package"),
+            cmd.outdir.join(format!("meta/{}.cm", cmd.name)),
+        ]
+        .iter()
+        .map(|p| p.to_string())
+        .collect();
+        deps.extend(system_files.into_values());
+        let mut deps: String = deps.iter().map(|p| format!("{p} ")).collect();
+        deps += &format!(": {}", cmd.system);
+        std::fs::write(&depfile, &deps).with_context(|| format!("Writing depfile: {}", depfile))?;
+    }
 
     Ok(())
 }
@@ -114,6 +135,7 @@ mod tests {
             base: base_manifest_path,
             system: Utf8PathBuf::from_str(EXT4_IMAGE_PATH).unwrap(),
             hal: vec![hal_manifest_path],
+            depfile: None,
         };
         generate(cmd).unwrap();
 
