@@ -52,7 +52,6 @@ USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "intl_services.icu_default_{}".format(icu_flavors.default_git_commit),
     "intl_services.icu_latest_{}".format(icu_flavors.latest_git_commit),
     "intl_services.icu_stable_{}".format(icu_flavors.stable_git_commit),
-    "netstack2",
     "netstack3",
     "omaha_client",
     "radar_proxy_without_injector",
@@ -72,6 +71,9 @@ USER_PLATFORM_AIB_NAMES_EXCLUDED_FROM_RISCV64 = [
     # The following are not currently supported on RISC-V. They must be added
     # separately to each list that (indirectly) builds on
     # USER_PLATFORM_AIB_NAMES_RISCV64.
+
+    # The Go toolchain used for netstack2 does not support RISC-V.
+    "netstack2",
 
     # TODO(fxbug.dev/128554): Move to the list above once build errors are resolved.
     "starnix_support",

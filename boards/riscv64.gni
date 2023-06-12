@@ -28,3 +28,6 @@ board_bootfs_labels += _imports.virtio_drivers
 images_config_label = "//boards/images:riscv64"
 zedboot_images_config_label = "//boards/images:zedboot_qemu"
 partitions_config_label = "//boards/partitions:riscv64"
+
+# The Go toolchain used for netstack2 does not support RISC-V.
+use_netstack3 = true

@@ -126,12 +126,21 @@ core_shard("persistence-core-shard") {
 # set.
 fuchsia_package("network-legacy-deprecated") {
   testonly = true
+
   deps = [
     "dns:component",
-    "netstack:component",
-    "netstack:component-with-fast-udp",
     "netstack3:component-debug",
   ]
+
+  # The Go toolchain used for netstack2 does not support RISC-V.
+  # TODO(fxbug.dev/85821): Move these back to the list above once
+  # https://fxrev.dev/868079 lands and this is no longer part of RISC-V builds.
+  if (current_cpu != "riscv64") {
+    deps += [
+      "netstack:component",
+      "netstack:component-with-fast-udp",
+    ]
+  }
 }
 
 group("drivers") {
