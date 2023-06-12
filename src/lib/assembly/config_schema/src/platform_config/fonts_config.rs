@@ -15,6 +15,15 @@ pub struct FontsConfig {
     /// Prod configurations will want to set this to false.
     #[serde(default = "default_enabled")]
     pub enabled: bool,
+
+    /// If defined, represents the name of the font collection domain
+    /// config package to be included in the product.
+    /// It is only valid if `enabled==true`.
+    ///
+    /// When unset, software assembly uses the (deprecated) fonts configuration
+    /// that reads the fonts from `config-data`.  When set,
+    /// software assembly uses the product configuration instead.
+    pub font_collection: Option<String>,
 }
 
 // Most configs want to enable fonts configuration, so the default here
@@ -25,7 +34,7 @@ fn default_enabled() -> bool {
 
 impl Default for FontsConfig {
     fn default() -> Self {
-        FontsConfig { enabled: default_enabled() }
+        FontsConfig { enabled: default_enabled(), font_collection: None }
     }
 }
 
