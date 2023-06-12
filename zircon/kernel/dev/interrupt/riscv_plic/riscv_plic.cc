@@ -88,7 +88,7 @@ zx_status_t plic_mask_interrupt(unsigned int vector) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  plic_disable_vector(vector, riscv64_curr_hart_id());
+  plic_disable_vector(vector, riscv64_boot_hart_id());
 
   return ZX_OK;
 }
@@ -100,7 +100,7 @@ zx_status_t plic_unmask_interrupt(unsigned int vector) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  plic_enable_vector(vector, riscv64_curr_hart_id());
+  plic_enable_vector(vector, riscv64_boot_hart_id());
 
   return ZX_OK;
 }
@@ -156,8 +156,11 @@ unsigned int plic_remap_interrupt(unsigned int vector) {
 
 void plic_handle_irq(iframe_t* frame) {
   // get the current vector
-  uint32_t vector = readl(PLIC_CLAIM(plic_base, riscv64_curr_hart_id()));
+  const uint32_t curr_hart_id = riscv64_curr_hart_id();
+  const uint32_t vector = readl(PLIC_CLAIM(plic_base, curr_hart_id));
   LTRACEF_LEVEL(2, "vector %u\n", vector);
+
+  DEBUG_ASSERT(curr_hart_id == riscv64_boot_hart_id());
 
   if (unlikely(vector == 0)) {
     // spurious
@@ -175,7 +178,7 @@ void plic_handle_irq(iframe_t* frame) {
   pdev_invoke_int_if_present(vector);
 
   // EOI
-  writel(vector, PLIC_COMPLETE(plic_base, riscv64_curr_hart_id()));
+  writel(vector, PLIC_COMPLETE(plic_base, curr_hart_id));
 
   LTRACEF_LEVEL(2, "cpu %u exit\n", cpu);
 
@@ -184,7 +187,15 @@ void plic_handle_irq(iframe_t* frame) {
 
 void plic_send_ipi(cpu_mask_t target, mp_ipi_t ipi) { PANIC_UNIMPLEMENTED; }
 
-void plic_init_percpu() {}
+void plic_init_percpu() {
+  const uint32_t curr_hart = riscv64_curr_hart_id();
+  LTRACEF("hart %u\n", curr_hart);
+
+  // mask all irqs on this cpu
+  for (uint i = 1; i < plic_max_int; i++) {
+    plic_disable_vector(i, curr_hart);
+  }
+}
 
 void plic_shutdown() { PANIC_UNIMPLEMENTED; }
 
@@ -246,14 +257,13 @@ void PLICInitEarly(const zbi_dcfg_riscv_plic_driver_t& config) {
   pdev_register_interrupts(&plic_ops);
 
   // mask all irqs and set their priority to 1
-  // TODO: mask on all the other cpus too
   for (uint i = 1; i < plic_max_int; i++) {
-    plic_disable_vector(i, riscv64_curr_hart_id());
+    plic_disable_vector(i, riscv64_boot_hart_id());
     writel(1, PLIC_PRIORITY(plic_base, i));
   }
 
   // set global priority threshold to 0
-  writel(0, PLIC_THRESHOLD(plic_base, riscv64_curr_hart_id()));
+  writel(0, PLIC_THRESHOLD(plic_base, riscv64_boot_hart_id()));
 
   LTRACE_EXIT;
 }
