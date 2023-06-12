@@ -382,6 +382,30 @@ macro_rules! fileops_impl_seekless {
     };
 }
 
+macro_rules! fileops_impl_dataless {
+    () => {
+        fn write(
+            &self,
+            _file: &crate::fs::FileObject,
+            _current_task: &crate::task::CurrentTask,
+            _offset: usize,
+            _data: &mut dyn crate::fs::buffers::InputBuffer,
+        ) -> Result<usize, Errno> {
+            error!(EINVAL)
+        }
+
+        fn read(
+            &self,
+            _file: &crate::fs::FileObject,
+            _current_task: &crate::task::CurrentTask,
+            _offset: usize,
+            _data: &mut dyn crate::fs::buffers::OutputBuffer,
+        ) -> Result<usize, Errno> {
+            error!(EINVAL)
+        }
+    };
+}
+
 /// Implements [`FileOps`] methods in a way that makes sense for directories. You must implement
 /// [`FileOps::seek`] and [`FileOps::readdir`].
 macro_rules! fileops_impl_directory {
@@ -416,6 +440,7 @@ macro_rules! fileops_impl_directory {
 
 // Public re-export of macros allows them to be used like regular rust items.
 
+pub(crate) use fileops_impl_dataless;
 pub(crate) use fileops_impl_delegate_read_and_seek;
 pub(crate) use fileops_impl_directory;
 pub(crate) use fileops_impl_nonseekable;
