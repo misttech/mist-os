@@ -8,7 +8,7 @@ import os
 import requests
 import shutil
 import subprocess
-from typing import List
+from typing import List, Dict
 from urllib.parse import parse_qs, urlparse
 
 
@@ -37,8 +37,7 @@ class PubSub:
             execute_commands_in_repo(repo, cmds, dest_path)
             # Publish downstream messages
             for topic, message in publish_table.items():
-                pub.publish(topic, os.path.join(
-                    repo, message))
+                self.publish(topic, os.path.join(repo, message))
 
 
 pub = PubSub()
@@ -56,6 +55,13 @@ class PubSubHandler(BaseHTTPRequestHandler):
 
         pub.publish(topic, message)
 
+    def do_POST(self):
+        content_length = int(self.headers['Content-Length'])
+        data = json.loads(self.rfile.read(content_length))
+        register_rules(data)
+        self.send_response(200)
+        self.end_headers()
+
 
 def execute_commands_in_repo(repo: str, commands: List[str], dest_path: str):
     print(f'Run in repo: {repo}')
@@ -65,12 +71,7 @@ def execute_commands_in_repo(repo: str, commands: List[str], dest_path: str):
         result = subprocess.run(cmd, cwd=repo)
 
 
-def register_config(config_path: str):
-    if not config_path:
-        return
-    with open(config_path, 'r') as f:
-        rule_table = json.load(f)
-
+def register_rules(rule_table: Dict[str, dict]):
     for _, config in rule_table.items():
         listen_to = config['listen_to']
         # Register config for each listened events
@@ -78,9 +79,19 @@ def register_config(config_path: str):
             pub.subscribe(topic, config)
 
 
+def register_config(args: argparse.Namespace):
+    config_path = args.config
+    if not config_path:
+        return
+    with open(config_path, 'r') as f:
+        rule_table = json.load(f)
+
+    register_rules(rule_table)
+
+
 def start_server(args: argparse.Namespace):
     # Parse configuration file
-    register_config(args.config)
+    register_config(args)
 
     # Start server
     server_address = ('localhost', 8000)
@@ -92,6 +103,16 @@ def start_server(args: argparse.Namespace):
 def publish_event(args: argparse.Namespace):
     response = requests.get(
         f'http://localhost:8000/?event={args.event}&message={args.message}')
+    print(response)
+
+
+def register_additional_configuration(args: argparse.Namespace):
+    config_path = args.config
+    with open(config_path, 'r') as f:
+        payload = json.load(f)
+    headers = {'Content-Type': 'application/json'}
+    response = requests.post(
+        'http://localhost:8000/', json=payload, headers=headers)
     print(response)
 
 
@@ -111,20 +132,31 @@ def parse_arguments() -> argparse.Namespace:
     parser_start.set_defaults(func=start_server)
 
     # Define publish command
-    parser_start = subparser.add_parser(
+    parser_publish = subparser.add_parser(
         'publish',
         help='Publish an event',
     )
-    parser_start.add_argument(
+    parser_publish.add_argument(
         'event',
         help='Event name published.',
     )
-    parser_start.add_argument(
+    parser_publish.add_argument(
         '--message',
         help='Addional message for the published event.',
         default='any',
     )
-    parser_start.set_defaults(func=publish_event)
+    parser_publish.set_defaults(func=publish_event)
+
+    # Define register command
+    parser_register = subparser.add_parser(
+        'register',
+        help='Register a new config to pubsub server',
+    )
+    parser_register.add_argument(
+        'config',
+        help='A path to the config file.',
+    )
+    parser_register.set_defaults(func=register_additional_configuration)
 
     return parser.parse_args()
 

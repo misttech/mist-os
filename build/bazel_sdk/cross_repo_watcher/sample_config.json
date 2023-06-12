@@ -40,7 +40,7 @@
         "repo": "~/fuchsia",
         "listen_to": {
             "wifi_far": "prebuilt/drivers/iwlwifi/iwlwifi_driver",
-            "rfc_far": "dest_2"
+            "rfc_far": "prebuilt/drivers/rtc/rtc_driver"
         },
         "commands": [
             "fx clean",
@@ -54,7 +54,7 @@
     "START_EMU": {
         "repo": "~/fuchsia",
         "listen_to": {
-            "product_bundle": "<dest path>"
+            "product_bundle": null
         },
         "commands": [
             "ffx emu start"
