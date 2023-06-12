@@ -5,11 +5,12 @@ use super::*;
 
 use crate::{
     auth::FsCred,
-    fs::{cgroup::CgroupDirectoryNode, kobject::*},
+    fs::{cgroup::CgroupDirectoryNode, kobject::*, tmpfs::TmpfsDirectory},
     task::*,
     types::*,
 };
 
+use fuchsia_zircon as zx;
 use std::sync::{Arc, Weak};
 
 struct SysFs;
@@ -215,11 +216,29 @@ impl FsNodeOps for CpuClassDirectory {
         _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(VecDirectory::new_file(vec![VecDirectoryEntry {
+        static CPUS: once_cell::sync::OnceCell<Vec<String>> = once_cell::sync::OnceCell::new();
+
+        let cpus = CPUS.get_or_init(|| {
+            let num = zx::system_get_num_cpus();
+            (0..num).map(|i| format!("cpu{}", i)).collect::<Vec<String>>()
+        });
+
+        let mut entries = vec![VecDirectoryEntry {
             entry_type: DirectoryEntryType::REG,
             name: b"online".to_vec(),
             inode: None,
-        }]))
+        }];
+
+        for cpu_name in cpus {
+            entries.push(VecDirectoryEntry {
+                entry_type: DirectoryEntryType::DIR,
+                name: cpu_name.as_bytes().to_vec(),
+                inode: None,
+            })
+        }
+
+        // TODO(fxbug.dev/121327): A workaround before binding FsNodeOps to each kobject.
+        Ok(VecDirectory::new_file(entries))
     }
 
     fn lookup(
@@ -229,6 +248,10 @@ impl FsNodeOps for CpuClassDirectory {
         name: &FsStr,
     ) -> Result<Arc<FsNode>, Errno> {
         match name {
+            name if name.starts_with(b"cpu") => Ok(node.fs().create_node(
+                TmpfsDirectory::new(),
+                FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
+            )),
             b"online" => Ok(node.fs().create_node(
                 BytesFile::new_node(format!("{}\n", 1).into_bytes()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
