@@ -1443,29 +1443,8 @@ where
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
 {
     sync_ctx.with_sockets(|_sync_ctx, state| {
-        let DatagramSockets { bound_state, bound: _, unbound } = state;
-        match id.into() {
-            DatagramSocketId::Unbound(id) => {
-                let UnboundSocketState { device, sharing: _, ip_options: _ } =
-                    unbound.get(id.get_key_index()).expect("unbound socket not found");
-                device.clone()
-            }
-            DatagramSocketId::Bound(DatagramBoundId::Listener(id)) => {
-                let state = bound_state.get(&SocketId::Listener(id)).expect("listener not found");
-                let (_, _, addr): &(S::ListenerState, S::ListenerSharingState, _) =
-                    Listener::from_socket_state_ref(state);
-                let ListenerAddr { device, ip: _ } = addr;
-                device.clone()
-            }
-            DatagramSocketId::Bound(DatagramBoundId::Connection(id)) => {
-                let state =
-                    bound_state.get(&SocketId::Connection(id)).expect("connected socket not found");
-                let (_, _, addr): &(S::ConnState, S::ConnSharingState, _) =
-                    Connection::from_socket_state_ref(state);
-                let ConnAddr { device, ip: _ } = addr;
-                device.clone()
-            }
-        }
+        let (_, device): (&IpOptions<_, _>, _) = get_options_device(state, id.into());
+        device.clone()
     })
 }
 
@@ -1586,31 +1565,7 @@ where
     let id = id.into();
 
     sync_ctx.with_sockets_mut(|sync_ctx, state, _allocator| {
-        let DatagramSockets { bound_state, bound: _, unbound } = state;
-        let bound_device = match id.clone() {
-            DatagramSocketId::Unbound(id) => {
-                let UnboundSocketState { device, sharing: _, ip_options: _ } =
-                    unbound.get(id.get_key_index()).expect("unbound UDP socket not found");
-                device
-            }
-            DatagramSocketId::Bound(DatagramBoundId::Listener(id)) => {
-                let state =
-                    bound_state.get(&SocketId::Listener(id)).expect("Listening socket not found");
-                let (_, _, ListenerAddr { ip: _, device }): &(
-                    ListenerState<_, _>,
-                    S::ListenerSharingState,
-                    _,
-                ) = Listener::from_socket_state_ref(state);
-                device
-            }
-            DatagramSocketId::Bound(DatagramBoundId::Connection(id)) => {
-                let state =
-                    bound_state.get(&SocketId::Connection(id)).expect("Connected socket not found");
-                let (_, _, ConnAddr { ip: _, device }): &(ConnState<_, _>, S::ConnSharingState, _) =
-                    Connection::from_socket_state_ref(state);
-                device
-            }
-        };
+        let (_, bound_device): (&IpOptions<_, _>, _) = get_options_device(state, id.clone());
 
         let interface = match interface {
             MulticastMembershipInterfaceSelector::Specified(selector) => match selector {
@@ -1638,37 +1593,7 @@ where
             }
         };
 
-        let DatagramSockets { bound_state: _, bound: _, unbound } = state;
-        let ip_options = match id {
-            DatagramSocketId::Unbound(id) => {
-                let UnboundSocketState { device: _, sharing: _, ip_options } =
-                    unbound.get_mut(id.get_key_index()).expect("unbound UDP socket not found");
-                ip_options
-            }
-
-            DatagramSocketId::Bound(DatagramBoundId::Listener(id)) => {
-                let state = bound_state
-                    .get_mut(&SocketId::Listener(id))
-                    .expect("Listening socket not found");
-                let (ListenerState { ip_options }, _, _): &mut (
-                    _,
-                    S::ListenerSharingState,
-                    ListenerAddr<_, _, _>,
-                ) = Listener::from_socket_state_mut(state);
-                ip_options
-            }
-            DatagramSocketId::Bound(DatagramBoundId::Connection(id)) => {
-                let state = bound_state
-                    .get_mut(&SocketId::Connection(id))
-                    .expect("Connected socket not found");
-                let (ConnState { socket, clear_device_on_disconnect: _, shutdown: _ }, _, _): &mut (
-                    _,
-                    S::ConnSharingState,
-                    ConnAddr<_, _, _, _>,
-                ) = Connection::from_socket_state_mut(state);
-                socket.options_mut()
-            }
-        };
+        let ip_options = get_options_mut(state, id);
 
         let Some(strong_interface) = interface.as_strong(sync_ctx) else {
             return Err(SetMulticastMembershipError::DeviceDoesNotExist);
@@ -1817,6 +1742,57 @@ where
         let IpOptions { hop_limits, multicast_memberships: _ } = options;
         let device = device.as_ref().and_then(|d| sync_ctx.upgrade_weak_device_id(d));
         hop_limits.get_limits_with_defaults(&sync_ctx.get_default_hop_limits(device.as_ref()))
+    })
+}
+
+pub(crate) fn get_sharing<
+    A: SocketMapAddrSpec,
+    SC: DatagramStateContext<A, C, S>,
+    C: DatagramStateNonSyncContext<A, S>,
+    S: DatagramSocketSpec<A>,
+    Sharing: Clone,
+>(
+    sync_ctx: &mut SC,
+    id: impl Into<DatagramSocketId<S>>,
+) -> Sharing
+where
+    Bound<S>: Tagged<AddrVec<A>>,
+    S: DatagramSocketSpec<
+        A,
+        UnboundSharingState = Sharing,
+        ListenerSharingState = Sharing,
+        ConnSharingState = Sharing,
+    >,
+    A::IpVersion: IpExt,
+{
+    sync_ctx.with_sockets(|_sync_ctx, sockets| {
+        let DatagramSockets { bound_state, bound: _, unbound } = &sockets;
+        match id.into() {
+            DatagramSocketId::Unbound(id) => {
+                let UnboundSocketState { device: _, sharing, ip_options: _ } =
+                    unbound.get(id.get_key_index()).expect("unbound UDP socket not found");
+                sharing
+            }
+            DatagramSocketId::Bound(id) => match id {
+                SocketId::Listener(id) => {
+                    let state = bound_state
+                        .get(&Listener::to_socket_id(id))
+                        .expect("listener UDP socket not found");
+                    let (_, sharing, _): &(ListenerState<_, _>, _, ListenerAddr<_, _, _>) =
+                        Listener::from_socket_state_ref(state);
+                    sharing
+                }
+                SocketId::Connection(id) => {
+                    let state = bound_state
+                        .get(&Connection::to_socket_id(id))
+                        .expect("conneted UDP socket not found");
+                    let (_, sharing, _): &(ConnState<_, _>, _, ConnAddr<_, _, _, _>) =
+                        Connection::from_socket_state_ref(state);
+                    sharing
+                }
+            },
+        }
+        .clone()
     })
 }
 

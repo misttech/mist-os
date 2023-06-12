@@ -59,8 +59,8 @@ use crate::{
             SocketHopLimits, SocketInfo as DatagramSocketInfo, UnboundSocketState,
         },
         AddrVec, Bound, BoundSocketMap, Connection, ConvertSocketTypeState, IncompatibleError,
-        InsertError, Listener, RemoveResult, SocketAddrType, SocketMapAddrStateSpec,
-        SocketMapConflictPolicy, SocketMapStateSpec,
+        InsertError, RemoveResult, SocketAddrType, SocketMapAddrStateSpec, SocketMapConflictPolicy,
+        SocketMapStateSpec,
     },
     sync::RwLock,
     trace_duration, transport, SyncCtx,
@@ -1436,45 +1436,8 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         })
     }
 
-    fn get_udp_posix_reuse_port(&mut self, _ctx: &C, SocketId(id): SocketId<I>) -> bool {
-        self.with_sockets(|_sync_ctx, state| {
-            let Sockets {
-                sockets: DatagramSockets { bound_state, bound: _, unbound },
-                lazy_port_alloc: _,
-            } = state;
-            match id {
-                SocketIdInner::Unbound(id) => {
-                    let UnboundSocketState { device: _, sharing, ip_options: _ } =
-                        unbound.get(id.into()).expect("unbound UDP socket not found");
-                    sharing
-                }
-                SocketIdInner::Bound(id) => match id {
-                    BoundId::Listening(id) => {
-                        let state = bound_state
-                            .get(&<Listener as ConvertSocketTypeState<
-                                IpPortSpec<I, Self::WeakDeviceId>,
-                                _,
-                            >>::to_socket_id(id))
-                            .expect("listener UDP socket not found");
-                        let (_, sharing, _): &(ListenerState<_, _>, _, ListenerAddr<_, _, _>) =
-                            Listener::from_socket_state_ref(state);
-                        sharing
-                    }
-                    BoundId::Connected(id) => {
-                        let state = bound_state
-                            .get(&<Connection as ConvertSocketTypeState<
-                                IpPortSpec<I, Self::WeakDeviceId>,
-                                _,
-                            >>::to_socket_id(id))
-                            .expect("conneted UDP socket not found");
-                        let (_, sharing, _): &(ConnState<_, _>, _, ConnAddr<_, _, _, _>) =
-                            Connection::from_socket_state_ref(state);
-                        sharing
-                    }
-                },
-            }
-            .is_reuse_port()
-        })
+    fn get_udp_posix_reuse_port(&mut self, _ctx: &C, id: SocketId<I>) -> bool {
+        datagram::get_sharing(self, id).is_reuse_port()
     }
 
     fn set_udp_multicast_membership(
