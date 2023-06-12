@@ -1255,13 +1255,10 @@ mod tests {
         let now = non_sync_ctx.now();
         let ll_addr = local_mac.to_ipv6_link_local().addr();
         let snmc_addr = ll_addr.to_solicited_node_address();
-        let snmc_timer_id = TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Mld(
-            MldDelayedReportTimerId(GmpDelayedReportTimerId {
-                device: device_id.clone(),
-                group_addr: snmc_addr,
-            })
-            .into(),
-        )));
+        let snmc_timer_id =
+            TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Mld(MldDelayedReportTimerId(
+                GmpDelayedReportTimerId { device: device_id.clone(), group_addr: snmc_addr },
+            ))));
         let range = now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL);
         struct TestConfig {
             ip_enabled: bool,

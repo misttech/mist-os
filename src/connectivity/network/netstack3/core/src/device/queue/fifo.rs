@@ -130,10 +130,8 @@ mod tests {
             res = Ok(EnqueueResult::QueuePreviouslyWasOccupied);
         }
 
-        let frames = (0..MAX_RX_QUEUED_LEN)
-            .into_iter()
-            .map(|i| ((), Buf::new([i as u8], ..)))
-            .collect::<VecDeque<_>>();
+        let frames =
+            (0..MAX_RX_QUEUED_LEN).map(|i| ((), Buf::new([i as u8], ..))).collect::<VecDeque<_>>();
         assert_eq!(fifo.items, frames);
 
         let body = Buf::new([131], ..);

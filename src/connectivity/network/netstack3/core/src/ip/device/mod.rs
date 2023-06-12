@@ -2326,7 +2326,7 @@ mod tests {
             [
                 DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressStateChanged {
                     device: weak_device_id.clone(),
-                    addr: ipv4_addr_subnet.addr().into(),
+                    addr: ipv4_addr_subnet.addr(),
                     state: IpAddressState::Assigned,
                 }),
                 DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
@@ -2374,7 +2374,7 @@ mod tests {
             [
                 DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressStateChanged {
                     device: weak_device_id.clone(),
-                    addr: ipv4_addr_subnet.addr().into(),
+                    addr: ipv4_addr_subnet.addr(),
                     state: IpAddressState::Unavailable,
                 }),
                 DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
@@ -2471,8 +2471,7 @@ mod tests {
                         MldDelayedReportTimerId(GmpDelayedReportTimerId {
                             device: device_id.clone(),
                             group_addr: ll_addr.addr().to_solicited_node_address(),
-                        })
-                        .into(),
+                        }),
                     ))),
                     ..,
                 ),
@@ -2483,8 +2482,7 @@ mod tests {
                         MldDelayedReportTimerId(GmpDelayedReportTimerId {
                             device: device_id.clone(),
                             group_addr,
-                        })
-                        .into(),
+                        }),
                     ))),
                     ..,
                 ))

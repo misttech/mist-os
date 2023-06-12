@@ -498,7 +498,7 @@ impl<C: SlaacNonSyncContext<SC::DeviceId>, SC: SlaacContext<C>> SlaacHandler<C> 
                     }
 
                     let timer_id =
-                        SlaacTimerId::new_deprecate_slaac_address(device_id.clone(), addr).into();
+                        SlaacTimerId::new_deprecate_slaac_address(device_id.clone(), addr);
                     let _previously_scheduled_instant: Option<C::Instant> = match preferred_for {
                         NonZeroNdpLifetime::Finite(preferred_for) => {
                             // Use `schedule_timer_instant` instead of `schedule_timer` to set
@@ -597,7 +597,7 @@ impl<C: SlaacNonSyncContext<SC::DeviceId>, SC: SlaacContext<C>> SlaacHandler<C> 
 
                         let _: Option<C::Instant> = ctx.schedule_timer_instant(
                             valid_until,
-                            SlaacTimerId::new_invalidate_slaac_address(device_id.clone(), addr).into(),
+                            SlaacTimerId::new_invalidate_slaac_address(device_id.clone(), addr),
                         );
                     }
                     NonZeroNdpLifetime::Infinite => {
@@ -605,7 +605,7 @@ impl<C: SlaacNonSyncContext<SC::DeviceId>, SC: SlaacContext<C>> SlaacHandler<C> 
                         update_slaac_addr_valid_until(slaac_config, Lifetime::Infinite);
 
                         let _: Option<C::Instant> = ctx.cancel_timer(
-                            SlaacTimerId::new_invalidate_slaac_address(device_id.clone(), addr).into(),
+                            SlaacTimerId::new_invalidate_slaac_address(device_id.clone(), addr),
                         );
                     }
                 },
@@ -1466,8 +1466,7 @@ fn add_slaac_addr_sub<C: SlaacNonSyncContext<SC::DeviceId>, SC: SlaacContext<C>>
                                 SlaacTimerId::new_invalidate_slaac_address(
                                     device_id.clone(),
                                     addr_sub.addr()
-                                )
-                                .into(),
+                                ),
                             ),
                             None
                         );
@@ -1493,7 +1492,7 @@ fn add_slaac_addr_sub<C: SlaacNonSyncContext<SC::DeviceId>, SC: SlaacContext<C>>
                                 assert_eq!(
                                     ctx.schedule_timer_instant(
                                         now.checked_add(preferred_for.get()).unwrap(),
-                                        deprecate_timer_id.into()
+                                        deprecate_timer_id
                                     ),
                                     None
                                 );
@@ -1509,7 +1508,6 @@ fn add_slaac_addr_sub<C: SlaacNonSyncContext<SC::DeviceId>, SC: SlaacContext<C>>
                                         device_id.clone(),
                                         addr_sub
                                     )
-                                    .into()
                                 ),
                                 None
                             ),
@@ -1518,7 +1516,7 @@ fn add_slaac_addr_sub<C: SlaacNonSyncContext<SC::DeviceId>, SC: SlaacContext<C>>
                     }
                     None => {
                         *deprecated = true;
-                        assert_eq!(ctx.cancel_timer(deprecate_timer_id.into()), None);
+                        assert_eq!(ctx.cancel_timer(deprecate_timer_id), None);
                     }
                 };
 

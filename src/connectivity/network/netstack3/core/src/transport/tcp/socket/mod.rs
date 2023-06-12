@@ -1058,7 +1058,7 @@ impl<I: IpExt> MaybeListenerId<I> {
         &ListenerSharingState,
         &ListenerAddr<I::Addr, D, NonZeroU16>,
     )> {
-        let state = bound_state.get(&BoundSocketId::Listener(self.into()))?;
+        let state = bound_state.get(&BoundSocketId::Listener(self))?;
         let (listener, sharing, addr) = BoundListener::from_socket_state_ref(state);
         Some((listener, sharing, addr))
     }
@@ -1074,7 +1074,7 @@ impl<I: IpExt> MaybeListenerId<I> {
         &mut ListenerSharingState,
         &mut ListenerAddr<I::Addr, D, NonZeroU16>,
     )> {
-        let state = bound_state.get_mut(&BoundSocketId::Listener(self.into()))?;
+        let state = bound_state.get_mut(&BoundSocketId::Listener(self))?;
         let (listener, sharing, addr) = BoundListener::from_socket_state_mut(state);
         Some((listener, sharing, addr))
     }
@@ -1090,7 +1090,7 @@ impl<I: IpExt> MaybeListenerId<I> {
         BoundSocketId<TcpSocketSpec<I, D, C>>,
         BoundSocketState<IpPortSpec<I, D>, TcpSocketSpec<I, D, C>>,
     > {
-        match bound_state.entry(BoundSocketId::Listener(self.into())) {
+        match bound_state.entry(BoundSocketId::Listener(self)) {
             IdMapCollectionEntry::Vacant(_) => panic!("invalid MaybeListenerId: not found"),
             IdMapCollectionEntry::Occupied(o) => o,
         }
@@ -1141,7 +1141,7 @@ impl<I: IpExt> MaybeClosedConnectionId<I> {
         BoundSocketId<TcpSocketSpec<I, D, C>>,
         BoundSocketState<IpPortSpec<I, D>, TcpSocketSpec<I, D, C>>,
     > {
-        match bound_state.entry(BoundSocketId::Connection(self.into())) {
+        match bound_state.entry(BoundSocketId::Connection(self)) {
             IdMapCollectionEntry::Vacant(_) => panic!("invalid ConnectionId: not found"),
             IdMapCollectionEntry::Occupied(o) => o,
         }
@@ -2129,7 +2129,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
     }
 
     fn reuseaddr(&mut self, id: SocketId<I>) -> bool {
-        get_reuseaddr(self, id.into())
+        get_reuseaddr(self, id)
     }
 
     fn on_icmp_error(
@@ -2321,7 +2321,7 @@ fn set_reuseaddr_maybe_listener<I: IpLayerIpExt, C: NonSyncContext, SC: SyncCont
         let Sockets { bound_state, port_alloc: _, inactive: _, socketmap } = sockets;
         let bound_state = id.get_from_bound_state_mut(bound_state).expect("invalid listener ID");
         let (_, old_sharing @ ListenerSharingState { listening, sharing }, addr) = &bound_state;
-        let entry = socketmap.listeners_mut().entry(&id.into(), addr).expect("invalid socket ID");
+        let entry = socketmap.listeners_mut().entry(&id, addr).expect("invalid socket ID");
         assert_eq!(listener, *listening);
         let new_sharing = match reuse {
             true => SharingState::ReuseAddress,
@@ -2461,7 +2461,7 @@ fn set_buffer_size<
 ) {
     sync_ctx.with_tcp_sockets_mut(|sockets| {
         let Sockets { bound_state, port_alloc: _, inactive, socketmap: _ } = sockets;
-        let get_listener = match id.into() {
+        let get_listener = match id {
             SocketId::Unbound(id) => {
                 let Unbound { bound_device: _, buffer_sizes, socket_options: _, sharing: _ } =
                     inactive.get_mut(id.into()).expect("invalid unbound ID");
@@ -2516,7 +2516,7 @@ fn get_buffer_size<
     sync_ctx.with_tcp_sockets(|sockets| {
         let Sockets { bound_state, port_alloc: _, inactive, socketmap: _ } = sockets;
         let sizes = (|| {
-            let listener = match id.into() {
+            let listener = match id {
                 SocketId::Unbound(id) => {
                     let Unbound { bound_device: _, buffer_sizes, socket_options: _, sharing: _ } =
                         inactive.get(id.into()).expect("invalid unbound ID");
@@ -4549,7 +4549,7 @@ mod tests {
             );
             assert_eq!(
                 local_ip,
-                AddrAndZone::new(client_ip.get(), FakeWeakDeviceId(FakeDeviceId)).unwrap().into()
+                AddrAndZone::new(client_ip.get(), FakeWeakDeviceId(FakeDeviceId)).unwrap()
             );
             assert_eq!(remote_ip, server_ip);
 
@@ -4642,7 +4642,7 @@ mod tests {
             );
             assert_eq!(
                 local_ip,
-                AddrAndZone::new(server_ip.get(), FakeWeakDeviceId(FakeDeviceId)).unwrap().into()
+                AddrAndZone::new(server_ip.get(), FakeWeakDeviceId(FakeDeviceId)).unwrap()
             );
             assert_eq!(remote_ip, client_ip);
 

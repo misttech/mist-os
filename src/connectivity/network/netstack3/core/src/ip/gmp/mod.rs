@@ -238,7 +238,6 @@ impl<A: IpAddress, T> MulticastGroupSet<A, T> {
             let (state, actions) = GmpStateMachine::join_group(rng, now, gmp_disabled);
             (T::from(state), actions)
         })
-        .into()
     }
 
     fn leave_group(&mut self, group: MulticastAddr<A>) -> GroupLeaveResult<T> {
@@ -258,7 +257,7 @@ impl<A: IpAddress, T> MulticastGroupSet<A, T> {
     where
         T: Into<GmpStateMachine<I, P>>,
     {
-        self.leave_group(group).map(|state| state.into().leave_group()).into()
+        self.leave_group(group).map(|state| state.into().leave_group())
     }
 
     /// Does the set contain the given group?

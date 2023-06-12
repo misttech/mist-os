@@ -1117,10 +1117,10 @@ mod tests {
         let mut net = crate::context::testutil::new_legacy_simple_fake_network(
             "alice",
             alice_ctx,
-            alice_device_ids[0].clone().into(),
+            alice_device_ids[0].clone(),
             "bob",
             bob_ctx,
-            bob_device_ids[0].clone().into(),
+            bob_device_ids[0].clone(),
         );
         core::mem::drop((alice_device_ids, bob_device_ids));
 
@@ -1168,10 +1168,10 @@ mod tests {
         let mut net = crate::context::testutil::new_legacy_simple_fake_network(
             1,
             ctx_1,
-            device_ids_1[0].clone().into(),
+            device_ids_1[0].clone(),
             2,
             ctx_2,
-            device_ids_2[0].clone().into(),
+            device_ids_2[0].clone(),
         );
         core::mem::drop((device_ids_1, device_ids_2));
 
@@ -1244,10 +1244,10 @@ mod tests {
         let mut net = crate::context::testutil::new_legacy_simple_fake_network(
             1,
             ctx_1,
-            device_ids_1[0].clone().into(),
+            device_ids_1[0].clone(),
             2,
             ctx_2,
-            device_ids_2[0].clone().into(),
+            device_ids_2[0].clone(),
         );
         core::mem::drop((device_ids_1, device_ids_2));
 

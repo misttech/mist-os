@@ -1028,7 +1028,7 @@ mod tests {
         // Test receiving NDP RA where source IP is not a link local address
         // (should not receive).
 
-        let icmpv6_packet_buf = router_advertisement_message(src_ip.into(), config.local_ip.get());
+        let icmpv6_packet_buf = router_advertisement_message(src_ip, config.local_ip.get());
         receive_ip_packet::<_, _, Ipv6>(
             &sync_ctx,
             &mut non_sync_ctx,
@@ -1291,7 +1291,7 @@ mod tests {
         let time = non_sync_ctx.now();
         assert_eq!(
             non_sync_ctx.trigger_next_timer(sync_ctx, crate::handle_timer).unwrap(),
-            rs_timer_id(eth_device_id.clone()).into()
+            rs_timer_id(eth_device_id.clone())
         );
         // Initial router solicitation should be a random delay between 0 and
         // `MAX_RTR_SOLICITATION_DELAY`.
@@ -1310,7 +1310,7 @@ mod tests {
         let time = non_sync_ctx.now();
         assert_eq!(
             non_sync_ctx.trigger_next_timer(sync_ctx, crate::handle_timer).unwrap(),
-            rs_timer_id(eth_device_id.clone()).into()
+            rs_timer_id(eth_device_id.clone())
         );
         assert_eq!(non_sync_ctx.now().duration_since(time), RTR_SOLICITATION_INTERVAL);
         let (src_mac, _, src_ip, _, _, message, code) =
@@ -1335,7 +1335,7 @@ mod tests {
         let time = non_sync_ctx.now();
         assert_eq!(
             non_sync_ctx.trigger_next_timer(sync_ctx, crate::handle_timer).unwrap(),
-            rs_timer_id(eth_device_id.clone()).into()
+            rs_timer_id(eth_device_id.clone())
         );
         assert_eq!(non_sync_ctx.now().duration_since(time), RTR_SOLICITATION_INTERVAL);
         let (src_mac, _, src_ip, _, _, message, code) =
@@ -1390,7 +1390,7 @@ mod tests {
         let time = non_sync_ctx.now();
         assert_eq!(
             non_sync_ctx.trigger_next_timer(sync_ctx, crate::handle_timer).unwrap(),
-            rs_timer_id(eth_device_id.clone()).into()
+            rs_timer_id(eth_device_id.clone())
         );
         // Initial router solicitation should be a random delay between 0 and
         // `MAX_RTR_SOLICITATION_DELAY`.
@@ -1401,7 +1401,7 @@ mod tests {
         let time = non_sync_ctx.now();
         assert_eq!(
             non_sync_ctx.trigger_next_timer(sync_ctx, crate::handle_timer).unwrap(),
-            rs_timer_id(eth_device_id).into()
+            rs_timer_id(eth_device_id)
         );
         assert_eq!(non_sync_ctx.now().duration_since(time), RTR_SOLICITATION_INTERVAL);
         assert_eq!(non_sync_ctx.frames_sent().len(), 2);
@@ -1465,7 +1465,7 @@ mod tests {
         )
         .unwrap();
         let timer_id: TimerId<_> =
-            rs_timer_id(device.clone().try_into().expect("expected ethernet ID")).into();
+            rs_timer_id(device.clone().try_into().expect("expected ethernet ID"));
 
         // Send the first router solicitation.
         assert_empty(non_sync_ctx.frames_sent());
@@ -2285,7 +2285,7 @@ mod tests {
         let expected_address_entry = GlobalIpv6Addr {
             addr_sub: expected_addr_sub,
             config: Ipv6AddrConfig::Slaac(SlaacConfig::Static {
-                valid_until: Lifetime::Finite(FakeInstant::from(valid_until)),
+                valid_until: Lifetime::Finite(valid_until),
             }),
             flags: Ipv6AddressFlags { deprecated: false, assigned: false },
         };
@@ -2904,7 +2904,6 @@ mod tests {
         // generate an address. In the loop below, each generated address is
         // detected as a duplicate.
         let attempted_addresses: Vec<_> = (0..=idgen_retries)
-            .into_iter()
             .map(|_| {
                 // An address should be selected. This must be checked using DAD
                 // against other hosts on the network.
@@ -3592,7 +3591,7 @@ mod tests {
         let expected_address_entry = GlobalIpv6Addr {
             addr_sub: AddrSubnet::new(expected_addr.get(), prefix_length).unwrap(),
             config: Ipv6AddrConfig::Slaac(SlaacConfig::Static {
-                valid_until: Lifetime::Finite(FakeInstant::from(valid_until)),
+                valid_until: Lifetime::Finite(valid_until),
             }),
             flags: Ipv6AddressFlags { deprecated: false, assigned: true },
         };

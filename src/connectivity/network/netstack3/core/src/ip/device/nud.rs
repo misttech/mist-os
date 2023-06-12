@@ -806,10 +806,8 @@ mod tests {
         // which requires resolution. This should cause all frames to be queued
         // pending resolution completion.
         const MAX_PENDING_FRAMES_U8: u8 = MAX_PENDING_FRAMES as u8;
-        let expected_pending_frames = (0..MAX_PENDING_FRAMES_U8)
-            .into_iter()
-            .map(|i| Buf::new(vec![i], ..))
-            .collect::<VecDeque<_>>();
+        let expected_pending_frames =
+            (0..MAX_PENDING_FRAMES_U8).map(|i| Buf::new(vec![i], ..)).collect::<VecDeque<_>>();
 
         for body in expected_pending_frames.iter() {
             assert_eq!(

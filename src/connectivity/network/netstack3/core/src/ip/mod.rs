@@ -3661,7 +3661,7 @@ mod tests {
         );
         assert_eq!(
             non_sync_ctx.trigger_next_timer(sync_ctx, crate::handle_timer).unwrap(),
-            IpLayerTimerId::from(key.into()).into(),
+            IpLayerTimerId::from(key).into(),
         );
 
         // Make sure no other timers exist.
@@ -3700,10 +3700,10 @@ mod tests {
         let mut net = crate::context::testutil::new_legacy_simple_fake_network(
             a,
             alice,
-            alice_device_ids[0].clone().into(),
+            alice_device_ids[0].clone(),
             b,
             bob,
-            bob_device_ids[0].clone().into(),
+            bob_device_ids[0].clone(),
         );
         // Make sure the (strongly referenced) device IDs are dropped before
         // `net`.
@@ -5098,7 +5098,7 @@ mod tests {
         assert_eq!(
             take_ip_layer_events::<I>(&mut non_sync_ctx, None)[..],
             [IpLayerEvent::RouteAdded(types::Entry {
-                subnet: I::FAKE_CONFIG.subnet.into(),
+                subnet: I::FAKE_CONFIG.subnet,
                 device: weak_device_id.clone(),
                 gateway: None,
                 metric
@@ -5116,7 +5116,7 @@ mod tests {
                 AddableEntry::with_gateway(
                     gateway_subnet,
                     None,
-                    I::FAKE_CONFIG.remote_ip.into(),
+                    I::FAKE_CONFIG.remote_ip,
                     addable_metric
                 )
                 .into()
@@ -5128,7 +5128,7 @@ mod tests {
             [IpLayerEvent::RouteAdded(types::Entry {
                 subnet: gateway_subnet,
                 device: weak_device_id.clone(),
-                gateway: Some(I::FAKE_CONFIG.remote_ip.into()),
+                gateway: Some(I::FAKE_CONFIG.remote_ip),
                 metric
             })]
         );
@@ -5138,7 +5138,7 @@ mod tests {
             [IpLayerEvent::RouteRemoved(types::Entry {
                 subnet: gateway_subnet,
                 device: weak_device_id.clone(),
-                gateway: Some(I::FAKE_CONFIG.remote_ip.into()),
+                gateway: Some(I::FAKE_CONFIG.remote_ip),
                 metric
             })]
         );
@@ -5155,7 +5155,7 @@ mod tests {
                 })),
             )[..],
             [IpLayerEvent::RouteRemoved(types::Entry {
-                subnet: I::FAKE_CONFIG.subnet.into(),
+                subnet: I::FAKE_CONFIG.subnet,
                 device: weak_device_id,
                 gateway: None,
                 metric

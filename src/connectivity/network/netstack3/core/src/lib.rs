@@ -8,7 +8,7 @@
 // In case we roll the toolchain and something we're using as a feature has been
 // stabilized.
 #![allow(stable_features)]
-#![deny(missing_docs, unreachable_patterns)]
+#![deny(missing_docs, unreachable_patterns, clippy::useless_conversion)]
 // Turn off checks for dead code, but only when building for benchmarking.
 // benchmarking. This allows the benchmarks to be written as part of the crate,
 // with access to test utilities, without a bunch of build errors due to unused
@@ -595,7 +595,7 @@ mod tests {
 
         let ip: SpecifiedAddr<IpAddr> = SpecifiedAddr::new(ip.into()).unwrap();
         // Del IP (ok).
-        let () = del_ip_addr(&sync_ctx, &mut non_sync_ctx, &device, ip.into()).unwrap();
+        let () = del_ip_addr(&sync_ctx, &mut non_sync_ctx, &device, ip).unwrap();
         assert_eq!(
             get_all_ip_addr_subnets(&sync_ctx, &device).into_iter().find(|&a| a == addr_subnet),
             None
@@ -603,7 +603,7 @@ mod tests {
 
         // Del IP again (not found).
         assert_eq!(
-            del_ip_addr(&sync_ctx, &mut non_sync_ctx, &device, ip.into()).unwrap_err(),
+            del_ip_addr(&sync_ctx, &mut non_sync_ctx, &device, ip).unwrap_err(),
             error::NotFoundError
         );
         assert_eq!(
@@ -695,7 +695,7 @@ mod tests {
                 AddableEntryEither::from(AddableEntry::with_gateway(
                     gateway_subnet,
                     gateway_device.clone(),
-                    I::FAKE_CONFIG.remote_ip.into(),
+                    I::FAKE_CONFIG.remote_ip,
                     AddableMetric::ExplicitMetric(RawMetric(0))
                 ))
             ),
@@ -713,7 +713,7 @@ mod tests {
                 &sync_ctx,
                 &mut non_sync_ctx,
                 AddableEntryEither::from(AddableEntry::without_gateway(
-                    I::FAKE_CONFIG.subnet.into(),
+                    I::FAKE_CONFIG.subnet,
                     device_id.clone(),
                     AddableMetric::ExplicitMetric(RawMetric(0))
                 ))
@@ -731,7 +731,7 @@ mod tests {
                 AddableEntryEither::from(AddableEntry::with_gateway(
                     gateway_subnet,
                     gateway_device,
-                    I::FAKE_CONFIG.remote_ip.into(),
+                    I::FAKE_CONFIG.remote_ip,
                     AddableMetric::ExplicitMetric(RawMetric(0))
                 ))
             ),
@@ -758,7 +758,7 @@ mod tests {
                 &sync_ctx,
                 &mut non_sync_ctx,
                 AddableEntryEither::from(AddableEntry::without_gateway(
-                    I::FAKE_CONFIG.subnet.into(),
+                    I::FAKE_CONFIG.subnet,
                     device_id.clone().into(),
                     AddableMetric::MetricTracksInterface
                 ))

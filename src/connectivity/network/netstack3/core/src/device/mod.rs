@@ -425,9 +425,11 @@ impl<'s, C: NonSyncContext> Iterator for DevicesIter<'s, C> {
         let Self { ethernet, loopback } = self;
         ethernet
             .map(|(id, state)| EthernetDeviceId(id, PrimaryRc::clone_strong(state)).into())
-            .chain(loopback.map(|state| {
-                DeviceId::Loopback(LoopbackDeviceId(PrimaryRc::clone_strong(state))).into()
-            }))
+            .chain(
+                loopback.map(|state| {
+                    DeviceId::Loopback(LoopbackDeviceId(PrimaryRc::clone_strong(state)))
+                }),
+            )
             .next()
     }
 }
@@ -533,9 +535,10 @@ impl<
     fn loopback_id(&mut self) -> Option<Self::DeviceId> {
         let mut locked = self.cast_with(|s| &s.state.device);
         let devices = &*locked.read_lock::<crate::lock_ordering::DeviceLayerState>();
-        devices.loopback.as_ref().map(|state| {
-            DeviceId::Loopback(LoopbackDeviceId(PrimaryRc::clone_strong(state))).into()
-        })
+        devices
+            .loopback
+            .as_ref()
+            .map(|state| DeviceId::Loopback(LoopbackDeviceId(PrimaryRc::clone_strong(state))))
     }
 }
 
@@ -948,9 +951,10 @@ impl<
     fn loopback_id(&mut self) -> Option<Self::DeviceId> {
         let mut locked = self.cast_with(|s| &s.state.device);
         let devices = &*locked.read_lock::<crate::lock_ordering::DeviceLayerState>();
-        devices.loopback.as_ref().map(|state| {
-            DeviceId::Loopback(LoopbackDeviceId(PrimaryRc::clone_strong(state))).into()
-        })
+        devices
+            .loopback
+            .as_ref()
+            .map(|state| DeviceId::Loopback(LoopbackDeviceId(PrimaryRc::clone_strong(state))))
     }
 }
 
@@ -1797,7 +1801,7 @@ impl<C: DeviceLayerTypes + socket::NonSyncContext<DeviceId<C>>> DeviceLayerState
         let strong_ptr = PrimaryRc::clone_strong(&ptr);
         let id = ethernet.push(ptr);
         debug!("adding Ethernet device with ID {} and MTU {:?}", id, max_frame_size);
-        EthernetDeviceId(id, strong_ptr).into()
+        EthernetDeviceId(id, strong_ptr)
     }
 
     /// Adds a new loopback device to the device layer.

@@ -614,7 +614,6 @@ mod tests {
                 assert_eq!(
                     core::mem::take(&mut sync_ctx.get_mut().transmitted_packets),
                     (i..i + MAX_BATCH_SIZE)
-                        .into_iter()
                         .map(|i| Buf::new(vec![i as u8], ..))
                         .collect::<Vec<_>>()
                 );
@@ -637,7 +636,6 @@ mod tests {
             assert_eq!(
                 core::mem::take(&mut sync_ctx.get_mut().transmitted_packets),
                 (MAX_BATCH_SIZE * (MAX_TX_QUEUED_LEN / MAX_BATCH_SIZE - 1)..MAX_TX_QUEUED_LEN)
-                    .into_iter()
                     .map(|i| Buf::new(vec![i as u8], ..))
                     .collect::<Vec<_>>()
             );
