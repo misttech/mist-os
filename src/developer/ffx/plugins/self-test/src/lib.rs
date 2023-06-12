@@ -47,7 +47,6 @@ pub async fn selftest(cmd: SelftestCommand) -> Result<()> {
         daemon::test_config_flag,
         daemon::test_stop,
         daemon::test_no_autostart,
-        daemon::test_isolate_cleanup,
         target::test_get_ssh_address_timeout,
         target::test_manual_add_get_ssh_address,
         target::test_manual_add_get_ssh_address_late_add,
