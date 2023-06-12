@@ -35,8 +35,11 @@
 
 #ifndef _E1000_API_H_
 #define _E1000_API_H_
+#include <zircon/compiler.h>
 
 #include "e1000_hw.h"
+
+__BEGIN_CDECLS
 
 extern void e1000_init_function_pointers_82542(struct e1000_hw *hw);
 extern void e1000_init_function_pointers_82543(struct e1000_hw *hw);
@@ -165,4 +168,7 @@ u32  e1000_translate_register_82542(u32 reg);
 
 #define E1000_MAX(a, b) ((a) > (b) ? (a) : (b))
 #define E1000_DIVIDE_ROUND_UP(a, b)	(((a) + (b) - 1) / (b)) /* ceil(a/b) */
+
+__END_CDECLS
+
 #endif /* _E1000_API_H_ */

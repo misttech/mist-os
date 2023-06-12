@@ -35,6 +35,9 @@
 
 #ifndef _E1000_ICH8LAN_H_
 #define _E1000_ICH8LAN_H_
+#include <zircon/compiler.h>
+
+__BEGIN_CDECLS
 
 #define ICH_FLASH_GFPREG		0x0000
 #define ICH_FLASH_HSFSTS		0x0004
@@ -341,4 +344,7 @@ s32 e1000_write_emi_reg_locked(struct e1000_hw *hw, u16 addr, u16 data);
 s32 e1000_set_eee_pchlan(struct e1000_hw *hw);
 s32 e1000_enable_ulp_lpt_lp(struct e1000_hw *hw, bool to_sx);
 s32 e1000_disable_ulp_lpt_lp(struct e1000_hw *hw, bool force);
+
+__END_CDECLS
+
 #endif /* _E1000_ICH8LAN_H_ */

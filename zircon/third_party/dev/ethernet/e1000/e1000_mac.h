@@ -35,6 +35,9 @@
 
 #ifndef _E1000_MAC_H_
 #define _E1000_MAC_H_
+#include <zircon/compiler.h>
+
+__BEGIN_CDECLS
 
 void e1000_init_mac_ops_generic(struct e1000_hw *hw);
 #define E1000_REMOVED(a) (0)
@@ -95,5 +98,7 @@ s32  e1000_get_hw_semaphore(struct e1000_hw *hw);
 void e1000_put_hw_semaphore(struct e1000_hw *hw);
 s32 e1000_acquire_swfw_sync(struct e1000_hw *hw, u16 mask);
 void e1000_release_swfw_sync(struct e1000_hw *hw, u16 mask);
+
+__END_CDECLS
 
 #endif
