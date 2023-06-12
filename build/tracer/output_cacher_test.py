@@ -371,9 +371,10 @@ class RunTwiceCompareTests(unittest.TestCase):
                                        return_value=True) as mock_exists:
                     with mock.patch.object(shutil, "copy2") as mock_copy:
                         with mock.patch.object(os, "makedirs") as mock_mkdir:
-                            self.assertEqual(
-                                action.run_twice_and_compare_outputs(transform),
-                                1)
+                            with mock.patch.object(time, "sleep") as mock_zzz:
+                                self.assertEqual(
+                                    action.run_twice_and_compare_outputs(
+                                        transform), 1)
         mock_call.assert_called_once_with(["run.sh"])
         mock_match.assert_not_called()
         mock_exists.assert_not_called()
@@ -394,9 +395,11 @@ class RunTwiceCompareTests(unittest.TestCase):
                         with mock.patch.object(os, "makedirs") as mock_mkdir:
                             with mock.patch.object(shutil,
                                                    "copy2") as mock_copy:
-                                self.assertEqual(
-                                    action.run_twice_and_compare_outputs(
-                                        transform), 0)
+                                with mock.patch.object(time,
+                                                       "sleep") as mock_zzz:
+                                    self.assertEqual(
+                                        action.run_twice_and_compare_outputs(
+                                            transform), 0)
         mock_call.assert_has_calls(
             [
                 mock.call(["run.sh", "in.put", "out.put"]),
@@ -424,9 +427,11 @@ class RunTwiceCompareTests(unittest.TestCase):
                         with mock.patch.object(os, "makedirs") as mock_mkdir:
                             with mock.patch.object(shutil,
                                                    "copy2") as mock_copy:
-                                self.assertEqual(
-                                    action.run_twice_and_compare_outputs(
-                                        transform), 1)
+                                with mock.patch.object(time,
+                                                       "sleep") as mock_zzz:
+                                    self.assertEqual(
+                                        action.run_twice_and_compare_outputs(
+                                            transform), 1)
         mock_call.assert_has_calls(
             [
                 mock.call(["run.sh", "in.put", "out.put"]),
@@ -440,7 +445,7 @@ class RunTwiceCompareTests(unittest.TestCase):
         mock_copy.assert_called_once_with(
             "out.put", "out.put.tmp", follow_symlinks=False)
 
-    def test_command_passed_and_some_outptus_differ(self):
+    def test_command_passed_and_some_outputs_differ(self):
 
         def fake_match(file1: str, file2: str) -> bool:
             if file1 == "out.put":
@@ -465,9 +470,11 @@ class RunTwiceCompareTests(unittest.TestCase):
                         with mock.patch.object(os, "makedirs") as mock_mkdir:
                             with mock.patch.object(shutil,
                                                    "copy2") as mock_copy:
-                                self.assertEqual(
-                                    action.run_twice_and_compare_outputs(
-                                        transform), 1)
+                                with mock.patch.object(time,
+                                                       "sleep") as mock_zzz:
+                                    self.assertEqual(
+                                        action.run_twice_and_compare_outputs(
+                                            transform), 1)
         mock_call.assert_has_calls(
             [
                 mock.call(["run.sh", "in.put", "out.put", "out2.put"]),

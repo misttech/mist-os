@@ -39,8 +39,12 @@ import sys
 import time
 from typing import Any, Callable, Collection, Dict, Iterable, Sequence, Tuple
 import dataclasses
+# TODO: migrate to pathlib.Path
 
 _SCRIPT_BASENAME = os.path.basename(__file__)
+_SCRIPT_DIR = os.path.dirname(__file__)
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(_SCRIPT_DIR))
+_DETAIL_DIFF_SCRIPT = 'build/rbe/detail-diff.sh'
 
 
 def _partition(
@@ -92,6 +96,16 @@ def ensure_file_exists(path):
 
     raise FileNotFoundError(
         f"[{_SCRIPT_BASENAME}] *** Expected output file not found: {path}")
+
+
+def detail_diff(left: str, right: str):
+    """Richer difference analysis."""
+    subprocess.call(
+        [
+            os.path.join(_PROJECT_ROOT, _DETAIL_DIFF_SCRIPT),
+            left,
+            right,
+        ])
 
 
 def retry_file_op_once_with_delay(
@@ -369,6 +383,10 @@ class Action(object):
             # preserve metadata such as timestamp
             shutil.copy2(out, backup, follow_symlinks=False)
 
+        # Delaying re-run by 1s greatly increases the chances of catching
+        # textual clock time differences, like __TIME__ in C-preprocessing.
+        time.sleep(1)
+
         rerun_retval = subprocess.call(self.command)
         if rerun_retval != 0:
             print(
@@ -376,7 +394,8 @@ class Action(object):
             )
             return rerun_retval
 
-        return verify_files_match(fileset=renamed_outputs, label=self.label)
+        return verify_files_match(
+            fileset=renamed_outputs, label=self.label, renamed=False)
 
     def run_twice_with_substitution_and_compare_outputs(
             self,
@@ -423,10 +442,12 @@ class Action(object):
             )
             return rerun_retval
 
-        return verify_files_match(fileset=renamed_outputs, label=self.label)
+        return verify_files_match(
+            fileset=renamed_outputs, label=self.label, renamed=True)
 
 
-def verify_files_match(fileset: Dict[str, str], label: str) -> int:
+def verify_files_match(
+        fileset: Dict[str, str], label: str, renamed: bool) -> int:
     """Compare outputs and report differences.
 
     Remove matching copies.
@@ -450,11 +471,21 @@ def verify_files_match(fileset: Dict[str, str], label: str) -> int:
         os.remove(temp_out)
 
     if different_files:
+        label_text = ""
+        if label:
+            label_text = " for target [{label}]"
+
+        renamed_text = ""
+        if renamed:
+            renamed_text = " with renamed outputs"
+
         print(
-            f"Repeating command for target [{label}] with renamed outputs produces different results:"
+            f"Repeating command{label_text}{renamed_text} produces different results:"
         )
+
         for orig, temp in different_files:
             print(f"  {orig} vs. {temp}")
+            detail_diff(orig, temp)
 
         # Keep around different outputs for analysis.
 

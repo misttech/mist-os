@@ -144,6 +144,7 @@ class CxxRemoteActionTests(unittest.TestCase):
         compiler = Path('clang++')
         source = Path('hello.S')
         output = Path('hello.o')
+        exec_root = Path('/exec/root')
         command = _strs(
             [
                 compiler, '--target=riscv64-apple-darwin21', '-c', source, '-o',
@@ -152,6 +153,8 @@ class CxxRemoteActionTests(unittest.TestCase):
         c = cxx_remote_wrapper.CxxRemoteAction(
             ['--'] + command,
             auto_reproxy=False,
+            exec_root=exec_root,
+            working_dir=exec_root / 'work',
         )
         self.assertTrue(c.local_only)
         with mock.patch.object(cxx_remote_wrapper,
@@ -160,12 +163,13 @@ class CxxRemoteActionTests(unittest.TestCase):
                                    return_value=0) as mock_call:
                 exit_code = c.run()
         self.assertEqual(exit_code, 0)
-        mock_call.assert_called_with(command)  # ran locally
+        mock_call.assert_called_with(command, cwd=c.working_dir)  # ran locally
 
     def test_objc_local_only(self):
         compiler = Path('clang++')
         source = Path('hello.mm')
         output = Path('hello.o')
+        exec_root = Path('/exec/root')
         command = _strs(
             [
                 compiler, '--target=riscv64-apple-darwin21', '-c', source, '-o',
@@ -174,6 +178,8 @@ class CxxRemoteActionTests(unittest.TestCase):
         c = cxx_remote_wrapper.CxxRemoteAction(
             ['--'] + command,
             auto_reproxy=False,
+            exec_root=exec_root,
+            working_dir=exec_root / 'work',
         )
         self.assertTrue(c.local_only)
         with mock.patch.object(cxx_remote_wrapper,
@@ -182,7 +188,7 @@ class CxxRemoteActionTests(unittest.TestCase):
                                    return_value=0) as mock_call:
                 exit_code = c.run()
         self.assertEqual(exit_code, 0)
-        mock_call.assert_called_with(command)  # ran locally
+        mock_call.assert_called_with(command, cwd=c.working_dir)  # ran locally
 
     def test_remote_action_paths(self):
         fake_root = Path('/home/project')
