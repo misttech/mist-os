@@ -129,13 +129,13 @@ void PrettyTypeManager::AddDefaultCppPrettyTypes() {
 
   // std::string_view. Like std::string, we encode variants for both "__2" and not for the nested
   // template type names.
-  PrettyHeapString pretty_string_view("__data", "__size",
-                                      GetterList{{"back", "__data[__size - 1]"},
-                                                 {"data", "__data"},
-                                                 {"front", "*__data"},
-                                                 {"size", "__size"},
-                                                 {"length", "__size"},
-                                                 {"empty", "__size == 0"}});
+  PrettyHeapString pretty_string_view("__data_", "__size_",
+                                      GetterList{{"back", "__data_[__size_ - 1]"},
+                                                 {"data", "__data_"},
+                                                 {"front", "*__data_"},
+                                                 {"size", "__size_"},
+                                                 {"length", "__size_"},
+                                                 {"empty", "__size_ == 0"}});
   cpp_.emplace_back(InternalGlob("std::__2::basic_string_view<char, std::char_traits<char> >"),
                     std::make_unique<PrettyHeapString>(pretty_string_view));
   cpp_.emplace_back(InternalGlob("std::__2::basic_string_view<char, std::__2::char_traits<char> >"),
