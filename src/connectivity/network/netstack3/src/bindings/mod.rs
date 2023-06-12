@@ -27,6 +27,7 @@ mod util;
 mod verifier_worker;
 
 use std::{
+    borrow::Cow,
     collections::HashMap,
     convert::TryFrom as _,
     ffi::CStr,
@@ -47,8 +48,8 @@ use fuchsia_async as fasync;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_zircon as zx;
 use futures::{
-    channel::mpsc, lock::Mutex as AsyncMutex, FutureExt as _, SinkExt as _, StreamExt as _,
-    TryStreamExt as _,
+    channel::mpsc, future::BoxFuture, lock::Mutex as AsyncMutex, FutureExt as _, SinkExt as _,
+    StreamExt as _, TryStreamExt as _,
 };
 use packet::{Buf, BufferMut};
 use rand::{rngs::OsRng, CryptoRng, RngCore};
@@ -64,7 +65,10 @@ use timers::TimerDispatcher;
 
 use net_declare::net_subnet_v4;
 use net_types::{
-    ip::{AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Mtu, Subnet},
+    ip::{
+        AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, IpVersion, Ipv4, Ipv4Addr, Ipv6, Mtu,
+        Subnet,
+    },
     SpecifiedAddr,
 };
 use netstack3_core::{
@@ -72,7 +76,7 @@ use netstack3_core::{
     context::{
         CounterContext, EventContext, InstantContext, RngContext, TimerContext, TracingContext,
     },
-    data_structures::id_map::IdMap,
+    data_structures::id_map::{EntryKey, IdMap},
     device::{
         loopback::LoopbackDeviceId, update_ipv4_configuration, update_ipv6_configuration, DeviceId,
         DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError, EthernetDeviceId,
@@ -91,6 +95,7 @@ use netstack3_core::{
         IpExt,
     },
     sync::Mutex as CoreMutex,
+    transport::tcp,
     transport::udp,
     NonSyncContext, SyncCtx, TimerId,
 };
@@ -900,6 +905,96 @@ impl Netstack {
             self.spawn_interface_control(binding_id, stop_receiver, control_receiver, removable);
         (stop_sender, binding_id, task)
     }
+
+    fn socket_info_getter(
+        &self,
+    ) -> impl Fn() -> BoxFuture<'static, Result<fuchsia_inspect::Inspector, anyhow::Error>>
+           + Clone
+           + Sync
+           + Send
+           + 'static {
+        /// Convert a [`tcp::socket::SocketId`] into a unique integer.
+        ///
+        /// Guarantees that no two unique `SocketId`s (even for different IP
+        /// versions) will have have the same output value.
+        fn transform_id<I: Ip>(id: tcp::socket::SocketId<I>) -> usize {
+            let (index, variant) = match id {
+                tcp::socket::SocketId::Unbound(id) => (id.get_key_index(), 0),
+                tcp::socket::SocketId::Bound(id) => (id.get_key_index(), 1),
+                tcp::socket::SocketId::Listener(id) => (id.get_key_index(), 2),
+                tcp::socket::SocketId::Connection(id) => (id.get_key_index(), 3),
+            };
+
+            let unique_for_ip_version = index * 4 + variant;
+            2 * unique_for_ip_version
+                + match I::VERSION {
+                    IpVersion::V4 => 0,
+                    IpVersion::V6 => 1,
+                }
+        }
+
+        struct Visitor(fuchsia_inspect::Inspector);
+        impl tcp::socket::InfoVisitor for &'_ mut Visitor {
+            type VisitResult = ();
+            fn visit<I: Ip>(
+                self,
+                per_socket: impl Iterator<Item = tcp::socket::SocketStats<I>>,
+            ) -> Self::VisitResult {
+                let Visitor(inspector) = self;
+                for socket in per_socket {
+                    let tcp::socket::SocketStats { id, local, remote } = socket;
+                    inspector.root().record_child(format!("{}", transform_id(id)), |node| {
+                        node.record_string("TransportProtocol", "TCP");
+                        node.record_string(
+                            "NetworkProtocol",
+                            match I::VERSION {
+                                IpVersion::V4 => "IPv4",
+                                IpVersion::V6 => "IPv6",
+                            },
+                        );
+                        fn format_addr_port<'a, A: IpAddress, S: Deref<Target = A>>(
+                            (addr, port): (S, NonZeroU16),
+                        ) -> Cow<'a, str> {
+                            Cow::Owned(format!("{}:{}", *addr, port))
+                        }
+                        node.record_string(
+                            "LocalAddress",
+                            local.map_or("[NOT BOUND]".into(), |(addr, port)| {
+                                format_addr_port((
+                                    &addr.map_or(I::UNSPECIFIED_ADDRESS, |a| *a),
+                                    port,
+                                ))
+                            }),
+                        );
+                        node.record_string(
+                            "RemoteAddress",
+                            remote.map_or("[NOT CONNECTED]".into(), format_addr_port),
+                        )
+                    })
+                }
+            }
+        }
+        let ctx = self.ctx.clone();
+        move || {
+            let mut ctx = ctx.clone();
+            Box::pin(async move {
+                #[derive(thiserror::Error, Debug)]
+                #[error("Netstack is not running")]
+                struct NetstackNotRunningError;
+
+                let Ctx { sync_ctx, non_sync_ctx: _ } = &mut ctx;
+
+                let mut visitor = Visitor(fuchsia_inspect::Inspector::new(
+                    fuchsia_inspect::InspectorConfig::default(),
+                ));
+                tcp::socket::with_info::<Ipv4, _, _>(sync_ctx, &mut visitor);
+                tcp::socket::with_info::<Ipv6, _, _>(sync_ctx, &mut visitor);
+
+                let Visitor(inspector) = visitor;
+                Ok(inspector)
+            })
+        }
+    }
 }
 
 enum Service {
@@ -986,6 +1081,11 @@ impl NetstackSeed {
             .add_fidl_service(Service::InterfacesAdmin)
             .add_fidl_service(Service::Filter)
             .add_fidl_service(Service::Verifier);
+
+        let inspector = fuchsia_inspect::component::inspector();
+        inspect_runtime::serve(inspector, &mut fs).expect("failed to serve inspect");
+        let _socket_info =
+            inspector.root().create_lazy_child("Socket Info", netstack.socket_info_getter());
 
         let services = fs.take_and_serve_directory_handle().context("directory handle")?;
 

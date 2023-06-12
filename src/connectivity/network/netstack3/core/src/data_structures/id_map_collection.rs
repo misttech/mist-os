@@ -346,6 +346,12 @@ impl<K: IdMapCollectionKey, T> IdMapCollection<K, T> {
         }
     }
 
+    /// Creates an iterator over the maps in variant order.
+    pub fn iter_maps(&self) -> impl Iterator<Item = &IdMap<T>> {
+        let Self { data, count: _, _marker } = self;
+        data.iter()
+    }
+
     /// Gets the given key's corresponding entry in the map for in-place
     /// manipulation.
     pub fn entry(&mut self, key: K) -> Entry<'_, K, T> {

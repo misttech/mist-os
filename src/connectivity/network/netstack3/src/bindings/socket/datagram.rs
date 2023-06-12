@@ -2766,7 +2766,7 @@ mod tests {
         const SENT_PACKETS: u8 = 10;
         for i in 0..SENT_PACKETS {
             let buf = [i; MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE];
-            let sent = socket
+            let sent: usize = socket
                 .send_msg(
                     Some(&addr),
                     &buf,
@@ -2775,14 +2775,17 @@ mod tests {
                 )
                 .await
                 .unwrap()
-                .expect("send_msg should succeed");
-            assert_eq!(sent, MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE.try_into().unwrap());
+                .expect("send_msg should succeed")
+                .try_into()
+                .unwrap();
+            assert_eq!(sent, MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE);
         }
 
         // Wait for all packets to be delivered before changing the buffer size.
         let stack = t.get(0);
-        let has_all_delivered =
-            |messages: &MessageQueue<_>| messages.available_messages().len() == SENT_PACKETS.into();
+        let has_all_delivered = |messages: &MessageQueue<_>| {
+            messages.available_messages().len() == usize::from(SENT_PACKETS)
+        };
         loop {
             let all_delivered =
                 stack.with_ctx(|Ctx { sync_ctx: _, non_sync_ctx }| {
@@ -2829,11 +2832,14 @@ mod tests {
         })
         .enumerate()
         .map(|(i, data)| {
-            assert_eq!(&data, &[i.try_into().unwrap(); MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE])
+            assert_eq!(
+                &data,
+                &[u8::try_from(i).unwrap(); MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE]
+            )
         })
         .count()
         .await;
-        assert_eq!(rx_count, SENT_PACKETS.into());
+        assert_eq!(rx_count, usize::from(SENT_PACKETS));
     }
 
     declare_tests!(
@@ -2853,17 +2859,20 @@ mod tests {
 
         const DATA: &[u8] = &[1, 2, 3, 4, 5];
         assert_eq!(
-            proxy
-                .send_msg(
-                    None,
-                    DATA,
-                    &fposix_socket::DatagramSocketSendControlData::default(),
-                    fposix_socket::SendMsgFlags::empty()
-                )
-                .await
-                .unwrap()
-                .expect("send_msg should succeed"),
-            DATA.len().try_into().unwrap()
+            usize::try_from(
+                proxy
+                    .send_msg(
+                        None,
+                        DATA,
+                        &fposix_socket::DatagramSocketSendControlData::default(),
+                        fposix_socket::SendMsgFlags::empty()
+                    )
+                    .await
+                    .unwrap()
+                    .expect("send_msg should succeed"),
+            )
+            .unwrap(),
+            DATA.len()
         );
 
         // First try receiving the message with PEEK set.
@@ -2943,17 +2952,20 @@ mod tests {
             .expect("bind succeeds");
 
         assert_eq!(
-            proxy
-                .send_msg(
-                    Some(&A::create(mcast_addr, PORT)),
-                    DATA,
-                    &fposix_socket::DatagramSocketSendControlData::default(),
-                    fposix_socket::SendMsgFlags::empty()
-                )
-                .await
-                .unwrap()
-                .expect("send_msg should succeed"),
-            DATA.len().try_into().unwrap()
+            usize::try_from(
+                proxy
+                    .send_msg(
+                        Some(&A::create(mcast_addr, PORT)),
+                        DATA,
+                        &fposix_socket::DatagramSocketSendControlData::default(),
+                        fposix_socket::SendMsgFlags::empty()
+                    )
+                    .await
+                    .unwrap()
+                    .expect("send_msg should succeed"),
+            )
+            .unwrap(),
+            DATA.len()
         );
 
         let _signals = event

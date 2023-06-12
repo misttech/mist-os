@@ -9,10 +9,6 @@
 // It does not include capabilities that are common between Netstack2 and
 // Netstack3.
 {
-    include: [
-        "inspect/client.shard.cml",
-        "syslog/client.shard.cml",
-    ],
     program: {
         runner: "elf",
     },

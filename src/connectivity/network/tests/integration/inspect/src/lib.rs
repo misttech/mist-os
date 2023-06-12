@@ -1442,6 +1442,34 @@ async fn inspect_socket_stats<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+async fn inspect_ns3_socket_stats(name: &str) {
+    type N = netstack_testing_common::realms::Netstack3;
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
+
+    let _tcp_socket = realm
+        .stream_socket(fposix_socket::Domain::Ipv4, fposix_socket::StreamSocketProtocol::Tcp)
+        .await
+        .expect("create TCP socket");
+
+    let data = get_inspect_data(&realm, "netstack", "root", "fuchsia.inspect.Tree")
+        .await
+        .expect("Socket Info inspect data should be present");
+    // Debug print the tree to make debugging easier in case of failures.
+    println!("Got inspect data: {:#?}", data);
+    fuchsia_inspect::assert_data_tree!(data, "root": contains {
+        "Socket Info": {
+            "0": {
+                LocalAddress: "[NOT BOUND]",
+                RemoteAddress: "[NOT CONNECTED]",
+                TransportProtocol: "TCP",
+                NetworkProtocol: "IPv4"
+            }
+        }
+    })
+}
+
+#[netstack_test]
 async fn inspect_for_sampler<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");

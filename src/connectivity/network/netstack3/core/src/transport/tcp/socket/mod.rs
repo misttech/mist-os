@@ -35,8 +35,8 @@ use assert_matches::assert_matches;
 use derivative::Derivative;
 use net_types::{
     ip::{
-        GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersion, IpVersionMarker, Ipv4,
-        Ipv4Addr, Ipv6, Ipv6Addr,
+        GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6,
+        Ipv6Addr,
     },
     AddrAndZone, SpecifiedAddr, ZonedAddr,
 };
@@ -54,7 +54,7 @@ use crate::{
     data_structures::{
         id_map::{self, Entry as IdMapEntry, EntryKey, IdMap},
         id_map_collection::{
-            Entry as IdMapCollectionEntry, IdMapCollection, IdMapCollectionKey,
+            Entry as IdMapCollectionEntry, IdMapCollection,
             OccupiedEntry as IdMapCollectionOccupied,
         },
         socketmap::{IterShadows as _, SocketMap, Tagged},
@@ -986,21 +986,6 @@ pub struct MaybeClosedConnectionId<I: Ip>(usize, IpVersionMarker<I>);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, GenericOverIp)]
 pub struct ConnectionId<I: Ip>(usize, IpVersionMarker<I>);
 
-impl<I: Ip> IdMapCollectionKey for ListenerId<I> {
-    const VARIANT_COUNT: NonZeroUsize = nonzero!(2usize);
-
-    fn get_variant(&self) -> usize {
-        match I::VERSION {
-            IpVersion::V4 => 0,
-            IpVersion::V6 => 1,
-        }
-    }
-
-    fn get_id(&self) -> usize {
-        (*self).into()
-    }
-}
-
 impl<I: IpExt> BoundId<I> {
     fn get_from_bound_state<D: WeakId, C: NonSyncContext>(
         self,
@@ -1372,6 +1357,7 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>:
     );
 
     fn get_connection_error(&mut self, conn_id: ConnectionId<I>) -> Option<ConnectionError>;
+    fn with_info<V: InfoVisitor>(&mut self, cb: V) -> V::VisitResult;
 }
 
 impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for SC {
@@ -2236,6 +2222,56 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                 hard_error.or_else(|| conn.soft_error.take())
             },
         )
+    }
+
+    fn with_info<V: InfoVisitor>(&mut self, visitor: V) -> V::VisitResult {
+        self.with_tcp_sockets(|sockets| {
+            let Sockets { port_alloc: _, inactive, socketmap: _, bound_state } = sockets;
+            let inactive = inactive.iter().map(|(index, _unbound)| SocketStats::<I> {
+                id: UnboundId(index, IpVersionMarker::default()).into(),
+                local: None,
+                remote: None,
+            });
+            let bound = bound_state.iter_maps().flat_map(|map| {
+                map.iter().filter_map(|(index, state)| match state {
+                    BoundSocketState::Listener((state, _sharing, addr)) => {
+                        let id = match state {
+                            MaybeListener::Bound(_) => {
+                                BoundId(index, IpVersionMarker::default()).into()
+                            }
+                            MaybeListener::Listener(_) => {
+                                ListenerId(index, IpVersionMarker::default()).into()
+                            }
+                        };
+                        let ListenerAddr { ip: ListenerIpAddr { identifier, addr }, device: _ } =
+                            *addr;
+                        Some(SocketStats { id, local: Some((addr, identifier)), remote: None })
+                    }
+                    BoundSocketState::Connected((state, _sharing, addr)) => {
+                        let Connection {
+                            acceptor: _,
+                            state: _,
+                            ip_sock: _,
+                            defunct,
+                            socket_options: _,
+                            soft_error: _,
+                        } = state;
+                        (!defunct).then(|| {
+                            let ConnAddr {
+                                ip: ConnIpAddr { local: (local_ip, local_port), remote },
+                                device: _,
+                            } = *addr;
+                            let id = ConnectionId(index, IpVersionMarker::default()).into();
+                            let local = Some((Some(local_ip), local_port));
+                            let remote = Some(remote);
+                            SocketStats { id, local, remote }
+                        })
+                    }
+                })
+            });
+
+            visitor.visit(inactive.chain(bound))
+        })
     }
 }
 
@@ -3105,6 +3141,45 @@ where
     )
 }
 
+/// Statistics about an individual socket.
+pub struct SocketStats<I: Ip> {
+    /// Identifier for the socket.
+    pub id: SocketId<I>,
+    /// The local address of the socket.
+    pub local: Option<(Option<SpecifiedAddr<I::Addr>>, NonZeroU16)>,
+    /// The remote address of the socket.
+    pub remote: Option<(SpecifiedAddr<I::Addr>, NonZeroU16)>,
+}
+
+/// Visitor for socket state.
+pub trait InfoVisitor {
+    /// The result of [`InfoVisitor::visit`].
+    type VisitResult;
+
+    /// Consumes `self` and a socket state iterator to produce a `VisitResult`.
+    fn visit<I: Ip>(self, stats: impl Iterator<Item = SocketStats<I>>) -> Self::VisitResult;
+}
+
+/// Provides access to shared and per-socket TCP stats via a visitor.
+pub fn with_info<I, C, V>(sync_ctx: &SyncCtx<C>, cb: V) -> V::VisitResult
+where
+    I: IpExt,
+    C: crate::NonSyncContext,
+    V: InfoVisitor,
+{
+    let mut sync_ctx = Locked::new(sync_ctx);
+    let IpInvariant(r) = I::map_ip(
+        IpInvariant((&mut sync_ctx, cb)),
+        |IpInvariant((sync_ctx, cb))| {
+            IpInvariant(SocketHandler::<Ipv4, _>::with_info(sync_ctx, cb))
+        },
+        |IpInvariant((sync_ctx, cb))| {
+            IpInvariant(SocketHandler::<Ipv6, _>::with_info(sync_ctx, cb))
+        },
+    );
+    r
+}
+
 /// Information about an unbound socket.
 #[derive(Clone, Debug, Eq, PartialEq, GenericOverIp)]
 pub struct UnboundInfo<D> {
@@ -3462,6 +3537,34 @@ impl<I: Ip> Into<usize> for ConnectionId<I> {
     fn into(self) -> usize {
         let Self(x, _marker) = self;
         x
+    }
+}
+
+impl<I: Ip> EntryKey for UnboundId<I> {
+    fn get_key_index(&self) -> usize {
+        let Self(x, _marker) = self;
+        *x
+    }
+}
+
+impl<I: Ip> EntryKey for BoundId<I> {
+    fn get_key_index(&self) -> usize {
+        let Self(x, _marker) = self;
+        *x
+    }
+}
+
+impl<I: Ip> EntryKey for ListenerId<I> {
+    fn get_key_index(&self) -> usize {
+        let Self(x, _marker) = self;
+        *x
+    }
+}
+
+impl<I: Ip> EntryKey for ConnectionId<I> {
+    fn get_key_index(&self) -> usize {
+        let Self(x, _marker) = self;
+        *x
     }
 }
 

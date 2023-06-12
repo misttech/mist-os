@@ -4,7 +4,6 @@
 {
     include: [
         "//src/connectivity/network/meta/netstack-common.shard.cml",
-        "syslog/client.shard.cml",
         "trace/client.shard.cml",
     ],
     program: {

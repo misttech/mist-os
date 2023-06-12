@@ -27,6 +27,8 @@ common_deps = [
   "//src/lib/async-utils",
   "//src/lib/const-unwrap",
   "//src/lib/cstr",
+  "//src/lib/diagnostics/inspect/runtime/rust",
+  "//src/lib/diagnostics/inspect/rust",
   "//src/lib/fidl/rust/fidl",
   "//src/lib/fuchsia",
   "//src/lib/fuchsia-async",

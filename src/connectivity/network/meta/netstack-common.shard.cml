@@ -5,6 +5,10 @@
 // Common capabilities for Netstack2 and Netstack3. Protocols that are exposed
 // by the system netstack should be listed here.
 {
+    include: [
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
     capabilities: [
         {
             protocol: [
