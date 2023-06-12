@@ -64,8 +64,9 @@ class Nvme : public DeviceType {
   void DdkRelease();
 
   // Perform an admin command synchronously (i.e., blocks for the command to complete or timeout).
-  zx_status_t DoAdminCommandSync(Submission& submission,
-                                 std::optional<zx::unowned_vmo> admin_data = std::nullopt);
+  // Returns the command completion.
+  zx::result<Completion> DoAdminCommandSync(
+      Submission& submission, std::optional<zx::unowned_vmo> admin_data = std::nullopt);
 
   // Queue an IO command to be performed asynchronously.
   void QueueIoCommand(IoCommand* io_cmd);
@@ -109,8 +110,6 @@ class Nvme : public DeviceType {
   // Admin submission and completion queues.
   std::unique_ptr<QueuePair> admin_queue_;
   fbl::Mutex admin_lock_;  // Used to serialize admin transactions.
-  sync_completion_t admin_signal_;
-  Completion admin_result_;
 
   // IO submission and completion queues.
   std::unique_ptr<QueuePair> io_queue_;

@@ -60,13 +60,6 @@ int Nvme::IrqLoop() {
       InterruptReg::MaskSet().FromValue(1).WriteTo(&mmio_);
     }
 
-    Completion* admin_completion;
-    if (admin_queue_->CheckForNewCompletion(&admin_completion) != ZX_ERR_SHOULD_WAIT) {
-      admin_result_ = *admin_completion;
-      sync_completion_signal(&admin_signal_);
-      admin_queue_->RingCompletionDb();
-    }
-
     sync_completion_signal(&io_signal_);
 
     if (irq_mode_ != fuchsia_hardware_pci::InterruptMode::kMsiX) {
@@ -85,41 +78,61 @@ int Nvme::IrqLoop() {
   return thrd_success;
 }
 
-zx_status_t Nvme::DoAdminCommandSync(Submission& submission,
-                                     std::optional<zx::unowned_vmo> admin_data) {
+zx::result<Completion> Nvme::DoAdminCommandSync(Submission& submission,
+                                                std::optional<zx::unowned_vmo> admin_data) {
   zx_status_t status;
   fbl::AutoLock lock(&admin_lock_);
-  sync_completion_reset(&admin_signal_);
 
   uint64_t data_size = 0;
   if (admin_data.has_value()) {
     status = admin_data.value()->get_size(&data_size);
     if (status != ZX_OK) {
       zxlogf(ERROR, "Failed to get size of vmo: %s", zx_status_get_string(status));
-      return status;
+      return zx::error(status);
     }
   }
   status = admin_queue_->Submit(submission, admin_data, 0, data_size, nullptr);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to submit admin command: %s", zx_status_get_string(status));
-    return status;
+    return zx::error(status);
   }
 
-  status = sync_completion_wait(&admin_signal_, ZX_SEC(10));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Timed out waiting for admin command: %s", zx_status_get_string(status));
-    return status;
-  }
+  zx::duration total_wait = zx::msec(0);
+  while (true) {
+    Completion* completion;
+    status = admin_queue_->CheckForNewCompletion(&completion);
+    if (status == ZX_ERR_SHOULD_WAIT) {
+      if (total_wait >= zx::sec(10)) {  // Wait for up to 10 seconds for an admin command.
+        zxlogf(ERROR, "Timed out waiting for admin command: %s", zx_status_get_string(status));
+        return zx::error(status);
+      }
 
-  if (admin_result_.status_code_type() == StatusCodeType::kGeneric &&
-      admin_result_.status_code() == 0) {
-    zxlogf(TRACE, "Completed admin command OK.");
-  } else {
-    zxlogf(ERROR, "Completed admin command ERROR: status type=%01x, status=%02x",
-           admin_result_.status_code_type(), admin_result_.status_code());
-    return ZX_ERR_IO;
+      // Wait and check for command completion again.
+      const zx::duration incremental_wait = zx::msec(1);
+      zx::nanosleep(zx::deadline_after(incremental_wait));
+      total_wait += incremental_wait;
+      continue;
+    }
+
+    auto ring_completion_doorbell = fit::defer([&] { admin_queue_->RingCompletionDb(); });
+
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to check completion of admin command: %s",
+             zx_status_get_string(status));
+      return zx::error(status);
+    }
+
+    if (completion->status_code_type() == StatusCodeType::kGeneric &&
+        completion->status_code() == 0) {
+      zxlogf(TRACE, "Completed admin command OK.");
+    } else {
+      zxlogf(ERROR, "Completed admin command ERROR: status type=%01x, status=%02x",
+             completion->status_code_type(), completion->status_code());
+      return zx::error(ZX_ERR_IO);
+    }
+
+    return zx::ok(*completion);
   }
-  return ZX_OK;
 }
 
 void Nvme::ProcessIoSubmissions() {
@@ -270,7 +283,7 @@ static zx_status_t WaitForReset(bool desired_ready_state, fdf::MmioBuffer* mmio)
       zxlogf(ERROR, "Timed out waiting for controller ready state %u: ", desired_ready_state);
       return ZX_ERR_TIMED_OUT;
     }
-    zx_nanosleep(zx_deadline_after(ZX_MSEC(1)));
+    zx::nanosleep(zx::deadline_after(zx::msec(1)));
   }
   zxlogf(DEBUG, "Controller reached ready state %u (took %u ms).", desired_ready_state,
          kResetWaitMs - ms_remaining);
@@ -528,10 +541,10 @@ zx_status_t Nvme::Init() {
 
   IdentifySubmission identify_controller;
   identify_controller.set_structure(IdentifySubmission::IdentifyCns::kIdentifyController);
-  status = DoAdminCommandSync(identify_controller, admin_data.borrow());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to identify controller: %s", zx_status_get_string(status));
-    return status;
+  zx::result<Completion> completion = DoAdminCommandSync(identify_controller, admin_data.borrow());
+  if (completion.is_error()) {
+    zxlogf(ERROR, "Failed to identify controller: %s", completion.status_string());
+    return completion.status_value();
   }
 
   auto identify = static_cast<IdentifyController*>(mapper.start());
@@ -560,14 +573,13 @@ zx_status_t Nvme::Init() {
   if (volatile_write_cache_present) {
     // Get 'Volatile Write Cache Enable' feature.
     GetVolatileWriteCacheSubmission get_vwc_enable;
-    status = DoAdminCommandSync(get_vwc_enable);
-    auto& completion = admin_result_.GetCompletion<GetVolatileWriteCacheCompletion>();
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to get 'Volatile Write Cache' feature: %s",
-             zx_status_get_string(status));
-      return status;
+    completion = DoAdminCommandSync(get_vwc_enable);
+    if (completion.is_error()) {
+      zxlogf(ERROR, "Failed to get 'Volatile Write Cache' feature: %s", completion.status_string());
+      return completion.status_value();
     } else {
-      volatile_write_cache_enabled_ = completion.get_volatile_write_cache_enabled();
+      const auto& vwc_completion = completion->GetCompletion<GetVolatileWriteCacheCompletion>();
+      volatile_write_cache_enabled_ = vwc_completion.get_volatile_write_cache_enabled();
       zxlogf(DEBUG, "Volatile write cache is %s",
              volatile_write_cache_enabled_ ? "enabled" : "disabled");
     }
@@ -580,18 +592,20 @@ zx_status_t Nvme::Init() {
   // Set feature (number of queues) to 1 IO submission queue and 1 IO completion queue.
   SetIoQueueCountSubmission set_queue_count;
   set_queue_count.set_num_submission_queues(1).set_num_completion_queues(1);
-  status = DoAdminCommandSync(set_queue_count);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to set feature (number of queues): %s", zx_status_get_string(status));
-    return status;
+  completion = DoAdminCommandSync(set_queue_count);
+  if (completion.is_error()) {
+    zxlogf(ERROR, "Failed to set feature (number of queues): %s", completion.status_string());
+    return completion.status_value();
   }
-  auto& completion = admin_result_.GetCompletion<SetIoQueueCountCompletion>();
-  if (completion.num_submission_queues() < 1) {
-    zxlogf(ERROR, "Unexpected IO submission queue count: %u", completion.num_submission_queues());
+  const auto& ioq_completion = completion->GetCompletion<SetIoQueueCountCompletion>();
+  if (ioq_completion.num_submission_queues() < 1) {
+    zxlogf(ERROR, "Unexpected IO submission queue count: %u",
+           ioq_completion.num_submission_queues());
     return ZX_ERR_IO;
   }
-  if (completion.num_completion_queues() < 1) {
-    zxlogf(ERROR, "Unexpected IO completion queue count: %u", completion.num_completion_queues());
+  if (ioq_completion.num_completion_queues() < 1) {
+    zxlogf(ERROR, "Unexpected IO completion queue count: %u",
+           ioq_completion.num_completion_queues());
     return ZX_ERR_IO;
   }
 
@@ -603,10 +617,10 @@ zx_status_t Nvme::Init() {
       .set_interrupt_en(true)
       .set_interrupt_vector(0);
   create_iocq.data_pointer[0] = io_queue_->completion().GetDeviceAddress();
-  status = DoAdminCommandSync(create_iocq);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to create IO completion queue: %s", zx_status_get_string(status));
-    return status;
+  completion = DoAdminCommandSync(create_iocq);
+  if (completion.is_error()) {
+    zxlogf(ERROR, "Failed to create IO completion queue: %s", completion.status_string());
+    return completion.status_value();
   }
 
   // Create IO submission queue.
@@ -616,19 +630,19 @@ zx_status_t Nvme::Init() {
       .set_completion_queue_id(io_queue_->completion().id())
       .set_contiguous(true);
   create_iosq.data_pointer[0] = io_queue_->submission().GetDeviceAddress();
-  status = DoAdminCommandSync(create_iosq);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to create IO submission queue: %s", zx_status_get_string(status));
-    return status;
+  completion = DoAdminCommandSync(create_iosq);
+  if (completion.is_error()) {
+    zxlogf(ERROR, "Failed to create IO submission queue: %s", completion.status_string());
+    return completion.status_value();
   }
 
   // Identify active namespaces.
   IdentifySubmission identify_ns_list;
   identify_ns_list.set_structure(IdentifySubmission::IdentifyCns::kActiveNamespaceList);
-  status = DoAdminCommandSync(identify_ns_list, admin_data.borrow());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to identify active namespace list: %s", zx_status_get_string(status));
-    return status;
+  completion = DoAdminCommandSync(identify_ns_list, admin_data.borrow());
+  if (completion.is_error()) {
+    zxlogf(ERROR, "Failed to identify active namespace list: %s", completion.status_string());
+    return completion.status_value();
   }
 
   // Bind active namespaces.

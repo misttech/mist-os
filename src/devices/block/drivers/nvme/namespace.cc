@@ -118,11 +118,11 @@ zx_status_t Namespace::Init() {
   IdentifySubmission identify_ns;
   identify_ns.namespace_id = namespace_id_;
   identify_ns.set_structure(IdentifySubmission::IdentifyCns::kIdentifyNamespace);
-  status = controller_->DoAdminCommandSync(identify_ns, admin_data.borrow());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to identify namespace %u: %s", namespace_id_,
-           zx_status_get_string(status));
-    return status;
+  zx::result<Completion> completion =
+      controller_->DoAdminCommandSync(identify_ns, admin_data.borrow());
+  if (completion.is_error()) {
+    zxlogf(ERROR, "Failed to identify namespace %u: %s", namespace_id_, completion.status_string());
+    return completion.status_value();
   }
 
   auto ns = static_cast<IdentifyNvmeNamespace*>(mapper.start());
