@@ -23,6 +23,11 @@
             from: "#netstack",
             to: "#dhcp-client",
         },
+        {
+            protocol: [ "fuchsia.posix.socket.Provider" ],
+            from: "#netstack",
+            to: [ "#dhcp-client" ],
+        },
     ],
     expose: [
         {
