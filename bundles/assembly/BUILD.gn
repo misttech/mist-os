@@ -548,9 +548,16 @@ assembly_input_bundle("common_minimal") {
     "//src/sys/activity",
 
     # Developer
-    "//src/developer/forensics:pkg",
     "//src/developer/memory/monitor",
   ]
+
+  # TODO(fxbug.dev/127655): Move package above once Crashpad supports RISC-V.
+  if (current_cpu != "riscv64") {
+    base_packages += [
+      # Developer
+      "//src/developer/forensics:pkg",
+    ]
+  }
 
   bootfs_files = [
     {
