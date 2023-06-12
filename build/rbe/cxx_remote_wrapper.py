@@ -157,6 +157,10 @@ class CxxRemoteAction(object):
                 "For remote compiling with clang, an explicit --target is required, but is missing."
             )
 
+        if self._main_args.fsatrace_path:
+            msg('Warning: Due to http://fxbug.dev/128947, remote fsatrace does not work with C++ mode as-is, because the fsatrace prefix confuses the re-client C++ input processor.  Automatically disabling --fsatrace-path.')
+            self._main_args.fsatrace_path = None
+
         # check for required remote tools
         missing_required_tools = list(
             check_missing_remote_tools(self.compiler_type, self.exec_root_rel))

@@ -110,10 +110,12 @@ template("clang_toolchain") {
         # Compare local vs. remote build.
         # Allow caching.
         # Use local concurrency.
+        # TODO(http://fxbug.dev/128947): enable file trace comparison
         compiler_prefix_list += [
           "--compare",
-          "--fsatrace-path",
-          rebase_path("//prebuilt/fsatrace/fsatrace", root_build_dir),
+
+          # "--fsatrace-path",
+          # rebase_path("//prebuilt/fsatrace/fsatrace", root_build_dir),
           "--exec_strategy=remote",
         ]
         _cxx_concurrent_jobs = concurrent_jobs.local
