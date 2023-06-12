@@ -13,7 +13,7 @@ use futures::{
 };
 use net_types::{ethernet::Mac, SpecifiedAddr, Witness as _};
 use rand::Rng as _;
-use std::{net::Ipv4Addr, num::NonZeroU32, time::Duration};
+use std::{fmt::Debug, net::Ipv4Addr, num::NonZeroU32, time::Duration};
 
 /// Unexpected, non-recoverable errors encountered by the DHCP client.
 #[derive(thiserror::Error, Debug)]
@@ -50,6 +50,9 @@ pub enum State<I> {
     /// The Renewing state (we actively have a lease that we are trying to
     /// renew by unicasting requests to our known DHCP server).
     Renewing(Renewing<I>),
+    /// The Rebinding state (we actively have a lease that we are trying to
+    /// renew by broadcasting requests to any DHCP server).
+    Rebinding(Rebinding<I>),
     /// Waiting to restart the configuration process (via transitioning to Init).
     WaitingToRestart(WaitingToRestart<I>),
 }
@@ -65,7 +68,13 @@ pub enum Step<I> {
 /// A state-transition to execute.
 pub struct Transition<I> {
     next_state: State<I>,
-    new_lease: Option<NewlyAcquiredLease<I>>,
+    lease_change: Option<LeaseChange<I>>,
+}
+
+#[derive(Debug)]
+enum LeaseChange<I> {
+    NewLease(NewlyAcquiredLease<I>),
+    RenewedLease(LeaseRenewal<I>),
 }
 
 /// A side-effect of a state transition.
@@ -76,8 +85,8 @@ pub enum TransitionEffect<I> {
     DropLease,
     /// Handle a newly-acquired lease.
     HandleNewLease(NewlyAcquiredLease<I>),
-    /// No effects need to be performed.
-    None,
+    /// Handle a renewed lease.
+    HandleRenewedLease(LeaseRenewal<I>),
 }
 
 /// Outcome of handling an address rejection.
@@ -101,6 +110,7 @@ impl<I: deps::Instant> State<I> {
         &self,
         config: &ClientConfig,
         packet_socket_provider: &impl deps::PacketSocketProvider,
+        udp_socket_provider: &impl deps::UdpSocketProvider,
         rng: &mut impl deps::RngProvider,
         clock: &C,
         stop_receiver: &mut mpsc::UnboundedReceiver<()>,
@@ -108,7 +118,7 @@ impl<I: deps::Instant> State<I> {
         match self {
             State::Init(init) => Ok(Step::NextState(Transition {
                 next_state: State::Selecting(init.do_init(rng, clock)),
-                new_lease: None,
+                lease_change: None,
             })),
             State::Selecting(selecting) => match selecting
                 .do_selecting(config, packet_socket_provider, rng, clock, stop_receiver)
@@ -117,7 +127,7 @@ impl<I: deps::Instant> State<I> {
                 SelectingOutcome::GracefulShutdown => Ok(Step::Exit(ExitReason::GracefulShutdown)),
                 SelectingOutcome::Requesting(requesting) => Ok(Step::NextState(Transition {
                     next_state: State::Requesting(requesting),
-                    new_lease: None,
+                    lease_change: None,
                 })),
             },
             State::Requesting(requesting) => {
@@ -131,7 +141,7 @@ impl<I: deps::Instant> State<I> {
                         );
                         Ok(Step::NextState(Transition {
                             next_state: State::Init(Init::default()),
-                            new_lease: None,
+                            lease_change: None,
                         }))
                     }
                     RequestingOutcome::GracefulShutdown => {
@@ -148,12 +158,12 @@ impl<I: deps::Instant> State<I> {
                             start_time,
                         } = &bound;
                         Ok(Step::NextState(Transition {
-                            new_lease: Some(NewlyAcquiredLease {
+                            lease_change: Some(LeaseChange::NewLease(NewlyAcquiredLease {
                                 ip_address: *yiaddr,
                                 start_time: *start_time,
                                 lease_time: *ip_address_lease_time,
                                 parameters,
-                            }),
+                            })),
                             next_state: State::Bound(bound),
                         }))
                     }
@@ -164,29 +174,123 @@ impl<I: deps::Instant> State<I> {
                         tracing::warn!("Returning to Init due to DHCPNAK: {:?}", nak);
                         Ok(Step::NextState(Transition {
                             next_state: State::Init(Init::default()),
-                            new_lease: None,
+                            lease_change: None,
                         }))
                     }
                 }
             }
-            State::Bound(bound) => {
-                let _: &Bound<_> = bound;
-                Ok(match bound.do_bound(clock, stop_receiver).await {
-                    BoundOutcome::GracefulShutdown => Step::Exit(ExitReason::GracefulShutdown),
-                    BoundOutcome::Renewing(renewing) => Step::NextState(Transition {
-                        next_state: State::Renewing(renewing),
-                        new_lease: None,
-                    }),
-                })
-            }
+            State::Bound(bound) => Ok(match bound.do_bound(clock, stop_receiver).await {
+                BoundOutcome::GracefulShutdown => Step::Exit(ExitReason::GracefulShutdown),
+                BoundOutcome::Renewing(renewing) => Step::NextState(Transition {
+                    next_state: State::Renewing(renewing),
+                    lease_change: None,
+                }),
+            }),
             State::Renewing(renewing) => {
-                let _: &Renewing<_> = renewing;
-                // TODO(https://fxbug.dev/125443): Implement Renewing state.
+                match renewing
+                    .do_renewing(config, udp_socket_provider, clock, stop_receiver)
+                    .await?
+                {
+                    RenewingOutcome::GracefulShutdown => {
+                        Ok(Step::Exit(ExitReason::GracefulShutdown))
+                    }
+                    RenewingOutcome::Renewed(bound, parameters) => {
+                        let Bound {
+                            discover_options: _,
+                            yiaddr: _,
+                            server_identifier: _,
+                            ip_address_lease_time,
+                            renewal_time: _,
+                            rebinding_time: _,
+                            start_time,
+                        } = &bound;
+                        Ok(Step::NextState(Transition {
+                            lease_change: Some(LeaseChange::RenewedLease(LeaseRenewal {
+                                start_time: *start_time,
+                                lease_time: *ip_address_lease_time,
+                                parameters,
+                            })),
+                            next_state: State::Bound(bound),
+                        }))
+                    }
+                    RenewingOutcome::NewAddress(bound, parameters) => {
+                        let Bound {
+                            discover_options: _,
+                            yiaddr,
+                            server_identifier: _,
+                            ip_address_lease_time,
+                            renewal_time: _,
+                            rebinding_time: _,
+                            start_time,
+                        } = &bound;
+                        Ok(Step::NextState(Transition {
+                            lease_change: Some(LeaseChange::NewLease(NewlyAcquiredLease {
+                                ip_address: *yiaddr,
+                                start_time: *start_time,
+                                lease_time: *ip_address_lease_time,
+                                parameters,
+                            })),
+                            next_state: State::Bound(bound),
+                        }))
+                    }
+                    RenewingOutcome::Rebinding(rebinding) => Ok(Step::NextState(Transition {
+                        lease_change: None,
+                        next_state: State::Rebinding(rebinding),
+                    })),
+                    RenewingOutcome::Nak(nak) => {
+                        // Per RFC 2131 section 3.1: "If the client receives a
+                        // DHCPNAK message, the client restarts the
+                        // configuration process."
+
+                        let Renewing {
+                            bound:
+                                Bound {
+                                    discover_options: _,
+                                    yiaddr,
+                                    server_identifier: _,
+                                    ip_address_lease_time: _,
+                                    start_time: _,
+                                    renewal_time: _,
+                                    rebinding_time: _,
+                                },
+                        } = renewing;
+                        tracing::warn!(
+                            "Dropping lease on {} and returning to Init due to DHCPNAK: {:?}",
+                            yiaddr,
+                            nak
+                        );
+                        Ok(Step::NextState(Transition {
+                            next_state: State::Init(Init::default()),
+                            lease_change: None,
+                        }))
+                    }
+                }
+            }
+            State::Rebinding(rebinding) => {
+                let Rebinding {
+                    bound:
+                        Bound {
+                            discover_options: _,
+                            yiaddr,
+                            server_identifier: _,
+                            ip_address_lease_time: _,
+                            start_time: _,
+                            renewal_time: _,
+                            rebinding_time: _,
+                        },
+                } = rebinding;
+                // TODO(https://fxbug.dev/127213): Implement Rebinding state.
                 // In order to unblock testing, rather than panicking here with
-                // a todo!, we instead just block until a shutdown request comes
-                // in.
-                stop_receiver.select_next_some().await;
-                Ok(Step::Exit(ExitReason::GracefulShutdown))
+                // a todo!, we instead transition to Init.
+                tracing::warn!(
+                    "TODO(https://fxbug.dev/127213): Implement Rebinding state. \
+                    Dropping lease on {} and transitioning to Init instead.",
+                    yiaddr
+                );
+                Ok(Step::NextState(Transition {
+                    next_state: State::Init(Init::default()),
+                    lease_change: None,
+                }))
             }
             State::WaitingToRestart(waiting_to_restart) => {
                 match waiting_to_restart.do_waiting_to_restart(clock, stop_receiver).await {
@@ -195,7 +299,7 @@ impl<I: deps::Instant> State<I> {
                     }
                     WaitingToRestartOutcome::Init(init) => Ok(Step::NextState(Transition {
                         next_state: State::Init(init),
-                        new_lease: None,
+                        lease_change: None,
                     })),
                 }
             }
@@ -221,7 +325,9 @@ impl<I: deps::Instant> State<I> {
                 );
                 Ok(AddressRejectionOutcome::ShouldBeImpossible)
             }
-            State::Bound(bound) | State::Renewing(Renewing { bound }) => {
+            State::Bound(bound)
+            | State::Renewing(Renewing { bound })
+            | State::Rebinding(Rebinding { bound }) => {
                 let Bound {
                     discover_options,
                     yiaddr,
@@ -281,6 +387,7 @@ impl<I: deps::Instant> State<I> {
             State::Requesting(_) => "Requesting",
             State::Bound(_) => "Bound",
             State::Renewing(_) => "Renewing",
+            State::Rebinding(_) => "Rebinding",
             State::WaitingToRestart(_) => "Waiting to Restart",
         }
     }
@@ -292,6 +399,7 @@ impl<I: deps::Instant> State<I> {
             State::Requesting(_) => false,
             State::Bound(_) => true,
             State::Renewing(_) => true,
+            State::Rebinding(_) => true,
             State::WaitingToRestart(_) => false,
         }
     }
@@ -300,16 +408,25 @@ impl<I: deps::Instant> State<I> {
     /// effects that need to be performed by bindings as a result of the transition.
     pub fn apply(
         &self,
-        Transition { next_state, new_lease }: Transition<I>,
-    ) -> (State<I>, TransitionEffect<I>) {
-        let effect = match new_lease {
-            Some(new_lease) => TransitionEffect::HandleNewLease(new_lease),
+        Transition { next_state, lease_change }: Transition<I>,
+    ) -> (State<I>, Option<TransitionEffect<I>>) {
+        tracing::info!("transitioning from {} to {}", self.state_name(), next_state.state_name());
+
+        let effect = match lease_change {
+            Some(lease_change) => match lease_change {
+                LeaseChange::NewLease(new_lease) => {
+                    Some(TransitionEffect::HandleNewLease(new_lease))
+                }
+                LeaseChange::RenewedLease(lease_renewal) => {
+                    Some(TransitionEffect::HandleRenewedLease(lease_renewal))
+                }
+            },
             None => match (self.has_lease(), next_state.has_lease()) {
-                (true, false) => TransitionEffect::DropLease,
+                (true, false) => Some(TransitionEffect::DropLease),
                 (false, true) => {
                     unreachable!("should already have decided on TransitionEffect::HandleNewLease")
                 }
-                (false, false) | (true, true) => TransitionEffect::None,
+                (false, false) | (true, true) => None,
             },
         };
         (next_state, effect)
@@ -435,20 +552,58 @@ fn build_decline(
     )
 }
 
-async fn send_with_retransmits<T: Clone + Send>(
+async fn send_with_retransmits<T: Clone + Send + Debug>(
     time: &impl deps::Clock,
-    retransmit_schedule: impl Iterator<Item = Duration>,
+    retransmit_schedule: impl IntoIterator<Item = Duration>,
     message: &[u8],
     socket: &impl deps::Socket<T>,
     dest: T,
 ) -> Result<(), Error> {
-    for wait_duration in std::iter::once(None).chain(retransmit_schedule.map(Some)) {
-        if let Some(wait_duration) = wait_duration {
-            time.wait_until(time.now().add(wait_duration)).await;
+    send_with_retransmits_at_instants(
+        time,
+        retransmit_schedule.into_iter().map(|duration| time.now().add(duration)),
+        message,
+        socket,
+        dest,
+    )
+    .await
+}
+
+async fn send_with_retransmits_at_instants<I: deps::Instant, T: Clone + Send + Debug>(
+    time: &impl deps::Clock<Instant = I>,
+    retransmit_schedule: impl IntoIterator<Item = I>,
+    message: &[u8],
+    socket: &impl deps::Socket<T>,
+    dest: T,
+) -> Result<(), Error> {
+    for wait_until in std::iter::once(None).chain(retransmit_schedule.into_iter().map(Some)) {
+        if let Some(wait_until) = wait_until {
+            time.wait_until(wait_until).await;
         }
-        // TODO(https://fxbug.dev/124593): better indicate recoverable
-        // vs. non-recoverable error types.
-        socket.send_to(message, dest.clone()).await.map_err(Error::Socket)?;
+        let result = socket.send_to(message, dest.clone()).await;
+        match result {
+            Ok(()) => (),
+            Err(e) => match e {
+                // We view these errors as non-recoverable, so we bubble them up
+                // to bindings:
+                deps::SocketError::FailedToOpen(_)
+                | deps::SocketError::NoInterface
+                | deps::SocketError::NetworkUnreachable
+                | deps::SocketError::UnsupportedHardwareType => return Err(Error::Socket(e)),
+                // We view EHOSTUNREACH as a recoverable error, as the desired
+                // destination could only be temporarily offline, and this does
+                // not necessarily indicate an issue with our own network stack.
+                // Log a warning and continue retransmitting.
+                deps::SocketError::HostUnreachable => {
+                    tracing::warn!("destination host unreachable: {:?}", dest);
+                }
+                // For errors that we don't recognize, default to logging an
+                // error and continuing to operate.
+                deps::SocketError::Other(_) => {
+                    tracing::error!("socket error while sending to {:?}: {:?}", dest, e);
+                }
+            },
+        }
     }
     Ok(())
 }
@@ -481,20 +636,47 @@ fn retransmit_schedule_during_acquisition(
 // of 1500 bytes.
 const BUFFER_SIZE: usize = 1500;
 
-fn recv_stream<'a, T, U: Send>(
+fn recv_stream<'a, T: 'a, U: Send>(
     socket: &'a impl deps::Socket<U>,
     recv_buf: &'a mut [u8],
     parser: impl Fn(&[u8], U) -> T + 'a,
 ) -> impl Stream<Item = Result<T, Error>> + 'a {
     futures::stream::try_unfold((recv_buf, parser), move |(recv_buf, parser)| async move {
-        // TODO(https://fxbug.dev/124593): better indicate recoverable
-        // vs. non-recoverable error types.
-        let DatagramInfo { length, address } =
-            socket.recv_from(recv_buf).await.map_err(Error::Socket)?;
+        let result = socket.recv_from(recv_buf).await;
+        let DatagramInfo { length, address } = match result {
+            Ok(datagram_info) => datagram_info,
+            Err(e) => match e {
+                // We view these errors as non-recoverable, so we bubble them up
+                // to bindings:
+                deps::SocketError::FailedToOpen(_)
+                | deps::SocketError::NoInterface
+                | deps::SocketError::NetworkUnreachable
+                | deps::SocketError::UnsupportedHardwareType => return Err(Error::Socket(e)),
+                // We view EHOSTUNREACH as a recoverable error, as the server
+                // we're communicating with could only be temporarily offline,
+                // and this does not indicate an issue with our own network
+                // stack. Log a warning and continue operating.
+                // (While it seems like this ought not to be relevant while
+                // receiving, there are instances where this could be observed,
+                // like when IP_RECVERR is set on the socket and link resolution
+                // fails, or as a result of an ICMP message.)
+                deps::SocketError::HostUnreachable => {
+                    tracing::warn!("EHOSTUNREACH from recv_from");
+                    return Ok(Some((None, (recv_buf, parser))));
+                }
+                // For errors that we don't recognize, default to logging an
+                // error and continuing to operate.
+                deps::SocketError::Other(_) => {
+                    tracing::error!("socket error while receiving: {:?}", e);
+                    return Ok(Some((None, (recv_buf, parser))));
+                }
+            },
+        };
         let raw_msg = &recv_buf[..length];
         let parsed = parser(raw_msg, address);
-        Ok(Some((parsed, (recv_buf, parser))))
+        Ok(Some((Some(parsed), (recv_buf, parser))))
     })
+    .try_filter_map(|item| futures::future::ok(item))
 }
 
 struct OutgoingOptions {
@@ -826,7 +1008,7 @@ impl<I: deps::Instant> Requesting<I> {
             validate_message(discover_options, client_config, &message)
                 .context("invalid DHCP message")?;
 
-            crate::parse::fields_to_retain_from_requesting(requested_parameters, message)
+            crate::parse::fields_to_retain_from_response_to_request(requested_parameters, message)
                 .context("error extracting needed fields from DHCP message during Requesting")
         })
         .try_filter_map(|parse_result| {
@@ -855,7 +1037,7 @@ impl<I: deps::Instant> Requesting<I> {
         };
 
         match fields_to_retain {
-            crate::parse::IncomingMessageDuringRequesting::Ack(ack) => {
+            crate::parse::IncomingResponseToRequest::Ack(ack) => {
                 let crate::parse::FieldsToRetainFromAck {
                     yiaddr,
                     server_identifier,
@@ -890,9 +1072,7 @@ impl<I: deps::Instant> Requesting<I> {
                     parameters,
                 ))
             }
-            crate::parse::IncomingMessageDuringRequesting::Nak(nak) => {
-                Ok(RequestingOutcome::Nak(nak))
-            }
+            crate::parse::IncomingResponseToRequest::Nak(nak) => Ok(RequestingOutcome::Nak(nak)),
         }
     }
 }
@@ -937,7 +1117,7 @@ fn build_request_during_address_acquisition(
 }
 
 /// A newly-acquired DHCP lease.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct NewlyAcquiredLease<I> {
     /// The IP address acquired.
     pub ip_address: SpecifiedAddr<net_types::ip::Ipv4Addr>,
@@ -990,6 +1170,13 @@ impl<I: deps::Instant> Bound<I> {
         // Per RFC 2131 section 4.4.5, "T1 defaults to (0.5 * duration_of_lease)".
         // (T1 is how the RFC refers to the time at which we transition to Renewing.)
         let renewal_time = renewal_time.unwrap_or(*ip_address_lease_time / 2);
+
+        tracing::debug!(
+            "In Bound state; ip_address_lease_time = {}, renewal_time = {}",
+            ip_address_lease_time.as_secs(),
+            renewal_time.as_secs(),
+        );
+
         let renewal_timeout_fut = time.wait_until(start_time.add(renewal_time)).fuse();
         pin_mut!(renewal_timeout_fut);
         select! {
@@ -999,11 +1186,214 @@ impl<I: deps::Instant> Bound<I> {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub(crate) enum RenewingOutcome<I> {
+    GracefulShutdown,
+    Renewed(Bound<I>, Vec<dhcp_protocol::DhcpOption>),
+    // It might be surprising to see that it's possible to yield a _new_ address
+    // while renewing, but per RFC 2131 section 4.4.5, "if the client is given a
+    // new network address, it MUST NOT continue using the previous network
+    // address and SHOULD notify the local users of the problem." This suggests
+    // that we should be prepared for a DHCP server to send us a different
+    // address from the one we asked for while renewing.
+    NewAddress(Bound<I>, Vec<dhcp_protocol::DhcpOption>),
+    Nak(crate::parse::FieldsToRetainFromNak),
+    Rebinding(Rebinding<I>),
+}
+
 /// The Renewing state as depicted in the state-transition diagram in [RFC 2131].
 ///
 /// [RFC 2131]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.4
 #[derive(Debug, PartialEq)]
 pub struct Renewing<I> {
+    bound: Bound<I>,
+}
+
+// Per RFC 2131 section 4.4.5: "In both RENEWING and REBINDING states,
+// if the client receives no response to its DHCPREQUEST message, the
+// client SHOULD wait one-half of the remaining time until T2 (in
+// RENEWING state) and one-half of the remaining lease time (in
+// REBINDING state), down to a minimum of 60 seconds, before
+// retransmitting the DHCPREQUEST message."
+const RENEW_RETRANSMIT_MINIMUM_DELAY: Duration = Duration::from_secs(60);
+
+impl<I: deps::Instant> Renewing<I> {
+    async fn do_renewing<C: deps::Clock<Instant = I>>(
+        &self,
+        client_config: &ClientConfig,
+        // TODO(https://fxbug.dev/124724): avoid dropping/recreating the packet
+        // socket unnecessarily by taking an `&impl
+        // deps::Socket<std::net::SocketAddr>` here instead.
+        udp_socket_provider: &impl deps::UdpSocketProvider,
+        time: &C,
+        stop_receiver: &mut mpsc::UnboundedReceiver<()>,
+    ) -> Result<RenewingOutcome<I>, Error> {
+        let renewal_start_time = time.now();
+
+        let Self {
+            bound:
+                bound @ Bound {
+                    discover_options,
+                    yiaddr,
+                    server_identifier,
+                    ip_address_lease_time,
+                    start_time,
+                    renewal_time: _,
+                    rebinding_time,
+                },
+        } = self;
+        let rebinding_time = rebinding_time.unwrap_or(*ip_address_lease_time / 8 * 7);
+        let socket = udp_socket_provider
+            .bind_new_udp_socket(std::net::SocketAddr::V4(std::net::SocketAddrV4::new(
+                yiaddr.get().into(),
+                CLIENT_PORT.get(),
+            )))
+            .await
+            .map_err(Error::Socket)?;
+
+        // Per the table in RFC 2131 section 4.4.1:
+        //
+        // 'ciaddr'                 client's network address (BOUND/RENEW/REBIND)
+        // Requested IP Address     MUST NOT (in BOUND or RENEWING)
+        // IP address lease time    MAY
+        // DHCP message type        DHCPREQUEST
+        // Server Identifier        MUST NOT (after INIT-REBOOT, BOUND, RENEWING or REBINDING)
+        // Parameter Request List   MAY
+        let message = build_outgoing_message(
+            client_config,
+            discover_options,
+            OutgoingOptions {
+                ciaddr: Some(*yiaddr),
+                requested_ip_address: None,
+                ip_address_lease_time_secs: client_config.preferred_lease_time_secs,
+                message_type: dhcp_protocol::MessageType::DHCPREQUEST,
+                server_identifier: None,
+                include_parameter_request_list: true,
+            },
+        );
+        let message_bytes = message.serialize();
+
+        let t2 = start_time.add(rebinding_time);
+        let server_sockaddr = std::net::SocketAddr::V4(std::net::SocketAddrV4::new(
+            server_identifier.get().into(),
+            SERVER_PORT.get(),
+        ));
+        let send_fut = send_with_retransmits_at_instants(
+            time,
+            std::iter::from_fn(|| {
+                let now = time.now();
+                let half_time_until_t2 = now.average(t2);
+                Some(half_time_until_t2.max(now.add(RENEW_RETRANSMIT_MINIMUM_DELAY)))
+            }),
+            message_bytes.as_ref(),
+            &socket,
+            server_sockaddr,
+        )
+        .fuse();
+
+        let mut recv_buf = [0u8; BUFFER_SIZE];
+        let responses_stream = recv_stream(&socket, &mut recv_buf, |packet, addr| {
+            if addr != server_sockaddr {
+                return Err(anyhow::Error::from(crate::parse::ParseError::WrongSource(addr)));
+            }
+            let message = dhcp_protocol::Message::from_buffer(packet)
+                .map_err(crate::parse::ParseError::Dhcp)
+                .context("error while parsing DHCP message from UDP datagram")?;
+            validate_message(discover_options, client_config, &message)
+                .context("invalid DHCP message")?;
+            crate::parse::fields_to_retain_from_response_to_request(
+                &client_config.requested_parameters,
+                message,
+            )
+            .context("error extracting needed fields from DHCP message during Renewing")
+        })
+        .try_filter_map(|parse_result| {
+            futures::future::ok(match parse_result {
+                Ok(msg) => Some(msg),
+                Err(error) => {
+                    tracing::warn!("discarding incoming packet: {:?}", error);
+                    None
+                }
+            })
+        })
+        .fuse();
+
+        let timeout_fut = time.wait_until(t2).fuse();
+        pin_mut!(send_fut, responses_stream, timeout_fut);
+
+        let response = select! {
+            () = timeout_fut => return Ok(RenewingOutcome::Rebinding(
+                    Rebinding { bound: bound.clone() }
+                )),
+            () = stop_receiver.select_next_some() => return Ok(RenewingOutcome::GracefulShutdown),
+            response = responses_stream.select_next_some() => {
+                response?
+            }
+            send_result = send_fut => {
+                return Err(send_result.expect_err("send_fut should never complete without error"))
+            }
+        };
+
+        match response {
+            crate::parse::IncomingResponseToRequest::Ack(ack) => {
+                let crate::parse::FieldsToRetainFromAck {
+                    yiaddr: new_yiaddr,
+                    server_identifier: _,
+                    ip_address_lease_time_secs,
+                    renewal_time_value_secs,
+                    rebinding_time_value_secs,
+                    parameters,
+                } = ack;
+                let variant = if new_yiaddr == *yiaddr {
+                    tracing::debug!("renewed with new lease time: {}", ip_address_lease_time_secs);
+                    RenewingOutcome::Renewed
+                } else {
+                    tracing::info!("obtained different address from renewal: {}", new_yiaddr);
+                    RenewingOutcome::NewAddress
+                };
+                Ok(variant(
+                    Bound {
+                        discover_options: discover_options.clone(),
+                        yiaddr: new_yiaddr,
+                        server_identifier: *server_identifier,
+                        ip_address_lease_time: Duration::from_secs(
+                            ip_address_lease_time_secs.get().into(),
+                        ),
+                        renewal_time: renewal_time_value_secs
+                            .map(u64::from)
+                            .map(Duration::from_secs),
+                        rebinding_time: rebinding_time_value_secs
+                            .map(u64::from)
+                            .map(Duration::from_secs),
+                        start_time: renewal_start_time,
+                    },
+                    parameters,
+                ))
+            }
+            crate::parse::IncomingResponseToRequest::Nak(nak) => Ok(RenewingOutcome::Nak(nak)),
+        }
+    }
+}
+
+/// A renewal of a DHCP lease.
+#[derive(Debug, PartialEq)]
+pub struct LeaseRenewal<I> {
+    /// The start time of the lease after renewal.
+    pub start_time: I,
+    /// The length of the lease after renewal.
+    pub lease_time: Duration,
+    /// Configuration parameters acquired from the server. Guaranteed to be a
+    /// subset of the parameters requested in the `parameter_request_list` in
+    /// `ClientConfig`.
+    pub parameters: Vec<dhcp_protocol::DhcpOption>,
+}
+
+/// The Rebinding state as depicted in the state-transition diagram in
+/// [RFC 2131].
+///
+/// [RFC 2131]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.4
+#[derive(Debug, PartialEq)]
+pub struct Rebinding<I> {
     bound: Bound<I>,
 }
 
@@ -1188,7 +1578,7 @@ mod test {
     }
 
     #[track_caller]
-    fn assert_outgoing_message(
+    fn assert_outgoing_message_when_not_assigned_address(
         got_message: &dhcp_protocol::Message,
         fields: VaryingOutgoingMessageFields,
     ) {
@@ -1266,7 +1656,7 @@ mod test {
                 )
                 .expect("received packet should parse as DHCP message");
 
-                assert_outgoing_message(
+                assert_outgoing_message_when_not_assigned_address(
                     &msg,
                     VaryingOutgoingMessageFields {
                         xid: msg.xid,
@@ -1417,7 +1807,7 @@ mod test {
             };
 
             let msg = parse_msg();
-            assert_outgoing_message(
+            assert_outgoing_message_when_not_assigned_address(
                 &parse_msg(),
                 VaryingOutgoingMessageFields {
                     xid: msg.xid,
@@ -1670,7 +2060,7 @@ mod test {
                 )
                 .expect("received packet should parse as DHCP message");
 
-                assert_outgoing_message(
+                assert_outgoing_message_when_not_assigned_address(
                     &msg,
                     VaryingOutgoingMessageFields {
                         xid: msg.xid,
@@ -1842,20 +2232,14 @@ mod test {
                 .expect("recv_from on test socket should succeed");
             assert_eq!(address, Mac::BROADCAST);
 
-            // `dhcp_protocol::Message` intentionally doesn't implement `Clone`,
-            // so we re-parse instead for testing purposes.
-            let parse_msg = || {
-                crate::parse::parse_dhcp_message_from_ip_packet(
-                    &recv_buf[..length],
-                    dhcp_protocol::SERVER_PORT,
-                )
-                .expect("received packet on test socket should parse as DHCP message")
-            };
+            let msg = crate::parse::parse_dhcp_message_from_ip_packet(
+                &recv_buf[..length],
+                dhcp_protocol::SERVER_PORT,
+            )
+            .expect("received packet on test socket should parse as DHCP message");
 
-            let msg = parse_msg();
-
-            assert_outgoing_message(
-                &parse_msg(),
+            assert_outgoing_message_when_not_assigned_address(
+                &msg,
                 VaryingOutgoingMessageFields {
                     xid: msg.xid,
                     options: vec![
@@ -1914,16 +2298,28 @@ mod test {
     }
 
     fn build_test_bound_state() -> Bound<std::time::Duration> {
+        build_test_bound_state_with_times(
+            Duration::from_secs(DEFAULT_LEASE_LENGTH_SECONDS.into()),
+            None,
+            None,
+        )
+    }
+
+    fn build_test_bound_state_with_times(
+        lease_length: Duration,
+        renewal_time: Option<Duration>,
+        rebinding_time: Option<Duration>,
+    ) -> Bound<std::time::Duration> {
         Bound {
             discover_options: TEST_DISCOVER_OPTIONS,
             yiaddr: net_types::ip::Ipv4Addr::from(YIADDR).try_into().expect("should be specified"),
             server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
                 .try_into()
                 .expect("should be specified"),
-            ip_address_lease_time: Duration::from_secs(DEFAULT_LEASE_LENGTH_SECONDS.into()),
+            ip_address_lease_time: lease_length,
             start_time: std::time::Duration::from_secs(0),
-            renewal_time: None,
-            rebinding_time: None,
+            renewal_time,
+            rebinding_time,
         }
     }
 
@@ -1943,9 +2339,9 @@ mod test {
             State::Init(Init::default()),
             Transition {
                 next_state: State::Bound(build_test_bound_state()),
-                new_lease: Some(build_test_newly_acquired_lease())
+                lease_change: Some(LeaseChange::NewLease(build_test_newly_acquired_lease()))
             }
-        ) => matches TransitionEffect::HandleNewLease(_);
+        ) => matches Some(TransitionEffect::HandleNewLease(_));
         "yields newly-acquired lease effect"
     )]
     #[test_case(
@@ -1953,14 +2349,14 @@ mod test {
             State::Bound(build_test_bound_state()),
             Transition {
                 next_state: State::Init(Init::default()),
-                new_lease: None,
+                lease_change: None,
             }
-        ) => matches TransitionEffect::DropLease;
+        ) => matches Some(TransitionEffect::DropLease);
         "recognizes loss of lease"
     )]
     fn apply_transition(
         (state, transition): (State<Duration>, Transition<Duration>),
-    ) -> TransitionEffect<Duration> {
+    ) -> Option<TransitionEffect<Duration>> {
         let (_next_state, effect) = state.apply(transition);
         effect
     }
@@ -2030,7 +2426,7 @@ mod test {
                     .expect("should succeed");
 
             use dhcp_protocol::DhcpOption;
-            assert_outgoing_message(
+            assert_outgoing_message_when_not_assigned_address(
                 &message,
                 VaryingOutgoingMessageFields {
                     xid: message.xid,
@@ -2101,5 +2497,344 @@ mod test {
             bound_fut.now_or_never().expect("should have completed"),
             BoundOutcome::GracefulShutdown
         );
+    }
+
+    fn build_test_renewing_state(
+        lease_length: Duration,
+        renewal_time: Option<Duration>,
+        rebinding_time: Option<Duration>,
+    ) -> Renewing<Duration> {
+        Renewing {
+            bound: build_test_bound_state_with_times(lease_length, renewal_time, rebinding_time),
+        }
+    }
+
+    #[test]
+    fn do_renewing_obeys_graceful_shutdown() {
+        initialize_logging();
+
+        let renewing = build_test_renewing_state(
+            Duration::from_secs(DEFAULT_LEASE_LENGTH_SECONDS.into()),
+            None,
+            None,
+        );
+        let client_config = &test_client_config();
+
+        let (_server_end, client_end) = FakeSocket::new_pair();
+        let test_socket_provider = &FakeSocketProvider::new(client_end);
+        let (stop_sender, mut stop_receiver) = mpsc::unbounded();
+        let time = &FakeTimeController::new();
+
+        let renewing_fut = renewing
+            .do_renewing(client_config, test_socket_provider, time, &mut stop_receiver)
+            .fuse();
+        pin_mut!(renewing_fut);
+
+        let mut executor = fasync::TestExecutor::new();
+        assert_matches!(executor.run_until_stalled(&mut renewing_fut), std::task::Poll::Pending);
+
+        stop_sender.unbounded_send(()).expect("sending stop signal should succeed");
+
+        let renewing_result = renewing_fut.now_or_never().expect(
+            "renewing_fut should complete after single poll after stop signal has been sent",
+        );
+
+        assert_matches!(renewing_result, Ok(RenewingOutcome::GracefulShutdown));
+    }
+
+    #[track_caller]
+    fn assert_outgoing_message_when_assigned_address(
+        got_message: &dhcp_protocol::Message,
+        fields: VaryingOutgoingMessageFields,
+    ) {
+        let VaryingOutgoingMessageFields { xid, options } = fields;
+        let want_message = dhcp_protocol::Message {
+            op: dhcp_protocol::OpCode::BOOTREQUEST,
+            xid,
+            secs: 0,
+            bdcast_flag: false,
+            ciaddr: YIADDR,
+            yiaddr: Ipv4Addr::UNSPECIFIED,
+            siaddr: Ipv4Addr::UNSPECIFIED,
+            giaddr: Ipv4Addr::UNSPECIFIED,
+            chaddr: TEST_MAC_ADDRESS,
+            sname: String::new(),
+            file: String::new(),
+            options,
+        };
+        assert_eq!(got_message, &want_message);
+    }
+
+    #[test]
+    fn do_renewing_sends_requests() {
+        initialize_logging();
+
+        // Just needs to be larger than rebinding time.
+        const LEASE_LENGTH: Duration = Duration::from_secs(100000);
+
+        // Set to have timestamps be conveniently derivable from powers of 2.
+        const RENEWAL_TIME: Duration = Duration::from_secs(0);
+        const REBINDING_TIME: Duration = Duration::from_secs(1024);
+
+        let renewing =
+            build_test_renewing_state(LEASE_LENGTH, Some(RENEWAL_TIME), Some(REBINDING_TIME));
+        let client_config = &test_client_config();
+
+        let (server_end, client_end) = FakeSocket::new_pair();
+        let (binds_sender, mut binds_receiver) = mpsc::unbounded();
+        let test_socket_provider = &FakeSocketProvider::new_with_events(client_end, binds_sender);
+        let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
+        let time = &FakeTimeController::new();
+
+        let renewing_fut = renewing
+            .do_renewing(client_config, test_socket_provider, time, &mut stop_receiver)
+            .fuse();
+
+        // Observe the "64, 4" instead of "64, 32" due to the 60 second minimum
+        // retransmission delay.
+        let expected_times_requests_are_sent =
+            [1024, 512, 256, 128, 64, 4].map(|time_remaining_when_request_is_sent| {
+                Duration::from_secs(1024 - time_remaining_when_request_is_sent)
+            });
+
+        let receive_fut = async {
+            for expected_time in expected_times_requests_are_sent {
+                let mut recv_buf = [0u8; BUFFER_SIZE];
+                let DatagramInfo { length, address } = server_end
+                    .recv_from(&mut recv_buf)
+                    .await
+                    .expect("recv_from on test socket should succeed");
+
+                assert_eq!(
+                    address,
+                    std::net::SocketAddr::V4(std::net::SocketAddrV4::new(
+                        SERVER_IP,
+                        SERVER_PORT.get()
+                    ))
+                );
+                assert_eq!(time.now(), expected_time);
+                let msg = dhcp_protocol::Message::from_buffer(&recv_buf[..length])
+                    .expect("received packet should parse as DHCP message");
+
+                assert_outgoing_message_when_assigned_address(
+                    &msg,
+                    VaryingOutgoingMessageFields {
+                        xid: msg.xid,
+                        options: vec![
+                            dhcp_protocol::DhcpOption::DhcpMessageType(
+                                dhcp_protocol::MessageType::DHCPREQUEST,
+                            ),
+                            dhcp_protocol::DhcpOption::ParameterRequestList(
+                                test_requested_parameters()
+                                    .iter_keys()
+                                    .collect::<Vec<_>>()
+                                    .try_into()
+                                    .expect("should fit parameter request list size constraints"),
+                            ),
+                        ],
+                    },
+                );
+            }
+        }
+        .fuse();
+
+        pin_mut!(renewing_fut, receive_fut);
+
+        let main_future = async { join!(renewing_fut, receive_fut) };
+        pin_mut!(main_future);
+
+        let mut executor = fasync::TestExecutor::new();
+        let (requesting_result, ()) =
+            run_with_accelerated_time(&mut executor, time, &mut main_future);
+
+        assert_matches!(requesting_result, Ok(RenewingOutcome::Rebinding(_)));
+        assert_matches!(server_end.recv_from(&mut []).now_or_never(), None);
+
+        let bound_socket_addr = binds_receiver
+            .next()
+            .now_or_never()
+            .expect("should have completed")
+            .expect("should be present");
+        assert_eq!(
+            bound_socket_addr,
+            std::net::SocketAddr::V4(std::net::SocketAddrV4::new(YIADDR, CLIENT_PORT.into()))
+        );
+    }
+
+    #[test_case(VaryingIncomingMessageFields {
+        yiaddr: YIADDR,
+        options: [
+            dhcp_protocol::DhcpOption::DhcpMessageType(
+                dhcp_protocol::MessageType::DHCPACK,
+            ),
+            dhcp_protocol::DhcpOption::ServerIdentifier(SERVER_IP),
+            dhcp_protocol::DhcpOption::IpAddressLeaseTime(
+                DEFAULT_LEASE_LENGTH_SECONDS,
+            ),
+        ]
+        .into_iter()
+        .chain(test_parameter_values())
+        .collect(),
+    } => RenewingOutcome::Renewed(Bound {
+        discover_options: TEST_DISCOVER_OPTIONS,
+        yiaddr: net_types::ip::Ipv4Addr::from(YIADDR)
+            .try_into()
+            .expect("should be specified"),
+        server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
+            .try_into()
+            .expect("should be specified"),
+        ip_address_lease_time: std::time::Duration::from_secs(DEFAULT_LEASE_LENGTH_SECONDS.into()),
+        renewal_time: None,
+        rebinding_time: None,
+        start_time: std::time::Duration::from_secs(0),
+    }, test_parameter_values().into_iter().collect()) ; "successfully renews after receiving DHCPACK")]
+    #[test_case(VaryingIncomingMessageFields {
+        yiaddr: OTHER_ADDR,
+        options: [
+            dhcp_protocol::DhcpOption::DhcpMessageType(
+                dhcp_protocol::MessageType::DHCPACK,
+            ),
+            dhcp_protocol::DhcpOption::ServerIdentifier(SERVER_IP),
+            dhcp_protocol::DhcpOption::IpAddressLeaseTime(
+                DEFAULT_LEASE_LENGTH_SECONDS,
+            ),
+        ]
+        .into_iter()
+        .chain(test_parameter_values())
+        .collect(),
+    } => RenewingOutcome::NewAddress(Bound {
+        discover_options: TEST_DISCOVER_OPTIONS,
+        yiaddr: net_types::ip::Ipv4Addr::from(OTHER_ADDR)
+            .try_into()
+            .expect("should be specified"),
+        server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
+            .try_into()
+            .expect("should be specified"),
+        ip_address_lease_time: std::time::Duration::from_secs(DEFAULT_LEASE_LENGTH_SECONDS.into()),
+        renewal_time: None,
+        rebinding_time: None,
+        start_time: std::time::Duration::from_secs(0),
+    }, test_parameter_values().into_iter().collect()) ; "observes new address from DHCPACK")]
+    #[test_case(VaryingIncomingMessageFields {
+        yiaddr: YIADDR,
+        options: [
+            dhcp_protocol::DhcpOption::DhcpMessageType(
+                dhcp_protocol::MessageType::DHCPACK,
+            ),
+            dhcp_protocol::DhcpOption::ServerIdentifier(SERVER_IP),
+            dhcp_protocol::DhcpOption::IpAddressLeaseTime(
+                DEFAULT_LEASE_LENGTH_SECONDS,
+            ),
+        ]
+        .into_iter()
+        .chain(test_parameter_values_excluding_subnet_mask())
+        .collect(),
+    } => RenewingOutcome::Rebinding(
+        Rebinding {
+            bound: build_test_bound_state()
+        }) ; "ignores replies lacking required option SubnetMask")]
+    #[test_case(VaryingIncomingMessageFields {
+        yiaddr: Ipv4Addr::UNSPECIFIED,
+        options: [
+            dhcp_protocol::DhcpOption::DhcpMessageType(
+                dhcp_protocol::MessageType::DHCPNAK,
+            ),
+            dhcp_protocol::DhcpOption::ServerIdentifier(SERVER_IP),
+            dhcp_protocol::DhcpOption::Message(NAK_MESSAGE.to_owned()),
+        ]
+        .into_iter()
+        .chain(test_parameter_values())
+        .collect(),
+    } => RenewingOutcome::Nak(crate::parse::FieldsToRetainFromNak {
+        server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
+            .try_into()
+            .expect("should be specified"),
+        message: Some(NAK_MESSAGE.to_owned()),
+        client_identifier: None,
+    }) ; "transitions to Init after receiving DHCPNAK")]
+    fn do_renewing_transitions_on_reply(
+        incoming_message: VaryingIncomingMessageFields,
+    ) -> RenewingOutcome<std::time::Duration> {
+        initialize_logging();
+
+        let renewing = build_test_renewing_state(
+            Duration::from_secs(DEFAULT_LEASE_LENGTH_SECONDS.into()),
+            None,
+            None,
+        );
+        let client_config = &test_client_config();
+
+        let (server_end, client_end) = FakeSocket::new_pair();
+        let test_socket_provider = &FakeSocketProvider::new(client_end);
+        let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
+        let time = &FakeTimeController::new();
+
+        let renewing_fut = renewing
+            .do_renewing(client_config, test_socket_provider, time, &mut stop_receiver)
+            .fuse();
+        pin_mut!(renewing_fut);
+
+        let server_socket_addr =
+            std::net::SocketAddr::V4(std::net::SocketAddrV4::new(SERVER_IP, SERVER_PORT.into()));
+
+        let server_fut = async {
+            let mut recv_buf = [0u8; BUFFER_SIZE];
+
+            let DatagramInfo { length, address } = server_end
+                .recv_from(&mut recv_buf)
+                .await
+                .expect("recv_from on test socket should succeed");
+            assert_eq!(address, server_socket_addr);
+
+            let msg = dhcp_protocol::Message::from_buffer(&recv_buf[..length])
+                .expect("received packet on test socket should parse as DHCP message");
+
+            assert_outgoing_message_when_assigned_address(
+                &msg,
+                VaryingOutgoingMessageFields {
+                    xid: msg.xid,
+                    options: vec![
+                        dhcp_protocol::DhcpOption::DhcpMessageType(
+                            dhcp_protocol::MessageType::DHCPREQUEST,
+                        ),
+                        dhcp_protocol::DhcpOption::ParameterRequestList(
+                            test_requested_parameters()
+                                .iter_keys()
+                                .collect::<Vec<_>>()
+                                .try_into()
+                                .expect("should fit parameter request list size constraints"),
+                        ),
+                    ],
+                },
+            );
+
+            let reply = build_incoming_message(msg.xid, incoming_message);
+
+            server_end
+                .send_to(
+                    &reply.serialize(),
+                    // Note that this is the address the client under test
+                    // observes in `recv_from`.
+                    server_socket_addr,
+                )
+                .await
+                .expect("send_to on test socket should succeed");
+        }
+        .fuse();
+
+        pin_mut!(renewing_fut, server_fut);
+
+        let main_future = async move {
+            let (renewing_result, ()) = join!(renewing_fut, server_fut);
+            renewing_result
+        }
+        .fuse();
+
+        pin_mut!(main_future);
+
+        let mut executor = fasync::TestExecutor::new();
+        let renewing_result = run_with_accelerated_time(&mut executor, time, &mut main_future);
+
+        assert_matches!(renewing_result, Ok(outcome) => outcome)
     }
 }

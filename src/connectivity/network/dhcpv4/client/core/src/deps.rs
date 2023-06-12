@@ -26,7 +26,7 @@ impl RngProvider for rand::rngs::StdRng {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 /// Contains information about a datagram received on a socket.
 pub struct DatagramInfo<T> {
     /// The length in bytes of the datagram received on the socket.
@@ -119,6 +119,9 @@ pub trait Instant: Sized + Ord + Copy + Clone + std::fmt::Debug + Send + Sync {
     /// Returns the time `self + duration`. Panics if `self + duration` would
     /// overflow the underlying instant storage type.
     fn add(&self, duration: std::time::Duration) -> Self;
+
+    /// Returns the instant halfway between `self` and `other`.
+    fn average(&self, other: Self) -> Self;
 }
 
 impl Instant for fasync::Time {
@@ -129,6 +132,12 @@ impl Instant for fasync::Time {
         {
             *self + duration.into()
         }
+    }
+
+    fn average(&self, other: Self) -> Self {
+        let lower = *self.min(&other);
+        let higher = *self.max(&other);
+        lower + (higher - lower) / 2
     }
 }
 
@@ -302,6 +311,12 @@ pub(crate) mod testutil {
         fn add(&self, duration: std::time::Duration) -> Self {
             self.checked_add(duration).unwrap()
         }
+
+        fn average(&self, other: Self) -> Self {
+            let lower = *self.min(&other);
+            let higher = *self.max(&other);
+            lower + (higher - lower) / 2
+        }
     }
 
     /// Fake implementation of `Time` that uses `std::time::Duration` as its
@@ -333,7 +348,13 @@ pub(crate) mod testutil {
         };
         for (_, senders) in timers_to_fire {
             for sender in senders {
-                sender.send(()).expect("receiving end was dropped");
+                match sender.send(()) {
+                    Ok(()) => (),
+                    Err(()) => {
+                        // ignore, it's fine for the client core to drop a timer
+                        // to cancel it
+                    }
+                }
             }
         }
     }
@@ -354,12 +375,24 @@ pub(crate) mod testutil {
         {
             let mut time = time.borrow_mut();
             let FakeTimeController { timer_heap, current_time } = time.deref_mut();
-            let first_entry = timer_heap.first_entry().expect("no timers installed");
 
-            let (Reverse(instant), senders) = first_entry.remove_entry();
+            // NOTE: the timer heap is ordered by Reverse<Duration> in order to
+            // facilitate the implementation of `advance()` by making
+            // `BTreeMap::split_off` have the right edge-case behavior. This
+            // makes it easy to get it first_entry vs last_entry mixed up here,
+            // though.
+            let earliest_entry = timer_heap.last_entry().expect("no timers installed");
+
+            let (Reverse(instant), senders) = earliest_entry.remove_entry();
             *current_time = instant;
             for sender in senders {
-                sender.send(()).expect("receiving end was dropped");
+                match sender.send(()) {
+                    Ok(()) => (),
+                    Err(()) => {
+                        // ignore, it's fine for the client core to drop a timer
+                        // to cancel it
+                    }
+                }
             }
         }
 
@@ -377,6 +410,7 @@ pub(crate) mod testutil {
         }
 
         async fn wait_until(&self, time: Self::Instant) {
+            tracing::info!("registering timer at {:?}", time);
             let receiver = {
                 let mut ctl = self.borrow_mut();
                 let FakeTimeController { timer_heap, current_time } = ctl.deref_mut();

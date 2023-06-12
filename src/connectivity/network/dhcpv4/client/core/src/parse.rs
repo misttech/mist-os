@@ -22,6 +22,8 @@ pub(crate) enum ParseError {
     Udp(packet_formats::error::ParseError),
     #[error("incoming packet destined for wrong port")]
     WrongPort(NonZeroU16),
+    #[error("incoming packet has wrong source address")]
+    WrongSource(std::net::SocketAddr),
     #[error("parsing DHCP message")]
     Dhcp(dhcp_protocol::ProtocolError),
 }
@@ -545,15 +547,14 @@ pub(crate) struct FieldsFromOfferToUseInRequest {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum IncomingMessageDuringRequesting {
+pub(crate) enum IncomingResponseToRequest {
     Ack(FieldsToRetainFromAck),
     Nak(FieldsToRetainFromNak),
 }
 
-/// Reasons that an incoming DHCP message might be discarded during Requesting
-/// state.
+/// Reasons that an incoming response to a DHCPREQUEST might be discarded.
 #[derive(thiserror::Error, Debug, PartialEq)]
-pub(crate) enum RequestingIncomingMessageError {
+pub(crate) enum IncomingResponseToRequestError {
     #[error("{0}")]
     CommonError(#[from] CommonIncomingMessageError),
     #[error("got DHCP message type = {0}, wanted DHCPACK or DHCPNAK")]
@@ -595,10 +596,10 @@ pub(crate) struct FieldsToRetainFromNak {
     >,
 }
 
-pub(crate) fn fields_to_retain_from_requesting(
+pub(crate) fn fields_to_retain_from_response_to_request(
     requested_parameters: &OptionCodeMap<OptionRequested>,
     message: dhcp_protocol::Message,
-) -> Result<IncomingMessageDuringRequesting, RequestingIncomingMessageError> {
+) -> Result<IncomingResponseToRequest, IncomingResponseToRequestError> {
     let CommonIncomingMessageFields {
         message_type,
         server_identifier,
@@ -620,24 +621,24 @@ pub(crate) fn fields_to_retain_from_requesting(
             if let Some(missing_option_code) =
                 requested_parameters.iter_required().find(|code| !seen_option_codes.contains(*code))
             {
-                return Err(RequestingIncomingMessageError::MissingRequiredOption(
+                return Err(IncomingResponseToRequestError::MissingRequiredOption(
                     missing_option_code,
                 ));
             }
-            Ok(IncomingMessageDuringRequesting::Ack(FieldsToRetainFromAck {
-                yiaddr: yiaddr.ok_or(RequestingIncomingMessageError::UnspecifiedYiaddr)?,
+            Ok(IncomingResponseToRequest::Ack(FieldsToRetainFromAck {
+                yiaddr: yiaddr.ok_or(IncomingResponseToRequestError::UnspecifiedYiaddr)?,
                 server_identifier,
                 ip_address_lease_time_secs: ip_address_lease_time_secs
-                    .ok_or(RequestingIncomingMessageError::NoLeaseTime)?,
+                    .ok_or(IncomingResponseToRequestError::NoLeaseTime)?,
                 renewal_time_value_secs,
                 rebinding_time_value_secs,
                 parameters,
             }))
         }
         dhcp_protocol::MessageType::DHCPNAK => {
-            Ok(IncomingMessageDuringRequesting::Nak(FieldsToRetainFromNak {
+            Ok(IncomingResponseToRequest::Nak(FieldsToRetainFromNak {
                 server_identifier: server_identifier
-                    .ok_or(RequestingIncomingMessageError::NoServerIdentifier)?,
+                    .ok_or(IncomingResponseToRequestError::NoServerIdentifier)?,
                 message,
                 client_identifier,
             }))
@@ -648,7 +649,7 @@ pub(crate) fn fields_to_retain_from_requesting(
         | dhcp_protocol::MessageType::DHCPDECLINE
         | dhcp_protocol::MessageType::DHCPRELEASE
         | dhcp_protocol::MessageType::DHCPINFORM => {
-            Err(RequestingIncomingMessageError::NotDhcpAckOrNak(message_type))
+            Err(IncomingResponseToRequestError::NotDhcpAckOrNak(message_type))
         }
     }
 }
@@ -992,7 +993,7 @@ mod test {
             rebinding_time_secs: None,
             message: None,
             include_duplicate_option: false,
-        } => Ok(IncomingMessageDuringRequesting::Ack(FieldsToRetainFromAck {
+        } => Ok(IncomingResponseToRequest::Ack(FieldsToRetainFromAck {
             yiaddr: net_types::ip::Ipv4Addr::from(YIADDR)
                 .try_into()
                 .expect("should be specified"),
@@ -1020,7 +1021,7 @@ mod test {
         rebinding_time_secs: None,
         message: None,
         include_duplicate_option: false,
-    } => Ok(IncomingMessageDuringRequesting::Ack(FieldsToRetainFromAck {
+    } => Ok(IncomingResponseToRequest::Ack(FieldsToRetainFromAck {
         yiaddr: net_types::ip::Ipv4Addr::from(YIADDR)
             .try_into()
             .expect("should be specified"),
@@ -1044,7 +1045,7 @@ mod test {
         rebinding_time_secs: Some(REBINDING_TIME_SECS),
         message: None,
         include_duplicate_option: false,
-    } => Ok(IncomingMessageDuringRequesting::Ack(FieldsToRetainFromAck {
+    } => Ok(IncomingResponseToRequest::Ack(FieldsToRetainFromAck {
         yiaddr: net_types::ip::Ipv4Addr::from(YIADDR)
             .try_into()
             .expect("should be specified"),
@@ -1072,7 +1073,7 @@ mod test {
         rebinding_time_secs: None,
         message: Some(MESSAGE.to_owned()),
         include_duplicate_option: false,
-    } => Ok(IncomingMessageDuringRequesting::Nak(FieldsToRetainFromNak {
+    } => Ok(IncomingResponseToRequest::Nak(FieldsToRetainFromNak {
         server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
             .try_into()
             .expect("should be specified"),
@@ -1090,7 +1091,7 @@ mod test {
         rebinding_time_secs: Some(REBINDING_TIME_SECS),
         message: None,
         include_duplicate_option: false,
-    } =>  Err(RequestingIncomingMessageError::NoLeaseTime); "rejects DHCPACK with no lease time")]
+    } =>  Err(IncomingResponseToRequestError::NoLeaseTime); "rejects DHCPACK with no lease time")]
     #[test_case(
         VaryingReplyToRequestFields {
             op: dhcp_protocol::OpCode::BOOTREPLY,
@@ -1103,7 +1104,7 @@ mod test {
             rebinding_time_secs: None,
             message: None,
             include_duplicate_option: false,
-        } => Err(RequestingIncomingMessageError::MissingRequiredOption(
+        } => Err(IncomingResponseToRequestError::MissingRequiredOption(
             dhcp_protocol::OptionCode::SubnetMask
         )); "rejects DHCPACK without required subnet mask")]
     #[test_case(VaryingReplyToRequestFields {
@@ -1117,7 +1118,7 @@ mod test {
         rebinding_time_secs: Some(REBINDING_TIME_SECS),
         message: None,
         include_duplicate_option: false,
-    } => Err(RequestingIncomingMessageError::CommonError(
+    } => Err(IncomingResponseToRequestError::CommonError(
         CommonIncomingMessageError::UnspecifiedServerIdentifier,
     )); "rejects DHCPACK with unspecified server identifier")]
     #[test_case(VaryingReplyToRequestFields {
@@ -1131,7 +1132,7 @@ mod test {
         rebinding_time_secs: Some(REBINDING_TIME_SECS),
         message: None,
         include_duplicate_option: false,
-    } => Err(RequestingIncomingMessageError::UnspecifiedYiaddr); "rejects DHCPACK with unspecified yiaddr")]
+    } => Err(IncomingResponseToRequestError::UnspecifiedYiaddr); "rejects DHCPACK with unspecified yiaddr")]
     #[test_case(VaryingReplyToRequestFields {
         op: dhcp_protocol::OpCode::BOOTREPLY,
         yiaddr: Ipv4Addr::UNSPECIFIED,
@@ -1143,7 +1144,7 @@ mod test {
         rebinding_time_secs: None,
         message: Some(MESSAGE.to_owned()),
         include_duplicate_option: false,
-    } => Err(RequestingIncomingMessageError::CommonError(
+    } => Err(IncomingResponseToRequestError::CommonError(
         CommonIncomingMessageError::UnspecifiedServerIdentifier,
     )); "rejects DHCPNAK with unspecified server identifier")]
     #[test_case(VaryingReplyToRequestFields {
@@ -1157,7 +1158,7 @@ mod test {
         rebinding_time_secs: None,
         message: Some(MESSAGE.to_owned()),
         include_duplicate_option: false,
-    } => Err(RequestingIncomingMessageError::NoServerIdentifier) ; "rejects DHCPNAK with no server identifier")]
+    } => Err(IncomingResponseToRequestError::NoServerIdentifier) ; "rejects DHCPNAK with no server identifier")]
     #[test_case(VaryingReplyToRequestFields {
         op: dhcp_protocol::OpCode::BOOTREQUEST,
         yiaddr: Ipv4Addr::UNSPECIFIED,
@@ -1169,7 +1170,7 @@ mod test {
         rebinding_time_secs: None,
         message: Some(MESSAGE.to_owned()),
         include_duplicate_option: false,
-    } => Err(RequestingIncomingMessageError::CommonError(
+    } => Err(IncomingResponseToRequestError::CommonError(
         CommonIncomingMessageError::NotBootReply(dhcp_protocol::OpCode::BOOTREQUEST),
     )) ; "rejects non-bootreply")]
     #[test_case(VaryingReplyToRequestFields {
@@ -1183,7 +1184,7 @@ mod test {
         rebinding_time_secs: None,
         message: Some(MESSAGE.to_owned()),
         include_duplicate_option: false,
-    } => Err(RequestingIncomingMessageError::NotDhcpAckOrNak(
+    } => Err(IncomingResponseToRequestError::NotDhcpAckOrNak(
         dhcp_protocol::MessageType::DHCPOFFER,
     )) ; "rejects non-DHCPACK or DHCPNAK")]
     #[test_case(VaryingReplyToRequestFields {
@@ -1197,7 +1198,7 @@ mod test {
         rebinding_time_secs: None,
         message: Some(MESSAGE.to_owned()),
         include_duplicate_option: false,
-    } => Err(RequestingIncomingMessageError::CommonError(
+    } => Err(IncomingResponseToRequestError::CommonError(
         CommonIncomingMessageError::BuilderMissingField("message_type"),
     )) ; "rejects missing DHCP message type")]
     #[test_case( VaryingReplyToRequestFields {
@@ -1211,15 +1212,15 @@ mod test {
         rebinding_time_secs: Some(REBINDING_TIME_SECS),
         message: None,
         include_duplicate_option: true,
-    } => Err(RequestingIncomingMessageError::CommonError(
+    } => Err(IncomingResponseToRequestError::CommonError(
         CommonIncomingMessageError::DuplicateOption(
             dhcp_protocol::OptionCode::DomainName,
         ),
     )); "rejects duplicate option")]
     fn fields_to_retain_during_requesting(
         incoming_fields: VaryingReplyToRequestFields,
-    ) -> Result<IncomingMessageDuringRequesting, RequestingIncomingMessageError> {
-        use super::fields_to_retain_from_requesting as fields;
+    ) -> Result<IncomingResponseToRequest, IncomingResponseToRequestError> {
+        use super::fields_to_retain_from_response_to_request as fields;
         use dhcp_protocol::DhcpOption;
 
         let VaryingReplyToRequestFields {

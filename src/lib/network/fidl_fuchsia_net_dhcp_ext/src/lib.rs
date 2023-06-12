@@ -354,10 +354,11 @@ pub mod testutil {
                                     let control = &control;
                                     let stack = &stack;
                                     async move {
-                                        address
-                                            .expect("should have address")
-                                            .add_to(control)
-                                            .expect("add address should succeed");
+                                        if let Some(address) = address {
+                                            address
+                                                .add_to(control)
+                                                .expect("add address should succeed");
+                                        }
 
                                         apply_new_routers(id, stack, &mut routers, new_routers)
                                             .await

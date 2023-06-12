@@ -63,6 +63,7 @@ pub(crate) async fn serve_client(
     mac: net_types::ethernet::Mac,
     interface_id: NonZeroU64,
     provider: &crate::packetsocket::PacketSocketProviderImpl,
+    udp_socket_provider: &crate::udpsocket::UdpSocketProviderImpl,
     params: NewClientParams,
     requests: ClientRequestStream,
 ) -> Result<(), Error> {
@@ -86,7 +87,7 @@ pub(crate) async fn serve_client(
                             Error::Exit(ClientExitReason::WatchConfigurationAlreadyPending)
                         })?;
                         responder
-                            .send(client.watch_configuration(provider).await?)
+                            .send(client.watch_configuration(provider, udp_socket_provider).await?)
                             .map_err(Error::Fidl)?;
                         Ok(())
                     }
@@ -253,7 +254,10 @@ impl Client {
         }
 
         if !unrequested_options.is_empty() {
-            panic!("Received options from core that we didn't ask for: {unrequested_options:#?}");
+            tracing::warn!(
+                "Received options from core that we didn't ask for: {:#?}",
+                unrequested_options
+            );
         }
 
         let prefix_len = prefix_len
@@ -274,7 +278,11 @@ impl Client {
             ip_address,
         });
 
-        assert!(previous_lease.is_none(), "should not currently have a lease");
+        if let Some(Lease { event_stream: _, address_state_provider: _, ip_address }) =
+            previous_lease
+        {
+            tracing::warn!("dropping previous lease for address {}", ip_address);
+        }
 
         Ok(ClientWatchConfigurationResponse {
             address: Some(fdhcp::Address {
@@ -296,16 +304,69 @@ impl Client {
                 address_state_provider: Some(asp_server_end),
                 ..Default::default()
             }),
-            dns_servers: dns_servers.map(|list| {
-                list.into_iter()
-                    .map(|addr| net_types::ip::Ipv4Addr::from(addr).into_ext())
-                    .collect()
-            }),
-            routers: routers.map(|list| {
-                list.into_iter()
-                    .map(|addr| net_types::ip::Ipv4Addr::from(addr).into_ext())
-                    .collect()
-            }),
+            dns_servers: dns_servers.map(into_fidl_list),
+            routers: routers.map(into_fidl_list),
+            ..Default::default()
+        })
+    }
+
+    async fn handle_lease_renewal(
+        &mut self,
+        dhcp_client_core::client::LeaseRenewal {
+            start_time,
+            lease_time,
+            parameters,
+        }: dhcp_client_core::client::LeaseRenewal<fasync::Time>,
+    ) -> Result<ClientWatchConfigurationResponse, Error> {
+        let Self { core: _, rng: _, config: _, stop_receiver: _, current_lease, interface_id: _ } =
+            self;
+
+        let mut dns_servers: Option<Vec<_>> = None;
+        let mut routers: Option<Vec<_>> = None;
+        let mut unrequested_options = Vec::new();
+
+        for option in parameters {
+            match option {
+                dhcp_protocol::DhcpOption::SubnetMask(len) => {
+                    tracing::info!("ignoring prefix length={:?} for renewed lease", len);
+                }
+                dhcp_protocol::DhcpOption::DomainNameServer(list) => {
+                    assert_eq!(dns_servers.replace(list.into()), None);
+                }
+                dhcp_protocol::DhcpOption::Router(list) => {
+                    assert_eq!(routers.replace(list.into()), None);
+                }
+                option => {
+                    unrequested_options.push(option);
+                }
+            }
+        }
+
+        if !unrequested_options.is_empty() {
+            tracing::warn!(
+                "Received options from core that we didn't ask for: {:#?}",
+                unrequested_options
+            );
+        }
+
+        let Lease { event_stream: _, address_state_provider, ip_address: _ } =
+            current_lease.as_mut().expect("should have current lease if we're handling a renewal");
+
+        address_state_provider
+            .update_address_properties(&fnet_interfaces_admin::AddressProperties {
+                preferred_lifetime_info: None,
+                valid_lifetime_end: Some(
+                    zx::Time::from(start_time + lease_time.into()).into_nanos(),
+                ),
+                ..Default::default()
+            })
+            .await
+            .map_err(Error::Fidl)?;
+
+        Ok(ClientWatchConfigurationResponse {
+            address: None,
+            dns_servers: dns_servers.map(into_fidl_list),
+            routers: routers.map(into_fidl_list),
             ..Default::default()
         })
     }
@@ -313,6 +374,7 @@ impl Client {
     async fn watch_configuration(
         &mut self,
         packet_socket_provider: &crate::packetsocket::PacketSocketProviderImpl,
+        udp_socket_provider: &crate::udpsocket::UdpSocketProviderImpl,
     ) -> Result<ClientWatchConfigurationResponse, Error> {
         let clock = Clock;
         loop {
@@ -342,8 +404,16 @@ impl Client {
             //    which point `current_lease` will be cleared for the next
             //    iteration.
             let select_result = {
-                let core_step_fut =
-                    core.run(config, packet_socket_provider, rng, &clock, stop_receiver).fuse();
+                let core_step_fut = core
+                    .run(
+                        config,
+                        packet_socket_provider,
+                        udp_socket_provider,
+                        rng,
+                        &clock,
+                        stop_receiver,
+                    )
+                    .fuse();
                 let address_removed_fut = async {
                     match current_lease {
                         Some(current_lease) => {
@@ -422,14 +492,15 @@ impl Client {
                         }
                     }
                 }
-                futures::future::Either::Right(core_step) => match core_step {
-                    Err(e) => return Err(Error::from_core(e)),
-                    Ok(step) => match step {
-                        dhcp_client_core::client::Step::NextState(transition) => {
-                            let (next_core, effect) = core.apply(transition);
-                            *core = next_core;
-                            match effect {
-                                dhcp_client_core::client::TransitionEffect::DropLease => {
+                futures::future::Either::Right(core_step) => {
+                    match core_step {
+                        Err(e) => return Err(Error::from_core(e)),
+                        Ok(step) => match step {
+                            dhcp_client_core::client::Step::NextState(transition) => {
+                                let (next_core, effect) = core.apply(transition);
+                                *core = next_core;
+                                match effect {
+                                Some(dhcp_client_core::client::TransitionEffect::DropLease) => {
                                     // TODO(https://fxbug.dev/126747):
                                     // Explicitly remove this address and
                                     // observe the OnAddressRemoved event to
@@ -438,22 +509,32 @@ impl Client {
                                     // address later.
                                     assert!(current_lease.take().is_some());
                                 }
-                                dhcp_client_core::client::TransitionEffect::HandleNewLease(
+                                Some(dhcp_client_core::client::TransitionEffect::HandleNewLease(
                                     newly_acquired_lease,
-                                ) => {
+                                )) => {
                                     return self.handle_newly_acquired_lease(newly_acquired_lease);
                                 }
-                                dhcp_client_core::client::TransitionEffect::None => (),
+                                Some(dhcp_client_core::client::TransitionEffect::HandleRenewedLease(
+                                    lease_renewal
+                                )) => {
+                                    return self.handle_lease_renewal(lease_renewal).await;
+                                }
+                                None => (),
+                                }
                             }
-                        }
-                        dhcp_client_core::client::Step::Exit(reason) => match reason {
-                            dhcp_client_core::client::ExitReason::GracefulShutdown => {
-                                return Err(Error::Exit(ClientExitReason::GracefulShutdown))
-                            }
+                            dhcp_client_core::client::Step::Exit(reason) => match reason {
+                                dhcp_client_core::client::ExitReason::GracefulShutdown => {
+                                    return Err(Error::Exit(ClientExitReason::GracefulShutdown))
+                                }
+                            },
                         },
-                    },
-                },
+                    }
+                }
             };
         }
     }
+}
+
+fn into_fidl_list(list: Vec<std::net::Ipv4Addr>) -> Vec<fidl_fuchsia_net::Ipv4Address> {
+    list.into_iter().map(|addr| net_types::ip::Ipv4Addr::from(addr).into_ext()).collect()
 }

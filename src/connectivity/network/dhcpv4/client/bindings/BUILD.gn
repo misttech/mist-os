@@ -22,7 +22,6 @@ rustc_binary("dhcp_client") {
     "//src/connectivity/network/dhcpv4/client/core",
     "//src/connectivity/network/dhcpv4/protocol",
     "//src/connectivity/network/lib/sockaddr",
-    "//src/connectivity/network/lib/todo_unused",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",

@@ -209,7 +209,6 @@ pub(crate) struct UdpSocketProviderImpl {
     provider: fposix_socket::ProviderProxy,
 }
 
-#[todo_unused::todo_unused("https://fxbug.dev/125443")]
 impl UdpSocketProviderImpl {
     pub(crate) fn new(provider: fposix_socket::ProviderProxy) -> Self {
         Self { provider }

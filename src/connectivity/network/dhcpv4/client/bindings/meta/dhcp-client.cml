@@ -12,6 +12,7 @@
     ],
     use: [
         { protocol: "fuchsia.posix.socket.packet.Provider" },
+        { protocol: "fuchsia.posix.socket.Provider" },
     ],
     expose: [
         {

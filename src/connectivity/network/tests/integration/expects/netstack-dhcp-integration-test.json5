@@ -20,8 +20,6 @@
         {
             type: "expect_failure_with_err_logs",
             matchers: [
-                "acquire_then_renew_with_dhcpd_bound_device_ns2_ns[23]_with_dhcp_out_of_stack",
-                "acquire_then_renew_with_dhcpd_bound_device_ns3_ns[23]_with_dhcp_out_of_stack",
                 "acquire_with_dhcpd_bound_device_dup_addr_ns[23]_ns[23]_with_dhcp_out_of_stack",
             ],
         },
