@@ -899,6 +899,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 can_send - u32::from(has_fin),
                 u32::try_from(readable.len()).unwrap_or(u32::MAX),
             );
+            let has_fin = has_fin && bytes_to_send == can_send - u32::from(has_fin);
             // Per RFC 9293 Section 3.7.4:
             //   If there is unacknowledged data (i.e., SND.NXT > SND.UNA), then
             //   the sending TCP endpoint buffers all user data (regardless of
@@ -4537,17 +4538,21 @@ mod test {
         }
     }
 
-    #[test_case(true)]
-    #[test_case(false)]
-    fn poll_send_len(has_fin: bool) {
-        const NUM_RESERVED: usize = 16;
+    #[test_case(true, 0)]
+    #[test_case(false, 0)]
+    #[test_case(true, 1)]
+    #[test_case(false, 1)]
+    fn poll_send_len(has_fin: bool, reserved_bytes: usize) {
         const VALUE: u8 = 0xaa;
 
-        fn with_poll_send_result<const HAS_FIN: bool>(f: impl FnOnce(Segment<SendPayload<'_>>)) {
+        fn with_poll_send_result<const HAS_FIN: bool>(
+            f: impl FnOnce(Segment<SendPayload<'_>>),
+            reserved_bytes: usize,
+        ) {
             const DATA_LEN: usize = 40;
             let buffer = ReservingBuffer {
                 buffer: RingBuffer::with_data(DATA_LEN, &vec![VALUE; DATA_LEN]),
-                reserved_bytes: NUM_RESERVED,
+                reserved_bytes,
             };
             assert_eq!(buffer.limits().len, DATA_LEN);
 
@@ -4582,7 +4587,7 @@ mod test {
             let Segment { contents, ack: _, seq: _, wnd: _, options: _ } = segment;
             let contents_len = contents.data().len();
 
-            if has_fin {
+            if has_fin && reserved_bytes == 0 {
                 assert_eq!(
                     contents.len(),
                     u32::try_from(contents_len + 1).unwrap(),
@@ -4597,8 +4602,8 @@ mod test {
             assert_eq!(target, vec![VALUE; contents_len]);
         };
         match has_fin {
-            true => with_poll_send_result::<true>(f),
-            false => with_poll_send_result::<false>(f),
+            true => with_poll_send_result::<true>(f, reserved_bytes),
+            false => with_poll_send_result::<false>(f, reserved_bytes),
         }
     }
 
