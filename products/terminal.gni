@@ -15,7 +15,6 @@ core_realm_shards += [
 
 legacy_base_package_labels += [
   "//src/connectivity/network/netcfg:config-default",
-  "//src/connectivity/network:network-legacy-deprecated",
   "//src/sys/pkg:system-update-checker",
 ]
 

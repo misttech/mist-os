@@ -28,10 +28,6 @@ legacy_base_package_labels += [
 
   # TODO(http://fxb/103965): remove once we have config_data support in assembly_input_bundle()
   "//src/connectivity/network/netcfg:config-default",
-
-  # TODO(https://fxbug.dev/85821): remove once out-of-tree users no longer
-  # reference v1 components.
-  "//src/connectivity/network:network-legacy-deprecated",
 ]
 
 # Use the product assembly config target to specify the product configuration.
