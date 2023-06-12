@@ -284,11 +284,10 @@ group("default-images") {
         deps += [ ":record_filesystem_sizes" ]
       }
     }
+  }
 
-    # TODO(https://fxbug.dev/125009): Support uefi-disk in Bazel assembly.
-    if (build_uefi_disk) {
-      deps += [ ":uefi-disk" ]
-    }
+  if (build_uefi_disk) {
+    deps += [ ":uefi-disk" ]
   }
 
   # Even if Bazel assembly uses product bundle to flash, downstream tools can
