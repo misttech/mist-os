@@ -150,4 +150,11 @@ TEST_F(FuseTest, Read) {
   ASSERT_EQ(strncmp(buffer, "hello\n", 6), 0);
 }
 
+TEST_F(FuseTest, NoFile) {
+  ASSERT_TRUE(Mount());
+  std::string mounted_witness = GetMountDir() + "/unexistent";
+  ScopedFD fd(open(mounted_witness.c_str(), O_RDONLY));
+  ASSERT_FALSE(fd.is_valid());
+  ASSERT_EQ(errno, ENOENT);
+}
 #endif  // SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_

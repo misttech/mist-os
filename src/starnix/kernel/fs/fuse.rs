@@ -352,6 +352,9 @@ impl FsNodeOps for Arc<FuseNode> {
         } else {
             return error!(EINVAL);
         };
+        if entry.nodeid == 0 {
+            return error!(ENOENT);
+        }
         node.fs().get_or_create_node(Some(entry.nodeid), |id| {
             let fuse_node =
                 Arc::new(FuseNode { connection: self.connection.clone(), nodeid: entry.nodeid });
