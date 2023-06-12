@@ -6,14 +6,24 @@ import(
     "//build/bazel/assembly/board_configurations/verify_board_configuration.gni")
 import("//build/python/python_binary.gni")
 
-verify_board_configuration("verify_x64") {
-  bazel_board_config_target = "//boards:x64"
-  golden_json = "//boards/x64/board_information.json5"
+verification_targets = []
+foreach(board,
+        [
+          "x64",
+          "qemu-x64",
+          "vim3",
+        ]) {
+  target_label = "verify_${board}"
+  verification_targets += [ ":${target_label}" ]
+  verify_board_configuration(target_label) {
+    bazel_board_config_target = "//boards:${board}"
+    golden_json = "//boards/${board}/board_information.json5"
+  }
 }
 
 group("verifications") {
   testonly = true
-  deps = [ ":verify_x64" ]
+  deps = verification_targets
 }
 
 python_binary("verify_board_configuration") {

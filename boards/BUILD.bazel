@@ -4,16 +4,29 @@
 
 load("@fuchsia_sdk//fuchsia:assembly.bzl", "fuchsia_board_configuration")
 
-package(
-    default_visibility = [
-        "//build/bazel/assembly:__subpackages__",
-    ],
-)
+package(default_visibility = ["//visibility:public"])
 
 fuchsia_board_configuration(
     name = "x64",
     board_name = "x64",
     provided_features = [
         "fuchsia::wlan_softmac",
+    ],
+)
+
+fuchsia_board_configuration(
+    name = "qemu-x64",
+    board_name = "qemu-x64",
+    provided_features = [
+        "fuchsia::wlan_softmac",
+    ],
+)
+
+fuchsia_board_configuration(
+    name = "vim3",
+    board_name = "vim3",
+    provided_features = [
+        "fuchsia::fan",
+        "fuchsia::usb_peripheral_support",
     ],
 )
