@@ -657,7 +657,6 @@
                 "AllUDPSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/*",
                 "AllUDPSockets/AllSocketPairTest.SetAndGetBooleanSocketOptions/*",
                 "AllUDPSockets/AllSocketPairTest.GetSetSocketRcvlowatOption/*",
-                "AllUDPSockets/NonStreamSocketPairTest.SendMsgTooLarge/*",
                 "AllUDPSockets/NonStreamSocketPairTest.RecvmsgMsghdrFlagMsgTrunc/*",
                 "AllUDPSockets/UDPSocketPairTest.ReceiveOrigDstAddrDefault/*",
                 "AllUDPSockets/UDPSocketPairTest.PayloadTooBig/*",
