@@ -789,10 +789,17 @@ TEST(RestrictedMode, KickWhileStartingAndExiting) {
   };
   ExceptionChannelRegistered ec;
 
+  struct ChildThreadStarted {
+    std::condition_variable cv;
+    std::mutex m;
+    zx_koid_t koid = 0;
+  };
+  ChildThreadStarted ct;
+
   // Register a debugger exception channel so we can intercept thread lifecycle events
   // and issue restricted kicks. This runs on a child thread so that we can process events
   // while the main thread is blocked on the main thread starting and joining.
-  std::thread exception_thread([&ec]() {
+  std::thread exception_thread([&ec, &ct]() {
     zx::channel exception_channel;
     ASSERT_OK(zx::process::self()->create_exception_channel(ZX_EXCEPTION_CHANNEL_DEBUGGER,
                                                             &exception_channel));
@@ -803,17 +810,39 @@ TEST(RestrictedMode, KickWhileStartingAndExiting) {
       ec.registered = true;
       ec.cv.notify_one();
     }
-    // Starting child_thread should generate a ZX_EXCP_THREAD_STARTING message on our exception
-    // channel.
+    zx_koid_t child_koid;
+    // Wait for the child thread to start and tell us its KOID.
+    {
+      std::unique_lock lock(ct.m);
+      ct.cv.wait(lock, [&ct]() { return ct.koid != 0; });
+      child_koid = ct.koid;
+    }
+
+    // Read exceptions out of the exception channel until we get the first one triggered by
+    // the child thread. We do this to avoid a rare race condition in which a
+    // ZX_EXCP_THREAD_EXITING triggered by a thread in another test case is delivered to the
+    // process exception channel after this test case starts. See https://fxbug.dev/128498
+    // for more info.
     zx_exception_info_t info;
     zx::exception exception;
-    ASSERT_OK(exception_channel.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite(), nullptr));
-    ASSERT_OK(exception_channel.read(0, &info, exception.reset_and_get_address(), sizeof(info), 1,
-                                     nullptr, nullptr));
-    ASSERT_EQ(info.type, ZX_EXCP_THREAD_STARTING);
-
+    zx_info_handle_basic_t handle_info = {};
     zx::thread thread;
-    ASSERT_OK(exception.get_thread(&thread));
+    while (handle_info.koid != child_koid) {
+      ASSERT_OK(exception_channel.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite(), nullptr));
+      ASSERT_OK(exception_channel.read(0, &info, exception.reset_and_get_address(), sizeof(info), 1,
+                                       nullptr, nullptr));
+      ASSERT_OK(exception.get_thread(&thread));
+      size_t actual;
+      size_t avail;
+      ASSERT_OK(zx_object_get_info(thread.get(), ZX_INFO_HANDLE_BASIC, &handle_info,
+                                   sizeof(handle_info), &actual, &avail));
+      ASSERT_EQ(actual, 1);
+      ASSERT_EQ(avail, 1);
+    }
+
+    // Starting child_thread should generate a ZX_EXCP_THREAD_STARTING message on our exception
+    // channel.
+    ASSERT_EQ(info.type, ZX_EXCP_THREAD_STARTING);
 
     uint32_t kick_options = 0;
     ASSERT_OK(zx_restricted_kick(thread.get(), kick_options));
@@ -855,6 +884,22 @@ TEST(RestrictedMode, KickWhileStartingAndExiting) {
                                        &reason_code));
     EXPECT_EQ(reason_code, ZX_RESTRICTED_REASON_KICK);
   });
+
+  // Get the KOID of the child thread and communicate it to the exception handler.
+  auto child_handle = native_thread_get_zx_handle(child_thread.native_handle());
+  size_t actual;
+  size_t avail;
+  zx_info_handle_basic_t info = {};
+  ASSERT_OK(
+      zx_object_get_info(child_handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), &actual, &avail));
+  ASSERT_EQ(actual, 1);
+  ASSERT_EQ(avail, 1);
+
+  {
+    std::lock_guard lock(ct.m);
+    ct.koid = info.koid;
+    ct.cv.notify_one();
+  }
 
   child_thread.join();
   exception_thread.join();
