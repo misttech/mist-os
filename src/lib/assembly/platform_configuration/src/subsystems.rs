@@ -164,7 +164,6 @@ fn configure_subsystems(
     }
 
     // The real platform subsystems
-
     connectivity::ConnectivitySubsystemConfig::define_configuration(
         context,
         &config.platform.connectivity,
@@ -242,6 +241,13 @@ fn configure_subsystems(
         builder,
     )
     .context("Configuring the 'storage' subsystem")?;
+
+    swd::SwdSubsystemConfig::define_configuration(
+        context,
+        &config.platform.software_delivery,
+        builder,
+    )
+    .context("Configuring the 'software_delivery' subsystem")?;
 
     thermal::ThermalSubsystem::define_configuration(context, &(), builder)
         .context("Configuring the 'thermal' subsystem")?;

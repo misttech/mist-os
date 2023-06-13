@@ -1059,9 +1059,49 @@ assembly_input_bundle("fshost_f2fs") {
 
 assembly_input_bundle("system_update_checker") {
   testonly = true
+  base_packages = [ "//src/sys/pkg/bin/system-update-checker" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/sys/pkg/bin/system-update-checker/meta/system_update_checker.core_shard_new.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
 }
 
 assembly_input_bundle("omaha_client") {
+  base_packages = [ "//src/sys/pkg/bin/omaha-client:omaha-client-unconfigured" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/sys/pkg/bin/omaha-client/meta/omaha_client_service.core_shard_new.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+
+  config_data = [
+    {
+      package_name = "triage-detect"
+      files = [
+        {
+          source = "//src/diagnostics/config/triage/detect/omaha-client-detect.triage"
+          destination = "omaha-client-detect.triage"
+        },
+      ]
+    },
+  ]
 }
 
 # AIB to enable virtualization support.
