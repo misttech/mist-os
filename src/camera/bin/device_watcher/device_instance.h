@@ -16,8 +16,6 @@
 #include <lib/fit/function.h>
 #include <lib/fpromise/result.h>
 #include <lib/sys/cpp/service_directory.h>
-#include <lib/vfs/cpp/pseudo_dir.h>
-#include <lib/vfs/cpp/service.h>
 #include <zircon/status.h>
 
 namespace camera {

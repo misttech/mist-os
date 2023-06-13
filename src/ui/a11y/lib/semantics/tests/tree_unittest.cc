@@ -13,7 +13,6 @@
 #include <lib/sys/cpp/testing/component_context_provider.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/commands.h>
-#include <lib/vfs/cpp/pseudo_dir.h>
 #include <lib/zx/event.h>
 
 #include <algorithm>

@@ -11,15 +11,13 @@
 #include <lib/inspect/service/cpp/service.h>
 #include <lib/stdcompat/variant.h>
 #include <lib/sys/cpp/component_context.h>
+#include <lib/vfs/cpp/pseudo_dir.h>
+#include <lib/vfs/cpp/service.h>
 
 #include <string>
 #include <vector>
 
 #include <diagnostics/validate/cpp/fidl.h>
-
-#include "lib/inspect/service/cpp/service.h"
-#include "lib/vfs/cpp/pseudo_dir.h"
-#include "lib/vfs/cpp/service.h"
 
 using cpp17::get;
 using cpp17::holds_alternative;

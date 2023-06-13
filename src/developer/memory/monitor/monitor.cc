@@ -11,8 +11,6 @@
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
-#include <lib/vfs/cpp/internal/file.h>
-#include <lib/vfs/cpp/vmo_file.h>
 #include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
 #include <string.h>

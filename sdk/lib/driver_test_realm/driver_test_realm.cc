@@ -20,7 +20,6 @@
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/syslog/global.h>
-#include <lib/vfs/cpp/remote_dir.h>
 #include <lib/zbi-format/board.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zx/job.h>
