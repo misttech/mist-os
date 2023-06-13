@@ -43,6 +43,7 @@
 #include "src/graphics/display/drivers/goldfish-display/render_control.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -345,10 +346,12 @@ zx_status_t Display::ImportVmoImage(image_t* image, const fuchsia_sysmem::PixelF
   return ZX_OK;
 }
 
-zx_status_t Display::DisplayControllerImplImportBufferCollection(uint64_t collection_id,
-                                                                 zx::channel collection_token) {
-  if (buffer_collections_.find(collection_id) != buffer_collections_.end()) {
-    zxlogf(ERROR, "Buffer Collection (id=%lu) already exists", collection_id);
+zx_status_t Display::DisplayControllerImplImportBufferCollection(
+    uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token) {
+  const display::DriverBufferCollectionId driver_buffer_collection_id =
+      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+  if (buffer_collections_.find(driver_buffer_collection_id) != buffer_collections_.end()) {
+    zxlogf(ERROR, "Buffer Collection (id=%lu) already exists", driver_buffer_collection_id.value());
     return ZX_ERR_ALREADY_EXISTS;
   }
 
@@ -370,25 +373,33 @@ zx_status_t Display::DisplayControllerImplImportBufferCollection(uint64_t collec
     return ZX_ERR_INTERNAL;
   }
 
-  buffer_collections_[collection_id] = fidl::SyncClient(std::move(collection_client_endpoint));
+  buffer_collections_[driver_buffer_collection_id] =
+      fidl::SyncClient(std::move(collection_client_endpoint));
   return ZX_OK;
 }
 
-zx_status_t Display::DisplayControllerImplReleaseBufferCollection(uint64_t collection_id) {
-  if (buffer_collections_.find(collection_id) == buffer_collections_.end()) {
+zx_status_t Display::DisplayControllerImplReleaseBufferCollection(
+    uint64_t banjo_driver_buffer_collection_id) {
+  const display::DriverBufferCollectionId driver_buffer_collection_id =
+      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+  if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
     zxlogf(ERROR, "Cannot release buffer collection %lu: buffer collection doesn't exist",
-           collection_id);
+           driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
-  buffer_collections_.erase(collection_id);
+  buffer_collections_.erase(driver_buffer_collection_id);
   return ZX_OK;
 }
 
-zx_status_t Display::DisplayControllerImplImportImage(image_t* image, uint64_t collection_id,
+zx_status_t Display::DisplayControllerImplImportImage(image_t* image,
+                                                      uint64_t banjo_driver_buffer_collection_id,
                                                       uint32_t index) {
-  const auto it = buffer_collections_.find(collection_id);
+  const display::DriverBufferCollectionId driver_buffer_collection_id =
+      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+  const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
-    zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)", collection_id);
+    zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)",
+           driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
 
@@ -737,11 +748,14 @@ zx_status_t Display::DisplayControllerImplGetSysmemConnection(zx::channel connec
   return status;
 }
 
-zx_status_t Display::DisplayControllerImplSetBufferCollectionConstraints(const image_t* config,
-                                                                         uint64_t collection_id) {
-  const auto it = buffer_collections_.find(collection_id);
+zx_status_t Display::DisplayControllerImplSetBufferCollectionConstraints(
+    const image_t* config, uint64_t banjo_driver_buffer_collection_id) {
+  const display::DriverBufferCollectionId driver_buffer_collection_id =
+      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+  const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
-    zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)", collection_id);
+    zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)",
+           driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
   const fidl::SyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second;

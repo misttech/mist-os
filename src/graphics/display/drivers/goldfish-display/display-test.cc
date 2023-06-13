@@ -19,6 +19,7 @@
 #include <fbl/vector.h>
 #include <gtest/gtest.h>
 
+#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace goldfish {
@@ -391,20 +392,24 @@ TEST_F(GoldfishDisplayTest, ImportBufferCollection) {
   ASSERT_TRUE(token2_endpoints.is_ok());
 
   // Test ImportBufferCollection().
-  const uint64_t kValidCollectionId = 1u;
+  constexpr display::DriverBufferCollectionId kValidCollectionId(1);
+  constexpr uint64_t kBanjoValidCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kValidCollectionId);
   EXPECT_OK(display_->DisplayControllerImplImportBufferCollection(
-      kValidCollectionId, token1_endpoints->client.TakeChannel()));
+      kBanjoValidCollectionId, token1_endpoints->client.TakeChannel()));
 
   // `collection_id` must be unused.
   EXPECT_EQ(display_->DisplayControllerImplImportBufferCollection(
-                kValidCollectionId, token2_endpoints->client.TakeChannel()),
+                kBanjoValidCollectionId, token2_endpoints->client.TakeChannel()),
             ZX_ERR_ALREADY_EXISTS);
 
   // Test ReleaseBufferCollection().
-  const uint64_t kInvalidCollectionId = 2u;
-  EXPECT_EQ(display_->DisplayControllerImplReleaseBufferCollection(kInvalidCollectionId),
+  constexpr display::DriverBufferCollectionId kInvalidCollectionId(2);
+  constexpr uint64_t kBanjoInvalidCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kInvalidCollectionId);
+  EXPECT_EQ(display_->DisplayControllerImplReleaseBufferCollection(kBanjoInvalidCollectionId),
             ZX_ERR_NOT_FOUND);
-  EXPECT_OK(display_->DisplayControllerImplReleaseBufferCollection(kValidCollectionId));
+  EXPECT_OK(display_->DisplayControllerImplReleaseBufferCollection(kBanjoValidCollectionId));
 
   loop_.Shutdown();
 }
