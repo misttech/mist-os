@@ -15,8 +15,8 @@ ext4_to_pkg("system_image") {
   } else if (target_cpu == "arm64") {
     input = "//prebuilt/starnix/linux-arm64/arm64_system.img"
   } else {
-    # Define an empty value to allow builds for "other" target_cpus.
-    input = ""
+    # Define a nonexistent but valid value to allow builds for "other" target_cpus.
+    input = "//nonexist"
   }
   prefix = "data/system"
 }
