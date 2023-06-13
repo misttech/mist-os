@@ -340,7 +340,11 @@ class WatchForTarget(Step):
                         board = child["value"]
 
         product_dot_board = f"{product}.{board}"
-        if ctx.sdk_id != sdk_version or ctx.pb_name != product_dot_board:
+
+        # Ignore names that end in '-dfv2' since they are not actually different
+        # boards and will always report an error.
+        pb_name = ctx.pb_name.removesuffix("-dfv2")
+        if ctx.sdk_id != sdk_version or pb_name != product_dot_board:
             ctx.log(
                 f"WARNING: the target {target} might not be compatible with your SDK."
             )
@@ -353,6 +357,8 @@ class WatchForTarget(Step):
             ctx.log(
                 f"Expected product: {ctx.pb_name}, Target product: {product_dot_board}"
             )
+        else:
+            ctx.log("Target is running expected SDK version and product.")
 
 
 class Runner:
