@@ -24,6 +24,7 @@ use {
     cm_types::Name,
     derivative::Derivative,
     from_enum::FromEnum,
+    futures::future::BoxFuture,
     moniker::{ChildMoniker, ChildMonikerBase},
     std::sync::Arc,
 };
@@ -234,7 +235,6 @@ where
     }
 }
 
-#[async_trait]
 impl<C, O, E, S, M, V> OfferAggregateCapabilityProvider<C>
     for OfferAggregateServiceProvider<C, O, E, S, M, V>
 where
@@ -259,45 +259,44 @@ where
     V: Send + Sync + Clone + 'static,
     M: DebugRouteMapper + Send + Sync + Clone + 'static,
 {
-    async fn list_instances(&self) -> Result<Vec<String>, RoutingError> {
-        // Returns the offer source string as the instance name. e.g child instance name, collection name, "parent", "framework", etc.
-        Ok(self
-            .offer_decls
-            .iter()
-            .flat_map(|o| o.clone().source_instance_filter.unwrap_or(Vec::new()))
-            .collect())
-    }
-
-    async fn route_instance(&self, instance: &str) -> Result<CapabilitySource<C>, RoutingError> {
+    fn route_instances(
+        &self,
+    ) -> Vec<BoxFuture<'_, Result<(CapabilitySource<C>, Vec<String>), RoutingError>>> {
+        // Without the explicit type, this does not compile
+        let mut out: Vec<BoxFuture<'_, Result<(CapabilitySource<C>, Vec<String>), RoutingError>>> =
+            vec![];
         for offer_decl in &self.offer_decls {
-            if offer_decl
-                .source_instance_filter
-                .as_ref()
-                .map(|allowed_instances| allowed_instances.contains(&instance.to_string()))
-                .unwrap_or(false)
-            {
-                // The visitor which we inherited from the router is parameterized on the generic
-                // type `O`. This construction with from_enum is a roundabout way of
-                // converting from the concrete variant type to the generic.
-                let offer_decl = OfferDecl::Service(offer_decl.clone());
-                let offer_decl = O::from_enum(&offer_decl).unwrap().clone();
-                return router::route_from_offer(
+            let filter =
+                offer_decl.source_instance_filter.as_ref().map(Clone::clone).unwrap_or_default();
+            if filter.is_empty() {
+                continue;
+            }
+            // The visitor which we inherited from the router is parameterized on the generic
+            // type `O`. This construction with from_enum is a roundabout way of
+            // converting from the concrete variant type to the generic.
+            let offer_decl = OfferDecl::Service(offer_decl.clone());
+            let offer_decl = O::from_enum(&offer_decl).unwrap().clone();
+            let fut = async {
+                let component = self.component.upgrade().map_err(|e| {
+                    RoutingError::unsupported_route_source(format!(
+                        "error upgrading aggregation point component {}",
+                        e
+                    ))
+                })?;
+                let capability_source = router::route_from_offer(
                     RouteBundle::from_offer(offer_decl),
-                    self.component.upgrade().map_err(|e| {
-                        RoutingError::unsupported_route_source(format!(
-                            "error upgrading aggregation point component {}",
-                            e
-                        ))
-                    })?,
+                    component,
                     self.sources.clone(),
                     &mut self.visitor.clone(),
                     &mut self.mapper.clone(),
                     &mut vec![],
                 )
-                .await;
-            }
+                .await?;
+                Ok((capability_source, filter))
+            };
+            out.push(Box::pin(fut));
         }
-        Err(RoutingError::unsupported_route_source(format!("instance '{}' not found", instance)))
+        out
     }
 
     fn clone_boxed(&self) -> Box<dyn OfferAggregateCapabilityProvider<C>> {

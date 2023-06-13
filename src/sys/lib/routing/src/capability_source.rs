@@ -23,6 +23,7 @@ use {
     cm_types::{Name, Path},
     derivative::Derivative,
     from_enum::FromEnum,
+    futures::future::BoxFuture,
     moniker::ChildMoniker,
     std::{collections::HashMap, fmt, sync::Weak},
     thiserror::Error,
@@ -212,16 +213,12 @@ impl<C> fmt::Debug for Box<dyn CollectionAggregateCapabilityProvider<C>> {
 /// A provider of a capability from an aggregation of zero or more offered instances of a capability.
 ///
 /// This trait type-erases the capability type, so it can be handled and hosted generically.
-#[async_trait]
 pub trait OfferAggregateCapabilityProvider<C: ComponentInstanceInterface>: Send + Sync {
-    /// Lists the instances of the capability.
-    ///
-    /// The instance is an opaque identifier that is only meaningful for a subsequent
-    /// call to `route_instance`.
-    async fn list_instances(&self) -> Result<Vec<String>, RoutingError>;
-
-    /// Route the given `instance` of the capability to its source.
-    async fn route_instance(&self, instance: &str) -> Result<CapabilitySource<C>, RoutingError>;
+    /// Return a list of futures to route every instance in the aggregate to its source. Each
+    /// result is paired with the list of instances to include in the source.
+    fn route_instances(
+        &self,
+    ) -> Vec<BoxFuture<'_, Result<(CapabilitySource<C>, Vec<String>), RoutingError>>>;
 
     /// Trait-object compatible clone.
     fn clone_boxed(&self) -> Box<dyn OfferAggregateCapabilityProvider<C>>;

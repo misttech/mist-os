@@ -267,6 +267,7 @@ impl<'a> OpenRequest<'a> {
                 }
             }
             CapabilitySource::OfferAggregate { capability_provider, component, .. } => {
+                // TODO(fxbug.dev/4776): This should cache the directory
                 Ok(Some(Box::new(
                     AggregateServiceDirectoryProvider::create(
                         component.clone(),
