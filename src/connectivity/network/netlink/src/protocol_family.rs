@@ -70,7 +70,7 @@ pub mod route {
         routes,
     };
 
-    use netlink_packet_core::{NLM_F_ACK, NLM_F_DUMP};
+    use netlink_packet_core::{NetlinkHeader, NLM_F_ACK, NLM_F_DUMP};
     use netlink_packet_route::rtnl::{
         address::{nlas::Nla as AddressNla, AddressMessage},
         constants::{
@@ -141,9 +141,7 @@ pub mod route {
         S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
     > {
         pub(crate) interfaces_request_sink: mpsc::Sender<interfaces::Request<S>>,
-        #[allow(unused)]
         pub(crate) v4_routes_request_sink: mpsc::Sender<routes::Request<S>>,
-        #[allow(unused)]
         pub(crate) v6_routes_request_sink: mpsc::Sender<routes::Request<S>>,
     }
 
@@ -242,11 +240,8 @@ pub mod route {
             req: NetlinkMessage<RtnlMessage>,
             client: &mut InternalClient<NetlinkRoute, S>,
         ) {
-            let Self {
-                interfaces_request_sink,
-                v4_routes_request_sink: _v4_routes_request_sink,
-                v6_routes_request_sink: _v6_routes_request_sink,
-            } = self;
+            let Self { interfaces_request_sink, v4_routes_request_sink, v6_routes_request_sink } =
+                self;
 
             let (req_header, payload) = req.into_parts();
             let req = match payload {
@@ -383,6 +378,29 @@ pub mod route {
                         client.send_unicast(new_ack(result, req_header))
                     }
                 }
+                GetRoute(ref message) if is_dump => {
+                    match message.header.address_family.into() {
+                        AF_UNSPEC => {
+                            // V4 routes are requested prior to V6 routes to conform
+                            // with `ip list` output.
+                            process_dump_for_routes_worker(v4_routes_request_sink, client, req_header).await;
+                            process_dump_for_routes_worker(v6_routes_request_sink, client, req_header).await;
+                        },
+                        AF_INET => {
+                            process_dump_for_routes_worker(v4_routes_request_sink, client, req_header).await;
+                        },
+                        AF_INET6 => {
+                            process_dump_for_routes_worker(v6_routes_request_sink, client, req_header).await;
+                        },
+                        family => {
+                            debug!("invalid address family ({}) in route dump request from {}: {:?}", family, client, req);
+                            client.send_unicast(new_ack(NackErrorCode::INVALID, req_header));
+                            return;
+                        }
+                    };
+
+                    client.send_unicast(new_done(req_header))
+                }
                 NewLink(_)
                 | DelLink(_)
                 | NewLinkProp(_)
@@ -439,7 +457,7 @@ pub mod route {
                 | GetLink(_)
                 // TODO(https://issuetracker.google.com/283134032): Implement GetAddress.
                 | GetAddress(_)
-                // TODO(https://issuetracker.google.com/283137647): Implement GetRoute.
+                // Non-dump GetRoute is not currently necessary for our use.
                 | GetRoute(_)
                 // TODO(https://issuetracker.google.com/283137907): Implement GetQueueDiscipline.
                 | GetQueueDiscipline(_)
@@ -467,6 +485,30 @@ pub mod route {
                 req => panic!("unexpected RtnlMessage: {:?}", req),
             }
         }
+    }
+
+    async fn process_dump_for_routes_worker<
+        S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
+    >(
+        sink: &mut mpsc::Sender<routes::Request<S>>,
+        client: &mut InternalClient<NetlinkRoute, S>,
+        req_header: NetlinkHeader,
+    ) {
+        let (completer, waiter) = oneshot::channel();
+        sink.send(routes::Request {
+            args: routes::RequestArgs::Route(routes::RouteRequestArgs::Get(
+                routes::GetRouteArgs::Dump,
+            )),
+            sequence_number: req_header.sequence_number,
+            client: client.clone(),
+            completer,
+        })
+        .await
+        .expect("route event loop should never terminate");
+        waiter
+            .await
+            .expect("routes event loop should have handled the request")
+            .expect("route dump requests are infallible");
     }
 
     /// A connection to the Route Netlink Protocol family.
@@ -593,8 +635,8 @@ mod test {
     };
     use netlink_packet_core::{NetlinkHeader, NLM_F_ACK, NLM_F_DUMP};
     use netlink_packet_route::{
-        rtnl::address::nlas::Nla as AddressNla, AddressMessage, LinkMessage, RtnlMessage,
-        TcMessage, AF_INET, AF_INET6, AF_PACKET, AF_UNSPEC,
+        rtnl::address::nlas::Nla as AddressNla, AddressMessage, LinkMessage, RouteMessage,
+        RtnlMessage, TcMessage, AF_INET, AF_INET6, AF_PACKET, AF_UNSPEC,
     };
     use test_case::test_case;
 
@@ -603,6 +645,7 @@ mod test {
         messaging::testutil::{FakeSender, SentMessage},
         netlink_packet::{new_ack, new_done, AckErrorCode, NackErrorCode},
         protocol_family::route::{NetlinkRoute, NetlinkRouteRequestHandler},
+        routes,
     };
 
     enum ExpectedResponse<C> {
@@ -1478,6 +1521,172 @@ mod test {
             expected_response
                 .into_iter()
                 .map(|code| SentMessage::unicast(new_ack(code, header)))
+                .collect::<Vec<_>>(),
+        )
+    }
+
+    async fn test_route_request(
+        family: u16,
+        request: NetlinkMessage<RtnlMessage>,
+        expected_request: Option<routes::RequestArgs>,
+    ) -> Vec<SentMessage<RtnlMessage>> {
+        let (mut client_sink, mut client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
+            crate::client::testutil::CLIENT_ID_1,
+            &[],
+        );
+
+        let (interfaces_request_sink, _interfaces_request_stream) = mpsc::channel(0);
+        let (v4_routes_request_sink, mut v4_routes_request_stream) = mpsc::channel(0);
+        let (v6_routes_request_sink, mut v6_routes_request_stream) = mpsc::channel(0);
+
+        let mut handler = NetlinkRouteRequestHandler::<FakeSender<_>> {
+            interfaces_request_sink,
+            v4_routes_request_sink,
+            v6_routes_request_sink,
+        };
+        let ((), ()) = futures::future::join(handler.handle_request(request, &mut client), async {
+            if family == AF_UNSPEC || family == AF_INET {
+                let next = v4_routes_request_stream.next();
+                match expected_request {
+                    Some(expected_request) => {
+                        let routes::Request { args, sequence_number: _, client: _, completer } =
+                            next.await.expect("handler should send request");
+                        assert_eq!(args, expected_request);
+                        completer.send(Ok(())).expect("handler should be alive");
+                    }
+                    None => assert_matches!(next.now_or_never(), None),
+                };
+            }
+            if family == AF_UNSPEC || family == AF_INET6 {
+                let next = v6_routes_request_stream.next();
+                match expected_request {
+                    Some(expected_request) => {
+                        let routes::Request { args, sequence_number: _, client: _, completer } =
+                            next.await.expect("handler should send request");
+                        assert_eq!(args, expected_request);
+                        completer.send(Ok(())).expect("handler should be alive");
+                    }
+                    None => assert_matches!(next.now_or_never(), None),
+                };
+            }
+        })
+        .await;
+
+        client_sink.take_messages()
+    }
+
+    /// Test RTM_GETROUTE.
+    #[test_case(
+        0,
+        AF_UNSPEC,
+        None,
+        None; "af_unspec_no_flags")]
+    #[test_case(
+        NLM_F_ACK,
+        AF_UNSPEC,
+        None,
+        Some(ExpectedResponse::Ack(Ok(()))); "af_unspec_ack_flag")]
+    #[test_case(
+        NLM_F_DUMP,
+        AF_UNSPEC,
+        Some(routes::GetRouteArgs::Dump),
+        Some(ExpectedResponse::Done); "af_unspec_dump_flag")]
+    #[test_case(
+        NLM_F_DUMP | NLM_F_ACK,
+        AF_UNSPEC,
+        Some(routes::GetRouteArgs::Dump),
+        Some(ExpectedResponse::Done); "af_unspec_dump_and_ack_flags")]
+    #[test_case(
+        0,
+        AF_INET,
+        None,
+        None; "af_inet_no_flags")]
+    #[test_case(
+        NLM_F_ACK,
+        AF_INET,
+        None,
+        Some(ExpectedResponse::Ack(Ok(()))); "af_inet_ack_flag")]
+    #[test_case(
+        NLM_F_DUMP,
+        AF_INET,
+        Some(routes::GetRouteArgs::Dump),
+        Some(ExpectedResponse::Done); "af_inet_dump_flag")]
+    #[test_case(
+        NLM_F_DUMP | NLM_F_ACK,
+        AF_INET,
+        Some(routes::GetRouteArgs::Dump),
+        Some(ExpectedResponse::Done); "af_inet_dump_and_ack_flags")]
+    #[test_case(
+        0,
+        AF_INET6,
+        None,
+        None; "af_inet6_no_flags")]
+    #[test_case(
+        NLM_F_ACK,
+        AF_INET6,
+        None,
+        Some(ExpectedResponse::Ack(Ok(()))); "af_inet6_ack_flag")]
+    #[test_case(
+        NLM_F_DUMP,
+        AF_INET6,
+        Some(routes::GetRouteArgs::Dump),
+        Some(ExpectedResponse::Done); "af_inet6_dump_flag")]
+    #[test_case(
+        NLM_F_DUMP | NLM_F_ACK,
+        AF_INET6,
+        Some(routes::GetRouteArgs::Dump),
+        Some(ExpectedResponse::Done); "af_inet6_dump_and_ack_flags")]
+    #[test_case(
+        0,
+        AF_PACKET,
+        None,
+        None; "af_other_no_flags")]
+    #[test_case(
+        NLM_F_ACK,
+        AF_PACKET,
+        None,
+        Some(ExpectedResponse::Ack(Ok(()))); "af_other_ack_flag")]
+    #[test_case(
+        NLM_F_DUMP,
+        AF_PACKET,
+        None,
+        Some(ExpectedResponse::Ack(Err(NackErrorCode::INVALID))); "af_other_dump_flag")]
+    #[test_case(
+        NLM_F_DUMP | NLM_F_ACK,
+        AF_PACKET,
+        None,
+        Some(ExpectedResponse::Ack(Err(NackErrorCode::INVALID))); "af_other_dump_and_ack_flags")]
+    #[fuchsia::test]
+    async fn test_get_route(
+        flags: u16,
+        family: u16,
+        expected_request_args: Option<routes::GetRouteArgs>,
+        expected_response: Option<ExpectedResponse<Result<(), NackErrorCode>>>,
+    ) {
+        let header = header_with_flags(flags);
+        let route_message = {
+            let mut message = RouteMessage::default();
+            message.header.address_family = family.try_into().unwrap();
+            message
+        };
+
+        pretty_assertions::assert_eq!(
+            test_route_request(
+                family,
+                NetlinkMessage::new(
+                    header,
+                    NetlinkPayload::InnerMessage(RtnlMessage::GetRoute(route_message)),
+                ),
+                expected_request_args
+                    .map(|a| routes::RequestArgs::Route(routes::RouteRequestArgs::Get(a))),
+            )
+            .await,
+            expected_response
+                .into_iter()
+                .map(|expected_response| SentMessage::unicast(match expected_response {
+                    ExpectedResponse::Ack(code) => new_ack(code, header),
+                    ExpectedResponse::Done => new_done(header),
+                }))
                 .collect::<Vec<_>>(),
         )
     }

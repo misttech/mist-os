@@ -38,24 +38,21 @@ use crate::{
 use crate::NETLINK_LOG_TAG;
 
 /// Arguments for an RTM_GETROUTE [`Request`].
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum GetRouteArgs {
-    #[allow(unused)]
     Dump,
 }
 
 /// [`Request`] arguments associated with routes.
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum RouteRequestArgs {
     /// RTM_GETROUTE
-    #[allow(unused)]
     Get(GetRouteArgs),
 }
 
 /// The argument(s) for a [`Request`].
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum RequestArgs {
-    #[allow(unused)]
     Route(RouteRequestArgs),
 }
 
@@ -64,6 +61,7 @@ pub(crate) enum RequestArgs {
 pub(crate) enum RequestError {}
 
 /// A request associated with routes.
+#[derive(Debug)]
 pub(crate) struct Request<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> {
     /// The resource and operation-specific argument(s) for this request.
     pub args: RequestArgs,
@@ -324,7 +322,7 @@ fn handle_route_watcher_event<I: Ip, S: Sender<<NetlinkRoute as ProtocolFamily>:
 /// A wrapper type for the netlink_packet_route `RouteMessage` to enable conversions
 /// from [`fnet_routes_ext::InstalledRoute`] and implement hashing.
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct NetlinkRouteMessage(RouteMessage);
+pub(crate) struct NetlinkRouteMessage(RouteMessage);
 
 // Constructs a new set of `NetlinkRouteMessage` from an
 // `InstalledRoute` HashSet.
@@ -363,7 +361,7 @@ impl NetlinkRouteMessage {
     }
 
     /// Wrap the inner [`RouteMessage`] in an [`RtnlMessage::NewRoute`].
-    fn into_rtnl_new_route(
+    pub(crate) fn into_rtnl_new_route(
         self,
         sequence_number: u32,
         is_dump: bool,
@@ -401,7 +399,7 @@ impl Hash for NetlinkRouteMessage {
 
 // NetlinkRouteMessage conversion related errors.
 #[derive(Debug, PartialEq)]
-enum NetlinkRouteMessageConversionError {
+pub(crate) enum NetlinkRouteMessageConversionError {
     // Route with non-forward action received from Netstack.
     RouteActionNotForwarding,
     // Interface id could not be downcasted to fit into the expected u32.
@@ -854,9 +852,9 @@ mod tests {
     }
 
     struct Setup<W, I: fnet_routes_ext::FidlRouteIpExt> {
-        event_loop: EventLoop<FakeSender<RtnlMessage>, I>,
-        watcher_stream: W,
-        request_sink: mpsc::Sender<Request<FakeSender<RtnlMessage>>>,
+        pub event_loop: EventLoop<FakeSender<RtnlMessage>, I>,
+        pub watcher_stream: W,
+        pub request_sink: mpsc::Sender<Request<FakeSender<RtnlMessage>>>,
     }
 
     fn setup_with_route_clients<I: fnet_routes_ext::FidlRouteIpExt>(
@@ -1132,7 +1130,7 @@ mod tests {
                             m.nlas.clone().into_iter().filter_map(|nla|
                                 match nla {
                                     netlink_packet_route::route::Nla::Oif(interface_id) =>
-                                        Some(interface_id),
+                                        Some((m.header.address_family, interface_id)),
                                     netlink_packet_route::route::Nla::Destination(_)
                                     | netlink_packet_route::route::Nla::Gateway(_)
                                     | netlink_packet_route::route::Nla::Priority(_) => None,
