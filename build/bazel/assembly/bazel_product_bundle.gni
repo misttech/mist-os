@@ -104,8 +104,11 @@ template("bazel_product_bundle") {
 
     product_bundle_out_dir = "${out_dir}/product_bundle"
     package_manifests_out_dir = "${out_dir}/manifests"
-    transfer_manifest_out_dir = "${out_dir}/transfer_manifest"
-    transfer_json = "${transfer_manifest_out_dir}/transfer.json"
+
+    # NOTE: transfer.json MUST live in the parent directory of
+    # `product_bundle_out_dir` for `ffx product download` to work.
+    # See details in https://fxbug.dev/128934.
+    transfer_json = "${out_dir}/transfer.json"
 
     if (defined(invoker.bazel_product_image_target)) {
       product_assembly_out_dir = labels.bazel_product_assembly
@@ -411,7 +414,7 @@ template("bazel_product_bundle") {
                            ])
     product_bundle_target = ":${labels.bazel_product_bundle}"
     product_bundle_dir = "${target_gen_dir}/${files.product_bundle_out_dir}"
-    output_dir = "${target_gen_dir}/${files.transfer_manifest_out_dir}"
+    output_dir = "${target_gen_dir}/${files.out_dir}"
   }
 
   # A convenience group for easy `fx build` invocation.
