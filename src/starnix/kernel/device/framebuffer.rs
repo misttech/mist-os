@@ -4,7 +4,7 @@
 
 use super::framebuffer_server::{spawn_view_provider, FramebufferServer};
 use crate::{
-    device::DeviceOps,
+    device::{input::InputFile, DeviceOps},
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         *,
@@ -17,7 +17,10 @@ use crate::{
     types::*,
 };
 
+use fidl_fuchsia_math as fmath;
 use fidl_fuchsia_ui_composition as fuicomposition;
+use fidl_fuchsia_ui_display_singleton as fuidisplay;
+use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_zircon as zx;
 use std::sync::Arc;
 use zerocopy::AsBytes;
@@ -30,8 +33,43 @@ pub struct Framebuffer {
 }
 
 impl Framebuffer {
-    pub fn new(width: u32, height: u32) -> Result<Arc<Self>, Errno> {
+    /// Creates a new `Framebuffer` according to the spec provided in `feature_string`.
+    ///
+    /// This also creates an `InputFile` that is set up to detect input within the bounds
+    /// of the framebuffer.
+    ///
+    /// For example, `aspect_ratio:1:1` creates a 1:1 aspect ratio framebuffer, scaled to
+    /// fit the display.
+    ///
+    /// If the `feature_string` is empty, or `None`, the framebuffer will be scaled to the
+    /// display.
+    pub fn new_with_input(
+        feature_string: Option<&String>,
+    ) -> Result<(Arc<Self>, Arc<InputFile>), Errno> {
         let mut info = fb_var_screeninfo::default();
+
+        let display_size =
+            Self::get_display_size().unwrap_or(fmath::SizeU { width: 700, height: 1200 });
+
+        // If the container has a specific aspect ratio set, use that to fit the framebuffer
+        // inside of the display.
+        let (feature_width, feature_height) = feature_string
+            .map(|s| {
+                let components: Vec<_> = s.split(':').collect();
+                assert_eq!(components.len(), 3, "Malformed aspect ratio");
+                (
+                    components[1].parse().expect("Malformed aspect ratio"),
+                    components[2].parse().expect("Malformed aspect ratio"),
+                )
+            })
+            .unwrap_or((display_size.width, display_size.height));
+
+        // Scale to framebuffer to fit the display, while maintaining the expected aspect ratio.
+        let ratio =
+            std::cmp::min(display_size.width / feature_width, display_size.height / feature_height);
+        let (width, height) = (feature_width * ratio, feature_height * ratio);
+
+        let input_file = InputFile::new(width, height);
 
         info.xres = width;
         info.yres = height;
@@ -52,14 +90,17 @@ impl Framebuffer {
                 log_warn!("could not write initial framebuffer: {:?}", err);
             }
 
-            Ok(Arc::new(Self { vmo, vmo_len, server: Some(server), info: RwLock::new(info) }))
+            Ok((
+                Arc::new(Self { vmo, vmo_len, server: Some(server), info: RwLock::new(info) }),
+                input_file,
+            ))
         } else {
             let vmo_len = info.xres * info.yres * (info.bits_per_pixel / 8);
             let vmo = Arc::new(zx::Vmo::create(vmo_len as u64).map_err(|s| match s {
                 zx::Status::NO_MEMORY => errno!(ENOMEM),
                 _ => impossible_error(s),
             })?);
-            Ok(Arc::new(Self { vmo, vmo_len, server: None, info: RwLock::new(info) }))
+            Ok((Arc::new(Self { vmo, vmo_len, server: None, info: RwLock::new(info) }), input_file))
         }
     }
 
@@ -76,6 +117,18 @@ impl Framebuffer {
         if let Some(server) = &self.server {
             spawn_view_provider(server.clone(), view_bound_protocols, outgoing_dir);
         }
+    }
+
+    fn get_display_size() -> Result<fmath::SizeU, Errno> {
+        let (server_end, client_end) = zx::Channel::create();
+        connect_channel_to_protocol::<fuidisplay::InfoMarker>(server_end)
+            .map_err(|_| errno!(ENOENT))?;
+        let singleton_display_info = fuidisplay::InfoSynchronousProxy::new(client_end);
+        let metrics =
+            singleton_display_info.get_metrics(zx::Time::INFINITE).map_err(|_| errno!(EINVAL))?;
+        let extent_in_px =
+            metrics.extent_in_px.ok_or("Failed to get extent_in_px").map_err(|_| errno!(EINVAL))?;
+        Ok(extent_in_px)
     }
 }
 
