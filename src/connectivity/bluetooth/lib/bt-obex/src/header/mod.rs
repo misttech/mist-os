@@ -60,6 +60,57 @@ impl TryFrom<u8> for ActionIdentifier {
     }
 }
 
+/// Describes the type of an OBEX object. Used in `Header::Type`.
+///
+/// See OBEX 1.5 Section 2.2.3.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MimeType(String);
+
+impl MimeType {
+    pub fn len(&self) -> usize {
+        // The encoded format for the MimeType includes a 1 byte null terminator.
+        self.0.len() + 1
+    }
+
+    pub fn to_be_bytes(&self) -> Vec<u8> {
+        // The Type header is encoded as a byte sequence of null terminated ASCII text.
+        let mut encoded_buf: Vec<u8> = self.0.clone().into_bytes();
+        encoded_buf.push(0); // Add the null terminator
+        encoded_buf
+    }
+}
+
+impl TryFrom<&[u8]> for MimeType {
+    type Error = PacketError;
+
+    fn try_from(src: &[u8]) -> Result<Self, Self::Error> {
+        if src.len() == 0 {
+            return Err(PacketError::data("empty Type header"));
+        }
+
+        let mut text = String::from_utf8(src.to_vec()).map_err(PacketError::external)?;
+        // The Type Header is represented as null terminated UTF-8 text. See OBEX 1.5 Section 2.2.3.
+        if !text.ends_with('\0') {
+            return Err(PacketError::data("Type missing null terminator"));
+        }
+
+        let _ = text.pop();
+        Ok(Self(text))
+    }
+}
+
+impl From<String> for MimeType {
+    fn from(src: String) -> MimeType {
+        MimeType(src)
+    }
+}
+
+impl From<&str> for MimeType {
+    fn from(src: &str) -> MimeType {
+        MimeType(src.to_string())
+    }
+}
+
 decodable_enum! {
     /// The Header Encoding is the upper 2 bits of the Header Identifier (HI) and describes the type
     /// of payload included in the Header.
@@ -256,7 +307,7 @@ pub struct UserDefinedHeader {
 pub enum Header {
     Count(u32),
     Name(ObexString),
-    Type(ObexString),
+    Type(MimeType),
     /// Number of bytes.
     Length(u32),
     /// Time represented as a well-formed NaiveDateTime (no timezone). This is typically UTC.
@@ -354,7 +405,7 @@ impl Header {
             | SingleResponseModeParameters(_) => 1,
             Count(_) | Length(_) | ConnectionId(_) | CreatorId(_) | Permissions(_)
             | Time4Byte(_) => 4,
-            Name(s) | Type(s) | Description(s) | DestName(s) => s.len(),
+            Name(s) | Description(s) | DestName(s) => s.len(),
             Target(b)
             | Http(b)
             | Body(b)
@@ -365,6 +416,7 @@ impl Header {
             | AuthenticationResponse(b)
             | ObjectClass(b)
             | SessionParameters(b) => b.len(),
+            Type(mime_type) => mime_type.len(),
             TimeIso8601(_) => Self::ISO_8601_LENGTH_BYTES,
             WanUuid(_) => Uuid::BLUETOOTH_UUID_LENGTH_BYTES,
             User(UserDefinedHeader { value, .. }) => value.len(),
@@ -411,7 +463,7 @@ impl Encodable for Header {
                 buf[start_index..start_index + 4].copy_from_slice(&v.to_be_bytes());
             }
 
-            Name(str) | Type(str) | Description(str) | DestName(str) => {
+            Name(str) | Description(str) | DestName(str) => {
                 // Encode all ObexString Headers.
                 let s = str.to_be_bytes();
                 buf[start_index..start_index + s.len()].copy_from_slice(&s);
@@ -433,6 +485,10 @@ impl Encodable for Header {
             SessionSequenceNumber(v) | SingleResponseMode(v) | SingleResponseModeParameters(v) => {
                 // Encode all 1-byte value headers.
                 buf[start_index] = *v;
+            }
+            Type(mime_type) => {
+                let b = mime_type.to_be_bytes();
+                buf[start_index..start_index + b.len()].copy_from_slice(&b[..]);
             }
             ActionId(v) => {
                 buf[start_index] = v.into();
@@ -505,7 +561,7 @@ impl Decodable for Header {
                 Ok(Header::Count(u32::from_be_bytes(data[..].try_into().unwrap())))
             }
             HeaderIdentifier::Name => Ok(Header::Name(ObexString::try_from(data)?)),
-            HeaderIdentifier::Type => Ok(Header::Type(ObexString::try_from(data)?)),
+            HeaderIdentifier::Type => Ok(Header::Type(MimeType::try_from(data)?)),
             HeaderIdentifier::Length => {
                 Ok(Header::Length(u32::from_be_bytes(data[..].try_into().unwrap())))
             }
@@ -855,6 +911,53 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn decode_type_header_success() {
+        let type_buf = [
+            0x42, // HI = Type
+            0x00, 0x10, // Total length = 16
+            0x74, 0x65, 0x78, 0x74, 0x2f, 0x78, 0x2d, 0x76, 0x43, 0x61, 0x72, 0x64,
+            0x00, // 'text/x-vCard'
+        ];
+        let result = Header::decode(&type_buf).expect("can decode type header");
+        assert_eq!(result, Header::Type("text/x-vCard".into()));
+
+        let empty_type_buf = [
+            0x42, // HI = Type
+            0x00, 0x04, // Total length = 4
+            0x00, // Text = empty string with null terminator.
+        ];
+        let result = Header::decode(&empty_type_buf).expect("can decode type header");
+        assert_eq!(result, Header::Type("".into()));
+    }
+
+    #[fuchsia::test]
+    fn decode_invalid_type_header_is_error() {
+        // Empty type is an Error since it's missing the null terminator.
+        let invalid_type_buf = [
+            0x42, // HI = Type
+            0x00, 0x03, // Total length = 3
+        ];
+        assert_matches!(Header::decode(&invalid_type_buf), Err(PacketError::Data(_)));
+
+        // Valid type string but missing null terminator.
+        let invalid_type_buf = [
+            0x42, // HI = Type
+            0x00, 0x0f, // Total length = 15
+            0x74, 0x65, 0x78, 0x74, 0x2f, 0x78, 0x2d, 0x76, 0x43, 0x61, 0x72,
+            0x64, // 'text/x-vCard'
+        ];
+        assert_matches!(Header::decode(&invalid_type_buf), Err(PacketError::Data(_)));
+
+        // Invalid utf-8 string.
+        let invalid_string_type_buf = [
+            0x42, // HI = Type
+            0x00, 0x07, // Total length = 7
+            0x9f, 0x92, 0x96, 0x00, // Invalid utf-8
+        ];
+        assert_matches!(Header::decode(&invalid_string_type_buf), Err(PacketError::Other(_)));
+    }
+
+    #[fuchsia::test]
     fn encode_user_data_header_success() {
         // Encoding a 1-byte User Header should succeed.
         let user = Header::User(UserDefinedHeader { identifier: 0xb3, value: vec![0x12] });
@@ -941,6 +1044,21 @@ mod tests {
             0x00, 0x13, // Length = 19 bytes
             0x00, 0x00, 0x18, 0x0d, 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0x80, 0x5f, 0x9b,
             0x34, 0xfb, // UUID (stringified) = "0000180d-0000-1000-8000-00805f9b34fb"
+        ];
+        assert_eq!(buf, expected_buf);
+    }
+
+    #[fuchsia::test]
+    fn encode_type_header_success() {
+        let type_ = Header::Type("text/html".into());
+        // Total length should be 3 bytes (ID, length) + 10 bytes (null terminated string)
+        assert_eq!(type_.encoded_len(), 13);
+        let mut buf = vec![0; type_.encoded_len()];
+        type_.encode(&mut buf).expect("can encode");
+        let expected_buf = [
+            0x42, // Header ID = Type
+            0x00, 0x0d, // Length = 13 bytes
+            0x74, 0x65, 0x78, 0x74, 0x2f, 0x68, 0x74, 0x6d, 0x6c, 0x00, // 'text/html'
         ];
         assert_eq!(buf, expected_buf);
     }
