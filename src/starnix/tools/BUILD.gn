@@ -16,5 +16,6 @@ group("tests") {
   deps = [
     "create_container_package:tests($host_toolchain)",
     "gen_android_starnix_container:tests($host_toolchain)",
+    "tar_to_pkg:tests($host_toolchain)",
   ]
 }

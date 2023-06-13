@@ -5,6 +5,7 @@
 use anyhow::{bail, Error};
 use argh::FromArgs;
 use std::str::FromStr;
+use tar_img_extract::InputFormat;
 
 #[derive(PartialEq)]
 pub enum ContainerArchitecture {
@@ -20,26 +21,6 @@ impl FromStr for ContainerArchitecture {
             "x64" => Ok(ContainerArchitecture::X64),
             "arm64" => Ok(ContainerArchitecture::Arm64),
             other => bail!("Invalid architecture: {}", other),
-        }
-    }
-}
-
-pub enum InputFormat {
-    /// A tarball containing the root filesystem.
-    Tarball,
-
-    /// A Docker archive (created with "docker save").
-    DockerArchive,
-}
-
-impl FromStr for InputFormat {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_ref() {
-            "tarball" => Ok(InputFormat::Tarball),
-            "docker-archive" => Ok(InputFormat::DockerArchive),
-            other => bail!("Invalid input format: {}", other),
         }
     }
 }
