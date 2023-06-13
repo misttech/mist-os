@@ -1972,7 +1972,12 @@ impl BinderObject {
     /// Creates a new BinderObject. It is the responsibility of the caller to sent a `BR_ACQUIRE`
     /// to the owning process.
     fn new(owner: &Arc<BinderProcess>, local: LocalBinderObject, flags: u32) -> Arc<Self> {
-        log_trace!("New binder object {:?} in process {:?} with flags {:?}", local, owner, flags);
+        log_trace!(
+            "New binder object {:?} in process {:?} with flags {:?}",
+            local,
+            owner.identifier,
+            flags
+        );
         Arc::new(Self {
             owner: Arc::downgrade(owner),
             local,
