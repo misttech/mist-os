@@ -291,6 +291,40 @@ func (pi *adminAddressStateProviderImpl) OnChanged(lifetimes stack.AddressLifeti
 	}
 }
 
+func (pi *adminAddressStateProviderImpl) Remove(fidl.Context) error {
+	_ = syslog.DebugTf(addressStateProviderName, "NICID=%d removing address %s from NIC %d due to explicit removal request", pi.nicid, pi.protocolAddr.AddressWithPrefix, pi.nicid)
+
+	pi.mu.Lock()
+	prevRemoved := pi.mu.removed
+	pi.mu.removed = true
+	pi.mu.Unlock()
+
+	if prevRemoved {
+		return nil
+	}
+
+	nicInfo, ok := pi.ns.stack.NICInfo()[pi.nicid]
+	if !ok {
+		panic(fmt.Sprintf("NIC %d not found when removing %s", pi.nicid, pi.protocolAddr.AddressWithPrefix))
+	}
+	ifs := nicInfo.Context.(*ifState)
+	switch status := ifs.removeAddress(pi.protocolAddr); status {
+	case zx.ErrOk:
+	case zx.ErrNotFound:
+		// Normally, we'd expect that it's impossible to get NotFound while holding
+		// an AddressStateProvider, as the existence of the ASP itself should
+		// indicate that the address is present.
+		// However, we could be racing with fuchsia.net.interfaces.admin.Control/RemoveAddress
+		// (see adminControlImpl.RemoveAddress in this file).
+		_ = syslog.ErrorTf(addressStateProviderName, "tried to remove address %s that was not found on NIC %d", pi.protocolAddr.AddressWithPrefix, pi.nicid)
+	case zx.ErrBadState:
+		_ = syslog.WarnTf(addressStateProviderName, "NIC %d removed when trying to remove address %s due to explicit removal request: %s", pi.nicid, pi.protocolAddr.AddressWithPrefix, status)
+	default:
+		panic(fmt.Sprintf("NICID=%d unknown error trying to remove address %s upon explicit removal request: %s", pi.nicid, pi.protocolAddr.AddressWithPrefix, status))
+	}
+	return nil
+}
+
 func (pi *adminAddressStateProviderImpl) OnRemoved(reason stack.AddressRemovalReason) {
 	_ = syslog.DebugTf(addressStateProviderName, "NIC=%d addr=%s removed reason=%s", pi.nicid, pi.protocolAddr.AddressWithPrefix, reason)
 

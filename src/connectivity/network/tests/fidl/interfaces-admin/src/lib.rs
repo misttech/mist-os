@@ -380,8 +380,16 @@ async fn add_address_errors<N: Netstack>(name: &str) {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+enum AddressRemovalMethod {
+    InterfaceControl,
+    AddressStateProviderExplicitRemove,
+}
+
 #[netstack_test]
-async fn add_address_removal<N: Netstack>(name: &str) {
+#[test_case(AddressRemovalMethod::InterfaceControl ; "removing address via Control.Remove")]
+#[test_case(AddressRemovalMethod::AddressStateProviderExplicitRemove ; "removing address via AddressStateProvider.Remove")]
+async fn add_address_removal<N: Netstack>(name: &str, removal_method: AddressRemovalMethod) {
     let sandbox = netemul::TestSandbox::new().expect("new sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
     let device = sandbox.create_endpoint(name).await.expect("create endpoint");
@@ -413,12 +421,19 @@ async fn add_address_removal<N: Netstack>(name: &str) {
         .await
         .expect("add address failed unexpectedly");
 
-        let did_remove = control
-            .remove_address(&mut address)
-            .await
-            .expect("FIDL error calling Control.RemoveAddress")
-            .expect("error calling Control.RemoveAddress");
-        assert!(did_remove);
+        match removal_method {
+            AddressRemovalMethod::InterfaceControl => {
+                let did_remove = control
+                    .remove_address(&mut address)
+                    .await
+                    .expect("FIDL error calling Control.RemoveAddress")
+                    .expect("error calling Control.RemoveAddress");
+                assert!(did_remove);
+            }
+            AddressRemovalMethod::AddressStateProviderExplicitRemove => {
+                address_state_provider.remove().expect("should not get FIDL error");
+            }
+        };
 
         let fidl_fuchsia_net_interfaces_admin::AddressStateProviderEvent::OnAddressRemoved {
             error: reason,
@@ -632,17 +647,66 @@ async fn ipv4_routing_table(
 
 enum AddressRemoval {
     DropHandle,
-    CallRemove,
+    CallControlRemove,
+    CallAddressStateProviderRemove,
 }
 use AddressRemoval::*;
 
 #[netstack_test]
-#[test_case(None, false, CallRemove; "default add_subnet_route explicit remove")]
-#[test_case(None, false, DropHandle; "default add_subnet_route implicit remove")]
-#[test_case(Some(false), false, CallRemove; "add_subnet_route is false explicit remove")]
-#[test_case(Some(false), false, DropHandle; "add_subnet_route is false implicit remove")]
-#[test_case(Some(true), true, CallRemove; "add_subnet_route is true explicit remove")]
-#[test_case(Some(true), true, DropHandle; "add_subnet_route is true implicit remove")]
+#[test_case(
+    None,
+    false,
+    CallControlRemove;
+    "default add_subnet_route explicit remove via Control"
+)]
+#[test_case(
+    None,
+    false,
+    CallAddressStateProviderRemove;
+    "default add_subnet_route explicit remove via AddressStateProvider"
+)]
+#[test_case(
+    None,
+    false,
+    DropHandle;
+    "default add_subnet_route implicit remove"
+)]
+#[test_case(
+    Some(false),
+    false,
+    CallControlRemove;
+    "add_subnet_route is false explicit remove via Control"
+)]
+#[test_case(
+    Some(false),
+    false,
+    CallAddressStateProviderRemove;
+    "add_subnet_route is false explicit remove via AddressStateProvider"
+)]
+#[test_case(
+    Some(false),
+    false,
+    DropHandle;
+    "add_subnet_route is false implicit remove"
+)]
+#[test_case(
+    Some(true),
+    true,
+    CallControlRemove;
+    "add_subnet_route is true explicit remove via Control"
+)]
+#[test_case(
+    Some(true),
+    true,
+    CallAddressStateProviderRemove;
+    "add_subnet_route is true explicit remove via AddressStateProvider"
+)]
+#[test_case(
+    Some(true),
+    true,
+    DropHandle;
+    "add_subnet_route is true implicit remove"
+)]
 async fn add_address_and_remove<N: Netstack>(
     name: &str,
     add_subnet_route: Option<bool>,
@@ -740,13 +804,79 @@ async fn add_address_and_remove<N: Netstack>(
             .await
             .expect("wait for address absence");
         }
-        AddressRemoval::CallRemove => {
+        AddressRemoval::CallControlRemove => {
             assert_eq!(
                 control.remove_address(&mut subnet.clone()).await.expect("fidl success"),
                 Ok(true)
-            )
+            );
+            let event = address_state_provider
+                .take_event_stream()
+                .try_next()
+                .await
+                .expect("fidl success")
+                .expect("should not have ended");
+            assert_matches!(
+                event,
+                finterfaces_admin::AddressStateProviderEvent::OnAddressRemoved {
+                    error: finterfaces_admin::AddressRemovalReason::UserRemoved,
+                }
+            );
+        }
+        AddressRemoval::CallAddressStateProviderRemove => {
+            address_state_provider.remove().expect("should succeed");
+            let event = address_state_provider
+                .take_event_stream()
+                .try_next()
+                .await
+                .expect("fidl success")
+                .expect("should not have ended");
+            assert_matches!(
+                event,
+                finterfaces_admin::AddressStateProviderEvent::OnAddressRemoved {
+                    error: finterfaces_admin::AddressRemovalReason::UserRemoved,
+                }
+            );
         }
     }
+
+    // The address should disappear. Unfortunately, we can't assume it to be
+    // synchronously gone from interface watchers as there's no synchronization
+    // guarantee between interfaces-admin and interface watchers on netstack2.
+    fnet_interfaces_ext::wait_interface_with_id(
+        fnet_interfaces_ext::event_stream_from_state(
+            &interface_state,
+            fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+        )
+        .expect("event stream from state"),
+        &mut fnet_interfaces_ext::InterfaceState::Unknown(id),
+        |fnet_interfaces_ext::PropertiesAndState {
+             properties:
+                 fnet_interfaces_ext::Properties {
+                     id: _,
+                     name: _,
+                     device_class: _,
+                     online: _,
+                     addresses,
+                     has_default_ipv4_route: _,
+                     has_default_ipv6_route: _,
+                 },
+             state: (),
+         }| {
+            addresses
+                .iter()
+                .all(
+                    |fnet_interfaces_ext::Address { addr, valid_until: _, assignment_state: _ }| {
+                        addr != &subnet
+                    },
+                )
+                .then_some(())
+        },
+    )
+    .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT, || {
+        panic!("timed out waiting for address to disappear")
+    })
+    .await
+    .expect("should succeed");
 
     // In either case, there should be no route for the subnet after the
     // address is removed.

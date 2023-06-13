@@ -599,7 +599,7 @@ impl BindingsNonSyncCtxImpl {
                     &mut address_info.address_state_provider;
                 if let Some(sender) = cancelation_sender.take() {
                     sender
-                        .send(fnet_interfaces_admin::AddressRemovalReason::DadFailed)
+                        .send(interfaces_admin::AddressStateProviderCancellationReason::DadFailed)
                         .expect("assignment state receiver unexpectedly disconnected");
                 }
             }

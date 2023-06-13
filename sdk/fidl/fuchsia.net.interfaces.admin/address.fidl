@@ -109,6 +109,12 @@ closed protocol AddressStateProvider {
     /// calling this method, and the address will not be removed.
     strict Detach();
 
+    /// Removes the address.
+    ///
+    /// The server end of the protocol is closed after address removal has
+    /// completed, and the `USER_REMOVED` `OnAddressRemoved` event is sent.
+    strict Remove();
+
     /// Terminal event. Immediately precedes the closure of the server end of
     /// the protocol.
     ///

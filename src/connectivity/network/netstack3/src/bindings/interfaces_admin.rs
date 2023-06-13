@@ -49,7 +49,7 @@ use futures::{
     future::FusedFuture as _, lock::Mutex as AsyncMutex, stream::FusedStream as _, FutureExt as _,
     SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
 };
-use net_types::{ip::AddrSubnetEither, ip::IpAddr, SpecifiedAddr};
+use net_types::{ip::AddrSubnetEither, ip::IpAddr, SpecifiedAddr, Witness};
 use netstack3_core::{
     device::{update_ipv4_configuration, update_ipv6_configuration, DeviceId},
     ip::device::{
@@ -616,7 +616,7 @@ pub(crate) async fn run_interface_control(
                  }| {
                     if let Some(cancelation_sender) = cancelation_sender.take() {
                         cancelation_sender
-                            .send(fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved)
+                            .send(AddressStateProviderCancellationReason::InterfaceRemoved)
                             .expect("failed to stop AddressStateProvider");
                     }
                     worker.clone()
@@ -811,7 +811,7 @@ async fn remove_address(ctx: &Ctx, id: BindingId, address: fnet::Subnet) -> bool
     let did_cancel_worker = match cancelation_sender {
         Some(cancelation_sender) => {
             cancelation_sender
-                .send(fnet_interfaces_admin::AddressRemovalReason::UserRemoved)
+                .send(AddressStateProviderCancellationReason::UserRemoved)
                 .expect("failed to stop AddressStateProvider");
             true
         }
@@ -996,7 +996,7 @@ fn add_address(
         Ok(addr) => addr,
         Err(e) => {
             tracing::warn!("not adding invalid address {:?} to interface {}: {:?}", address, id, e);
-            close_address_state_provider(
+            send_address_removal_event(
                 address.addr.into_core(),
                 id,
                 control_handle,
@@ -1053,7 +1053,7 @@ fn add_address(
     core_id.external_state().with_common_info_mut(|i| {
         let vacant_address_entry = match i.addresses.entry(specified_addr) {
             hash_map::Entry::Occupied(_occupied) => {
-                close_address_state_provider(
+                send_address_removal_event(
                     address.addr.into_core(),
                     id,
                     control_handle,
@@ -1092,6 +1092,29 @@ fn add_address(
     })
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum AddressStateProviderCancellationReason {
+    UserRemoved,
+    DadFailed,
+    InterfaceRemoved,
+}
+
+impl From<AddressStateProviderCancellationReason> for fnet_interfaces_admin::AddressRemovalReason {
+    fn from(value: AddressStateProviderCancellationReason) -> Self {
+        match value {
+            AddressStateProviderCancellationReason::UserRemoved => {
+                fnet_interfaces_admin::AddressRemovalReason::UserRemoved
+            }
+            AddressStateProviderCancellationReason::DadFailed => {
+                fnet_interfaces_admin::AddressRemovalReason::DadFailed
+            }
+            AddressStateProviderCancellationReason::InterfaceRemoved => {
+                fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved
+            }
+        }
+    }
+}
+
 /// A worker for `fuchsia.net.interfaces.admin/AddressStateProvider`.
 async fn run_address_state_provider(
     ctx: Ctx,
@@ -1103,9 +1126,7 @@ async fn run_address_state_provider(
     mut assignment_state_receiver: futures::channel::mpsc::UnboundedReceiver<
         fnet_interfaces::AddressAssignmentState,
     >,
-    mut stop_receiver: futures::channel::oneshot::Receiver<
-        fnet_interfaces_admin::AddressRemovalReason,
-    >,
+    mut stop_receiver: futures::channel::oneshot::Receiver<AddressStateProviderCancellationReason>,
 ) {
     let addr_subnet_either = addr_subnet_and_config.addr_subnet_either();
     let (address, subnet) = addr_subnet_either.addr_subnet();
@@ -1129,17 +1150,17 @@ async fn run_address_state_provider(
             addr_subnet_and_config,
         )
     };
-    let state_to_remove_from_core = match add_to_core_result {
+    let (state_to_remove_from_core, removal_reason) = match add_to_core_result {
         Err(netstack3_core::error::ExistsError) => {
-            close_address_state_provider(
+            send_address_removal_event(
                 *address,
                 id,
-                control_handle,
+                control_handle.clone(),
                 fnet_interfaces_admin::AddressRemovalReason::AlreadyAssigned,
             );
             // The address already existed, so don't attempt to remove it.
             // Otherwise we would accidentally remove an address we didn't add!
-            StateInCore { address: false, subnet_route: false }
+            (StateInCore { address: false, subnet_route: false }, None)
         }
         Ok(()) => {
             let state_to_remove = if add_subnet_route {
@@ -1180,23 +1201,26 @@ async fn run_address_state_provider(
             // Pass in the `assignment_state_receiver` and `stop_receiver` by
             // ref so that they don't get dropped after the main loop exits
             // (before the senders are removed from `ctx`).
-            match address_state_provider_main_loop(
+            let (needs_removal, removal_reason) = address_state_provider_main_loop(
                 ctx.clone(),
                 address,
                 id,
-                control_handle,
                 req_stream,
                 &mut assignment_state_receiver,
                 initial_assignment_state,
                 &mut stop_receiver,
             )
-            .await
-            {
-                AddressNeedsExplicitRemovalFromCore::Yes => state_to_remove,
-                AddressNeedsExplicitRemovalFromCore::No => {
-                    StateInCore { address: false, ..state_to_remove }
-                }
-            }
+            .await;
+
+            (
+                match needs_removal {
+                    AddressNeedsExplicitRemovalFromCore::Yes => state_to_remove,
+                    AddressNeedsExplicitRemovalFromCore::No => {
+                        StateInCore { address: false, ..state_to_remove }
+                    }
+                },
+                removal_reason,
+            )
         }
     };
 
@@ -1243,6 +1267,10 @@ async fn run_address_state_provider(
             Ok(())
         );
     }
+
+    if let Some(removal_reason) = removal_reason {
+        send_address_removal_event(address.get(), id, control_handle, removal_reason.into());
+    }
 }
 
 enum AddressNeedsExplicitRemovalFromCore {
@@ -1257,16 +1285,13 @@ async fn address_state_provider_main_loop(
     ctx: Ctx,
     address: SpecifiedAddr<IpAddr>,
     id: BindingId,
-    control_handle: fnet_interfaces_admin::AddressStateProviderControlHandle,
     req_stream: fnet_interfaces_admin::AddressStateProviderRequestStream,
     assignment_state_receiver: &mut futures::channel::mpsc::UnboundedReceiver<
         fnet_interfaces::AddressAssignmentState,
     >,
     initial_assignment_state: fnet_interfaces::AddressAssignmentState,
-    stop_receiver: &mut futures::channel::oneshot::Receiver<
-        fnet_interfaces_admin::AddressRemovalReason,
-    >,
-) -> AddressNeedsExplicitRemovalFromCore {
+    stop_receiver: &mut futures::channel::oneshot::Receiver<AddressStateProviderCancellationReason>,
+) -> (AddressNeedsExplicitRemovalFromCore, Option<AddressStateProviderCancellationReason>) {
     // When detached, the lifetime of `req_stream` should not be tied to the
     // lifetime of `address`.
     let mut detached = false;
@@ -1277,7 +1302,7 @@ async fn address_state_provider_main_loop(
     enum AddressStateProviderEvent {
         Request(Result<Option<fnet_interfaces_admin::AddressStateProviderRequest>, fidl::Error>),
         AssignmentStateChange(fnet_interfaces::AddressAssignmentState),
-        Canceled(fnet_interfaces_admin::AddressRemovalReason),
+        Canceled(AddressStateProviderCancellationReason),
     }
     futures::pin_mut!(req_stream);
     futures::pin_mut!(stop_receiver);
@@ -1295,6 +1320,7 @@ async fn address_state_provider_main_loop(
                 },
             reason = stop_receiver => AddressStateProviderEvent::Canceled(reason.expect("failed to receive stop")),
         };
+
         match next_event {
             AddressStateProviderEvent::Request(req) => match req {
                 // The client hung up, stop serving.
@@ -1317,7 +1343,10 @@ async fn address_state_provider_main_loop(
                         &mut detached,
                         &mut watch_state,
                     ) {
-                        Ok(()) => continue,
+                        Ok(Some(UserRemove)) => {
+                            break Some(AddressStateProviderCancellationReason::UserRemoved)
+                        }
+                        Ok(None) => continue,
                         Err(e) => e,
                     };
                     let (log_level, should_terminate) = match &e {
@@ -1361,22 +1390,23 @@ async fn address_state_provider_main_loop(
                     });
             }
             AddressStateProviderEvent::Canceled(reason) => {
-                close_address_state_provider(*address, id, control_handle, reason);
                 break Some(reason);
             }
         }
     };
 
-    match cancelation_reason {
-        Some(fnet_interfaces_admin::AddressRemovalReason::DadFailed)
-        | Some(fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved) => {
-            return AddressNeedsExplicitRemovalFromCore::No
-        }
-        Some(fnet_interfaces_admin::AddressRemovalReason::Invalid)
-        | Some(fnet_interfaces_admin::AddressRemovalReason::AlreadyAssigned)
-        | Some(fnet_interfaces_admin::AddressRemovalReason::UserRemoved)
-        | None => AddressNeedsExplicitRemovalFromCore::Yes,
-    }
+    (
+        match cancelation_reason {
+            Some(AddressStateProviderCancellationReason::DadFailed)
+            | Some(AddressStateProviderCancellationReason::InterfaceRemoved) => {
+                AddressNeedsExplicitRemovalFromCore::No
+            }
+            Some(AddressStateProviderCancellationReason::UserRemoved) | None => {
+                AddressNeedsExplicitRemovalFromCore::Yes
+            }
+        },
+        cancelation_reason,
+    )
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -1464,7 +1494,12 @@ impl AddressAssignmentWatcherState {
     }
 }
 
+struct UserRemove;
+
 /// Serves a `fuchsia.net.interfaces.admin/AddressStateProvider` request.
+///
+/// If `Ok(Some(UserRemove))` is returned, the client has explicitly
+/// requested removal of the address, but the address has not been removed yet.
 fn dispatch_address_state_provider_request(
     ctx: Ctx,
     req: fnet_interfaces_admin::AddressStateProviderRequest,
@@ -1472,7 +1507,7 @@ fn dispatch_address_state_provider_request(
     id: BindingId,
     detached: &mut bool,
     watch_state: &mut AddressAssignmentWatcherState,
-) -> Result<(), AddressStateProviderError> {
+) -> Result<Option<UserRemove>, AddressStateProviderError> {
     tracing::debug!("serving {:?}", req);
     match req {
         fnet_interfaces_admin::AddressStateProviderRequest::UpdateAddressProperties {
@@ -1510,7 +1545,10 @@ fn dispatch_address_state_provider_request(
                 ),
             };
             match result {
-                Ok(()) => responder.send().map_err(AddressStateProviderError::Fidl),
+                Ok(()) => {
+                    responder.send().map_err(AddressStateProviderError::Fidl)?;
+                    Ok(None)
+                }
                 Err(netstack3_core::error::SetIpAddressPropertiesError::NotFound(
                     netstack3_core::error::NotFoundError,
                 )) => {
@@ -1523,15 +1561,21 @@ fn dispatch_address_state_provider_request(
         }
         fnet_interfaces_admin::AddressStateProviderRequest::WatchAddressAssignmentState {
             responder,
-        } => watch_state.on_new_watch_req(responder),
+        } => {
+            watch_state.on_new_watch_req(responder)?;
+            Ok(None)
+        }
         fnet_interfaces_admin::AddressStateProviderRequest::Detach { control_handle: _ } => {
             *detached = true;
-            Ok(())
+            Ok(None)
+        }
+        fnet_interfaces_admin::AddressStateProviderRequest::Remove { control_handle: _ } => {
+            Ok(Some(UserRemove))
         }
     }
 }
 
-fn close_address_state_provider(
+fn send_address_removal_event(
     addr: IpAddr,
     id: BindingId,
     control_handle: fnet_interfaces_admin::AddressStateProviderControlHandle,

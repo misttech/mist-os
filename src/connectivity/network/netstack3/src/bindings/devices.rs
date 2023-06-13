@@ -11,7 +11,6 @@ use std::{
 use assert_matches::assert_matches;
 use derivative::Derivative;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use futures::stream::StreamExt as _;
 use net_types::{
     ethernet::Mac,
@@ -192,7 +191,8 @@ pub struct DynamicCommonInfo {
 #[derive(Debug)]
 pub(crate) struct AddressInfo {
     // The `AddressStateProvider` FIDL protocol worker.
-    pub(crate) address_state_provider: FidlWorkerInfo<fnet_interfaces_admin::AddressRemovalReason>,
+    pub(crate) address_state_provider:
+        FidlWorkerInfo<interfaces_admin::AddressStateProviderCancellationReason>,
     // Sender for [`AddressAssignmentState`] change events published by Core;
     // the receiver is held by the `AddressStateProvider` worker. Note that an
     // [`UnboundedSender`] is used because it exposes a synchronous send API
