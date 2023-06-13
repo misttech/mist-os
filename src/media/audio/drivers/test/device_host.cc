@@ -123,9 +123,8 @@ void DeviceHost::DetectDevices(bool devfs_only, bool no_virtual_audio) {
   }
 }
 
-// Optionally called during DetectDevices. Create virtual_audio instances -- StreamConfig, Dai and
-// Composite, each for both input and output -- using the default configurations settings
-// (which should pass all tests).
+// Optionally called during DetectDevices. Create virtual_audio instances -- one for input, one for
+// output -- using the default configurations settings (which should pass all tests).
 void DeviceHost::AddVirtualDevices() {
   const std::string kControlNodePath =
       fxl::Concatenate({"/dev/", fuchsia::virtualaudio::CONTROL_NODE_NAME});
@@ -143,57 +142,54 @@ void DeviceHost::AddVirtualDevices() {
       << num_outputs
       << " virtual_audio devices with unspecified direction already exist (should be 0)";
 
-  AddVirtualDevice(true, fuchsia::virtualaudio::DeviceType::STREAM_CONFIG, stream_config_input_);
-  AddVirtualDevice(false, fuchsia::virtualaudio::DeviceType::STREAM_CONFIG, stream_config_output_);
-  AddVirtualDevice(true, fuchsia::virtualaudio::DeviceType::DAI, dai_input_);
-  AddVirtualDevice(false, fuchsia::virtualaudio::DeviceType::DAI, dai_output_);
-  // No direction support in composite devices, is_input = true is unused.
-  AddVirtualDevice(true, fuchsia::virtualaudio::DeviceType::COMPOSITE, composite_);
-}
+  // Input StreamConfig.
+  fuchsia::virtualaudio::Direction input_direction;
+  input_direction.set_is_input(true);
+  fuchsia::virtualaudio::Control_GetDefaultConfiguration_Result input_config_result;
+  status = controller_->GetDefaultConfiguration(fuchsia::virtualaudio::DeviceType::STREAM_CONFIG,
+                                                std::move(input_direction), &input_config_result);
+  ASSERT_EQ(status, ZX_OK)
+      << "virtualaudio::Control::GetDefaultConfiguration (StreamConfig input) failed";
+  ASSERT_FALSE(input_config_result.is_err())
+      << "Failed to GetDefaultConfiguration for StreamConfig input device: "
+      << input_config_result.err();
 
-void DeviceHost::AddVirtualDevice(bool is_input,
-                                  const fuchsia::virtualaudio::DeviceType device_type,
-                                  fuchsia::virtualaudio::DevicePtr& device_ptr) {
-  const char* direction = is_input ? "input" : "output";
-  const char* type;
+  ASSERT_EQ(status, ZX_OK) << "GetDefaultConfiguration for StreamConfig input failed";
+  fuchsia::virtualaudio::Configuration input_config =
+      std::move(input_config_result.response().config);
+  fuchsia::virtualaudio::Control_AddDevice_Result input_result;
+  status = controller_->AddDevice(
+      std::move(input_config), input_device_.NewRequest(device_loop_.dispatcher()), &input_result);
+  ASSERT_EQ(status, ZX_OK) << "virtualaudio::Control::AddDevice (StreamConfig input) failed";
+  ASSERT_FALSE(input_result.is_err())
+      << "Failed to add StreamConfig input device: " << input_result.err();
+  input_device_.set_error_handler([](zx_status_t error) {
+    FAIL() << "virtualaudio::Device (StreamConfig input) disconnected: " << error;
+  });
 
-  switch (device_type) {
-    case fuchsia::virtualaudio::DeviceSpecific::Tag::kStreamConfig:
-      type = "StreamConfig";
-      break;
-    case fuchsia::virtualaudio::DeviceSpecific::Tag::kDai:
-      type = "Dai";
-      break;
-    case fuchsia::virtualaudio::DeviceSpecific::Tag::kCodec:
-      type = "Codec";
-      break;
-    case fuchsia::virtualaudio::DeviceSpecific::Tag::kComposite:
-      type = "Composite";
-      break;
-    default:
-      ZX_ASSERT(0);
-  }
-  fuchsia::virtualaudio::Direction configuration_direction;
-  configuration_direction.set_is_input(is_input);
-  fuchsia::virtualaudio::Control_GetDefaultConfiguration_Result config_result;
-  zx_status_t status = controller_->GetDefaultConfiguration(
-      device_type, std::move(configuration_direction), &config_result);
-  ASSERT_EQ(status, ZX_OK) << "virtualaudio::Control::GetDefaultConfiguration (" << type << " "
-                           << direction << ") failed";
-  ASSERT_FALSE(config_result.is_err()) << "Failed to GetDefaultConfiguration for (" << type << " "
-                                       << direction << ") device: " << config_result.err();
+  // Output StreamConfig.
+  fuchsia::virtualaudio::Direction output_direction;
+  output_direction.set_is_input(false);
+  fuchsia::virtualaudio::Control_GetDefaultConfiguration_Result output_config_result;
+  status = controller_->GetDefaultConfiguration(fuchsia::virtualaudio::DeviceType::STREAM_CONFIG,
+                                                std::move(output_direction), &output_config_result);
+  ASSERT_EQ(status, ZX_OK)
+      << "virtualaudio::Control::GetDefaultConfiguration (StreamConfig output) failed";
+  ASSERT_FALSE(input_config_result.is_err())
+      << "Failed to GetDefaultConfiguration for StreamConfig output device: "
+      << input_config_result.err();
+  fuchsia::virtualaudio::Configuration output_config =
+      std::move(output_config_result.response().config);
 
-  fuchsia::virtualaudio::Configuration config = std::move(config_result.response().config);
-  fuchsia::virtualaudio::Control_AddDevice_Result result;
-  status = controller_->AddDevice(std::move(config),
-                                  device_ptr.NewRequest(device_loop_.dispatcher()), &result);
-
-  ASSERT_EQ(status, ZX_OK) << "virtualaudio::Control::AddDevice (" << type << " " << direction
-                           << ") failed";
-  ASSERT_FALSE(result.is_err()) << "Failed to add " << type << " " << direction
-                                << " device: " << result.err();
-  device_ptr.set_error_handler([type, direction](zx_status_t error) {
-    FAIL() << "virtualaudio::Device (" << type << " " << direction << ") disconnected: " << error;
+  fuchsia::virtualaudio::Control_AddDevice_Result output_result;
+  status =
+      controller_->AddDevice(std::move(output_config),
+                             output_device_.NewRequest(device_loop_.dispatcher()), &output_result);
+  ASSERT_EQ(status, ZX_OK) << "virtualaudio::Control::AddOutput for StreamConfig failed";
+  ASSERT_FALSE(output_result.is_err())
+      << "Failed to add StreamConfig output device: " << output_result.err();
+  output_device_.set_error_handler([](zx_status_t error) {
+    FAIL() << "virtualaudio::Device (StreamConfig output) disconnected: " << error;
   });
 }
 
@@ -220,11 +216,8 @@ zx_status_t DeviceHost::QuitDeviceLoop() {
 
   libsync::Completion done;
   async::PostTask(device_loop_.dispatcher(), [this, &done]() {
-    stream_config_input_.set_error_handler(nullptr);
-    stream_config_output_.set_error_handler(nullptr);
-    dai_input_.set_error_handler(nullptr);
-    dai_output_.set_error_handler(nullptr);
-    composite_.set_error_handler(nullptr);
+    input_device_.set_error_handler(nullptr);
+    output_device_.set_error_handler(nullptr);
 
     if (controller_.is_bound()) {
       zx_status_t status = controller_->RemoveAll();
