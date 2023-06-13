@@ -238,7 +238,7 @@ pub struct DiskBuilder {
     data_spec: DataSpec,
     volumes_spec: VolumesSpec,
     // Only used if `format` is Some.
-    corrupt_contents: bool,
+    corrupt_data: bool,
     gpt: bool,
     with_account_and_virtualization: bool,
     format_fvm: bool,
@@ -255,7 +255,7 @@ impl DiskBuilder {
             data_volume_size: DEFAULT_DATA_VOLUME_SIZE,
             data_spec: DataSpec { format: None, zxcrypt: false },
             volumes_spec: VolumesSpec { fxfs_blob: false, create_data_partition: true },
-            corrupt_contents: false,
+            corrupt_data: false,
             gpt: false,
             with_account_and_virtualization: false,
             format_fvm: true,
@@ -302,7 +302,7 @@ impl DiskBuilder {
     }
 
     pub fn corrupt_data(&mut self) -> &mut Self {
-        self.corrupt_contents = true;
+        self.corrupt_data = true;
         self
     }
 
@@ -509,7 +509,7 @@ impl DiskBuilder {
     }
 
     async fn init_data_minfs(&self, data_device: ControllerProxy) {
-        if self.corrupt_contents {
+        if self.corrupt_data {
             let (block, server) = fidl::endpoints::create_proxy::<BlockMarker>().unwrap();
             let () = data_device.connect_to_device_fidl(server.into_channel()).unwrap();
 
@@ -525,7 +525,7 @@ impl DiskBuilder {
     }
 
     async fn init_data_f2fs(&self, data_device: ControllerProxy) {
-        if self.corrupt_contents {
+        if self.corrupt_data {
             let (block, server) = fidl::endpoints::create_proxy::<BlockMarker>().unwrap();
             let () = data_device.connect_to_device_fidl(server.into_channel()).unwrap();
 
@@ -544,7 +544,7 @@ impl DiskBuilder {
         let mut fxblob = false;
         let (mut fs, crypt_realm) = match fxfs {
             FxfsType::Fxfs(data_device) => {
-                if self.corrupt_contents {
+                if self.corrupt_data {
                     let (block, server) = fidl::endpoints::create_proxy::<BlockMarker>().unwrap();
                     let () = data_device.connect_to_device_fidl(server.into_channel()).unwrap();
 
@@ -570,7 +570,7 @@ impl DiskBuilder {
             let mut file = std::fs::File::create("/unencrypted_volume/keys/fxfs-data")
                 .expect("create file failed");
             let mut key_bag = KEY_BAG_CONTENTS.as_bytes();
-            if self.corrupt_contents && fxblob {
+            if self.corrupt_data && fxblob {
                 key_bag = &BLOB_CONTENTS;
             }
             file.write_all(key_bag).expect("write file failed");
