@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 
 use {
+    crate::cml,
     crate::error::Error,
     crate::util,
-    crate::util::{json_or_json5_from_file, write_depfile},
-    serde_json::{json, Value},
+    crate::util::write_depfile,
     std::fs,
     std::io::{BufRead, BufReader, Write},
     std::path::PathBuf,
+    std::str::FromStr,
 };
 
 /// read in the provided list of json files, merge them, and pretty-print the merged result to
@@ -41,30 +42,17 @@ pub fn merge(
         return Err(Error::invalid_args(format!("no files provided")));
     }
 
-    let json_str = if files.iter().all(|f| f.to_str().unwrap().ends_with(".cml")) {
-        let mut document = util::read_cml(&files.remove(0))?;
-        for file in &files {
-            let mut include_document = util::read_cml(&file)?;
-            document.merge_from(&mut include_document, &file)?;
+    // If given an aggregated CML file generated using GN metadata, merge all of the included
+    // CML objects therein.
+    let mut document = cml::parse_one_document(&"{}".to_string(), &PathBuf::from_str("").unwrap())?;
+    for file in &files {
+        let include_documents = util::read_cml_tolerate_gn_metadata(&file)?;
+        for mut d in include_documents.into_iter() {
+            document.merge_from(&mut d, &file)?;
         }
-        serde_json::to_string_pretty(&document)?
-    } else {
-        // Perform a simple JSON merge algorithm for non-.cml files.
-        // TODO(fxbug.dev/127380): Remove this once test manifest fragments are merged as CML files
-        let mut res = json!({});
-        for filename in &files {
-            let v: Value = json_or_json5_from_file(filename)?;
-            merge_json(&mut res, &v).map_err(|e| {
-                Error::parse(
-                    format!("Multiple manifests set the same key: {}", e),
-                    None,
-                    Some(filename.as_path()),
-                )
-            })?;
-        }
-        serde_json::to_string_pretty(&res)?
-    };
+    }
 
+    let json_str = serde_json::to_string_pretty(&document)?;
     if let Some(output_path) = &output {
         util::ensure_directory_exists(output_path)?;
         fs::OpenOptions::new()
@@ -84,53 +72,6 @@ pub fn merge(
     Ok(())
 }
 
-/// Merges the JSON values in `from` into the object in `res`.
-///
-/// If `from` is an array of objects, each object in the array will be merged
-/// into `res` one at a time, in order. If `from` is an object, that object will
-/// be merged into `res`.
-pub fn merge_json(mut res: &mut Value, from: &Value) -> Result<(), String> {
-    match &from {
-        Value::Array(from_arr) => {
-            for item in from_arr {
-                merge_json_inner(&mut res, &item)?;
-            }
-        }
-        Value::Object(_) => merge_json_inner(&mut res, &from)?,
-        _ => return Err("files to be merged must contain an object or an array of objects".into()),
-    }
-    Ok(())
-}
-
-fn merge_json_inner(mut res: &mut Value, from: &Value) -> Result<(), String> {
-    match (&mut res, &from) {
-        (Value::Object(res_map), Value::Object(from_map)) => {
-            for (k, v) in from_map {
-                if !res_map.contains_key(k) {
-                    res_map.insert(k.clone(), v.clone());
-                } else {
-                    merge_json_inner(&mut res_map[k], v).map_err(|e| {
-                        if e == "" {
-                            format!("{}", k)
-                        } else {
-                            format!("{}.{}", k, e)
-                        }
-                    })?;
-                }
-            }
-        }
-        (Value::Array(res_arr), Value::Array(from_arr)) => {
-            for item in from_arr {
-                if !res_arr.contains(&item) {
-                    res_arr.push(item.clone())
-                }
-            }
-        }
-        _ => return Err(format!("could not merge `{}` with `{}`", res, from)),
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -138,105 +79,6 @@ mod tests {
     use std::fs::File;
     use std::io::{LineWriter, Read, Write};
     use tempfile::TempDir;
-
-    #[test]
-    fn test_merge_json() {
-        let tests = vec![
-            // Valid merges
-            (vec![json!({}), json!({})], Some(json!({}))),
-            (vec![json!({}), json!([])], Some(json!({}))),
-            (vec![json!({}), json!([{}])], Some(json!({}))),
-            (vec![json!([]), json!([])], Some(json!({}))),
-            (vec![json!([{}]), json!([{}])], Some(json!({}))),
-            (vec![json!({"foo": 1}), json!({})], Some(json!({"foo": 1}))),
-            (vec![json!({}), json!({"foo": 1})], Some(json!({"foo": 1}))),
-            (vec![json!({"foo": 1}), json!({"bar": 2})], Some(json!({"foo": 1, "bar": 2}))),
-            (vec![json!({"foo": [1]}), json!({"bar": [2]})], Some(json!({"foo": [1], "bar": [2]}))),
-            (
-                vec![json!({"foo": {"bar": 1}}), json!({"foo": {"baz": 2}})],
-                Some(json!({"foo": {"bar": 1, "baz": 2}})),
-            ),
-            (vec![json!({"foo": [1]}), json!({"foo": [2]})], Some(json!({"foo": [1,2]}))),
-            (vec![json!({"foo": [1]}), json!({"foo": [1]})], Some(json!({"foo": [1]}))),
-            (
-                vec![json!({"foo": [{"bar": 1}]}), json!({"foo": [{"bar": 1}]})],
-                Some(json!({"foo": [{"bar": 1}]})),
-            ),
-            (
-                vec![json!({"foo": [{"bar": 1}]}), json!({"foo": [{"bar": 2}]})],
-                Some(json!({"foo": [{"bar": 1},{"bar": 2}]})),
-            ),
-            (
-                vec![json!({"foo": [{"bar": 1}]}), json!([{"foo": [{"bar": 2}]}, {"baz": 3}])],
-                Some(json!({"foo": [{"bar": 1},{"bar": 2}], "baz": 3})),
-            ),
-            // merges that should fail
-            (vec![json!({"foo": 1}), json!({"foo": 1})], None),
-            (vec![json!({"foo": 1}), json!({"foo": 2})], None),
-            (vec![json!({"foo": {"bar": 1}}), json!({"foo": 2})], None),
-            (vec![json!({"foo": [1]}), json!({"foo": 1})], None),
-            (vec![json!({"foo": [1]}), json!({"foo": {"bar": 1}})], None),
-            (vec![json!({"foo": [1]}), json!([{"foo": [2]}, {"foo": 3}])], None),
-        ];
-
-        for (vec_to_merge, expected_results) in tests {
-            let tmp_dir = TempDir::new().unwrap();
-
-            let mut counter = 0;
-            let mut filenames = vec![];
-            for json_val in &vec_to_merge {
-                let tmp_file_path = tmp_dir.path().join(format!("{}.json", counter));
-                counter += 1;
-                File::create(&tmp_file_path)
-                    .unwrap()
-                    .write_all(format!("{}", json_val).as_bytes())
-                    .unwrap();
-                filenames.push(tmp_file_path);
-            }
-
-            let output_file_path = tmp_dir.path().join("output.json");
-
-            let result = merge(filenames, Some(output_file_path.clone()), None, None);
-
-            if result.is_ok() != expected_results.is_some() {
-                println!("example failed:");
-                for item in &vec_to_merge {
-                    println!(" - {}", item);
-                }
-                println!("result={:?}; expected={:?}", result, expected_results);
-            }
-            assert_eq!(result.is_ok(), expected_results.is_some());
-
-            if let Some(expected_json) = expected_results {
-                let mut buffer = String::new();
-                File::open(&output_file_path).unwrap().read_to_string(&mut buffer).unwrap();
-                assert_eq!(buffer, format!("{:#}", expected_json));
-            }
-        }
-    }
-
-    #[test]
-    fn test_merge_json5() {
-        let tmp_dir = TempDir::new().unwrap();
-
-        let input = vec![
-            (tmp_dir.path().join("1.json"), "{\"foo\": 1,} // comment"),
-            (tmp_dir.path().join("2.json"), "{\"bar\": 2,} // comment"),
-        ];
-        let mut filenames = vec![];
-        for (fname, contents) in &input {
-            File::create(fname).unwrap().write_all(contents.as_bytes()).unwrap();
-            filenames.push(fname.clone());
-        }
-
-        let output_file_path = tmp_dir.path().join("output.json");
-        merge(filenames, Some(output_file_path.clone()), None, None).expect("failed to merge");
-
-        let mut buffer = String::new();
-        File::open(&output_file_path).unwrap().read_to_string(&mut buffer).unwrap();
-        let expected_json = json!({"foo": 1, "bar": 2});
-        assert_eq!(buffer, format!("{:#}", expected_json));
-    }
 
     #[test]
     fn test_merge_cml() {
@@ -259,12 +101,40 @@ mod tests {
         File::open(&output_file_path).unwrap().read_to_string(&mut buffer).unwrap();
         let expected_json = json!({
             "use": [
-                {
-                    "protocol": [ "bar" ],
-                },
-                {
-                    "protocol": "foo"
-                }
+                {"protocol": ["bar"]},
+                {"protocol": "foo"},
+            ]
+        });
+        assert_eq!(buffer, format!("{:#}", expected_json));
+    }
+
+    #[test]
+    fn test_merge_cml_gn_metadata() {
+        let tmp_dir = TempDir::new().unwrap();
+
+        let input = vec![
+            (
+                tmp_dir.path().join("1.cml"),
+                "[{use: [{ protocol: [\"bar\"]}]}, {use: [{ protocol: [\"baz\"]}]}]",
+            ),
+            (tmp_dir.path().join("2.cml"), "[{use: [{ protocol: [\"foo\", \"bar\"]}]}]"),
+        ];
+        let mut filenames = vec![];
+        for (fname, contents) in &input {
+            File::create(fname).unwrap().write_all(contents.as_bytes()).unwrap();
+            filenames.push(fname.clone());
+        }
+
+        let output_file_path = tmp_dir.path().join("output.json");
+        merge(filenames, Some(output_file_path.clone()), None, None).expect("failed to merge");
+
+        let mut buffer = String::new();
+        File::open(&output_file_path).unwrap().read_to_string(&mut buffer).unwrap();
+        let expected_json = json!({
+            "use": [
+                {"protocol": ["bar"]},
+                {"protocol": ["baz"]},
+                {"protocol": "foo"},
             ]
         });
         assert_eq!(buffer, format!("{:#}", expected_json));
@@ -294,10 +164,10 @@ mod tests {
 
         let input = vec![
             // The first two files will be provided as regular inputs
-            (tmp_dir.path().join("1.json"), "{\"foo\": 1,} // comment"),
-            (tmp_dir.path().join("2.json"), "{\"bar\": 2,} // comment"),
+            (tmp_dir.path().join("1.cml"), "{use: [{ protocol: [\"bar\"]}]}"),
+            (tmp_dir.path().join("2.cml"), "{use: [{ protocol: [\"foo\"]}]}"),
             // The third file will be referenced via --fromfile
-            (tmp_dir.path().join("3.json"), "{\"qux\": 3,} // comment"),
+            (tmp_dir.path().join("3.cml"), "{use: [{ protocol: [\"baz\"]}]}"),
         ];
         for (fname, contents) in &input {
             File::create(fname).unwrap().write_all(contents.as_bytes()).unwrap();
@@ -311,13 +181,19 @@ mod tests {
         writeln!(fromfile, "{}", input[2].0.clone().into_os_string().into_string().unwrap())
             .unwrap();
 
-        let output_file_path = tmp_dir.path().join("output.json");
+        let output_file_path = tmp_dir.path().join("output.cml");
         merge(filenames, Some(output_file_path.clone()), Some(fromfile_path), None)
             .expect("failed to merge");
 
         let mut buffer = String::new();
         File::open(&output_file_path).unwrap().read_to_string(&mut buffer).unwrap();
-        let expected_json = json!({"foo": 1, "bar": 2, "qux": 3});
+        let expected_json = json!({
+            "use": [
+                {"protocol": ["bar"]},
+                {"protocol": ["foo"]},
+                {"protocol": ["baz"]},
+            ]
+        });
         assert_eq!(buffer, format!("{:#}", expected_json));
     }
 }

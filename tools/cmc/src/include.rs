@@ -4,7 +4,6 @@
 
 use {
     crate::error::Error,
-    crate::merge::merge_json,
     crate::util,
     crate::util::{json_or_json5_from_file, write_depfile},
     serde_json::Value,
@@ -31,41 +30,16 @@ pub fn merge_includes(
     validate: bool,
 ) -> Result<(), Error> {
     let includes = transitive_includes(&file, &includepath, &includeroot)?;
-    let json_str = if file.as_path().to_str().unwrap().ends_with(".cml") {
-        let mut document = util::read_cml(&file)?;
-        for include in &includes {
-            let mut include_document = util::read_cml(&include)?;
-            document.merge_from(&mut include_document, &include)?;
-        }
-        document.include = None;
-        if validate {
-            cml::compile(&document, cml::CompileOptions::new().file(file.as_path()))?;
-        }
-        serde_json::to_string_pretty(&document)?
-    } else {
-        // Perform a simple JSON merge algorithm.
-        let mut v: Value = json_or_json5_from_file(&file)?;
-        v.as_object_mut().and_then(|v| v.remove("include"));
-
-        for include in &includes {
-            let mut includev: Value = json_or_json5_from_file(&include).map_err(|e| {
-                Error::parse(
-                    format!("Couldn't read include {:?}: {}", &include, e),
-                    None,
-                    Some(&file),
-                )
-            })?;
-            includev.as_object_mut().and_then(|v| v.remove("include"));
-            merge_json(&mut v, &includev).map_err(|e| {
-                Error::parse(
-                    format!("Failed to merge with {:?}: {}", include, e),
-                    None,
-                    Some(&file),
-                )
-            })?;
-        }
-        serde_json::to_string_pretty(&v)?
-    };
+    let mut document = util::read_cml(&file)?;
+    for include in &includes {
+        let mut include_document = util::read_cml(&include)?;
+        document.merge_from(&mut include_document, &include)?;
+    }
+    document.include = None;
+    if validate {
+        cml::compile(&document, cml::CompileOptions::new().file(file.as_path()))?;
+    }
+    let json_str = serde_json::to_string_pretty(&document)?;
 
     if let Some(output_path) = output.as_ref() {
         util::ensure_directory_exists(&output_path)?;

@@ -1663,7 +1663,7 @@ mod tests {
     ) -> Result<(), Error> {
         let input = format!("{}", std::str::from_utf8(input).unwrap().to_string());
         let file = Path::new(filename);
-        let document = crate::parse(&input, &file)?;
+        let document = crate::parse_one_document(&input, &file)?;
         validate_cml(
             &document,
             Some(&file),

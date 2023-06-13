@@ -74,17 +74,30 @@ pub fn write_depfile(
 
 /// Read .cml file and parse into a cml::Document.
 pub fn read_cml(file: &Path) -> Result<cml::Document, Error> {
+    let buffer = read_file_to_string(file)?;
+    cml::parse_one_document(&buffer, file)
+}
+
+/// Read .cml file and parse into one or more Documents. Some fuchsia.git GN rules
+/// collect .cml files to merge using "GN metadata", which can only output its merged
+/// representation as a JSON array. In the case of component GN rules, this is an
+/// array of many .cml JSON objects.
+pub fn read_cml_tolerate_gn_metadata(file: &Path) -> Result<Vec<cml::Document>, Error> {
+    let buffer = read_file_to_string(file)?;
+    cml::parse_many_documents(&buffer, file)
+}
+
+fn read_file_to_string(file: &Path) -> Result<String, Error> {
     let mut buffer = String::new();
     fs::File::open(&file)
         .map_err(|e| {
-            Error::parse(format!("Couldn't read include {:?}: {}", file, e), None, Some(file))
+            Error::parse(format!("Couldn't read file {:?}: {}", file, e), None, Some(file))
         })?
         .read_to_string(&mut buffer)
         .map_err(|e| {
-            Error::parse(format!("Couldn't read include {:?}: {}", file, e), None, Some(file))
+            Error::parse(format!("Couldn't read file {:?}: {}", file, e), None, Some(file))
         })?;
-
-    cml::parse(&buffer, file)
+    Ok(buffer)
 }
 
 /// Read .cm file and parse into a cm_rust::ComponentDecl.

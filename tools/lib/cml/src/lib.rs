@@ -51,12 +51,28 @@ lazy_static! {
 }
 
 /// Parses a string `buffer` into a [Document]. `file` is used for error reporting.
-pub fn parse(buffer: &String, file: &std::path::Path) -> Result<Document, Error> {
+pub fn parse_one_document(buffer: &String, file: &std::path::Path) -> Result<Document, Error> {
     serde_json5::from_str(&buffer).map_err(|e| {
         let serde_json5::Error::Message { location, msg } = e;
         let location = location.map(|l| Location { line: l.line, column: l.column });
         Error::parse(msg, location, Some(file))
     })
+}
+
+/// Parses a string `buffer` into a vector of [Document]. `file` is used for error reporting.
+/// Supports JSON encoded as an array of Document JSON objects.
+pub fn parse_many_documents(
+    buffer: &String,
+    file: &std::path::Path,
+) -> Result<Vec<Document>, Error> {
+    let res: Result<Vec<Document>, _> = serde_json5::from_str(&buffer);
+    match res {
+        Err(_) => {
+            let d = parse_one_document(buffer, file)?;
+            Ok(vec![d])
+        }
+        Ok(docs) => Ok(docs),
+    }
 }
 
 /// A name/identity of a capability exposed/offered to another component.
