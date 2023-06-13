@@ -10,15 +10,21 @@
 
 use {
     crate::{
-        async_spooled::AsyncSpooledTempFile,
         range::{ContentLength, Range},
         repository::{Error, RepoProvider, RepositorySpec},
         resource::Resource,
+        util::file_stream,
     },
     anyhow::{anyhow, Context as _},
     futures::{future::BoxFuture, AsyncRead, FutureExt as _, TryStreamExt as _},
     hyper::{header::CONTENT_LENGTH, Body, Response, StatusCode},
-    std::{collections::BTreeSet, fmt::Debug, io, time::SystemTime},
+    std::{
+        collections::BTreeSet,
+        fmt::Debug,
+        io::{self, Seek as _, SeekFrom, Write as _},
+        time::SystemTime,
+    },
+    tempfile::SpooledTempFile,
     tuf::{
         metadata::{MetadataPath, MetadataVersion, TargetPath},
         pouf::Pouf1,
@@ -187,21 +193,27 @@ where
         mut body: Body,
         range: Range,
     ) -> Result<Resource, Error> {
-        let mut tmp = AsyncSpooledTempFile::new(UNKNOWN_CONTENT_LEN_BUF_SIZE);
+        let mut file = SpooledTempFile::new(UNKNOWN_CONTENT_LEN_BUF_SIZE);
 
+        let mut total_len = 0;
         while let Some(chunk) = body.try_next().await? {
-            tmp.write_all(&chunk).await.map_err(Error::Io)?;
+            total_len += chunk.len() as u64;
+            file.write_all(&chunk).map_err(Error::Io)?;
         }
+        file.flush().map_err(Error::Io)?;
 
-        let (len, stream) = tmp.into_stream().await.map_err(Error::Io)?;
+        file.seek(SeekFrom::Start(0)).map_err(Error::Io)?;
 
         // Make sure we didn't try to fetch data that's out of bounds.
-        let content_len = ContentLength::new(len);
+        let content_len = ContentLength::new(total_len);
         if !content_len.contains_range(range) {
             return Err(Error::RangeNotSatisfiable);
         }
 
-        Ok(Resource { content_range: content_len.into(), stream })
+        Ok(Resource {
+            content_range: content_len.into(),
+            stream: Box::pin(file_stream(total_len, file, None)),
+        })
     }
 }
 
@@ -327,7 +339,7 @@ mod tests {
         },
         assert_matches::assert_matches,
         camino::{Utf8Path, Utf8PathBuf},
-        std::{fs::File, io::Write as _},
+        std::fs::File,
         url::Url,
     };
 

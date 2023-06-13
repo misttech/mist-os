@@ -16,13 +16,13 @@ use {
     fuchsia_async as fasync,
     fuchsia_merkle::Hash,
     futures::{
-        future::BoxFuture, io::SeekFrom, stream::BoxStream, AsyncRead, AsyncSeekExt as _,
-        FutureExt as _, Stream, StreamExt as _,
+        future::BoxFuture, stream::BoxStream, AsyncRead, FutureExt as _, Stream, StreamExt as _,
     },
     notify::{recommended_watcher, RecursiveMode, Watcher as _},
     std::{
         collections::BTreeSet,
         ffi::OsStr,
+        io::{Seek as _, SeekFrom},
         pin::Pin,
         task::{Context, Poll},
         time::SystemTime,
@@ -163,7 +163,7 @@ impl FileSystemRepository {
         let file_path = sanitize_path(repo_path, resource_path);
         async move {
             let file_path = file_path?;
-            let mut file = async_fs::File::open(&file_path).await.map_err(|err| {
+            let mut file = std::fs::File::open(&file_path).map_err(|err| {
                 if err.kind() == std::io::ErrorKind::NotFound {
                     Error::NotFound
                 } else {
@@ -171,7 +171,7 @@ impl FileSystemRepository {
                 }
             })?;
 
-            let total_len = file.metadata().await.map_err(Error::Io)?.len();
+            let total_len = file.metadata().map_err(Error::Io)?.len();
 
             let content_range = match range {
                 Range::Full => ContentRange::Full { complete_len: total_len },
@@ -183,7 +183,7 @@ impl FileSystemRepository {
                         return Err(Error::RangeNotSatisfiable);
                     }
 
-                    file.seek(SeekFrom::Start(first_byte_pos)).await.map_err(Error::Io)?;
+                    file.seek(SeekFrom::Start(first_byte_pos)).map_err(Error::Io)?;
 
                     ContentRange::Inclusive {
                         first_byte_pos,
@@ -196,7 +196,7 @@ impl FileSystemRepository {
                         return Err(Error::RangeNotSatisfiable);
                     }
 
-                    file.seek(SeekFrom::Start(first_byte_pos)).await.map_err(Error::Io)?;
+                    file.seek(SeekFrom::Start(first_byte_pos)).map_err(Error::Io)?;
 
                     ContentRange::Inclusive {
                         first_byte_pos,
@@ -209,7 +209,7 @@ impl FileSystemRepository {
                         return Err(Error::RangeNotSatisfiable);
                     }
                     let start = total_len - len;
-                    file.seek(SeekFrom::Start(start)).await.map_err(Error::Io)?;
+                    file.seek(SeekFrom::Start(start)).map_err(Error::Io)?;
 
                     ContentRange::Inclusive {
                         first_byte_pos: start,

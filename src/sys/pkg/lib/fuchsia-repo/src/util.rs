@@ -5,8 +5,8 @@
 use {
     bytes::{Bytes, BytesMut},
     camino::{Utf8Path, Utf8PathBuf},
-    futures::{stream, AsyncRead, Stream, TryStreamExt as _},
-    std::{cmp::min, io, pin::Pin, task::Poll},
+    futures::{stream, Stream, TryStreamExt as _},
+    std::{cmp::min, io, task::Poll},
 };
 
 /// Read files in chunks of this size off the local storage.
@@ -40,13 +40,13 @@ fn path_nlink(_path: &Utf8Path) -> Option<usize> {
 /// This will return an error if the file changed size during streaming.
 pub(super) fn file_stream(
     expected_len: u64,
-    mut file: impl AsyncRead + Unpin,
+    mut file: impl io::Read,
     path: Option<Utf8PathBuf>,
 ) -> impl Stream<Item = io::Result<Bytes>> {
     let mut buf = BytesMut::new();
     let mut remaining_len = expected_len;
 
-    stream::poll_fn(move |cx| {
+    stream::poll_fn(move |_cx| {
         if remaining_len == 0 {
             return Poll::Ready(None);
         }
@@ -54,7 +54,11 @@ pub(super) fn file_stream(
         buf.resize(min(CHUNK_SIZE, remaining_len as usize), 0);
 
         // Read a chunk from the file.
-        let n = match futures::ready!(Pin::new(&mut file).poll_read(cx, &mut buf)) {
+        // FIXME(fxbug.dev/128882): We should figure out why we were occasionally getting
+        // zero-sized reads from async IO, even though we knew there were more bytes available in
+        // the file. Once that bug is fixed, we should switch back to async IO to avoid stalling
+        // the executor.
+        let n = match file.read(&mut buf) {
             Ok(n) => n as u64,
             Err(err) => {
                 return Poll::Ready(Some(Err(err)));
@@ -109,14 +113,7 @@ pub(super) fn file_stream(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        proptest::prelude::*,
-        std::{
-            io,
-            task::{Context, Poll},
-        },
-    };
+    use {super::*, proptest::prelude::*};
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_file_stream() {
@@ -175,41 +172,13 @@ mod tests {
         assert_eq!(actual, &buf[..short_len]);
     }
 
-    struct TestReader<'a> {
-        bytes: &'a [u8],
-    }
-
-    impl<'a> AsyncRead for TestReader<'a> {
-        fn poll_read(
-            mut self: Pin<&mut Self>,
-            _cx: &mut Context<'_>,
-            buf: &mut [u8],
-        ) -> Poll<Result<usize, io::Error>> {
-            let mut this = self.as_mut();
-            let mut n = min(buf.len(), this.bytes.len());
-            if n > 10 {
-                n -= 5;
-            }
-
-            let (lhs, rhs) = this.bytes.split_at(n);
-            this.bytes = rhs;
-
-            buf[..n].copy_from_slice(&lhs[..n]);
-
-            Poll::Ready(Ok(n))
-        }
-    }
-
     proptest! {
         #[test]
         fn test_file_stream_proptest(len in 0usize..CHUNK_SIZE * 100) {
             let mut executor = fuchsia_async::TestExecutor::new();
             let () = executor.run_singlethreaded(async move {
                 let expected = (0..std::u8::MAX).cycle().take(len).collect::<Vec<_>>();
-                let reader = TestReader {
-                    bytes: expected.as_slice(),
-                };
-                let stream = file_stream(expected.len() as u64, reader, None);
+                let stream = file_stream(expected.len() as u64, expected.as_slice(), None);
 
                 let mut actual = vec![];
                 read_stream_to_end(stream, &mut actual).await.unwrap();

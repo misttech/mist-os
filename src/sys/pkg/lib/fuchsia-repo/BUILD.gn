@@ -67,7 +67,6 @@ if (is_host) {
     ]
 
     sources = [
-      "src/async_spooled.rs",
       "src/lib.rs",
       "src/manager.rs",
       "src/package_manifest_watcher.rs",

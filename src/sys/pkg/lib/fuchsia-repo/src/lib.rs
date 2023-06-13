@@ -18,5 +18,4 @@ pub mod resource;
 pub mod server;
 pub mod test_utils;
 
-mod async_spooled;
 mod util;
