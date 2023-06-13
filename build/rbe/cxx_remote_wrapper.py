@@ -204,10 +204,6 @@ class CxxRemoteAction(object):
             transform=self.remote_action._relativize_remote_or_local_deps,
         )
 
-    def _remote_output_files(self) -> Sequence[Path]:
-        return list(
-            self.cxx_action.output_files()) + self.command_line_output_files
-
     def prepare(self) -> int:
         """Setup everything ahead of remote execution."""
         assert not self.local_only, "This should not be reached in local-only mode."
@@ -251,7 +247,8 @@ class CxxRemoteAction(object):
         # The output file is inferred automatically by rewrapper in C++ mode,
         # but naming it explicitly here makes it easier for RemoteAction
         # to use the output file name for other auxiliary files.
-        remote_output_files = self._remote_output_files()
+        remote_output_files = list(
+            self.cxx_action.output_files()) + self.command_line_output_files
 
         # Workaround b/239101612: missing gcc support libexec binaries for remote build
         if self.compiler_type == cxx.Compiler.GCC:
@@ -372,14 +369,6 @@ class CxxRemoteAction(object):
         return False
 
     @property
-    def check_determinism(self) -> bool:
-        return self._main_args.check_determinism
-
-    @property
-    def label(self) -> Optional[str]:
-        return self._main_args.label
-
-    @property
     def local_only(self) -> bool:
         return self._local_only
 
@@ -396,21 +385,7 @@ class CxxRemoteAction(object):
         return fuchsia.remote_executable(self.cxx_action.compiler.tool)
 
     def _run_locally(self) -> int:
-        if self.check_determinism:
-            self.vmsg(
-                "Running the original compile command locally twice and comparing outputs."
-            )
-            command = fuchsia.check_determinism_command(
-                exec_root=self.exec_root_rel,
-                outputs=self._remote_output_files(),
-                command=self.original_compile_command,
-                label=self.label,
-            )
-        else:
-            self.vmsg("Running the original compile command locally.")
-            command = self.original_compile_command
-
-        return subprocess.call(command, cwd=self.working_dir)
+        return subprocess.call(self.original_compile_command)
 
     def preprocess_locally(self) -> int:
         # Locally preprocess if needed

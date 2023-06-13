@@ -54,6 +54,8 @@ _DETAIL_DIFF_SCRIPT = Path('build', 'rbe', 'detail-diff.sh')
 
 _REPROXY_CFG = Path('build', 'rbe', 'fuchsia-reproxy.cfg')
 
+_CHECK_DETERMINISM_SCRIPT = Path('build', 'tracer', 'output_cacher.py')
+
 _RECLIENT_ERROR_STATUS = 35
 _RBE_SERVER_ERROR_STATUS = 45
 _RBE_KILLED_STATUS = 137
@@ -833,7 +835,6 @@ class RemoteAction(object):
         disable: bool = False,
         verbose: bool = False,
         save_temps: bool = False,
-        label: str = None,
         remote_log: str = "",
         fsatrace_path: Optional[Path] = None,
         diagnose_nonzero: bool = False,
@@ -869,7 +870,6 @@ class RemoteAction(object):
           compare_with_local: if true, also run locally and compare outputs.
           check_determinism: if true, compare outputs of two local executions.
           save_temps: if true, keep around temporarily generated files after execution.
-          label: build system identifier, for diagnostic messages.
           remote_log: "" means disabled.  Any other value, remote logging is
             enabled, and stdout/stderr of the remote execution is captured
             to a file and downloaded.
@@ -905,7 +905,6 @@ class RemoteAction(object):
         self._remote_only_command = command
         self._remote_disable = disable
         self._verbose = verbose
-        self._label = label
         self._compare_with_local = compare_with_local
         self._check_determinism = check_determinism
         self._options = (options or [])
@@ -962,10 +961,6 @@ class RemoteAction(object):
     def vmsg(self, text: str):
         if self.verbose:
             msg(text)
-
-    @property
-    def label(self) -> Optional[str]:
-        return self._label
 
     @property
     def exec_root(self) -> Optional[str]:
@@ -1257,14 +1252,24 @@ class RemoteAction(object):
         yield from self.remote_only_command
 
     def _generate_check_determinism_prefix(self) -> Iterable[str]:
-        yield from fuchsia.check_determinism_command(
-            exec_root=self.exec_root_rel,
-            outputs=self.output_files_relative_to_working_dir,
-            label=self.label,
-            # no command, just prefix
-        )
+        yield from [
+            sys.executable,  # same Python interpreter
+            '-S',
+            str(self.exec_root_rel / _CHECK_DETERMINISM_SCRIPT),
+            '--check-repeatability',
+            '--outputs',
+        ]
+
+        # Don't bother mentioning the fsatrace file as an output,
+        # for checking determinism, as it may be sensitive to process id,
+        # and other temporary file accesses.
+        for f in self.output_files_relative_to_working_dir:
+            yield str(f)
+
         # TODO: The comparison script does not support directories yet.
         # When it does, yield from self.output_dirs_relative_to_working_dir.
+
+        yield '--'
 
     def _generate_local_launch_command(self) -> Iterable[str]:
         """The local launch command may include some prefix wrappers."""
@@ -1755,9 +1760,7 @@ class RemoteAction(object):
                     for line in result.stderr:
                         print(line)
                 if not result.stdout and not result.stderr:
-                    print(
-                        f"diff tool exited {result.returncode}, but did not report differences."
-                    )
+                    print(f"diff tool exited {result.returncode}, but did not report differences.")
                 msg("------------------------------------")
 
             # Also compare file access traces, if available.
@@ -2050,7 +2053,6 @@ def remote_action_from_args(
         output_dirs=output_dirs,
         disable=main_args.local,
         verbose=main_args.verbose,
-        label=main_args.label,
         compare_with_local=main_args.compare,
         check_determinism=main_args.check_determinism,
         save_temps=main_args.save_temps,

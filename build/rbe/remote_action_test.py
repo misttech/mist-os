@@ -1144,7 +1144,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
             launch_command, '--')
         self.assertEqual(check_prefix[0], sys.executable)
         self.assertIn(
-            str(exec_root_rel / fuchsia._CHECK_DETERMINISM_SCRIPT),
+            str(exec_root_rel / remote_action._CHECK_DETERMINISM_SCRIPT),
             check_prefix)
         self.assertIn('--check-repeatability', check_prefix)
         _, _, output_list = cl_utils.partition_sequence(

@@ -254,10 +254,6 @@ class RustRemoteAction(object):
         return self._main_args.dry_run
 
     @property
-    def check_determinism(self) -> bool:
-        return self._main_args.check_determinism
-
-    @property
     def local_only(self) -> bool:
         """If the conditions are not right for remote execution, disable,
         regardless of configuration.
@@ -267,10 +263,6 @@ class RustRemoteAction(object):
     @property
     def label(self) -> str:
         return self._main_args.label
-
-    def vmsg(self, text: str):
-        if self.verbose:
-            msg(text)
 
     def value_verbose(self, desc: str, value: str) -> str:
         """In verbose mode, print and forward value."""
@@ -303,10 +295,6 @@ class RustRemoteAction(object):
     @property
     def exec_root(self) -> Path:
         return self._exec_root
-
-    @property
-    def label(self) -> Optional[str]:
-        return self._main_args.label
 
     @property
     def host_platform(self) -> str:
@@ -808,17 +796,10 @@ class RustRemoteAction(object):
     def run_local(self) -> int:
         # don't bother with remote action preparation
         # or any of the remote action features.
-        command = cl_utils.auto_env_prefix_command(self.original_command)
-        if self.check_determinism:
-            self.vmsg("Comparing two local runs of the original command.")
-            command = fuchsia.check_determinism_command(
-                exec_root=self.exec_root_rel,
-                outputs=list(self._remote_output_files()),
-                command=command,
-                label=self.label,
-            )
-
-        return subprocess.call(command, cwd=self.working_dir)
+        return subprocess.call(
+            cl_utils.auto_env_prefix_command(self.original_command),
+            cwd=self.working_dir,
+        )
 
     def run(self) -> int:
         if self.local_only:

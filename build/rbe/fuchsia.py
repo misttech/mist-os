@@ -126,30 +126,6 @@ REMOTE_GCC_SUBDIR = Path('prebuilt', 'third_party', 'gcc', REMOTE_PLATFORM)
 # Until then, this remote fsatrace only works from linux-x64 hosts.
 FSATRACE_PATH = Path('prebuilt', 'fsatrace', 'fsatrace')
 
-_CHECK_DETERMINISM_SCRIPT = Path('build', 'tracer', 'output_cacher.py')
-
-
-def check_determinism_command(exec_root: Path, outputs: Sequence[Path], command: Sequence[Path] = None, label: str = None) -> Sequence[str]:
-    """Returns a command that checks for output determinism.
-
-    The check runs locally twice, moving outputs out of the way temporarily,
-    and then compares.
-
-    Args:
-      exec_root: path to project root (relative or absolute).
-      outputs: output files to compare.
-      command: the command to execute.
-      label: build system identifier for diagnostics.
-    """
-    return [
-        sys.executable,  # same Python interpreter
-        '-S',
-        str(exec_root / _CHECK_DETERMINISM_SCRIPT),
-    ] + ([f'--label={label}'] if label else []) + [
-        '--check-repeatability',
-        '--outputs',
-    ] + [str(p) for p in outputs] + ['--'] + (command or [])
-
 
 # On platforms where ELF utils are unavailable, hardcode rustc's shlibs.
 def remote_rustc_shlibs(root_rel: Path) -> Iterable[Path]:
