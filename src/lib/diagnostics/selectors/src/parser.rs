@@ -362,8 +362,10 @@ where
         '\\',
         tag(":"),
     );
-    let (rest, segments) =
-        separated_nonempty_list(tag("/"), recognize(accepted_characters))(input)?;
+    let (rest, segments) = preceded(
+        opt(tag("/")),
+        separated_nonempty_list(tag("/"), recognize(accepted_characters)),
+    )(input)?;
     Ok((rest, ComponentSelector { segments: segments.into_iter().map(|s| s.into()).collect() }))
 }
 
@@ -578,13 +580,22 @@ mod tests {
         ];
 
         for (test_string, expected_segments) in test_vector {
-            let (_, component_selector) =
+            let (_, selector) =
                 component_selector::<nom::error::VerboseError<&str>>(&test_string).unwrap();
-
             assert_eq!(
-                expected_segments, component_selector.segments,
+                expected_segments, selector.segments,
                 "For '{}', got: {:?}",
-                test_string, component_selector,
+                test_string, selector,
+            );
+
+            // Component selectors can start with `/`
+            let test_moniker_string = format!("/{test_string}");
+            let (_, selector) =
+                component_selector::<nom::error::VerboseError<&str>>(&test_moniker_string).unwrap();
+            assert_eq!(
+                expected_segments, selector.segments,
+                "For '{}', got: {:?}",
+                test_moniker_string, selector,
             );
         }
     }
