@@ -736,7 +736,7 @@ mod tests {
     use {
         super::*,
         crate::*,
-        fidl_diagnostics_validate::Value,
+        fidl_diagnostics_validate::{self as validate, *},
         fuchsia_inspect::reader::snapshot::BackingBuffer,
         inspect_format::{
             constants, Block, BlockIndex, BlockType, HeaderFields, PayloadFields, ReadBytes,

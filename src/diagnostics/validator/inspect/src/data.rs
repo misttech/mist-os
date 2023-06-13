@@ -3,15 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    super::{
-        metrics::Metrics,
-        validate::{self, Value},
-    },
-    crate::puppet::DiffType,
+    crate::{metrics::Metrics, puppet::DiffType},
     anyhow::{bail, format_err, Error},
     base64,
     diagnostics_hierarchy::{ArrayContent, DiagnosticsHierarchy, Property as iProperty},
     difference,
+    fidl_diagnostics_validate::{self as validate, Value},
     inspect_format::{ArrayFormat, BlockIndex, LinkNodeDisposition},
     num_derive::{FromPrimitive, ToPrimitive},
     std::{

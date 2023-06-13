@@ -16,10 +16,8 @@ group("tests") {
   ]
 }
 
-# The binary used by validator_component. Contains test cases, which are sent to the parent,
-# #inspect_validator_test_manager, and then to the appropriate puppet.
-rustc_binary("validator_bin") {
-  name = "validator"
+rustc_library("inspect_validator") {
+  testonly = true
   edition = "2021"
   with_unit_tests = true
 
@@ -27,7 +25,7 @@ rustc_binary("validator_bin") {
     "src/data.rs",
     "src/data/fetch.rs",
     "src/data/scanner.rs",
-    "src/main.rs",
+    "src/lib.rs",
     "src/metrics.rs",
     "src/puppet.rs",
     "src/results.rs",
@@ -37,19 +35,18 @@ rustc_binary("validator_bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_rust",
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//src/diagnostics/validator/inspect/fidl:validate_rust",
     "//src/lib/diagnostics/hierarchy/rust",
     "//src/lib/diagnostics/inspect/format/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/diagnostics/reader/rust",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:base64",
     "//third_party/rust_crates:difference",
-    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:num-derive",
     "//third_party/rust_crates:num-traits",
     "//third_party/rust_crates:serde",
@@ -58,44 +55,48 @@ rustc_binary("validator_bin") {
 
   test_deps = [
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]
 }
 
 # Unit tests for validator_bin (not the validation tests themselves)
 fuchsia_unittest_package("inspect_validator_unittest") {
-  deps = [ ":validator_bin_test" ]
+  deps = [ ":inspect_validator_test" ]
 }
 
-# The binary run by #inspect_validator_test_manager. Orchestrates communication between #puppet
-# and #validator_component.
-rustc_test("inspect_validator_test_manager_bin") {
-  name = "inspect_validator_test_manager_bin"
+# The program that actually executes the validator tests.
+rustc_test("validator_bin") {
+  name = "validator"
   edition = "2021"
-  source_root = "src/test.rs"
-  sources = [ "src/test.rs" ]
+  source_root = "src/main.rs"
+
+  sources = [ "src/main.rs" ]
+
   deps = [
-    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
-    "//src/diagnostics/validator/inspect/fidl:validate_rust",
-    "//src/lib/fidl/rust/fidl",
+    ":inspect_validator",
     "//src/lib/fuchsia",
-    "//src/lib/fuchsia-component",
-    "//third_party/rust_crates:tracing",
   ]
 }
 
-# The parent component of #validator_component and #puppet.
-fuchsia_test_component("inspect_validator_test_manager") {
-  component_name = "validator_test"
+# The parent component of #validator_component and #puppet. Provides the necessary topology.
+fuchsia_test_component("inspect_validator_test_executor") {
+  component_name = "test"
   manifest = "meta/test.cml"
-  deps = [ ":inspect_validator_test_manager_bin" ]
+}
+
+# Pre-compiled manifest for #validator_component
+fuchsia_component_manifest("validator_component_manifest") {
+  testonly = true
+  component_name = "validator"
+  manifest = "meta/validator.cml"
 }
 
 # Component containing the test cases.
 fuchsia_test_component("validator_component") {
-  component_name = "validator"
-  manifest = "meta/validator.cml"
+  cm_label = ":validator_component_manifest"
   deps = [ ":validator_bin" ]
 }
 
@@ -115,7 +116,7 @@ fuchsia_test_package("inspect_validator_test_rust") {
       package = "//src/diagnostics/validator/inspect/lib/rust"
     },
   ]
-  test_components = [ ":inspect_validator_test_manager" ]
+  test_components = [ ":inspect_validator_test_executor" ]
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
@@ -131,7 +132,7 @@ fuchsia_test_package("inspect_validator_test_cpp") {
       package = "//src/diagnostics/validator/inspect/lib/cpp"
     },
   ]
-  test_components = [ ":inspect_validator_test_manager" ]
+  test_components = [ ":inspect_validator_test_executor" ]
 }
 
 fuchsia_test_package("inspect_validator_test_dart") {
@@ -142,5 +143,5 @@ fuchsia_test_package("inspect_validator_test_dart") {
       package = "//sdk/dart/fuchsia_inspect/test/validator_puppet:dart"
     },
   ]
-  test_components = [ ":inspect_validator_test_manager" ]
+  test_components = [ ":inspect_validator_test_executor" ]
 }

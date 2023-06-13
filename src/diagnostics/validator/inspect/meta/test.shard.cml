@@ -2,13 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "//src/sys/test_runners/rust/default.shard.cml",
-        "syslog/client.shard.cml",
-    ],
-    program: {
-        binary: "bin/inspect_validator_test_manager_bin",
-    },
+    include: [ "syslog/offer.shard.cml" ],
     children: [
         {
             name: "puppet",
@@ -19,17 +13,12 @@
             url: "inspect_validator#meta/validator.cm",
         },
     ],
-    use: [
-        {
-            protocol: "diagnostics.validate.Validator",
-            from: "#validator",
-        },
+    offer: [
         {
             protocol: "fuchsia.sys2.LifecycleController",
             from: "framework",
+            to: "#validator",
         },
-    ],
-    offer: [
         {
             protocol: "diagnostics.validate.InspectPuppet",
             from: "#puppet",
@@ -39,6 +28,12 @@
             protocol: "fuchsia.diagnostics.ArchiveAccessor",
             from: "parent",
             to: "#validator",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.test.Suite",
+            from: "#validator",
         },
     ],
 }

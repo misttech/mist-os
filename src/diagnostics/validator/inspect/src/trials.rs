@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::validate::{self, Action, Value, ValueType, ROOT_ID};
+use fidl_diagnostics_validate::{self as validate, Action, Value, ValueType, ROOT_ID};
 
 pub enum Step {
     Actions(Vec<validate::Action>),
@@ -655,9 +655,9 @@ fn lazy_nodes_trial() -> Trial {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use {super::*, fidl_diagnostics_validate::*};
+    use super::*;
 
-    pub fn trial_with_action(name: &str, action: Action) -> Trial {
+    pub fn trial_with_action(name: &str, action: validate::Action) -> Trial {
         Trial { name: name.into(), steps: vec![Step::Actions(vec![action])] }
     }
 }

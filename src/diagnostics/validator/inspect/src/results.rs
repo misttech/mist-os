@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    super::{metrics::Metrics, validate::*},
-    crate::puppet::DiffType,
+    super::{metrics::Metrics, puppet::DiffType},
+    fidl_diagnostics_validate::*,
     serde::Serialize,
     std::collections::HashSet,
 };
@@ -16,7 +16,6 @@ pub struct Results {
     failed: bool,
     metrics: Vec<TrialMetrics>,
     pub diff_type: DiffType,
-    pub test_archive: bool,
 }
 
 pub trait Summary {
@@ -109,9 +108,6 @@ struct TrialMetrics {
     step_name: String,
 }
 
-// TODO(fxbug.dev/128581): There shouldn't really be any unused functionality. It needs to be
-// incorporated into the error output/InspectPuppet responses, or deleted.
-#[allow(unused)]
 impl Results {
     pub fn new() -> Results {
         Results {
@@ -120,7 +116,6 @@ impl Results {
             unimplemented: HashSet::new(),
             failed: false,
             diff_type: DiffType::Full,
-            test_archive: false,
         }
     }
 
@@ -213,7 +208,11 @@ impl Results {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::*};
+    use {
+        super::*,
+        crate::*,
+        fidl_diagnostics_validate::{self as validate, Value},
+    };
 
     #[fuchsia::test]
     fn error_result_fails_and_outputs() {

@@ -34,13 +34,10 @@ fuchsia_unittest_component("puppet") {
   manifest = "meta/puppet.cml"
 }
 
-# The parent component of #validator_component and #puppet.
-fuchsia_test_component("inspect_validator_test_manager") {
+# The parent component of #validator and #puppet.
+fuchsia_test_component("inspect_validator_test_component") {
   component_name = "validator_test"
   manifest = "meta/test.cml"
-  deps = [
-    "//src/diagnostics/validator/inspect:inspect_validator_test_manager_bin",
-  ]
 }
 
 fuchsia_package("go") {
@@ -57,7 +54,7 @@ fuchsia_test_package("inspect-validator-tests-go") {
       package = "//src/connectivity/network/netstack/inspect/validator:go"
     },
   ]
-  test_components = [ ":inspect_validator_test_manager" ]
+  test_components = [ ":inspect_validator_test_component" ]
 }
 
 group("tests") {

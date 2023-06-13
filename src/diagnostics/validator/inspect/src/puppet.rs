@@ -6,6 +6,7 @@ use {
     super::{
         data::{self, Data, LazyNode},
         metrics::Metrics,
+        PUPPET_MONIKER,
     },
     anyhow::{format_err, Error},
     fidl_diagnostics_validate as validate, fidl_fuchsia_inspect as fidl_inspect,
@@ -84,6 +85,16 @@ impl Puppet {
         Puppet::initialize_with_connection(Connection::connect().await?).await
     }
 
+    pub(crate) async fn shutdown(self) {
+        let lifecycle_controller =
+            fclient::connect_to_protocol::<fidl_fuchsia_sys2::LifecycleControllerMarker>().unwrap();
+        lifecycle_controller
+            .stop_instance(&format!("./{}", PUPPET_MONIKER))
+            .await
+            .unwrap()
+            .unwrap();
+    }
+
     /// Get the printable name associated with this puppet/test
     pub fn printable_name(&self) -> &str {
         &self.config.printable_name
@@ -91,7 +102,9 @@ impl Puppet {
 
     #[cfg(test)]
     pub async fn connect_local(local_fidl: validate::InspectPuppetProxy) -> Result<Puppet, Error> {
-        Puppet::initialize_with_connection(Connection::new(local_fidl)).await
+        let mut puppet = Puppet::initialize_with_connection(Connection::new(local_fidl)).await?;
+        puppet.config.test_archive = false;
+        Ok(puppet)
     }
 
     async fn initialize_with_connection(mut connection: Connection) -> Result<Puppet, Error> {
@@ -194,7 +207,7 @@ impl Connection {
 pub(crate) mod tests {
     use {
         super::*,
-        crate::create_node,
+        crate::{create_node, puppet::DiffType},
         anyhow::Context as _,
         fidl::endpoints::{create_proxy, RequestStream, ServerEnd},
         fidl_diagnostics_validate::{
