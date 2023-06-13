@@ -8,7 +8,6 @@ use crate::{
         budget::BudgetHandle,
         buffer::{ArcList, LazyItem},
         multiplex::PinStream,
-        serial::ComponentSerialConfig,
         socket::{Encoding, LogMessageSocket},
         stats::LogStreamStats,
         stored_message::StoredMessage,
@@ -71,10 +70,6 @@ pub struct LogsArtifactsContainer {
 
     /// Mechanism for a test to retrieve the internal hanging get state.
     hanging_get_test_state: Arc<Mutex<TestState>>,
-
-    /// The serial configuration for this component to know whether to also write the log to serial
-    /// when reading.
-    serial_config: Option<ComponentSerialConfig>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -110,7 +105,6 @@ impl LogsArtifactsContainer {
         interest_selectors: impl Iterator<Item = &LogInterestSelector>,
         parent_node: &inspect::Node,
         budget: BudgetHandle,
-        serial_config: Option<ComponentSerialConfig>,
     ) -> Self {
         let stats = LogStreamStats::default()
             .with_inspect(parent_node, identity.relative_moniker.to_string())
@@ -131,7 +125,6 @@ impl LogsArtifactsContainer {
             event_timestamp: zx::Time::get_monotonic(),
             next_hanging_get_id: AtomicUsize::new(0),
             hanging_get_test_state: Arc::new(Mutex::new(TestState::NoRequest)),
-            serial_config,
         };
 
         // there are no control handles so this won't notify anyone
@@ -396,16 +389,6 @@ impl LogsArtifactsContainer {
 
     /// Updates log stats in inspect and push the message onto the container's buffer.
     pub async fn ingest_message(&self, mut message: StoredMessage) {
-        // TODO(fxbug.dev/100486): we need a different place in which we write all serial logs.
-        // Given that the Archivist is multithreaded, writing here can lead to interleaving
-        // zx_debug_write calls when a message has to be split across multiple lines. Resulting in:
-        //
-        // 00009.317 19891:00000 [netstack] INFO: I'm message one, I'm long and I have a
-        // 00009.319 01103:01171 [mdns] INFO: Starting mDNS on interface ethp0004 using port 5353
-        // continuation that ended up in a new line (still message 1 from netstack, not 2)
-        if let Some(config) = &self.serial_config {
-            config.maybe_write_to_serial(&message, &self.identity);
-        }
         self.budget.allocate(message.size()).await;
         self.stats.ingest_message(&message);
         if !message.has_stats() {
@@ -689,7 +672,6 @@ mod tests {
                 std::iter::empty(),
                 inspect::component::inspector().root(),
                 budget_manager.handle(),
-                None,
             )
             .await,
         );

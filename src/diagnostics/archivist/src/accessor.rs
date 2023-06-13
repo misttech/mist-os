@@ -745,7 +745,7 @@ impl PerformanceConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{diagnostics::AccessorStats, logs::serial::SerialConfig, pipeline::Pipeline};
+    use crate::{diagnostics::AccessorStats, pipeline::Pipeline};
     use assert_matches::assert_matches;
     use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, BatchIteratorMarker};
     use fuchsia_inspect::{Inspector, Node};
@@ -758,8 +758,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<ArchiveAccessorMarker>().unwrap();
         let pipeline = Arc::new(Pipeline::for_test(None));
         let inspector = Inspector::default();
-        let log_repo =
-            LogsRepository::new(1_000_000, SerialConfig::default(), inspector.root()).await;
+        let log_repo = LogsRepository::new(1_000_000, inspector.root()).await;
         let inspect_repo = Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
         let server = ArchiveAccessorServer::new(inspect_repo, log_repo, 4);
         server.spawn_server(pipeline, stream);
@@ -813,8 +812,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<ArchiveAccessorMarker>().unwrap();
         let pipeline = Arc::new(Pipeline::for_test(None));
         let inspector = Inspector::default();
-        let log_repo =
-            LogsRepository::new(1_000_000, SerialConfig::default(), inspector.root()).await;
+        let log_repo = LogsRepository::new(1_000_000, inspector.root()).await;
         let inspect_repo = Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
         let server = Arc::new(ArchiveAccessorServer::new(inspect_repo, log_repo, 4));
         server.spawn_server(pipeline, stream);

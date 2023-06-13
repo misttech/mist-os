@@ -12,7 +12,12 @@ use crate::{
         types::*,
     },
     inspect::{repository::InspectRepository, servers::*},
-    logs::{repository::LogsRepository, serial::SerialConfig, servers::*, KernelDebugLog},
+    logs::{
+        repository::LogsRepository,
+        serial::{SerialConfig, SerialSink},
+        servers::*,
+        KernelDebugLog,
+    },
     pipeline::Pipeline,
 };
 use archivist_config::Config;
@@ -49,6 +54,9 @@ pub struct Archivist {
 
     /// Tasks that drains klog.
     _drain_klog_task: Option<fasync::Task<()>>,
+
+    /// Task writing logs to serial.
+    _serial_task: Option<fasync::Task<()>>,
 
     /// Tasks receiving external events from component manager and appmgr.
     incoming_external_event_producers: Vec<fasync::Task<()>>,
@@ -91,10 +99,17 @@ impl Archivist {
 
         let logs_repo = LogsRepository::new(
             config.logs_max_cached_original_bytes,
-            SerialConfig::new(config.allow_serial_logs, config.deny_serial_log_tags),
             component::inspector().root(),
         )
         .await;
+        let serial_task = if !config.allow_serial_logs.is_empty() {
+            Some(fasync::Task::spawn(
+                SerialConfig::new(config.allow_serial_logs, config.deny_serial_log_tags)
+                    .write_logs(Arc::clone(&logs_repo), SerialSink::default()),
+            ))
+        } else {
+            None
+        };
         let inspect_repo =
             Arc::new(InspectRepository::new(pipelines.iter().map(Arc::downgrade).collect()));
 
@@ -151,6 +166,7 @@ impl Archivist {
             inspect_server,
             log_settings_server,
             event_router,
+            _serial_task: serial_task,
             stop_recv: None,
             lifecycle_task: None,
             _drain_klog_task: None,
