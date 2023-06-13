@@ -24,17 +24,17 @@ type ProfileError = strict enum {
 
 /// A service which provides profile information for the terminal.
 @discoverable
-protocol Profiles {
+closed protocol Profiles {
 
     /// Returns the list of [ProfileEntry] objects.
-    GetProfileList() -> (struct {
+    strict GetProfileList() -> (struct {
         profile_list vector<ProfileEntry>:MAX_ALLOWED_PROFILES;
     });
 
     /// Sets the profile with the given id as the default.
     ///
     /// This method can fail if a profile with the given id does not exist.
-    SetDefault(struct {
+    strict SetDefault(struct {
         id ProfileId;
     }) -> () error ProfileError;
 
@@ -42,14 +42,14 @@ protocol Profiles {
     ///
     /// Note: this method will not be called if properties of an individual
     /// profile are updated.
-    -> OnProfileListUpdated(struct {
+    strict -> OnProfileListUpdated(struct {
         profile_entries vector<ProfileEntry>:MAX_ALLOWED_PROFILES;
     });
 
     /// Returns the profile with the given [id].
     ///
     /// If there is no profile with the given [name] an error will be returned.
-    GetProfile(struct {
+    strict GetProfile(struct {
         id ProfileId;
     }) -> (struct {
         profile Profile;
@@ -59,7 +59,7 @@ protocol Profiles {
     ///
     /// This method will fail if a profile with the given id does not already
     /// exist. A Profile must be created with a call to [CreateProfile].
-    UpdateProfile(struct {
+    strict UpdateProfile(struct {
         id ProfileId;
         profile Profile;
     }) -> () error ProfileError;
@@ -67,7 +67,7 @@ protocol Profiles {
     /// Creates a new profile.
     ///
     /// After the profile is created it can be updated with a call to [Update].
-    CreateNew() -> (struct {
+    strict CreateNew() -> (struct {
         id ProfileId;
         profile Profile;
     });
@@ -80,12 +80,12 @@ protocol Profiles {
     /// defined and it is up to the implementor to choose. The new default
     /// profile can be retrieved by listening for the OnProfileListUpdated
     /// event.
-    Delete(struct {
+    strict Delete(struct {
         id ProfileId;
     });
 
     /// Triggered when a given profile is updated.
-    -> OnProfileUpdated(struct {
+    strict -> OnProfileUpdated(struct {
         id ProfileId;
         profile Profile;
     });

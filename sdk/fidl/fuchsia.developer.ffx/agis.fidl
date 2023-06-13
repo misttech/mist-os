@@ -6,14 +6,14 @@ library fuchsia.developer.ffx;
 using fuchsia.gpu.agis;
 
 @discoverable
-protocol Listener {
+closed protocol Listener {
     // Initiate bi-directional communication between the AGI application and the
     // Vulkan traceable component identified by |global_id|.
-    Listen(struct {
+    strict Listen(struct {
         target_query TargetQuery;
         global_id uint32;
     }) -> () error fuchsia.gpu.agis.Error;
 
     // Shut down all running listeners.
-    Shutdown() -> () error fuchsia.gpu.agis.Error;
+    strict Shutdown() -> () error fuchsia.gpu.agis.Error;
 };

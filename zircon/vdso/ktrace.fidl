@@ -4,7 +4,7 @@
 library zx;
 
 @transport("Syscall")
-protocol Ktrace {
+closed protocol Ktrace {
     // TODO(scottmg): This is another one where it's:
     //   (handle, data, offset, data_size)
     // rather than:
@@ -48,7 +48,7 @@ protocol Ktrace {
     /// ## See also
     ///
     /// TODO(fxbug.dev/32938)
-    Read(resource struct {
+    strict Read(resource struct {
         handle Handle:RESOURCE;
         @out
         @voidptr
@@ -98,7 +98,7 @@ protocol Ktrace {
     /// ## See also
     ///
     /// TODO(fxbug.dev/32938)
-    Control(resource struct {
+    strict Control(resource struct {
         handle Handle:RESOURCE;
         action uint32;
         options uint32;
@@ -146,7 +146,7 @@ protocol Ktrace {
     /// ## See also
     ///
     /// TODO(fxbug.dev/32938)
-    Write(resource struct {
+    strict Write(resource struct {
         handle Handle:RESOURCE;
         id uint32;
         arg0 uint32;

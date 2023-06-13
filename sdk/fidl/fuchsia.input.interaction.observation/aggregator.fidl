@@ -8,9 +8,9 @@ using zx;
 /// The Aggregator protocol collects evidence of user activity and uses this
 /// evidence to set the system's activity state.
 @discoverable
-protocol Aggregator {
+closed protocol Aggregator {
     /// Reports a discrete activity such as a keystroke.
-    ReportDiscreteActivity(struct {
+    strict ReportDiscreteActivity(struct {
         event_time zx.Time;
     }) -> ();
 };

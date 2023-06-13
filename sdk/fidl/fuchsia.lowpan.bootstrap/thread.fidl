@@ -10,7 +10,7 @@ using fuchsia.mem as mem;
 /// an existing Thread implementation to ensure continuity of the Thread network and
 /// other thread settings.
 @discoverable
-protocol Thread {
+closed protocol Thread {
     /// Import a json data file containing the Thread configuration as created by
     /// [ThreadConfigManager]
     /// (https://fuchsia.googlesource.com/fuchsia/+/refs/heads/master/src/connectivity/openthread/third_party/openthread/platform/thread_config_manager.cc).
@@ -40,7 +40,7 @@ protocol Thread {
     /// Settings are guaranteed to have been persisted upon successful
     /// completion of this call. The channel will be closed if importing
     /// settings fail.
-    ImportSettings(resource struct {
+    strict ImportSettings(resource struct {
         thread_settings_json mem.Buffer;
     }) -> ();
 };

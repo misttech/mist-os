@@ -23,7 +23,7 @@ const MAX_COUNT_CREATE_CHILDREN int32 = 64;
 // including BufferCollectionToken(s) which have since been converted to a
 // BufferCollection channel.
 @available(added=9)
-protocol Node {
+closed protocol Node {
     // Sync()
     //
     /// Ensure that previous messages, including Duplicate() messages on a
@@ -60,7 +60,7 @@ protocol Node {
     /// hang forever.  See ValidateBufferCollectionToken() to check token
     /// validity first if the token isn't already known to be (is/was) valid.
     @available(added=9)
-    Sync() -> ();
+    strict Sync() -> ();
 
     // Close()
     //
@@ -107,14 +107,14 @@ protocol Node {
     /// BufferCollectionTokenGroup channel had remained open), and the close
     /// doesn't trigger or propagate failure.
     @available(added=9)
-    Close();
+    strict Close();
 
     /// Set a name for VMOs in this buffer collection. The name may be truncated
     /// shorter. The name only affects VMOs allocated after it's set - this call
     /// does not rename existing VMOs. If multiple clients set different names
     /// then the larger priority value will win.
     @available(added=9)
-    SetName(struct {
+    strict SetName(struct {
         priority uint32;
         name string:64;
     });
@@ -142,7 +142,7 @@ protocol Node {
     /// can be used to help disambiguate if a Node is suspected of having info
     /// that was copied from its parent.
     @available(added=9)
-    SetDebugClientInfo(struct {
+    strict SetDebugClientInfo(struct {
         name string:64;
         id uint64;
     });
@@ -152,7 +152,7 @@ protocol Node {
     /// when the log is printed. If multiple client set the deadline, it's
     /// unspecified which deadline will take effect.
     @available(added=9)
-    SetDebugTimeoutLogDeadline(struct {
+    strict SetDebugTimeoutLogDeadline(struct {
         deadline zx.Time;
     });
 
@@ -187,7 +187,7 @@ protocol Node {
     /// with the node, if we don't trust a node enough to let it turn on verbose
     /// logging.
     @available(added=9)
-    SetVerboseLogging();
+    strict SetVerboseLogging();
 
     // GetNodeRef()
     //
@@ -202,7 +202,7 @@ protocol Node {
     ///
     /// See also IsAlternateFor().
     @available(added=9)
-    GetNodeRef() -> (resource struct {
+    strict GetNodeRef() -> (resource struct {
         node_ref zx.Handle:EVENT;
     });
 
@@ -287,7 +287,7 @@ protocol Node {
     ///     which selects a child sub-tree other than the sub-tree containing
     ///     the calling Node or node_ref Node.
     @available(added=9)
-    IsAlternateFor(resource struct {
+    strict IsAlternateFor(resource struct {
         node_ref zx.Handle:EVENT;
     }) -> (struct {
         is_alternate bool;
@@ -302,7 +302,7 @@ protocol Node {
 /// (pair) because this way we can detect error conditions like a participant
 /// dying mid-create.
 // LINT.IfChange
-protocol BufferCollectionToken {
+closed protocol BufferCollectionToken {
     @available(added=9)
     compose Node;
 
@@ -310,53 +310,53 @@ protocol BufferCollectionToken {
     // use the Node equivalents instead.  These ordinals will eventually not be
     // recognized by sysmem.
     @available(added=7, deprecated=8, removed=9)
-    Sync() -> ();
+    strict Sync() -> ();
     // Still handled, for clients that haven't been re-built yet.
     @available(added=9)
     @selector("Sync")
-    DeprecatedSync() -> ();
+    strict DeprecatedSync() -> ();
 
     @available(added=7, deprecated=8, removed=9)
-    Close();
+    strict Close();
     // Still handled, for clients that haven't been re-built yet.
     @available(added=9)
     @selector("Close")
-    DeprecatedClose();
+    strict DeprecatedClose();
 
     @available(added=7, deprecated=8, removed=9)
-    SetName(struct {
+    strict SetName(struct {
         priority uint32;
         name string:64;
     });
     // Still handled, for clients that haven't been re-built yet.
     @available(added=9)
     @selector("SetName")
-    DeprecatedSetName(struct {
+    strict DeprecatedSetName(struct {
         priority uint32;
         name string:64;
     });
 
     @available(added=7, deprecated=8, removed=9)
-    SetDebugClientInfo(struct {
+    strict SetDebugClientInfo(struct {
         name string:64;
         id uint64;
     });
     // Still handled, for clients that haven't been re-built yet.
     @available(added=9)
     @selector("SetDebugClientInfo")
-    DeprecatedSetDebugClientInfo(struct {
+    strict DeprecatedSetDebugClientInfo(struct {
         name string:64;
         id uint64;
     });
 
     @available(added=7, deprecated=8, removed=9)
-    SetDebugTimeoutLogDeadline(struct {
+    strict SetDebugTimeoutLogDeadline(struct {
         deadline zx.Time;
     });
     // Still handled, for clients that haven't been re-built yet.
     @available(added=9)
     @selector("SetDebugTimeoutLogDeadline")
-    DeprecatedSetDebugTimeoutLogDeadline(struct {
+    strict DeprecatedSetDebugTimeoutLogDeadline(struct {
         deadline zx.Time;
     });
 
@@ -384,7 +384,7 @@ protocol BufferCollectionToken {
     /// participant to gain rights that the participant doesn't already have.
     /// The value ZX_RIGHT_SAME_RIGHTS can be used to specify that no
     /// attenuation should be applied.
-    DuplicateSync(struct {
+    strict DuplicateSync(struct {
         rights_attenuation_masks vector<zx.Rights>:MAX_COUNT_DUPLICATES;
     }) -> (resource struct {
         tokens vector<client_end:BufferCollectionToken>:MAX_COUNT_DUPLICATES;
@@ -431,7 +431,7 @@ protocol BufferCollectionToken {
     /// `token_request` is the server end of a BufferCollectionToken channel.
     /// The client end of this channel acts as another participant in creating the
     /// shared BufferCollection.
-    Duplicate(resource struct {
+    strict Duplicate(resource struct {
         rights_attenuation_mask uint32;
         token_request server_end:BufferCollectionToken;
     });
@@ -489,7 +489,7 @@ protocol BufferCollectionToken {
     /// be used to replace the failed dispensable token.
     ///
     /// SetDispensable() on an already-dispensable token is idempotent.
-    SetDispensable();
+    strict SetDispensable();
 
     // CreateBufferCollectionTokenGroup()
     //
@@ -513,7 +513,7 @@ protocol BufferCollectionToken {
     /// group_request - the server end of a BufferCollectionTokenGroup channel
     /// to be served by sysmem.
     @available(added=9)
-    CreateBufferCollectionTokenGroup(resource struct {
+    strict CreateBufferCollectionTokenGroup(resource struct {
         group_request server_end:BufferCollectionTokenGroup;
     });
 };
@@ -547,7 +547,7 @@ protocol BufferCollectionToken {
 /// memory fragmentation and avoid overlap of buffer allocation lifetimes for
 /// the old and new collections. Collections can be large enough that it's worth
 /// avoiding allocation overlap (in time).
-protocol BufferCollection {
+closed protocol BufferCollection {
     @available(added=9)
     compose Node;
 
@@ -555,37 +555,37 @@ protocol BufferCollection {
     // use the Node equivalents instead.  These ordinals will eventually not be
     // recognized by sysmem.
     @available(added=7, deprecated=8, removed=9)
-    Sync() -> ();
+    strict Sync() -> ();
     @available(added=9)
     @selector("Sync")
-    DeprecatedSync() -> ();
+    strict DeprecatedSync() -> ();
 
     @available(added=7, deprecated=8, removed=9)
-    Close();
+    strict Close();
     @available(added=9)
     @selector("Close")
-    DeprecatedClose();
+    strict DeprecatedClose();
 
     @available(added=7, deprecated=8, removed=9)
-    SetName(struct {
+    strict SetName(struct {
         priority uint32;
         name string:64;
     });
     @available(added=9)
     @selector("SetName")
-    DeprecatedSetName(struct {
+    strict DeprecatedSetName(struct {
         priority uint32;
         name string:64;
     });
 
     @available(added=7, deprecated=8, removed=9)
-    SetDebugClientInfo(struct {
+    strict SetDebugClientInfo(struct {
         name string:64;
         id uint64;
     });
     @available(added=9)
     @selector("SetDebugClientInfo")
-    DeprecatedSetDebugClientInfo(struct {
+    strict DeprecatedSetDebugClientInfo(struct {
         name string:64;
         id uint64;
     });
@@ -619,7 +619,7 @@ protocol BufferCollection {
     /// buffer_index.
     ///
     /// `constraints` are constraints on the buffer collection.
-    SetConstraints(struct {
+    strict SetConstraints(struct {
         has_constraints bool;
         constraints BufferCollectionConstraints;
     });
@@ -643,7 +643,7 @@ protocol BufferCollection {
     /// satisfied, perhaps due to hardware limitations.
     ///
     /// `buffer_collection_info` has the VMO handles and other related info.
-    WaitForBuffersAllocated() -> (resource struct {
+    strict WaitForBuffersAllocated() -> (resource struct {
         status zx.Status;
         buffer_collection_info BufferCollectionInfo_2;
     });
@@ -651,27 +651,27 @@ protocol BufferCollection {
     /// This returns the same result code as WaitForBuffersAllocated if the
     /// buffer collection has been allocated or failed, or `ZX_ERR_UNAVAILABLE`
     /// if WaitForBuffersAllocated would block.
-    CheckBuffersAllocated() -> (struct {
+    strict CheckBuffersAllocated() -> (struct {
         status zx.Status;
     });
 
     @available(added=7, deprecated=8, removed=9)
-    AllocateSingleBuffer(struct {
+    strict AllocateSingleBuffer(struct {
         buffer_index uint64;
     });
     @available(added=7, deprecated=8, removed=9)
-    CloseSingleBuffer(struct {
+    strict CloseSingleBuffer(struct {
         buffer_index uint64;
     });
     @available(added=7, deprecated=8, removed=9)
-    WaitForSingleBufferAllocated(struct {
+    strict WaitForSingleBufferAllocated(struct {
         buffer_index uint64;
     }) -> (resource struct {
         status zx.Status;
         buffer_info SingleBufferInfo;
     });
     @available(added=7, deprecated=8, removed=9)
-    CheckSingleBufferAllocated(struct {
+    strict CheckSingleBufferAllocated(struct {
         buffer_index uint64;
     });
 
@@ -683,7 +683,7 @@ protocol BufferCollection {
     /// not result in channel closure until SetConstraints() is received by
     /// sysmem.
     @available(added=7, deprecated=9)
-    SetConstraintsAuxBuffers(struct {
+    strict SetConstraintsAuxBuffers(struct {
         constraints BufferCollectionConstraintsAuxBuffers;
     });
 
@@ -713,7 +713,7 @@ protocol BufferCollection {
     /// "allow_clear_aux_buffers_for_secure" false to call GetAuxBuffers(), in
     /// which case buffer[0].vmo will not be set.
     @available(added=7, deprecated=9)
-    GetAuxBuffers() -> (resource struct {
+    strict GetAuxBuffers() -> (resource struct {
         status zx.Status;
         buffer_collection_info_aux_buffers BufferCollectionInfo_2;
     });
@@ -783,7 +783,7 @@ protocol BufferCollection {
     /// to help diagnose the bug in client code):
     ///   * ZX_RIGHT_SAME_RIGHTS (preferred)
     ///   * 0xFFFFFFFF (this is reasonable when an attenuation mask is computed)
-    AttachToken(resource struct {
+    strict AttachToken(resource struct {
         rights_attenuation_mask uint32;
         token_request server_end:BufferCollectionToken;
     });
@@ -854,7 +854,7 @@ protocol BufferCollection {
     /// The server_end may lack ZX_RIGHT_SIGNAL or ZX_RIGHT_SIGNAL_PEER, but
     /// must have ZX_RIGHT_DUPLICATE (and must have ZX_RIGHT_TRANSFER to
     /// transfer without causing CodecFactory channel failure).
-    AttachLifetimeTracking(resource struct {
+    strict AttachLifetimeTracking(resource struct {
         server_end zx.Handle:EVENTPAIR;
         buffers_remaining uint32;
     });
@@ -943,7 +943,7 @@ protocol BufferCollection {
 /// of a sub-tree under such a node that doesn't propagate failure to its
 /// parent).
 @available(added=9)
-protocol BufferCollectionTokenGroup {
+closed protocol BufferCollectionTokenGroup {
     compose Node;
 
     /// Create a child token.  Before passing the client end of this token to
@@ -956,7 +956,7 @@ protocol BufferCollectionTokenGroup {
     /// rights_attenuation_mask - If ZX_RIGHT_SAME_RIGHTS, the created token
     /// allows the holder to get the same rights to buffers as the parent token
     /// (of the group) had.
-    CreateChild(resource table {
+    strict CreateChild(resource table {
         /// Must be set.
         1: token_request server_end:BufferCollectionToken;
 
@@ -981,7 +981,7 @@ protocol BufferCollectionTokenGroup {
     /// The maximum permissible total number of children per group, and total
     /// number of nodes in an overall tree (from the root) are capped to limits
     /// which are not configurable via these protocols.
-    CreateChildrenSync(struct {
+    strict CreateChildrenSync(struct {
         rights_attenuation_masks vector<zx.Rights>:MAX_COUNT_CREATE_CHILDREN;
     }) -> (resource struct {
         tokens vector<client_end:BufferCollectionToken>:MAX_COUNT_CREATE_CHILDREN;
@@ -996,5 +996,5 @@ protocol BufferCollectionTokenGroup {
     /// If Close() is to be sent, it should be sent _after_
     /// AllChildrenPresent(), else failure of the group and propagation of the
     /// failure to the group's parent will still be triggered.
-    AllChildrenPresent();
+    strict AllChildrenPresent();
 };

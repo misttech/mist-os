@@ -40,37 +40,37 @@ type PdevMmio = resource struct {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol PDev {
-    GetMmio(struct {
+closed protocol PDev {
+    strict GetMmio(struct {
         index uint32;
     }) -> (resource struct {
         s zx.Status;
         mmio PdevMmio;
     });
-    GetInterrupt(struct {
+    strict GetInterrupt(struct {
         index uint32;
         flags uint32;
     }) -> (resource struct {
         s zx.Status;
         irq zx.Handle:INTERRUPT;
     });
-    GetBti(struct {
+    strict GetBti(struct {
         index uint32;
     }) -> (resource struct {
         s zx.Status;
         bti zx.Handle:BTI;
     });
-    GetSmc(struct {
+    strict GetSmc(struct {
         index uint32;
     }) -> (resource struct {
         s zx.Status;
         smc zx.Handle:RESOURCE;
     });
-    GetDeviceInfo() -> (struct {
+    strict GetDeviceInfo() -> (struct {
         s zx.Status;
         info PdevDeviceInfo;
     });
-    GetBoardInfo() -> (struct {
+    strict GetBoardInfo() -> (struct {
         s zx.Status;
         info PdevBoardInfo;
     });

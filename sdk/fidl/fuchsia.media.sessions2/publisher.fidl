@@ -20,8 +20,8 @@ type PlayerRegistration = table {
 /// `Publisher` publishes media players so they may be discovered and
 /// controlled by clients who have permission to do so.
 @discoverable
-protocol Publisher {
-    Publish(resource struct {
+closed protocol Publisher {
+    strict Publish(resource struct {
         player client_end:Player;
         registration PlayerRegistration;
     }) -> (struct {

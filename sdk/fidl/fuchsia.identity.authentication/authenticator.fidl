@@ -11,7 +11,7 @@ library fuchsia.identity.authentication;
 ///
 /// NOTE: This protocol may not be discoverable in the future.
 @discoverable
-protocol StorageUnlockMechanism {
+closed protocol StorageUnlockMechanism {
     /// Interactively requests the user to authenticate against any of the
     /// provided enrollments.
     ///
@@ -28,7 +28,7 @@ protocol StorageUnlockMechanism {
     ///                    attempt is successful.
     ///
     /// Fails with `ABORTED` if the client closes the `interaction` channel.
-    Authenticate(resource struct {
+    strict Authenticate(resource struct {
         interaction InteractionProtocolServerEnd;
         enrollments vector<Enrollment>:MAX_ENROLLMENTS;
     }) -> (struct {
@@ -49,7 +49,7 @@ protocol StorageUnlockMechanism {
     ///                            enrollment.
     ///
     /// Fails with `ABORTED` if the client closes the `interaction` channel.
-    Enroll(resource struct {
+    strict Enroll(resource struct {
         interaction InteractionProtocolServerEnd;
     }) -> (struct {
         enrollment_data EnrollmentData;

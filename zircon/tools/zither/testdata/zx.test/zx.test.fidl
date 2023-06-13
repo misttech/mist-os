@@ -23,9 +23,9 @@ resource_definition Handle : uint32 {
 };
 
 @transport("Syscall")
-protocol Channel {
+closed protocol Channel {
     @handle_unchecked
-    Read(resource struct {
+    strict Read(resource struct {
         handle Handle:CHANNEL;
         options uint32;
         @out
@@ -40,7 +40,7 @@ protocol Channel {
         actual_handles uint32;
     }) error Status;
 
-    Write(resource struct {
+    strict Write(resource struct {
         handle Handle:CHANNEL;
         options uint32;
         @voidptr
@@ -54,30 +54,30 @@ protocol Channel {
 
 @transport("Syscall")
 @no_protocol_prefix
-protocol Clockfuncs {
+closed protocol Clockfuncs {
     @vdsocall
-    ClockGetMonotonic() -> (@wrapped_return struct {
+    strict ClockGetMonotonic() -> (@wrapped_return struct {
         time Time;
     });
 
     @internal
-    ClockGetMonotonicViaKernel() -> (@wrapped_return struct {
+    strict ClockGetMonotonicViaKernel() -> (@wrapped_return struct {
         time Time;
     });
 };
 
 @transport("Syscall")
 @no_protocol_prefix
-protocol Handlefuncs {
-    HandleCloseMany(resource struct {
+closed protocol Handlefuncs {
+    strict HandleCloseMany(resource struct {
         @release
         handles vector<Handle>;
     }) -> () error Status;
 };
 
 @transport("Syscall")
-protocol Ktrace {
-    Control(resource struct {
+closed protocol Ktrace {
+    strict Control(resource struct {
         handle Handle:RESOURCE;
         action uint32;
         options uint32;
@@ -90,7 +90,7 @@ protocol Ktrace {
 
 @transport("Syscall")
 @no_protocol_prefix
-protocol Misc {
+closed protocol Misc {
     /// ## Summary
     ///
     /// High resolution sleep.
@@ -142,41 +142,41 @@ protocol Misc {
     /// [`zx_timer_create()`]: timer_create.md
     /// [`zx_timer_set()`]: timer_set.md
     @blocking
-    Nanosleep(struct {
+    strict Nanosleep(struct {
         deadline Time;
     }) -> () error Status;
 };
 
 @transport("Syscall")
-protocol Process {
+closed protocol Process {
     @noreturn
-    Exit(struct {
+    strict Exit(struct {
         retcode int64;
     });
 };
 
 @transport("Syscall")
-protocol System {
+closed protocol System {
     @const
     @vdsocall
-    GetPageSize() -> (@wrapped_return struct {
+    strict GetPageSize() -> (@wrapped_return struct {
         size uint32;
     });
 };
 
 @transport("Syscall")
-protocol Syscall {
+closed protocol Syscall {
     @next
-    Next();
+    strict Next();
 
     @testonly
-    Test0();
+    strict Test0();
 
     @testonly
     @test_category1
-    Test1();
+    strict Test1();
 
     @testonly
     @test_category2
-    Test2();
+    strict Test2();
 };

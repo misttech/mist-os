@@ -23,9 +23,9 @@ type SymlinkInfo = table {
 
 /// A ['Node'] which contains a symbolic link.
 @available(added=HEAD)
-protocol Symlink {
+closed protocol Symlink {
     compose Node;
 
     @selector("fuchsia.io/Symlink.Describe")
-    Describe() -> (SymlinkInfo);
+    strict Describe() -> (SymlinkInfo);
 };

@@ -17,4 +17,4 @@ library fuchsia.component;
 /// Note: The component doesn't need to serve this protocol, it is implemented
 /// by the framework.
 @discoverable
-protocol Binder {};
+closed protocol Binder {};

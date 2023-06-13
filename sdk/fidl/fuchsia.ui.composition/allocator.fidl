@@ -100,13 +100,13 @@ type RegisterBufferCollectionArgs = resource table {
 };
 
 @discoverable
-protocol Allocator {
+closed protocol Allocator {
     /// A BufferCollection is a set of VMOs created by Sysmem and shared by a number of
     /// participants, one of which is the Flatland Renderer. Some content, such as Images, use a
     /// BufferCollection as their backing memory.
     ///
     /// See [`RegisterBufferCollectionArgs`] for information on each argument.
-    RegisterBufferCollection(resource struct {
+    strict RegisterBufferCollection(resource struct {
         args RegisterBufferCollectionArgs;
     }) -> () error RegisterBufferCollectionError;
 };

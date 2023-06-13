@@ -14,7 +14,7 @@ alias InterfaceName = fuchsia.lowpan.InterfaceName;
 ///
 /// This protocol is implemented by LoWPAN drivers and used by client tools that need to issue
 /// factory commands. It is obtained from calling `FactoryLookup.Lookup()`.
-protocol FactoryDevice {
+closed protocol FactoryDevice {
     /// Send a proprietary manufacturing command to the device and return the response.
     ///
     /// This method is intended to be used to facilitate device testing on the assembly line and is
@@ -25,7 +25,7 @@ protocol FactoryDevice {
     ///
     /// When finished sending manufacturing commands, call `fuchsia.lowpan.test.DeviceTest.reset()`
     /// to return the device to normal behavior.
-    SendMfgCommand(struct {
+    strict SendMfgCommand(struct {
         command string:2000;
     }) -> (struct {
         response string:2000;
@@ -36,7 +36,7 @@ protocol FactoryDevice {
     /// This method is intended to send the exact same set of commands as SendMfgCommand(), but
     /// instead of sending one command at a time, this method opens an opens an interactive shell
     /// operated over `server_socket`.
-    SetupOtCli(resource struct {
+    strict SetupOtCli(resource struct {
         server_socket zx.Handle:<SOCKET, zx.RIGHTS_IO | zx.Rights.WAIT>;
     }) -> ();
 };
@@ -46,9 +46,9 @@ protocol FactoryDevice {
 /// This protocol is implemented by the LoWPAN service and used by client tools that need to issue
 /// factory commands.
 @discoverable
-protocol FactoryLookup {
+closed protocol FactoryLookup {
     /// Connects the the associated `FactoryDevice` API for the given LoWPAN interface name.
-    Lookup(resource struct {
+    strict Lookup(resource struct {
         name InterfaceName;
         device_factory server_end:FactoryDevice;
     });
@@ -61,9 +61,9 @@ protocol FactoryLookup {
 /// This protocol is implemented by LoWPAN drivers and used by the LoWPAN service when
 /// handling calls to `FactoryLookup.Lookup()`. It is registered with the service via
 /// a call to `FactoryRegister.Register()`.
-protocol FactoryDriver {
+closed protocol FactoryDriver {
     /// Used to obtain a `FactoryDevice` protocol instance.
-    GetFactoryDevice(resource struct {
+    strict GetFactoryDevice(resource struct {
         device_factory server_end:FactoryDevice;
     });
 };
@@ -72,13 +72,13 @@ protocol FactoryDriver {
 ///
 /// This protocol is implemented by the LoWPAN service and used by LoWPAN drivers.
 @discoverable
-protocol FactoryRegister {
+closed protocol FactoryRegister {
     /// Registers the given LoWPAN device factory API with the LoWPAN Service
     /// using the given interface name.
     ///
     /// The provided `FactoryDriver` will be used to connect requests made via
     /// `FactoryLookup.Lookup()` for `FactoryDevice`.
-    Register(resource struct {
+    strict Register(resource struct {
         name InterfaceName;
         driver client_end:FactoryDriver;
     });

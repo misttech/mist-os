@@ -64,7 +64,7 @@ const MAX_VIEW_COUNT uint32 = 300;
 /// sit quietly.
 ///
 /// Lifecycle: The server endpoint is closed when the context view dies.
-protocol ViewTreeWatcher {
+closed protocol ViewTreeWatcher {
     /// A method of obtaining view tree snapshots for a particular view.
     ///
     /// This call is formulated as a "hanging get" pattern: the client asks for
@@ -82,7 +82,7 @@ protocol ViewTreeWatcher {
     /// Client pacing. The server will dispatch snapshots to the caller on a
     /// lossless, best-effort basis, but the caller must allocate enough time to
     /// keep up with new snapshots.
-    Watch() -> (WatchResponse);
+    strict Watch() -> (WatchResponse);
 };
 
 /// Response for fuchsia.ui.observation.geometry.ViewTreeWatcher.Watch.

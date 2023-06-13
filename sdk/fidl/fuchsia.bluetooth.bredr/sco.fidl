@@ -114,12 +114,12 @@ type RxPacketStatus = strict enum : uint8 {
     DATA_PARTIALLY_LOST = 0x3;
 };
 
-protocol ScoConnection {
+closed protocol ScoConnection {
     // Read the next inbound SCO payload.
     // Hangs until new data is received.
     // Only one Read request may be pending at a time. Additional requests will result in protocol
     // closure.
-    Read() -> (struct {
+    strict Read() -> (struct {
         status_flag RxPacketStatus;
         data vector<uint8>:MAX;
     });
@@ -128,23 +128,23 @@ protocol ScoConnection {
     // If Write tries to send more data than `max_tx_data_size`, the protocol will be closed.
     // Only one Write request may be pending at a time. Additional requests will result in protocol
     // closure.
-    Write(struct {
+    strict Write(struct {
         data vector<uint8>:MAX;
     }) -> ();
 };
 
 /// Represents an active synchronous connection request by a profile.
 /// Either `Connected()` or `Error()` will be called and then server will close the protocol.
-protocol ScoConnectionReceiver {
+closed protocol ScoConnectionReceiver {
     /// Called upon successful connection establishment.
     /// `params` contains the parameters that were used to establish the connection.
-    Connected(resource struct {
+    strict Connected(resource struct {
         connection client_end:ScoConnection;
         params ScoConnectionParameters;
     });
 
     /// Called when connection establishment fails or is cancelled by the host.
-    Error(struct {
+    strict Error(struct {
         error ScoErrorCode;
     });
 };

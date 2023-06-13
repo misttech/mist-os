@@ -16,7 +16,7 @@ const MAX_ARGS_LENGTH uint64 = 1024;
 
 /// USB ADB implementation protocol. The USB ADB driver would start serving this interface on the
 /// server endpoint passed to a driver during Device::Start.
-protocol UsbAdbImpl {
+closed protocol UsbAdbImpl {
     /// Request transmission of the packet in |data|.
     ///
     /// Return status indicates queue state:
@@ -24,7 +24,7 @@ protocol UsbAdbImpl {
     ///   Other: Packet could not be enqueued.
     /// Upon a return of ZX_OK, the packet has been enqueued, but no information is returned as to
     /// the completion state of the transmission itself.
-    QueueTx(struct {
+    strict QueueTx(struct {
         data vector<uint8>:MAX;
     }) -> () error zx.Status;
 
@@ -37,21 +37,21 @@ protocol UsbAdbImpl {
     ///    ZX_ERR_BAD_STATE: Subsequent requests will not succeed as well.
     /// Other error codes are from underlying subsystem and the caller should retry |Receive| in
     /// that case.
-    Receive() -> (struct {
+    strict Receive() -> (struct {
         data vector<uint8>:MAX;
     }) error zx.Status;
 
     /// Event triggered when USB ADB interface status changes.
-    -> OnStatusChanged(struct {
+    strict -> OnStatusChanged(struct {
         status StatusFlags;
     });
 };
 
 /// Device interface for USB ADB. The device manages the USB endpoints needed for ADB.
 @discoverable
-protocol Device {
+closed protocol Device {
     /// Start USB ADB protocol with |interface|.
-    Start(resource struct {
+    strict Start(resource struct {
         interface server_end:UsbAdbImpl;
     }) -> () error zx.Status;
 };
@@ -69,10 +69,10 @@ protocol Device {
 ///      and hands it the socket.
 ///    - adb component and service Provider component (adb-shell) communicate over the socket.
 @discoverable
-protocol Provider {
+closed protocol Provider {
     /// Connect `socket` to the service (called in response to adb OPEN message).
     /// `args` provides additional arguments passed by the client if any.
-    ConnectToService(resource struct {
+    strict ConnectToService(resource struct {
         socket zx.Handle:SOCKET;
         args string:<MAX_ARGS_LENGTH, optional>;
     }) -> () error zx.Status;

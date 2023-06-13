@@ -71,7 +71,7 @@ type FrameInfo = resource table {
 /// [`fuchsia.sysmem/BufferCollection`] and [`fuchsia.ui.composition/Allocator`] protocols
 /// as those are necessary to create the BufferCollections and images ScreenCapture uses.
 @discoverable
-protocol ScreenCapture {
+closed protocol ScreenCapture {
     /// Clients should first use the Allocator protocol to register a
     /// BufferCollection. This function will fail with BAD_OPERATION unless all clients of the
     /// BufferCollection have set their constraints.
@@ -97,7 +97,7 @@ protocol ScreenCapture {
     /// if the client wishes to change any of the configuration settings. In
     /// this case all the buffers from the previous call to [`Configure`] will
     /// be released.
-    Configure(ScreenCaptureConfig) -> () error ScreenCaptureError;
+    strict Configure(ScreenCaptureConfig) -> () error ScreenCaptureError;
 
     /// Following a successful call to [`Configure`], clients can call
     /// GetNextFrame. This will populate a buffer with the most recent frame.
@@ -119,11 +119,11 @@ protocol ScreenCapture {
     /// must be called to make a buffer available before this function can be called successfully.
     // TODO(fxbug.dev/97057): Add a way to notify clients of the display
     // refresh rate, perhaps through the Display API.
-    GetNextFrame(GetNextFrameArgs) -> (FrameInfo) error ScreenCaptureError;
+    strict GetNextFrame(GetNextFrameArgs) -> (FrameInfo) error ScreenCaptureError;
 
     /// Once the client no longer needs an image, they can call ReleaseFrame on
     /// the VMO index of the buffer so that the server can reuse it in the future.
-    ReleaseFrame(struct {
+    strict ReleaseFrame(struct {
         buffer_id uint32;
     }) -> () error ScreenCaptureError;
 };

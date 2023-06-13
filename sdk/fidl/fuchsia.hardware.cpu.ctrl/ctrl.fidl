@@ -20,10 +20,10 @@ type CpuPerformanceStateInfo = struct {
     voltage_uv int64;
 };
 
-protocol Device {
+closed protocol Device {
     /// Returns information about a given performance state for this performance
     /// domain.
-    GetPerformanceStateInfo(struct {
+    strict GetPerformanceStateInfo(struct {
         state uint32;
     }) -> (struct {
         info CpuPerformanceStateInfo;
@@ -31,14 +31,14 @@ protocol Device {
 
     /// Returns the number of logical cores contained within this performance
     /// domain.
-    GetNumLogicalCores() -> (struct {
+    strict GetNumLogicalCores() -> (struct {
         count uint64;
     });
 
     /// Returns a global system-wide core ID for the nth core in this
     /// performance domain. `index` must be a value in the range [0, n) where
     /// n is the value returned by GetNumLogicalCores().
-    GetLogicalCoreId(struct {
+    strict GetLogicalCoreId(struct {
         index uint64;
     }) -> (struct {
         id uint64;

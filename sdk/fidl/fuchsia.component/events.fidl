@@ -190,13 +190,13 @@ type Event = resource table {
 /// Listener for events on the component hierarchy.
 @discoverable
 @available(added=11)
-protocol EventStream {
-    GetNext() -> (resource struct {
+closed protocol EventStream {
+    strict GetNext() -> (resource struct {
         events vector<Event>:MAX;
     });
 
     /// Returns immediately. Used to indicate that the FIDL connection
     /// completed. This is needed for non-static streams to verify
     /// that subscribe has completed before components are started.
-    WaitForReady() -> ();
+    strict WaitForReady() -> ();
 };

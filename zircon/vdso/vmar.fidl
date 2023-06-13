@@ -7,7 +7,7 @@ alias VmOption = uint32;
 
 // TODO(scottmg): bits for ZX_VM_xyz flags, and const for ZX_VM_ALIGN_xyz.
 @transport("Syscall")
-protocol Vmar {
+closed protocol Vmar {
     /// ## Summary
     ///
     /// Allocate a new subregion.
@@ -139,7 +139,7 @@ protocol Vmar {
     /// [`zx_vmar_map()`]: vmar_map.md
     /// [`zx_vmar_protect()`]: vmar_protect.md
     /// [`zx_vmar_unmap()`]: vmar_unmap.md
-    Allocate(resource struct {
+    strict Allocate(resource struct {
         parent_vmar Handle:VMAR;
         options VmOption;
         offset usize64;
@@ -205,7 +205,7 @@ protocol Vmar {
     /// [`zx_vmar_map()`]: vmar_map.md
     /// [`zx_vmar_protect()`]: vmar_protect.md
     /// [`zx_vmar_unmap()`]: vmar_unmap.md
-    Destroy(resource struct {
+    strict Destroy(resource struct {
         handle Handle:VMAR;
     }) -> () error Status;
 
@@ -365,7 +365,7 @@ protocol Vmar {
     /// [`zx_vmar_destroy()`]: vmar_destroy.md
     /// [`zx_vmar_protect()`]: vmar_protect.md
     /// [`zx_vmar_unmap()`]: vmar_unmap.md
-    Map(resource struct {
+    strict Map(resource struct {
         handle Handle:VMAR;
         options VmOption;
         vmar_offset usize64;
@@ -435,7 +435,7 @@ protocol Vmar {
     /// [`zx_vmar_destroy()`]: vmar_destroy.md
     /// [`zx_vmar_map()`]: vmar_map.md
     /// [`zx_vmar_protect()`]: vmar_protect.md
-    Unmap(resource struct {
+    strict Unmap(resource struct {
         handle Handle:VMAR;
         addr Vaddr;
         len usize64;
@@ -534,7 +534,7 @@ protocol Vmar {
     /// [`zx_vmar_destroy()`]: vmar_destroy.md
     /// [`zx_vmar_map()`]: vmar_map.md
     /// [`zx_vmar_unmap()`]: vmar_unmap.md
-    Protect(resource struct {
+    strict Protect(resource struct {
         handle Handle:VMAR;
         options VmOption;
         addr Vaddr;
@@ -654,7 +654,7 @@ protocol Vmar {
     /// [`zx_vmar_map()`]: vmar_map.md
     /// [`zx_vmar_unmap()`]: vmar_unmap.md
     /// [`zx_vmo_op_range()`]: vmo_op_range.md
-    OpRange(resource struct {
+    strict OpRange(resource struct {
         handle Handle:VMAR;
         op uint32;
         address Vaddr;

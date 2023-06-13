@@ -21,9 +21,9 @@ type LookupError = strict enum {
 
 /// Provides name and address resolution.
 @discoverable
-protocol Lookup {
+closed protocol Lookup {
     /// Lookup a list of IP addresses by hostname.
-    LookupIp(struct {
+    strict LookupIp(struct {
         /// The hostname to look up.
         ///
         /// Must be a valid host domain name; i.e. may not be an IP address in
@@ -70,7 +70,7 @@ protocol Lookup {
         };
     }) error LookupError;
     /// Look up a hostname by IP address.
-    LookupHostname(struct {
+    strict LookupHostname(struct {
         addr fuchsia.net.IpAddress;
     }) -> (struct {
         hostname fuchsia.net.Hostname;

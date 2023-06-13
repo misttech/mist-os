@@ -16,7 +16,7 @@ using fuchsia.thermal;
 ///              Thus, the valid values of `fan_level` is
 ///              determined per product according to the
 ///              corresponding config json file.
-protocol Fan {
+closed protocol Fan {
     /// Get the current fan level.
     /// - response `status`
     ///      ZX_ERR_INTERNAL if `fan_level` is not available.
@@ -25,7 +25,7 @@ protocol Fan {
     ///        terribly wrong.
     /// - response `fan_level` a uint32 field indicating the
     ///      current fan level. See fan level description above.
-    GetFanLevel() -> (struct {
+    strict GetFanLevel() -> (struct {
         status zx.Status;
         fan_level uint32;
     });
@@ -36,7 +36,7 @@ protocol Fan {
     /// - response `status`
     ///      ZX_ERR_OUT_OF_RANGE if the requested fan_level is not
     ///        valid.
-    SetFanLevel(struct {
+    strict SetFanLevel(struct {
         fan_level uint32;
     }) -> (struct {
         status zx.Status;
@@ -44,12 +44,12 @@ protocol Fan {
 };
 
 @discoverable
-protocol Device {
+closed protocol Device {
     compose Fan;
 
     /// Returns the client type to use for
     ///    `fuchsia.thermal.ClientStateConnector::Connect`.
-    GetClientType() -> (struct {
+    strict GetClientType() -> (struct {
         client_type fuchsia.thermal.ClientType;
     });
 };

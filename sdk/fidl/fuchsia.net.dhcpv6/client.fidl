@@ -58,13 +58,13 @@ type Prefix = struct {
 
 /// Provides a method to create new clients.
 @discoverable
-protocol ClientProvider {
+closed protocol ClientProvider {
     /// Provides a DHCPv6 client.
     ///
     /// + request `params` the parameters to create the client with.
     /// + request `request` grants control over the client. Closed with an
     ///     epitaph if the client cannot be created.
-    NewClient(resource struct {
+    strict NewClient(resource struct {
         params @generated_name("NewClientParams") table {
             /// The ID of the interface the client will run on.
             ///
@@ -184,7 +184,7 @@ protocol ClientProvider {
 /// - Closing the client end causes the object to be destroyed.
 /// - Observing a closure of the server end indicates the object no longer
 ///   exists.
-protocol Client {
+closed protocol Client {
     compose fuchsia.net.name.DnsServerWatcher;
 
     /// Returns an address and its parameters.
@@ -200,7 +200,7 @@ protocol Client {
     ///     and enables updating address properties; client end is closed if
     ///     the address becomes invalid (its valid lifetime expires and Renew
     ///     and Rebind fail).
-    WatchAddress() -> (resource struct {
+    strict WatchAddress() -> (resource struct {
         address fuchsia.net.Subnet;
         address_parameters fuchsia.net.interfaces.admin.AddressParameters;
         address_state_provider server_end:fuchsia.net.interfaces.admin.AddressStateProvider;
@@ -217,7 +217,7 @@ protocol Client {
     /// Doing so will cause the server end of the protocol to be closed.
     ///
     /// - response `prefixes` the assigned prefixes and their lifetimes.
-    WatchPrefixes() -> (struct {
+    strict WatchPrefixes() -> (struct {
         /// Prefixes must be unique on [`Prefix.prefix`].
         ///
         /// Prefixes with a `Prefix.prefix` value that did not appear in
@@ -242,12 +242,12 @@ protocol Client {
     /// * error a `zx.Status` if any of the addresses were not gracefully
     ///     released, e.g. the client times out waiting for Reply to Release,
     ///     or the interface is down and sending Release fails.
-    Shutdown() -> () error zx.Status;
+    strict Shutdown() -> () error zx.Status;
 };
 
 /// Provides IPv6 prefixes acquired via Prefix delegation.
 @discoverable
-protocol PrefixProvider {
+closed protocol PrefixProvider {
     /// Acquire an IPv6 prefix via Prefix Delegation.
     ///
     /// If this method is called with invalid parameters, a terminal event
@@ -257,7 +257,7 @@ protocol PrefixProvider {
     ///
     /// + request `config` prefix acquisition configuration.
     /// + request `prefix` provides control over prefix acquisition.
-    AcquirePrefix(resource struct {
+    strict AcquirePrefix(resource struct {
         config @generated_name("AcquirePrefixConfig") table {
             /// Optional. If specified, PD will only be performed on the
             /// interface identified. If absent, the interface(s) to perform PD
@@ -284,7 +284,7 @@ protocol PrefixProvider {
 /// a best effort will be made to release leases back to the server, and no
 /// further attempt will be made to acquire any of the prefixes this protocol
 /// was configured to acquire.
-protocol PrefixControl {
+closed protocol PrefixControl {
     /// Hanging get for the prefix and its lifetimes.
     ///
     /// The first call to this method is guaranteed to return
@@ -297,7 +297,7 @@ protocol PrefixControl {
     /// the terminal event [`PrefixControlExitReason.DOUBLE_WATCH`].
     ///
     /// - response `event` an optional prefix.
-    WatchPrefix() -> (struct {
+    strict WatchPrefix() -> (struct {
         event @generated_name("PrefixEvent") strict union {
             /// No prefix is assigned.
             ///
@@ -318,7 +318,7 @@ protocol PrefixControl {
     /// Terminal event yielded by the server before the server end is closed.
     ///
     /// - response `reason` the reason this prefix acquisition stopped.
-    -> OnExit(struct {
+    strict -> OnExit(struct {
         reason @generated_name("PrefixControlExitReason") enum {
             /// The interface identified is invalid for acquiring a prefix on.
             INVALID_INTERFACE = 1;

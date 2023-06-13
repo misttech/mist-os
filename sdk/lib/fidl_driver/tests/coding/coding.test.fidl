@@ -8,9 +8,9 @@ using zx;
 using fdf;
 
 @transport("Driver")
-protocol DriverChannelProtocol {};
+closed protocol DriverChannelProtocol {};
 
-protocol ZirconChannelProtocol {};
+closed protocol ZirconChannelProtocol {};
 
 type MixedResources = resource table {
     1: zircon_handle zx.Handle:CHANNEL;

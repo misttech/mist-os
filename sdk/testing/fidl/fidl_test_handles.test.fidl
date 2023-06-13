@@ -5,8 +5,8 @@ library fidl.test.handles;
 
 using zx;
 
-protocol Foo {
-    Bar(resource struct {
+closed protocol Foo {
+    strict Bar(resource struct {
         h zx.Handle;
     });
 };

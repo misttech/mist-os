@@ -284,11 +284,11 @@ const MAX_METHOD_ARG uint32 = 7;
 
 /// Provides access to an ACPI device.
 @discoverable
-protocol Device {
+closed protocol Device {
     /// If ACPI has determined this device is a bus, returns the bus ID.
     /// Errors:
     /// * ZX_ERR_BAD_STATE - the device is not a bus as far as ACPI is aware.
-    GetBusId() -> (struct {
+    strict GetBusId() -> (struct {
         /// Unique ID of this bus on the system.
         /// This ID is not necessarily constant between boots of the same system,
         /// but it remains stable for a single boot.
@@ -300,7 +300,7 @@ protocol Device {
     /// * ZX_ERR_OUT_OF_RANGE - `index` is out of range.
     /// * ZX_ERR_INVALID_ARGS - the interrupt type described by ACPI is unrecognised.
     /// * ZX_ERR_INTERNAL - an internal error occured (e.g. failure to evaluate ACPI tables).
-    MapInterrupt(struct {
+    strict MapInterrupt(struct {
         index uint64;
     }) -> (resource struct {
         irq zx.Handle:INTERRUPT;
@@ -310,7 +310,7 @@ protocol Device {
     /// Errors:
     /// * ZX_ERR_OUT_OF_RANGE - `index` is out of range.
     /// * ZX_ERR_INTERNAL - an internal error occured (e.g. failure to evaluate ACPI tables).
-    GetPio(struct {
+    strict GetPio(struct {
         index uint32;
     }) -> (resource struct {
         pio zx.Handle:RESOURCE;
@@ -321,7 +321,7 @@ protocol Device {
     /// * ZX_ERR_OUT_OF_RANGE - `index` is out of range.
     /// * ZX_ERR_INTERNAL - an internal error occured (e.g. failure to evaluate ACPI tables).
     /// * ZX_ERR_INVALID_ARGS - the MMIO region described by ACPI is not page-aligned.
-    GetMmio(struct {
+    strict GetMmio(struct {
         index uint32;
     }) -> (resource struct {
         mmio fuchsia.mem.Range;
@@ -334,7 +334,7 @@ protocol Device {
     /// Errors:
     /// * ZX_ERR_NOT_SUPPORTED - the device is not a pure ACPI device.
     /// * ZX_ERR_OUT_OF_RANGE - `index` is out of range for the device.
-    GetBti(struct {
+    strict GetBti(struct {
         index uint32;
     }) -> (resource struct {
         bti zx.Handle:BTI;
@@ -358,7 +358,7 @@ protocol Device {
     /// * NOT_IMPLEMENTED - An unsupported |mode| or |parameters| was supplied, or evaluation
     ///   returned an unsupported Object type.
     /// * TYPE - The object is of a type that cannot be evaluated.
-    EvaluateObject(struct {
+    strict EvaluateObject(struct {
         path string:MAX;
         mode EvaluateObjectMode;
         parameters vector<Object>:<MAX_METHOD_ARG, optional>;
@@ -371,14 +371,14 @@ protocol Device {
     /// Errors:
     /// * BAD_PARAMETER - if "mode" is invalid.
     /// * ALREADY_EXISTS - if a handler is already installed.
-    InstallNotifyHandler(resource struct {
+    strict InstallNotifyHandler(resource struct {
         mode NotificationMode;
         handler client_end:NotifyHandler;
     }) -> () error Status;
 
     /// Remove a Device Object Notification handler. Returns AE_OK if either the handler was
     /// successfully removed, or if the device has no handler. Otherwise returns failure.
-    RemoveNotifyHandler() -> () error Status;
+    strict RemoveNotifyHandler() -> () error Status;
 
     /// Acquire the ACPI global lock. This is only permitted for devices which
     /// have a _GLK entry in their namespace. See ACPI v6.4, Section 6.5.7 "_GLK
@@ -386,7 +386,7 @@ protocol Device {
     /// This method will not return until the global lock has been acquired.
     /// Errors:
     /// * ACCESS - if "_GLK" is not present, or if "_GLK" does not evaluate to 1.
-    AcquireGlobalLock() -> (resource struct {
+    strict AcquireGlobalLock() -> (resource struct {
         handle client_end:GlobalLock;
     }) error Status;
 
@@ -394,7 +394,7 @@ protocol Device {
     /// Errors:
     /// * ALREADY_EXISTS - if a handler is already installed.
     /// * NOT_SUPPORTED - the AddressSpace supplied is not supported.
-    InstallAddressSpaceHandler(resource struct {
+    strict InstallAddressSpaceHandler(resource struct {
         space AddressSpace;
         handler client_end:AddressSpaceHandler;
     }) -> () error Status;
@@ -411,7 +411,7 @@ protocol Device {
     /// BAD_PARAMETER - could not get GPE information.
     /// TYPE - GPE is not marked as a wake GPE.
     /// NOT_EXIST - GPE register could not be found.
-    SetWakeDevice(struct {
+    strict SetWakeDevice(struct {
         requested_state uint8;
     }) -> () error Status;
 };

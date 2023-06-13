@@ -90,15 +90,15 @@ type AudioDeviceTuningProfile = table {
 };
 
 @discoverable
-protocol AudioTuner {
+closed protocol AudioTuner {
     /// Provides names of audio effects classes available for tuning.
-    GetAvailableAudioEffects() -> (struct {
+    strict GetAvailableAudioEffects() -> (struct {
         effects vector<AudioEffectType>:16;
     });
 
     /// Provides the current, tunable audio effects configuration and
     /// volume settings for the given device.
-    GetAudioDeviceProfile(struct {
+    strict GetAudioDeviceProfile(struct {
         device_id string:32;
     }) -> (struct {
         profile AudioDeviceTuningProfile;
@@ -106,7 +106,7 @@ protocol AudioTuner {
 
     /// Provides the device's current default audio effects configuration and
     /// volume settings, which are read-only and unaffected by the audio tuner.
-    GetDefaultAudioDeviceProfile(struct {
+    strict GetDefaultAudioDeviceProfile(struct {
         device_id string:32;
     }) -> (struct {
         profile AudioDeviceTuningProfile;
@@ -114,7 +114,7 @@ protocol AudioTuner {
 
     /// Updates the audio effects configuration and volume settings of the given
     /// device with the provided profile.
-    SetAudioDeviceProfile(struct {
+    strict SetAudioDeviceProfile(struct {
         device_id string:32;
         profile AudioDeviceTuningProfile;
     }) -> (struct {
@@ -123,7 +123,7 @@ protocol AudioTuner {
 
     /// Deletes the current, tunable audio effects configuration and volume settings
     /// for the given device.
-    DeleteAudioDeviceProfile(struct {
+    strict DeleteAudioDeviceProfile(struct {
         device_id string:32;
     }) -> (struct {
         status zx.Status;
@@ -138,7 +138,7 @@ protocol AudioTuner {
     ///
     /// For example, two 'equalizer' effect instances named 'equalizer1' and 'equalizer2'
     /// can be applied to the same media pipeline.
-    SetAudioEffectConfig(struct {
+    strict SetAudioEffectConfig(struct {
         device_id string:32;
         effect AudioEffectConfig;
     }) -> (struct {

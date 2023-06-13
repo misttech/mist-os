@@ -9,7 +9,7 @@ using fuchsia.net;
 /// Discoverable protocol for publishing on behalf of another host.
 @available(added=9)
 @discoverable
-protocol ProxyHostPublisher {
+closed protocol ProxyHostPublisher {
     /// Publishes a host name on behalf of a remote host and provides a `ServiceInstancePublisher`
     /// for publishing service instances on behalf of that host.
     ///
@@ -26,7 +26,7 @@ protocol ProxyHostPublisher {
     ///
     /// The proxy host created by this method persists until the `ServiceInstancePublisher`
     /// channel is closed.
-    PublishProxyHost(resource struct {
+    strict PublishProxyHost(resource struct {
         host host_name;
         addresses vector<fuchsia.net.IpAddress>:MAX_ADDRESSES;
         options ProxyHostPublicationOptions;

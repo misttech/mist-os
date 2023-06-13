@@ -110,12 +110,12 @@ type FamilyInfo = struct {
 ///
 /// TODO(fxbug.dev/8903): Remove deprecated methods and move to provider.fidl.
 @discoverable
-protocol Provider {
+closed protocol Provider {
 
     /// Deprecated. See `GetTypeface`.
     ///
     /// Returns font that matches specified `request`.
-    GetFont(struct {
+    strict GetFont(struct {
         request Request;
     }) -> (resource struct {
         response box<Response>;
@@ -127,7 +127,7 @@ protocol Provider {
     /// no family with the specified name. This function respects family name
     /// aliases and ignores case, so request for "robotoSLAB" will return
     /// FamilyInfo for "Roboto Slab".
-    GetFamilyInfo(struct {
+    strict GetFamilyInfo(struct {
         family string:MAX_FAMILY_NAME_LENGTH;
     }) -> (struct {
         family_info box<FamilyInfo>;
@@ -136,7 +136,7 @@ protocol Provider {
     /// Returns a typeface that matches the specified `request`, or an empty table if no matching
     /// face is found. (The latter is more likely to happen if `TypefaceRequestFlags.EXACT_FAMILY`
     /// is used to disable fallbacks.)
-    GetTypeface(struct {
+    strict GetTypeface(struct {
         request TypefaceRequest;
     }) -> (resource struct {
         response TypefaceResponse;
@@ -148,7 +148,7 @@ protocol Provider {
     /// This function respects family name aliases and ignores case. For example, "RobotoSlab" is an
     /// alias for the canonical name "Roboto Slab". A request for "robotoSLAB" would return the
     /// `FontFamilyInfo` for "Roboto Slab" due to the case-insensitivity and alias resolution.
-    GetFontFamilyInfo(struct {
+    strict GetFontFamilyInfo(struct {
         family FamilyName;
     }) -> (struct {
         family_info FontFamilyInfo;
@@ -158,7 +158,7 @@ protocol Provider {
     /// A client can register as many listeners as it wishes.
     ///
     /// To unregister, close the channel.
-    RegisterFontSetEventListener(resource struct {
+    strict RegisterFontSetEventListener(resource struct {
         listener client_end:FontSetEventListener;
     }) -> ();
 };

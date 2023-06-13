@@ -10,7 +10,7 @@ library fuchsia.feedback;
 /// server. This API allows components to choose their own product while still benefiting from the
 /// platform's exception handling and crash reporting.
 @discoverable
-protocol CrashReportingProductRegister {
+closed protocol CrashReportingProductRegister {
     /// Upserts, i.e. updates or inserts, a crash reporting product for a given component URL.
     ///
     /// A subsequent call to Upsert() for the same component URL overwrites the
@@ -18,7 +18,7 @@ protocol CrashReportingProductRegister {
     ///
     /// Prefer UpsertWithAck() if the component also files crash reports itself, to avoid race
     /// conditions and mis-attribution.
-    Upsert(struct {
+    strict Upsert(struct {
         // 2083 is the maximum expected component URL length.
         component_url string:2083;
         product CrashReportingProduct;
@@ -30,7 +30,7 @@ protocol CrashReportingProductRegister {
     /// Otherwise if a crash report is filed before the upsert completes, the crash report will be
     /// attributed to the wrong product, leading to potentially incorrect crash data.
     @transitional
-    UpsertWithAck(struct {
+    strict UpsertWithAck(struct {
         // 2083 is the maximum expected component URL length.
         component_url string:2083;
         product CrashReportingProduct;

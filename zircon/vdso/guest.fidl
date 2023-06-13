@@ -4,7 +4,7 @@
 library zx;
 
 @transport("Syscall")
-protocol Guest {
+closed protocol Guest {
     /// ## Summary
     ///
     /// Create a guest.
@@ -95,7 +95,7 @@ protocol Guest {
     /// [`zx_vcpu_write_state()`]: vcpu_write_state.md
     /// [`zx_vmar_map()`]: vmar_map.md
     /// [`zx_vmo_create()`]: vmo_create.md
-    Create(resource struct {
+    strict Create(resource struct {
         resource Handle:RESOURCE;
         options uint32;
     }) -> (resource struct {
@@ -224,7 +224,7 @@ protocol Guest {
     /// [`zx_vcpu_kick()`]: vcpu_kick.md
     /// [`zx_vcpu_read_state()`]: vcpu_read_state.md
     /// [`zx_vcpu_write_state()`]: vcpu_write_state.md
-    SetTrap(resource struct {
+    strict SetTrap(resource struct {
         handle Handle:GUEST;
         kind uint32;
         addr Vaddr;

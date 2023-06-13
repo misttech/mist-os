@@ -85,25 +85,25 @@ type GetIfaceHistogramStatsResponse = strict union {
     2: error_status zx.Status;
 };
 
-protocol DeviceWatcher {
-    -> OnPhyAdded(struct {
+closed protocol DeviceWatcher {
+    strict -> OnPhyAdded(struct {
         phy_id uint16;
     });
-    -> OnPhyRemoved(struct {
+    strict -> OnPhyRemoved(struct {
         phy_id uint16;
     });
-    -> OnIfaceAdded(struct {
+    strict -> OnIfaceAdded(struct {
         iface_id uint16;
     });
-    -> OnIfaceRemoved(struct {
+    strict -> OnIfaceRemoved(struct {
         iface_id uint16;
     });
 };
 
 @discoverable
-protocol DeviceService {
+closed protocol DeviceService {
     // Iface methods
-    AddIface(resource struct {
+    strict AddIface(resource struct {
         req AddIfaceRequest;
     }) -> (struct {
         status int32;
@@ -112,67 +112,67 @@ protocol DeviceService {
 };
 
 @discoverable
-protocol DeviceMonitor {
+closed protocol DeviceMonitor {
     // Phy methods
-    ListPhys() -> (struct {
+    strict ListPhys() -> (struct {
         phy_list vector<uint16>:MAX;
     });
-    ListIfaces() -> (struct {
+    strict ListIfaces() -> (struct {
         iface_list vector<uint16>:MAX;
     });
-    GetDevPath(struct {
+    strict GetDevPath(struct {
         phy_id uint16;
     }) -> (struct {
         dev_path string:optional;
     });
-    GetSupportedMacRoles(struct {
+    strict GetSupportedMacRoles(struct {
         phy_id uint16;
     }) -> (struct {
         supported_mac_roles
                 vector<fuchsia.wlan.common.WlanMacRole>:fuchsia.wlan.common.MAX_SUPPORTED_MAC_ROLES;
     }) error zx.Status;
-    WatchDevices(resource struct {
+    strict WatchDevices(resource struct {
         watcher server_end:DeviceWatcher;
     });
-    GetCountry(struct {
+    strict GetCountry(struct {
         phy_id uint16;
     }) -> (struct {
         resp GetCountryResponse;
     }) error int32;
-    SetCountry(struct {
+    strict SetCountry(struct {
         req SetCountryRequest;
     }) -> (struct {
         status int32;
     });
-    ClearCountry(struct {
+    strict ClearCountry(struct {
         req ClearCountryRequest;
     }) -> (struct {
         status int32;
     });
-    SetPowerSaveMode(struct {
+    strict SetPowerSaveMode(struct {
         req SetPowerSaveModeRequest;
     }) -> (struct {
         status int32;
     });
-    GetPowerSaveMode(struct {
+    strict GetPowerSaveMode(struct {
         phy_id uint16;
     }) -> (struct {
         resp GetPowerSaveModeResponse;
     }) error int32;
 
     // Iface methods
-    CreateIface(struct {
+    strict CreateIface(struct {
         req CreateIfaceRequest;
     }) -> (struct {
         status int32;
         resp box<CreateIfaceResponse>;
     });
-    QueryIface(struct {
+    strict QueryIface(struct {
         iface_id uint16;
     }) -> (struct {
         resp QueryIfaceResponse;
     }) error zx.Status;
-    DestroyIface(struct {
+    strict DestroyIface(struct {
         req DestroyIfaceRequest;
     }) -> (struct {
         status int32;
@@ -187,7 +187,7 @@ protocol DeviceMonitor {
     ///     * NOT_FOUND: The given iface_id does not exist.
     ///     * NOT_SUPPORTED: The underlying SME is not a Client SME.
     ///     * PEER_CLOSED: The underlying SME is shutting down.
-    GetClientSme(resource struct {
+    strict GetClientSme(resource struct {
         iface_id uint16;
         sme_server server_end:fuchsia.wlan.sme.ClientSme;
     }) -> () error zx.Status;
@@ -198,7 +198,7 @@ protocol DeviceMonitor {
     ///     * NOT_FOUND: The given iface_id does not exist.
     ///     * NOT_SUPPORTED: The underlying SME is not a Client SME.
     ///     * PEER_CLOSED: The underlying SME is shutting down.
-    GetApSme(resource struct {
+    strict GetApSme(resource struct {
         iface_id uint16;
         sme_server server_end:fuchsia.wlan.sme.ApSme;
     }) -> () error zx.Status;
@@ -209,7 +209,7 @@ protocol DeviceMonitor {
     ///     * NOT_FOUND: The given iface_id does not exist.
     ///     * NOT_SUPPORTED: The underlying SME is not a Client SME.
     ///     * PEER_CLOSED: The underlying SME is shutting down.
-    GetSmeTelemetry(resource struct {
+    strict GetSmeTelemetry(resource struct {
         iface_id uint16;
         telemetry_server server_end:fuchsia.wlan.sme.Telemetry;
     }) -> () error zx.Status;
@@ -219,7 +219,7 @@ protocol DeviceMonitor {
     /// Likely errors include:
     ///     * NOT_FOUND: The given iface_id does not exist.
     ///     * PEER_CLOSED: The underlying SME is shutting down.
-    GetFeatureSupport(resource struct {
+    strict GetFeatureSupport(resource struct {
         iface_id uint16;
         feature_support_server server_end:fuchsia.wlan.sme.FeatureSupport;
     }) -> () error zx.Status;

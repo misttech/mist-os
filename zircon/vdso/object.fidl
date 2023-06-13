@@ -18,7 +18,7 @@ type WaitItem = resource struct {
 };
 
 @transport("Syscall")
-protocol Object {
+closed protocol Object {
     /// ## Summary
     ///
     /// Wait for signals on an object.
@@ -107,7 +107,7 @@ protocol Object {
     /// [`zx_object_wait_async()`]: object_wait_async.md
     /// [`zx_object_wait_many()`]: object_wait_many.md
     @blocking
-    WaitOne(resource struct {
+    strict WaitOne(resource struct {
         handle Handle;
         signals Signals;
         deadline Time;
@@ -226,7 +226,7 @@ protocol Object {
     /// [`zx_object_wait_async()`]: object_wait_async.md
     /// [`zx_object_wait_one()`]: object_wait_one.md
     @blocking
-    WaitMany(resource struct {
+    strict WaitMany(resource struct {
         @inout
         items vector<WaitItem>:WAIT_MANY_MAX_ITEMS;
         deadline Time;
@@ -368,7 +368,7 @@ protocol Object {
     /// [`zx_port_cancel()`]: port_cancel.md
     /// [`zx_port_queue()`]: port_queue.md
     /// [`zx_port_wait()`]: port_wait.md
-    WaitAsync(resource struct {
+    strict WaitAsync(resource struct {
         handle Handle;
         port Handle:PORT;
         key uint64;
@@ -433,7 +433,7 @@ protocol Object {
     /// [`zx_event_create()`]: event_create.md
     /// [`zx_eventpair_create()`]: eventpair_create.md
     /// [`zx_object_signal_peer()`]: object_signal_peer.md
-    Signal(resource struct {
+    strict Signal(resource struct {
         handle Handle;
         clear_mask uint32;
         set_mask uint32;
@@ -498,7 +498,7 @@ protocol Object {
     /// [`zx_event_create()`]: event_create.md
     /// [`zx_eventpair_create()`]: eventpair_create.md
     /// [`zx_object_signal()`]: object_signal.md
-    SignalPeer(resource struct {
+    strict SignalPeer(resource struct {
         handle Handle;
         clear_mask uint32;
         set_mask uint32;
@@ -768,7 +768,7 @@ protocol Object {
     ///  - [`zx_object_set_property()`]
     ///
     /// [`zx_object_set_property()`]: object_set_property.md
-    GetProperty(resource struct {
+    strict GetProperty(resource struct {
         handle Handle;
         property uint32;
     }) -> (struct {
@@ -817,7 +817,7 @@ protocol Object {
     ///  - [`zx_object_get_property()`]
     ///
     /// [`zx_object_get_property()`]: object_get_property.md
-    SetProperty(resource struct {
+    strict SetProperty(resource struct {
         handle Handle;
         property uint32;
         @voidptr
@@ -1977,7 +1977,7 @@ protocol Object {
     /// [`zx_object_wait_one()`]: object_wait_one.md
     /// [`zx_port_wait()`]: port_wait.md
     /// [`zx_task_suspend()`]: task_suspend.md
-    GetInfo(resource struct {
+    strict GetInfo(resource struct {
         handle Handle;
         topic uint32;
     }) -> (struct {
@@ -2055,7 +2055,7 @@ protocol Object {
     /// [`zx_handle_duplicate()`]: handle_duplicate.md
     /// [`zx_handle_replace()`]: handle_replace.md
     /// [`zx_object_get_info()`]: object_get_info.md
-    GetChild(resource struct {
+    strict GetChild(resource struct {
         handle Handle;
         koid uint64;
         rights Rights;
@@ -2119,7 +2119,7 @@ protocol Object {
     ///  - [`zx_profile_create()`]
     ///
     /// [`zx_profile_create()`]: profile_create.md
-    SetProfile(resource struct {
+    strict SetProfile(resource struct {
         handle Handle;
         profile Handle:PROFILE;
         options uint32;

@@ -35,36 +35,36 @@ type SdhciQuirk = strict enum : uint64 {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Sdhci {
+closed protocol Sdhci {
     // TODO: should be replaced with a generic busdev mechanism
-    GetInterrupt() -> (resource struct {
+    strict GetInterrupt() -> (resource struct {
         s zx.Status;
         irq zx.Handle:INTERRUPT;
     });
     /// mmio size minus offset must be at least 512 bytes as per the SDHCI specification.
-    GetMmio() -> (resource struct {
+    strict GetMmio() -> (resource struct {
         s zx.Status;
         mmio zx.Handle:VMO;
         offset zx.Off;
     });
     /// Gets a handle to the bus transaction initiator for the device. The caller
     /// receives ownership of the handle.
-    GetBti(struct {
+    strict GetBti(struct {
         index uint32;
     }) -> (resource struct {
         s zx.Status;
         bti zx.Handle:BTI;
     });
 
-    GetBaseClock() -> (struct {
+    strict GetBaseClock() -> (struct {
         clock uint32;
     });
 
     /// returns device quirks
-    GetQuirks() -> (struct {
+    strict GetQuirks() -> (struct {
         quirks uint64;
         dma_boundary_alignment uint64;
     });
     /// platform specific HW reset
-    HwReset() -> ();
+    strict HwReset() -> ();
 };

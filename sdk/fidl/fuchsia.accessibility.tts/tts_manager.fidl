@@ -8,11 +8,11 @@ library fuchsia.accessibility.tts;
 /// The TTS Manager offers assistive technology a way to open a TTS engine to
 /// start producing speech output.
 @discoverable
-protocol TtsManager {
+closed protocol TtsManager {
     /// A speaker is an assistive technology that wants to produce speech
     /// output. Only one speaker is allowed to have an open connection to the
     /// engine at a time. If already in use, BUSY error is returned.
-    OpenEngine(resource struct {
+    strict OpenEngine(resource struct {
         engine_request server_end:Engine;
     }) -> () error Error;
 };

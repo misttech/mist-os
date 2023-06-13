@@ -104,18 +104,18 @@ type OpResult = resource table {
 
 /// Provides information about the TEE device.
 @discoverable
-protocol DeviceInfo {
+closed protocol DeviceInfo {
     /// Obtains information about the TEE OS.
-    GetOsInfo() -> (struct {
+    strict GetOsInfo() -> (struct {
         info OsInfo;
     });
 };
 
 /// Represents a connection to an application running in the TEE.
 @discoverable
-protocol Application {
+closed protocol Application {
     /// Initiates a communication session with the trusted application.
-    OpenSession2(resource struct {
+    strict OpenSession2(resource struct {
         parameter_set ParameterSet;
     }) -> (resource struct {
         session_id uint32;
@@ -124,7 +124,7 @@ protocol Application {
 
     /// Requests the trusted application perform the provided command. The command is unique to the
     /// trusted application.
-    InvokeCommand(resource struct {
+    strict InvokeCommand(resource struct {
         session_id uint32;
         command_id uint32;
         parameter_set ParameterSet;
@@ -133,7 +133,7 @@ protocol Application {
     });
 
     /// Closes an established session.
-    CloseSession(struct {
+    strict CloseSession(struct {
         session_id uint32;
     }) -> ();
 };

@@ -10,7 +10,7 @@ using zx;
 /// Discoverable protocol for resolving host names to IP addresses.
 @available(added=9)
 @discoverable
-protocol HostNameResolver {
+closed protocol HostNameResolver {
     /// Gets the addresses for the specified host.
     ///
     /// + request `host` the simple name of the host.
@@ -20,7 +20,7 @@ protocol HostNameResolver {
     /// + request `options` options to be applied to the resolution.
     /// - response `addresses` the addresses of the specified host, if it was found, an empty vector
     ///   if not.
-    ResolveHostName(struct {
+    strict ResolveHostName(struct {
         host host_name;
         timeout zx.Duration;
         options HostNameResolutionOptions;

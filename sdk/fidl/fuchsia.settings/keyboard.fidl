@@ -21,28 +21,28 @@ type KeyboardSettings = table {
 };
 
 /// The mutable API for modifying the keyboard settings.
-protocol KeyboardSet {
+closed protocol KeyboardSet {
     /// Setting protocol: if a field is left unset, it is not modified.
     /// To clear a field, set it to its type's "zero" value.
-    Set(struct {
+    strict Set(struct {
         settings KeyboardSettings;
     }) -> () error Error;
 };
 
 /// The read-only API for monitoring the changes to the keyboard settings.
-protocol KeyboardWatch {
+closed protocol KeyboardWatch {
     /// The Watch protocol is the same as in the other `fuchsia.settings.*` protocols.
     ///
     /// Returns immediately on first call; on subsequent calls it blocks until the settings
     /// change, and then returns following the "hanging get" pattern.
-    Watch() -> (struct {
+    strict Watch() -> (struct {
         settings KeyboardSettings;
     });
 };
 
 /// The SetUI protocol for reading and modifying the keyboard settings.
 @discoverable
-protocol Keyboard {
+closed protocol Keyboard {
     compose KeyboardSet;
     compose KeyboardWatch;
 };

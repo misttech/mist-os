@@ -15,7 +15,7 @@ using zx;
 /// becomes available and allows non-component packages and easier directory routing.
 @deprecated("For use only in Font Provider. To be replaced after Components v2 launch.")
 @discoverable
-protocol FontResolver {
+closed protocol FontResolver {
     /// Populates or updates the cache of a font package, fetching it if it is not present on the
     /// local system.
     ///
@@ -32,7 +32,7 @@ protocol FontResolver {
     ///       not known to be a font package.
     ///     * `ZX_ERR_NO_SPACE` if there is no space available to store the package.
     ///     * `ZX_ERR_UNAVAILABLE` if the resolver is currently unable to fetch a package blob.
-    Resolve(resource struct {
+    strict Resolve(resource struct {
         package_url string;
         directory_request server_end:fuchsia.io.Directory;
     }) -> () error zx.Status;

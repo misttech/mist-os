@@ -6,9 +6,9 @@ library fuchsia.hardware.temperature;
 
 using zx;
 
-protocol Device {
+closed protocol Device {
     /// Get the current temperature in degrees Celsius.
-    GetTemperatureCelsius() -> (struct {
+    strict GetTemperatureCelsius() -> (struct {
         status zx.Status;
         temp float32;
     });

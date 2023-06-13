@@ -9,11 +9,11 @@ using fuchsia.hardware.usb.endpoint;
 
 /// The UsbHci protocol is implemented by a USB Host Controller driver.
 @discoverable
-protocol UsbHci {
+closed protocol UsbHci {
     /// Connects to endpoint. Returns
     ///  * ZX_ERR_NOT_FOUND: if device id and/or endpoint address does not exist.
     ///  * ZX_ERR_ALREADY_BOUND: if the endpoint is already bound.
-    ConnectToEndpoint(resource struct {
+    strict ConnectToEndpoint(resource struct {
         device_id uint32;
         ep_addr uint8;
         ep server_end:fuchsia.hardware.usb.endpoint.Endpoint;

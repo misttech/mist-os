@@ -4,7 +4,7 @@
 library zx;
 
 @transport("Syscall")
-protocol Timer {
+closed protocol Timer {
     /// ## Summary
     ///
     /// Create a timer.
@@ -73,7 +73,7 @@ protocol Timer {
     /// [`zx_handle_close()`]: handle_close.md
     /// [`zx_timer_cancel()`]: timer_cancel.md
     /// [`zx_timer_set()`]: timer_set.md
-    Create(struct {
+    strict Create(struct {
         options uint32;
         clock_id Clock;
     }) -> (resource struct {
@@ -148,7 +148,7 @@ protocol Timer {
     /// [`zx_deadline_after()`]: deadline_after.md
     /// [`zx_timer_cancel()`]: timer_cancel.md
     /// [`zx_timer_create()`]: timer_create.md
-    Set(resource struct {
+    strict Set(resource struct {
         handle Handle:TIMER;
         deadline Time;
         slack Duration;
@@ -202,7 +202,7 @@ protocol Timer {
     ///
     /// [`zx_timer_create()`]: timer_create.md
     /// [`zx_timer_set()`]: timer_set.md
-    Cancel(resource struct {
+    strict Cancel(resource struct {
         handle Handle:TIMER;
     }) -> () error Status;
 };

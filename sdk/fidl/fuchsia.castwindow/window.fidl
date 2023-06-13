@@ -11,8 +11,8 @@ type Interaction = strict enum : uint32 {
 /// Routes interaction requests to the application instance identified
 /// by |session_id|.
 @discoverable
-protocol InteractionHandler {
-    SendInteraction(struct {
+closed protocol InteractionHandler {
+    strict SendInteraction(struct {
         session_id string:MAX;
         interaction Interaction;
     });

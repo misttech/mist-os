@@ -40,7 +40,7 @@ type ProvisioningResponse = resource struct {
 ///
 /// DRM systems use the [`ProvisioningFetcher`] to fetch the provisioning when
 /// the system determines that it is needed.
-protocol ProvisioningFetcher {
+closed protocol ProvisioningFetcher {
     /// Fetches provisioning from a server.
     ///
     /// Called by the DRM system when it is in need of provisioning.
@@ -49,7 +49,7 @@ protocol ProvisioningFetcher {
     ///   a provisioning server.
     /// - response `response` a [`ProvisioningResponse`] message from the
     ///   provisioning server.
-    Fetch(resource struct {
+    strict Fetch(resource struct {
         request ProvisioningRequest;
     }) -> (resource struct {
         response ProvisioningResponse;

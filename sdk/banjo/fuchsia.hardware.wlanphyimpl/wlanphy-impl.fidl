@@ -39,9 +39,9 @@ type WlanPhyPsMode = struct {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol WlanPhyImpl {
+closed protocol WlanPhyImpl {
     /// MAC roles supported for ifaces on the physical device.
-    GetSupportedMacRoles() -> (struct {
+    strict GetSupportedMacRoles() -> (struct {
         s zx.Status;
         supported_mac_roles_list
                 array<fuchsia.wlan.common.WlanMacRole, fuchsia.wlan.common.MAX_SUPPORTED_MAC_ROLES>;
@@ -52,7 +52,7 @@ protocol WlanPhyImpl {
     /// Some common error codes are:
     /// ZX_ERR_NO_RESOURCES: maximum number of interfaces have already been created
     /// ZX_ERR_NOT_SUPPORTED: device does not support the specified role
-    CreateIface(resource struct {
+    strict CreateIface(resource struct {
         req WlanPhyImplCreateIfaceReq;
     }) -> (struct {
         s zx.Status;
@@ -60,34 +60,34 @@ protocol WlanPhyImpl {
     });
 
     /// Destroy the interface with the matching id.
-    DestroyIface(struct {
+    strict DestroyIface(struct {
         iface_id uint16;
     }) -> (struct {
         s zx.Status;
     });
 
     /// Set country with a WlanPhyCountry
-    SetCountry(struct {
+    strict SetCountry(struct {
         country WlanPhyCountry;
     }) -> (struct {
         s zx.Status;
     });
 
     /// Set device to a world-safe country
-    ClearCountry() -> (struct {
+    strict ClearCountry() -> (struct {
         s zx.Status;
     });
 
     /// Read currently configured country. Implementations are advised to read the
     /// country directly from the firmware, where possible.
-    GetCountry() -> (struct {
+    strict GetCountry() -> (struct {
         s zx.Status;
         country WlanPhyCountry;
     });
 
     /// Set Power Save mode On/Off on device. In most implementations this
     /// likely to be set in Firmware.
-    SetPowerSaveMode(struct {
+    strict SetPowerSaveMode(struct {
         ps_mode WlanPhyPsMode;
     }) -> (struct {
         s zx.Status;
@@ -95,7 +95,7 @@ protocol WlanPhyImpl {
 
     /// Get current Power Save Mode from device. In most implementation this
     /// likely to be retrieved from Firmware.
-    GetPowerSaveMode() -> (struct {
+    strict GetPowerSaveMode() -> (struct {
         s zx.Status;
         ps_mode WlanPhyPsMode;
     });

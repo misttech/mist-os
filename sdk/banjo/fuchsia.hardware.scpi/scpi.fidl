@@ -25,32 +25,32 @@ type ScpiOpp = struct {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Scpi {
-    GetSensor(struct {
+closed protocol Scpi {
+    strict GetSensor(struct {
         name string:MAX;
     }) -> (struct {
         s zx.Status;
         sensor_id uint32;
     });
-    GetSensorValue(struct {
+    strict GetSensorValue(struct {
         sensor_id uint32;
     }) -> (struct {
         s zx.Status;
         sensor_value uint32;
     });
-    GetDvfsInfo(struct {
+    strict GetDvfsInfo(struct {
         power_domain uint8;
     }) -> (struct {
         s zx.Status;
         opps ScpiOpp;
     });
-    GetDvfsIdx(struct {
+    strict GetDvfsIdx(struct {
         power_domain uint8;
     }) -> (struct {
         s zx.Status;
         index uint16;
     });
-    SetDvfsIdx(struct {
+    strict SetDvfsIdx(struct {
         power_domain uint8;
         index uint16;
     }) -> (struct {

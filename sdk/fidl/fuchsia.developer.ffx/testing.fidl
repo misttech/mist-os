@@ -5,10 +5,10 @@ library fuchsia.developer.ffx;
 
 /// Internal testing functionality for the underlying FFX daemon.
 @discoverable
-protocol Testing {
+closed protocol Testing {
     /// Causes the daemon to hang (pausing all execution indefinitely).
-    Hang() -> ();
+    strict Hang() -> ();
 
     /// Crashes the daemon by intentionally invoking a rust panic.
-    Crash() -> ();
+    strict Crash() -> ();
 };

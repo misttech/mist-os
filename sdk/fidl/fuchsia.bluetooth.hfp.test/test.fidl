@@ -12,17 +12,17 @@ type ConnectionBehavior = table {
 
 /// Provides additional methods not in `Hfp` that are strictly for testing.
 @discoverable
-protocol HfpTest {
+closed protocol HfpTest {
     /// Set the value of the AG battery indicator.
     ///
     /// `level` must be within the range 0-5 inclusive. Values outside of this
     /// range cause the channel to close.
-    BatteryIndicator(struct {
+    strict BatteryIndicator(struct {
         level uint8;
     });
 
     /// Configure the connection behavior when the component discovers new peers.
-    SetConnectionBehavior(struct {
+    strict SetConnectionBehavior(struct {
         behavior ConnectionBehavior;
     });
 };

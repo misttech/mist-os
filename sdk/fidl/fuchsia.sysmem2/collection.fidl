@@ -29,7 +29,7 @@ const MAX_COUNT_CREATE_CHILDREN int32 = 64;
 // including `BufferCollectionToken`(s) which have since been converted to a
 // `BufferCollection` channel.
 @available(added=HEAD)
-protocol Node {
+closed protocol Node {
     // Sync
     //
     /// Ensure that previous messages, including `Duplicate` messages on a
@@ -65,7 +65,7 @@ protocol Node {
     /// know that this token is/was valid, or `BufferCollectionToken.Sync` may
     /// hang forever.  See `ValidateBufferCollectionToken` to check token
     /// validity first if the token isn't already known to be (is/was) valid.
-    Sync() -> ();
+    strict Sync() -> ();
 
     // Close
     //
@@ -112,7 +112,7 @@ protocol Node {
     /// constraints remain intact (just as they would if the
     /// `BufferCollectionTokenGroup` channel had remained open), and the close
     /// doesn't trigger or propagate failure.
-    Close();
+    strict Close();
 
     /// Set a name for VMOs in this buffer collection. The name may be truncated
     /// shorter. The name only affects VMOs allocated after it's set - this call
@@ -120,7 +120,7 @@ protocol Node {
     /// then the larger priority value will win.
     ///
     /// All table fields are currently required.
-    SetName(table {
+    strict SetName(table {
         1: priority uint32;
         2: name string:64;
     });
@@ -149,7 +149,7 @@ protocol Node {
     /// that was copied from its parent.
     ///
     /// All table fields are currently required.
-    SetDebugClientInfo(table {
+    strict SetDebugClientInfo(table {
         1: name string:64;
         2: id uint64;
     });
@@ -160,7 +160,7 @@ protocol Node {
     /// unspecified which deadline will take effect.
     ///
     /// All table fields are currently required.
-    SetDebugTimeoutLogDeadline(table {
+    strict SetDebugTimeoutLogDeadline(table {
         1: deadline zx.Time;
     });
 
@@ -194,7 +194,7 @@ protocol Node {
     /// This may be a NOP for some nodes due to intentional policy associated
     /// with the node, if we don't trust a node enough to let it turn on verbose
     /// logging.
-    SetVerboseLogging();
+    strict SetVerboseLogging();
 
     // GetNodeRef
     //
@@ -210,7 +210,7 @@ protocol Node {
     /// See also `IsAlternateFor`.
     ///
     /// All table fields are currently required.
-    GetNodeRef() -> (resource table {
+    strict GetNodeRef() -> (resource table {
         1: node_ref zx.Handle:EVENT;
     });
 
@@ -298,7 +298,7 @@ protocol Node {
     ///     `Node`.
     ///
     /// All table fields are currently required.
-    IsAlternateFor(resource table {
+    strict IsAlternateFor(resource table {
         1: node_ref zx.Handle:EVENT;
     }) -> (table {
         1: is_alternate bool;
@@ -314,7 +314,7 @@ protocol Node {
 /// participant dying mid-create.
 // LINT.IfChange
 @available(added=HEAD)
-protocol BufferCollectionToken {
+closed protocol BufferCollectionToken {
     compose Node;
 
     /// This method can be used to add more participants prior to creating a
@@ -343,7 +343,7 @@ protocol BufferCollectionToken {
     /// attenuation should be applied.
     ///
     /// All table fields are currently required.
-    DuplicateSync(table {
+    strict DuplicateSync(table {
         1: rights_attenuation_masks vector<zx.Rights>:MAX_COUNT_DUPLICATES;
     }) -> (resource table {
         1: tokens vector<client_end:BufferCollectionToken>:MAX_COUNT_DUPLICATES;
@@ -395,7 +395,7 @@ protocol BufferCollectionToken {
     /// the shared `BufferCollection`.
     ///
     /// All table fields are currently required.
-    Duplicate(resource table {
+    strict Duplicate(resource table {
         1: rights_attenuation_mask uint32;
         2: token_request server_end:BufferCollectionToken;
     });
@@ -453,7 +453,7 @@ protocol BufferCollectionToken {
     /// to replace the failed dispensable token.
     ///
     /// `SetDispensable` on an already-dispensable token is idempotent.
-    SetDispensable();
+    strict SetDispensable();
 
     // CreateBufferCollectionTokenGroup
     //
@@ -479,7 +479,7 @@ protocol BufferCollectionToken {
     /// channel to be served by sysmem.
     ///
     /// All table fields are currently required.
-    CreateBufferCollectionTokenGroup(resource table {
+    strict CreateBufferCollectionTokenGroup(resource table {
         1: group_request server_end:BufferCollectionTokenGroup;
     });
 };
@@ -510,7 +510,7 @@ protocol BufferCollectionToken {
 /// Collections can be large enough that it can be worth avoiding allocation
 /// overlap (in time) using `AttachLifetimeTracking`.
 @available(added=HEAD)
-protocol BufferCollection {
+closed protocol BufferCollection {
     compose Node;
 
     /// Provide `BufferCollectionConstraints` to the logical buffer collection.
@@ -528,7 +528,7 @@ protocol BufferCollection {
     /// field won't receive any VMO handles, but can still find out how many
     /// buffers were allocated and can still refer to buffers by their
     /// `buffer_index`.
-    SetConstraints(resource table {
+    strict SetConstraints(resource table {
         1: constraints BufferCollectionConstraints;
     });
 
@@ -551,7 +551,7 @@ protocol BufferCollection {
     ///      perhaps due to hardware limitations.
     ///
     /// `buffer_collection_info` has the VMO handles and other related info.
-    WaitForAllBuffersAllocated() -> (resource table {
+    strict WaitForAllBuffersAllocated() -> (resource table {
         1: buffer_collection_info BufferCollectionInfo;
     }) error zx.Status;
 
@@ -564,7 +564,7 @@ protocol BufferCollection {
     /// If the buffer collection hasn't attempted allocation yet, returns
     /// `ZX_ERR_UNAVAILABLE`.  This means that WaitForAllBuffersAllocated
     /// would block (not respond quickly).
-    CheckAllBuffersAllocated() -> (table {
+    strict CheckAllBuffersAllocated() -> (table {
             // nothing here yet
             }) error zx.Status;
 
@@ -636,7 +636,7 @@ protocol BufferCollection {
     ///   * 0xFFFFFFFF (this is reasonable when an attenuation mask is computed)
     ///
     /// All table fields are currently required.
-    AttachToken(resource table {
+    strict AttachToken(resource table {
         1: rights_attenuation_mask uint32;
         2: token_request server_end:BufferCollectionToken;
     });
@@ -704,7 +704,7 @@ protocol BufferCollection {
     /// transfer without causing `BufferCollection` channel failure).
     ///
     /// All table fields are currently required.
-    AttachLifetimeTracking(resource table {
+    strict AttachLifetimeTracking(resource table {
         1: server_end zx.Handle:EVENTPAIR;
         2: buffers_remaining uint32;
     });
@@ -794,7 +794,7 @@ protocol BufferCollection {
 /// part of a sub-tree under such a node that doesn't propagate failure to its
 /// parent).
 @available(added=HEAD)
-protocol BufferCollectionTokenGroup {
+closed protocol BufferCollectionTokenGroup {
     compose Node;
 
     /// Create a child token.  Before passing the client end of this token to
@@ -807,7 +807,7 @@ protocol BufferCollectionTokenGroup {
     /// `rights_attenuation_mask` - If ZX_RIGHT_SAME_RIGHTS, the created token
     /// allows the holder to get the same rights to buffers as the parent token
     /// (of the group) had.
-    CreateChild(resource table {
+    strict CreateChild(resource table {
         /// Must be set.
         1: token_request server_end:BufferCollectionToken;
 
@@ -832,7 +832,7 @@ protocol BufferCollectionTokenGroup {
     /// The maximum permissible total number of children per group, and total
     /// number of nodes in an overall tree (from the root) are capped to limits
     /// which are not configurable via these protocols.
-    CreateChildrenSync(table {
+    strict CreateChildrenSync(table {
         1: rights_attenuation_masks vector<zx.Rights>:MAX_COUNT_CREATE_CHILDREN;
     }) -> (resource table {
         1: tokens vector<client_end:BufferCollectionToken>:MAX_COUNT_CREATE_CHILDREN;
@@ -847,5 +847,5 @@ protocol BufferCollectionTokenGroup {
     /// If `Close` is to be sent, it should be sent _after_
     /// `AllChildrenPresent`, else failure of the group and propagation of the
     /// failure to the group's parent will still be triggered.
-    AllChildrenPresent();
+    strict AllChildrenPresent();
 };

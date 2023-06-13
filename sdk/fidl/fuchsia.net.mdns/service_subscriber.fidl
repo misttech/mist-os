@@ -8,7 +8,7 @@ library fuchsia.net.mdns;
 // TODO(dalesat): rename `ServiceSubscriber`.
 @available(added=9)
 @discoverable
-protocol ServiceSubscriber2 {
+closed protocol ServiceSubscriber2 {
     /// Subscribes to a service. The subscription lasts until `subscriber` is unbound.
     ///
     /// + request `service` name of the type of service to which to subscribe. For example, cast
@@ -16,7 +16,7 @@ protocol ServiceSubscriber2 {
     ///   closed immediately and an error message is logged.
     /// + request `options` options to be applied to the subscription.
     /// + request `listener` client end of the `ServiceSubscriptionListener` channel.
-    SubscribeToService(resource struct {
+    strict SubscribeToService(resource struct {
         service service_name;
         options ServiceSubscriptionOptions;
         listener client_end:ServiceSubscriptionListener;
@@ -27,7 +27,7 @@ protocol ServiceSubscriber2 {
     /// + request `options` options to be applied to the subscription.
     /// + request `listener` client end of the `ServiceSubscriptionListener` channel.
     @available(added=9)
-    SubscribeToAllServices(resource struct {
+    strict SubscribeToAllServices(resource struct {
         options ServiceSubscriptionOptions;
         listener client_end:ServiceSubscriptionListener;
     });
@@ -56,26 +56,26 @@ type ServiceSubscriptionOptions = table {
 /// throttle traffic. The service won't necessarily wait for a reply before
 /// calling another method.
 @available(added=9)
-protocol ServiceSubscriptionListener {
+closed protocol ServiceSubscriptionListener {
     /// Notifies the subscriber that a service instance has been discovered.
-    OnInstanceDiscovered(struct {
+    strict OnInstanceDiscovered(struct {
         instance ServiceInstance;
     }) -> ();
 
     /// Notifies the subscriber that addresses or text for a known service
     /// instance have changed.
-    OnInstanceChanged(struct {
+    strict OnInstanceChanged(struct {
         instance ServiceInstance;
     }) -> ();
 
     /// Notifies the subscriber that a known service instance has been lost.
-    OnInstanceLost(struct {
+    strict OnInstanceLost(struct {
         service service_name;
         instance instance_name;
     }) -> ();
 
     /// Notifies the subscriber that a PTR query has been sent.
-    OnQuery(struct {
+    strict OnQuery(struct {
         resource_type ResourceType;
     }) -> ();
 };

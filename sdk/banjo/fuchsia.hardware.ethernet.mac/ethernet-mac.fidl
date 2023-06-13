@@ -9,8 +9,8 @@ const MAC_ARRAY_LENGTH uint32 = 6;
 
 @transport("Banjo")
 @banjo_layout("ddk-callback")
-protocol EthMacCallbacks {
-    ConfigPhy(struct {
+closed protocol EthMacCallbacks {
+    strict ConfigPhy(struct {
         mac array<uint8, MAC_ARRAY_LENGTH>;
     }) -> (struct {
         s zx.Status;
@@ -19,20 +19,20 @@ protocol EthMacCallbacks {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol EthMac {
-    MdioRead(struct {
+closed protocol EthMac {
+    strict MdioRead(struct {
         reg uint32;
     }) -> (struct {
         s zx.Status;
         val uint32;
     });
-    MdioWrite(struct {
+    strict MdioWrite(struct {
         reg uint32;
         val uint32;
     }) -> (struct {
         s zx.Status;
     });
-    RegisterCallbacks(resource struct {
+    strict RegisterCallbacks(resource struct {
         cb client_end:EthMacCallbacks;
     }) -> (struct {
         s zx.Status;

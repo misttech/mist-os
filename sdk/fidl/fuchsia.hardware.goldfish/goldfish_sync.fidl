@@ -14,13 +14,13 @@ using zx;
 /// multiple commands (i.e. "guest->host" commands) and signal specific Fuchsia
 /// events once a command finishes executing on device.
 @discoverable
-protocol SyncDevice {
+closed protocol SyncDevice {
     /// Create a new sync timeline.
     ///
     /// A protocol request `timeline_req` provides an interface to the
     /// `SyncTimeline`. Each device can have multiple timelines at the same
     /// time.
-    CreateTimeline(resource struct {
+    strict CreateTimeline(resource struct {
         timeline_req server_end:SyncTimeline;
     }) -> ();
 };
@@ -30,11 +30,11 @@ protocol SyncDevice {
 ///
 /// The SyncTimeline should be kept alive until both the timeline connection
 /// and all events returned from SyncTimeline are closed by clients.
-protocol SyncTimeline {
+closed protocol SyncTimeline {
     /// Runs `CMD_TRIGGER_HOST_WAIT` command: Starts a wait on the sync device
     /// ("host") with the given GlSync object and sync thread handles.
     /// Once the command ends, `event` will signal its peer.
-    TriggerHostWait(resource struct {
+    strict TriggerHostWait(resource struct {
         host_glsync_handle uint64;
         host_syncthread_handle uint64;
         event zx.Handle:EVENTPAIR;

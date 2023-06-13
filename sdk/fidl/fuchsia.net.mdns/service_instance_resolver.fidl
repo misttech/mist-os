@@ -8,7 +8,7 @@ using zx;
 
 /// Discoverable protocol for resolving service instances.
 @discoverable
-protocol ServiceInstanceResolver {
+closed protocol ServiceInstanceResolver {
     /// Resolves a specific service instance by sending an SRV query and returns
     /// the endpoints, target and text records.
     ///
@@ -23,7 +23,7 @@ protocol ServiceInstanceResolver {
     /// A successful resolution will return target and at least one endpoint.
     /// Unsuccessful resolution occurs when either the service instance doesn't respond or
     /// there is no endpoint (IP & port).
-    ResolveServiceInstance(struct {
+    strict ResolveServiceInstance(struct {
         service service_name;
         instance instance_name;
         timeout zx.Duration;

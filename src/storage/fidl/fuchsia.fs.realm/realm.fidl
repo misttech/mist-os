@@ -19,21 +19,21 @@ type FormatOptions = resource table {
 };
 
 @discoverable
-protocol Controller {
+closed protocol Controller {
     /// Mounts a filesystem on a block device.
-    Mount(resource struct {
+    strict Mount(resource struct {
         device client_end:fuchsia.device.Controller;
         name string:fuchsia.io.MAX_FILENAME;
         options MountOptions;
     }) -> () error zx.Status;
 
     /// Unmounts a previously mounted filesystem.
-    Unmount(struct {
+    strict Unmount(struct {
         name string:fuchsia.io.MAX_FILENAME;
     }) -> () error zx.Status;
 
     /// Formats a block device with a particular filesystem format
-    Format(resource struct {
+    strict Format(resource struct {
         device client_end:fuchsia.device.Controller;
         name string:fuchsia.io.MAX_FILENAME;
         options FormatOptions;
@@ -41,7 +41,7 @@ protocol Controller {
 
     /// Checks the consistency of the filesystem formatted on
     /// the block device
-    Check(resource struct {
+    strict Check(resource struct {
         device client_end:fuchsia.device.Controller;
         name string:fuchsia.io.MAX_FILENAME;
     }) -> () error zx.Status;

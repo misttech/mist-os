@@ -12,27 +12,27 @@ using fuchsia.hardware.usb.request;
 /// The UsbHci protocol is implemented by a USB Host Controller driver.
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol UsbHci {
+closed protocol UsbHci {
     /// Queues a USB request with the HCI driver.
     /// The client must allocate sufficient space in the request object
     /// by using the GetRequestSize() method.
     /// Once the request is queued, the HCI driver owns it until the callback is invoked.
-    RequestQueue(resource struct {
+    strict RequestQueue(resource struct {
         @in_out
         usb_request fuchsia.hardware.usb.request.UsbRequest;
         @in_out
         complete_cb client_end:fuchsia.hardware.usb.request.UsbRequestCompleteCallback;
     }) -> ();
     /// Registers callbacks to the USB bus driver with the HCI driver.
-    SetBusInterface(resource struct {
+    strict SetBusInterface(resource struct {
         bus_intf client_end:fuchsia.hardware.usb.bus.UsbBusInterface;
     }) -> ();
     /// Returns the maximum number of USB devices that might be connected to the controller.
-    GetMaxDeviceCount() -> (struct {
+    strict GetMaxDeviceCount() -> (struct {
         count uint64;
     });
     /// Enables or disables an endpoint using parameters derived from |ep_desc|.
-    EnableEndpoint(struct {
+    strict EnableEndpoint(struct {
         device_id uint32;
         ep_desc fuchsia.hardware.usb.descriptor.UsbEndpointDescriptor;
         ss_com_desc fuchsia.hardware.usb.descriptor.UsbSsEpCompDescriptor;
@@ -41,11 +41,11 @@ protocol UsbHci {
         s zx.Status;
     });
     /// Returns the current frame (in milliseconds), used for isochronous transfers.
-    GetCurrentFrame() -> (struct {
+    strict GetCurrentFrame() -> (struct {
         frame uint64;
     });
     /// Called by the USB hub driver to configure a newly enumerated USB hub.
-    ConfigureHub(struct {
+    strict ConfigureHub(struct {
         device_id uint32;
         speed fuchsia.hardware.usb.descriptor.UsbSpeed;
         desc fuchsia.hardware.usb.hubdescriptor.UsbHubDescriptor;
@@ -54,7 +54,7 @@ protocol UsbHci {
         s zx.Status;
     });
     /// Called by the USB hub driver when a new device is attached.
-    HubDeviceAdded(struct {
+    strict HubDeviceAdded(struct {
         device_id uint32;
         port uint32;
         speed fuchsia.hardware.usb.descriptor.UsbSpeed;
@@ -62,42 +62,42 @@ protocol UsbHci {
         s zx.Status;
     });
     /// Called by the USB hub driver when a device has been removed.
-    HubDeviceRemoved(struct {
+    strict HubDeviceRemoved(struct {
         device_id uint32;
         port uint32;
     }) -> (struct {
         s zx.Status;
     });
     /// Called by the USB hub driver when a device has been reset.
-    HubDeviceReset(struct {
+    strict HubDeviceReset(struct {
         device_id uint32;
         port uint32;
     }) -> (struct {
         s zx.Status;
     });
     /// Resets an endpoint on the specified device.
-    ResetEndpoint(struct {
+    strict ResetEndpoint(struct {
         device_id uint32;
         ep_address uint8;
     }) -> (struct {
         s zx.Status;
     });
     /// Resets the specified device.
-    ResetDevice(struct {
+    strict ResetDevice(struct {
         hub_address uint32;
         device_id uint32;
     }) -> (struct {
         s zx.Status;
     });
     /// Returns the maximum size of a packet that can be queued on the specified endpoint.
-    GetMaxTransferSize(struct {
+    strict GetMaxTransferSize(struct {
         device_id uint32;
         ep_address uint8;
     }) -> (struct {
         size uint64;
     });
     /// Cancels all transactions currently queued on the specified endpoint.
-    CancelAll(struct {
+    strict CancelAll(struct {
         device_id uint32;
         ep_address uint8;
     }) -> (struct {
@@ -105,7 +105,7 @@ protocol UsbHci {
     });
     /// Returns the size needed for a |usb_request_t|, including private storage needed by the
     /// HCI driver.
-    GetRequestSize() -> (struct {
+    strict GetRequestSize() -> (struct {
         size uint64;
     });
 };

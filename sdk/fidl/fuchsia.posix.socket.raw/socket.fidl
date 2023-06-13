@@ -31,9 +31,9 @@ type ProtocolAssociation = strict union {
 
 /// A raw network socket provider.
 @discoverable
-protocol Provider {
+closed protocol Provider {
     /// Requests a raw socket.
-    Socket(struct {
+    strict Socket(struct {
         domain fuchsia.posix.socket.Domain;
         proto ProtocolAssociation;
     }) -> (resource struct {
@@ -86,10 +86,10 @@ const SOCKET_PROTOCOL_NAME string = "fuchsia.posix.socket.raw/Socket";
 /// Instead, clients should use the BSD sockets API to interact with sockets.
 /// We plan to change this protocol substantially and clients that couple
 /// directly to this protocol will make those changes more difficult.
-protocol Socket {
+closed protocol Socket {
     compose fuchsia.posix.socket.BaseNetworkSocket;
 
-    Describe() -> (resource table {
+    strict Describe() -> (resource table {
         /// Signals additional information about the state of the socket such as
         /// readiness or shutdown-ness.
         1: event zx.Handle:EVENTPAIR;
@@ -109,7 +109,7 @@ protocol Socket {
     /// - response `control` control messages, if requested.
     /// - response `truncated` indicates whether or not the returned message
     ///   was truncated.
-    RecvMsg(struct {
+    strict RecvMsg(struct {
         want_addr bool;
         data_len uint32;
         want_control bool;
@@ -128,7 +128,7 @@ protocol Socket {
     /// + request `data` the message.
     /// + request `control` ancillary data.
     /// + request `flags` flags for the send request.
-    SendMsg(struct {
+    strict SendMsg(struct {
         addr fuchsia.net.SocketAddress:optional;
         data vector<uint8>:MAX;
         control fuchsia.posix.socket.NetworkSocketSendControlData;
@@ -139,35 +139,35 @@ protocol Socket {
     ///
     /// - response `domain` the socket's associated domain.
     /// - response `proto` the socket's associated protocol.
-    GetInfo() -> (struct {
+    strict GetInfo() -> (struct {
         domain fuchsia.posix.socket.Domain;
         proto ProtocolAssociation;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_IP` -> `IP_HDRINCL`.
-    SetIpHeaderIncluded(struct {
+    strict SetIpHeaderIncluded(struct {
         value bool;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_IP` -> `IP_HDRINCL`.
-    GetIpHeaderIncluded() -> (struct {
+    strict GetIpHeaderIncluded() -> (struct {
         value bool;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_ICMPV6` -> `ICMP6_FILTER`.
-    SetIcmpv6Filter(struct {
+    strict SetIcmpv6Filter(struct {
         filter Icmpv6Filter;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_ICMPV6` -> `ICMP6_FILTER`.
-    GetIcmpv6Filter() -> (struct {
+    strict GetIcmpv6Filter() -> (struct {
         filter Icmpv6Filter;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_IPV6` -> `IPV6_CHECKSUM`.
-    SetIpv6Checksum(struct {
+    strict SetIpv6Checksum(struct {
         config Ipv6ChecksumConfiguration;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_IPV6` -> `IPV6_CHECKSUM`.
-    GetIpv6Checksum() -> (struct {
+    strict GetIpv6Checksum() -> (struct {
         config Ipv6ChecksumConfiguration;
     }) error fuchsia.posix.Errno;
 };

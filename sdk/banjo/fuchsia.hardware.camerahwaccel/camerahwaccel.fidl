@@ -33,10 +33,10 @@ type FrameAvailableInfo = struct {
 
 @transport("Banjo")
 @banjo_layout("ddk-callback")
-protocol HwAccelFrameCallback {
+closed protocol HwAccelFrameCallback {
     // This is called by the camera HW Accel drivers (gdc, ge2d, ...), every time a
     // frame is ready to be consumed.
-    FrameReady(struct {
+    strict FrameReady(struct {
         info FrameAvailableInfo;
     });
 };
@@ -45,20 +45,20 @@ protocol HwAccelFrameCallback {
 // case we want to change things around later.
 @transport("Banjo")
 @banjo_layout("ddk-callback")
-protocol HwAccelResChangeCallback {
+closed protocol HwAccelResChangeCallback {
     // This is called by the camera HW Accel drivers (gdc, ge2d, ...), every time a
     // change of resolution completes.
-    FrameResolutionChanged(struct {
+    strict FrameResolutionChanged(struct {
         info FrameAvailableInfo;
     });
 };
 
 @transport("Banjo")
 @banjo_layout("ddk-callback")
-protocol HwAccelRemoveTaskCallback {
+closed protocol HwAccelRemoveTaskCallback {
     // This is called by the camera HW Accel drivers (gdc, ge2d, ...), every time a
     // task is released.
-    TaskRemoved(struct {
+    strict TaskRemoved(struct {
         status TaskRemoveStatus;
     });
 };

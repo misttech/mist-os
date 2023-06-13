@@ -10,32 +10,32 @@ service BankAccount {
 };
 
 /// Provides read-only access to a bank account.
-protocol ReadOnlyAccount {
+closed protocol ReadOnlyAccount {
     /// Returns the bank account owner's name.
-    GetOwner() -> (struct {
+    strict GetOwner() -> (struct {
         owner string:MAX;
     });
 
     /// Returns the bank account's current balance in cents.
-    GetBalance() -> (struct {
+    strict GetBalance() -> (struct {
         balance int64;
     });
 };
 
 /// Provides read-write access to a bank account.
-protocol ReadWriteAccount {
+closed protocol ReadWriteAccount {
     compose ReadOnlyAccount;
 
     /// Withdraws `amount` cents from the bank account.
     /// Returns false if the account had insufficient funds.
-    Debit(struct {
+    strict Debit(struct {
         amount int64;
     }) -> (struct {
         succeeded bool;
     });
 
     /// Deposits `amount` cents to the bank account.
-    Credit(struct {
+    strict Credit(struct {
         amount int64;
     }) -> ();
 };

@@ -92,13 +92,13 @@ type ServerStatus = strict union {
 };
 
 @discoverable
-protocol RepositoryRegistry {
+closed protocol RepositoryRegistry {
     /// Start the repository server if it is not already running. Returns the local socket address
     /// the server is listening upon.
     ///
     /// `address`: local socket address that the server will listen on to run package repository.
     ///     This param is optional and if not provided will rely on ffx config.
-    ServerStart(struct {
+    strict ServerStart(struct {
         address fuchsia.net.SocketAddress:optional;
     }) -> (struct {
         address fuchsia.net.SocketAddress;
@@ -107,31 +107,31 @@ protocol RepositoryRegistry {
     /// Stop the repository server.
     ///
     /// * error `RepositoryError.SERVER_NOT_RUNNING` if the server is not running.
-    ServerStop() -> () error RepositoryError;
+    strict ServerStop() -> () error RepositoryError;
 
     /// Query status of the package repository server.
     ///
     /// Note: this may race with other channels calling `ServerStart()` or `ServerStop()`,
     /// but it will not race with calls on the same channel.
-    ServerStatus() -> (struct {
+    strict ServerStatus() -> (struct {
         status ServerStatus;
     });
 
     /// Add a repository named `name` that has the following [RepositorySpec].
-    AddRepository(struct {
+    strict AddRepository(struct {
         name string:MAX_NAME;
         repository RepositorySpec;
     }) -> () error RepositoryError;
 
     /// Returns true if the repository was removed, or false if there is no
     /// repository named `name`.
-    RemoveRepository(struct {
+    strict RemoveRepository(struct {
         name string:MAX_NAME;
     }) -> (struct {
         found bool;
     });
 
-    ListRepositories(resource struct {
+    strict ListRepositories(resource struct {
         iterator server_end:RepositoryIterator;
     });
 
@@ -139,7 +139,7 @@ protocol RepositoryRegistry {
     ///
     /// `target_info`: Metadata describing the repository registration.
     /// `alias_conflict_mode`: Resolution mode if alias conflicts present.
-    RegisterTarget(struct {
+    strict RegisterTarget(struct {
         target_info RepositoryTarget;
         alias_conflict_mode RepositoryRegistrationAliasConflictMode;
     }) -> () error RepositoryError;
@@ -148,13 +148,13 @@ protocol RepositoryRegistry {
     ///
     /// `repo_name`: The configured name of the repository.
     /// `target_identifier`: The target from which to deregister this repository.
-    DeregisterTarget(struct {
+    strict DeregisterTarget(struct {
         repository_name string:MAX_NAME;
         target_identifier string:<fuchsia.device.DEVICE_NAME_MAX, optional>;
     }) -> () error RepositoryError;
 
     /// List the packages in the repository named `name`.
-    ListPackages(resource struct {
+    strict ListPackages(resource struct {
         name string:MAX_NAME;
         iterator server_end:RepositoryPackagesIterator;
         /// Fields to include. This defaults to being empty (and therefore including none of the
@@ -163,14 +163,14 @@ protocol RepositoryRegistry {
     }) -> () error RepositoryError;
 
     /// List the components in the package named `package_name` from a repo named `repository_name` .
-    ShowPackage(resource struct {
+    strict ShowPackage(resource struct {
         repository_name string:MAX_NAME;
         package_name string:MAX_NAME;
         iterator server_end:PackageEntryIterator;
     }) -> () error RepositoryError;
 
     /// Get a list associating repositories with the targets they have been registered to.
-    ListRegisteredTargets(resource struct {
+    strict ListRegisteredTargets(resource struct {
         iterator server_end:RepositoryTargetsIterator;
     });
 };
@@ -180,26 +180,26 @@ type RepositoryConfig = struct {
     spec RepositorySpec;
 };
 
-protocol RepositoryIterator {
-    Next() -> (struct {
+closed protocol RepositoryIterator {
+    strict Next() -> (struct {
         repos vector<RepositoryConfig>:MAX_REPOS;
     });
 };
 
-protocol PackageEntryIterator {
-    Next() -> (struct {
+closed protocol PackageEntryIterator {
+    strict Next() -> (struct {
         entries vector<PackageEntry>:MAX;
     });
 };
 
-protocol RepositoryPackagesIterator {
-    Next() -> (struct {
+closed protocol RepositoryPackagesIterator {
+    strict Next() -> (struct {
         packages vector<RepositoryPackage>:MAX;
     });
 };
 
-protocol RepositoryTargetsIterator {
-    Next() -> (struct {
+closed protocol RepositoryTargetsIterator {
+    strict Next() -> (struct {
         registrations vector<RepositoryTarget>:MAX;
     });
 };

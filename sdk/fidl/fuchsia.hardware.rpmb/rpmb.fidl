@@ -45,11 +45,11 @@ type Request = resource struct {
 };
 
 @discoverable
-protocol Rpmb {
-    GetDeviceInfo() -> (struct {
+closed protocol Rpmb {
+    strict GetDeviceInfo() -> (struct {
         info DeviceInfo;
     });
-    Request(resource struct {
+    strict Request(resource struct {
         request Request;
     }) -> () error zx.Status;
 };

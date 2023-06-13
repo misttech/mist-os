@@ -17,26 +17,26 @@ type MaliProperties = table {
 /// Low-level protocol between ARM Mali GPU driver and low-level SoC driver.
 @discoverable
 @transport("Driver")
-protocol ArmMali {
-    GetProperties() -> (struct {
+closed protocol ArmMali {
+    strict GetProperties() -> (struct {
         properties MaliProperties;
     });
 
     /// Cause the GPU to enter protected mode. All buses must be idle and the L2
     /// cache cleared before executing this command.
-    EnterProtectedMode() -> () error zx.Status;
+    strict EnterProtectedMode() -> () error zx.Status;
 
     /// Start the process of exiting protected mode. All buses must be idle and
     /// the L2 cache cleared before executing this command. The GPU will not be
     /// able to access any memory after this command is complete and will be
     /// reset. The driver must wait for the reset to complete then call
     /// FinishExitProtectedMode().
-    StartExitProtectedMode() -> () error zx.Status;
+    strict StartExitProtectedMode() -> () error zx.Status;
 
     /// Allows the GPU to access non-protected memory. Must only be called after
     /// StartExitProtectedMode. The RESET_COMPLETED bit in the GPU_IRQ_RAWSTAT
     /// register must be set while this is called.
-    FinishExitProtectedMode() -> () error zx.Status;
+    strict FinishExitProtectedMode() -> () error zx.Status;
 };
 
 service Service {

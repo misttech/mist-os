@@ -7,7 +7,7 @@ library fuchsia.sys.test;
 /// An interface for interacting with the isolated system cache. Typically only
 /// accessed from tests.
 @discoverable
-protocol CacheControl {
+closed protocol CacheControl {
     /// Causes all isolated caches for the system to be cleared.
-    Clear() -> ();
+    strict Clear() -> ();
 };

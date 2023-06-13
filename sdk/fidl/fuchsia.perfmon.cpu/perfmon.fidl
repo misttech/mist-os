@@ -83,9 +83,9 @@ type Allocation = struct {
     buffer_size_in_pages uint32;
 };
 
-protocol Controller {
+closed protocol Controller {
     /// Fetch the performance monitor properties of the system.
-    GetProperties() -> (struct {
+    strict GetProperties() -> (struct {
         /// The properties of this system.
         properties @generated_name("Properties") struct {
             /// S/W API version = `API_VERSION`.
@@ -130,7 +130,7 @@ protocol Controller {
     /// "other resources" is basically a catch-all for other things that will
     /// be needed. This does not include reserving the events, that is done
     /// later by `StageConfig()`.
-    Initialize(struct {
+    strict Initialize(struct {
         allocation Allocation;
     }) -> () error zx.Status;
 
@@ -138,10 +138,10 @@ protocol Controller {
     /// This is also done when the connection is closed.
     /// Tracing is first stopped if not already stopped.
     /// May be called multiple times.
-    Terminate() -> ();
+    strict Terminate() -> ();
 
     /// Return the trace allocation configuration, if there is one.
-    GetAllocation() -> (struct {
+    strict GetAllocation() -> (struct {
         allocation box<Allocation>;
     });
 
@@ -149,20 +149,20 @@ protocol Controller {
     /// Must be called with data collection off and after `Initialize()`.
     /// Note: This doesn't actually configure the h/w, this just stages
     /// the values for subsequent use by `Start()`.
-    StageConfig(struct {
+    strict StageConfig(struct {
         config Config;
     }) -> () error zx.Status;
 
     /// Fetch performance monitor specification for a cpu, if it exists.
     /// Must be called with data collection off and after `StageConfig()`.
-    GetConfig() -> (struct {
+    strict GetConfig() -> (struct {
         config box<Config>;
     });
 
     /// Return a handle of a trace buffer, if it exists, and if `descriptor`
     /// is valid.
     /// `descriptor` is (0, 1, 2, ..., `num_buffers`-1)
-    GetBufferHandle(struct {
+    strict GetBufferHandle(struct {
         descriptor uint32;
     }) -> (resource struct {
         vmo zx.Handle:<VMO, optional>;
@@ -171,21 +171,21 @@ protocol Controller {
     /// Turn on data collection.
     /// Must be called after `Initialize()` + `StageConfig()` and with data
     /// collection off.
-    Start() -> () error zx.Status;
+    strict Start() -> () error zx.Status;
 
     /// Turn off data collection.
     /// May be called any time after `Initialize()` has been called and before
     /// `Terminate()`. If called at other times the call is ignored.
     /// May be called multiple times.
-    Stop() -> ();
+    strict Stop() -> ();
 };
 
-protocol Device {
+closed protocol Device {
     /// Opens a new session on the device.
     ///
     /// At most one session is permitted at one time; the server end will be
     /// closed with `ZX_ERR_ALREADY_BOUND` if a session already exists.
-    OpenSession(resource struct {
+    strict OpenSession(resource struct {
         session server_end:Controller;
     });
 };

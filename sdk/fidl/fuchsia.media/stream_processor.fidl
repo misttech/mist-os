@@ -504,14 +504,14 @@ type Packet = table {
 /// doing so can sometimes skip over re-allocation of buffers. This can be a
 /// useful thing to do for cases like seeking to a new location - at the
 /// StreamProcessor interface that can look like switching to a new stream.
-protocol StreamProcessor {
+closed protocol StreamProcessor {
     /// Permit the server to use OnStreamFailed() instead of the server just
     /// closing the whole StreamProcessor channel on stream failure.
     ///
     /// If the server hasn't seen this message by the time a stream fails, the
     /// server will close the StreamProcessor channel instead of sending
     /// OnStreamFailed().
-    EnableOnStreamFailed();
+    strict EnableOnStreamFailed();
 
     /// The stream has failed, but the StreamProcessor instance is still usable
     /// for a new stream.
@@ -539,7 +539,7 @@ protocol StreamProcessor {
     /// No further messages will arrive from the server regarding the failed
     /// stream.  This includes any OnOutputEndOfStream() that the client would
     /// have otherwise expected.
-    -> OnStreamFailed(struct {
+    strict -> OnStreamFailed(struct {
         stream_lifetime_ordinal uint64;
         error StreamError;
     });
@@ -575,7 +575,7 @@ protocol StreamProcessor {
     // "recommended" values for input, maybe only on request rather than via
     // this event, to keep things simpler for simpler clients.  Maybe separate
     // the recommendations from the constraints.
-    -> OnInputConstraints(struct {
+    strict -> OnInputConstraints(struct {
         input_constraints StreamBufferConstraints;
     });
 
@@ -602,7 +602,7 @@ protocol StreamProcessor {
     /// server can expect that allocation is in fact complete and can expect to
     /// get the allocation information from sysmem immediately upon requesting
     /// the information from sysmem.
-    SetInputBufferPartialSettings(resource struct {
+    strict SetInputBufferPartialSettings(resource struct {
         input_settings StreamBufferPartialSettings;
     });
 
@@ -680,7 +680,7 @@ protocol StreamProcessor {
     ///
     /// This message is ordered with respect to output packets, and with respect
     /// to OnOutputFormat().
-    -> OnOutputConstraints(struct {
+    strict -> OnOutputConstraints(struct {
         output_config StreamOutputConstraints;
     });
 
@@ -735,7 +735,7 @@ protocol StreamProcessor {
     /// with buffer_constraints_action_required true hasn't been processed by the
     /// client (by configuring output buffers using
     /// SetOutputBufferPartialSettings() etc).
-    -> OnOutputFormat(struct {
+    strict -> OnOutputFormat(struct {
         output_format StreamOutputFormat;
     });
 
@@ -762,7 +762,7 @@ protocol StreamProcessor {
     /// client knows that there's no longer a current stream.
     ///
     /// See also CompleteOutputBufferPartialSettings().
-    SetOutputBufferPartialSettings(resource struct {
+    strict SetOutputBufferPartialSettings(resource struct {
         output_settings StreamBufferPartialSettings;
     });
 
@@ -781,7 +781,7 @@ protocol StreamProcessor {
     ///
     /// Other clients may first wait for sysmem to allocate, prepare to receive
     /// output, and then send CompleteOutputBufferPartialSettings().
-    CompleteOutputBufferPartialSettings(struct {
+    strict CompleteOutputBufferPartialSettings(struct {
         buffer_lifetime_ordinal uint64;
     });
 
@@ -825,7 +825,7 @@ protocol StreamProcessor {
     /// is done. The client will know the stream_lifetime_ordinal is done when
     /// OnOutputEndOfStream(), OnStreamFailed(), or the StreamProcessor channel
     /// closes.
-    FlushEndOfStreamAndCloseStream(struct {
+    strict FlushEndOfStreamAndCloseStream(struct {
         stream_lifetime_ordinal uint64;
     });
 
@@ -849,7 +849,7 @@ protocol StreamProcessor {
     /// buffers and new buffers (not all clients are).
     ///
     /// See also Sync().
-    CloseCurrentStream(struct {
+    strict CloseCurrentStream(struct {
         stream_lifetime_ordinal uint64;
         release_input_buffers bool;
         release_output_buffers bool;
@@ -881,7 +881,7 @@ protocol StreamProcessor {
     /// repeated SetInputBufferSettings() and the like, a client that spams the
     /// channel can expect that the channel will just close if the server or the
     /// channel itself gets too far behind.
-    Sync() -> ();
+    strict Sync() -> ();
 
     /// This is how the stream processor emits an output packet to the stream
     /// processor client.
@@ -917,7 +917,7 @@ protocol StreamProcessor {
     ///
     /// The scope of error_detected_during is from the start to the end of this
     /// output_packet.
-    -> OnOutputPacket(struct {
+    strict -> OnOutputPacket(struct {
         output_packet Packet;
         error_detected_before bool;
         error_detected_during bool;
@@ -933,7 +933,7 @@ protocol StreamProcessor {
     /// explicit or implicit output buffer de-configuration().  See
     /// buffer_lifetime_ordinal for more on that. A server must ignore any such
     /// stale RecycleOutputPacket() calls.
-    RecycleOutputPacket(struct {
+    strict RecycleOutputPacket(struct {
         available_output_packet PacketHeader;
     });
 
@@ -965,7 +965,7 @@ protocol StreamProcessor {
     ///
     /// The error_detected_before bool has the same semantics as the
     /// error_detected_before bool in OnOutputPacket().
-    -> OnOutputEndOfStream(struct {
+    strict -> OnOutputEndOfStream(struct {
         stream_lifetime_ordinal uint64;
         error_detected_before bool;
     });
@@ -999,7 +999,7 @@ protocol StreamProcessor {
     /// the start of any stream).  The format specified need not match what was
     /// specified during stream processor creation, but if it doesn't match, the
     /// StreamProcessor channel might close as described above.
-    QueueInputFormatDetails(struct {
+    strict QueueInputFormatDetails(struct {
         stream_lifetime_ordinal uint64;
         format_details FormatDetails;
     });
@@ -1017,7 +1017,7 @@ protocol StreamProcessor {
     /// previously-queued input packets.  The input data must continue as long
     /// as there are free packets to be assured that the server will ever
     /// generate the first OnOutputConstraints().
-    QueueInputPacket(struct {
+    strict QueueInputPacket(struct {
         packet Packet;
     });
 
@@ -1066,7 +1066,7 @@ protocol StreamProcessor {
     /// properly even if the order of OnFreeInputPacket() messages is
     /// intentionally scrambled with respect to each other (but not scrambled
     /// across OnStreamFailed(), for now).
-    -> OnFreeInputPacket(struct {
+    strict -> OnFreeInputPacket(struct {
         free_input_packet PacketHeader;
     });
 
@@ -1106,7 +1106,7 @@ protocol StreamProcessor {
     /// QueueInputEndOfStream() for this stream after the first
     /// QueueInputEndOfStream() for this stream, a server should close the
     /// StreamProcessor channel.
-    QueueInputEndOfStream(struct {
+    strict QueueInputEndOfStream(struct {
         stream_lifetime_ordinal uint64;
     });
 };

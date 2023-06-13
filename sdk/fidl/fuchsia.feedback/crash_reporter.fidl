@@ -8,7 +8,7 @@ using zx;
 
 /// Provides the ability to file crash reports.
 @discoverable
-protocol CrashReporter {
+closed protocol CrashReporter {
     /// Files a crash `report`.
     ///
     /// This could mean generating a crash report in a local crash report database or uploading the
@@ -23,7 +23,7 @@ protocol CrashReporter {
     /// has been successfully or unsuccessfully filed.
     // TODO(fxbug.dev/122422): delete File once F12 is out of support window.
     @available(deprecated=11, removed=12, legacy=true, note="use FileReport")
-    File(resource struct {
+    strict File(resource struct {
         report CrashReport;
     }) -> () error zx.Status;
 
@@ -36,7 +36,7 @@ protocol CrashReporter {
     /// Warning: this could potentially take up to several minutes. Calling
     /// this function in a synchronous manner is not recommended.
     @available(added=11)
-    FileReport(resource struct {
+    strict FileReport(resource struct {
         report CrashReport;
     }) -> (struct {
         results FileReportResults;

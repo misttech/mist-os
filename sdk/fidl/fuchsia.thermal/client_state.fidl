@@ -19,7 +19,7 @@ alias ClientType = string:8;
 /// Allows a client to connect a [`ClientStateWatcher`] to the thermal state of
 /// a given [`ClientType`].
 @discoverable
-protocol ClientStateConnector {
+closed protocol ClientStateConnector {
     /// Connects a [`ClientStateWatcher`] to the thermal state of the specified
     /// [`ClientType`].
     ///
@@ -37,7 +37,7 @@ protocol ClientStateConnector {
     ///
     /// + `watcher` is the server endpoint of a [`ClientStateWatcher`] channel
     /// that will be connected to the thermal state of `client_type`.
-    Connect(resource struct {
+    strict Connect(resource struct {
         client_type ClientType;
         watcher server_end:ClientStateWatcher;
     });
@@ -51,7 +51,7 @@ protocol ClientStateConnector {
 /// [`ClientStateConnector.Connect'] method. The client endpoint of a
 /// `ClientStateWatcher` channel is only useful after it has been connected in
 /// this way.
-protocol ClientStateWatcher {
+closed protocol ClientStateWatcher {
     /// Watches for changes to a client's thermal state.
     ///
     /// A client's thermal state is determined according to the central thermal
@@ -68,7 +68,7 @@ protocol ClientStateWatcher {
     ///
     /// - `state` is an unsigned integer representing the client's thermal
     /// state.
-    Watch() -> (struct {
+    strict Watch() -> (struct {
         state uint64;
     });
 };

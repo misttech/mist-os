@@ -72,13 +72,13 @@ type TraceOptions = table {
 };
 
 @discoverable
-protocol Tracing {
+closed protocol Tracing {
     /// Starts a trace recording. If the target behind the query is already
     /// running a trace, or some trace is actively writing to the output file,
     /// this will return a [RecordingAlreadyStarted] error.
     ///
     /// On success, returns the target on which the trace is running.
-    StartRecording(struct {
+    strict StartRecording(struct {
         target_query TargetQuery;
         output_file string:255;
         options TraceOptions;
@@ -115,14 +115,14 @@ protocol Tracing {
     /// // Can also be stopped via this invocation.
     /// proxy.stop_recording("output_file.fxt");
     /// ```
-    StopRecording(struct {
+    strict StopRecording(struct {
         name string:255;
     }) -> (struct {
         target TargetInfo;
     }) error RecordingError;
 
     /// Reports the current status of all running traces.
-    Status(resource struct {
+    strict Status(resource struct {
         iterator server_end:TracingStatusIterator;
     }) -> ();
 };
@@ -149,9 +149,9 @@ type TraceInfo = table {
     6: triggers vector<Trigger>:MAX;
 };
 
-protocol TracingStatusIterator {
+closed protocol TracingStatusIterator {
     /// Gets the next block of trace info entries.
-    GetNext() -> (struct {
+    strict GetNext() -> (struct {
         entries vector<TraceInfo>:MAX;
     });
 };

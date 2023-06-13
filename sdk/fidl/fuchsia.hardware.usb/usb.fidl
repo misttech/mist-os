@@ -8,11 +8,11 @@ using zx;
 using fuchsia.hardware.usb.endpoint;
 
 @discoverable
-protocol Usb {
+closed protocol Usb {
     /// Connects to endpoint. Returns
     ///  * ZX_ERR_NOT_FOUND: if endpoint address does not exist.
     ///  * ZX_ERR_ALREADY_BOUND: if the endpoint is already bound.
-    ConnectToEndpoint(resource struct {
+    strict ConnectToEndpoint(resource struct {
         ep_addr uint8;
         ep server_end:fuchsia.hardware.usb.endpoint.Endpoint;
     }) -> () error zx.Status;

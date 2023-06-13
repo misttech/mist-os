@@ -19,7 +19,7 @@ type FocusState = table {
 /// or otherwise, need access to view-focus state, so the protocol is
 /// deliberately minimal. Possession of a ViewRef (and this protocol) does not
 /// grant the power to learn about a ViewRef's focus state.
-protocol ViewRefFocused {
+closed protocol ViewRefFocused {
     /// Sets up a callback to fire when the implicit ViewRef has gained or lost
     /// focus. Typically, focus changes happen at a slow pace, such that every
     /// transition is captured by the callback. However, focus changes can
@@ -45,7 +45,7 @@ protocol ViewRefFocused {
     /// Flow control: The caller is allowed at most one in-flight |Watch| call
     /// at at time: subsequent |Watch| calls must wait until the acknowledgment
     /// returns. Non-compliance results in channel closure.
-    Watch() -> (struct {
+    strict Watch() -> (struct {
         state FocusState;
     });
 };

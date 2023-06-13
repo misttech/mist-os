@@ -9,10 +9,10 @@ using zx;
 /// connecting to the thermal driver's FIDL interface via Banjo.
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Thermal {
+closed protocol Thermal {
     /// Pass a channel handle to the thermal driver to connect to its
     /// FIDL interface.
-    Connect(resource struct {
+    strict Connect(resource struct {
         chan zx.Handle:CHANNEL;
     }) -> (struct {
         status zx.Status;

@@ -4,7 +4,7 @@
 library zx;
 
 @transport("Syscall")
-protocol Task {
+closed protocol Task {
     // TODO(scottmg): Need something like handle:TASK in this file to mean {job, process, thread}.
     // Or otherwise some way to express multiple options for constraints on inputs in this protocol.
 
@@ -95,7 +95,7 @@ protocol Task {
     /// [`zx_process_start()`]: process_start.md
     /// [`zx_task_kill()`]: task_kill.md
     /// [`zx_thread_start()`]: thread_start.md
-    Suspend(resource struct {
+    strict Suspend(resource struct {
         handle Handle;
     }) -> (resource struct {
         token Handle;
@@ -162,7 +162,7 @@ protocol Task {
     /// [`zx_handle_close()`]: handle_close.md
     /// [`zx_task_kill()`]: task_kill.md
     /// [`zx_task_suspend()`]: task_suspend.md
-    SuspendToken(resource struct {
+    strict SuspendToken(resource struct {
         handle Handle;
     }) -> (resource struct {
         token Handle;
@@ -263,7 +263,7 @@ protocol Task {
     /// [exceptions]: /docs/concepts/kernel/exceptions.md
     /// [`zx_channel_read()`]: channel_read.md
     /// [`zx_object_get_property()`]: object_get_property.md
-    CreateExceptionChannel(resource struct {
+    strict CreateExceptionChannel(resource struct {
         handle Handle;
         options uint32;
     }) -> (resource struct {
@@ -329,7 +329,7 @@ protocol Task {
     /// [`zx_job_create()`]: job_create.md
     /// [`zx_object_get_info()`]: object_get_info.md
     /// [`zx_process_create()`]: process_create.md
-    Kill(resource struct {
+    strict Kill(resource struct {
         handle Handle;
     }) -> () error Status;
 };

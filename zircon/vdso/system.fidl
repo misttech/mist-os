@@ -26,7 +26,7 @@ type StringView = struct {
 };
 
 @transport("Syscall")
-protocol System {
+closed protocol System {
     /// ## Summary
     ///
     /// TODO(fxbug.dev/32938)
@@ -60,7 +60,7 @@ protocol System {
     /// TODO(fxbug.dev/32938)
     @const
     @vdsocall
-    GetDcacheLineSize() -> (@wrapped_return struct {
+    strict GetDcacheLineSize() -> (@wrapped_return struct {
         size uint32;
     });
 
@@ -103,7 +103,7 @@ protocol System {
     /// [`zx_system_get_physmem()`]: system_get_physmem.md
     @const
     @vdsocall
-    GetNumCpus() -> (@wrapped_return struct {
+    strict GetNumCpus() -> (@wrapped_return struct {
         count uint32;
     });
 
@@ -155,7 +155,7 @@ protocol System {
     ///
     @const
     @vdsocall
-    GetVersionString() -> (StringView);
+    strict GetVersionString() -> (StringView);
 
     /// ## Summary
     ///
@@ -209,7 +209,7 @@ protocol System {
     /// [`zx_vmo_create()`]: vmo_create.md
     @const
     @vdsocall
-    GetPageSize() -> (@wrapped_return struct {
+    strict GetPageSize() -> (@wrapped_return struct {
         size uint32;
     });
 
@@ -253,7 +253,7 @@ protocol System {
     ///
     /// [`zx_system_get_num_cpus()`]: system_get_num_cpus.md
     @vdsocall
-    GetPhysmem() -> (@wrapped_return struct {
+    strict GetPhysmem() -> (@wrapped_return struct {
         physmem uint64;
     });
 
@@ -308,7 +308,7 @@ protocol System {
     /// [`zx_system_get_num_cpus()`]: system_get_num_cpus.md
     /// [`zx_system_get_physmem()`]: system_get_physmem.md
     @vdsocall
-    GetFeatures(struct {
+    strict GetFeatures(struct {
         kind uint32;
     }) -> (struct {
         features uint32;
@@ -407,7 +407,7 @@ protocol System {
     ///
     /// **ZX_ERR_INVALID_ARGS** *kind* was not one of the supported values specified
     /// above.
-    GetEvent(resource struct {
+    strict GetEvent(resource struct {
         root_job Handle:JOB;
         kind uint32;
     }) -> (resource struct {
@@ -490,7 +490,7 @@ protocol System {
     ///  - [`zx_system_get_performance_info()`]
     ///
     /// [`zx_system_get_performance_info()`]: system_get_performance_info.md
-    SetPerformanceInfo(resource struct {
+    strict SetPerformanceInfo(resource struct {
         resource Handle:RESOURCE;
         topic uint32;
         // TODO(joshuaseaton): vector<byte>
@@ -588,7 +588,7 @@ protocol System {
     ///  - [`zx_system_set_performance_info()`]
     ///
     /// [`zx_system_set_performance_info()`]: system_set_performance_info.md
-    GetPerformanceInfo(resource struct {
+    strict GetPerformanceInfo(resource struct {
         resource Handle:RESOURCE;
         topic uint32;
         count usize64;
@@ -653,7 +653,7 @@ protocol System {
     ///  - [`zx_system_mexec_payload_get()`]
     ///
     /// [`zx_system_mexec_payload_get()`]: system_mexec_payload_get.md
-    Mexec(resource struct {
+    strict Mexec(resource struct {
         resource Handle:RESOURCE;
         kernel_vmo Handle:VMO;
         bootimage_vmo Handle:VMO;
@@ -711,7 +711,7 @@ protocol System {
     ///  - [`zx_system_mexec()`]
     ///
     /// [`zx_system_mexec()`]: system_mexec.md
-    MexecPayloadGet(resource struct {
+    strict MexecPayloadGet(resource struct {
         resource Handle:RESOURCE;
     }) -> (struct {
         @voidptr
@@ -865,7 +865,7 @@ protocol System {
     /// ## See also
     ///
     /// TODO(fxbug.dev/32938)
-    Powerctl(resource struct {
+    strict Powerctl(resource struct {
         resource Handle:RESOURCE;
         cmd uint32;
         arg SystemPowerctlArg;

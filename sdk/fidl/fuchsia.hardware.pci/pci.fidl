@@ -63,13 +63,13 @@ type PciDevice = struct {
 /// The Bus protocol provides information about PCI device children on the PCI
 /// providing the service.
 @discoverable
-protocol Bus {
+closed protocol Bus {
     /// Retrieve information about the segment group and buses covered by a Bus.
-    GetHostBridgeInfo() -> (struct {
+    strict GetHostBridgeInfo() -> (struct {
         info HostBridgeInfo;
     });
     /// Retrieve all Devices on the Bus.
-    GetDevices() -> (struct {
+    strict GetDevices() -> (struct {
         devices vector<PciDevice>:MAX_DEVICES;
     });
     /// Read from a Device's base address register (BAR). The BAR must be an MMIO type.
@@ -86,7 +86,7 @@ protocol Bus {
     /// |ZX_ERR_INVALID_ARGS|: |bar_id| is invalid,  or offset / size combined
     /// are invalid for the given BAR's size.
     /// |ZX_ERR_NOT_SUPPORTED|: The BAR specified by |bar_id| is not an MMIO BAR.
-    ReadBar(struct {
+    strict ReadBar(struct {
         device Address;
         bar_id uint8;
         offset uint64;
@@ -318,9 +318,9 @@ alias ExtendedConfigOffset = uint16;
 
 
 @discoverable
-protocol Device {
+closed protocol Device {
     /// Returns a structure containing device information from the configuration header.
-    GetDeviceInfo() -> (struct {
+    strict GetDeviceInfo() -> (struct {
         info DeviceInfo;
     });
 
@@ -337,7 +337,7 @@ protocol Device {
     /// |ZX_ERR_INTERNAL|: A bus driver error has occurred.
     /// |ZX_ERR_INVALID_ARGS|: The |bar_id| specified is outside of the acceptable range.
     /// |ZX_ERR_NOT_FOUND|: The specified |bar_id| does not exist for this device.
-    GetBar(struct {
+    strict GetBar(struct {
         bar_id uint32;
     }) -> (resource struct {
         result Bar;
@@ -350,7 +350,7 @@ protocol Device {
     ///
     /// Errors:
     /// |ZX_ERR_BAD_STATE|: Method was called while the device is disabled.
-    SetBusMastering(struct {
+    strict SetBusMastering(struct {
         enabled bool;
     }) -> () error zx.Status;
 
@@ -364,7 +364,7 @@ protocol Device {
     /// |ZX_ERR_TIMED_OUT|: The device did not complete its reset in the
     /// expected amount of time and is presumed to no longer be operating
     /// properly.
-    ResetDevice() -> () error zx.Status;
+    strict ResetDevice() -> () error zx.Status;
 
     /// Alerts the bus driver to deassert the raised legacy interrupt so that it
     /// may be waited on again. Only used if |SetInterruptMode| was called with
@@ -372,7 +372,7 @@ protocol Device {
     ///
     /// Errors:
     /// |ZX_ERR_BAD_STATE|: device is not configured to use the Legacy interrupt mode.
-    AckInterrupt() -> () error zx.Status;
+    strict AckInterrupt() -> () error zx.Status;
 
     /// Maps a device's interrupt to a zx:interrupt. The device's interrupt mode
     /// must already be configured with |SetInterruptMode|, and |which_irq| must
@@ -392,14 +392,14 @@ protocol Device {
     /// already mapped to a valid handle.
     /// |ZX_ERR_BAD_STATE|: interrupts are currently disabled for the device.
     /// |ZX_ERR_INVALID_ARGS|: |which_irq| is invalid for the mode.
-    MapInterrupt(struct {
+    strict MapInterrupt(struct {
         which_irq uint32;
     }) -> (resource struct {
         interrupt zx.Handle:INTERRUPT;
     }) error zx.Status;
 
     /// Returns the supported interrupt modes for a device.
-    GetInterruptModes() -> (struct {
+    strict GetInterruptModes() -> (struct {
         modes InterruptModes;
     });
 
@@ -416,7 +416,7 @@ protocol Device {
     /// existing handles to mapped MSIs exist.
     /// |ZX_ERR_INVALID_ARGS|: |requested_irq_count| is 0.
     /// |ZX_ERR_NOT_SUPPORTED|: The provided |mode| is not supported, or invalid.
-    SetInterruptMode(struct {
+    strict SetInterruptMode(struct {
         mode InterruptMode;
         requested_irq_count uint32;
     }) -> () error zx.Status;
@@ -430,7 +430,7 @@ protocol Device {
     ///
     /// Errors:
     /// |ZX_ERR_OUT_OF_RANGE|: |offset| is an invalid address.
-    ReadConfig8(struct {
+    strict ReadConfig8(struct {
         offset ExtendedConfigOffset;
     }) -> (struct {
         value uint8;
@@ -445,7 +445,7 @@ protocol Device {
     ///
     /// Errors:
     /// |ZX_ERR_OUT_OF_RANGE|: |offset| is an invalid address.
-    ReadConfig16(struct {
+    strict ReadConfig16(struct {
         offset ExtendedConfigOffset;
     }) -> (struct {
         value uint16;
@@ -460,7 +460,7 @@ protocol Device {
     ///
     /// Errors:
     /// |ZX_ERR_OUT_OF_RANGE|: |offset| is an invalid address.
-    ReadConfig32(struct {
+    strict ReadConfig32(struct {
         offset ExtendedConfigOffset;
     }) -> (struct {
         value uint32;
@@ -478,7 +478,7 @@ protocol Device {
     /// Errors:
     /// |ZX_ERR_ACCESS_DENIED|: |offset| is within the device's configuration header.
     /// |ZX_ERR_OUT_OF_RANGE|: |offset| is an invalid address.
-    WriteConfig8(struct {
+    strict WriteConfig8(struct {
         offset ExtendedConfigOffset;
         value uint8;
     }) -> () error zx.Status;
@@ -495,7 +495,7 @@ protocol Device {
     /// Errors:
     /// |ZX_ERR_ACCESS_DENIED|: |offset| is within the device's configuration header.
     /// |ZX_ERR_OUT_OF_RANGE|: |offset| is an invalid address.
-    WriteConfig16(struct {
+    strict WriteConfig16(struct {
         offset ExtendedConfigOffset;
         value uint16;
     }) -> () error zx.Status;
@@ -512,7 +512,7 @@ protocol Device {
     /// Errors:
     /// |ZX_ERR_ACCESS_DENIED|: |offset| is within the device's configuration header.
     /// |ZX_ERR_OUT_OF_RANGE|: |offset| is an invalid address.
-    WriteConfig32(struct {
+    strict WriteConfig32(struct {
         offset ExtendedConfigOffset;
         value uint32;
     }) -> () error zx.Status;
@@ -524,7 +524,7 @@ protocol Device {
     ///
     /// Parameters:
     /// |id|: the capability id to search for.
-    GetCapabilities(struct {
+    strict GetCapabilities(struct {
         id CapabilityId;
     }) -> (struct {
         offsets vector<ConfigOffset>:MAX_CAPABILITIES;
@@ -536,7 +536,7 @@ protocol Device {
     ///
     /// Parameters:
     /// |id|: the capability id to search for
-    GetExtendedCapabilities(struct {
+    strict GetExtendedCapabilities(struct {
         id ExtendedCapabilityId;
     }) -> (struct {
         offsets vector<ExtendedConfigOffset>:MAX_EXT_CAPABILITIES;
@@ -549,7 +549,7 @@ protocol Device {
     ///
     /// Errors:
     /// |ZX_ERR_OUT_OF_RANGE|: |index| was not 0.
-    GetBti(struct {
+    strict GetBti(struct {
         index uint32;
     }) -> (resource struct {
         bti zx.Handle:BTI;

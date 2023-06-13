@@ -43,7 +43,7 @@ type Transaction = table {
 alias ReadData = vector<uint8>:MAX_TRANSFER_SIZE;
 
 @discoverable
-protocol Device {
+closed protocol Device {
     /// Issue one or more transactions to a particular I2C device.
     ///
     /// Each `Transaction` is performed in the order in which it appears in `transactions`. Data for
@@ -58,7 +58,7 @@ protocol Device {
     ///   ZX_ERR_OUT_OF_RANGE: A `DataTransfer` was too large to be handled by this I2C controller.
     ///   ZX_ERR_IO_NOT_PRESENT: The device did not respond to its I2C address.
     ///   ZX_ERR_IO_REFUSED: The device issued a NACK before the end of a write transfer.
-    Transfer(struct {
+    strict Transfer(struct {
         transactions vector<Transaction>:MAX_COUNT_TRANSACTIONS;
     }) -> (struct {
         read_data vector<ReadData>:MAX_COUNT_TRANSACTIONS;
@@ -67,7 +67,7 @@ protocol Device {
     /// Get the name of this I2C Device. Returns ZX_ERR_NOT_SUPPORTED if the
     /// name is unspecified or the empty string.
     @available(added=11)
-    GetName() -> (struct {
+    strict GetName() -> (struct {
         name string:MAX_I2C_NAME_LEN;
     }) error zx.Status;
 };

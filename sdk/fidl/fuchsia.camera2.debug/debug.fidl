@@ -9,9 +9,9 @@ using zx;
 /// This is the interface to the camera driver
 /// which allows debug settings.
 @discoverable
-protocol Debug {
+closed protocol Debug {
     // Set the default sensor mode
-    SetDefaultSensorMode(resource struct {
+    strict SetDefaultSensorMode(resource struct {
         mode uint32;
     }) -> (struct {
         status zx.Status;

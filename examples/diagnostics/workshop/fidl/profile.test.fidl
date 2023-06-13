@@ -4,17 +4,17 @@
 
 library fuchsia.examples.diagnostics;
 
-protocol Profile {
+closed protocol Profile {
     compose ProfileReader;
-    SetName(struct {
+    strict SetName(struct {
         name string:NAME_LENGTH;
     });
 
-    AddBalance(struct {
+    strict AddBalance(struct {
         amount int64;
     });
 
-    WithdrawBalance(struct {
+    strict WithdrawBalance(struct {
         amount int64;
     }) -> (struct {
         success bool;
@@ -22,12 +22,12 @@ protocol Profile {
 };
 
 // Read only protocol for the profile.
-protocol ProfileReader {
-    GetName() -> (struct {
+closed protocol ProfileReader {
+    strict GetName() -> (struct {
         name string:NAME_LENGTH;
     });
 
-    GetBalance() -> (struct {
+    strict GetBalance() -> (struct {
         amount int64;
     });
 };

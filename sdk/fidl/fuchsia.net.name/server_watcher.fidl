@@ -4,7 +4,7 @@
 library fuchsia.net.name;
 
 /// Provides a hanging get interface to watch for DNS servers configuration.
-protocol DnsServerWatcher {
+closed protocol DnsServerWatcher {
     /// Returns a list of DNS servers.
     ///
     /// First call always returns a snapshot of the current list of servers or blocks if an empty
@@ -18,7 +18,7 @@ protocol DnsServerWatcher {
     /// server end of the protocol to be closed.
     ///
     /// - response `servers` The list of servers to use for DNS resolution, in priority order.
-    WatchServers() -> (struct {
+    strict WatchServers() -> (struct {
         servers vector<DnsServer>:MAX;
     });
 };

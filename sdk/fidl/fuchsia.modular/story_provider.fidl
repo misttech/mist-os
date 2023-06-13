@@ -9,19 +9,19 @@ library fuchsia.modular;
 /// Closing a `StoryProvider` connection has no effect on the state of the
 /// framework.
 @discoverable
-protocol StoryProvider {
+closed protocol StoryProvider {
     /// Returns a list of existing stories. If `watcher` is provided, the client will
     /// be notified of story changes (new stories, deleted stories, runtime
     /// state changes).
     @transitional("Use GetStories2 instead")
-    GetStories(resource struct {
+    strict GetStories(resource struct {
         watcher client_end:<StoryProviderWatcher, optional>;
     }) -> (struct {
         story_infos vector<StoryInfo>:MAX;
     });
     /// For transition purposes only.
     @transitional("Only use while GetStories is transitional")
-    GetStories2(resource struct {
+    strict GetStories2(resource struct {
         watcher client_end:<StoryProviderWatcher, optional>;
     }) -> (resource struct {
         story_infos vector<StoryInfo2>:MAX;
@@ -30,14 +30,14 @@ protocol StoryProvider {
     /// Requests detailed information about the given story. If the story doesn't
     /// exist, returns null.
     @transitional("Use GetStoryInfo2 instead")
-    GetStoryInfo(struct {
+    strict GetStoryInfo(struct {
         story_id string:MAX;
     }) -> (struct {
         story_info box<StoryInfo>;
     });
     /// For transition purposes only.
     @transitional("Use only while GetStoryInfo is transitional")
-    GetStoryInfo2(struct {
+    strict GetStoryInfo2(struct {
         story_id string:MAX;
     }) -> (resource struct {
         story_info StoryInfo2;
@@ -46,20 +46,20 @@ protocol StoryProvider {
     /// Obtains a controller for a previously created story identified by its story
     /// ID. Obtaining the controller doesn't run it yet. If the story doesn't
     /// exist, the interface request is closed.
-    GetController(resource struct {
+    strict GetController(resource struct {
         story_id string:MAX;
         request server_end:StoryController;
     });
 
     /// Registers a watcher for changes in the story collection.
     /// DEPRECATED: In favor of GetStories().
-    Watch(resource struct {
+    strict Watch(resource struct {
         watcher client_end:StoryProviderWatcher;
     });
 };
 
 /// Implemented by clients of StoryProvider.
-protocol StoryProviderWatcher {
+closed protocol StoryProviderWatcher {
     /// Called in three different situations:
     ///
     ///  * Immediately when a new watcher is registered with one OnChange()
@@ -78,14 +78,14 @@ protocol StoryProviderWatcher {
     ///
     /// `story_visibility_state` is deprecated and will always have a value of DEFAULT.
     @transitional("Implement OnChange2 instead")
-    OnChange(struct {
+    strict OnChange(struct {
         story_info StoryInfo;
         story_state StoryState;
         story_visibility_state StoryVisibilityState;
     });
     /// For transition purposes only.
     @transitional("Implement only while OnChange is transitional")
-    OnChange2(resource struct {
+    strict OnChange2(resource struct {
         story_info StoryInfo2;
         story_state StoryState;
         story_visibility_state StoryVisibilityState;
@@ -96,7 +96,7 @@ protocol StoryProviderWatcher {
     ///
     /// If the story is running on this device at the time it is deleted,
     /// OnChange() will not be called first.
-    OnDelete(struct {
+    strict OnDelete(struct {
         story_id string:MAX;
     });
 };

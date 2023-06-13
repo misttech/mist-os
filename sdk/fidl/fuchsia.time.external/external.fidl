@@ -21,17 +21,17 @@ using zx;
 
 /// A protocol which defines common methods for all time sources. Should not be
 /// implemented directly.
-protocol TimeSource {
+closed protocol TimeSource {
     /// Notifies the time source of changes to global properties of the device
     /// that it may use to increase accuracy of time measurements.
-    UpdateDeviceProperties(struct {
+    strict UpdateDeviceProperties(struct {
         properties Properties;
     });
 };
 
 /// A protocol for time sources that produce time samples on demand.
 @discoverable
-protocol PullSource {
+closed protocol PullSource {
     compose TimeSource;
     /// Produce a new time sample.
     ///
@@ -47,7 +47,7 @@ protocol PullSource {
     /// before requesting another sample. In this case the client may call
     /// `NextPossibleSampleTime` to determine when the time source will be
     /// willing to produce another sample.
-    Sample(struct {
+    strict Sample(struct {
         urgency Urgency;
     }) -> (struct {
         sample TimeSample;
@@ -56,7 +56,7 @@ protocol PullSource {
     /// Returns the monotonic time at which the PullSource is willing to produce
     /// another sample. If the PullSource is not rate limited it will return a
     /// time less than or equal to current monotonic time.
-    NextPossibleSampleTime() -> (struct {
+    strict NextPossibleSampleTime() -> (struct {
         next_possible_time zx.Time;
     });
 };
@@ -67,7 +67,7 @@ protocol PullSource {
 /// general health indication through the `WatchHealth` method to reflect
 /// whether or not it expects to successfully produce time samples.
 @discoverable
-protocol PushSource {
+closed protocol PushSource {
     compose TimeSource;
     /// Watch for new time samples from the time source. This method is a
     /// hanging get and returns the latest time sample if one is available and
@@ -82,7 +82,7 @@ protocol PushSource {
     /// In the case a client sends a second WatchSample request while another
     /// request is active, the channel is closed with a ZX_ERR_BAD_STATE
     /// epitaph.
-    WatchSample() -> (struct {
+    strict WatchSample() -> (struct {
         sample TimeSample;
     });
 
@@ -94,7 +94,7 @@ protocol PushSource {
     /// In the case a client sends a second WatchStatus request while another
     /// request is active, the channel is closed with a ZX_ERR_BAD_STATE
     /// epitaph.
-    WatchStatus() -> (struct {
+    strict WatchStatus() -> (struct {
         status Status;
     });
 };

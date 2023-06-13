@@ -51,9 +51,9 @@ type ColorTransformConfiguration = table {
 
 /// Handler implemented by the owner of the presentation. Accessibility manager uses this protocol
 /// to make changes to the screen's color transform.
-protocol ColorTransformHandler {
+closed protocol ColorTransformHandler {
     /// Called when the color transform configuration has changed.
-    SetColorTransformConfiguration(struct {
+    strict SetColorTransformConfiguration(struct {
         configuration ColorTransformConfiguration;
     }) -> ();
 };
@@ -61,9 +61,9 @@ protocol ColorTransformHandler {
 /// Allows a presentation owner to register a handler for color transforms. This API is implemented
 /// by the Accessibility manager and called by Root Presenter.
 @discoverable
-protocol ColorTransform {
+closed protocol ColorTransform {
     /// Registers a handler for changes in the color transform configuration.
-    RegisterColorTransformHandler(resource struct {
+    strict RegisterColorTransformHandler(resource struct {
         handler client_end:ColorTransformHandler;
     });
 };

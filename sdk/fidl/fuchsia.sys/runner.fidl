@@ -65,7 +65,7 @@ type Package = resource struct {
 /// particular classes of programs. For example, the Dart virtual machine
 /// exposes this interface to run Dart programs.
 @discoverable
-protocol Runner {
+closed protocol Runner {
     /// Execute the given component.
     ///
     /// Upon startup, the component is to be given the information in
@@ -75,7 +75,7 @@ protocol Runner {
     /// The `controller` interface request typically originates from the
     /// `Launcher.CreateComponent` message that caused this component to be
     /// started.
-    StartComponent(resource struct {
+    strict StartComponent(resource struct {
         package Package;
         startup_info StartupInfo;
         controller server_end:<ComponentController, optional>;

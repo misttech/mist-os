@@ -133,10 +133,10 @@ const SOCKET_PROTOCOL_NAME string = "fuchsia.posix.socket.packet/Socket";
 /// We plan to change this protocol substantially and clients that couple
 /// directly to this protocol will make those changes more difficult.
 // TODO(https://fxbug.dev/85597): Implement RFC-0109 for packet sockets.
-protocol Socket {
+closed protocol Socket {
     compose fuchsia.posix.socket.BaseSocket;
 
-    Describe() -> (resource table {
+    strict Describe() -> (resource table {
         /// Signals additional information about the state of the socket such as
         /// readiness or shutdown-ness.
         1: event zx.Handle:EVENTPAIR;
@@ -146,7 +146,7 @@ protocol Socket {
     ///
     /// + request `protocol` the socket's new protocol association.
     /// + request `bound_interface_id` the socket's new interface binding.
-    Bind(struct {
+    strict Bind(struct {
         protocol ProtocolAssociation:optional;
         bound_interface_id strict union {
             1: all Empty;
@@ -160,7 +160,7 @@ protocol Socket {
     /// - response `protocol` the socket's protocol association, if associated.
     /// - response `bound_interface` properties of the socket's interface
     ///   binding.
-    GetInfo() -> (struct {
+    strict GetInfo() -> (struct {
         kind Kind;
         protocol ProtocolAssociation:optional;
         bound_interface strict union {
@@ -182,7 +182,7 @@ protocol Socket {
     /// - response `control` control messages, if requested.
     /// - response `truncated` indicates whether or not the returned message
     ///   was truncated.
-    RecvMsg(struct {
+    strict RecvMsg(struct {
         want_packet_info bool;
         data_len uint32;
         want_control bool;
@@ -207,7 +207,7 @@ protocol Socket {
     /// + request `data` the message.
     /// + request `control` ancillary data.
     /// + request `flags` flags for the send request.
-    SendMsg(struct {
+    strict SendMsg(struct {
         packet_info box<PacketInfo>;
         data vector<uint8>:MAX;
         control @generated_name("SendControlData") table {
@@ -220,12 +220,12 @@ protocol Socket {
 
 /// A packet socket provider.
 @discoverable
-protocol Provider {
+closed protocol Provider {
     /// Requests a packet socket.
     ///
     /// + request `kind` the kind of packet socket to create.
     /// - response `socket` the packet socket.
-    Socket(struct {
+    strict Socket(struct {
         kind Kind;
     }) -> (resource struct {
         socket client_end:Socket;

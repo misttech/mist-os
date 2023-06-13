@@ -10,14 +10,14 @@ const MAX_BUFFER_SIZE uint64 = 16384;
 
 /// Allows the factory testing tool to communicate to the firmware via the driver using
 /// a pre-formatted command buffer to observe and/or control the WLAN hardware's behavior.
-protocol Iovar {
+closed protocol Iovar {
 
     /// + request `iface_idx` interface index in the firmware
     /// + request `cmd` pre-defined command index specified by the manufacturer
     /// + request `request` additional data associated with the command
     /// - response `result` pre-formatted response data retrieved from firmware
     /// * error a status code indicating why the request could not be completed.
-    Get(struct {
+    strict Get(struct {
         iface_idx int32;
         cmd int32;
         request vector<uint8>:MAX_BUFFER_SIZE;
@@ -29,7 +29,7 @@ protocol Iovar {
     /// + request `cmd` pre-defined command index specified by the manufacturer
     /// + request `request` additional data associated with the command
     /// * error a status code indicating why the request could not be completed.
-    Set(struct {
+    strict Set(struct {
         iface_idx int32;
         cmd int32;
         request vector<uint8>:MAX_BUFFER_SIZE;

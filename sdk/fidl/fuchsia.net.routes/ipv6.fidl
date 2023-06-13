@@ -51,12 +51,12 @@ type InstalledRouteV6 = table {
 /// Provides observability to the system's IPv6 routing state.
 @discoverable
 @available(added=HEAD)
-protocol StateV6 {
+closed protocol StateV6 {
     /// Initialize a watcher for IPv6 routing state.
     ///
     /// + request 'watcher' grants access to the `WatcherV6` Protocol.
     /// + request `watch_options` specifies the behavior of the `WatcherV6`.
-    GetWatcherV6(resource struct {
+    strict GetWatcherV6(resource struct {
         watcher server_end:WatcherV6;
         options @generated_name("WatcherOptionsV6") table {};
     });
@@ -64,7 +64,7 @@ protocol StateV6 {
 
 /// An observer protocol for changes in system's IPv6 routing state.
 @available(added=HEAD)
-protocol WatcherV6 {
+closed protocol WatcherV6 {
     /// Hanging-Get style API for observing routing changes.
     ///
     /// Clients must only have one pending `Watch` call at a time. Calling
@@ -85,7 +85,7 @@ protocol WatcherV6 {
     /// system.
     ///
     /// - response `events` A vector of at most `MAX_EVENTS` events.
-    Watch() -> (struct {
+    strict Watch() -> (struct {
         events vector<@generated_name("EventV6") flexible union {
             /// A route that already existed when watching started.
             1: existing InstalledRouteV6;

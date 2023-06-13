@@ -5,7 +5,7 @@ library fidl.test.frobinator;
 
 using zx;
 
-protocol EmptyProtocol {};
+closed protocol EmptyProtocol {};
 
 type BasicUnion = union {
     1: v uint32;
@@ -27,45 +27,45 @@ type ComplexTable = table {
 };
 alias ComplexTableRetData = vector<uint8>:MAX_TRANSFER_SIZE;
 
-protocol Frobinator {
-    Frob(struct {
+closed protocol Frobinator {
+    strict Frob(struct {
         value string;
     });
-    Grob(struct {
+    strict Grob(struct {
         value string;
     }) -> (struct {
         value string;
     });
-    -> Hrob(struct {
+    strict -> Hrob(struct {
         value string;
     });
-    Fail(struct {
+    strict Fail(struct {
         fail bool;
     }) -> () error uint32;
-    FailHard(struct {
+    strict FailHard(struct {
         fail bool;
     }) -> (struct {
         froyo string;
     }) error uint32;
-    FailHardest(struct {
+    strict FailHardest(struct {
         fail bool;
     }) -> (struct {
         fro string;
         yo string;
     }) error uint32;
-    SendEventHandle(resource struct {
+    strict SendEventHandle(resource struct {
         event zx.Handle:<EVENT, zx.DEFAULT_EVENT_RIGHTS>;
     });
-    SendProtocol(resource struct {
+    strict SendProtocol(resource struct {
         ep client_end:EmptyProtocol;
     });
-    SendBasicUnion(struct {
+    strict SendBasicUnion(struct {
         union BasicUnion;
     });
-    SendBasicTable(struct {
+    strict SendBasicTable(struct {
         table BasicTable;
     });
-    SendComplexTables(struct {
+    strict SendComplexTables(struct {
         ct vector<ComplexTable>:MAX_TRANSFER_SIZE;
     }) -> (struct {
         ret vector<ComplexTableRetData>:MAX_TRANSFER_SIZE;

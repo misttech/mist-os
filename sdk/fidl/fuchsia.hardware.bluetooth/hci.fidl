@@ -5,25 +5,25 @@ library fuchsia.hardware.bluetooth;
 
 using zx;
 
-protocol Hci {
+closed protocol Hci {
     /// Opens a command/event channel on the provided handle. The zircon channel
     /// is closed in the event of an error opening the hci channel or if the hci
     /// channel is already associated with a handle to another zircon channel.
-    OpenCommandChannel(resource struct {
+    strict OpenCommandChannel(resource struct {
         channel zx.Handle:CHANNEL;
     });
 
     /// Opens a acl data channel on the provided handle. The zircon channel is
     /// closed in the event of an error opening the hci channel or if the hci
     /// channel is already associated with a handle to another zircon channel.
-    OpenAclDataChannel(resource struct {
+    strict OpenAclDataChannel(resource struct {
         channel zx.Handle:CHANNEL;
     });
 
     /// Opens a snoop channel on the provided handle. The zircon channel is
     /// closed in the event of an error opening the hci channel or if the hci
     /// channel is already associated with a handle to another zircon channel.
-    OpenSnoopChannel(resource struct {
+    strict OpenSnoopChannel(resource struct {
         channel zx.Handle:CHANNEL;
     });
 };

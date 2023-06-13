@@ -6,7 +6,7 @@ library zx;
 const LOG_RECORD_MAX usize64 = 256;
 
 @transport("Syscall")
-protocol Debuglog {
+closed protocol Debuglog {
     // TODO(fxbug.dev/32803): handle == ZX_HANDLE_INVALID accepted.
     /// ## Summary
     ///
@@ -59,7 +59,7 @@ protocol Debuglog {
     ///
     /// [`zx_debuglog_read()`]: debuglog_read.md
     /// [`zx_debuglog_write()`]: debuglog_write.md
-    Create(resource struct {
+    strict Create(resource struct {
         resource Handle:RESOURCE;
         options uint32;
     }) -> (resource struct {
@@ -126,7 +126,7 @@ protocol Debuglog {
     /// [`zx_debug_write()`]: debug_write.md
     /// [`zx_debuglog_create()`]: debuglog_create.md
     /// [`zx_debuglog_read()`]: debuglog_read.md
-    Write(resource struct {
+    strict Write(resource struct {
         handle Handle:LOG;
         options uint32;
         @voidptr
@@ -234,7 +234,7 @@ protocol Debuglog {
     ///
     /// [`zx_debuglog_create()`]: debuglog_create.md
     /// [`zx_debuglog_write()`]: debuglog_write.md
-    Read(resource struct {
+    strict Read(resource struct {
         handle Handle:LOG;
         options uint32;
     }) -> (struct {

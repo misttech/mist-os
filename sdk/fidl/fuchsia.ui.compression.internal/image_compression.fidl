@@ -18,8 +18,8 @@ type ImageCompressionError = flexible enum {
 
 /// Compresses images for the screenshot API in a secure way by isolating the
 /// use of the insecure libpng library to a separate component.
-protocol ImageCompressor {
-    EncodePng(resource table {
+closed protocol ImageCompressor {
+    strict EncodePng(resource table {
         /// VMO holding the image-to-be-encoded in packaged, BGRA_RAW format.
         1: raw_vmo zx.Handle:VMO;
 

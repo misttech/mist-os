@@ -13,7 +13,7 @@ type GdcConfigInfo = resource struct {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Gdc {
+closed protocol Gdc {
     // Registers the buffer collections and configuration which the GDC will be using
     // for this task and also the callback functions for a particular task and
     // returns a task index.
@@ -22,7 +22,7 @@ protocol Gdc {
     // |config_vmos| : Static configuration for GDC is stored in this vmo for this task.
     // |callback| : This function is called when GDC is done processing the task.
     // @Returns: |task_index| : Task ID for this task.
-    InitTask(resource struct {
+    strict InitTask(resource struct {
         input_buffer_collection fuchsia.sysmem.BufferCollectionInfo_2;
         output_buffer_collection fuchsia.sysmem.BufferCollectionInfo_2;
         input_image_format fuchsia.sysmem.ImageFormat_2;
@@ -40,7 +40,7 @@ protocol Gdc {
     // De-registers the task.
     // NOTE: Ensure that after calling RemoveTask() on a particular |task_index|,
     //       no other tasks pertaining to this |task_index| are queued up.
-    RemoveTask(struct {
+    strict RemoveTask(struct {
         task_index uint32;
     });
 
@@ -49,7 +49,7 @@ protocol Gdc {
     // |output_buffer_collection| after applying the correct configuration.
     // After processing we call the callback registered for this task with the
     // output buffer index. |capture_timestamp| is forwarded to derived frames.
-    ProcessFrame(struct {
+    strict ProcessFrame(struct {
         task_index uint32;
         input_buffer_index uint32;
         capture_timestamp uint64;
@@ -59,7 +59,7 @@ protocol Gdc {
 
     // Releases the frame |buffer_index| from the |output_buffer_collection| to be
     // used again by GDC driver again later.
-    ReleaseFrame(struct {
+    strict ReleaseFrame(struct {
         task_index uint32;
         buffer_index uint32;
     });
@@ -67,7 +67,7 @@ protocol Gdc {
     // Set the output resolution.This operation is queued to the worker thread to be
     // performed in sequence. Once the output resolution for this Task has changed,
     // callback using the HwAccelCallback, returning the new index of the Image Format.
-    SetOutputResolution(struct {
+    strict SetOutputResolution(struct {
         task_index uint32;
         new_output_image_format_index uint32;
     }) -> (struct {

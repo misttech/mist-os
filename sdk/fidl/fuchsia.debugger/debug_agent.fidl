@@ -6,10 +6,10 @@ library fuchsia.debugger;
 using zx;
 
 @discoverable
-protocol DebugAgent {
+closed protocol DebugAgent {
     /// Hand the debug agent a socket that connects it to the debugger. This
     /// will return ZX_ERR_ALREADY_BOUND if a connection already exists.
-    Connect(resource struct {
+    strict Connect(resource struct {
         socket zx.Handle:SOCKET;
     }) -> (struct {
         status zx.Status;

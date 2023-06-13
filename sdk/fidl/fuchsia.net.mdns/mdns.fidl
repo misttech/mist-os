@@ -17,7 +17,7 @@ alias txt_string = string:255;
 /// Deprecated: use HostNameResolver.
 @available(deprecated=9)
 @discoverable
-protocol Resolver {
+closed protocol Resolver {
     /// Gets the addresses for the specified host. `timeout` specifies how long
     /// the service should wait before giving up when waiting for a response to
     /// a resolution query. In typical use, a timeout of two or three seconds
@@ -25,7 +25,7 @@ protocol Resolver {
     ///
     /// A successful resolution may return one or both addresses. An
     /// unsuccessful resolution is indicated when both addresses are null.
-    ResolveHostName(struct {
+    strict ResolveHostName(struct {
         host host_name;
         timeout zx.Duration;
     }) -> (struct {
@@ -38,10 +38,10 @@ protocol Resolver {
 /// Deprecated: use ServiceInstanceSubscriber.
 @available(deprecated=9)
 @discoverable
-protocol Subscriber {
+closed protocol Subscriber {
     /// Subscribes to a service. The subscription lasts until `subscriber` is
     /// unbound.
-    SubscribeToService(resource struct {
+    strict SubscribeToService(resource struct {
         service service_name;
         subscriber client_end:ServiceSubscriber;
     });
@@ -51,26 +51,26 @@ protocol Subscriber {
 /// throttle traffic. The service won't necessarily wait for a reply before
 /// calling another method.
 @available(deprecated=9)
-protocol ServiceSubscriber {
+closed protocol ServiceSubscriber {
     /// Notifies the subscriber that a service instance has been discovered.
-    OnInstanceDiscovered(struct {
+    strict OnInstanceDiscovered(struct {
         instance ServiceInstance;
     }) -> ();
 
     /// Notifies the subscriber that addresses or text for a known service
     /// instance have changed.
-    OnInstanceChanged(struct {
+    strict OnInstanceChanged(struct {
         instance ServiceInstance;
     }) -> ();
 
     /// Notifies the subscriber that a known service instance has been lost.
-    OnInstanceLost(struct {
+    strict OnInstanceLost(struct {
         service service_name;
         instance instance_name;
     }) -> ();
 
     /// Notifies the subscriber that a PTR query has been sent.
-    OnQuery(struct {
+    strict OnQuery(struct {
         resource_type ResourceType;
     }) -> ();
 };
@@ -79,7 +79,7 @@ protocol ServiceSubscriber {
 /// Deprecated: use ServiceInstancePublisher.
 @available(deprecated=9)
 @discoverable
-protocol Publisher {
+closed protocol Publisher {
     /// Publishes a service instance. `publication_responder` is consulted via its
     /// `OnPublication` method for initial announcements and to answer queries.
     /// The service is published until the `publication_responder` channel closes. In
@@ -92,7 +92,7 @@ protocol Publisher {
     /// If a service with the same service and instance names is already published, the
     /// old publication will be terminated, and the responder channel for the old
     /// publication will be closed.
-    PublishServiceInstance(resource struct {
+    strict PublishServiceInstance(resource struct {
         service service_name;
         instance instance_name;
         media Media;
@@ -103,14 +103,14 @@ protocol Publisher {
 
 /// Client-supplied publication responder interface.
 @available(deprecated=9)
-protocol PublicationResponder {
+closed protocol PublicationResponder {
     /// Provides instance information for initial announcements and query
     /// responses relating to the service instance specified in
     /// `ServiceInstancePublisher.PublishServiceInstance`.  If the publication relates to a
     /// subtype of the service, `subtype` contains the subtype, otherwise
     /// it is null. If `publication` is null, no announcement or response is
     /// transmitted. Strings in `text` are transmitted in the TXT record.
-    OnPublication(struct {
+    strict OnPublication(struct {
         publication_cause PublicationCause;
         subtype subtype_name:optional;
         source_addresses vector<fuchsia.net.IpAddress>:MAX_ADDRESSES;
@@ -121,7 +121,7 @@ protocol PublicationResponder {
     /// Sets the subtypes for the service instance. The specified subtypes will
     /// be announced subject to filtering through the responder. The initial
     /// subtype collection is empty.
-    -> SetSubtypes(struct {
+    strict -> SetSubtypes(struct {
         subtypes vector<subtype_name>:MAX_SUBTYPES;
     });
 
@@ -129,7 +129,7 @@ protocol PublicationResponder {
     /// instance's port number or text strings. All announcements are filtered
     /// through `OnPublication`, which replies with the new port and text
     /// values.
-    -> Reannounce();
+    strict -> Reannounce();
 };
 
 /// Describes the cause of a publication.

@@ -8,7 +8,7 @@ using fuchsia.media;
 using zx;
 
 @discoverable
-protocol Factory {
+closed protocol Factory {
     /// Creates a new `fuchsia.media.AudioCapturer` that is capable of capturing audio in
     /// the ultrasonic frequency range.
     ///
@@ -29,7 +29,7 @@ protocol Factory {
     ///
     /// - `SetReferenceClock` is disallowed. The reference clock of an ultrasound capturer is not
     /// configurable, but instead returned from `CreateCapturer`.
-    CreateCapturer(resource struct {
+    strict CreateCapturer(resource struct {
         request server_end:fuchsia.media.AudioCapturer;
     }) -> (resource struct {
         reference_clock zx.Handle:CLOCK;
@@ -56,7 +56,7 @@ protocol Factory {
     ///
     /// - `SetReferenceClock` is disallowed. The reference clock of an ultrasound renderer is not
     /// configurable, but instead returned from `CreateRenderer`.
-    CreateRenderer(resource struct {
+    strict CreateRenderer(resource struct {
         renderer server_end:fuchsia.media.AudioRenderer;
     }) -> (resource struct {
         reference_clock zx.Handle:CLOCK;

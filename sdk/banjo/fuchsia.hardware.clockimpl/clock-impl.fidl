@@ -14,19 +14,19 @@ using zx;
 /// See clock.banjo for documentation for each method.
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol ClockImpl {
+closed protocol ClockImpl {
     /// Clock Gating Control.
-    Enable(struct {
+    strict Enable(struct {
         id uint32;
     }) -> (struct {
         s zx.Status;
     });
-    Disable(struct {
+    strict Disable(struct {
         id uint32;
     }) -> (struct {
         s zx.Status;
     });
-    IsEnabled(struct {
+    strict IsEnabled(struct {
         id uint32;
     }) -> (struct {
         s zx.Status;
@@ -34,20 +34,20 @@ protocol ClockImpl {
     });
 
     /// Clock Frequency Scaling Control.
-    SetRate(struct {
+    strict SetRate(struct {
         id uint32;
         hz uint64;
     }) -> (struct {
         s zx.Status;
     });
-    QuerySupportedRate(struct {
+    strict QuerySupportedRate(struct {
         id uint32;
         hz uint64;
     }) -> (struct {
         s zx.Status;
         hz uint64;
     });
-    GetRate(struct {
+    strict GetRate(struct {
         id uint32;
     }) -> (struct {
         s zx.Status;
@@ -55,19 +55,19 @@ protocol ClockImpl {
     });
 
     /// Clock input control.
-    SetInput(struct {
+    strict SetInput(struct {
         id uint32;
         idx uint32;
     }) -> (struct {
         s zx.Status;
     });
-    GetNumInputs(struct {
+    strict GetNumInputs(struct {
         id uint32;
     }) -> (struct {
         s zx.Status;
         n uint32;
     });
-    GetInput(struct {
+    strict GetInput(struct {
         id uint32;
     }) -> (struct {
         s zx.Status;

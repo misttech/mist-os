@@ -48,11 +48,11 @@ type EnergyScanParameters = table {
 /// Protocol for returning the results of an energy scan operation.
 ///
 /// Closing the protocol will cancel the associated scan operation.
-protocol EnergyScanResultStream {
+closed protocol EnergyScanResultStream {
     /// Called to fetch the next set of energy scan results.
     ///
     /// The last set will have zero items and the protocol will be closed.
-    Next() -> (struct {
+    strict Next() -> (struct {
         results vector<EnergyScanResult>:MAX_STREAM_SET_SIZE;
     });
 };
@@ -60,7 +60,7 @@ protocol EnergyScanResultStream {
 /// Protocol for connecting to [`EnergyScan`] on a LoWPAN
 /// interface.
 @discoverable
-protocol EnergyScanConnector {
+closed protocol EnergyScanConnector {
     /// Connects to the [`EnergyScan`] protocol on the
     /// named LoWPAN interface.
     ///
@@ -77,13 +77,13 @@ protocol EnergyScanConnector {
     ///   given name.
     /// * `ZX_ERR_NOT_SUPPORTED`: The interface exists but
     ///   does not support this protocol.
-    Connect(resource struct {
+    strict Connect(resource struct {
         name fuchsia.lowpan.InterfaceName;
         server_end server_end:EnergyScan;
     });
 };
 
-protocol EnergyScan {
+closed protocol EnergyScan {
     /// Starts an energy scan operation.
     ///
     /// This can be used for surveying the spectrum to identify channels
@@ -104,7 +104,7 @@ protocol EnergyScan {
     /// Performing energy scans could be used to profile the spectrum
     /// energy for a location and thus be used to determine or refine coarse
     /// location information.
-    StartEnergyScan(resource struct {
+    strict StartEnergyScan(resource struct {
         params EnergyScanParameters;
         stream server_end:EnergyScanResultStream;
     });

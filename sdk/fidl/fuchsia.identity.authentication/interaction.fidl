@@ -43,7 +43,7 @@ type Mode = strict enum {
 /// state until the UI collects the description of the error, whereafter it
 /// returns to the "WAITING" state. If the client closes the channel the
 /// authentication or enrollment attempt is abandoned.
-protocol Interaction {
+closed protocol Interaction {
     /// Begins interactive authentication or enrollment for a password. This
     /// method should only be called when a `WatchState` response indicated that
     /// password is available for the requested mode.
@@ -52,7 +52,7 @@ protocol Interaction {
     /// requested mode or mechanism was invalid or when the authentication or
     /// enrollment is complete. Either event will cause a response to
     /// `WatchState`.
-    StartPassword(resource struct {
+    strict StartPassword(resource struct {
         ui server_end:PasswordInteraction;
         mode Mode;
     });
@@ -65,7 +65,7 @@ protocol Interaction {
     /// requested mode or mechanism was invalid or when the authentication or
     /// enrollment is complete. Either event will cause a response to
     /// `WatchState`.
-    StartTest(resource struct {
+    strict StartTest(resource struct {
         ui server_end:TestInteraction;
         mode Mode;
     });
@@ -76,7 +76,7 @@ protocol Interaction {
     /// change in state on subsequent calls. Note that when a `Start*` method
     /// fails, `WatchState` will return, and may return the same set of
     /// mechanisms as the previous call.
-    WatchState() -> (strict union {
+    strict WatchState() -> (strict union {
         /// One or more mechanisms are available for authentication. Not all
         /// products allow multiple concurrent mechanisms, but when multiple
         /// mechanisms are allowed these are ordered from most preferred to

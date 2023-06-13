@@ -14,10 +14,10 @@ alias PolicyId = uint32;
 /// boot.
 @discoverable
 @available(deprecated=11, removed=12, legacy=true)
-protocol VolumePolicyController {
+closed protocol VolumePolicyController {
     /// Gets a list of volume policy properties, including possible transforms
     /// and active policies for the property.
-    GetProperties() -> (struct {
+    strict GetProperties() -> (struct {
         properties vector<Property>:MAX;
     });
 
@@ -37,7 +37,7 @@ protocol VolumePolicyController {
     /// Adding a policy will immediately adjust the audio setting values if they
     /// don't yet conform to the policy, such as reducing the volume if it's
     /// greater than a specified maximum volume.
-    AddPolicy(struct {
+    strict AddPolicy(struct {
         target Target;
         parameters PolicyParameters;
     }) -> (struct {
@@ -47,7 +47,7 @@ protocol VolumePolicyController {
     /// Removes a policy with the given policy id.
     ///
     /// Any client of this API can remove policies set by any other client.
-    RemovePolicy(struct {
+    strict RemovePolicy(struct {
         policy_id PolicyId;
     }) -> () error Error;
 };

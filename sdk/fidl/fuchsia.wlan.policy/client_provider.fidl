@@ -16,13 +16,13 @@ using zx;
 /// paradigm by limiting the number of controlling applications.  A single caller
 /// at a time is permitted to make API calls that impact wlan state.
 @discoverable
-protocol ClientProvider {
+closed protocol ClientProvider {
     /// Control channel used by a single caller to trigger wlan client mode state
     /// changes.  The caller also provides a channel to receive wlan updates.
     /// Only one caller can have the control channel open at a time.  Attempts to
     /// register as a controller while there is an active control registration
     /// will result in the new caller's provided channel being closed.
-    GetController(resource struct {
+    strict GetController(resource struct {
         requests server_end:ClientController;
         updates client_end:ClientStateUpdates;
     });
@@ -31,9 +31,9 @@ protocol ClientProvider {
 /// The ClientListener API provides a mechanism for callers to receive state change
 /// updates about wlan operation.
 @discoverable
-protocol ClientListener {
+closed protocol ClientListener {
     /// Registration for callers to receive wlan client mode state updates.
-    GetListener(resource struct {
+    strict GetListener(resource struct {
         updates client_end:ClientStateUpdates;
     });
 };
@@ -44,7 +44,7 @@ protocol ClientListener {
 ///
 /// Individual calls provided by the API are triggered after registering with
 /// the wlan ClientProvider via the OpenControlChannel call.
-protocol ClientController {
+closed protocol ClientController {
     /// Enables wlan to initiate connections to networks (either by autoconnecting
     /// to saved networks or acting on incoming calls triggering connections).
     /// Depending on the underlying capabilities of the device, this call may impact
@@ -52,7 +52,7 @@ protocol ClientController {
     /// The returned status represents acknowledgement of the request.  The
     /// ClientListener protocol should be monitored to learn when client functionality
     /// has been enabled.
-    StartClientConnections() -> (struct {
+    strict StartClientConnections() -> (struct {
         status fuchsia.wlan.common.RequestStatus;
     });
 
@@ -61,7 +61,7 @@ protocol ClientController {
     /// The returned status represents acknowledgements of the request.  The
     /// ClientListener protocol should be monitored to learn when client functionality
     /// has been disabled.
-    StopClientConnections() -> (struct {
+    strict StopClientConnections() -> (struct {
         status fuchsia.wlan.common.RequestStatus;
     });
 
@@ -71,7 +71,7 @@ protocol ClientController {
     /// notified via a status update in the ScanResultIterator.
     /// In the current implementation, client connections must be started for a scan
     /// to be performed.
-    ScanForNetworks(resource struct {
+    strict ScanForNetworks(resource struct {
         iterator server_end:ScanResultIterator;
     });
 
@@ -80,19 +80,19 @@ protocol ClientController {
     /// different.  If a caller attempts to save a NetworkConfig with the same
     /// NetworkIdentifier and same Credentials as a previously saved network
     /// the method will effectively be a no-op.
-    SaveNetwork(struct {
+    strict SaveNetwork(struct {
         config NetworkConfig;
     }) -> () error NetworkConfigChangeError;
 
     /// Removes a saved network configuration, if one exists.  This method will
     /// automatically trigger a disconnection if the NetworkConfig was used to
     /// establish the connection.
-    RemoveNetwork(struct {
+    strict RemoveNetwork(struct {
         config NetworkConfig;
     }) -> () error NetworkConfigChangeError;
 
     /// Retrieve the currently saved networks using the provided iterator.
-    GetSavedNetworks(resource struct {
+    strict GetSavedNetworks(resource struct {
         iterator server_end:NetworkConfigIterator;
     });
 
@@ -104,7 +104,7 @@ protocol ClientController {
     /// to the connection status are disseminated via the ClientStateUpdates protocol.
     /// If the connect attempt fails, the service will fall back to default behavior
     /// with scanning and connecting via network selection.
-    Connect(struct {
+    strict Connect(struct {
         id NetworkIdentifier;
     }) -> (struct {
         status fuchsia.wlan.common.RequestStatus;
@@ -114,13 +114,13 @@ protocol ClientController {
 /// Iterator used to send back scan results to the caller.  The corresponding channel
 /// will be closed after the scan is complete and results are returned or fails due
 /// to an error.
-protocol ScanResultIterator {
+closed protocol ScanResultIterator {
     /// Allows caller to request the next set of scan results.
     /// After all scan results have been sent, the next call to GetNext will return
     /// an empty vector and the channel will be closed.
     /// If an error is encountered during the scan, the error will be returned and
     /// the channel will be closed. No scan results will be provided.
-    GetNext() -> (struct {
+    strict GetNext() -> (struct {
         scan_results vector<ScanResult>;
     }) error ScanErrorCode;
 };
@@ -166,10 +166,10 @@ type Bss = table {
 };
 
 /// Iterator used by callers to retrieve saved network information.
-protocol NetworkConfigIterator {
+closed protocol NetworkConfigIterator {
 
     /// Method allowing the next block of saved networks to be handled.
-    GetNext() -> (struct {
+    strict GetNext() -> (struct {
         configs vector<NetworkConfig>;
     });
 };
@@ -181,13 +181,13 @@ protocol NetworkConfigIterator {
 /// attempt information.  The connection and network related calls are based on
 /// NetworkIdentifier to allow multiple simultaneous connections on supporting
 /// devices.
-protocol ClientStateUpdates {
+closed protocol ClientStateUpdates {
 
     /// Updates registered listeners with the current summary of wlan client state.
     /// This will be called when there is any change to the state and the
     /// registered listeners are responsible for deciding what information has
     /// changed (since this is dependent on when they last acknowledged the update).
-    OnClientStateUpdate(struct {
+    strict OnClientStateUpdate(struct {
         summary ClientStateSummary;
     }) -> ();
 };

@@ -36,9 +36,9 @@ using zx;
 /// must be established when this protocol is created.
 ///
 /// TODO(fxbug.dev/94277): scheduling semantics are subject to change
-protocol GainControl {
+closed protocol GainControl {
     /// Sets the gain knob.
-    SetGain(table {
+    strict SetGain(table {
         /// How to update the gain knob.
         ///
         /// Required.
@@ -50,7 +50,7 @@ protocol GainControl {
     }) -> (table {}) error GainError;
 
     /// Set the mute knob.
-    SetMute(table {
+    strict SetMute(table {
         /// New value of the mute knob.
         ///
         /// Required.

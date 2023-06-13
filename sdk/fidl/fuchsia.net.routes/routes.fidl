@@ -67,7 +67,7 @@ type Destination = table {
 
 /// Provides access to the system's routing state.
 @discoverable
-protocol State {
+closed protocol State {
     /// Resolves the route to a destination.
     ///
     /// + request `destination` the IP address to resolve a route to. If the
@@ -80,7 +80,7 @@ protocol State {
     // want to let the caller specify which table to use. Alternatively, if
     // multiple tables are accessed through scoped objects, a `Resolve` call in
     // a table would have the same effect.
-    Resolve(struct {
+    strict Resolve(struct {
         destination fuchsia.net.IpAddress;
     }) -> (struct {
         /// A resolved route.

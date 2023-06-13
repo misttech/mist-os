@@ -84,7 +84,7 @@ type RouteValidatorError = flexible enum {
 };
 
 @discoverable
-protocol RouteValidator {
+closed protocol RouteValidator {
     /// Routes all incoming and exposed capabilities of a component identified by the given
     /// relative moniker. If the routing failed, an error is returned in the response.
     /// This function may cause components to be resolved.
@@ -92,7 +92,7 @@ protocol RouteValidator {
     /// Errors:
     /// * INVALID_ARGUMENTS: The given moniker is not valid.
     /// * INSTANCE_NOT_FOUND: No instance was found matching the given moniker.
-    Validate(struct {
+    strict Validate(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> (struct {
         reports vector<RouteReport>:MAX;
@@ -114,7 +114,7 @@ protocol RouteValidator {
     /// * INSTANCE_NOT_FOUND: No instance was found matching the given moniker.
     /// * RESOURCE_NOT_FOUND: No capability was found matching one of the given names.
     @available(added=12)
-    Route(struct {
+    strict Route(struct {
         /// The target component with the capability to route.
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         /// The target capabilites to route (i.e., uses or exposes)

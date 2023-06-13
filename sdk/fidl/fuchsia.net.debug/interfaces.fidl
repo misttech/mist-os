@@ -12,12 +12,12 @@ using fuchsia.hardware.network;
 /// This protocol is intended for debugging and testing only; and not meant for
 /// load-bearing code.
 @discoverable
-protocol Interfaces {
+closed protocol Interfaces {
     /// Return an interface's MAC address.
     ///
     /// + request `id` identifies the interface whose MAC is requested.
     /// - response `mac` is the interface's MAC address, if it has one.
-    GetMac(struct {
+    strict GetMac(struct {
         id fuchsia.net.InterfaceId;
     }) -> (struct {
         mac box<fuchsia.net.MacAddress>;
@@ -34,7 +34,7 @@ protocol Interfaces {
     ///
     /// + request `id` identifies the interface whose port is granted.
     /// + request `port` grants access to the interface's device port.
-    GetPort(resource struct {
+    strict GetPort(resource struct {
         id fuchsia.net.InterfaceId;
         port server_end:fuchsia.hardware.network.Port;
     });

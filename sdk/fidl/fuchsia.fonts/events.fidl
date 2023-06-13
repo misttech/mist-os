@@ -6,10 +6,10 @@ library fuchsia.fonts;
 /// Protocol for listening to possible events that may occur in the `Provider`'s set of fonts.
 ///
 /// Register a listener using [`fuchsia.fonts/Provider.RegisterFontSetEventListener`].
-protocol FontSetEventListener {
+closed protocol FontSetEventListener {
     /// The set of fonts available in the `Provider` has changed. See
     /// [`fuchsia.fonts/FontSetUpdatedEvent`].
-    OnFontSetUpdated(struct {
+    strict OnFontSetUpdated(struct {
         event FontSetUpdatedEvent;
     }) -> ();
 

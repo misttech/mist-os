@@ -104,13 +104,13 @@ type RealmArgs = resource table {
 /// This protocol is for the DriverTestRealm. It is an integration test
 /// framework for drivers.
 @discoverable
-protocol Realm {
+closed protocol Realm {
     /// Start the realm. Calling this will cause DriverTestRealm to start
     /// servicing other protocols (like /dev/). `args` is used to configure
     /// the DriverTestRealm.
     ///
     /// * error `ZX_ERR_ALREADY_EXISTS` the realm has already had `Start` called.
-    Start(resource struct {
+    strict Start(resource struct {
         args RealmArgs;
     }) -> () error zx.Status;
 };

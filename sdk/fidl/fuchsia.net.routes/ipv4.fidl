@@ -51,12 +51,12 @@ type InstalledRouteV4 = table {
 /// Provides observability to the system's IPv4 routing state.
 @discoverable
 @available(added=HEAD)
-protocol StateV4 {
+closed protocol StateV4 {
     /// Initialize a watcher for IPv4 routing state.
     ///
     /// + request 'watcher' grants access to the `WatcherV4` Protocol.
     /// + request `watch_options` specifies the behavior of the `WatcherV4`.
-    GetWatcherV4(resource struct {
+    strict GetWatcherV4(resource struct {
         watcher server_end:WatcherV4;
         options @generated_name("WatcherOptionsV4") table {};
     });
@@ -64,7 +64,7 @@ protocol StateV4 {
 
 /// An observer protocol for changes in system's IPv4 routing state.
 @available(added=HEAD)
-protocol WatcherV4 {
+closed protocol WatcherV4 {
     /// Hanging-Get style API for observing routing changes.
     ///
     /// Clients must only have one pending `Watch` call at a time. Calling
@@ -85,7 +85,7 @@ protocol WatcherV4 {
     /// system.
     ///
     /// - response `events` A vector of at most `MAX_EVENTS` events.
-    Watch() -> (struct {
+    strict Watch() -> (struct {
         events vector<@generated_name("EventV4") flexible union {
             /// A route that already existed when watching started.
             1: existing InstalledRouteV4;

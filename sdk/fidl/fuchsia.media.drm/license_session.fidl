@@ -80,11 +80,11 @@ type KeyState = table {
 ///
 /// If the client closes the `LicenseSession`, any derived Decryptors will also
 /// be closed as the encryption keys will no longer be maintained.
-protocol LicenseSession {
+closed protocol LicenseSession {
     /// Indicates that the [`LicenseSession`] has successfully initialized.
     ///
     /// This is always the first message sent by the `LicenseSession`.
-    -> OnReady();
+    strict -> OnReady();
 
     /// Generates a license request for a session based on the `init_data`.
     ///
@@ -95,7 +95,7 @@ protocol LicenseSession {
     /// + request `init_data` container-specific data that is used to generate a
     ///   [`LicenseMessageType.REQUEST`] `LicenseMessage`.
     /// * error an [`Error`] indicating the reason for failure.
-    GenerateLicenseRequest(struct {
+    strict GenerateLicenseRequest(struct {
         init_data LicenseInitData;
     }) -> () error Error;
 
@@ -114,7 +114,7 @@ protocol LicenseSession {
     /// the `LicenseSession` channel.
     ///
     /// * error an [`Error`] indicating the reason for failure.
-    GenerateLicenseRelease() -> () error Error;
+    strict GenerateLicenseRelease() -> () error Error;
 
     /// Updates the [`LicenseSession`] with a message from the license server.
     ///
@@ -124,7 +124,7 @@ protocol LicenseSession {
     /// + request `response` a message from the license server to update the
     ///   state of the `LicenseSession`.
     /// * error an [`Error`] indicating the reason for failure.
-    ProcessLicenseResponse(resource struct {
+    strict ProcessLicenseResponse(resource struct {
         response LicenseServerMessage;
     }) -> () error Error;
 
@@ -137,7 +137,7 @@ protocol LicenseSession {
     /// + request `params` the parameters with which to create the `decryptor`.
     /// + request `decryptor` the server endpoint of the
     ///   `fuchsia.media/StreamProcessor`.
-    CreateDecryptor(resource struct {
+    strict CreateDecryptor(resource struct {
         params DecryptorParams;
         decryptor server_end:fuchsia.media.StreamProcessor;
     });
@@ -149,7 +149,7 @@ protocol LicenseSession {
     ///
     /// - response `request` a message from the `LicenseSession` that the client
     ///   should send to the license server.
-    -> OnLicenseMessageGenerated(resource struct {
+    strict -> OnLicenseMessageGenerated(resource struct {
         request LicenseMessage;
     });
 
@@ -160,7 +160,7 @@ protocol LicenseSession {
     ///
     /// - response `key_states` a list of the key_ids and their related
     ///   [`KeyStatusCode`]s
-    -> OnKeyStatesChanged(struct {
+    strict -> OnKeyStatesChanged(struct {
         key_states vector<KeyState>:MAX;
     });
 };

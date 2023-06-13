@@ -9,16 +9,16 @@ const MAX_STRING_LENGTH uint64 = 32;
 
 // [START echo]
 @discoverable
-protocol Echo {
-    EchoString(struct {
+closed protocol Echo {
+    strict EchoString(struct {
         value string:MAX_STRING_LENGTH;
     }) -> (struct {
         response string:MAX_STRING_LENGTH;
     });
-    SendString(struct {
+    strict SendString(struct {
         value string:MAX_STRING_LENGTH;
     });
-    -> OnString(struct {
+    strict -> OnString(struct {
         response string:MAX_STRING_LENGTH;
     });
 };
@@ -26,13 +26,13 @@ protocol Echo {
 
 // [START launcher]
 @discoverable
-protocol EchoLauncher {
-    GetEcho(struct {
+closed protocol EchoLauncher {
+    strict GetEcho(struct {
         echo_prefix string:MAX_STRING_LENGTH;
     }) -> (resource struct {
         response client_end:Echo;
     });
-    GetEchoPipelined(resource struct {
+    strict GetEchoPipelined(resource struct {
         echo_prefix string:MAX_STRING_LENGTH;
         request server_end:Echo;
     });

@@ -4,7 +4,7 @@
 library zx;
 
 @transport("Syscall")
-protocol Job {
+closed protocol Job {
     /// ## Summary
     ///
     /// Create a new job.
@@ -71,7 +71,7 @@ protocol Job {
     /// [`zx_object_get_property()`]: object_get_property.md
     /// [`zx_process_create()`]: process_create.md
     /// [`zx_task_kill()`]: task_kill.md
-    Create(resource struct {
+    strict Create(resource struct {
         parent_job Handle:JOB;
         options uint32;
     }) -> (resource struct {
@@ -286,7 +286,7 @@ protocol Job {
     /// [`zx_object_get_info()`]: object_get_info.md
     /// [`zx_process_create()`]: process_create.md
     /// [`zx_vmo_replace_as_executable()`]: vmo_replace_as_executable.md
-    SetPolicy(resource struct {
+    strict SetPolicy(resource struct {
         handle Handle:JOB;
         options uint32;
         topic uint32;
@@ -355,7 +355,7 @@ protocol Job {
     /// [`zx_job_create()`]: job_create.md
     /// [`zx_process_create()`]: process_create.md
     /// [`zx_task_kill()`]: task_kill.md
-    SetCritical(resource struct {
+    strict SetCritical(resource struct {
         job Handle:JOB;
         options uint32;
         process Handle:PROCESS;

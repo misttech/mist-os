@@ -5,17 +5,17 @@ library fuchsia.hardware.overnet;
 
 using zx;
 
-protocol Callback {
+closed protocol Callback {
     // Called when a new link is ready to be serviced. RCS should serve a circuit link over the
     // given socket.
-    NewLink(resource struct {
+    strict NewLink(resource struct {
         socket zx.Handle:SOCKET;
     }) -> ();
 };
 
-protocol Device {
+closed protocol Device {
     // Called by RCS to set a callback through which RCS can receive sockets.
-    SetCallback(resource struct {
+    strict SetCallback(resource struct {
         callback client_end:Callback;
     }) -> ();
 };

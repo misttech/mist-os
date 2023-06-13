@@ -63,30 +63,30 @@ type EdidOp = struct {
 };
 
 @discoverable
-protocol Hdmi {
+closed protocol Hdmi {
     /// This function is called to power up the HDMI interface
     /// Should be called once on boot. Any future calls should do nothing.
-    PowerUp(struct {
+    strict PowerUp(struct {
         display_id uint8;
     }) -> () error zx.Status;
     /// This function is called to power down the HDMI interface
     /// Should be called only once on shut down.
-    PowerDown(struct {
+    strict PowerDown(struct {
         display_id uint8;
     }) -> ();
     /// This function return true if the HDMI block is powered on and not in reset
-    IsPoweredUp(struct {
+    strict IsPoweredUp(struct {
         display_id uint8;
     }) -> (struct {
         on bool;
     });
     /// This function resets the HDMI IP block
-    Reset(struct {
+    strict Reset(struct {
         display_id uint8;
     }) -> () error zx.Status;
 
     /// This function is called upon HDMI display change
-    ModeSet(struct {
+    strict ModeSet(struct {
         display_id uint8;
         mode DisplayMode;
     }) -> () error zx.Status;
@@ -109,7 +109,7 @@ protocol Hdmi {
     /// `write_segments_data` would be a vector with 1 element including the 2 bytes address of the
     /// read. Upon success `read_segments_data` would return a vector with one element, the byte
     /// read.
-    EdidTransfer(struct {
+    strict EdidTransfer(struct {
         ops vector<EdidOp>:MAX_COUNT_SEGMENTS;
         write_segments_data vector<vector<uint8>:MAX_TRANSFER_SIZE>:MAX_COUNT_SEGMENTS;
         read_segments_length vector<uint16>:MAX_COUNT_SEGMENTS;
@@ -120,26 +120,26 @@ protocol Hdmi {
     /// This function allows writing to any register within the HDMI block. This could be used
     /// for debug purposes during development stages without needing to modify the HDMI IMPL
     /// protocol or to write to registers that don't really belong in the HDMI IP block.
-    WriteReg(struct {
+    strict WriteReg(struct {
         reg uint32;
         val uint32;
     }) -> ();
 
     /// This function returns the value of any register within the HDMI IP block
-    ReadReg(struct {
+    strict ReadReg(struct {
         reg uint32;
     }) -> (struct {
         val uint32;
     });
 
     /// This function enable BIST pattern generation. This is useful during development stages
-    EnableBist(struct {
+    strict EnableBist(struct {
         display_id uint8;
         pattern uint32;
     }) -> () error zx.Status;
 
     /// This function prints the value of all HDMI registers
-    PrintHdmiRegisters() -> ();
+    strict PrintHdmiRegisters() -> ();
 };
 
 service Service {

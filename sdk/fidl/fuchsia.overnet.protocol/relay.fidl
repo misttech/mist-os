@@ -13,12 +13,12 @@ using fuchsia.net;
 /// * Using an intermediate UDP based node to discover and connect directly to other UDP based
 ///   nodes.
 @discoverable
-protocol UdpReachable {
+closed protocol UdpReachable {
     /// Hanging-get style returns the latest list of socket addresses that this node *may* be
     /// reachable from.
     /// This can change over time as extra sockets are added or removed, or NAT-ed addresses
     /// for existing sockets are learned, or indeed as connected networks change.
-    GetPossibleAddressList() -> (struct {
+    strict GetPossibleAddressList() -> (struct {
         address vector<fuchsia.net.SocketAddress>:MAX;
     });
 };

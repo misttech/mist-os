@@ -19,13 +19,13 @@ type BootstrapError = strict enum : uint32 {
 /// assume the Bluetooth identity of another device, this protocol should only be exposed to
 /// privileged components that can vouchsafe the origin of the data.
 @discoverable
-protocol Bootstrap {
+closed protocol Bootstrap {
     /// Adds identities to be added to the unpopulated Bluetooth stack.
     ///
     /// Repeated calls will append identities.
     // TODO(fxbug.dev/1304): If necessary, paginate bonding data to allow an arbitrary number of bonds for
     // each identity, e.g. AddBonds(adapter_id, bonds).
-    AddIdentities(struct {
+    strict AddIdentities(struct {
         identities vector<Identity>:MAX;
     });
 
@@ -34,5 +34,5 @@ protocol Bootstrap {
     /// considered initialized even if no bootstrapping data was written. Returns
     /// INVALID_HOST_IDENTITY if any host or bonded peer data is insufficient or inconsistent, with
     /// no effect (the client may retry by obtaining another protocol handle).
-    Commit() -> () error BootstrapError;
+    strict Commit() -> () error BootstrapError;
 };

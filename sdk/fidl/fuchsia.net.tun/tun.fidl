@@ -169,11 +169,11 @@ type Frame = table {
 /// - Closing the client end causes the object to be destroyed.
 /// - Observing a closure of the server end indicates the object no longer
 /// exists.
-protocol Port {
+closed protocol Port {
     /// Gets the port internal state.
     ///
     /// - response `state` a snapshot of the port's internal state.
-    GetState() -> (struct {
+    strict GetState() -> (struct {
         state InternalState;
     });
     /// Observes changes to internal state.
@@ -187,7 +187,7 @@ protocol Port {
     /// between `WatchState` calls.
     ///
     /// - response `state` the latest observed port internal state.
-    WatchState() -> (struct {
+    strict WatchState() -> (struct {
         state InternalState;
     });
     /// Sets the port's online status.
@@ -198,13 +198,13 @@ protocol Port {
     /// passed to `SetOnline`.
     ///
     /// + request `online` desired port online state.
-    SetOnline(struct {
+    strict SetOnline(struct {
         online bool;
     }) -> ();
     /// Connects to the underlying device port.
     ///
     /// + request `port` grants access to the device port.
-    GetPort(resource struct {
+    strict GetPort(resource struct {
         port server_end:fuchsia.hardware.network.Port;
     });
     /// Triggers port removal.
@@ -213,7 +213,7 @@ protocol Port {
     /// all resources related to the port. This is equivalent to simply dropping
     /// the client end, but provides callers with a signal of when removal is
     /// complete, allowing port identifiers to be reused, for example.
-    Remove();
+    strict Remove();
 };
 
 /// Provides control over the created device.
@@ -225,7 +225,7 @@ protocol Port {
 /// - Closing the client end causes the object to be destroyed.
 /// - Observing a closure of the server end indicates the object no longer
 /// exists.
-protocol Device {
+closed protocol Device {
     /// Writes a frame to the device (data coming from network-end).
     ///
     /// If the device was created with the
@@ -243,7 +243,7 @@ protocol Device {
     /// pending.
     /// * error `ZX_ERR_SHOULD_WAIT` if `blocking` is set to `false` and there
     /// are no buffers available to fulfill the request.
-    WriteFrame(struct {
+    strict WriteFrame(struct {
         frame Frame;
     }) -> () error zx.Status;
     /// Gets the next frame from the device (data coming from host-end).
@@ -258,7 +258,7 @@ protocol Device {
     /// pending.
     /// * error `ZX_ERR_SHOULD_WAIT` if `blocking` is set to `false` and there
     /// are no frames to be read.
-    ReadFrame() -> (struct {
+    strict ReadFrame() -> (struct {
         frame Frame;
     }) error zx.Status;
     /// Retrieves signals eventpair.
@@ -266,7 +266,7 @@ protocol Device {
     /// - response `signals` an eventpair that is signalled with
     /// `SIGNAL_READABLE` and `SIGNAL_WRITABLE` when read and write buffers are
     /// available, respectively.
-    GetSignals() -> (resource struct {
+    strict GetSignals() -> (resource struct {
         signals zx.Handle:EVENTPAIR;
     });
     /// Creates a new port on this device.
@@ -274,7 +274,7 @@ protocol Device {
     /// + request `config` new port configuration.
     /// + request `port` grants control over the port. Closed with an epitaph if
     /// `config` is not valid.
-    AddPort(resource struct {
+    strict AddPort(resource struct {
         config @generated_name("DevicePortConfig") table {
             /// Base port configuration.
             ///
@@ -296,7 +296,7 @@ protocol Device {
     /// Connects to the underlying device endpoint.
     ///
     /// + request `device` device handle.
-    GetDevice(resource struct {
+    strict GetDevice(resource struct {
         device server_end:fuchsia.hardware.network.Device;
     });
 };
@@ -321,14 +321,14 @@ protocol Device {
 /// - Closing the client end causes the object to be destroyed.
 /// - Observing a closure of the server end indicates the object no longer
 /// exists.
-protocol DevicePair {
+closed protocol DevicePair {
     /// Adds a logical port to this device pair.
     ///
     /// + request `config` port configuration.
     /// * error `ZX_ERR_INVALID_ARGS` if `config` is invalid.
     /// * error `ZX_ERR_ALREADY_EXISTS` if the provided port identifier is
     /// already in use.
-    AddPort(struct {
+    strict AddPort(struct {
         config @generated_name("DevicePairPortConfig") table {
             /// Base port configuration.
             ///
@@ -353,26 +353,26 @@ protocol DevicePair {
     ///
     /// + request `id` identifier of the port to remove.
     /// * error `ZX_ERR_NOT_FOUND` if `id` does not map to an existing port.
-    RemovePort(struct {
+    strict RemovePort(struct {
         id fuchsia.hardware.network.BasePortId;
     }) -> () error zx.Status;
     /// Connects to the underlying left device endpoint.
     ///
     /// + request `device` handle serve the left device endpoint on.
-    GetLeft(resource struct {
+    strict GetLeft(resource struct {
         device server_end:fuchsia.hardware.network.Device;
     });
     /// Connects to the underlying right device endpoint.
     ///
     /// + request `device` handle serve the right device endpoint on.
-    GetRight(resource struct {
+    strict GetRight(resource struct {
         device server_end:fuchsia.hardware.network.Device;
     });
     /// Connects to an underlying left port.
     ///
     /// + request `id` requested port identifier.
     /// + request `port` grants access to the requested port on the left device.
-    GetLeftPort(resource struct {
+    strict GetLeftPort(resource struct {
         id fuchsia.hardware.network.BasePortId;
         port server_end:fuchsia.hardware.network.Port;
     });
@@ -380,7 +380,7 @@ protocol DevicePair {
     ///
     /// + request `id` requested port identifier.
     /// + request `port` grants access to the requested port on the right device.
-    GetRightPort(resource struct {
+    strict GetRightPort(resource struct {
         id fuchsia.hardware.network.BasePortId;
         port server_end:fuchsia.hardware.network.Port;
     });
@@ -391,13 +391,13 @@ protocol DevicePair {
 /// `Control` allows creating an arbitrary number of `Device`s and
 /// `DevicePair`s.
 @discoverable
-protocol Control {
+closed protocol Control {
     /// Creates a `Device` with given `config`.
     ///
     /// + request `config` new device configuration.
     /// + request `device` grants control over the device. Closed with an
     /// epitaph if `config` is not valid.
-    CreateDevice(resource struct {
+    strict CreateDevice(resource struct {
         config @generated_name("DeviceConfig") table {
             /// Base device configuration.
             ///
@@ -421,7 +421,7 @@ protocol Control {
     /// + request `config` new device pair configuration.
     /// + request `device_pair` grants control over the device pair. Closed with
     /// an epitaph if `config` is not valid.
-    CreatePair(resource struct {
+    strict CreatePair(resource struct {
         config @generated_name("DevicePairConfig") table {
             /// Base device configuration.
             ///

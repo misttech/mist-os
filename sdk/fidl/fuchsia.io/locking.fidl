@@ -17,7 +17,7 @@ using zx;
 /// These primitives are designed to support the flock() and fcntl(),
 /// specifically F_SETLK, F_SETLKW, and F_GETLK, functionality that code
 /// running on Fuchsia expects from other operating systems.
-protocol AdvisoryLocking {
+closed protocol AdvisoryLocking {
     /// Acquires an advisory lock on the underlying file.
     ///
     /// The lock lasts until either this connection is closed or
@@ -42,7 +42,7 @@ protocol AdvisoryLocking {
     /// * `ZX_ERR_ACCESS_DENIED` This connection does not have sufficient rights
     ///   to acquire the given type of lock.
     @selector("fuchsia.io/AdvisoryLocking.AdvisoryLock")
-    AdvisoryLock(struct {
+    strict AdvisoryLock(struct {
         request @generated_name("AdvisoryLockRequest") table {
             /// The type of lock to be acquired.
             ///

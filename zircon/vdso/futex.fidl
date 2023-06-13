@@ -11,7 +11,7 @@ alias Futex = int32;
 // sometimes it's passed by pointer, and sometimes by value.
 @transport("Syscall")
 @no_protocol_prefix
-protocol Futexfuncs {
+closed protocol Futexfuncs {
     /// ## Summary
     ///
     /// Wait on a futex.
@@ -96,7 +96,7 @@ protocol Futexfuncs {
     /// [`zx_futex_requeue()`]: futex_requeue.md
     /// [`zx_futex_wake()`]: futex_wake.md
     @blocking
-    FutexWait(resource struct {
+    strict FutexWait(resource struct {
         @embedded_alias("zx/Futex")
         value_ptr experimental_pointer<Futex>;
         current_value Futex;
@@ -160,7 +160,7 @@ protocol Futexfuncs {
     /// [`zx_futex_requeue()`]: futex_requeue.md
     /// [`zx_futex_wait()`]: futex_wait.md
     /// [`zx_futex_wake_single_owner()`]: futex_wake_single_owner.md
-    FutexWake(struct {
+    strict FutexWake(struct {
         @embedded_alias("zx/Futex")
         value_ptr experimental_pointer<Futex>;
         wake_count uint32;
@@ -257,7 +257,7 @@ protocol Futexfuncs {
     /// [`zx_futex_requeue_single_owner()`]: futex_requeue_single_owner.md
     /// [`zx_futex_wait()`]: futex_wait.md
     /// [`zx_futex_wake()`]: futex_wake.md
-    FutexRequeue(resource struct {
+    strict FutexRequeue(resource struct {
         @embedded_alias("zx/Futex")
         value_ptr experimental_pointer<Futex>;
         wake_count uint32;
@@ -311,7 +311,7 @@ protocol Futexfuncs {
     /// [`zx_futex_requeue()`]: futex_requeue.md
     /// [`zx_futex_wait()`]: futex_wait.md
     /// [`zx_futex_wake()`]: futex_wake.md
-    FutexWakeSingleOwner(struct {
+    strict FutexWakeSingleOwner(struct {
         @embedded_alias("zx/Futex")
         value_ptr experimental_pointer<Futex>;
     }) -> () error Status;
@@ -380,7 +380,7 @@ protocol Futexfuncs {
     /// [`zx_futex_requeue()`]: futex_requeue.md
     /// [`zx_futex_wait()`]: futex_wait.md
     /// [`zx_futex_wake()`]: futex_wake.md
-    FutexRequeueSingleOwner(resource struct {
+    strict FutexRequeueSingleOwner(resource struct {
         @embedded_alias("zx/Futex")
         value_ptr experimental_pointer<Futex>;
         current_value Futex;
@@ -433,7 +433,7 @@ protocol Futexfuncs {
     /// ## See also
     ///
     /// [futex objects](/docs/reference/kernel_objects/futex.md)
-    FutexGetOwner(struct {
+    strict FutexGetOwner(struct {
         @embedded_alias("zx/Futex")
         value_ptr experimental_pointer<Futex>;
     }) -> (struct {

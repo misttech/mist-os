@@ -8,7 +8,7 @@ using fuchsia.update.channel;
 
 /// Control the target update channel, this is the channel we will use on the next update check.
 @discoverable
-protocol ChannelControl {
+closed protocol ChannelControl {
     compose fuchsia.update.channel.Provider;
 
     /// Set a new desired target channel.  This tells the updater to attempt to
@@ -19,7 +19,7 @@ protocol ChannelControl {
     /// valid.
     ///
     /// + request `channel` the new target channel name (name used by the updater)
-    SetTarget(struct {
+    strict SetTarget(struct {
         channel string:128;
     }) -> ();
 
@@ -31,13 +31,13 @@ protocol ChannelControl {
     ///    - a new target that's different, but hasn't been OTA'd from yet.
     ///
     /// - response `channel` the current target channel.
-    GetTarget() -> (struct {
+    strict GetTarget() -> (struct {
         channel string:128;
     });
 
     /// Get the list of well-known target channels that can be passed to SetTarget().
     /// There may be other, unlisted channels.
-    GetTargetList() -> (struct {
+    strict GetTargetList() -> (struct {
         channels vector<string:128>:100;
     });
 };

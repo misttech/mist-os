@@ -545,7 +545,7 @@ type DetailedCodecDescription = table {
 /// The interface methods don't attempt to homogenize all codec types,
 /// preferring to have a separate dedicated message for decoders.
 @discoverable
-protocol CodecFactory {
+closed protocol CodecFactory {
     /// Driver-based local CodecFactory(s) will send this once shortly after the
     /// main CodecFactory connects to the driver-local CodecFactory.
     ///
@@ -557,7 +557,7 @@ protocol CodecFactory {
     //
     // TODO(fxb/122622): Remove OnCodecList when possible.
     @available(added=7, deprecated=11, note="use GetDetailedCodecDescriptions()")
-    -> OnCodecList(struct {
+    strict -> OnCodecList(struct {
         codecs vector<CodecDescription>:CODEC_FACTORY_CODEC_LIST_SIZE_MAX;
     });
 
@@ -566,7 +566,7 @@ protocol CodecFactory {
     /// A client should call |GetDetailedCodecDescriptions()| to get a list of
     /// codecs supported either by software implementations or by underlying hardware.
     @available(added=11)
-    GetDetailedCodecDescriptions() -> (table {
+    strict GetDetailedCodecDescriptions() -> (table {
         1: codecs vector<DetailedCodecDescription>:CODEC_FACTORY_CODEC_LIST_SIZE_MAX;
     });
 
@@ -590,7 +590,7 @@ protocol CodecFactory {
     /// CreateDecoder(params, decoder_request);
     ///
     /// See use_media_decoder code for more detail.
-    CreateDecoder(resource struct {
+    strict CreateDecoder(resource struct {
         decoder_params CreateDecoder_Params;
         decoder server_end:fuchsia.media.StreamProcessor;
     });
@@ -606,7 +606,7 @@ protocol CodecFactory {
     /// status here because finding the Codec is allowed to be fully async, so
     /// we don't necessarily yet know on return from this method which Codec
     /// will be selected, if any.
-    CreateEncoder(resource struct {
+    strict CreateEncoder(resource struct {
         encoder_params CreateEncoder_Params;
         encoder server_end:fuchsia.media.StreamProcessor;
     });
@@ -659,7 +659,7 @@ protocol CodecFactory {
     /// The codec_end may lack ZX_RIGHT_SIGNAL or ZX_RIGHT_SIGNAL_PEER, but must
     /// have ZX_RIGHT_DUPLICATE (and must have ZX_RIGHT_TRANSFER to transfer
     /// without causing CodecFactory channel failure).
-    AttachLifetimeTracking(resource struct {
+    strict AttachLifetimeTracking(resource struct {
         codec_end zx.Handle:EVENTPAIR;
     });
 };

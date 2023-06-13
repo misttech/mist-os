@@ -6,7 +6,7 @@ library fuchsia.feedback;
 /// Used to externally control the data provider, say when disk space is becoming scarce or user
 /// privacy settings change.
 @discoverable
-protocol DataProviderController {
+closed protocol DataProviderController {
     /// Disables persistent logging for the remainder of the boot and drops any logs that have been
     /// persisted. Returns when both have completed. Persistent logging cannot
     /// be re-enabled at the moment due to the fact that a device is expected to reboot soon after
@@ -14,5 +14,5 @@ protocol DataProviderController {
     ///
     /// Be aware that any snapshots created during the next boot will not have logs from the
     /// current boot and can make debugging difficult.
-    DisableAndDropPersistentLogs() -> ();
+    strict DisableAndDropPersistentLogs() -> ();
 };

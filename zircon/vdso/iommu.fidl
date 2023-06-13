@@ -6,7 +6,7 @@ library zx;
 const IOMMU_MAX_DESC_LEN usize64 = 4096;
 
 @transport("Syscall")
-protocol Iommu {
+closed protocol Iommu {
     /// ## Summary
     ///
     /// Create a new IOMMU object in the kernel.
@@ -81,7 +81,7 @@ protocol Iommu {
     /// [`zx_bti_create()`]: bti_create.md
     /// [`zx_bti_pin()`]: bti_pin.md
     /// [`zx_pmt_unpin()`]: pmt_unpin.md
-    Create(resource struct {
+    strict Create(resource struct {
         resource Handle:RESOURCE;
         type uint32;
         @voidptr

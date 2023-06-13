@@ -50,24 +50,24 @@ type BoardInfo = table {
 
 /// Device provides an interface to retrieve device-specific properties.
 @discoverable
-protocol Device {
-    GetInfo() -> (struct {
+closed protocol Device {
+    strict GetInfo() -> (struct {
         info DeviceInfo;
     });
 };
 
 /// Product provides an interface to retrieve product-specific properties.
 @discoverable
-protocol Product {
-    GetInfo() -> (struct {
+closed protocol Product {
+    strict GetInfo() -> (struct {
         info ProductInfo;
     });
 };
 
 /// Board provides an interface to retrieve hardware-specific information.
 @discoverable
-protocol Board {
-    GetInfo() -> (struct {
+closed protocol Board {
+    strict GetInfo() -> (struct {
         info BoardInfo;
     });
 };

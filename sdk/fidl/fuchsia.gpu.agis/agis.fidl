@@ -46,9 +46,9 @@ type Error = flexible enum {
 /// The AGIS ComponentRegistry protocol allows traceable Fuchsia components to register
 /// as Vulkan traceable.
 @discoverable
-protocol ComponentRegistry {
+closed protocol ComponentRegistry {
     /// Register a process as traceable.
-    Register(struct {
+    strict Register(struct {
         /// Client assigned ID for the vtc.
         id ClientId;
 
@@ -60,7 +60,7 @@ protocol ComponentRegistry {
     }) -> () error Error;
 
     // Unregister |global_id| from the registry.
-    Unregister(struct {
+    strict Unregister(struct {
         id ClientId;
     }) -> () error Error;
 
@@ -68,7 +68,7 @@ protocol ComponentRegistry {
     /// socket pair.  This get is first satisfied when the client
     /// (the AGI application) calls FfxBridge::GetSocket() on the |global_id|
     /// that matches the client id |id|.
-    GetVulkanSocket(struct {
+    strict GetVulkanSocket(struct {
         id ClientId;
     }) -> (resource struct {
         socket zx.Handle:<SOCKET, optional>;
@@ -78,19 +78,19 @@ protocol ComponentRegistry {
 /// The AGIS Observer protocol provides the interface to retrieve the full list of
 /// registered Vulkan Traceable Components (vtcs).
 @discoverable
-protocol Observer {
+closed protocol Observer {
     /// Retrieve registered components.
     /// For AGI, gapis will be the only client of this Vtcs interface.
-    Vtcs() -> (resource struct {
+    strict Vtcs() -> (resource struct {
         vtcs vector<Vtc>:MAX_VTCS;
     }) error Error;
 };
 
 /// The AGIS Connector protocol provides the interface to retrieve the ffx socket endpoint.
 @discoverable
-protocol Connector {
+closed protocol Connector {
     /// Retrieves the ffx socket endpoint of the ffx/vulkan socket pair.
-    GetSocket(struct {
+    strict GetSocket(struct {
         global_id GlobalId;
     }) -> (resource struct {
         socket zx.Handle:SOCKET;

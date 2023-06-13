@@ -7,14 +7,14 @@ using zx;
 
 /// A factory for creating processors.
 @discoverable
-protocol ProcessorCreator {
+closed protocol ProcessorCreator {
     /// Create a new Processor and return it's ProcessorConfiguration.
     ///
     /// + request `name` A string naming the processor to create. The meaning of this
     ///   name is up to the implementor.
     /// - response `processor_configuration` Description of the new processor.
     /// * error A zx.Status value indicating success or failure.
-    Create(struct {
+    strict Create(struct {
         name string:1024;
     }) -> (resource struct {
         processor_configuration ProcessorConfiguration;

@@ -6,11 +6,11 @@ library fuchsia.bluetooth.gatt;
 using fuchsia.bluetooth as bt;
 
 /// Interface for responding to requests on a local service.
-protocol LocalServiceDelegate {
+closed protocol LocalServiceDelegate {
     /// Notifies the delegate when a remote device with `peer_id` enables or
     /// disables notifications or indications on the characteristic with the given
     /// `characteristic_id`.
-    OnCharacteristicConfiguration(struct {
+    strict OnCharacteristicConfiguration(struct {
         characteristic_id uint64;
         peer_id bt.PeerIdString;
         notify bool;
@@ -23,7 +23,7 @@ protocol LocalServiceDelegate {
     /// read request resulted in an error it should be returned in `error_code`.
     /// On success, `error_code` should be set to NO_ERROR and a `value` should be
     /// provided.
-    OnReadValue(struct {
+    strict OnReadValue(struct {
         id uint64;
         offset int32;
     }) -> (struct {
@@ -33,7 +33,7 @@ protocol LocalServiceDelegate {
 
     /// Called when a remote device issues a request to write the value of the
     /// characteristic or descriptor with the given identifier.
-    OnWriteValue(struct {
+    strict OnWriteValue(struct {
         id uint64;
         offset uint16;
         value vector<uint8>:MAX;
@@ -44,7 +44,7 @@ protocol LocalServiceDelegate {
     /// Called when a remote device issues a request to write the value of the
     /// characteristic with the given identifier. This can be called on a
     /// characteristic with the WRITE_WITHOUT_RESPONSE property.
-    OnWriteWithoutResponse(struct {
+    strict OnWriteWithoutResponse(struct {
         id uint64;
         offset uint16;
         value vector<uint8>:MAX;
@@ -52,10 +52,10 @@ protocol LocalServiceDelegate {
 };
 
 /// Interface for communicating with a published service.
-protocol LocalService {
+closed protocol LocalService {
     /// Removes the service that this interface instance corresponds to. Does
     /// nothing if the service is already removed.
-    RemoveService();
+    strict RemoveService();
 
     /// Sends a notification carrying the `value` of the characteristic with the
     /// given `characteristic_id` to the device with `peer_id`.
@@ -66,7 +66,7 @@ protocol LocalService {
     ///
     /// This method has no effect if the peer has not enabled notifications or
     /// indications on the requested characteristic.
-    NotifyValue(struct {
+    strict NotifyValue(struct {
         characteristic_id uint64;
         peer_id bt.PeerIdString;
         value vector<uint8>:MAX;
@@ -75,7 +75,7 @@ protocol LocalService {
 };
 
 @discoverable
-protocol Server {
+closed protocol Server {
     /// Publishes the given service so that it is available to all remote peers.
     /// A LocalServiceDelegate must be provided over which to receive service requests.
     ///
@@ -88,7 +88,7 @@ protocol Server {
     ///
     /// Returns the success or failure status of the call and a unique identifier
     /// that can be used to unregister the service.
-    PublishService(resource struct {
+    strict PublishService(resource struct {
         info ServiceInfo;
         delegate client_end:LocalServiceDelegate;
         service server_end:LocalService;

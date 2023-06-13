@@ -47,12 +47,12 @@ type HidInfo = struct {
 
 @transport("Banjo")
 @banjo_layout("ddk-interface")
-protocol HidbusIfc {
+closed protocol HidbusIfc {
     /// Queues a report received by the hidbus device.
     /// Timestamp should be whenever the report was created. Ideally it should
     /// come from the driver's IRQ callback. If the driver doesn't have
     /// something like that it should fill this with `zx_clock_get_monotonic()`
-    IoQueue(struct {
+    strict IoQueue(struct {
         @buffer
         buf vector<uint8>:MAX;
         timestamp zx.Time;
@@ -61,10 +61,10 @@ protocol HidbusIfc {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Hidbus {
+closed protocol Hidbus {
     /// Obtain information about the hidbus device and supported features.
     /// Safe to call at any time.
-    Query(struct {
+    strict Query(struct {
         options uint32;
     }) -> (struct {
         s zx.Status;
@@ -73,21 +73,21 @@ protocol Hidbus {
     /// Start the hidbus device. The device may begin queueing hid reports via
     /// ifc->io_queue before this function returns. It is an error to start an
     /// already-started hidbus device.
-    Start(resource struct {
+    strict Start(resource struct {
         ifc client_end:HidbusIfc;
     }) -> (struct {
         s zx.Status;
     });
     /// Stop the hidbus device. Safe to call if the hidbus is already stopped.
-    Stop() -> ();
-    GetDescriptor(struct {
+    strict Stop() -> ();
+    strict GetDescriptor(struct {
         desc_type HidDescriptionType;
     }) -> (struct {
         s zx.Status;
         @buffer
         data vector<uint8>:MAX;
     });
-    GetReport(struct {
+    strict GetReport(struct {
         rpt_type HidReportType;
         rpt_id uint8;
     }) -> (struct {
@@ -95,7 +95,7 @@ protocol Hidbus {
         @buffer
         data vector<uint8>:MAX;
     });
-    SetReport(struct {
+    strict SetReport(struct {
         rpt_type HidReportType;
         rpt_id uint8;
         @buffer
@@ -103,23 +103,23 @@ protocol Hidbus {
     }) -> (struct {
         s zx.Status;
     });
-    GetIdle(struct {
+    strict GetIdle(struct {
         rpt_id uint8;
     }) -> (struct {
         s zx.Status;
         duration uint8;
     });
-    SetIdle(struct {
+    strict SetIdle(struct {
         rpt_id uint8;
         duration uint8;
     }) -> (struct {
         s zx.Status;
     });
-    GetProtocol() -> (struct {
+    strict GetProtocol() -> (struct {
         s zx.Status;
         protocol HidProtocol;
     });
-    SetProtocol(struct {
+    strict SetProtocol(struct {
         protocol HidProtocol;
     }) -> (struct {
         s zx.Status;

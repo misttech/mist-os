@@ -10,13 +10,13 @@ const MAX_STREAMS_PER_CONFIGURATION uint32 = 256;
 /// A Device represents a unique physical camera present in the system. Only one client may connect
 /// to an unbound physical camera, however the "Rebind" method can be used to create multiple
 /// connections to it to be used by a coordinated set of clients.
-protocol Device {
+closed protocol Device {
     /// Returns an identifier for the camera. If present, identical devices on different systems
     /// will have the same identifier. Clients may use this to determine if additional semantics
     /// known a priori for a given device apply to the current camera.
     // TODO(fxbug.dev/43247): unify device identification
     // go/unified-device-discovery will eliminate the need for this protocol
-    GetIdentifier() -> (struct {
+    strict GetIdentifier() -> (struct {
         identifier string:<MAX_IDENTIFIER_LENGTH, optional>;
     });
 
@@ -25,7 +25,7 @@ protocol Device {
     /// lifetime of the client's connection to the Camera.
     @transitional
     @deprecated("Use GetConfigurations2")
-    GetConfigurations() -> (struct {
+    strict GetConfigurations() -> (struct {
         configurations vector<Configuration>:MAX_CONFIGURATIONS_PER_CAMERA;
     });
 
@@ -33,20 +33,20 @@ protocol Device {
     /// one configuration. The values returned are immutable - they will not change for the
     /// lifetime of the client's connection to the Camera.
     @transitional
-    GetConfigurations2() -> (struct {
+    strict GetConfigurations2() -> (struct {
         configurations vector<Configuration2>:MAX_CONFIGURATIONS_PER_CAMERA;
     });
 
     /// Returns the index of the current configuration when it has changed from a previously
     /// returned configuration, or is called by a client for the first time.
-    WatchCurrentConfiguration() -> (struct {
+    strict WatchCurrentConfiguration() -> (struct {
         index uint32;
     });
 
     /// Sets the configuration using the provided index. Calling this method disconnects any
     /// existing Stream clients associated with this camera. An epitaph of ZX_OK
     /// will be sent for any connected Stream clients on closing.
-    SetCurrentConfiguration(struct {
+    strict SetCurrentConfiguration(struct {
         index uint32;
     });
 
@@ -54,7 +54,7 @@ protocol Device {
     /// state, or is called by a client for the first time. A camera may be muted using
     /// SetSoftwareMuteState or by a physical switch. If either muted mode is active, stream
     /// clients associated with this physical camera will stop receiving new frames.
-    WatchMuteState() -> (struct {
+    strict WatchMuteState() -> (struct {
         software_muted bool;
         hardware_muted bool;
     });
@@ -62,20 +62,20 @@ protocol Device {
     /// Sets the current camera's software mute state. When transitioning to the muted state, this
     /// method returns when the camera has successfully ceased sending new frames to stream
     /// clients. When transitioning to the unmuted state, this method returns immediately.
-    SetSoftwareMuteState(struct {
+    strict SetSoftwareMuteState(struct {
         muted bool;
     }) -> ();
 
     /// Connects to the Stream at the provided index. If any clients already exist for this stream,
     /// the request is closed with the ZX_ERR_ALREADY_BOUND epitaph.
-    ConnectToStream(resource struct {
+    strict ConnectToStream(resource struct {
         index uint32;
         request server_end:Stream;
     });
 
     /// Request another connection to this Device. This allows a client to delegate different
     /// operations to different coordinated clients.
-    Rebind(resource struct {
+    strict Rebind(resource struct {
         request server_end:Device;
     });
 };

@@ -56,13 +56,13 @@ type NodeAttributes = struct {
 
 const MAX_FS_NAME_BUFFER uint64 = 32;
 
-protocol Node {
+closed protocol Node {
     compose Node1;
     compose Node2;
 };
 
 /// Node defines the minimal interface for entities which can be accessed in a filesystem.
-protocol Node1 {
+closed protocol Node1 {
     /// Create another connection to the same remote object.
     ///
     /// `flags` may be any of:
@@ -82,7 +82,7 @@ protocol Node1 {
     /// It is invalid to pass any of the `OpenFlags.RIGHT_*` flags together with
     /// `OpenFlags.CLONE_SAME_RIGHTS`.
     @selector("fuchsia.io1/Node.Clone")
-    Clone(resource struct {
+    strict Clone(resource struct {
         flags OpenFlags;
         object server_end:Node;
     });
@@ -93,7 +93,7 @@ protocol Node1 {
     /// object. If the status is `ZX_OK`, `info` contains descriptive information about the object
     /// (the same as would be returned by `Describe`).
     @selector("fuchsia.io1/Node.OnOpen")
-    -> OnOpen(resource struct {
+    strict -> OnOpen(resource struct {
         s zx.Status;
         info @generated_name("NodeInfoDeprecated") strict resource union {
             /// No protocol information was supplied by the connection.
@@ -130,7 +130,7 @@ protocol Node1 {
     ///
     /// This method does not require any rights.
     @selector("fuchsia.io1/Node.GetAttr")
-    GetAttr() -> (struct {
+    strict GetAttr() -> (struct {
         s zx.Status;
         attributes NodeAttributes;
     });
@@ -140,7 +140,7 @@ protocol Node1 {
     /// This method requires following rights: `OpenFlags.RIGHT_WRITABLE`, otherwise returns
     /// `ZX_ERR_BAD_HANDLE`.
     @selector("fuchsia.io1/Node.SetAttr")
-    SetAttr(struct {
+    strict SetAttr(struct {
         flags NodeAttributeFlags;
         attributes NodeAttributes;
     }) -> (struct {
@@ -151,7 +151,7 @@ protocol Node1 {
     ///
     /// This method does not require any rights.
     @selector("fuchsia.io1/Node.NodeGetFlags")
-    GetFlags() -> (struct {
+    strict GetFlags() -> (struct {
         s zx.Status;
         flags OpenFlags;
     });
@@ -162,7 +162,7 @@ protocol Node1 {
     ///
     /// This method does not require any rights.
     @selector("fuchsia.io1/Node.NodeSetFlags")
-    SetFlags(struct {
+    strict SetFlags(struct {
         flags OpenFlags;
     }) -> (struct {
         s zx.Status;
@@ -170,7 +170,7 @@ protocol Node1 {
 
     /// Query the filesystem for filesystem-specific information.
     @selector("fuchsia.io.admin/DirectoryAdmin.QueryFilesystem")
-    QueryFilesystem() -> (struct {
+    strict QueryFilesystem() -> (struct {
         s zx.Status;
         info box<@generated_name("FilesystemInfo") struct {
             /// The number of data bytes which may be stored in a filesystem. This does not count

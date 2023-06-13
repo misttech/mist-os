@@ -24,7 +24,7 @@ const MAX_HANDLE_COUNT uint32 = 128;
 /// Note: The component manager is the only intended direct client of this
 /// interface.
 @discoverable
-protocol ComponentRunner {
+closed protocol ComponentRunner {
     /// Start running a component instance described by `start_info`.
     ///
     /// Component manager binds and uses `controller` to control the
@@ -36,7 +36,7 @@ protocol ComponentRunner {
     ///
     /// Errors:
     ///
-    Start(resource struct {
+    strict Start(resource struct {
         start_info ComponentStartInfo;
         controller server_end:ComponentController;
     });
@@ -180,14 +180,14 @@ type ComponentStartInfo = resource table {
 ///   of the component runner itself. The component manager may respond to such
 ///   failures by terminating the component runner's job to ensure system
 ///   stability.
-protocol ComponentController {
+closed protocol ComponentController {
     /// Request to stop the component instance.
     ///
     /// After stopping the component instance, the server should close this
     /// connection with an epitaph. After the connection
     /// closes, component manager considers this component instance to be
     /// Stopped and the component's namespace will be torn down.
-    Stop();
+    strict Stop();
 
     /// Stop this component instance immediately.
     ///
@@ -198,7 +198,7 @@ protocol ComponentController {
     ///
     /// In some cases Kill() may be issued before Stop(), but that is not
     /// guaranteed.
-    Kill();
+    strict Kill();
 
     /// Event for runners to publish diagnostics to the platform.
     ///
@@ -206,7 +206,7 @@ protocol ComponentController {
     /// component is publishing diagnostics about the runtime of the
     /// component. The component manager may optionally expose this data
     /// to clients.
-    -> OnPublishDiagnostics(resource struct {
+    strict -> OnPublishDiagnostics(resource struct {
         payload fuchsia.diagnostics.types.ComponentDiagnostics;
     });
 };

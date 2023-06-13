@@ -16,22 +16,22 @@ type DmaState = strict enum : uint32 {
 
 @transport("Banjo")
 @banjo_layout("ddk-callback")
-protocol DmaNotifyCallback {
-    Callback(struct {
+closed protocol DmaNotifyCallback {
+    strict Callback(struct {
         state DmaState;
     }) -> ();
 };
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol SharedDma {
+closed protocol SharedDma {
 
     /// Initializes and provides a VMO for memory source or destination.
     /// Only supports device to memory and memory to device DMAs.
     /// The provided id is opaque and HW specific.  The id implicitly defines the direction of the
     /// DMA (biderectional DMAs are not supported yet).  Transfer sizes and alignment are
     /// managed within the shared DMA driver.
-    InitializeAndGetBuffer(struct {
+    strict InitializeAndGetBuffer(struct {
         channel_id uint32;
         type DmaType;
         size uint32;
@@ -41,17 +41,17 @@ protocol SharedDma {
     });
 
     /// Start DMA
-    Start(struct {
+    strict Start(struct {
         channel_id uint32;
     });
 
     /// Stop DMA
-    Stop(struct {
+    strict Stop(struct {
         channel_id uint32;
     });
 
     /// Returns the current position within memory where is the DMA has written to or read from.
-    GetBufferPosition(struct {
+    strict GetBufferPosition(struct {
         channel_id uint32;
     }) -> (struct {
         position uint32;
@@ -61,7 +61,7 @@ protocol SharedDma {
     /// of data (accounting for warp around) into or from memory, hence for:
     /// Device to memory DMAs, it is not safe to read this amount past the buffer position.
     /// Memory to device DMAs, it is not safe to write this amount before the buffer position.
-    GetTransferSize(struct {
+    strict GetTransferSize(struct {
         channel_id uint32;
     }) -> (struct {
         size_per_transfer uint32;
@@ -70,7 +70,7 @@ protocol SharedDma {
     /// Specifies a callback for notifications of state change.
     /// Notification for DmaType CYCLIC with DmaState COMPLETE are expected periodically;
     /// size_per_notification indicates how often (in bytes) the notifications are delivered.
-    SetNotifyCallback(resource struct {
+    strict SetNotifyCallback(resource struct {
         channel_id uint32;
         cb client_end:DmaNotifyCallback;
     }) -> (struct {

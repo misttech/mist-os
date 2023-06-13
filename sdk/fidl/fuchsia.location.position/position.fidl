@@ -39,9 +39,9 @@ type PositionExtras = table {
 /// of this service are expected to be subject to different power and privacy
 /// controls than more general location services.
 @discoverable
-protocol EmergencyProvider {
+closed protocol EmergencyProvider {
     /// Returns the current position, if available.
-    GetCurrent() -> (struct {
+    strict GetCurrent() -> (struct {
         position Position;
     }) error fuchsia.location.Error;
 };

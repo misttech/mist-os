@@ -4,7 +4,7 @@
 library zx;
 
 @transport("Syscall")
-protocol Cache {
+closed protocol Cache {
     /// ## Summary
     ///
     /// Flush CPU data and/or instruction caches.
@@ -59,7 +59,7 @@ protocol Cache {
     ///
     /// **ZX_ERR_INVALID_ARGS** *options* is invalid.
     @vdsocall
-    Flush(struct {
+    strict Flush(struct {
         @voidptr
         addr experimental_pointer<byte>;
         size usize64;

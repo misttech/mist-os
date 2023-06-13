@@ -26,14 +26,14 @@ const INVALID_DISP_ID DisplayIdValue = 0;
 ///
 /// Performing illegal actions on the interface will result in the interface
 /// being closed.
-protocol Coordinator {
+closed protocol Coordinator {
     // Event fired when displays are added or removed. This event will be fired
     // when the callback is registered if there are any connected displays.
     //
     // A display change always invalidates the current configuration. When a
     // client receives this event, they must either apply a new configuration
     // or revalidate and reapply their current configuration.
-    -> OnDisplaysChanged(struct {
+    strict -> OnDisplaysChanged(struct {
         added vector<Info>:MAX;
         removed vector<DisplayIdValue>:MAX;
     });
@@ -45,7 +45,7 @@ protocol Coordinator {
     // the collection id. If the provided |image_id| is already in use, this
     // function will return |ZX_ERR_ALREADY_EXISTS|.
     @selector("ImportImage2")
-    ImportImage(struct {
+    strict ImportImage(struct {
         image_config ImageConfig;
         collection_id uint64;
         image_id uint64;
@@ -62,7 +62,7 @@ protocol Coordinator {
     // and any fences associated with the image are dropped. The resources
     // associated with the image will be released as soon as the image is
     // no longer in use.
-    ReleaseImage(struct {
+    strict ReleaseImage(struct {
         image_id uint64;
     });
 
@@ -74,7 +74,7 @@ protocol Coordinator {
     ///
     /// If a client is reusing events, they must clear the signal
     /// before referencing the id again.
-    ImportEvent(resource struct {
+    strict ImportEvent(resource struct {
         event zx.Handle:EVENT;
         id uint64;
     });
@@ -85,7 +85,7 @@ protocol Coordinator {
     /// will still be waited up or signaled as appropriate before its
     /// resources are released. It is an error to reuse an ID while the
     /// active config has references to it.
-    ReleaseEvent(struct {
+    strict ReleaseEvent(struct {
         id uint64;
     });
 
@@ -96,7 +96,7 @@ protocol Coordinator {
     // use from the time it is passed to SetDisplayLayers until a subsequent
     // configuration is applied which does not include the layer or until its
     // display is removed.
-    CreateLayer() -> (struct {
+    strict CreateLayer() -> (struct {
         res zx.Status;
         layer_id LayerIdValue;
     });
@@ -104,14 +104,14 @@ protocol Coordinator {
     // Destroys the given layer.
     //
     // It is illegal to destroy a layer which does not exist or which is in use.
-    DestroyLayer(struct {
+    strict DestroyLayer(struct {
         layer_id LayerIdValue;
     });
 
     // Sets the display mode for the given display.
     //
     // It is illegal to pass a display mode which was not part of the display's Info.
-    SetDisplayMode(struct {
+    strict SetDisplayMode(struct {
         display_id DisplayIdValue;
         mode Mode;
     });
@@ -142,7 +142,7 @@ protocol Coordinator {
     // to ApplyConfig() they will remain in place until changed and another ApplyConfig() call is
     // successful. If SetDisplayColorConversion() is called and then the config is discarded, then
     // the last successfully applied state is restored.
-    SetDisplayColorConversion(struct {
+    strict SetDisplayColorConversion(struct {
         display_id DisplayIdValue;
         preoffsets array<float32, 3>;
         coefficients array<float32, 9>;
@@ -155,7 +155,7 @@ protocol Coordinator {
     // needs to be moved between displays, it must be removed from the first display's
     // pending config before being added to the second display's pending config. It
     // is also illegal to pass an invalid layer id.
-    SetDisplayLayers(struct {
+    strict SetDisplayLayers(struct {
         display_id DisplayIdValue;
         layer_ids vector<LayerIdValue>:MAX;
     });
@@ -168,7 +168,7 @@ protocol Coordinator {
     // affects the layer's contents.
     //
     // It is illegal to pass an invalid layer id.
-    SetLayerPrimaryConfig(struct {
+    strict SetLayerPrimaryConfig(struct {
         layer_id LayerIdValue;
         image_config ImageConfig;
     });
@@ -182,7 +182,7 @@ protocol Coordinator {
     //
     // Calling this on a non-primary layer or passing an invalid transform
     // is illegal.
-    SetLayerPrimaryPosition(struct {
+    strict SetLayerPrimaryPosition(struct {
         layer_id LayerIdValue;
         transform Transform;
         src_frame Frame;
@@ -204,7 +204,7 @@ protocol Coordinator {
     // It is illegal to call this on a non-primary layer, to pass an
     // invalid mode, or to pass a value of `val` which is not NaN or
     // in the range [0, 1].
-    SetLayerPrimaryAlpha(struct {
+    strict SetLayerPrimaryAlpha(struct {
         layer_id LayerIdValue;
         mode AlphaMode;
         val float32;
@@ -217,7 +217,7 @@ protocol Coordinator {
     // affects the layer's contents.
     //
     // It is illegal to call this on an invalid layer.
-    SetLayerCursorConfig(struct {
+    strict SetLayerCursorConfig(struct {
         layer_id LayerIdValue;
         image_config ImageConfig;
     });
@@ -228,7 +228,7 @@ protocol Coordinator {
     // will clamp y to [-cursor_height + 1, display_height - 1].
     //
     // It is illegal to call this on a non-cursor layer.
-    SetLayerCursorPosition(struct {
+    strict SetLayerCursorPosition(struct {
         layer_id LayerIdValue;
         x int32;
         y int32;
@@ -242,7 +242,7 @@ protocol Coordinator {
     //
     // It is illegal to call this on an invalid layer or for the length of
     // color_bytes to mismatch the size of the supplied format.
-    SetLayerColorConfig(struct {
+    strict SetLayerColorConfig(struct {
         layer_id LayerIdValue;
         pixel_format fuchsia.images2.PixelFormat;
         color_bytes vector<uint8>:MAX;
@@ -281,7 +281,7 @@ protocol Coordinator {
     // with an image layer that has no image (note that is is not illegal to
     // validate such a configuration). It is illegal to reuse a wait event which
     // another layer that has not been presented is waiting on.
-    SetLayerImage(struct {
+    strict SetLayerImage(struct {
         layer_id LayerIdValue;
         image_id uint64;
         wait_event_id uint64;
@@ -299,7 +299,7 @@ protocol Coordinator {
     // modify the configuration in a way which requires revalidation.
     //
     // If discard is true, the pending changes will be discarded after validation.
-    CheckConfig(struct {
+    strict CheckConfig(struct {
         discard bool;
     }) -> (struct {
         res ConfigResult;
@@ -312,7 +312,7 @@ protocol Coordinator {
     // If the pending configuration cannot be applied, this call will silently
     // fail, so the client should ensure its configuration is valid with
     // CheckConfig.
-    ApplyConfig();
+    strict ApplyConfig();
 
     // TODO(fxbug.dev/72588): This is a temporary solution to support old
     // ApplyConfig() with new OnVsync() events. Remove this once the migration
@@ -323,7 +323,7 @@ protocol Coordinator {
     /// accepted; the display configuration may not have been rendered yet
     /// because of pending image availability or pending layer changes.
     /// If no configuration was applied before, returns `INVALID_CONFIG_STAMP_VALUE`.
-    GetLatestAppliedConfigStamp() -> (struct {
+    strict GetLatestAppliedConfigStamp() -> (struct {
         stamp ConfigStamp;
     });
 
@@ -358,13 +358,13 @@ protocol Coordinator {
     // should be named to better indicate the timing and semantics when it is
     // signaled by the display driver.
     @transitional
-    ApplyConfig2(resource struct {
+    strict ApplyConfig2(resource struct {
         signal_fences vector<zx.Handle:EVENT>:APPLY_CONFIG_MAX_SIGNAL_FENCES;
     });
 
     // Sets whether or not vsync events will be given to this client. Defaults
     // to false.
-    EnableVsync(struct {
+    strict EnableVsync(struct {
         enable bool;
     });
 
@@ -372,7 +372,7 @@ protocol Coordinator {
     // The cookie sent should match the cookie received via vsync message (OnVsync).
     // A cookie can only be acknowledged once. Using invalid cookies, or previously
     // acknowledged cookies will not be accepted by the driver.
-    AcknowledgeVsync(struct {
+    strict AcknowledgeVsync(struct {
         cookie uint64;
     });
 
@@ -415,7 +415,7 @@ protocol Coordinator {
     // TODO(fxbug.dev/72588): Remove "@transitional" tag after implementing
     // OnVsync on all display clients.
     //
-    -> OnVsync(resource struct {
+    strict -> OnVsync(resource struct {
         display_id DisplayIdValue;
         timestamp uint64;
         applied_config_stamp ConfigStamp;
@@ -425,7 +425,7 @@ protocol Coordinator {
     /// Sets the visibility behavior of the virtcon.
     ///
     /// This must only be called from the Virtcon client.
-    SetVirtconMode(struct {
+    strict SetVirtconMode(struct {
         mode VirtconMode;
     });
 
@@ -433,13 +433,13 @@ protocol Coordinator {
     //
     // New clients should assume they do not have ownership of the display
     // until this event informs them otherwise.
-    -> OnClientOwnershipChange(struct {
+    strict -> OnClientOwnershipChange(struct {
         has_ownership bool;
     });
 
     // Import a sysmem buffer collection token. `collection_id` must not
     // already be in use.
-    ImportBufferCollection(resource struct {
+    strict ImportBufferCollection(resource struct {
         collection_id uint64;
         collection_token client_end:fuchsia.sysmem.BufferCollectionToken;
     }) -> (struct {
@@ -447,7 +447,7 @@ protocol Coordinator {
     });
 
     // Release an imported buffer collection.
-    ReleaseBufferCollection(struct {
+    strict ReleaseBufferCollection(struct {
         collection_id uint64;
     });
 
@@ -457,7 +457,7 @@ protocol Coordinator {
     // setting constraints if set to zero.
     // TODO(fxbug.dev/85320): Update this API to better support
     // optional fields.
-    SetBufferCollectionConstraints(struct {
+    strict SetBufferCollectionConstraints(struct {
         collection_id uint64;
         config ImageConfig;
     }) -> (struct {
@@ -465,7 +465,7 @@ protocol Coordinator {
     });
 
     /// Returns true if Capture is supported on the platform.
-    IsCaptureSupported() -> (struct {
+    strict IsCaptureSupported() -> (struct {
         supported bool;
     }) error zx.Status;
 
@@ -475,7 +475,7 @@ protocol Coordinator {
     /// image_id must be used by the client to start capture and/or release
     /// resources allocated for capture.
     /// Returns ZX_ERR_NOT_SUPPORTED if coordinator does not support capture
-    ImportImageForCapture(struct {
+    strict ImportImageForCapture(struct {
         image_config ImageConfig;
         collection_id uint64;
         index uint32;
@@ -488,14 +488,14 @@ protocol Coordinator {
     /// using ImportEvent FIDL API. Image_id is the id from ImportImageForCapture.
     /// The client will get notified once capture is complete via signal_event_id.
     /// Returns ZX_ERR_NOT_SUPPORTED if coordinator does not support capture
-    StartCapture(struct {
+    strict StartCapture(struct {
         signal_event_id uint64;
         image_id uint64;
     }) -> () error zx.Status;
 
     /// Releases resources allocated for capture.
     /// Returns ZX_ERR_NOT_SUPPORTED if coordinator does not support capture
-    ReleaseCapture(struct {
+    strict ReleaseCapture(struct {
         image_id uint64;
     }) -> () error zx.Status;
 
@@ -509,7 +509,7 @@ protocol Coordinator {
     ///
     /// Unlike other calls in this API, SetMiniumRgb is applied immediately, and does not
     /// wait for ApplyConfig(). It is, however, still stateful.
-    SetMinimumRgb(struct {
+    strict SetMinimumRgb(struct {
         minimum_rgb uint8;
     }) -> () error zx.Status;
 
@@ -532,7 +532,7 @@ protocol Coordinator {
     /// handles this method.
     /// Returns ZX_ERR_NOT_SUPPORTED if the display driver IC doesn't support
     /// turning on/off displays.
-    SetDisplayPower(struct {
+    strict SetDisplayPower(struct {
         display_id DisplayIdValue;
         power_on bool;
     }) -> () error zx.Status;

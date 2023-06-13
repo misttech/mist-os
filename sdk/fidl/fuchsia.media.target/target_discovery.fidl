@@ -25,7 +25,7 @@ alias DisplayName = string:200;
 
 /// A protocol for discovering media targets.
 @discoverable
-protocol Discovery {
+closed protocol Discovery {
     compose Group;
     compose Selector;
 
@@ -35,13 +35,13 @@ protocol Discovery {
     ///
     /// Bindings are returned as deltas between the watch calls, leave a
     /// request hanging to get the latest updates.
-    WatchSessionBindings() -> (struct {
+    strict WatchSessionBindings() -> (struct {
         event SessionBindingsWatchEvent;
     });
 
     /// Connects to a target by id. Drops the given channel if no such
     /// target exists.
-    ConnectToTarget(resource struct {
+    strict ConnectToTarget(resource struct {
         target_id Id;
         target_request server_end:Target;
     });
@@ -66,7 +66,7 @@ type SessionBindingsWatchEvent = table {
 
 /// A target is a device or group of devices on which media can be rendered,
 /// such as a speaker which renders audio.
-protocol Target {
+closed protocol Target {
     compose GroupEditor;
     compose Group;
     compose VolumeControl;
@@ -77,7 +77,7 @@ type TargetChange = struct {
 };
 
 /// A protocol for adding and removing members of a group target.
-protocol GroupEditor {
+closed protocol GroupEditor {
     /// Adds a target to this group target.
     ///
     /// If the added target is a group of devices, all the devices in that group
@@ -85,7 +85,7 @@ protocol GroupEditor {
     ///
     /// Returns the id of the new target if a new group was created to fulfill this
     /// request.
-    AddTarget(struct {
+    strict AddTarget(struct {
         target_id Id;
     }) -> (struct {
         target_change box<TargetChange>;
@@ -93,7 +93,7 @@ protocol GroupEditor {
 
     /// Removes a target from this group. Returns the id of the new target
     /// if a new group was created to fulfill this request.
-    RemoveTarget(struct {
+    strict RemoveTarget(struct {
         target_id Id;
     }) -> (struct {
         target_change box<TargetChange>;
@@ -101,13 +101,13 @@ protocol GroupEditor {
 };
 
 /// A protocol for watching the members of a group.
-protocol Group {
+closed protocol Group {
     /// Watches for changes to the set of registered targets. Leave a request
     /// hanging to get replies when changes occur. New clients will be caught
     /// up with the state of the world.
     ///
     /// Targets are returned as deltas between the watch calls.
-    WatchTargets() -> (struct {
+    strict WatchTargets() -> (struct {
         targets_watch_event TargetsWatchEvent;
     });
 };
@@ -121,11 +121,11 @@ type TargetsWatchEvent = table {
 };
 
 /// A protocol to control the volume of target.
-protocol VolumeControl {
+closed protocol VolumeControl {
     /// Binds to the target's volume control. If this target is a group,
     /// all member volumes are influenced. These settings persist
     /// for the lifetime of the target.
-    BindVolumeControl(resource struct {
+    strict BindVolumeControl(resource struct {
         volume_control_request server_end:fuchsia.media.audio.VolumeControl;
     });
 
@@ -136,7 +136,7 @@ protocol VolumeControl {
     /// participating as a member of the group. This is used to adjust the balance
     /// of volume among members of a group. These settings persist for the lifetime
     /// of the target
-    BindMemberVolumeControl(resource struct {
+    strict BindMemberVolumeControl(resource struct {
         group Id;
         volume_control_request server_end:fuchsia.media.audio.VolumeControl;
     });
@@ -169,10 +169,10 @@ type CapabilityFlags = strict bits : uint64 {
 
 /// A protocol for selecting a media target. Commands on this protocol can
 /// change the target on which a media session is rendered.
-protocol Selector {
+closed protocol Selector {
     /// Renders the media session specified by `session_id` on the target
     /// specified by `target_id`.
-    BindTarget(struct {
+    strict BindTarget(struct {
         session_id fuchsia.media.sessions2.SessionId;
         target_id Id;
     }) -> () error Error;
@@ -184,7 +184,7 @@ protocol Selector {
     /// targets as members, if one does not exist. The group target may be
     /// temporary, only existing for the lifetime of playback, and not
     /// discoverable through `Discovery`.
-    BindGroupTarget(struct {
+    strict BindGroupTarget(struct {
         session_id fuchsia.media.sessions2.SessionId;
         target_ids vector<Id>:100;
     }) -> (struct {

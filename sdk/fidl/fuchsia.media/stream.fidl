@@ -12,14 +12,14 @@ using zx;
 /// Manages a set of payload buffers for a stream. This interface is typically
 /// inherited along with `StreamSink` or `StreamSource` to enable the transport
 /// of elementary streams between clients and services.
-protocol StreamBufferSet {
+closed protocol StreamBufferSet {
     /// Adds a payload buffer to the current buffer set associated with the
     /// connection. A `StreamPacket` struct reference a payload buffer in the
     /// current set by ID using the `StreamPacket.payload_buffer_id` field.
     ///
     /// A buffer with ID `id` must not be in the current set when this method is
     /// invoked, otherwise the service will close the connection.
-    AddPayloadBuffer(resource struct {
+    strict AddPayloadBuffer(resource struct {
         id uint32;
         payload_buffer zx.Handle:VMO;
     });
@@ -29,7 +29,7 @@ protocol StreamBufferSet {
     ///
     /// A buffer with ID `id` must exist in the current set when this method is
     /// invoked, otherwise the service will will close the connection.
-    RemovePayloadBuffer(struct {
+    strict RemovePayloadBuffer(struct {
         id uint32;
     });
 };
@@ -37,13 +37,13 @@ protocol StreamBufferSet {
 /// Consumes a stream of packets. This interface is typically inherited along
 /// with `StreamBufferSet` to enable the transport of elementary streams from
 /// clients to services.
-protocol StreamSink {
+closed protocol StreamSink {
     /// Sends a packet to the service. The response is sent when the service is
     /// done with the associated payload memory.
     ///
     /// `packet` must be valid for the current buffer set, otherwise the service
     /// will close the connection.
-    SendPacket(struct {
+    strict SendPacket(struct {
         packet StreamPacket;
     }) -> ();
 
@@ -53,41 +53,41 @@ protocol StreamSink {
     ///
     /// `packet` must be valid for the current buffer set, otherwise the service
     /// will close the connection.
-    SendPacketNoReply(struct {
+    strict SendPacketNoReply(struct {
         packet StreamPacket;
     });
 
     /// Indicates the stream has ended. The precise semantics of this method are
     /// determined by the inheriting interface.
-    EndOfStream();
+    strict EndOfStream();
 
     /// Discards packets previously sent via `SendPacket` or `SendPacketNoReply`
     /// and not yet released. The response is sent after all packets have been
     /// released.
-    DiscardAllPackets() -> ();
+    strict DiscardAllPackets() -> ();
 
     /// Discards packets previously sent via `SendPacket` or `SendPacketNoReply`
     /// and not yet released.
-    DiscardAllPacketsNoReply();
+    strict DiscardAllPacketsNoReply();
 };
 
 /// Produces a stream of packets. This interface is typically inherited along
 /// with `StreamBufferSet` to enable the transport of elementary streams from
 /// services to clients.
-protocol StreamSource {
+closed protocol StreamSource {
     /// Delivers a packet produced by the service. When the client is done with
     /// the payload memory, the client must call `ReleasePacket` to release the
     /// payload memory.
-    -> OnPacketProduced(struct {
+    strict -> OnPacketProduced(struct {
         packet StreamPacket;
     });
 
     /// Indicates that the stream has ended.
-    -> OnEndOfStream();
+    strict -> OnEndOfStream();
 
     /// Releases payload memory associated with a packet previously delivered
     /// via `OnPacketProduced`.
-    ReleasePacket(struct {
+    strict ReleasePacket(struct {
         packet StreamPacket;
     });
 
@@ -100,12 +100,12 @@ protocol StreamSource {
     // the service should cancel all unfulfilled `CaptureAt` requests. A
     // new method should be created for that purpose.
     // TODO(dalesat): This should be an event.
-    DiscardAllPackets() -> ();
-    DiscardAllPacketsNoReply();
+    strict DiscardAllPackets() -> ();
+    strict DiscardAllPacketsNoReply();
 };
 
 /// A StreamSink that uses StreamBufferSet for buffer management.
-protocol SimpleStreamSink {
+closed protocol SimpleStreamSink {
     compose StreamBufferSet;
     compose StreamSink;
 };

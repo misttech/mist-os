@@ -80,11 +80,11 @@ type VideoFormat = struct {
 /// These are the original interfaces, which are being used for compatibility.
 /// The names are preserved from the ones in camera.h for porting ease.
 @discoverable
-protocol Control {
+closed protocol Control {
     /// Get the available format types for this device
     /// NOTE: The formats are paginated to `MAX_FORMATS_PER_RESPONSE`, multiple
     /// GetFormats need to be issued until total_format_count are received
-    GetFormats(struct {
+    strict GetFormats(struct {
         index uint32;
     }) -> (struct {
         formats vector<VideoFormat>;
@@ -99,33 +99,33 @@ protocol Control {
     ///     1) If the stream token receives the `PEER_CLOSED` event, the driver will close
     ///        the stream.
     ///     2) If the Stream interface is closed, the driver will close the eventpair.
-    CreateStream(resource struct {
+    strict CreateStream(resource struct {
         buffer_collection fuchsia.sysmem.BufferCollectionInfo;
         rate FrameRate;
         stream server_end:Stream;
         stream_token zx.Handle:EVENTPAIR;
     });
 
-    GetDeviceInfo() -> (struct {
+    strict GetDeviceInfo() -> (struct {
         device_info DeviceInfo;
     });
 };
 
-protocol Stream {
+closed protocol Stream {
     /// Starts the streaming of frames.
-    Start();
+    strict Start();
 
     /// Stops the streaming of frames.
-    Stop();
+    strict Stop();
 
     /// Unlocks the specified frame, allowing the driver to reuse the memory.
-    ReleaseFrame(struct {
+    strict ReleaseFrame(struct {
         buffer_id uint32;
     });
 
     /// Sent by the driver to the client when a frame is available for processing,
     /// or an error occurred.
-    -> OnFrameAvailable(struct {
+    strict -> OnFrameAvailable(struct {
         frame FrameAvailableEvent;
     });
 };

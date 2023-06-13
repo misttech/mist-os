@@ -25,7 +25,7 @@ using zx;
 /// The client can be a Fuchsia component, or a Linux program (running
 /// in a VM, or using some other type of compatibility layer).
 @discoverable
-protocol Server {
+closed protocol Server {
     /// Establishes a new connection to the server.
     ///
     /// For a client to open a new connection, a zx::channel must be created for
@@ -33,7 +33,7 @@ protocol Server {
     /// and the other endpoint will be provided to this method. The messages on
     /// the channel will be Wayland protocol messages. Each channel datagram will
     /// contain 1 or more complete Wayland messages.
-    Connect(resource struct {
+    strict Connect(resource struct {
         channel zx.Handle:CHANNEL;
     });
 };

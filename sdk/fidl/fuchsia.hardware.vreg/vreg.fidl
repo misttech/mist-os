@@ -6,14 +6,14 @@ library fuchsia.hardware.vreg;
 using zx;
 
 @discoverable
-protocol Vreg {
+closed protocol Vreg {
     // Set the step which yields a voltage of min_uv + step_size_uv * step.
-    SetVoltageStep(struct {
+    strict SetVoltageStep(struct {
         step uint32;
     }) -> () error zx.Status;
 
     // Get the current step.
-    GetVoltageStep() -> (struct {
+    strict GetVoltageStep() -> (struct {
         result uint32;
     });
 
@@ -24,7 +24,7 @@ protocol Vreg {
     //  v_out = min_voltage + step_size * step
     //
     // Where the `step` is programmable by software.
-    GetRegulatorParams() -> (struct {
+    strict GetRegulatorParams() -> (struct {
         // Minimum voltage supported by this voltage regulator.
         min_uv uint32;
 

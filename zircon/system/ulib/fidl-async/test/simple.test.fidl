@@ -3,16 +3,16 @@
 // found in the LICENSE file.
 library fidl.test.simple;
 
-protocol Simple {
+closed protocol Simple {
     /// Replies with the value requested.
-    Echo(struct {
+    strict Echo(struct {
         request int32;
     }) -> (struct {
         reply int32;
     });
 
     /// Never actually replies.  Just closes instead.
-    Close() -> (struct {
+    strict Close() -> (struct {
         v int32;
     });
 };

@@ -8,7 +8,7 @@ using fuchsia.net.http;
 
 /// Interface supplied by the embedder for receiving notifications about navigation events in a
 /// [`Frame`].
-protocol NavigationEventListener {
+closed protocol NavigationEventListener {
     /// Called immediately after [`Frame.SetNavigationEventListener`] and every time user-visible
     /// navigation state has changed. In the first call, `change` contains the current navigation
     /// state (empty before the first navigation request). In every following call, `change` will
@@ -18,16 +18,16 @@ protocol NavigationEventListener {
     /// unset, then its value has not changed at any time since the previous notification.
     ///
     /// Implementer must call the acknowledgement callback to receive new navigation events.
-    OnNavigationStateChanged(resource struct {
+    strict OnNavigationStateChanged(resource struct {
         change NavigationState;
     }) -> ();
 };
 
-protocol NavigationPolicyProvider {
+closed protocol NavigationPolicyProvider {
     /// Called when the [`Frame`] is processing a navigation request in one of the phase(s)
     /// specified in [`NavigationPolicyProviderParams`]. Navigation is paused until the result is
     /// received. The returned [`NavigationDecision`] defines how the navigation should proceed.
-    EvaluateRequestedNavigation(struct {
+    strict EvaluateRequestedNavigation(struct {
         requested_navigation RequestedNavigation;
     }) -> (resource struct {
         decision NavigationDecision;
@@ -44,7 +44,7 @@ type NavigationControllerError = strict enum : int32 {
 };
 
 /// Provides methods for controlling and querying the navigation state of a [`Frame`].
-protocol NavigationController {
+closed protocol NavigationController {
     /// Tells the [`Frame`] to navigate to a `url`.
     ///
     /// - `url`: The address to navigate to.
@@ -54,22 +54,22 @@ protocol NavigationController {
     /// If an error occurred, the [`NavigationControllerError`] will be set to one of these values:
     /// - `INVALID_URL`: The `url` parameter is invalid.
     /// - `INVALID_HEADER`: At least one of the headers in [`LoadUrlParams.headers`] is invalid.
-    LoadUrl(resource struct {
+    strict LoadUrl(resource struct {
         url Url;
         params LoadUrlParams;
     }) -> () error NavigationControllerError;
 
     /// Tells the [`Frame`] to navigate to the previous page in its history, if any.
-    GoBack();
+    strict GoBack();
 
     /// Tells the [`Frame`] to navigate to the next page in its history, if any.
-    GoForward();
+    strict GoForward();
 
     /// Tells the [`Frame`] to stop the current navigation if a navigation is ongoing.
-    Stop();
+    strict Stop();
 
     /// Tells the [`Frame`] to reload the current page.
-    Reload(struct {
+    strict Reload(struct {
         type ReloadType;
     });
 
@@ -78,7 +78,7 @@ protocol NavigationController {
     @deprecated("Use a NavigationEventListener to receive state changes, instead.")
     @available(removed=10)
     @transitional
-    GetVisibleEntry() -> (resource struct {
+    strict GetVisibleEntry() -> (resource struct {
         entry NavigationState;
     });
 };

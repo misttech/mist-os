@@ -8,15 +8,15 @@ using zx;
 
 const MAX_TRANSFER_SIZE uint32 = 8196; // arbitrary - to be removed
 @discoverable
-protocol Device {
+closed protocol Device {
     /// Half-duplex transmit data to a SPI device; always transmits the entire buffer on success.
-    TransmitVector(struct {
+    strict TransmitVector(struct {
         data vector<uint8>:MAX_TRANSFER_SIZE;
     }) -> (struct {
         status zx.Status;
     });
     /// Half-duplex receive data from a SPI device; always reads the full size requested.
-    ReceiveVector(struct {
+    strict ReceiveVector(struct {
         size uint32;
     }) -> (struct {
         status zx.Status;
@@ -24,7 +24,7 @@ protocol Device {
     });
     /// Full-duplex SPI transaction. Received data will exactly equal the length of the transmit
     /// buffer.
-    ExchangeVector(struct {
+    strict ExchangeVector(struct {
         txdata vector<uint8>:MAX_TRANSFER_SIZE;
     }) -> (struct {
         status zx.Status;
@@ -32,19 +32,19 @@ protocol Device {
     });
 
     /// Returns true if the device can call |AssertCs()| and |DeassertCs()|.
-    CanAssertCs() -> (struct {
+    strict CanAssertCs() -> (struct {
         can bool;
     });
 
     /// Assert CS for this device.
     /// Returns ZX_ERR_NOT_SUPPORTED if there is more than one device on the bus.
-    AssertCs() -> (struct {
+    strict AssertCs() -> (struct {
         status zx.Status;
     });
     /// Deassert CS for this device.
     /// Returns ZX_ERR_BAD_STATE if CS is already deasserted.
     /// Returns ZX_ERR_NOT_SUPPORTED if there is more than one device on the bus.
-    DeassertCs() -> (struct {
+    strict DeassertCs() -> (struct {
         status zx.Status;
     });
 
@@ -52,12 +52,12 @@ protocol Device {
     compose fuchsia.hardware.sharedmemory.SharedVmoRegister;
 };
 
-protocol Controller {
+closed protocol Controller {
     /// Opens a new session on the device.
     ///
     /// At most one session is permitted at one time; the server end will be
     /// closed with `ZX_ERR_ALREADY_BOUND` if a session already exists.
-    OpenSession(resource struct {
+    strict OpenSession(resource struct {
         session server_end:Device;
     });
 };

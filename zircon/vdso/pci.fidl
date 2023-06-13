@@ -61,7 +61,7 @@ type PciInitArg = struct {
 };
 
 @transport("Syscall")
-protocol Pci {
+closed protocol Pci {
     /// ## Summary
     ///
     /// This function is obsolete and should not be used.
@@ -97,7 +97,7 @@ protocol Pci {
     /// ## See also
     ///
     /// TODO(fxbug.dev/32938)
-    GetNthDevice(resource struct {
+    strict GetNthDevice(resource struct {
         handle Handle:RESOURCE;
         index uint32;
     }) -> (resource struct {
@@ -137,7 +137,7 @@ protocol Pci {
     /// ## See also
     ///
     /// TODO(fxbug.dev/32938)
-    EnableBusMaster(resource struct {
+    strict EnableBusMaster(resource struct {
         handle Handle:PCI_DEVICE;
         enable uint32;
     }) -> () error Status;
@@ -174,7 +174,7 @@ protocol Pci {
     /// ## See also
     ///
     /// TODO(fxbug.dev/32938)
-    ResetDevice(resource struct {
+    strict ResetDevice(resource struct {
         handle Handle:PCI_DEVICE;
     }) -> () error Status;
 
@@ -217,7 +217,7 @@ protocol Pci {
     /// ## See also
     ///
     /// TODO(fxbug.dev/32938)
-    ConfigRead(resource struct {
+    strict ConfigRead(resource struct {
         handle Handle:PCI_DEVICE;
         offset uint16;
         width usize64;
@@ -260,7 +260,7 @@ protocol Pci {
     /// ## See also
     ///
     /// TODO(fxbug.dev/32938)
-    ConfigWrite(resource struct {
+    strict ConfigWrite(resource struct {
         handle Handle:PCI_DEVICE;
         offset uint16;
         width usize64;
@@ -306,7 +306,7 @@ protocol Pci {
     /// ## See also
     ///
     /// TODO(fxbug.dev/32938)
-    CfgPioRw(resource struct {
+    strict CfgPioRw(resource struct {
         handle Handle:RESOURCE;
         bus uint8;
         dev uint8;
@@ -357,7 +357,7 @@ protocol Pci {
     /// ## See also
     ///
     /// TODO(fxbug.dev/32938)
-    GetBar(resource struct {
+    strict GetBar(resource struct {
         handle Handle:PCI_DEVICE;
         bar_num uint32;
     }) -> (resource struct {
@@ -399,7 +399,7 @@ protocol Pci {
     /// ## See also
     ///
     /// TODO(fxbug.dev/32938)
-    MapInterrupt(resource struct {
+    strict MapInterrupt(resource struct {
         handle Handle:PCI_DEVICE;
         which_irq int32;
     }) -> (resource struct {
@@ -440,7 +440,7 @@ protocol Pci {
     /// ## See also
     ///
     /// TODO(fxbug.dev/32938)
-    QueryIrqMode(resource struct {
+    strict QueryIrqMode(resource struct {
         handle Handle:PCI_DEVICE;
         mode uint32;
     }) -> (struct {
@@ -481,7 +481,7 @@ protocol Pci {
     /// ## See also
     ///
     /// TODO(fxbug.dev/32938)
-    SetIrqMode(resource struct {
+    strict SetIrqMode(resource struct {
         handle Handle:PCI_DEVICE;
         mode uint32;
         requested_irq_count uint32;
@@ -523,7 +523,7 @@ protocol Pci {
     /// ## See also
     ///
     /// TODO(fxbug.dev/32938)
-    Init(resource struct {
+    strict Init(resource struct {
         handle Handle:RESOURCE;
         init_buf PciInitArg;
         len uint32;
@@ -565,7 +565,7 @@ protocol Pci {
     /// ## See also
     ///
     /// TODO(fxbug.dev/32938)
-    AddSubtractIoRange(resource struct {
+    strict AddSubtractIoRange(resource struct {
         handle Handle:RESOURCE;
         mmio uint32;
         base uint64;

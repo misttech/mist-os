@@ -8,7 +8,7 @@ using zx;
 
 /// USB Fastboot implementation protocol. Fastboot is a single-channel and fully synchronous
 /// protocol for communication between host and device.
-protocol FastbootImpl {
+closed protocol FastbootImpl {
     /// Sends fastboot data via USB fastboot device.
     ///
     /// This FIDL protocol blocks until all USB requests needed to send the data are completed. It
@@ -16,7 +16,7 @@ protocol FastbootImpl {
     ///
     /// Returns ZX_ERR_UNAVAILABLE if another call is made while a previous one is being processed,
     /// or the FIDL is called too early during boot when the driver has not become ready.
-    Send(resource struct {
+    strict Send(resource struct {
         data zx.Handle:VMO;
     }) -> () error zx.Status;
 
@@ -39,7 +39,7 @@ protocol FastbootImpl {
     ///
     /// Returns ZX_ERR_UNAVAILABLE if another call is made while a previous one is being processed,
     /// or the FIDL is called too early during boot when the driver has not become ready.
-    Receive(struct {
+    strict Receive(struct {
         requested uint64;
     }) -> (resource struct {
         data zx.Handle:VMO;

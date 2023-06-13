@@ -6,8 +6,8 @@ library fuchsia.hardware.ethernet.board;
 using zx;
 
 @discoverable
-protocol EthBoard {
-    ResetPhy() -> () error zx.Status;
+closed protocol EthBoard {
+    strict ResetPhy() -> () error zx.Status;
 };
 
 service Service {

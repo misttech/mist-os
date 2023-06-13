@@ -9,8 +9,8 @@ using fuchsia.hardware.audio;
 /// Use the `Provider` interface to manually add devices that do not use the
 /// devfs mechanism. Devices that do are automatically added, upon detection.
 @discoverable
-protocol Provider {
-    AddDevice(resource table {
+closed protocol Provider {
+    strict AddDevice(resource table {
         /// The device's high-level name. Must not be an empty string.
         ///
         /// Required.

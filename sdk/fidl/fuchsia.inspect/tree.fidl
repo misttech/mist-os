@@ -21,13 +21,13 @@ type TreeContent = resource table {
 };
 
 /// Iterator protocol for listing the names of children of a particular Tree.
-protocol TreeNameIterator {
+closed protocol TreeNameIterator {
     /// Get the next batch of names.
     ///
     /// Returns an empty vector and closes the channel when no more names are present.
     /// Implementors may eagerly close the channel after sending the last batch.
     @available(added=9)
-    GetNext() -> (struct {
+    strict GetNext() -> (struct {
         name vector<TreeName>:MAX;
     });
 
@@ -36,7 +36,7 @@ protocol TreeNameIterator {
     /// Returns an empty vector and closes the channel when no more names are present.
     /// Implementors may eagerly close the channel after sending the last batch.
     @available(removed=9)
-    GetNext() -> (struct {
+    strict GetNext() -> (struct {
         name vector<TreeName>:MAX_TREE_NAME_LIST_SIZE;
     });
 };
@@ -53,7 +53,7 @@ protocol TreeNameIterator {
 /// order to reduce memory usage. Serving components are free to deny
 /// connections to avoid unbounded memory usage.
 @discoverable
-protocol Tree {
+closed protocol Tree {
     /// Get the content for the Inspect VMO backing this tree.
     ///
     /// So long as the Tree connection is still maintained, the contents
@@ -63,7 +63,7 @@ protocol Tree {
     ///
     /// Serving components may return different buffers to GetContent
     /// requests for the same Tree.
-    GetContent() -> (resource struct {
+    strict GetContent() -> (resource struct {
         content TreeContent;
     });
 
@@ -71,14 +71,14 @@ protocol Tree {
     ///
     /// The underlying list of children may change in between calls to
     /// ListChildNames and OpenChild.
-    ListChildNames(resource struct {
+    strict ListChildNames(resource struct {
         tree_iterator server_end:TreeNameIterator;
     });
 
     /// Open a child Tree by name.
     ///
     /// If the child cannot be opened, the given request is closed.
-    OpenChild(resource struct {
+    strict OpenChild(resource struct {
         child_name TreeName;
         tree server_end:Tree;
     });

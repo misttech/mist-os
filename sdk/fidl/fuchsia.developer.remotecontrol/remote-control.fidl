@@ -25,52 +25,52 @@ type TunnelError = strict enum {
 };
 
 @discoverable
-protocol RemoteControl {
+closed protocol RemoteControl {
     /// Returns the input.
-    EchoString(struct {
+    strict EchoString(struct {
         value string:255;
     }) -> (struct {
         response string:255;
     });
 
     /// Writes a string to the syslog on the device.
-    LogMessage(struct {
+    strict LogMessage(struct {
         tag string:MAX;
         message string:MAX;
         severity diagnostics.Severity;
     }) -> ();
 
     /// Connects to the root [`fuchsia.sys2/RealmExplorer`] protocol.
-    RootRealmExplorer(resource struct {
+    strict RootRealmExplorer(resource struct {
         server server_end:sys2.RealmExplorer;
     }) -> () error zx.Status;
 
     /// Connects to the root [`fuchsia.sys2/RealmQuery`] protocol.
-    RootRealmQuery(resource struct {
+    strict RootRealmQuery(resource struct {
         server server_end:sys2.RealmQuery;
     }) -> () error zx.Status;
 
     /// Connects to the root [`fuchsia.sys2/LifecycleController`] protocol.
-    RootLifecycleController(resource struct {
+    strict RootLifecycleController(resource struct {
         server server_end:sys2.LifecycleController;
     }) -> () error zx.Status;
 
     /// Connects to the root [`fuchsia.sys2/RouteValidator`] protocol.
-    RootRouteValidator(resource struct {
+    strict RootRouteValidator(resource struct {
         server server_end:sys2.RouteValidator;
     }) -> () error zx.Status;
 
     // Connects to the [`fuchsia.kernel/Stats`] protocol
-    KernelStats(resource struct {
+    strict KernelStats(resource struct {
         server server_end:kernel.Stats;
     }) -> () error zx.Status;
 
     // Connects to the [`fuchsia.boot/Arguments`] protocol
-    BootArguments(resource struct {
+    strict BootArguments(resource struct {
         server server_end:boot.Arguments;
     }) -> () error zx.Status;
 
-    IdentifyHost() -> (struct {
+    strict IdentifyHost() -> (struct {
         response IdentifyHostResponse;
     }) error IdentifyHostError;
 
@@ -78,7 +78,7 @@ protocol RemoteControl {
     // matches exactly one service on the system.
     // If successful, returns information about the service connected to.
     @deprecated("Please use `ConnectCapability`")
-    Connect(resource struct {
+    strict Connect(resource struct {
         selector diagnostics.Selector;
         service_chan zx.Handle:CHANNEL;
     }) -> (struct {
@@ -88,7 +88,7 @@ protocol RemoteControl {
     // Connects a channel to a service, given a moniker and a channel iff the
     // component identified by the given moniker exposes a capability of the
     // requested name.
-    ConnectCapability(resource struct {
+    strict ConnectCapability(resource struct {
         moniker string:component.MAX_MONIKER_LENGTH;
         capability_name component.name;
         server_chan zx.Handle:CHANNEL;
@@ -101,7 +101,7 @@ protocol RemoteControl {
     // IDs to help identify transport or physical layer topologies. ffx uses
     // this API to pair an RCS instance discovered on Overnet to a device that
     // was discovered over mdns, for example.
-    AddId(struct {
+    strict AddId(struct {
         id uint64;
     }) -> ();
 
@@ -109,33 +109,33 @@ protocol RemoteControl {
     // of this link will host only the RemoteControl service. This method also
     // performs the function of `AddId`, which is the purpose of the `id`
     // argument.
-    AddOvernetLink(resource struct {
+    strict AddOvernetLink(resource struct {
         id uint64;
         socket zx.Handle:SOCKET;
     }) -> ();
 
     // Establishes a TCP connection to the given address and forwards traffic through the given
     // socket.
-    ForwardTcp(resource struct {
+    strict ForwardTcp(resource struct {
         addr net.SocketAddress;
         socket zx.Handle:SOCKET;
     }) -> () error TunnelError;
 
     // Listens on a TCP port and forwards any incoming connections to newly-created sockets which
     // are passed back via the callback.
-    ReverseTcp(resource struct {
+    strict ReverseTcp(resource struct {
         addr net.SocketAddress;
         client client_end:ForwardCallback;
     }) -> () error TunnelError;
 
     // Gets the current monotonic time in nanoseconds.
-    GetTime() -> (struct {
+    strict GetTime() -> (struct {
         time int64;
     });
 };
 
-protocol ForwardCallback {
-    Forward(resource struct {
+closed protocol ForwardCallback {
+    strict Forward(resource struct {
         socket zx.Handle:SOCKET;
         addr net.SocketAddress;
     });

@@ -8,8 +8,8 @@ type Bits = strict bits : uint8 {
     A = 2;
 };
 
-protocol Constraint {
-    Echo(struct {
+closed protocol Constraint {
+    strict Echo(struct {
         bits Bits;
     }) -> (struct {
         bits Bits;

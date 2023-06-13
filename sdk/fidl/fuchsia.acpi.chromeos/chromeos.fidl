@@ -20,41 +20,41 @@ type BootSlot = flexible enum {
     B = 2;
 };
 
-protocol Device {
+closed protocol Device {
     /// Get the ChromeOS HWID for this device, which identifies a device's model
     /// and configuration.
-    GetHardwareId() -> (struct {
+    strict GetHardwareId() -> (struct {
         hwid string:MAX_HWID_LEN;
     }) error zx.Status;
 
     /// Get the version of the active RW firmware.
-    GetRwFirmwareVersion() -> (struct {
+    strict GetRwFirmwareVersion() -> (struct {
         version string:MAX_FW_VERSION_LEN;
     }) error zx.Status;
 
     /// Get the version of the RO firmware.
-    GetRoFirmwareVersion() -> (struct {
+    strict GetRoFirmwareVersion() -> (struct {
         version string:MAX_FW_VERSION_LEN;
     }) error zx.Status;
 
     /// Get the offset and size of the VBoot configuration in the CMOS nvram.
-    GetNvramMetadataLocation() -> (struct {
+    strict GetNvramMetadataLocation() -> (struct {
         offset uint32;
         size uint32;
     }) error zx.Status;
 
     /// Get the address of the flashmap in physical memory.
-    GetFlashmapAddress() -> (struct {
+    strict GetFlashmapAddress() -> (struct {
         address uint64;
     }) error zx.Status;
 
     /// Get the nvdata version.
-    GetNvdataVersion() -> (struct {
+    strict GetNvdataVersion() -> (struct {
         version uint32;
     }) error zx.Status;
 
     /// Get the currently booted firmware slot.
-    GetActiveApFirmware() -> (struct {
+    strict GetActiveApFirmware() -> (struct {
         slot BootSlot;
     }) error zx.Status;
 };

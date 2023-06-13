@@ -27,7 +27,7 @@ const MAX_CATEGORY_NAME_LENGTH uint32 = 100;
 ///
 /// See //zircon/system/ulib/trace-provider/ for a C++ implementation of
 /// this interface which can easily be configured by an application.
-protocol Provider {
+closed protocol Provider {
     /// Initialize tracing and prepare for writing trace records for events in
     /// the specified `categories` into `buffer` using `fifo` for signaling.
     /// Tracing hasn't started yet, a `Start()` call is still required.
@@ -35,7 +35,7 @@ protocol Provider {
     ///
     /// At most one trace can be active at a time. Subsequent `Initialize()`
     /// requests received prior to a `Terminate()` call must be ignored.
-    Initialize(resource struct {
+    strict Initialize(resource struct {
         config ProviderConfig;
     });
 
@@ -45,7 +45,7 @@ protocol Provider {
     ///
     /// There is no result. The provider must send a `TRACE_PROVIDER_STARTED`
     /// packet on `fifo` to indicate success/failure of starting.
-    Start(struct {
+    strict Start(struct {
         options StartOptions;
     });
 
@@ -57,7 +57,7 @@ protocol Provider {
     /// buffer, it must send a `TRACE_PROVIDER_STOPPED` packet on `fifo`.
     /// Note that multiple `Start,Stop` requests can be received between
     /// `Initialize,Terminate`.
-    Stop();
+    strict Stop();
 
     /// Terminate tracing.
     ///
@@ -65,11 +65,11 @@ protocol Provider {
     /// After tracing has fully terminated the provider must close both
     /// `buffer` and `fifo` to indicate to the trace manager that tracing is
     /// finished.
-    Terminate();
+    strict Terminate();
 
     /// Gets the trace categories that might be produced by this provider.
     @available(added=11)
-    GetKnownCategories() -> (struct {
+    strict GetKnownCategories() -> (struct {
         categories vector<fuchsia.tracing.KnownCategory>:fuchsia.tracing.MAX_NUM_KNOWN_CATEGORIES;
     });
 };
@@ -79,14 +79,14 @@ protocol Provider {
 /// Note that one property of this interface is that once registration is made
 /// the provider can drop this connection.
 @discoverable
-protocol Registry {
+closed protocol Registry {
     /// Registers the trace provider.
     /// Note: Registration is asynchronous, it's only at some point after this
     /// returns that the provider is actually registered.
     /// To unregister, simply close the Provider pipe.
     /// `pid` is the process id of the provider, `name` is the name of the
     /// provider. Both of these are used in logging and diagnostic messages.
-    RegisterProvider(resource struct {
+    strict RegisterProvider(resource struct {
         provider client_end:Provider;
         pid zx.Koid;
         @available(removed=11)
@@ -104,7 +104,7 @@ protocol Registry {
     /// To unregister, simply close the Provider pipe.
     /// `pid` is the process id of the provider, `name` is the name of the
     /// provider. Both of these are used in logging and diagnostic messages.
-    RegisterProviderSynchronously(resource struct {
+    strict RegisterProviderSynchronously(resource struct {
         provider client_end:Provider;
         pid zx.Koid;
         @available(removed=11)

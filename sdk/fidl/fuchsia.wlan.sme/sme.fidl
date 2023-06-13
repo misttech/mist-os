@@ -144,25 +144,25 @@ type DisconnectInfo = struct {
     disconnect_source DisconnectSource;
 };
 
-protocol ConnectTransaction {
+closed protocol ConnectTransaction {
     /// Return the result of the initial connection request or later SME-initiated reconnection.
-    -> OnConnectResult(struct {
+    strict -> OnConnectResult(struct {
         result ConnectResult;
     });
 
     /// Notify that the client has disconnected. If DisconnectInfo indicates that SME is
     /// attempting to reconnect by itself, there's not need for caller to intervene for now.
-    -> OnDisconnect(struct {
+    strict -> OnDisconnect(struct {
         info DisconnectInfo;
     });
 
     /// Give an update of the latest signal report.
-    -> OnSignalReport(struct {
+    strict -> OnSignalReport(struct {
         ind fuchsia.wlan.internal.SignalReportIndication;
     });
 
     /// Give an update of the channel switching.
-    -> OnChannelSwitched(struct {
+    strict -> OnChannelSwitched(struct {
         info fuchsia.wlan.internal.ChannelSwitchInfo;
     });
 };
@@ -206,27 +206,27 @@ type ClientStatusResponse = strict union {
     3: idle Empty;
 };
 
-protocol ClientSme {
+closed protocol ClientSme {
     // TODO(fxbug.dev/100478): Remove this denylist when support
     // for other languages is complete.
     @bindings_denylist("cpp, dart, go, hlcpp, llcpp")
     @experimental_overflowing(response=true)
-    Scan(resource struct {
+    strict Scan(resource struct {
         req ScanRequest;
     }) -> (struct {
         scan_results vector<ScanResult>;
     }) error ScanErrorCode;
-    Connect(resource struct {
+    strict Connect(resource struct {
         req ConnectRequest;
         txn server_end:<ConnectTransaction, optional>;
     });
-    Disconnect(struct {
+    strict Disconnect(struct {
         reason UserDisconnectReason;
     }) -> ();
-    Status() -> (struct {
+    strict Status() -> (struct {
         resp ClientStatusResponse;
     });
-    WmmStatus() -> (struct {
+    strict WmmStatus() -> (struct {
         resp fuchsia.wlan.internal.WmmStatusResponse;
     }) error int32;
 };
@@ -263,16 +263,16 @@ type ApStatusResponse = struct {
     running_ap box<Ap>;
 };
 
-protocol ApSme {
-    Start(struct {
+closed protocol ApSme {
+    strict Start(struct {
         config ApConfig;
     }) -> (struct {
         code StartApResultCode;
     });
-    Stop() -> (struct {
+    strict Stop() -> (struct {
         code StopApResultCode;
     });
-    Status() -> (struct {
+    strict Status() -> (struct {
         resp ApStatusResponse;
     });
 };
@@ -300,53 +300,53 @@ type GetMeshPathTableResultCode = strict enum {
     INTERNAL_ERROR = 1;
 };
 
-protocol MeshSme {
-    Join(struct {
+closed protocol MeshSme {
+    strict Join(struct {
         config MeshConfig;
     }) -> (struct {
         code JoinMeshResultCode;
     });
-    Leave() -> (struct {
+    strict Leave() -> (struct {
         code LeaveMeshResultCode;
     });
-    GetMeshPathTable() -> (struct {
+    strict GetMeshPathTable() -> (struct {
         code GetMeshPathTableResultCode;
         path fuchsia.wlan.mesh.MeshPathTable;
     });
 };
 
-protocol Telemetry {
-    GetCounterStats() -> (struct {
+closed protocol Telemetry {
+    strict GetCounterStats() -> (struct {
         stats fuchsia.wlan.stats.IfaceCounterStats;
     }) error zx.Status;
-    GetHistogramStats() -> (struct {
+    strict GetHistogramStats() -> (struct {
         stats fuchsia.wlan.stats.IfaceHistogramStats;
     }) error zx.Status;
 };
 
-protocol FeatureSupport {
+closed protocol FeatureSupport {
     /// Return support for features related to discovery of potential BSSs.
     /// * see [`fuchsia.wlan.common/DiscoverySupport`]
-    QueryDiscoverySupport() -> (struct {
+    strict QueryDiscoverySupport() -> (struct {
         resp fuchsia.wlan.common.DiscoverySupport;
     }) error zx.Status;
 
     /// Return support for features related to the MAC sublayer.
     /// * see [`fuchsia.wlan.common/MacSublayerSupport`]
-    QueryMacSublayerSupport() -> (struct {
+    strict QueryMacSublayerSupport() -> (struct {
         resp fuchsia.wlan.common.MacSublayerSupport;
     }) error zx.Status;
 
     /// Return support for features related to security/access control
     /// and data confidentiality.
     /// * see [`fuchsia.wlan.common/SecuritySupport`]
-    QuerySecuritySupport() -> (struct {
+    strict QuerySecuritySupport() -> (struct {
         resp fuchsia.wlan.common.SecuritySupport;
     }) error zx.Status;
 
     /// Return support for features related to spectrum management.
     /// * see [`fuchsia.wlan.common/SpectrumManagementSupport`]
-    QuerySpectrumManagementSupport() -> (struct {
+    strict QuerySpectrumManagementSupport() -> (struct {
         resp fuchsia.wlan.common.SpectrumManagementSupport;
     }) error zx.Status;
 };
@@ -356,8 +356,8 @@ type LegacyPrivacySupport = struct {
     wpa1_supported bool;
 };
 
-protocol UsmeBootstrap {
-    Start(resource struct {
+closed protocol UsmeBootstrap {
+    strict Start(resource struct {
         generic_sme_server server_end:GenericSme;
         legacy_privacy_support LegacyPrivacySupport;
     }) -> (resource struct {
@@ -371,11 +371,11 @@ type GenericSmeQuery = struct {
     sta_addr ieee80211.MacAddr;
 };
 
-protocol GenericSme {
+closed protocol GenericSme {
     /// Query the underlying SME to determine basic properties. This should
     /// generally be called first to determine which SME protocol to request
     /// for the SME.
-    Query() -> (resource struct {
+    strict Query() -> (resource struct {
         resp GenericSmeQuery;
     });
     /// Attempt to establish a new connection to an underlying Client SME.
@@ -384,7 +384,7 @@ protocol GenericSme {
     /// Likely errors include:
     ///     * NOT_SUPPORTED: The underlying SME is not a Client SME.
     ///     * PEER_CLOSED: The underlying SME is shutting down.
-    GetClientSme(resource struct {
+    strict GetClientSme(resource struct {
         sme_server server_end:ClientSme;
     }) -> () error zx.Status;
     /// Attempt to establish a new connection to an underlying AP SME.
@@ -393,7 +393,7 @@ protocol GenericSme {
     /// Likely errors include:
     ///     * NOT_SUPPORTED: The underlying SME is not an AP SME.
     ///     * PEER_CLOSED: The underlying SME is shutting down.
-    GetApSme(resource struct {
+    strict GetApSme(resource struct {
         sme_server server_end:ApSme;
     }) -> () error zx.Status;
     /// Attempt to establish a new connection to telemetry information for the
@@ -403,7 +403,7 @@ protocol GenericSme {
     /// Likely errors include:
     ///     * NOT_SUPPORTED: The underlying SME does not support telemetry.
     ///     * PEER_CLOSED: The underlying SME is shutting down.
-    GetSmeTelemetry(resource struct {
+    strict GetSmeTelemetry(resource struct {
         telemetry_server server_end:Telemetry;
     }) -> () error zx.Status;
     /// Attempt to establish a new connection to feature support information for
@@ -412,7 +412,7 @@ protocol GenericSme {
     /// concurrent connections are safe since this is a read-only API.
     /// Likely errors include:
     ///     * PEER_CLOSED: The underlying SME is shutting down.
-    GetFeatureSupport(resource struct {
+    strict GetFeatureSupport(resource struct {
         feature_support_server server_end:FeatureSupport;
     }) -> () error zx.Status;
 };

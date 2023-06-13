@@ -16,7 +16,7 @@ using zx;
 /// That way, if we discover the newly written version is bad (e.g. it cannot itself
 /// update), then the system can fall back to the previous committed version.
 @discoverable
-protocol CommitStatusProvider {
+closed protocol CommitStatusProvider {
     /// Determines whether the currently booted system is committed, and immediately
     /// returns an EventPair.
     ///
@@ -31,7 +31,7 @@ protocol CommitStatusProvider {
     ///     EventPairs will observe the `ZX_EVENTPAIR_PEER_CLOSED` signal.
     ///
     /// - response `event` an EventPair with rights `ZX_RIGHTS_BASIC`.
-    IsCurrentSystemCommitted() -> (resource struct {
+    strict IsCurrentSystemCommitted() -> (resource struct {
         event zx.Handle:EVENTPAIR;
     });
 };

@@ -7,7 +7,7 @@ using fuchsia.lowpan;
 
 /// Protocol for connecting to [`Meshcop`] on a LoWPAN device.
 @discoverable
-protocol MeshcopConnector {
+closed protocol MeshcopConnector {
     /// Connects to the [`Meshcop`] protocol on the
     /// named LoWPAN interface.
     ///
@@ -24,14 +24,14 @@ protocol MeshcopConnector {
     ///   given name.
     /// * `ZX_ERR_NOT_SUPPORTED`: The interface exists but
     ///   does not support this protocol.
-    Connect(resource struct {
+    strict Connect(resource struct {
         name fuchsia.lowpan.InterfaceName;
         server_end server_end:Meshcop;
     });
 };
 
 /// Methods associated with the Mesh Commissioning Protocol (Meshcop).
-protocol Meshcop {
+closed protocol Meshcop {
     /// Updates the TXT record information associated with the Meshcop border
     /// agent DNS-SD entry. This allows additional information about the
     /// device to be discoverable on the local network when acting as a
@@ -55,7 +55,7 @@ protocol Meshcop {
     /// protocol being closed.
     ///
     /// [1]: https://github.com/openthread/ot-br-posix/blob/0b5c6e1ecb8152ef6cea57c09b8a37a020fc4d6f/src/dbus/server/introspect.xml#L196-L210
-    UpdateTxtEntries(struct {
+    strict UpdateTxtEntries(struct {
         txt_entries vector<struct {
             /// The key string for this TXT entry.
             ///

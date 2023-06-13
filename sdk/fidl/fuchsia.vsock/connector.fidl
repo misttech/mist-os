@@ -18,14 +18,14 @@ type ConnectionTransport = resource struct {
 };
 
 /// Interface for manipulating the state of an active connection.
-protocol Connection {
+closed protocol Connection {
     /// Trigger asynchronous shutdown. The underlying channel will be closed
     /// once shutdown is complete. Shutdown has an implicit barrier as any already
     /// queued sends will complete, but any additional sends will generate errors
-    Shutdown();
+    strict Shutdown();
     /// Send a VMO. The reply indicates that the VMO send has finished and that
     /// data may be queued on the socket again without causing races.
-    SendVmo(resource struct {
+    strict SendVmo(resource struct {
         vmo zx.Handle:VMO;
         off uint64;
         len uint64;
@@ -35,10 +35,10 @@ protocol Connection {
 };
 
 /// Interface presented by a listener to accept or reject connections
-protocol Acceptor {
+closed protocol Acceptor {
     /// The response is either a `ConnectionTransport` to indicate that the connection
     /// is accepted, or none to indicate that it should be rejected.
-    Accept(struct {
+    strict Accept(struct {
         addr fuchsia.hardware.vsock.Addr;
     }) -> (resource struct {
         con box<ConnectionTransport>;
@@ -49,10 +49,10 @@ protocol Acceptor {
 /// provides the ability for listeners to be multiplexed by port and manages dynamic
 /// port allocation for outbound connections.
 @discoverable
-protocol Connector {
+closed protocol Connector {
     /// Attempt to establish a connection to the specified remote cid/port pair.
     /// No local port is specified as an ephemeral one will automatically be allocated.
-    Connect(resource struct {
+    strict Connect(resource struct {
         remote_cid uint32;
         remote_port uint32;
         con ConnectionTransport;
@@ -62,7 +62,7 @@ protocol Connector {
     });
     /// Registers a listener for a local port. There can only be one listener for
     /// a single port at a time.
-    Listen(resource struct {
+    strict Listen(resource struct {
         local_port uint32;
         acceptor client_end:Acceptor;
     }) -> (struct {

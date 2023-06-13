@@ -53,33 +53,33 @@ type Config = struct {
 };
 
 /// A serial device.
-protocol Device {
+closed protocol Device {
     /// Lookup what type of serial device this is.
-    GetClass() -> (struct {
+    strict GetClass() -> (struct {
         device_class Class;
     });
 
     /// Set the configuration of this serial device.
-    SetConfig(struct {
+    strict SetConfig(struct {
         config Config;
     }) -> (struct {
         s zx.Status;
     });
 
     /// Reads data from the serial port.
-    Read() -> (struct {
+    strict Read() -> (struct {
         data vector<uint8>:MAX;
     }) error zx.Status;
 
     /// Writes data to the serial port.
-    Write(struct {
+    strict Write(struct {
         data vector<uint8>:MAX;
     }) -> () error zx.Status;
 };
 
 @discoverable
-protocol DeviceProxy {
-    GetChannel(resource struct {
+closed protocol DeviceProxy {
+    strict GetChannel(resource struct {
         req server_end:Device;
     });
 };

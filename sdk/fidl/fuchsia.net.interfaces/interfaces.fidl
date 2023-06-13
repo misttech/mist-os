@@ -143,7 +143,7 @@ type Properties = table {
 
 /// Network interface state inspection and observation.
 @discoverable
-protocol State {
+closed protocol State {
     /// Initialize a watcher for interface state.
     ///
     /// The server enqueues interface addition, deletion and property changes as
@@ -153,7 +153,7 @@ protocol State {
     /// + request `watcher` grants access to a [`Watcher`]. Closed if the queue
     ///     cannot be allocated or if the queue is full when the server attempts
     ///     to enqueue an event.
-    GetWatcher(resource struct {
+    strict GetWatcher(resource struct {
         /// Options for configuring the interface state watcher.
         options @generated_name("WatcherOptions") table {
             // TODO(https://fxbug.dev/110587): Implement disinterest in address
@@ -185,7 +185,7 @@ protocol State {
 
 /// Observer protocol for changes to network interfaces (addition, deletion, and
 /// interface property changes).
-protocol Watcher {
+closed protocol Watcher {
     /// Hanging get for an interface addition/deletion change.
     ///
     /// Clients should only have one call of this method at a time; a second
@@ -205,7 +205,7 @@ protocol Watcher {
     /// order in which the changes occurred.
     ///
     /// - response `event` the interface change event.
-    Watch() -> (struct {
+    strict Watch() -> (struct {
         event strict union {
             /// Properties of an interface that existed when watching started.
             ///

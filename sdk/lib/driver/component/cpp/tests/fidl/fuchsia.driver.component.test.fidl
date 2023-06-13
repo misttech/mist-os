@@ -5,13 +5,13 @@ library fuchsia.driver.component.test;
 
 using zx;
 
-protocol ZirconProtocol {
-    ZirconMethod() -> () error zx.Status;
+closed protocol ZirconProtocol {
+    strict ZirconMethod() -> () error zx.Status;
 };
 
 @transport("Driver")
-protocol DriverProtocol {
-    DriverMethod() -> () error zx.Status;
+closed protocol DriverProtocol {
+    strict DriverMethod() -> () error zx.Status;
 };
 
 service ZirconService {

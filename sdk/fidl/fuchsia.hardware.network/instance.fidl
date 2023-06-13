@@ -13,11 +13,11 @@ library fuchsia.hardware.network;
 // pattern will be improved with Unified Services (https://fxbug.dev/8035) and
 // Drivers as Components (https://fxbug.dev/33183).
 @available(added=HEAD)
-protocol DeviceInstance {
+closed protocol DeviceInstance {
     /// Connects to the [`Device`] implementation.
     ///
     /// + request `device` device handle.
-    GetDevice(resource struct {
+    strict GetDevice(resource struct {
         device server_end:Device;
     });
 };

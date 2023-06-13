@@ -64,7 +64,7 @@ type Burst = struct {
     timestamp zx.Time;
 };
 
-protocol RadarBurstReader {
+closed protocol RadarBurstReader {
     /// Returns the size in bytes of each burst reported by this driver. Clients
     /// should use this size to create VMOs to be registered by the driver.
     ///
@@ -72,7 +72,7 @@ protocol RadarBurstReader {
     // TODO(fxbug.dev/100020): Remove this when all users have been switched to
     // `GetBurstProperties()`.
     @transitional
-    GetBurstSize() -> (struct {
+    strict GetBurstSize() -> (struct {
         burst_size uint32;
     });
 
@@ -80,7 +80,7 @@ protocol RadarBurstReader {
     // TODO(fxbug.dev/100020): Remove @transitional when all servers implement
     // this method.
     @transitional
-    GetBurstProperties() -> (struct {
+    strict GetBurstProperties() -> (struct {
         size uint32;
         period zx.Duration;
     });
@@ -102,7 +102,7 @@ protocol RadarBurstReader {
     /// *     `VMO_ACCESS_DENIED`: A VMO in `vmos` could not be mapped due to
     /// *         insufficient permissions.
     /// *     `VMO_TOO_SMALL`: A VMO in `vmos` was smaller than the burst size.
-    RegisterVmos(resource struct {
+    strict RegisterVmos(resource struct {
         vmo_ids vector<uint32>:VMO_VECTOR_MAX_COUNT;
         vmos vector<zx.Handle:VMO>:VMO_VECTOR_MAX_COUNT;
     }) -> () error StatusCode;
@@ -120,14 +120,14 @@ protocol RadarBurstReader {
     /// * error one of the following `StatusCode` values:
     /// *     `INVALID_ARGS`: `vmo_ids` was too big.
     /// *     `VMO_NOT_FOUND`: An ID in `vmo_ids` was not registered.
-    UnregisterVmos(struct {
+    strict UnregisterVmos(struct {
         vmo_ids vector<uint32>:VMO_VECTOR_MAX_COUNT;
     }) -> (resource struct {
         vmos vector<zx.Handle:VMO>:VMO_VECTOR_MAX_COUNT;
     }) error StatusCode;
 
     /// Tells the driver to start sending bursts via `OnBurst()`.
-    StartBursts();
+    strict StartBursts();
 
     /// Tells the driver to stop sending bursts via `OnBurst()`. If all clients
     /// call `StopBursts()` then the driver may choose to stop its worker thread.
@@ -136,7 +136,7 @@ protocol RadarBurstReader {
     ///
     /// Note that already inflight `OnBurst()` bursts may still be received by
     /// the client.
-    StopBursts() -> ();
+    strict StopBursts() -> ();
 
     /// Returns the ID of a VMO containing a single burst, the time the burst
     /// was received. Ownership of the VMO must be returned to the driver by
@@ -159,14 +159,14 @@ protocol RadarBurstReader {
     /// *         quickly enough.
     /// *     `SENSOR_ERROR`: An unspecified driver or sensor error occurred
     /// *         when trying to read the burst.
-    -> OnBurst(struct {
+    strict -> OnBurst(struct {
         burst Burst;
     }) error StatusCode;
 
     // TODO(fxbug.dev/99924): Remove this after `OnBurst()` has the same
     // signature and all users have been migrated.
     @available(added=12)
-    -> OnBurst2(flexible union {
+    strict -> OnBurst2(flexible union {
         1: burst Burst;
         2: error StatusCode;
     });
@@ -175,7 +175,7 @@ protocol RadarBurstReader {
     /// client must not access the VMO after calling this.
     ///
     /// + request `vmo_id` the ID of the VMO to return to the driver.
-    UnlockVmo(struct {
+    strict UnlockVmo(struct {
         vmo_id uint32;
     });
 };
@@ -183,7 +183,7 @@ protocol RadarBurstReader {
 /// The main protocol implemented by radar drivers. Clients use this protocol to
 /// establish a `RadarBurstReader` connection with the driver.
 @discoverable
-protocol RadarBurstReaderProvider {
+closed protocol RadarBurstReaderProvider {
     /// + request `server` the `RadarBurstReader` server end for the driver to
     ///     bind to.
     /// * error one of the following `StatusCode` values:
@@ -191,18 +191,18 @@ protocol RadarBurstReaderProvider {
     ///         provided server channel.
     ///     `ALREADY_BOUND`: Another client has already established a
     ///         `RadarBurstReader` connection with the driver.
-    Connect(resource struct {
+    strict Connect(resource struct {
         server server_end:RadarBurstReader;
     }) -> () error StatusCode;
 };
 
 @available(added=12)
-protocol RadarSensorInfo {
+closed protocol RadarSensorInfo {
     /// Returns the size and period of bursts reported by the sensor.
     ///
     /// - response `size` the size of each radar burst in bytes.
     /// - response `period` the time between bursts in nanoseconds.
-    GetBurstProperties() -> (struct {
+    strict GetBurstProperties() -> (struct {
         size uint32;
         period zx.Duration;
     });
@@ -225,7 +225,7 @@ type BurstData = resource struct {
 /// that attempt to connect.
 @available(added=12)
 @discoverable
-protocol RadarBurstInjector {
+closed protocol RadarBurstInjector {
     compose RadarSensorInfo;
 
     /// Enqueues the given VMO with burst data to be injected. After all bursts
@@ -252,7 +252,7 @@ protocol RadarBurstInjector {
     /// *   `INVALID_ARGS`: The number of bursts was zero.
     /// *   `BAD_STATE`: A previous call to `StopBurstInjection()` is still
     /// *     pending.
-    EnqueueBursts(resource struct {
+    strict EnqueueBursts(resource struct {
         bursts BurstData;
     }) -> (struct {
         bursts_id uint32;
@@ -264,7 +264,7 @@ protocol RadarBurstInjector {
     ///
     /// + request `bursts_id` the ID returned by a previous call to
     ///     `EnqueueBursts()`.
-    -> OnBurstsDelivered(struct {
+    strict -> OnBurstsDelivered(struct {
         bursts_id uint32;
     });
 
@@ -281,7 +281,7 @@ protocol RadarBurstInjector {
     /// * error one of the following `StatusCode` values:
     /// *   `BAD_STATE`: Injection has already been started, or a previous call
     /// *     to `StopBurstInjection()` is still pending.
-    StartBurstInjection() -> () error StatusCode;
+    strict StartBurstInjection() -> () error StatusCode;
 
     /// Tells radar-proxy to finish injecting bursts from VMOs currently on the
     /// queue then switch back to delivering bursts from the real radar driver.
@@ -296,5 +296,5 @@ protocol RadarBurstInjector {
     /// * error one of the following `StatusCode` values:
     /// *   `BAD_STATE`: Injection has already been stopped, or a call to this
     /// *     method is still pending.
-    StopBurstInjection() -> () error StatusCode;
+    strict StopBurstInjection() -> () error StatusCode;
 };

@@ -310,9 +310,9 @@ type GetVmoError = strict enum {
 
 /// For an overview see
 /// [Audio Driver Streaming Interface](https://fuchsia.dev/fuchsia-src/concepts/drivers/driver_architectures/audio_drivers/audio_streaming)
-protocol RingBuffer {
+closed protocol RingBuffer {
     /// Accessor for top level static properties.
-    GetProperties() -> (struct {
+    strict GetProperties() -> (struct {
         properties RingBufferProperties;
     });
 
@@ -327,7 +327,7 @@ protocol RingBuffer {
     /// `WatchClockRecoveryPositionInfo` may only be called after `GetVmo` was called, hence a
     /// `clock_recovery_notifications_per_ring` was specified.
     /// Must be delivered with timestamps that are monotonically increasing.
-    WatchClockRecoveryPositionInfo() -> (struct {
+    strict WatchClockRecoveryPositionInfo() -> (struct {
         position_info RingBufferPositionInfo;
     });
 
@@ -354,7 +354,7 @@ protocol RingBuffer {
     ///
     // TODO(fxbug.dev/116353): Reconsider the `clock_recovery_notifications_per_ring` parameter,
     // once we must recover a clock from a device being actively rate-adjusted in hardware.
-    GetVmo(struct {
+    strict GetVmo(struct {
         min_frames uint32;
         clock_recovery_notifications_per_ring uint32;
     }) -> (resource struct {
@@ -369,7 +369,7 @@ protocol RingBuffer {
     /// If `Start` is called before `GetVmo`, the channel must be closed with `ZX_ERR_BAD_STATE`.
     /// If `Start` is called while this RingBuffer is already started, the channel must be closed
     /// with an error `ZX_ERR_BAD_STATE` returned.
-    Start() -> (struct {
+    strict Start() -> (struct {
         start_time zx.Time;
     });
 
@@ -377,7 +377,7 @@ protocol RingBuffer {
     /// notifications will be sent until `Start` is called again.
     /// If `Stop` is called before `GetVmo`, the channel must be closed with `ZX_ERR_BAD_STATE`.
     // TODO(fxbug.dev/39494): Add timestamp parameter.
-    Stop() -> ();
+    strict Stop() -> ();
 
     /// Sets which channels are active via a bitmask.
     /// The least significant bit corresponds to channel index 0.
@@ -403,7 +403,7 @@ protocol RingBuffer {
     /// hardware to actually turn on, the driver replies with a `set_time` indicating when the
     /// hardware configuration was completed.
     /// For input channels, it is not required that the driver zero-out inactive channels.
-    SetActiveChannels(struct {
+    strict SetActiveChannels(struct {
         active_channels_bitmask uint64;
     }) -> (struct {
         set_time zx.Time;
@@ -413,7 +413,7 @@ protocol RingBuffer {
     /// first `WatchDelayInfo` sent by the client. The driver will not respond to subsequent client
     /// `WatchDelayInfo` calls until the delay info changes from what was most recently reported.
     @available(added=HEAD)
-    WatchDelayInfo() -> (struct {
+    strict WatchDelayInfo() -> (struct {
         delay_info DelayInfo;
     });
 };

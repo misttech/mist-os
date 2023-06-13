@@ -4,7 +4,7 @@
 library zx;
 
 @transport("Syscall")
-protocol Restricted {
+closed protocol Restricted {
     /// ## Summary
     ///
     /// Enter restricted mode
@@ -99,7 +99,7 @@ protocol Restricted {
     // can use ZX_ERR_INTERNAL_INTR_RETRY and the vDSO retry logic.  See
     // https://fxbug.dev/126200 for details.
     @blocking
-    Enter(struct {
+    strict Enter(struct {
         options uint32;
         vector_table_ptr uintptr64;
         context uintptr64;
@@ -182,7 +182,7 @@ protocol Restricted {
     /// [`zx_vmo_read()`]: vmo_read.md
     /// [`zx_vmo_write()`]: vmo_write.md
     @next
-    BindState(resource struct {
+    strict BindState(resource struct {
         options uint32;
     }) -> (resource struct {
         out Handle:VMO;
@@ -227,7 +227,7 @@ protocol Restricted {
     /// [`zx_restricted_enter()`]: restricted_enter.md
     /// [`zx_restricted_bind_state()`]: restricted_bind_state.md
     @next
-    UnbindState(resource struct {
+    strict UnbindState(resource struct {
         options uint32;
     }) -> () error Status;
 
@@ -276,7 +276,7 @@ protocol Restricted {
     /// **ZX_ERR_ACCESS_DENIED** *thread* does not have ZX_RIGHT_MANAGE_THREAD.
     /// **ZX_ERR_BAD_STATE** *thread* is dead.
     @next
-    Kick(resource struct {
+    strict Kick(resource struct {
         thread Handle:THREAD;
         options uint32;
     }) -> () error Status;

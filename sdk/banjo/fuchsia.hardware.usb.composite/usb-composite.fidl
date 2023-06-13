@@ -9,19 +9,19 @@ using zx;
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol UsbComposite {
+closed protocol UsbComposite {
     /// Returns the length of the additional descriptor list.
-    GetAdditionalDescriptorLength() -> (struct {
+    strict GetAdditionalDescriptorLength() -> (struct {
         length uint64;
     });
     /// Returns the USB descriptors following the interface's existing descriptors.
-    GetAdditionalDescriptorList() -> (struct {
+    strict GetAdditionalDescriptorList() -> (struct {
         s zx.Status;
         desc vector<uint8>:MAX;
     });
     /// Marks the interface as claimed and appends the interface descriptor to the
     /// interface's existing descriptors.
-    ClaimInterface(struct {
+    strict ClaimInterface(struct {
         desc fuchsia.hardware.usb.descriptor.UsbInterfaceDescriptor;
         length uint32;
     }) -> (struct {

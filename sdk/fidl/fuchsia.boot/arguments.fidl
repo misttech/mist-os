@@ -16,16 +16,16 @@ type BoolPair = struct {
 
 /// Protocol for retrieving boot arguments.
 @discoverable
-protocol Arguments {
+closed protocol Arguments {
     /// Get the value of a boot argument `key`.
-    GetString(struct {
+    strict GetString(struct {
         key string:MAX_ARGS_NAME_LENGTH;
     }) -> (struct {
         value string:<MAX_ARGS_VALUE_LENGTH, optional>;
     });
 
     /// Get the values of a list of arguments specified in `keys`.
-    GetStrings(struct {
+    strict GetStrings(struct {
         keys vector<string:MAX_ARGS_NAME_LENGTH>:MAX_ARGS_VECTOR_LENGTH;
     }) -> (struct {
         values vector<string:<MAX_ARGS_VALUE_LENGTH, optional>>:MAX_ARGS_VECTOR_LENGTH;
@@ -36,7 +36,7 @@ protocol Arguments {
     /// A key is considered to be false if its string value is exactly
     /// "off", "0", or "false". Any other value (including empty) is returned
     /// as true.
-    GetBool(struct {
+    strict GetBool(struct {
         key string:MAX_ARGS_NAME_LENGTH;
         defaultval bool;
     }) -> (struct {
@@ -45,7 +45,7 @@ protocol Arguments {
 
     /// Get the boolean values of a list of boot arguments `keys.key`,
     /// or return `keys.defaultval` for each if not present.
-    GetBools(struct {
+    strict GetBools(struct {
         keys vector<BoolPair>:MAX_ARGS_VECTOR_LENGTH;
     }) -> (struct {
         values vector<bool>:MAX_ARGS_VECTOR_LENGTH;
@@ -54,7 +54,7 @@ protocol Arguments {
     /// Get all boot arguments with keys starting with
     /// `prefix`. Returns a vector with strings of the form 'key=value'.
     /// TODO(fxbug.dev/33460) - remove Collect once boot arguments have been componentised.
-    Collect(struct {
+    strict Collect(struct {
         prefix string:MAX_ARGS_NAME_LENGTH;
     }) -> (struct {
         results vector<string:MAX_ARGS_COLLECT_LENGTH>:MAX_ARGS_VECTOR_LENGTH;

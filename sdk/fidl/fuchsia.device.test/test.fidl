@@ -19,41 +19,41 @@ type TestReport = struct {
     failure_count uint32;
 };
 
-protocol Test {
+closed protocol Test {
     /// Execute the tests for this device. Returns the status from the test. If
     /// used as part of the Device protocol then Test output will be streamed to
     /// the socket set by SetOutputSocket().
-    RunTests() -> (struct {
+    strict RunTests() -> (struct {
         status zx.Status;
         report TestReport;
     });
 };
 
 /// Interface for controlling a device created via RootDevice.CreateDevice
-protocol Device {
+closed protocol Device {
     compose Test;
 
     /// Set a socket to stream test output to.
-    SetOutputSocket(resource struct {
+    strict SetOutputSocket(resource struct {
         sock zx.Handle:SOCKET;
     });
 
     /// Set a channel for the test to use in a test-specific manner.
-    SetChannel(resource struct {
+    strict SetChannel(resource struct {
         chan zx.Handle:CHANNEL;
     });
 
     /// Unload this device.
-    Destroy();
+    strict Destroy();
 };
 
 /// Maximum device name len.  This value must match `ZX_DEVICE_NAME_MAX`.
 const MAX_DEVICE_NAME_LEN uint32 = 31;
 
 /// Interface for creating devices within a devhost.
-protocol RootDevice {
+closed protocol RootDevice {
     /// Create a device with the given `name` that is a child of this device.
-    CreateDevice(resource struct {
+    strict CreateDevice(resource struct {
         name string:MAX_DEVICE_NAME_LEN;
     }) -> () error zx.Status;
 };

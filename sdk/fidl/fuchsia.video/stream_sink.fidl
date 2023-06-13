@@ -9,9 +9,9 @@ using zx;
 
 /// A packet consumer for cross-process video stream transport, implemented by video consumers
 /// and used by video producers.
-protocol StreamSink {
+closed protocol StreamSink {
     /// Puts a packet to the sink.
-    PutPacket(resource table {
+    strict PutPacket(resource table {
         /// Describes the packet. This field is required.
         1: packet Packet;
 
@@ -24,7 +24,7 @@ protocol StreamSink {
 
     /// Starts a new segment. Packets following this request and preceding the next such request
     /// are assigned to the segment.
-    StartSegment(table {
+    strict StartSegment(table {
         /// Identifies the segment. New segment IDs for a given connection must always be strictly
         /// increasing. This field is required.
         1: segment_id int64;
@@ -35,12 +35,12 @@ protocol StreamSink {
     /// client knows when to, for example, change the UI state of a player to let the user know the
     /// content is done playing. This method is logically scoped to the current segment. A
     /// `SetSegment` request and (typically) more packets may follow this request.
-    End();
+    strict End();
 
     /// Sent immediately before the producer closes to indicate why the producer is closing the
     /// connection. After sending this request, the producer must refrain from sending any more
     /// messages and close the connection promptly.
-    WillClose(table {
+    strict WillClose(table {
         /// Reason the connection will close.
         1: reason fuchsia.media2.ProducerClosedReason;
     });
@@ -48,7 +48,7 @@ protocol StreamSink {
     /// Sent immediately before the consumer closes to indicate why the consumer is closing the
     /// connection. After sending this event, the consumer must refrain from sending any more
     /// messages and close the connection promptly.
-    -> OnWillClose(table {
+    strict -> OnWillClose(table {
         /// Reason the connection will close.
         1: reason fuchsia.media2.ConsumerClosedReason;
     });
@@ -56,7 +56,7 @@ protocol StreamSink {
 
 /// An extended packet consumer for cross-process transport of uncompressed video streams
 /// that may change dimensions.
-protocol VariableStreamSink {
+closed protocol VariableStreamSink {
     compose StreamSink;
 
     /// The provided buffer_collection_id applies to all packets received via `PutPacket` until the
@@ -97,13 +97,13 @@ protocol VariableStreamSink {
     /// the most-recently-received `buffer_collection_id`, not stored explicitly in the packet. A
     /// new `segment_id` does not necessarily imply a new `buffer_collection_id`. If the buffers
     /// are still suitable, they can continue to be used.
-    SetBufferCollection(table {
+    strict SetBufferCollection(table {
         /// The id of the new buffer collection.
         1: buffer_collection_id int64;
     });
 
     /// Specifies the format of subsequent frames. Only geometry changes are currently supported.
-    SetFormat(table {
+    strict SetFormat(table {
         /// The new format. The `image_format` field must be populated, and all of the required
         /// fields of the image format must be populated. Given that only geometry changes are
         /// supported, image format fields `pixel_format`, `pixel_format_modifier`, and
@@ -124,7 +124,7 @@ protocol VariableStreamSink {
     /// send this message or the server ignores it, the server must ask sysmem for a VMO 
     /// corresponding to `buffer_collection_id` and `buffer_id` (if the server hasn't already done
     /// so previously) upon reception of `PutPacket` indicating that buffer at the server.
-    PrepareBuffer(table {
+    strict PrepareBuffer(table {
         /// The buffer collection containing the buffer that will be used.
         1: buffer_collection_id int64;
 
@@ -155,7 +155,7 @@ protocol VariableStreamSink {
     ///
     /// A server that handles reception of `SetBufferCollection` beyond the first one must also
     /// handle this message.
-    DoneWithBuffer(table {
+    strict DoneWithBuffer(table {
         /// The buffer collection containing the buffer that will no longer be used.
         1: buffer_collection_id int64;
 

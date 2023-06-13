@@ -30,7 +30,7 @@ type ModeRequestError = flexible enum {
 /// A protocol that can be used to request a change to the currently active
 /// system power modes.
 @discoverable
-protocol Requester {
+closed protocol Requester {
     /// Requests to set or clear a system power mode.
     ///
     /// The call returns immediately after the request has been received,
@@ -61,7 +61,7 @@ protocol Requester {
     /// + `set` should be true to request to set `mode`, or false to clear it
     /// * error a [`ModeRequestError`] value indicating why the request was
     /// rejected.
-    Request(struct {
+    strict Request(struct {
         mode SystemMode;
         set bool;
     }) -> () error ModeRequestError;
@@ -107,7 +107,7 @@ type ModeMatch = struct {
 /// A protocol that can be used to update the power configuration for a given
 /// [`ClientType`].
 @discoverable
-protocol ClientConfigurator {
+closed protocol ClientConfigurator {
     /// Gets the power configuration for the given [`ClientType`].
     ///
     /// If there is no power configuration for `client_type` then the returned
@@ -116,7 +116,7 @@ protocol ClientConfigurator {
     /// + `client_type` specifies which [`ClientType`] [`ClientConfig`] to get
     /// - `config` is the returned client-specific configuration, or an absent
     /// value if `client_type` does not have an existing configuration
-    Get(struct {
+    strict Get(struct {
         client_type fuchsia.power.clientlevel.ClientType;
     }) -> (struct {
         config box<ClientConfig>;
@@ -147,7 +147,7 @@ protocol ClientConfigurator {
     ///
     /// + `client_type` specifies which [`ClientType`]'s [`ClientConfig`] to set
     /// + `config` is the [`ClientConfig`] that will be set for [`client_type`]
-    Set(struct {
+    strict Set(struct {
         client_type fuchsia.power.clientlevel.ClientType;
         config ClientConfig;
     }) -> ();

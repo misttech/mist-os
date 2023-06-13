@@ -9,12 +9,12 @@ library fuchsia.legacymetrics;
 /// For similar behavior, see Chromium's MetricsService:
 /// https://chromium.googlesource.com/chromium/src.git/+/HEAD/components/metrics/metrics_service.cc
 @discoverable
-protocol MetricsRecorder {
+closed protocol MetricsRecorder {
     /// Processes and enqueues a batch of events for upload. Returns after the
     /// provided metrics are successfully processed by the service. Clients
     /// should wait for a completion callback before sending subsequent Record()
     /// requests.
-    Record(struct {
+    strict Record(struct {
         events vector<Event>:MAX;
     }) -> ();
 
@@ -23,5 +23,5 @@ protocol MetricsRecorder {
     /// available metrics and close its connection to this sevice. Otherwise,
     /// this service will close all incoming connections after a predefined
     /// timeout starting from the moment it broadcasts this event.
-    -> OnCloseSoon();
+    strict -> OnCloseSoon();
 };

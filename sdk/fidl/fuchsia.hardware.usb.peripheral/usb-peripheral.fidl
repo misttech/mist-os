@@ -40,18 +40,18 @@ type DeviceDescriptor = struct {
 /// of the completion of various server-side events.
 /// This callback interface can be registered using the SetStateChangeListener
 /// method on the Device protocol.
-protocol Events {
+closed protocol Events {
     /// Invoked when a function registers
-    FunctionRegistered() -> ();
+    strict FunctionRegistered() -> ();
     /// Invoked when all functions have been cleared.
-    FunctionsCleared();
+    strict FunctionsCleared();
 };
 
-protocol Device {
+closed protocol Device {
     /// Sets the device's descriptors, adds the functions and creates the child devices for the
     /// configuration's interfaces.
     /// At least one function descriptor must be provided.
-    SetConfiguration(struct {
+    strict SetConfiguration(struct {
         device_desc DeviceDescriptor;
         config_descriptors vector<ConfigurationDescriptor>:MAX_CONFIG_DESCRIPTORS;
     }) -> () error zx.Status;
@@ -59,9 +59,9 @@ protocol Device {
     /// Tells the device to remove the child devices for the configuration's interfaces
     /// and reset the list of functions to empty.
     /// The caller should wait for the `FunctionsCleared` event.
-    ClearFunctions() -> ();
+    strict ClearFunctions() -> ();
     /// Adds a state change listener that is invoked when a state change completes.
-    SetStateChangeListener(resource struct {
+    strict SetStateChangeListener(resource struct {
         listener client_end:Events;
     });
 };

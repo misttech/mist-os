@@ -183,21 +183,21 @@ type WpState = flexible bits : uint8 {
 };
 
 @discoverable
-protocol Cr50 {
+closed protocol Cr50 {
     /// Get information about the current state of case-closed debugging.
-    CcdGetInfo() -> (struct {
+    strict CcdGetInfo() -> (struct {
         rc Cr50Rc;
         info box<CcdInfo>;
     }) error zx.Status;
 
     /// Lock case-closed debugging.
-    CcdLock() -> (struct {
+    strict CcdLock() -> (struct {
         rc Cr50Rc;
     }) error zx.Status;
 
     /// Put case-closed debugging into the OPEN state.
     /// See |CcdState| for a description of what each state means.
-    CcdOpen(struct {
+    strict CcdOpen(struct {
         password string:<CCD_PASSWORD_MAX, optional>;
     }) -> (resource struct {
         rc Cr50Rc;
@@ -206,7 +206,7 @@ protocol Cr50 {
 
     /// Put case-closed debugging into the UNLOCKED state.
     /// See |CcdState| for a description of what each state means.
-    CcdUnlock(struct {
+    strict CcdUnlock(struct {
         password string:<CCD_PASSWORD_MAX, optional>;
     }) -> (resource struct {
         rc Cr50Rc;
@@ -214,7 +214,7 @@ protocol Cr50 {
     }) error zx.Status;
 
     /// Get the current state of the AP BIOS flash write protect.
-    WpGetState() -> (struct {
+    strict WpGetState() -> (struct {
         rc Cr50Rc;
         state WpState;
     }) error zx.Status;
@@ -243,12 +243,12 @@ type PhysicalPresenceEvent = flexible union {
 /// This protocol has no form of backpressure because it is not expected to
 /// generate a large number of messages. An unlock or open will usually result in less
 /// than 20 messages.
-protocol PhysicalPresenceNotifier {
+closed protocol PhysicalPresenceNotifier {
     /// Called when the PP check has changed state.
     /// If CLOSED is the first event sent, it means that no PP check was necessary
     /// (i.e. CCD is already open). However, if CLOSED isn't the first event
     /// sent, then CLOSED indicates that the PP check timed out.
-    -> OnChange(struct {
+    strict -> OnChange(struct {
         event PhysicalPresenceEvent;
     });
 };

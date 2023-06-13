@@ -7,11 +7,11 @@ using zx;
 
 // Reader with seek semantics.
 // TODO(dalesat): Report problems using Problem rather than SeekingReaderResult.
-protocol SeekingReader {
+closed protocol SeekingReader {
     // Describes the content. If there’s a problem accessing the content, this
     // is expressed by using result. The size_in_bytes may be reported as
     // UNKNOWN_SIZE if the size of the content is unknown.
-    Describe() -> (struct {
+    strict Describe() -> (struct {
         status zx.Status;
         size uint64;
         can_seek bool;
@@ -20,7 +20,7 @@ protocol SeekingReader {
     // Reads the content. If there’s a problem performing the read, this is
     // expressed using result. If the read succeeded, the reply must contain a
     // valid socket from which the content can be read.
-    ReadAt(struct {
+    strict ReadAt(struct {
         position uint64;
     }) -> (resource struct {
         status zx.Status;

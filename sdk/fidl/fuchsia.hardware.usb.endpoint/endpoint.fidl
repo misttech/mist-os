@@ -72,16 +72,16 @@ type Completion = resource table {
 /// the Endpoint is closed, all outstanding registered VMOs are unregistered, references to their
 /// handles dropped and any necessary actions for DisableEndpoint will be called.
 @discoverable
-protocol Endpoint {
+closed protocol Endpoint {
     /// Gets endpoint information
-    GetInfo() -> (struct {
+    strict GetInfo() -> (struct {
         info EndpointInfo;
     }) error zx.Status;
 
     /// Registers and pins VMOs to the vmo_ids. Returns
     ///  * vmo: Handles to successfully registered vmo_ids.
     /// VMO IDs that are already are registered to will fail.
-    RegisterVmos(resource struct {
+    strict RegisterVmos(resource struct {
         vmo_ids vector<VmoInfo>:VMO_VECTOR_MAX;
     }) -> (resource struct {
         vmos vector<VmoHandle>:VMO_VECTOR_MAX;
@@ -89,7 +89,7 @@ protocol Endpoint {
     /// Unregisters the VMOs corresponding to the vmo_ids. Returns
     ///  * failed_vmo_ids: vmo_ids that failed to unregister.
     ///  * errors: Error values that correspond 1:1 to failed_vmo_ids above.
-    UnregisterVmos(struct {
+    strict UnregisterVmos(struct {
         vmo_ids vector<fuchsia.hardware.usb.request.VmoId>:VMO_VECTOR_MAX;
     }) -> (resource struct {
         failed_vmo_ids vector<fuchsia.hardware.usb.request.VmoId>:VMO_VECTOR_MAX;
@@ -121,19 +121,19 @@ protocol Endpoint {
     /// is ready on schedule.
     ///  * Definition of "on schedule" varies for different endpoints and controllers. In general,
     ///    this will be communicated by the `lead_time` parameter returned by `GetInfo`.
-    QueueRequests(resource struct {
+    strict QueueRequests(resource struct {
         req vector<fuchsia.hardware.usb.request.Request>:REQUEST_MAX;
     });
     /// Called on a completion to notify the device driver of an completion event.
     /// Note that if more than REQUEST_MAX successful requests with defer_completion == true have
     /// been seen, driver may call OnCompletion multiple times when defer_completion == false is
     /// seen (or failure happens) to return all seen requests to the client.
-    -> OnCompletion(resource struct {
+    strict -> OnCompletion(resource struct {
         completion vector<Completion>:REQUEST_MAX;
     });
 
     /// Cancels all requests. Returns
     ///  * ZX_ERR_IO_NOT_PRESENT: If device is not running, disconnected, or inactive.
     ///  * ZX_ERR_IO: If cancel failed due to an unsuccessful request.
-    CancelAll() -> () error zx.Status;
+    strict CancelAll() -> () error zx.Status;
 };

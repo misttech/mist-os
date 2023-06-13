@@ -196,7 +196,7 @@ type Topology = table {
 
 /// For an overview see
 /// [[Signal Processing Interface]](https://fuchsia.dev/fuchsia-src/concepts/drivers/driver_architectures/audio_drivers/audio_signal_processing).
-protocol SignalProcessing {
+closed protocol SignalProcessing {
     /// Exposes read-only signal processing properties.
     compose Reader;
 
@@ -226,7 +226,7 @@ protocol SignalProcessing {
     /// close the protocol channel such that the protocol negotiations are started over.
     /// The client then must make the `SetElementState` call that returned
     /// ZX_ERR_BAD_STATE before any non-`SignalProcessing` protocol calls.
-    SetElementState(struct {
+    strict SetElementState(struct {
         processing_element_id uint64;
         state ElementState;
     }) -> () error zx.Status;
@@ -240,17 +240,17 @@ protocol SignalProcessing {
     /// If called after non-`SignalProcessing` protocol calls, then `SetTopology` may return
     /// ZX_ERR_BAD_STATE to indicate that the operation can not proceed without renegotiation of the
     /// driver state. See `SetElementState` for further discussion.
-    SetTopology(struct {
+    strict SetTopology(struct {
         topology_id uint64;
     }) -> () error zx.Status;
 };
 
 /// For an overview see
 /// [[Signal Processing Interface]](https://fuchsia.dev/fuchsia-src/concepts/drivers/driver_architectures/audio_drivers/audio_signal_processing).
-protocol Reader {
+closed protocol Reader {
     /// Returns a vector of supported processing elements.
     /// Must return one or more processing elements, or ZX_ERR_NOT_SUPPORTED.
-    GetElements() -> (struct {
+    strict GetElements() -> (struct {
         processing_elements vector<Element>:MAX_COUNT_PROCESSING_ELEMENTS;
     }) error zx.Status;
 
@@ -259,7 +259,7 @@ protocol Reader {
     /// The driver will not respond to subsequent client `WatchElement` calls for a
     /// given `processing_element_id` until any field of the `Element` table
     /// changes from what was most recently reported for that `processing_element_id`.
-    WatchElementState(struct {
+    strict WatchElementState(struct {
         processing_element_id uint64;
     }) -> (struct {
         state ElementState;
@@ -273,7 +273,7 @@ protocol Reader {
     /// the one and only topology used can't be changed with `SetTopology`.
     /// If `GetElements` returns one or more elements, `GetTopologies` must return one or
     /// more topologies.
-    GetTopologies() -> (struct {
+    strict GetTopologies() -> (struct {
         topologies vector<Topology>:MAX_COUNT_TOPOLOGIES;
     }) error zx.Status;
 };

@@ -8,17 +8,17 @@ library fuchsia.ui.input;
 /// Input devices can describe their capabilities using `DeviceDescriptor`
 /// and register themselves with the `InputDeviceRegistry`.
 @available(deprecated=12, removed=13)
-protocol InputDeviceRegistry {
+closed protocol InputDeviceRegistry {
     /// Register a device with the capabilities described by `DeviceDescriptor`
-    RegisterDevice(resource struct {
+    strict RegisterDevice(resource struct {
         descriptor DeviceDescriptor;
         input_device server_end:InputDevice;
     });
 };
 
-protocol InputDevice {
+closed protocol InputDevice {
     /// Dispatch an `InputReport` from the device `token`
-    DispatchReport(struct {
+    strict DispatchReport(struct {
         report InputReport;
     });
 };

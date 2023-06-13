@@ -11,19 +11,19 @@ const MAX_RESOLUTIONS_PER_STREAM uint32 = 256;
 
 /// A Stream represents timing, sequencing, and other camera-specific properties applied to a buffer
 /// collection.
-protocol Stream {
+closed protocol Stream {
     /// Gets the properties associated with this stream. The value returned is identical to the one
     /// corresponding to this stream as returned by |Device.GetConfigurations|.
     @transitional
     @deprecated("Use GetProperties2")
-    GetProperties() -> (struct {
+    strict GetProperties() -> (struct {
         properties StreamProperties;
     });
 
     /// Gets the properties associated with this stream. The value returned is identical to the one
     /// corresponding to this stream as returned by |Device.GetConfigurations|.
     @transitional
-    GetProperties2() -> (struct {
+    strict GetProperties2() -> (struct {
         properties StreamProperties2;
     });
 
@@ -35,28 +35,28 @@ protocol Stream {
     /// to specifying a region covering the entire image. Upon initial connection, the region is
     /// unset. If the stream does not support crop region, the connection is closed with the
     /// ZX_ERR_NOT_SUPPORTED epitaph.
-    SetCropRegion(struct {
+    strict SetCropRegion(struct {
         region box<fuchsia.math.RectF>;
     });
 
     /// Returns the crop region if it has changed from a previously returned value, or is called by
     /// a client for the first time. Frame callbacks received after receiving this callback reflect
     /// the use of the new region. See SetCropRegion for a description of the region parameter.
-    WatchCropRegion() -> (struct {
+    strict WatchCropRegion() -> (struct {
         region box<fuchsia.math.RectF>;
     });
 
     /// Sets the resolution of the stream to the provided value. If the implementation does not
     /// precisely support the provided value, it will be expanded to the minimum resolution that
     /// exceeds the provided resolution.
-    SetResolution(struct {
+    strict SetResolution(struct {
         coded_size fuchsia.math.Size;
     });
 
     /// Returns the resolution if it has changed from a previously returned value, or is called by
     /// a client for the first time. Frame callbacks received after receiving this callback reflect
     /// the new resolution.
-    WatchResolution() -> (struct {
+    strict WatchResolution() -> (struct {
         coded_size fuchsia.math.Size;
     });
 
@@ -66,7 +66,7 @@ protocol Stream {
     /// non-participant. After registering as a participant, clients must always have an outstanding
     /// call to WatchBufferCollection to receive tokens from the server so that they are able to
     /// respond to current and future renegotiation requests.
-    SetBufferCollection(resource struct {
+    strict SetBufferCollection(resource struct {
         token client_end:<fuchsia.sysmem.BufferCollectionToken, optional>;
     });
 
@@ -77,21 +77,21 @@ protocol Stream {
     /// Because the camera can output directly to these collections, each client should support
     /// reading from a |fuchsia.sysmem.CoherencyDomain| of RAM, and set |ram_domain_supported| in
     /// their |fuchsia.sysmem.BufferMemoryConstraints|.
-    WatchBufferCollection() -> (resource struct {
+    strict WatchBufferCollection() -> (resource struct {
         token client_end:fuchsia.sysmem.BufferCollectionToken;
     });
 
     /// Returns the orientation if it has changed from a previously returned value, or is called by
     /// a client for the first time. Frame callbacks received after receiving this callback reflect
     /// the new orientation.
-    WatchOrientation() -> (struct {
+    strict WatchOrientation() -> (struct {
         orientation Orientation;
     });
 
     /// See GetNextFrame2.
     @transitional
     @deprecated("Use GetNextFrame2")
-    GetNextFrame() -> (resource struct {
+    strict GetNextFrame() -> (resource struct {
         info FrameInfo;
     });
 
@@ -102,14 +102,14 @@ protocol Stream {
     /// negotiated buffer collection token. If a buffer renegotiation is in progress, this call will
     /// return only after the negotiation is complete and a new collection is available.
     @transitional
-    GetNextFrame2() -> (resource struct {
+    strict GetNextFrame2() -> (resource struct {
         info FrameInfo2;
     });
 
     /// Request another connection to this Stream. This allows a client to delegate different
     /// operations to different coordinated clients, or have multiple clients concurrently observe
     /// frames produced by the stream.
-    Rebind(resource struct {
+    strict Rebind(resource struct {
         request server_end:Stream;
     });
 };

@@ -9,52 +9,52 @@ using zx;
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol UsbDci {
+closed protocol UsbDci {
     /// Queues a USB request with the DCI driver.
-    RequestQueue(resource struct {
+    strict RequestQueue(resource struct {
         @in_out
         usb_request fuchsia.hardware.usb.request.UsbRequest;
         @in_out
         complete_cb client_end:fuchsia.hardware.usb.request.UsbRequestCompleteCallback;
     }) -> ();
     /// Registers callback interface with the DCI driver.
-    SetInterface(resource struct {
+    strict SetInterface(resource struct {
         interface client_end:UsbDciInterface;
     }) -> (struct {
         s zx.Status;
     });
     /// Configures an endpoint based on provided descriptors.
-    ConfigEp(struct {
+    strict ConfigEp(struct {
         ep_desc fuchsia.hardware.usb.descriptor.UsbEndpointDescriptor;
         ss_comp_desc fuchsia.hardware.usb.descriptor.UsbSsEpCompDescriptor;
     }) -> (struct {
         s zx.Status;
     });
     /// Disables the specified endpoint.
-    DisableEp(struct {
+    strict DisableEp(struct {
         ep_address uint8;
     }) -> (struct {
         s zx.Status;
     });
     /// Stalls the specified endpoint.
-    EpSetStall(struct {
+    strict EpSetStall(struct {
         ep_address uint8;
     }) -> (struct {
         s zx.Status;
     });
     /// Clears a stall condition for the specified endpoint.
-    EpClearStall(struct {
+    strict EpClearStall(struct {
         ep_address uint8;
     }) -> (struct {
         s zx.Status;
     });
     /// Returns the size needed for a |usb_request_t|, including private storage needed by the
     /// HCI driver.
-    GetRequestSize() -> (struct {
+    strict GetRequestSize() -> (struct {
         size uint64;
     });
     /// Cancels all transactions currently queued on the specified endpoint.
-    CancelAll(struct {
+    strict CancelAll(struct {
         ep_address uint8;
     }) -> (struct {
         s zx.Status;
@@ -64,9 +64,9 @@ protocol UsbDci {
 /// Interface for use by the DCI controller to call into the USB peripheral driver.
 @transport("Banjo")
 @banjo_layout("ddk-interface")
-protocol UsbDciInterface {
+closed protocol UsbDciInterface {
     /// Callback for handling ep0 control requests.
-    Control(struct {
+    strict Control(struct {
         setup fuchsia.hardware.usb.descriptor.UsbSetup;
         @buffer
         write vector<uint8>:MAX;
@@ -76,11 +76,11 @@ protocol UsbDciInterface {
         read vector<uint8>:MAX;
     });
     /// Notifies change in USB connected state.
-    SetConnected(struct {
+    strict SetConnected(struct {
         connected bool;
     }) -> ();
     /// Notifies current USB speed..
-    SetSpeed(struct {
+    strict SetSpeed(struct {
         speed fuchsia.hardware.usb.descriptor.UsbSpeed;
     }) -> ();
 };

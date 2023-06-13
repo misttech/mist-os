@@ -7,9 +7,9 @@ const CPRNG_DRAW_MAX_LEN usize64 = 256;
 const CPRNG_ADD_ENTROPY_MAX_LEN usize64 = 256;
 
 @transport("Syscall")
-protocol Cprng {
+closed protocol Cprng {
     @internal
-    DrawOnce() -> (struct {
+    strict DrawOnce() -> (struct {
         @voidptr
         buffer vector<byte>:CPRNG_DRAW_MAX_LEN;
     }) error Status;
@@ -55,7 +55,7 @@ protocol Cprng {
     ///
     /// [`zx_cprng_add_entropy()`]: cprng_add_entropy.md
     @vdsocall
-    Draw() -> (struct {
+    strict Draw() -> (struct {
         @voidptr
         buffer vector<byte>:CPRNG_DRAW_MAX_LEN;
     });
@@ -100,7 +100,7 @@ protocol Cprng {
     ///  - [`zx_cprng_draw()`]
     ///
     /// [`zx_cprng_draw()`]: cprng_draw.md
-    AddEntropy(struct {
+    strict AddEntropy(struct {
         @voidptr
         buffer vector<byte>:CPRNG_ADD_ENTROPY_MAX_LEN;
     }) -> () error Status;

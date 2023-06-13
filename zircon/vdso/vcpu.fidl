@@ -4,7 +4,7 @@
 library zx;
 
 @transport("Syscall")
-protocol Vcpu {
+closed protocol Vcpu {
     /// ## Summary
     ///
     /// Create a VCPU.
@@ -98,7 +98,7 @@ protocol Vcpu {
     /// [`zx_vcpu_kick()`]: vcpu_kick.md
     /// [`zx_vcpu_read_state()`]: vcpu_read_state.md
     /// [`zx_vcpu_write_state()`]: vcpu_write_state.md
-    Create(resource struct {
+    strict Create(resource struct {
         guest Handle:GUEST;
         options uint32;
         entry Vaddr;
@@ -179,7 +179,7 @@ protocol Vcpu {
     /// [`zx_vcpu_read_state()`]: vcpu_read_state.md
     /// [`zx_vcpu_write_state()`]: vcpu_write_state.md
     @blocking
-    Enter(resource struct {
+    strict Enter(resource struct {
         handle Handle:VCPU;
     }) -> (struct {
         packet PortPacket;
@@ -239,7 +239,7 @@ protocol Vcpu {
     /// [`zx_vcpu_interrupt()`]: vcpu_interrupt.md
     /// [`zx_vcpu_read_state()`]: vcpu_read_state.md
     /// [`zx_vcpu_write_state()`]: vcpu_write_state.md
-    Kick(resource struct {
+    strict Kick(resource struct {
         handle Handle:VCPU;
     }) -> () error Status;
 
@@ -297,7 +297,7 @@ protocol Vcpu {
     /// [`zx_vcpu_kick()`]: vcpu_kick.md
     /// [`zx_vcpu_read_state()`]: vcpu_read_state.md
     /// [`zx_vcpu_write_state()`]: vcpu_write_state.md
-    Interrupt(resource struct {
+    strict Interrupt(resource struct {
         handle Handle:VCPU;
         vector uint32;
     }) -> () error Status;
@@ -367,7 +367,7 @@ protocol Vcpu {
     /// [`zx_vcpu_interrupt()`]: vcpu_interrupt.md
     /// [`zx_vcpu_kick()`]: vcpu_kick.md
     /// [`zx_vcpu_write_state()`]: vcpu_write_state.md
-    ReadState(resource struct {
+    strict ReadState(resource struct {
         handle Handle:VCPU;
         kind uint32;
     }) -> (struct {
@@ -440,7 +440,7 @@ protocol Vcpu {
     /// [`zx_vcpu_interrupt()`]: vcpu_interrupt.md
     /// [`zx_vcpu_kick()`]: vcpu_kick.md
     /// [`zx_vcpu_read_state()`]: vcpu_read_state.md
-    WriteState(resource struct {
+    strict WriteState(resource struct {
         handle Handle:VCPU;
         kind uint32;
         @voidptr

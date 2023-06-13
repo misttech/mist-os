@@ -40,30 +40,30 @@ const MAX_REBOOT_WATCHER_RESPONSE_TIME_SECONDS uint32 = 5;
 /// Alternatively, the caller could choose to use an asynchronous FIDL client with this protocol to
 /// avoid blocking their calling thread.
 @discoverable
-protocol Admin {
+closed protocol Admin {
     /// Asks the device to enter a fully on state.
-    PowerFullyOn() -> () error zx.Status;
+    strict PowerFullyOn() -> () error zx.Status;
 
     /// Asks the device to reboot.
-    Reboot(struct {
+    strict Reboot(struct {
         reason RebootReason;
     }) -> () error zx.Status;
 
     /// Asks the device to reboot into the bootloader.
-    RebootToBootloader() -> () error zx.Status;
+    strict RebootToBootloader() -> () error zx.Status;
 
     /// Asks the device to reboot into the recovery partition.
-    RebootToRecovery() -> () error zx.Status;
+    strict RebootToRecovery() -> () error zx.Status;
 
     /// Asks all devices to enter a powered off state.
-    Poweroff() -> () error zx.Status;
+    strict Poweroff() -> () error zx.Status;
 
     /// Performs a kernel mexec.
     ///
     /// It is expected that the ZBI items specified by
     /// `zx_system_mexec_payload_get()` have not yet been appended to the
     /// provided data ZBI.
-    Mexec(resource struct {
+    strict Mexec(resource struct {
         kernel_zbi zx.Handle:VMO;
         data_zbi zx.Handle:VMO;
     }) -> () error zx.Status;
@@ -72,7 +72,7 @@ protocol Admin {
     /// x64. If a system state transition is already in progress then ZX_ERR_ALREADY_EXISTS is
     /// returned. If the device fails to reach the suspend power state then ZX_ERR_INTERNAL is
     /// returned. If the device successfully suspends, ZX_OK is returned when the device resumes.
-    SuspendToRam() -> () error zx.Status;
+    strict SuspendToRam() -> () error zx.Status;
 };
 
 /// Allows components to register a callback that will be executed when a Reboot
@@ -80,7 +80,7 @@ protocol Admin {
 /// reboot reasons. Consider relying on Component Framework's orderly shutdown
 /// if you're looking at using this protocol.
 @discoverable
-protocol RebootMethodsWatcherRegister {
+closed protocol RebootMethodsWatcherRegister {
     /// Register a watcher to be notified when a Reboot method is called. The
     /// Register channel will be used at most once to notify the watcher of an
     /// impending reboot and allow it the chance to respond.
@@ -90,7 +90,7 @@ protocol RebootMethodsWatcherRegister {
     // moved to `RegisterWithAck`. After removal, consider renaming
     // `RegisterWithAck` back to `Register`.
     @available(deprecated=HEAD)
-    Register(resource struct {
+    strict Register(resource struct {
         watcher client_end:RebootMethodsWatcher;
     });
 
@@ -110,7 +110,7 @@ protocol RebootMethodsWatcherRegister {
     ///
     /// Watchers can unregister by closing their `RebootMethodsWatcher` channel.
     @available(added=HEAD)
-    RegisterWithAck(resource struct {
+    strict RegisterWithAck(resource struct {
         watcher client_end:RebootMethodsWatcher;
     }) -> ();
 };
@@ -120,8 +120,8 @@ protocol RebootMethodsWatcherRegister {
 /// before the system power state is changed. The channel will be used once to
 /// send a notification to the watcher. Once the watcher responds or the timeout
 /// expires, the channel will be closed by the client of RebootMethodsWatcher.
-protocol RebootMethodsWatcher {
-    OnReboot(struct {
+closed protocol RebootMethodsWatcher {
+    strict OnReboot(struct {
         reason RebootReason;
     }) -> ();
 };
