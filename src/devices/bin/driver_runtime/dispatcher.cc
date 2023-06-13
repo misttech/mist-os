@@ -383,20 +383,6 @@ zx_status_t Dispatcher::CreateWithAdder(uint32_t options, std::string_view name,
   return ZX_OK;
 }
 
-zx_status_t Dispatcher::CreateWithLoop(uint32_t options, std::string_view name,
-                                       std::string_view scheduler_role, const void* owner,
-                                       async::Loop* loop,
-                                       fdf_dispatcher_shutdown_observer_t* observer,
-                                       Dispatcher** out_dispatcher) {
-  // TODO(fxbug.dev/123943): the dispatcher uses the default thread pool to track IRQs,
-  // so we pass it in even though we already have a loop. This is so we don't have to add
-  // null checks everywhere. Eventually we will be deleting this |CreateWithLoop| API anyway.
-  auto default_thread_pool = GetDispatcherCoordinator().default_thread_pool();
-  return CreateWithAdder(
-      options, name, scheduler_role, owner, default_thread_pool, loop->dispatcher(),
-      [&]() { return loop->StartThread(); }, observer, out_dispatcher);
-}
-
 // fdf_dispatcher_t implementation
 
 // static
@@ -616,7 +602,7 @@ void Dispatcher::Destroy() {
     ZX_ASSERT(state_ == DispatcherState::kShutdown);
     state_ = DispatcherState::kDestroyed;
   }
-  // Recover the reference created in |CreateWithLoop|.
+  // Recover the reference created in |CreateWithAdder|.
   auto dispatcher_ref = fbl::ImportFromRawPtr(this);
   GetDispatcherCoordinator().RemoveDispatcher(*this);
 }

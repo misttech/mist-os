@@ -269,7 +269,7 @@ class Dispatcher : public async_dispatcher_t,
   };
 
   // Public for std::make_unique.
-  // Use |Create| or |CreateWithLoop| instead of calling directly.
+  // Use |Create| instead of calling directly.
   Dispatcher(uint32_t options, std::string_view name, bool unsynchronized, bool allow_sync_calls,
              const void* owner, ThreadPool* thread_pool,
              async_dispatcher_t* process_shared_dispatcher,
@@ -286,17 +286,6 @@ class Dispatcher : public async_dispatcher_t,
                                      ThreadPool* thread_pool, async_dispatcher_t* dispatcher,
                                      ThreadAdder adder, fdf_dispatcher_shutdown_observer_t*,
                                      Dispatcher** out_dispatcher);
-
-  // Creates a dispatcher which is backed by |loop|.
-  // |loop| can be the |ProcessSharedLoop|, or a private async loop created by a test.
-  //
-  // Returns ownership of the dispatcher in |out_dispatcher|. The caller should call
-  // |Destroy| once they are done using the dispatcher. Once |Destroy| is called,
-  // the dispatcher will be deleted once all callbacks canclled or completed by the dispatcher.
-  static zx_status_t CreateWithLoop(uint32_t options, std::string_view name,
-                                    std::string_view scheduler_role, const void* owner,
-                                    async::Loop* loop, fdf_dispatcher_shutdown_observer_t*,
-                                    Dispatcher** out_dispatcher);
 
   // fdf_dispatcher_t implementation
   // Returns ownership of the dispatcher in |out_dispatcher|. The caller should call
