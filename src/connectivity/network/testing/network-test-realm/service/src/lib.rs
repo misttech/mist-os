@@ -130,11 +130,17 @@ pub async fn get_interface_id<'a>(
         fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
     )
     .context("failed to get interface stream")?;
-    let interfaces = fnet_interfaces_ext::existing(stream, HashMap::<u64, _>::new())
-        .await
-        .context("failed to get existing interfaces")?;
+    let interfaces = fnet_interfaces_ext::existing(
+        stream,
+        HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new(),
+    )
+    .await
+    .context("failed to get existing interfaces")?;
     Ok(interfaces.values().find_map(
-        |fidl_fuchsia_net_interfaces_ext::Properties { id, name, .. }| {
+        |fidl_fuchsia_net_interfaces_ext::PropertiesAndState {
+             properties: fidl_fuchsia_net_interfaces_ext::Properties { id, name, .. },
+             state: _,
+         }| {
             if name == interface_name {
                 Some(id.get())
             } else {

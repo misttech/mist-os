@@ -7,6 +7,7 @@ use {
     fidl_fuchsia_device as fdevice, fidl_fuchsia_hwinfo as hwinfo,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fuchsia_zircon as zx,
+    std::collections::HashMap,
     tracing::*,
 };
 
@@ -48,9 +49,12 @@ impl HostIdentifier {
             error!(%e, "Getting interface watcher failed");
             rcs::IdentifyHostError::ListInterfacesFailed
         })?;
-        let ilist = fnet_interfaces_ext::existing(stream, std::collections::HashMap::new())
-            .await
-            .map_err(|e| {
+        let ilist = fnet_interfaces_ext::existing(
+            stream,
+            HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<()>>::new(),
+        )
+        .await
+        .map_err(|e| {
             error!(%e, "Getting existing interfaces failed");
             rcs::IdentifyHostError::ListInterfacesFailed
         })?;
@@ -75,31 +79,17 @@ impl HostIdentifier {
         let addresses = ilist
             .into_iter()
             .map(|(_, v): (u64, _)| v)
-            .flat_map(
-                |fnet_interfaces_ext::Properties {
-                     id: _,
-                     name: _,
-                     device_class: _,
-                     online: _,
-                     addresses,
-                     has_default_ipv4_route: _,
-                     has_default_ipv6_route: _,
-                 }| {
-                    addresses.into_iter().filter_map(
-                        |fnet_interfaces_ext::Address {
-                             addr,
-                             valid_until: _,
-                             assignment_state,
-                         }| {
-                            match assignment_state {
-                                fnet_interfaces::AddressAssignmentState::Assigned => Some(addr),
-                                fnet_interfaces::AddressAssignmentState::Tentative
-                                | fnet_interfaces::AddressAssignmentState::Unavailable => None,
-                            }
-                        },
-                    )
-                },
-            )
+            .flat_map(|properties_and_state| {
+                properties_and_state.properties.addresses.into_iter().filter_map(
+                    |fnet_interfaces_ext::Address { addr, valid_until: _, assignment_state }| {
+                        match assignment_state {
+                            fnet_interfaces::AddressAssignmentState::Assigned => Some(addr),
+                            fnet_interfaces::AddressAssignmentState::Tentative
+                            | fnet_interfaces::AddressAssignmentState::Unavailable => None,
+                        }
+                    },
+                )
+            })
             .collect::<Vec<_>>();
 
         let addresses = Some(addresses);

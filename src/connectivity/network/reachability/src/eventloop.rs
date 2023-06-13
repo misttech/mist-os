@@ -164,7 +164,7 @@ pub struct EventLoop {
     monitor: Monitor,
     handler: ReachabilityHandler,
     watchdog: Watchdog,
-    interface_properties: HashMap<u64, fnet_interfaces_ext::Properties>,
+    interface_properties: HashMap<u64, fnet_interfaces_ext::PropertiesAndState<()>>,
     neighbor_cache: NeighborCache,
     routes: RouteTable,
     latest_dns_addresses: Vec<fnet::IpAddress>,
@@ -345,7 +345,7 @@ impl EventLoop {
                 probe = probe_futures.select_next_some() => {
                     match probe {
                         (Some(id), stream) => {
-                            if let Some(properties) = self.interface_properties.get(&id) {
+                            if let Some(fnet_interfaces_ext::PropertiesAndState { properties, state: _ }) = self.interface_properties.get(&id) {
                                 let () = Self::begin_network_check(
                                     &mut self.monitor,
                                     &mut self.watchdog,
@@ -401,10 +401,14 @@ impl EventLoop {
                     .context("failed to handle interface watcher event")?;
                 if let Some(id) = discovered_id {
                     if let Some(telemetry_sender) = &self.telemetry_sender {
-                        let has_default_ipv4_route =
-                            self.interface_properties.values().any(|p| p.has_default_ipv4_route);
-                        let has_default_ipv6_route =
-                            self.interface_properties.values().any(|p| p.has_default_ipv6_route);
+                        let has_default_ipv4_route = self
+                            .interface_properties
+                            .values()
+                            .any(|p| p.properties.has_default_ipv4_route);
+                        let has_default_ipv6_route = self
+                            .interface_properties
+                            .values()
+                            .any(|p| p.properties.has_default_ipv6_route);
                         telemetry_sender.send(TelemetryEvent::NetworkConfig {
                             has_default_ipv4_route,
                             has_default_ipv6_route,
@@ -428,8 +432,8 @@ impl EventLoop {
             .update(event)
             .context("failed to update interface properties map with watcher event")?
         {
-            fnet_interfaces_ext::UpdateResult::Added(properties)
-            | fnet_interfaces_ext::UpdateResult::Existing(properties) => {
+            fnet_interfaces_ext::UpdateResult::Added { properties, state: _ }
+            | fnet_interfaces_ext::UpdateResult::Existing { properties, state: _ } => {
                 if !Self::should_monitor_interface(&properties) {
                     return Ok(None);
                 }
@@ -468,6 +472,7 @@ impl EventLoop {
                         has_default_ipv4_route: _,
                         has_default_ipv6_route: _,
                     },
+                state: _,
             } => {
                 // TODO(https://fxbug.dev/110445): Don't register interest in
                 // valid-until instead of filtering out address property
@@ -506,7 +511,9 @@ impl EventLoop {
                     .await;
                 }
             }
-            fnet_interfaces_ext::UpdateResult::Removed(properties) => {
+            fnet_interfaces_ext::UpdateResult::Removed(
+                fnet_interfaces_ext::PropertiesAndState { properties, state: () },
+            ) => {
                 self.watchdog.handle_interface_removed(properties.id.get());
                 self.monitor.handle_interface_removed(properties);
             }

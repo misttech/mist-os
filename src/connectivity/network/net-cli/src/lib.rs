@@ -124,20 +124,11 @@ pub async fn do_root<C: NetCliDepsConnector>(
 
 fn shortlist_interfaces(
     name_pattern: &str,
-    interfaces: &mut HashMap<u64, finterfaces_ext::Properties>,
+    interfaces: &mut HashMap<u64, finterfaces_ext::PropertiesAndState<()>>,
 ) {
-    interfaces.retain(
-        |_: &u64,
-         finterfaces_ext::Properties {
-             id: _,
-             name,
-             device_class: _,
-             online: _,
-             addresses: _,
-             has_default_ipv4_route: _,
-             has_default_ipv6_route: _,
-         }| name.contains(name_pattern),
-    )
+    interfaces.retain(|_: &u64, properties_and_state| {
+        properties_and_state.properties.name.contains(name_pattern)
+    })
 }
 
 fn write_tabulated_interfaces_info<
@@ -286,15 +277,23 @@ async fn do_if<C: NetCliDepsConnector>(
                 &interface_state,
                 finterfaces_ext::IncludedAddresses::OnlyAssigned,
             )?;
-            let mut response = finterfaces_ext::existing(stream, HashMap::new()).await?;
+            let mut response = finterfaces_ext::existing(
+                stream,
+                HashMap::<u64, finterfaces_ext::PropertiesAndState<()>>::new(),
+            )
+            .await?;
             if let Some(name_pattern) = name_pattern {
                 let () = shortlist_interfaces(&name_pattern, &mut response);
             }
-            let response = response.into_values().map(|properties| async {
-                let finterfaces_ext::Properties { id, .. } = &properties;
-                let mac = debug_interfaces.get_mac(id.get()).await.context("call get_mac")?;
-                Ok::<_, Error>((properties, mac))
-            });
+            let response = response.into_values().map(
+                |finterfaces_ext::PropertiesAndState { properties, state: () }| async {
+                    let mac = debug_interfaces
+                        .get_mac(properties.id.get())
+                        .await
+                        .context("call get_mac")?;
+                    Ok::<_, Error>((properties, mac))
+                },
+            );
             let response = futures::future::try_join_all(response).await?;
             let mut response: Vec<_> = response
                 .into_iter()
@@ -324,14 +323,19 @@ async fn do_if<C: NetCliDepsConnector>(
                 &interface_state,
                 finterfaces_ext::IncludedAddresses::OnlyAssigned,
             )?;
-            let response =
-                finterfaces_ext::existing(stream, finterfaces_ext::InterfaceState::Unknown(id))
-                    .await?;
+            let response = finterfaces_ext::existing(
+                stream,
+                finterfaces_ext::InterfaceState::<()>::Unknown(id),
+            )
+            .await?;
             match response {
                 finterfaces_ext::InterfaceState::Unknown(id) => {
                     return Err(user_facing_error(format!("interface with id={} not found", id)));
                 }
-                finterfaces_ext::InterfaceState::Known(properties) => {
+                finterfaces_ext::InterfaceState::Known(finterfaces_ext::PropertiesAndState {
+                    properties,
+                    state: _,
+                }) => {
                     let finterfaces_ext::Properties { id, .. } = &properties;
                     let mac = debug_interfaces.get_mac(id.get()).await.context("call get_mac")?;
                     match mac {
@@ -655,14 +659,18 @@ async fn do_if<C: NetCliDepsConnector>(
                         .map(
                             |(
                                 id,
-                                finterfaces_ext::Properties {
-                                    name,
-                                    id: _,
-                                    device_class: _,
-                                    online: _,
-                                    addresses: _,
-                                    has_default_ipv4_route: _,
-                                    has_default_ipv6_route: _,
+                                finterfaces_ext::PropertiesAndState {
+                                    properties:
+                                        finterfaces_ext::Properties {
+                                            name,
+                                            id: _,
+                                            device_class: _,
+                                            online: _,
+                                            addresses: _,
+                                            has_default_ipv4_route: _,
+                                            has_default_ipv6_route: _,
+                                        },
+                                    state: (),
                                 },
                             )| (name, id),
                         )
@@ -1600,7 +1608,7 @@ mod tests {
         .into_iter()
         .map(|(properties, _): (_, Option<fnet::MacAddress>)| {
             let finterfaces_ext::Properties { id, .. } = &properties;
-            (id.get(), properties)
+            (id.get(), finterfaces_ext::PropertiesAndState { properties, state: () })
         })
         .collect();
         let () = shortlist_interfaces(name_pattern, &mut interfaces);

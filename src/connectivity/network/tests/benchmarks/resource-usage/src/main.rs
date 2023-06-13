@@ -92,14 +92,16 @@ async fn run_benchmark<W: Workload, N: Netstack>(
                 fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
             )
             .expect("get interface event stream"),
-            HashMap::<u64, _>::new(),
+            HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<()>>::new(),
         )
         .await
         .expect("collect existing interfaces")
     };
     assert_eq!(interfaces.len(), 1);
-    let fnet_interfaces_ext::Properties { device_class, online, .. } =
-        interfaces.values().into_iter().next().unwrap();
+    let fnet_interfaces_ext::PropertiesAndState {
+        properties: fnet_interfaces_ext::Properties { device_class, online, .. },
+        state: _,
+    } = interfaces.values().into_iter().next().unwrap();
     assert_eq!(device_class, &fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty));
     assert!(online);
 

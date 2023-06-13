@@ -34,18 +34,22 @@ const ENTRY_METRICS: u32 = 256;
 
 fn get_interface_id(
     want_name: &str,
-    intf: &HashMap<u64, fnet_interfaces_ext::Properties>,
+    intf: &HashMap<u64, fnet_interfaces_ext::PropertiesAndState<()>>,
 ) -> Result<u64, Error> {
     intf.values()
         .find_map(
-            |fidl_fuchsia_net_interfaces_ext::Properties {
-                 id,
-                 name,
-                 device_class: _,
-                 online: _,
-                 addresses: _,
-                 has_default_ipv4_route: _,
-                 has_default_ipv6_route: _,
+            |fnet_interfaces_ext::PropertiesAndState {
+                 properties:
+                     fnet_interfaces_ext::Properties {
+                         id,
+                         name,
+                         device_class: _,
+                         online: _,
+                         addresses: _,
+                         has_default_ipv4_route: _,
+                         has_default_ipv6_route: _,
+                     },
+                 state: _,
              }| if name == want_name { Some(id.get()) } else { None },
         )
         .ok_or(anyhow::format_err!("failed to find {}", want_name))

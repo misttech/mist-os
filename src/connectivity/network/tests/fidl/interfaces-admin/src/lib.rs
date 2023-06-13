@@ -157,27 +157,22 @@ async fn update_address_lifetimes<N: Netstack>(name: &str) {
     .fuse();
     futures::pin_mut!(event_stream);
 
-    let mut if_state = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(interface.id());
+    let mut if_state =
+        fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(interface.id());
     async fn wait_for_lifetimes(
         event_stream: impl futures::Stream<
             Item = Result<fidl_fuchsia_net_interfaces::Event, fidl::Error>,
         >,
-        if_state: &mut fidl_fuchsia_net_interfaces_ext::InterfaceState,
+        if_state: &mut fidl_fuchsia_net_interfaces_ext::InterfaceState<()>,
         valid_until: zx::sys::zx_time_t,
     ) -> Result<(), anyhow::Error> {
         fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
             event_stream,
             if_state,
-            move |fidl_fuchsia_net_interfaces_ext::Properties {
-                      addresses,
-                      online: _,
-                      id: _,
-                      name: _,
-                      device_class: _,
-                      has_default_ipv4_route: _,
-                      has_default_ipv6_route: _,
-                  }: &fidl_fuchsia_net_interfaces_ext::Properties| {
-                addresses
+            move |iface| {
+                iface
+                    .properties
+                    .addresses
                     .contains(&fidl_fuchsia_net_interfaces_ext::Address {
                         addr: ADDR,
                         valid_until,
@@ -601,7 +596,7 @@ async fn create_realm_and_interface<'a, N: Netstack>(
             fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
         )
         .expect("create watcher event stream"),
-        HashMap::new(),
+        HashMap::<_, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new(),
     )
     .await
     .expect("initial");
@@ -685,20 +680,14 @@ async fn add_address_and_remove<N: Netstack>(
     )
     .expect("event stream from state");
     futures::pin_mut!(event_stream);
-    let mut properties = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(id);
+    let mut properties = fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(id);
     let () = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
         event_stream.by_ref(),
         &mut properties,
-        |fidl_fuchsia_net_interfaces_ext::Properties {
-             id: _,
-             name: _,
-             device_class: _,
-             online: _,
-             addresses,
-             has_default_ipv4_route: _,
-             has_default_ipv6_route: _,
-         }| {
-            addresses
+        |iface| {
+            iface
+                .properties
+                .addresses
                 .iter()
                 .any(
                     |&fidl_fuchsia_net_interfaces_ext::Address {
@@ -727,16 +716,10 @@ async fn add_address_and_remove<N: Netstack>(
             let () = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
                 event_stream.by_ref(),
                 &mut properties,
-                |fidl_fuchsia_net_interfaces_ext::Properties {
-                     id: _,
-                     name: _,
-                     device_class: _,
-                     online: _,
-                     addresses,
-                     has_default_ipv4_route: _,
-                     has_default_ipv6_route: _,
-                 }| {
-                    addresses
+                |iface| {
+                    iface
+                        .properties
+                        .addresses
                         .iter()
                         .all(
                             |&fidl_fuchsia_net_interfaces_ext::Address {
@@ -809,7 +792,7 @@ async fn add_address_and_detach<N: Netstack>(
 
     std::mem::drop(address_state_provider);
 
-    let mut properties = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(id);
+    let mut properties = fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(id);
     let () = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
         fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
             &interface_state,
@@ -817,16 +800,10 @@ async fn add_address_and_detach<N: Netstack>(
         )
         .expect("get interface event stream"),
         &mut properties,
-        |fidl_fuchsia_net_interfaces_ext::Properties {
-             id: _,
-             name: _,
-             device_class: _,
-             online: _,
-             addresses,
-             has_default_ipv4_route: _,
-             has_default_ipv6_route: _,
-         }| {
-            addresses
+        |iface| {
+            iface
+                .properties
+                .addresses
                 .iter()
                 .all(
                     |&fidl_fuchsia_net_interfaces_ext::Address {
@@ -900,12 +877,14 @@ async fn device_control_create_interface<N: Netstack>(name: &str) {
             fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
         )
         .expect("create watcher event stream"),
-        fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(iface_id),
+        fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(iface_id),
     )
     .await
     .expect("get interface state");
     let properties = match interface_state {
-        fidl_fuchsia_net_interfaces_ext::InterfaceState::Known(properties) => properties,
+        fidl_fuchsia_net_interfaces_ext::InterfaceState::Known(
+            fidl_fuchsia_net_interfaces_ext::PropertiesAndState { properties, state: () },
+        ) => properties,
         fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(id) => {
             panic!("failed to retrieve new interface with id {}", id)
         }
@@ -967,7 +946,7 @@ async fn device_control_owns_interfaces_lifetimes<N: Netstack>(name: &str, detac
     // Consume the watcher until we see the idle event.
     let existing = fidl_fuchsia_net_interfaces_ext::existing(
         watcher.by_ref().map(Result::<_, fidl::Error>::Ok),
-        HashMap::<u64, _>::new(),
+        HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new(),
     )
     .await
     .expect("existing");
@@ -1674,7 +1653,7 @@ async fn control_enable_disable<N: Netstack>(name: &str) {
     // Consume the watcher until we see the idle event.
     let existing = fidl_fuchsia_net_interfaces_ext::existing(
         watcher.by_ref().map(Result::<_, fidl::Error>::Ok),
-        HashMap::<u64, _>::new(),
+        HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new(),
     )
     .await
     .expect("existing");
@@ -1765,13 +1744,16 @@ async fn link_state_interface_state_interaction<N: Netstack>(name: &str) {
     // Consume the watcher until we see the idle event.
     let existing = fidl_fuchsia_net_interfaces_ext::existing(
         watcher.by_ref().map(Result::<_, fidl::Error>::Ok),
-        HashMap::<u64, _>::new(),
+        HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new(),
     )
     .await
     .expect("existing");
     assert_matches!(
         existing.get(&iface_id),
-        Some(fidl_fuchsia_net_interfaces_ext::Properties { online: false, .. })
+        Some(fidl_fuchsia_net_interfaces_ext::PropertiesAndState {
+            properties: fidl_fuchsia_net_interfaces_ext::Properties { online: false, .. },
+            state: _,
+        })
     );
 
     // Map the `watcher` to only produce `Events` when `online` changes.
@@ -2174,7 +2156,7 @@ async fn control_owns_interface_lifetime<N: Netstack>(name: &str, detach: bool) 
     // Consume the watcher until we see the idle event.
     let existing = fidl_fuchsia_net_interfaces_ext::existing(
         watcher.by_ref().map(Result::<_, fidl::Error>::Ok),
-        HashMap::<u64, _>::new(),
+        HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new(),
     )
     .await
     .expect("existing");

@@ -790,21 +790,25 @@ impl TestRealmExt for netemul::TestRealm<'_> {
                 fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
             )
             .expect("create watcher event stream"),
-            HashMap::new(),
+            HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<()>>::new(),
         )
         .await
         .context("failed to get existing interface properties from watcher")?
         .into_iter()
-        .find_map(|(_id, properties): (u64, _)| {
-            let fnet_interfaces_ext::Properties {
-                id: _,
-                name: _,
-                device_class,
-                online: _,
-                addresses: _,
-                has_default_ipv4_route: _,
-                has_default_ipv6_route: _,
-            } = properties;
+        .find_map(|(_id, properties_and_state): (u64, _)| {
+            let fnet_interfaces_ext::PropertiesAndState {
+                properties:
+                    properties @ fnet_interfaces_ext::Properties {
+                        id: _,
+                        name: _,
+                        device_class,
+                        online: _,
+                        addresses: _,
+                        has_default_ipv4_route: _,
+                        has_default_ipv6_route: _,
+                    },
+                state: (),
+            } = properties_and_state;
             match device_class {
                 fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty) => Some(properties),
                 fnet_interfaces::DeviceClass::Device(_) => None,

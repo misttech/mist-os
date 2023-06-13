@@ -567,7 +567,7 @@ pub struct NetCfg<'a> {
     // TODO(https://fxbug.dev/67407): These hashmaps are all indexed by
     // interface ID and store per-interface state, and should be merged.
     interface_states: HashMap<NonZeroU64, InterfaceState>,
-    interface_properties: HashMap<NonZeroU64, fnet_interfaces_ext::Properties>,
+    interface_properties: HashMap<NonZeroU64, fnet_interfaces_ext::PropertiesAndState<()>>,
     interface_metrics: InterfaceMetrics,
 
     dns_servers: DnsServers,
@@ -1390,7 +1390,7 @@ impl<'a> NetCfg<'a> {
     // rather than `&mut self` directly, because `update_result` already holds a reference into
     // `self.interface_properties`.
     async fn handle_interface_update_result(
-        update_result: &fnet_interfaces_ext::UpdateResult<'_>,
+        update_result: &fnet_interfaces_ext::UpdateResult<'_, ()>,
         watchers: &mut DnsServerWatchers<'_>,
         dns_servers: &mut DnsServers,
         interface_states: &mut HashMap<NonZeroU64, InterfaceState>,
@@ -1403,7 +1403,7 @@ impl<'a> NetCfg<'a> {
         dhcpv6_client_provider: &Option<fnet_dhcpv6::ClientProviderProxy>,
     ) -> Result<(), errors::Error> {
         match update_result {
-            fnet_interfaces_ext::UpdateResult::Added(properties) => {
+            fnet_interfaces_ext::UpdateResult::Added { properties, state: _ } => {
                 match interface_states.get_mut(&properties.id) {
                     Some(state) => state
                         .on_discovery(
@@ -1420,7 +1420,7 @@ impl<'a> NetCfg<'a> {
                     None => Ok(()),
                 }
             }
-            fnet_interfaces_ext::UpdateResult::Existing(properties) => {
+            fnet_interfaces_ext::UpdateResult::Existing { properties, state: _ } => {
                 match interface_states.get_mut(&properties.id) {
                     Some(state) => state
                         .on_discovery(
@@ -1440,6 +1440,7 @@ impl<'a> NetCfg<'a> {
             fnet_interfaces_ext::UpdateResult::Changed {
                 previous: fnet_interfaces::Properties { online: previous_online, .. },
                 current: current_properties,
+                state: _,
             } => {
                 let &fnet_interfaces_ext::Properties {
                     id, ref name, online, ref addresses, ..
@@ -1600,11 +1601,12 @@ impl<'a> NetCfg<'a> {
                     }
                 }
             }
-            fnet_interfaces_ext::UpdateResult::Removed(fnet_interfaces_ext::Properties {
-                id,
-                name,
-                ..
-            }) => {
+            fnet_interfaces_ext::UpdateResult::Removed(
+                fnet_interfaces_ext::PropertiesAndState {
+                    properties: fnet_interfaces_ext::Properties { id, name, .. },
+                    state: (),
+                },
+            ) => {
                 match interface_states.remove(&id) {
                     // An interface netcfg was not responsible for configuring was removed, do
                     // nothing.
@@ -2356,16 +2358,17 @@ impl<'a> NetCfg<'a> {
             // Save the config so that future DHCPv6 clients are started with PD.
             *dhcpv6_pd_config = Some(pd_config.clone());
 
-            let properties = if let Some(properties) = self.interface_properties.get(&id) {
-                properties
-            } else {
-                // There is a delay between when netcfg installs and when said interface's
-                // properties are received via the interface watcher and ends up in
-                // `interface_properties`, so if the properties are not yet known, simply
-                // continue. The DHCPv6 client on such an interface will be started with PD
-                // configured per the usual process when handling interface watcher events.
-                continue;
-            };
+            let fnet_interfaces_ext::PropertiesAndState { properties, state: _ } =
+                if let Some(properties) = self.interface_properties.get(&id) {
+                    properties
+                } else {
+                    // There is a delay between when netcfg installs and when said interface's
+                    // properties are received via the interface watcher and ends up in
+                    // `interface_properties`, so if the properties are not yet known, simply
+                    // continue. The DHCPv6 client on such an interface will be started with PD
+                    // configured per the usual process when handling interface watcher events.
+                    continue;
+                };
 
             // TODO(https://fxbug.dev/117651): Reload configuration in-place rather than
             // restarting the DHCPv6 client with different configuration.
@@ -2494,9 +2497,10 @@ impl<'a> NetCfg<'a> {
             )
             .await;
 
-            let properties = self.interface_properties.get(id).unwrap_or_else(|| {
-                panic!("interface {} has DHCPv6 client but properties unknown", id)
-            });
+            let fnet_interfaces_ext::PropertiesAndState { properties, state: _ } =
+                self.interface_properties.get(id).unwrap_or_else(|| {
+                    panic!("interface {} has DHCPv6 client but properties unknown", id)
+                });
 
             // Restart DHCPv6 client without PD.
             let sockaddr = match start_dhcpv6_client(

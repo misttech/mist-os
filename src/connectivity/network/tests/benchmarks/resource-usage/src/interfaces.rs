@@ -34,10 +34,12 @@ impl crate::Workload for Interfaces {
             )
             .expect("get interface event stream");
             futures::pin_mut!(stream);
-            let mut if_state =
-                fnet_interfaces_ext::existing(stream.by_ref(), HashMap::<u64, _>::new())
-                    .await
-                    .expect("collect existing interfaces");
+            let mut if_state = fnet_interfaces_ext::existing(
+                stream.by_ref(),
+                HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<()>>::new(),
+            )
+            .await
+            .expect("collect existing interfaces");
 
             const NUM_INTERFACES: usize = 10;
             let (tx, rx) = futures::channel::mpsc::channel(NUM_INTERFACES);
@@ -71,10 +73,12 @@ impl crate::Workload for Interfaces {
         )
         .expect("get interface event stream");
         futures::pin_mut!(stream);
-        let mut interfaces =
-            fnet_interfaces_ext::existing(stream.by_ref(), HashMap::<u64, _>::new())
-                .await
-                .expect("collect existing interfaces");
+        let mut interfaces = fnet_interfaces_ext::existing(
+            stream.by_ref(),
+            HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<()>>::new(),
+        )
+        .await
+        .expect("collect existing interfaces");
         if interfaces.len() != 1 {
             fnet_interfaces_ext::wait_interface(stream.by_ref(), &mut interfaces, |interfaces| {
                 (interfaces.len() == 1).then_some(())
@@ -143,7 +147,7 @@ async fn stress_interface(interface: Interface, interfaces_state: &fnet_interfac
     )
     .expect("get interface event stream");
     futures::pin_mut!(stream);
-    let mut state = fnet_interfaces_ext::InterfaceState::Unknown(id);
+    let mut state = fnet_interfaces_ext::InterfaceState::<()>::Unknown(id);
 
     // Repeatedly toggle interface up/down and send traffic through it
     // simulating incoming neighbor solicitations.
@@ -152,22 +156,18 @@ async fn stress_interface(interface: Interface, interfaces_state: &fnet_interfac
         fuchsia_async::Timer::new(zx::Duration::from_millis(50)).await;
 
         assert!(control.disable().await.expect("call disable").expect("disable interface"));
-        fnet_interfaces_ext::wait_interface_with_id(
-            stream.by_ref(),
-            &mut state,
-            |fnet_interfaces_ext::Properties { online, .. }| (!online).then_some(()),
-        )
+        fnet_interfaces_ext::wait_interface_with_id(stream.by_ref(), &mut state, |iface| {
+            (!iface.properties.online).then_some(())
+        })
         .await
         .expect("wait for interface offline");
 
         fuchsia_async::Timer::new(zx::Duration::from_millis(50)).await;
 
         assert!(control.enable().await.expect("call enable").expect("enable interface"));
-        fnet_interfaces_ext::wait_interface_with_id(
-            stream.by_ref(),
-            &mut state,
-            |fnet_interfaces_ext::Properties { online, .. }| online.then_some(()),
-        )
+        fnet_interfaces_ext::wait_interface_with_id(stream.by_ref(), &mut state, |iface| {
+            iface.properties.online.then_some(())
+        })
         .await
         .expect("wait for interface online");
 

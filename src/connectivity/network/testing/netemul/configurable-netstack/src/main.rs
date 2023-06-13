@@ -219,8 +219,8 @@ async fn configure_interface(
             fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
         )
         .context("get interface state watcher events")?,
-        &mut fnet_interfaces_ext::InterfaceState::Unknown(nicid),
-        |fnet_interfaces_ext::Properties { online, .. }| online.then(|| ()),
+        &mut fnet_interfaces_ext::InterfaceState::<()>::Unknown(nicid),
+        |properties_and_state| properties_and_state.properties.online.then(|| ()),
     )
     .await
     .context("wait for interface online")?;
@@ -237,8 +237,9 @@ async fn configure_interface(
                 fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
             )
             .context("get interface state watcher events")?,
-            &mut fnet_interfaces_ext::InterfaceState::Unknown(nicid),
-            |fnet_interfaces_ext::Properties { addresses, .. }| {
+            &mut fnet_interfaces_ext::InterfaceState::<()>::Unknown(nicid),
+            |properties_and_state| {
+                let addresses = &properties_and_state.properties.addresses;
                 if addresses.is_empty() {
                     None
                 } else {

@@ -153,19 +153,23 @@ async fn inspect_nic<N: Netstack>(name: &str) {
             fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
         )
         .expect("failed to create event stream"),
-        &mut HashMap::<u64, _>::new(),
+        &mut HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new(),
         |if_map| {
-            let loopback =
-                if_map.values().find_map(|properties| match properties.device_class {
-                    fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
-                        fidl_fuchsia_net_interfaces::Empty {},
-                    ) => Some(properties.clone()),
-                    fidl_fuchsia_net_interfaces::DeviceClass::Device(_) => None,
-                })?;
+            let loopback = if_map.values().find_map(
+                |fidl_fuchsia_net_interfaces_ext::PropertiesAndState { properties, state: _ }| {
+                    match properties.device_class {
+                        fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
+                            fidl_fuchsia_net_interfaces::Empty {},
+                        ) => Some(properties.clone()),
+                        fidl_fuchsia_net_interfaces::DeviceClass::Device(_) => None,
+                    }
+                },
+            )?;
             // Endpoint is up, has assigned IPv4 and at least the expected number of
             // IPv6 addresses.
             let netdev_properties = {
-                let properties = if_map.get(&netdev.id())?;
+                let fidl_fuchsia_net_interfaces_ext::PropertiesAndState { properties, state: _ } =
+                    if_map.get(&netdev.id())?;
                 let fidl_fuchsia_net_interfaces_ext::Properties { online, addresses, .. } =
                     properties;
                 if !online {

@@ -115,13 +115,23 @@ pub enum UpdateError {
 
 /// The result of updating network interface state with an event.
 #[derive(Debug, PartialEq)]
-pub enum UpdateResult<'a> {
+pub enum UpdateResult<'a, S> {
     /// The update did not change the local state.
     NoChange,
     /// The update inserted an existing interface into the local state.
-    Existing(&'a Properties),
+    Existing {
+        /// The properties,
+        properties: &'a Properties,
+        /// The state.
+        state: &'a mut S,
+    },
     /// The update inserted an added interface into the local state.
-    Added(&'a Properties),
+    Added {
+        /// The properties,
+        properties: &'a Properties,
+        /// The state.
+        state: &'a mut S,
+    },
     /// The update changed an existing interface in the local state.
     Changed {
         /// The previous values of any properties which changed.
@@ -132,31 +142,47 @@ pub enum UpdateResult<'a> {
         previous: fnet_interfaces::Properties,
         /// The properties of the interface post-update.
         current: &'a Properties,
+        /// The state of the interface.
+        state: &'a mut S,
     },
     /// The update removed an interface from the local state.
-    Removed(Properties),
+    Removed(PropertiesAndState<S>),
+}
+
+/// The properties and state for an interface.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PropertiesAndState<S> {
+    /// Properties.
+    pub properties: Properties,
+    /// State.
+    pub state: S,
 }
 
 /// A trait for types holding interface state that can be updated by change events.
-pub trait Update {
+pub trait Update<S> {
     /// Update state with the interface change event.
     ///
     /// Returns a bool indicating whether the update caused any changes.
-    fn update(&mut self, event: fnet_interfaces::Event) -> Result<UpdateResult<'_>, UpdateError>;
+    fn update(&mut self, event: fnet_interfaces::Event)
+        -> Result<UpdateResult<'_, S>, UpdateError>;
 }
 
-impl Update for Properties {
-    fn update(&mut self, event: fnet_interfaces::Event) -> Result<UpdateResult<'_>, UpdateError> {
+impl<S> Update<S> for PropertiesAndState<S> {
+    fn update(
+        &mut self,
+        event: fnet_interfaces::Event,
+    ) -> Result<UpdateResult<'_, S>, UpdateError> {
+        let Self { properties, state } = self;
         match event {
             fnet_interfaces::Event::Existing(existing) => {
                 let existing = Properties::try_from(existing)?;
-                if existing.id == self.id {
+                if existing.id == properties.id {
                     return Err(UpdateError::DuplicateExisting(existing.into()));
                 }
             }
             fnet_interfaces::Event::Added(added) => {
                 let added = Properties::try_from(added)?;
-                if added.id == self.id {
+                if added.id == properties.id {
                     return Err(UpdateError::DuplicateAdded(added.into()));
                 }
             }
@@ -172,13 +198,13 @@ impl Update for Properties {
                     ..
                 } = &mut change;
                 if let Some(id) = *id {
-                    if self.id.get() == id {
+                    if properties.id.get() == id {
                         let mut changed = false;
                         macro_rules! swap_if_some {
                             ($field:ident) => {
                                 if let Some($field) = $field {
-                                    if self.$field != *$field {
-                                        std::mem::swap(&mut self.$field, $field);
+                                    if properties.$field != *$field {
+                                        std::mem::swap(&mut properties.$field, $field);
                                         changed = true;
                                     }
                                 }
@@ -195,32 +221,38 @@ impl Update for Properties {
                             // it's worth.
                             // TODO(https://github.com/rust-lang/rust/issues/64295) Use `eq_by` to
                             // compare the iterators once stabilized.
-                            if addresses.len() != self.addresses.len()
+                            if addresses.len() != properties.addresses.len()
                                 || !addresses
                                     .iter()
                                     .zip(
-                                        self.addresses
+                                        properties
+                                            .addresses
                                             .iter()
                                             .cloned()
                                             .map(fnet_interfaces::Address::from),
                                     )
                                     .all(|(a, b)| *a == b)
                             {
-                                let previous_len = self.addresses.len();
+                                let previous_len = properties.addresses.len();
                                 // NB This is equivalent to Vec::try_extend, if such a method
                                 // existed.
-                                let () = self.addresses.reserve(addresses.len());
+                                let () = properties.addresses.reserve(addresses.len());
                                 for address in addresses.drain(..).map(Address::try_from) {
-                                    let () = self.addresses.push(address?);
+                                    let () = properties.addresses.push(address?);
                                 }
-                                let () = addresses
-                                    .extend(self.addresses.drain(..previous_len).map(Into::into));
+                                let () = addresses.extend(
+                                    properties.addresses.drain(..previous_len).map(Into::into),
+                                );
                                 changed = true;
                             }
                         }
                         if changed {
                             change.id = None;
-                            return Ok(UpdateResult::Changed { previous: change, current: self });
+                            return Ok(UpdateResult::Changed {
+                                previous: change,
+                                current: properties,
+                                state,
+                            });
                         } else {
                             return Err(UpdateError::EmptyChange(change));
                         }
@@ -230,7 +262,7 @@ impl Update for Properties {
                 }
             }
             fnet_interfaces::Event::Removed(removed_id) => {
-                if self.id.get() == removed_id {
+                if properties.id.get() == removed_id {
                     return Err(UpdateError::Removed);
                 }
             }
@@ -240,9 +272,12 @@ impl Update for Properties {
     }
 }
 
-impl Update for InterfaceState {
-    fn update(&mut self, event: fnet_interfaces::Event) -> Result<UpdateResult<'_>, UpdateError> {
-        fn get_properties(state: &InterfaceState) -> &Properties {
+impl<S: Default> Update<S> for InterfaceState<S> {
+    fn update(
+        &mut self,
+        event: fnet_interfaces::Event,
+    ) -> Result<UpdateResult<'_, S>, UpdateError> {
+        fn get_properties<S>(state: &mut InterfaceState<S>) -> &mut PropertiesAndState<S> {
             match state {
                 InterfaceState::Known(properties) => properties,
                 InterfaceState::Unknown(id) => unreachable!(
@@ -254,17 +289,25 @@ impl Update for InterfaceState {
         match self {
             InterfaceState::Unknown(id) => match event {
                 fnet_interfaces::Event::Existing(existing) => {
-                    let existing = Properties::try_from(existing)?;
-                    if existing.id.get() == *id {
-                        *self = InterfaceState::Known(existing);
-                        return Ok(UpdateResult::Existing(get_properties(self)));
+                    let properties = Properties::try_from(existing)?;
+                    if properties.id.get() == *id {
+                        *self = InterfaceState::Known(PropertiesAndState {
+                            properties,
+                            state: S::default(),
+                        });
+                        let PropertiesAndState { properties, state } = get_properties(self);
+                        return Ok(UpdateResult::Existing { properties, state });
                     }
                 }
                 fnet_interfaces::Event::Added(added) => {
-                    let added = Properties::try_from(added)?;
-                    if added.id.get() == *id {
-                        *self = InterfaceState::Known(added);
-                        return Ok(UpdateResult::Added(get_properties(self)));
+                    let properties = Properties::try_from(added)?;
+                    if properties.id.get() == *id {
+                        *self = InterfaceState::Known(PropertiesAndState {
+                            properties,
+                            state: S::default(),
+                        });
+                        let PropertiesAndState { properties, state } = get_properties(self);
+                        return Ok(UpdateResult::Added { properties, state });
                     }
                 }
                 fnet_interfaces::Event::Changed(change) => {
@@ -305,11 +348,15 @@ impl TryFromMaybeNonzero for NonZeroU64 {
     }
 }
 
-impl<K> Update for HashMap<K, Properties>
+impl<K, S> Update<S> for HashMap<K, PropertiesAndState<S>>
 where
     K: TryFromMaybeNonzero + Copy + From<NonZeroU64> + Eq + std::hash::Hash,
+    S: Default,
 {
-    fn update(&mut self, event: fnet_interfaces::Event) -> Result<UpdateResult<'_>, UpdateError> {
+    fn update(
+        &mut self,
+        event: fnet_interfaces::Event,
+    ) -> Result<UpdateResult<'_, S>, UpdateError> {
         match event {
             fnet_interfaces::Event::Existing(existing) => {
                 let existing = Properties::try_from(existing)?;
@@ -318,7 +365,12 @@ where
                         Err(UpdateError::DuplicateExisting(existing.into()))
                     }
                     hash_map::Entry::Vacant(entry) => {
-                        Ok(UpdateResult::Existing(entry.insert(existing)))
+                        let PropertiesAndState { properties, state } =
+                            entry.insert(PropertiesAndState {
+                                properties: existing,
+                                state: S::default(),
+                            });
+                        Ok(UpdateResult::Existing { properties, state })
                     }
                 }
             }
@@ -326,7 +378,11 @@ where
                 let added = Properties::try_from(added)?;
                 match self.entry(added.id.into()) {
                     hash_map::Entry::Occupied(_) => Err(UpdateError::DuplicateAdded(added.into())),
-                    hash_map::Entry::Vacant(entry) => Ok(UpdateResult::Added(entry.insert(added))),
+                    hash_map::Entry::Vacant(entry) => {
+                        let PropertiesAndState { properties, state } = entry
+                            .insert(PropertiesAndState { properties: added, state: S::default() });
+                        Ok(UpdateResult::Added { properties, state })
+                    }
                 }
             }
             fnet_interfaces::Event::Changed(change) => {
@@ -355,7 +411,7 @@ where
 
 /// Interface watcher operational errors.
 #[derive(Error, Debug)]
-pub enum WatcherOperationError<B: Update + std::fmt::Debug> {
+pub enum WatcherOperationError<S: std::fmt::Debug, B: Update<S> + std::fmt::Debug> {
     /// Watcher event stream yielded an error.
     #[error("event stream error: {0}")]
     EventStream(fidl::Error),
@@ -367,6 +423,8 @@ pub enum WatcherOperationError<B: Update + std::fmt::Debug> {
     UnexpectedEnd {
         /// The local state at the time of the watcher event stream's end.
         final_state: B,
+        /// Marker for the state held alongside interface properties.
+        marker: std::marker::PhantomData<S>,
     },
     /// Watcher event stream yielded an event with unexpected type.
     #[error("unexpected event type: {0:?}")]
@@ -395,14 +453,15 @@ pub enum WatcherCreationError {
 /// Since the state passed via `init` is mutably updated for every event, when this function
 /// returns successfully, the state can be used as the initial state in a subsequent call with a
 /// stream of events from the same watcher.
-pub async fn wait_interface<B, S, F, T>(
-    stream: S,
+pub async fn wait_interface<S, B, St, F, T>(
+    stream: St,
     init: &mut B,
     mut predicate: F,
-) -> Result<T, WatcherOperationError<B>>
+) -> Result<T, WatcherOperationError<S, B>>
 where
-    B: Update + Clone + std::fmt::Debug,
-    S: Stream<Item = Result<fnet_interfaces::Event, fidl::Error>>,
+    S: std::fmt::Debug + Default,
+    B: Update<S> + Clone + std::fmt::Debug,
+    St: Stream<Item = Result<fnet_interfaces::Event, fidl::Error>>,
     F: FnMut(&B) -> Option<T>,
 {
     async_utils::fold::try_fold_while(
@@ -411,8 +470,8 @@ where
         |acc, event| {
             futures::future::ready(match acc.update(event) {
                 Ok(changed) => match changed {
-                    UpdateResult::Existing(_)
-                    | UpdateResult::Added(_)
+                    UpdateResult::Existing { .. }
+                    | UpdateResult::Added { .. }
                     | UpdateResult::Changed { .. }
                     | UpdateResult::Removed(_) => {
                         if let Some(rtn) = predicate(acc) {
@@ -431,16 +490,17 @@ where
     .short_circuited()
     .map_err(|final_state| WatcherOperationError::UnexpectedEnd {
         final_state: final_state.clone(),
+        marker: Default::default(),
     })
 }
 
 /// The local state of an interface's properties.
 #[derive(Clone, Debug, PartialEq)]
-pub enum InterfaceState {
+pub enum InterfaceState<S> {
     /// Not yet known.
     Unknown(u64),
     /// Locally known.
-    Known(Properties),
+    Known(PropertiesAndState<S>),
 }
 
 /// Wait for a condition on a specific interface to be satisfied.
@@ -454,14 +514,15 @@ pub enum InterfaceState {
 /// Since the state passed via `init` is mutably updated for every event, when this function
 /// returns successfully, the state can be used as the initial state in a subsequent call with a
 /// stream of events from the same watcher.
-pub async fn wait_interface_with_id<S, F, T>(
-    stream: S,
-    init: &mut InterfaceState,
+pub async fn wait_interface_with_id<S, St, F, T>(
+    stream: St,
+    init: &mut InterfaceState<S>,
     mut predicate: F,
-) -> Result<T, WatcherOperationError<InterfaceState>>
+) -> Result<T, WatcherOperationError<S, InterfaceState<S>>>
 where
-    S: Stream<Item = Result<fnet_interfaces::Event, fidl::Error>>,
-    F: FnMut(&Properties) -> Option<T>,
+    S: Default + Clone + std::fmt::Debug,
+    St: Stream<Item = Result<fnet_interfaces::Event, fidl::Error>>,
+    F: FnMut(&PropertiesAndState<S>) -> Option<T>,
 {
     wait_interface(stream, init, |state| {
         match state {
@@ -479,10 +540,11 @@ where
 ///
 /// Note that `stream` must be created from a watcher with interest in all
 /// fields, such as one created from [`event_stream_from_state`].
-pub async fn existing<S, B>(stream: S, init: B) -> Result<B, WatcherOperationError<B>>
+pub async fn existing<S, St, B>(stream: St, init: B) -> Result<B, WatcherOperationError<S, B>>
 where
-    S: futures::Stream<Item = Result<fnet_interfaces::Event, fidl::Error>>,
-    B: Update + std::fmt::Debug,
+    S: std::fmt::Debug,
+    St: futures::Stream<Item = Result<fnet_interfaces::Event, fidl::Error>>,
+    B: Update<S> + std::fmt::Debug,
 {
     async_utils::fold::try_fold_while(
         stream.map_err(WatcherOperationError::EventStream),
@@ -490,7 +552,9 @@ where
         |mut acc, event| {
             futures::future::ready(match event {
                 fnet_interfaces::Event::Existing(_) => match acc.update(event) {
-                    Ok::<UpdateResult<'_>, _>(_) => Ok(async_utils::fold::FoldWhile::Continue(acc)),
+                    Ok::<UpdateResult<'_, _>, _>(_) => {
+                        Ok(async_utils::fold::FoldWhile::Continue(acc))
+                    }
                     Err(e) => Err(WatcherOperationError::Update(e)),
                 },
                 fnet_interfaces::Event::Idle(fnet_interfaces::Empty {}) => {
@@ -506,7 +570,10 @@ where
     )
     .await?
     .short_circuited()
-    .map_err(|acc| WatcherOperationError::UnexpectedEnd { final_state: acc })
+    .map_err(|acc| WatcherOperationError::UnexpectedEnd {
+        final_state: acc,
+        marker: Default::default(),
+    })
 }
 
 /// The kind of addresses included from the watcher.
@@ -575,8 +642,11 @@ mod tests {
         }
     }
 
-    fn validated_properties(id: u64) -> Properties {
-        fidl_properties(id).try_into().expect("failed to validate FIDL Properties")
+    fn validated_properties(id: u64) -> PropertiesAndState<()> {
+        PropertiesAndState {
+            properties: fidl_properties(id).try_into().expect("failed to validate FIDL Properties"),
+            state: (),
+        }
     }
 
     fn properties_delta(id: u64) -> fnet_interfaces::Properties {
@@ -605,8 +675,13 @@ mod tests {
         }
     }
 
-    fn validated_properties_after_change(id: u64) -> Properties {
-        fidl_properties_after_change(id).try_into().expect("failed to validate FIDL Properties")
+    fn validated_properties_after_change(id: u64) -> PropertiesAndState<()> {
+        PropertiesAndState {
+            properties: fidl_properties_after_change(id)
+                .try_into()
+                .expect("failed to validate FIDL Properties"),
+            state: (),
+        }
     }
 
     fn fidl_address(addr: fnet::Subnet, valid_until: zx::zx_time_t) -> fnet_interfaces::Address {
@@ -629,7 +704,7 @@ mod tests {
     )]
     #[test_case(&mut InterfaceState::Known(validated_properties(ID)); "interface_state_known")]
     #[test_case(&mut validated_properties(ID); "properties")]
-    fn test_duplicate_error(state: &mut impl Update) {
+    fn test_duplicate_error(state: &mut impl Update<()>) {
         assert_matches::assert_matches!(
             state.update(fnet_interfaces::Event::Added(fidl_properties(ID))),
             Err(UpdateError::DuplicateAdded(added)) if added == fidl_properties(ID)
@@ -642,7 +717,7 @@ mod tests {
 
     #[test_case(&mut HashMap::<u64, _>::new(); "hashmap")]
     #[test_case(&mut InterfaceState::Unknown(ID); "interface_state_unknown")]
-    fn test_unknown_error(state: &mut impl Update) {
+    fn test_unknown_error(state: &mut impl Update<()>) {
         let unknown =
             fnet_interfaces::Properties { id: Some(ID), online: Some(true), ..Default::default() };
         assert_matches::assert_matches!(
@@ -657,7 +732,7 @@ mod tests {
 
     #[test_case(&mut InterfaceState::Known(validated_properties(ID)); "interface_state_known")]
     #[test_case(&mut validated_properties(ID); "properties")]
-    fn test_removed_error(state: &mut impl Update) {
+    fn test_removed_error(state: &mut impl Update<()>) {
         assert_matches::assert_matches!(
             state.update(fnet_interfaces::Event::Removed(ID)),
             Err(UpdateError::Removed)
@@ -668,7 +743,7 @@ mod tests {
     #[test_case(&mut InterfaceState::Unknown(ID); "interface_state_unknown")]
     #[test_case(&mut InterfaceState::Known(validated_properties(ID)); "interface_state_known")]
     #[test_case(&mut validated_properties(ID); "properties")]
-    fn test_missing_id_error(state: &mut impl Update) {
+    fn test_missing_id_error(state: &mut impl Update<()>) {
         let missing_id = fnet_interfaces::Properties { online: Some(true), ..Default::default() };
         assert_matches::assert_matches!(
             state.update(fnet_interfaces::Event::Changed(missing_id.clone())),
@@ -682,7 +757,7 @@ mod tests {
     )]
     #[test_case(&mut InterfaceState::Known(validated_properties(ID)); "interface_state_known")]
     #[test_case(&mut validated_properties(ID); "properties")]
-    fn test_empty_change_error(state: &mut impl Update) {
+    fn test_empty_change_error(state: &mut impl Update<()>) {
         let empty_change = fnet_interfaces::Properties { id: Some(ID), ..Default::default() };
         let net_zero_change =
             fnet_interfaces::Properties { name: None, device_class: None, ..fidl_properties(ID) };
@@ -702,7 +777,7 @@ mod tests {
     )]
     #[test_case(&mut InterfaceState::Known(validated_properties(ID)); "interface_state_known")]
     #[test_case(&mut validated_properties(ID); "properties")]
-    fn test_update_changed_result(state: &mut impl Update) {
+    fn test_update_changed_result(state: &mut impl Update<()>) {
         let want_previous = fnet_interfaces::Properties {
             online: Some(false),
             has_default_ipv4_route: Some(false),
@@ -712,8 +787,12 @@ mod tests {
         };
         assert_matches::assert_matches!(
             state.update(fnet_interfaces::Event::Changed(properties_delta(ID).clone())),
-            Ok(UpdateResult::Changed { previous, current })
-                if previous == want_previous && *current == validated_properties_after_change(ID)
+            Ok(UpdateResult::Changed { previous, current, state: _ }) => {
+                assert_eq!(previous, want_previous);
+                let PropertiesAndState { properties, state: () } =
+                    validated_properties_after_change(ID);
+                assert_eq!(*current, properties);
+            }
         );
     }
 
@@ -766,7 +845,7 @@ mod tests {
 
     fn test_wait_interface<'a, B>(state: &mut B, want_states: impl IntoIterator<Item = &'a B>)
     where
-        B: 'a + Update + Clone + std::fmt::Debug + std::cmp::PartialEq,
+        B: 'a + Update<()> + Clone + std::fmt::Debug + std::cmp::PartialEq,
     {
         let event_stream = test_event_stream();
         for want in want_states.into_iter() {
@@ -840,7 +919,7 @@ mod tests {
     )]
     fn test_existing<B>(state: B, want: B)
     where
-        B: Update + std::fmt::Debug + std::cmp::PartialEq,
+        B: Update<()> + std::fmt::Debug + std::cmp::PartialEq,
     {
         let events = [
             fnet_interfaces::Event::Existing(fidl_properties(ID)),

@@ -29,7 +29,7 @@ pub async fn wait_for_non_loopback_interface_up<
     exclude_ids: Option<&HashSet<u64>>,
     timeout: zx::Duration,
 ) -> Result<(u64, String)> {
-    let mut if_map = HashMap::new();
+    let mut if_map = HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new();
     let wait_for_interface = fidl_fuchsia_net_interfaces_ext::wait_interface(
         fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
             interface_state,
@@ -40,8 +40,15 @@ pub async fn wait_for_non_loopback_interface_up<
             if_map.iter().find_map(
                 |(
                     id,
-                    fidl_fuchsia_net_interfaces_ext::Properties {
-                        name, device_class, online, ..
+                    fidl_fuchsia_net_interfaces_ext::PropertiesAndState {
+                        properties:
+                            fidl_fuchsia_net_interfaces_ext::Properties {
+                                name,
+                                device_class,
+                                online,
+                                ..
+                            },
+                        state: _,
                     },
                 )| {
                     (*device_class
@@ -233,7 +240,7 @@ pub async fn wait_for_addresses<T, F>(
 where
     F: FnMut(&[fidl_fuchsia_net_interfaces_ext::Address]) -> Option<T>,
 {
-    let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(u64::from(id));
+    let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(u64::from(id));
     fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
         fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
             &interfaces_state,
@@ -241,15 +248,7 @@ where
         )
         .context("get interface event stream")?,
         &mut state,
-        |fidl_fuchsia_net_interfaces_ext::Properties {
-             addresses,
-             id: _,
-             name: _,
-             device_class: _,
-             online: _,
-             has_default_ipv4_route: _,
-             has_default_ipv6_route: _,
-         }| { predicate(addresses) },
+        |properties_and_state| predicate(&properties_and_state.properties.addresses),
     )
     .await
     .context("wait for address")
@@ -261,7 +260,7 @@ pub async fn wait_for_online(
     id: u64,
     want_online: bool,
 ) -> Result<()> {
-    let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(u64::from(id));
+    let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(u64::from(id));
     fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
         fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
             &interfaces_state,
@@ -269,15 +268,9 @@ pub async fn wait_for_online(
         )
         .context("get interface event stream")?,
         &mut state,
-        |fidl_fuchsia_net_interfaces_ext::Properties {
-             online,
-             id: _,
-             name: _,
-             device_class: _,
-             addresses: _,
-             has_default_ipv4_route: _,
-             has_default_ipv6_route: _,
-         }| { (*online == want_online).then_some(()) },
+        |properties_and_state| {
+            (properties_and_state.properties.online == want_online).then_some(())
+        },
     )
     .await
     .with_context(|| format!("wait for online {}", want_online))

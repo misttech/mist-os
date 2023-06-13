@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{Address, Properties, Update, UpdateResult, WatcherOperationError};
+use crate::{Address, Properties, PropertiesAndState, Update, UpdateResult, WatcherOperationError};
 
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
@@ -81,26 +81,29 @@ pub fn is_globally_routable(
 /// fields, such as one created from [`crate::event_stream_from_state`].
 pub fn to_reachability_stream(
     event_stream: impl Stream<Item = Result<fnet_interfaces::Event, fidl::Error>>,
-) -> impl Stream<Item = Result<bool, WatcherOperationError<HashMap<u64, Properties>>>> {
+) -> impl Stream<Item = Result<bool, WatcherOperationError<(), HashMap<u64, PropertiesAndState<()>>>>>
+{
     let mut if_map = HashMap::<u64, _>::new();
     let mut reachable = None;
     let mut reachable_ids = HashSet::new();
     event_stream.map_err(WatcherOperationError::EventStream).try_filter_map(move |event| {
         futures::future::ready(if_map.update(event).map_err(WatcherOperationError::Update).map(
-            |changed| {
+            |changed: UpdateResult<'_, ()>| {
                 let reachable_ids_changed = match changed {
-                    UpdateResult::Existing(properties)
-                    | UpdateResult::Added(properties)
-                    | UpdateResult::Changed { previous: _, current: properties }
+                    UpdateResult::Existing { properties, state: _ }
+                    | UpdateResult::Added { properties, state: _ }
+                    | UpdateResult::Changed { previous: _, current: properties, state: _ }
                         if is_globally_routable(properties) =>
                     {
                         reachable_ids.insert(properties.id)
                     }
-                    UpdateResult::Existing(_) | UpdateResult::Added(_) => false,
-                    UpdateResult::Changed { previous: _, current: properties } => {
+                    UpdateResult::Existing { .. } | UpdateResult::Added { .. } => false,
+                    UpdateResult::Changed { previous: _, current: properties, state: _ } => {
                         reachable_ids.remove(&properties.id)
                     }
-                    UpdateResult::Removed(properties) => reachable_ids.remove(&properties.id),
+                    UpdateResult::Removed(PropertiesAndState { properties, state: _ }) => {
+                        reachable_ids.remove(&properties.id)
+                    }
                     UpdateResult::NoChange => return None,
                 };
                 // If the stream hasn't yielded anything yet, do so even if the set of reachable
@@ -123,9 +126,9 @@ pub fn to_reachability_stream(
 
 /// Reachability status stream operational errors.
 #[derive(Error, Debug)]
-pub enum OperationError<B: Update + std::fmt::Debug> {
+pub enum OperationError<S: std::fmt::Debug, B: Update<S> + std::fmt::Debug> {
     #[error("watcher operation error: {0}")]
-    Watcher(WatcherOperationError<B>),
+    Watcher(WatcherOperationError<S, B>),
     #[error("reachability status stream ended unexpectedly")]
     UnexpectedEnd,
 }
@@ -134,7 +137,7 @@ pub enum OperationError<B: Update + std::fmt::Debug> {
 /// has properties which satisfy [`is_globally_routable`].
 pub async fn wait_for_reachability(
     event_stream: impl Stream<Item = Result<fnet_interfaces::Event, fidl::Error>>,
-) -> Result<(), OperationError<HashMap<u64, Properties>>> {
+) -> Result<(), OperationError<(), HashMap<u64, PropertiesAndState<()>>>> {
     futures::pin_mut!(event_stream);
     let rtn = to_reachability_stream(event_stream)
         .map_err(OperationError::Watcher)

@@ -102,9 +102,9 @@ async fn wait_interface_online_status<'a>(
             fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
         )
         .expect("watcher creation failed"),
-        &mut fnet_interfaces_ext::InterfaceState::Unknown(id),
-        |&fnet_interfaces_ext::Properties { online, .. }| {
-            (expected_online_status == online).then(|| ())
+        &mut fnet_interfaces_ext::InterfaceState::<()>::Unknown(id),
+        |properties_and_state| {
+            (expected_online_status == properties_and_state.properties.online).then(|| ())
         },
     )
     .await
@@ -451,18 +451,18 @@ async fn add_interface(
                 fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
             )
             .expect("failed getting interfaces event stream"),
-            HashMap::<u64, _>::new(),
+            HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<()>>::new(),
         )
         .await
         .expect("failed getting existing interfaces state");
 
         let iface = ifaces_state
             .values()
-            .find(|iface| iface.name == EXPECTED_INTERFACE_NAME)
+            .find(|iface| iface.properties.name == EXPECTED_INTERFACE_NAME)
             .unwrap_or_else(|| panic!("no interface with name {}", EXPECTED_INTERFACE_NAME));
 
         assert!(
-            !iface.addresses.is_empty(),
+            !iface.properties.addresses.is_empty(),
             "interface {:?} has no IP addresses; expected to have waited for autoconfigured IP \
              address",
             iface

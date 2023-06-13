@@ -56,19 +56,12 @@ impl<'a> Node<'a> {
         interface: &'a netemul::TestInterface<'_>,
         mut addr_predicate: F,
     ) -> Result<Node<'a>> {
-        let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(interface.id());
+        let mut state =
+            fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(interface.id());
         let (v4_addrs, v6_addrs) = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
             interface.get_interface_event_stream()?,
             &mut state,
-            |fidl_fuchsia_net_interfaces_ext::Properties {
-                 addresses,
-                 id: _,
-                 name: _,
-                 device_class: _,
-                 online: _,
-                 has_default_ipv4_route: _,
-                 has_default_ipv6_route: _,
-             }| { addr_predicate(addresses) },
+            |properties_and_state| addr_predicate(&properties_and_state.properties.addresses),
         )
         .await
         .context("failed to wait for addresses")?;

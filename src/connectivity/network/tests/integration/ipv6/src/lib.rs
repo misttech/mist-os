@@ -94,7 +94,7 @@ async fn install_and_get_ipv6_addrs_for_endpoint<N: Netstack>(
     let interface_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("failed to connect to fuchsia.net.interfaces/State service");
-    let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(id.into());
+    let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(id.into());
     let ipv6_addresses = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
         fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
             &interface_state,
@@ -102,16 +102,10 @@ async fn install_and_get_ipv6_addrs_for_endpoint<N: Netstack>(
         )
         .expect("creating interface event stream"),
         &mut state,
-        |fidl_fuchsia_net_interfaces_ext::Properties {
-             id: _,
-             name: _,
-             device_class: _,
-             online: _,
-             addresses,
-             has_default_ipv4_route: _,
-             has_default_ipv6_route: _,
-         }| {
-            let ipv6_addresses = addresses
+        |iface| {
+            let ipv6_addresses = iface
+                .properties
+                .addresses
                 .iter()
                 .filter_map(
                     |fidl_fuchsia_net_interfaces_ext::Address {
@@ -400,9 +394,11 @@ async fn slaac_with_privacy_extensions<N: Netstack>(
             fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
         )
         .expect("error getting interface state event stream"),
-        &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(iface.id()),
-        |fidl_fuchsia_net_interfaces_ext::Properties { addresses, .. }| {
-            if addresses
+        &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(iface.id()),
+        |iface| {
+            if iface
+                .properties
+                .addresses
                 .iter()
                 .filter_map(
                     |&fidl_fuchsia_net_interfaces_ext::Address {
@@ -886,13 +882,13 @@ async fn slaac_regeneration_after_dad_failure<N: Netstack>(name: &str) {
             fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
         )
         .expect("error getting interfaces state event stream"),
-        &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(iface.id()),
-        |fidl_fuchsia_net_interfaces_ext::Properties { addresses, .. }| {
+        &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(iface.id()),
+        |iface| {
             // We have to make sure 2 things:
             // 1. We have `expected_addrs` addrs which have the advertised prefix for the
             // interface.
             // 2. The last tried address should be among the addresses for the interface.
-            let (slaac_addrs, has_target_addr) = addresses.iter().fold(
+            let (slaac_addrs, has_target_addr) = iface.properties.addresses.iter().fold(
                 (0, false),
                 |(mut slaac_addrs, mut has_target_addr),
                  &fidl_fuchsia_net_interfaces_ext::Address {
@@ -1244,17 +1240,9 @@ async fn sending_ra_with_autoconf_flag_triggers_slaac<N: Netstack>(name: &str) {
             fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
         )
         .expect("creating interface event stream"),
-        &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(iface.id()),
-        |fidl_fuchsia_net_interfaces_ext::Properties {
-             id: _,
-             name: _,
-             device_class: _,
-             online: _,
-             addresses,
-             has_default_ipv4_route: _,
-             has_default_ipv6_route: _,
-         }| {
-            addresses.into_iter().find_map(
+        &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(iface.id()),
+        |iface| {
+            iface.properties.addresses.iter().find_map(
                 |fidl_fuchsia_net_interfaces_ext::Address {
                      addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
                      valid_until: _,

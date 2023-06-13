@@ -11,6 +11,7 @@ use fidl_fuchsia_net_interfaces_admin as finterfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as finterfaces_ext;
 use fidl_fuchsia_net_stack as fnet_stack;
 use std::{
+    collections::HashMap,
     convert::{TryFrom as _, TryInto as _},
     num::NonZeroU64,
 };
@@ -161,12 +162,15 @@ impl InterfaceIdentifier {
                 )?;
                 let response = finterfaces_ext::existing(
                     stream,
-                    std::collections::HashMap::<NonZeroU64, _>::new(),
+                    HashMap::<NonZeroU64, finterfaces_ext::PropertiesAndState<()>>::new(),
                 )
                 .await?;
                 response
                     .values()
-                    .find_map(|interface| (&interface.name == name).then(|| interface.id.get()))
+                    .find_map(|properties_and_state| {
+                        (&properties_and_state.properties.name == name)
+                            .then(|| properties_and_state.properties.id.get())
+                    })
                     .ok_or_else(|| user_facing_error(format!("No interface with name {}", name)))
             }
         }

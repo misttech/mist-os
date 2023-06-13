@@ -200,7 +200,8 @@ async fn interface_disruption<N: Netstack>(name: &str, ip_supported: IpSupported
         }
     }
     let wait_for_dhcpv4 = || async {
-        let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(client_if.id());
+        let mut state =
+            fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(client_if.id());
         let fnet::Subnet { addr, prefix_len: _ } = fnet_interfaces_ext::wait_interface_with_id(
             fnet_interfaces_ext::event_stream_from_state(
                 &client_interfaces_state,
@@ -208,14 +209,18 @@ async fn interface_disruption<N: Netstack>(name: &str, ip_supported: IpSupported
             )
             .expect("get interface event stream"),
             &mut state,
-            |fnet_interfaces_ext::Properties {
-                 addresses,
-                 has_default_ipv4_route,
-                 id: _,
-                 name: _,
-                 device_class: _,
-                 online: _,
-                 has_default_ipv6_route: _,
+            |fnet_interfaces_ext::PropertiesAndState {
+                 properties:
+                     fnet_interfaces_ext::Properties {
+                         addresses,
+                         has_default_ipv4_route,
+                         id: _,
+                         name: _,
+                         device_class: _,
+                         online: _,
+                         has_default_ipv6_route: _,
+                     },
+                 state: _,
              }| {
                 if !has_default_ipv4_route {
                     return None;

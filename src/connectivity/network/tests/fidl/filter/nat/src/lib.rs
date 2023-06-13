@@ -247,21 +247,27 @@ pub async fn setup_masquerade_nat_network<'a>(
         // so we can reliably observe its removal later.
         let mut router_ep2_interface_state = fnet_interfaces_ext::existing(
             &mut state_stream,
-            fnet_interfaces_ext::InterfaceState::Unknown(router_ep2_id),
+            fnet_interfaces_ext::InterfaceState::<()>::Unknown(router_ep2_id),
         )
         .await
         .expect("error reading existing interface event");
 
         let router_ep2_name = match &router_ep2_interface_state {
-            fnet_interfaces_ext::InterfaceState::Known(fnet_interfaces_ext::Properties {
-                id,
-                name,
-                device_class: _,
-                online: _,
-                addresses: _,
-                has_default_ipv4_route: _,
-                has_default_ipv6_route: _,
-            }) => {
+            fnet_interfaces_ext::InterfaceState::Known(
+                fnet_interfaces_ext::PropertiesAndState {
+                    properties:
+                        fnet_interfaces_ext::Properties {
+                            id,
+                            name,
+                            device_class: _,
+                            online: _,
+                            addresses: _,
+                            has_default_ipv4_route: _,
+                            has_default_ipv6_route: _,
+                        },
+                    state: _,
+                },
+            ) => {
                 assert_eq!(id.get(), router_ep2_id);
                 name.clone()
             }
@@ -275,16 +281,8 @@ pub async fn setup_masquerade_nat_network<'a>(
         let () = fnet_interfaces_ext::wait_interface_with_id(
             state_stream,
             &mut router_ep2_interface_state,
-            |fnet_interfaces_ext::Properties {
-                 id,
-                 name: _,
-                 device_class: _,
-                 online: _,
-                 addresses: _,
-                 has_default_ipv4_route: _,
-                 has_default_ipv6_route: _,
-             }| {
-                assert_eq!(id.get(), router_ep2_id);
+            |iface| {
+                assert_eq!(iface.properties.id.get(), router_ep2_id);
                 None
             },
         )

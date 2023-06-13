@@ -351,7 +351,8 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
         )
         .expect("get interface event stream");
         futures::pin_mut!(event_stream);
-        let mut if_map = HashMap::<u64, _>::new();
+        let mut if_map =
+            HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new();
         let (wlan_ap_id, wlan_ap_name) = fidl_fuchsia_net_interfaces_ext::wait_interface(
             event_stream.by_ref(),
             &mut if_map,
@@ -359,8 +360,15 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
                 if_map.iter().find_map(
                     |(
                         id,
-                        fidl_fuchsia_net_interfaces_ext::Properties {
-                            name, online, addresses, ..
+                        fidl_fuchsia_net_interfaces_ext::PropertiesAndState {
+                            properties:
+                                fidl_fuchsia_net_interfaces_ext::Properties {
+                                    name,
+                                    online,
+                                    addresses,
+                                    ..
+                                },
+                            state: _,
                         },
                     )| {
                         (*online
@@ -470,7 +478,13 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
                 if_map.iter().find_map(
                     |(
                         id,
-                        fidl_fuchsia_net_interfaces_ext::Properties { online, addresses, .. },
+                        fidl_fuchsia_net_interfaces_ext::PropertiesAndState {
+                            properties:
+                                fidl_fuchsia_net_interfaces_ext::Properties {
+                                    online, addresses, ..
+                                },
+                            state: _,
+                        },
                     )| {
                         (*id != wlan_ap_id
                             && *online

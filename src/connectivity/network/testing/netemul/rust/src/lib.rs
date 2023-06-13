@@ -395,8 +395,8 @@ impl<'a> TestRealm<'a> {
                 &interface_state,
                 fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
             )?,
-            &mut fnet_interfaces_ext::InterfaceState::Unknown(interface.id()),
-            |&fnet_interfaces_ext::Properties { online, .. }| online.then_some(()),
+            &mut fnet_interfaces_ext::InterfaceState::<()>::Unknown(interface.id()),
+            |properties_and_state| properties_and_state.properties.online.then_some(()),
         )
         .await
         .context("failed to observe interface up")?;
@@ -1055,7 +1055,7 @@ impl<'a> TestInterface<'a> {
                 &interface_state,
                 fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
             )?,
-            fnet_interfaces_ext::InterfaceState::Unknown(self.id),
+            fnet_interfaces_ext::InterfaceState::<()>::Unknown(self.id),
         )
         .await
         .context("failed to get existing interfaces")?;
@@ -1065,7 +1065,9 @@ impl<'a> TestInterface<'a> {
                 id,
                 self.endpoint.name
             )),
-            fnet_interfaces_ext::InterfaceState::Known(properties) => Ok(properties),
+            fnet_interfaces_ext::InterfaceState::Known(
+                fnet_interfaces_ext::PropertiesAndState { properties, state: () },
+            ) => Ok(properties),
         }
     }
 

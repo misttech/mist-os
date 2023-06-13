@@ -433,7 +433,10 @@ async fn virtualization<N: Netstack>(name: &str, sub_name: &str, steps: &[Step])
                 .any(|NetworkClient { interface_map, network_proxy: _ }| !interface_map.is_empty())
             {
                 if step.may_reconstruct_bridge() {
-                    let mut interfaces_map = HashMap::<u64, _>::new();
+                    let mut interfaces_map = HashMap::<
+                        u64,
+                        fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>,
+                    >::new();
                     let bridge_id = fnet_interfaces_ext::wait_interface(
                         fnet_interfaces_ext::event_stream_from_state(
                             &host_interfaces_state,
@@ -443,14 +446,18 @@ async fn virtualization<N: Netstack>(name: &str, sub_name: &str, steps: &[Step])
                         &mut interfaces_map,
                         |interfaces_map| {
                             interfaces_map.values().find_map(
-                                |&fnet_interfaces_ext::Properties {
-                                     id,
-                                     device_class,
-                                     addresses: _,
-                                     name: _,
-                                     online: _,
-                                     has_default_ipv4_route: _,
-                                     has_default_ipv6_route: _,
+                                |&fidl_fuchsia_net_interfaces_ext::PropertiesAndState {
+                                     properties:
+                                         fnet_interfaces_ext::Properties {
+                                             id,
+                                             device_class,
+                                             addresses: _,
+                                             name: _,
+                                             online: _,
+                                             has_default_ipv4_route: _,
+                                             has_default_ipv6_route: _,
+                                         },
+                                     state: _,
                                  }| {
                                     match device_class {
                                         fnet_interfaces::DeviceClass::Device(

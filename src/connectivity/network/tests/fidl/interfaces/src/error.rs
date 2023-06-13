@@ -46,29 +46,32 @@ async fn interfaces_watcher_after_invalid_state_request<N: Netstack>(name: &str)
         NetstackVersion::Netstack3
         | NetstackVersion::Netstack2 { tracing: false, fast_udp: false } => std::iter::once((
             1,
-            fidl_fuchsia_net_interfaces_ext::Properties {
-                id: nonzero_ext::nonzero!(1u64),
-                name: "lo".to_owned(),
-                device_class: fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
-                    fidl_fuchsia_net_interfaces::Empty,
-                ),
-                online: true,
-                addresses: vec![
-                    fidl_fuchsia_net_interfaces_ext::Address {
-                        addr: fidl_subnet!("127.0.0.1/8"),
-                        valid_until: zx::sys::ZX_TIME_INFINITE,
-                        assignment_state:
-                            fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned,
-                    },
-                    fidl_fuchsia_net_interfaces_ext::Address {
-                        addr: fidl_subnet!("::1/128"),
-                        valid_until: zx::sys::ZX_TIME_INFINITE,
-                        assignment_state:
-                            fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned,
-                    },
-                ],
-                has_default_ipv4_route: false,
-                has_default_ipv6_route: false,
+            fidl_fuchsia_net_interfaces_ext::PropertiesAndState {
+                properties: fidl_fuchsia_net_interfaces_ext::Properties {
+                    id: nonzero_ext::nonzero!(1u64),
+                    name: "lo".to_owned(),
+                    device_class: fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
+                        fidl_fuchsia_net_interfaces::Empty,
+                    ),
+                    online: true,
+                    addresses: vec![
+                        fidl_fuchsia_net_interfaces_ext::Address {
+                            addr: fidl_subnet!("127.0.0.1/8"),
+                            valid_until: zx::sys::ZX_TIME_INFINITE,
+                            assignment_state:
+                                fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned,
+                        },
+                        fidl_fuchsia_net_interfaces_ext::Address {
+                            addr: fidl_subnet!("::1/128"),
+                            valid_until: zx::sys::ZX_TIME_INFINITE,
+                            assignment_state:
+                                fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned,
+                        },
+                    ],
+                    has_default_ipv4_route: false,
+                    has_default_ipv6_route: false,
+                },
+                state: (),
             },
         ))
         .collect(),

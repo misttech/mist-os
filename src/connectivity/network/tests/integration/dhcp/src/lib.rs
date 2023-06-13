@@ -101,7 +101,7 @@ async fn assert_client_acquires_addr<D: DhcpClient>(
     futures::pin_mut!(event_stream);
 
     let mut properties =
-        fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(client_interface.id());
+        fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(client_interface.id());
     for () in std::iter::repeat(()).take(cycles) {
         // Enable the interface and assert that binding fails before the address is acquired.
         let () = client_interface.stop_dhcp::<D>().await.expect("failed to stop DHCP");
@@ -155,16 +155,8 @@ async fn assert_client_acquires_addr<D: DhcpClient>(
             fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
                 event_stream.by_ref(),
                 &mut properties,
-                |fidl_fuchsia_net_interfaces_ext::Properties {
-                     id: _,
-                     addresses,
-                     online: _,
-                     device_class: _,
-                     has_default_ipv4_route: _,
-                     has_default_ipv6_route: _,
-                     name: _,
-                 }| {
-                    if addresses.iter().any(
+                |iface| {
+                    if iface.properties.addresses.iter().any(
                         |&fidl_fuchsia_net_interfaces_ext::Address {
                              addr,
                              valid_until: _,
@@ -198,21 +190,13 @@ async fn assert_interface_assigned_addr(
     event_stream: impl futures::Stream<
         Item = std::result::Result<fidl_fuchsia_net_interfaces::Event, fidl::Error>,
     >,
-    mut properties: &mut fidl_fuchsia_net_interfaces_ext::InterfaceState,
+    mut properties: &mut fidl_fuchsia_net_interfaces_ext::InterfaceState<()>,
 ) -> zx_time_t {
     let (addr, valid_until) = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
         event_stream,
         &mut properties,
-        |fidl_fuchsia_net_interfaces_ext::Properties {
-             id: _,
-             addresses,
-             online: _,
-             device_class: _,
-             has_default_ipv4_route: _,
-             has_default_ipv6_route: _,
-             name: _,
-         }| {
-            addresses.iter().find_map(
+        |iface| {
+            iface.properties.addresses.iter().find_map(
                 |&fidl_fuchsia_net_interfaces_ext::Address {
                      addr: subnet,
                      valid_until,

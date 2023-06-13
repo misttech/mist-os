@@ -241,21 +241,22 @@ impl NetstackFacade {
             std::collections::HashMap::<u64, _>::new(),
         )
         .await?;
-        let response = response.into_values().map(|properties| async {
-            let fidl_fuchsia_net_interfaces_ext::Properties { id, .. } = &properties;
-            match debug_interfaces.get_mac(id.get()).await? {
-                Ok(mac) => {
-                    let mac = mac.map(|boxed_mac| *boxed_mac);
-                    let view: Properties = (properties, mac).into();
-                    Ok::<_, Error>(Some(view))
+        let response = response.into_values().map(
+            |fidl_fuchsia_net_interfaces_ext::PropertiesAndState { properties, state: () }| async {
+                match debug_interfaces.get_mac(properties.id.get()).await? {
+                    Ok(mac) => {
+                        let mac = mac.map(|boxed_mac| *boxed_mac);
+                        let view: Properties = (properties, mac).into();
+                        Ok::<_, Error>(Some(view))
+                    }
+                    Err(fidl_fuchsia_net_debug::InterfacesGetMacError::NotFound) => {
+                        // Interface with given id not found; this occurs when state
+                        // is reported for an interface that has since been removed.
+                        Ok::<_, Error>(None)
+                    }
                 }
-                Err(fidl_fuchsia_net_debug::InterfacesGetMacError::NotFound) => {
-                    // Interface with given id not found; this occurs when state
-                    // is reported for an interface that has since been removed.
-                    Ok::<_, Error>(None)
-                }
-            }
-        });
+            },
+        );
         let mut response: Vec<Properties> =
             futures::future::try_join_all(response).await?.into_iter().filter_map(|r| r).collect();
         let () = response.sort_by_key(|&Properties { id, .. }| id);

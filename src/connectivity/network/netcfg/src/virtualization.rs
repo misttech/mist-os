@@ -97,7 +97,7 @@ pub(super) trait Handler {
 
     async fn handle_interface_update_result(
         &mut self,
-        update_result: &fnet_interfaces_ext::UpdateResult<'_>,
+        update_result: &fnet_interfaces_ext::UpdateResult<'_, ()>,
     ) -> Result<(), errors::Error>;
 }
 
@@ -663,12 +663,12 @@ impl<'a, B: BridgeHandler> Handler for Virtualization<'a, B> {
 
     async fn handle_interface_update_result(
         &mut self,
-        update_result: &fnet_interfaces_ext::UpdateResult<'_>,
+        update_result: &fnet_interfaces_ext::UpdateResult<'_, ()>,
     ) -> Result<(), errors::Error> {
         let Self { bridge, installer: _, _allowed_upstream_device_classes } = self;
         match update_result {
-            fnet_interfaces_ext::UpdateResult::Added(properties)
-            | fnet_interfaces_ext::UpdateResult::Existing(properties) => {
+            fnet_interfaces_ext::UpdateResult::Added { properties, state: _ }
+            | fnet_interfaces_ext::UpdateResult::Existing { properties, state: _ } => {
                 let fnet_interfaces_ext::Properties { id, online, device_class, .. } = **properties;
                 let allowed_for_bridge_upstream =
                     bridge.is_device_class_allowed_for_bridge_upstream(device_class);
@@ -683,6 +683,7 @@ impl<'a, B: BridgeHandler> Handler for Virtualization<'a, B> {
             fnet_interfaces_ext::UpdateResult::Changed {
                 previous: fnet_interfaces::Properties { online: previously_online, .. },
                 current: current_properties,
+                state: _,
             } => {
                 let fnet_interfaces_ext::Properties { id, online, device_class, .. } =
                     **current_properties;
@@ -710,10 +711,12 @@ impl<'a, B: BridgeHandler> Handler for Virtualization<'a, B> {
                     (None, false) => {}
                 }
             }
-            fnet_interfaces_ext::UpdateResult::Removed(fnet_interfaces_ext::Properties {
-                id,
-                ..
-            }) => {
+            fnet_interfaces_ext::UpdateResult::Removed(
+                fnet_interfaces_ext::PropertiesAndState {
+                    properties: fnet_interfaces_ext::Properties { id, .. },
+                    state: _,
+                },
+            ) => {
                 bridge
                     .handle_interface_removed(id.get())
                     .await
@@ -739,7 +742,7 @@ impl Handler for Stub {
 
     async fn handle_interface_update_result(
         &mut self,
-        _update_result: &fnet_interfaces_ext::UpdateResult<'_>,
+        _update_result: &fnet_interfaces_ext::UpdateResult<'_, ()>,
     ) -> Result<(), errors::Error> {
         Ok(())
     }

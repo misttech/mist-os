@@ -521,22 +521,8 @@ mod helpers {
                 fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
             )
             .expect("failed to create event stream"),
-            &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(interface_id),
-            |&fidl_fuchsia_net_interfaces_ext::Properties {
-                 id: _,
-                 addresses: _,
-                 online,
-                 device_class: _,
-                 has_default_ipv4_route: _,
-                 has_default_ipv6_route: _,
-                 name: _,
-             }| {
-                if online {
-                    Some(())
-                } else {
-                    None
-                }
-            },
+            &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(interface_id),
+            |iface| iface.properties.online.then_some(()),
         )
         .await
         .expect("failed to wait for interface online")

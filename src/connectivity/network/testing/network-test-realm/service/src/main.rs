@@ -247,8 +247,8 @@ async fn wait_for_any_ip_address(
     })?;
     let addr = fnet_interfaces_ext::wait_interface_with_id(
         stream,
-        &mut fnet_interfaces_ext::InterfaceState::Unknown(id),
-        |properties| properties.addresses.iter().next().cloned(),
+        &mut fnet_interfaces_ext::InterfaceState::<()>::Unknown(id),
+        |properties_and_state| properties_and_state.properties.addresses.iter().next().cloned(),
     )
     .await
     .map_err(|e| {
@@ -278,18 +278,25 @@ async fn find_interface_id_and_status(
         fntr::Error::Internal
     })?;
 
-    let interfaces =
-        fnet_interfaces_ext::existing(stream, HashMap::<u64, _>::new()).await.map_err(|e| {
-            error!("failed to read existing interfaces: {:?}", e);
-            fntr::Error::Internal
-        })?;
+    let interfaces = fnet_interfaces_ext::existing(
+        stream,
+        HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<()>>::new(),
+    )
+    .await
+    .map_err(|e| {
+        error!("failed to read existing interfaces: {:?}", e);
+        fntr::Error::Internal
+    })?;
 
     let debug_interfaces_proxy = connector.connect_to_protocol::<fnet_debug::InterfacesMarker>()?;
 
     let interfaces_stream = futures::stream::iter(interfaces.into_values());
 
-    let results =
-        interfaces_stream.filter_map(|fnet_interfaces_ext::Properties { id, online, .. }| {
+    let results = interfaces_stream.filter_map(
+        |fnet_interfaces_ext::PropertiesAndState {
+             properties: fnet_interfaces_ext::Properties { id, online, .. },
+             state: _,
+         }| {
             let debug_interfaces_proxy = &debug_interfaces_proxy;
             async move {
                 match debug_interfaces_proxy.get_mac(id.get()).await {
@@ -310,7 +317,8 @@ async fn find_interface_id_and_status(
                     },
                 }
             }
-        });
+        },
+    );
 
     futures::pin_mut!(results);
 

@@ -313,8 +313,8 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
             // (useful for tests).
             let addresses: BTreeMap<_, _> = interface_properties
                 .values()
-                .map(|properties| {
-                    addresses_optionally_from_interface_properties(properties)
+                .map(|properties_and_state| {
+                    addresses_optionally_from_interface_properties(&properties_and_state.properties)
                         .map(IntoIterator::into_iter)
                         .into_iter()
                         .flatten()
@@ -532,7 +532,7 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
 
     async fn handle_request(
         interfaces_proxy: &fnet_root::InterfacesProxy,
-        interface_properties: &HashMap<u64, fnet_interfaces_ext::Properties>,
+        interface_properties: &HashMap<u64, fnet_interfaces_ext::PropertiesAndState<()>>,
         all_addresses: &BTreeMap<InterfaceAndAddr, NetlinkAddressMessage>,
         Request { args, sequence_number, mut client, completer }: Request<S>,
     ) {
@@ -543,6 +543,9 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
                 GetLinkArgs::Dump => {
                     interface_properties
                         .values()
+                        .map(|fnet_interfaces_ext::PropertiesAndState { properties, state: _ }| {
+                            properties
+                        })
                         .filter_map(NetlinkLinkMessage::optionally_from)
                         .for_each(|message| {
                             client.send_unicast(message.into_rtnl_new_link(sequence_number, true))
@@ -682,7 +685,7 @@ fn update_addresses<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
 /// Returns an `InterfaceEventLoopError` when unexpected events occur, or an
 /// `UpdateError` when updates are not consistent with the current state.
 fn handle_interface_watcher_event<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
-    interface_properties: &mut HashMap<u64, fnet_interfaces_ext::Properties>,
+    interface_properties: &mut HashMap<u64, fnet_interfaces_ext::PropertiesAndState<()>>,
     all_addresses: &mut BTreeMap<InterfaceAndAddr, NetlinkAddressMessage>,
     route_clients: &ClientTable<NetlinkRoute, S>,
     event: fnet_interfaces::Event,
@@ -693,7 +696,7 @@ fn handle_interface_watcher_event<S: Sender<<NetlinkRoute as ProtocolFamily>::In
     };
 
     match update {
-        fnet_interfaces_ext::UpdateResult::Added(properties) => {
+        fnet_interfaces_ext::UpdateResult::Added { properties, state: _ } => {
             if let Some(message) = NetlinkLinkMessage::optionally_from(properties) {
                 route_clients.send_message_to_group(
                     message.into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false),
@@ -734,6 +737,7 @@ fn handle_interface_watcher_event<S: Sender<<NetlinkRoute as ProtocolFamily>::In
                     has_default_ipv4_route: _,
                     has_default_ipv6_route: _,
                 },
+            state: _,
         } => {
             if online.is_some() {
                 if let Some(message) = NetlinkLinkMessage::optionally_from(current) {
@@ -767,7 +771,10 @@ fn handle_interface_watcher_event<S: Sender<<NetlinkRoute as ProtocolFamily>::In
                 );
             }
         }
-        fnet_interfaces_ext::UpdateResult::Removed(properties) => {
+        fnet_interfaces_ext::UpdateResult::Removed(fnet_interfaces_ext::PropertiesAndState {
+            properties,
+            state: (),
+        }) => {
             update_addresses(&properties.id, all_addresses, BTreeMap::new(), route_clients);
 
             // Send link messages after the address message for removed links
@@ -785,7 +792,7 @@ fn handle_interface_watcher_event<S: Sender<<NetlinkRoute as ProtocolFamily>::In
                 "processed interface remove event for id {}", properties.id
             );
         }
-        fnet_interfaces_ext::UpdateResult::Existing(properties) => {
+        fnet_interfaces_ext::UpdateResult::Existing { properties, state: _ } => {
             return Err(InterfaceEventHandlerError::ExistingEventReceived(properties.clone()));
         }
         fnet_interfaces_ext::UpdateResult::NoChange => {}
@@ -1341,7 +1348,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_handle_interface_watcher_event() {
-        let mut interface_properties: HashMap<u64, fnet_interfaces_ext::Properties> =
+        let mut interface_properties: HashMap<u64, fnet_interfaces_ext::PropertiesAndState<()>> =
             HashMap::new();
         let mut addresses = BTreeMap::new();
         let route_clients = ClientTable::<NetlinkRoute, FakeSender<_>>::default();
@@ -1359,7 +1366,7 @@ mod tests {
             ),
             Ok(())
         );
-        assert_eq!(interface_properties.get(&1).unwrap(), &interface1);
+        assert_eq!(interface_properties.get(&1).unwrap().properties, interface1);
 
         // Sending an updated interface properties with a different field
         // should update the properties stored under the same interface id.
@@ -1374,7 +1381,7 @@ mod tests {
             ),
             Ok(())
         );
-        assert_eq!(interface_properties.get(&1).unwrap(), &interface1);
+        assert_eq!(interface_properties.get(&1).unwrap().properties, interface1);
 
         let interface2_add_event = fnet_interfaces::Event::Added(interface2.clone().into());
         assert_matches!(
@@ -1386,8 +1393,8 @@ mod tests {
             ),
             Ok(())
         );
-        assert_eq!(interface_properties.get(&1).unwrap(), &interface1);
-        assert_eq!(interface_properties.get(&2).unwrap(), &interface2);
+        assert_eq!(interface_properties.get(&1).unwrap().properties, interface1);
+        assert_eq!(interface_properties.get(&2).unwrap().properties, interface2);
 
         // A remove event should result in no longer seeing the LinkMessage in the
         // interface properties HashMap.
@@ -1402,7 +1409,7 @@ mod tests {
             Ok(())
         );
         assert_eq!(interface_properties.get(&1), None);
-        assert_eq!(interface_properties.get(&2).unwrap(), &interface2);
+        assert_eq!(interface_properties.get(&2).unwrap().properties, interface2);
     }
 
     fn get_fake_interface(
