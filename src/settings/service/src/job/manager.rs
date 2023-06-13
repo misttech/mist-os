@@ -446,9 +446,10 @@ mod tests {
 
         // Send a fidl error before a valid job.
         requests_tx
-            .unbounded_send(Err(Error::Unexpected(fidl::Error::ClientRead(
-                zx::Status::PEER_CLOSED,
-            ))))
+            .unbounded_send(Err(Error::Unexpected(fidl::Error::ClientChannelClosed {
+                status: zx::Status::PEER_CLOSED,
+                protocol_name: "",
+            })))
             .expect("Should be able to queue requests");
 
         // Now send a valid job, which should not be processed after the error.

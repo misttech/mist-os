@@ -4,6 +4,7 @@
 
 //! Extensions for fuchsia.net.interfaces.admin.
 
+use fidl::endpoints::ProtocolMarker as _;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fuchsia_zircon_status as zx;
@@ -263,7 +264,12 @@ impl Control {
         let Self { proxy: _, terminal_event_fut } = self;
         match terminal_event_fut.await {
             Ok(Some(event)) => TerminalError::Terminal(event),
-            Ok(None) => TerminalError::Fidl(fidl::Error::ClientRead(zx::Status::PEER_CLOSED)),
+            Ok(None) => TerminalError::Fidl(fidl::Error::ClientChannelClosed {
+                status: zx::Status::PEER_CLOSED,
+                protocol_name: fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
+                #[cfg(not(target_os = "fuchsia"))]
+                reason: None,
+            }),
             Err(e) => TerminalError::Fidl(e),
         }
     }
@@ -296,9 +302,12 @@ impl Control {
                         if let Some(query_result) = fut.now_or_never() {
                             query_result.map_err(TerminalError::Fidl)
                         } else {
-                            Err(TerminalError::Fidl(fidl::Error::ClientRead(
-                                zx::Status::PEER_CLOSED,
-                            )))
+                            Err(TerminalError::Fidl(fidl::Error::ClientChannelClosed {
+                                status: zx::Status::PEER_CLOSED,
+                                protocol_name: fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
+                                #[cfg(not(target_os = "fuchsia"))]
+                                reason: None,
+                            }))
                         }
                     }
                 }
@@ -589,8 +598,10 @@ mod test {
         );
         #[cfg(target_os = "fuchsia")]
         assert_matches::assert_matches!(
-            control
-                .or_terminal_event_no_return(Err(fidl::Error::ClientRead(zx::Status::PEER_CLOSED))),
+            control.or_terminal_event_no_return(Err(fidl::Error::ClientChannelClosed {
+                status: zx::Status::PEER_CLOSED,
+                protocol_name: fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
+            })),
             Err(super::TerminalError::Terminal(CLOSE_REASON))
         );
     }
