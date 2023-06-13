@@ -70,6 +70,8 @@ pub struct Info {
 pub type PostCommitHook =
     Option<Box<dyn Fn() -> futures::future::BoxFuture<'static, ()> + Send + Sync>>;
 
+pub type PreCommitHook = Option<Box<dyn Fn(&Transaction<'_>) -> Result<(), Error> + Send + Sync>>;
+
 pub struct Options {
     /// True if the filesystem is read-only.
     pub read_only: bool,
@@ -78,6 +80,10 @@ pub struct Options {
     /// we can't end up with more than two live keys (so it must be bigger than the maximum possible
     /// size of unflushed journal contents).  This is exposed for testing purposes.
     pub roll_metadata_key_byte_count: u64,
+
+    /// A callback that runs before every transaction is committed.  If this callback returns an
+    /// error then the transaction is failed with that error.
+    pub pre_commit_hook: PreCommitHook,
 
     /// A callback that runs after every transaction has been committed.  This will be called whilst
     /// a lock is held which will block more transactions from being committed.
@@ -93,6 +99,7 @@ impl Default for Options {
         Options {
             roll_metadata_key_byte_count: 128 * 1024 * 1024,
             read_only: false,
+            pre_commit_hook: None,
             post_commit_hook: None,
             skip_initial_reap: false,
         }
@@ -297,6 +304,15 @@ impl FxFilesystemBuilder {
     /// Sets how often the metadata keys are rolled. See `Options::roll_metadata_key_byte_count`.
     pub fn roll_metadata_key_byte_count(mut self, roll_metadata_key_byte_count: u64) -> Self {
         self.options.roll_metadata_key_byte_count = roll_metadata_key_byte_count;
+        self
+    }
+
+    /// Sets a callback that runs before every transaction. See `Options::pre_commit_hook`.
+    pub fn pre_commit_hook(
+        mut self,
+        hook: impl Fn(&Transaction<'_>) -> Result<(), Error> + Send + Sync + 'static,
+    ) -> Self {
+        self.options.pre_commit_hook = Some(Box::new(hook));
         self
     }
 
@@ -715,6 +731,9 @@ impl TransactionHandler for FxFilesystem {
         callback: &mut (dyn FnMut(u64) + Send),
     ) -> Result<u64, Error> {
         trace_duration!("FxFilesystem::commit_transaction");
+        if let Some(hook) = self.options.pre_commit_hook.as_ref() {
+            hook(transaction)?;
+        }
         debug_assert_not_too_long!(self.lock_manager.commit_prepare(&transaction));
         {
             let mut flush_task = self.flush_task.lock().unwrap();

@@ -87,6 +87,7 @@ rustc_library("platform") {
       "//src/lib/fuchsia-fs",
       "//src/lib/storage/fs_management/rust:fs_management",
       "//src/lib/storage/ramdevice_client/rust:ramdevice_client",
+      "//src/lib/test_util",
       "//src/storage/bin/blobfs:blobfs-component",
       "//src/storage/fxfs:lib",
       "//src/storage/fxfs-crypt:lib",

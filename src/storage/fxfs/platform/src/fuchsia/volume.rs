@@ -1655,6 +1655,7 @@ mod tests {
 
             // Trim to zero. Bytes should decrease.
             file_proxy.resize(0).await.expect("FIDL call failed").expect("Resize file");
+            file_proxy.sync().await.expect("FIDL call failed").expect("Sync failed.");
             {
                 let BytesAndNodes { bytes, nodes } =
                     project_proxy.info(PROJECT_ID).await.unwrap().expect("Fetching project info").1;

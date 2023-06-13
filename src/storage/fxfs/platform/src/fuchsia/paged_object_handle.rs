@@ -64,6 +64,21 @@ struct Inner {
 
     /// The amount of extra space currently reserved. See `SPARE_SIZE`.
     spare: u64,
+
+    /// Stores whether the file needs to be shrunk or trimmed during the next flush.
+    pending_shrink: PendingShrink,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum PendingShrink {
+    None,
+
+    /// The file needs to be shrunk during the next flush. After shrinking the file, the file may
+    /// then also need to be trimmed.
+    ShrinkTo(u64),
+
+    /// The file needs to be trimmed during the next flush.
+    NeedsTrim,
 }
 
 // DirtyTimestamp tracks a dirty timestamp and handles flushing. Whilst we're flushing, we need to
@@ -217,6 +232,7 @@ impl PagedObjectHandle {
                 dirty_mtime: DirtyTimestamp::None,
                 dirty_page_count: 0,
                 spare: 0,
+                pending_shrink: PendingShrink::None,
             }),
         }
     }
@@ -556,6 +572,19 @@ impl PagedObjectHandle {
         let keys = [LockKey::truncate(store.store_object_id(), self.handle.object_id())];
         let _truncate_guard = debug_assert_not_too_long!(fs.write_lock(&keys));
 
+        let pending_shrink = self.inner.lock().unwrap().pending_shrink;
+        if let PendingShrink::ShrinkTo(size) = pending_shrink {
+            let needs_trim = self.shrink_file(size).await.context("Failed to shrink file")?;
+            self.inner.lock().unwrap().pending_shrink =
+                if needs_trim { PendingShrink::NeedsTrim } else { PendingShrink::None };
+        }
+
+        let pending_shrink = self.inner.lock().unwrap().pending_shrink;
+        if let PendingShrink::NeedsTrim = pending_shrink {
+            self.store().trim(self.object_id()).await.context("Failed to trim file")?;
+            self.inner.lock().unwrap().pending_shrink = PendingShrink::None;
+        }
+
         // If the file had several dirty pages and then was truncated to before those dirty pages
         // then we'll still have space reserved that is no longer needed and should be released as
         // part of this flush.
@@ -652,7 +681,8 @@ impl PagedObjectHandle {
         }
     }
 
-    async fn shrink_file(&self, new_size: u64) -> Result<(), Error> {
+    /// Returns true if the file still needs to be trimmed.
+    async fn shrink_file(&self, new_size: u64) -> Result<bool, Error> {
         let mut transaction = self.new_transaction(None).await?;
 
         let needs_trim = self.handle.shrink(&mut transaction, new_size).await?.0;
@@ -671,11 +701,7 @@ impl PagedObjectHandle {
         transaction.commit().await.context("Failed to commit transaction")?;
         self.inner.lock().unwrap().end_flush();
 
-        if needs_trim {
-            self.store().trim(self.object_id()).await?;
-        }
-
-        Ok(())
+        Ok(needs_trim)
     }
 
     pub async fn truncate(&self, new_size: u64) -> Result<(), Error> {
@@ -685,19 +711,19 @@ impl PagedObjectHandle {
         let keys = [LockKey::truncate(store.store_object_id(), self.handle.object_id())];
         let _truncate_guard = debug_assert_not_too_long!(fs.write_lock(&keys));
 
-        // Resizing the buffer will trigger an mtime change.
+        // Changing the size of the vmo will cause `was_file_modified_since_last_call` to return
+        // true which will update the mtime during the next flush.
         self.buffer.resize(new_size).await;
 
-        // Shrinking a large fragmented file can use lots of metadata space which isn't accounted
-        // for in the dirty page reservations. To avoid running out of metadata space during a
-        // flush, blocks are freed as part of the truncate. The entire truncate transaction can
-        // borrow metadata space because it will result in more free space after a compaction.
-        let block_size = self.handle.block_size();
-        let new_block_aligned_size = round_up(new_size, block_size).unwrap();
-        let previous_block_aligned_size = round_up(self.handle.get_size(), block_size).unwrap();
-        if new_block_aligned_size < previous_block_aligned_size {
-            if let Err(error) = self.shrink_file(new_size).await {
-                warn!(?error, "Failed to shrink the file");
+        let previous_content_size = self.handle.get_size();
+        if new_size < previous_content_size {
+            let mut inner = self.inner.lock().unwrap();
+            inner.pending_shrink = match inner.pending_shrink {
+                PendingShrink::None => PendingShrink::ShrinkTo(new_size),
+                PendingShrink::ShrinkTo(size) => {
+                    PendingShrink::ShrinkTo(std::cmp::min(size, new_size))
+                }
+                PendingShrink::NeedsTrim => PendingShrink::ShrinkTo(new_size),
             }
         }
 
@@ -763,6 +789,7 @@ impl PagedObjectHandle {
         inner.dirty_crtime.needs_flush()
             || inner.dirty_mtime.needs_flush()
             || inner.dirty_page_count > 0
+            || inner.pending_shrink != PendingShrink::None
     }
 }
 
@@ -952,14 +979,30 @@ impl FlushRange {
 mod tests {
     use {
         super::*,
-        crate::fuchsia::testing::{
-            close_file_checked, open_file_checked, TestFixture, TestFixtureOptions,
+        crate::fuchsia::{
+            directory::FxDirectory,
+            testing::{close_dir_checked, close_file_checked, open_file_checked, TestFixture},
+            volume::FxVolumeAndRoot,
         },
+        anyhow::{bail, Context},
+        fidl::endpoints::{create_proxy, ServerEnd},
         fidl_fuchsia_io as fio,
         fuchsia_fs::file,
         fuchsia_zircon as zx,
-        std::{sync::atomic::Ordering, time::Duration},
+        fxfs::{
+            filesystem::{FxFilesystemBuilder, OpenFxFilesystem},
+            object_store::volume::root_volume,
+        },
+        std::{
+            sync::{
+                atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
+                Arc, Weak,
+            },
+            time::Duration,
+        },
         storage_device::{fake_device::FakeDevice, DeviceHolder},
+        test_util::{assert_geq, assert_lt},
+        vfs::path::Path,
     };
 
     const BLOCK_SIZE: u32 = 512;
@@ -996,15 +1039,50 @@ mod tests {
         zx::Status::ok(status).expect("set_attr failed");
     }
 
-    #[fuchsia::test(threads = 10)]
+    async fn open_filesystem(
+        pre_commit_hook: impl Fn(&Transaction<'_>) -> Result<(), Error> + Send + Sync + 'static,
+    ) -> (OpenFxFilesystem, FxVolumeAndRoot) {
+        let device = DeviceHolder::new(FakeDevice::new(BLOCK_COUNT, BLOCK_SIZE));
+        let fs = FxFilesystemBuilder::new()
+            .pre_commit_hook(pre_commit_hook)
+            .format(true)
+            .open(device)
+            .await
+            .unwrap();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let store = root_volume.new_volume("vol", None).await.unwrap();
+        let store_object_id = store.store_object_id();
+        let volume =
+            FxVolumeAndRoot::new::<FxDirectory>(Weak::new(), store, store_object_id).await.unwrap();
+        (fs, volume)
+    }
+
+    fn open_volume(volume: &FxVolumeAndRoot) -> fio::DirectoryProxy {
+        let (root, server_end) =
+            create_proxy::<fio::DirectoryMarker>().expect("create_proxy failed");
+        volume.root().clone().open(
+            volume.volume().scope().clone(),
+            fio::OpenFlags::DIRECTORY
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE,
+            Path::dot(),
+            ServerEnd::new(server_end.into_channel()),
+        );
+        root
+    }
+
+    #[fuchsia::test]
     async fn test_large_flush_requiring_multiple_transactions() {
-        let device = FakeDevice::new(BLOCK_COUNT, BLOCK_SIZE);
-        let fixture = TestFixture::open(
-            DeviceHolder::new(device),
-            TestFixtureOptions { format: true, as_blob: false, encrypted: false },
-        )
+        let transaction_count = Arc::new(AtomicU64::new(0));
+        let (fs, volume) = open_filesystem({
+            let transaction_count = transaction_count.clone();
+            move |_| {
+                transaction_count.fetch_add(1, Ordering::Relaxed);
+                Ok(())
+            }
+        })
         .await;
-        let root = fixture.root();
+        let root = open_volume(&volume);
 
         let file = open_file_checked(
             &root,
@@ -1027,32 +1105,32 @@ mod tests {
                 .expect("write should succeed");
         }
 
+        transaction_count.store(0, Ordering::Relaxed);
         file.sync().await.unwrap().unwrap();
+        assert_eq!(transaction_count.load(Ordering::Relaxed), 3);
 
         close_file_checked(file).await;
-        fixture.close().await;
+        close_dir_checked(root).await;
+        volume.volume().scope().wait().await;
+        volume.volume().terminate().await;
+        fs.close().await.expect("close filesystem failed");
     }
 
-    #[fuchsia::test(threads = 10)]
+    #[fuchsia::test]
     async fn test_multi_transaction_flush_with_failing_middle_transaction() {
-        let mut device = FakeDevice::new(BLOCK_COUNT, BLOCK_SIZE);
-        let fail_device_after = Arc::new(std::sync::atomic::AtomicI64::new(i64::MAX));
-        device.set_op_callback({
-            let fail_device_after = fail_device_after.clone();
+        let fail_transaction_after = Arc::new(AtomicI64::new(i64::MAX));
+        let (fs, volume) = open_filesystem({
+            let fail_transaction_after = fail_transaction_after.clone();
             move |_| {
-                if fail_device_after.fetch_sub(1, Ordering::Relaxed) < 1 {
-                    Err(zx::Status::IO.into())
+                if fail_transaction_after.fetch_sub(1, Ordering::Relaxed) < 1 {
+                    bail!("Intentionally fail transaction")
                 } else {
                     Ok(())
                 }
             }
-        });
-        let fixture = TestFixture::open(
-            DeviceHolder::new(device),
-            TestFixtureOptions { format: true, as_blob: false, encrypted: false },
-        )
+        })
         .await;
-        let root = fixture.root();
+        let root = open_volume(&volume);
 
         let file = open_file_checked(
             &root,
@@ -1076,9 +1154,9 @@ mod tests {
         // from the second transaction. The metadata from all of the transactions doesn't get
         // written to disk until the journal is synced which happens in FxFile::sync after all of
         // the multi_writes.
-        fail_device_after.store(1, Ordering::Relaxed);
+        fail_transaction_after.store(1, Ordering::Relaxed);
         file.sync().await.unwrap().expect_err("sync should fail");
-        fail_device_after.store(i64::MAX, Ordering::Relaxed);
+        fail_transaction_after.store(i64::MAX, Ordering::Relaxed);
 
         // This sync will panic if the allocator reservations intended for the second or third
         // transactions weren't retained or the pages in the first transaction weren't properly
@@ -1086,17 +1164,15 @@ mod tests {
         file.sync().await.unwrap().expect("sync should succeed");
 
         close_file_checked(file).await;
-        fixture.close().await;
+        close_dir_checked(root).await;
+        volume.volume().scope().wait().await;
+        volume.volume().terminate().await;
+        fs.close().await.expect("close filesystem failed");
     }
 
-    #[fuchsia::test(threads = 10)]
+    #[fuchsia::test]
     async fn test_writeback_begin_and_end_are_called_correctly() {
-        let device = FakeDevice::new(BLOCK_COUNT, BLOCK_SIZE);
-        let fixture = TestFixture::open(
-            DeviceHolder::new(device),
-            TestFixtureOptions { format: true, as_blob: false, encrypted: false },
-        )
-        .await;
+        let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
         let file = open_file_checked(
@@ -1145,14 +1221,9 @@ mod tests {
         fixture.close().await;
     }
 
-    #[fuchsia::test(threads = 10)]
+    #[fuchsia::test]
     async fn test_writing_overrides_set_mtime() {
-        let device = FakeDevice::new(8192, 512);
-        let fixture = TestFixture::open(
-            DeviceHolder::new(device),
-            TestFixtureOptions { format: true, as_blob: false, encrypted: false },
-        )
-        .await;
+        let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
         let file = open_file_checked(
@@ -1187,14 +1258,9 @@ mod tests {
         fixture.close().await;
     }
 
-    #[fuchsia::test(threads = 10)]
+    #[fuchsia::test]
     async fn test_flushing_after_get_attr_does_not_change_mtime() {
-        let device = FakeDevice::new(8192, 512);
-        let fixture = TestFixture::open(
-            DeviceHolder::new(device),
-            TestFixtureOptions { format: true, as_blob: false, encrypted: false },
-        )
-        .await;
+        let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
         let file = open_file_checked(
@@ -1225,26 +1291,21 @@ mod tests {
         fixture.close().await;
     }
 
-    #[fuchsia::test(threads = 10)]
+    #[fuchsia::test]
     async fn test_timestamps_are_preserved_across_flush_failures() {
-        let mut device = FakeDevice::new(BLOCK_COUNT, BLOCK_SIZE);
-        let fail_device = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        device.set_op_callback({
-            let fail_device = fail_device.clone();
+        let fail_transaction = Arc::new(AtomicBool::new(false));
+        let (fs, volume) = open_filesystem({
+            let fail_transaction = fail_transaction.clone();
             move |_| {
-                if fail_device.load(Ordering::Relaxed) {
-                    Err(zx::Status::IO.into())
+                if fail_transaction.load(Ordering::Relaxed) {
+                    Err(zx::Status::IO).context("Intentionally fail transaction")
                 } else {
                     Ok(())
                 }
             }
-        });
-        let fixture = TestFixture::open(
-            DeviceHolder::new(device),
-            TestFixtureOptions { format: true, as_blob: false, encrypted: false },
-        )
+        })
         .await;
-        let root = fixture.root();
+        let root = open_volume(&volume);
 
         let file = open_file_checked(
             &root,
@@ -1258,26 +1319,24 @@ mod tests {
         let future = attrs.creation_time + ONE_DAY;
         set_attrs_checked(&file, Some(future), Some(future)).await;
 
-        fail_device.store(true, Ordering::Relaxed);
+        fail_transaction.store(true, Ordering::Relaxed);
         file.sync().await.unwrap().expect_err("sync should fail");
-        fail_device.store(false, Ordering::Relaxed);
+        fail_transaction.store(false, Ordering::Relaxed);
 
         let attrs = get_attrs_checked(&file).await;
         assert_eq!(attrs.creation_time, future);
         assert_eq!(attrs.modification_time, future);
 
         close_file_checked(file).await;
-        fixture.close().await;
+        close_dir_checked(root).await;
+        volume.volume().scope().wait().await;
+        volume.volume().terminate().await;
+        fs.close().await.expect("close filesystem failed");
     }
 
-    #[fuchsia::test(threads = 10)]
+    #[fuchsia::test]
     async fn test_max_file_size() {
-        let device = FakeDevice::new(BLOCK_COUNT, BLOCK_SIZE);
-        let fixture = TestFixture::open(
-            DeviceHolder::new(device),
-            TestFixtureOptions { format: true, as_blob: false, encrypted: false },
-        )
-        .await;
+        let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
         let file = open_file_checked(
@@ -1511,5 +1570,114 @@ mod tests {
         assert_eq!(batches.dirty_page_count, 0);
         assert!(batches.batches.is_empty());
         assert_eq!(batches.skipped_dirty_page_count, 2);
+    }
+
+    #[fuchsia::test]
+    async fn test_retry_shrink_transaction() {
+        let fail_transaction = Arc::new(AtomicBool::new(false));
+        let (fs, volume) = open_filesystem({
+            let fail_transaction = fail_transaction.clone();
+            move |_| {
+                if fail_transaction.load(Ordering::Relaxed) {
+                    bail!("Intentionally fail transaction")
+                } else {
+                    Ok(())
+                }
+            }
+        })
+        .await;
+        let root = open_volume(&volume);
+
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+        let initial_file_size = zx::system_get_page_size() as usize * 10;
+        file::write(&file, vec![5u8; initial_file_size]).await.unwrap();
+        file.sync().await.unwrap().map_err(zx::ok).unwrap();
+        let initial_attrs = get_attrs_checked(&file).await;
+        assert_geq!(initial_attrs.storage_size, initial_file_size as u64);
+        file.resize(0).await.unwrap().map_err(zx::ok).unwrap();
+
+        fail_transaction.store(true, Ordering::Relaxed);
+        file.sync().await.unwrap().expect_err("flush should have failed");
+        fail_transaction.store(false, Ordering::Relaxed);
+
+        // Verify that the file wasn't resized and non of the blocks were freed.
+        let attrs = get_attrs_checked(&file).await;
+        assert_eq!(attrs.storage_size, initial_attrs.storage_size);
+
+        file.sync().await.unwrap().map_err(zx::ok).unwrap();
+        let attrs = get_attrs_checked(&file).await;
+        // The shrink transaction was retried and the blocks were freed.
+        assert_eq!(attrs.storage_size, 0);
+
+        close_file_checked(file).await;
+        close_dir_checked(root).await;
+        volume.volume().scope().wait().await;
+        volume.volume().terminate().await;
+        fs.close().await.expect("close filesystem failed");
+    }
+
+    #[fuchsia::test]
+    async fn test_retry_trim_transaction() {
+        let fail_transaction_after = Arc::new(AtomicI64::new(i64::MAX));
+        let (fs, volume) = open_filesystem({
+            let fail_transaction_after = fail_transaction_after.clone();
+            move |_| {
+                if fail_transaction_after.fetch_sub(1, Ordering::Relaxed) < 1 {
+                    bail!("Intentionally fail transaction")
+                } else {
+                    Ok(())
+                }
+            }
+        })
+        .await;
+        let root = open_volume(&volume);
+
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+        let page_size = zx::system_get_page_size() as u64;
+        // Write to every other page to generate lots of small extents that will require multiple
+        // transactions to be freed.
+        let write_count: u64 = 256;
+        for i in 0..write_count {
+            file.write_at(&[5u8; 1], page_size * 2 * i)
+                .await
+                .unwrap()
+                .map_err(zx::ok)
+                .unwrap_or_else(|e| panic!("Write {} failed {:?}", i, e));
+        }
+        file.sync().await.unwrap().map_err(zx::ok).unwrap();
+        let initial_attrs = get_attrs_checked(&file).await;
+        assert_geq!(initial_attrs.storage_size, write_count * page_size);
+        file.resize(0).await.unwrap().map_err(zx::ok).unwrap();
+
+        // Allow the shrink transaction, fail the trim transaction.
+        fail_transaction_after.store(1, Ordering::Relaxed);
+        file.sync().await.unwrap().expect_err("flush should have failed");
+        fail_transaction_after.store(i64::MAX, Ordering::Relaxed);
+
+        // Some of the extents will be freed by the shrink transactions but not all of them.
+        let attrs = get_attrs_checked(&file).await;
+        assert_ne!(attrs.storage_size, 0);
+        assert_lt!(attrs.storage_size, initial_attrs.storage_size);
+
+        file.sync().await.unwrap().map_err(zx::ok).unwrap();
+        let attrs = get_attrs_checked(&file).await;
+        // The trim transaction was retried and the extents were freed.
+        assert_eq!(attrs.storage_size, 0);
+
+        close_file_checked(file).await;
+        close_dir_checked(root).await;
+        volume.volume().scope().wait().await;
+        volume.volume().terminate().await;
+        fs.close().await.expect("close filesystem failed");
     }
 }
