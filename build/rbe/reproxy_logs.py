@@ -12,7 +12,7 @@ import os
 import shutil
 import subprocess
 
-from api.proxy import log_pb2
+from api.log import log_pb2
 from pathlib import Path
 from typing import Dict
 
@@ -103,6 +103,13 @@ def setup_logdir_for_logdump(path: Path, verbose: bool = False) -> Path:
     return cached_log_dir
 
 
+def _log_dump_from_pb(log_pb_file: Path) -> log_pb2.LogDump:
+    log_dump = log_pb2.LogDump()
+    with open(log_pb_file, mode='rb') as logf:
+        log_dump.ParseFromString(logf.read())
+    return log_dump
+
+
 def convert_reproxy_actions_log(
         reproxy_logdir: Path,
         reclient_bindir: Path,
@@ -127,8 +134,4 @@ def convert_reproxy_actions_log(
     if verbose:
         msg(f"Loading log records from {log_pb_file}.")
 
-    log_dump = log_pb2.LogDump()
-    with open(log_pb_file, mode='rb') as logf:
-        log_dump.ParseFromString(logf.read())
-
-    return log_dump
+    return _log_dump_from_pb(log_pb_file)

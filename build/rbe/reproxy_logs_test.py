@@ -46,6 +46,7 @@ class ReproxyLogTests(unittest.TestCase):
                 'bbbbaaaa/9': record2,
             })
 
+
 class SetupLogdirForLogDumpTest(unittest.TestCase):
 
     def test_already_a_directory(self):
@@ -68,19 +69,17 @@ class SetupLogdirForLogDumpTest(unittest.TestCase):
 class ConvertReproxyActionsLogTest(unittest.TestCase):
 
     def test_basic(self):
-
+        empty_log = log_pb2.LogDump()
         with mock.patch.object(subprocess, "check_call") as mock_process_call:
-            with mock.patch.object(__builtins__, "open") as mock_open:
-                with mock.patch.object(log_pb2.LogDump,
-                                       "ParseFromString") as mock_parse:
-                    log_dump = reproxy_logs.convert_reproxy_actions_log(
-                        reproxy_logdir=Path("/tmp/reproxy.log.dir"),
-                        reclient_bindir=Path("/usr/local/reclient/bin"),
-                    )
+            with mock.patch.object(reproxy_logs, "_log_dump_from_pb",
+                                   return_value=empty_log) as mock_parse:
+                log_dump = reproxy_logs.convert_reproxy_actions_log(
+                    reproxy_logdir=Path("/tmp/reproxy.log.dir"),
+                    reclient_bindir=Path("/usr/local/reclient/bin"),
+                )
         mock_process_call.assert_called_once()
-        mock_open.assert_called_once()
         mock_parse.assert_called_once()
-        self.assertEqual(log_dump, log_pb2.LogDump())
+        self.assertEqual(log_dump, log_dump)
 
 
 if __name__ == '__main__':

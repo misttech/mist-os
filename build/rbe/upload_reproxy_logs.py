@@ -18,7 +18,7 @@ import uuid
 
 import pb_message_util
 import reproxy_logs
-from api.proxy import log_pb2
+from api.log import log_pb2
 from api.stats import stats_pb2
 import rbe_metrics_pb2
 from pathlib import Path

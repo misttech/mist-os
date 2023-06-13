@@ -11,9 +11,9 @@ import pb_message_util
 
 # The function being tested works on any subclass of message.Message
 # which is an abstract base class.  However, we need a concrete message type
-# to test.  We choose api.proxy.log_pb2.LogDump because this is what
+# to test.  We choose api.log.log_pb2.LogDump because this is what
 # upload_reproxy_logs.py uses, and it is very stable.
-from api.proxy import log_pb2
+from api.log import log_pb2
 from go.api.command import command_pb2
 from google.protobuf import timestamp_pb2
 

@@ -21,8 +21,8 @@ options:
 
 This populates the Fuchsia source tree with the following files:
 
-  build/rbe/proto/api/proxy/log.proto
-  build/rbe/proto/api/proxy/log_pb2.py
+  build/rbe/proto/api/log/log.proto
+  build/rbe/proto/api/log/log_pb2.py
   build/rbe/proto/api/stats/stats.proto
   build/rbe/proto/api/stats/stats_pb2.py
   build/rbe/proto/go/api/command/command.proto
@@ -74,9 +74,9 @@ test -n "$RECLIENT_SRCDIR" || {
 }
 
 echo "Fetching protos from $RECLIENT_SRCDIR, installing to $DESTDIR"
-mkdir -p "$DESTDIR"/api/proxy
-grep -v "bq_table.proto" "$RECLIENT_SRCDIR"/api/proxy/log.proto | \
-  grep -v "option.*gen_bq_schema" > "$DESTDIR"/api/proxy/log.proto
+mkdir -p "$DESTDIR"/api/log
+grep -v "bq_table.proto" "$RECLIENT_SRCDIR"/api/log/log.proto | \
+  grep -v "option.*gen_bq_schema" > "$DESTDIR"/api/log/log.proto
 mkdir -p "$DESTDIR"/api/stats
 cp "$RECLIENT_SRCDIR"/api/stats/stats.proto "$DESTDIR"/api/stats/
 
@@ -95,7 +95,7 @@ readonly PROTOBUF_DEST=third_party/protobuf/python
 
 echo "Compiling $DESTDIR protos to Python"
 LOG_PROTOS=(
-  api/proxy/log.proto
+  api/log/log.proto
   api/stats/stats.proto
   go/api/command/command.proto
   rbe_metrics.proto
