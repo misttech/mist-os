@@ -53,6 +53,22 @@ fn init_devtmpfs(current_task: &CurrentTask) -> FileSystemHandle {
     mkblk(b"loop5", DeviceType::new(LOOP_MAJOR, 5));
     mkblk(b"loop6", DeviceType::new(LOOP_MAJOR, 6));
     mkblk(b"loop7", DeviceType::new(LOOP_MAJOR, 7));
+    mkblk(b"loop8", DeviceType::new(LOOP_MAJOR, 8));
+    mkblk(b"loop9", DeviceType::new(LOOP_MAJOR, 9));
+    mkblk(b"loop10", DeviceType::new(LOOP_MAJOR, 10));
+    mkblk(b"loop11", DeviceType::new(LOOP_MAJOR, 11));
+    mkblk(b"loop12", DeviceType::new(LOOP_MAJOR, 12));
+    mkblk(b"loop13", DeviceType::new(LOOP_MAJOR, 13));
+    mkblk(b"loop14", DeviceType::new(LOOP_MAJOR, 14));
+    mkblk(b"loop15", DeviceType::new(LOOP_MAJOR, 15));
+    mkblk(b"loop16", DeviceType::new(LOOP_MAJOR, 16));
+    mkblk(b"loop17", DeviceType::new(LOOP_MAJOR, 17));
+    mkblk(b"loop18", DeviceType::new(LOOP_MAJOR, 18));
+    mkblk(b"loop19", DeviceType::new(LOOP_MAJOR, 19));
+    mkblk(b"loop20", DeviceType::new(LOOP_MAJOR, 20));
+    mkblk(b"loop21", DeviceType::new(LOOP_MAJOR, 21));
+    mkblk(b"loop22", DeviceType::new(LOOP_MAJOR, 22));
+    mkblk(b"loop23", DeviceType::new(LOOP_MAJOR, 23));
 
     mkdir(b"shm");
 
