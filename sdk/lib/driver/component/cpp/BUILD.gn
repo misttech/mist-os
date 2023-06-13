@@ -21,8 +21,6 @@ sdk_source_set("cpp") {
     "composite_node_spec.h",
     "driver_base.cc",
     "driver_base.h",
-    "driver_context.cc",
-    "driver_context.h",
     "driver_cpp.h",
     "lifecycle.h",
     "node_add_args.cc",

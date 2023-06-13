@@ -7,12 +7,12 @@
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <lib/component/outgoing/cpp/structured_config.h>
-#include <lib/driver/component/cpp/driver_context.h>
 #include <lib/driver/component/cpp/prepare_stop_completer.h>
 #include <lib/driver/component/cpp/start_args.h>
 #include <lib/driver/component/cpp/start_completer.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/logging/cpp/logger.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdf/cpp/dispatcher.h>
 
 namespace fdf {
@@ -142,14 +142,14 @@ class DriverBase {
 
   // Used to access the incoming namespace of the driver. This allows connecting to both zircon and
   // driver transport incoming services.
-  const std::shared_ptr<Namespace>& incoming() const { return driver_context_.incoming(); }
+  const std::shared_ptr<Namespace>& incoming() const { return incoming_; }
 
   // The `/svc` directory in the incoming namespace.
-  fidl::UnownedClientEnd<fuchsia_io::Directory> svc() const { return driver_context_.svc(); }
+  fidl::UnownedClientEnd<fuchsia_io::Directory> svc() const { return incoming_->svc_dir(); }
 
   // Used to access the outgoing directory that the driver is serving. Can be used to add both
   // zircon and driver transport outgoing services.
-  std::shared_ptr<OutgoingDirectory>& outgoing() { return driver_context_.outgoing(); }
+  std::shared_ptr<OutgoingDirectory>& outgoing() { return outgoing_; }
 
   // The unowned synchronized driver dispatcher that the driver is started with.
   const fdf::UnownedSynchronizedDispatcher& driver_dispatcher() const { return driver_dispatcher_; }
@@ -179,11 +179,15 @@ class DriverBase {
   }
 
  private:
+  void InitializeAndServe(Namespace incoming,
+                          fidl::ServerEnd<fuchsia_io::Directory> outgoing_directory_request);
+
   std::string name_;
   DriverStartArgs start_args_;
   fdf::UnownedSynchronizedDispatcher driver_dispatcher_;
   async_dispatcher_t* dispatcher_;
-  DriverContext driver_context_;
+  std::shared_ptr<Namespace> incoming_;
+  std::shared_ptr<OutgoingDirectory> outgoing_;
 };
 
 }  // namespace fdf
