@@ -37,8 +37,8 @@
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_PCIE_INTERNAL_H_
 
 #include <lib/device-protocol/pci.h>
-#include <lib/mmio/mmio-buffer.h>
 #include <lib/sync/completion.h>
+#include <lib/mmio-ptr/mmio-ptr.h>
 #include <threads.h>
 #include <zircon/listnode.h>
 
@@ -443,7 +443,7 @@ struct iwl_trans_pcie {
   struct iwl_pci_dev* pci_dev;
   struct iwl_pci_fidl* pci;
   pci_interrupt_mode_t irq_mode;
-  mmio_buffer_t mmio;
+  MMIO_PTR void* mmio_vaddr;
 
   bool ucode_write_complete;
   bool sx_complete;

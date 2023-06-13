@@ -1880,26 +1880,22 @@ static void iwl_trans_pcie_op_mode_leave(struct iwl_trans* trans) {
 }
 
 static void iwl_trans_pcie_write8(struct iwl_trans* trans, uint32_t ofs, uint8_t val) {
-  uintptr_t addr = (uintptr_t)(IWL_TRANS_GET_PCIE_TRANS(trans)->mmio.vaddr) + ofs;
-  *(volatile uint8_t*)addr = val;
+  MmioWrite8(val, IWL_TRANS_GET_PCIE_TRANS(trans)->mmio_vaddr + ofs);
 }
 
 static void iwl_trans_pcie_write32(struct iwl_trans* trans, uint32_t ofs, uint32_t val) {
-  uintptr_t addr = (uintptr_t)(IWL_TRANS_GET_PCIE_TRANS(trans)->mmio.vaddr) + ofs;
-  *(volatile uint32_t*)addr = val;
+  MmioWrite32(val, IWL_TRANS_GET_PCIE_TRANS(trans)->mmio_vaddr + ofs);
 }
 
 static uint32_t iwl_trans_pcie_read32(struct iwl_trans* trans, uint32_t ofs) {
-  uintptr_t addr = (uintptr_t)(IWL_TRANS_GET_PCIE_TRANS(trans)->mmio.vaddr) + ofs;
-  return *(volatile uint32_t*)addr;
+  return MmioRead32(IWL_TRANS_GET_PCIE_TRANS(trans)->mmio_vaddr + ofs);
 }
 
 static uint32_t iwl_trans_pcie_prph_msk(struct iwl_trans* trans) {
   if (trans->trans_cfg->device_family >= IWL_DEVICE_FAMILY_AX210) {
     return 0x00FFFFFF;
-  } else {
-    return 0x000FFFFF;
   }
+  return 0x000FFFFF;
 }
 
 static uint32_t iwl_trans_pcie_read_prph(struct iwl_trans* trans, uint32_t reg) {
@@ -3535,7 +3531,7 @@ struct iwl_trans* iwl_trans_pcie_alloc(struct iwl_pci_dev* pdev,
 #endif  // NEEDS_PORTING
 
   status = iwl_pci_map_bar_buffer(trans_pcie->pci, 0 /* bar_id */, ZX_CACHE_POLICY_UNCACHED_DEVICE,
-                              &trans_pcie->mmio);
+                              &trans_pcie->mmio_vaddr);
   if (status != ZX_OK) {
     IWL_ERR(trans, "Failed to map resources for BAR 0: %s\n", zx_status_get_string(status));
     goto out_no_pci;

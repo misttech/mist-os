@@ -6,7 +6,7 @@
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_PLATFORM_PCI_FIDL_H_
 
 #include <lib/device-protocol/pci.h>
-#include <lib/mmio/mmio-buffer.h>
+#include <lib/mmio-ptr/mmio-ptr.h>
 #include <zircon/types.h>
 
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/kernel.h"
@@ -32,8 +32,8 @@ zx_status_t iwl_pci_set_bus_mastering(const struct iwl_pci_fidl* fidl, bool enab
 zx_status_t iwl_pci_map_interrupt(const struct iwl_pci_fidl* fidl, uint32_t which_irq,
                                   zx_handle_t* out_interrupt);
 zx_status_t iwl_pci_write_config8(const struct iwl_pci_fidl* fidl, uint16_t offset, uint8_t value);
-zx_status_t iwl_pci_map_bar_buffer(const struct iwl_pci_fidl* fidl, uint32_t bar_id,
-                                   uint32_t cache_policy, mmio_buffer_t* buffer);
+zx_status_t iwl_pci_map_bar_buffer(struct iwl_pci_fidl* fidl, uint32_t bar_id,
+                                   uint32_t cache_policy, MMIO_PTR void** buffer);
 
 struct zx_device;
 

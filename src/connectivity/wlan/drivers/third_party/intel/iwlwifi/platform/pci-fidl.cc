@@ -2,8 +2,11 @@
 
 #include <lib/device-protocol/pci.h>
 
+namespace fpci = fuchsia_hardware_pci::wire;
+
 struct iwl_pci_fidl {
   std::unique_ptr<ddk::Pci> pci;
+  std::optional<fdf::MmioBuffer> mmio;
 };
 
 void iwl_pci_ack_interrupt(const struct iwl_pci_fidl* fidl) { fidl->pci->AckInterrupt(); }
@@ -14,7 +17,7 @@ zx_status_t iwl_pci_read_config16(const struct iwl_pci_fidl* fidl, uint16_t offs
 }
 
 zx_status_t iwl_pci_get_device_info(const struct iwl_pci_fidl* fidl, pci_device_info_t* out_info) {
-  fuchsia_hardware_pci::wire::DeviceInfo info;
+  fpci::DeviceInfo info;
   zx_status_t status = fidl->pci->GetDeviceInfo(&info);
   if (status == ZX_OK) {
     *out_info = ddk::convert_device_info_to_banjo(info);
@@ -33,7 +36,7 @@ zx_status_t iwl_pci_get_bti(const struct iwl_pci_fidl* fidl, uint32_t index, zx_
 
 void iwl_pci_get_interrupt_modes(const struct iwl_pci_fidl* fidl,
                                  pci_interrupt_modes_t* out_modes) {
-  fuchsia_hardware_pci::wire::InterruptModes modes;
+  fpci::InterruptModes modes;
   fidl->pci->GetInterruptModes(&modes);
   *out_modes = ddk::convert_interrupt_modes_to_banjo(modes);
 }
@@ -62,9 +65,14 @@ zx_status_t iwl_pci_write_config8(const struct iwl_pci_fidl* fidl, uint16_t offs
   return fidl->pci->WriteConfig8(offset, value);
 }
 
-zx_status_t iwl_pci_map_bar_buffer(const struct iwl_pci_fidl* fidl, uint32_t bar_id,
-                                   uint32_t cache_policy, mmio_buffer_t* buffer) {
-  return fidl->pci->MapMmio(bar_id, cache_policy, buffer);
+zx_status_t iwl_pci_map_bar_buffer(struct iwl_pci_fidl* fidl, uint32_t bar_id,
+                                   uint32_t cache_policy, MMIO_PTR void** buffer) {
+  ZX_DEBUG_ASSERT(bar_id < fpci::kBaseAddressCount);
+  zx_status_t status = fidl->pci->MapMmio(bar_id, cache_policy, &fidl->mmio);
+  if (status == ZX_OK) {
+    *buffer = fidl->mmio->get();
+  }
+  return status;
 }
 
 zx_status_t iwl_pci_connect_fragment_protocol(struct zx_device* parent, const char* fragment_name,
