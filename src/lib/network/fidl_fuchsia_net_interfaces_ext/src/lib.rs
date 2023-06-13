@@ -17,7 +17,10 @@ use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_table_validation::*;
 use fuchsia_zircon_types as zx;
 use futures::{Stream, TryStreamExt as _};
-use std::collections::hash_map::{self, HashMap};
+use std::collections::{
+    btree_map::{self, BTreeMap},
+    hash_map::{self, HashMap},
+};
 use std::convert::TryFrom as _;
 use std::num::NonZeroU64;
 use thiserror::Error;
@@ -348,66 +351,82 @@ impl TryFromMaybeNonzero for NonZeroU64 {
     }
 }
 
-impl<K, S> Update<S> for HashMap<K, PropertiesAndState<S>>
-where
-    K: TryFromMaybeNonzero + Copy + From<NonZeroU64> + Eq + std::hash::Hash,
-    S: Default,
-{
-    fn update(
-        &mut self,
-        event: fnet_interfaces::Event,
-    ) -> Result<UpdateResult<'_, S>, UpdateError> {
-        match event {
-            fnet_interfaces::Event::Existing(existing) => {
-                let existing = Properties::try_from(existing)?;
-                match self.entry(existing.id.into()) {
-                    hash_map::Entry::Occupied(_) => {
-                        Err(UpdateError::DuplicateExisting(existing.into()))
+macro_rules! impl_map {
+    ($map_type:ident, $map_mod:tt) => {
+        impl<K, S> Update<S> for $map_type<K, PropertiesAndState<S>>
+        where
+            K: TryFromMaybeNonzero + Copy + From<NonZeroU64> + Eq + Ord + std::hash::Hash,
+            S: Default,
+        {
+            fn update(
+                &mut self,
+                event: fnet_interfaces::Event,
+            ) -> Result<UpdateResult<'_, S>, UpdateError> {
+                match event {
+                    fnet_interfaces::Event::Existing(existing) => {
+                        let existing = Properties::try_from(existing)?;
+                        match self.entry(existing.id.into()) {
+                            $map_mod::Entry::Occupied(_) => {
+                                Err(UpdateError::DuplicateExisting(existing.into()))
+                            }
+                            $map_mod::Entry::Vacant(entry) => {
+                                let PropertiesAndState { properties, state } =
+                                    entry.insert(PropertiesAndState {
+                                        properties: existing,
+                                        state: S::default(),
+                                    });
+                                Ok(UpdateResult::Existing { properties, state })
+                            }
+                        }
                     }
-                    hash_map::Entry::Vacant(entry) => {
-                        let PropertiesAndState { properties, state } =
-                            entry.insert(PropertiesAndState {
-                                properties: existing,
-                                state: S::default(),
-                            });
-                        Ok(UpdateResult::Existing { properties, state })
+                    fnet_interfaces::Event::Added(added) => {
+                        let added = Properties::try_from(added)?;
+                        match self.entry(added.id.into()) {
+                            $map_mod::Entry::Occupied(_) => {
+                                Err(UpdateError::DuplicateAdded(added.into()))
+                            }
+                            $map_mod::Entry::Vacant(entry) => {
+                                let PropertiesAndState { properties, state } =
+                                    entry.insert(PropertiesAndState {
+                                        properties: added,
+                                        state: S::default(),
+                                    });
+                                Ok(UpdateResult::Added { properties, state })
+                            }
+                        }
+                    }
+                    fnet_interfaces::Event::Changed(change) => {
+                        let id = if let Some(id) = change.id {
+                            id
+                        } else {
+                            return Err(UpdateError::MissingId(change));
+                        };
+                        if let Some(properties) = self.get_mut(&K::try_from_maybe_nonzero(id)?) {
+                            properties.update(fnet_interfaces::Event::Changed(change))
+                        } else {
+                            Err(UpdateError::UnknownChanged(change))
+                        }
+                    }
+                    fnet_interfaces::Event::Removed(removed_id) => {
+                        if let Some(properties) =
+                            self.remove(&K::try_from_maybe_nonzero(removed_id)?)
+                        {
+                            Ok(UpdateResult::Removed(properties))
+                        } else {
+                            Err(UpdateError::UnknownRemoved(removed_id))
+                        }
+                    }
+                    fnet_interfaces::Event::Idle(fnet_interfaces::Empty {}) => {
+                        Ok(UpdateResult::NoChange)
                     }
                 }
             }
-            fnet_interfaces::Event::Added(added) => {
-                let added = Properties::try_from(added)?;
-                match self.entry(added.id.into()) {
-                    hash_map::Entry::Occupied(_) => Err(UpdateError::DuplicateAdded(added.into())),
-                    hash_map::Entry::Vacant(entry) => {
-                        let PropertiesAndState { properties, state } = entry
-                            .insert(PropertiesAndState { properties: added, state: S::default() });
-                        Ok(UpdateResult::Added { properties, state })
-                    }
-                }
-            }
-            fnet_interfaces::Event::Changed(change) => {
-                let id = if let Some(id) = change.id {
-                    id
-                } else {
-                    return Err(UpdateError::MissingId(change));
-                };
-                if let Some(properties) = self.get_mut(&K::try_from_maybe_nonzero(id)?) {
-                    properties.update(fnet_interfaces::Event::Changed(change))
-                } else {
-                    Err(UpdateError::UnknownChanged(change))
-                }
-            }
-            fnet_interfaces::Event::Removed(removed_id) => {
-                if let Some(properties) = self.remove(&K::try_from_maybe_nonzero(removed_id)?) {
-                    Ok(UpdateResult::Removed(properties))
-                } else {
-                    Err(UpdateError::UnknownRemoved(removed_id))
-                }
-            }
-            fnet_interfaces::Event::Idle(fnet_interfaces::Empty {}) => Ok(UpdateResult::NoChange),
         }
-    }
+    };
 }
+
+impl_map!(BTreeMap, btree_map);
+impl_map!(HashMap, hash_map);
 
 /// Interface watcher operational errors.
 #[derive(Error, Debug)]
