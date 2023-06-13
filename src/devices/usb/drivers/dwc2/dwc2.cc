@@ -175,54 +175,6 @@ void Dwc2::HandleInEpInterrupt() {
         }
       }
 
-      // Timeout on receiving appropriate 2.0 token from host.
-      if (diepint.timeout() && ep_num == DWC_EP0_IN) {
-        switch (ep0_state_) {
-          case Ep0State::DATA: {
-            // TODO(105382) remove logging once timeout recovery has stabilized.
-            //   - what does the core think it's doing at wrt NAK status?
-            //   - Is the core globally NAK-ing all non-periodic IN endpoints at the moment?
-            auto dctl = DCTL::Get().ReadFrom(mmio);
-            auto depctl0 = DEPCTL0::Get(0).ReadFrom(mmio);
-            zxlogf(ERROR,
-                   "Got diepint.timeout for DATA_IN phase on ep%u, attempting to recover. "
-                   "DCTL=0x%08x DEPCTL0=0x%08x",
-                   ep_num, dctl.reg_value(), depctl0.reg_value());
-
-            // The timeout is due to one of two cases:
-            //   1. The core never received an ACK to sent IN-data. In this case, the host
-            //      successfully received IN-data, and will subsequently ACK the transmission. That
-            //      ACK was lost in transit to the core.
-            //   2. IN-data was lost in transmission to the host. In this case, the host will
-            //      re-issue an IN-token requesting the data be retransmitted.
-            //
-            // In the case of #1, the core is in a state where it NAKs all incoming tokens on
-            // OUT-EP0. It needs to clear NAK state and prepare to receive an ACK token from the
-            // host.
-            //
-            // In the case of #2, the core needs to prepare to retransmit the lost data (which
-            // remains in the FIFO).
-            HandleEp0TimeoutRecovery();
-
-            // The recovery logic currently executes a soft disconnect and core reset. We don't want
-            // to process any further interrupts.
-            return;
-          }
-          case Ep0State::DISCONNECTED:
-          case Ep0State::IDLE:
-          case Ep0State::STATUS:
-          case Ep0State::TIMEOUT_RECOVERY:
-          case Ep0State::STALL:
-            // The other cases should either theoretically never happen, or handled by the core
-            // internally in dedicate-FIFO mode, but we'll log anyway.
-            zxlogf(ERROR, "Unhandled IN EP0 diepint.timeout at txn phase %s",
-                   Ep0StateToStr(ep0_state_));
-
-            DIEPINT::Get(ep_num).ReadFrom(mmio).set_timeout(1).WriteTo(mmio);
-            break;
-        }
-      }
-
       // TODO(voydanoff) Implement error recovery for these interrupts
       if (diepint.epdisabled()) {
         zxlogf(ERROR, "Unhandled interrupt diepint.epdisabled for ep_num %u", ep_num);
@@ -232,16 +184,29 @@ void Dwc2::HandleInEpInterrupt() {
         zxlogf(ERROR, "Unhandled interrupt diepint.ahberr for ep_num %u", ep_num);
         DIEPINT::Get(ep_num).ReadFrom(mmio).set_ahberr(1).WriteTo(mmio);
       }
-      if (diepint.timeout() && ep_num != DWC_EP0_IN) {
-        // Note the DWC_EP0_IN case is handled above.
-        if (ep_num == DWC_EP0_OUT) {
-          // This should theoretically never happen in dedicated-FIFO mode, but we'll log anyway.
-          zxlogf(ERROR, "Unhandled OUT EP0 diepint.timeout at txn phase %s",
-                 Ep0StateToStr(ep0_state_));
-        } else {
-          zxlogf(ERROR, "Unhandled interrupt diepint.timeout for ep_num %u", ep_num);
-        }
-        DIEPINT::Get(ep_num).ReadFrom(mmio).set_timeout(1).WriteTo(mmio);
+      if (diepint.timeout()) {
+        // The timeout is due to one of two cases:
+        //   1. The core never received an ACK to sent IN-data. In this case, the host
+        //      successfully received IN-data, and will subsequently ACK the transmission. That
+        //      ACK was lost in transit to the core.
+        //   2. IN-data was lost in transmission to the host. In this case, the host will
+        //      re-issue an IN-token requesting the data be retransmitted.
+        //
+        // In the case of #1, the core is in a state where it NAKs all incoming tokens on
+        // OUT-EP0. It needs to clear NAK state and prepare to receive an ACK token from the
+        // host. In the case of #2, the core needs to prepare to retransmit the lost data (which
+        // remains in the FIFO).
+        //
+        // The actual recovery logic proved difficult to get right without the ability to locally
+        // reproduce the issue outside of the CI/CQ lab. I'll probably need access to bench test
+        // equipment capable of synthesizing the issue locally (which I don't have). In the
+        // meantime, we'll service DIEPINT.timeout by issuing a soft-disconnect, and reset the
+        // controller. This appears to the host as an unplug/re-plug port event.
+        HandleEp0TimeoutRecovery();
+
+        // The recovery logic currently clobbers all controller state, including pending interrupts.
+        // Since there's no more work to perform, this IRQ handler can return.
+        return;
       }
       if (diepint.intktxfemp()) {
         zxlogf(ERROR, "Unhandled interrupt diepint.intktxfemp for ep_num %u", ep_num);
@@ -750,6 +715,7 @@ void Dwc2::HandleEp0TransferComplete(bool is_in) {
 void Dwc2::SoftDisconnect() {
   auto* mmio = get_mmio();
 
+  zxlogf(WARNING, "executing USB port soft-disconnect and controller reset");
   DCTL::Get().ReadFrom(mmio).set_sftdiscon(1).WriteTo(mmio);
   auto grstctl = GRSTCTL::Get();
   grstctl.ReadFrom(mmio).set_csftrst(1).WriteTo(mmio);
@@ -769,6 +735,7 @@ void Dwc2::HandleEp0TimeoutRecovery() {
   ep0_state_ = Ep0State::DISCONNECTED;
   zx::nanosleep(zx::deadline_after(zx::msec(50)));
   InitController(); // Clears the GRSTCTRL.sftdiscon condition.
+  zxlogf(INFO, "USB port soft-disconnect and controller reset sequence complete");
 }
 
 // Handles transfer complete events for endpoints other than endpoint zero
