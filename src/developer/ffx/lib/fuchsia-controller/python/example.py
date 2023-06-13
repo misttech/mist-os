@@ -9,16 +9,16 @@ import asyncio
 
 async def echo():
     ctx = Context({})
-    ch = ctx.open_target_proxy()
+    ch = ctx.connect_target_proxy()
     echo_proxy = fidl.fuchsia_developer_ffx.Echo.Client(
-        ctx.open_daemon_protocol('fuchsia.developer.ffx.Echo'))
+        ctx.connect_daemon_protocol('fuchsia.developer.ffx.Echo'))
     result = await echo_proxy.echo_string(value="foobar")
     print(f"Echo Result: {result}")
 
 
 async def target_info():
     ctx = Context({})
-    ch = ctx.open_target_proxy()
+    ch = ctx.connect_target_proxy()
     proxy = fidl.fuchsia_developer_ffx.Target.Client(ch)
     result = await proxy.identity()
     print(f"Target Info Received: {result}")

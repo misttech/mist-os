@@ -73,7 +73,7 @@ pub unsafe extern "C" fn create_ffx_env_context(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ffx_open_daemon_protocol(
+pub unsafe extern "C" fn ffx_connect_daemon_protocol(
     ctx: *mut EnvContext,
     protocol: *const i8,
     handle: *mut zx_types::zx_handle_t,
@@ -93,7 +93,7 @@ pub unsafe extern "C" fn ffx_open_daemon_protocol(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ffx_open_device_proxy(
+pub unsafe extern "C" fn ffx_connect_device_proxy(
     ctx: *mut EnvContext,
     moniker: *const i8,
     capability_name: *const i8,
@@ -121,10 +121,10 @@ pub unsafe extern "C" fn ffx_open_device_proxy(
     }
 }
 
-/// This function isn't really necessary. It can be opened via open_daemon_protocol from the
+/// This function isn't really necessary. It can be opened via connect_daemon_protocol from the
 /// target.
 #[no_mangle]
-pub unsafe extern "C" fn ffx_open_target_proxy(
+pub unsafe extern "C" fn ffx_connect_target_proxy(
     ctx: *mut EnvContext,
     handle: *mut zx_types::zx_handle_t,
 ) -> zx_status::Status {
@@ -141,7 +141,7 @@ pub unsafe extern "C" fn ffx_open_target_proxy(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ffx_open_remote_control_proxy(
+pub unsafe extern "C" fn ffx_connect_remote_control_proxy(
     ctx: *mut EnvContext,
     handle: *mut zx_types::zx_handle_t,
 ) -> zx_status::Status {
@@ -279,7 +279,7 @@ pub unsafe extern "C" fn ffx_socket_read(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ffx_open_handle_notifier(ctx: *const LibContext) -> i32 {
+pub unsafe extern "C" fn ffx_connect_handle_notifier(ctx: *const LibContext) -> i32 {
     let ctx = unsafe { get_arc(ctx) };
     let (tx, rx) = mpsc::sync_channel(1);
     ctx.run(LibraryCommand::GetNotificationDescriptor { lib: ctx.clone(), responder: tx });
@@ -634,7 +634,7 @@ mod test {
     #[test]
     fn handle_ready_notification() {
         let lib_ctx = testing_lib_context();
-        let fd: RawFd = unsafe { ffx_open_handle_notifier(lib_ctx) };
+        let fd: RawFd = unsafe { ffx_connect_handle_notifier(lib_ctx) };
         assert!(fd > 0);
         let mut notifier_file = unsafe { File::from_raw_fd(fd) };
         let (a, b) = fidl::Channel::create();

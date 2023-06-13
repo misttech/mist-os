@@ -105,7 +105,7 @@ impl LibraryCommand {
                 }
             }
             Self::OpenDaemonProtocol { env, protocol, responder } => {
-                match env.open_daemon_protocol(protocol).await {
+                match env.connect_daemon_protocol(protocol).await {
                     Ok(r) => {
                         responder.send(Ok(r)).unwrap();
                     }
@@ -115,7 +115,7 @@ impl LibraryCommand {
                     }
                 }
             }
-            Self::OpenTargetProxy { env, responder } => match env.open_target_proxy().await {
+            Self::OpenTargetProxy { env, responder } => match env.connect_target_proxy().await {
                 Ok(h) => {
                     responder.send(Ok(h)).unwrap();
                 }
@@ -125,7 +125,7 @@ impl LibraryCommand {
                 }
             },
             Self::OpenRemoteControlProxy { env, responder } => {
-                match env.open_remote_control_proxy().await {
+                match env.connect_remote_control_proxy().await {
                     Ok(h) => {
                         responder.send(Ok(h)).unwrap();
                     }
@@ -136,7 +136,7 @@ impl LibraryCommand {
                 }
             }
             Self::OpenDeviceProxy { env, moniker, capability_name, responder } => {
-                match env.open_device_proxy(moniker, capability_name).await {
+                match env.connect_device_proxy(moniker, capability_name).await {
                     Ok(r) => {
                         responder.send(Ok(r)).unwrap();
                     }

@@ -189,7 +189,7 @@ async def read_and_decode(chan: fc.FidlChannel):
         # executor), will cause failures in vanilla rust interfaces that call into Fuchsia
         # controller multiple times via asyncio.run(). This should keep a mapping to publish to more
         # than one executor.
-        notification_fd = fc.open_handle_notifier()
+        notification_fd = fc.connect_handle_notifier()
         loop.add_reader(
             notification_fd,
             enqueue_ready_zx_handle_from_fd,

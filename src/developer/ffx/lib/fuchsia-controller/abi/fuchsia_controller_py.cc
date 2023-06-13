@@ -94,13 +94,13 @@ int Context_init(Context *self, PyObject *args, PyObject *kwds) {
   return 0;
 }
 
-PyObject *Context_open_daemon_protocol(Context *self, PyObject *protocol) {
+PyObject *Context_connect_daemon_protocol(Context *self, PyObject *protocol) {
   const char *c_protocol = PyUnicode_AsUTF8(protocol);
   if (c_protocol == nullptr) {
     return nullptr;
   }
   zx_handle_t handle;
-  if (ffx_open_daemon_protocol(self->env_context, c_protocol, &handle) != ZX_OK) {
+  if (ffx_connect_daemon_protocol(self->env_context, c_protocol, &handle) != ZX_OK) {
     mod::dump_python_err();
     return nullptr;
   }
@@ -108,9 +108,9 @@ PyObject *Context_open_daemon_protocol(Context *self, PyObject *protocol) {
                                handle);
 }
 
-PyObject *Context_open_target_proxy(Context *self, PyObject *Py_UNUSED(unused)) {
+PyObject *Context_connect_target_proxy(Context *self, PyObject *Py_UNUSED(unused)) {
   zx_handle_t handle;
-  if (ffx_open_target_proxy(self->env_context, &handle) != ZX_OK) {
+  if (ffx_connect_target_proxy(self->env_context, &handle) != ZX_OK) {
     mod::dump_python_err();
     return nullptr;
   }
@@ -118,14 +118,14 @@ PyObject *Context_open_target_proxy(Context *self, PyObject *Py_UNUSED(unused)) 
                                handle);
 }
 
-PyObject *Context_open_device_proxy(Context *self, PyObject *args) {
+PyObject *Context_connect_device_proxy(Context *self, PyObject *args) {
   char *c_moniker;
   char *c_capability_name;
   if (!PyArg_ParseTuple(args, "ss", &c_moniker, &c_capability_name)) {
     return nullptr;
   }
   zx_handle_t handle;
-  if (ffx_open_device_proxy(self->env_context, c_moniker, c_capability_name, &handle) != ZX_OK) {
+  if (ffx_connect_device_proxy(self->env_context, c_moniker, c_capability_name, &handle) != ZX_OK) {
     mod::dump_python_err();
     return nullptr;
   }
@@ -134,11 +134,11 @@ PyObject *Context_open_device_proxy(Context *self, PyObject *args) {
 }
 
 PyMethodDef Context_methods[] = {
-    {"open_daemon_protocol", reinterpret_cast<PyCFunction>(Context_open_daemon_protocol), METH_O,
+    {"connect_daemon_protocol", reinterpret_cast<PyCFunction>(Context_connect_daemon_protocol), METH_O,
      nullptr},
-    {"open_target_proxy", reinterpret_cast<PyCFunction>(Context_open_target_proxy), METH_NOARGS,
+    {"connect_target_proxy", reinterpret_cast<PyCFunction>(Context_connect_target_proxy), METH_NOARGS,
      nullptr},
-    {"open_device_proxy", reinterpret_cast<PyCFunction>(Context_open_device_proxy), METH_VARARGS,
+    {"connect_device_proxy", reinterpret_cast<PyCFunction>(Context_connect_device_proxy), METH_VARARGS,
      nullptr},
     SENTINEL};
 
@@ -157,8 +157,8 @@ DES_MIX PyTypeObject ContextType = {
     .tp_new = PyType_GenericNew,
 };
 
-PyObject *open_handle_notifier(PyObject *self, PyObject *Py_UNUSED(arg)) {
-  auto descriptor = ffx_open_handle_notifier(mod::get_module_state()->ctx);
+PyObject *connect_handle_notifier(PyObject *self, PyObject *Py_UNUSED(arg)) {
+  auto descriptor = ffx_connect_handle_notifier(mod::get_module_state()->ctx);
   if (descriptor <= 0) {
     mod::dump_python_err();
     return nullptr;
@@ -167,7 +167,7 @@ PyObject *open_handle_notifier(PyObject *self, PyObject *Py_UNUSED(arg)) {
 }
 
 PyMethodDef FuchsiaControllerMethods[] = {
-    {"open_handle_notifier", open_handle_notifier, METH_NOARGS,
+    {"connect_handle_notifier", connect_handle_notifier, METH_NOARGS,
      "Open the handle notification descriptor. Can only be done once within a module."},
     SENTINEL,
 };

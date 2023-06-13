@@ -29,14 +29,14 @@ extern void destroy_ffx_env_context(ffx_env_context_t* ctx);
 
 extern void destroy_ffx_lib_context(ffx_lib_context_t* env_ctx);
 
-extern zx_status_t ffx_open_daemon_protocol(ffx_env_context_t* ctx, const char* protocol,
+extern zx_status_t ffx_connect_daemon_protocol(ffx_env_context_t* ctx, const char* protocol,
                                             zx_handle_t* out);
 
 // These three functions are for convenience, and can be done via the daemon protocol
 // if desired, albeit through more than one proxy layer.
-extern zx_status_t ffx_open_target_proxy(ffx_env_context_t* ctx, zx_handle_t* out);
-extern zx_status_t ffx_open_remote_control_proxy(ffx_env_context_t* ctx, zx_handle_t* out);
-extern zx_status_t ffx_open_device_proxy(ffx_env_context_t* ctx, const char* moniker,
+extern zx_status_t ffx_connect_target_proxy(ffx_env_context_t* ctx, zx_handle_t* out);
+extern zx_status_t ffx_connect_remote_control_proxy(ffx_env_context_t* ctx, zx_handle_t* out);
+extern zx_status_t ffx_connect_device_proxy(ffx_env_context_t* ctx, const char* moniker,
                                          const char* capability_name, zx_handle_t* out);
 extern void ffx_close_handle(zx_handle_t handle);
 extern zx_status_t ffx_channel_write(ffx_lib_context_t* ctx, zx_handle_t handle,
@@ -53,7 +53,7 @@ extern zx_status_t ffx_socket_write(ffx_lib_context_t* ctx, zx_handle_t handle, 
 // Opens a file descriptor that delivers zircon handle numbers that are ready to be read.
 // There can only be one file descriptor for the lifetime of a library module, so all calls to this
 // function will return the same file descriptor number.
-extern int32_t ffx_open_handle_notifier(ffx_lib_context_t* ctx);
+extern int32_t ffx_connect_handle_notifier(ffx_lib_context_t* ctx);
 
 #ifdef __cplusplus
 }  // extern "C"

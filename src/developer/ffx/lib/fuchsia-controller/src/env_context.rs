@@ -63,7 +63,7 @@ impl EnvContext {
         Ok(Self { context, injector, _hoist_cache_dir, lib_ctx })
     }
 
-    pub async fn open_daemon_protocol(&self, protocol: String) -> Result<zx_types::zx_handle_t> {
+    pub async fn connect_daemon_protocol(&self, protocol: String) -> Result<zx_types::zx_handle_t> {
         let proxy = self.injector.daemon_factory().await?;
         let (client, server) = fidl::Channel::create();
         proxy.connect_to_protocol(protocol.as_str(), server).await?.map_err(fxe)?;
@@ -72,7 +72,7 @@ impl EnvContext {
         Ok(res)
     }
 
-    pub async fn open_target_proxy(&self) -> Result<zx_types::zx_handle_t> {
+    pub async fn connect_target_proxy(&self) -> Result<zx_types::zx_handle_t> {
         let proxy = self.injector.target_factory().await?;
         let hdl = proxy.into_channel().map_err(fxe)?.into_zx_channel();
         let res = hdl.raw_handle();
@@ -80,7 +80,7 @@ impl EnvContext {
         Ok(res)
     }
 
-    pub async fn open_remote_control_proxy(&self) -> Result<zx_types::zx_handle_t> {
+    pub async fn connect_remote_control_proxy(&self) -> Result<zx_types::zx_handle_t> {
         let proxy = self.injector.remote_factory().await?;
         let hdl = proxy.into_channel().map_err(fxe)?.into_zx_channel();
         let res = hdl.raw_handle();
@@ -88,7 +88,7 @@ impl EnvContext {
         Ok(res)
     }
 
-    pub async fn open_device_proxy(
+    pub async fn connect_device_proxy(
         &self,
         moniker: String,
         capability_name: String,
