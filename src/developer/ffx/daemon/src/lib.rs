@@ -195,7 +195,18 @@ pub async fn try_to_kill_pid(pid: u32) -> Result<()> {
         // Kill failed for some other reason
         Err(e) => bail!("Could not kill daemon: {e}"),
         // The kill() worked, i.e. the process was still around
-        _ => bail!("Daemon did not exit. Giving up"),
+        _ => {
+            // Let's find out what happened
+            let stat_file = format!("/proc/{pid}/status");
+            let status = match std::fs::read_to_string(&stat_file)
+                .with_context(|| format!("could not cat {stat_file}"))
+            {
+                Ok(s) => s,
+                Err(e) => format!("[Failed to read /proc] {e}"),
+            };
+
+            bail!("Daemon did not exit. Giving up.  Proc status: {status}")
+        }
     }
 }
 
