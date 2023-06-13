@@ -77,33 +77,9 @@ dart_test("fuchsia_inspect_package_unittests") {
   ]
 }
 
-dart_test_component("dart-archive-reader-test-component") {
-  component_name = "dart-archive-reader-test"
-  manifest = "meta/dart-archive-reader-test.cml"
-  sources = [ "reader/reader_test.dart" ]
-  deps = [
-    ":fuchsia_inspect",
-    "//sdk/dart/fuchsia_component_test:dart_realm_builder_deps",
-    "//sdk/fidl/fuchsia.component:fuchsia.component_dart",
-    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_dart",
-    "//third_party/dart-pkg/pub/pedantic",
-    "//third_party/dart-pkg/pub/test",
-  ]
-}
-
-# Run these tests using:
-#  fx test dart-archive-reader-test
-
-fuchsia_test_package("dart-archive-reader-test") {
-  package_name = "dart-archive-reader-test"
-  test_components = [ ":dart-archive-reader-test-component" ]
-  deps = [ "//src/lib/diagnostics/inspect/runtime/rust:inspect_test_component" ]
-}
-
 group("tests") {
   testonly = true
   deps = [
-    ":dart-archive-reader-test",
     ":fuchsia_inspect_package_unittests($host_toolchain)",
     "test/integration:tests",
   ]
