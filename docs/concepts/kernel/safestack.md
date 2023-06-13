@@ -66,7 +66,7 @@ targets.  To disable it for a specific compilation, use the
 `-fno-sanitize=safe-stack` option.
 
 Zircon supports safe-stack for both user-mode and kernel code.
-In the Zircon build, safe-stack is always enabled when building
+In the x86 Zircon build, safe-stack is always enabled when building
 with Clang (pass `variants = [ "clang" ]` to `GN`).
 
 ## Implementation details
