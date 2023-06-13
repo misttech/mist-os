@@ -1,0 +1,10 @@
+fuchsia.network.socket.tun: WriteRead/TCP/IPv4/1000KiB
+fuchsia.network.socket.tun: WriteRead/TCP/IPv4/100KiB
+fuchsia.network.socket.tun: WriteRead/TCP/IPv4/10KiB
+fuchsia.network.socket.tun: WriteRead/TCP/IPv4/1KiB
+fuchsia.network.socket.tun: WriteRead/TCP/IPv4/500KiB
+fuchsia.network.socket.tun: WriteRead/TCP/IPv6/1000KiB
+fuchsia.network.socket.tun: WriteRead/TCP/IPv6/100KiB
+fuchsia.network.socket.tun: WriteRead/TCP/IPv6/10KiB
+fuchsia.network.socket.tun: WriteRead/TCP/IPv6/1KiB
+fuchsia.network.socket.tun: WriteRead/TCP/IPv6/500KiB

@@ -1,0 +1,82 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+import("//build/rust/rustc_test.gni")
+
+rustc_binary("tun_socket_benchmarks") {
+  testonly = true
+  edition = "2021"
+
+  sources = [ "src/main.rs" ]
+
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
+    "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
+    "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
+    "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_rust",
+    "//sdk/fidl/fuchsia.net.tun:fuchsia.net.tun_rust",
+    "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
+    "//src/connectivity/lib/net-declare",
+    "//src/connectivity/lib/net-types",
+    "//src/connectivity/network/testing/netemul/rust:lib",
+    "//src/connectivity/network/tests/integration/common:netstack_testing_common",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/network/fidl_fuchsia_net_ext",
+    "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
+    "//src/performance/lib/fuchsiaperf",
+    "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:libc",
+    "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:socket2",
+  ]
+
+  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+}
+
+common_deps = [
+  ":tun_socket_benchmarks",
+  "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
+  "//src/connectivity/network/tun/network-tun:component",
+]
+
+fuchsia_test_component("tun-socket-benchmarks-ns2") {
+  deps = [
+           "//src/connectivity/network/netstack:component",
+           "//src/sys/stash:stash_secure_v2",
+         ] + common_deps
+  manifest = "meta/tun-socket-benchmarks-ns2.cml"
+}
+
+fuchsia_test_component("tun-socket-benchmarks-ns3") {
+  deps = [
+           "//src/connectivity/network/netstack3:component",
+
+           # TODO(https://fxbug.dev/125773): remove this when the production Netstack3
+           # component no longer brings its own DHCPv4 client, given that it is
+           # otherwise unused in this benchmark.
+           "//src/connectivity/network/dhcpv4/client/bindings:component",
+         ] + common_deps
+  manifest = "meta/tun-socket-benchmarks-ns3.cml"
+}
+
+fuchsia_test_package("tun-socket-benchmarks") {
+  test_components = [
+    ":tun-socket-benchmarks-ns2",
+    ":tun-socket-benchmarks-ns3",
+  ]
+}
+
+group("benchmarks") {
+  testonly = true
+  deps = [ ":tun-socket-benchmarks" ]
+}
+
+group("tests") {
+  testonly = true
+  public_deps = [ ":tun-socket-benchmarks" ]
+}

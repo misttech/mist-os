@@ -38,17 +38,27 @@ fx set terminal.x64 --with //src/tests/end_to_end/perf:test
 
 ## Microbenchmarks
 
-### Socket benchmarks
+### Loopback socket benchmarks {#loopback-socket-benchmarks}
 
 These focus on measuring the duration of specific socket related system calls
-from the benchmarking binary for TCP, UDP, and ICMP sockets. They run against
-Netstack2, Netstack3, and Netstack2 with Fast UDP enabled.
+from the benchmarking binary for TCP, UDP, and ICMP sockets over loopback. They
+run against Netstack2, Netstack3, and Netstack2 with Fast UDP enabled.
 
 #### Fake netstack
 
-The socket benchmarks also run against the "fake netstack", a stubbed-out
-netstack the implements the minimum amount of the fuchsia.posix.socket API
-possible, to attempt to measure the overhead of the API structure itself.
+The loopback socket benchmarks also run against the "fake netstack",
+a stubbed-out netstack the implements the minimum amount of the
+fuchsia.posix.socket API possible, to attempt to measure the overhead of
+the API structure itself.
+
+### Tun socket benchmarks
+
+These benchmarks measure the same operations as the
+[loopback socket benchmarks](#loopback-socket-benchmarks), except there are two
+netstacks involved connected via a network-tun [device-pair]. This means that
+the latency numbers also include time spent in the netstack's device layer,
+which is absent from the loopback benchmarks. They run against Netstack2 and
+Netstack3.
 
 ### UDP serde benchmarks
 
@@ -83,3 +93,5 @@ workloads. Metrics are emitted for baseline usage on netstack startup, initial
 usage after one run of a given workload, peak usage while running a workload
 repeatedly, and final increase in usage from the baseline after a workload is
 complete.
+
+[device-pair]: /sdk/fidl/fuchsia.net.tun/tun.fidl

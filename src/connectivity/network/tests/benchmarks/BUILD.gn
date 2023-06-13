@@ -7,6 +7,7 @@ group("benchmarks") {
   deps = [
     "resource-usage:tests",
     "socket:benchmarks",
+    "socket-tun:benchmarks",
   ]
 }
 
@@ -15,5 +16,6 @@ group("tests") {
   deps = [
     "resource-usage:tests",
     "socket:tests",
+    "socket-tun:tests",
   ]
 }
