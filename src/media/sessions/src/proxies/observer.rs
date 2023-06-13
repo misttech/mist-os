@@ -4,7 +4,6 @@
 
 use crate::Result;
 use fidl_fuchsia_media_sessions2::*;
-use fuchsia_zircon as zx;
 use futures::{
     stream::{Fuse, Map, Stream, StreamExt},
     Future,
@@ -133,9 +132,6 @@ where
             let responder = self.current_responder.take().expect("Get responder; variant checked");
             let status = self.current_status.take().expect("Get status; variant checked");
             match responder.send(status) {
-                Err(fidl::Error::ServerResponseWrite(e)) if e == zx::Status::PEER_CLOSED => {
-                    return Poll::Ready(Ok(()));
-                }
                 Err(e) => {
                     warn!(tag = "observer", "Error writing status to observer: {:?}", e);
                 }

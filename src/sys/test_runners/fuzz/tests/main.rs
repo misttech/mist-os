@@ -150,7 +150,7 @@ async fn subscribe_to_updates(
     let reasons = Rc::new(RefCell::new(Vec::new()));
     stream
         .try_for_each(|request| async {
-            let result = match request {
+            match request {
                 fuzz::MonitorRequest::Update { reason, status: _, responder } => {
                     {
                         let mut reasons = reasons.borrow_mut();
@@ -158,10 +158,6 @@ async fn subscribe_to_updates(
                     }
                     responder.send()
                 }
-            };
-            match result {
-                Err(fidl::Error::ServerResponseWrite(s)) if s == zx::Status::PEER_CLOSED => Ok(()),
-                other => other,
             }
         })
         .await

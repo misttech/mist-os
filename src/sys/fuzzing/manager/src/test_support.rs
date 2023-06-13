@@ -38,7 +38,6 @@ pub struct TestRealm {
     manager_streams: Vec<fuzz::ManagerRequestStream>,
     pub registry_status: zx::Status,
     pub launch_error: Option<LaunchError>,
-    pub killable: bool,
 }
 
 impl TestRealm {
@@ -48,7 +47,6 @@ impl TestRealm {
             manager_streams: Vec::new(),
             registry_status: zx::Status::OK,
             launch_error: None,
-            killable: false,
         }
     }
 
@@ -273,9 +271,9 @@ async fn serve_run_builder(
     mut stream: RunBuilderRequestStream,
     test_realm: Rc<RefCell<TestRealm>>,
 ) -> Result<()> {
-    let (fuzzers, launch_error, killable) = {
+    let (fuzzers, launch_error) = {
         let mut test_realm = test_realm.borrow_mut();
-        (Rc::clone(&test_realm.fuzzers), test_realm.launch_error.take(), test_realm.killable)
+        (Rc::clone(&test_realm.fuzzers), test_realm.launch_error.take())
     };
     // |RunBuilder| requests will always follow a specific order: |AddSuite|, then |Build|.
     let (url, suite_stream) = match stream.next().await {
@@ -320,17 +318,17 @@ async fn serve_run_builder(
 
     try_join!(
         async {
-            serve_suite_controller(suite_stream, launch_error, suite_receiver, killable)
+            serve_suite_controller(suite_stream, launch_error, suite_receiver)
                 .await
                 .context("failed to serve suite controller")
         },
         async {
-            serve_run_controller(run_stream, run_receiver, killable)
+            serve_run_controller(run_stream, run_receiver)
                 .await
                 .context("failed to serve run controller")
         },
         async {
-            serve_batch_iterator(batch_stream, syslog_receiver, killable)
+            serve_batch_iterator(batch_stream, syslog_receiver)
                 .await
                 .context("failed to serve batch iterator")
         },
@@ -412,7 +410,6 @@ async fn serve_suite_controller(
     stream: SuiteControllerRequestStream,
     launch_error: Option<LaunchError>,
     payload_receiver: mpsc::UnboundedReceiver<SuiteEventPayload>,
-    killable: bool,
 ) -> Result<()> {
     let payload_receiver_rc = RefCell::new(payload_receiver);
     stream
@@ -444,15 +441,7 @@ async fn serve_suite_controller(
                             Ok(suite_events)
                         }
                     };
-                    // It's okay for the unit test to give up before reading a response.
-                    match responder.send(response) {
-                        Err(fidl::Error::ServerResponseWrite(status))
-                            if killable && status == zx::Status::PEER_CLOSED =>
-                        {
-                            Ok(())
-                        }
-                        other => other,
-                    }
+                    responder.send(response)
                 }
                 _ => unreachable!(),
             }
@@ -467,7 +456,6 @@ async fn serve_suite_controller(
 async fn serve_run_controller(
     stream: RunControllerRequestStream,
     payload_receiver: mpsc::UnboundedReceiver<RunEventPayload>,
-    killable: bool,
 ) -> Result<()> {
     let payload_receiver_rc = RefCell::new(payload_receiver);
     stream
@@ -493,14 +481,7 @@ async fn serve_run_controller(
                             ..Default::default()
                         })
                         .collect();
-                    match responder.send(run_events) {
-                        Err(fidl::Error::ServerResponseWrite(status))
-                            if killable && status == zx::Status::PEER_CLOSED =>
-                        {
-                            Ok(())
-                        }
-                        other => other,
-                    }
+                    responder.send(run_events)
                 }
                 RunControllerRequest::Kill { control_handle } => {
                     control_handle.shutdown();
@@ -519,7 +500,6 @@ async fn serve_run_controller(
 async fn serve_batch_iterator(
     stream: Option<fdiagnostics::BatchIteratorRequestStream>,
     receiver: Option<mpsc::UnboundedReceiver<String>>,
-    killable: bool,
 ) -> Result<()> {
     let stream = match stream {
         Some(stream) => stream,
@@ -560,14 +540,7 @@ async fn serve_batch_iterator(
                         buf.vmo.write(msg.as_bytes(), 0).context("failed to write to VMO")?;
                         batch.push(fdiagnostics::FormattedContent::Text(buf));
                     }
-                    match responder.send(Ok(batch)) {
-                        Err(fidl::Error::ServerResponseWrite(status))
-                            if killable && status == zx::Status::PEER_CLOSED =>
-                        {
-                            Ok(())
-                        }
-                        other => other,
-                    }
+                    responder.send(Ok(batch))
                 }
             }
             .map_err(Error::msg)

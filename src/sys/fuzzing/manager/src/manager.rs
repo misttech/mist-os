@@ -438,7 +438,6 @@ mod tests {
         {
             let mut test_realm_mut = test_realm.borrow_mut();
             test_realm_mut.registry_status = zx::Status::TIMED_OUT;
-            test_realm_mut.killable = true;
         }
         let test_fut = || async move {
             let (_, server) = create_endpoints::<fuzz::ControllerMarker>();

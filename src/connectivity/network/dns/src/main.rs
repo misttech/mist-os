@@ -745,7 +745,7 @@ async fn run_lookup<T: ResolverLookup>(
     stream: LookupRequestStream,
     sender: mpsc::Sender<IpLookupRequest>,
 ) -> Result<(), fidl::Error> {
-    let result = stream
+    stream
         .try_for_each_concurrent(None, |request| async {
             match request {
                 LookupRequest::LookupIp { hostname, options, responder } => {
@@ -760,14 +760,7 @@ async fn run_lookup<T: ResolverLookup>(
                     .send(handle_lookup_hostname(&resolver, addr).await.as_deref().map_err(|e| *e)),
             }
         })
-        .await;
-    // Some clients will drop the channel when timing out
-    // requests. Mute those errors to prevent log spamming.
-    if let Err(fidl::Error::ServerResponseWrite(zx::Status::PEER_CLOSED)) = result {
-        Ok(())
-    } else {
-        result
-    }
+        .await
 }
 
 const MAX_PARALLEL_REQUESTS: usize = 256;
@@ -937,15 +930,12 @@ fn create_ip_lookup_fut<T: ResolverLookup>(
                     })
                 })()
                 .await;
-                responder.send(lookup_result.as_ref().map_err(|e| *e)).unwrap_or_else(|e| match e {
-                    // Some clients will drop the channel when timing out
-                    // requests. Mute those errors to prevent log spamming.
-                    fidl::Error::ServerResponseWrite(zx::Status::PEER_CLOSED) => {}
-                    e => warn!(
+                responder.send(lookup_result.as_ref().map_err(|e| *e)).unwrap_or_else(|e|
+                    warn!(
                         "failed to send IP lookup result {:?} due to FIDL error: {}",
                         lookup_result, e
-                    ),
-                })
+                    )
+                )
             }
         },
     )

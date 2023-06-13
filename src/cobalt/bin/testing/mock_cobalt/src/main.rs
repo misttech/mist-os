@@ -6,7 +6,6 @@ use {
     anyhow::Error,
     fidl_fuchsia_metrics::MetricEvent,
     fuchsia_cobalt_builders::MetricEventExt,
-    fuchsia_zircon_status as zx_status,
     futures::{lock::Mutex, StreamExt, TryStreamExt},
     std::{collections::HashMap, sync::Arc},
     tracing::info,
@@ -100,70 +99,68 @@ async fn handle_metric_event_logger(
     log: EventsLogHandle,
 ) -> Result<(), fidl::Error> {
     use fidl_fuchsia_metrics::MetricEventLoggerRequest::*;
-    let fut = stream.try_for_each_concurrent(None, |event| async {
-        let mut log = log.lock().await;
-        let log_state = match event {
-            LogOccurrence { responder, metric_id, count, event_codes } => {
-                let state = &mut log.log_occurrence;
-                state.log.push(
-                    MetricEvent::builder(metric_id)
-                        .with_event_codes(event_codes)
-                        .as_occurrence(count),
-                );
-                responder.send(Ok(()))?;
-                state
-            }
-            LogInteger { responder, metric_id, value, event_codes } => {
-                let state = &mut log.log_integer;
-                state.log.push(
-                    MetricEvent::builder(metric_id).with_event_codes(event_codes).as_integer(value),
-                );
-                responder.send(Ok(()))?;
-                state
-            }
-            LogIntegerHistogram { responder, metric_id, histogram, event_codes } => {
-                let state = &mut log.log_integer_histogram;
-                state.log.push(
-                    MetricEvent::builder(metric_id)
-                        .with_event_codes(event_codes)
-                        .as_integer_histogram(histogram),
-                );
-                responder.send(Ok(()))?;
-                state
-            }
-            LogString { responder, metric_id, string_value, event_codes } => {
-                let state = &mut log.log_string;
-                state.log.push(
-                    MetricEvent::builder(metric_id)
-                        .with_event_codes(event_codes)
-                        .as_string(string_value),
-                );
-                responder.send(Ok(()))?;
-                state
-            }
-            LogMetricEvents { responder, mut events } => {
-                let state = &mut log.log_metric_events;
-                state.log.append(&mut events);
-                responder.send(Ok(()))?;
-                state
-            }
-        };
+    stream
+        .try_for_each_concurrent(None, |event| async {
+            let mut log = log.lock().await;
+            let log_state = match event {
+                LogOccurrence { responder, metric_id, count, event_codes } => {
+                    let state = &mut log.log_occurrence;
+                    state.log.push(
+                        MetricEvent::builder(metric_id)
+                            .with_event_codes(event_codes)
+                            .as_occurrence(count),
+                    );
+                    responder.send(Ok(()))?;
+                    state
+                }
+                LogInteger { responder, metric_id, value, event_codes } => {
+                    let state = &mut log.log_integer;
+                    state.log.push(
+                        MetricEvent::builder(metric_id)
+                            .with_event_codes(event_codes)
+                            .as_integer(value),
+                    );
+                    responder.send(Ok(()))?;
+                    state
+                }
+                LogIntegerHistogram { responder, metric_id, histogram, event_codes } => {
+                    let state = &mut log.log_integer_histogram;
+                    state.log.push(
+                        MetricEvent::builder(metric_id)
+                            .with_event_codes(event_codes)
+                            .as_integer_histogram(histogram),
+                    );
+                    responder.send(Ok(()))?;
+                    state
+                }
+                LogString { responder, metric_id, string_value, event_codes } => {
+                    let state = &mut log.log_string;
+                    state.log.push(
+                        MetricEvent::builder(metric_id)
+                            .with_event_codes(event_codes)
+                            .as_string(string_value),
+                    );
+                    responder.send(Ok(()))?;
+                    state
+                }
+                LogMetricEvents { responder, mut events } => {
+                    let state = &mut log.log_metric_events;
+                    state.log.append(&mut events);
+                    responder.send(Ok(()))?;
+                    state
+                }
+            };
 
-        while let Some(hanging_get_state) = log_state.hanging.pop() {
-            let mut last_observed = hanging_get_state.last_observed.lock().await;
-            let new_logs = &log_state.log[*last_observed..];
-            let limited_new_logs = &new_logs[..std::cmp::min(new_logs.len(), MAX_QUERY_LENGTH)];
-            *last_observed = log_state.log.len();
-            hanging_get_state.responder.send(limited_new_logs, false)?;
-        }
-        Ok(())
-    });
-
-    match fut.await {
-        // Don't consider PEER_CLOSED to be an error.
-        Err(fidl::Error::ServerResponseWrite(zx_status::Status::PEER_CLOSED)) => Ok(()),
-        other => other,
-    }
+            while let Some(hanging_get_state) = log_state.hanging.pop() {
+                let mut last_observed = hanging_get_state.last_observed.lock().await;
+                let new_logs = &log_state.log[*last_observed..];
+                let limited_new_logs = &new_logs[..std::cmp::min(new_logs.len(), MAX_QUERY_LENGTH)];
+                *last_observed = log_state.log.len();
+                hanging_get_state.responder.send(limited_new_logs, false)?;
+            }
+            Ok(())
+        })
+        .await
 }
 
 async fn run_metrics_query_service(
