@@ -1038,10 +1038,6 @@ impl FsNode {
         self.info().mode.is_lnk()
     }
 
-    pub fn dev(&self) -> DeviceType {
-        self.fs().dev_id
-    }
-
     pub fn stat(&self, current_task: &CurrentTask) -> Result<uapi::stat, Errno> {
         let info = self.ops().update_info(self, current_task, &self.info)?;
 
@@ -1062,7 +1058,7 @@ impl FsNode {
         let (st_ctime, st_ctime_nsec) = time_to_kernel_timespec_pair(info.time_status_change)?;
 
         Ok(uapi::stat {
-            st_dev: self.dev().bits(),
+            st_dev: self.fs().dev_id.bits(),
             st_ino: info.ino,
             st_nlink: info.link_count.try_into().map_err(|_| errno!(EINVAL))?,
             st_mode: info.mode.bits(),

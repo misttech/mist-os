@@ -2,279 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{fs::*, lock::Mutex, mm::*, syscalls::*, task::*, types::*};
-use bitflags::bitflags;
+use crate::{fs::*, lock::Mutex, syscalls::*, task::*, types::*};
 use std::collections::btree_map::{BTreeMap, Entry};
 use std::sync::Arc;
 
-// See LOOP_SET_BLOCK_SIZE in <https://man7.org/linux/man-pages/man4/loop.4.html>.
-const MIN_BLOCK_SIZE: u32 = 512;
-
-bitflags! {
-    #[derive(Default)]
-    struct LoopDeviceFlags: u32 {
-        const READ_ONLY = LO_FLAGS_READ_ONLY;
-        const AUTOCLEAR = LO_FLAGS_AUTOCLEAR;
-        const PARTSCAN = LO_FLAGS_PARTSCAN;
-        const DIRECT_IO = LO_FLAGS_DIRECT_IO;
-    }
-}
-
-#[derive(Debug)]
-struct LoopDeviceState {
-    file: Option<FileHandle>,
-    block_size: u32,
-
-    // See struct loop_info64 for details about these fields.
-    size_limit: u64,
-    flags: LoopDeviceFlags,
-
-    // Encryption is not implemented.
-    encrypt_type: u32,
-    encrypt_key: Vec<u8>,
-    init: [u64; 2],
-}
-
-impl Default for LoopDeviceState {
-    fn default() -> Self {
-        LoopDeviceState {
-            file: Default::default(),
-            block_size: MIN_BLOCK_SIZE,
-            size_limit: Default::default(),
-            flags: Default::default(),
-            encrypt_type: Default::default(),
-            encrypt_key: Default::default(),
-            init: Default::default(),
-        }
-    }
-}
-
-impl LoopDeviceState {
-    fn set_file(&mut self, file: FileHandle) -> Result<(), Errno> {
-        if self.file.is_some() {
-            return error!(EBUSY);
-        }
-        self.file = Some(file);
-        self.update_size_limit();
-        Ok(())
-    }
-
-    fn set_info(&mut self, info: &uapi::loop_info64) {
-        let encrypt_key_size = info.lo_encrypt_key_size.clamp(0, LO_KEY_SIZE);
-        self.size_limit = info.lo_sizelimit;
-        self.flags = LoopDeviceFlags::from_bits_truncate(info.lo_flags);
-        self.encrypt_type = info.lo_encrypt_type;
-        self.encrypt_key = info.lo_encrypt_key[0..(encrypt_key_size as usize)].to_owned();
-        self.init = info.lo_init;
-        if let Some(file) = &self.file {
-            *file.offset.lock() = info.lo_offset as i64;
-        }
-    }
-
-    fn update_size_limit(&mut self) {
-        if let Some(file) = &self.file {
-            self.size_limit = file.node().info().size as u64;
-        } else {
-            self.size_limit = 0;
-        }
-    }
-}
-
 #[derive(Debug, Default)]
-struct LoopDevice {
-    number: u32,
-    state: Mutex<LoopDeviceState>,
-}
+struct LoopDevice {}
 
 impl LoopDevice {
-    fn new(minor: u32) -> Arc<Self> {
-        Arc::new(LoopDevice { number: minor, state: Default::default() })
+    fn new() -> Arc<Self> {
+        Arc::new(LoopDevice {})
     }
 
     fn create_file_ops(self: &Arc<Self>) -> Box<dyn FileOps> {
-        Box::new(LoopDeviceFile { device: self.clone() })
+        Box::new(LoopDeviceFile { _device: self.clone() })
     }
 
     fn is_busy(&self) -> bool {
-        self.state.lock().file.is_some()
+        // TODO: Add more state to the loop device.
+        false
     }
-}
-
-fn check_block_size(block_size: u32) -> Result<(), Errno> {
-    let page_size = *PAGE_SIZE as u32;
-    let mut allowed_size = MIN_BLOCK_SIZE;
-    while allowed_size <= page_size {
-        if block_size == allowed_size {
-            return Ok(());
-        }
-        allowed_size *= 2;
-    }
-    error!(EINVAL)
 }
 
 struct LoopDeviceFile {
-    device: Arc<LoopDevice>,
+    _device: Arc<LoopDevice>,
 }
 
 impl FileOps for LoopDeviceFile {
+    // TODO: Implement loop.
     fileops_impl_seekless!();
-
-    // TODO: Implement data operations.
     fileops_impl_dataless!();
-
-    fn ioctl(
-        &self,
-        file: &FileObject,
-        current_task: &CurrentTask,
-        request: u32,
-        arg: SyscallArg,
-    ) -> Result<SyscallResult, Errno> {
-        match request {
-            BLKGETSIZE => {
-                let user_size = UserRef::<u64>::from(arg);
-                let state = self.device.state.lock();
-                let size = state.size_limit / (state.block_size as u64);
-                std::mem::drop(state);
-                current_task.mm.write_object(user_size, &size)?;
-                Ok(SUCCESS)
-            }
-            BLKGETSIZE64 => {
-                let user_size = UserRef::<u64>::from(arg);
-                let size = self.device.state.lock().size_limit;
-                current_task.mm.write_object(user_size, &size)?;
-                Ok(SUCCESS)
-            }
-            LOOP_SET_FD => {
-                let fd = arg.into();
-                let file = current_task.files.get_unless_opath(fd)?;
-                self.device.state.lock().set_file(file)?;
-                Ok(SUCCESS)
-            }
-            LOOP_CLR_FD => {
-                let mut state = self.device.state.lock();
-                state.file = None;
-                state.size_limit = 0;
-                Ok(SUCCESS)
-            }
-            LOOP_SET_STATUS => {
-                let modifiable_flags = LoopDeviceFlags::AUTOCLEAR | LoopDeviceFlags::PARTSCAN;
-
-                let user_info = UserRef::<uapi::loop_info>::from(arg);
-                let info = current_task.mm.read_object(user_info)?;
-                let flags = LoopDeviceFlags::from_bits_truncate(info.lo_flags as u32);
-                let encrypt_key_size = info.lo_encrypt_key_size.clamp(0, LO_KEY_SIZE as i32);
-                let mut state = self.device.state.lock();
-                state.flags = (state.flags & !modifiable_flags) | (flags & modifiable_flags);
-                state.encrypt_type = info.lo_encrypt_type as u32;
-                state.encrypt_key = info.lo_encrypt_key[0..(encrypt_key_size as usize)].to_owned();
-                state.init = info.lo_init;
-                *file.offset.lock() = info.lo_offset as i64;
-                Ok(SUCCESS)
-            }
-            LOOP_GET_STATUS => {
-                let user_info = UserRef::<uapi::loop_info>::from(arg);
-                let node = file.node();
-                let (ino, rdev) = {
-                    let info = node.info();
-                    (info.ino, info.rdev)
-                };
-                let offset = *file.offset.lock();
-                let state = self.device.state.lock();
-                let info = loop_info {
-                    lo_number: self.device.number as i32,
-                    lo_device: node.dev().bits() as __kernel_old_dev_t,
-                    lo_inode: ino,
-                    lo_rdevice: rdev.bits() as __kernel_old_dev_t,
-                    lo_offset: offset as i32,
-                    lo_encrypt_type: state.encrypt_type as i32,
-                    lo_flags: state.flags.bits() as i32,
-                    lo_init: state.init,
-                    ..Default::default()
-                };
-                std::mem::drop(state);
-                current_task.mm.write_object(user_info, &info)?;
-                Ok(SUCCESS)
-            }
-            LOOP_CHANGE_FD => {
-                let fd = arg.into();
-                let file = current_task.files.get_unless_opath(fd)?;
-                let mut state = self.device.state.lock();
-                if let Some(_existing_file) = &state.file {
-                    // https://man7.org/linux/man-pages/man4/loop.4.html says:
-                    //
-                    //   This operation is possible only if the loop device is read-only and the
-                    //   new backing store is the same size and type as the old backing store.
-                    //
-                    // TODO: Add a check for the backing store size, once we know what that means.
-                    if !state.flags.contains(LoopDeviceFlags::READ_ONLY) {
-                        return error!(EINVAL);
-                    }
-                    state.file = Some(file);
-                    Ok(SUCCESS)
-                } else {
-                    error!(EINVAL)
-                }
-            }
-            LOOP_SET_CAPACITY => {
-                self.device.state.lock().update_size_limit();
-                Ok(SUCCESS)
-            }
-            LOOP_SET_DIRECT_IO => {
-                not_implemented!("Loop device does not implement LOOP_SET_DIRECT_IO");
-                error!(ENOSYS)
-            }
-            LOOP_SET_BLOCK_SIZE => {
-                let block_size = arg.into();
-                check_block_size(block_size)?;
-                self.device.state.lock().block_size = block_size;
-                Ok(SUCCESS)
-            }
-            LOOP_CONFIGURE => {
-                let user_config = UserRef::<uapi::loop_config>::from(arg);
-                let config = current_task.mm.read_object(user_config)?;
-                let fd = FdNumber::from_raw(config.fd as i32);
-                let file = current_task.files.get_unless_opath(fd)?;
-                check_block_size(config.block_size)?;
-                let mut state = self.device.state.lock();
-                state.set_file(file)?;
-                state.block_size = config.block_size;
-                state.set_info(&config.info);
-                Ok(SUCCESS)
-            }
-            LOOP_SET_STATUS64 => {
-                let user_info = UserRef::<uapi::loop_info64>::from(arg);
-                let info = current_task.mm.read_object(user_info)?;
-                self.device.state.lock().set_info(&info);
-                Ok(SUCCESS)
-            }
-            LOOP_GET_STATUS64 => {
-                let user_info = UserRef::<uapi::loop_info64>::from(arg);
-                let node = file.node();
-                let (ino, rdev) = {
-                    let info = node.info();
-                    (info.ino, info.rdev)
-                };
-                let offset = *file.offset.lock();
-                let state = self.device.state.lock();
-                let info = loop_info64 {
-                    lo_device: node.dev().bits(),
-                    lo_inode: ino,
-                    lo_rdevice: rdev.bits(),
-                    lo_offset: offset as u64,
-                    lo_sizelimit: state.size_limit,
-                    lo_number: self.device.number,
-                    lo_encrypt_type: state.encrypt_type,
-                    lo_flags: state.flags.bits(),
-                    lo_init: state.init,
-                    ..Default::default()
-                };
-                std::mem::drop(state);
-                current_task.mm.write_object(user_info, &info)?;
-                Ok(SUCCESS)
-            }
-            _ => default_ioctl(request),
-        }
-    }
 }
 
 #[derive(Debug, Default)]
@@ -284,7 +41,7 @@ pub struct LoopDeviceRegistry {
 
 impl LoopDeviceRegistry {
     fn get_or_create(&self, minor: u32) -> Arc<LoopDevice> {
-        self.devices.lock().entry(minor).or_insert_with(|| LoopDevice::new(minor)).clone()
+        self.devices.lock().entry(minor).or_insert_with(LoopDevice::new).clone()
     }
 
     fn find(&self) -> Result<u32, Errno> {
@@ -293,7 +50,7 @@ impl LoopDeviceRegistry {
         loop {
             match devices.entry(minor) {
                 Entry::Vacant(e) => {
-                    e.insert(LoopDevice::new(minor));
+                    e.insert(LoopDevice::new());
                     return Ok(minor);
                 }
                 Entry::Occupied(e) => {
@@ -310,7 +67,7 @@ impl LoopDeviceRegistry {
     fn add(&self, minor: u32) -> Result<(), Errno> {
         match self.devices.lock().entry(minor) {
             Entry::Vacant(e) => {
-                e.insert(LoopDevice::new(minor));
+                e.insert(LoopDevice::new());
                 Ok(())
             }
             Entry::Occupied(_) => {

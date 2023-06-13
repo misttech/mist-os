@@ -180,72 +180,6 @@ pub const SOCK_TXREHASH_DEFAULT: u32 = 255;
 pub const SOCK_TXREHASH_DISABLED: u32 = 0;
 pub const SOCK_TXREHASH_ENABLED: u32 = 1;
 pub const __FD_SETSIZE: u32 = 1024;
-pub const POLLIN: u32 = 1;
-pub const POLLPRI: u32 = 2;
-pub const POLLOUT: u32 = 4;
-pub const POLLERR: u32 = 8;
-pub const POLLHUP: u32 = 16;
-pub const POLLNVAL: u32 = 32;
-pub const POLLRDNORM: u32 = 64;
-pub const POLLRDBAND: u32 = 128;
-pub const POLLWRNORM: u32 = 256;
-pub const POLLWRBAND: u32 = 512;
-pub const POLLMSG: u32 = 1024;
-pub const POLLREMOVE: u32 = 4096;
-pub const POLLRDHUP: u32 = 8192;
-pub const _KERNEL__NSIG: u32 = 64;
-pub const SIGHUP: u32 = 1;
-pub const SIGINT: u32 = 2;
-pub const SIGQUIT: u32 = 3;
-pub const SIGILL: u32 = 4;
-pub const SIGTRAP: u32 = 5;
-pub const SIGABRT: u32 = 6;
-pub const SIGIOT: u32 = 6;
-pub const SIGBUS: u32 = 7;
-pub const SIGFPE: u32 = 8;
-pub const SIGKILL: u32 = 9;
-pub const SIGUSR1: u32 = 10;
-pub const SIGSEGV: u32 = 11;
-pub const SIGUSR2: u32 = 12;
-pub const SIGPIPE: u32 = 13;
-pub const SIGALRM: u32 = 14;
-pub const SIGTERM: u32 = 15;
-pub const SIGSTKFLT: u32 = 16;
-pub const SIGCHLD: u32 = 17;
-pub const SIGCONT: u32 = 18;
-pub const SIGSTOP: u32 = 19;
-pub const SIGTSTP: u32 = 20;
-pub const SIGTTIN: u32 = 21;
-pub const SIGTTOU: u32 = 22;
-pub const SIGURG: u32 = 23;
-pub const SIGXCPU: u32 = 24;
-pub const SIGXFSZ: u32 = 25;
-pub const SIGVTALRM: u32 = 26;
-pub const SIGPROF: u32 = 27;
-pub const SIGWINCH: u32 = 28;
-pub const SIGIO: u32 = 29;
-pub const SIGPOLL: u32 = 29;
-pub const SIGPWR: u32 = 30;
-pub const SIGSYS: u32 = 31;
-pub const SIGUNUSED: u32 = 31;
-pub const __SIGRTMIN: u32 = 32;
-pub const __SIGRTMAX: u32 = 64;
-pub const MINSIGSTKSZ: u32 = 2048;
-pub const SIGSTKSZ: u32 = 8192;
-pub const SA_NOCLDSTOP: u32 = 1;
-pub const SA_NOCLDWAIT: u32 = 2;
-pub const SA_SIGINFO: u32 = 4;
-pub const SA_UNSUPPORTED: u32 = 1024;
-pub const SA_EXPOSE_TAGBITS: u32 = 2048;
-pub const SA_ONSTACK: u32 = 134217728;
-pub const SA_RESTART: u32 = 268435456;
-pub const SA_NODEFER: u32 = 1073741824;
-pub const SA_RESETHAND: u32 = 2147483648;
-pub const SA_NOMASK: u32 = 1073741824;
-pub const SA_ONESHOT: u32 = 2147483648;
-pub const SIG_BLOCK: u32 = 0;
-pub const SIG_UNBLOCK: u32 = 1;
-pub const SIG_SETMASK: u32 = 2;
 pub const _IOC_NRBITS: u32 = 8;
 pub const _IOC_TYPEBITS: u32 = 8;
 pub const _IOC_SIZEBITS: u32 = 14;
@@ -338,6 +272,72 @@ pub const TIOCPKT_NOSTOP: u32 = 16;
 pub const TIOCPKT_DOSTOP: u32 = 32;
 pub const TIOCPKT_IOCTL: u32 = 64;
 pub const TIOCSER_TEMT: u32 = 1;
+pub const POLLIN: u32 = 1;
+pub const POLLPRI: u32 = 2;
+pub const POLLOUT: u32 = 4;
+pub const POLLERR: u32 = 8;
+pub const POLLHUP: u32 = 16;
+pub const POLLNVAL: u32 = 32;
+pub const POLLRDNORM: u32 = 64;
+pub const POLLRDBAND: u32 = 128;
+pub const POLLWRNORM: u32 = 256;
+pub const POLLWRBAND: u32 = 512;
+pub const POLLMSG: u32 = 1024;
+pub const POLLREMOVE: u32 = 4096;
+pub const POLLRDHUP: u32 = 8192;
+pub const _KERNEL__NSIG: u32 = 64;
+pub const SIGHUP: u32 = 1;
+pub const SIGINT: u32 = 2;
+pub const SIGQUIT: u32 = 3;
+pub const SIGILL: u32 = 4;
+pub const SIGTRAP: u32 = 5;
+pub const SIGABRT: u32 = 6;
+pub const SIGIOT: u32 = 6;
+pub const SIGBUS: u32 = 7;
+pub const SIGFPE: u32 = 8;
+pub const SIGKILL: u32 = 9;
+pub const SIGUSR1: u32 = 10;
+pub const SIGSEGV: u32 = 11;
+pub const SIGUSR2: u32 = 12;
+pub const SIGPIPE: u32 = 13;
+pub const SIGALRM: u32 = 14;
+pub const SIGTERM: u32 = 15;
+pub const SIGSTKFLT: u32 = 16;
+pub const SIGCHLD: u32 = 17;
+pub const SIGCONT: u32 = 18;
+pub const SIGSTOP: u32 = 19;
+pub const SIGTSTP: u32 = 20;
+pub const SIGTTIN: u32 = 21;
+pub const SIGTTOU: u32 = 22;
+pub const SIGURG: u32 = 23;
+pub const SIGXCPU: u32 = 24;
+pub const SIGXFSZ: u32 = 25;
+pub const SIGVTALRM: u32 = 26;
+pub const SIGPROF: u32 = 27;
+pub const SIGWINCH: u32 = 28;
+pub const SIGIO: u32 = 29;
+pub const SIGPOLL: u32 = 29;
+pub const SIGPWR: u32 = 30;
+pub const SIGSYS: u32 = 31;
+pub const SIGUNUSED: u32 = 31;
+pub const __SIGRTMIN: u32 = 32;
+pub const __SIGRTMAX: u32 = 64;
+pub const MINSIGSTKSZ: u32 = 2048;
+pub const SIGSTKSZ: u32 = 8192;
+pub const SA_NOCLDSTOP: u32 = 1;
+pub const SA_NOCLDWAIT: u32 = 2;
+pub const SA_SIGINFO: u32 = 4;
+pub const SA_UNSUPPORTED: u32 = 1024;
+pub const SA_EXPOSE_TAGBITS: u32 = 2048;
+pub const SA_ONSTACK: u32 = 134217728;
+pub const SA_RESTART: u32 = 268435456;
+pub const SA_NODEFER: u32 = 1073741824;
+pub const SA_RESETHAND: u32 = 2147483648;
+pub const SA_NOMASK: u32 = 1073741824;
+pub const SA_ONESHOT: u32 = 2147483648;
+pub const SIG_BLOCK: u32 = 0;
+pub const SIG_UNBLOCK: u32 = 1;
+pub const SIG_SETMASK: u32 = 2;
 pub const FIOSETOWN: u32 = 35073;
 pub const SIOCSPGRP: u32 = 35074;
 pub const FIOGETOWN: u32 = 35075;
@@ -3297,6 +3297,158 @@ pub const IPT_FUNCTION_MAXNAMELEN: u32 = 30;
 pub const IPT_TABLE_MAXNAMELEN: u32 = 32;
 pub const IPT_CONTINUE: u32 = 4294967295;
 pub const IPT_RETURN: i32 = -5;
+pub const XT_TCP_INV_SRCPT: u32 = 1;
+pub const XT_TCP_INV_DSTPT: u32 = 2;
+pub const XT_TCP_INV_FLAGS: u32 = 4;
+pub const XT_TCP_INV_OPTION: u32 = 8;
+pub const XT_TCP_INV_MASK: u32 = 15;
+pub const XT_UDP_INV_SRCPT: u32 = 1;
+pub const XT_UDP_INV_DSTPT: u32 = 2;
+pub const XT_UDP_INV_MASK: u32 = 3;
+pub const IPT_TCP_INV_SRCPT: u32 = 1;
+pub const IPT_TCP_INV_DSTPT: u32 = 2;
+pub const IPT_TCP_INV_FLAGS: u32 = 4;
+pub const IPT_TCP_INV_OPTION: u32 = 8;
+pub const IPT_TCP_INV_MASK: u32 = 15;
+pub const IPT_UDP_INV_SRCPT: u32 = 1;
+pub const IPT_UDP_INV_DSTPT: u32 = 2;
+pub const IPT_UDP_INV_MASK: u32 = 3;
+pub const IPT_STANDARD_TARGET: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"\0") };
+pub const IPT_ERROR_TARGET: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"ERROR\0") };
+pub const IPT_F_FRAG: u32 = 1;
+pub const IPT_F_GOTO: u32 = 2;
+pub const IPT_F_MASK: u32 = 3;
+pub const IPT_INV_VIA_IN: u32 = 1;
+pub const IPT_INV_VIA_OUT: u32 = 2;
+pub const IPT_INV_TOS: u32 = 4;
+pub const IPT_INV_SRCIP: u32 = 8;
+pub const IPT_INV_DSTIP: u32 = 16;
+pub const IPT_INV_FRAG: u32 = 32;
+pub const IPT_INV_PROTO: u32 = 64;
+pub const IPT_INV_MASK: u32 = 127;
+pub const IPT_BASE_CTL: u32 = 64;
+pub const IPT_SO_SET_REPLACE: u32 = 64;
+pub const IPT_SO_SET_ADD_COUNTERS: u32 = 65;
+pub const IPT_SO_SET_MAX: u32 = 65;
+pub const IPT_SO_GET_INFO: u32 = 64;
+pub const IPT_SO_GET_ENTRIES: u32 = 65;
+pub const IPT_SO_GET_REVISION_MATCH: u32 = 66;
+pub const IPT_SO_GET_REVISION_TARGET: u32 = 67;
+pub const IPT_SO_GET_MAX: u32 = 67;
+pub const IPT_ICMP_INV: u32 = 1;
+pub const NF_IP6_PRE_ROUTING: u32 = 0;
+pub const NF_IP6_LOCAL_IN: u32 = 1;
+pub const NF_IP6_FORWARD: u32 = 2;
+pub const NF_IP6_LOCAL_OUT: u32 = 3;
+pub const NF_IP6_POST_ROUTING: u32 = 4;
+pub const NF_IP6_NUMHOOKS: u32 = 5;
+pub const IP6T_FUNCTION_MAXNAMELEN: u32 = 30;
+pub const IP6T_TABLE_MAXNAMELEN: u32 = 32;
+pub const IP6T_CONTINUE: u32 = 4294967295;
+pub const IP6T_RETURN: i32 = -5;
+pub const IP6T_TCP_INV_SRCPT: u32 = 1;
+pub const IP6T_TCP_INV_DSTPT: u32 = 2;
+pub const IP6T_TCP_INV_FLAGS: u32 = 4;
+pub const IP6T_TCP_INV_OPTION: u32 = 8;
+pub const IP6T_TCP_INV_MASK: u32 = 15;
+pub const IP6T_UDP_INV_SRCPT: u32 = 1;
+pub const IP6T_UDP_INV_DSTPT: u32 = 2;
+pub const IP6T_UDP_INV_MASK: u32 = 3;
+pub const IP6T_STANDARD_TARGET: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"\0") };
+pub const IP6T_ERROR_TARGET: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"ERROR\0") };
+pub const IP6T_F_PROTO: u32 = 1;
+pub const IP6T_F_TOS: u32 = 2;
+pub const IP6T_F_GOTO: u32 = 4;
+pub const IP6T_F_MASK: u32 = 7;
+pub const IP6T_INV_VIA_IN: u32 = 1;
+pub const IP6T_INV_VIA_OUT: u32 = 2;
+pub const IP6T_INV_TOS: u32 = 4;
+pub const IP6T_INV_SRCIP: u32 = 8;
+pub const IP6T_INV_DSTIP: u32 = 16;
+pub const IP6T_INV_FRAG: u32 = 32;
+pub const IP6T_INV_PROTO: u32 = 64;
+pub const IP6T_INV_MASK: u32 = 127;
+pub const IP6T_BASE_CTL: u32 = 64;
+pub const IP6T_SO_SET_REPLACE: u32 = 64;
+pub const IP6T_SO_SET_ADD_COUNTERS: u32 = 65;
+pub const IP6T_SO_SET_MAX: u32 = 65;
+pub const IP6T_SO_GET_INFO: u32 = 64;
+pub const IP6T_SO_GET_ENTRIES: u32 = 65;
+pub const IP6T_SO_GET_REVISION_MATCH: u32 = 68;
+pub const IP6T_SO_GET_REVISION_TARGET: u32 = 69;
+pub const IP6T_SO_GET_MAX: u32 = 69;
+pub const IP6T_SO_ORIGINAL_DST: u32 = 80;
+pub const IP6T_ICMP_INV: u32 = 1;
+pub const NETLINK_ROUTE: u32 = 0;
+pub const NETLINK_UNUSED: u32 = 1;
+pub const NETLINK_USERSOCK: u32 = 2;
+pub const NETLINK_FIREWALL: u32 = 3;
+pub const NETLINK_SOCK_DIAG: u32 = 4;
+pub const NETLINK_NFLOG: u32 = 5;
+pub const NETLINK_XFRM: u32 = 6;
+pub const NETLINK_SELINUX: u32 = 7;
+pub const NETLINK_ISCSI: u32 = 8;
+pub const NETLINK_AUDIT: u32 = 9;
+pub const NETLINK_FIB_LOOKUP: u32 = 10;
+pub const NETLINK_CONNECTOR: u32 = 11;
+pub const NETLINK_NETFILTER: u32 = 12;
+pub const NETLINK_IP6_FW: u32 = 13;
+pub const NETLINK_DNRTMSG: u32 = 14;
+pub const NETLINK_KOBJECT_UEVENT: u32 = 15;
+pub const NETLINK_GENERIC: u32 = 16;
+pub const NETLINK_SCSITRANSPORT: u32 = 18;
+pub const NETLINK_ECRYPTFS: u32 = 19;
+pub const NETLINK_RDMA: u32 = 20;
+pub const NETLINK_CRYPTO: u32 = 21;
+pub const NETLINK_SMC: u32 = 22;
+pub const NETLINK_INET_DIAG: u32 = 4;
+pub const MAX_LINKS: u32 = 32;
+pub const NLM_F_REQUEST: u32 = 1;
+pub const NLM_F_MULTI: u32 = 2;
+pub const NLM_F_ACK: u32 = 4;
+pub const NLM_F_ECHO: u32 = 8;
+pub const NLM_F_DUMP_INTR: u32 = 16;
+pub const NLM_F_DUMP_FILTERED: u32 = 32;
+pub const NLM_F_ROOT: u32 = 256;
+pub const NLM_F_MATCH: u32 = 512;
+pub const NLM_F_ATOMIC: u32 = 1024;
+pub const NLM_F_DUMP: u32 = 768;
+pub const NLM_F_REPLACE: u32 = 256;
+pub const NLM_F_EXCL: u32 = 512;
+pub const NLM_F_CREATE: u32 = 1024;
+pub const NLM_F_APPEND: u32 = 2048;
+pub const NLM_F_NONREC: u32 = 256;
+pub const NLM_F_BULK: u32 = 512;
+pub const NLM_F_CAPPED: u32 = 256;
+pub const NLM_F_ACK_TLVS: u32 = 512;
+pub const NLMSG_ALIGNTO: u32 = 4;
+pub const NLMSG_NOOP: u32 = 1;
+pub const NLMSG_ERROR: u32 = 2;
+pub const NLMSG_DONE: u32 = 3;
+pub const NLMSG_OVERRUN: u32 = 4;
+pub const NLMSG_MIN_TYPE: u32 = 16;
+pub const NETLINK_ADD_MEMBERSHIP: u32 = 1;
+pub const NETLINK_DROP_MEMBERSHIP: u32 = 2;
+pub const NETLINK_PKTINFO: u32 = 3;
+pub const NETLINK_BROADCAST_ERROR: u32 = 4;
+pub const NETLINK_NO_ENOBUFS: u32 = 5;
+pub const NETLINK_RX_RING: u32 = 6;
+pub const NETLINK_TX_RING: u32 = 7;
+pub const NETLINK_LISTEN_ALL_NSID: u32 = 8;
+pub const NETLINK_LIST_MEMBERSHIPS: u32 = 9;
+pub const NETLINK_CAP_ACK: u32 = 10;
+pub const NETLINK_EXT_ACK: u32 = 11;
+pub const NETLINK_GET_STRICT_CHK: u32 = 12;
+pub const NL_MMAP_MSG_ALIGNMENT: u32 = 4;
+pub const NET_MAJOR: u32 = 36;
+pub const NLA_F_NESTED: u32 = 32768;
+pub const NLA_F_NET_BYTEORDER: u32 = 16384;
+pub const NLA_TYPE_MASK: i32 = -49153;
+pub const NLA_ALIGNTO: u32 = 4;
 pub const PR_SET_PDEATHSIG: u32 = 1;
 pub const PR_GET_PDEATHSIG: u32 = 2;
 pub const PR_GET_DUMPABLE: u32 = 3;
@@ -3475,6 +3627,24 @@ pub const PRIO_PGRP: u32 = 1;
 pub const PRIO_USER: u32 = 2;
 pub const _STK_LIM: u32 = 8388608;
 pub const MLOCK_LIMIT: u32 = 8388608;
+pub const RLIMIT_CPU: u32 = 0;
+pub const RLIMIT_FSIZE: u32 = 1;
+pub const RLIMIT_DATA: u32 = 2;
+pub const RLIMIT_STACK: u32 = 3;
+pub const RLIMIT_CORE: u32 = 4;
+pub const RLIMIT_RSS: u32 = 5;
+pub const RLIMIT_NPROC: u32 = 6;
+pub const RLIMIT_NOFILE: u32 = 7;
+pub const RLIMIT_MEMLOCK: u32 = 8;
+pub const RLIMIT_AS: u32 = 9;
+pub const RLIMIT_LOCKS: u32 = 10;
+pub const RLIMIT_SIGPENDING: u32 = 11;
+pub const RLIMIT_MSGQUEUE: u32 = 12;
+pub const RLIMIT_NICE: u32 = 13;
+pub const RLIMIT_RTPRIO: u32 = 14;
+pub const RLIMIT_RTTIME: u32 = 15;
+pub const RLIM_NLIMITS: u32 = 16;
+pub const RLIM_INFINITY: i32 = -1;
 pub const CSIGNAL: u32 = 255;
 pub const CLONE_VM: u32 = 256;
 pub const CLONE_FS: u32 = 512;
@@ -3563,24 +3733,6 @@ pub const SECURE_KEEP_CAPS: u32 = 4;
 pub const SECURE_KEEP_CAPS_LOCKED: u32 = 5;
 pub const SECURE_NO_CAP_AMBIENT_RAISE: u32 = 6;
 pub const SECURE_NO_CAP_AMBIENT_RAISE_LOCKED: u32 = 7;
-pub const RLIMIT_CPU: u32 = 0;
-pub const RLIMIT_FSIZE: u32 = 1;
-pub const RLIMIT_DATA: u32 = 2;
-pub const RLIMIT_STACK: u32 = 3;
-pub const RLIMIT_CORE: u32 = 4;
-pub const RLIMIT_RSS: u32 = 5;
-pub const RLIMIT_NPROC: u32 = 6;
-pub const RLIMIT_NOFILE: u32 = 7;
-pub const RLIMIT_MEMLOCK: u32 = 8;
-pub const RLIMIT_AS: u32 = 9;
-pub const RLIMIT_LOCKS: u32 = 10;
-pub const RLIMIT_SIGPENDING: u32 = 11;
-pub const RLIMIT_MSGQUEUE: u32 = 12;
-pub const RLIMIT_NICE: u32 = 13;
-pub const RLIMIT_RTPRIO: u32 = 14;
-pub const RLIMIT_RTTIME: u32 = 15;
-pub const RLIM_NLIMITS: u32 = 16;
-pub const RLIM_INFINITY: i32 = -1;
 pub const SI_MAX_SIZE: u32 = 128;
 pub const SI_USER: u32 = 0;
 pub const SI_KERNEL: u32 = 128;
@@ -3804,14 +3956,6 @@ pub const STATX_ATTR_MOUNT_ROOT: u32 = 8192;
 pub const STATX_ATTR_VERITY: u32 = 1048576;
 pub const STATX_ATTR_DAX: u32 = 2097152;
 pub const SI_LOAD_SHIFT: u32 = 16;
-pub const XT_TCP_INV_SRCPT: u32 = 1;
-pub const XT_TCP_INV_DSTPT: u32 = 2;
-pub const XT_TCP_INV_FLAGS: u32 = 4;
-pub const XT_TCP_INV_OPTION: u32 = 8;
-pub const XT_TCP_INV_MASK: u32 = 15;
-pub const XT_UDP_INV_SRCPT: u32 = 1;
-pub const XT_UDP_INV_DSTPT: u32 = 2;
-pub const XT_UDP_INV_MASK: u32 = 3;
 pub const IGNBRK: u32 = 1;
 pub const BRKINT: u32 = 2;
 pub const IGNPAR: u32 = 4;
@@ -3954,39 +4098,6 @@ pub const EXTPROC: u32 = 65536;
 pub const TCSANOW: u32 = 0;
 pub const TCSADRAIN: u32 = 1;
 pub const TCSAFLUSH: u32 = 2;
-pub const IPT_TCP_INV_SRCPT: u32 = 1;
-pub const IPT_TCP_INV_DSTPT: u32 = 2;
-pub const IPT_TCP_INV_FLAGS: u32 = 4;
-pub const IPT_TCP_INV_OPTION: u32 = 8;
-pub const IPT_TCP_INV_MASK: u32 = 15;
-pub const IPT_UDP_INV_SRCPT: u32 = 1;
-pub const IPT_UDP_INV_DSTPT: u32 = 2;
-pub const IPT_UDP_INV_MASK: u32 = 3;
-pub const IPT_STANDARD_TARGET: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"\0") };
-pub const IPT_ERROR_TARGET: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"ERROR\0") };
-pub const IPT_F_FRAG: u32 = 1;
-pub const IPT_F_GOTO: u32 = 2;
-pub const IPT_F_MASK: u32 = 3;
-pub const IPT_INV_VIA_IN: u32 = 1;
-pub const IPT_INV_VIA_OUT: u32 = 2;
-pub const IPT_INV_TOS: u32 = 4;
-pub const IPT_INV_SRCIP: u32 = 8;
-pub const IPT_INV_DSTIP: u32 = 16;
-pub const IPT_INV_FRAG: u32 = 32;
-pub const IPT_INV_PROTO: u32 = 64;
-pub const IPT_INV_MASK: u32 = 127;
-pub const IPT_BASE_CTL: u32 = 64;
-pub const IPT_SO_SET_REPLACE: u32 = 64;
-pub const IPT_SO_SET_ADD_COUNTERS: u32 = 65;
-pub const IPT_SO_SET_MAX: u32 = 65;
-pub const IPT_SO_GET_INFO: u32 = 64;
-pub const IPT_SO_GET_ENTRIES: u32 = 65;
-pub const IPT_SO_GET_REVISION_MATCH: u32 = 66;
-pub const IPT_SO_GET_REVISION_TARGET: u32 = 67;
-pub const IPT_SO_GET_MAX: u32 = 67;
-pub const IPT_ICMP_INV: u32 = 1;
 pub const NCC: u32 = 8;
 pub const TIOCM_LE: u32 = 1;
 pub const TIOCM_DTR: u32 = 2;
@@ -4010,117 +4121,6 @@ pub const UIO_FASTIOV: u32 = 8;
 pub const UIO_MAXIOV: u32 = 1024;
 pub const UNIX_PATH_MAX: u32 = 108;
 pub const SIOCUNIXFILE: u32 = 35296;
-pub const SO_VM_SOCKETS_BUFFER_SIZE: u32 = 0;
-pub const SO_VM_SOCKETS_BUFFER_MIN_SIZE: u32 = 1;
-pub const SO_VM_SOCKETS_BUFFER_MAX_SIZE: u32 = 2;
-pub const SO_VM_SOCKETS_PEER_HOST_VM_ID: u32 = 3;
-pub const SO_VM_SOCKETS_TRUSTED: u32 = 5;
-pub const SO_VM_SOCKETS_CONNECT_TIMEOUT_OLD: u32 = 6;
-pub const SO_VM_SOCKETS_NONBLOCK_TXRX: u32 = 7;
-pub const SO_VM_SOCKETS_CONNECT_TIMEOUT_NEW: u32 = 8;
-pub const SO_VM_SOCKETS_CONNECT_TIMEOUT: u32 = 6;
-pub const VMADDR_CID_ANY: i32 = -1;
-pub const VMADDR_PORT_ANY: i32 = -1;
-pub const VMADDR_CID_HYPERVISOR: u32 = 0;
-pub const VMADDR_CID_LOCAL: u32 = 1;
-pub const VMADDR_CID_HOST: u32 = 2;
-pub const VMADDR_FLAG_TO_HOST: u32 = 1;
-pub const VM_SOCKETS_INVALID_VERSION: i32 = -1;
-pub const WNOHANG: u32 = 1;
-pub const WUNTRACED: u32 = 2;
-pub const WSTOPPED: u32 = 2;
-pub const WEXITED: u32 = 4;
-pub const WCONTINUED: u32 = 8;
-pub const WNOWAIT: u32 = 16777216;
-pub const __WNOTHREAD: u32 = 536870912;
-pub const __WALL: u32 = 1073741824;
-pub const __WCLONE: u32 = 2147483648;
-pub const P_ALL: u32 = 0;
-pub const P_PID: u32 = 1;
-pub const P_PGID: u32 = 2;
-pub const P_PIDFD: u32 = 3;
-pub const XATTR_CREATE: u32 = 1;
-pub const XATTR_REPLACE: u32 = 2;
-pub const XATTR_OS2_PREFIX: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"os2.\0") };
-pub const XATTR_MAC_OSX_PREFIX: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"osx.\0") };
-pub const XATTR_BTRFS_PREFIX: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"btrfs.\0") };
-pub const XATTR_HURD_PREFIX: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"gnu.\0") };
-pub const XATTR_SECURITY_PREFIX: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.\0") };
-pub const XATTR_SYSTEM_PREFIX: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"system.\0") };
-pub const XATTR_TRUSTED_PREFIX: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"trusted.\0") };
-pub const XATTR_USER_PREFIX: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"user.\0") };
-pub const XATTR_EVM_SUFFIX: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"evm\0") };
-pub const XATTR_NAME_EVM: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.evm\0") };
-pub const XATTR_IMA_SUFFIX: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"ima\0") };
-pub const XATTR_NAME_IMA: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.ima\0") };
-pub const XATTR_SELINUX_SUFFIX: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"selinux\0") };
-pub const XATTR_NAME_SELINUX: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.selinux\0") };
-pub const XATTR_SMACK_SUFFIX: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"SMACK64\0") };
-pub const XATTR_SMACK_IPIN: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"SMACK64IPIN\0") };
-pub const XATTR_SMACK_IPOUT: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"SMACK64IPOUT\0") };
-pub const XATTR_SMACK_EXEC: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"SMACK64EXEC\0") };
-pub const XATTR_SMACK_TRANSMUTE: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"SMACK64TRANSMUTE\0") };
-pub const XATTR_SMACK_MMAP: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"SMACK64MMAP\0") };
-pub const XATTR_NAME_SMACK: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.SMACK64\0") };
-pub const XATTR_NAME_SMACKIPIN: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.SMACK64IPIN\0") };
-pub const XATTR_NAME_SMACKIPOUT: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.SMACK64IPOUT\0") };
-pub const XATTR_NAME_SMACKEXEC: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.SMACK64EXEC\0") };
-pub const XATTR_NAME_SMACKTRANSMUTE: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.SMACK64TRANSMUTE\0") };
-pub const XATTR_NAME_SMACKMMAP: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.SMACK64MMAP\0") };
-pub const XATTR_APPARMOR_SUFFIX: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"apparmor\0") };
-pub const XATTR_NAME_APPARMOR: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.apparmor\0") };
-pub const XATTR_CAPS_SUFFIX: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"capability\0") };
-pub const XATTR_NAME_CAPS: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.capability\0") };
-pub const XATTR_POSIX_ACL_ACCESS: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"posix_acl_access\0") };
-pub const XATTR_NAME_POSIX_ACL_ACCESS: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"system.posix_acl_access\0") };
-pub const XATTR_POSIX_ACL_DEFAULT: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"posix_acl_default\0") };
-pub const XATTR_NAME_POSIX_ACL_DEFAULT: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"system.posix_acl_default\0") };
-pub const VDSO_CONSTANTS_ALIGN: u32 = 8;
-pub const VDSO_CONSTANTS_SIZE: u32 = 16;
-pub const SPLICE_F_MOVE: u32 = 1;
-pub const SPLICE_F_NONBLOCK: u32 = 2;
-pub const SPLICE_F_MORE: u32 = 4;
-pub const SPLICE_F_GIFT: u32 = 8;
-pub const NF_IP6_PRE_ROUTING: u32 = 0;
-pub const NF_IP6_LOCAL_IN: u32 = 1;
-pub const NF_IP6_FORWARD: u32 = 2;
-pub const NF_IP6_LOCAL_OUT: u32 = 3;
-pub const NF_IP6_POST_ROUTING: u32 = 4;
-pub const NF_IP6_NUMHOOKS: u32 = 5;
 pub const __NR_io_setup: u32 = 0;
 pub const __NR_io_destroy: u32 = 1;
 pub const __NR_io_submit: u32 = 2;
@@ -4440,6 +4440,111 @@ pub const __NR_fstat: u32 = 80;
 pub const __NR_mmap: u32 = 222;
 pub const __NR_fadvise64: u32 = 223;
 pub const __NR_riscv_flush_icache: u32 = 259;
+pub const SO_VM_SOCKETS_BUFFER_SIZE: u32 = 0;
+pub const SO_VM_SOCKETS_BUFFER_MIN_SIZE: u32 = 1;
+pub const SO_VM_SOCKETS_BUFFER_MAX_SIZE: u32 = 2;
+pub const SO_VM_SOCKETS_PEER_HOST_VM_ID: u32 = 3;
+pub const SO_VM_SOCKETS_TRUSTED: u32 = 5;
+pub const SO_VM_SOCKETS_CONNECT_TIMEOUT_OLD: u32 = 6;
+pub const SO_VM_SOCKETS_NONBLOCK_TXRX: u32 = 7;
+pub const SO_VM_SOCKETS_CONNECT_TIMEOUT_NEW: u32 = 8;
+pub const SO_VM_SOCKETS_CONNECT_TIMEOUT: u32 = 6;
+pub const VMADDR_CID_ANY: i32 = -1;
+pub const VMADDR_PORT_ANY: i32 = -1;
+pub const VMADDR_CID_HYPERVISOR: u32 = 0;
+pub const VMADDR_CID_LOCAL: u32 = 1;
+pub const VMADDR_CID_HOST: u32 = 2;
+pub const VMADDR_FLAG_TO_HOST: u32 = 1;
+pub const VM_SOCKETS_INVALID_VERSION: i32 = -1;
+pub const WNOHANG: u32 = 1;
+pub const WUNTRACED: u32 = 2;
+pub const WSTOPPED: u32 = 2;
+pub const WEXITED: u32 = 4;
+pub const WCONTINUED: u32 = 8;
+pub const WNOWAIT: u32 = 16777216;
+pub const __WNOTHREAD: u32 = 536870912;
+pub const __WALL: u32 = 1073741824;
+pub const __WCLONE: u32 = 2147483648;
+pub const P_ALL: u32 = 0;
+pub const P_PID: u32 = 1;
+pub const P_PGID: u32 = 2;
+pub const P_PIDFD: u32 = 3;
+pub const XATTR_CREATE: u32 = 1;
+pub const XATTR_REPLACE: u32 = 2;
+pub const XATTR_OS2_PREFIX: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"os2.\0") };
+pub const XATTR_MAC_OSX_PREFIX: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"osx.\0") };
+pub const XATTR_BTRFS_PREFIX: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"btrfs.\0") };
+pub const XATTR_HURD_PREFIX: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"gnu.\0") };
+pub const XATTR_SECURITY_PREFIX: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.\0") };
+pub const XATTR_SYSTEM_PREFIX: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"system.\0") };
+pub const XATTR_TRUSTED_PREFIX: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"trusted.\0") };
+pub const XATTR_USER_PREFIX: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"user.\0") };
+pub const XATTR_EVM_SUFFIX: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"evm\0") };
+pub const XATTR_NAME_EVM: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.evm\0") };
+pub const XATTR_IMA_SUFFIX: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"ima\0") };
+pub const XATTR_NAME_IMA: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.ima\0") };
+pub const XATTR_SELINUX_SUFFIX: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"selinux\0") };
+pub const XATTR_NAME_SELINUX: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.selinux\0") };
+pub const XATTR_SMACK_SUFFIX: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"SMACK64\0") };
+pub const XATTR_SMACK_IPIN: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"SMACK64IPIN\0") };
+pub const XATTR_SMACK_IPOUT: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"SMACK64IPOUT\0") };
+pub const XATTR_SMACK_EXEC: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"SMACK64EXEC\0") };
+pub const XATTR_SMACK_TRANSMUTE: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"SMACK64TRANSMUTE\0") };
+pub const XATTR_SMACK_MMAP: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"SMACK64MMAP\0") };
+pub const XATTR_NAME_SMACK: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.SMACK64\0") };
+pub const XATTR_NAME_SMACKIPIN: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.SMACK64IPIN\0") };
+pub const XATTR_NAME_SMACKIPOUT: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.SMACK64IPOUT\0") };
+pub const XATTR_NAME_SMACKEXEC: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.SMACK64EXEC\0") };
+pub const XATTR_NAME_SMACKTRANSMUTE: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.SMACK64TRANSMUTE\0") };
+pub const XATTR_NAME_SMACKMMAP: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.SMACK64MMAP\0") };
+pub const XATTR_APPARMOR_SUFFIX: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"apparmor\0") };
+pub const XATTR_NAME_APPARMOR: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.apparmor\0") };
+pub const XATTR_CAPS_SUFFIX: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"capability\0") };
+pub const XATTR_NAME_CAPS: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"security.capability\0") };
+pub const XATTR_POSIX_ACL_ACCESS: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"posix_acl_access\0") };
+pub const XATTR_NAME_POSIX_ACL_ACCESS: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"system.posix_acl_access\0") };
+pub const XATTR_POSIX_ACL_DEFAULT: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"posix_acl_default\0") };
+pub const XATTR_NAME_POSIX_ACL_DEFAULT: &'static std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"system.posix_acl_default\0") };
+pub const VDSO_CONSTANTS_ALIGN: u32 = 8;
+pub const VDSO_CONSTANTS_SIZE: u32 = 16;
+pub const SPLICE_F_MOVE: u32 = 1;
+pub const SPLICE_F_NONBLOCK: u32 = 2;
+pub const SPLICE_F_MORE: u32 = 4;
+pub const SPLICE_F_GIFT: u32 = 8;
 pub type wchar_t = crate::types::c_int;
 #[repr(C)]
 #[repr(align(16))]
@@ -4462,7 +4567,7 @@ pub union __kernel_sockaddr_storage__bindgen_ty_1 {
     pub __align: uaddr,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct __kernel_sockaddr_storage__bindgen_ty_1__bindgen_ty_1 {
     pub ss_family: __kernel_sa_family_t,
     pub __data: [crate::types::c_char; 126usize],
@@ -4507,7 +4612,8 @@ pub type __u64 = crate::types::c_ulonglong;
 pub struct __kernel_fd_set {
     pub fds_bits: [crate::types::c_ulong; 16usize],
 }
-pub type __kernel_sighandler_t = uaddr;
+pub type __kernel_sighandler_t =
+    ::std::option::Option<unsafe extern "C" fn(arg1: crate::types::c_int)>;
 pub type __kernel_key_t = crate::types::c_int;
 pub type __kernel_mqd_t = crate::types::c_int;
 pub type __kernel_long_t = crate::types::c_long;
@@ -4621,7 +4727,7 @@ pub struct __riscv_d_ext_state {
 }
 #[repr(C)]
 #[repr(align(16))]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct __riscv_q_ext_state {
     pub f: [__u64; 64usize],
     pub fcsr: __u32,
@@ -4675,9 +4781,9 @@ pub struct sigset_t {
     pub sig: [crate::types::c_ulong; 1usize],
 }
 pub type old_sigset_t = crate::types::c_ulong;
-pub type __signalfn_t = uaddr;
+pub type __signalfn_t = ::std::option::Option<unsafe extern "C" fn(arg1: crate::types::c_int)>;
 pub type __sighandler_t = u64;
-pub type __restorefn_t = uaddr;
+pub type __restorefn_t = ::std::option::Option<unsafe extern "C" fn()>;
 pub type __sigrestore_t = u64;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
@@ -4687,7 +4793,7 @@ pub struct sigaction {
     pub sa_mask: sigset_t,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct sigaltstack {
     pub ss_sp: uaddr,
     pub ss_flags: crate::types::c_int,
@@ -5273,7 +5379,7 @@ pub struct bpf_iter_link_info__bindgen_ty_1 {
     pub map_fd: __u32,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct bpf_iter_link_info__bindgen_ty_2 {
     pub order: bpf_cgroup_iter_order,
     pub cgroup_fd: __u32,
@@ -7753,7 +7859,7 @@ impl bpf_sk_lookup {
     }
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct btf_ptr {
     pub ptr: uaddr,
     pub type_id: __u32,
@@ -7788,7 +7894,7 @@ pub const bpf_core_relo_kind_BPF_CORE_ENUMVAL_VALUE: bpf_core_relo_kind = 11;
 pub const bpf_core_relo_kind_BPF_CORE_TYPE_MATCHES: bpf_core_relo_kind = 12;
 pub type bpf_core_relo_kind = crate::types::c_uint;
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct bpf_core_relo {
     pub insn_off: __u32,
     pub type_id: __u32,
@@ -7869,7 +7975,7 @@ pub struct open_how {
     pub resolve: __u64,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct i2c_msg {
     pub addr: __u16,
     pub flags: __u16,
@@ -7965,7 +8071,7 @@ pub struct fb_var_screeninfo {
     pub reserved: [__u32; 4usize],
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct fb_cmap {
     pub start: __u32,
     pub len: __u32,
@@ -8025,7 +8131,7 @@ pub struct fb_fillrect {
     pub rop: __u32,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct fb_image {
     pub dx: __u32,
     pub dy: __u32,
@@ -8054,7 +8160,7 @@ pub struct fbcurpos {
     pub y: __u16,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct fb_cursor {
     pub set: __u16,
     pub enable: __u16,
@@ -8108,7 +8214,7 @@ pub struct fscrypt_policy_v1 {
     pub master_key_descriptor: [__u8; 8usize],
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct fscrypt_key {
     pub mode: __u32,
     pub raw: [__u8; 64usize],
@@ -8934,7 +9040,7 @@ pub struct futex_waitv {
     pub __reserved: __u32,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct robust_list {
     pub next: uref<robust_list>,
 }
@@ -8948,7 +9054,7 @@ impl Default for robust_list {
     }
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct robust_list_head {
     pub list: robust_list,
     pub futex_offset: crate::types::c_long,
@@ -9112,7 +9218,7 @@ pub struct ff_condition_effect {
     pub center: __s16,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct ff_periodic_effect {
     pub waveform: __u16,
     pub period: __u16,
@@ -9690,7 +9796,7 @@ pub const LO_FLAGS_PARTSCAN: _bindgen_ty_45 = 8;
 pub const LO_FLAGS_DIRECT_IO: _bindgen_ty_45 = 16;
 pub type _bindgen_ty_45 = crate::types::c_uint;
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct loop_info {
     pub lo_number: crate::types::c_int,
     pub lo_device: __kernel_old_dev_t,
@@ -9717,7 +9823,7 @@ impl Default for loop_info {
     }
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct loop_info64 {
     pub lo_device: __u64,
     pub lo_inode: __u64,
@@ -9743,7 +9849,7 @@ impl Default for loop_info64 {
     }
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct loop_config {
     pub fd: __u32,
     pub block_size: __u32,
@@ -10233,7 +10339,7 @@ pub struct xt_entry_match__bindgen_ty_1__bindgen_ty_1 {
     pub revision: __u8,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct xt_entry_match__bindgen_ty_1__bindgen_ty_2 {
     pub match_size: __u16,
     pub __bindgen_padding_0: [u8; 6usize],
@@ -10286,7 +10392,7 @@ pub struct xt_entry_target__bindgen_ty_1__bindgen_ty_1 {
     pub revision: __u8,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct xt_entry_target__bindgen_ty_1__bindgen_ty_2 {
     pub target_size: __u16,
     pub __bindgen_padding_0: [u8; 6usize],
@@ -10484,22 +10590,6 @@ pub const nf_ip6_hook_priorities_NF_IP6_PRI_SELINUX_LAST: nf_ip6_hook_priorities
 pub const nf_ip6_hook_priorities_NF_IP6_PRI_CONNTRACK_HELPER: nf_ip6_hook_priorities = 300;
 pub const nf_ip6_hook_priorities_NF_IP6_PRI_LAST: nf_ip6_hook_priorities = 2147483647;
 pub type nf_ip6_hook_priorities = crate::types::c_int;
-pub const IP6T_FUNCTION_MAXNAMELEN: u32 = 30;
-pub const IP6T_TABLE_MAXNAMELEN: u32 = 32;
-pub const IP6T_CONTINUE: u32 = 4294967295;
-pub const IP6T_RETURN: i32 = -5;
-pub const IP6T_TCP_INV_SRCPT: u32 = 1;
-pub const IP6T_TCP_INV_DSTPT: u32 = 2;
-pub const IP6T_TCP_INV_FLAGS: u32 = 4;
-pub const IP6T_TCP_INV_OPTION: u32 = 8;
-pub const IP6T_TCP_INV_MASK: u32 = 15;
-pub const IP6T_UDP_INV_SRCPT: u32 = 1;
-pub const IP6T_UDP_INV_DSTPT: u32 = 2;
-pub const IP6T_UDP_INV_MASK: u32 = 3;
-pub const IP6T_STANDARD_TARGET: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"\0") };
-pub const IP6T_ERROR_TARGET: &'static std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"ERROR\0") };
 #[repr(C)]
 #[derive(Copy, Clone, FromBytes, FromZeroes)]
 pub struct ip6t_ip6 {
@@ -10526,18 +10616,6 @@ impl Default for ip6t_ip6 {
         }
     }
 }
-pub const IP6T_F_PROTO: u32 = 1;
-pub const IP6T_F_TOS: u32 = 2;
-pub const IP6T_F_GOTO: u32 = 4;
-pub const IP6T_F_MASK: u32 = 7;
-pub const IP6T_INV_VIA_IN: u32 = 1;
-pub const IP6T_INV_VIA_OUT: u32 = 2;
-pub const IP6T_INV_TOS: u32 = 4;
-pub const IP6T_INV_SRCIP: u32 = 8;
-pub const IP6T_INV_DSTIP: u32 = 16;
-pub const IP6T_INV_FRAG: u32 = 32;
-pub const IP6T_INV_PROTO: u32 = 64;
-pub const IP6T_INV_MASK: u32 = 127;
 #[repr(C)]
 #[derive(FromBytes, FromZeroes)]
 pub struct ip6t_entry {
@@ -10587,16 +10665,6 @@ impl Default for ip6t_error {
         }
     }
 }
-pub const IP6T_BASE_CTL: u32 = 64;
-pub const IP6T_SO_SET_REPLACE: u32 = 64;
-pub const IP6T_SO_SET_ADD_COUNTERS: u32 = 65;
-pub const IP6T_SO_SET_MAX: u32 = 65;
-pub const IP6T_SO_GET_INFO: u32 = 64;
-pub const IP6T_SO_GET_ENTRIES: u32 = 65;
-pub const IP6T_SO_GET_REVISION_MATCH: u32 = 68;
-pub const IP6T_SO_GET_REVISION_TARGET: u32 = 69;
-pub const IP6T_SO_GET_MAX: u32 = 69;
-pub const IP6T_SO_ORIGINAL_DST: u32 = 80;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct ip6t_icmp {
@@ -10604,7 +10672,6 @@ pub struct ip6t_icmp {
     pub code: [__u8; 2usize],
     pub invflags: __u8,
 }
-pub const IP6T_ICMP_INV: u32 = 1;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct ip6t_getinfo {
@@ -10654,30 +10721,6 @@ impl Default for ip6t_get_entries {
         }
     }
 }
-pub const NETLINK_ROUTE: u32 = 0;
-pub const NETLINK_UNUSED: u32 = 1;
-pub const NETLINK_USERSOCK: u32 = 2;
-pub const NETLINK_FIREWALL: u32 = 3;
-pub const NETLINK_SOCK_DIAG: u32 = 4;
-pub const NETLINK_NFLOG: u32 = 5;
-pub const NETLINK_XFRM: u32 = 6;
-pub const NETLINK_SELINUX: u32 = 7;
-pub const NETLINK_ISCSI: u32 = 8;
-pub const NETLINK_AUDIT: u32 = 9;
-pub const NETLINK_FIB_LOOKUP: u32 = 10;
-pub const NETLINK_CONNECTOR: u32 = 11;
-pub const NETLINK_NETFILTER: u32 = 12;
-pub const NETLINK_IP6_FW: u32 = 13;
-pub const NETLINK_DNRTMSG: u32 = 14;
-pub const NETLINK_KOBJECT_UEVENT: u32 = 15;
-pub const NETLINK_GENERIC: u32 = 16;
-pub const NETLINK_SCSITRANSPORT: u32 = 18;
-pub const NETLINK_ECRYPTFS: u32 = 19;
-pub const NETLINK_RDMA: u32 = 20;
-pub const NETLINK_CRYPTO: u32 = 21;
-pub const NETLINK_SMC: u32 = 22;
-pub const NETLINK_INET_DIAG: u32 = 4;
-pub const MAX_LINKS: u32 = 32;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct sockaddr_nl {
@@ -10695,30 +10738,6 @@ pub struct nlmsghdr {
     pub nlmsg_seq: __u32,
     pub nlmsg_pid: __u32,
 }
-pub const NLM_F_REQUEST: u32 = 1;
-pub const NLM_F_MULTI: u32 = 2;
-pub const NLM_F_ACK: u32 = 4;
-pub const NLM_F_ECHO: u32 = 8;
-pub const NLM_F_DUMP_INTR: u32 = 16;
-pub const NLM_F_DUMP_FILTERED: u32 = 32;
-pub const NLM_F_ROOT: u32 = 256;
-pub const NLM_F_MATCH: u32 = 512;
-pub const NLM_F_ATOMIC: u32 = 1024;
-pub const NLM_F_DUMP: u32 = 768;
-pub const NLM_F_REPLACE: u32 = 256;
-pub const NLM_F_EXCL: u32 = 512;
-pub const NLM_F_CREATE: u32 = 1024;
-pub const NLM_F_APPEND: u32 = 2048;
-pub const NLM_F_NONREC: u32 = 256;
-pub const NLM_F_BULK: u32 = 512;
-pub const NLM_F_CAPPED: u32 = 256;
-pub const NLM_F_ACK_TLVS: u32 = 512;
-pub const NLMSG_ALIGNTO: u32 = 4;
-pub const NLMSG_NOOP: u32 = 1;
-pub const NLMSG_ERROR: u32 = 2;
-pub const NLMSG_DONE: u32 = 3;
-pub const NLMSG_OVERRUN: u32 = 4;
-pub const NLMSG_MIN_TYPE: u32 = 16;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct nlmsgerr {
@@ -10735,18 +10754,6 @@ pub const nlmsgerr_attrs_NLMSGERR_ATTR_MISS_NEST: nlmsgerr_attrs = 6;
 pub const nlmsgerr_attrs___NLMSGERR_ATTR_MAX: nlmsgerr_attrs = 7;
 pub const nlmsgerr_attrs_NLMSGERR_ATTR_MAX: nlmsgerr_attrs = 6;
 pub type nlmsgerr_attrs = crate::types::c_uint;
-pub const NETLINK_ADD_MEMBERSHIP: u32 = 1;
-pub const NETLINK_DROP_MEMBERSHIP: u32 = 2;
-pub const NETLINK_PKTINFO: u32 = 3;
-pub const NETLINK_BROADCAST_ERROR: u32 = 4;
-pub const NETLINK_NO_ENOBUFS: u32 = 5;
-pub const NETLINK_RX_RING: u32 = 6;
-pub const NETLINK_TX_RING: u32 = 7;
-pub const NETLINK_LISTEN_ALL_NSID: u32 = 8;
-pub const NETLINK_LIST_MEMBERSHIPS: u32 = 9;
-pub const NETLINK_CAP_ACK: u32 = 10;
-pub const NETLINK_EXT_ACK: u32 = 11;
-pub const NETLINK_GET_STRICT_CHK: u32 = 12;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct nl_pktinfo {
@@ -10776,8 +10783,6 @@ pub const nl_mmap_status_NL_MMAP_STATUS_VALID: nl_mmap_status = 2;
 pub const nl_mmap_status_NL_MMAP_STATUS_COPY: nl_mmap_status = 3;
 pub const nl_mmap_status_NL_MMAP_STATUS_SKIP: nl_mmap_status = 4;
 pub type nl_mmap_status = crate::types::c_uint;
-pub const NL_MMAP_MSG_ALIGNMENT: u32 = 4;
-pub const NET_MAJOR: u32 = 36;
 pub const NETLINK_UNCONNECTED: _bindgen_ty_50 = 0;
 pub const NETLINK_CONNECTED: _bindgen_ty_50 = 1;
 pub type _bindgen_ty_50 = crate::types::c_uint;
@@ -10787,10 +10792,6 @@ pub struct nlattr {
     pub nla_len: __u16,
     pub nla_type: __u16,
 }
-pub const NLA_F_NESTED: u32 = 32768;
-pub const NLA_F_NET_BYTEORDER: u32 = 16384;
-pub const NLA_TYPE_MASK: i32 = -49153;
-pub const NLA_ALIGNTO: u32 = 4;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct nla_bitfield32 {
@@ -10832,7 +10833,7 @@ pub const netlink_policy_type_attr___NL_POLICY_TYPE_ATTR_MAX: netlink_policy_typ
 pub const netlink_policy_type_attr_NL_POLICY_TYPE_ATTR_MAX: netlink_policy_type_attr = 12;
 pub type netlink_policy_type_attr = crate::types::c_uint;
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct prctl_mm_map {
     pub start_code: __u64,
     pub end_code: __u64,
@@ -11064,7 +11065,7 @@ pub union __sifields__bindgen_ty_5__bindgen_ty_1 {
     pub _perf: __sifields__bindgen_ty_5__bindgen_ty_1__bindgen_ty_3,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct __sifields__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1 {
     pub _dummy_bnd: [crate::types::c_char; 8usize],
     pub _lower: uaddr,
@@ -11204,9 +11205,9 @@ pub union sigevent__bindgen_ty_1 {
     pub _sigev_thread: sigevent__bindgen_ty_1__bindgen_ty_1,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct sigevent__bindgen_ty_1__bindgen_ty_1 {
-    pub _function: uaddr,
+    pub _function: ::std::option::Option<unsafe extern "C" fn(arg1: sigval_t)>,
     pub _attribute: uaddr,
 }
 impl Default for sigevent__bindgen_ty_1__bindgen_ty_1 {
@@ -11366,7 +11367,7 @@ pub struct termio {
     pub __bindgen_padding_0: u8,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct iovec {
     pub iov_base: uaddr,
     pub iov_len: __kernel_size_t,
@@ -11381,7 +11382,7 @@ impl Default for iovec {
     }
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct sockaddr_un {
     pub sun_family: __kernel_sa_family_t,
     pub sun_path: [crate::types::c_char; 108usize],
@@ -11422,10 +11423,6 @@ pub const _TIOCSIG: __u32 = 1074025526;
 pub const TIOCSIG: __u32 = 1074025526;
 pub const _TIOCGPTN: __u32 = 2147767344;
 pub const TIOCGPTN: __u32 = 2147767344;
-pub const _BLKGETSIZE: __u32 = 4704;
-pub const BLKGETSIZE: __u32 = 4704;
-pub const _BLKGETSIZE64: __u32 = 2148012658;
-pub const BLKGETSIZE64: __u32 = 2148012658;
 pub const _BINDER_WRITE_READ: __u32 = 3224396289;
 pub const BINDER_WRITE_READ: __u32 = 3224396289;
 pub const _BINDER_SET_IDLE_TIMEOUT: __u32 = 1074291203;
@@ -11467,7 +11464,7 @@ pub const EVIOCGPROP: __u32 = 2147763465;
 pub const EVIOCGABS_X: __u32 = 2149074240;
 pub const EVIOCGABS_Y: __u32 = 2149074241;
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Copy, Clone)]
 pub struct remote_binder_start_command {
     pub incoming_service: uref<crate::types::c_char>,
 }

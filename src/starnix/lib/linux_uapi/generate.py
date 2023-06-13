@@ -124,17 +124,11 @@ REPLACEMENTS = [
         r"\n#\[derive\(Debug, Default, Copy, Clone(, FromBytes)?\)\]\n",
         "\n#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]\n"
     ),
-    (
-        r"\n#\[derive\(Debug, Copy, Clone(, FromBytes)?\)\]\n",
-        "\n#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]\n"),
 
     # Use uaddr/uref in place of pointers for compat with zerocopy traits. Because
     # the target of the pointer is in userspace anyway, treating it as an opaque
     # pointer is harmless.
     (r'\*mut crate::types::c_void', 'uaddr'),
-    (
-        r'::std::option::Option<unsafe extern "C" fn\([a-zA-Z_0-9: ]*\)>',
-        'uaddr'),
     (r'([:=]) \*(const|mut) ([a-zA-Z_0-9:]*)', '\\1 uref<\\3>')
 ]
 
