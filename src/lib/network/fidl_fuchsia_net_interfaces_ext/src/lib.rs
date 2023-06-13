@@ -164,8 +164,6 @@ pub struct PropertiesAndState<S> {
 /// A trait for types holding interface state that can be updated by change events.
 pub trait Update<S> {
     /// Update state with the interface change event.
-    ///
-    /// Returns a bool indicating whether the update caused any changes.
     fn update(&mut self, event: fnet_interfaces::Event)
         -> Result<UpdateResult<'_, S>, UpdateError>;
 }
