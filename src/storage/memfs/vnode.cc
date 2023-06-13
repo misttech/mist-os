@@ -46,16 +46,6 @@ void Vnode::UpdateModified() {
   } else {
     modify_time_ = 0;
   }
-
-#ifdef __Fuchsia__
-  // Notify current vnode.
-  CheckInotifyFilterAndNotify(fuchsia_io::wire::InotifyWatchMask::kModify);
-  // Notify all parent vnodes.
-  for (auto parent = dnode_parent_; parent != nullptr; parent = parent->GetParent()) {
-    parent->AcquireVnode()->CheckInotifyFilterAndNotify(
-        fuchsia_io::wire::InotifyWatchMask::kModify);
-  }
-#endif
 }
 
 }  // namespace memfs

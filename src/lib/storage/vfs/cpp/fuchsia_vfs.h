@@ -111,12 +111,6 @@ class FuchsiaVfs : public Vfs {
   zx_status_t Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
                     Vnode::ValidatedOptions options) __TA_EXCLUDES(vfs_lock_);
 
-  // Adds a inotify filter to the vnode.
-  zx_status_t AddInotifyFilterToVnode(fbl::RefPtr<Vnode> vnode, const fbl::RefPtr<Vnode>& parent,
-                                      fuchsia_io::wire::InotifyWatchMask filter,
-                                      uint32_t watch_descriptor, zx::socket socket)
-      __TA_EXCLUDES(vfs_lock_);
-
   // Serves a Vnode over the specified channel (used for creating new filesystems); the Vnode must
   // be a directory.
   zx_status_t ServeDirectory(fbl::RefPtr<Vnode> vn,

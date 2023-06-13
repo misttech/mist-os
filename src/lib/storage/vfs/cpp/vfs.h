@@ -75,11 +75,6 @@ class Vfs {
   // Sets whether this file system is read-only.
   void SetReadonly(bool value) __TA_EXCLUDES(vfs_lock_);
 
-  // Used for inotify filter addition to traverse a vnode, without actually
-  // opening it.
-  TraversePathResult TraversePathFetchVnode(fbl::RefPtr<Vnode> vndir, std::string_view path)
-      __TA_EXCLUDES(vfs_lock_);
-
  protected:
   // Whether this file system is read-only.
   bool ReadonlyLocked() const __TA_REQUIRES(vfs_lock_) { return readonly_; }
@@ -127,9 +122,6 @@ class Vfs {
   // |pathout| is the remainder of the path to search.
   zx_status_t Walk(fbl::RefPtr<Vnode> vn, std::string_view path, fbl::RefPtr<Vnode>* out_vn,
                    std::string_view* out_path) __TA_REQUIRES(vfs_lock_);
-
-  TraversePathResult TraversePathFetchVnodeLocked(fbl::RefPtr<Vnode> vndir, std::string_view path)
-      __TA_REQUIRES(vfs_lock_);
 
   bool readonly_ = false;
 };

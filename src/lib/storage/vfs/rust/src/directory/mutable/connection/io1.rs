@@ -118,8 +118,7 @@ impl MutableConnection {
             fio::DirectoryRequest::Sync { responder } => {
                 responder.send(this.base.directory.sync().await.map_err(zx::Status::into_raw))?;
             }
-            request @ (fio::DirectoryRequest::AddInotifyFilter { .. }
-            | fio::DirectoryRequest::AdvisoryLock { .. }
+            request @ (fio::DirectoryRequest::AdvisoryLock { .. }
             | fio::DirectoryRequest::Clone { .. }
             | fio::DirectoryRequest::Close { .. }
             | fio::DirectoryRequest::GetConnectionInfo { .. }

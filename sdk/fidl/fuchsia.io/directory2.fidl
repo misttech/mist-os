@@ -252,7 +252,7 @@ closed protocol Directory2 {
     ///   have a different server end of the socket and there will be a single client end per
     ///   inotify instance on inotify init.
     ///
-    @available(deprecated=12, removed=13, note="Never fully implemented", legacy=true)
+    @available(deprecated=12, removed=13, note="Never fully implemented")
     @selector("fuchsia.io/Directory.AddInotifyFilter")
     @transitional
     strict AddInotifyFilter(resource struct {

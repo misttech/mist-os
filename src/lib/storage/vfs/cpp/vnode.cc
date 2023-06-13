@@ -26,8 +26,6 @@ namespace fio = fuchsia_io;
 namespace fs {
 
 #ifdef __Fuchsia__
-std::mutex Vnode::gInotifyLock;
-std::map<const Vnode*, std::vector<Vnode::InotifyFilter>> Vnode::gInotifyMap;
 std::mutex Vnode::gLockAccess;
 std::map<const Vnode*, std::shared_ptr<file_lock::FileLock>> Vnode::gLockMap;
 #endif
@@ -77,56 +75,6 @@ zx_status_t Vnode::GetNodeInfo(Rights rights, VnodeRepresentation* info) {
 }
 
 void Vnode::Notify(std::string_view name, fuchsia_io::wire::WatchEvent event) {}
-
-zx_status_t Vnode::InsertInotifyFilter(fio::wire::InotifyWatchMask filter,
-                                       uint32_t watch_descriptor, zx::socket socket) {
-  // TODO add basic checks for filter and watch_descriptor.
-  std::lock_guard lock_access(gInotifyLock);
-  auto inotify_filter_list = gInotifyMap.find(this);
-  // No filters exist for this Vnode.
-  if (inotify_filter_list == gInotifyMap.end()) {
-    auto inserted = gInotifyMap.emplace(std::pair(this, std::vector<Vnode::InotifyFilter>()));
-    if (inserted.second) {
-      auto vnode_filter = inserted.first;
-      vnode_filter->second.push_back(InotifyFilter(filter, watch_descriptor, std::move(socket)));
-    } else {
-      return ZX_ERR_NO_RESOURCES;
-    }
-  } else {
-    inotify_filter_list->second.push_back(
-        InotifyFilter(filter, watch_descriptor, std::move(socket)));
-  }
-  return ZX_OK;
-}
-
-zx_status_t Vnode::CheckInotifyFilterAndNotify(fio::wire::InotifyWatchMask event) {
-  std::lock_guard lock(gInotifyLock);
-  auto inotify_filter_list = gInotifyMap.find(this);
-  if (inotify_filter_list == gInotifyMap.end()) {
-    // No filters on this Vnode.
-    return ZX_OK;
-  }
-  // Filter list found. Iterate list to check if we have a filter for the desired event.
-  for (auto iter = inotify_filter_list->second.begin(); iter != inotify_filter_list->second.end();
-       ++iter) {
-    uint32_t incoming_event = static_cast<uint32_t>(event);
-    incoming_event &= static_cast<uint32_t>(iter->filter_);
-    if (incoming_event) {
-      // filter found, we need to send event on the socket.
-      fio::wire::InotifyEvent inotify_event{.watch_descriptor = iter->watch_descriptor_,
-                                            .mask = event,
-                                            .cookie = 0,
-                                            .len = 0,
-                                            .filename = {}};
-      size_t actual;
-      zx_status_t status = iter->socket_.write(0, &inotify_event, sizeof(inotify_event), &actual);
-      if (status != ZX_OK) {
-        // TODO(fxbug.dev/83035) Report IN_Q_OVERFLOW if the socket buffer is full.
-      }
-    }
-  }
-  return ZX_OK;
-}
 
 zx_status_t Vnode::GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) {
   return ZX_ERR_NOT_SUPPORTED;
@@ -214,10 +162,6 @@ zx_status_t Vnode::Open(ValidatedOptions options, fbl::RefPtr<Vnode>* out_redire
     open_count_--;
     return status;
   }
-#ifdef __Fuchsia__
-  // Traverse the inotify list for open event filter and send event back to clients.
-  CheckInotifyFilterAndNotify(fio::wire::InotifyWatchMask::kOpen);
-#endif
   return ZX_OK;
 }
 
@@ -238,10 +182,6 @@ zx_status_t Vnode::Close() {
     std::lock_guard lock(mutex_);
     open_count_--;
   }
-#ifdef __Fuchsia__
-  // Traverse the inotify list for close event filter and send event back to clients.
-  CheckInotifyFilterAndNotify(fuchsia_io::wire::kCloseAll);
-#endif
   return CloseNode();
 }
 

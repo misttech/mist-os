@@ -368,10 +368,6 @@ func (dirState *directoryState) Open2(ctx fidl.Context, path string, protocols i
 	return nil
 }
 
-func (*directoryState) AddInotifyFilter(ctx fidl.Context, path string, filters io.InotifyWatchMask, wd uint32, socket zx.Socket) error {
-	return nil
-}
-
 func (*directoryState) Unlink(fidl.Context, string, io.UnlinkOptions) (io.Directory2UnlinkResult, error) {
 	return io.Directory2UnlinkResultWithErr(int32(zx.ErrNotSupported)), nil
 }

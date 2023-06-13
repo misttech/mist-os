@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/fdio/io.h>
+#include <lib/zx/socket.h>
 
 #include "fdio_unistd.h"
 #include "zxio.h"

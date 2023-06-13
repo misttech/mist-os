@@ -289,16 +289,6 @@ zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
   return Serve(std::move(vnode), std::move(server_end), result.value());
 }
 
-zx_status_t FuchsiaVfs::AddInotifyFilterToVnode(fbl::RefPtr<Vnode> vnode,
-                                                const fbl::RefPtr<Vnode>& parent_vnode,
-                                                fuchsia_io::wire::InotifyWatchMask filter,
-                                                uint32_t watch_descriptor, zx::socket socket) {
-  // TODO we need parent vnode for inotify events when a directory is being watched for events on
-  // its directory entries.
-  vnode->InsertInotifyFilter(filter, watch_descriptor, std::move(socket));
-  return ZX_OK;
-}
-
 zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
                               Vnode::ValidatedOptions options) {
   // At this point, the protocol that will be spoken over |server_end| is not

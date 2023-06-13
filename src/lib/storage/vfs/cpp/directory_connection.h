@@ -86,8 +86,6 @@ class DirectoryConnection final : public Connection,
   void Rename(RenameRequestView request, RenameCompleter::Sync& completer) final;
   void Link(LinkRequestView request, LinkCompleter::Sync& completer) final;
   void Watch(WatchRequestView request, WatchCompleter::Sync& completer) final;
-  void AddInotifyFilter(AddInotifyFilterRequestView request,
-                        AddInotifyFilterCompleter::Sync& completer) final;
   void QueryFilesystem(QueryFilesystemCompleter::Sync& completer) final;
   void Open2(fuchsia_io::wire::Directory2Open2Request* request,
              Open2Completer::Sync& completer) final {

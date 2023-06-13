@@ -39,7 +39,7 @@ class VnodeFile final : public Vnode {
   uint64_t GetContentSize() const __TA_REQUIRES_SHARED(mutex_);
 
   // Checks to see if the contents of this file were modified since the last time this method was
-  // called. If the file was modified then the mtime is updated and inotify events are sent.
+  // called. If the file was modified then the mtime is updated.
   void UpdateModifiedIfVmoChanged() __TA_REQUIRES_SHARED(mutex_);
 
   [[maybe_unused]] Memfs& memfs_;

@@ -247,10 +247,6 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // methods on the vnode. Other errors are considered fatal and will terminate the connection.
   virtual zx_status_t CreateStream(uint32_t stream_options, zx::stream* out_stream);
 
-  zx_status_t InsertInotifyFilter(fuchsia_io::wire::InotifyWatchMask filter,
-                                  uint32_t watch_descriptor, zx::socket socket)
-      __TA_EXCLUDES(gInotifyLock);
-
   // Acquire a vmo from a vnode.
   //
   // At the moment, mmap can only map files from read-only filesystems, since (without paging) there
@@ -266,10 +262,6 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // `IsRemote()`.
   virtual zx_status_t OpenRemote(fuchsia_io::OpenFlags, fuchsia_io::ModeType, fidl::StringView,
                                  fidl::ServerEnd<fuchsia_io::Node>) const;
-
-  // Check existing inotify watches and issue inotify events.
-  zx_status_t CheckInotifyFilterAndNotify(fuchsia_io::wire::InotifyWatchMask event)
-      __TA_EXCLUDES(gInotifyLock);
 
   // Instead of adding a |file_lock::FileLock| member variable to |Vnode|,
   // maintain a map from |this| to the lock objects. This is done, because
@@ -429,17 +421,6 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
 #ifdef __Fuchsia__
   static std::mutex gLockAccess;
   static std::map<const Vnode*, std::shared_ptr<file_lock::FileLock>> gLockMap;
-  struct InotifyFilter {
-    fuchsia_io::wire::InotifyWatchMask filter_;
-    uint32_t watch_descriptor_;
-    zx::socket socket_;
-    InotifyFilter(fuchsia_io::wire::InotifyWatchMask filter, uint32_t wd, zx::socket socket)
-        : filter_{filter}, watch_descriptor_{wd} {
-      socket_ = std::move(socket);
-    }
-  };
-  static std::mutex gInotifyLock;
-  static std::map<const Vnode*, std::vector<InotifyFilter>> gInotifyMap;
 #endif
 };
 

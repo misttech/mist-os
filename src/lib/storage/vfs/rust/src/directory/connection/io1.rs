@@ -282,22 +282,6 @@ where
                     .to_object_request(object_request)
                     .handle(|req| self.handle_open2(path, protocols, req));
             }
-            fio::DirectoryRequest::AddInotifyFilter {
-                path,
-                filter,
-                watch_descriptor,
-                socket: _,
-                responder,
-            } => {
-                fuchsia_trace::duration!("storage", "Directory::AddInotifyFilter");
-                tracing::error!(
-                    %path,
-                    ?filter,
-                    watch_descriptor,
-                    "AddInotifyFilter not implemented: https://fxbug.dev/77623"
-                );
-                responder.send()?;
-            }
             fio::DirectoryRequest::AdvisoryLock { request: _, responder } => {
                 fuchsia_trace::duration!("storage", "Directory::AdvisoryLock");
                 responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
@@ -706,28 +690,5 @@ mod tests {
             })
         );
         assert_matches!(event_stream.try_next().await, Ok(None));
-    }
-
-    #[fuchsia::test]
-    async fn test_add_inotify_filter_does_not_crash() {
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
-
-        let dir = simple();
-        dir.open(
-            ExecutionScope::new(),
-            fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-            Path::dot(),
-            ServerEnd::new(dir_server_end.into_channel()),
-        );
-
-        let (send_socket, _keep_socket) = fidl::Socket::create_stream();
-
-        assert_matches!(
-            dir_proxy
-                .add_inotify_filter("foo", fio::InotifyWatchMask::ACCESS, 42, send_socket)
-                .await,
-            Ok(())
-        );
     }
 }

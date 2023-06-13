@@ -9,13 +9,13 @@ library fuchsia.io;
 /// monitor directories.  When a directory is monitored, inotify will
 /// return events for the directory itself, and for files inside the
 /// directory.
-@available(deprecated=12, removed=13, note="inotify was never fully implemented", legacy=true)
+@available(deprecated=12, removed=13, note="inotify was never fully implemented")
 closed protocol Inotifier {};
 
 /// Used by InotifyAddWatch to indicate the server the events to be watched on.
 /// Also used by [`Node.Inotify`] to indicate the types of events
 /// that occurred on server side, to be notified to clients. See InotifyEvent.
-@available(deprecated=12, removed=13, note="inotify was never fully implemented", legacy=true)
+@available(deprecated=12, removed=13, note="inotify was never fully implemented")
 type InotifyWatchMask = strict bits : uint32 {
     // Events to watch in inotify
     ACCESS = 0x00000001; // File was accessed.
@@ -45,14 +45,14 @@ type InotifyWatchMask = strict bits : uint32 {
 };
 
 // Helper events
-@available(deprecated=12, removed=13, note="inotify was never fully implemented", legacy=true)
+@available(deprecated=12, removed=13, note="inotify was never fully implemented")
 const CLOSE_ALL InotifyWatchMask = InotifyWatchMask.CLOSE_WRITE | InotifyWatchMask.CLOSE_NOWRITE;
 
-@available(deprecated=12, removed=13, note="inotify was never fully implemented", legacy=true)
+@available(deprecated=12, removed=13, note="inotify was never fully implemented")
 const MOVE InotifyWatchMask = InotifyWatchMask.MOVED_FROM | InotifyWatchMask.MOVED_TO;
 
 // Events returned from reading the inotifier file descriptor.
-@available(deprecated=12, removed=13, note="inotify was never fully implemented", legacy=true)
+@available(deprecated=12, removed=13, note="inotify was never fully implemented")
 type InotifyEvent = struct {
     // Watch descriptor for the file/directory. watch_descriptor identifies the watch for which
     // this event occurs. It is one of the watch descriptors (channel/connection to the

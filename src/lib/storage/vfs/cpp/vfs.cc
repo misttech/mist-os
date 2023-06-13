@@ -143,47 +143,6 @@ Vfs::OpenResult Vfs::OpenLocked(fbl::RefPtr<Vnode> vndir, std::string_view path,
   return OpenResult::Ok{.vnode = std::move(vn), .validated_options = validated_options.value()};
 }
 
-Vfs::TraversePathResult Vfs::TraversePathFetchVnode(fbl::RefPtr<Vnode> vndir,
-                                                    std::string_view path) {
-  std::lock_guard lock(vfs_lock_);
-  return TraversePathFetchVnodeLocked(std::move(vndir), path);
-}
-
-Vfs::TraversePathResult Vfs::TraversePathFetchVnodeLocked(fbl::RefPtr<Vnode> vndir,
-                                                          std::string_view path) {
-  FS_PRETTY_TRACE_DEBUG("VfsTraversePathFetchVnode: path='", path, "'");
-  if (zx_status_t result = Vfs::Walk(vndir, path, &vndir, &path); result != ZX_OK) {
-    return result;
-  }
-
-  if (vndir->IsRemote()) {
-    // remote filesystem, return handle and path to caller
-    return TraversePathResult::Remote{.vnode = std::move(vndir), .path = path};
-  }
-
-  {
-    zx::result result = TrimName(path);
-    if (result.is_error()) {
-      return result.status_value();
-    }
-    if (path == "..") {
-      return ZX_ERR_INVALID_ARGS;
-    }
-  }
-
-  fbl::RefPtr<Vnode> vn;
-  if (zx_status_t status = LookupNode(std::move(vndir), path, &vn); status != ZX_OK) {
-    return status;
-  }
-
-  if (vn->IsRemote()) {
-    // Found a mount point: Traverse across remote.
-    return TraversePathResult::Remote{.vnode = std::move(vn), .path = "."};
-  }
-
-  return TraversePathResult::Ok{.vnode = std::move(vn)};
-}
-
 zx_status_t Vfs::Unlink(fbl::RefPtr<Vnode> vndir, std::string_view name, bool must_be_dir) {
   {
     std::lock_guard lock(vfs_lock_);

@@ -599,20 +599,6 @@ async fn serve_failing_blobfs(
                 let _ = object_request;
                 todo!("https://fxbug.dev/77623: path={} protocols={:?}", path, protocols);
             }
-            fio::DirectoryRequest::AddInotifyFilter {
-                path,
-                filter,
-                watch_descriptor,
-                socket: _,
-                responder: _,
-            } => {
-                todo!(
-                    "https://fxbug.dev/77623: path={} filter={:?} watch_descriptor={}",
-                    path,
-                    filter,
-                    watch_descriptor
-                );
-            }
             fio::DirectoryRequest::Unlink { name: _, options: _, responder } => {
                 responder.send(Err(zx::Status::IO.into_raw())).context("failing unlink")?
             }

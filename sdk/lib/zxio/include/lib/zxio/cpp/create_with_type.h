@@ -6,6 +6,7 @@
 #define LIB_ZXIO_CPP_CREATE_WITH_TYPE_H_
 
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <lib/zx/socket.h>
 #include <lib/zx/stream.h>
 #include <lib/zx/vmo.h>
 #include <lib/zxio/zxio.h>
