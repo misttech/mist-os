@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_diagnostics_validate::{Action, Value, ValueType, ROOT_ID};
+use fidl_diagnostics_validate::{Action, LazyAction, LinkDisposition, Value, ValueType, ROOT_ID};
 
 pub enum Step {
-    Actions(Vec<fidl_diagnostics_validate::Action>),
-    LazyActions(Vec<fidl_diagnostics_validate::LazyAction>),
-    WithMetrics(Vec<fidl_diagnostics_validate::Action>, String),
+    Actions(Vec<Action>),
+    LazyActions(Vec<LazyAction>),
+    WithMetrics(Vec<Action>, String),
 }
 
 pub struct Trial {
@@ -37,297 +37,19 @@ pub fn real_trials() -> Vec<Trial> {
     ]
 }
 
-#[macro_export]
-macro_rules! create_node {
-    (parent: $parent:expr, id: $id:expr, name: $name:expr) => {
-        fidl_diagnostics_validate::Action::CreateNode(fidl_diagnostics_validate::CreateNode {
-            parent: $parent,
-            id: $id,
-            name: $name.into(),
-        })
-    };
-}
-
-#[macro_export]
-macro_rules! delete_node {
-    (id: $id:expr) => {
-        fidl_diagnostics_validate::Action::DeleteNode(fidl_diagnostics_validate::DeleteNode {
-            id: $id,
-        })
-    };
-}
-
-#[macro_export]
-macro_rules! create_numeric_property {
-    (parent: $parent:expr, id: $id:expr, name: $name:expr, value: $value:expr) => {
-        fidl_diagnostics_validate::Action::CreateNumericProperty(
-            fidl_diagnostics_validate::CreateNumericProperty {
-                parent: $parent,
-                id: $id,
-                name: $name.into(),
-                value: $value,
-            },
-        )
-    };
-}
-
-#[macro_export]
-macro_rules! create_bytes_property {
-    (parent: $parent:expr, id: $id:expr, name: $name:expr, value: $value:expr) => {
-        fidl_diagnostics_validate::Action::CreateBytesProperty(
-            fidl_diagnostics_validate::CreateBytesProperty {
-                parent: $parent,
-                id: $id,
-                name: $name.into(),
-                value: $value.into(),
-            },
-        )
-    };
-}
-
-#[macro_export]
-macro_rules! create_string_property {
-    (parent: $parent:expr, id: $id:expr, name: $name:expr, value: $value:expr) => {
-        fidl_diagnostics_validate::Action::CreateStringProperty(
-            fidl_diagnostics_validate::CreateStringProperty {
-                parent: $parent,
-                id: $id,
-                name: $name.into(),
-                value: $value.into(),
-            },
-        )
-    };
-}
-
-#[macro_export]
-macro_rules! create_bool_property {
-    (parent: $parent:expr, id: $id:expr, name: $name:expr, value: $value:expr) => {
-        fidl_diagnostics_validate::Action::CreateBoolProperty(
-            fidl_diagnostics_validate::CreateBoolProperty {
-                parent: $parent,
-                id: $id,
-                name: $name.into(),
-                value: $value.into(),
-            },
-        )
-    };
-}
-
-#[macro_export]
-macro_rules! set_string {
-    (id: $id:expr, value: $value:expr) => {
-        fidl_diagnostics_validate::Action::SetString(fidl_diagnostics_validate::SetString {
-            id: $id,
-            value: $value.into(),
-        })
-    };
-}
-
-#[macro_export]
-macro_rules! set_bytes {
-    (id: $id:expr, value: $value:expr) => {
-        fidl_diagnostics_validate::Action::SetBytes(fidl_diagnostics_validate::SetBytes {
-            id: $id,
-            value: $value.into(),
-        })
-    };
-}
-
-#[macro_export]
-macro_rules! set_number {
-    (id: $id:expr, value: $value:expr) => {
-        fidl_diagnostics_validate::Action::SetNumber(fidl_diagnostics_validate::SetNumber {
-            id: $id,
-            value: $value,
-        })
-    };
-}
-
-#[macro_export]
-macro_rules! set_bool {
-    (id: $id:expr, value: $value:expr) => {
-        fidl_diagnostics_validate::Action::SetBool(fidl_diagnostics_validate::SetBool {
-            id: $id,
-            value: $value.into(),
-        })
-    };
-}
-
-#[macro_export]
-macro_rules! add_number {
-    (id: $id:expr, value: $value:expr) => {
-        fidl_diagnostics_validate::Action::AddNumber(fidl_diagnostics_validate::AddNumber {
-            id: $id,
-            value: $value,
-        })
-    };
-}
-
-#[macro_export]
-macro_rules! subtract_number {
-    (id: $id:expr, value: $value:expr) => {
-        fidl_diagnostics_validate::Action::SubtractNumber(
-            fidl_diagnostics_validate::SubtractNumber { id: $id, value: $value },
-        )
-    };
-}
-
-#[macro_export]
-macro_rules! delete_property {
-    (id: $id:expr) => {
-        fidl_diagnostics_validate::Action::DeleteProperty(
-            fidl_diagnostics_validate::DeleteProperty { id: $id },
-        )
-    };
-}
-
-#[macro_export]
-macro_rules! apply_no_op {
-    () => {
-        fidl_diagnostics_validate::Action::ApplyNoOp(fidl_diagnostics_validate::ApplyNoOp {})
-    };
-}
-
-#[macro_export]
-macro_rules! create_array_property {
-    (parent: $parent:expr, id: $id:expr, name: $name:expr, slots: $slots:expr, type: $type:expr) => {
-        fidl_diagnostics_validate::Action::CreateArrayProperty(
-            fidl_diagnostics_validate::CreateArrayProperty {
-                parent: $parent,
-                id: $id,
-                name: $name.into(),
-                slots: $slots,
-                value_type: $type,
-            },
-        )
-    };
-}
-
-#[macro_export]
-macro_rules! array_set {
-    (id: $id:expr, index: $index:expr, value: $value:expr) => {
-        fidl_diagnostics_validate::Action::ArraySet(fidl_diagnostics_validate::ArraySet {
-            id: $id,
-            index: $index,
-            value: $value,
-        })
-    };
-}
-
-#[macro_export]
-macro_rules! array_add {
-    (id: $id:expr, index: $index:expr, value: $value:expr) => {
-        fidl_diagnostics_validate::Action::ArrayAdd(fidl_diagnostics_validate::ArrayAdd {
-            id: $id,
-            index: $index,
-            value: $value,
-        })
-    };
-}
-
-#[macro_export]
-macro_rules! array_subtract {
-    (id: $id:expr, index: $index:expr, value: $value:expr) => {
-        fidl_diagnostics_validate::Action::ArraySubtract(fidl_diagnostics_validate::ArraySubtract {
-            id: $id,
-            index: $index,
-            value: $value,
-        })
-    };
-}
-
-#[macro_export]
-macro_rules! create_linear_histogram {
-    (parent: $parent:expr, id: $id:expr, name: $name:expr, floor: $floor:expr,
-        step_size: $step_size:expr, buckets: $buckets:expr, type: $type:ident) => {
-        fidl_diagnostics_validate::Action::CreateLinearHistogram(
-            fidl_diagnostics_validate::CreateLinearHistogram {
-                parent: $parent,
-                id: $id,
-                name: $name.into(),
-                floor: Value::$type($floor),
-                step_size: Value::$type($step_size),
-                buckets: $buckets,
-            },
-        )
-    };
-}
-
-#[macro_export]
-macro_rules! create_exponential_histogram {
-    (parent: $parent:expr, id: $id:expr, name: $name:expr, floor: $floor:expr,
-        initial_step: $initial_step:expr, step_multiplier: $step_multiplier:expr,
-        buckets: $buckets:expr, type: $type:ident) => {
-        fidl_diagnostics_validate::Action::CreateExponentialHistogram(
-            fidl_diagnostics_validate::CreateExponentialHistogram {
-                parent: $parent,
-                id: $id,
-                name: $name.into(),
-                floor: Value::$type($floor),
-                initial_step: Value::$type($initial_step),
-                step_multiplier: Value::$type($step_multiplier),
-                buckets: $buckets,
-            },
-        )
-    };
-}
-
-#[macro_export]
-macro_rules! insert {
-    (id: $id:expr, value: $value:expr) => {
-        fidl_diagnostics_validate::Action::Insert(fidl_diagnostics_validate::Insert {
-            id: $id,
-            value: $value,
-        })
-    };
-}
-
-#[macro_export]
-macro_rules! insert_multiple {
-    (id: $id:expr, value: $value:expr, count: $count:expr) => {
-        fidl_diagnostics_validate::Action::InsertMultiple(
-            fidl_diagnostics_validate::InsertMultiple { id: $id, value: $value, count: $count },
-        )
-    };
-}
-
-#[macro_export]
-macro_rules! create_lazy_node {
-    (parent: $parent:expr, id: $id:expr, name: $name:expr, disposition: $disposition:expr, actions: $actions:expr) => {
-        fidl_diagnostics_validate::LazyAction::CreateLazyNode(
-            fidl_diagnostics_validate::CreateLazyNode {
-                parent: $parent,
-                id: $id,
-                name: $name.into(),
-                disposition: $disposition,
-                actions: $actions,
-            },
-        )
-    };
-}
-
-#[macro_export]
-macro_rules! delete_lazy_node {
-    (id: $id:expr) => {
-        fidl_diagnostics_validate::LazyAction::DeleteLazyNode(
-            fidl_diagnostics_validate::DeleteLazyNode { id: $id },
-        )
-    };
-}
-
 fn basic_node() -> Trial {
     Trial {
         name: "Basic Node".into(),
         steps: vec![Step::Actions(vec![
-            create_node!(parent: ROOT_ID, id: 1, name: "child"),
-            create_node!(parent: 1, id: 2, name: "grandchild"),
-            delete_node!( id: 2),
-            delete_node!( id: 1 ),
+            crate::create_node!(parent: ROOT_ID, id: 1, name: "child"),
+            crate::create_node!(parent: 1, id: 2, name: "grandchild"),
+            crate::delete_node!( id: 2),
+            crate::delete_node!( id: 1 ),
             // Verify they can be deleted in either order.
-            create_node!(parent: ROOT_ID, id: 1, name: "child"),
-            create_node!(parent: 1, id: 2, name: "grandchild"),
-            delete_node!( id: 1),
-            delete_node!( id: 2 ),
+            crate::create_node!(parent: ROOT_ID, id: 1, name: "child"),
+            crate::create_node!(parent: 1, id: 2, name: "grandchild"),
+            crate::delete_node!( id: 1),
+            crate::delete_node!( id: 2 ),
         ])],
     }
 }
@@ -336,13 +58,13 @@ fn basic_string() -> Trial {
     Trial {
         name: "Basic String".into(),
         steps: vec![Step::Actions(vec![
-            create_string_property!(parent: ROOT_ID, id:1, name: "str", value: "foo"),
-            set_string!(id: 1, value: "bar"),
-            set_string!(id: 1, value: "This Is A Longer String"),
-            set_string!(id: 1, value: "."),
+            crate::create_string_property!(parent: ROOT_ID, id:1, name: "str", value: "foo"),
+            crate::set_string!(id: 1, value: "bar"),
+            crate::set_string!(id: 1, value: "This Is A Longer String"),
+            crate::set_string!(id: 1, value: "."),
             // Make sure it can hold a string bigger than the biggest block (3000 chars > 2040)
-            set_string!(id: 1, value: ["1234567890"; 300].to_vec().join("")),
-            delete_property!(id: 1),
+            crate::set_string!(id: 1, value: ["1234567890"; 300].to_vec().join("")),
+            crate::delete_property!(id: 1),
         ])],
     }
 }
@@ -351,10 +73,10 @@ fn basic_bytes() -> Trial {
     Trial {
         name: "Basic bytes".into(),
         steps: vec![Step::Actions(vec![
-            create_bytes_property!(parent: ROOT_ID, id: 8, name: "bytes", value: vec![1u8, 2u8]),
-            set_bytes!(id: 8, value: vec![3u8, 4, 5, 6, 7]),
-            set_bytes!(id: 8, value: vec![8u8]),
-            delete_property!(id: 8),
+            crate::create_bytes_property!(parent: ROOT_ID, id: 8, name: "bytes", value: vec![1u8, 2u8]),
+            crate::set_bytes!(id: 8, value: vec![3u8, 4, 5, 6, 7]),
+            crate::set_bytes!(id: 8, value: vec![8u8]),
+            crate::delete_property!(id: 8),
         ])],
     }
 }
@@ -363,10 +85,10 @@ fn basic_bool() -> Trial {
     Trial {
         name: "Basic Bool".into(),
         steps: vec![Step::Actions(vec![
-            create_bool_property!(parent: ROOT_ID, id: 1, name: "bool", value: true),
-            set_bool!(id: 1, value: false),
-            set_bool!(id: 1, value: true),
-            delete_property!(id: 1),
+            crate::create_bool_property!(parent: ROOT_ID, id: 1, name: "bool", value: true),
+            crate::set_bool!(id: 1, value: false),
+            crate::set_bool!(id: 1, value: true),
+            crate::delete_property!(id: 1),
         ])],
     }
 }
@@ -375,12 +97,12 @@ fn basic_int() -> Trial {
     Trial {
         name: "Basic Int".into(),
         steps: vec![Step::Actions(vec![
-            create_numeric_property!(parent: ROOT_ID, id: 5, name: "int", value: Value::IntT(10)),
-            set_number!(id: 5, value: Value::IntT(std::i64::MAX)),
-            subtract_number!(id: 5, value: Value::IntT(3)),
-            set_number!(id: 5, value: Value::IntT(std::i64::MIN)),
-            add_number!(id: 5, value: Value::IntT(2)),
-            delete_property!(id: 5),
+            crate::create_numeric_property!(parent: ROOT_ID, id: 5, name: "int", value: Value::IntT(10)),
+            crate::set_number!(id: 5, value: Value::IntT(std::i64::MAX)),
+            crate::subtract_number!(id: 5, value: Value::IntT(3)),
+            crate::set_number!(id: 5, value: Value::IntT(std::i64::MIN)),
+            crate::add_number!(id: 5, value: Value::IntT(2)),
+            crate::delete_property!(id: 5),
         ])],
     }
 }
@@ -389,12 +111,12 @@ fn basic_uint() -> Trial {
     Trial {
         name: "Basic Uint".into(),
         steps: vec![Step::Actions(vec![
-            create_numeric_property!(parent: ROOT_ID, id: 5, name: "uint", value: Value::UintT(1)),
-            set_number!(id: 5, value: Value::UintT(std::u64::MAX)),
-            subtract_number!(id: 5, value: Value::UintT(3)),
-            set_number!(id: 5, value: Value::UintT(0)),
-            add_number!(id: 5, value: Value::UintT(2)),
-            delete_property!(id: 5),
+            crate::create_numeric_property!(parent: ROOT_ID, id: 5, name: "uint", value: Value::UintT(1)),
+            crate::set_number!(id: 5, value: Value::UintT(std::u64::MAX)),
+            crate::subtract_number!(id: 5, value: Value::UintT(3)),
+            crate::set_number!(id: 5, value: Value::UintT(0)),
+            crate::add_number!(id: 5, value: Value::UintT(2)),
+            crate::delete_property!(id: 5),
         ])],
     }
 }
@@ -403,24 +125,24 @@ fn basic_double() -> Trial {
     Trial {
         name: "Basic Double".into(),
         steps: vec![Step::Actions(vec![
-            create_numeric_property!(parent: ROOT_ID, id: 5, name: "double",
+            crate::create_numeric_property!(parent: ROOT_ID, id: 5, name: "double",
                                      value: Value::DoubleT(1.0)),
-            set_number!(id: 5, value: Value::DoubleT(std::f64::MAX)),
-            subtract_number!(id: 5, value: Value::DoubleT(std::f64::MAX/10_f64)),
-            set_number!(id: 5, value: Value::DoubleT(std::f64::MIN)),
-            add_number!(id: 5, value: Value::DoubleT(std::f64::MAX / 10_f64)),
-            delete_property!(id: 5),
+            crate::set_number!(id: 5, value: Value::DoubleT(std::f64::MAX)),
+            crate::subtract_number!(id: 5, value: Value::DoubleT(std::f64::MAX/10_f64)),
+            crate::set_number!(id: 5, value: Value::DoubleT(std::f64::MIN)),
+            crate::add_number!(id: 5, value: Value::DoubleT(std::f64::MAX / 10_f64)),
+            crate::delete_property!(id: 5),
         ])],
     }
 }
 
 fn repeated_names() -> Trial {
-    let mut actions = vec![create_node!(parent: ROOT_ID, id: 1, name: "measurements")];
+    let mut actions = vec![crate::create_node!(parent: ROOT_ID, id: 1, name: "measurements")];
 
     for i in 100..120 {
-        actions.push(create_node!(parent: 1, id: i, name: format!("{}", i)));
-        actions.push(create_numeric_property!(parent: i, id: i + 1000, name: "count", value: Value::UintT(i as u64 * 2)));
-        actions.push(create_numeric_property!(parent: i, id: i + 2000, name: "time_spent", value: Value::UintT(i as u64 * 1000 + 10)));
+        actions.push(crate::create_node!(parent: 1, id: i, name: format!("{}", i)));
+        actions.push(crate::create_numeric_property!(parent: i, id: i + 1000, name: "count", value: Value::UintT(i as u64 * 2)));
+        actions.push(crate::create_numeric_property!(parent: i, id: i + 2000, name: "time_spent", value: Value::UintT(i as u64 * 1000 + 10)));
     }
 
     Trial {
@@ -438,89 +160,95 @@ fn array_indexes_to_test() -> Vec<u64> {
 }
 
 fn basic_int_array() -> Trial {
-    let mut actions = vec![create_array_property!(parent: ROOT_ID, id: 5, name: "int", slots: 5,
+    let mut actions =
+        vec![crate::create_array_property!(parent: ROOT_ID, id: 5, name: "int", slots: 5,
                                        type: ValueType::Int)];
     for index in array_indexes_to_test().iter() {
-        actions.push(array_add!(id: 5, index: *index, value: Value::IntT(7)));
-        actions.push(array_subtract!(id: 5, index: *index, value: Value::IntT(3)));
-        actions.push(array_set!(id: 5, index: *index, value: Value::IntT(19)));
+        actions.push(crate::array_add!(id: 5, index: *index, value: Value::IntT(7)));
+        actions.push(crate::array_subtract!(id: 5, index: *index, value: Value::IntT(3)));
+        actions.push(crate::array_set!(id: 5, index: *index, value: Value::IntT(19)));
     }
-    actions.push(delete_property!(id: 5));
+    actions.push(crate::delete_property!(id: 5));
     Trial { name: "Int Array Ops".into(), steps: vec![Step::Actions(actions)] }
 }
 
 fn basic_string_array() -> Trial {
     const ID: u32 = 5;
     let mut actions = vec![
-        create_array_property!(parent: ROOT_ID, id: ID, name: "string", slots: 5, type: ValueType::String),
+        crate::create_array_property!(parent: ROOT_ID, id: ID, name: "string", slots: 5, type: ValueType::String),
     ];
 
     for index in array_indexes_to_test().iter() {
         if *index % 2 == 0 {
             actions
-            .push(array_set!(id: ID, index: *index, value: Value::StringT(format!("string data {}", *index))));
+            .push(crate::array_set!(id: ID, index: *index, value: Value::StringT(format!("string data {}", *index))));
         } else if *index % 3 == 0 {
-            actions.push(array_set!(id: ID, index: *index, value: Value::StringT(String::new())));
+            actions.push(
+                crate::array_set!(id: ID, index: *index, value: Value::StringT(String::new())),
+            );
         } else {
             actions.push(
-                array_set!(id: ID, index: *index, value: Value::StringT("string data".into())),
+                crate::array_set!(id: ID, index: *index, value: Value::StringT("string data".into())),
             );
         }
     }
 
     for index in array_indexes_to_test().iter() {
         if *index % 2 == 0 {
-            actions.push(array_set!(id: ID, index: *index, value: Value::StringT("".into())));
+            actions
+                .push(crate::array_set!(id: ID, index: *index, value: Value::StringT("".into())));
         }
     }
 
     for index in array_indexes_to_test().iter() {
         if *index % 4 == 0 {
             actions.push(
-                array_set!(id: ID, index: *index, value: Value::StringT(format!("{}", *index))),
+                crate::array_set!(id: ID, index: *index, value: Value::StringT(format!("{}", *index))),
             );
         }
     }
 
-    actions.push(delete_property!(id: ID));
+    actions.push(crate::delete_property!(id: ID));
     Trial { name: "String Array Ops".into(), steps: vec![Step::Actions(actions)] }
 }
 
 fn basic_uint_array() -> Trial {
-    let mut actions = vec![create_array_property!(parent: ROOT_ID, id: 6, name: "uint", slots: 5,
+    let mut actions =
+        vec![crate::create_array_property!(parent: ROOT_ID, id: 6, name: "uint", slots: 5,
                                        type: ValueType::Uint)];
     for index in array_indexes_to_test().iter() {
-        actions.push(array_add!(id: 6, index: *index, value: Value::UintT(11)));
-        actions.push(array_subtract!(id: 6, index: *index, value: Value::UintT(3)));
-        actions.push(array_set!(id: 6, index: *index, value: Value::UintT(19)));
+        actions.push(crate::array_add!(id: 6, index: *index, value: Value::UintT(11)));
+        actions.push(crate::array_subtract!(id: 6, index: *index, value: Value::UintT(3)));
+        actions.push(crate::array_set!(id: 6, index: *index, value: Value::UintT(19)));
     }
-    actions.push(delete_property!(id: 6));
+    actions.push(crate::delete_property!(id: 6));
     Trial { name: "Unt Array Ops".into(), steps: vec![Step::Actions(actions)] }
 }
 
 fn basic_double_array() -> Trial {
-    let mut actions = vec![create_array_property!(parent: ROOT_ID, id: 4, name: "float", slots: 5,
+    let mut actions =
+        vec![crate::create_array_property!(parent: ROOT_ID, id: 4, name: "float", slots: 5,
                                        type: ValueType::Double)];
     for index in array_indexes_to_test().iter() {
-        actions.push(array_add!(id: 4, index: *index, value: Value::DoubleT(2.0)));
-        actions.push(array_subtract!(id: 4, index: *index, value: Value::DoubleT(3.5)));
-        actions.push(array_set!(id: 4, index: *index, value: Value::DoubleT(19.0)));
+        actions.push(crate::array_add!(id: 4, index: *index, value: Value::DoubleT(2.0)));
+        actions.push(crate::array_subtract!(id: 4, index: *index, value: Value::DoubleT(3.5)));
+        actions.push(crate::array_set!(id: 4, index: *index, value: Value::DoubleT(19.0)));
     }
-    actions.push(delete_property!(id: 4));
+    actions.push(crate::delete_property!(id: 4));
     Trial { name: "Int Array Ops".into(), steps: vec![Step::Actions(actions)] }
 }
 
 fn int_histogram_ops_trial() -> Trial {
-    fn push_ops(actions: &mut Vec<fidl_diagnostics_validate::Action>, value: i64) {
-        actions.push(insert!(id: 4, value: Value::IntT(value)));
-        actions.push(insert_multiple!(id: 4, value: Value::IntT(value), count: 3));
-        actions.push(insert!(id: 5, value: Value::IntT(value)));
-        actions.push(insert_multiple!(id: 5, value: Value::IntT(value), count: 3));
+    fn push_ops(actions: &mut Vec<Action>, value: i64) {
+        actions.push(crate::insert!(id: 4, value: Value::IntT(value)));
+        actions.push(crate::insert_multiple!(id: 4, value: Value::IntT(value), count: 3));
+        actions.push(crate::insert!(id: 5, value: Value::IntT(value)));
+        actions.push(crate::insert_multiple!(id: 5, value: Value::IntT(value), count: 3));
     }
     let mut actions = vec![
-        create_linear_histogram!(parent: ROOT_ID, id: 4, name: "Lhist", floor: -5,
+        crate::create_linear_histogram!(parent: ROOT_ID, id: 4, name: "Lhist", floor: -5,
                                  step_size: 3, buckets: 3, type: IntT),
-        create_exponential_histogram!(parent: ROOT_ID, id: 5, name: "Ehist", floor: -5,
+        crate::create_exponential_histogram!(parent: ROOT_ID, id: 5, name: "Ehist", floor: -5,
                                  initial_step: 2, step_multiplier: 4,
                                  buckets: 3, type: IntT),
     ];
@@ -530,22 +258,22 @@ fn int_histogram_ops_trial() -> Trial {
     for value in vec![-10_i64, -5_i64, 0_i64, 3_i64, 100_i64] {
         push_ops(&mut actions, value);
     }
-    actions.push(delete_property!(id: 4));
-    actions.push(delete_property!(id: 5));
+    actions.push(crate::delete_property!(id: 4));
+    actions.push(crate::delete_property!(id: 5));
     Trial { name: "Int Histogram Ops".into(), steps: vec![Step::Actions(actions)] }
 }
 
 fn uint_histogram_ops_trial() -> Trial {
-    fn push_ops(actions: &mut Vec<fidl_diagnostics_validate::Action>, value: u64) {
-        actions.push(insert!(id: 4, value: Value::UintT(value)));
-        actions.push(insert_multiple!(id: 4, value: Value::UintT(value), count: 3));
-        actions.push(insert!(id: 5, value: Value::UintT(value)));
-        actions.push(insert_multiple!(id: 5, value: Value::UintT(value), count: 3));
+    fn push_ops(actions: &mut Vec<Action>, value: u64) {
+        actions.push(crate::insert!(id: 4, value: Value::UintT(value)));
+        actions.push(crate::insert_multiple!(id: 4, value: Value::UintT(value), count: 3));
+        actions.push(crate::insert!(id: 5, value: Value::UintT(value)));
+        actions.push(crate::insert_multiple!(id: 5, value: Value::UintT(value), count: 3));
     }
     let mut actions = vec![
-        create_linear_histogram!(parent: ROOT_ID, id: 4, name: "Lhist", floor: 5,
+        crate::create_linear_histogram!(parent: ROOT_ID, id: 4, name: "Lhist", floor: 5,
                                  step_size: 3, buckets: 3, type: UintT),
-        create_exponential_histogram!(parent: ROOT_ID, id: 5, name: "Ehist", floor: 5,
+        crate::create_exponential_histogram!(parent: ROOT_ID, id: 5, name: "Ehist", floor: 5,
                                  initial_step: 2, step_multiplier: 4,
                                  buckets: 3, type: UintT),
     ];
@@ -555,25 +283,25 @@ fn uint_histogram_ops_trial() -> Trial {
     for value in vec![0_u64, 5_u64, 8_u64, 20u64, 200_u64] {
         push_ops(&mut actions, value);
     }
-    actions.push(delete_property!(id: 4));
-    actions.push(delete_property!(id: 5));
+    actions.push(crate::delete_property!(id: 4));
+    actions.push(crate::delete_property!(id: 5));
     Trial { name: "Uint Histogram Ops".into(), steps: vec![Step::Actions(actions)] }
 }
 
 fn double_histogram_ops_trial() -> Trial {
-    fn push_ops(actions: &mut Vec<fidl_diagnostics_validate::Action>, value: f64) {
-        actions.push(insert!(id: 4, value: Value::DoubleT(value)));
-        actions.push(insert_multiple!(id: 4, value: Value::DoubleT(value), count: 3));
-        actions.push(insert!(id: 5, value: Value::DoubleT(value)));
-        actions.push(insert_multiple!(id: 5, value: Value::DoubleT(value), count: 3));
+    fn push_ops(actions: &mut Vec<Action>, value: f64) {
+        actions.push(crate::insert!(id: 4, value: Value::DoubleT(value)));
+        actions.push(crate::insert_multiple!(id: 4, value: Value::DoubleT(value), count: 3));
+        actions.push(crate::insert!(id: 5, value: Value::DoubleT(value)));
+        actions.push(crate::insert_multiple!(id: 5, value: Value::DoubleT(value), count: 3));
     }
     let mut actions = vec![
         // Create exponential first in this test, so that if histograms aren't supported, both
         // linear and exponential will be reported as unsupported.
-        create_exponential_histogram!(parent: ROOT_ID, id: 5, name: "Ehist",
+        crate::create_exponential_histogram!(parent: ROOT_ID, id: 5, name: "Ehist",
                                 floor: std::f64::consts::PI, initial_step: 2.0,
                                 step_multiplier: 4.0, buckets: 3, type: DoubleT),
-        create_linear_histogram!(parent: ROOT_ID, id: 4, name: "Lhist", floor: 5.0,
+        crate::create_linear_histogram!(parent: ROOT_ID, id: 4, name: "Lhist", floor: 5.0,
                                  step_size: 3.0, buckets: 3, type: DoubleT),
     ];
     for value in &[std::f64::MIN, std::f64::MAX, std::f64::MIN_POSITIVE, 0.0] {
@@ -582,8 +310,8 @@ fn double_histogram_ops_trial() -> Trial {
     for value in vec![3.0, 3.15, 5.0, 10.0] {
         push_ops(&mut actions, value as f64);
     }
-    actions.push(delete_property!(id: 4));
-    actions.push(delete_property!(id: 5));
+    actions.push(crate::delete_property!(id: 4));
+    actions.push(crate::delete_property!(id: 5));
     Trial { name: "Double Histogram Ops".into(), steps: vec![Step::Actions(actions)] }
 }
 
@@ -591,22 +319,22 @@ fn deletions_trial() -> Trial {
     // Action, being a FIDL struct, doesn't implement Clone, so we have to build a new
     // Action each time we want to invoke it.
     fn n1() -> Action {
-        create_node!(parent: ROOT_ID, id: 1, name: "root_child")
+        crate::create_node!(parent: ROOT_ID, id: 1, name: "root_child")
     }
     fn n2() -> Action {
-        create_node!(parent: 1, id: 2, name: "parent")
+        crate::create_node!(parent: 1, id: 2, name: "parent")
     }
     fn n3() -> Action {
-        create_node!(parent: 2, id: 3, name: "child")
+        crate::create_node!(parent: 2, id: 3, name: "child")
     }
     fn p1() -> Action {
-        create_numeric_property!(parent: 1, id: 4, name: "root_int", value: Value::IntT(1))
+        crate::create_numeric_property!(parent: 1, id: 4, name: "root_int", value: Value::IntT(1))
     }
     fn p2() -> Action {
-        create_numeric_property!(parent: 2, id: 5, name: "parent_int", value: Value::IntT(2))
+        crate::create_numeric_property!(parent: 2, id: 5, name: "parent_int", value: Value::IntT(2))
     }
     fn p3() -> Action {
-        create_numeric_property!(parent: 3, id: 6, name: "child_int", value: Value::IntT(3))
+        crate::create_numeric_property!(parent: 3, id: 6, name: "child_int", value: Value::IntT(3))
     }
     fn create() -> Vec<Action> {
         vec![n1(), n2(), n3(), p1(), p2(), p3()]
@@ -615,22 +343,22 @@ fn deletions_trial() -> Trial {
         vec![n1(), p1(), n2(), p2(), n3(), p3()]
     }
     fn d1() -> Action {
-        delete_node!(id: 1)
+        crate::delete_node!(id: 1)
     }
     fn d2() -> Action {
-        delete_node!(id: 2)
+        crate::delete_node!(id: 2)
     }
     fn d3() -> Action {
-        delete_node!(id: 3)
+        crate::delete_node!(id: 3)
     }
     fn x1() -> Action {
-        delete_property!(id: 4)
+        crate::delete_property!(id: 4)
     }
     fn x2() -> Action {
-        delete_property!(id: 5)
+        crate::delete_property!(id: 5)
     }
     fn x3() -> Action {
-        delete_property!(id: 6)
+        crate::delete_property!(id: 6)
     }
     let mut steps = Vec::new();
     steps.push(Step::Actions(create()));
@@ -663,40 +391,40 @@ fn lazy_nodes_trial() -> Trial {
         name: "Lazy Nodes".into(),
         steps: vec![Step::LazyActions(vec![
             // Create sibling node with same name and same content
-            create_lazy_node!(
+            crate::create_lazy_node!(
                 parent: ROOT_ID,
                 id: 1,
                 name: "child",
-                disposition: fidl_diagnostics_validate::LinkDisposition::Child,
-                actions: vec![create_bytes_property!(parent: ROOT_ID, id: 1, name: "child_bytes",value: vec!(3u8, 4u8))]
+                disposition: LinkDisposition::Child,
+                actions: vec![crate::create_bytes_property!(parent: ROOT_ID, id: 1, name: "child_bytes",value: vec!(3u8, 4u8))]
             ),
-            create_lazy_node!(
+            crate::create_lazy_node!(
                 parent: ROOT_ID,
                 id: 2,
                 name: "child",
-                disposition: fidl_diagnostics_validate::LinkDisposition::Child,
-                actions: vec![create_bytes_property!(parent: ROOT_ID, id: 1, name: "child_bytes",value: vec!(3u8, 4u8))]
+                disposition: LinkDisposition::Child,
+                actions: vec![crate::create_bytes_property!(parent: ROOT_ID, id: 1, name: "child_bytes",value: vec!(3u8, 4u8))]
             ),
-            delete_lazy_node!(id: 1),
-            delete_lazy_node!(id: 2),
+            crate::delete_lazy_node!(id: 1),
+            crate::delete_lazy_node!(id: 2),
             // Recreate child node with new values
-            create_lazy_node!(
+            crate::create_lazy_node!(
                 parent: ROOT_ID,
                 id: 1,
                 name: "child",
-                disposition: fidl_diagnostics_validate::LinkDisposition::Child,
-                actions: vec![create_bytes_property!(parent: ROOT_ID, id: 1, name: "child_bytes_new",value: vec!(1u8, 2u8))]
+                disposition: LinkDisposition::Child,
+                actions: vec![crate::create_bytes_property!(parent: ROOT_ID, id: 1, name: "child_bytes_new",value: vec!(1u8, 2u8))]
             ),
-            delete_lazy_node!(id: 1),
+            crate::delete_lazy_node!(id: 1),
             // Create child node with inline disposition
-            create_lazy_node!(
+            crate::create_lazy_node!(
                 parent: ROOT_ID,
                 id: 1,
                 name: "inline_child",
-                disposition: fidl_diagnostics_validate::LinkDisposition::Inline,
-                actions: vec![create_bytes_property!(parent: ROOT_ID, id: 1, name: "inline_child",value: vec!(1u8, 2u8))]
+                disposition: LinkDisposition::Inline,
+                actions: vec![crate::create_bytes_property!(parent: ROOT_ID, id: 1, name: "inline_child",value: vec!(1u8, 2u8))]
             ),
-            delete_lazy_node!(id: 1),
+            crate::delete_lazy_node!(id: 1),
         ])],
     }
 }
@@ -705,7 +433,7 @@ fn lazy_nodes_trial() -> Trial {
 pub(crate) mod tests {
     use super::*;
 
-    pub fn trial_with_action(name: &str, action: fidl_diagnostics_validate::Action) -> Trial {
+    pub fn trial_with_action(name: &str, action: Action) -> Trial {
         Trial { name: name.into(), steps: vec![Step::Actions(vec![action])] }
     }
 }

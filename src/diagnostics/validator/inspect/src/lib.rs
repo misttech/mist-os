@@ -9,6 +9,9 @@ mod results; // Stores and formats reports-to-user
 mod runner; // Coordinates testing operations
 mod trials; // Defines the trials to run
 
+#[macro_use]
+mod macros; // Macros used for common validation actions
+
 pub use runner::run_all_trials;
 
 /// meta/validator.shard.cml must use this name in `children: name:`.

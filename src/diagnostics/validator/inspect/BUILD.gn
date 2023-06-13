@@ -26,6 +26,7 @@ rustc_library("inspect_validator") {
     "src/data/fetch.rs",
     "src/data/scanner.rs",
     "src/lib.rs",
+    "src/macros.rs",
     "src/metrics.rs",
     "src/puppet.rs",
     "src/results.rs",
