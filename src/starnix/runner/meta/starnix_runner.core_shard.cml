@@ -27,6 +27,12 @@
             to: "#starnix_runner",
         },
         {
+            protocol: [ "fuchsia.net.root.Interfaces_OnlyForStarnix" ],
+            from: "#network",
+            as: "fuchsia.net.root.Interfaces",
+            to: "#starnix_runner",
+        },
+        {
             protocol: [ "fuchsia.power.battery.BatteryManager" ],
             from: "#battery_manager",
             to: "#starnix_runner",

@@ -242,6 +242,11 @@
             as: "fuchsia.net.root.Interfaces_OnlyForWeavestack",
         },
         {
+            protocol: [ "fuchsia.net.root.Interfaces" ],
+            from: "#netstack",
+            as: "fuchsia.net.root.Interfaces_OnlyForStarnix",
+        },
+        {
             protocol: [ "fuchsia.net.name.Lookup" ],
             from: "#dns-resolver",
         },

@@ -44,6 +44,7 @@
                 "fuchsia.kernel.Stats",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.net.interfaces.State",
+                "fuchsia.net.root.Interfaces",
                 "fuchsia.net.routes.StateV4",
                 "fuchsia.net.routes.StateV6",
                 "fuchsia.posix.socket.Provider",

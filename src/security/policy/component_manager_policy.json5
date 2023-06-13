@@ -703,6 +703,21 @@
                 ],
             },
             {
+                source_moniker: "/core/network/netstack",
+                source: "component",
+                source_name: "fuchsia.net.root.Interfaces",
+                capability: "protocol",
+                target_monikers: [
+                    "/core/network",
+                    "/core/network/netstack",
+                    "/core/starnix_runner",
+                    "/core/starnix_runner/kernels:**",
+
+                    // TODO(https://fxbug.dev/111695): Move away from Root API.
+                    "/core/weavestack",
+                ],
+            },
+            {
                 source_moniker: "/core/lowpanservice",
                 source: "component",
                 source_name: "fuchsia.factory.lowpan.FactoryLookup",
