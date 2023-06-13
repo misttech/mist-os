@@ -62,9 +62,15 @@ template <size_t ScanBeforeCompletion>
 struct SingleNodeMatcher {
   static constexpr size_t kMaxScans = ScanBeforeCompletion;
 
+  template <typename T, typename U, typename V>
+  SingleNodeMatcher(std::string_view path_to_match, T&& node_cb, U&& walk_cb, V&& on_subtree_cb)
+      : path_to_match(path_to_match), node(node_cb), walk(walk_cb), on_subtree(on_subtree_cb) {}
+
   template <typename T, typename U>
   SingleNodeMatcher(std::string_view path_to_match, T&& node_cb, U&& walk_cb)
-      : path_to_match(path_to_match), node(node_cb), walk(walk_cb) {}
+      : SingleNodeMatcher(path_to_match, node_cb, walk_cb, [](const devicetree::NodePath&) {
+          return devicetree::ScanState::kActive;
+        }) {}
 
   template <typename T>
   SingleNodeMatcher(std::string_view path_to_match, T&& node_cb)
@@ -94,6 +100,11 @@ struct SingleNodeMatcher {
     };
   }
 
+  devicetree::ScanState OnSubtree(const devicetree::NodePath& path) {
+    on_subtree_count++;
+    return on_subtree(path);
+  }
+
   devicetree::ScanState OnWalk() {
     walk_count++;
     walk();
@@ -109,8 +120,10 @@ struct SingleNodeMatcher {
   bool found = false;
   int visit_count = 0;
   size_t walk_count = 0;
+  size_t on_subtree_count = 0;
   fit::function<void(std::string_view, const devicetree::PropertyDecoder&)> node;
   fit::function<void()> walk;
+  fit::function<devicetree::ScanState(const devicetree::NodePath&)> on_subtree;
 };
 
 class MatchTest : public zxtest::Test {
@@ -192,6 +205,10 @@ TEST_F(MatchTest, NoShortCircuitingAliasesNode) {
   // Walk 0: * -> Meeds Path resolution at root. 1 visit.
   // Walk 1: * -> A -> B -> C -> D (Done)
   EXPECT_EQ(matcher.visit_count, 6);
+
+  // Its never called because of DFS, the matcher gets Done.
+  EXPECT_EQ(matcher.on_subtree_count, 0);
+
   EXPECT_EQ(matcher.walk_count, 0);
   EXPECT_TRUE(matcher.error.empty());
   EXPECT_EQ(seen, 1);
@@ -215,6 +232,9 @@ TEST_F(MatchTest, MultipleWalksForCompletion) {
   // Walk 0: * -> A -> B -> C -> D -> E
   // Walk 1: * -> A -> B -> C -> D (Done)
   EXPECT_EQ(matcher.visit_count, 11);
+
+  // D -> C -> A -> Root subtrees completed before the matcher reaches completion (1st walk)
+  EXPECT_EQ(matcher.on_subtree_count, 4);
   EXPECT_EQ(matcher.walk_count, 1);
   EXPECT_TRUE(matcher.error.empty());
   EXPECT_EQ(seen, 2);
@@ -234,6 +254,8 @@ TEST_F(MatchTest, OnWalkCompetion) {
 
   // This matcher completes after a full walk.
   EXPECT_TRUE(matcher.found);
+  // D -> C -> A -> Root subtrees completed before the matcher reaches completion on walk (1st walk)
+  EXPECT_EQ(matcher.on_subtree_count, 4);
   // Walk 0: * -> A -> B -> C -> D -> E
   EXPECT_EQ(matcher.visit_count, 6);
   EXPECT_EQ(matcher.walk_count, 1);
@@ -259,6 +281,8 @@ TEST_F(MatchTest, OnErrorReturnsFalse) {
   // Walk 0: * -> A -> B -> C -> D -> E
   // Walk 1: * -> A -> B -> C -> D -> E
   EXPECT_EQ(matcher.visit_count, 12);
+  // D -> C -> A -> Root subtrees completed before the matcher on each walk.
+  EXPECT_EQ(matcher.on_subtree_count, 8);
   EXPECT_EQ(matcher.walk_count, 2);
   EXPECT_FALSE(matcher.error.empty());
   EXPECT_EQ(seen, 2);
@@ -283,12 +307,14 @@ TEST_F(MatchTest, MultipleMatchersEarlyCompletion) {
   EXPECT_TRUE(matcher_1.found);
   EXPECT_EQ(matcher_1.visit_count, 5);
   EXPECT_EQ(matcher_1.walk_count, 0);
+  EXPECT_EQ(matcher_1.on_subtree_count, 0);
   EXPECT_TRUE(matcher_1.error.empty());
   EXPECT_EQ(seen_1, 1);
 
   EXPECT_TRUE(matcher_2.found);
   EXPECT_EQ(matcher_2.visit_count, 6);
   EXPECT_EQ(matcher_2.walk_count, 0);
+  EXPECT_EQ(matcher_2.on_subtree_count, 0);
   EXPECT_TRUE(matcher_2.error.empty());
   EXPECT_EQ(seen_2, 1);
 }
@@ -316,12 +342,16 @@ TEST_F(MatchTest, MultipleMatchersOnWalkCompletion) {
   EXPECT_TRUE(matcher_1.found);
   EXPECT_EQ(matcher_1.visit_count, 6);
   EXPECT_EQ(matcher_1.walk_count, 1);
+  // Only non zero because the matcher is completed on Walk, not on visit.
+  EXPECT_EQ(matcher_1.on_subtree_count, 4);
   EXPECT_TRUE(matcher_1.error.empty());
   EXPECT_EQ(seen_1, 1);
 
   EXPECT_TRUE(matcher_2.found);
   EXPECT_EQ(matcher_2.visit_count, 7);
   EXPECT_EQ(matcher_2.walk_count, 1);
+  // Only non zero because the matcher is completed on Walk, not on visit.
+  EXPECT_EQ(matcher_2.on_subtree_count, 5);
   EXPECT_TRUE(matcher_2.error.empty());
   EXPECT_EQ(seen_2, 1);
 }
@@ -347,14 +377,78 @@ TEST_F(MatchTest, MultipleMatchersOnErrorIsFalse) {
   EXPECT_TRUE(matcher_1.found);
   EXPECT_EQ(matcher_1.visit_count, 5);
   EXPECT_EQ(matcher_1.walk_count, 0);
+  EXPECT_EQ(matcher_1.on_subtree_count, 0);
   EXPECT_TRUE(matcher_1.error.empty());
   EXPECT_EQ(seen_1, 1);
 
   EXPECT_TRUE(matcher_2.found);
   EXPECT_EQ(matcher_2.visit_count, 14);
   EXPECT_EQ(matcher_2.walk_count, 2);
+  EXPECT_EQ(matcher_2.on_subtree_count, 10);
   EXPECT_FALSE(matcher_2.error.empty());
   EXPECT_EQ(seen_2, 2);
+}
+
+TEST_F(MatchTest, OnSubtreeCalledWhenActive) {
+  size_t seen_1 = 0;
+  size_t root_after = 0;
+  SingleNodeMatcher<2> matcher_1(
+      "/A/C/D",
+      [&](auto name, const auto& decoder) {
+        seen_1++;
+        EXPECT_EQ(name, "D");
+      },
+      []() {},
+      [&](const devicetree::NodePath& path) {
+        if (devicetree::ComparePath(path, "/A") == devicetree::kIsMatch) {
+          root_after++;
+          return devicetree::ScanState::kDone;
+        }
+        return devicetree::ScanState::kActive;
+      });
+  matcher_1.node_match_result = devicetree::ScanState::kActive;
+
+  auto tree = no_prop_tree();
+  EXPECT_TRUE(devicetree::Match(tree, matcher_1));
+
+  EXPECT_EQ(root_after, 1);
+  EXPECT_EQ(matcher_1.visit_count, 5);
+  EXPECT_EQ(matcher_1.walk_count, 0);
+  EXPECT_EQ(matcher_1.on_subtree_count, 3);
+  EXPECT_TRUE(matcher_1.error.empty());
+  EXPECT_EQ(seen_1, 1);
+}
+
+TEST_F(MatchTest, OnSubtreeDoneWithSubtreeIsNoOp) {
+  size_t seen_1 = 0;
+  size_t root_after = 0;
+  SingleNodeMatcher<2> matcher_1(
+      "/A/C/D",
+      [&](auto name, const auto& decoder) {
+        seen_1++;
+        EXPECT_EQ(name, "D");
+      },
+      []() {},
+      [&](const devicetree::NodePath& path) {
+        if (devicetree::ComparePath(path, "/A") == devicetree::kIsMatch) {
+          root_after++;
+          return devicetree::ScanState::kDone;
+        }
+        // Done with subtree means its not done yet, but nothing else to do with the subtree,
+        // in this case should be equivalent to |kDone|.
+        return devicetree::ScanState::kDoneWithSubtree;
+      });
+  matcher_1.node_match_result = devicetree::ScanState::kActive;
+
+  auto tree = no_prop_tree();
+  EXPECT_TRUE(devicetree::Match(tree, matcher_1));
+
+  EXPECT_EQ(root_after, 1);
+  EXPECT_EQ(matcher_1.visit_count, 5);
+  EXPECT_EQ(matcher_1.walk_count, 0);
+  EXPECT_EQ(matcher_1.on_subtree_count, 3);
+  EXPECT_TRUE(matcher_1.error.empty());
+  EXPECT_EQ(seen_1, 1);
 }
 
 }  // namespace

@@ -28,6 +28,10 @@ DECLARE_HAS_MEMBER_FN(HasOnNode, OnNode);
 DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(OnNodeSignature, OnNode,
                                      ScanState (C::*)(const NodePath&, const PropertyDecoder&));
 
+DECLARE_HAS_MEMBER_FN(HasOnSubtree, OnSubtree);
+DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(OnSubtreeSignature, OnSubtree,
+                                     ScanState (C::*)(const NodePath&));
+
 DECLARE_HAS_MEMBER_FN(HasOnWalk, OnWalk);
 DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(OnWalkSignature, OnWalk, ScanState (C::*)());
 
@@ -51,6 +55,11 @@ template <typename Matcher>
 constexpr bool CheckInterface() {
   static_assert(HasOnNode<Matcher>::value, "|Matcher| must implement |OnNode| member function.");
   static_assert(OnNodeSignature<Matcher>::value, "|Matcher::OnNode| has incorrect signature.");
+
+  static_assert(HasOnSubtree<Matcher>::value,
+                "|Matcher| must implement |OnSubtree| member function.");
+  static_assert(OnSubtreeSignature<Matcher>::value,
+                "|Matcher::OnSubtree| has incorrect signature.");
 
   static_assert(HasOnWalk<Matcher>::value, "|Matcher| must implement |OnWalk| member function.");
   static_assert(OnWalkSignature<Matcher>::value, "|Matcher::OnWalk| has incorrect signature.");
@@ -163,6 +172,8 @@ class AliasMatcher {
   ScanState OnNode(const NodePath& path, const PropertyDecoder& decoder);
 
   ScanState OnWalk();
+
+  ScanState OnSubtree(const NodePath& path);
 
   void OnError(std::string_view error);
 };

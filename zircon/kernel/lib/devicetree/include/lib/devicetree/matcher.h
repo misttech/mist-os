@@ -39,6 +39,13 @@ namespace devicetree {
 //   // parent node or |kNeedsAliases|.
 //   ScanState OnNode(NodePath& path, PropertyDecoder& decoder);
 //
+//   // Called after every node in the subtree rooted at |path| has been visited, if the
+//   // matcher's state is |ScanState::kActive|.
+//   // Returning |kNeedsPathResolution| is considered an error.
+//   // Returning |ScanState::kDoneWithSubtree| is equivalent to |ScanState::kDone|, users should
+//   // prefer the latter.
+//   ScanState OnSubtree(const NodePath& path);
+//
 //   // When multiple tree scans are performed, |Matcher::OnWalk| is called
 //   // at the end of each walk, meaning all nodes of the tree have at least all
 //   // nodes that this matcher has showed interest on have been visited.
@@ -57,8 +64,15 @@ namespace devicetree {
 //   ScanState OnNode(const NodePath& path, const PropertyDecoder& decoder) {
 //     if (path.back() == "foo") {
 //        foo_count++;
+//        subtree_start_ = &path.back();
 //        return ScanState::kActive;
 //     }
+//   }
+//
+//   ScanState OnSubtree(const NodePath& path) {
+//      if (&path.back() ==  subtree_start_) {
+//          // All childs of |subtree_start_| have been visited.
+//      }
 //   }
 //
 //   ScanState OnWalk() {
@@ -138,7 +152,16 @@ constexpr bool Match(const devicetree::Devicetree& devicetree, Matchers&&... mat
   auto unprune = [&visit_state, &matchers..., &alias_matcher](const NodePath& path,
                                                               const PropertyDecoder& decoder) {
     ForEachMatcher(
-        [&visit_state, &path](auto& matcher, size_t index) { visit_state[index].Unprune(path); },
+        [&visit_state, &path](auto& matcher, size_t index) {
+          auto state = visit_state[index].state();
+          if (state == ScanState::kActive) {
+            ScanState subtree_state = matcher.OnSubtree(path);
+            visit_state[index].set_state(
+                subtree_state == ScanState::kDoneWithSubtree ? ScanState::kActive : subtree_state);
+            ZX_ASSERT(visit_state[index].state() != ScanState::kNeedsPathResolution);
+          }
+          visit_state[index].Unprune(path);
+        },
         matchers..., alias_matcher);
   };
 

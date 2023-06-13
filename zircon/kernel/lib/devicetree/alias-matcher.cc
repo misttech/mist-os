@@ -32,6 +32,8 @@ ScanState AliasMatcher::OnNode(const NodePath& path, const PropertyDecoder& deco
   __UNREACHABLE;
 }
 
+ScanState AliasMatcher::OnSubtree(const NodePath& path) { return ScanState::kActive; }
+
 ScanState AliasMatcher::OnWalk() { return ScanState::kDone; }
 
 void AliasMatcher::OnError(std::string_view err) {

@@ -64,6 +64,10 @@ class FakeMatcher : public boot_shim::DevicetreeItemBase<FakeMatcher, 2> {
     }
   }
 
+  devicetree::ScanState OnSubtree(const devicetree::NodePath& path) {
+    return devicetree::ScanState::kActive;
+  }
+
   devicetree::ScanState OnWalk() {
     return value_.empty() ? devicetree::ScanState::kActive : devicetree::ScanState::kDone;
   }
