@@ -28,6 +28,7 @@
 #include "src/graphics/display/drivers/virtio-guest/virtio-abi.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -91,9 +92,10 @@ void GpuDevice::DisplayControllerImplSetDisplayControllerInterface(
 }
 
 zx::result<GpuDevice::BufferInfo> GpuDevice::GetAllocatedBufferInfoForImage(
-    uint64_t collection_id, uint32_t index, const image_t* image) const {
+    display::DriverBufferCollectionId driver_buffer_collection_id, uint32_t index,
+    const image_t* image) const {
   const fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& client =
-      buffer_collections_.at(collection_id);
+      buffer_collections_.at(driver_buffer_collection_id);
   fidl::WireResult check_result = client->CheckBuffersAllocated();
   // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
@@ -162,10 +164,12 @@ zx::result<GpuDevice::BufferInfo> GpuDevice::GetAllocatedBufferInfoForImage(
   });
 }
 
-zx_status_t GpuDevice::DisplayControllerImplImportBufferCollection(uint64_t collection_id,
-                                                                   zx::channel collection_token) {
-  if (buffer_collections_.find(collection_id) != buffer_collections_.end()) {
-    zxlogf(ERROR, "Buffer Collection (id=%lu) already exists", collection_id);
+zx_status_t GpuDevice::DisplayControllerImplImportBufferCollection(
+    uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token) {
+  const display::DriverBufferCollectionId driver_buffer_collection_id =
+      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+  if (buffer_collections_.find(driver_buffer_collection_id) != buffer_collections_.end()) {
+    zxlogf(ERROR, "Buffer Collection (id=%lu) already exists", driver_buffer_collection_id.value());
     return ZX_ERR_ALREADY_EXISTS;
   }
 
@@ -187,30 +191,38 @@ zx_status_t GpuDevice::DisplayControllerImplImportBufferCollection(uint64_t coll
     return ZX_ERR_INTERNAL;
   }
 
-  buffer_collections_[collection_id] = fidl::WireSyncClient(std::move(collection_client_endpoint));
+  buffer_collections_[driver_buffer_collection_id] =
+      fidl::WireSyncClient(std::move(collection_client_endpoint));
   return ZX_OK;
 }
 
-zx_status_t GpuDevice::DisplayControllerImplReleaseBufferCollection(uint64_t collection_id) {
-  if (buffer_collections_.find(collection_id) == buffer_collections_.end()) {
+zx_status_t GpuDevice::DisplayControllerImplReleaseBufferCollection(
+    uint64_t banjo_driver_buffer_collection_id) {
+  const display::DriverBufferCollectionId driver_buffer_collection_id =
+      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+  if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
     zxlogf(ERROR, "Cannot release buffer collection %lu: buffer collection doesn't exist",
-           collection_id);
+           driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
-  buffer_collections_.erase(collection_id);
+  buffer_collections_.erase(driver_buffer_collection_id);
   return ZX_OK;
 }
 
-zx_status_t GpuDevice::DisplayControllerImplImportImage(image_t* image, uint64_t collection_id,
+zx_status_t GpuDevice::DisplayControllerImplImportImage(image_t* image,
+                                                        uint64_t banjo_driver_buffer_collection_id,
                                                         uint32_t index) {
-  const auto it = buffer_collections_.find(collection_id);
+  const display::DriverBufferCollectionId driver_buffer_collection_id =
+      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+  const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
-    zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)", collection_id);
+    zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)",
+           driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
 
   zx::result<BufferInfo> buffer_info_result =
-      GetAllocatedBufferInfoForImage(collection_id, index, image);
+      GetAllocatedBufferInfoForImage(driver_buffer_collection_id, index, image);
   if (!buffer_info_result.is_ok()) {
     return buffer_info_result.error_value();
   }
@@ -325,12 +337,14 @@ zx_status_t GpuDevice::DisplayControllerImplGetSysmemConnection(zx::channel sysm
   return ZX_OK;
 }
 
-zx_status_t GpuDevice::DisplayControllerImplSetBufferCollectionConstraints(const image_t* config,
-                                                                           uint64_t collection_id) {
-  const auto it = buffer_collections_.find(collection_id);
+zx_status_t GpuDevice::DisplayControllerImplSetBufferCollectionConstraints(
+    const image_t* config, uint64_t banjo_driver_buffer_collection_id) {
+  const display::DriverBufferCollectionId driver_buffer_collection_id =
+      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+  const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
     zxlogf(ERROR, "SetBufferCollectionConstraints: Cannot find imported buffer collection (id=%lu)",
-           collection_id);
+           driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
 

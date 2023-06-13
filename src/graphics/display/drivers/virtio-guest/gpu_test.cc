@@ -16,6 +16,7 @@
 
 #include "fidl/fuchsia.hardware.sysmem/cpp/markers.h"
 #include "lib/fidl/cpp/wire/channel.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 
 #define USE_GTEST
 #include <lib/virtio/backends/fake.h>
@@ -81,7 +82,7 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
 
   void BindSharedCollection(BindSharedCollectionRequestView request,
                             BindSharedCollectionCompleter::Sync& completer) override {
-    auto buffer_collection_id = next_buffer_collection_id_++;
+    display::DriverBufferCollectionId buffer_collection_id = next_buffer_collection_id_++;
     fbl::AutoLock lock(&lock_);
     active_buffer_collections_.emplace(
         buffer_collection_id,
@@ -143,15 +144,14 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
     std::unique_ptr<StubBufferCollection> mock_buffer_collection;
   };
 
-  using BufferCollectionId = int;
-
   mutable fbl::Mutex lock_;
-  std::unordered_map<BufferCollectionId, BufferCollection> active_buffer_collections_
+  std::unordered_map<display::DriverBufferCollectionId, BufferCollection> active_buffer_collections_
       __TA_GUARDED(lock_);
   std::vector<fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>>
       inactive_buffer_collection_tokens_ __TA_GUARDED(lock_);
 
-  BufferCollectionId next_buffer_collection_id_ = 0;
+  display::DriverBufferCollectionId next_buffer_collection_id_ =
+      display::DriverBufferCollectionId(0);
   async_dispatcher_t* dispatcher_ = nullptr;
 };
 
@@ -220,11 +220,12 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
     loop().Shutdown();
   }
 
-  void ImportBufferCollection(uint64_t buffer_collection_id) {
+  void ImportBufferCollection(display::DriverBufferCollectionId buffer_collection_id) {
     zx::result token_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
     ASSERT_TRUE(token_endpoints.is_ok());
     EXPECT_OK(device_->DisplayControllerImplImportBufferCollection(
-        buffer_collection_id, token_endpoints->client.TakeChannel()));
+        display::ToBanjoDriverBufferCollectionId(buffer_collection_id),
+        token_endpoints->client.TakeChannel()));
   }
 
  protected:
@@ -238,7 +239,9 @@ TEST_F(VirtioGpuTest, ImportVmo) {
                                     reinterpret_cast<void*>(&proto)));
 
   // Import buffer collection.
-  constexpr uint64_t kBufferCollectionId = 1u;
+  constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
+  constexpr uint64_t kBanjoBufferCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
   ImportBufferCollection(kBufferCollectionId);
 
   // Set buffer collection constraints.
@@ -249,7 +252,7 @@ TEST_F(VirtioGpuTest, ImportVmo) {
       .handle = 0,
   };
   EXPECT_OK(proto.ops->set_buffer_collection_constraints(device_.get(), &kDefaultImage,
-                                                         kBufferCollectionId));
+                                                         kBanjoBufferCollectionId));
   RunLoopUntilIdle();
 
   PerformBlockingWork([&] {
@@ -271,8 +274,10 @@ TEST_F(VirtioGpuTest, SetConstraints) {
   // Import buffer collection.
   zx::result token_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
-  constexpr uint64_t kBufferCollectionId = 1u;
-  EXPECT_OK(proto.ops->import_buffer_collection(device_.get(), kBufferCollectionId,
+  constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
+  constexpr uint64_t kBanjoBufferCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
+  EXPECT_OK(proto.ops->import_buffer_collection(device_.get(), kBanjoBufferCollectionId,
                                                 token_endpoints->client.handle()->get()));
   RunLoopUntilIdle();
 
@@ -284,7 +289,7 @@ TEST_F(VirtioGpuTest, SetConstraints) {
       .handle = 0,
   };
   EXPECT_OK(proto.ops->set_buffer_collection_constraints(device_.get(), &kDefaultImage,
-                                                         kBufferCollectionId));
+                                                         kBanjoBufferCollectionId));
   RunLoopUntilIdle();
 }
 
@@ -321,12 +326,14 @@ TEST_F(VirtioGpuTest, ImportBufferCollection) {
                                     reinterpret_cast<void*>(&proto)));
 
   // Test ImportBufferCollection().
-  constexpr uint64_t kValidBufferCollectionId = 1u;
-  EXPECT_OK(proto.ops->import_buffer_collection(device_.get(), kValidBufferCollectionId,
+  constexpr display::DriverBufferCollectionId kValidBufferCollectionId(1);
+  constexpr uint64_t kBanjoValidBufferCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kValidBufferCollectionId);
+  EXPECT_OK(proto.ops->import_buffer_collection(device_.get(), kBanjoValidBufferCollectionId,
                                                 token1_endpoints->client.handle()->get()));
 
   // `collection_id` must be unused.
-  EXPECT_EQ(proto.ops->import_buffer_collection(device_.get(), kValidBufferCollectionId,
+  EXPECT_EQ(proto.ops->import_buffer_collection(device_.get(), kBanjoValidBufferCollectionId,
                                                 token2_endpoints->client.handle()->get()),
             ZX_ERR_ALREADY_EXISTS);
 
@@ -346,10 +353,12 @@ TEST_F(VirtioGpuTest, ImportBufferCollection) {
   }
 
   // Test ReleaseBufferCollection().
-  constexpr uint64_t kInvalidBufferCollectionId = 2u;
-  EXPECT_EQ(proto.ops->release_buffer_collection(device_.get(), kInvalidBufferCollectionId),
+  constexpr display::DriverBufferCollectionId kInvalidBufferCollectionId(2);
+  constexpr uint64_t kBanjoInvalidBufferCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kInvalidBufferCollectionId);
+  EXPECT_EQ(proto.ops->release_buffer_collection(device_.get(), kBanjoInvalidBufferCollectionId),
             ZX_ERR_NOT_FOUND);
-  EXPECT_OK(proto.ops->release_buffer_collection(device_.get(), kValidBufferCollectionId));
+  EXPECT_OK(proto.ops->release_buffer_collection(device_.get(), kBanjoValidBufferCollectionId));
 
   RunLoopUntilIdle();
   EXPECT_TRUE(allocator->GetActiveBufferCollectionTokenClients().empty());
@@ -380,8 +389,10 @@ TEST_F(VirtioGpuTest, ImportImage) {
                                     reinterpret_cast<void*>(&proto)));
 
   // Import buffer collection.
-  constexpr uint64_t kBufferCollectionId = 1u;
-  EXPECT_OK(proto.ops->import_buffer_collection(device_.get(), kBufferCollectionId,
+  constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
+  constexpr uint64_t kBanjoBufferCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
+  EXPECT_OK(proto.ops->import_buffer_collection(device_.get(), kBanjoBufferCollectionId,
                                                 token1_endpoints->client.handle()->get()));
 
   RunLoopUntilIdle();
@@ -395,32 +406,34 @@ TEST_F(VirtioGpuTest, ImportImage) {
       .handle = 0,
   };
   EXPECT_OK(proto.ops->set_buffer_collection_constraints(device_.get(), &kDefaultImage,
-                                                         kBufferCollectionId));
+                                                         kBanjoBufferCollectionId));
   RunLoopUntilIdle();
 
   // Invalid import: bad collection id
   image_t invalid_image = kDefaultImage;
-  uint64_t kInvalidCollectionId = 100;
+  constexpr display::DriverBufferCollectionId kInvalidCollectionId(100);
+  constexpr uint64_t kBanjoInvalidCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kInvalidCollectionId);
   PerformBlockingWork([&] {
-    EXPECT_EQ(
-        proto.ops->import_image(device_.get(), &invalid_image, kInvalidCollectionId, /*index=*/0),
-        ZX_ERR_NOT_FOUND);
+    EXPECT_EQ(proto.ops->import_image(device_.get(), &invalid_image, kBanjoInvalidCollectionId,
+                                      /*index=*/0),
+              ZX_ERR_NOT_FOUND);
   });
 
   // Invalid import: bad index
   invalid_image = kDefaultImage;
   uint32_t kInvalidIndex = 100;
   PerformBlockingWork([&] {
-    EXPECT_EQ(
-        proto.ops->import_image(device_.get(), &invalid_image, kBufferCollectionId, kInvalidIndex),
-        ZX_ERR_OUT_OF_RANGE);
+    EXPECT_EQ(proto.ops->import_image(device_.get(), &invalid_image, kBanjoBufferCollectionId,
+                                      kInvalidIndex),
+              ZX_ERR_OUT_OF_RANGE);
   });
 
   // TODO(fxbug.dev/122727): Implement fake ring-buffer based tests so that we
   // can test the valid import case.
 
   // Release buffer collection.
-  EXPECT_OK(proto.ops->release_buffer_collection(device_.get(), kBufferCollectionId));
+  EXPECT_OK(proto.ops->release_buffer_collection(device_.get(), kBanjoBufferCollectionId));
 
   RunLoopUntilIdle();
   EXPECT_TRUE(allocator->GetActiveBufferCollectionTokenClients().empty());
