@@ -8,6 +8,7 @@
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/runtime/testing/cpp/dispatcher.h>
 #include <lib/driver/symbols/symbols.h>
+#include <lib/driver/testing/cpp/async_task.h>
 
 // This is the exported driver lifecycle symbol that the driver framework looks for.
 // NOLINTNEXTLINE(bugprone-reserved-identifier)
@@ -18,87 +19,79 @@ namespace fdf_testing {
 using OpaqueDriverPtr = void*;
 
 // The |DriverUnderTest| is a templated class so we pull out the non-template specifics into this
-// base class so we don't have to put the implementation in the header.
+// base class so the implementation does not have to live in the header.
 class DriverUnderTestBase {
  public:
-  explicit DriverUnderTestBase(
-      fdf_dispatcher_t* driver_dispatcher = nullptr,
-      const DriverLifecycle& driver_lifecycle_symbol = __fuchsia_driver_lifecycle__);
-  ~DriverUnderTestBase();
+  explicit DriverUnderTestBase(DriverLifecycle driver_lifecycle_symbol);
+  virtual ~DriverUnderTestBase();
 
-  zx::result<std::shared_ptr<libsync::Completion>> Start(fdf::DriverStartArgs start_args);
-  zx::result<std::shared_ptr<libsync::Completion>> StartWithErrorHandler(
-      fdf::DriverStartArgs start_args, fit::callback<void(zx_status_t error)> error_handler);
+  // Start the driver. This is an asynchronous operation.
+  // Use |fdf::WaitFor| to await the completion of the future.
+  // The resulting zx::result is the result of the start operation.
+  AsyncTask<zx::result<>> Start(fdf::DriverStartArgs start_args);
 
-  std::shared_ptr<libsync::Completion> PrepareStop();
-  std::shared_ptr<libsync::Completion> PrepareStopWithErrorHandler(
-      fit::callback<void(zx_status_t error)> error_handler);
+  // PrepareStop the driver. This is an asynchronous operation.
+  // Use |fdf::WaitFor| to await the completion of the future.
+  // The resulting zx::result is the result of the prepare stop operation.
+  AsyncTask<zx::result<>> PrepareStop();
+
+  // Stop the driver. The PrepareStop operation must have been completed before Stop is called.
+  // Returns the result of the stop operation.
   zx::result<> Stop();
 
  protected:
-  async::synchronization_checker& checker() { return checker_; }
-  std::optional<OpaqueDriverPtr>& driver() { return driver_; }
+  void* GetDriver();
 
  private:
   fdf_dispatcher_t* driver_dispatcher_;
-  const DriverLifecycle& driver_lifecycle_symbol_;
+  DriverLifecycle driver_lifecycle_symbol_;
   async::synchronization_checker checker_;
-  std::optional<OpaqueDriverPtr> driver_ __TA_GUARDED(checker_);
-  std::shared_ptr<libsync::Completion> prepare_stop_completer_ __TA_GUARDED(checker_);
+  std::optional<zx::result<OpaqueDriverPtr>> driver_ __TA_GUARDED(checker_);
+  std::optional<std::promise<zx::result<>>> start_promise_ __TA_GUARDED(checker_);
+  std::optional<std::promise<zx::result<>>> prepare_stop_promise_ __TA_GUARDED(checker_);
+  std::shared_future<zx::result<>> prepare_stop_promise_future_ __TA_GUARDED(checker_);
 };
 
-// This is a RAII wrapper over a driver under test. On destruction, it will stop the driver.
+// This is a RAII wrapper over a driver under test. On destruction, it will call |Stop| for the
+// driver if it hasn't already been called, but |PrepareStop| must have been manually called and
+// awaited.
+//
+// The |Driver| type given in the template is used to provide pass-through `->` and `*` operators
+// to the given driver type.
+//
+// To use this class, ensure that the driver has been exported into the
+// __fuchsia_driver_lifecycle__ symbol using the FUCHSIA_DRIVER macros. Otherwise pass the
+// DriverLifecycle manually into this class.
+//
 // # Thread safety
 //
 // This class is thread-unsafe. Instances must be managed and used from a synchronized dispatcher.
 // See
 // https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#synchronized-dispatcher
 //
-template <typename Driver>
+// If the driver dispatcher is the default dispatcher, the DriverUnderTest does not need to be
+// wrapped in a DispatcherBound. Example:
+// ```
+// fdf::TestSynchronizedDispatcher test_dispatcher_{fdf::kDispatcherDefault};
+// fdf_testing::DriverUnderTest driver_;
+// ```
+//
+// If the driver dispatcher is not the default dispatcher, the suggestion is to
+// wrap this inside of an |async_patterns::TestDispatcherBound|. Example:
+// ```
+// fdf::TestSynchronizedDispatcher test_dispatcher_{fdf::kDispatcherManaged};
+// async_patterns::TestDispatcherBound<fdf_testing::TestSynchronizedDispatcher> driver_{
+//      test_dispatcher_.dispatcher(), std::in_place};
+// ```
+template <typename Driver = void>
 class DriverUnderTest : public DriverUnderTestBase {
  public:
-  Driver* operator->() {
-    std::lock_guard guard(checker());
-    ZX_ASSERT_MSG(driver().has_value(), "Driver does not exist.");
-    return static_cast<Driver*>(driver().value());
-  }
+  explicit DriverUnderTest(DriverLifecycle driver_lifecycle_symbol = __fuchsia_driver_lifecycle__)
+      : DriverUnderTestBase(driver_lifecycle_symbol) {}
 
-  Driver* operator*() {
-    std::lock_guard guard(checker());
-    ZX_ASSERT_MSG(driver().has_value(), "Driver does not exist.");
-    return static_cast<Driver*>(driver().value());
-  }
+  Driver* operator->() { return static_cast<Driver*>(GetDriver()); }
+  Driver* operator*() { return static_cast<Driver*>(GetDriver()); }
 };
-
-// Start a driver using the DriverLifecycle symbol's start hook. This is optional to use, the test
-// can also construct and start the driver on its own if it wants to do so.
-//
-// This MUST be called from the main test thread.
-zx::result<OpaqueDriverPtr> StartDriver(
-    fdf::DriverStartArgs start_args, fdf::TestSynchronizedDispatcher& driver_dispatcher,
-    const DriverLifecycle& driver_lifecycle_symbol = __fuchsia_driver_lifecycle__);
-
-// Templated version of |StartDriver| which will return the requested driver type.
-template <typename Driver>
-zx::result<Driver*> StartDriver(
-    fdf::DriverStartArgs start_args, fdf::TestSynchronizedDispatcher& driver_dispatcher,
-    const DriverLifecycle& driver_lifecycle_symbol = __fuchsia_driver_lifecycle__) {
-  zx::result result =
-      StartDriver(std::move(start_args), driver_dispatcher, driver_lifecycle_symbol);
-  if (result.is_error()) {
-    return result.take_error();
-  }
-
-  return zx::ok(static_cast<Driver*>(result.value()));
-}
-
-// Initiates the teardown of the driver and the driver dispatcher. Teardown consist of using the
-// prepare_stop hook, waiting for the completion, and calling the stop lifecycle hook.
-//
-// This MUST be called from the main test thread.
-zx::result<> TeardownDriver(
-    OpaqueDriverPtr driver, fdf::TestSynchronizedDispatcher& driver_dispatcher,
-    const DriverLifecycle& driver_lifecycle_symbol = __fuchsia_driver_lifecycle__);
 
 }  // namespace fdf_testing
 

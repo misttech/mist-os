@@ -38,6 +38,9 @@ class FakeTestDriver : public MagmaTestDriverBase {
   }
 };
 
+// Export the |FakeTestDriver| for the |fdf_testing::DriverUnderTest<FakeTestDriver>| to use.
+FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<FakeTestDriver>);
+
 class FakeDriver : public MagmaProductionDriverBase {
  public:
   FakeDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
@@ -94,17 +97,17 @@ class MagmaDriverStarted : public testing::Test {
                                    std::move(start_args->incoming_directory_server));
     EXPECT_EQ(ZX_OK, result.status_value());
 
-    auto driver = fdf_testing::StartDriver<FakeTestDriver>(std::move(start_args->start_args),
-                                                           driver_dispatcher_, lifecycle_);
-
-    ASSERT_TRUE(driver.is_ok());
-
-    driver_ = std::move(*driver);
+    zx::result start_result = driver_
+                                  .SyncCall(&fdf_testing::DriverUnderTest<FakeTestDriver>::Start,
+                                            std::move(start_args->start_args))
+                                  .Await();
+    ASSERT_EQ(ZX_OK, start_result.status_value());
   }
 
   void TearDown() override {
-    EXPECT_EQ(ZX_OK,
-              fdf_testing::TeardownDriver(driver_, driver_dispatcher_, lifecycle_).status_value());
+    zx::result prepare_stop_result =
+        driver_.SyncCall(&fdf_testing::DriverUnderTest<FakeTestDriver>::PrepareStop).Await();
+    ASSERT_EQ(ZX_OK, prepare_stop_result.status_value());
   }
 
   async_patterns::TestDispatcherBound<fdf_testing::TestNode>& node_server() { return node_server_; }
@@ -116,22 +119,17 @@ class MagmaDriverStarted : public testing::Test {
   }
 
  protected:
-  using FakeLifecycle = fdf::Lifecycle<FakeTestDriver>;
-
   fdf_testing::DriverRuntimeEnv managed_env;
   fdf::TestSynchronizedDispatcher driver_dispatcher_{fdf::kDispatcherManaged};
   fdf::TestSynchronizedDispatcher test_env_dispatcher_{fdf::kDispatcherManaged};
 
   async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
       test_env_dispatcher_.dispatcher(), std::in_place, std::string("root")};
-  DriverLifecycle lifecycle_{.version = DRIVER_LIFECYCLE_VERSION_3,
-                             .v1 = {.start = nullptr, .stop = FakeLifecycle::Stop},
-                             .v2 = {FakeLifecycle::PrepareStop},
-                             .v3 = {FakeLifecycle::Start}};
   async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
       test_env_dispatcher_.dispatcher(), std::in_place};
 
-  FakeTestDriver* driver_{};
+  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<FakeTestDriver>> driver_{
+      driver_dispatcher_.dispatcher(), std::in_place};
 };
 
 TEST_F(MagmaDriverStarted, TestDriver) {}
@@ -199,10 +197,10 @@ TEST_F(MagmaDriverStarted, DependencyInjection) {
                    }).status_value());
 
   MsdMockDevice* mock_device;
-  {
-    std::lock_guard magma_lock(driver_->magma_mutex());
-    mock_device = static_cast<MsdMockDevice*>(driver_->magma_system_device()->msd_dev());
-  }
+  driver_.SyncCall([&mock_device](fdf_testing::DriverUnderTest<FakeTestDriver>* driver) mutable {
+    std::lock_guard magma_lock((*driver)->magma_mutex());
+    mock_device = static_cast<MsdMockDevice*>((*driver)->magma_system_device()->msd_dev());
+  });
   mock_device->WaitForMemoryPressureSignal();
   EXPECT_EQ(MAGMA_MEMORY_PRESSURE_LEVEL_WARNING, mock_device->memory_pressure_level());
 }

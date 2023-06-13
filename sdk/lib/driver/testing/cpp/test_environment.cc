@@ -8,35 +8,6 @@
 
 namespace fdf_testing {
 
-const char AsyncTestEnvironment::kAsyncTestEnvironmentThreadSafetyDescription[] =
-    "|fdf_testing::AsyncTestEnvironment| is thread-unsafe.";
-
-AsyncTestEnvironment::AsyncTestEnvironment(async_dispatcher_t* dispatcher)
-    : dispatcher_(dispatcher ? dispatcher : async_get_default_dispatcher()),
-      incoming_directory_server_(dispatcher_),
-      checker_(dispatcher_, kAsyncTestEnvironmentThreadSafetyDescription) {}
-
-zx::result<> AsyncTestEnvironment::Initialize(
-    fidl::ServerEnd<fuchsia_io::Directory> incoming_directory_server_end) {
-  std::lock_guard guard(checker_);
-
-  zx::result result = incoming_directory_server_.Serve(std::move(incoming_directory_server_end));
-  if (result.is_error()) {
-    return result.take_error();
-  }
-
-  // Forward the LogSink protocol that we have from our own incoming namespace.
-  result = incoming_directory_server_.AddUnmanagedProtocol<fuchsia_logger::LogSink>(
-      [](fidl::ServerEnd<fuchsia_logger::LogSink> server_end) {
-        ZX_ASSERT(component::Connect<fuchsia_logger::LogSink>(std::move(server_end)).is_ok());
-      });
-  if (result.is_error()) {
-    return result.take_error();
-  }
-
-  return zx::ok();
-}
-
 const char TestEnvironment::kTestEnvironmentThreadSafetyDescription[] =
     "|fdf_testing::TestEnvironment| is thread-unsafe.";
 

@@ -23,6 +23,7 @@ source_set("cpp") {
   testonly = true
 
   sources = [
+    "async_task.h",
     "driver_lifecycle.cc",
     "driver_lifecycle.h",
     "driver_runtime_env.h",

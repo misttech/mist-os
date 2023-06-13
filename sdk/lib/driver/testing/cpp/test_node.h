@@ -9,15 +9,57 @@
 
 namespace fdf_testing {
 
+// This class serves as the FIDL servers for the fuchsia_driver_framework::Node and
+// fuchsia_driver_framework::NodeController to a driver under test.
+//
+// In a regular driver environment, this is provided by the driver framework's driver manager.
+// The Node FIDL is how drivers communicate with the driver framework to add child nodes into the
+// driver topology.
+//
+// The TestNode is part of the unit test's environment that is given to the driver under test using
+// it's start args. Therefore this class is where the test acquires the start args to give to the
+// driver, using CreateStartArgsAndServe. The result of this contains three values:
+//  - The actual start args for the driver to be given to the driver's Start.
+//  - A server end of the incoming directory the driver will use. This must be passed into the
+//    |fdf_testing::TestEnvironment::Initialize| function.
+//  - A client end to the outgoing directory of the driver. This can be used by the test to
+//    talk to FIDLs provided by the driver under test.
+//
+// # Thread safety
+//
+// This class is thread-unsafe. Instances must be managed and used from a synchronized dispatcher.
+// See
+// https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#synchronized-dispatcher
+//
+// If the dispatcher used for it is a default dispatcher, the TestNode does not need to be
+// wrapped in a DispatcherBound. Example:
+// ```
+// fdf::TestSynchronizedDispatcher test_env_dispatcher_{fdf::kDispatcherDefault};
+// fdf_testing::TestNode node_server_{"root"};
+// ```
+//
+// If the dispatcher is not the default dispatcher of the main thread, the suggestion is to wrap
+// this inside of an |async_patterns::TestDispatcherBound|. Example:
+// ```
+// fdf::TestSynchronizedDispatcher test_env_dispatcher_{fdf::kDispatcherManaged};
+// async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
+//      test_env_dispatcher_.dispatcher(), std::in_place, std::string("root")};
+// ```
 class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
                  public fidl::WireServer<fuchsia_driver_framework::Node> {
  public:
+  // This can be used to access child nodes that a driver has created.
   using ChildrenMap = std::unordered_map<std::string, TestNode>;
+
+  // Used to see the result of using NodeController::RequestBind.
   struct BindData {
     bool force_rebind;
     std::string driver_url_suffix;
   };
 
+  // This is the bundle returned from |CreateStartArgsAndServe|.
+  // As described above, start_args goes to the driver, incoming_directory_server goes to the
+  // environment, and outgoing_directory_client may be used by the test.
   struct CreateStartArgsResult {
     fuchsia_driver_framework::DriverStartArgs start_args;
     fidl::ServerEnd<fuchsia_io::Directory> incoming_directory_server;
@@ -30,7 +72,10 @@ class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeControlle
 
   ~TestNode() override;
 
+  // Gets the children created by the driver on this node.
   ChildrenMap& children() { return children_; }
+
+  // Gets the name of the node.
   const std::string& name() const { return name_; }
 
   // Create a channel pair, serve the server end, and return the client end.
@@ -47,20 +92,27 @@ class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeControlle
   // Connects to the devfs device this node is serving.
   zx::result<zx::channel> ConnectToDevice();
 
+  // Whether this node has started serving the fdf::Node, this happens when |Serve|
+  // or |CreateNodeChannel| has been called.
   bool HasNode() {
     std::lock_guard guard(checker_);
     return node_binding_.has_value();
   }
 
+  // Get the node properties that this node was created with. Can be used to validate that a driver
+  // is creating valid child nodes.
   std::vector<fuchsia_driver_framework::NodeProperty> GetProperties() const {
     std::lock_guard guard(checker_);
     return properties_;
   }
+
+  // Gets the bind data that were stored as part of NodeController::RequestBind calls.
   std::vector<BindData> GetBindData() const {
     std::lock_guard guard(checker_);
     return bind_data_;
   }
 
+  // Get the dispatcher this Node object lives and serves FIDLs on.
   async_dispatcher_t* dispatcher() const { return dispatcher_; }
 
  private:

@@ -150,14 +150,13 @@ class TestIncomingAndOutgoingFidlsDefaultDriver : public TestIncomingAndOutgoing
 
   void SetUp() override {
     TestIncomingAndOutgoingFidlsBase::SetUp();
-    zx::result start_result = driver_.Start(std::move(start_args()));
-    ASSERT_EQ(ZX_OK, start_result.status_value());
-    ASSERT_EQ(ZX_OK, fdf::WaitFor(*start_result.value()).status_value());
+    zx::result result = driver_.Start(std::move(start_args())).Await();
+    ASSERT_EQ(ZX_OK, result.status_value());
   }
 
   void TearDown() override {
-    std::shared_ptr<libsync::Completion> completion = driver_.PrepareStop();
-    ASSERT_EQ(ZX_OK, fdf::WaitFor(*completion).status_value());
+    zx::result result = driver_.PrepareStop().Await();
+    ASSERT_EQ(ZX_OK, result.status_value());
   }
 
   TestDriver* driver() { return *driver_; }
@@ -238,16 +237,16 @@ class TestIncomingAndOutgoingFidlsManagedDriver : public TestIncomingAndOutgoing
  public:
   void SetUp() override {
     TestIncomingAndOutgoingFidlsBase::SetUp();
-    zx::result start_result =
-        driver_.SyncCall(&fdf_testing::DriverUnderTest<TestDriver>::Start, std::move(start_args()));
-    ASSERT_EQ(ZX_OK, start_result.status_value());
-    ASSERT_EQ(ZX_OK, fdf::WaitFor(*start_result.value()).status_value());
+    zx::result result =
+        driver_.SyncCall(&fdf_testing::DriverUnderTest<TestDriver>::Start, std::move(start_args()))
+            .Await();
+    ASSERT_EQ(ZX_OK, result.status_value());
   }
 
   void TearDown() override {
-    std::shared_ptr<libsync::Completion> completion =
-        driver_.SyncCall(&fdf_testing::DriverUnderTest<TestDriver>::PrepareStop);
-    ASSERT_EQ(ZX_OK, fdf::WaitFor(*completion).status_value());
+    zx::result result =
+        driver_.SyncCall(&fdf_testing::DriverUnderTest<TestDriver>::PrepareStop).Await();
+    ASSERT_EQ(ZX_OK, result.status_value());
   }
 
   async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<TestDriver>>& driver() {

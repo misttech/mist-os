@@ -35,7 +35,7 @@ zx::result<> WaitFor(libsync::Completion& completion);
 //
 // This MUST be called from the main test thread.
 template <typename T>
-zx::result<T> WaitFor(std::future<T> future) {
+zx::result<T> WaitFor(std::shared_future<T> future) {
   using namespace std::chrono_literals;
   zx::result wait_result = fdf_internal::IfExistsRunUnmanagedUntil(
       [&] { return future.wait_for(1ms) != std::future_status::timeout; });
@@ -44,6 +44,16 @@ zx::result<T> WaitFor(std::future<T> future) {
   }
 
   return zx::ok(future.get());
+}
+
+// Wait until the future is resolved, then returns the resolved value of the future.
+// This will run all of the unmanaged dispatchers with |fdf_testing_run_until_idle|,
+// if there are any.
+//
+// This MUST be called from the main test thread.
+template <typename T>
+zx::result<T> WaitFor(std::future<T> future) {
+  return WaitFor(future.share());
 }
 
 }  // namespace fdf

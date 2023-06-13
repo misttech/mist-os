@@ -30,18 +30,16 @@ class TestDefaultDispatcher : public ::testing::Test {
     EXPECT_EQ(ZX_OK, result.status_value());
 
     // Start driver
-    zx::result driver =
-        fdf_testing::StartDriver<TestDriver>(std::move(start_args->start_args), test_dispatcher_);
-    EXPECT_EQ(ZX_OK, driver.status_value());
-    driver_ = driver.value();
+    zx::result start_result = driver_.Start(std::move(start_args->start_args)).Await();
+    EXPECT_EQ(ZX_OK, start_result.status_value());
   }
 
   void TearDown() override {
-    zx::result result = fdf_testing::TeardownDriver(driver_, test_dispatcher_);
-    EXPECT_EQ(ZX_OK, result.status_value());
+    zx::result prepare_stop_result = driver_.PrepareStop().Await();
+    EXPECT_EQ(ZX_OK, prepare_stop_result.status_value());
   }
 
-  TestDriver* driver() { return driver_; }
+  fdf_testing::DriverUnderTest<TestDriver>& driver() { return driver_; }
 
  private:
   // The dispatcher is set to default, and not managed by driver runtime threads.
@@ -54,7 +52,7 @@ class TestDefaultDispatcher : public ::testing::Test {
   // The default dispatcher is an fdf_dispatcher so we can add driver transport FIDL servers into
   // this environment.
   fdf_testing::TestEnvironment test_environment_;
-  TestDriver* driver_;
+  fdf_testing::DriverUnderTest<TestDriver> driver_;
 };
 
 TEST_F(TestDefaultDispatcher, CreateChildNodeAsync) {
@@ -82,18 +80,16 @@ class TestDefaultDispatcherManagedEnv : public ::testing::Test {
                                    std::move(start_args->incoming_directory_server));
     EXPECT_EQ(ZX_OK, init_result.status_value());
 
-    zx::result driver = fdf_testing::StartDriver<TestDriver>(std::move(start_args->start_args),
-                                                             test_driver_dispatcher_);
-    EXPECT_EQ(ZX_OK, driver.status_value());
-    driver_ = driver.value();
+    zx::result start_result = driver_.Start(std::move(start_args->start_args)).Await();
+    EXPECT_EQ(ZX_OK, start_result.status_value());
   }
 
   void TearDown() override {
-    zx::result result = fdf_testing::TeardownDriver(driver_, test_driver_dispatcher_);
-    EXPECT_EQ(ZX_OK, result.status_value());
+    zx::result prepare_stop_result = driver_.PrepareStop().Await();
+    EXPECT_EQ(ZX_OK, prepare_stop_result.status_value());
   }
 
-  TestDriver* driver() { return driver_; }
+  fdf_testing::DriverUnderTest<TestDriver>& driver() { return driver_; }
 
   async_dispatcher_t* env_dispatcher() { return test_env_dispatcher_.dispatcher(); }
 
@@ -116,7 +112,7 @@ class TestDefaultDispatcherManagedEnv : public ::testing::Test {
   async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
       env_dispatcher(), std::in_place};
 
-  TestDriver* driver_;
+  fdf_testing::DriverUnderTest<TestDriver> driver_;
 };
 
 TEST_F(TestDefaultDispatcherManagedEnv, CreateChildNodeSync) {
