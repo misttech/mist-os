@@ -44,13 +44,9 @@ async fn handle_get_admin(
     let core_id = match core_id {
         Some(c) => c,
         None => {
-            control.close_with_epitaph(zx::Status::NOT_FOUND).unwrap_or_else(|e| {
-                if e.is_closed() {
-                    debug!(err = ?e, "control handle closed before sending epitaph")
-                } else {
-                    error!(err = ?e, "failed to send epitaph")
-                }
-            });
+            control
+                .close_with_epitaph(zx::Status::NOT_FOUND)
+                .unwrap_or_else(|e| error!(err = ?e, "failed to send epitaph"));
             return;
         }
     };

@@ -72,6 +72,9 @@ pub(crate) fn write_epitaph_impl<T: ChannelLike>(
     };
     encoding::with_tls_encoded::<TransactionMessageType<EpitaphBody>, (), false>(
         msg,
-        |bytes, handles| channel.write_etc(bytes, handles).map_err(Error::ServerEpitaphWrite),
+        |bytes, handles| match channel.write_etc(bytes, handles) {
+            Ok(()) | Err(zx_status::Status::PEER_CLOSED) => Ok(()),
+            Err(e) => Err(Error::ServerEpitaphWrite(e)),
+        },
     )
 }
