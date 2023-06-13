@@ -183,6 +183,9 @@ std::optional<RegProperty> RegProperty::Create(uint32_t num_address_cells, uint3
   if (num_address_cells > 2 || num_size_cells > 2) {
     return std::nullopt;
   }
+  if (bytes.size() % (num_address_cells + num_size_cells)) {
+    return std::nullopt;
+  }
   return RegProperty(bytes, num_address_cells, num_size_cells);
 }
 
@@ -193,6 +196,37 @@ std::optional<RegProperty> RegProperty::Create(const PropertyDecoder& decoder, B
   const auto& parent = *decoder.parent();
   return RegProperty::Create(parent.num_address_cells().value_or(kRegDefaultAddressCells),
                              parent.num_size_cells().value_or(kRegDefaultSizeCells), bytes);
+}
+
+std::optional<RangesProperty> RangesProperty::Create(uint32_t num_address_cells,
+                                                     uint32_t num_size_cells,
+                                                     uint32_t num_parent_address_cells,
+                                                     ByteView bytes) {
+  if (num_address_cells > 2 || num_size_cells > 2) {
+    return std::nullopt;
+  }
+
+  if (bytes.size() %
+      (sizeof(uint32_t) * (num_address_cells + num_size_cells + num_parent_address_cells))) {
+    return std::nullopt;
+  }
+  return RangesProperty(bytes, num_address_cells, num_size_cells, num_parent_address_cells);
+}
+
+std::optional<RangesProperty> RangesProperty::Create(const PropertyDecoder& decoder,
+                                                     ByteView bytes) {
+  if (!decoder.num_address_cells() || !decoder.num_size_cells()) {
+    return std::nullopt;
+  }
+
+  if (!decoder.parent()) {
+    return std::nullopt;
+  }
+
+  return RangesProperty::Create(
+      decoder.num_address_cells().value_or(kRegDefaultAddressCells),
+      decoder.num_size_cells().value_or(kRegDefaultSizeCells),
+      decoder.parent()->num_address_cells().value_or(kRegDefaultAddressCells), bytes);
 }
 
 Devicetree::Devicetree(ByteView blob) {

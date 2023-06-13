@@ -246,6 +246,71 @@ class RegProperty : public PropEncodedArray<RegPropertyElement> {
 };
 
 // See
+// https://devicetree-specification.readthedocs.io/en/v0.3/devicetree-basics.html#ranges
+// for property description.
+class RangesPropertyElement : public PropEncodedArrayElement<3> {
+ public:
+  using PropEncodedArrayElement<3>::PropEncodedArrayElement;
+
+  constexpr std::optional<uint64_t> child_bus_address() const { return (*this)[0]; }
+  constexpr std::optional<uint64_t> parent_bus_address() const { return (*this)[1]; }
+  constexpr std::optional<uint64_t> length() const { return (*this)[2]; }
+};
+
+class RangesProperty : public PropEncodedArray<RangesPropertyElement> {
+ public:
+  static std::optional<RangesProperty> Create(uint32_t num_address_cells, uint32_t num_size_cells,
+                                              uint32_t num_parent_address_cells, ByteView bytes);
+
+  static std::optional<RangesProperty> Create(const PropertyDecoder& decoder, ByteView bytes);
+
+  // Returns the translated address from a child address to parent address.
+  //
+  // Essentially a ranges property dictates how addresses in child nodes are translated
+  // into parent node address range. For example:
+  //
+  // '/' {
+  //   foo {
+  //     ranges = <0 123 4> <4 256 4>
+  //     bar {
+  //       reg = <0 2>
+  //     }
+  // }
+  //
+  // If we wanted to translate the register bank of device node |bar|, we would need to use the
+  // ranges property, such that the child bus address is translated to the parent bus address (in
+  // this case, this is the root), To achieve that would look for the first range where the address
+  // would fit, in this case that is the first range. This range tells us that child addresses from
+  // [0, 4] are at offset 123 from the parent bus address, so the parent address for 'bar' node
+  // would be '123 + 0'. This address would then be used for mmio access in the case of register
+  // banks.
+  constexpr std::optional<uint64_t> TranslateChildAddress(uint64_t address) const {
+    // No rangees (ranges = <empty>) means identity mapping, which is not the same
+    // as missing |ranges|.
+
+    if (size() == 0) {
+      return address;
+    }
+
+    for (size_t i = 0; i < size(); ++i) {
+      auto range = (*this)[i];
+      if (!range.child_bus_address() || !range.parent_bus_address() || !range.length()) {
+        continue;
+      }
+      if (address >= *range.child_bus_address() &&
+          address < *range.child_bus_address() + *range.length()) {
+        return address - *range.child_bus_address() + *range.parent_bus_address();
+      }
+    }
+    // Something went wrong, we couldnt find a valid range to translate the addres.
+    return std::nullopt;
+  }
+
+ private:
+  using PropEncodedArray<RangesPropertyElement>::PropEncodedArray;
+};
+
+// See
 // https://devicetree-specification.readthedocs.io/en/v0.3/devicetree-basics.html#property-values
 // for the types and representations of possible property values.
 class PropertyValue {
@@ -297,6 +362,19 @@ class PropertyValue {
   //  https://devicetree-specification.readthedocs.io/en/v0.3/devicetree-basics.html#address-cells-and-size-cells
   std::optional<RegProperty> AsReg(const PropertyDecoder& decoder) const {
     return RegProperty::Create(decoder, bytes_);
+  }
+
+  // Attempts to parse the bytes a 'ranges' property. A ranges property consist of an array of
+  // 3-Tuples, the first element being the child bus address, then the parent bus address and the
+  // length of the range last. The number of cells of each entry is obtained as follows:
+  //   * 'address-cells' for child bus address from decoder itself.
+  //   * 'address-cells' for parent bus address from decoder's parent.
+  //   * 'size-cells' for length from decoder itself.
+  //
+  // See 'ranges'
+  // https://devicetree-specification.readthedocs.io/en/v0.3/devicetree-basics.html#ranges
+  std::optional<RangesProperty> AsRanges(const PropertyDecoder& decoder) const {
+    return RangesProperty::Create(decoder, bytes_);
   }
 
  private:

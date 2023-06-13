@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -842,6 +843,123 @@ TEST(RegisterBlockPropertyTest, AccessorsMultipleAddressCells) {
 
   EXPECT_EQ(*(*reg_block)[2].address(), 0xACED0000DEAD);
   EXPECT_EQ(*(*reg_block)[2].size(), 0xBEEF);
+}
+
+TEST(RangesPropertyTest, Accessors) {
+  struct Range {
+    std::array<uint32_t, 2> child;
+    std::array<uint32_t, 1> parent;
+    std::array<uint32_t, 1> length;
+  };
+
+  std::array<Range, 4> data = {
+      Range{
+          .child =
+              {
+                  byte_swap(2),
+                  byte_swap(1),
+              },
+          .parent =
+              {
+                  byte_swap(4),
+              },
+          .length = {byte_swap(6)},
+      },
+      Range{
+          .child =
+              {
+                  byte_swap(8),
+                  byte_swap(7),
+              },
+          .parent =
+              {
+                  byte_swap(10),
+              },
+          .length = {byte_swap(12)},
+      },
+      Range{
+          .child =
+              {
+                  byte_swap(14),
+                  byte_swap(13),
+              },
+          .parent =
+              {
+                  byte_swap(16),
+              },
+          .length = {byte_swap(18)},
+      },
+  };
+
+  devicetree::ByteView view(reinterpret_cast<uint8_t*>(data.data()), data.size() * sizeof(Range));
+  auto ranges_property = devicetree::RangesProperty::Create(2, 1, 1, view);
+  ASSERT_TRUE(ranges_property);
+  auto ranges = *ranges_property;
+
+  auto range_0 = ranges[0];
+  EXPECT_EQ(range_0.child_bus_address(), uint64_t(2) << 32 | 1);
+  EXPECT_EQ(range_0.parent_bus_address(), uint64_t(4));
+  EXPECT_EQ(range_0.length(), 6);
+
+  auto range_1 = ranges[1];
+  EXPECT_EQ(range_1.child_bus_address(), uint64_t(8) << 32 | 7);
+  EXPECT_EQ(range_1.parent_bus_address(), uint64_t(10));
+  EXPECT_EQ(range_1.length(), 12);
+
+  auto range_2 = ranges[2];
+  EXPECT_EQ(range_2.child_bus_address(), uint64_t(14) << 32 | 13);
+  EXPECT_EQ(range_2.parent_bus_address(), uint64_t(16));
+  EXPECT_EQ(range_2.length(), 18);
+}
+
+TEST(RangesPropertyTest, AddressTranslation) {
+  struct Range {
+    std::array<uint32_t, 1> child;
+    std::array<uint32_t, 1> parent;
+    std::array<uint32_t, 1> length;
+  };
+  static_assert(std::has_unique_object_representations_v<Range>);
+  static_assert(sizeof(Range) == 12);
+
+  std::array<Range, 2> data = {
+      Range{
+          .child = {byte_swap(1000)},
+          .parent = {byte_swap(1111)},
+          .length = {byte_swap(50)},
+      },
+      Range{
+          .child = {byte_swap(1050)},
+          .parent = {byte_swap(2222)},
+          .length = {byte_swap(50)},
+      },
+  };
+
+  devicetree::ByteView view(reinterpret_cast<uint8_t*>(data.data()), data.size() * sizeof(Range));
+  auto ranges_property = devicetree::RangesProperty::Create(1, 1, 1, view);
+  ASSERT_TRUE(ranges_property);
+  auto ranges = *ranges_property;
+
+  EXPECT_FALSE(ranges.TranslateChildAddress(999));
+  EXPECT_EQ(ranges.TranslateChildAddress(1000), 1111);
+  EXPECT_EQ(ranges.TranslateChildAddress(1001), 1112);
+
+  EXPECT_EQ(ranges.TranslateChildAddress(1050), 2222);
+  EXPECT_EQ(ranges.TranslateChildAddress(1051), 2223);
+  EXPECT_FALSE(ranges.TranslateChildAddress(2100));
+}
+
+TEST(RangesPropertyTest, EmptyRanges) {
+  devicetree::ByteView view;
+  auto ranges_property = devicetree::RangesProperty::Create(2, 1, 1, view);
+  ASSERT_TRUE(ranges_property);
+  auto ranges = *ranges_property;
+
+  EXPECT_EQ(ranges.TranslateChildAddress(999), 999);
+  EXPECT_EQ(ranges.TranslateChildAddress(1000), 1000);
+  EXPECT_EQ(ranges.TranslateChildAddress(1001), 1001);
+  EXPECT_EQ(ranges.TranslateChildAddress(1050), 1050);
+  EXPECT_EQ(ranges.TranslateChildAddress(1051), 1051);
+  EXPECT_EQ(ranges.TranslateChildAddress(2100), 2100);
 }
 
 TEST(PropertyValueTest, AsRegisterBlockWithBadSizeIsNullopt) {
