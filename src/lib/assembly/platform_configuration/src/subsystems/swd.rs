@@ -55,69 +55,6 @@ impl DefaultByBuildType for SwdConfig {
         }
     }
 }
-
-pub(crate) struct SwdSubsystemConfig;
-impl DefineSubsystemConfiguration<Option<SwdConfig>> for SwdSubsystemConfig {
-    /// Configures the SWD system. If |subsystem_config| is None, no SWD system
-    /// is configured by this call.
-    /// Configures the SWD system. If |subsystem_config| is None, the default
-    /// is set based on the build type and/or feature set level.
-    fn define_configuration(
-        context: &ConfigurationContext<'_>,
-        subsystem_config: &Option<SwdConfig>,
-        builder: &mut dyn ConfigurationBuilder,
-    ) -> anyhow::Result<()> {
-        match subsystem_config {
-            // Add the checker according to the configuration
-            Some(SwdConfig { update_checker: Some(update_checker), .. }) => {
-                Self::set_update_checker(update_checker, builder)?;
-            }
-            // No checker is set or there is no SWD config at all, set based on
-            // feature set level
-            Some(SwdConfig { update_checker: None, .. }) | None => {
-                match context.feature_set_level {
-                    // Minimal has an update checker
-                    FeatureSupportLevel::Minimal => {
-                        let update_checker =
-                            UpdateChecker::default_by_build_type(context.build_type);
-                        Self::set_update_checker(&update_checker, builder)?;
-                    }
-                    // Bootstrap and utility default to no update checker
-                    FeatureSupportLevel::Bootstrap | FeatureSupportLevel::Utility => {}
-                }
-            }
-        }
-
-        Ok(())
-    }
-}
-
-impl SwdSubsystemConfig {
-    /// Configure which AIB to select based on the UpdateChecker
-    fn set_update_checker(
-        update_checker: &UpdateChecker,
-        builder: &mut dyn ConfigurationBuilder,
-    ) -> anyhow::Result<()> {
-        match update_checker {
-            UpdateChecker::OmahaClient(OtaConfigs { policy_config, .. }) => {
-                builder.platform_bundle("omaha_client");
-                let mut omaha_config =
-                    builder.package("omaha-client").component("meta/omaha-client-service.cm")?;
-                omaha_config
-                    .field("periodic_interval_minutes", policy_config.periodic_interval_minutes)?
-                    .field("startup_delay_seconds", policy_config.startup_delay_seconds)?
-                    .field("allow_reboot_when_idle", policy_config.allow_reboot_when_idle)?
-                    .field("retry_delay_seconds", policy_config.retry_delay_seconds)?
-                    .field("fuzz_percentage_range", policy_config.fuzz_percentage_range)?;
-            }
-            UpdateChecker::SystemUpdateChecker => {
-                builder.platform_bundle("system_update_checker");
-            }
-        }
-        Ok(())
-    }
-}
-
 impl DefaultByBuildType for UpdateChecker {
     fn default_by_build_type(build_type: &BuildType) -> Self {
         match build_type {
