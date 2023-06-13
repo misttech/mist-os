@@ -352,7 +352,7 @@ impl FileOps for FuseFileObject {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _current_offset: off_t,
-        _whence: SeekTarget,
+        _target: SeekTarget,
     ) -> Result<off_t, Errno> {
         not_implemented!("FileOps::seek");
         error!(ENOTSUP)

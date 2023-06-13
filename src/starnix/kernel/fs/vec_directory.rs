@@ -41,9 +41,9 @@ impl FileOps for VecDirectory {
         _file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,
-        whence: SeekTarget,
+        target: SeekTarget,
     ) -> Result<off_t, Errno> {
-        unbounded_seek(current_offset, whence)
+        unbounded_seek(current_offset, target)
     }
 
     fn readdir(

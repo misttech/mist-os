@@ -32,6 +32,10 @@ pub enum SeekTarget {
     Cur(off_t),
     /// Seek to the given offset relative to the end of the file.
     End(off_t),
+    /// Seek for the first data after the given offset,
+    Data(off_t),
+    /// Seek for the first hole after the given offset,
+    Hole(off_t),
 }
 
 impl SeekTarget {
@@ -40,6 +44,8 @@ impl SeekTarget {
             SEEK_SET => Ok(SeekTarget::Set(offset)),
             SEEK_CUR => Ok(SeekTarget::Cur(offset)),
             SEEK_END => Ok(SeekTarget::End(offset)),
+            SEEK_DATA => Ok(SeekTarget::Data(offset)),
+            SEEK_HOLE => Ok(SeekTarget::Hole(offset)),
             _ => error!(EINVAL),
         }
     }
@@ -106,7 +112,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         file: &FileObject,
         current_task: &CurrentTask,
         current_offset: off_t,
-        whence: SeekTarget,
+        target: SeekTarget,
     ) -> Result<off_t, Errno>;
 
     /// Returns a VMO representing this file. At least the requested protection flags must
@@ -248,24 +254,38 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
 /// Implement the seek method for a file. The computation from the end of the file must be provided
 /// through a callback.
 ///
-/// Errors if `whence` is invalid, or the calculated offset is invalid.
+/// Errors if the calculated offset is invalid.
 ///
-/// - `offset`: The target offset from `whence`.
-/// - `whence`: The location from which to compute the updated offset.
+/// - `current_offset`: The current position
+/// - `target`: The location to seek to.
 /// - `compute_end`: Compute the new offset from the end. Return an error if the operation is not
-///                  supported.
+///    supported.
 pub fn default_seek<F>(
     current_offset: off_t,
-    whence: SeekTarget,
+    target: SeekTarget,
     compute_end: F,
 ) -> Result<off_t, Errno>
 where
     F: FnOnce(off_t) -> Result<off_t, Errno>,
 {
-    let new_offset = match whence {
+    let new_offset = match target {
         SeekTarget::Set(offset) => Some(offset),
         SeekTarget::Cur(offset) => current_offset.checked_add(offset),
         SeekTarget::End(offset) => Some(compute_end(offset)?),
+        SeekTarget::Data(offset) => {
+            let eof = compute_end(0).unwrap_or(off_t::MAX);
+            if offset >= eof {
+                return error!(ENXIO);
+            }
+            Some(offset)
+        }
+        SeekTarget::Hole(offset) => {
+            let eof = compute_end(0)?;
+            if offset >= eof {
+                return error!(ENXIO);
+            }
+            Some(eof)
+        }
     }
     .ok_or_else(|| errno!(EINVAL))?;
 
@@ -280,12 +300,12 @@ where
 ///
 /// This is useful for files without a defined size.
 ///
-/// Errors if `whence` is invalid, or the calculated offset is invalid.
+/// Errors if the calculated offset is invalid.
 ///
-/// - `offset`: The target offset from `whence`.
-/// - `whence`: The location from which to compute the updated offset.
-pub fn unbounded_seek(current_offset: off_t, whence: SeekTarget) -> Result<off_t, Errno> {
-    default_seek(current_offset, whence, |_| Ok(MAX_LFS_FILESIZE as off_t))
+/// - `current_offset`: The current position
+/// - `target`: The location to seek to.
+pub fn unbounded_seek(current_offset: off_t, target: SeekTarget) -> Result<off_t, Errno> {
+    default_seek(current_offset, target, |_| Ok(MAX_LFS_FILESIZE as off_t))
 }
 
 macro_rules! fileops_impl_delegate_read_and_seek {
@@ -309,9 +329,9 @@ macro_rules! fileops_impl_delegate_read_and_seek {
             file: &FileObject,
             current_task: &crate::task::CurrentTask,
             current_offset: crate::types::off_t,
-            whence: crate::fs::SeekTarget,
+            target: crate::fs::SeekTarget,
         ) -> Result<off_t, crate::types::Errno> {
-            $delegate.seek(file, current_task, current_offset, whence)
+            $delegate.seek(file, current_task, current_offset, target)
         }
     };
 }
@@ -328,9 +348,9 @@ macro_rules! fileops_impl_seekable {
             file: &crate::fs::FileObject,
             current_task: &crate::task::CurrentTask,
             current_offset: crate::types::off_t,
-            whence: crate::fs::SeekTarget,
+            target: crate::fs::SeekTarget,
         ) -> Result<crate::types::off_t, crate::types::Errno> {
-            crate::fs::default_seek(current_offset, whence, |offset| {
+            crate::fs::default_seek(current_offset, target, |offset| {
                 let file_size = file.node().stat(current_task)?.st_size as off_t;
                 offset.checked_add(file_size).ok_or_else(|| errno!(EINVAL))
             })
@@ -350,7 +370,7 @@ macro_rules! fileops_impl_nonseekable {
             _file: &crate::fs::FileObject,
             _current_task: &crate::task::CurrentTask,
             _current_offset: crate::types::off_t,
-            _whence: crate::fs::SeekTarget,
+            _target: crate::fs::SeekTarget,
         ) -> Result<crate::types::off_t, crate::types::Errno> {
             use crate::types::errno::*;
             error!(ESPIPE)
@@ -375,7 +395,7 @@ macro_rules! fileops_impl_seekless {
             _file: &crate::fs::FileObject,
             _current_task: &crate::task::CurrentTask,
             _current_offset: crate::types::off_t,
-            _whence: crate::fs::SeekTarget,
+            _target: crate::fs::SeekTarget,
         ) -> Result<crate::types::off_t, crate::types::Errno> {
             Ok(0)
         }
@@ -500,7 +520,7 @@ impl FileOps for OPathOps {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _current_offset: off_t,
-        _whence: SeekTarget,
+        _target: SeekTarget,
     ) -> Result<off_t, Errno> {
         error!(EBADF)
     }
@@ -574,7 +594,7 @@ impl FileOps for ProxyFileOps {
             file: &FileObject,
             current_task: &CurrentTask,
             offset: off_t,
-            whence: SeekTarget,
+            target: SeekTarget,
         ) -> Result<off_t, Errno>;
         fn get_vmo(
             &self,
@@ -933,17 +953,17 @@ impl FileObject {
         })
     }
 
-    pub fn seek(&self, current_task: &CurrentTask, whence: SeekTarget) -> Result<off_t, Errno> {
+    pub fn seek(&self, current_task: &CurrentTask, target: SeekTarget) -> Result<off_t, Errno> {
         if !self.ops().is_seekable() {
             return error!(ESPIPE);
         }
 
         if !self.ops().has_persistent_offsets() {
-            return self.ops().seek(self, current_task, 0, whence);
+            return self.ops().seek(self, current_task, 0, target);
         }
 
         let mut offset_guard = self.offset.lock();
-        let new_offset = self.ops().seek(self, current_task, *offset_guard, whence)?;
+        let new_offset = self.ops().seek(self, current_task, *offset_guard, target)?;
         *offset_guard = new_offset;
         Ok(new_offset)
     }
