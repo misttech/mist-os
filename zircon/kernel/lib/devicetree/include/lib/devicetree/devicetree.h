@@ -21,6 +21,8 @@
 #include <fbl/intrusive_container_utils.h>
 #include <fbl/intrusive_double_list.h>
 
+#include "internal/devicetree.h"
+
 // This library provides abstractions and utilities for dealing with
 // 'devicetree's in their flattened, binary form (.dtb). Although not used in
 // Fuchsia-compliant bootloaders (which use the ZBI protocol), dealing with
@@ -32,6 +34,89 @@
 namespace devicetree {
 
 using ByteView = std::basic_string_view<uint8_t>;
+
+// Represents a tuple of N-elements encoded as collection of cells. Each cell is a 32 bit big endian
+// unsigned integer.
+//     A   B      C   D
+//    u32 u32    u32 u32 => 2 tuple of a 16 byte element. 2 cells per tuple element.
+//
+//    field 1  = A << 32 | B
+//    field 2  = C << 32 | D
+//
+//  A, B, C and D are the endian decoded values of each cell, that is from big endian to the
+//  platforms endianess.
+//
+// This class represents the individual elements of each `prop-encoded-array`.
+template <size_t N>
+class PropEncodedArrayElement {
+ public:
+  static constexpr size_t kFields = N;
+
+  constexpr PropEncodedArrayElement() = default;
+  constexpr PropEncodedArrayElement(const PropEncodedArrayElement&) = default;
+  constexpr PropEncodedArrayElement(ByteView raw_element, const std::array<size_t, N>& num_cells) {
+    size_t offset = 0;
+    for (size_t i = 0; i < N; ++i) {
+      if (num_cells[i] == 0) {
+        continue;
+      }
+      elements_[i] = internal::ParseCells(
+          raw_element.substr(offset, sizeof(uint32_t) * num_cells[i]), uint32_t(num_cells[i]));
+      offset += static_cast<size_t>(num_cells[i]) * sizeof(uint32_t);
+    }
+  }
+
+  constexpr std::optional<uint64_t> operator[](size_t index) const { return elements_[index]; }
+
+ private:
+  std::array<std::optional<uint64_t>, N> elements_;
+};
+
+// Represents a `prop-encoded-array`, where each element is an N-Tuple, represented by
+// PropEncodedArrayElement<N>.
+//
+// To represent specific properties |DecodedProperty| must provide |DecodedProperty::kFields|
+// as the value of N for the array elements. Additionally it is recommended that |DecodedProperty|
+// inherits from |PropEncodedArrayElement| and add accessors as needed for each element of the
+// tuple.
+//
+// See |RegProperty| and |RegPropertyElement| for an example.
+template <typename ElementType, size_t N = ElementType::kFields>
+class PropEncodedArray {
+ public:
+  static_assert(std::is_base_of_v<PropEncodedArrayElement<N>, ElementType>);
+
+  constexpr PropEncodedArray() = default;
+
+  template <typename... Elements>
+  explicit constexpr PropEncodedArray(ByteView data, Elements... num_cells)
+      : cells_for_elements_({static_cast<size_t>(num_cells)...}),
+        entry_size_(std::accumulate(
+            cells_for_elements_.begin(), cells_for_elements_.end(), 0,
+            [](size_t acc, size_t num_cells) { return acc + num_cells * sizeof(uint32_t); })),
+        prop_encoded_raw_(data) {
+    static_assert(sizeof...(Elements) == N);
+    ZX_ASSERT(prop_encoded_raw_.size() % entry_size_ == 0);
+  }
+
+  constexpr ElementType operator[](size_t index) const {
+    ZX_ASSERT(index * entry_size_ < prop_encoded_raw_.size());
+    return ElementType(prop_encoded_raw_.substr(index * entry_size_, entry_size_),
+                       cells_for_elements_);
+  }
+
+  constexpr size_t size() const {
+    if (entry_size_ == 0) {
+      return 0;
+    }
+    return prop_encoded_raw_.size() / entry_size_;
+  }
+
+ private:
+  std::array<size_t, N> cells_for_elements_ = {};
+  size_t entry_size_ = 0;
+  ByteView prop_encoded_raw_;
+};
 
 // Represents the node name of a devicetree. This has the same API as
 // std::string_view and is meant to be used the same way. It requires its own
@@ -141,51 +226,23 @@ class PropertyDecoder;
 // See
 // https://devicetree-specification.readthedocs.io/en/v0.3/devicetree-basics.html#reg
 // for property description.
-class RegProperty {
+class RegPropertyElement : public PropEncodedArrayElement<2> {
+ public:
+  using PropEncodedArrayElement<2>::PropEncodedArrayElement;
+
+  constexpr std::optional<uint64_t> address() const { return (*this)[0]; }
+  constexpr std::optional<uint64_t> size() const { return (*this)[1]; }
+};
+
+class RegProperty : public PropEncodedArray<RegPropertyElement> {
  public:
   static std::optional<RegProperty> Create(uint32_t num_address_cells, uint32_t num_size_cells,
                                            ByteView bytes);
 
   static std::optional<RegProperty> Create(const PropertyDecoder& decoder, ByteView bytes);
 
-  struct Register {
-    Register(ByteView reg, uint32_t num_address_cells, uint32_t num_size_cells);
-
-    uint64_t address = 0;
-    uint64_t size = 0;
-  };
-
-  constexpr RegProperty() = default;
-  constexpr RegProperty(const RegProperty&) = default;
-  constexpr RegProperty(RegProperty&&) noexcept = default;
-  constexpr RegProperty& operator=(const RegProperty&) = default;
-  constexpr RegProperty& operator=(RegProperty&&) noexcept = default;
-
-  // Returns |i|-th register pair.
-  Register operator[](size_t index) const {
-    ZX_ASSERT(index < size());
-    const uint32_t entry_size = sizeof(uint32_t) * (num_address_cells_ + num_size_cells_);
-    size_t offset = index * entry_size;
-    return Register(bytes_.substr(offset, entry_size), num_address_cells_, num_size_cells_);
-  }
-
-  // Number of register entries in the RegProperty.
-  constexpr uint64_t size() const {
-    uint32_t register_size = num_size_cells_ + num_address_cells_;
-    if (register_size == 0) {
-      return 0;
-    }
-    return bytes_.size() / (sizeof(uint32_t) * (num_address_cells_ + num_size_cells_));
-  }
-
  private:
-  explicit constexpr RegProperty(uint32_t num_address_cells_, uint32_t num_size_cells,
-                                 ByteView bytes)
-      : num_address_cells_(num_address_cells_), num_size_cells_(num_size_cells), bytes_(bytes) {}
-
-  uint32_t num_address_cells_ = 0;
-  uint32_t num_size_cells_ = 0;
-  ByteView bytes_;
+  using PropEncodedArray<RegPropertyElement>::PropEncodedArray;
 };
 
 // See
@@ -518,20 +575,19 @@ class PropertyDecoder {
     std::array<std::optional<PropertyValue>, sizeof...(PropertyNames)> result = {};
     int count = 0;
     auto try_populate = [&](auto name, size_t index, const Property& property, bool& matched) {
-      if (!result[index].has_value() && property.name == name) {
+      if (!matched && !result[index].has_value() && property.name == name) {
         matched = true;
         result[index] = property.value;
         count++;
-        return true;
       }
-      return result[index].has_value();
+      return !matched;
     };
 
     // Like an if/elseif branch, where |matched| determines whether the branch
     // should be evaluated or not.
     Visit([&](auto property) {
       bool matched = false;
-      std::ignore = ((!matched && try_populate(property_names, Is, property, matched)) && ...);
+      std::ignore = ((try_populate(property_names, Is, property, matched)) && ...);
       return count != sizeof...(PropertyNames);
     });
 

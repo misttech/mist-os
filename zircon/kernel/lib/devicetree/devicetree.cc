@@ -7,6 +7,7 @@
 #include "lib/devicetree/devicetree.h"
 
 #include <inttypes.h>
+#include <lib/devicetree/internal/devicetree.h>
 #include <lib/devicetree/path.h>
 #include <lib/fit/defer.h>
 #include <lib/fit/result.h>
@@ -59,19 +60,8 @@ struct FdtProperty {
 // Structure block tokens are 4-byte aligned.
 inline size_t StructBlockAlign(size_t x) { return ZX_ALIGN(x, sizeof(uint32_t)); }
 
-struct ReadBigEndianUint32Result {
-  uint32_t value;
-  ByteView tail;
-};
-
-inline ReadBigEndianUint32Result ReadBigEndianUint32(ByteView bytes) {
-  ZX_ASSERT(bytes.size() >= sizeof(uint32_t));
-  return {
-      (static_cast<uint32_t>(bytes[0]) << 24) | (static_cast<uint32_t>(bytes[1]) << 16) |
-          (static_cast<uint32_t>(bytes[2]) << 8) | static_cast<uint32_t>(bytes[3]),
-      bytes.substr(sizeof(uint32_t)),
-  };
-}
+using internal::ReadBigEndianUint32;
+using internal::ReadBigEndianUint32Result;
 
 struct ReadBigEndianUint64Result {
   uint64_t value;
@@ -101,29 +91,6 @@ PropertyBlockContents ReadPropertyBlock(ByteView bytes) {
   auto [name_offset, block_end] = ReadBigEndianUint32(bytes.substr(offsetof(FdtProperty, nameoff)));
   ByteView value = block_end.substr(0, prop_size);
   return {value, name_offset, block_end.substr(StructBlockAlign(prop_size))};
-}
-
-template <size_t N>
-uint64_t ParseCells(ByteView bytes) {
-  static_assert(N == 1 || N == 2, "Only supports 1 or 2 cells.");
-  uint64_t higher = ReadBigEndianUint32(bytes).value;
-  if constexpr (N == 1) {
-    return higher;
-  } else {
-    uint64_t lower = ReadBigEndianUint32(bytes.substr(4)).value;
-    return higher << 32 | lower;
-  }
-}
-
-uint64_t ParseCells(ByteView bytes, uint32_t num_cells) {
-  switch (num_cells) {
-    case 1:
-      return ParseCells<1>(bytes);
-    case 2:
-      return ParseCells<2>(bytes);
-    default:
-      ZX_PANIC("Invalid number of cells (%" PRIu32 ")", num_cells);
-  }
 }
 
 }  // namespace
@@ -216,7 +183,7 @@ std::optional<RegProperty> RegProperty::Create(uint32_t num_address_cells, uint3
   if (num_address_cells > 2 || num_size_cells > 2) {
     return std::nullopt;
   }
-  return RegProperty(num_address_cells, num_size_cells, bytes);
+  return RegProperty(bytes, num_address_cells, num_size_cells);
 }
 
 std::optional<RegProperty> RegProperty::Create(const PropertyDecoder& decoder, ByteView bytes) {
@@ -226,16 +193,6 @@ std::optional<RegProperty> RegProperty::Create(const PropertyDecoder& decoder, B
   const auto& parent = *decoder.parent();
   return RegProperty::Create(parent.num_address_cells().value_or(kRegDefaultAddressCells),
                              parent.num_size_cells().value_or(kRegDefaultSizeCells), bytes);
-}
-
-RegProperty::Register::Register(ByteView bytes, uint32_t num_address_cells,
-                                uint32_t num_size_cells) {
-  // address cells then size cells.
-  address = ParseCells(bytes, num_address_cells);
-  // size cells then size cells.
-  size = ParseCells(
-      bytes.substr(num_address_cells * sizeof(uint32_t), num_size_cells * sizeof(uint32_t)),
-      num_size_cells);
 }
 
 Devicetree::Devicetree(ByteView blob) {

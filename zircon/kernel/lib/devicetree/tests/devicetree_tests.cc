@@ -14,8 +14,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <type_traits>
 
 #include <zxtest/zxtest.h>
 
@@ -795,14 +797,14 @@ TEST(RegisterBlockPropertyTest, Accessors) {
   ASSERT_TRUE(reg_block);
 
   ASSERT_EQ(reg_block->size(), 3);
-  EXPECT_EQ((*reg_block)[0].address, 0xACED);
-  EXPECT_EQ((*reg_block)[0].size, 0xD1CE);
+  EXPECT_EQ(*(*reg_block)[0].address(), 0xACED);
+  EXPECT_EQ(*(*reg_block)[0].size(), 0xD1CE);
 
-  EXPECT_EQ((*reg_block)[1].address, 0xDEED);
-  EXPECT_EQ((*reg_block)[1].size, 0xFEE7);
+  EXPECT_EQ(*(*reg_block)[1].address(), 0xDEED);
+  EXPECT_EQ(*(*reg_block)[1].size(), 0xFEE7);
 
-  EXPECT_EQ((*reg_block)[2].address, 0xDEAD);
-  EXPECT_EQ((*reg_block)[2].size, 0xBEEF);
+  EXPECT_EQ(*(*reg_block)[2].address(), 0xDEAD);
+  EXPECT_EQ(*(*reg_block)[2].size(), 0xBEEF);
 }
 
 TEST(RegisterBlockPropertyTest, AccessorsMultipleAddressCells) {
@@ -832,14 +834,14 @@ TEST(RegisterBlockPropertyTest, AccessorsMultipleAddressCells) {
   ASSERT_TRUE(reg_block);
 
   ASSERT_EQ(reg_block->size(), 3);
-  EXPECT_EQ((*reg_block)[0].address, 0xACED0000ACED);
-  EXPECT_EQ((*reg_block)[0].size, 0xD1CE);
+  EXPECT_EQ(*(*reg_block)[0].address(), 0xACED0000ACED);
+  EXPECT_EQ(*(*reg_block)[0].size(), 0xD1CE);
 
-  EXPECT_EQ((*reg_block)[1].address, 0xACED0000DEED);
-  EXPECT_EQ((*reg_block)[1].size, 0xFEE7);
+  EXPECT_EQ(*(*reg_block)[1].address(), 0xACED0000DEED);
+  EXPECT_EQ(*(*reg_block)[1].size(), 0xFEE7);
 
-  EXPECT_EQ((*reg_block)[2].address, 0xACED0000DEAD);
-  EXPECT_EQ((*reg_block)[2].size, 0xBEEF);
+  EXPECT_EQ(*(*reg_block)[2].address(), 0xACED0000DEAD);
+  EXPECT_EQ(*(*reg_block)[2].size(), 0xBEEF);
 }
 
 TEST(PropertyValueTest, AsRegisterBlockWithBadSizeIsNullopt) {
@@ -856,6 +858,131 @@ TEST(PropertyValueTest, AsRegisterBlockWithBadSizeIsNullopt) {
 
   auto reg_block = reg->AsReg(decoder);
   ASSERT_FALSE(reg_block);
+}
+
+TEST(PropertyEncodedArrayTest, DecodeFields) {
+  struct Triplet {
+    std::array<uint32_t, 2> field_1;
+    uint32_t field_2;
+    std::array<uint32_t, 2> field_3;
+  };
+  static_assert(std::has_unique_object_representations_v<Triplet>);
+
+  std::array<Triplet, 4> raw_data = {
+      Triplet{
+          // 12  | 32 << 32
+          .field_1 =
+              {
+                  byte_swap(12),
+                  byte_swap(32),
+              },
+          .field_2 = byte_swap(16),
+          .field_3 =
+              {
+                  byte_swap(0),
+                  byte_swap(1),
+              },
+      },
+      Triplet{
+          .field_1 =
+              {
+                  byte_swap(45),
+                  byte_swap(3),
+              },
+          .field_2 = byte_swap(17),
+          .field_3 =
+              {
+                  byte_swap(1),
+                  byte_swap(21),
+              },
+      },
+      Triplet{
+          .field_1 =
+              {
+                  byte_swap(451),
+                  byte_swap(31),
+              },
+          .field_2 = byte_swap(18),
+          .field_3 =
+              {
+                  byte_swap(15),
+                  byte_swap(22),
+              },
+      },
+      Triplet{
+          .field_1 =
+              {
+                  byte_swap(454),
+                  byte_swap(34),
+              },
+          .field_2 = byte_swap(155),
+          .field_3 =
+              {
+                  byte_swap(150),
+                  byte_swap(220),
+              },
+      },
+  };
+  devicetree::ByteView data(reinterpret_cast<uint8_t*>(raw_data.data()),
+                            raw_data.size() * sizeof(Triplet));
+  devicetree::PropEncodedArray<devicetree::PropEncodedArrayElement<3>>
+      triplet_property_encoded_array(data, /*field_1 num cells*/ 2, /*field_2 num cells*/ 1,
+                                     /*field_3 num_cells*/ 2);
+
+  auto encoded_triplet_0 = triplet_property_encoded_array[0];
+
+  EXPECT_EQ(*encoded_triplet_0[0], uint64_t(12) << 32 | 32);
+  EXPECT_EQ(*encoded_triplet_0[1], uint64_t(16));
+  EXPECT_EQ(*encoded_triplet_0[2], uint64_t(0) << 32 | 1);
+
+  auto encoded_triplet_1 = triplet_property_encoded_array[1];
+
+  EXPECT_EQ(*encoded_triplet_1[0], uint64_t(45) << 32 | 3);
+  EXPECT_EQ(*encoded_triplet_1[1], uint64_t(17));
+  EXPECT_EQ(*encoded_triplet_1[2], uint64_t(1) << 32 | 21);
+
+  auto encoded_triplet_2 = triplet_property_encoded_array[2];
+
+  EXPECT_EQ(*encoded_triplet_2[0], uint64_t(451) << 32 | 31);
+  EXPECT_EQ(*encoded_triplet_2[1], uint64_t(18));
+  EXPECT_EQ(*encoded_triplet_2[2], uint64_t(15) << 32 | 22);
+
+  auto encoded_triplet_3 = triplet_property_encoded_array[3];
+
+  EXPECT_EQ(*encoded_triplet_3[0], uint64_t(454) << 32 | 34);
+  EXPECT_EQ(*encoded_triplet_3[1], uint64_t(155));
+  EXPECT_EQ(*encoded_triplet_3[2], uint64_t(150) << 32 | 220);
+}
+
+TEST(PropertyEncodedArrayTest, DecodeFieldsWithZeroSize) {
+  struct Triplet {
+    std::array<uint32_t, 2> field_1;
+    // field_2 0 size.
+    uint32_t field_3;
+  };
+
+  std::array<Triplet, 2> raw_data = {
+      Triplet{.field_1 = {byte_swap(456), byte_swap(123)}, .field_3 = byte_swap(2)},
+      Triplet{.field_1 = {byte_swap(456), byte_swap(124)}, .field_3 = byte_swap(3)},
+  };
+
+  devicetree::ByteView data(reinterpret_cast<uint8_t*>(raw_data.data()),
+                            raw_data.size() * sizeof(Triplet));
+  devicetree::PropEncodedArray<devicetree::PropEncodedArrayElement<3>>
+      triplet_property_encoded_array(data, /*field_1 num cells*/ 2, /*field_2 num cells*/ 0,
+                                     /*field_3 num_cells*/ 1);
+
+  auto encoded_triplet_0 = triplet_property_encoded_array[0];
+
+  EXPECT_EQ(*encoded_triplet_0[0], uint64_t(456) << 32 | 123);
+  EXPECT_FALSE(encoded_triplet_0[1].has_value());
+  EXPECT_EQ(*encoded_triplet_0[2], 2);
+
+  auto encoded_triplet_1 = triplet_property_encoded_array[1];
+
+  EXPECT_EQ(*encoded_triplet_1[0], uint64_t(456) << 32 | 124);
+  EXPECT_FALSE(encoded_triplet_1[1].has_value());
+  EXPECT_EQ(*encoded_triplet_1[2], 3);
 }
 
 }  // namespace
