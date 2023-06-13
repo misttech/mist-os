@@ -6,11 +6,7 @@
 //! RTM_LINK and RTM_ADDR Netlink messages based on events received from
 //! Netstack's interface watcher.
 
-use std::{
-    collections::BTreeMap,
-    hash::Hash,
-    num::{NonZeroU32, NonZeroU64},
-};
+use std::{collections::BTreeMap, num::NonZeroU32};
 
 use fidl_fuchsia_hardware_network as fhwnet;
 use fidl_fuchsia_net as fnet;
@@ -242,6 +238,13 @@ pub(crate) enum InterfacesNetstackError {
     Update(fnet_interfaces_ext::UpdateError),
 }
 
+#[derive(Debug, Default, Clone, PartialEq)]
+struct InterfaceState {
+    // `BTreeMap` so that addresses are iterated in deterministic order
+    // (useful for tests).
+    addresses: BTreeMap<fnet::IpAddress, NetlinkAddressMessage>,
+}
+
 impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
     /// `new` returns a `Result<EventLoop, EventLoopError>` instance.
     /// This is fallible iff it is not possible to obtain the `StateProxy`.
@@ -288,10 +291,10 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
         // interfaces/addresses that already existed. Sending messages in
         // response to existing (`fnet_interfaces::Event::Existing`) events will
         // violate that expectation.
-        let (mut interface_properties, mut addresses) = {
-            let interface_properties = match fnet_interfaces_ext::existing(
+        let mut interface_properties = {
+            let mut interface_properties = match fnet_interfaces_ext::existing(
                 if_event_stream.by_ref(),
-                BTreeMap::new(),
+                BTreeMap::<u64, fnet_interfaces_ext::PropertiesAndState<InterfaceState>>::new(),
             )
             .await
             {
@@ -312,20 +315,16 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
                 }
             };
 
-            // `BTreeMap` so that addresses are iterated in deterministic order
-            // (useful for tests).
-            let addresses: BTreeMap<_, _> = interface_properties
-                .values()
-                .map(|properties_and_state| {
-                    addresses_optionally_from_interface_properties(&properties_and_state.properties)
-                        .map(IntoIterator::into_iter)
-                        .into_iter()
-                        .flatten()
-                })
-                .flatten()
-                .collect();
+            for fnet_interfaces_ext::PropertiesAndState { properties, state } in
+                interface_properties.values_mut()
+            {
+                if let Some(addresses) = addresses_optionally_from_interface_properties(properties)
+                {
+                    state.addresses = addresses;
+                }
+            }
 
-            (interface_properties, addresses)
+            interface_properties
         };
 
         // Chain a pending so that the stream never ends. This is so that tests
@@ -350,7 +349,6 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
 
                     match handle_interface_watcher_event(
                         &mut interface_properties,
-                        &mut addresses,
                         &route_clients,
                         event,
                     ) {
@@ -372,7 +370,6 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
                     Self::handle_request(
                         &interfaces_proxy,
                         &interface_properties,
-                        &addresses,
                         req.expect(
                             "request stream should never end because of chained `pending`",
                         ),
@@ -535,8 +532,10 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
 
     async fn handle_request(
         interfaces_proxy: &fnet_root::InterfacesProxy,
-        interface_properties: &BTreeMap<u64, fnet_interfaces_ext::PropertiesAndState<()>>,
-        all_addresses: &BTreeMap<InterfaceAndAddr, NetlinkAddressMessage>,
+        interface_properties: &BTreeMap<
+            u64,
+            fnet_interfaces_ext::PropertiesAndState<InterfaceState>,
+        >,
         Request { args, sequence_number, mut client, completer }: Request<S>,
     ) {
         debug!("handling request {args:?} from {client}");
@@ -559,8 +558,10 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
             RequestArgs::Address(args) => match args {
                 AddressRequestArgs::Get(args) => match args {
                     GetAddressArgs::Dump { ip_version_filter } => {
-                        all_addresses
+                        interface_properties
                             .values()
+                            .map(|iface| iface.state.addresses.values())
+                            .flatten()
                             .filter(|NetlinkAddressMessage(message)| {
                                 ip_version_filter.map_or(true, |ip_version| {
                                     ip_version.eq(&match message.header.family.into() {
@@ -614,16 +615,9 @@ enum InterfaceEventHandlerError {
     ExistingEventReceived(fnet_interfaces_ext::Properties),
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-struct InterfaceAndAddr {
-    id: u32,
-    addr: fnet::IpAddress,
-}
-
 fn update_addresses<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
-    interface_id: &NonZeroU64,
-    all_addresses: &mut BTreeMap<InterfaceAndAddr, NetlinkAddressMessage>,
-    interface_addresses: BTreeMap<InterfaceAndAddr, NetlinkAddressMessage>,
+    existing_addresses: &mut BTreeMap<fnet::IpAddress, NetlinkAddressMessage>,
+    updated_addresses: BTreeMap<fnet::IpAddress, NetlinkAddressMessage>,
     route_clients: &ClientTable<NetlinkRoute, S>,
 ) {
     enum UpdateKind {
@@ -651,22 +645,16 @@ fn update_addresses<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
 
     // Send a message to interested listeners only if the address is newly added
     // or its message has changed.
-    for (key, message) in interface_addresses.iter() {
-        if all_addresses.get(key) != Some(message) {
+    for (key, message) in updated_addresses.iter() {
+        if existing_addresses.get(key) != Some(message) {
             send_update(message, UpdateKind::New)
         }
     }
 
-    all_addresses.retain(|key @ InterfaceAndAddr { id, addr: _ }, message| {
-        // If the address is for an interface different from what we are
-        // operating on, keep the address.
-        if u64::from(*id) != interface_id.get() {
-            return true;
-        }
-
+    existing_addresses.retain(|addr, message| {
         // If the address exists in the latest update, keep it. If it was
         // updated, we will update this map with the updated values below.
-        if interface_addresses.contains_key(key) {
+        if updated_addresses.contains_key(addr) {
             return true;
         }
 
@@ -677,9 +665,9 @@ fn update_addresses<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
         false
     });
 
-    // Update our set of all addresses with the latest set known to be assigned
-    // to the interface.
-    all_addresses.extend(interface_addresses);
+    // Update our set of existing addresses with the latest set known to be
+    // assigned to the interface.
+    existing_addresses.extend(updated_addresses);
 }
 
 /// Handles events observed from the interface watcher by updating interfaces
@@ -688,8 +676,10 @@ fn update_addresses<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
 /// Returns an `InterfaceEventLoopError` when unexpected events occur, or an
 /// `UpdateError` when updates are not consistent with the current state.
 fn handle_interface_watcher_event<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
-    interface_properties: &mut BTreeMap<u64, fnet_interfaces_ext::PropertiesAndState<()>>,
-    all_addresses: &mut BTreeMap<InterfaceAndAddr, NetlinkAddressMessage>,
+    interface_properties: &mut BTreeMap<
+        u64,
+        fnet_interfaces_ext::PropertiesAndState<InterfaceState>,
+    >,
     route_clients: &ClientTable<NetlinkRoute, S>,
     event: fnet_interfaces::Event,
 ) -> Result<(), InterfaceEventHandlerError> {
@@ -699,7 +689,10 @@ fn handle_interface_watcher_event<S: Sender<<NetlinkRoute as ProtocolFamily>::In
     };
 
     match update {
-        fnet_interfaces_ext::UpdateResult::Added { properties, state: _ } => {
+        fnet_interfaces_ext::UpdateResult::Added {
+            properties,
+            state: InterfaceState { addresses },
+        } => {
             if let Some(message) = NetlinkLinkMessage::optionally_from(properties) {
                 route_clients.send_message_to_group(
                     message.into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false),
@@ -710,10 +703,10 @@ fn handle_interface_watcher_event<S: Sender<<NetlinkRoute as ProtocolFamily>::In
             // Send address messages after the link message for newly added links
             // so that netlink clients are aware of the interface before sending
             // address messages for an interface.
-            if let Some(interface_addresses) =
+            if let Some(updated_addresses) =
                 addresses_optionally_from_interface_properties(properties)
             {
-                update_addresses(&properties.id, all_addresses, interface_addresses, route_clients);
+                update_addresses(addresses, updated_addresses, route_clients);
             }
 
             debug!(tag = NETLINK_LOG_TAG, "processed add/existing event for id {}", properties.id);
@@ -740,7 +733,7 @@ fn handle_interface_watcher_event<S: Sender<<NetlinkRoute as ProtocolFamily>::In
                     has_default_ipv4_route: _,
                     has_default_ipv6_route: _,
                 },
-            state: _,
+            state: InterfaceState { addresses: interface_addresses },
         } => {
             if online.is_some() {
                 if let Some(message) = NetlinkLinkMessage::optionally_from(current) {
@@ -759,13 +752,13 @@ fn handle_interface_watcher_event<S: Sender<<NetlinkRoute as ProtocolFamily>::In
             // The `is_some` check is not strictly necessary because
             // `update_addresses` will calculate the delta before sending
             // updates but is useful as an optimization when addresses don't
-            // change (avoid allocations and message comparisons that will net
+            // change (<avoid allocations and message comparisons that will net
             // no updates).
             if addresses.is_some() {
-                if let Some(interface_addresses) =
+                if let Some(updated_addresses) =
                     addresses_optionally_from_interface_properties(current)
                 {
-                    update_addresses(&id, all_addresses, interface_addresses, route_clients);
+                    update_addresses(interface_addresses, updated_addresses, route_clients);
                 }
 
                 debug!(
@@ -776,9 +769,9 @@ fn handle_interface_watcher_event<S: Sender<<NetlinkRoute as ProtocolFamily>::In
         }
         fnet_interfaces_ext::UpdateResult::Removed(fnet_interfaces_ext::PropertiesAndState {
             properties,
-            state: (),
+            state: InterfaceState { mut addresses },
         }) => {
-            update_addresses(&properties.id, all_addresses, BTreeMap::new(), route_clients);
+            update_addresses(&mut addresses, BTreeMap::new(), route_clients);
 
             // Send link messages after the address message for removed links
             // so that netlink clients are aware of the interface throughout the
@@ -991,7 +984,7 @@ enum NetlinkAddressMessageConversionError {
 
 fn addresses_optionally_from_interface_properties(
     properties: &fnet_interfaces_ext::Properties,
-) -> Option<BTreeMap<InterfaceAndAddr, NetlinkAddressMessage>> {
+) -> Option<BTreeMap<fnet::IpAddress, NetlinkAddressMessage>> {
     match interface_properties_to_address_messages(properties) {
         Ok(o) => Some(o),
         Err(NetlinkAddressMessageConversionError::InvalidInterfaceId(id)) => {
@@ -1013,7 +1006,7 @@ fn interface_properties_to_address_messages(
         has_default_ipv4_route: _,
         has_default_ipv6_route: _,
     }: &fnet_interfaces_ext::Properties,
-) -> Result<BTreeMap<InterfaceAndAddr, NetlinkAddressMessage>, NetlinkAddressMessageConversionError>
+) -> Result<BTreeMap<fnet::IpAddress, NetlinkAddressMessage>, NetlinkAddressMessageConversionError>
 {
     // We expect interface ids to safely fit in the range of the u32 values.
     let id: u32 = match id.get().try_into() {
@@ -1077,7 +1070,7 @@ fn interface_properties_to_address_messages(
                 let mut addr_message = AddressMessage::default();
                 addr_message.header = addr_header;
                 addr_message.nlas = nlas;
-                (InterfaceAndAddr { id, addr: addr.clone() }, NetlinkAddressMessage(addr_message))
+                (addr.clone(), NetlinkAddressMessage(addr_message))
             },
         )
         .collect();
@@ -1260,6 +1253,8 @@ pub(crate) mod testutil {
 mod tests {
     use super::{testutil::*, *};
 
+    use std::num::NonZeroU64;
+
     use fidl::endpoints::{ControlHandle as _, RequestStream as _, Responder as _};
     use fidl_fuchsia_net as fnet;
     use fnet_interfaces::AddressAssignmentState;
@@ -1322,15 +1317,15 @@ mod tests {
         interface_id: u64,
         interface_name: String,
         flags: u32,
-    ) -> BTreeMap<InterfaceAndAddr, NetlinkAddressMessage> {
+    ) -> BTreeMap<fnet::IpAddress, NetlinkAddressMessage> {
         let interface_id = interface_id.try_into().expect("should fit into u32");
         BTreeMap::from_iter([
             (
-                InterfaceAndAddr { id: interface_id, addr: TEST_V4_ADDR.addr },
+                TEST_V4_ADDR.addr,
                 create_address_message(interface_id, TEST_V4_ADDR, interface_name.clone(), flags),
             ),
             (
-                InterfaceAndAddr { id: interface_id, addr: TEST_V6_ADDR.addr },
+                TEST_V6_ADDR.addr,
                 create_address_message(interface_id, TEST_V6_ADDR, interface_name, flags),
             ),
         ])
@@ -1338,25 +1333,24 @@ mod tests {
 
     #[fuchsia::test]
     fn test_handle_interface_watcher_event() {
-        let mut interface_properties: BTreeMap<u64, fnet_interfaces_ext::PropertiesAndState<()>> =
-            BTreeMap::new();
-        let mut addresses = BTreeMap::new();
+        let mut interface_properties =
+            BTreeMap::<u64, fnet_interfaces_ext::PropertiesAndState<InterfaceState>>::new();
         let route_clients = ClientTable::<NetlinkRoute, FakeSender<_>>::default();
 
-        let mut interface1 = create_interface(1, "test".into(), ETHERNET, true, vec![]);
-        let interface2 = create_interface(2, "lo".into(), LOOPBACK, true, vec![]);
+        let mut interface1 =
+            create_interface(ETH_INTERFACE_ID, "test".into(), ETHERNET, true, vec![]);
+        let interface2 = create_interface(LO_INTERFACE_ID, "lo".into(), LOOPBACK, true, vec![]);
 
         let interface1_add_event = fnet_interfaces::Event::Added(interface1.clone().into());
         assert_matches!(
             handle_interface_watcher_event(
                 &mut interface_properties,
-                &mut addresses,
                 &route_clients,
                 interface1_add_event
             ),
             Ok(())
         );
-        assert_eq!(interface_properties.get(&1).unwrap().properties, interface1);
+        assert_eq!(interface_properties.get(&ETH_INTERFACE_ID).unwrap().properties, interface1);
 
         // Sending an updated interface properties with a different field
         // should update the properties stored under the same interface id.
@@ -1365,41 +1359,38 @@ mod tests {
         assert_matches!(
             handle_interface_watcher_event(
                 &mut interface_properties,
-                &mut addresses,
                 &route_clients,
                 interface1_change_event
             ),
             Ok(())
         );
-        assert_eq!(interface_properties.get(&1).unwrap().properties, interface1);
+        assert_eq!(interface_properties.get(&ETH_INTERFACE_ID).unwrap().properties, interface1);
 
         let interface2_add_event = fnet_interfaces::Event::Added(interface2.clone().into());
         assert_matches!(
             handle_interface_watcher_event(
                 &mut interface_properties,
-                &mut addresses,
                 &route_clients,
                 interface2_add_event
             ),
             Ok(())
         );
-        assert_eq!(interface_properties.get(&1).unwrap().properties, interface1);
-        assert_eq!(interface_properties.get(&2).unwrap().properties, interface2);
+        assert_eq!(interface_properties.get(&ETH_INTERFACE_ID).unwrap().properties, interface1);
+        assert_eq!(interface_properties.get(&LO_INTERFACE_ID).unwrap().properties, interface2);
 
         // A remove event should result in no longer seeing the LinkMessage in the
         // interface properties BTreeMap.
-        let interface1_remove_event = fnet_interfaces::Event::Removed(1);
+        let interface1_remove_event = fnet_interfaces::Event::Removed(ETH_INTERFACE_ID);
         assert_matches!(
             handle_interface_watcher_event(
                 &mut interface_properties,
-                &mut addresses,
                 &route_clients,
                 interface1_remove_event
             ),
             Ok(())
         );
-        assert_eq!(interface_properties.get(&1), None);
-        assert_eq!(interface_properties.get(&2).unwrap().properties, interface2);
+        assert_eq!(interface_properties.get(&ETH_INTERFACE_ID), None);
+        assert_eq!(interface_properties.get(&LO_INTERFACE_ID).unwrap().properties, interface2);
     }
 
     fn get_fake_interface(
