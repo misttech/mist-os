@@ -22,9 +22,12 @@ group("tests") {
     "ld:tests",
     "stdcompat:tests",
     "sys/component:tests",
+    "sys/cpp:tests",
     "sys/inspect:tests",
+    "sys/service/cpp:tests",
     "syslog:tests",
     "utf-utils:tests",
+    "vfs/cpp:tests",
     "zxio:tests",
   ]
 }

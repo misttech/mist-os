@@ -62,3 +62,8 @@ fuchsia_unittest_package("sys_service_tests") {
   deps = [ ":sys_service_unittests" ]
   manifest = "../meta/sys_service_unittests.cml"
 }
+
+group("tests") {
+  testonly = true
+  public_deps = [ ":sys_service_tests" ]
+}
