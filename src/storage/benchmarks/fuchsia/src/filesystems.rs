@@ -126,6 +126,16 @@ impl Filesystem for FsmFilesystem {
     fn benchmark_dir(&self) -> &Path {
         Path::new(MOUNT_PATH)
     }
+
+    fn exposed_dir(&mut self) -> &fio::DirectoryProxy {
+        let fs = self.serving_filesystem.as_ref().unwrap();
+        match fs {
+            Either::Left(serving_filesystem) => serving_filesystem.exposed_dir(),
+            Either::Right(serving_filesystem) => {
+                serving_filesystem.volume("default").unwrap().exposed_dir()
+            }
+        }
+    }
 }
 
 pub struct Blobfs {}
@@ -258,7 +268,7 @@ impl FilesystemConfig for Fxblob {
         let block_device = block_device_factory
             .create_block_device(&BlockDeviceConfig {
                 use_zxcrypt: false,
-                fvm_volume_size: Some(60 * 1024 * 1024),
+                fvm_volume_size: Some(125 * 1024 * 1024),
             })
             .await;
         let fxblob = FsmFilesystem::new(
@@ -311,7 +321,9 @@ impl FilesystemConfig for F2fs {
     }
 }
 
-struct MemfsInstance {}
+struct MemfsInstance {
+    exposed_dir: fio::DirectoryProxy,
+}
 
 impl MemfsInstance {
     pub async fn new() -> Self {
@@ -354,7 +366,7 @@ impl MemfsInstance {
         let namespace = fdio::Namespace::installed().expect("Failed to get local namespace");
         namespace.bind(MOUNT_PATH, root_dir).expect("Failed to bind memfs");
 
-        Self {}
+        Self { exposed_dir }
     }
 }
 
@@ -374,6 +386,10 @@ impl Filesystem for MemfsInstance {
 
     fn benchmark_dir(&self) -> &Path {
         Path::new(MOUNT_PATH)
+    }
+
+    fn exposed_dir(&mut self) -> &fio::DirectoryProxy {
+        &self.exposed_dir
     }
 }
 
@@ -436,6 +452,10 @@ mod tests {
     use {
         super::*,
         crate::block_devices::RamdiskFactory,
+        blob_writer::BlobWriter,
+        fidl::endpoints::{create_proxy, ServerEnd},
+        fuchsia_component::client::connect_to_protocol_at_dir_svc,
+        fuchsia_merkle::MerkleTree,
         std::{
             fs::OpenOptions,
             io::{Read, Write},
@@ -474,6 +494,62 @@ mod tests {
         fs.shutdown().await;
     }
 
+    async fn check_blob_filesystem_new_write_api(filesystem: &dyn FilesystemConfig) {
+        const BLOB_CONTENTS: &str = "blob-contents";
+        let merkle = MerkleTree::from_reader(BLOB_CONTENTS.as_bytes()).unwrap().root();
+
+        let ramdisk_factory = RamdiskFactory::new(BLOCK_SIZE, BLOCK_COUNT).await;
+        let mut fs = filesystem.start_filesystem(&ramdisk_factory).await;
+
+        let blob_proxy =
+            connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::WriteBlobMarker>(fs.exposed_dir())
+                .expect("failed to connect to the WriteBlob service");
+        let writer_client_end = blob_proxy
+            .create(&merkle.into(), false)
+            .await
+            .expect("transport error on WriteBlob.Create")
+            .expect("failed to create blob");
+        let writer = writer_client_end.into_proxy().unwrap();
+        let mut blob_writer = BlobWriter::create(writer, BLOB_CONTENTS.len() as u64)
+            .await
+            .expect("failed to create BlobWriter");
+        blob_writer.write(BLOB_CONTENTS.as_bytes()).await.unwrap();
+
+        let root = fuchsia_fs::directory::open_directory_no_describe(
+            fs.exposed_dir(),
+            "root",
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::POSIX_EXECUTABLE
+                | fio::OpenFlags::POSIX_WRITABLE,
+        )
+        .unwrap();
+        let (blob, server_end) = create_proxy::<fio::FileMarker>().expect("create_proxy failed");
+        root.open(
+            fio::OpenFlags::RIGHT_READABLE,
+            fio::ModeType::empty(),
+            &merkle.to_string(),
+            ServerEnd::new(server_end.into_channel()),
+        )
+        .expect("failed to open blob");
+        let _: Vec<_> = blob.query().await.expect("failed to query blob");
+
+        let mut read_data = Vec::new();
+        loop {
+            let chunk = blob
+                .read(fio::MAX_TRANSFER_SIZE)
+                .await
+                .expect("FIDL call failed")
+                .expect("read failed");
+            let done = chunk.len() < fio::MAX_TRANSFER_SIZE as usize;
+            read_data.extend(chunk);
+            if done {
+                break;
+            }
+        }
+        assert_eq!(BLOB_CONTENTS.as_bytes(), read_data.as_slice());
+        fs.shutdown().await;
+    }
+
     async fn check_filesystem(filesystem: &dyn FilesystemConfig) {
         const FILE_CONTENTS: &str = "file-contents";
 
@@ -507,8 +583,13 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn start_fxblob() {
+    async fn start_fxblob_old() {
         check_blob_filesystem(&Fxblob::new()).await;
+    }
+
+    #[fuchsia::test]
+    async fn start_fxblob_new() {
+        check_blob_filesystem_new_write_api(&Fxblob::new()).await;
     }
 
     #[fuchsia::test]

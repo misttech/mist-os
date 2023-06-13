@@ -5,6 +5,7 @@
 use {
     crate::{filesystem::MountedFilesystemInstance, Filesystem},
     async_trait::async_trait,
+    fidl_fuchsia_io::DirectoryProxy,
     futures::lock::Mutex,
     std::{
         path::{Path, PathBuf},
@@ -57,6 +58,10 @@ impl Filesystem for TestFilesystem {
 
     fn benchmark_dir(&self) -> &Path {
         &self.benchmark_dir
+    }
+
+    fn exposed_dir(&mut self) -> &DirectoryProxy {
+        unreachable!()
     }
 }
 

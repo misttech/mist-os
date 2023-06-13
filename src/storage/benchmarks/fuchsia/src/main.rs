@@ -6,7 +6,8 @@ use {
     crate::{
         blob_benchmarks::{
             PageInBlobRandomCompressed, PageInBlobSequentialCompressed,
-            PageInBlobSequentialUncompressed,
+            PageInBlobSequentialUncompressed, WriteBlobWithBlobWriter, WriteBlobWithFidl,
+            WriteRealisticBlobsWithBlobWriter, WriteRealisticBlobsWithFidl,
         },
         block_devices::{FvmVolumeFactory, RamdiskFactory},
         filesystems::{Blobfs, F2fs, Fxblob, Fxfs, Memfs, Minfs},
@@ -119,6 +120,20 @@ fn build_blob_benchmark_set() -> BenchmarkSet {
         .add_benchmark(PageInBlobSequentialUncompressed::new(BLOB_SIZE), &blob_filesystems);
     benchmark_set.add_benchmark(PageInBlobSequentialCompressed::new(BLOB_SIZE), &blob_filesystems);
     benchmark_set.add_benchmark(PageInBlobRandomCompressed::new(BLOB_SIZE), &blob_filesystems);
+
+    const SMALL_BLOB_SIZE: usize = 2 * 1024 * 1024; // 2 MiB
+    const LARGE_BLOB_SIZE: usize = 25 * 1024 * 1024; // 25 MiB
+    let blobfs: Vec<Arc<dyn FilesystemConfig>> = vec![Arc::new(Blobfs::new())];
+    let fxblob: Vec<Arc<dyn FilesystemConfig>> = vec![Arc::new(Fxblob::new())];
+
+    benchmark_set.add_benchmark(WriteBlobWithFidl::new(SMALL_BLOB_SIZE), &blobfs);
+    benchmark_set.add_benchmark(WriteBlobWithBlobWriter::new(SMALL_BLOB_SIZE), &fxblob);
+
+    benchmark_set.add_benchmark(WriteBlobWithFidl::new(LARGE_BLOB_SIZE), &blobfs);
+    benchmark_set.add_benchmark(WriteBlobWithBlobWriter::new(LARGE_BLOB_SIZE), &fxblob);
+
+    benchmark_set.add_benchmark(WriteRealisticBlobsWithFidl::new(), &blobfs);
+    benchmark_set.add_benchmark(WriteRealisticBlobsWithBlobWriter::new(), &fxblob);
 
     benchmark_set
 }

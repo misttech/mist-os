@@ -5,6 +5,7 @@
 use {
     crate::BlockDeviceFactory,
     async_trait::async_trait,
+    fidl_fuchsia_io as fio,
     std::path::{Path, PathBuf},
 };
 
@@ -35,6 +36,10 @@ pub trait Filesystem: Send {
     /// Path to where the filesystem is located in the current process's namespace. All benchmark
     /// operations should happen within this directory.
     fn benchmark_dir(&self) -> &Path;
+
+    /// Proxy to the exposed directory of the serving filesystem or the serving volume for a
+    /// multi-volume filesystem.
+    fn exposed_dir(&mut self) -> &fio::DirectoryProxy;
 }
 
 /// A `FilesystemConfig` for a filesystem that is already present in the process's namespace.
@@ -95,5 +100,9 @@ impl Filesystem for MountedFilesystemInstance {
 
     fn benchmark_dir(&self) -> &Path {
         self.dir.as_path()
+    }
+
+    fn exposed_dir(&mut self) -> &fio::DirectoryProxy {
+        unreachable!()
     }
 }

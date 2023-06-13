@@ -308,6 +308,7 @@ mod tests {
             block_device::PanickingBlockDeviceFactory, filesystem::MountedFilesystem,
             FilesystemConfig,
         },
+        fidl_fuchsia_io::DirectoryProxy,
     };
 
     fn assert_approximately_eq(a: f64, b: f64) {
@@ -363,6 +364,10 @@ mod tests {
         async fn shutdown(self: Box<Self>) {}
 
         fn benchmark_dir(&self) -> &std::path::Path {
+            panic!("not supported");
+        }
+
+        fn exposed_dir(&mut self) -> &DirectoryProxy {
             panic!("not supported");
         }
     }

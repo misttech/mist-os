@@ -4,8 +4,13 @@
 
 use {
     async_trait::async_trait,
+    blob_writer::BlobWriter,
+    fidl_fuchsia_fxfs::WriteBlobProxy,
+    fidl_fuchsia_io as fio,
+    fuchsia_component::client::connect_to_protocol_at_dir_svc,
     fuchsia_merkle::MerkleTree,
     fuchsia_zircon as zx,
+    futures::stream::{self, StreamExt},
     rand::{
         distributions::{Distribution, WeightedIndex},
         seq::SliceRandom,
@@ -62,6 +67,90 @@ macro_rules! page_in_benchmark {
     }
 }
 
+macro_rules! write_blobs_benchmark {
+    ($benchmark:ident, $write_blobs_benchmark:ident) => {
+        #[derive(Clone)]
+        pub struct $benchmark {
+            blob_size: usize,
+        }
+
+        impl $benchmark {
+            pub fn new(blob_size: usize) -> Self {
+                Self { blob_size }
+            }
+        }
+
+        #[async_trait]
+        impl Benchmark for $benchmark {
+            async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
+                trace_duration!(
+                    "benchmark",
+                    stringify!($benchmark),
+                    "blob_size" => self.blob_size as u64
+                );
+                let mut rng = XorShiftRng::seed_from_u64(RNG_SEED);
+                let mut data = Vec::new();
+                for _n in 1..=5 {
+                    data.push(create_compressible_data(self.blob_size, &mut rng));
+                }
+                $write_blobs_benchmark(fs, data).await
+            }
+
+            fn name(&self) -> String {
+                format!("{}/{}", stringify!($benchmark), self.blob_size)
+            }
+        }
+    };
+}
+
+macro_rules! write_realistic_blobs_benchmark {
+    ($benchmark:ident, $write_blobs_benchmark:ident) => {
+        #[derive(Clone)]
+        pub struct $benchmark {}
+
+        impl $benchmark {
+            pub fn new() -> Self {
+                Self {}
+            }
+        }
+
+        #[async_trait]
+        impl Benchmark for $benchmark {
+            async fn run(&self, fs: &mut dyn Filesystem) -> Vec<OperationDuration> {
+                trace_duration!("benchmark", stringify!($benchmark));
+                let mut rng = XorShiftRng::seed_from_u64(RNG_SEED);
+                let mut data = Vec::new();
+                let sizes = vec![
+                    67 * 1024 * 1024,
+                    33 * 1024 * 1024,
+                    2 * 1024 * 1024,
+                    1024 * 1024,
+                    131072,
+                    65536,
+                    65536,
+                    32768,
+                    16384,
+                    16384,
+                    4096,
+                    4096,
+                    4096,
+                    4096,
+                    4096,
+                    4096,
+                ];
+                for size in sizes {
+                    data.push(create_compressible_data(size, &mut rng));
+                }
+                $write_blobs_benchmark(fs, data).await
+            }
+
+            fn name(&self) -> String {
+                stringify!($benchmark).to_string()
+            }
+        }
+    };
+}
+
 page_in_benchmark!(
     PageInBlobSequentialUncompressed,
     create_incompressible_data,
@@ -69,6 +158,17 @@ page_in_benchmark!(
 );
 page_in_benchmark!(PageInBlobSequentialCompressed, create_compressible_data, sequential_page_iter);
 page_in_benchmark!(PageInBlobRandomCompressed, create_compressible_data, random_page_iter);
+
+write_blobs_benchmark!(WriteBlobWithFidl, write_blobs_with_fidl_benchmark);
+write_blobs_benchmark!(WriteBlobWithBlobWriter, write_blobs_with_blob_writer_benchmark);
+write_realistic_blobs_benchmark!(
+    WriteRealisticBlobsWithFidl,
+    write_realistic_blobs_with_fidl_benchmark
+);
+write_realistic_blobs_benchmark!(
+    WriteRealisticBlobsWithBlobWriter,
+    write_realistic_blobs_with_blob_writer_benchmark
+);
 
 struct MappedBlob {
     addr: *mut libc::c_void,
@@ -205,9 +305,134 @@ fn errno_error() -> std::io::Error {
     std::io::Error::last_os_error()
 }
 
+/// Creates, truncates, and writes a new blob using fuchsia.io.
+async fn write_blob_with_fidl(blob_root: &fio::DirectoryProxy, data: &[u8], merkle: &str) {
+    let blob = fuchsia_fs::directory::open_file(
+        blob_root,
+        merkle,
+        fuchsia_fs::OpenFlags::CREATE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
+    )
+    .await
+    .unwrap();
+    let blob_size = data.len();
+    let () = blob.resize(blob_size as u64).await.unwrap().unwrap();
+    let mut written = 0;
+    while written != blob_size {
+        // Don't try to write more than MAX_TRANSFER_SIZE bytes at a time.
+        let bytes_to_write = std::cmp::min(fio::MAX_TRANSFER_SIZE, (blob_size - written) as u64);
+        let bytes_written =
+            blob.write(&data[written..written + bytes_to_write as usize]).await.unwrap().unwrap();
+        assert_eq!(bytes_written, bytes_to_write);
+        written += bytes_written as usize;
+    }
+}
+
+/// Creates, truncates, and writes a new blob using a BlobWriter.
+async fn write_blob_with_blob_writer(blob_proxy: &WriteBlobProxy, data: &[u8], merkle: &[u8; 32]) {
+    let writer_client_end = blob_proxy
+        .create(merkle, false)
+        .await
+        .expect("transport error on WriteBlob.Create")
+        .expect("failed to create blob");
+    let writer = writer_client_end.into_proxy().unwrap();
+    let mut blob_writer =
+        BlobWriter::create(writer, data.len() as u64).await.expect("failed to create BlobWriter");
+    blob_writer.write(&data).await.unwrap();
+}
+
+async fn write_blobs_with_fidl_benchmark(
+    fs: &mut dyn Filesystem,
+    blobs: Vec<Vec<u8>>,
+) -> Vec<OperationDuration> {
+    let mut durations = Vec::new();
+    let blob_root = fuchsia_fs::directory::open_in_namespace(
+        fs.benchmark_dir().to_str().unwrap(),
+        fuchsia_fs::OpenFlags::RIGHT_WRITABLE | fuchsia_fs::OpenFlags::RIGHT_READABLE,
+    )
+    .unwrap();
+    for blob in blobs {
+        let merkle = MerkleTree::from_reader(blob.as_slice()).unwrap().root();
+        let total_duration = OperationTimer::start();
+        write_blob_with_fidl(&blob_root, &blob, &merkle.to_string()).await;
+        durations.push(total_duration.stop());
+    }
+    durations
+}
+
+async fn write_blobs_with_blob_writer_benchmark(
+    fs: &mut dyn Filesystem,
+    blobs: Vec<Vec<u8>>,
+) -> Vec<OperationDuration> {
+    let mut durations = Vec::new();
+    let blob_proxy =
+        connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::WriteBlobMarker>(fs.exposed_dir())
+            .expect("failed to connect to the WriteBlob service");
+    for blob in blobs {
+        let merkle = MerkleTree::from_reader(blob.as_slice()).unwrap().root();
+        let timer = OperationTimer::start();
+        write_blob_with_blob_writer(&blob_proxy, &blob, &merkle.into()).await;
+        durations.push(timer.stop());
+    }
+    durations
+}
+
+async fn write_realistic_blobs_with_fidl_benchmark(
+    fs: &mut dyn Filesystem,
+    blobs: Vec<Vec<u8>>,
+) -> Vec<OperationDuration> {
+    let mut futures = Vec::new();
+    let blob_root = fuchsia_fs::directory::open_in_namespace(
+        fs.benchmark_dir().to_str().unwrap(),
+        fuchsia_fs::OpenFlags::RIGHT_WRITABLE | fuchsia_fs::OpenFlags::RIGHT_READABLE,
+    )
+    .unwrap();
+    for blob in blobs {
+        let merkle = MerkleTree::from_reader(blob.as_slice()).unwrap().root();
+        let blob_root_clone = std::clone::Clone::clone(&blob_root);
+        let blob_future = async move {
+            write_blob_with_fidl(&blob_root_clone, &blob, &merkle.to_string()).await;
+        };
+        futures.push(blob_future);
+    }
+    let fut = stream::iter(futures).for_each_concurrent(2, |blob_future| async move {
+        blob_future.await;
+    });
+    let timer = OperationTimer::start();
+    fut.await;
+    vec![timer.stop()]
+}
+
+async fn write_realistic_blobs_with_blob_writer_benchmark(
+    fs: &mut dyn Filesystem,
+    blobs: Vec<Vec<u8>>,
+) -> Vec<OperationDuration> {
+    let mut futures = Vec::new();
+    let blob_proxy =
+        connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::WriteBlobMarker>(fs.exposed_dir())
+            .expect("failed to connect to the WriteBlob service");
+    for blob in blobs {
+        let merkle = MerkleTree::from_reader(blob.as_slice()).unwrap().root();
+        let blob_proxy_clone = blob_proxy.clone();
+        let blob_future = async move {
+            write_blob_with_blob_writer(&blob_proxy_clone, &blob, &merkle.into()).await;
+        };
+        futures.push(blob_future);
+    }
+    let fut = stream::iter(futures).for_each_concurrent(2, |blob_future| async move {
+        blob_future.await;
+    });
+    let timer = OperationTimer::start();
+    fut.await;
+    vec![timer.stop()]
+}
+
 #[cfg(test)]
 mod tests {
-    use {super::*, storage_benchmarks::testing::TestFilesystem};
+    use {
+        super::*,
+        crate::{block_devices::RamdiskFactory, filesystems::Fxblob},
+        storage_benchmarks::{testing::TestFilesystem, FilesystemConfig},
+    };
     const PAGE_COUNT: usize = 32;
 
     fn page_size() -> usize {
@@ -220,6 +445,15 @@ mod tests {
 
         assert_eq!(results.len(), op_count);
         assert_eq!(test_fs.clear_cache_count().await, clear_cache_count);
+        test_fs.shutdown().await;
+    }
+
+    async fn check_new_write_blobs_benchmark(benchmark: impl Benchmark, op_count: usize) {
+        let ramdisk_factory = RamdiskFactory::new(page_size() as u64, 35000).await;
+        let mut test_fs = Fxblob::new().start_filesystem(&ramdisk_factory).await;
+        let results = benchmark.run(test_fs.as_mut()).await;
+
+        assert_eq!(results.len(), op_count);
         test_fs.shutdown().await;
     }
 
@@ -251,6 +485,51 @@ mod tests {
             /*clear_cache_count=*/ 1,
         )
         .await;
+    }
+
+    #[fuchsia::test]
+    async fn write_small_blob_with_fidl_test() {
+        check_benchmark(
+            WriteBlobWithFidl::new(PAGE_COUNT * page_size()),
+            5,
+            /*clear_cache_count=*/ 0,
+        )
+        .await;
+    }
+
+    #[fuchsia::test]
+    async fn write_small_blob_with_blob_writer_test() {
+        check_new_write_blobs_benchmark(WriteBlobWithBlobWriter::new(PAGE_COUNT * page_size()), 5)
+            .await;
+    }
+
+    #[fuchsia::test]
+    async fn write_large_blob_with_fidl_test() {
+        check_benchmark(
+            WriteBlobWithFidl::new(PAGE_COUNT * page_size() * 25),
+            5,
+            /*clear_cache_count=*/ 0,
+        )
+        .await;
+    }
+
+    #[fuchsia::test]
+    async fn write_large_blob_with_blob_writer_test() {
+        check_new_write_blobs_benchmark(
+            WriteBlobWithBlobWriter::new(PAGE_COUNT * page_size() * 25),
+            5,
+        )
+        .await;
+    }
+
+    #[fuchsia::test]
+    async fn write_realistic_blobs_with_fidl_test() {
+        check_benchmark(WriteRealisticBlobsWithFidl::new(), 1, /*clear_cache_count=*/ 0).await;
+    }
+
+    #[fuchsia::test]
+    async fn write_realistic_blobs_with_blob_writer_test() {
+        check_new_write_blobs_benchmark(WriteRealisticBlobsWithBlobWriter::new(), 1).await;
     }
 
     #[fuchsia::test]
