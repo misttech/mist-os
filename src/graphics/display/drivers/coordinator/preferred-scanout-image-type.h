@@ -13,18 +13,20 @@
 // For now, this header serves the role of "some other means".
 
 #if defined(__x86_64__)
-// IMAGE_TYPE_X_TILED from fuchsia/hardware/intelgpucore/c/banjo.h
+// `fuchsia.hardware.intelgpucore/IMAGE_TYPE_X_TILED` from the Banjo API.
 constexpr uint32_t IMAGE_TYPE_PREFERRED_SCANOUT = 1;
 #elif defined(__aarch64__)
-// TYPE_SIMPLE from fuchsia.hardware.display/display-controller.fidl
-// ImageType::SIMPLE from display-controller.banjo
+// `fuchsia.hardware.display/TYPE_SIMPLE` from the FIDL API.
+// `fuchsia.hardware.display.controller/ImageType.SIMPLE` from the Banjo API.
 constexpr uint32_t IMAGE_TYPE_PREFERRED_SCANOUT = 0;
 #elif defined(__riscv)
-// A temporary value to get past build issues.
-// TODO(fxbug.dev/128617): Define an appropriate value.
+// `fuchsia.hardware.display/TYPE_SIMPLE` from the FIDL API.
+// `fuchsia.hardware.display.controller/ImageType.SIMPLE` from the Banjo API.
+//
+// This may be revisited, depending on the hardware that we end supporting.
 constexpr uint32_t IMAGE_TYPE_PREFERRED_SCANOUT = 0;
 #else
-#error "Preferred scanout image format only defined on Intel and ARM."
+#error "Preferred scanout image format not defined for this platform."
 #endif
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_PREFERRED_SCANOUT_IMAGE_TYPE_H_
