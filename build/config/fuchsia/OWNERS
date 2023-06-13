@@ -1,1 +1,4 @@
 include /scripts/versioning/OWNERS
+
+# Add access for platform version roller
+per-file platform_version.json=global-integration-roller@fuchsia-infra.iam.gserviceaccount.com

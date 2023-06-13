@@ -6,3 +6,6 @@ hjfreyer@google.com
 
 # For platform versioning tooling changes.
 kjharland@google.com
+
+# Add access for platform version roller
+global-integration-roller@fuchsia-infra.iam.gserviceaccount.com

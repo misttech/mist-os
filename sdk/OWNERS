@@ -19,3 +19,6 @@ hjfreyer@google.com
 #   That's "how" the SDK is made, ask
 dschuyler@google.com
 per-file *.gn,*.gni,version_history.json = file: /build/OWNERS
+
+# Add access for platform version roller
+per-file version_history.json=global-integration-roller@fuchsia-infra.iam.gserviceaccount.com

@@ -1,1 +1,4 @@
 include /sdk/ctf/OWNERS
+
+# Add access for platform version roller
+per-file fidl_api_compatibility_testing.md=global-integration-roller@fuchsia-infra.iam.gserviceaccount.com
