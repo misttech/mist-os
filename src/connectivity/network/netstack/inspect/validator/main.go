@@ -16,8 +16,8 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/inspect/vmobuffer"
 	"go.fuchsia.dev/fuchsia/src/lib/component"
 
+	"fidl/diagnostics/validate"
 	fidlinspect "fidl/fuchsia/inspect"
-	"fidl/test/inspect/validate"
 )
 
 type impl struct {
@@ -91,6 +91,10 @@ func (*impl) InitializeTree(fidl.Context, validate.InitializationParams) (fidlin
 	return fidlinspect.TreeWithCtxInterface{}, validate.TestResultUnimplemented, nil
 }
 
+func (i *impl) GetConfig(fidl.Context) (string, validate.Options, error) {
+	return "golang-puppet", validate.Options{}, nil
+}
+
 func (i *impl) Publish(fidl.Context) (validate.TestResult, error) {
 	i.published = true
 	return validate.TestResultOk, nil
@@ -158,9 +162,9 @@ func main() {
 	componentCtx.OutgoingService.AddDiagnostics("root", &component.DirectoryWrapper{
 		Directory: &i,
 	})
-	stub := validate.ValidateWithCtxStub{Impl: &i}
+	stub := validate.InspectPuppetWithCtxStub{Impl: &i}
 	componentCtx.OutgoingService.AddService(
-		validate.ValidateName,
+		validate.InspectPuppetName,
 		func(ctx context.Context, c zx.Channel) error {
 			go component.Serve(ctx, &stub, c, component.ServeOptions{
 				OnError: func(err error) {

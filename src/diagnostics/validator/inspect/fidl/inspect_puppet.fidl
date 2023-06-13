@@ -7,7 +7,7 @@
 /// the library (and report the result of commands). (After executing some
 /// commands, the Validator program will analyze the VMO contents for
 /// correctness and memory-packing efficiency.)
-library test.inspect.validate;
+library diagnostics.validate;
 
 using fuchsia.inspect as inspect;
 using zx;
@@ -246,14 +246,38 @@ type LazyAction = flexible union {
     2: delete_lazy_node DeleteLazyNode;
 };
 
+/// Indicate the preferred DiffType on failed tests.
+type DiffType = strict enum {
+    /// Get the full rendering of both trees.
+    FULL = 0;
+
+    /// Get the diff between the trees.
+    DIFF = 1;
+
+    /// Get both the full rendering of both trees, and their diff.
+    BOTH = 2;
+};
+
 @discoverable
-closed protocol Validate {
+closed protocol InspectPuppet {
     /// Initializes the Inspect library being tested by the puppet.
     strict Initialize(struct {
         params InitializationParams;
     }) -> (resource struct {
         vmo zx.Handle:optional;
         result TestResult;
+    });
+
+    /// Provides configuration values for the validator.
+    strict GetConfig() -> (resource struct {
+        printable_name string:MAX;
+        options resource table {
+            /// Defaults to false
+            1: has_runner_node bool;
+
+            /// Defaults to FULL
+            2: diff_type DiffType;
+        };
     });
 
     /// Use instead of `Initialize` on puppets which support the Tree / Lazy method of getting VMOs.

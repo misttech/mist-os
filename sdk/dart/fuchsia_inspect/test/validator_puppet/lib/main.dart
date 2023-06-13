@@ -11,37 +11,43 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:fidl/fidl.dart';
-import 'package:fidl_test_inspect_validate/fidl_async.dart' as fidl_validate;
+import 'package:fidl_diagnostics_validate/fidl_async.dart' as fidl_validate;
 import 'package:fuchsia_inspect/src/inspect/inspect.dart';
 import 'package:fuchsia_logger/logger.dart';
 import 'package:fuchsia_services/services.dart';
 //import 'package:fuchsia/fuchsia.dart' as fuchsia; // for fuchsia.exit()
 
-class _ValidateImpl extends fidl_validate.Validate {
-  final _binding = fidl_validate.ValidateBinding();
+class _InspectPuppetImpl extends fidl_validate.InspectPuppet {
+  final _binding = fidl_validate.InspectPuppetBinding();
   Inspect _inspect;
   final _nodes = <int, Node>{};
   final _properties = <int, Property>{};
 
-  void bind(InterfaceRequest<fidl_validate.Validate> request) {
+  void bind(InterfaceRequest<fidl_validate.InspectPuppet> request) {
     _binding.bind(this, request);
   }
 
   @override
-  Future<fidl_validate.Validate$Initialize$Response> initialize(
+  Future<fidl_validate.InspectPuppet$Initialize$Response> initialize(
       fidl_validate.InitializationParams params) async {
     _inspect = Inspect();
 
     var handle = _inspect.vmoHandleForExportTestOnly;
-    return fidl_validate.Validate$Initialize$Response(
+    return fidl_validate.InspectPuppet$Initialize$Response(
         handle, fidl_validate.TestResult.ok);
   }
 
   @override
-  Future<fidl_validate.Validate$InitializeTree$Response> initializeTree(
+  Future<fidl_validate.InspectPuppet$InitializeTree$Response> initializeTree(
       fidl_validate.InitializationParams params) async {
-    return fidl_validate.Validate$InitializeTree$Response(
+    return fidl_validate.InspectPuppet$InitializeTree$Response(
         null, fidl_validate.TestResult.unimplemented);
+  }
+
+  @override
+  Future<fidl_validate.InspectPuppet$GetConfig$Response> getConfig() async {
+    return fidl_validate.InspectPuppet$GetConfig$Response(
+        "dart-puppet", fidl_validate.Options(hasRunnerNode: true));
   }
 
   @override
@@ -189,12 +195,13 @@ class _ValidateImpl extends fidl_validate.Validate {
 void main(List<String> args) {
   final context = ComponentContext.create();
   setupLogger();
-  // Initialize & serve the inspect singleton before use in _ValidateImpl.
+
+  // Initialize & serve the inspect singleton before use in _InspectPuppetImpl.
   Inspect().serve(context.outgoing);
-  final validate = _ValidateImpl();
+  final validate = _InspectPuppetImpl();
 
   context.outgoing
-    ..addPublicService<fidl_validate.Validate>(
-        validate.bind, fidl_validate.Validate.$serviceName)
+    ..addPublicService<fidl_validate.InspectPuppet>(
+        validate.bind, fidl_validate.InspectPuppet.$serviceName)
     ..serveFromStartupInfo();
 }

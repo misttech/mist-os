@@ -11,53 +11,128 @@ use {
     },
     anyhow::{bail, Error},
     diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect},
-    fidl_test_inspect_validate::TestResult,
+    fidl_diagnostics_validate::{
+        TestFailure, TestResult, TestSuccess, ValidateResult,
+        ValidateResultsIteratorGetNextResponse, ValidateResultsIteratorRequest,
+        ValidateResultsIteratorRequestStream, ValidatorRequest, ValidatorRequestStream,
+    },
+    futures::StreamExt,
 };
 
-pub async fn run_all_trials(printable_name: &str, is_dart: bool, results: &mut results::Results) {
-    let mut trial_set = trials::real_trials();
-    for trial in trial_set.iter_mut() {
-        match puppet::Puppet::connect(printable_name, is_dart).await {
-            Ok(mut puppet) => {
-                if results.test_archive {
-                    match puppet.publish().await {
-                        Ok(TestResult::Ok) => {}
-                        Ok(result) => {
-                            results.error(format!("Publish reported {:?}", result));
-                            return;
-                        }
-                        Err(e) => {
-                            results.error(format!("Publish error: {:?}", e));
-                            return;
-                        }
-                    }
+pub async fn serve_connection_requests(stream: ValidatorRequestStream) {
+    stream
+        .for_each_concurrent(None, |request| async move {
+            let Ok(request) = request else {
+                    return;
+                };
+            match request {
+                ValidatorRequest::Validate { results, .. } => {
+                    let stream = results.into_stream().expect("valid stream");
+                    run_all_trials(stream).await;
                 }
-                let mut data = Data::new();
-                if let Err(e) = run_trial(&mut puppet, &mut data, trial, results).await {
-                    results.error(format!("Running trial {}, got failure:\n{}", trial.name, e));
-                } else {
-                    results.log(format!("Trial {} succeeds", trial.name));
-                }
-                if results.test_archive {
-                    match puppet.unpublish().await {
-                        Ok(TestResult::Ok) => {}
-                        Ok(result) => {
-                            results.error(format!("Unpublish reported {:?}", result));
-                            return;
-                        }
-                        Err(e) => {
-                            results.error(format!("Unpublish error: {:?}", e));
-                            return;
-                        }
-                    }
-                }
-                // The puppet has to be shut down (it will restart) so the VMO fetch will succeed
-                // on the next trial. This also makes sure the puppet is in a clean state for
-                // each trial.
-                puppet.shutdown().await;
             }
-            Err(e) => {
-                results.error(format!("Failed to form Puppet {} - error {:?}.", printable_name, e));
+        })
+        .await;
+}
+
+async fn publish_puppet(
+    puppet: &mut puppet::Puppet,
+) -> Result<(), ValidateResultsIteratorGetNextResponse> {
+    match puppet.publish().await {
+        Ok(TestResult::Ok) => Ok(()),
+        Ok(failed_result) => Err(ValidateResultsIteratorGetNextResponse {
+            result: Some(ValidateResult::Failure(TestFailure {
+                test_name: "Test archive".to_string(),
+                reason: format!("Publish reported {failed_result:?}"),
+            })),
+            ..ValidateResultsIteratorGetNextResponse::default()
+        }),
+        Err(e) => Err(ValidateResultsIteratorGetNextResponse {
+            result: Some(ValidateResult::Failure(TestFailure {
+                test_name: "Test archive".to_string(),
+                reason: format!("Publish error: {e:?}"),
+            })),
+            ..ValidateResultsIteratorGetNextResponse::default()
+        }),
+    }
+}
+
+async fn unpublish_puppet(
+    puppet: &mut puppet::Puppet,
+) -> Result<(), ValidateResultsIteratorGetNextResponse> {
+    match puppet.unpublish().await {
+        Ok(TestResult::Ok) => Ok(()),
+        Ok(failed_result) => Err(ValidateResultsIteratorGetNextResponse {
+            result: Some(ValidateResult::Failure(TestFailure {
+                test_name: "Test archive".to_string(),
+                reason: format!("Unpublish reported {failed_result:?}"),
+            })),
+            ..ValidateResultsIteratorGetNextResponse::default()
+        }),
+        Err(e) => Err(ValidateResultsIteratorGetNextResponse {
+            result: Some(ValidateResult::Failure(TestFailure {
+                test_name: "Test archive".to_string(),
+                reason: format!("Unpublish error: {e:?}"),
+            })),
+            ..ValidateResultsIteratorGetNextResponse::default()
+        }),
+    }
+}
+
+pub async fn run_all_trials(mut stream: ValidateResultsIteratorRequestStream) {
+    let mut results = results::Results::new();
+    let mut trial_set = trials::real_trials();
+    while let Some(Ok(request)) = stream.next().await {
+        match request {
+            ValidateResultsIteratorRequest::GetNext { responder } => {
+                match puppet::Puppet::connect().await {
+                    Ok(mut puppet) => {
+                        results.diff_type = puppet.config.diff_type;
+                        if puppet.config.test_archive {
+                            if let Err(e) = publish_puppet(&mut puppet).await {
+                                responder.send(e).ok();
+                                continue;
+                            }
+                        }
+
+                        let Some(mut trial) = trial_set.pop() else {
+                            responder.send(ValidateResultsIteratorGetNextResponse::default()).ok();
+                            continue;
+                        };
+
+                        let mut data = Data::new();
+                        let trial_result =
+                            run_trial(&mut puppet, &mut data, &mut trial, &mut results).await;
+
+                        if puppet.config.test_archive {
+                            if let Err(e) = unpublish_puppet(&mut puppet).await {
+                                responder.send(e).ok();
+                                continue;
+                            }
+                        }
+
+                        match trial_result {
+                            Err(failed) => responder.send(failed).ok(),
+                            Ok(passed) => responder.send(passed).ok(),
+                        };
+                    }
+
+                    Err(e) => {
+                        responder
+                            .send(ValidateResultsIteratorGetNextResponse {
+                                result: Some(ValidateResult::Failure(TestFailure {
+                                    test_name: "Failed to start up tests".to_string(),
+                                    reason: format!(
+                                        "Failed to form unknown Puppet - error {:?}.",
+                                        e
+                                    ),
+                                })),
+                                ..ValidateResultsIteratorGetNextResponse::default()
+                            })
+                            .ok();
+                        continue;
+                    }
+                }
             }
         }
     }
@@ -72,35 +147,60 @@ enum StepResult {
     Stop,
 }
 
+fn into_response(trial_name: String, err: Error) -> ValidateResultsIteratorGetNextResponse {
+    ValidateResultsIteratorGetNextResponse {
+        result: Some(ValidateResult::Failure(TestFailure {
+            test_name: trial_name,
+            reason: format!("{err:?}"),
+        })),
+        ..ValidateResultsIteratorGetNextResponse::default()
+    }
+}
+
 async fn run_trial(
     puppet: &mut puppet::Puppet,
     data: &mut Data,
     trial: &mut trials::Trial,
     results: &mut results::Results,
-) -> Result<(), Error> {
+) -> Result<ValidateResultsIteratorGetNextResponse, ValidateResultsIteratorGetNextResponse> {
     let trial_name = format!("{}:{}", puppet.printable_name(), trial.name);
     // We have to give explicit type here because compiler can't deduce it from None option value.
-    try_compare::<validate::Action>(data, puppet, &trial_name, -1, None, -1, results).await?;
+    try_compare::<validate::Action>(data, puppet, &trial_name, -1, None, -1, results)
+        .await
+        .map_err(|e| into_response(trial_name.clone(), e))?;
     for (step_index, step) in trial.steps.iter_mut().enumerate() {
         let step_result = match step {
             Step::Actions(actions) => {
-                run_actions(actions, data, puppet, &trial.name, step_index, results).await?
+                run_actions(actions, data, puppet, &trial.name, step_index, results)
+                    .await
+                    .map_err(|e| into_response(trial_name.clone(), e))?
             }
             Step::WithMetrics(actions, step_name) => {
-                let r =
-                    run_actions(actions, data, puppet, &trial.name, step_index, results).await?;
-                results.remember_metrics(puppet.metrics()?, &trial.name, step_index, step_name);
+                let r = run_actions(actions, data, puppet, &trial.name, step_index, results)
+                    .await
+                    .map_err(|e| into_response(trial_name.clone(), e))?;
+                results.remember_metrics(
+                    puppet.metrics().map_err(|e| into_response(trial_name.clone(), e))?,
+                    &trial.name,
+                    step_index,
+                    step_name,
+                );
                 r
             }
             Step::LazyActions(actions) => {
-                run_lazy_actions(actions, data, puppet, &trial.name, step_index, results).await?
+                run_lazy_actions(actions, data, puppet, &trial.name, step_index, results)
+                    .await
+                    .map_err(|e| into_response(trial_name.clone(), e))?
             }
         };
         if step_result == StepResult::Stop {
             break;
         }
     }
-    Ok(())
+    Ok(ValidateResultsIteratorGetNextResponse {
+        result: Some(ValidateResult::Success(TestSuccess { test_name: trial.name.clone() })),
+        ..ValidateResultsIteratorGetNextResponse::default()
+    })
 }
 
 async fn run_actions(
@@ -239,7 +339,7 @@ async fn try_compare<ActionType: std::fmt::Debug>(
                 );
             }
             Ok(mut puppet_data) => {
-                if puppet.is_dart {
+                if puppet.config.has_runner_node {
                     puppet_data.remove_tree("runner");
                 }
                 if let Err(e) = data.compare(&puppet_data, results.diff_type) {
@@ -288,7 +388,7 @@ async fn try_compare<ActionType: std::fmt::Debug>(
             }
 
             let mut hierarchy_data: Data = archive_data[0].payload.as_ref().unwrap().clone().into();
-            if puppet.is_dart {
+            if puppet.config.has_runner_node {
                 hierarchy_data.remove_tree("runner");
             }
             if let Err(e) = data.compare_to_json(&hierarchy_data, results.diff_type) {
@@ -313,11 +413,11 @@ mod tests {
         crate::trials::tests::trial_with_action,
         crate::trials::{Step, Trial},
         crate::*,
-        fidl_test_inspect_validate::*,
+        fidl_diagnostics_validate::*,
     };
 
     #[fuchsia::test]
-    async fn unimplemented_works() -> Result<(), Error> {
+    async fn unimplemented_works() {
         let mut int_maker = trial_with_action(
             "foo",
             create_numeric_property!(
@@ -338,21 +438,21 @@ mod tests {
             ],
         };
         let mut results = results::Results::new();
-        let mut puppet = puppet::tests::local_incomplete_puppet().await?;
+        let mut puppet = puppet::tests::local_incomplete_puppet().await.unwrap();
         // results contains a list of the _un_implemented actions. local_incomplete_puppet()
         // implements Int creation, but not Uint. So results should not include Uint but should
         // include Int.
         {
             let mut data = Data::new();
-            run_trial(&mut puppet, &mut data, &mut int_maker, &mut results).await?;
+            run_trial(&mut puppet, &mut data, &mut int_maker, &mut results).await.unwrap();
         }
         {
             let mut data = Data::new();
-            run_trial(&mut puppet, &mut data, &mut uint_maker, &mut results).await?;
+            run_trial(&mut puppet, &mut data, &mut uint_maker, &mut results).await.unwrap();
         }
         {
             let mut data = Data::new();
-            run_trial(&mut puppet, &mut data, &mut uint_create_delete, &mut results).await?;
+            run_trial(&mut puppet, &mut data, &mut uint_create_delete, &mut results).await.unwrap();
         }
         assert!(!results
             .to_json()
@@ -360,6 +460,5 @@ mod tests {
         assert!(results
             .to_json()
             .contains(&format!("{}: CreateProperty(Uint)", puppet.printable_name())));
-        Ok(())
     }
 }

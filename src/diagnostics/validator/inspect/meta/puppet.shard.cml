@@ -8,12 +8,12 @@
     ],
     capabilities: [
         {
-            protocol: [ "test.inspect.validate.Validate" ],
+            protocol: [ "diagnostics.validate.InspectPuppet" ],
         },
     ],
     expose: [
         {
-            protocol: [ "test.inspect.validate.Validate" ],
+            protocol: [ "diagnostics.validate.InspectPuppet" ],
             from: "self",
         },
     ],

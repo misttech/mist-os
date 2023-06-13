@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    super::{metrics::Metrics, validate::*, DiffType},
+    super::{metrics::Metrics, validate::*},
+    crate::puppet::DiffType,
     serde::Serialize,
     std::collections::HashSet,
 };
@@ -108,6 +109,9 @@ struct TrialMetrics {
     step_name: String,
 }
 
+// TODO(fxbug.dev/128581): There shouldn't really be any unused functionality. It needs to be
+// incorporated into the error output/InspectPuppet responses, or deleted.
+#[allow(unused)]
 impl Results {
     pub fn new() -> Results {
         Results {

@@ -655,7 +655,7 @@ fn lazy_nodes_trial() -> Trial {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use {super::*, fidl_test_inspect_validate::*};
+    use {super::*, fidl_diagnostics_validate::*};
 
     pub fn trial_with_action(name: &str, action: Action) -> Trial {
         Trial { name: name.into(), steps: vec![Step::Actions(vec![action])] }

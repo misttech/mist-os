@@ -18,7 +18,7 @@ The Inspect Validator implementation includes:
 
 * [Core Validator program](/src/diagnostics/validator/inspect/src)
     * [Tests](/src/diagnostics/validator/inspect/src/trials.rs)
-    * [FIDL](/src/diagnostics/validator/inspect/fidl/validate.test.fidl)
+    * [FIDL](/src/diagnostics/validator/inspect/fidl/inspect_puppet.fidl)
     * [Reading the puppet's output](/src/diagnostics/validator/inspect/src/data/scanner.rs)
     * [Reference Behavior and comparison](/src/diagnostics/validator/inspect/src/data.rs)
     * [Analysis](/src/diagnostics/validator/inspect/src/runner.rs)

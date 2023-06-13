@@ -1,0 +1,39 @@
+// Copyright 2020 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library diagnostics.validate;
+
+@discoverable
+protocol Validator {
+    /// Runs the encoding validation test suite and reports the results on the
+    /// given channel.
+    strict Validate(resource struct {
+        results server_end:ValidateResultsIterator;
+    });
+};
+
+protocol ValidateResultsIterator {
+    /// Returns the result of a test case execution.
+    GetNext() -> (resource table {
+        1: result ValidateResult;
+    });
+};
+
+type ValidateResult = strict union {
+    /// Set when the test case passed.
+    1: success TestSuccess;
+    /// Set when the test case failed.
+    2: failure TestFailure;
+};
+
+type TestSuccess = struct {
+    /// The name of the test case.
+    test_name string:MAX;
+};
+
+type TestFailure = struct {
+    /// The name of the test case.
+    test_name string:MAX;
+    /// The reason the test case failed.
+    reason string:MAX;
+};

@@ -1,0 +1,44 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/sys/test_runners/rust/default.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        binary: "bin/inspect_validator_test_manager_bin",
+    },
+    children: [
+        {
+            name: "puppet",
+            url: "puppet#meta/puppet.cm",
+        },
+        {
+            name: "validator",
+            url: "inspect_validator#meta/validator.cm",
+        },
+    ],
+    use: [
+        {
+            protocol: "diagnostics.validate.Validator",
+            from: "#validator",
+        },
+        {
+            protocol: "fuchsia.sys2.LifecycleController",
+            from: "framework",
+        },
+    ],
+    offer: [
+        {
+            protocol: "diagnostics.validate.InspectPuppet",
+            from: "#puppet",
+            to: "#validator",
+        },
+        {
+            protocol: "fuchsia.diagnostics.ArchiveAccessor",
+            from: "parent",
+            to: "#validator",
+        },
+    ],
+}

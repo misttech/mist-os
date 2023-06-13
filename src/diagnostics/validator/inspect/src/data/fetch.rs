@@ -21,7 +21,9 @@ pub struct LazyNode {
 impl LazyNode {
     /// Creates a VMO tree using the channel given as root and the children trees as read from `channel.open_child`.
     /// In order to support async recursion, we have to Pin and Box the Future type.
-    pub fn new(channel: TreeProxy) -> Pin<Box<dyn Future<Output = Result<LazyNode, Error>>>> {
+    pub fn new(
+        channel: TreeProxy,
+    ) -> Pin<Box<dyn Future<Output = Result<LazyNode, Error>> + Send>> {
         Box::pin(async move {
             let fetcher = LazyNodeFetcher::new(channel);
             let vmo = fetcher.get_vmo().await?;

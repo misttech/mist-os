@@ -9,12 +9,15 @@ group("tests") {
   testonly = true
 
   deps = [
-    ":inspect-validator-test",
-    "lib/cpp:tests",
-    "lib/rust:tests",
+    ":inspect_validator_test_cpp",
+    ":inspect_validator_test_dart",
+    ":inspect_validator_test_rust",
+    ":inspect_validator_unittest",
   ]
 }
 
+# The binary used by validator_component. Contains test cases, which are sent to the parent,
+# #inspect_validator_test_manager, and then to the appropriate puppet.
 rustc_binary("validator_bin") {
   name = "validator"
   edition = "2021"
@@ -34,7 +37,6 @@ rustc_binary("validator_bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_rust",
-    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//src/diagnostics/validator/inspect/fidl:validate_rust",
     "//src/lib/diagnostics/hierarchy/rust",
     "//src/lib/diagnostics/inspect/format/rust",
@@ -45,9 +47,9 @@ rustc_binary("validator_bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:argh",
     "//third_party/rust_crates:base64",
     "//third_party/rust_crates:difference",
+    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:num-derive",
     "//third_party/rust_crates:num-traits",
     "//third_party/rust_crates:serde",
@@ -57,11 +59,88 @@ rustc_binary("validator_bin") {
   test_deps = [
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
     "//src/lib/fuchsia-async",
-    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]
 }
 
-fuchsia_unittest_package("inspect-validator-test") {
+# Unit tests for validator_bin (not the validation tests themselves)
+fuchsia_unittest_package("inspect_validator_unittest") {
   deps = [ ":validator_bin_test" ]
+}
+
+# The binary run by #inspect_validator_test_manager. Orchestrates communication between #puppet
+# and #validator_component.
+rustc_test("inspect_validator_test_manager_bin") {
+  name = "inspect_validator_test_manager_bin"
+  edition = "2021"
+  source_root = "src/test.rs"
+  sources = [ "src/test.rs" ]
+  deps = [
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
+    "//src/diagnostics/validator/inspect/fidl:validate_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
+    "//third_party/rust_crates:tracing",
+  ]
+}
+
+# The parent component of #validator_component and #puppet.
+fuchsia_test_component("inspect_validator_test_manager") {
+  component_name = "validator_test"
+  manifest = "meta/test.cml"
+  deps = [ ":inspect_validator_test_manager_bin" ]
+}
+
+# Component containing the test cases.
+fuchsia_test_component("validator_component") {
+  component_name = "validator"
+  manifest = "meta/validator.cml"
+  deps = [ ":validator_bin" ]
+}
+
+fuchsia_package("validator") {
+  testonly = true
+  package_name = "inspect_validator"
+  deps = [ ":validator_component" ]
+}
+
+# The per-language test packages are below
+
+fuchsia_test_package("inspect_validator_test_rust") {
+  subpackages = [ ":validator" ]
+  renameable_subpackages = [
+    {
+      name = "puppet"
+      package = "//src/diagnostics/validator/inspect/lib/rust"
+    },
+  ]
+  test_components = [ ":inspect_validator_test_manager" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+fuchsia_test_package("inspect_validator_test_cpp") {
+  subpackages = [ ":validator" ]
+  renameable_subpackages = [
+    {
+      name = "puppet"
+      package = "//src/diagnostics/validator/inspect/lib/cpp"
+    },
+  ]
+  test_components = [ ":inspect_validator_test_manager" ]
+}
+
+fuchsia_test_package("inspect_validator_test_dart") {
+  subpackages = [ ":validator" ]
+  renameable_subpackages = [
+    {
+      name = "puppet"
+      package = "//sdk/dart/fuchsia_inspect/test/validator_puppet:dart"
+    },
+  ]
+  test_components = [ ":inspect_validator_test_manager" ]
 }

@@ -6,25 +6,52 @@ use {
     super::{
         data::{self, Data, LazyNode},
         metrics::Metrics,
-        PUPPET_MONIKER,
     },
     anyhow::{format_err, Error},
-    fidl_fuchsia_inspect as fidl_inspect, fidl_test_inspect_validate as validate,
+    fidl_diagnostics_validate as validate, fidl_fuchsia_inspect as fidl_inspect,
     fuchsia_component::client as fclient,
     fuchsia_zircon::{self as zx, Vmo},
+    serde::Serialize,
     std::convert::TryFrom,
 };
 
 pub const VMO_SIZE: u64 = 4096;
+
+#[derive(Debug)]
+pub struct Config {
+    pub diff_type: DiffType,
+    pub printable_name: String,
+    pub has_runner_node: bool,
+    pub test_archive: bool,
+}
+
+/// When reporting a discrepancy between local and remote Data trees, should the output include:
+/// - The full rendering of both trees?
+/// - The condensed diff between the trees? (This may still be quite large.)
+/// - Both full and condensed renderings?
+#[derive(Clone, Copy, Debug, Serialize)]
+pub enum DiffType {
+    Full,
+    Diff,
+    Both,
+}
+
+impl From<Option<validate::DiffType>> for DiffType {
+    fn from(original: Option<validate::DiffType>) -> Self {
+        match original {
+            None | Some(validate::DiffType::Full) => Self::Full,
+            Some(validate::DiffType::Diff) => Self::Diff,
+            Some(validate::DiffType::Both) => Self::Both,
+        }
+    }
+}
 
 pub struct Puppet {
     pub vmo: Vmo,
     // Need to remember the connection to avoid dropping the VMO
     connection: Connection,
     // A printable name for output to the user.
-    pub printable_name: String,
-    // Keep track of whether it's a Dart puppet (the Dart runner adds fields to Inspect data)
-    pub is_dart: bool,
+    pub config: Config,
 }
 
 impl Puppet {
@@ -53,46 +80,25 @@ impl Puppet {
         Ok(self.connection.fidl.unpublish().await?)
     }
 
-    pub async fn connect(printable_name: &str, is_dart: bool) -> Result<Self, Error> {
-        Puppet::initialize_with_connection(Connection::connect().await?, printable_name, is_dart)
-            .await
-    }
-
-    pub(crate) async fn shutdown(self) {
-        let lifecycle_controller =
-            fclient::connect_to_protocol::<fidl_fuchsia_sys2::LifecycleControllerMarker>().unwrap();
-        lifecycle_controller
-            .stop_instance(&format!("./{}", PUPPET_MONIKER))
-            .await
-            .unwrap()
-            .unwrap();
+    pub async fn connect() -> Result<Self, Error> {
+        Puppet::initialize_with_connection(Connection::connect().await?).await
     }
 
     /// Get the printable name associated with this puppet/test
     pub fn printable_name(&self) -> &str {
-        &self.printable_name
+        &self.config.printable_name
     }
 
     #[cfg(test)]
-    pub async fn connect_local(local_fidl: validate::ValidateProxy) -> Result<Puppet, Error> {
-        Puppet::initialize_with_connection(
-            Connection::new(local_fidl),
-            "*Local*",
-            false, /* is_dart */
-        )
-        .await
+    pub async fn connect_local(local_fidl: validate::InspectPuppetProxy) -> Result<Puppet, Error> {
+        Puppet::initialize_with_connection(Connection::new(local_fidl)).await
     }
 
-    async fn initialize_with_connection(
-        mut connection: Connection,
-        printable_name: &str,
-        is_dart: bool,
-    ) -> Result<Puppet, Error> {
+    async fn initialize_with_connection(mut connection: Connection) -> Result<Puppet, Error> {
         Ok(Puppet {
             vmo: connection.initialize_vmo().await?,
+            config: connection.get_config().await?,
             connection,
-            printable_name: printable_name.to_string(),
-            is_dart,
         })
     }
 
@@ -112,7 +118,7 @@ impl Puppet {
 }
 
 struct Connection {
-    fidl: validate::ValidateProxy,
+    fidl: validate::InspectPuppetProxy,
     // Connection to Tree FIDL if Puppet supports it.
     // Puppets can add support by implementing InitializeTree method.
     root_link_channel: Option<fidl_inspect::TreeProxy>,
@@ -120,11 +126,23 @@ struct Connection {
 
 impl Connection {
     async fn connect() -> Result<Self, Error> {
-        let puppet_fidl = fclient::connect_to_protocol::<validate::ValidateMarker>().unwrap();
+        let puppet_fidl = fclient::connect_to_protocol::<validate::InspectPuppetMarker>().unwrap();
         Ok(Self::new(puppet_fidl))
     }
 
-    async fn fetch_link_channel(fidl: &validate::ValidateProxy) -> Option<fidl_inspect::TreeProxy> {
+    async fn get_config(&self) -> Result<Config, Error> {
+        let (printable_name, opts) = self.fidl.get_config().await?;
+        Ok(Config {
+            diff_type: opts.diff_type.into(),
+            printable_name,
+            has_runner_node: opts.has_runner_node.unwrap_or(false),
+            test_archive: true,
+        })
+    }
+
+    async fn fetch_link_channel(
+        fidl: &validate::InspectPuppetProxy,
+    ) -> Option<fidl_inspect::TreeProxy> {
         let params =
             validate::InitializationParams { vmo_size: Some(VMO_SIZE), ..Default::default() };
         let response = fidl.initialize_tree(&params).await;
@@ -141,7 +159,7 @@ impl Connection {
         Ok(buffer.vmo)
     }
 
-    fn new(fidl: validate::ValidateProxy) -> Self {
+    fn new(fidl: validate::InspectPuppetProxy) -> Self {
         Self { fidl, root_link_channel: None }
     }
 
@@ -176,10 +194,13 @@ impl Connection {
 pub(crate) mod tests {
     use {
         super::*,
-        crate::{create_node, DiffType},
+        crate::create_node,
         anyhow::Context as _,
         fidl::endpoints::{create_proxy, RequestStream, ServerEnd},
-        fidl_test_inspect_validate::*,
+        fidl_diagnostics_validate::{
+            Action, CreateNode, CreateNumericProperty, InspectPuppetMarker, InspectPuppetRequest,
+            InspectPuppetRequestStream, Options, TestResult, Value, ROOT_ID,
+        },
         fuchsia_async as fasync,
         fuchsia_inspect::{Inspector, InspectorConfig, IntProperty, Node},
         fuchsia_zircon::HandleBased,
@@ -215,7 +236,7 @@ pub(crate) mod tests {
         Ok(Puppet::connect_local(client_end).await?)
     }
 
-    async fn spawn_local_puppet(server_end: ServerEnd<ValidateMarker>) {
+    async fn spawn_local_puppet(server_end: ServerEnd<InspectPuppetMarker>) {
         fasync::Task::spawn(
             async move {
                 // Inspector must be remembered so its VMO persists
@@ -223,10 +244,13 @@ pub(crate) mod tests {
                 let mut nodes: HashMap<u32, Node> = HashMap::new();
                 let mut properties: HashMap<u32, IntProperty> = HashMap::new();
                 let server_chan = fasync::Channel::from_channel(server_end.into_channel())?;
-                let mut stream = ValidateRequestStream::from_channel(server_chan);
+                let mut stream = InspectPuppetRequestStream::from_channel(server_chan);
                 while let Some(event) = stream.try_next().await? {
                     match event {
-                        ValidateRequest::Initialize { params, responder } => {
+                        InspectPuppetRequest::GetConfig { responder } => {
+                            responder.send("*Local*", Options::default()).ok();
+                        }
+                        InspectPuppetRequest::Initialize { params, responder } => {
                             let inspector = match params.vmo_size {
                                 Some(size) => {
                                     Inspector::new(InspectorConfig::default().size(size as usize))
@@ -241,7 +265,7 @@ pub(crate) mod tests {
                                 .context("responding to initialize")?;
                             inspector_maybe = Some(inspector);
                         }
-                        ValidateRequest::Act { action, responder } => match action {
+                        InspectPuppetRequest::Act { action, responder } => match action {
                             Action::CreateNode(CreateNode { parent, id, name }) => {
                                 inspector_maybe.as_ref().map(|i| {
                                     let parent_node = if parent == ROOT_ID {
@@ -279,16 +303,16 @@ pub(crate) mod tests {
 
                             _ => responder.send(TestResult::Illegal)?,
                         },
-                        ValidateRequest::InitializeTree { params: _, responder } => {
+                        InspectPuppetRequest::InitializeTree { params: _, responder } => {
                             responder.send(None, TestResult::Unimplemented)?;
                         }
-                        ValidateRequest::ActLazy { lazy_action: _, responder } => {
+                        InspectPuppetRequest::ActLazy { lazy_action: _, responder } => {
                             responder.send(TestResult::Unimplemented)?;
                         }
-                        ValidateRequest::Publish { responder } => {
+                        InspectPuppetRequest::Publish { responder } => {
                             responder.send(TestResult::Unimplemented)?;
                         }
-                        ValidateRequest::Unpublish { responder } => {
+                        InspectPuppetRequest::Unpublish { responder } => {
                             responder.send(TestResult::Unimplemented)?;
                         }
                     }

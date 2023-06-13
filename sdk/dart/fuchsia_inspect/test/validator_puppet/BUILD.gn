@@ -34,18 +34,8 @@ dart_component("puppet_component") {
   deps = [ ":lib" ]
 }
 
-fuchsia_test_component("validator-component") {
-  component_name = "validator"
-  manifest = "meta/validator.cml"
-  deps = [ "//src/diagnostics/validator/inspect:validator_bin" ]
-}
-
-fuchsia_test_package("inspect-validator-test-dart") {
-  test_components = [ ":validator-component" ]
-  deps = [ ":puppet_component" ]
-}
-
-group("tests") {
+fuchsia_package("dart") {
   testonly = true
-  deps = [ ":inspect-validator-test-dart" ]
+  package_name = "dart_puppet"
+  deps = [ ":puppet_component" ]
 }

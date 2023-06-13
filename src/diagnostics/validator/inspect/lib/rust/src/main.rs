@@ -12,9 +12,9 @@ use fuchsia_inspect::Property as UsablePropertyTrait;
 use {
     anyhow::{format_err, Context as _, Error},
     fidl::endpoints::{create_request_stream, DiscoverableProtocolMarker},
+    fidl_diagnostics_validate::*,
     fidl_fuchsia_inspect::TreeMarker,
     fidl_fuchsia_io as fio,
-    fidl_test_inspect_validate::*,
     fuchsia_component::server::{ServiceFs, ServiceObjTrait},
     fuchsia_inspect::hierarchy::*,
     fuchsia_inspect::*,
@@ -515,13 +515,16 @@ fn new_inspector(params: &InitializationParams) -> Inspector {
 }
 
 async fn run_driver_service(
-    mut stream: ValidateRequestStream,
+    mut stream: InspectPuppetRequestStream,
     mut publisher: Publisher,
 ) -> Result<(), Error> {
     let mut actor_maybe: Option<Actor> = None;
     while let Some(event) = stream.try_next().await? {
         match event {
-            ValidateRequest::Initialize { params, responder } => {
+            InspectPuppetRequest::GetConfig { responder, .. } => {
+                responder.send("rust-puppet", Options::default()).ok();
+            }
+            InspectPuppetRequest::Initialize { params, responder } => {
                 if actor_maybe.is_some() {
                     responder.send(None, TestResult::Illegal).context("Double initialize call")?;
                 } else {
@@ -535,7 +538,7 @@ async fn run_driver_service(
                     actor_maybe = Some(actor);
                 }
             }
-            ValidateRequest::InitializeTree { params, responder } => {
+            InspectPuppetRequest::InitializeTree { params, responder } => {
                 let actor = Actor::new(new_inspector(&params));
                 let (tree, request_stream) = create_request_stream::<TreeMarker>()?;
                 service::spawn_tree_server(
@@ -547,7 +550,7 @@ async fn run_driver_service(
                 responder.send(Some(tree), TestResult::Ok)?;
                 actor_maybe = Some(actor);
             }
-            ValidateRequest::Act { action, responder } => {
+            InspectPuppetRequest::Act { action, responder } => {
                 let result = if let Some(a) = &mut actor_maybe {
                     match a.act(action) {
                         Ok(()) => TestResult::Ok,
@@ -561,7 +564,7 @@ async fn run_driver_service(
                 };
                 responder.send(result)?;
             }
-            ValidateRequest::ActLazy { lazy_action, responder } => {
+            InspectPuppetRequest::ActLazy { lazy_action, responder } => {
                 let result = if let Some(a) = &mut actor_maybe {
                     match a.act_lazy(lazy_action) {
                         Ok(()) => TestResult::Ok,
@@ -575,7 +578,7 @@ async fn run_driver_service(
                 };
                 responder.send(result)?;
             }
-            ValidateRequest::Publish { responder } => match &actor_maybe {
+            InspectPuppetRequest::Publish { responder } => match &actor_maybe {
                 Some(ref actor) => {
                     publisher.publish(actor.inspector.clone());
                     responder.send(TestResult::Ok)?;
@@ -584,7 +587,7 @@ async fn run_driver_service(
                     responder.send(TestResult::Illegal)?;
                 }
             },
-            ValidateRequest::Unpublish { responder } => {
+            InspectPuppetRequest::Unpublish { responder } => {
                 publisher.unpublish();
                 responder.send(TestResult::Ok)?;
             }
@@ -594,7 +597,7 @@ async fn run_driver_service(
 }
 
 enum IncomingService {
-    Validate(ValidateRequestStream),
+    InspectPuppet(InspectPuppetRequestStream),
     // ... more services here
 }
 
@@ -620,16 +623,16 @@ async fn main() -> Result<(), Error> {
     info!("Puppet starting");
 
     let mut fs = ServiceFs::new_local();
-    fs.dir("svc").add_fidl_service(IncomingService::Validate);
+    fs.dir("svc").add_fidl_service(IncomingService::InspectPuppet);
 
     let dir = make_diagnostics_dir(&mut fs);
 
     fs.take_and_serve_directory_handle()?;
 
-    // Set concurrent > 1, otherwise additional requests hang on the completion of the Validate
+    // Set concurrent > 1, otherwise additional requests hang on the completion of the InspectPuppet
     // service.
     const MAX_CONCURRENT: usize = 4;
-    let fut = fs.for_each_concurrent(MAX_CONCURRENT, |IncomingService::Validate(stream)| {
+    let fut = fs.for_each_concurrent(MAX_CONCURRENT, |IncomingService::InspectPuppet(stream)| {
         run_driver_service(stream, Publisher::new(dir.clone()))
             .unwrap_or_else(|e| error!("ERROR in puppet's main: {:?}", e))
     });

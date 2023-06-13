@@ -6,8 +6,8 @@ use {
     super::{
         metrics::Metrics,
         validate::{self, Value},
-        DiffType,
     },
+    crate::puppet::DiffType,
     anyhow::{bail, format_err, Error},
     base64,
     diagnostics_hierarchy::{ArrayContent, DiagnosticsHierarchy, Property as iProperty},
@@ -1247,7 +1247,7 @@ mod tests {
     use {
         super::*,
         crate::*,
-        fidl_test_inspect_validate::{Value, ValueType, ROOT_ID},
+        fidl_diagnostics_validate::{Value, ValueType, ROOT_ID},
         fuchsia_inspect::reader::{ArrayContent as iArrayContent, ArrayFormat},
         inspect_format::BlockType,
     };

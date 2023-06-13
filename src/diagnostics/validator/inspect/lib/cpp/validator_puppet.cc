@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fuchsia/inspect/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fidl/cpp/binding_set.h>
@@ -14,23 +15,22 @@
 #include <string>
 #include <vector>
 
-#include <test/inspect/validate/cpp/fidl.h>
+#include <diagnostics/validate/cpp/fidl.h>
 
-#include "fuchsia/inspect/cpp/fidl.h"
 #include "lib/inspect/service/cpp/service.h"
 #include "lib/vfs/cpp/pseudo_dir.h"
 #include "lib/vfs/cpp/service.h"
 
 using cpp17::get;
 using cpp17::holds_alternative;
+using diagnostics::validate::Action;
+using diagnostics::validate::InitializationParams;
+using diagnostics::validate::LazyAction;
+using diagnostics::validate::LinkDisposition;
+using diagnostics::validate::ROOT_ID;
+using diagnostics::validate::TestResult;
+using diagnostics::validate::ValueType;
 using inspect::LazyNode;
-using test::inspect::validate::Action;
-using test::inspect::validate::InitializationParams;
-using test::inspect::validate::LazyAction;
-using test::inspect::validate::LinkDisposition;
-using test::inspect::validate::ROOT_ID;
-using test::inspect::validate::TestResult;
-using test::inspect::validate::ValueType;
 
 using Value =
     cpp17::variant<cpp17::monostate, inspect::Node, inspect::IntProperty, inspect::UintProperty,
@@ -599,7 +599,7 @@ class Actor {
   std::map<uint64_t, LazyNode> lazy_children_map_;
 };
 
-class Puppet : public test::inspect::validate::Validate {
+class Puppet : public diagnostics::validate::InspectPuppet {
  public:
   explicit Puppet(std::unique_ptr<sys::ComponentContext> context) : context_(std::move(context)) {
     context_->outgoing()->AddPublicService(bindings_.GetHandler(this));
@@ -632,6 +632,8 @@ class Puppet : public test::inspect::validate::Validate {
     tree_handler_(tree_ptr.NewRequest());
     callback(std::move(tree_ptr), TestResult::OK);
   }
+
+  void GetConfig(GetConfigCallback callback) override { callback("cpp-puppet", {}); }
 
   void Publish(PublishCallback callback) override {
     if (actor_ == nullptr) {
@@ -669,13 +671,15 @@ class Puppet : public test::inspect::validate::Validate {
  private:
   std::unique_ptr<sys::ComponentContext> context_;
   vfs::PseudoDir* diagnostics_directory_;
-  fidl::BindingSet<test::inspect::validate::Validate> bindings_;
+  fidl::BindingSet<diagnostics::validate::InspectPuppet> bindings_;
   fidl::InterfaceRequestHandler<fuchsia::inspect::Tree> tree_handler_;
   std::unique_ptr<Actor> actor_;
 };
 
 int main(int argc, const char** argv) {
+  // must be first thing
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+
   Puppet puppet(sys::ComponentContext::CreateAndServeOutgoingDirectory());
 
   loop.Run();

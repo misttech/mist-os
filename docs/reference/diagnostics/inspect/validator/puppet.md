@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Validator program sends FIDL commands to control a "puppet" program, which
+The Validator system sends FIDL commands to control a "puppet" program, which
 invokes library functionality to modify some state that the Validator then
 evaluates. For more information about the Inspect Validator, see the
 [README](README.md).
@@ -18,8 +18,8 @@ This doc focuses on the Inspect Validator Rust Puppet located at
 
 ## FIDL design
 
-The FIDL protocol for Inspect Validator is defined in
-[//src/diagnostics/validator/inspect/fidl/validate.test.fidl](/src/diagnostics/validator/inspect/fidl/validate.test.fidl).
+The FIDL protocol for Inspect Puppet is defined in
+[//src/diagnostics/validator/inspect/fidl/inspect_puppet.fidl](/src/diagnostics/validator/inspect/fidl/inspect_puppet.fidl).
 The FIDL protocol corresponds closely to the functions in the
 [Inspect library API](/docs/development/diagnostics/inspect/README.md)
 which defines actions to be applied to any Inspect API implementation. The FIDL
@@ -67,7 +67,7 @@ as a dependency to the `test_package()` named `inspect_validator_test_rust`
 which is the test that exercises the Rust puppet.
 
 The Rust puppet itself is
-[built as a standard rustc_binary](/src/diagnostics/validator/inspect/lib/rust/BUILD.gn#8).
+[a component](/src/diagnostics/validator/inspect/lib/rust/BUILD.gn#8).
 That build rule produces
 `inspect_validator_rust_puppet`, which is included in the binaries of the
 `fuchsia_unittest_package()`.
@@ -93,19 +93,22 @@ There are the following CML files in [//src/diagnostics/validator/inspect/meta](
 * [puppet.shard.cml](/src/diagnostics/validator/inspect/meta/puppet.shard.cml)
 
   Lets the puppet binary run, use the logger and Inspect, and serve the Validate protocol.
-* [validator.shard.cml](/src/diagnostics/validator/inspect/meta/validator.shard.cml)
+* [validator.cml](/src/diagnostics/validator/inspect/meta/validator.cml)
 
     * `use: protocol:` specifies the services that the Validator needs to run.
         * `fuchsia.diagnostics.ArchiveAccessor` lets it read the puppet's published Inspect data.
-        * `test.inspect.validate.Validate` lets it control the puppet.
-        * `fuchsia.sys2.LifecycleController` lets it shut down (and thus restart) the puppet
-          between trials.
+        * `diagnostics.validate.InspectPuppet` lets it control the puppet.
     * `children: name: "puppet"` places the puppet in the component hierarchy.
     * `children: url: "#meta/puppet.cm"` allows the puppet to be found and loaded.
     * `offer: protocol: "fuchsia.logger.LogSink"` is needed for the puppet's logs to be visible.
+    * Provides the necessary structured config for the validator for each puppet.
+* [test.shard.cml](/src/diagnostics/validator/inspect/meta/test.shard.cml)
 
-These shards are used by the puppet's and validator's CML files in each puppet directory.
-Currently there are 4 puppets:
+  Defines the abilities necessary to run the Inspect Validator test manager, which is the parent
+  of the validator and the component.
+
+These shards are used by the puppet's and validator's CML files in each puppet directory, or by
+the test manager. Currently there are 4 puppets:
 
 * [Rust](/src/diagnostics/validator/inspect/lib/rust)
 * [C++](/src/diagnostics/validator/inspect/lib/cpp)
@@ -119,10 +122,3 @@ The Validator conroller's CML is referred to in the `manifest` key of `fuchsia_u
 (for Rust or C++) or `fuchsia_test_component()` (for Dart) or `fuchsia_unittest_component()`
 (for Go).
 
-    * `program: args` supplies command-line arguments to the Validator. Dart needs special handling,
-      and each puppet gets its own printable-name.
-    * `program: binary` declares that you want to run the `bin/validator"` binary created by
-      `rustc_binary("validator_bin")` and linked via
-      `"//src/diagnostics/validator/inspect:validator_bin"` in the `deps` of
-      `fuchsia_unittest_package()` (for Rust and C++) or `fuchsia_test_component()` (for Dart) or
-      `fuchsia_unittest_component()` (for Go).
