@@ -11,9 +11,7 @@
 
 #include <ddktl/fidl.h>
 
-#include "src/media/audio/drivers/virtual_audio/virtual_audio_dai.h"
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_device_impl.h"
-#include "src/media/audio/drivers/virtual_audio/virtual_audio_stream.h"
 
 namespace virtual_audio {
 
@@ -103,29 +101,169 @@ void VirtualAudioControlImpl::DdkMessage(void* ctx, fidl_incoming_msg_t msg,
       ddk::FromDeviceFIDLTransaction(txn));
 }
 
-void VirtualAudioControlImpl::GetDefaultConfiguration(
-    GetDefaultConfigurationRequestView request, GetDefaultConfigurationCompleter::Sync& completer) {
-  fidl::Arena arena;
-  switch (request->type) {
-    case fuchsia_virtualaudio::wire::DeviceType::kStreamConfig:
-      completer.ReplySuccess(
-          fidl::ToWire(arena, VirtualAudioStream::GetDefaultConfig(request->direction.is_input())));
-      break;
-    case fuchsia_virtualaudio::wire::DeviceType::kDai:
-      completer.ReplySuccess(
-          fidl::ToWire(arena, VirtualAudioDai::GetDefaultConfig(request->direction.is_input())));
-      break;
-    default:
-      ZX_ASSERT_MSG(0, "Unknown device type");
-  }
+namespace {
+// TODO(fxbug.dev/124865): Consider per-driver type constructors that declare explicit defaults.
+//
+// Although one can configure `virtual_audio` instances in non-compliant ways for testing purposes,
+// the default settings should always produce a fully functional device that passes all tests.
+VirtualAudioDeviceImpl::Config DefaultConfig(bool is_input) {
+  VirtualAudioDeviceImpl::Config config;
+  config.device_type = fuchsia_virtualaudio::wire::DeviceType::kStreamConfig;
+  config.is_input = is_input;
+
+  config.device_name = "Virtual Audio Device";
+  // Sibling devices cannot have duplicate names, so differentiate them based on direction.
+  config.device_name += (is_input ? " (input)" : " (output)");
+
+  config.manufacturer_name = "Fuchsia Virtual Audio Group";
+  config.product_name = "Virgil v1, a Virtual Volume Vessel";
+  config.unique_id = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0};
+
+  // Default FIFO is 250 usec, at 48k stereo 16
+  config.driver_transfer_bytes = 48;
+  config.internal_delay = zx::nsec(0);
+  config.external_delay = zx::nsec(0);
+
+  // Default ring buffer format is 48kHz stereo 16bit.
+  config.supported_formats.push_back({
+      .sample_formats = AUDIO_SAMPLE_FORMAT_16BIT,
+      .min_frames_per_second = 48000,
+      .max_frames_per_second = 48000,
+      .min_channels = 2,
+      .max_channels = 2,
+      .flags = ASF_RANGE_FLAG_FPS_48000_FAMILY,
+  });
+
+  // Default DAI format is 48kHz I2S (2 channels of 16-in-32, total frame size 8 bytes).
+  fuchsia_hardware_audio::DaiSupportedFormats item;
+  item.number_of_channels(std::vector<uint32_t>{2});
+  item.sample_formats(std::vector{fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned});
+  item.frame_formats(std::vector{fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+      fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S)});
+  item.frame_rates(std::vector<uint32_t>{48'000});
+  item.bits_per_slot(std::vector<uint8_t>{32});
+  item.bits_per_sample(std::vector<uint8_t>{16});
+  config.dai_supported_formats.push_back(std::move(item));
+
+  // Default is CLOCK_MONOTONIC.
+  config.clock.domain = 0;
+  config.clock.initial_rate_adjustment_ppm = 0;
+
+  // Default ring buffer size is at least 250msec (assuming default rate 48k).
+  config.ring_buffer.min_frames = 12000;
+  config.ring_buffer.max_frames = 1 << 19;  // (10+ sec, at default 48k!)
+  config.ring_buffer.modulo_frames = 1;
+
+  // By default, support a wide gain range with good precision.
+  config.gain = fuchsia_virtualaudio::wire::GainProperties{
+      .min_gain_db = -160.f,
+      .max_gain_db = 24.f,
+      .gain_step_db = 0.25f,
+      .current_gain_db = -0.75f,
+      .can_mute = true,
+      .current_mute = false,
+      .can_agc = false,
+      .current_agc = false,
+  };
+
+  // By default, device is hot-pluggable
+  config.plug.plug_change_time = zx::clock::get_monotonic().get();
+  config.plug.plugged = true;
+  config.plug.hardwired = false;
+  config.plug.can_notify = true;
+
+  return config;
 }
+
+zx::result<VirtualAudioDeviceImpl::Config> ConfigFromFIDL(
+    const fuchsia_virtualaudio::wire::Configuration& fidl) {
+  // If is_input is not specified the direction is not known, here we default to output.
+  auto config = DefaultConfig(fidl.has_is_input() ? fidl.is_input() : false);
+
+  if (fidl.has_device_type()) {
+    config.device_type = fidl.device_type();
+  }
+  if (fidl.has_device_name()) {
+    config.device_name = std::string(fidl.device_name().get());
+  }
+  if (fidl.has_manufacturer_name()) {
+    config.manufacturer_name = std::string(fidl.manufacturer_name().get());
+  }
+  if (fidl.has_product_name()) {
+    config.product_name = std::string(fidl.product_name().get());
+  }
+  if (fidl.has_unique_id()) {
+    memmove(config.unique_id.data(), fidl.unique_id().data(), sizeof(config.unique_id));
+  }
+  if (fidl.has_driver_transfer_bytes()) {
+    config.driver_transfer_bytes = fidl.driver_transfer_bytes();
+  }
+  if (fidl.has_external_delay()) {
+    config.external_delay = zx::nsec(fidl.external_delay());
+  }
+  if (fidl.has_supported_formats()) {
+    config.supported_formats.clear();
+    for (auto& fmt : fidl.supported_formats()) {
+      if (fmt.min_frame_rate > fmt.max_frame_rate) {
+        zxlogf(ERROR, "Invalid FormatRange: min_frame_rate=%u > max_frame_rate=%u",
+               fmt.min_frame_rate, fmt.max_frame_rate);
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      }
+      if (fmt.min_channels > fmt.max_channels) {
+        zxlogf(ERROR, "Invalid FormatRange: min_channels=%u > max_channels=%u", fmt.min_channels,
+               fmt.max_channels);
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      }
+      config.supported_formats.push_back({
+          .sample_formats = fmt.sample_format_flags,
+          .min_frames_per_second = fmt.min_frame_rate,
+          .max_frames_per_second = fmt.max_frame_rate,
+          .min_channels = fmt.min_channels,
+          .max_channels = fmt.max_channels,
+          .flags = fmt.rate_family_flags,
+      });
+    }
+  }
+  if (fidl.has_clock_properties()) {
+    auto& fidl_clock = fidl.clock_properties();
+    if (fidl_clock.initial_rate_adjustment_ppm != 0 && fidl_clock.domain == 0) {
+      zxlogf(ERROR, "Invalid ClockProperties: domain=%u, initial_rate_adjustment_ppm=%u",
+             fidl_clock.domain, fidl_clock.initial_rate_adjustment_ppm);
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+    config.clock = fidl_clock;
+  }
+  if (fidl.has_ring_buffer_constraints()) {
+    auto& fidl_rb = fidl.ring_buffer_constraints();
+    if (fidl_rb.modulo_frames == 0 || fidl_rb.min_frames > fidl_rb.max_frames ||
+        fidl_rb.min_frames % fidl_rb.modulo_frames != 0 ||
+        fidl_rb.max_frames % fidl_rb.modulo_frames != 0) {
+      zxlogf(ERROR, "Invalid RingBufferConstraints: min_frames=%u, max_frames=%u, modulo_frames=%u",
+             fidl_rb.min_frames, fidl_rb.max_frames, fidl_rb.modulo_frames);
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+    config.ring_buffer = fidl_rb;
+  }
+  if (fidl.has_gain_properties()) {
+    config.gain = fidl.gain_properties();
+  }
+  if (fidl.has_plug_properties()) {
+    config.plug = fidl.plug_properties();
+  }
+  if (fidl.has_initial_notifications_per_ring()) {
+    config.initial_notifications_per_ring = fidl.initial_notifications_per_ring();
+  }
+
+  return zx::ok(config);
+}
+}  // namespace
 
 void VirtualAudioControlImpl::AddDevice(AddDeviceRequestView request,
                                         AddDeviceCompleter::Sync& completer) {
-  auto config = fidl::ToNatural(request->config);
-  ZX_ASSERT(config.device_specific().has_value());
-  auto result = VirtualAudioDeviceImpl::Create(std::move(config), std::move(request->server),
-                                               dev_node_, dispatcher_);
+  // TODO(fxbug.dev/124865): Return INVALID_ARGS if config is not valid its device_type.
+  auto cfg = ConfigFromFIDL(request->config);
+  auto result = VirtualAudioDeviceImpl::Create(cfg.value(), std::move(request->server), dev_node_,
+                                               dispatcher_);
   if (!result.is_ok()) {
     zxlogf(ERROR, "Device creation failed with status %d",
            fidl::ToUnderlying(result.error_value()));
@@ -139,23 +277,18 @@ void VirtualAudioControlImpl::AddDevice(AddDeviceRequestView request,
 void VirtualAudioControlImpl::GetNumDevices(GetNumDevicesCompleter::Sync& completer) {
   uint32_t num_inputs = 0;
   uint32_t num_outputs = 0;
-  uint32_t num_unspecified_direction = 0;
   for (auto& d : devices_) {
     if (!d->is_bound()) {
       devices_.erase(d);
       continue;
     }
-    if (d->is_input().has_value()) {
-      if (d->is_input().value()) {
-        num_inputs++;
-      } else {
-        num_outputs++;
-      }
+    if (d->is_input()) {
+      num_inputs++;
     } else {
-      num_unspecified_direction++;
+      num_outputs++;
     }
   }
-  completer.Reply(num_inputs, num_outputs, num_unspecified_direction);
+  completer.Reply(num_inputs, num_outputs);
 }
 
 void VirtualAudioControlImpl::RemoveAll(RemoveAllCompleter::Sync& completer) {

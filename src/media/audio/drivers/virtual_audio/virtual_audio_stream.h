@@ -23,10 +23,9 @@ namespace virtual_audio {
 
 class VirtualAudioStream : public audio::SimpleAudioStream {
  public:
-  static fbl::RefPtr<VirtualAudioStream> Create(const fuchsia_virtualaudio::Configuration& cfg,
+  static fbl::RefPtr<VirtualAudioStream> Create(const VirtualAudioDeviceImpl::Config& cfg,
                                                 std::weak_ptr<VirtualAudioDeviceImpl> owner,
                                                 zx_device_t* dev_node);
-  static fuchsia_virtualaudio::Configuration GetDefaultConfig(bool is_input);
 
   using ErrorT = fuchsia_virtualaudio::Error;
 
@@ -53,12 +52,9 @@ class VirtualAudioStream : public audio::SimpleAudioStream {
   friend class audio::SimpleAudioStream;
   friend class fbl::RefPtr<VirtualAudioStream>;
 
-  VirtualAudioStream(const fuchsia_virtualaudio::Configuration& cfg,
+  VirtualAudioStream(const VirtualAudioDeviceImpl::Config& cfg,
                      std::weak_ptr<VirtualAudioDeviceImpl> parent, zx_device_t* dev_node)
-      // StreamConfig is either input or output;
-      // if direction is unspecified the is_input field access will assert.
-      : audio::SimpleAudioStream(dev_node,
-                                 cfg.device_specific()->stream_config()->is_input().value()),
+      : audio::SimpleAudioStream(dev_node, cfg.is_input),
         config_(cfg),
         parent_(std::move(parent)) {}
 
@@ -67,7 +63,6 @@ class VirtualAudioStream : public audio::SimpleAudioStream {
   //
 
   zx_status_t Init() __TA_REQUIRES(domain_token()) override;
-  void InitStreamConfigSpecific() __TA_REQUIRES(domain_token());
   zx_status_t EstablishReferenceClock() __TA_REQUIRES(domain_token());
   zx_status_t AdjustClockRate() __TA_REQUIRES(domain_token());
 
@@ -105,7 +100,7 @@ class VirtualAudioStream : public audio::SimpleAudioStream {
 
   static zx::time MonoTimeFromRefTime(const zx::clock& clock, zx::time ref_time);
 
-  const fuchsia_virtualaudio::Configuration config_;
+  const VirtualAudioDeviceImpl::Config config_;
 
   // This should never be invalid: this VirtualAudioStream should always be destroyed before
   // its parent. This field is a weak_ptr to avoid a circular reference count.
@@ -149,8 +144,8 @@ class VirtualAudioStream : public audio::SimpleAudioStream {
   uint32_t num_channels_ __TA_GUARDED(domain_token()) = 0;
   affine::Transform ref_time_to_running_frame_ __TA_GUARDED(domain_token());
 
-  zx::clock reference_clock_ __TA_GUARDED(domain_token()) = {};
-  int32_t clock_rate_adjustment_ __TA_GUARDED(domain_token()) = 0;
+  zx::clock reference_clock_ __TA_GUARDED(domain_token());
+  int32_t clock_rate_adjustment_ __TA_GUARDED(domain_token());
 };
 
 // This class composes a VirtualAudioStream. This allows using the functionality of a
@@ -162,10 +157,11 @@ class VirtualAudioStreamWrapper : public VirtualAudioDriver {
  public:
   using ErrorT = fuchsia_virtualaudio::Error;
 
-  VirtualAudioStreamWrapper(const fuchsia_virtualaudio::Configuration& cfg,
+  VirtualAudioStreamWrapper(const VirtualAudioDeviceImpl::Config& cfg,
                             std::weak_ptr<VirtualAudioDeviceImpl> owner, zx_device_t* dev_node) {
     stream_ = VirtualAudioStream::Create(cfg, std::move(owner), dev_node);
   }
+
   async_dispatcher_t* dispatcher() override { return stream_->dispatcher(); }
   fit::result<ErrorT, CurrentFormat> GetFormatForVA() override {
     audio::ScopedToken t(stream_->domain_token());

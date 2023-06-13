@@ -557,7 +557,7 @@ class AdjustableClockPipelineTest : public ClockSyncPipelineTest {
     constexpr int32_t kNonMonotonicDomain = 1;
     VirtualDevice::ClockProperties clock_properties = {
         .domain = (clock_slew_ppm ? kNonMonotonicDomain : kMonotonicDomain),
-        .rate_adjustment_ppm = clock_slew_ppm,
+        .initial_rate_adjustment_ppm = clock_slew_ppm,
     };
 
     // Buffer up to 2s of data.

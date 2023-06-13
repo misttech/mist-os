@@ -15,7 +15,7 @@ namespace virtual_audio {
 
 // static
 fbl::RefPtr<VirtualAudioStream> VirtualAudioStream::Create(
-    const fuchsia_virtualaudio::Configuration& cfg, std::weak_ptr<VirtualAudioDeviceImpl> owner,
+    const VirtualAudioDeviceImpl::Config& cfg, std::weak_ptr<VirtualAudioDeviceImpl> owner,
     zx_device_t* devnode) {
   return audio::SimpleAudioStream::Create<VirtualAudioStream>(cfg, owner, devnode);
 }
@@ -35,199 +35,65 @@ zx::time VirtualAudioStream::MonoTimeFromRefTime(const zx::clock& clock, zx::tim
   return zx::time{mono_time};
 }
 
-// static
-fuchsia_virtualaudio::Configuration VirtualAudioStream::GetDefaultConfig(bool is_input) {
-  fuchsia_virtualaudio::Configuration config = {};
-  config.device_name(std::string("Virtual Audio Device") + (is_input ? " (input)" : " (output)"));
-  config.manufacturer_name("Fuchsia Virtual Audio Group");
-  config.product_name("Virgil v1, a Virtual Volume Vessel");
-  config.unique_id(std::array<uint8_t, 16>({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0}));
-
-  // Driver type is StreamConfig.
-  fuchsia_virtualaudio::StreamConfig stream_config = {};
-  stream_config.is_input(is_input);
-
-  // Ring Buffer.
-  fuchsia_virtualaudio::RingBuffer ring_buffer = {};
-
-  // By default, expose a single ring buffer format: 48kHz stereo 16bit.
-  fuchsia_virtualaudio::FormatRange format = {};
-  format.sample_format_flags(AUDIO_SAMPLE_FORMAT_16BIT);
-  format.min_frame_rate(48'000);
-  format.max_frame_rate(48'000);
-  format.min_channels(2);
-  format.max_channels(2);
-  format.rate_family_flags(ASF_RANGE_FLAG_FPS_48000_FAMILY);
-  ring_buffer.supported_formats(
-      std::optional<std::vector<fuchsia_virtualaudio::FormatRange>>{std::in_place, {format}});
-
-  // Default FIFO is 250 usec (at 48k stereo 16). No internal delay; external delay unspecified.
-  ring_buffer.driver_transfer_bytes(48);
-  ring_buffer.internal_delay(0);
-
-  // Default ring buffer size is at least 250msec (assuming default rate 48k).
-  fuchsia_virtualaudio::RingBufferConstraints ring_buffer_constraints = {};
-  ring_buffer_constraints.min_frames(12000);
-  ring_buffer_constraints.max_frames(1 << 19);  // (10+ sec, at default 48k!)
-  ring_buffer_constraints.modulo_frames(1);
-  ring_buffer.ring_buffer_constraints(std::move(ring_buffer_constraints));
-
-  stream_config.ring_buffer(std::move(ring_buffer));
-
-  // Clock properties with no rate_adjustment_ppm specified (defaults to 0).
-  fuchsia_virtualaudio::ClockProperties clock_properties = {};
-  clock_properties.domain(0);
-  stream_config.clock_properties(std::move(clock_properties));
-
-  // By default, support a wide gain range with good precision.
-  fuchsia_virtualaudio::GainProperties gain_properties = {};
-  gain_properties.can_mute(true);
-  gain_properties.can_agc(false);
-  gain_properties.min_gain_db(-160.f);
-  gain_properties.max_gain_db(24.f);
-  gain_properties.gain_step_db(0.25f);
-  fuchsia_hardware_audio::GainState gain_state;
-  gain_state.gain_db(-0.75f);
-  gain_state.muted(false);
-  gain_state.agc_enabled(false);
-  gain_properties.gain_state(std::move(gain_state));
-  stream_config.gain_properties(std::move(gain_properties));
-
-  // By default, device is hot-pluggable
-  fuchsia_virtualaudio::PlugProperties plug_properties = {};
-  fuchsia_hardware_audio::PlugState plug_state = {};
-  plug_state.plugged(true).plug_state_time(zx::clock::get_monotonic().get());
-  plug_properties.plug_state(std::move(plug_state));
-  plug_properties.plug_detect_capabilities(
-      fuchsia_hardware_audio::PlugDetectCapabilities::kCanAsyncNotify);
-  stream_config.plug_properties(std::move(plug_properties));
-
-  config.device_specific() =
-      fuchsia_virtualaudio::DeviceSpecific::WithStreamConfig(std::move(stream_config));
-  return config;
-}
-
 zx_status_t VirtualAudioStream::Init() {
-  if (config_.device_name().has_value()) {
-    strncpy(device_name_, config_.device_name()->c_str(), sizeof(device_name_));
-  }
-  if (config_.manufacturer_name().has_value()) {
-    strncpy(mfr_name_, config_.manufacturer_name()->c_str(), sizeof(mfr_name_));
-  }
-  if (config_.product_name().has_value()) {
-    strncpy(prod_name_, config_.product_name()->c_str(), sizeof(prod_name_));
-  }
-  if (config_.unique_id().has_value()) {
-    memcpy(unique_id_.data, &(config_.unique_id().value()[0]), sizeof(unique_id_.data));
-  }
+  ZX_ASSERT_MSG(strlcpy(device_name_, config_.device_name.c_str(), sizeof(device_name_)),
+                "strlcpy(device_name) failed");
+  ZX_ASSERT_MSG(strlcpy(mfr_name_, config_.manufacturer_name.c_str(), sizeof(mfr_name_)),
+                "strlcpy(mfr_name) failed");
+  ZX_ASSERT_MSG(strlcpy(prod_name_, config_.product_name.c_str(), sizeof(prod_name_)),
+                "strlcpy(prod_name) failed");
 
-  InitStreamConfigSpecific();
-
-  zx_status_t status = EstablishReferenceClock();
-  ZX_ASSERT_MSG(status == ZX_OK, "EstablishReferenceClock failed: %d", status);
-
-  return ZX_OK;
-}
-
-void VirtualAudioStream::InitStreamConfigSpecific() {
-  ZX_ASSERT(config_.device_specific()->Which() ==
-            fuchsia_virtualaudio::DeviceSpecific::Tag::kStreamConfig);
-  auto& stream_config = config_.device_specific()->stream_config();
+  memcpy(unique_id_.data, config_.unique_id.data(), sizeof(unique_id_.data));
 
   supported_formats_.reset();
-  ZX_ASSERT(stream_config->ring_buffer().has_value());
-  auto& ring_buffer = stream_config->ring_buffer();
-
-  ZX_ASSERT(ring_buffer->supported_formats().has_value());
-  auto& supported_formats = ring_buffer->supported_formats().value();
-  for (auto& range : supported_formats) {
+  for (auto range : config_.supported_formats) {
     SimpleAudioStream::SupportedFormat format = {};
-    format.range.sample_formats = range.sample_format_flags();
-    format.range.min_frames_per_second = range.min_frame_rate();
-    format.range.max_frames_per_second = range.max_frame_rate();
-    format.range.min_channels = range.min_channels();
-    format.range.max_channels = range.max_channels();
-    format.range.flags = range.rate_family_flags();
+    format.range = range;
     supported_formats_.push_back(std::move(format));
   }
-  if (ring_buffer->driver_transfer_bytes().has_value()) {
-    driver_transfer_bytes_ = ring_buffer->driver_transfer_bytes().value();
-  }
-  if (ring_buffer->external_delay().has_value()) {
-    external_delay_nsec_ = ring_buffer->external_delay().value();
-  }
 
-  if (ring_buffer->ring_buffer_constraints().has_value()) {
-    ZX_ASSERT_MSG(ring_buffer->ring_buffer_constraints()->min_frames(),
-                  "ring buffer min_frames cannot be zero");
-    ZX_ASSERT_MSG(ring_buffer->ring_buffer_constraints()->min_frames() <=
-                      ring_buffer->ring_buffer_constraints()->max_frames(),
-                  "ring buffer min_frames cannot exceed max_frames");
-    max_buffer_frames_ = ring_buffer->ring_buffer_constraints()->max_frames();
-    min_buffer_frames_ = ring_buffer->ring_buffer_constraints()->min_frames();
-    modulo_buffer_frames_ = ring_buffer->ring_buffer_constraints()->modulo_frames();
-  }
+  driver_transfer_bytes_ = config_.driver_transfer_bytes;
+  external_delay_nsec_ = config_.external_delay.to_nsecs();
 
-  if (ring_buffer->notifications_per_ring().has_value()) {
-    va_client_notifications_per_ring_ = ring_buffer->notifications_per_ring().value();
-  }
+  clock_domain_ = config_.clock.domain;
+  clock_rate_adjustment_ = config_.clock.initial_rate_adjustment_ppm;
+  zx_status_t status = EstablishReferenceClock();
+  ZX_ASSERT_MSG(status == ZX_OK, "EstablishReferenceClock failed: %d", status);
+  ZX_ASSERT_MSG(config_.ring_buffer.min_frames, "ring buffer min_frames cannot be zero");
+  ZX_ASSERT_MSG(config_.ring_buffer.min_frames <= config_.ring_buffer.max_frames,
+                "ring buffer min_frames cannot exceed max_frames");
+  max_buffer_frames_ = config_.ring_buffer.max_frames;
+  min_buffer_frames_ = config_.ring_buffer.min_frames;
+  modulo_buffer_frames_ = config_.ring_buffer.modulo_frames;
 
-  ZX_ASSERT(stream_config->clock_properties().has_value());
-  if (stream_config->clock_properties()->domain().has_value()) {
-    clock_domain_ = stream_config->clock_properties()->domain().value();
-  }
-  if (stream_config->clock_properties()->rate_adjustment_ppm().has_value()) {
-    clock_rate_adjustment_ = stream_config->clock_properties()->rate_adjustment_ppm().value();
-  }
+  cur_gain_state_ = {
+      .cur_mute = config_.gain.current_mute,
+      .cur_agc = config_.gain.current_agc,
+      .cur_gain = config_.gain.current_gain_db,
+      .can_mute = config_.gain.can_mute,
+      .can_agc = config_.gain.can_agc,
+      .min_gain = config_.gain.min_gain_db,
+      .max_gain = config_.gain.max_gain_db,
+      .gain_step = config_.gain.gain_step_db,
+  };
 
-  ZX_ASSERT(stream_config->gain_properties().has_value());
-  auto& gain_properties = stream_config->gain_properties();
-  ZX_ASSERT(gain_properties->gain_state().has_value());
-  auto& gain_state = gain_properties->gain_state().value();
-  if (gain_state.muted().has_value()) {
-    cur_gain_state_.cur_mute = gain_state.muted().value();
+  audio_pd_notify_flags_t plug_flags = 0;
+  if (config_.plug.hardwired) {
+    plug_flags |= AUDIO_PDNF_HARDWIRED;
   }
-  if (gain_state.agc_enabled().has_value()) {
-    cur_gain_state_.cur_agc = gain_state.agc_enabled().value();
+  if (config_.plug.can_notify) {
+    plug_flags |= AUDIO_PDNF_CAN_NOTIFY;
   }
-  if (gain_state.gain_db().has_value()) {
-    cur_gain_state_.cur_gain = gain_state.gain_db().value();
-  }
-  if (gain_properties->can_mute().has_value()) {
-    cur_gain_state_.can_mute = gain_properties->can_mute().value();
-  }
-  if (gain_properties->can_agc().has_value()) {
-    cur_gain_state_.can_agc = gain_properties->can_agc().value();
-  }
-  if (gain_properties->min_gain_db().has_value()) {
-    cur_gain_state_.min_gain = gain_properties->min_gain_db().value();
-  }
-  if (gain_properties->max_gain_db().has_value()) {
-    cur_gain_state_.max_gain = gain_properties->max_gain_db().value();
-  }
-  if (gain_properties->gain_step_db().has_value()) {
-    cur_gain_state_.gain_step = gain_properties->gain_step_db().value();
-  }
-
-  ZX_ASSERT(stream_config->plug_properties().has_value());
-  audio_pd_notify_flags_t plug_flags = {};
-  auto& plug_properties = stream_config->plug_properties();
-  if (plug_properties->plug_detect_capabilities().has_value()) {
-    switch (plug_properties->plug_detect_capabilities().value()) {
-      case fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired:
-        plug_flags |= AUDIO_PDNF_HARDWIRED;
-        break;
-      case fuchsia_hardware_audio::PlugDetectCapabilities::kCanAsyncNotify:
-        plug_flags |= AUDIO_PDNF_CAN_NOTIFY;
-        break;
-    }
-  }
-  ZX_ASSERT(plug_properties->plug_state().has_value());
-  if (plug_properties->plug_state().value().plugged().has_value() &&
-      plug_properties->plug_state().value().plugged().value()) {
+  if (config_.plug.plugged) {
     plug_flags |= AUDIO_PDNF_PLUGGED;
   }
   SetInitialPlugState(plug_flags);
+
+  if (config_.initial_notifications_per_ring.has_value()) {
+    va_client_notifications_per_ring_ = config_.initial_notifications_per_ring.value();
+  }
+
+  return ZX_OK;
 }
 
 // We use this clock to emulate a real hardware time source. It is not exposed outside the driver.
@@ -264,7 +130,7 @@ fit::result<VirtualAudioStream::ErrorT, CurrentFormat> VirtualAudioStream::GetFo
       .frames_per_second = frame_rate_,
       .sample_format = sample_format_,
       .num_channels = num_channels_,
-      .external_delay = zx::nsec(external_delay_nsec_),
+      .external_delay = config_.external_delay,
   });
 }
 

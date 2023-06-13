@@ -22,57 +22,38 @@ VirtualDevice::VirtualDevice(TestFixture* fixture, HermeticAudioRealm* realm, bo
       expected_gain_db_(expected_gain_db),
       rb_(format, frame_count) {
   // Setup the device's configuration.
-  fuchsia::virtualaudio::Direction direction;
-  direction.set_is_input(is_input);
-  fuchsia::virtualaudio::Control_GetDefaultConfiguration_Result config_result;
-  zx_status_t status = realm->virtual_audio_control()->GetDefaultConfiguration(
-      fuchsia::virtualaudio::DeviceType::STREAM_CONFIG, std::move(direction), &config_result);
-  if (status != ZX_OK) {
-    ADD_FAILURE() << "virtualaudio::Control::GetDefaultConfiguration failed";
-  } else if (config_result.is_err()) {
-    ADD_FAILURE() << "Failed to GetDefaultConfiguration: " << config_result.err();
-  }
-  fuchsia::virtualaudio::Configuration config = std::move(config_result.response().config);
+  fuchsia::virtualaudio::Configuration config;
+  config.set_device_type(fuchsia::virtualaudio::DeviceType::STREAM_CONFIG);
+  config.set_is_input(is_input);
   std::copy(std::begin(device_id.data), std::end(device_id.data),
             std::begin(*config.mutable_unique_id()));
 
-  fuchsia::virtualaudio::StreamConfig& stream_config =
-      config.mutable_device_specific()->stream_config();
   if (plug_properties) {
-    fuchsia::hardware::audio::PlugState plug_state;
-    plug_state.set_plugged(plug_properties->plugged);
-    plug_state.set_plug_state_time(plug_properties->plug_change_time.get());
-    stream_config.mutable_plug_properties()->set_plug_state(std::move(plug_state));
-    if (plug_properties->hardwired) {
-      stream_config.mutable_plug_properties()->set_plug_detect_capabilities(
-          fuchsia::hardware::audio::PlugDetectCapabilities::HARDWIRED);
-    } else if (plug_properties->can_notify) {
-      stream_config.mutable_plug_properties()->set_plug_detect_capabilities(
-          fuchsia::hardware::audio::PlugDetectCapabilities::CAN_ASYNC_NOTIFY);
-    } else {
-      ADD_FAILURE() << "Plug propperties not hardwired or can notify";
-    }
+    *config.mutable_plug_properties() = {
+        .plug_change_time = plug_properties->plug_change_time.get(),
+        .plugged = plug_properties->plugged,
+        .hardwired = plug_properties->hardwired,
+        .can_notify = plug_properties->can_notify,
+    };
   }
 
   if (!AudioSampleFormatToDriverSampleFormat(format_.sample_format(), &driver_format_)) {
     FX_CHECK(false) << "Failed to convert Fmt 0x" << std::hex
                     << static_cast<uint32_t>(format_.sample_format()) << " to driver format.";
   }
-  stream_config.mutable_ring_buffer()->set_supported_formats(
-      std::vector{fuchsia::virtualaudio::FormatRange{
-          .sample_format_flags = driver_format_,
-          .min_frame_rate = static_cast<uint32_t>(format_.frames_per_second()),
-          .max_frame_rate = static_cast<uint32_t>(format_.frames_per_second()),
-          .min_channels = static_cast<uint8_t>(format_.channels()),
-          .max_channels = static_cast<uint8_t>(format_.channels()),
-          .rate_family_flags = ASF_RANGE_FLAG_FPS_CONTINUOUS,
-      }});
+  config.mutable_supported_formats()->push_back({
+      .sample_format_flags = driver_format_,
+      .min_frame_rate = static_cast<uint32_t>(format_.frames_per_second()),
+      .max_frame_rate = static_cast<uint32_t>(format_.frames_per_second()),
+      .min_channels = static_cast<uint8_t>(format_.channels()),
+      .max_channels = static_cast<uint8_t>(format_.channels()),
+      .rate_family_flags = ASF_RANGE_FLAG_FPS_CONTINUOUS,
+  });
 
-  stream_config.mutable_ring_buffer()->set_driver_transfer_bytes(kDriverTransferBytes);
-  stream_config.mutable_ring_buffer()->set_internal_delay(kInternalDelay.to_nsecs());
-  stream_config.mutable_ring_buffer()->set_external_delay(kExternalDelay.to_nsecs());
+  config.set_driver_transfer_bytes(kDriverTransferBytes);
+  config.set_external_delay(kExternalDelay.to_nsecs());
 
-  *stream_config.mutable_ring_buffer()->mutable_ring_buffer_constraints() = {
+  *config.mutable_ring_buffer_constraints() = {
       .min_frames = static_cast<uint32_t>(frame_count),
       .max_frames = static_cast<uint32_t>(frame_count),
       .modulo_frames = static_cast<uint32_t>(frame_count),
@@ -80,12 +61,13 @@ VirtualDevice::VirtualDevice(TestFixture* fixture, HermeticAudioRealm* realm, bo
 
   auto ring_buffer_ms = static_cast<uint32_t>(
       static_cast<double>(frame_count) / static_cast<double>(format_.frames_per_second()) * 1000);
-  stream_config.mutable_ring_buffer()->set_notifications_per_ring(ring_buffer_ms / kNotifyMs);
+  config.set_initial_notifications_per_ring(ring_buffer_ms / kNotifyMs);
 
   if (device_clock_properties) {
-    stream_config.mutable_clock_properties()->set_domain(device_clock_properties->domain);
-    stream_config.mutable_clock_properties()->set_rate_adjustment_ppm(
-        device_clock_properties->rate_adjustment_ppm);
+    *config.mutable_clock_properties() = {
+        .domain = device_clock_properties->domain,
+        .initial_rate_adjustment_ppm = device_clock_properties->initial_rate_adjustment_ppm,
+    };
   }
 
   if (is_input) {

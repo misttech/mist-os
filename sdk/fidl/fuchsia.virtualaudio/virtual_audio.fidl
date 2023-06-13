@@ -4,45 +4,16 @@
 library fuchsia.virtualaudio;
 
 using zx;
-using fuchsia.hardware.audio;
-using fuchsia.hardware.audio.signalprocessing;
 
 const MAX_UI_STRING_SIZE uint32 = 256;
 const MAX_FORMAT_RANGES uint32 = 64;
-// Can't have more ring buffers than processing elements.
-const MAX_COUNT_RING_BUFFERS uint32
-        = fuchsia.hardware.audio.signalprocessing.MAX_COUNT_PROCESSING_ELEMENTS;
-// Can't have more DAI interconnects than processing elements.
-const MAX_COUNT_DAI_INTERCONNECTS uint32
-        = fuchsia.hardware.audio.signalprocessing.MAX_COUNT_PROCESSING_ELEMENTS;
 
 const CONTROL_NODE_NAME string = "sys/platform/00:00:2f/virtual_audio";
-
-type Direction = table {
-    /// Device type is input (true) or output (false)
-    /// If unspecified, then the driver may be used for both input and output.
-    ///
-    /// For StreamConfig devices `is_input` is required.
-    /// For Dai devices `is_input` is required.
-    /// For Codec devices `is_input` is optional.
-    /// For Composite devices `is_input` is ignored.
-    ///
-    /// Optional.
-    1: is_input bool;
-};
 
 /// This protocol provides methods for adding and removing virtual audio
 /// devices. This protocol is made available through the device tree via
 /// `CONTROL_NODE_NAME`.
 protocol Control {
-    /// Returns the default configuration for the given device type and direction.
-    GetDefaultConfiguration(struct {
-        type DeviceType;
-        direction Direction;
-    }) -> (struct {
-        config Configuration;
-    }) error Error;
-
     /// Adds a device to the device tree.
     /// The device lives until the `Device` FIDL channel is closed.
     AddDevice(resource struct {
@@ -50,13 +21,11 @@ protocol Control {
         server server_end:Device;
     }) -> () error Error;
 
-    /// Returns the number of active input and output devices and devices with unspecified
-    /// direction.
+    /// Returns the number of active input and output virtual devices.
     // TODO(fxbug.dev/124865): Consider adding per-driver type info here.
     GetNumDevices() -> (struct {
         num_input_devices uint32;
         num_output_devices uint32;
-        num_unspecified_direction_devices uint32;
     });
 
     /// Synchronously remove all all active input and output devices.
@@ -66,176 +35,87 @@ protocol Control {
 /// Configures a virtual audio device.
 type Configuration = table {
     /// Device's name.
-    ///
-    /// Optional.
+    /// If not specified, a default name is used.
     1: device_name string:MAX_UI_STRING_SIZE;
 
-    /// Device manufacturer's name.
-    ///
-    /// Optional.
+    /// Device manufacturor's name.
+    /// If not specified, a default manufacturer name is used.
     2: manufacturer_name string:MAX_UI_STRING_SIZE;
 
-    /// Device's product name.
-    ///
-    /// Optional.
+    /// Device product's.
+    /// If not specified, a default product name is used.
     3: product_name string:MAX_UI_STRING_SIZE;
 
     /// Device's unique identifier, a 16 byte string.
     /// This field is only valid for `device_type` `STREAM_CONFIG` and `CODEC`.
     /// If it is specified for another device_type, the AddDevice call will
     /// fail with `INVALID_ARGS`.
-    ///
-    /// Optional.
+    /// If not specified, a default ID is used.
     4: unique_id array<uint8, 16>;
 
-    /// The configuration specific to this device type.
-    /// The device type is determined by which `DeviceSpecific` union
-    /// member is defined.
-    ///
-    /// Required.
-    5: device_specific DeviceSpecific;
-};
-
-type DeviceSpecific = flexible union {
-    1: stream_config StreamConfig;
-    2: dai Dai;
-    3: codec Codec;
-    4: composite Composite;
-};
-
-/// Configuration for a fuchsia.hardware.audio/StreamConfig driver.
-type StreamConfig = table {
-    /// Device type is input (true) or output (false).
-    /// This is required such that a user can find a device in devfs in either
-    /// the `/dev/class/audio-output' or `/dev/class/audio-input`, otherwise it
-    /// would be optional such that a driver could be misconfigured on purpose to
-    /// not have an `is_input` field.
-    ///
-    /// Required.
-    1: is_input bool;
-
-    /// Configuration for the device ring buffer.
-    ///
-    /// Required.
-    2: ring_buffer RingBuffer;
-
-    /// Configuration for the device's clock.
-    ///
-    /// Required.
-    3: clock_properties ClockProperties;
-
-    /// Configuration of the device gain.
-    ///
-    /// Required.
-    4: gain_properties GainProperties;
-
-    /// Configuration of the device's plug state.
-    ///
-    /// Required.
-    5: plug_properties PlugProperties;
-};
-
-/// Configuration for a fuchsia.hardware.audio/Dai driver.
-type Dai = table {
-    /// Device type is input (true) or output (false).
-    ///
-    /// Optional.
-    1: is_input bool;
-
-    /// Configuration for the device ring buffer.
-    ///
-    /// Required.
-    2: ring_buffer RingBuffer;
-
-    /// Configuration for the device DAI interconnect.
-    ///
-    /// Required.
-    3: dai_interconnect DaiInterconnect;
-
-    /// Configuration for the device's clock.
-    ///
-    /// Required.
-    4: clock_properties ClockProperties;
-};
-
-/// Configuration for a fuchsia.hardware.audio/Codec driver.
-type Codec = table {
-    /// Device type is input (true) or output (false).
-    /// If unspecified, then the driver may be used for both input and output.
-    ///
-    /// Optional.
-    1: is_input bool;
-
-    /// Configuration for the device's DAI interconnect.
-    ///
-    /// Required.
-    2: dai_interconnect DaiInterconnect;
-
-    /// Configuration of the device's plug state.
-    ///
-    /// Required.
-    3: plug_properties PlugProperties;
-};
-
-/// Configuration for a fuchsia.hardware.audio/Composite driver.
-type Composite = table {
-    /// Ring buffers configuration.
-    ///
-    /// Required.
-    1: ring_buffers vector<CompositeRingBuffer>:MAX_COUNT_RING_BUFFERS;
-
-    /// DAI interconnects configurations.
-    ///
-    /// Required.
-    2: dai_interconnects vector<CompositeDaiInterconnect>:MAX_COUNT_DAI_INTERCONNECTS;
-
-    /// Configuration for the device's clock.
-    ///
-    /// Required.
-    3: clock_properties ClockProperties;
-
-    /// Topologies supported via the signalprocessing API.
-    ///
-    /// Optional.
-    4: topologies
-            vector<fuchsia.hardware.audio.signalprocessing.Topology>:fuchsia.hardware.audio.signalprocessing.MAX_COUNT_TOPOLOGIES;
-};
-
-/// Configuration for a fuchsia.hardware.audio/RingBuffer.
-type RingBuffer = table {
     /// Driver transfer bytes.
-    ///
-    /// Optional.
-    1: driver_transfer_bytes uint32;
-
-    /// Internal delay.
-    ///
-    /// Optional.
-    2: internal_delay zx.Duration;
+    /// This field is only valid for `device_type` `STREAM_CONFIG` and `DAI`.
+    /// If it is specified for another device_type, the AddDevice call will
+    /// fail with `INVALID_ARGS`.
+    /// If not specified for `STREAM_CONFIG` or `DAI`, a default value is used.
+    5: driver_transfer_bytes uint32;
 
     /// External delay.
-    ///
-    /// Optional.
-    3: external_delay zx.Duration;
+    /// If not specified, defaults to an arbitrary duration.
+    6: external_delay zx.Duration;
 
-    /// Supported ring buffer format ranges for this ring buffer.
-    ///
-    /// Required.
-    4: supported_formats vector<FormatRange>:MAX_FORMAT_RANGES;
+    /// Supported ring buffer format ranges for this virtual audio device.
+    /// This field is only valid for `device_type` `STREAM_CONFIG` and `DAI`.
+    /// If it is specified for another device_type, the AddDevice call will
+    /// fail with `INVALID_ARGS`.
+    /// If empty, supports only a 48kHz stereo int16 format by default.
+    7: supported_formats vector<FormatRange>:MAX_FORMAT_RANGES;
+
+    /// Configuration for the device's clock.
+    /// This field is only valid for `device_type` `STREAM_CONFIG`.
+    /// If it is specified for another device_type, the AddDevice call will
+    /// fail with `INVALID_ARGS`.
+    /// If not specified, use the domain of the monotonic clock.
+    8: clock_properties ClockProperties;
 
     /// Constraints on the ring buffer.
-    /// If unspecified, there are no constraints.
-    ///
-    /// Optional.
-    5: ring_buffer_constraints RingBufferConstraints;
+    /// This field is only valid for `device_type` `STREAM_CONFIG` and `DAI`.
+    /// If it is specified for another device_type, the AddDevice call will
+    /// fail with `INVALID_ARGS`.
+    /// If not specified, there are no constraints.
+    9: ring_buffer_constraints RingBufferConstraints;
 
-    /// Notification frequency.
+    /// Configuration of the device gain.
+    /// This field is only valid for `device_type` `STREAM_CONFIG`.
+    /// If it is specified for another device_type, the AddDevice call will
+    /// fail with `INVALID_ARGS`.
+    /// If not specified, the device has unity gain and cannot mute, enable AGC,
+    /// or change gain.
+   10: gain_properties GainProperties;
+
+    /// Configuration of the device's plug state.
+    /// This field is only valid for `device_type` `STREAM_CONFIG` and `CODEC`.
+    /// If it is specified for another device_type, the AddDevice call will
+    /// fail with `INVALID_ARGS`.
+    /// If not specified, the device starts plugged in, with plug notifications
+    /// enabled, and is not hardwired.
+   11: plug_properties PlugProperties;
+
+    /// Initial notification frequency.
+    /// This field is only valid for `device_type` `STREAM_CONFIG` and `DAI`.
+    /// If it is specified for another device_type, the AddDevice call will
+    /// fail with `INVALID_ARGS`.
     /// This can be changed later with SetNotificationFrequency.
-    /// If unspecified, the notification frequency will be the same as that
-    /// specified by the client when retrieving the RingBuffer VMO.
-    ///
-    /// Optional.
-    6: notifications_per_ring uint32;
+   12: initial_notifications_per_ring uint32;
+
+    /// Device type.
+    /// If not specified, StreamConfig.
+   13: device_type DeviceType;
+
+    /// Is the direction input or output.
+    /// If true the direction is input, if false the direction is output.
+    /// If not specified, the device may be used for both input and output.
+   14: is_input bool;
 };
 
 type FormatRange = struct {
@@ -251,55 +131,17 @@ type FormatRange = struct {
     rate_family_flags uint16;
 };
 
-/// Configuration for a DAI interconnect.
-type DaiInterconnect = table {
-    /// DAI interconnect supported formats.
-    ///
-    /// Required.
-    1: dai_supported_formats
-            vector<fuchsia.hardware.audio.DaiSupportedFormats>:fuchsia.hardware.audio.MAX_COUNT_DAI_FORMATS;
-};
-
-/// Configuration for a fuchsia.hardware.audio/RingBuffer as used by a Composite driver.
-type CompositeRingBuffer = table {
-    /// Signal processing id for this composite device ring buffer.
-    ///
-    /// Required.
-    1: id uint64;
-
-    /// Configuration for this ring buffer.
-    ///
-    /// Required.
-    2: ring_buffer RingBuffer;
-};
-
-/// Configuration for a DAI interconnect as used by a Composite driver.
-type CompositeDaiInterconnect = table {
-    /// Signal processing id for this composite device DAI interconnect.
-    ///
-    /// Required.
-    1: id uint64;
-
-    /// Configuration for this DAI interconnect.
-    ///
-    /// Required.
-    2: dai_interconnect DaiInterconnect;
-};
-
-type ClockProperties = table {
+type ClockProperties = struct {
     /// The clock domain is an int32 provided by the clock tree to an audio
     /// driver. special values for `CLOCK_DOMAIN_MONOTONIC` (0), and
     /// `CLOCK_DOMAIN_EXTERNAL` (-1) (not locally controllable) are defined in
-    /// `fuchsia.hardware.audio`. Note: other than -1, clients should treat any
-    /// negative `clock_domain` value as invalid.
-    ///
-    /// Optional.
-    1: domain int32;
+    /// `fuchsia.hardware.audio`. Other than -1, any negative value
+    /// for clock_domain is invalid and will be ignored.
+    domain int32;
 
-    /// Rate-adjustment value for this clock. If omitted, treated as 0 ppm.
-    ///
-    /// Optional.
-    2: rate_adjustment_ppm int32;
+    /// Initial rate-adjustment value for this clock. May be non-zero only if
+    /// `clock_domain != 0`.
+    initial_rate_adjustment_ppm int32;
 };
 
 /// Set restrictions for the device ring buffer. This must be called before
@@ -321,49 +163,22 @@ type RingBufferConstraints = struct {
     modulo_frames uint32;
 };
 
-type GainProperties = table {
-    /// The initial gain state at device initialization time.
-    ///
-    /// Required.
-    1: gain_state fuchsia.hardware.audio.GainState;
-
-    /// The device's minimum gain, in decibels.
-    ///
-    /// Optional.
-    2: min_gain_db float32;
-
-    /// The device's maximum gain, in decibels.
-    ///
-    /// Optional.
-    3: max_gain_db float32;
-
-    /// The precision of each gain-change step, in decibels.
-    ///
-    /// Optional.
-    4: gain_step_db float32;
-
-    /// If true, the device contains a distinct MUTE control. If false or
-    /// absent, it does not.
-    ///
-    /// Optional.
-    5: can_mute bool;
-
-    /// Automatic Gain Control. If absent, this hardware does not support AGC.
-    ///
-    /// Optional.
-    6: can_agc bool;
+type GainProperties = struct {
+    min_gain_db float32;
+    max_gain_db float32;
+    gain_step_db float32;
+    current_gain_db float32;
+    can_mute bool;
+    current_mute bool;
+    can_agc bool;
+    current_agc bool;
 };
 
-type PlugProperties = table {
-    /// The initial plug state at device initialization time.
-    ///
-    /// Required.
-    1: plug_state fuchsia.hardware.audio.PlugState;
-
-    /// Plug Detect Capabilities.
-    ///
-    /// Optional.
-    2: plug_detect_capabilities fuchsia.hardware.audio.PlugDetectCapabilities;
+type PlugProperties = struct {
+    plug_change_time zx.Time;
+    plugged bool;
+    hardwired bool;
+    can_notify bool;
 };
 
 /// This protocol represents the base functionality of active audio devices. A

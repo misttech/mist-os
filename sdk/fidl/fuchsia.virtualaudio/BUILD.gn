@@ -9,11 +9,7 @@ fidl("fuchsia.virtualaudio") {
 
   sources = [ "virtual_audio.fidl" ]
 
-  public_deps = [
-    "//sdk/fidl/fuchsia.hardware.audio",
-    "//sdk/fidl/fuchsia.hardware.audio.signalprocessing",
-    "//zircon/vdso/zx",
-  ]
+  public_deps = [ "//zircon/vdso/zx" ]
 
   enable_hlcpp = true
 }
