@@ -111,6 +111,7 @@ impl FakeBasePackageResolver {
 }
 
 async fn serve_fake_filesystem(
+    base_manifest: Arc<VmoFile>,
     base_packages: HashMap<String, Arc<dyn DirectoryEntry>>,
     handles: LocalComponentHandles,
 ) -> Result<(), anyhow::Error> {
@@ -125,6 +126,11 @@ async fn serve_fake_filesystem(
         },
         "boot" => vfs::pseudo_directory! {
             "meta" => vfs::pseudo_directory! {},
+            "config" => vfs::pseudo_directory! {
+              "driver_index" => vfs::pseudo_directory! {
+                "base_driver_manifest" => base_manifest
+              }
+            },
         },
     };
     root.open(
@@ -138,6 +144,7 @@ async fn serve_fake_filesystem(
 }
 
 async fn create_realm(
+    base_manifest: Arc<VmoFile>,
     base_packages: HashMap<String, Arc<dyn DirectoryEntry>>,
 ) -> Result<fuchsia_component_test::RealmInstance, Error> {
     let builder = RealmBuilder::new().await?;
@@ -145,7 +152,9 @@ async fn create_realm(
     let fake_filesystem = builder
         .add_local_child(
             "fake_filesystem",
-            move |h: LocalComponentHandles| serve_fake_filesystem(base_packages.clone(), h).boxed(),
+            move |h: LocalComponentHandles| {
+                serve_fake_filesystem(base_manifest.clone(), base_packages.clone(), h).boxed()
+            },
             ChildOptions::new().eager(),
         )
         .await
@@ -231,20 +240,12 @@ async fn load_package_firmware_test() -> Result<(), Error> {
         ),
     );
 
-    let base_packages = HashMap::from([
-        (
-            "fuchsia-pkg://fuchsia.com/driver-manager-base-config".to_owned(),
-            vfs::pseudo_directory! {
-                "config" => vfs::pseudo_directory! { "base-driver-manifest.json" => base_manifest },
-            } as Arc<dyn DirectoryEntry>,
-        ),
-        (
-            "fuchsia-pkg://fuchsia.com/my-package".to_owned(),
-            Arc::new(my_package) as Arc<dyn DirectoryEntry>,
-        ),
-    ]);
+    let base_packages = HashMap::from([(
+        "fuchsia-pkg://fuchsia.com/my-package".to_owned(),
+        Arc::new(my_package) as Arc<dyn DirectoryEntry>,
+    )]);
 
-    let instance = create_realm(base_packages).await?;
+    let instance = create_realm(base_manifest, base_packages).await?;
 
     // This is unused but connecting to it causes DriverManager to start.
     let _admin = instance

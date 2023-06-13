@@ -143,8 +143,8 @@ fuchsia_driver_component("test-fallback-component") {
   manifest = "meta/test-fallback-component.cml"
 }
 
-driver_manifest("driver-manifest") {
-  manifest_name = "base-driver-manifest.json"
+driver_manifest("base-driver-manifest") {
+  manifest_name = "driver_index/base_driver_manifest"
   install_as_config_resource = true
   package_url = "fuchsia-pkg://fuchsia.com/driver-index-unittests"
   deps = [
@@ -163,8 +163,8 @@ fuchsia_unittest_package("driver-index-unittests") {
     }
   }
   deps = [
+    ":base-driver-manifest",
     ":bin_test",
-    ":driver-manifest",
     ":test-bind-component",
     ":test-bind2-component",
     ":test-fallback-component",

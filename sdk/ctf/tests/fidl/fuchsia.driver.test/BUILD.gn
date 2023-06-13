@@ -36,4 +36,10 @@ ctf_fuchsia_test_package("fuchsia.driver.test_test") {
   plasa_element = "fidl/fuchsia.driver.test/Realm"
   package_name = "fuchsia.driver.test_test"
   test_components = [ ":test" ]
+  test_specs = {
+    # Allow error logging for absent driver manifest files
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }

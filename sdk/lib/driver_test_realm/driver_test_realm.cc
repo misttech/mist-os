@@ -211,67 +211,6 @@ class FakeRootJob final : public fidl::WireServer<fuchsia_kernel::RootJob> {
   }
 };
 
-class FakeBasePackageResolver final : public fidl::WireServer<fuchsia_pkg::PackageResolver> {
- public:
-  FakeBasePackageResolver(fs::SynchronousVfs* vfs) : vfs_(vfs) {}
-
- private:
-  void Resolve(ResolveRequestView request, ResolveCompleter::Sync& completer) override {
-    if (request->package_url.get() != "fuchsia-pkg://fuchsia.com/driver-manager-base-config" &&
-        request->package_url.get() != "fuchsia-pkg://fuchsia.com/driver-manager-base-config/0") {
-      FX_SLOG(ERROR, "FakeBasePackageResolver asked to resolve unknown package",
-              KV("url", request->package_url.get()));
-      completer.ReplyError(fuchsia_pkg::wire::ResolveError::kPackageNotFound);
-      return;
-    }
-
-    auto driver_manager_base_config = fbl::MakeRefCounted<fs::PseudoDir>();
-    // Create the driver-manager-base-config package.
-    // It has entry /config/base-driver-manifest.json
-    {
-      auto config = fbl::MakeRefCounted<fs::PseudoDir>();
-      auto base_driver_manifest = fbl::MakeRefCounted<fs::UnbufferedPseudoFile>(
-          [](fbl::String* output) {
-            // Return an empty JSON array.
-            *output = fbl::String("[]");
-            return ZX_OK;
-          },
-          [](std::string_view input) { return ZX_ERR_NOT_SUPPORTED; });
-
-      config->AddEntry("base-driver-manifest.json", std::move(base_driver_manifest));
-      driver_manager_base_config->AddEntry("config", std::move(config));
-    }
-
-    if (zx_status_t status =
-            vfs_->Serve(std::move(driver_manager_base_config), request->dir.TakeChannel(),
-                        fs::VnodeConnectionOptions::ReadExec());
-        status != ZX_OK) {
-      FX_SLOG(ERROR, "FakeBasePackageResolver failed to serve driver-manager-base-config",
-              KV("status", status));
-      completer.ReplyError(fuchsia_pkg::wire::ResolveError::kInternal);
-    }
-
-    auto resolution_context = fuchsia_pkg::wire::ResolutionContext({});
-    completer.ReplySuccess(resolution_context);
-  }
-
-  void ResolveWithContext(ResolveWithContextRequestView request,
-                          ResolveWithContextCompleter::Sync& completer) override {
-    FX_SLOG(ERROR, "ResolveWithContext is not yet implemented in FakeBasePackageResolver");
-    completer.ReplyError(fuchsia_pkg::wire::ResolveError::kInternal);
-  }
-
-  void GetHash(GetHashRequestView request, GetHashCompleter::Sync& completer) override {
-    // Even given the same URL, GetHash is not guaranteed to return the hash of the previously
-    // resolved package (e.g. the package repository could have been updated in between calls).
-    // Clients should obtain the package's hash by reading the package's meta entry as a file.
-    FX_SLOG(ERROR, "GetHash is not implemented in FakeBasePackageResolver");
-    completer.ReplyError(ZX_ERR_INTERNAL);
-  }
-
-  fs::SynchronousVfs* vfs_;
-};
-
 class FakeFullPackageResolver final : public fidl::WireServer<fuchsia_pkg::PackageResolver> {
   void Resolve(ResolveRequestView request, ResolveCompleter::Sync& completer) override {
     auto status = fdio_open("/pkg",
@@ -461,13 +400,6 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
     }
 
     result = outgoing_->AddProtocol<fuchsia_kernel::RootJob>(std::make_unique<FakeRootJob>());
-    if (result.is_error()) {
-      completer.Reply(result.take_error());
-      return;
-    }
-
-    result = outgoing_->AddProtocol<fuchsia_pkg::PackageResolver>(
-        std::make_unique<FakeBasePackageResolver>(&vfs_), "fuchsia.pkg.PackageResolver-base");
     if (result.is_error()) {
       completer.Reply(result.take_error());
       return;
