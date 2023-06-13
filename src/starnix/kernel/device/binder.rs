@@ -372,18 +372,28 @@ impl Drop for TransactionState {
     fn drop(&mut self) {
         log_trace!("Dropping binder TransactionState");
         let Some(proc) = self.proc.upgrade() else { return; };
+        let mut drop_actions = vec![];
         let mut proc = proc.lock();
         for handle in &self.handles {
             // Ignore the error because there is little we can do about it.
             // Panicking would be wrong, in case the client issued an extra strong decrement.
-            let result = proc.handles.dec_strong(handle.object_index());
-            if let Err(error) = result {
-                log_warn!(
-                    "Error when dropping transaction state for process {}: {:?}",
-                    proc.base.pid,
-                    error
-                );
+            match proc.handles.dec_strong(handle.object_index()) {
+                Err(error) => {
+                    log_warn!(
+                        "Error when dropping transaction state for process {}: {:?}",
+                        proc.base.pid,
+                        error
+                    );
+                }
+                Ok(actions) => {
+                    drop_actions.extend(actions);
+                }
             }
+        }
+        drop(proc);
+        // Executing action must be done without holding BinderProcess lock.
+        for action in drop_actions {
+            action.execute();
         }
     }
 }
@@ -486,8 +496,10 @@ struct BinderProcess {
     /// The [`SharedMemory`] region mapped in both the driver and the binder process. Allows for
     /// transactions to copy data once from the sender process into the receiver process.
     shared_memory: Mutex<Option<SharedMemory>>,
+
     /// The main mutable state of the `BinderProcess`.
     state: Mutex<BinderProcessState>,
+
     /// A queue for commands that could not be scheduled on any existing binder threads. Binder
     /// threads that exhaust their own queue will read from this one.
     ///
@@ -1893,7 +1905,7 @@ impl ObjectReferenceCount {
         }
     }
 
-    /// Acknowledge a client ack for a rerence count increase.
+    /// Acknowledge a client ack for a reference count increase.
     fn ack(&mut self) -> Result<(), Errno> {
         match self {
             Self::WaitingAck(x) => {
@@ -6128,6 +6140,73 @@ pub mod tests {
         assert!(
             test.receiver_task.files.get_all_fds().is_empty(),
             "receiver should not have any files"
+        );
+    }
+
+    #[fuchsia::test]
+    async fn cleanup_refs_in_successful_transaction() {
+        let test = TranslateHandlesTestFixture::new();
+        let mut receiver_shared_memory = test.lock_receiver_shared_memory();
+        let mut allocations =
+            receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
+
+        const BINDER_OBJECT: LocalBinderObject = LocalBinderObject {
+            weak_ref_addr: UserAddress::const_from(0x0000000000000010),
+            strong_ref_addr: UserAddress::const_from(0x0000000000000100),
+        };
+
+        const DATA_PREAMBLE: &[u8; 5] = b"stuff";
+
+        let mut transaction_data = Vec::new();
+        transaction_data.extend(DATA_PREAMBLE);
+        let offsets = [transaction_data.len() as binder_uintptr_t];
+        transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
+            hdr.type_: BINDER_TYPE_BINDER,
+            flags: 0,
+            cookie: BINDER_OBJECT.strong_ref_addr.ptr() as u64,
+            __bindgen_anon_1.binder: BINDER_OBJECT.weak_ref_addr.ptr() as u64,
+        }));
+
+        const EXPECTED_HANDLE: Handle = Handle::from_raw(1);
+
+        let transaction_state = test
+            .driver
+            .translate_objects(
+                &test.sender_task,
+                &test.sender_proc,
+                &test.sender_thread,
+                &test.receiver_task,
+                &test.receiver_proc,
+                &offsets,
+                &mut transaction_data,
+                &mut allocations.scatter_gather_buffer,
+            )
+            .expect("failed to translate handles");
+
+        let object = test
+            .receiver_proc
+            .lock()
+            .handles
+            .get(EXPECTED_HANDLE.object_index())
+            .expect("expected handle not present");
+        object.ack_acquire().expect("ack_acquire");
+
+        // Verify that a strong acquire command is sent to the sender process (on the same thread
+        // that sent the transaction).
+        assert_matches!(
+            test.sender_thread.lock().command_queue.commands.front(),
+            Some(Command::AcquireRef(BINDER_OBJECT))
+        );
+        test.sender_thread.lock().command_queue.commands.pop_front().unwrap();
+
+        // Simulate a successful transaction by converting the transient state.
+        let transaction_state: TransactionState = transaction_state.into();
+        drop(transaction_state);
+
+        // Verify that a strong release command is sent to the sender process.
+        assert_matches!(
+            test.sender_proc.command_queue.lock().commands.front(),
+            Some(Command::ReleaseRef(BINDER_OBJECT))
         );
     }
 
