@@ -208,11 +208,7 @@ impl Results {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::*,
-        fidl_diagnostics_validate::{self as validate, Value},
-    };
+    use {super::*, crate::*, fidl_diagnostics_validate::Value};
 
     #[fuchsia::test]
     fn error_result_fails_and_outputs() {
