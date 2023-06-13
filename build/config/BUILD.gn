@@ -661,8 +661,6 @@ config("Wno-conversion") {
     "//sdk/lib/sys/cpp/tests:*",
     "//sdk/lib/sys/service/cpp:*",
     "//sdk/lib/syslog/streams/cpp:*",
-    "//sdk/lib/vfs/cpp:*",
-    "//sdk/lib/vfs/cpp/testing:*",
     "//src/cobalt/bin/system-metrics:*",
     "//src/cobalt/bin/testapp:*",
     "//src/connectivity/bluetooth/hci/transport/uart:*",

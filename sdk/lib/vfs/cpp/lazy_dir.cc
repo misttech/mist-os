@@ -59,7 +59,7 @@ zx_status_t LazyDir::Readdir(uint64_t offset, void* data, uint64_t len, uint64_t
   for (auto it = std::upper_bound(entries.begin(), entries.end(), offset,
                                   [](uint64_t b_id, const LazyEntry& a) { return b_id < a.id; });
        it != entries.end(); ++it) {
-    auto dtype = ((fuchsia::io::MODE_TYPE_MASK & it->type) >> 12);
+    uint8_t dtype = ((fuchsia::io::MODE_TYPE_MASK & it->type) >> 12);
     if (filler.Next(it->name, dtype, ino) != ZX_OK) {
       *out_actual = filler.GetBytesFilled();
       if (*out_actual == 0) {

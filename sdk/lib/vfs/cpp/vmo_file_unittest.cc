@@ -24,7 +24,7 @@ namespace {
 
 void FillBuffer(char* buf, size_t size) {
   for (size_t i = 0; i < size; i++) {
-    buf[i] = i % 256;
+    buf[i] = static_cast<char>(i);
   }
 }
 

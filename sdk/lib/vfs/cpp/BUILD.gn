@@ -55,9 +55,6 @@ sdk_source_set("cpp") {
   ]
 
   public_configs = [ "//sdk/config" ]
-
-  # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
 test("vfs_cpp_unittests") {
@@ -81,9 +78,6 @@ test("vfs_cpp_unittests") {
     "//src/lib/testing/loop_fixture",
     "//src/testing/fidl:placeholders_hlcpp",
   ]
-
-  # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
 fuchsia_unittest_package("vfs_cpp_tests") {
