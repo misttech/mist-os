@@ -17,6 +17,7 @@
 #include <gtest/gtest.h>
 
 #include "src/graphics/display/drivers/amlogic-display/osd.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/predicates/status.h"
 
@@ -200,7 +201,6 @@ class MockBufferCollectionForCapture : public MockBufferCollectionBase {
 
 class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocator> {
  public:
-  using BufferCollectionId = int;
   using MockBufferCollectionBuilder =
       fit::function<std::unique_ptr<MockBufferCollectionBase>(void)>;
 
@@ -233,7 +233,8 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
   }
 
   MockBufferCollectionBase* GetMostRecentBufferCollection() {
-    const BufferCollectionId most_recent_collection_id = next_buffer_collection_id_ - 1;
+    const display::DriverBufferCollectionId most_recent_collection_id(
+        next_buffer_collection_id_.value() - 1);
     if (active_buffer_collections_.find(most_recent_collection_id) ==
         active_buffer_collections_.end()) {
       return nullptr;
@@ -275,11 +276,13 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
     std::unique_ptr<MockBufferCollectionBase> mock_buffer_collection;
   };
 
-  std::unordered_map<BufferCollectionId, BufferCollection> active_buffer_collections_;
+  std::unordered_map<display::DriverBufferCollectionId, BufferCollection>
+      active_buffer_collections_;
   std::vector<fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>>
       inactive_buffer_collection_tokens_;
 
-  BufferCollectionId next_buffer_collection_id_ = 0;
+  display::DriverBufferCollectionId next_buffer_collection_id_ =
+      display::DriverBufferCollectionId(0);
   MockBufferCollectionBuilder mock_buffer_collection_builder_ = nullptr;
 
   async_dispatcher_t* dispatcher_ = nullptr;
@@ -402,13 +405,15 @@ TEST_F(FakeSysmemTest, ImportBufferCollection) {
   ASSERT_OK(token2_endpoints.status_value());
 
   // Test ImportBufferCollection().
-  constexpr uint64_t kValidBufferCollectionId = 1u;
+  constexpr display::DriverBufferCollectionId kValidBufferCollectionId(1);
+  constexpr uint64_t kBanjoValidBufferCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kValidBufferCollectionId);
   EXPECT_OK(display_->DisplayControllerImplImportBufferCollection(
-      kValidBufferCollectionId, token1_endpoints->client.TakeChannel()));
+      kBanjoValidBufferCollectionId, token1_endpoints->client.TakeChannel()));
 
-  // `collection_id` must be unused.
+  // `driver_buffer_collection_id` must be unused.
   EXPECT_EQ(display_->DisplayControllerImplImportBufferCollection(
-                kValidBufferCollectionId, token2_endpoints->client.TakeChannel()),
+                kBanjoValidBufferCollectionId, token2_endpoints->client.TakeChannel()),
             ZX_ERR_ALREADY_EXISTS);
 
   EXPECT_TRUE(
@@ -438,10 +443,12 @@ TEST_F(FakeSysmemTest, ImportBufferCollection) {
   }
 
   // Test ReleaseBufferCollection().
-  constexpr uint64_t kInvalidBufferCollectionId = 2u;
-  EXPECT_EQ(display_->DisplayControllerImplReleaseBufferCollection(kInvalidBufferCollectionId),
+  constexpr display::DriverBufferCollectionId kInvalidBufferCollectionId(2);
+  constexpr uint64_t kBanjoInvalidBufferCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kInvalidBufferCollectionId);
+  EXPECT_EQ(display_->DisplayControllerImplReleaseBufferCollection(kBanjoInvalidBufferCollectionId),
             ZX_ERR_NOT_FOUND);
-  EXPECT_OK(display_->DisplayControllerImplReleaseBufferCollection(kValidBufferCollectionId));
+  EXPECT_OK(display_->DisplayControllerImplReleaseBufferCollection(kBanjoValidBufferCollectionId));
 
   EXPECT_TRUE(
       PollUntil([&]() { return allocator_->GetActiveBufferCollectionTokenClients().empty(); },
@@ -476,8 +483,10 @@ TEST_F(FakeSysmemTest, ImportImage) {
   ASSERT_OK(token_endpoints.status_value());
   auto& [token_client, token_server] = token_endpoints.value();
 
-  constexpr uint64_t kBufferCollectionId = 1u;
-  EXPECT_OK(display_->DisplayControllerImplImportBufferCollection(kBufferCollectionId,
+  constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
+  constexpr uint64_t kBanjoBufferCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
+  EXPECT_OK(display_->DisplayControllerImplImportBufferCollection(kBanjoBufferCollectionId,
                                                                   token_client.TakeChannel()));
 
   // Driver sets BufferCollection buffer memory constraints.
@@ -487,45 +496,48 @@ TEST_F(FakeSysmemTest, ImportImage) {
       .type = IMAGE_TYPE_SIMPLE,
       .handle = 0,
   };
-  EXPECT_OK(display_->DisplayControllerImplSetBufferCollectionConstraints(&kDefaultConfig,
-                                                                          kBufferCollectionId));
+  EXPECT_OK(display_->DisplayControllerImplSetBufferCollectionConstraints(
+      &kDefaultConfig, kBanjoBufferCollectionId));
 
-  constexpr uint64_t kInvalidBufferCollectionId = 100u;
+  constexpr display::DriverBufferCollectionId kInvalidBufferCollectionId(100);
+  constexpr uint64_t kBanjoInvalidBufferCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kInvalidBufferCollectionId);
   EXPECT_EQ(display_->DisplayControllerImplSetBufferCollectionConstraints(
-                &kDefaultConfig, kInvalidBufferCollectionId),
+                &kDefaultConfig, kBanjoInvalidBufferCollectionId),
             ZX_ERR_NOT_FOUND);
 
   // Invalid import: Bad image type.
   image_t invalid_config = kDefaultConfig;
   invalid_config.type = IMAGE_TYPE_CAPTURE;
-  EXPECT_EQ(display_->DisplayControllerImplImportImage(&invalid_config, kBufferCollectionId,
+  EXPECT_EQ(display_->DisplayControllerImplImportImage(&invalid_config, kBanjoBufferCollectionId,
                                                        /*index=*/0),
             ZX_ERR_INVALID_ARGS);
 
   // Invalid import: Invalid collection ID.
   invalid_config = kDefaultConfig;
-  EXPECT_EQ(display_->DisplayControllerImplImportImage(&invalid_config, kInvalidBufferCollectionId,
-                                                       /*index=*/0),
-            ZX_ERR_NOT_FOUND);
+  EXPECT_EQ(
+      display_->DisplayControllerImplImportImage(&invalid_config, kBanjoInvalidBufferCollectionId,
+                                                 /*index=*/0),
+      ZX_ERR_NOT_FOUND);
 
   // Invalid import: Invalid buffer collection index.
   invalid_config = kDefaultConfig;
   constexpr uint64_t kInvalidBufferCollectionIndex = 100u;
-  EXPECT_EQ(display_->DisplayControllerImplImportImage(&invalid_config, kBufferCollectionId,
+  EXPECT_EQ(display_->DisplayControllerImplImportImage(&invalid_config, kBanjoBufferCollectionId,
                                                        kInvalidBufferCollectionIndex),
             ZX_ERR_OUT_OF_RANGE);
 
   // Valid import.
   image_t valid_config = kDefaultConfig;
   EXPECT_EQ(valid_config.handle, 0u);
-  EXPECT_OK(display_->DisplayControllerImplImportImage(&valid_config, kBufferCollectionId,
+  EXPECT_OK(display_->DisplayControllerImplImportImage(&valid_config, kBanjoBufferCollectionId,
                                                        /*index=*/0));
   EXPECT_NE(valid_config.handle, 0u);
 
   // Release the image.
   display_->DisplayControllerImplReleaseImage(&valid_config);
 
-  EXPECT_OK(display_->DisplayControllerImplReleaseBufferCollection(kBufferCollectionId));
+  EXPECT_OK(display_->DisplayControllerImplReleaseBufferCollection(kBanjoBufferCollectionId));
 }
 
 TEST_F(FakeSysmemTest, ImportImageForCapture) {
@@ -537,8 +549,10 @@ TEST_F(FakeSysmemTest, ImportImageForCapture) {
   ASSERT_OK(token_endpoints.status_value());
   auto& [token_client, token_server] = token_endpoints.value();
 
-  constexpr uint64_t kBufferCollectionId = 1u;
-  EXPECT_OK(display_->DisplayControllerImplImportBufferCollection(kBufferCollectionId,
+  constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
+  constexpr uint64_t kBanjoBufferCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
+  EXPECT_OK(display_->DisplayControllerImplImportBufferCollection(kBanjoBufferCollectionId,
                                                                   token_client.TakeChannel()));
 
   // Driver sets BufferCollection buffer memory constraints.
@@ -548,32 +562,32 @@ TEST_F(FakeSysmemTest, ImportImageForCapture) {
       .type = IMAGE_TYPE_CAPTURE,
       .handle = 0,
   };
-  EXPECT_OK(display_->DisplayControllerImplSetBufferCollectionConstraints(&kDefaultConfig,
-                                                                          kBufferCollectionId));
+  EXPECT_OK(display_->DisplayControllerImplSetBufferCollectionConstraints(
+      &kDefaultConfig, kBanjoBufferCollectionId));
 
   // Invalid import: invalid buffer collection ID.
   uint64_t capture_handle = 0;
-  const uint64_t kInvalidBufferCollectionId = 100;
-  EXPECT_EQ(display_->DisplayControllerImplImportImageForCapture(kInvalidBufferCollectionId,
+  const uint64_t kBanjoInvalidBufferCollectionId = 100;
+  EXPECT_EQ(display_->DisplayControllerImplImportImageForCapture(kBanjoInvalidBufferCollectionId,
                                                                  /*index=*/0, &capture_handle),
             ZX_ERR_NOT_FOUND);
 
   // Invalid import: index out of range.
   const uint64_t kInvalidIndex = 100;
-  EXPECT_EQ(display_->DisplayControllerImplImportImageForCapture(kBufferCollectionId, kInvalidIndex,
-                                                                 &capture_handle),
+  EXPECT_EQ(display_->DisplayControllerImplImportImageForCapture(kBanjoBufferCollectionId,
+                                                                 kInvalidIndex, &capture_handle),
             ZX_ERR_OUT_OF_RANGE);
 
   // Valid import.
   capture_handle = 0;
-  EXPECT_OK(display_->DisplayControllerImplImportImageForCapture(kBufferCollectionId, /*index=*/0,
-                                                                 &capture_handle));
+  EXPECT_OK(display_->DisplayControllerImplImportImageForCapture(kBanjoBufferCollectionId,
+                                                                 /*index=*/0, &capture_handle));
   EXPECT_NE(capture_handle, 0u);
 
   // Release the image.
   display_->DisplayControllerImplReleaseCapture(capture_handle);
 
-  EXPECT_OK(display_->DisplayControllerImplReleaseBufferCollection(kBufferCollectionId));
+  EXPECT_OK(display_->DisplayControllerImplReleaseBufferCollection(kBanjoBufferCollectionId));
 }
 
 TEST_F(FakeSysmemTest, SysmemRequirements) {
@@ -591,15 +605,17 @@ TEST_F(FakeSysmemTest, SysmemRequirements) {
   ASSERT_OK(token_endpoints.status_value());
   auto& [token_client, token_server] = token_endpoints.value();
 
-  constexpr uint64_t kBufferCollectionId = 1u;
-  EXPECT_OK(display_->DisplayControllerImplImportBufferCollection(kBufferCollectionId,
+  constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
+  constexpr uint64_t kBanjoBufferCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
+  EXPECT_OK(display_->DisplayControllerImplImportBufferCollection(kBanjoBufferCollectionId,
                                                                   token_client.TakeChannel()));
 
   EXPECT_TRUE(PollUntil([&] { return collection != nullptr; }, zx::msec(5), 1000));
 
   image_t image = {};
-  EXPECT_OK(
-      display_->DisplayControllerImplSetBufferCollectionConstraints(&image, kBufferCollectionId));
+  EXPECT_OK(display_->DisplayControllerImplSetBufferCollectionConstraints(
+      &image, kBanjoBufferCollectionId));
 
   EXPECT_TRUE(PollUntil([&] { return collection->set_constraints_called(); }, zx::msec(5), 1000));
   EXPECT_TRUE(collection->set_name_called());
@@ -624,15 +640,17 @@ TEST_F(FakeSysmemTest, SysmemRequirements_BgraOnly) {
   ASSERT_OK(token_endpoints.status_value());
   auto& [token_client, token_server] = token_endpoints.value();
 
-  constexpr uint64_t kBufferCollectionId = 1u;
-  EXPECT_OK(display_->DisplayControllerImplImportBufferCollection(kBufferCollectionId,
+  constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
+  constexpr uint64_t kBanjoBufferCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
+  EXPECT_OK(display_->DisplayControllerImplImportBufferCollection(kBanjoBufferCollectionId,
                                                                   token_client.TakeChannel()));
 
   EXPECT_TRUE(PollUntil([&] { return collection != nullptr; }, zx::msec(5), 1000));
 
   image_t image = {};
-  EXPECT_OK(
-      display_->DisplayControllerImplSetBufferCollectionConstraints(&image, kBufferCollectionId));
+  EXPECT_OK(display_->DisplayControllerImplSetBufferCollectionConstraints(
+      &image, kBanjoBufferCollectionId));
 
   EXPECT_TRUE(PollUntil([&] { return collection->set_constraints_called(); }, zx::msec(5), 1000));
   EXPECT_TRUE(collection->set_name_called());
@@ -675,13 +693,15 @@ TEST_F(FakeSysmemTest, NoLeakCaptureCanvas) {
   ASSERT_OK(token_endpoints.status_value());
   auto& [token_client, token_server] = token_endpoints.value();
 
-  constexpr uint64_t kBufferCollectionId = 1u;
-  EXPECT_OK(display_->DisplayControllerImplImportBufferCollection(kBufferCollectionId,
+  constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
+  constexpr uint64_t kBanjoBufferCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
+  EXPECT_OK(display_->DisplayControllerImplImportBufferCollection(kBanjoBufferCollectionId,
                                                                   token_client.TakeChannel()));
 
   uint64_t capture_handle;
-  EXPECT_OK(display_->DisplayControllerImplImportImageForCapture(kBufferCollectionId, /*index=*/0,
-                                                                 &capture_handle));
+  EXPECT_OK(display_->DisplayControllerImplImportImageForCapture(kBanjoBufferCollectionId,
+                                                                 /*index=*/0, &capture_handle));
   EXPECT_OK(display_->DisplayControllerImplReleaseCapture(capture_handle));
 
   canvas_.SyncCall(&FakeCanvasProtocol::CheckThatNoEntriesInUse);

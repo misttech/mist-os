@@ -171,9 +171,11 @@ void AmlogicDisplay::DisplayControllerImplSetDisplayControllerInterface(
 
 // part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
 zx_status_t AmlogicDisplay::DisplayControllerImplImportBufferCollection(
-    uint64_t collection_id, zx::channel collection_token) {
-  if (buffer_collections_.find(collection_id) != buffer_collections_.end()) {
-    zxlogf(ERROR, "Buffer Collection (id=%lu) already exists", collection_id);
+    uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token) {
+  const display::DriverBufferCollectionId driver_buffer_collection_id =
+      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+  if (buffer_collections_.find(driver_buffer_collection_id) != buffer_collections_.end()) {
+    zxlogf(ERROR, "Buffer Collection (id=%lu) already exists", driver_buffer_collection_id.value());
     return ZX_ERR_ALREADY_EXISTS;
   }
 
@@ -195,27 +197,33 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportBufferCollection(
     return ZX_ERR_INTERNAL;
   }
 
-  buffer_collections_[collection_id] = fidl::WireSyncClient(std::move(collection_client_endpoint));
+  buffer_collections_[driver_buffer_collection_id] =
+      fidl::WireSyncClient(std::move(collection_client_endpoint));
   return ZX_OK;
 }
 
 // part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
-zx_status_t AmlogicDisplay::DisplayControllerImplReleaseBufferCollection(uint64_t collection_id) {
-  if (buffer_collections_.find(collection_id) == buffer_collections_.end()) {
+zx_status_t AmlogicDisplay::DisplayControllerImplReleaseBufferCollection(
+    uint64_t banjo_driver_buffer_collection_id) {
+  const display::DriverBufferCollectionId driver_buffer_collection_id =
+      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+  if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
     zxlogf(ERROR, "Cannot release buffer collection %lu: buffer collection doesn't exist",
-           collection_id);
+           driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
-  buffer_collections_.erase(collection_id);
+  buffer_collections_.erase(driver_buffer_collection_id);
   return ZX_OK;
 }
 
 // part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
-zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(image_t* image, uint64_t collection_id,
-                                                             uint32_t index) {
-  if (buffer_collections_.find(collection_id) == buffer_collections_.end()) {
+zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(
+    image_t* image, uint64_t banjo_driver_buffer_collection_id, uint32_t index) {
+  const display::DriverBufferCollectionId driver_buffer_collection_id =
+      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+  if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
     zxlogf(ERROR, "Cannot import Image on collection %lu: buffer collection doesn't exist",
-           collection_id);
+           driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
 
@@ -231,7 +239,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(image_t* image, uin
   }
 
   const fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection =
-      buffer_collections_.at(collection_id);
+      buffer_collections_.at(driver_buffer_collection_id);
   fidl::WireResult check_result = collection->CheckBuffersAllocated();
   // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
@@ -571,16 +579,18 @@ zx_status_t AmlogicDisplay::DisplayControllerImplGetSysmemConnection(zx::channel
 }
 
 zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
-    const image_t* config, uint64_t collection_id) {
-  if (buffer_collections_.find(collection_id) == buffer_collections_.end()) {
+    const image_t* config, uint64_t banjo_driver_buffer_collection_id) {
+  const display::DriverBufferCollectionId driver_buffer_collection_id =
+      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+  if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
     zxlogf(ERROR,
            "Cannot set buffer collection constraints for %lu: buffer collection doesn't exist",
-           collection_id);
+           driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
 
   const fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection =
-      buffer_collections_.at(collection_id);
+      buffer_collections_.at(driver_buffer_collection_id);
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints = {};
   const char* buffer_name;
   if (config->type == IMAGE_TYPE_CAPTURE) {
@@ -692,15 +702,17 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetDisplayCaptureInterface(
 }
 
 zx_status_t AmlogicDisplay::DisplayControllerImplImportImageForCapture(
-    uint64_t collection_id, uint32_t index, uint64_t* out_capture_handle) {
-  if (buffer_collections_.find(collection_id) == buffer_collections_.end()) {
+    uint64_t banjo_driver_buffer_collection_id, uint32_t index, uint64_t* out_capture_handle) {
+  const display::DriverBufferCollectionId driver_buffer_collection_id =
+      display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+  if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
     zxlogf(ERROR, "Cannot import capture image on collection %lu: buffer collection doesn't exist",
-           collection_id);
+           driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
 
   const fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection =
-      buffer_collections_.at(collection_id);
+      buffer_collections_.at(driver_buffer_collection_id);
   auto import_capture = std::make_unique<ImageInfo>();
   if (import_capture == nullptr) {
     return ZX_ERR_NO_MEMORY;
