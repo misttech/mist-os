@@ -65,6 +65,9 @@ pub struct FsNode {
 
     /// Records locks associated with this node.
     record_locks: RecordLocks,
+
+    /// Inotify watchers on this node. See inotify(7).
+    pub watchers: inotify::InotifyWatchers,
 }
 
 pub type FsNodeHandle = Arc<FsNode>;
@@ -655,6 +658,7 @@ impl FsNode {
                 append_lock: Default::default(),
                 flock_info: Default::default(),
                 record_locks: Default::default(),
+                watchers: Default::default(),
             };
             #[cfg(any(test, debug_assertions))]
             {

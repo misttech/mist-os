@@ -2035,7 +2035,6 @@ pub fn sys_fallocate(
 }
 
 pub fn sys_inotify_init1(current_task: &CurrentTask, flags: u32) -> Result<FdNumber, Errno> {
-    not_implemented!("inotify_init1({})", flags);
     if flags & !(IN_NONBLOCK | IN_CLOEXEC) != 0 {
         return error!(EINVAL);
     }
@@ -2047,22 +2046,26 @@ pub fn sys_inotify_init1(current_task: &CurrentTask, flags: u32) -> Result<FdNum
 }
 
 pub fn sys_inotify_add_watch(
-    _current_task: &CurrentTask,
+    current_task: &CurrentTask,
     fd: FdNumber,
     user_path: UserCString,
     mask: u32,
 ) -> Result<WdNumber, Errno> {
-    not_implemented!("sys_inotify_add_watch({}, {}, {})", fd, user_path, mask);
-    Ok(WdNumber::from_raw(1))
+    let file = current_task.files.get(fd)?;
+    let inotify_file = file.downcast_file::<InotifyFileObject>().ok_or_else(|| errno!(EINVAL))?;
+    let watched_node =
+        lookup_at(current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
+    inotify_file.add_watch(watched_node.entry, mask, Arc::downgrade(&file))
 }
 
 pub fn sys_inotify_rm_watch(
-    _current_task: &CurrentTask,
+    current_task: &CurrentTask,
     fd: FdNumber,
-    wd: WdNumber,
+    watch_id: WdNumber,
 ) -> Result<(), Errno> {
-    not_implemented!("sys_inotify_rm_watch({}, {})", fd, wd);
-    Ok(())
+    let file = current_task.files.get(fd)?;
+    let inotify_file = file.downcast_file::<InotifyFileObject>().ok_or_else(|| errno!(EINVAL))?;
+    inotify_file.remove_watch(watch_id, Arc::downgrade(&file))
 }
 
 pub fn sys_utimensat(

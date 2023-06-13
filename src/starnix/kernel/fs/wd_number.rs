@@ -5,6 +5,9 @@
 use std::fmt;
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
+/// Watch descriptor returned by inotify_add_watch(2).
+///
+/// See inotify(7) for details.
 #[derive(
     Hash, PartialEq, Eq, PartialOrd, Ord, Debug, Copy, Clone, AsBytes, FromZeroes, FromBytes,
 )]
