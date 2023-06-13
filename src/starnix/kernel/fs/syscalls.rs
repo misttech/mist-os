@@ -469,6 +469,9 @@ pub fn sys_faccessat2(
     let mode = Access::from_bits(mode).ok_or_else(|| errno!(EINVAL))?;
     let lookup_flags = LookupFlags::from_bits(flags, AT_SYMLINK_NOFOLLOW | AT_EACCESS)?;
     let name = lookup_at(current_task, dir_fd, user_path, lookup_flags)?;
+    if mode.contains(Access::WRITE) {
+        name.check_readonly_filesystem()?;
+    }
     name.entry.node.check_access(current_task, mode)
 }
 
@@ -605,6 +608,7 @@ pub fn sys_truncate(
 ) -> Result<(), Errno> {
     let length = length.try_into().map_err(|_| errno!(EINVAL))?;
     let name = lookup_at(current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
+    name.check_readonly_filesystem()?;
     name.entry.node.truncate(current_task, length)?;
     Ok(())
 }
@@ -690,6 +694,7 @@ pub fn sys_linkat(
         if !NamespaceNode::mount_eq(&target, &parent) {
             return error!(EXDEV);
         }
+        parent.check_readonly_filesystem()?;
         parent.entry.link(current_task, basename, &target.entry.node)
     })?;
 
@@ -786,6 +791,7 @@ pub fn sys_fchown(
     group: u32,
 ) -> Result<(), Errno> {
     let file = current_task.files.get_unless_opath(fd)?;
+    file.name.check_readonly_filesystem()?;
     file.name.entry.node.chown(current_task, maybe_uid(owner), maybe_uid(group))
 }
 
@@ -799,6 +805,7 @@ pub fn sys_fchownat(
 ) -> Result<(), Errno> {
     let flags = LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW)?;
     let name = lookup_at(current_task, dir_fd, user_path, flags)?;
+    name.check_readonly_filesystem()?;
     name.entry.node.chown(current_task, maybe_uid(owner), maybe_uid(group))
 }
 
@@ -891,6 +898,7 @@ fn do_setxattr(
     if size > XATTR_NAME_MAX as usize {
         return error!(E2BIG);
     }
+    node.check_readonly_filesystem()?;
     let mode = node.entry.node.info().mode;
     if mode.is_chr() || mode.is_fifo() {
         return error!(EPERM);
@@ -950,6 +958,7 @@ fn do_removexattr(
     node: &NamespaceNode,
     name_addr: UserCString,
 ) -> Result<(), Errno> {
+    node.check_readonly_filesystem()?;
     let mode = node.entry.node.info().mode;
     if mode.is_chr() || mode.is_fifo() {
         return error!(EPERM);
@@ -2107,6 +2116,7 @@ pub fn sys_utimensat(
         let lookup_flags = LookupFlags::from_bits(flags, AT_SYMLINK_NOFOLLOW)?;
         lookup_at(current_task, dir_fd, user_path, lookup_flags)?
     };
+    name.check_readonly_filesystem()?;
     name.entry.node.update_atime_mtime(current_task, atime, mtime)
 }
 

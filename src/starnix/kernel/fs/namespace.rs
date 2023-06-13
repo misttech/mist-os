@@ -817,6 +817,9 @@ impl NamespaceNode {
         flags: OpenFlags,
         check_access: bool,
     ) -> Result<FileHandle, Errno> {
+        if check_access && Access::from_open_flags(flags).contains(Access::WRITE) {
+            self.check_readonly_filesystem()?;
+        }
         Ok(FileObject::new(
             self.entry.node.open(current_task, flags, check_access)?,
             self.clone(),

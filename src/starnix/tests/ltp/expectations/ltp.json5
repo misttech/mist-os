@@ -14,7 +14,6 @@
             matchers: [
                 "*accept02*",
                 "*access01*",
-                "*access04*",
                 "*acct01*",
                 "*acct02*",
                 "*acl1*",
@@ -224,7 +223,6 @@
                 "*fchown01_16*",
                 "*fchown02_16*",
                 "*fchown03_16*",
-                "*fchown04*",
                 "*fchown04_16*",
                 "*fchown05_16*",
                 "*fcntl06*",
@@ -489,7 +487,6 @@
                 "*lchown03_16*",
                 "*leapsec01*",
                 "*libcgroup_freezer*",
-                "*link08*",
                 "*linkat02*",
                 "*llseek01*",
                 "*lremovexattr01*",

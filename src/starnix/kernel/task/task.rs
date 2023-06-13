@@ -1307,6 +1307,7 @@ impl CurrentTask {
             // are supposed to truncate the file if this task can write
             // to the underlying node, even if we are opening the file
             // as read-only. See OpenTest.CanTruncateReadOnly.
+            name.check_readonly_filesystem()?;
             name.entry.node.truncate(self, 0)?;
         }
 
