@@ -72,6 +72,24 @@ def prepare_clang_repository(repo_ctx, clang_install_dir):
     short_version, long_version, builtin_include_paths = \
         process_clang_builtins_output(result.stderr)
 
+    # Clang places a number of built-in headers (e.g. <mmintrin.h>) and
+    # runtime libraries (e.g. libclang_rt.builtins.a) under a directory
+    # whose location has changed over time.
+    #
+    # It used to be lib/clang/<long_version>/, but apparently this has
+    # changed to lib/clang/<short_version>/ in clang-16. Support both schemes
+    # by probing the file system.
+    #
+    lib_clang_internal_dir = None
+    for version in [long_version, short_version]:
+        candidate_dir = "lib/clang/" + version
+        if repo_ctx.path(candidate_dir).exists:
+            lib_clang_internal_dir = candidate_dir
+            break
+
+    if not lib_clang_internal_dir:
+        fail("Could not find lib/clang/<version> directory!?")
+
     # Now convert that into a string that can go into a .bzl file.
     builtin_include_paths_str = "\n".join(["    \"%s\"," % path for path in builtin_include_paths])
 
@@ -79,6 +97,7 @@ def prepare_clang_repository(repo_ctx, clang_install_dir):
 constants = struct(
   long_version = "{long_version}",
   short_version = "{short_version}",
+  lib_clang_internal_dir = "{lib_clang_internal_dir}",
   builtin_include_paths = [
 {builtin_paths}
   ],
@@ -86,6 +105,7 @@ constants = struct(
 '''.format(
         long_version = long_version,
         short_version = short_version,
+        lib_clang_internal_dir = lib_clang_internal_dir,
         builtin_paths = builtin_include_paths_str,
     ))
 

@@ -143,8 +143,8 @@ def compute_clang_features():
     return features
 
 # buildifier: disable=unnamed-macro
-def _generate_libcxx_filegroups(clang_constants, os, arch):
-    """Generate filegroups for libc++ headers and runtime libraries.
+def _generate_clang_runtime_filegroups(clang_constants, os, arch):
+    """Generate filegroups for Clang runtime headers and libraries.
 
     Args:
       clang_constants: A struct containing Clang configuration information.
@@ -153,21 +153,27 @@ def _generate_libcxx_filegroups(clang_constants, os, arch):
 
     Returns:
       A struct giving the names of the filegroups for the headers and runtime
-      libraries for libc++.
+      libraries for libc++ and other Clang runtimes.
     """
     clang_target_tuple = to_clang_target_tuple(os, arch)
 
     prefix = clang_target_tuple
+
     names = struct(
-        headers = prefix + "_libcxx_headers",
-        runtime_libs = prefix + "_libcxx_runtime",
+        headers = prefix + "_runtime_headers",
+        runtime_libs = prefix + "_runtime_libs",
     )
 
     native.filegroup(
         name = names.headers,
         srcs = native.glob([
-            "lib/clang/%s/include/**" % clang_constants.long_version,
+            # built-in headers, e.g. <builtins.h> or <xmmintrin.h>
+            "%s/include/**" % clang_constants.lib_clang_internal_dir,
+
+            # libc++ headers
             "include/c++/v1/**",
+
+            # arch-specific libc++ headers.
             "include/%s/c++/v1/**" % clang_target_tuple,
         ]),
     )
@@ -175,10 +181,58 @@ def _generate_libcxx_filegroups(clang_constants, os, arch):
     native.filegroup(
         name = names.runtime_libs,
         srcs = native.glob([
+            # This contains the C++ runtime libraries, including libunwind,
+            # and all their variants. TODO(digit): Restrict this to only
+            # what is needed to speed up C++ link operations. E.g.:
+            #
+            #   libc++.a
+            #   libc++abi.so --> libc++abi.so.1
+            #   libc++abi.so.1 --> libc++abi.so.1.0
+            #   libc++abi.so.1.0
+            #   libc++experimental.a
+            #   libc++.so   (linker script: INPUT(libc++.so.2 -c++abi -unwind)
+            #   libc++.so.2 --> libc++.so.2.0
+            #   libc++.so.2.0
+            #   libunwind.a
+            #   libunwind.so --> libunwind.so.1
+            #   libunwind.so.1 --> libuwind.so.1.0
+            #   libunwind.so.1.0
+            #   asan/
+            #     ...
+            #   asan-noexcept/
+            #     ...
+            #   compat/
+            #     ...
+            #   noexcept/
+            #     ...
+            #
             "lib/%s/**" % clang_target_tuple,
-        ]) + [
-            "lib/clang/%s/lib/%s/libclang_rt.builtins.a" % (clang_constants.short_version, clang_target_tuple),
-        ],
+        ]) + native.glob([
+            # This contains the Clang runtime libraries, including all
+            # their variants. TODO(digit): Restrict this to only what is
+            # needed to speed up C++ link operations. E.g.:
+            #
+            #  libclang_rt.asan.a
+            #  libclang_rt.asan_cxx.a
+            #  libclang_rt.asan_preinit.a
+            #  libclang_rt.asan.so
+            #  libclang_rt.asan_static.a
+            #  libclang_rt.builtins.a
+            #  libclang_rt.fuzzer.a
+            #  libclang_rt.fuzzer.interceptors.a
+            #  libclang_rt.fuzzer_no_main.a
+            #  libclang_rt.hwasan.a
+            #  libclang_rt.hwasan_aliases.a
+            #  libclang_rt.hwasan_aliases_cxx.a
+            #  libclang_rt.hwasan_aliases.so
+            #  libclang_rt.hwasan.a
+            #  libclang_rt.hwasan_cxx.a
+            #  libclang_rt.hwasan_preinit.a
+            #  libclang_rt.hwasan.so
+            #  ...
+            #
+            "%s/lib/%s/**" % (clang_constants.lib_clang_internal_dir, clang_target_tuple),
+        ]),
     )
 
     return names
@@ -282,7 +336,7 @@ def generate_clang_cc_toolchain(
         clang_info = "//:clang_info",
     )
 
-    libcxx = _generate_libcxx_filegroups(clang_constants, target_os, target_arch)
+    libcxx = _generate_clang_runtime_filegroups(clang_constants, target_os, target_arch)
 
     common_compiler_files = [
         ":clang_compiler_binaries",
