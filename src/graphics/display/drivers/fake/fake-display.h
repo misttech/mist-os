@@ -30,6 +30,7 @@
 #include <fbl/mutex.h>
 
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 
 namespace fake_display {
 
@@ -59,10 +60,12 @@ class FakeDisplay : public DeviceType,
   // DisplayControllerImplProtocol implementation:
   void DisplayControllerImplSetDisplayControllerInterface(
       const display_controller_interface_protocol_t* intf);
-  zx_status_t DisplayControllerImplImportBufferCollection(uint64_t collection_id,
-                                                          zx::channel collection_token);
-  zx_status_t DisplayControllerImplReleaseBufferCollection(uint64_t collection_id);
-  zx_status_t DisplayControllerImplImportImage(image_t* image, uint64_t collection_id,
+  zx_status_t DisplayControllerImplImportBufferCollection(
+      uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
+  zx_status_t DisplayControllerImplReleaseBufferCollection(
+      uint64_t banjo_driver_buffer_collection_id);
+  zx_status_t DisplayControllerImplImportImage(image_t* image,
+                                               uint64_t banjo_driver_buffer_collection_id,
                                                uint32_t index);
   void DisplayControllerImplReleaseImage(image_t* image);
   config_check_result_t DisplayControllerImplCheckConfiguration(
@@ -74,12 +77,13 @@ class FakeDisplay : public DeviceType,
   void DisplayControllerImplSetEld(uint64_t display_id, const uint8_t* raw_eld_list,
                                    size_t raw_eld_count);
   zx_status_t DisplayControllerImplGetSysmemConnection(zx::channel connection);
-  zx_status_t DisplayControllerImplSetBufferCollectionConstraints(const image_t* config,
-                                                                  uint64_t collection_id);
+  zx_status_t DisplayControllerImplSetBufferCollectionConstraints(
+      const image_t* config, uint64_t banjo_driver_buffer_collection_id);
   zx_status_t DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on);
   zx_status_t DisplayControllerImplSetDisplayCaptureInterface(
       const display_capture_interface_protocol_t* intf);
-  zx_status_t DisplayControllerImplImportImageForCapture(uint64_t collection_id, uint32_t index,
+  zx_status_t DisplayControllerImplImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
+                                                         uint32_t index,
                                                          uint64_t* out_capture_handle)
       __TA_EXCLUDES(capture_lock_);
   zx_status_t DisplayControllerImplStartCapture(uint64_t capture_handle)
@@ -194,7 +198,8 @@ class FakeDisplay : public DeviceType,
   fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client_;
 
   // Imported sysmem buffer collections.
-  std::unordered_map<uint64_t, fidl::SyncClient<fuchsia_sysmem::BufferCollection>>
+  std::unordered_map<display::DriverBufferCollectionId,
+                     fidl::SyncClient<fuchsia_sysmem::BufferCollection>>
       buffer_collections_;
 
   // Imported Images
