@@ -41,6 +41,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 
 namespace i915 {
 
@@ -91,12 +92,15 @@ class Controller : public DeviceType,
       const display_capture_interface_protocol_t* intf) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  zx_status_t DisplayControllerImplImportBufferCollection(uint64_t collection_id,
-                                                          zx::channel collection_token);
-  zx_status_t DisplayControllerImplReleaseBufferCollection(uint64_t collection_id);
-  zx_status_t DisplayControllerImplImportImage(image_t* image, uint64_t collection_id,
+  zx_status_t DisplayControllerImplImportBufferCollection(
+      uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
+  zx_status_t DisplayControllerImplReleaseBufferCollection(
+      uint64_t banjo_driver_buffer_collection_id);
+  zx_status_t DisplayControllerImplImportImage(image_t* image,
+                                               uint64_t banjo_driver_buffer_collection_id,
                                                uint32_t index);
-  zx_status_t DisplayControllerImplImportImageForCapture(uint64_t collection_id, uint32_t index,
+  zx_status_t DisplayControllerImplImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
+                                                         uint32_t index,
                                                          uint64_t* out_capture_handle) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -110,8 +114,8 @@ class Controller : public DeviceType,
   void DisplayControllerImplSetEld(uint64_t banjo_display_id, const uint8_t* raw_eld_list,
                                    size_t raw_eld_count);
   zx_status_t DisplayControllerImplGetSysmemConnection(zx::channel connection);
-  zx_status_t DisplayControllerImplSetBufferCollectionConstraints(const image_t* config,
-                                                                  uint64_t collection_id);
+  zx_status_t DisplayControllerImplSetBufferCollectionConstraints(
+      const image_t* config, uint64_t banjo_driver_buffer_collection_id);
   zx_status_t DisplayControllerImplSetDisplayPower(uint64_t banjo_display_id, bool power_on) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -281,7 +285,8 @@ class Controller : public DeviceType,
   fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client_;
 
   // Imported sysmem buffer collections.
-  std::unordered_map<uint64_t, fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>>
+  std::unordered_map<display::DriverBufferCollectionId,
+                     fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>>
       buffer_collections_;
 
   ddk::DisplayControllerInterfaceProtocolClient dc_intf_ __TA_GUARDED(display_lock_);

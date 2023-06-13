@@ -29,6 +29,7 @@
 #include "src/devices/pci/testing/pci_protocol_fake.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/intel-i915/pci-ids.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 
 #define ASSERT_OK(x) ASSERT_EQ(ZX_OK, (x))
@@ -134,7 +135,7 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
         fuchsia_sysmem::wire::PixelFormatType::kBgra32,
         fuchsia_sysmem::wire::PixelFormatType::kR8G8B8A8};
 
-    auto buffer_collection_id = next_buffer_collection_id_++;
+    display::DriverBufferCollectionId buffer_collection_id = next_buffer_collection_id_++;
     active_buffer_collections_[buffer_collection_id] = {
         .token_client = std::move(request->token),
         .mock_buffer_collection = std::make_unique<MockNoCpuBufferCollection>(),
@@ -198,14 +199,14 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
     std::unique_ptr<MockNoCpuBufferCollection> mock_buffer_collection;
   };
 
-  using BufferCollectionId = int;
-
   MockNoCpuBufferCollection* most_recent_buffer_collection_ = nullptr;
-  std::unordered_map<BufferCollectionId, BufferCollection> active_buffer_collections_;
+  std::unordered_map<display::DriverBufferCollectionId, BufferCollection>
+      active_buffer_collections_;
   std::vector<fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>>
       inactive_buffer_collection_tokens_;
 
-  BufferCollectionId next_buffer_collection_id_ = 0;
+  display::DriverBufferCollectionId next_buffer_collection_id_ =
+      display::DriverBufferCollectionId(0);
 
   async_dispatcher_t* dispatcher_ = nullptr;
 };
@@ -353,13 +354,15 @@ TEST_F(ControllerWithFakeSysmemTest, ImportBufferCollection) {
   ASSERT_TRUE(token2_endpoints.is_ok());
 
   // Test ImportBufferCollection().
-  constexpr uint64_t kValidBufferCollectionId = 1u;
+  constexpr display::DriverBufferCollectionId kValidBufferCollectionId(1);
+  constexpr uint64_t kBanjoValidBufferCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kValidBufferCollectionId);
   EXPECT_OK(display_.DisplayControllerImplImportBufferCollection(
-      kValidBufferCollectionId, token1_endpoints->client.TakeChannel()));
+      kBanjoValidBufferCollectionId, token1_endpoints->client.TakeChannel()));
 
   // `collection_id` must be unused.
   EXPECT_EQ(display_.DisplayControllerImplImportBufferCollection(
-                kValidBufferCollectionId, token2_endpoints->client.TakeChannel()),
+                kBanjoValidBufferCollectionId, token2_endpoints->client.TakeChannel()),
             ZX_ERR_ALREADY_EXISTS);
 
   loop_.RunUntilIdle();
@@ -387,10 +390,12 @@ TEST_F(ControllerWithFakeSysmemTest, ImportBufferCollection) {
   }
 
   // Test ReleaseBufferCollection().
-  constexpr uint64_t kInvalidBufferCollectionId = 2u;
-  EXPECT_EQ(display_.DisplayControllerImplReleaseBufferCollection(kInvalidBufferCollectionId),
+  constexpr display::DriverBufferCollectionId kInvalidBufferCollectionId(2);
+  constexpr uint64_t kBanjoInvalidBufferCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kInvalidBufferCollectionId);
+  EXPECT_EQ(display_.DisplayControllerImplReleaseBufferCollection(kBanjoInvalidBufferCollectionId),
             ZX_ERR_NOT_FOUND);
-  EXPECT_OK(display_.DisplayControllerImplReleaseBufferCollection(kValidBufferCollectionId));
+  EXPECT_OK(display_.DisplayControllerImplReleaseBufferCollection(kBanjoValidBufferCollectionId));
 
   loop_.RunUntilIdle();
 
@@ -456,11 +461,13 @@ TEST(IntelI915Display, ImportImage) {
   ASSERT_OK(display.InitGttForTesting(pci, std::move(mmio), /*fb_offset=*/0));
 
   // Import buffer collection.
-  constexpr uint64_t kBufferCollectionId = 1u;
+  constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
+  constexpr uint64_t kBanjoBufferCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
   zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
   EXPECT_OK(display.DisplayControllerImplImportBufferCollection(
-      kBufferCollectionId, token_endpoints->client.TakeChannel()));
+      kBanjoBufferCollectionId, token_endpoints->client.TakeChannel()));
 
   const image_t kDefaultImage = {
       .width = 32,
@@ -469,38 +476,38 @@ TEST(IntelI915Display, ImportImage) {
       .handle = 0u,
   };
   EXPECT_OK(display.DisplayControllerImplSetBufferCollectionConstraints(&kDefaultImage,
-                                                                        kBufferCollectionId));
+                                                                        kBanjoBufferCollectionId));
 
   // Invalid import: bad collection id
   image_t invalid_image = kDefaultImage;
-  uint64_t kInvalidCollectionId = 100;
-  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kInvalidCollectionId, 0),
+  uint64_t kBanjoInvalidCollectionId = 100;
+  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kBanjoInvalidCollectionId, 0),
             ZX_ERR_NOT_FOUND);
 
   // Invalid import: bad index
   invalid_image = kDefaultImage;
   uint32_t kInvalidIndex = 100;
-  EXPECT_EQ(
-      display.DisplayControllerImplImportImage(&invalid_image, kBufferCollectionId, kInvalidIndex),
-      ZX_ERR_OUT_OF_RANGE);
+  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kBanjoBufferCollectionId,
+                                                     kInvalidIndex),
+            ZX_ERR_OUT_OF_RANGE);
 
   // Invalid import: bad type
   invalid_image = kDefaultImage;
   invalid_image.type = IMAGE_TYPE_CAPTURE;
-  EXPECT_EQ(
-      display.DisplayControllerImplImportImage(&invalid_image, kBufferCollectionId, /*index=*/0),
-      ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kBanjoBufferCollectionId,
+                                                     /*index=*/0),
+            ZX_ERR_INVALID_ARGS);
 
   // Valid import
   image_t valid_image = kDefaultImage;
   EXPECT_EQ(valid_image.handle, 0u);
-  EXPECT_OK(display.DisplayControllerImplImportImage(&valid_image, kBufferCollectionId, 0));
+  EXPECT_OK(display.DisplayControllerImplImportImage(&valid_image, kBanjoBufferCollectionId, 0));
   EXPECT_NE(valid_image.handle, 0u);
 
   display.DisplayControllerImplReleaseImage(&valid_image);
 
   // Release buffer collection.
-  EXPECT_OK(display.DisplayControllerImplReleaseBufferCollection(kBufferCollectionId));
+  EXPECT_OK(display.DisplayControllerImplReleaseBufferCollection(kBanjoBufferCollectionId));
 
   // Shutdown the loop before destroying the FakeSysmem and MockAllocator which
   // may still have pending callbacks.
@@ -511,16 +518,18 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemRequirements) {
   zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
 
-  constexpr uint64_t kBufferCollectionId = 1u;
+  constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
+  constexpr uint64_t kBanjoBufferCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
   EXPECT_OK(display_.DisplayControllerImplImportBufferCollection(
-      kBufferCollectionId, token_endpoints->client.TakeChannel()));
+      kBanjoBufferCollectionId, token_endpoints->client.TakeChannel()));
 
   loop_.RunUntilIdle();
 
   image_t image = {};
 
-  EXPECT_OK(
-      display_.DisplayControllerImplSetBufferCollectionConstraints(&image, kBufferCollectionId));
+  EXPECT_OK(display_.DisplayControllerImplSetBufferCollectionConstraints(&image,
+                                                                         kBanjoBufferCollectionId));
 
   loop_.RunUntilIdle();
 
@@ -534,9 +543,11 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidType) {
   zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
 
-  constexpr uint64_t kBufferCollectionId = 1u;
+  constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
+  constexpr uint64_t kBanjoBufferCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
   EXPECT_OK(display_.DisplayControllerImplImportBufferCollection(
-      kBufferCollectionId, token_endpoints->client.TakeChannel()));
+      kBanjoBufferCollectionId, token_endpoints->client.TakeChannel()));
 
   loop_.RunUntilIdle();
 
@@ -544,7 +555,7 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidType) {
   image.type = 1000000;
 
   EXPECT_EQ(ZX_ERR_INVALID_ARGS, display_.DisplayControllerImplSetBufferCollectionConstraints(
-                                     &image, kBufferCollectionId));
+                                     &image, kBanjoBufferCollectionId));
 
   loop_.RunUntilIdle();
 
@@ -630,16 +641,19 @@ TEST_F(IntegrationTest, SysmemImport) {
   Controller* ctx = dev->GetDeviceContext<Controller>();
 
   // Import buffer collection.
-  constexpr uint64_t kBufferCollectionId = 1u;
+  constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
+  constexpr uint64_t kBanjoBufferCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
   zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
   EXPECT_OK(ctx->DisplayControllerImplImportBufferCollection(
-      kBufferCollectionId, token_endpoints->client.TakeChannel()));
+      kBanjoBufferCollectionId, token_endpoints->client.TakeChannel()));
 
   image_t image = {};
   image.width = 128;
   image.height = kImageHeight;
-  EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints(&image, kBufferCollectionId));
+  EXPECT_OK(
+      ctx->DisplayControllerImplSetBufferCollectionConstraints(&image, kBanjoBufferCollectionId));
 
   RunLoopUntilIdle();
 
@@ -649,7 +663,7 @@ TEST_F(IntegrationTest, SysmemImport) {
   EXPECT_TRUE(collection->set_constraints_called());
 
   PerformBlockingWork([&] {
-    EXPECT_OK(ctx->DisplayControllerImplImportImage(&image, kBufferCollectionId, /*index=*/0));
+    EXPECT_OK(ctx->DisplayControllerImplImportImage(&image, kBanjoBufferCollectionId, /*index=*/0));
   });
 
   const GttRegion& region = ctx->SetupGttImage(&image, FRAME_TRANSFORM_IDENTITY);
@@ -668,11 +682,13 @@ TEST_F(IntegrationTest, SysmemRotated) {
   Controller* ctx = dev->GetDeviceContext<Controller>();
 
   // Import buffer collection.
-  constexpr uint64_t kBufferCollectionId = 1u;
+  constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
+  constexpr uint64_t kBanjoBufferCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
   zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
   EXPECT_OK(ctx->DisplayControllerImplImportBufferCollection(
-      kBufferCollectionId, token_endpoints->client.TakeChannel()));
+      kBanjoBufferCollectionId, token_endpoints->client.TakeChannel()));
 
   RunLoopUntilIdle();
 
@@ -687,14 +703,15 @@ TEST_F(IntegrationTest, SysmemRotated) {
   // Must match set_format_modifier above, and also be y or yf tiled so rotation is allowed.
   image.type = IMAGE_TYPE_Y_LEGACY_TILED;
 
-  EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints(&image, kBufferCollectionId));
+  EXPECT_OK(
+      ctx->DisplayControllerImplSetBufferCollectionConstraints(&image, kBanjoBufferCollectionId));
 
   RunLoopUntilIdle();
   EXPECT_TRUE(collection->set_constraints_called());
 
   image.type = IMAGE_TYPE_Y_LEGACY_TILED;
   PerformBlockingWork([&]() mutable {
-    EXPECT_OK(ctx->DisplayControllerImplImportImage(&image, kBufferCollectionId, /*index=*/0));
+    EXPECT_OK(ctx->DisplayControllerImplImportImage(&image, kBanjoBufferCollectionId, /*index=*/0));
   });
 
   // Check that rotating the image doesn't hang.
