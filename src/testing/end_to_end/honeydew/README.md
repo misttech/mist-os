@@ -37,11 +37,11 @@ as all of the in-tree code is developed using `fuchsia-vendored-python`
 ~$ cd $FUCHSIA_DIR
 
 # create a virtual environment using `fuchsia-vendored-python`
-~/fuchsia$ mkdir -p $FUCHSIA_DIR/.venvs/
-~/fuchsia$ fuchsia-vendored-python -m venv $FUCHSIA_DIR/.venvs/fuchsia_python_venv
+~/fuchsia$ mkdir -p $FUCHSIA_DIR/src/testing/end_to_end/.venvs/
+~/fuchsia$ fuchsia-vendored-python -m venv $FUCHSIA_DIR/src/testing/end_to_end/.venvs/fuchsia_python_venv
 
 # activate the virtual environment
-~/fuchsia$ source $FUCHSIA_DIR/.venvs/fuchsia_python_venv/bin/activate
+~/fuchsia$ source $FUCHSIA_DIR/src/testing/end_to_end/.venvs/fuchsia_python_venv/bin/activate
 
 # upgrade the `pip` module
 (fuchsia_python_venv)~/fuchsia$ python -m pip install --upgrade pip
@@ -67,7 +67,7 @@ Type "help", "copyright", "credits" or "license" for more information.
 To fully uninstall HoneyDew, delete the virtual environment that was crated
 ```shell
 (fuchsia_python_venv)~/fuchsia$ deactivate
-~/fuchsia$ rm -rf $FUCHSIA_DIR/.venvs/fuchsia_python_venv
+~/fuchsia$ rm -rf $FUCHSIA_DIR/src/testing/end_to_end/.venvs/fuchsia_python_venv
 ```
 
 ## Usage
@@ -199,6 +199,14 @@ these dependencies inside a [python virtual environment].
 Follow [Installation](#Installation) to install HoneyDew which will also install
 all of these dependencies.
 
+Before proceeding further, ensure you are inside the virtual environment created
+by above installation step.
+```shell
+# activate the virtual environment
+~/fuchsia$ source $FUCHSIA_DIR/src/testing/end_to_end/.venvs/fuchsia_python_venv/bin/activate
+(fuchsia_python_venv)~/fuchsia$
+```
+
 ### Python Style Guide
 HoneyDew code follows [Google Python Style Guide] and it is important to ensure
 any new code written continue to follow these guidelines.
@@ -213,11 +221,11 @@ follow the below instructions every time HoneyDew code is changed.
 
 * Remove unused code by running below command
     ```shell
-    autoflake --in-place --remove-unused-variables --remove-all-unused-imports --remove-duplicate-keys --recursive $FUCHSIA_DIR/src/testing/end_to_end/honeydew/
+    (fuchsia_python_venv)~/fuchsia$ autoflake --in-place --remove-unused-variables --remove-all-unused-imports --remove-duplicate-keys --recursive $FUCHSIA_DIR/src/testing/end_to_end/honeydew/
     ```
 * Sort the imports within python sources by running below command
     ```shell
-    isort $FUCHSIA_DIR/src/testing/end_to_end/honeydew/
+    (fuchsia_python_venv)~/fuchsia$ isort $FUCHSIA_DIR/src/testing/end_to_end/honeydew/
     ```
 * Ensure code is formatted using [yapf]
     * `fx format-code` underneath uses [yapf] for formatting the python code.
