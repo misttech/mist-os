@@ -11,7 +11,7 @@ use {
     fuchsia_backoff::{retry_or_last_error, Backoff},
     fuchsia_hyper::HttpsClient,
     http::{request, StatusCode},
-    hyper::{Body, Method, Request, Response},
+    hyper::{self, Body, Method, Request, Response},
     rand::{rngs::StdRng, Rng, SeedableRng},
     serde_json,
     std::{cmp, fmt, string::String, time::Duration},
@@ -183,25 +183,32 @@ impl TokenStore {
         // https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/
         impl Backoff<Error> for ExponentialBackoff {
             fn next_backoff(&mut self, err: &Error) -> Option<Duration> {
-                match err.downcast_ref::<GcsError>() {
-                    // Handle transient errors.
-                    Some(GcsError::HttpTransientError(_)) => {
-                        self.transient_errors += 1;
-                        if self.backoff_budget == 0 {
-                            None
-                        } else {
-                            let backoff_time = cmp::min(
-                                self.rng.gen_range(0..self.backoff_base.pow(self.transient_errors)),
-                                self.backoff_budget,
-                            );
-                            self.backoff_budget -= backoff_time;
-                            Some(Duration::from_millis(backoff_time))
-                        }
+                // Handle transient errors.
+                if err.is::<hyper::Error>()
+                    || matches!(
+                        err.downcast_ref::<GcsError>(),
+                        Some(GcsError::HttpTransientError(_))
+                    )
+                {
+                    self.transient_errors += 1;
+                    if self.backoff_budget > 0 {
+                        let backoff_time = cmp::min(
+                            self.rng.gen_range(0..self.backoff_base.pow(self.transient_errors)),
+                            self.backoff_budget,
+                        );
+
+                        self.backoff_budget -= backoff_time;
+                        return Some(Duration::from_millis(backoff_time));
+                    } else {
+                        eprintln!(
+                            "A network request failed after {} attempts.",
+                            self.transient_errors
+                        );
                     }
-                    // Ignore non-transient [GcsError]s (eg: NeedNewAccessToken)
-                    // and non-[GcsError]s.
-                    _ => None,
                 }
+                // Ignore non-transient errors (eg: NeedNewAccessToken or
+                // non-transient [GcsError]s).
+                None
             }
         }
 
