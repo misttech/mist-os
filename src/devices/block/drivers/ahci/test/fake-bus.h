@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_STORAGE_BLOCK_DRIVERS_AHCI_TEST_FAKE_BUS_H_
-#define SRC_STORAGE_BLOCK_DRIVERS_AHCI_TEST_FAKE_BUS_H_
+#ifndef SRC_DEVICES_BLOCK_DRIVERS_AHCI_TEST_FAKE_BUS_H_
+#define SRC_DEVICES_BLOCK_DRIVERS_AHCI_TEST_FAKE_BUS_H_
 
 #include <lib/sync/completion.h>
 
@@ -37,7 +37,7 @@ struct FakePort {
 
 class FakeBus : public Bus {
  public:
-  FakeBus();
+  explicit FakeBus(bool support_ncq = true);
   ~FakeBus() override;
   zx_status_t Configure(zx_device_t* parent) override;
   zx_status_t IoBufferInit(ddk::IoBuffer* buffer_, size_t size, uint32_t flags,
@@ -53,6 +53,9 @@ class FakeBus : public Bus {
 
   // Test control functions.
 
+  // Manually trigger the interrupt.
+  void InterruptTrigger();
+
   // Cause calls to Configure() to return an error.
   void DoFailConfigure() { fail_configure_ = true; }
 
@@ -64,6 +67,8 @@ class FakeBus : public Bus {
  private:
   zx_status_t HbaRead(size_t offset, uint32_t* val_out);
   zx_status_t HbaWrite(size_t offset, uint32_t val);
+
+  const bool support_ncq_;
 
   sync_completion_t irq_completion_;
   bool interrupt_cancelled_ = false;
@@ -84,4 +89,4 @@ class FakeBus : public Bus {
 
 }  // namespace ahci
 
-#endif  // SRC_STORAGE_BLOCK_DRIVERS_AHCI_TEST_FAKE_BUS_H_
+#endif  // SRC_DEVICES_BLOCK_DRIVERS_AHCI_TEST_FAKE_BUS_H_

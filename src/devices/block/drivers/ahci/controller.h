@@ -60,6 +60,8 @@ class Controller : public ControllerDeviceType {
   DISALLOW_COPY_ASSIGN_AND_MOVE(Controller);
 
   static zx_status_t Bind(void* ctx, zx_device_t* parent);
+  // Invokes DdkAdd().
+  zx_status_t AddDevice();
 
   void DdkInit(ddk::InitTxn txn);
   void DdkRelease();
@@ -94,9 +96,6 @@ class Controller : public ControllerDeviceType {
   static int IrqThread(void* arg) { return static_cast<Controller*>(arg)->IrqLoop(); }
   int WorkerLoop();
   int IrqLoop();
-
-  // Invokes DdkAdd().
-  zx_status_t AddDevice();
 
   // Initialize controller and detect devices.
   zx_status_t Init();

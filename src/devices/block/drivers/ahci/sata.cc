@@ -178,13 +178,11 @@ zx_status_t SataDevice::Init() {
   inspect_device.RecordBool("volatile_write_cache_supported", volatile_write_cache_supported);
   inspect_device.RecordBool("volatile_write_cache_enabled", volatile_write_cache_enabled);
 
-  const bool fua_command_supported =
-      devinfo.command_set1_2 & SATA_DEVINFO_CMD_SET1_2_WRITE_DMA_FUA_EXT_SUPPORTED;
-  // READ_FPDMA_QUEUED and WRITE_FPDMA_QUEUED commands also support FUA.
-  if (fua_command_supported || use_command_queue_) {
+  // READ_FPDMA_QUEUED and WRITE_FPDMA_QUEUED commands support FUA, whereas for non-NCQ, FUA read
+  // commands do not exist (FUA writes do).
+  if (use_command_queue_) {
     info_.flags |= FLAG_FUA_SUPPORT;
   }
-  inspect_device.RecordBool("fua_command_supported", fua_command_supported);
 
   uint32_t max_sg_size = SATA_MAX_BLOCK_COUNT * block_size;  // SATA cmd limit
   if (IsModelIdQemu(devinfo.model_id.string)) {
@@ -218,37 +216,31 @@ void SataDevice::BlockImplQueue(block_op_t* bop, block_impl_queue_callback compl
 
   switch (bop->command.opcode) {
     case BLOCK_OPCODE_READ:
-    case BLOCK_OPCODE_WRITE:
+    case BLOCK_OPCODE_WRITE: {
       if (zx_status_t status = block::CheckIoRange(bop->rw, info_.block_count); status != ZX_OK) {
         txn->Complete(status);
         return;
       }
-      if (!(info_.flags & FLAG_FUA_SUPPORT) && (bop->command.flags & BLOCK_IO_FLAG_FORCE_ACCESS)) {
-        txn->Complete(ZX_ERR_NOT_SUPPORTED);
-        return;
-      }
 
       txn->device = 0x40;
-      if (bop->command.opcode == BLOCK_OPCODE_READ) {
-        if (use_command_queue_) {
-          txn->cmd = SATA_CMD_READ_FPDMA_QUEUED;
-        } else {
-          txn->cmd = SATA_CMD_READ_DMA_EXT;
+      const bool is_read = bop->command.opcode == BLOCK_OPCODE_READ;
+      const bool is_fua = bop->command.flags & BLOCK_IO_FLAG_FORCE_ACCESS;
+      if (use_command_queue_) {
+        if (is_fua) {
+          txn->device |= 1 << 7;  // Set FUA
         }
+        txn->cmd = is_read ? SATA_CMD_READ_FPDMA_QUEUED : SATA_CMD_WRITE_FPDMA_QUEUED;
       } else {
-        if (use_command_queue_) {
-          txn->cmd = SATA_CMD_WRITE_FPDMA_QUEUED;
-          if (bop->command.flags & BLOCK_IO_FLAG_FORCE_ACCESS) {
-            txn->device |= 1 << 7;  // Set FUA
-          }
-        } else {
-          txn->cmd = (bop->command.flags & BLOCK_IO_FLAG_FORCE_ACCESS) ? SATA_CMD_WRITE_DMA_FUA_EXT
-                                                                       : SATA_CMD_WRITE_DMA_EXT;
+        if (is_fua) {
+          txn->Complete(ZX_ERR_NOT_SUPPORTED);
+          return;
         }
+        txn->cmd = is_read ? SATA_CMD_READ_DMA_EXT : SATA_CMD_WRITE_DMA_EXT;
       }
 
       zxlogf(DEBUG, "sata: queue op 0x%x txn %p", bop->command.opcode, txn);
       break;
+    }
     case BLOCK_OPCODE_FLUSH:
       txn->cmd = SATA_CMD_FLUSH_EXT;
       txn->device = 0x00;

@@ -403,8 +403,7 @@ zx_status_t Port::TxnBeginLocked(uint32_t slot, SataTransaction* txn) {
   cfis[7] = device;
 
   // some commands have lba/count fields
-  if (cmd == SATA_CMD_READ_DMA_EXT || cmd == SATA_CMD_WRITE_DMA_EXT ||
-      cmd == SATA_CMD_WRITE_DMA_FUA_EXT) {
+  if (cmd == SATA_CMD_READ_DMA_EXT || cmd == SATA_CMD_WRITE_DMA_EXT) {
     cfis[4] = lba & 0xff;
     cfis[5] = (lba >> 8) & 0xff;
     cfis[6] = (lba >> 16) & 0xff;

@@ -12,7 +12,7 @@ namespace ahci {
 
 constexpr uint64_t to64(uint64_t upper, uint32_t lower) { return (upper << 32) | lower; }
 
-FakeBus::FakeBus() {
+FakeBus::FakeBus(bool support_ncq) : support_ncq_(support_ncq) {
   for (uint32_t i = 0; i < num_ports_; i++) {
     port_[i].num = i;
   }
@@ -54,11 +54,14 @@ zx_status_t FakeBus::HbaRead(size_t offset, uint32_t* val_out) {
       *val_out = ghc_;
       return ZX_OK;
     case kHbaCapabilities: {
-      *val_out = (1u << 30) |              // Supports native command queue.
-                 ((slots_ - 1) << 8) |     // Number of command slots (0-based).
+      *val_out = ((slots_ - 1) << 8) |     // Number of command slots (0-based).
                  ((num_ports_ - 1) << 0);  // Number of ports (0-based).
+      if (support_ncq_) {
+        *val_out |= (uint32_t{1} << 30);  // Supports native command queue.
+      }
       return ZX_OK;
     }
+    case kHbaInterruptStatus:  // Assert interrupt bits for implemented ports.
     case kHbaPortsImplemented: {
       uint32_t pi = 0;  // Bitfield of available ports.
       // Ports may be hidden by clearing their associated bits.
@@ -99,6 +102,9 @@ zx_status_t FakeBus::HbaWrite(size_t offset, uint32_t val) {
         // Leave it set.
       }
       ghc_ = val;
+      return ZX_OK;
+    case kHbaInterruptStatus:
+      // Just ack'ing.
       return ZX_OK;
 
     default:
@@ -146,8 +152,10 @@ zx_status_t FakeBus::InterruptWait() {
 
 void FakeBus::InterruptCancel() {
   interrupt_cancelled_ = true;
-  sync_completion_signal(&irq_completion_);
+  InterruptTrigger();
 }
+
+void FakeBus::InterruptTrigger() { sync_completion_signal(&irq_completion_); }
 
 zx_status_t FakePort::Read(size_t offset, uint32_t* val_out) {
   switch (offset) {
@@ -155,12 +163,19 @@ zx_status_t FakePort::Read(size_t offset, uint32_t* val_out) {
     case kPortCommandListBaseUpper:
     case kPortFISBase:
     case kPortFISBaseUpper:
-    case kPortCommand:
     case kPortInterruptStatus:
+    case kPortCommand:
+    case kPortTaskFileData:
     case kPortSataError:
-    case kPortCommandIssue:
     case kPortSataActive:
+    case kPortCommandIssue:
       *val_out = raw[offset / sizeof(uint32_t)];
+      return ZX_OK;
+    case kPortSignature:
+      *val_out = AHCI_PORT_SIG_SATA;  // Report SATA device.
+      return ZX_OK;
+    case kPortSataStatus:
+      *val_out = AHCI_PORT_SSTS_DET_PRESENT;  // Report device present.
       return ZX_OK;
 
     default:
@@ -201,6 +216,10 @@ zx_status_t FakePort::Write(size_t offset, uint32_t val) {
     case kPortInterruptStatus:
       // Writing to interrupt status clears those set bits.
       reg.is &= ~val;
+      return ZX_OK;
+
+    case kPortInterruptEnable:
+      // Just ack'ing.
       return ZX_OK;
 
     case kPortSataError:

@@ -22,7 +22,6 @@
 #define SATA_CMD_READ_FPDMA_QUEUED 0x60
 #define SATA_CMD_WRITE_DMA 0xca
 #define SATA_CMD_WRITE_DMA_EXT 0x35
-#define SATA_CMD_WRITE_DMA_FUA_EXT 0x3D
 #define SATA_CMD_WRITE_FPDMA_QUEUED 0x61
 #define SATA_CMD_FLUSH_EXT 0xea
 
@@ -31,7 +30,6 @@
 #define SATA_DEVINFO_MODEL_ID_LEN 40
 
 #define SATA_DEVINFO_CMD_SET1_0_VOLATILE_WRITE_CACHE_SUPPORTED 1 << 5
-#define SATA_DEVINFO_CMD_SET1_2_WRITE_DMA_FUA_EXT_SUPPORTED 1 << 6
 #define SATA_DEVINFO_CMD_SET2_0_VOLATILE_WRITE_CACHE_ENABLED 1 << 5
 
 #define SATA_MAX_BLOCK_COUNT 0x10000  // 16-bit count
@@ -199,6 +197,8 @@ class SataDevice : public SataDeviceType,
   // ddk::BlockImplProtocol implementations.
   void BlockImplQuery(block_info_t* out_info, uint64_t* out_block_op_size);
   void BlockImplQueue(block_op_t* op, block_impl_queue_callback callback, void* cookie);
+
+  uint32_t port() const { return port_; }
 
  private:
   // Invokes DdkAdd().

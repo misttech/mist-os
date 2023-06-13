@@ -52,9 +52,10 @@ test("ahci-unittest-bin") {
   deps = [
     ":shared",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
+    "//sdk/lib/inspect/testing/cpp:zxtest",
     "//src/devices/lib/mmio",
     "//src/devices/testing/fake-bti",
-    "//src/devices/testing/no_ddk",
+    "//src/devices/testing/mock-ddk",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/sync",
@@ -64,6 +65,12 @@ test("ahci-unittest-bin") {
 
 fuchsia_unittest_package("ahci-unittest") {
   deps = [ ":ahci-unittest-bin" ]
+  test_specs = {
+    log_settings = {
+      # PortTest.ShutdownWaitsForTransactionsInFlight tests timeout errors.
+      max_severity = "ERROR"
+    }
+  }
 }
 
 source_set("shared") {

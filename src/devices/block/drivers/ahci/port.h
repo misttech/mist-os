@@ -87,6 +87,9 @@ class Port {
   // Does not modify bus registers.
   void TestSetRunning(SataTransaction* txn, uint32_t slot);
 
+  // Peek at running transactions.
+  const SataTransaction* TestGetRunning(uint32_t slot) const { return commands_[slot]; }
+
  private:
   bool SlotBusyLocked(uint32_t slot);
   zx_status_t TxnBeginLocked(uint32_t slot, SataTransaction* txn);

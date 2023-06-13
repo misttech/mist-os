@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <byteswap.h>
+#include <lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <lib/zx/clock.h>
 
 #include <thread>
@@ -11,10 +12,11 @@
 
 #include "../controller.h"
 #include "fake-bus.h"
+#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace ahci {
 
-class AhciTestFixture : public zxtest::Test {
+class PortTest : public zxtest::Test {
  protected:
   void TearDown() override { fake_bus_.reset(); }
 
@@ -148,7 +150,7 @@ TEST(AhciTest, HbaReset) {
   con->Shutdown();
 }
 
-TEST_F(AhciTestFixture, PortTestEnable) {
+TEST_F(PortTest, PortTestEnable) {
   Port port;
   BusAndPortEnable(&port);
 }
@@ -159,7 +161,7 @@ void cb_status(void* cookie, zx_status_t status, block_op_t* bop) {
 
 void cb_assert(void* cookie, zx_status_t status, block_op_t* bop) { EXPECT_TRUE(false); }
 
-TEST_F(AhciTestFixture, PortCompleteNone) {
+TEST_F(PortTest, PortCompleteNone) {
   Port port;
   BusAndPortEnable(&port);
 
@@ -168,7 +170,7 @@ TEST_F(AhciTestFixture, PortCompleteNone) {
   EXPECT_FALSE(port.Complete());
 }
 
-TEST_F(AhciTestFixture, PortCompleteRunning) {
+TEST_F(PortTest, PortCompleteRunning) {
   Port port;
   BusAndPortEnable(&port);
 
@@ -195,7 +197,7 @@ TEST_F(AhciTestFixture, PortCompleteRunning) {
   EXPECT_TRUE(port.Complete());
 }
 
-TEST_F(AhciTestFixture, PortCompleteSuccess) {
+TEST_F(PortTest, PortCompleteSuccess) {
   Port port;
   BusAndPortEnable(&port);
 
@@ -226,7 +228,7 @@ TEST_F(AhciTestFixture, PortCompleteSuccess) {
   EXPECT_OK(status);
 }
 
-TEST_F(AhciTestFixture, PortCompleteTimeout) {
+TEST_F(PortTest, PortCompleteTimeout) {
   Port port;
   BusAndPortEnable(&port);
 
@@ -258,7 +260,7 @@ TEST_F(AhciTestFixture, PortCompleteTimeout) {
   EXPECT_NOT_OK(status);
 }
 
-TEST_F(AhciTestFixture, ShutdownWaitsForTransactionsInFlight) {
+TEST_F(PortTest, ShutdownWaitsForTransactionsInFlight) {
   zx_device_t* fake_parent = nullptr;
   std::unique_ptr<FakeBus> bus(new FakeBus());
   FakeBus* bus_ptr = bus.get();
@@ -319,7 +321,7 @@ TEST_F(AhciTestFixture, ShutdownWaitsForTransactionsInFlight) {
   EXPECT_EQ(status, ZX_ERR_TIMED_OUT);
 }
 
-TEST_F(AhciTestFixture, FlushWhenCommandQueueEmpty) {
+TEST_F(PortTest, FlushWhenCommandQueueEmpty) {
   Port port;
   BusAndPortEnable(&port);
 
@@ -362,7 +364,7 @@ TEST_F(AhciTestFixture, FlushWhenCommandQueueEmpty) {
   EXPECT_FALSE(port.paused_cmd_issuing());
 }
 
-TEST_F(AhciTestFixture, FlushWhenWritePrecedingAndReadFollowing) {
+TEST_F(PortTest, FlushWhenWritePrecedingAndReadFollowing) {
   Port port;
   BusAndPortEnable(&port);
 
@@ -462,5 +464,154 @@ TEST_F(AhciTestFixture, FlushWhenWritePrecedingAndReadFollowing) {
   EXPECT_FALSE(port.ProcessQueued());
   EXPECT_FALSE(port.paused_cmd_issuing());
 }
+
+class AhciTestFixture : public inspect::InspectTestHelper, public zxtest::TestWithParam<bool> {
+ public:
+  static constexpr uint32_t kTestLogicalBlockCount = 1024;
+
+  void SetUp() override {
+    support_native_command_queuing_ = GetParam();
+    fake_root_ = MockDevice::FakeRootParent();
+
+    // Create a fake bus.
+    auto bus = std::make_unique<FakeBus>(support_native_command_queuing_);
+    fake_bus_ = bus.get();
+
+    // Set up the driver.
+    zx::result controller = Controller::CreateWithBus(fake_root_.get(), std::move(bus));
+    ASSERT_TRUE(controller.is_ok());
+    ASSERT_OK(controller->AddDevice());
+    [[maybe_unused]] auto unused = controller.value().release();
+
+    device_ = fake_root_->GetLatestChild();
+    controller_ = device_->GetDeviceContext<Controller>();
+  }
+
+  void RunInit() {
+    device_->InitOp();
+    ASSERT_OK(device_->WaitUntilInitReplyCalled(zx::time::infinite()));
+    ASSERT_OK(device_->InitReplyCallStatus());
+  }
+
+  void TearDown() override {
+    device_async_remove(device_);
+    EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(device_));
+  }
+
+ protected:
+  bool support_native_command_queuing_;
+  std::shared_ptr<zx_device> fake_root_;
+  FakeBus* fake_bus_;
+  zx_device* device_;
+  Controller* controller_;
+};
+
+TEST_P(AhciTestFixture, SataDeviceInitAndRead) {
+  ASSERT_NO_FATAL_FAILURE(RunInit());
+  ASSERT_NE(device_->child_count(), 0);
+
+  zx_device* sata_device = device_->GetLatestChild();
+  std::thread device_init_thread([&]() {
+    sata_device->InitOp();  // Issues IDENTIFY DEVICE command.
+    sata_device->WaitUntilInitReplyCalled(zx::time::infinite());
+    ASSERT_OK(sata_device->InitReplyCallStatus());
+  });
+
+  const uint32_t port_number = sata_device->GetDeviceContext<SataDevice>()->port();
+  Port* port = controller_->port(port_number);
+  const SataTransaction* command;
+  while (true) {
+    command = port->TestGetRunning(0);
+    if (command != nullptr) {
+      break;
+    }
+    // Wait until IDENTIFY DEVICE command is issued.
+    zx::nanosleep(zx::deadline_after(zx::msec(1)));
+  }
+  ASSERT_EQ(command->cmd, SATA_CMD_IDENTIFY_DEVICE);
+
+  // Perform IDENTIFY DEVICE command.
+  SataIdentifyDeviceResponse devinfo{};
+  devinfo.major_version = 1 << 10;  // Support ACS-3.
+  devinfo.capabilities_1 = 1 << 9;  // Spec simply says, "Shall be set to one."
+  devinfo.lba_capacity = kTestLogicalBlockCount;
+  zx::unowned_vmo vmo(command->bop.rw.vmo);
+  ASSERT_OK(vmo->write(&devinfo, 0, sizeof(devinfo)));
+
+  // Clear the running bit in the bus.
+  fake_bus_->PortRegOverride(port_number, kPortSataActive, 0);
+  fake_bus_->PortRegOverride(port_number, kPortCommandIssue, 0);
+
+  // Set interrupt for successful transfer completion.
+  fake_bus_->PortRegOverride(port_number, kPortInterruptStatus, AHCI_PORT_INT_DP);
+  // Invoke interrupt handler.
+  fake_bus_->InterruptTrigger();
+
+  device_init_thread.join();
+  ASSERT_NO_FATAL_FAILURE(ReadInspect(controller_->inspector().DuplicateVmo()));
+  const auto* ahci = hierarchy().GetByPath({"ahci"});
+  ASSERT_NOT_NULL(ahci);
+  const auto* ncq = ahci->node().get_property<inspect::BoolPropertyValue>("native_command_queuing");
+  ASSERT_NOT_NULL(ncq);
+  EXPECT_EQ(ncq->value(), support_native_command_queuing_);
+
+  ddk::BlockImplProtocolClient client(sata_device);
+  block_info_t info;
+  uint64_t op_size;
+  client.Query(&info, &op_size);
+  EXPECT_EQ(info.block_size, 512);
+  EXPECT_EQ(info.block_count, kTestLogicalBlockCount);
+  if (support_native_command_queuing_) {
+    EXPECT_TRUE(info.flags & FLAG_FUA_SUPPORT);
+  } else {
+    EXPECT_FALSE(info.flags & FLAG_FUA_SUPPORT);
+  }
+
+  sync_completion_t done;
+  auto callback = [](void* ctx, zx_status_t status, block_op_t* op) {
+    EXPECT_OK(status);
+    sync_completion_signal(static_cast<sync_completion_t*>(ctx));
+  };
+
+  zx::vmo read_vmo;
+  ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &read_vmo));
+  auto block_op = std::make_unique<uint8_t[]>(op_size);
+  auto op = reinterpret_cast<block_op_t*>(block_op.get());
+  *op = {.rw = {
+             .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
+             .vmo = read_vmo.get(),
+             .length = 1,
+             .offset_dev = 0,
+             .offset_vmo = 0,
+         }};
+  client.Queue(op, callback, &done);
+
+  while (true) {
+    command = port->TestGetRunning(0);
+    if (command != nullptr) {
+      break;
+    }
+    // Wait until read command is issued.
+    zx::nanosleep(zx::deadline_after(zx::msec(1)));
+  }
+  if (support_native_command_queuing_) {
+    EXPECT_EQ(command->cmd, SATA_CMD_READ_FPDMA_QUEUED);
+  } else {
+    EXPECT_EQ(command->cmd, SATA_CMD_READ_DMA_EXT);
+  }
+
+  // Clear the running bit in the bus.
+  fake_bus_->PortRegOverride(port_number, kPortSataActive, 0);
+  fake_bus_->PortRegOverride(port_number, kPortCommandIssue, 0);
+
+  // Set interrupt for successful transfer completion.
+  fake_bus_->PortRegOverride(port_number, kPortInterruptStatus, AHCI_PORT_INT_DP);
+  // Invoke interrupt handler.
+  fake_bus_->InterruptTrigger();
+
+  sync_completion_wait(&done, ZX_TIME_INFINITE);
+}
+
+INSTANTIATE_TEST_SUITE_P(NativeCommandQueuingSupportTest, AhciTestFixture, zxtest::Bool());
 
 }  // namespace ahci
