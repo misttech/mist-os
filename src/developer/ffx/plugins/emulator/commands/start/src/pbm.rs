@@ -17,7 +17,6 @@ use ffx_emulator_common::{
 use ffx_emulator_config::convert_bundle_to_configs;
 use ffx_emulator_start_args::StartCommand;
 use pbms::{load_product_bundle, ListingMode};
-use sdk_metadata::{ProductBundle, VirtualDeviceManifest};
 use std::{
     collections::hash_map::DefaultHasher, env, hash::Hasher, path::PathBuf, str::FromStr,
     time::Duration,
@@ -30,14 +29,7 @@ pub(crate) async fn list_virtual_devices(
 ) -> Result<Vec<String>> {
     let bundle =
         load_product_bundle(&sdk, &cmd.product_bundle, ListingMode::ReadyBundlesOnly).await?;
-    match bundle {
-        ProductBundle::V1(product_bundle) => Ok(product_bundle.device_refs.clone()),
-        ProductBundle::V2(product_bundle) => {
-            let path = product_bundle.get_virtual_devices_path();
-            let manifest = VirtualDeviceManifest::from_path(&path).context("manifest from_path")?;
-            Ok(manifest.device_names())
-        }
-    }
+    bundle.device_refs()
 }
 
 /// Create a RuntimeConfiguration based on the command line args.

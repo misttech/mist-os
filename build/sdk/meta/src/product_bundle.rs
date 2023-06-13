@@ -7,6 +7,7 @@
 mod v1;
 mod v2;
 
+use crate::VirtualDeviceManifest;
 use anyhow::{Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_repo::repository::FileSystemRepository;
@@ -90,10 +91,15 @@ impl ProductBundle {
     }
 
     /// Get the list of logical device names.
-    pub fn device_refs(&self) -> &Vec<String> {
+    pub fn device_refs(&self) -> Result<Vec<String>> {
         match self {
-            Self::V1(data) => &data.device_refs,
-            Self::V2(_) => panic!("no device_refs"),
+            Self::V1(data) => Ok(data.device_refs.clone()),
+            Self::V2(data) => {
+                let path = data.get_virtual_devices_path();
+                let manifest =
+                    VirtualDeviceManifest::from_path(&path).context("manifest from_path")?;
+                Ok(manifest.device_names())
+            }
         }
     }
 
