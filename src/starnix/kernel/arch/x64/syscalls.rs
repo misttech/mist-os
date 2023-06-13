@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_runtime::utc_time;
 use fuchsia_zircon as zx;
 
 use crate::{
@@ -20,6 +19,7 @@ use crate::{
     signals::syscalls::sys_signalfd4,
     syscalls::not_implemented,
     task::{syscalls::do_clone, CurrentTask, Waiter},
+    time::*,
     types::*,
 };
 
@@ -307,8 +307,8 @@ pub fn sys_time(
     current_task: &CurrentTask,
     time_addr: UserRef<__kernel_time_t>,
 ) -> Result<__kernel_time_t, Errno> {
-    let time =
-        (utc_time().into_nanos() / zx::Duration::from_seconds(1).into_nanos()) as __kernel_time_t;
+    let time = (utc::utc_now().into_nanos() / zx::Duration::from_seconds(1).into_nanos())
+        as __kernel_time_t;
     if !time_addr.is_null() {
         current_task.mm.write_object(time_addr, &time)?;
     }

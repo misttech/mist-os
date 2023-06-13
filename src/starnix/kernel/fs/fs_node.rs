@@ -14,6 +14,7 @@ use crate::{
     lock::{Mutex, RwLock, RwLockReadGuard},
     signals::*,
     task::*,
+    time::*,
     types::{as_any::AsAny, *},
 };
 
@@ -90,7 +91,7 @@ pub struct FsNodeInfo {
 
 impl FsNodeInfo {
     pub fn new(ino: ino_t, mode: FileMode, owner: FsCred) -> Self {
-        let now = fuchsia_runtime::utc_time();
+        let now = utc::utc_now();
         Self {
             ino,
             mode,
@@ -115,7 +116,7 @@ impl FsNodeInfo {
 
     pub fn chmod(&mut self, mode: FileMode) {
         self.mode = (self.mode & !FileMode::PERMISSIONS) | (mode & FileMode::PERMISSIONS);
-        self.time_status_change = fuchsia_runtime::utc_time();
+        self.time_status_change = utc::utc_now();
     }
 
     fn chown(&mut self, owner: Option<uid_t>, group: Option<gid_t>) {
@@ -132,7 +133,7 @@ impl FsNodeInfo {
             }
             self.clear_sgid_bit();
         }
-        self.time_status_change = fuchsia_runtime::utc_time();
+        self.time_status_change = utc::utc_now();
     }
 
     fn clear_sgid_bit(&mut self) {
@@ -1221,7 +1222,7 @@ impl FsNode {
     /// Update the ctime and mtime of a file to now.
     pub fn update_ctime_mtime(&self) -> Result<(), Errno> {
         self.update_info(|info| {
-            let now = fuchsia_runtime::utc_time();
+            let now = utc::utc_now();
             info.time_status_change = now;
             info.time_modify = now;
             Ok(())
@@ -1231,7 +1232,7 @@ impl FsNode {
     /// Update the ctime of a file to now.
     pub fn update_ctime(&self) -> Result<(), Errno> {
         self.update_info(|info| {
-            let now = fuchsia_runtime::utc_time();
+            let now = utc::utc_now();
             info.time_status_change = now;
             Ok(())
         })
@@ -1263,7 +1264,7 @@ impl FsNode {
 
         if !matches!((atime, mtime), (TimeUpdateType::Omit, TimeUpdateType::Omit)) {
             self.update_info(|info| {
-                let now = fuchsia_runtime::utc_time();
+                let now = utc::utc_now();
                 info.time_status_change = now;
                 let get_time = |time: TimeUpdateType| match time {
                     TimeUpdateType::Now => Some(now),

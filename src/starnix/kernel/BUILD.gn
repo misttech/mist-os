@@ -295,6 +295,8 @@ rustc_binary("starnix_kernel_bin") {
     "task/uts_namespace.rs",
     "task/waiter.rs",
     "testing.rs",
+    "time/mod.rs",
+    "time/utc.rs",
     "trace.rs",
     "types/arc_key.rs",
     "types/as_any.rs",

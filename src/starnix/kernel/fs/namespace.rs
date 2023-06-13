@@ -25,6 +25,7 @@ use crate::{
     mutable_state::*,
     selinux::selinux_fs,
     task::*,
+    time::*,
     types::*,
 };
 
@@ -1129,7 +1130,7 @@ impl NamespaceNode {
         if let Some(mount) = &self.mount {
             if !mount.flags().contains(MountFlags::NOATIME) {
                 self.entry.node.update_info(|info| {
-                    let now = fuchsia_runtime::utc_time();
+                    let now = utc::utc_now();
                     info.time_access = now;
                     Ok(())
                 })?;
