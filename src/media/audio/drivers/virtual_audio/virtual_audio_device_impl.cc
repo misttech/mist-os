@@ -8,7 +8,6 @@
 
 #include <memory>
 
-#include "src/media/audio/drivers/virtual_audio/virtual_audio_composite.h"
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_dai.h"
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_stream.h"
 
@@ -28,8 +27,7 @@ VirtualAudioDeviceImpl::Create(const fuchsia_virtualaudio::Configuration& cfg,
       is_input = cfg.device_specific()->dai()->is_input();
       break;
     case fuchsia_virtualaudio::DeviceSpecific::Tag::kComposite:
-      // No direction (is_input) support in Composite drivers.
-      break;
+      [[fallthrough]];
     case fuchsia_virtualaudio::DeviceSpecific::Tag::kCodec:
       [[fallthrough]];
     default:
@@ -63,8 +61,7 @@ VirtualAudioDeviceImpl::Create(const fuchsia_virtualaudio::Configuration& cfg,
       device->driver_ = std::make_unique<VirtualAudioDai>(cfg, device, dev_node);
       break;
     case fuchsia_virtualaudio::DeviceSpecific::Tag::kComposite:
-      device->driver_ = std::make_unique<VirtualAudioComposite>(cfg, device, dev_node);
-      break;
+      [[fallthrough]];
     case fuchsia_virtualaudio::DeviceSpecific::Tag::kCodec:
       [[fallthrough]];
     default:

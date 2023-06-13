@@ -477,12 +477,6 @@ bool VirtualAudioUtil::ResetAllConfigurations() {
   if (!ResetConfiguration(fuchsia::virtualaudio::DeviceType::DAI, true)) {
     return false;
   }
-
-  // No direction support in composite devices, is_input = true is unused.
-  if (!ResetConfiguration(fuchsia::virtualaudio::DeviceType::COMPOSITE, true)) {
-    return false;
-  }
-
   return true;
 }
 
