@@ -29,6 +29,8 @@ class TestBindManager : public dfv2::BindManager {
   const std::vector<dfv2::NodeBindingInfoResultCallback>& GetPendingOrphanRebindCallbacks() const {
     return pending_orphan_rebind_callbacks();
   }
+
+  dfv2::CompositeDeviceManager& GetLegacyCompositeManager() { return legacy_composite_manager(); }
 };
 
 class TestDriverIndex final : public fidl::WireServer<fuchsia_driver_index::DriverIndex> {
@@ -135,6 +137,12 @@ class BindManagerTestBase : public gtest::TestLoopFixture {
   void AddAndBindNode_EXPECT_BIND_START(std::string name);
   void AddAndBindNode_EXPECT_QUEUED(std::string name);
 
+  // Adds a legacy composite.
+  // If EXPECT_QUEUED, the function verifies that it queues a TryBindAllAvailable callback.
+  void AddLegacyComposite(std::string composite, std::vector<std::string> fragment_names);
+  void AddLegacyComposite_EXPECT_QUEUED(std::string composite,
+                                        std::vector<std::string> fragment_names);
+
   // Invoke Bind() for the node with the given |name|. The node should already exist.
   // If EXPECT_BIND_START, the function verifies that it started a new bind process.
   // If EXPECT_QUEUED, the function verifies that it queued new bind request.
@@ -144,7 +152,7 @@ class BindManagerTestBase : public gtest::TestLoopFixture {
 
   // Invoke TryBindAllAvailable().
   // If EXPECT_BIND_START, the function verifies that it started a new bind process.
-  // If EXPECT_QUEUED, the function verifies that it queues a TryBindAll callback.
+  // If EXPECT_QUEUED, the function verifies that it queues a TryBindAllAvailable callback.
   void InvokeTryBindAllAvailable();
   void InvokeTryBindAllAvailable_EXPECT_BIND_START();
   void InvokeTryBindAllAvailable_EXPECT_QUEUED();
@@ -162,6 +170,11 @@ class BindManagerTestBase : public gtest::TestLoopFixture {
 
   // Verify that the orphaned nodes set in BindManager contains |expected_nodes|.
   void VerifyOrphanedNodes(std::vector<std::string> expected_nodes);
+
+  void VerifyLegacyCompositeFragmentIsBound(std::string composite, std::string fragment_name);
+  void VerifyLegacyCompositeBuilt(std::string composite);
+
+  void VerifyPendingBindRequestCount(size_t expected);
 
  protected:
   std::unordered_map<std::string, std::shared_ptr<dfv2::Node>> nodes() const { return nodes_; }

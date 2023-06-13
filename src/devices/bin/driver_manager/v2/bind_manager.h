@@ -81,6 +81,9 @@ class BindManager {
     return pending_orphan_rebind_callbacks_;
   }
 
+  // Exposed for testing.
+  CompositeDeviceManager& legacy_composite_manager() { return legacy_composite_manager_; }
+
  private:
   using BindMatchCompleteCallback = fit::callback<void()>;
 

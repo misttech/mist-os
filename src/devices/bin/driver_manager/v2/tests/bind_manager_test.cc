@@ -202,3 +202,160 @@ TEST_F(BindManagerTest, PendingBindShareSameNode) {
   VerifyNoOngoingBind();
   VerifyOrphanedNodes({});
 }
+
+TEST_F(BindManagerTest, AddLegacyCompositeThenBind) {
+  AddLegacyComposite("composite-a", {"node-a", "node-b"});
+
+  // Add node-a and verify that it matches a fragment. Since this
+  // is synchronous, we should not have an ongoing bind process.
+  AddAndBindNode("node-a");
+  VerifyLegacyCompositeFragmentIsBound("composite-a", "node-a");
+  VerifyNoOngoingBind();
+
+  // Add node-b and verify that it matches a fragment. Composite-a should
+  // be built, kickstarting an ongoing bind process.
+  AddAndBindNode("node-b");
+  VerifyLegacyCompositeFragmentIsBound("composite-a", "node-b");
+  VerifyBindOngoingWithRequests({{"composite-a", 1}});
+  RunLoopUntilIdle();
+
+  DriverIndexReplyWithNoMatch("composite-a");
+  VerifyOrphanedNodes({"node-a.composite-a"});
+  VerifyNoOngoingBind();
+}
+
+TEST_F(BindManagerTest, AddNodesBetweenAddingLegacyComposite) {
+  // Add node-a and verify that it matches a fragment. Since this
+  // is synchronous, we should not have an ongoing bind process.
+  AddAndOrphanNode("node-a");
+  VerifyNoOngoingBind();
+
+  AddLegacyComposite("composite-a", {"node-a", "node-b"});
+  VerifyLegacyCompositeFragmentIsBound("composite-a", "node-a");
+  VerifyNoOngoingBind();
+
+  // Add node-b and verify that it matches a fragment. Composite-a should
+  // be built, kickstarting an ongoing bind process.
+  AddAndBindNode("node-b");
+  VerifyLegacyCompositeFragmentIsBound("composite-a", "node-b");
+  VerifyBindOngoingWithRequests({{"composite-a", 1}});
+
+  DriverIndexReplyWithDriver("composite-a");
+  VerifyOrphanedNodes({});
+  VerifyNoOngoingBind();
+}
+
+TEST_F(BindManagerTest, AddNodesThenLegacyComposite) {
+  AddAndOrphanNode("node-a");
+  AddAndOrphanNode("node-b");
+  VerifyNoOngoingBind();
+
+  AddLegacyComposite("composite-a", {"node-a", "node-b"});
+  VerifyLegacyCompositeFragmentIsBound("composite-a", "node-a");
+  VerifyLegacyCompositeFragmentIsBound("composite-a", "node-b");
+  VerifyBindOngoingWithRequests({{"composite-a", 1}});
+
+  DriverIndexReplyWithNoMatch("composite-a");
+  VerifyOrphanedNodes({"node-a.composite-a"});
+  VerifyNoOngoingBind();
+}
+
+TEST_F(BindManagerTest, AddLegacyCompositeDuringTryAllBind) {
+  AddAndOrphanNode("node-a");
+  AddAndOrphanNode("node-b");
+  AddAndOrphanNode("node-c");
+
+  InvokeTryBindAllAvailable_EXPECT_BIND_START();
+  VerifyBindOngoingWithRequests({{"node-a", 1}, {"node-b", 1}, {"node-c", 1}});
+
+  // Add the legacy composite. It should trigger bind all available, which
+  // will get queued up.
+  AddLegacyComposite_EXPECT_QUEUED("composite-a", {"node-a", "node-d"});
+
+  DriverIndexReplyWithNoMatch("node-a");
+
+  // Add one of the missing fragments. We should get a queued bind request.
+  AddAndBindNode_EXPECT_QUEUED("node-d");
+
+  // Complete the ongoing bind. This should trigger a follow up bind process.
+  DriverIndexReplyWithNoMatch("node-b");
+  DriverIndexReplyWithNoMatch("node-c");
+
+  // We should have match requests from node-b, node-c.
+  VerifyBindOngoingWithRequests({{"node-b", 1}, {"node-c", 1}});
+  VerifyLegacyCompositeBuilt("composite-a");
+  VerifyPendingBindRequestCount(1);
+
+  // Complete the ongoing bind. This kickstart another bind process, which
+  // will match the nodes to composite-a and assemble the composite.
+  DriverIndexReplyWithDriver("node-b");
+  DriverIndexReplyWithDriver("node-c");
+  VerifyBindOngoingWithRequests({{"composite-a", 1}});
+
+  // Complete bind.
+  DriverIndexReplyWithNoMatch("composite-a");
+  VerifyOrphanedNodes({"node-a.composite-a"});
+  VerifyNoOngoingBind();
+}
+
+TEST_F(BindManagerTest, AddLegacyCompositeDuringBind) {
+  AddAndBindNode_EXPECT_BIND_START("node-a");
+
+  // Add the legacy composite. It should trigger bind all available, which
+  // will get queued up.
+  AddLegacyComposite_EXPECT_QUEUED("composite-a", {"node-a", "node-d"});
+
+  // Add one of the missing fragments. We should get a queued bind request.
+  AddAndBindNode_EXPECT_QUEUED("node-d");
+
+  // Complete the ongoing bind. This should trigger a follow up bind process
+  // that builds composite-a.
+  DriverIndexReplyWithNoMatch("node-a");
+  VerifyLegacyCompositeBuilt("composite-a");
+
+  // We should be binding composite-a
+  VerifyBindOngoingWithRequests({{"composite-a", 1}});
+
+  // Complete bind.
+  DriverIndexReplyWithNoMatch("composite-a");
+  VerifyOrphanedNodes({"node-a.composite-a"});
+  VerifyNoOngoingBind();
+}
+
+TEST_F(BindManagerTest, AddMultipleLegacyCompositeDuringBind) {
+  AddAndOrphanNode("node-a");
+  AddAndOrphanNode("node-b");
+
+  InvokeTryBindAllAvailable_EXPECT_BIND_START();
+  VerifyBindOngoingWithRequests({{"node-a", 1}, {"node-b", 1}});
+
+  // Add two legacy composites. They should trigger bind all available, which will get
+  // queued.
+  AddLegacyComposite_EXPECT_QUEUED("composite-a", {"node-a", "node-d"});
+  AddLegacyComposite_EXPECT_QUEUED("composite-b", {"node-b", "node-c"});
+
+  AddAndBindNode_EXPECT_QUEUED("node-c");
+
+  // Complete the ongoing bind process. This should kickstart a new process in which
+  // node-b and node-c matches to composite-b, resulting it to be assembled.
+  DriverIndexReplyWithNoMatch("node-a");
+  DriverIndexReplyWithNoMatch("node-b");
+
+  VerifyLegacyCompositeBuilt("composite-b");
+  VerifyBindOngoingWithRequests({{"composite-b", 1}});
+
+  // Complete the match for composite-b. This should end the bind process.
+  DriverIndexReplyWithDriver("composite-b");
+  VerifyOrphanedNodes({});
+  VerifyNoOngoingBind();
+
+  // Add the remaining fragment for composite-a. This should build it and kickstart
+  // a new bind process where composite-a is built.
+  AddAndBindNode_EXPECT_BIND_START("node-d");
+  VerifyBindOngoingWithRequests({{"composite-a", 1}});
+
+  // Complete bind.
+  DriverIndexReplyWithNoMatch("composite-a");
+  VerifyOrphanedNodes({"node-a.composite-a"});
+  VerifyNoOngoingBind();
+}

@@ -63,6 +63,15 @@ class CompositeDeviceAssembler {
 
   void Inspect(inspect::Node& root) const;
 
+  // Exposed for testing.
+  std::string name() const { return name_; }
+
+  // Exposed for testing.
+  std::vector<CompositeDeviceFragment>& fragments() { return fragments_; }
+
+  // Exposed for testing.
+  bool is_assembled() const { return assembled_node_.has_value(); }
+
  private:
   // Check if we have all of our fragments bound. If we do, then create the
   // composite node. If we don't have all fragments bound, this does nothing.
@@ -114,6 +123,9 @@ class CompositeDeviceManager
   // Trigger a rebind of all the nodes that are currently used in composite
   // devices. This should only be used by tests.
   void RebindNodes();
+
+  // Exposed for testing.
+  std::vector<std::unique_ptr<CompositeDeviceAssembler>>& assemblers() { return assemblers_; }
 
  private:
   void AddCompositeDevice(AddCompositeDeviceRequest& request,

@@ -96,6 +96,7 @@ executable("bind_manager_test") {
     "tests/bind_manager_test.cc",
     "tests/bind_manager_test_base.cc",
     "tests/bind_manager_test_base.h",
+    "tests/multibind_test.cc",
   ]
 
   deps = [
