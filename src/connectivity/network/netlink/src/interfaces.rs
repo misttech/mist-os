@@ -7,7 +7,7 @@
 //! Netstack's interface watcher.
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     hash::Hash,
     num::{NonZeroU32, NonZeroU64},
 };
@@ -289,25 +289,28 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
         // response to existing (`fnet_interfaces::Event::Existing`) events will
         // violate that expectation.
         let (mut interface_properties, mut addresses) = {
-            let interface_properties =
-                match fnet_interfaces_ext::existing(if_event_stream.by_ref(), HashMap::new()).await
-                {
-                    Ok(interfaces) => interfaces,
-                    Err(fnet_interfaces_ext::WatcherOperationError::UnexpectedEnd { .. }) => {
-                        return EventLoopError::Netstack(InterfacesNetstackError::EventStreamEnded);
-                    }
-                    Err(fnet_interfaces_ext::WatcherOperationError::EventStream(e)) => {
-                        return EventLoopError::Fidl(InterfacesFidlError::EventStream(e));
-                    }
-                    Err(fnet_interfaces_ext::WatcherOperationError::Update(e)) => {
-                        return EventLoopError::Netstack(InterfacesNetstackError::Update(e));
-                    }
-                    Err(fnet_interfaces_ext::WatcherOperationError::UnexpectedEvent(event)) => {
-                        return EventLoopError::Netstack(InterfacesNetstackError::UnexpectedEvent(
-                            event,
-                        ));
-                    }
-                };
+            let interface_properties = match fnet_interfaces_ext::existing(
+                if_event_stream.by_ref(),
+                BTreeMap::new(),
+            )
+            .await
+            {
+                Ok(interfaces) => interfaces,
+                Err(fnet_interfaces_ext::WatcherOperationError::UnexpectedEnd { .. }) => {
+                    return EventLoopError::Netstack(InterfacesNetstackError::EventStreamEnded);
+                }
+                Err(fnet_interfaces_ext::WatcherOperationError::EventStream(e)) => {
+                    return EventLoopError::Fidl(InterfacesFidlError::EventStream(e));
+                }
+                Err(fnet_interfaces_ext::WatcherOperationError::Update(e)) => {
+                    return EventLoopError::Netstack(InterfacesNetstackError::Update(e));
+                }
+                Err(fnet_interfaces_ext::WatcherOperationError::UnexpectedEvent(event)) => {
+                    return EventLoopError::Netstack(InterfacesNetstackError::UnexpectedEvent(
+                        event,
+                    ));
+                }
+            };
 
             // `BTreeMap` so that addresses are iterated in deterministic order
             // (useful for tests).
@@ -532,7 +535,7 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
 
     async fn handle_request(
         interfaces_proxy: &fnet_root::InterfacesProxy,
-        interface_properties: &HashMap<u64, fnet_interfaces_ext::PropertiesAndState<()>>,
+        interface_properties: &BTreeMap<u64, fnet_interfaces_ext::PropertiesAndState<()>>,
         all_addresses: &BTreeMap<InterfaceAndAddr, NetlinkAddressMessage>,
         Request { args, sequence_number, mut client, completer }: Request<S>,
     ) {
@@ -604,7 +607,7 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
 /// Errors related to handling interface events.
 #[derive(Debug)]
 enum InterfaceEventHandlerError {
-    /// Interface event handler updated the HashMap with an event, but received an
+    /// Interface event handler updated the map with an event, but received an
     /// unexpected response.
     Update(fnet_interfaces_ext::UpdateError),
     /// Interface event handler attempted to process an event for an interface that already existed.
@@ -680,12 +683,12 @@ fn update_addresses<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
 }
 
 /// Handles events observed from the interface watcher by updating interfaces
-/// from the underlying interface properties HashMap.
+/// from the underlying interface properties BTreeMap.
 ///
 /// Returns an `InterfaceEventLoopError` when unexpected events occur, or an
 /// `UpdateError` when updates are not consistent with the current state.
 fn handle_interface_watcher_event<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
-    interface_properties: &mut HashMap<u64, fnet_interfaces_ext::PropertiesAndState<()>>,
+    interface_properties: &mut BTreeMap<u64, fnet_interfaces_ext::PropertiesAndState<()>>,
     all_addresses: &mut BTreeMap<InterfaceAndAddr, NetlinkAddressMessage>,
     route_clients: &ClientTable<NetlinkRoute, S>,
     event: fnet_interfaces::Event,
@@ -1086,13 +1089,11 @@ fn interface_properties_to_address_messages(
 pub(crate) mod testutil {
     use super::*;
 
-    use assert_matches::assert_matches;
     use fuchsia_zircon as zx;
     use futures::stream::Stream;
     use net_declare::{fidl_subnet, net_addr_subnet};
-    use netlink_packet_core::NetlinkPayload;
 
-    use crate::messaging::testutil::{FakeSender, SentMessage};
+    use crate::messaging::testutil::FakeSender;
 
     pub(crate) const LO_INTERFACE_ID: u64 = 1;
     pub(crate) const LO_NAME: &str = "lo";
@@ -1180,17 +1181,6 @@ pub(crate) mod testutil {
                 }
             })
             .await
-    }
-
-    pub(crate) fn sort_link_messages(messages: &mut [SentMessage<RtnlMessage>]) {
-        messages.sort_by_key(|message| {
-            assert_matches!(
-                &message.message.payload,
-                NetlinkPayload::InnerMessage(RtnlMessage::NewLink(m)) => {
-                    m.header.index
-                }
-            )
-        })
     }
 
     pub(crate) fn create_netlink_link_message(
@@ -1348,8 +1338,8 @@ mod tests {
 
     #[fuchsia::test]
     fn test_handle_interface_watcher_event() {
-        let mut interface_properties: HashMap<u64, fnet_interfaces_ext::PropertiesAndState<()>> =
-            HashMap::new();
+        let mut interface_properties: BTreeMap<u64, fnet_interfaces_ext::PropertiesAndState<()>> =
+            BTreeMap::new();
         let mut addresses = BTreeMap::new();
         let route_clients = ClientTable::<NetlinkRoute, FakeSender<_>>::default();
 
@@ -1397,7 +1387,7 @@ mod tests {
         assert_eq!(interface_properties.get(&2).unwrap().properties, interface2);
 
         // A remove event should result in no longer seeing the LinkMessage in the
-        // interface properties HashMap.
+        // interface properties BTreeMap.
         let interface1_remove_event = fnet_interfaces::Event::Removed(1);
         assert_matches!(
             handle_interface_watcher_event(
@@ -2022,36 +2012,36 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_get_link() {
-        let TestRequestResult { mut messages, waiter_result } = test_request(
-            RequestArgs::Link(LinkRequestArgs::Get(GetLinkArgs::Dump)),
-            expect_no_root_requests,
-        )
-        .await;
-        sort_link_messages(&mut messages);
-        assert_eq!(waiter_result, Ok(()));
         assert_eq!(
-            messages,
-            [
-                SentMessage::unicast(
-                    create_netlink_link_message(
-                        LO_INTERFACE_ID,
-                        ARPHRD_LOOPBACK,
-                        IFF_UP | IFF_RUNNING | IFF_LOOPBACK,
-                        create_nlas(LO_NAME.to_string(), ARPHRD_LOOPBACK, true),
-                    )
-                    .into_rtnl_new_link(TEST_SEQUENCE_NUMBER, true)
-                ),
-                SentMessage::unicast(
-                    create_netlink_link_message(
-                        ETH_INTERFACE_ID,
-                        ARPHRD_ETHER,
-                        0,
-                        create_nlas(ETH_NAME.to_string(), ARPHRD_ETHER, false),
-                    )
-                    .into_rtnl_new_link(TEST_SEQUENCE_NUMBER, true)
-                ),
-            ],
-        );
+            test_request(
+                RequestArgs::Link(LinkRequestArgs::Get(GetLinkArgs::Dump)),
+                expect_no_root_requests,
+            )
+            .await,
+            TestRequestResult {
+                messages: vec![
+                    SentMessage::unicast(
+                        create_netlink_link_message(
+                            LO_INTERFACE_ID,
+                            ARPHRD_LOOPBACK,
+                            IFF_UP | IFF_RUNNING | IFF_LOOPBACK,
+                            create_nlas(LO_NAME.to_string(), ARPHRD_LOOPBACK, true),
+                        )
+                        .into_rtnl_new_link(TEST_SEQUENCE_NUMBER, true)
+                    ),
+                    SentMessage::unicast(
+                        create_netlink_link_message(
+                            ETH_INTERFACE_ID,
+                            ARPHRD_ETHER,
+                            0,
+                            create_nlas(ETH_NAME.to_string(), ARPHRD_ETHER, false),
+                        )
+                        .into_rtnl_new_link(TEST_SEQUENCE_NUMBER, true)
+                    ),
+                ],
+                waiter_result: Ok(()),
+            },
+        )
     }
 
     #[test_case(Some(IpVersion::V4); "v4")]
