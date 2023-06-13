@@ -164,10 +164,6 @@ pub fn rename_and_add<'a>(libraries: &mut HashSet<Library>, original: &'a str) -
             libraries.insert(Library::Bluetooth);
             "fuchsia.bluetooth.BIND_PROTOCOL.GATT_SVC"
         }
-        "ZX_PROTOCOL_CLOCK" => {
-            libraries.insert(Library::Clock);
-            "fuchsia.hardware.clock.BIND_PROTOCOL.DEVICE"
-        }
         "ZX_PROTOCOL_PDEV" => {
             libraries.insert(Library::Platform);
             "fuchsia.platform.BIND_PROTOCOL.DEVICE"

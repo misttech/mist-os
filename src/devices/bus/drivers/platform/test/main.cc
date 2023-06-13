@@ -93,30 +93,6 @@ TEST(PbusTest, Enumeration) {
       fstatat(dirfd, "sys/platform/11:01:23/composite_node_spec/test-composite-node-spec", &st, 0),
       0);
 
-  // Check that we see multiple entries that begin with "fragment-" for a device that is a
-  // fragment of multiple composites
-  fbl::unique_fd clock_dir;
-  ASSERT_OK(fdio_open_fd_at(dirfd, "sys/platform/11:01:7/test-clock/clock-1",
-                            static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                            clock_dir.reset_and_get_address()));
-  size_t devices_seen = 0;
-  ASSERT_EQ(
-      fdio_watch_directory(
-          clock_dir.get(),
-          [](int dirfd, int event, const char* fn, void* cookie) {
-            auto devices_seen = static_cast<size_t*>(cookie);
-            if (event == WATCH_EVENT_ADD_FILE && !strncmp(fn, "fragment-", strlen("fragment-"))) {
-              *devices_seen += 1;
-            }
-            if (event == WATCH_EVENT_WAITING) {
-              return ZX_ERR_STOP;
-            }
-            return ZX_OK;
-          },
-          ZX_TIME_INFINITE, &devices_seen),
-      ZX_ERR_STOP);
-  ASSERT_EQ(devices_seen, 2);
-
   zx::result channel = RecursiveWaitForFile(dirfd, "sys/platform");
   ASSERT_OK(channel.status_value());
 

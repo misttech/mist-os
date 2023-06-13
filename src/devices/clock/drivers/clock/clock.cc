@@ -17,16 +17,16 @@
 #include <fbl/alloc_checker.h>
 
 void ClockDevice::Enable(EnableCompleter::Sync& completer) {
-  completer.Reply(zx::make_result(ClockEnable()));
+  completer.Reply(zx::make_result(clock_.Enable(id_)));
 }
 
 void ClockDevice::Disable(DisableCompleter::Sync& completer) {
-  completer.Reply(zx::make_result(ClockDisable()));
+  completer.Reply(zx::make_result(clock_.Disable(id_)));
 }
 
 void ClockDevice::IsEnabled(IsEnabledCompleter::Sync& completer) {
   bool enabled;
-  zx_status_t status = ClockIsEnabled(&enabled);
+  zx_status_t status = clock_.IsEnabled(id_, &enabled);
   if (status == ZX_OK) {
     completer.ReplySuccess(enabled);
   } else {
@@ -35,13 +35,13 @@ void ClockDevice::IsEnabled(IsEnabledCompleter::Sync& completer) {
 }
 
 void ClockDevice::SetRate(SetRateRequestView request, SetRateCompleter::Sync& completer) {
-  completer.Reply(zx::make_result(ClockSetRate(request->hz)));
+  completer.Reply(zx::make_result(clock_.SetRate(id_, request->hz)));
 }
 
 void ClockDevice::ClockDevice::QuerySupportedRate(QuerySupportedRateRequestView request,
                                                   QuerySupportedRateCompleter::Sync& completer) {
   uint64_t hz_out;
-  zx_status_t status = ClockQuerySupportedRate(request->hz_in, &hz_out);
+  zx_status_t status = clock_.QuerySupportedRate(id_, request->hz_in, &hz_out);
   if (status == ZX_OK) {
     completer.ReplySuccess(hz_out);
   } else {
@@ -51,7 +51,7 @@ void ClockDevice::ClockDevice::QuerySupportedRate(QuerySupportedRateRequestView 
 
 void ClockDevice::GetRate(GetRateCompleter::Sync& completer) {
   uint64_t current_rate;
-  zx_status_t status = ClockGetRate(&current_rate);
+  zx_status_t status = clock_.GetRate(id_, &current_rate);
   if (status == ZX_OK) {
     completer.ReplySuccess(current_rate);
   } else {
@@ -60,12 +60,12 @@ void ClockDevice::GetRate(GetRateCompleter::Sync& completer) {
 }
 
 void ClockDevice::SetInput(SetInputRequestView request, SetInputCompleter::Sync& completer) {
-  completer.Reply(zx::make_result(ClockSetInput(request->idx)));
+  completer.Reply(zx::make_result(clock_.SetInput(id_, request->idx)));
 }
 
 void ClockDevice::GetNumInputs(GetNumInputsCompleter::Sync& completer) {
   uint32_t num_inputs;
-  zx_status_t status = ClockGetNumInputs(&num_inputs);
+  zx_status_t status = clock_.GetNumInputs(id_, &num_inputs);
   if (status == ZX_OK) {
     completer.ReplySuccess(num_inputs);
   } else {
@@ -75,37 +75,12 @@ void ClockDevice::GetNumInputs(GetNumInputsCompleter::Sync& completer) {
 
 void ClockDevice::GetInput(GetInputCompleter::Sync& completer) {
   uint32_t input;
-  zx_status_t status = ClockGetInput(&input);
+  zx_status_t status = clock_.GetInput(id_, &input);
   if (status == ZX_OK) {
     completer.ReplySuccess(input);
   } else {
     completer.ReplyError(status);
   }
-}
-
-zx_status_t ClockDevice::ClockEnable() { return clock_.Enable(id_); }
-
-zx_status_t ClockDevice::ClockDisable() { return clock_.Disable(id_); }
-
-zx_status_t ClockDevice::ClockIsEnabled(bool* out_enabled) {
-  return clock_.IsEnabled(id_, out_enabled);
-}
-
-zx_status_t ClockDevice::ClockSetRate(uint64_t hz) { return clock_.SetRate(id_, hz); }
-
-zx_status_t ClockDevice::ClockQuerySupportedRate(uint64_t max_rate,
-                                                 uint64_t* out_max_supported_rate) {
-  return clock_.QuerySupportedRate(id_, max_rate, out_max_supported_rate);
-}
-
-zx_status_t ClockDevice::ClockSetInput(uint32_t idx) { return clock_.SetInput(id_, idx); }
-
-zx_status_t ClockDevice::ClockGetNumInputs(uint32_t* out) { return clock_.GetNumInputs(id_, out); }
-
-zx_status_t ClockDevice::ClockGetInput(uint32_t* out) { return clock_.GetInput(id_, out); }
-
-zx_status_t ClockDevice::ClockGetRate(uint64_t* out_current_rate) {
-  return clock_.GetRate(id_, out_current_rate);
 }
 
 zx_status_t ClockDevice::ServeOutgoing(fidl::ServerEnd<fuchsia_io::Directory> server_end) {

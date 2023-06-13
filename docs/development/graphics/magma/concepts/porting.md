@@ -99,7 +99,7 @@ and get it into operating mode. This may include:
 * Powering on the device (possibly using the
   [fuchsia.hardware.power.Device][fuchsia.hardware.power.Device] banjo interface).
 * Enabling clocks (possibly using the
-  [fuchsia.hardware.clock.Clock][fuchsia.hardware.clock.Clock] banjo interface).
+  [fuchsia.hardware.clock.Clock][fuchsia.hardware.clock.Clock] FIDL interface).
 * Enabling bus mastering or memory access.
 * Loading firmware.
 
@@ -348,7 +348,7 @@ the system driver using the Zircon DDK.
 [vulkan_icd_load]: /sdk/ctf/tests/pkg/vulkan
 [libmagma]: /src/graphics/lib/magma/src/libmagma
 [intelgn]: /src/graphics/lib/magma/gnbuild/magma-intel-gen/BUILD.gn
-[fuchsia.hardware.clock.Clock]: /sdk/banjo/fuchsia.hardware.clock/clock.fidl
+[fuchsia.hardware.clock.Clock]: /sdk/fidl/fuchsia.hardware.clock/clock.fidl
 [fuchsia.hardware.power.Device]: /sdk/fidl/fuchsia.hardware.power/power.fidl
 [dgsd]: /docs/development/drivers/concepts/getting_started.md
 [libc]: /docs/concepts/kernel/libc.md

@@ -6,7 +6,6 @@
 #define SRC_DEVICES_INTERNAL_DRIVERS_FRAGMENT_FRAGMENT_PROXY_H_
 
 #include <fuchsia/hardware/audio/cpp/banjo.h>
-#include <fuchsia/hardware/clock/cpp/banjo.h>
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/spi/cpp/banjo.h>
@@ -26,7 +25,6 @@ class FragmentProxy;
 using FragmentProxyBase = ddk::Device<FragmentProxy, ddk::GetProtocolable>;
 
 class FragmentProxy : public FragmentProxyBase,
-                      public ddk::ClockProtocol<FragmentProxy>,
                       public ddk::GpioProtocol<FragmentProxy>,
                       public ddk::DaiProtocol<FragmentProxy>,
                       public ddk::PDevProtocol<FragmentProxy>,

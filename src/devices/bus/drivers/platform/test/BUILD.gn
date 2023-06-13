@@ -157,7 +157,6 @@ fuchsia_driver("test-clock-driver") {
   sources = [ "test/clock.cc" ]
   deps = [
     ":test-clock-bind",
-    "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
@@ -282,10 +281,10 @@ fuchsia_driver("test-composite-driver") {
   sources = [ "test/composite.c" ]
   deps = [
     ":test-composite-bind",
-    "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.spi:fuchsia.hardware.spi_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.test:fuchsia.hardware.test_banjo_cpp",
     "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
@@ -301,28 +300,6 @@ fuchsia_driver_component("test-composite") {
   deps = [ ":test-composite-driver" ]
   info = "test-driver-info.json"
   manifest = "meta/test-composite.cml"
-}
-
-driver_bind_rules("test-child-2.proxy-bind") {
-  disable_autobind = true
-}
-
-fuchsia_driver("test-child-2.proxy-driver") {
-  output_name = "test-child-2.proxy"
-  configs += [ "//build/config:all_source" ]
-  sources = [ "test/child-2.proxy.c" ]
-  deps = [
-    ":test-child-2.proxy-bind",
-    "//src/devices/lib/driver",
-    "//src/lib/ddk",
-  ]
-}
-
-fuchsia_driver_component("test-child-2.proxy") {
-  component_name = "test-child-2.proxy"
-  deps = [ ":test-child-2.proxy-driver" ]
-  info = "test-driver-info.json"
-  manifest = "meta/test-child-2.proxy.cml"
 }
 
 simple_drivers = [
@@ -365,7 +342,6 @@ fuchsia_unittest_package("platform-bus-test") {
   deps = [
     ":platform-bus",
     ":test-board",
-    ":test-child-2.proxy",
     ":test-clock",
     ":test-composite",
     ":test-composite-node-spec",

@@ -15,7 +15,6 @@ group("drivers") {
     "drivers/platform/test:test-bti-board",
     "drivers/platform/test:test-child-1",
     "drivers/platform/test:test-child-2",
-    "drivers/platform/test:test-child-2.proxy",
     "drivers/platform/test:test-child-3",
     "drivers/platform/test:test-clock",
     "drivers/platform/test:test-composite",

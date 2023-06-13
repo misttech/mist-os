@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/hardware/clock/c/banjo.h>
 #include <fuchsia/hardware/gpio/c/banjo.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/spi/c/banjo.h>
+#include <fuchsia/hardware/test/c/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -28,18 +28,14 @@
 enum Fragments_1 {
   FRAGMENT_PDEV_1, /* Should be 1st fragment */
   FRAGMENT_GPIO_1,
-  FRAGMENT_CLOCK_1,
   FRAGMENT_I2C_1,
   FRAGMENT_POWER_1,
-  FRAGMENT_CHILD4_1,
   FRAGMENT_COUNT_1,
 };
 
 enum Fragments_2 {
   FRAGMENT_PDEV_2, /* Should be 1st fragment */
-  FRAGMENT_CLOCK_2,
   FRAGMENT_POWER_2,
-  FRAGMENT_CHILD4_2,
   FRAGMENT_SPI_2,
   FRAGMENT_COUNT_2,
 };
@@ -86,59 +82,6 @@ static zx_status_t test_gpio(gpio_protocol_t* gpio) {
   }
   if ((status = gpio_read(gpio, &value)) != ZX_OK || value != 1) {
     return status;
-  }
-
-  return ZX_OK;
-}
-
-static zx_status_t test_clock(clock_protocol_t* clock) {
-  zx_status_t status;
-  const uint64_t kOneMegahertz = 1000000;
-  const uint32_t kBad = 0xDEADBEEF;
-  uint64_t out_rate = 0;
-
-  if ((status = clock_enable(clock)) != ZX_OK) {
-    return status;
-  }
-  if ((status = clock_disable(clock)) != ZX_OK) {
-    return status;
-  }
-
-  bool is_enabled = false;
-  if ((status = clock_is_enabled(clock, &is_enabled)) != ZX_OK) {
-    return status;
-  }
-
-  if ((status = clock_set_rate(clock, kOneMegahertz)) != ZX_OK) {
-    return status;
-  }
-
-  if ((status = clock_query_supported_rate(clock, kOneMegahertz, &out_rate)) != ZX_OK) {
-    return status;
-  }
-
-  if ((status = clock_get_rate(clock, &out_rate)) != ZX_OK) {
-    return status;
-  }
-
-  if ((status = clock_set_input(clock, 0)) != ZX_OK) {
-    return status;
-  }
-
-  uint32_t num_inputs = kBad;
-  if ((status = clock_get_num_inputs(clock, &num_inputs)) != ZX_OK) {
-    return status;
-  }
-
-  uint32_t current_input = kBad;
-  if ((status = clock_get_input(clock, &current_input)) != ZX_OK) {
-    return status;
-  }
-
-  // Make sure that the input value was actually set.
-  if (num_inputs == kBad || current_input == kBad) {
-    // The above calls returned ZX_OK but the out value was unchanged?
-    return ZX_ERR_BAD_STATE;
   }
 
   return ZX_OK;
@@ -252,8 +195,6 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
     return ZX_ERR_INTERNAL;
   }
 
-  clock_protocol_t clock;
-  clock_protocol_t child4;
   gpio_protocol_t gpio;
   spi_protocol_t spi;
 
@@ -264,24 +205,6 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
       return ZX_ERR_BAD_STATE;
     }
 
-    if (strncmp(fragments[FRAGMENT_CLOCK_1].name, "clock", 32)) {
-      zxlogf(ERROR, "%s: Unexpected name: %s", DRIVER_NAME, fragments[FRAGMENT_CLOCK_1].name);
-      return ZX_ERR_INTERNAL;
-    }
-    status = device_get_protocol(fragments[FRAGMENT_CLOCK_1].device, ZX_PROTOCOL_CLOCK, &clock);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: could not get protocol ZX_PROTOCOL_CLOCK", DRIVER_NAME);
-      return status;
-    }
-    if (strncmp(fragments[FRAGMENT_CHILD4_1].name, "child4", 32)) {
-      zxlogf(ERROR, "%s: Unexpected name: %s", DRIVER_NAME, fragments[FRAGMENT_CHILD4_1].name);
-      return ZX_ERR_INTERNAL;
-    }
-    status = device_get_protocol(fragments[FRAGMENT_CHILD4_1].device, ZX_PROTOCOL_CLOCK, &child4);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: could not get protocol from child4", DRIVER_NAME);
-      return status;
-    }
     if (strncmp(fragments[FRAGMENT_GPIO_1].name, "gpio", 32)) {
       zxlogf(ERROR, "%s: Unexpected name: %s", DRIVER_NAME, fragments[FRAGMENT_GPIO_1].name);
       return ZX_ERR_INTERNAL;
@@ -295,10 +218,6 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
       zxlogf(ERROR, "%s: Unexpected name: %s", DRIVER_NAME, fragments[FRAGMENT_I2C_1].name);
       return ZX_ERR_INTERNAL;
     }
-    if ((status = test_clock(&clock)) != ZX_OK) {
-      zxlogf(ERROR, "%s: test_clock failed: %d", DRIVER_NAME, status);
-      return status;
-    }
     if ((status = test_gpio(&gpio)) != ZX_OK) {
       zxlogf(ERROR, "%s: test_gpio failed: %d", DRIVER_NAME, status);
       return status;
@@ -310,24 +229,6 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
       return ZX_ERR_BAD_STATE;
     }
 
-    if (strncmp(fragments[FRAGMENT_CLOCK_2].name, "clock", 32)) {
-      zxlogf(ERROR, "%s: Unexpected name: %s", DRIVER_NAME, fragments[FRAGMENT_CLOCK_2].name);
-      return ZX_ERR_INTERNAL;
-    }
-    status = device_get_protocol(fragments[FRAGMENT_CLOCK_2].device, ZX_PROTOCOL_CLOCK, &clock);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: could not get protocol ZX_PROTOCOL_CLOCK", DRIVER_NAME);
-      return status;
-    }
-    if (strncmp(fragments[FRAGMENT_CHILD4_2].name, "child4", 32)) {
-      zxlogf(ERROR, "%s: Unexpected name: %s", DRIVER_NAME, fragments[FRAGMENT_CHILD4_2].name);
-      return ZX_ERR_INTERNAL;
-    }
-    status = device_get_protocol(fragments[FRAGMENT_CHILD4_2].device, ZX_PROTOCOL_CLOCK, &child4);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: could not get protocol from child4", DRIVER_NAME);
-      return status;
-    }
     if (strncmp(fragments[FRAGMENT_SPI_2].name, "spi", 32)) {
       zxlogf(ERROR, "%s: Unexpected name: %s", DRIVER_NAME, fragments[FRAGMENT_SPI_2].name);
       return ZX_ERR_INTERNAL;
@@ -335,10 +236,6 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
     status = device_get_protocol(fragments[FRAGMENT_SPI_2].device, ZX_PROTOCOL_SPI, &spi);
     if (status != ZX_OK) {
       zxlogf(ERROR, "%s: could not get protocol ZX_PROTOCOL_SPI", DRIVER_NAME);
-      return status;
-    }
-    if ((status = test_clock(&clock)) != ZX_OK) {
-      zxlogf(ERROR, "%s: test_clock failed: %d", DRIVER_NAME, status);
       return status;
     }
     if ((status = test_spi(&spi)) != ZX_OK) {

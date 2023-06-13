@@ -164,7 +164,7 @@ class PlatformBus : public PlatformBusType,
     ProtocolNodeAddCompleter::Async completer;
     std::unique_ptr<async::Task> timeout_task;
   };
-  // Key is the protocol ID (i.e. ZX_PROTOCOL_GPIO, ZX_PROTOCOL_CLOCK, etc).
+  // Key is the protocol ID (i.e. ZX_PROTOCOL_GPIO, etc).
   std::unordered_map<uint32_t, ProtoReadyResponse> proto_ready_responders_
       __TA_GUARDED(proto_completion_mutex_);
   // Protects proto_ready_responders_.

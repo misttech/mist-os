@@ -131,34 +131,6 @@ struct DaiProxyResponse {
   ProxyResponse header;
 };
 
-// ZX_PROTOCOL_CLOCK proxy support.
-enum class ClockOp {
-  ENABLE,
-  DISABLE,
-  IS_ENABLED,
-  SET_RATE,
-  QUERY_SUPPORTED_RATE,
-  GET_RATE,
-  SET_INPUT,
-  GET_NUM_INPUTS,
-  GET_INPUT,
-};
-
-struct ClockProxyRequest {
-  ProxyRequest header;
-  ClockOp op;
-  uint64_t rate;
-  uint32_t input_idx;
-};
-
-struct ClockProxyResponse {
-  ProxyResponse header;
-  bool is_enabled;
-  uint64_t rate;
-  uint32_t num_inputs;
-  uint32_t current_input;
-};
-
 // ZX_PROTOCOL_SYSMEM proxy support.
 enum class SysmemOp {
   CONNECT,

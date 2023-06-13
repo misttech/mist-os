@@ -95,46 +95,6 @@ void Fragment::DdkInit(ddk::InitTxn init_txn) {
   init_txn.Reply(ZX_OK);
 }
 
-zx_status_t Fragment::RpcClock(const uint8_t* req_buf, uint32_t req_size, uint8_t* resp_buf,
-                               uint32_t* out_resp_size, zx::handle* req_handles,
-                               uint32_t req_handle_count, zx::handle* resp_handles,
-                               uint32_t* resp_handle_count) {
-  if (!clock_client_.proto_client().is_valid()) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  auto* req = reinterpret_cast<const ClockProxyRequest*>(req_buf);
-  if (req_size < sizeof(*req)) {
-    zxlogf(ERROR, "%s received %u, expecting %zu", __func__, req_size, sizeof(*req));
-    return ZX_ERR_INTERNAL;
-  }
-  auto* resp = reinterpret_cast<ClockProxyResponse*>(resp_buf);
-  *out_resp_size = sizeof(*resp);
-
-  switch (req->op) {
-    case ClockOp::ENABLE:
-      return clock_client_.proto_client().Enable();
-    case ClockOp::DISABLE:
-      return clock_client_.proto_client().Disable();
-    case ClockOp::IS_ENABLED:
-      return clock_client_.proto_client().IsEnabled(&resp->is_enabled);
-    case ClockOp::SET_RATE:
-      return clock_client_.proto_client().SetRate(req->rate);
-    case ClockOp::QUERY_SUPPORTED_RATE:
-      return clock_client_.proto_client().QuerySupportedRate(req->rate, &resp->rate);
-    case ClockOp::GET_RATE:
-      return clock_client_.proto_client().GetRate(&resp->rate);
-    case ClockOp::SET_INPUT:
-      return clock_client_.proto_client().SetInput(req->input_idx);
-    case ClockOp::GET_NUM_INPUTS:
-      return clock_client_.proto_client().GetNumInputs(&resp->num_inputs);
-    case ClockOp::GET_INPUT:
-      return clock_client_.proto_client().GetInput(&resp->current_input);
-    default:
-      zxlogf(ERROR, "%s: unknown clk op %u", __func__, static_cast<uint32_t>(req->op));
-      return ZX_ERR_INTERNAL;
-  }
-}
-
 zx_status_t Fragment::RpcGpio(const uint8_t* req_buf, uint32_t req_size, uint8_t* resp_buf,
                               uint32_t* out_resp_size, zx::handle* req_handles,
                               uint32_t req_handle_count, zx::handle* resp_handles,
@@ -398,10 +358,6 @@ zx_status_t Fragment::ReadFidlFromChannel() {
   uint32_t resp_len = 0;
 
   switch (req_header->proto_id) {
-    case ZX_PROTOCOL_CLOCK:
-      status = RpcClock(req_buf, actual, resp_buf, &resp_len, req_handles, req_handle_count,
-                        resp_handles, &resp_handle_count);
-      break;
     case ZX_PROTOCOL_GPIO:
       status = RpcGpio(req_buf, actual, resp_buf, &resp_len, req_handles, req_handle_count,
                        resp_handles, &resp_handle_count);
@@ -447,13 +403,6 @@ zx_status_t Fragment::ReadFidlFromChannel() {
 
 zx_status_t Fragment::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
   switch (proto_id) {
-    case ZX_PROTOCOL_CLOCK: {
-      if (!clock_client_.proto_client().is_valid()) {
-        return ZX_ERR_NOT_SUPPORTED;
-      }
-      clock_client_.proto_client().GetProto(static_cast<clock_protocol_t*>(out_protocol));
-      return ZX_OK;
-    }
     case ZX_PROTOCOL_GPIO: {
       if (!gpio_client_.proto_client().is_valid()) {
         return ZX_ERR_NOT_SUPPORTED;

@@ -6,7 +6,6 @@
 #define SRC_DEVICES_CLOCK_DRIVERS_CLOCK_CLOCK_H_
 
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
-#include <fuchsia/hardware/clock/cpp/banjo.h>
 #include <fuchsia/hardware/clockimpl/cpp/banjo.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
@@ -16,11 +15,7 @@
 class ClockDevice;
 using ClockDeviceType = ddk::Device<ClockDevice>;
 
-class ClockDevice : public ClockDeviceType,
-                    // TODO(fxbug.dev/126069): Remove banjo clock protocol when
-                    // there aren't any banjo clock protocol clients.
-                    public ddk::ClockProtocol<ClockDevice, ddk::base_protocol>,
-                    public fidl::WireServer<fuchsia_hardware_clock::Clock> {
+class ClockDevice : public ClockDeviceType, public fidl::WireServer<fuchsia_hardware_clock::Clock> {
  public:
   ClockDevice(zx_device_t* parent, clock_impl_protocol_t* clock, uint32_t id)
       : ClockDeviceType(parent), clock_(clock), id_(id) {}
@@ -29,18 +24,6 @@ class ClockDevice : public ClockDeviceType,
 
   // Device protocol implementation
   void DdkRelease();
-
-  zx_status_t ClockEnable();
-  zx_status_t ClockDisable();
-  zx_status_t ClockIsEnabled(bool* out_enabled);
-
-  zx_status_t ClockSetRate(uint64_t hz);
-  zx_status_t ClockQuerySupportedRate(uint64_t max_rate, uint64_t* out_max_supported_rate);
-  zx_status_t ClockGetRate(uint64_t* out_current_rate);
-
-  zx_status_t ClockSetInput(uint32_t idx);
-  zx_status_t ClockGetNumInputs(uint32_t* out);
-  zx_status_t ClockGetInput(uint32_t* out);
 
   zx_status_t ServeOutgoing(fidl::ServerEnd<fuchsia_io::Directory> server_end);
 

@@ -43,9 +43,6 @@ zx_status_t FragmentProxy::DdkGetProtocol(uint32_t proto_id, void* out) {
     case ZX_PROTOCOL_DAI:
       proto->ops = &dai_protocol_ops_;
       return ZX_OK;
-    case ZX_PROTOCOL_CLOCK:
-      proto->ops = &clock_protocol_ops_;
-      return ZX_OK;
     case ZX_PROTOCOL_GPIO:
       proto->ops = &gpio_protocol_ops_;
       return ZX_OK;
@@ -126,116 +123,6 @@ zx_status_t FragmentProxy::DaiConnect(zx::channel chan) {
     return status;
   }
   return ZX_OK;
-}
-
-zx_status_t FragmentProxy::ClockEnable() {
-  ClockProxyRequest req = {};
-  ClockProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_CLOCK;
-  req.op = ClockOp::ENABLE;
-
-  return Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
-}
-
-zx_status_t FragmentProxy::ClockDisable() {
-  ClockProxyRequest req = {};
-  ClockProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_CLOCK;
-  req.op = ClockOp::DISABLE;
-
-  return Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
-}
-
-zx_status_t FragmentProxy::ClockIsEnabled(bool* out_enabled) {
-  ClockProxyRequest req = {};
-  ClockProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_CLOCK;
-  req.op = ClockOp::IS_ENABLED;
-
-  auto status = Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
-  if (status == ZX_OK) {
-    *out_enabled = resp.is_enabled;
-  }
-  return status;
-}
-
-zx_status_t FragmentProxy::ClockSetRate(uint64_t hz) {
-  ClockProxyRequest req = {};
-  ClockProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_CLOCK;
-  req.op = ClockOp::SET_RATE;
-  req.rate = hz;
-
-  return Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
-}
-
-zx_status_t FragmentProxy::ClockQuerySupportedRate(uint64_t max_rate,
-                                                   uint64_t* out_max_supported_rate) {
-  ClockProxyRequest req = {};
-  ClockProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_CLOCK;
-  req.op = ClockOp::QUERY_SUPPORTED_RATE;
-  req.rate = max_rate;
-
-  auto status = Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
-  if (status == ZX_OK) {
-    *out_max_supported_rate = resp.rate;
-  }
-  return status;
-}
-
-zx_status_t FragmentProxy::ClockGetRate(uint64_t* out_current_rate) {
-  ClockProxyRequest req = {};
-  ClockProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_CLOCK;
-  req.op = ClockOp::GET_RATE;
-
-  auto status = Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
-  if (status == ZX_OK) {
-    *out_current_rate = resp.rate;
-  }
-  return status;
-}
-
-zx_status_t FragmentProxy::ClockSetInput(uint32_t idx) {
-  ClockProxyRequest req = {};
-  ClockProxyResponse resp = {};
-
-  req.header.proto_id = ZX_PROTOCOL_CLOCK;
-  req.op = ClockOp::SET_INPUT;
-  req.input_idx = idx;
-
-  return Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
-}
-
-zx_status_t FragmentProxy::ClockGetNumInputs(uint32_t* out_num_inputs) {
-  ClockProxyRequest req = {};
-  ClockProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_CLOCK;
-  req.op = ClockOp::GET_NUM_INPUTS;
-
-  auto status = Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
-
-  if (status == ZX_OK) {
-    *out_num_inputs = resp.num_inputs;
-  }
-
-  return status;
-}
-
-zx_status_t FragmentProxy::ClockGetInput(uint32_t* out_current_input) {
-  ClockProxyRequest req = {};
-  ClockProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_CLOCK;
-  req.op = ClockOp::GET_INPUT;
-
-  auto status = Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
-
-  if (status == ZX_OK) {
-    *out_current_input = resp.current_input;
-  }
-
-  return status;
 }
 
 zx_status_t FragmentProxy::GpioConfigIn(uint32_t flags) {

@@ -123,19 +123,10 @@ zx_status_t TestBoard::Create(zx_device_t* parent) {
       BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_GPIO),
       BI_MATCH_IF(EQ, BIND_GPIO_PIN, 3),
   };
-  const zx_bind_inst_t clock_match[] = {
-      BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_CLOCK),
-      BI_MATCH_IF(EQ, BIND_CLOCK_ID, 1),
-  };
   const zx_bind_inst_t i2c_match[] = {
       BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_I2C),
       BI_ABORT_IF(NE, BIND_I2C_BUS_ID, 1),
       BI_MATCH_IF(EQ, BIND_I2C_ADDRESS, 5),
-  };
-  const zx_bind_inst_t child4_match[] = {
-      BI_ABORT_IF(NE, BIND_PLATFORM_DEV_VID, PDEV_VID_TEST),
-      BI_ABORT_IF(NE, BIND_PLATFORM_DEV_PID, PDEV_PID_PBUS_TEST),
-      BI_MATCH_IF(EQ, BIND_PLATFORM_DEV_DID, PDEV_DID_TEST_CHILD_4),
   };
   const zx_bind_inst_t spi_match[] = {
       BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_SPI),
@@ -145,24 +136,16 @@ zx_status_t TestBoard::Create(zx_device_t* parent) {
   device_fragment_part_t gpio_fragment[] = {
       {std::size(gpio_match), gpio_match},
   };
-  device_fragment_part_t clock_fragment[] = {
-      {std::size(clock_match), clock_match},
-  };
   device_fragment_part_t i2c_fragment[] = {
       {std::size(i2c_match), i2c_match},
-  };
-  device_fragment_part_t child4_fragment[] = {
-      {std::size(child4_match), child4_match},
   };
   device_fragment_part_t spi_fragment[] = {
       {std::size(spi_match), spi_match},
   };
   device_fragment_t composite[] = {
       {"gpio", std::size(gpio_fragment), gpio_fragment},
-      {"clock", std::size(clock_fragment), clock_fragment},
       {"i2c", std::size(i2c_fragment), i2c_fragment},
       {"power", std::size(power_fragment), power_fragment},
-      {"child4", std::size(child4_fragment), child4_fragment},
   };
 
   struct composite_test_metadata metadata_1 = {
@@ -219,9 +202,7 @@ zx_status_t TestBoard::Create(zx_device_t* parent) {
   }
 
   device_fragment_t composite2[] = {
-      {"clock", std::size(clock_fragment), clock_fragment},
       {"power", std::size(power_fragment), power_fragment},
-      {"child4", std::size(child4_fragment), child4_fragment},
       {"spi", std::size(spi_fragment), spi_fragment},
   };
 
