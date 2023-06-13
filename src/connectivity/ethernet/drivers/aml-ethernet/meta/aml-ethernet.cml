@@ -17,8 +17,17 @@
         colocate: "true",
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },
+    capabilities: [
+        { service: "fuchsia.hardware.ethernet.board.Service" },
+    ],
     use: [
         { service: "fuchsia.hardware.i2c.Service" },
         { service: "fuchsia.hardware.platform.device.Service" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.ethernet.board.Service",
+            from: "self",
+        },
     ],
 }
