@@ -454,3 +454,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0218_io_buffer.md
   - title: "RFC-0219: Zircon Page Compression"
     path: /docs/contribute/governance/rfcs/0219_zircon_page_compression.md
+  - title: "RFC-0220: The future of in-tree products"
+    path: /docs/contribute/governance/rfcs/0220_the_future_of_in_tree_products.md

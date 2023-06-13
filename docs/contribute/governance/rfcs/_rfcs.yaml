@@ -2866,3 +2866,16 @@
   reviewers: ['eieio@google.com', 'rashaeqbal@google.com', 'maniscalco@google.com']
   submitted: '2022-05-31'
   reviewed: '2023-06-03'
+
+- name: 'RFC-0220'
+  title: 'The future of in-tree products'
+  short_description: 'A proposal to simplify the set of product configurations in the open source //products directory.'
+  authors: ['wittrock@google.com', 'hjfreyer@google.com']
+  file: '0220_the_future_of_in_tree_products.md'
+  area: ['General', 'Software Assembly']
+  issue: ['121898']
+  gerrit_change_id: ['831920']
+  status: 'Accepted'
+  reviewers: ['aaronwood@google.com', 'abarth@google.com', 'amathes@google.com', 'ddorwin@google.com', 'dworsham@google.com', 'fmeawad@google.com', 'hjfreyer@google.com', 'jasoncampbell@google.com', 'neelsa@google.com', 'nicoh@google.com']
+  submitted: '2022-04-06'
+  reviewed: '2022-06-13'
