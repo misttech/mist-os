@@ -74,7 +74,7 @@ type ScanOptions = table {
 /// close the protocol to stop scanning. If a scan is stopped by the system, the
 /// protocol will be closed with the epitaph `CANCELED` to communicate this to
 /// the client.
-closed protocol ScanResultWatcher {
+protocol ScanResultWatcher {
     /// Returns a list of all LE peers that satisfy the filters indicated in
     /// `ScanOptions`. The first response(s) will return matching discovered
     /// peers immediately. Subsequent calls receive a response only when peers
@@ -84,13 +84,13 @@ closed protocol ScanResultWatcher {
     ///
     /// - response `updated` Peers that were added or updated since the last
     ///   call to Watch().
-    strict Watch() -> (struct {
+    Watch() -> (struct {
         updated vector<Peer>:MAX;
     });
 };
 
 @discoverable
-closed protocol Central {
+protocol Central {
     /// Scans for nearby LE peripherals and broadcasters. If the scan cannot be
     /// initiated, then `result_watcher` will be closed with an epitaph.
     ///
@@ -117,7 +117,7 @@ closed protocol Central {
     ///   `ScanOptions` documentation.
     /// * error `INTERNAL`: An internal error occurred and a scan could not be
     ///   started.
-    strict Scan(resource struct {
+    Scan(resource struct {
         options ScanOptions;
         result_watcher server_end:ScanResultWatcher;
     }) -> ();
@@ -144,7 +144,7 @@ closed protocol Central {
     /// + request `handle` Handle that remains valid for the duration of this
     ///   connection.
     @available(added=HEAD)
-    strict Connect(resource struct {
+    Connect(resource struct {
         id bt.PeerId;
         options ConnectionOptions;
         handle server_end:Connection;
@@ -156,7 +156,7 @@ closed protocol Central {
     ///
     /// This method only returns peripherals (i.e. connectable devices).
     @deprecated
-    strict GetPeripherals(struct {
+    GetPeripherals(struct {
         service_uuids vector<bt.UuidString>:<MAX, optional>;
     }) -> (struct {
         peripherals vector<RemoteDevice>:MAX;
@@ -168,7 +168,7 @@ closed protocol Central {
     /// connection, and/or bonding procedures based on its unique identifier. Returns null if
     /// `identifier` is not recognized.
     @deprecated
-    strict GetPeripheral(struct {
+    GetPeripheral(struct {
         identifier bt.PeerIdString;
     }) -> (struct {
         peripheral box<RemoteDevice>;
@@ -183,7 +183,7 @@ closed protocol Central {
     /// should generally filter results by at least one of `filter.service_uuids`,
     /// `filter.service_data`, and/or `filter.manufacturer_identifier`.
     @deprecated("Use Scan instead")
-    strict StartScan(struct {
+    StartScan(struct {
         filter box<ScanFilter>;
     }) -> (struct {
         status bt.Status;
@@ -191,7 +191,7 @@ closed protocol Central {
 
     /// Terminate a previously started scan session.
     @deprecated
-    strict StopScan();
+    StopScan();
 
     /// Creates a connection to the peripheral device with the given identifier.
     /// Returns the status of the operation in `status`.
@@ -200,7 +200,7 @@ closed protocol Central {
     /// role procedures. On failure, `gatt_client` will be closed and `status` will
     /// indicate an error.
     @deprecated("Use Connect instead")
-    strict ConnectPeripheral(resource struct {
+    ConnectPeripheral(resource struct {
         identifier bt.PeerIdString;
         options ConnectionOptions;
         gatt_client server_end:fuchsia.bluetooth.gatt.Client;
@@ -210,7 +210,7 @@ closed protocol Central {
 
     /// Disconnects this Central's connection to the peripheral with the given identifier.
     @deprecated
-    strict DisconnectPeripheral(struct {
+    DisconnectPeripheral(struct {
         identifier bt.PeerIdString;
     }) -> (struct {
         status bt.Status;
@@ -219,7 +219,7 @@ closed protocol Central {
     /// Called when the scan state changes, e.g. when a scan session terminates due to a call to
     /// Central.StopScan() or another unexpected condition.
     @deprecated
-    strict -> OnScanStateChanged(struct {
+    -> OnScanStateChanged(struct {
         scanning bool;
     });
 
@@ -227,13 +227,13 @@ closed protocol Central {
     /// contains the received signal strength of the advertising packet that generated this event, if
     /// available.
     @deprecated
-    strict -> OnDeviceDiscovered(struct {
+    -> OnDeviceDiscovered(struct {
         device RemoteDevice;
     });
 
     /// Called when this Central's connection to a peripheral with the given identifier is terminated.
     @deprecated
-    strict -> OnPeripheralDisconnected(struct {
+    -> OnPeripheralDisconnected(struct {
         identifier bt.PeerIdString;
     });
 };

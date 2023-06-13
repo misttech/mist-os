@@ -44,7 +44,7 @@ type Level = strict enum {
 
 /// Registration protocol
 @discoverable
-closed protocol Provider {
+protocol Provider {
     /// Used to register for memory pressure level changes.
     /// `watcher`: memory pressure `Watcher` channel that the `Provider` will use to send
     /// level change messages to the client.
@@ -58,14 +58,14 @@ closed protocol Provider {
     /// memory pressure messages in transit at the same time.
     /// Also, the more context a job has, the better equipped it will be to react to
     /// memory pressure by controlling the behavior of children jobs in its tree.
-    strict RegisterWatcher(resource struct {
+    RegisterWatcher(resource struct {
         watcher client_end:Watcher;
     });
 };
 
 /// Watcher protocol
 /// To be implemented by clients who wish to be notified on memory pressure level changes.
-closed protocol Watcher {
+protocol Watcher {
     /// Sent to the registered client when the memory pressure level changes.
     /// `level`: indicates the current memory pressure level.
     ///
@@ -98,7 +98,7 @@ closed protocol Watcher {
     /// On a similar note, the provider may decide to send repeated messages at the
     /// same pressure level, particularly CRITICAL, to indicate that further action
     /// needs to be taken.
-    strict OnLevelChanged(struct {
+    OnLevelChanged(struct {
         level Level;
     }) -> ();
 };

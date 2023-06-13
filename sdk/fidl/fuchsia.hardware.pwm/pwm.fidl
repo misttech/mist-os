@@ -14,17 +14,17 @@ type PwmConfig = struct {
     mode_config vector<uint8>:MAX;
 };
 
-closed protocol Pwm {
-    strict GetConfig() -> (struct {
+protocol Pwm {
+    GetConfig() -> (struct {
         config PwmConfig;
     }) error zx.Status;
 
-    strict SetConfig(struct {
+    SetConfig(struct {
         config PwmConfig;
     }) -> () error zx.Status;
 
-    strict Enable() -> () error zx.Status;
-    strict Disable() -> () error zx.Status;
+    Enable() -> () error zx.Status;
+    Disable() -> () error zx.Status;
 };
 
 service Service {

@@ -26,9 +26,9 @@ type GUIDType = strict enum : uint8 {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-closed protocol BlockPartition {
+protocol BlockPartition {
     /// Get a GUID of the partition (if one exists).
-    strict GetGuid(struct {
+    GetGuid(struct {
         guid_type GUIDType;
     }) -> (struct {
         status zx.Status;
@@ -36,7 +36,7 @@ closed protocol BlockPartition {
     });
 
     /// Get the name of the partition (if one exists).
-    strict GetName() -> (struct {
+    GetName() -> (struct {
         status zx.Status;
         name string:<MAX_PARTITION_NAME_LENGTH, optional>;
     });

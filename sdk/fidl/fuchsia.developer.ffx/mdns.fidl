@@ -27,17 +27,17 @@ type MdnsEventType = strict union {
 };
 
 @discoverable
-closed protocol Mdns {
+protocol Mdns {
     /// Gets the next event from the protocol. There is only ever meant to be
     /// one event ready at a time on the service side, so it is important that
     /// the client call this frequently.
-    strict GetNextEvent() -> (struct {
+    GetNextEvent() -> (struct {
         event MdnsEventType:optional;
     });
 
     /// Gets full cache of targets. It is advised to call this before
     /// `GetNextEvent()`.
-    strict GetTargets() -> (struct {
+    GetTargets() -> (struct {
         targets vector<TargetInfo>:512;
     });
 };

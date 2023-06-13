@@ -4,7 +4,6 @@
 // fidl_experiment = output_index_json
 // fidl_experiment = simple_empty_response_syntax
 // fidl_experiment = unknown_interactions
-// fidl_experiment = unknown_interactions_mandate
 
 #include <fidl/test.handles/cpp/type_conversions.h>
 

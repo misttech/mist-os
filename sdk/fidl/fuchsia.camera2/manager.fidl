@@ -7,7 +7,7 @@ using fuchsia.sysmem;
 using zx;
 
 @discoverable
-closed protocol Manager {
+protocol Manager {
     /// Notifies the client when a camera becomes available.  A number of these events will
     /// be sent when a client first connects to this protocol.
     /// `device_id` is used to identify the camera.  The device_id should not change throughout
@@ -15,28 +15,28 @@ closed protocol Manager {
     /// `last_known_camera` is set to true when the Camera Manager has notified the client
     /// of all the devices it currently knows about.
     /// `description` describes the properties of the camera.
-    strict -> OnDeviceAvailable(struct {
+    -> OnDeviceAvailable(struct {
         device_id int32;
         description DeviceInfo;
         last_known_camera bool;
     });
 
     /// Notifies the client when a camera becomes unavailable.
-    strict -> OnDeviceUnavailable(struct {
+    -> OnDeviceUnavailable(struct {
         device_id int32;
     });
 
     /// Notifies the client when a camera becomes muted or unmuted.
     /// `device_id` refers to the device_id from the description of a previous OnDeviceAvailable
     /// call.
-    strict -> OnDeviceMuteChanged(struct {
+    -> OnDeviceMuteChanged(struct {
         device_id int32;
         currently_muted bool;
     });
 
     /// AcknowledgeDeviceEvent must be called after any of the above events before more
     /// events will be sent.
-    strict AcknowledgeDeviceEvent();
+    AcknowledgeDeviceEvent();
 
     /// Connect to a camera stream:
     /// `device_id` Refers to a specific device_id that has been advertised by OnDeviceAvailable.
@@ -53,7 +53,7 @@ closed protocol Manager {
     /// on the stream is indicated on the response.
     /// The connection is considered to be successful once a response has been given, unless
     /// `stream` is closed.
-    strict ConnectToStream(resource struct {
+    ConnectToStream(resource struct {
         device_id int32;
         constraints StreamConstraints;
         token client_end:fuchsia.sysmem.BufferCollectionToken;
@@ -64,18 +64,18 @@ closed protocol Manager {
 };
 
 @discoverable
-closed protocol MuteControl {
+protocol MuteControl {
     /// Mutes a camera.  This is independent from stopping or closing a stream.  A muted
     /// camera will not produce any more images until
     /// unmute is called.  You can still connect to streams from a muted camera, but they
     /// will not produce frames until the camera is unmuted.
     /// `device_id` refers to the device_id from a previous OnDeviceAvailable call.
-    strict Mute(struct {
+    Mute(struct {
         device_id int32;
     }) -> (struct {
         status zx.Status;
     });
-    strict Unmute(struct {
+    Unmute(struct {
         device_id int32;
     }) -> (struct {
         status zx.Status;

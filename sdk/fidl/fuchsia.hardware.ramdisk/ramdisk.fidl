@@ -6,9 +6,9 @@ library fuchsia.hardware.ramdisk;
 using zx;
 
 /// The protocol for interacting with a instance of a ramdisk.
-closed protocol Ramdisk {
+protocol Ramdisk {
     /// Sets any of the `RAMDISK_FLAG_*` flags.
-    strict SetFlags(struct {
+    SetFlags(struct {
         flags @generated_name("RamdiskFlag") strict bits : uint32 {
             /// Identifies if requests which are sent ot the ramdisk while it is
             /// considered "asleep" should be processed when the ramdisk wakes
@@ -30,20 +30,20 @@ closed protocol Ramdisk {
     /// Wakes a ramdisk, if it was sleeping.
     ///
     /// Resets the block counts being stored by the ramdisk.
-    strict Wake() -> ();
+    Wake() -> ();
 
     /// Causes the ramdisk to sleep after `count` blocks are written successfully.
     /// After `count` blocks are written, requests either wait for the ramdisk to
     /// be awoken (if RESUME_ON_WAKE has been set), or begin failing immediately.
     ///
     /// Resets the block counts being stored by the ramdisk.
-    strict SleepAfter(struct {
+    SleepAfter(struct {
         count uint64;
     }) -> ();
 
     /// Returns the number of write requests since the last call to either
     /// "SleepAfter" or "Wake".
-    strict GetBlockCounts() -> (struct {
+    GetBlockCounts() -> (struct {
         /// Counters for the number of write requests since the last call to either
         /// "SleepAfter" or "Wake". All units are in individual blocks.
         counts @generated_name("BlockWriteCounts") struct {
@@ -56,7 +56,7 @@ closed protocol Ramdisk {
     /// Causes the ramdisk size to grow to `required_size` in bytes.
     /// If `required_size` is smaller than the current size an error will be
     /// returned. `required_size` must be a multiple of `block_size`.
-    strict Grow(struct {
+    Grow(struct {
         new_size uint64;
     }) -> () error zx.Status;
 };
@@ -74,10 +74,10 @@ type Guid = struct {
 
 const MAX_NAME_LENGTH uint32 = 32;
 
-closed protocol RamdiskController {
+protocol RamdiskController {
     /// Initializes a new Ramdisk instance with the provided block size and block count.
     /// Takes an optional `type_guid`, which may be queried from the ramdisk instance.
-    strict Create(struct {
+    Create(struct {
         block_size uint64;
         block_count uint64;
         type_guid box<Guid>;
@@ -87,7 +87,7 @@ closed protocol RamdiskController {
 
     /// Initializes a new Ramdisk instance from a VMO. Uses a block size of `PAGE_SIZE`,
     /// and derives the block count from the size of the VMO.
-    strict CreateFromVmo(resource struct {
+    CreateFromVmo(resource struct {
         vmo zx.Handle:VMO;
     }) -> (struct {
         name string:<MAX_NAME_LENGTH, optional>;
@@ -95,7 +95,7 @@ closed protocol RamdiskController {
 
     /// Same as CreateFromVmo, but with the given `block_size` and optional `type_guid`. If
     /// `block_size` is zero, `PAGE_SIZE` will be used as `block_size`.
-    strict CreateFromVmoWithParams(resource struct {
+    CreateFromVmoWithParams(resource struct {
         vmo zx.Handle:VMO;
         block_size uint64;
         type_guid box<Guid>;

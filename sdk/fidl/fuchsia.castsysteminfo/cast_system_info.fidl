@@ -29,10 +29,10 @@ type SystemInfo = table {
 
 /// Exposes Cast system info, as modeled in the SystemInfo table.
 @discoverable
-closed protocol Provider {
+protocol Provider {
     /// Retrieves the SystemInfo fields that are generated at first boot and are
     /// available at startup.
-    strict GetSystemInfo() -> (struct {
+    GetSystemInfo() -> (struct {
         systemInfo SystemInfo;
     }) error ErrorCode;
 };

@@ -9,7 +9,7 @@ using zx;
 /// Protocol for connecting to [`LegacyJoining`] on a LoWPAN
 /// interface.
 @discoverable
-closed protocol LegacyJoiningConnector {
+protocol LegacyJoiningConnector {
     /// Connects to the [`LegacyJoining`] protocol on the
     /// named LoWPAN interface.
     ///
@@ -26,7 +26,7 @@ closed protocol LegacyJoiningConnector {
     ///   given name.
     /// * `ZX_ERR_NOT_SUPPORTED`: The interface exists but
     ///   does not support this protocol.
-    strict Connect(resource struct {
+    Connect(resource struct {
         name fuchsia.lowpan.InterfaceName;
         server_end server_end:LegacyJoining;
     });
@@ -36,7 +36,7 @@ closed protocol LegacyJoiningConnector {
 /// Only one instance of this protocol may be valid at a time: after the
 /// first request all subsequent requests for this protocol will fail until
 /// the first instance is closed.
-closed protocol LegacyJoining {
+protocol LegacyJoining {
     /// Makes the interface joinable for Thread devices that need to use a
     /// non-standard in-band commissioning protocol. It is not used for
     /// standard Thread commissioning.
@@ -60,7 +60,7 @@ closed protocol LegacyJoining {
     ///
     /// `port` specifies the local port that TCP or UDP commissioning traffic
     /// will be directed to.
-    strict MakeJoinable(struct {
+    MakeJoinable(struct {
         duration zx.Duration;
         port uint16;
     }) -> ();

@@ -73,16 +73,16 @@ type StreamProperties = table {
     1: stream_type CameraStreamType;
 };
 
-closed protocol Stream {
+protocol Stream {
     /// Control Operations
     /// Starts the streaming of frames.
-    strict Start();
+    Start();
 
     /// Stops the streaming of frames.
-    strict Stop();
+    Stop();
 
     /// Unlocks the specified frame, allowing the driver to reuse the memory.
-    strict ReleaseFrame(struct {
+    ReleaseFrame(struct {
         buffer_id uint32;
     });
 
@@ -92,12 +92,12 @@ closed protocol Stream {
     /// read-lock for a non-error frame, or the consumer will eventually run out of buffers.
     /// If a frame has an error, the client must call AcknowledgeFrameError before
     /// another OnFrameAvailable will be called with an error frame.
-    strict -> OnFrameAvailable(struct {
+    -> OnFrameAvailable(struct {
         frame FrameAvailableInfo;
     });
 
     /// Provides flow control for receiving frame errors. See OnFrameAvailable comment.
-    strict AcknowledgeFrameError();
+    AcknowledgeFrameError();
 
     /// Data operations
     /// This is used by clients to provide inputs for region of interest
@@ -105,7 +105,7 @@ closed protocol Stream {
     /// Inputs are the x & y coordinates for the new bounding box.
     /// For streams which do not support smart framing, this would
     /// return an error.
-    strict SetRegionOfInterest(struct {
+    SetRegionOfInterest(struct {
         x_min float32;
         y_min float32;
         x_max float32;
@@ -117,14 +117,14 @@ closed protocol Stream {
     /// Change the image format of the stream. This is called when clients want
     /// to dynamically change the resolution of the stream while the streaming is
     /// is going on.
-    strict SetImageFormat(struct {
+    SetImageFormat(struct {
         image_format_index uint32;
     }) -> (struct {
         s zx.Status;
     });
 
     /// Get the image formats that this stream supports.
-    strict GetImageFormats() -> (struct {
+    GetImageFormats() -> (struct {
         image_formats vector<fuchsia.sysmem.ImageFormat_2>:MAX_IMAGE_FORMATS;
     });
 
@@ -133,7 +133,7 @@ closed protocol Stream {
     /// to complete. This also means that any SetConstraints call on the returned token can't
     /// conflict with the constraints in the `StreamConfig`, otherwise attempts to wait for buffers
     /// on the token will fail.
-    strict GetBuffers() -> (resource struct {
+    GetBuffers() -> (resource struct {
         token client_end:fuchsia.sysmem.BufferCollectionToken;
     });
 };

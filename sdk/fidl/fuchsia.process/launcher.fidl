@@ -110,14 +110,14 @@ type ProcessStartData = resource struct {
 /// `CreateWithoutStarting` method to create the process without actually
 /// starting it.
 @discoverable
-closed protocol Launcher {
+protocol Launcher {
     /// Creates and starts the process described by `info`.
     ///
     /// After processing this message, the `Launcher` is reset to its initial
     /// state and is ready to launch another process.
     ///
     /// `process` is present if, and only if, `status` is `ZX_OK`.
-    strict Launch(resource struct {
+    Launch(resource struct {
         info LaunchInfo;
     }) -> (resource struct {
         status zx.Status;
@@ -133,7 +133,7 @@ closed protocol Launcher {
     /// in `ProcessStartData` to actually start the process.
     ///
     /// `data` is present if, and only if, `status` is `ZX_OK`.
-    strict CreateWithoutStarting(resource struct {
+    CreateWithoutStarting(resource struct {
         info LaunchInfo;
     }) -> (resource struct {
         status zx.Status;
@@ -143,14 +143,14 @@ closed protocol Launcher {
     /// Adds the given arguments to the command-line for the process.
     ///
     /// Calling this method multiple times concatenates the arguments.
-    strict AddArgs(struct {
+    AddArgs(struct {
         args vector<vector<uint8>:MAX>:MAX;
     });
 
     /// Adds the given variables to the environment variables for the process.
     ///
     /// Calling this method multiple times concatenates the variables.
-    strict AddEnvirons(struct {
+    AddEnvirons(struct {
         environ vector<vector<uint8>:MAX>:MAX;
     });
 
@@ -160,14 +160,14 @@ closed protocol Launcher {
     /// <https://fuchsia.dev/fuchsia-src/concepts/process/namespaces> for details.
     ///
     /// Calling this method multiple times concatenates the names.
-    strict AddNames(resource struct {
+    AddNames(resource struct {
         names vector<NameInfo>:MAX;
     });
 
     /// Adds the given handles to the startup handles for the process.
     ///
     /// Calling this method multiple times concatenates the handles.
-    strict AddHandles(resource struct {
+    AddHandles(resource struct {
         handles vector<HandleInfo>:MAX;
     });
 
@@ -175,7 +175,7 @@ closed protocol Launcher {
     ///
     /// Calling this method multiple times will overwrite the current options.
     @available(added=9)
-    strict SetOptions(struct {
+    SetOptions(struct {
         /// These options are expected to be valid process creation options. The options are checked
         /// on `Launch` or `CreateWithoutStarting`.
         ///

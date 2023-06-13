@@ -8,7 +8,7 @@ using fuchsia.ui.views;
 /// An interface used to instruct a server to present graphical views, and observe
 /// and control the view's lifecycle.
 @discoverable
-closed protocol GraphicalPresenter {
+protocol GraphicalPresenter {
     /// Presents the view described by `view_spec`.
     ///
     /// If `view_controller_request` is provided, it will be connected to a `ViewController`
@@ -28,7 +28,7 @@ closed protocol GraphicalPresenter {
     ///   set, error `PresentViewError.INVALID_ARGS` is returned.
     /// * error `PresentViewError.INVALID_ARGS` if `spec.view_holder_token` or
     ///   `spec.view_ref` are missing or invalid.
-    strict PresentView(resource struct {
+    PresentView(resource struct {
         view_spec ViewSpec;
         annotation_controller client_end:<AnnotationController, optional>;
         view_controller_request server_end:<ViewController, optional>;
@@ -67,7 +67,7 @@ type ViewSpec = resource table {
 
 /// Gives clients of `GraphicalPresenter` control over an individual view
 /// presented through `PresentView()`.
-closed protocol ViewController {
+protocol ViewController {
     /// Instructs the presenter to dismiss the associated view. Once dismissed,
     /// the `ViewController` channel is closed with a `ZX_OK` epitaph. At this
     /// point, it is safe to clean up any resources (such as terminating
@@ -75,8 +75,8 @@ closed protocol ViewController {
     ///
     /// Clients should call `Dismiss()` prior to closing the `ViewController`
     /// channel themselves.
-    strict Dismiss();
+    Dismiss();
 
     /// An event that signals that the view is now being presented.
-    strict -> OnPresented();
+    -> OnPresented();
 };

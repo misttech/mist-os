@@ -46,7 +46,7 @@ type SessionState = strict enum {
 /// events.  This ensures that the trace format can be extended without needing
 /// to modify the trace controller.
 @discoverable
-closed protocol Controller {
+protocol Controller {
     /// Requests to initialize tracing with the specified `config`.
     ///
     /// A bad request will terminate the connection.
@@ -54,7 +54,7 @@ closed protocol Controller {
     /// The trace controller emits trace data to `output` as a sequence of
     /// binary formatted trace records.  Traces obtained from different providers
     /// are delimited by metadata records within the stream.
-    strict InitializeTracing(resource struct {
+    InitializeTracing(resource struct {
         config TraceConfig;
         output zx.Handle:SOCKET;
     });
@@ -65,7 +65,7 @@ closed protocol Controller {
     /// If `options.write_results` is true, then the trace controller
     /// continues to transfer any remaining data to the output socket
     /// until finished, then closes the output.
-    strict TerminateTracing(struct {
+    TerminateTracing(struct {
         options TerminateOptions;
     }) -> (struct {
         result TerminateResult;
@@ -82,7 +82,7 @@ closed protocol Controller {
     /// One useful reason for the has-started acknowledgement is that the
     /// trace program can start a program to trace knowing that all the
     /// providers are started.
-    strict StartTracing(struct {
+    StartTracing(struct {
         options StartOptions;
     }) -> () error StartErrorCode;
 
@@ -91,27 +91,27 @@ closed protocol Controller {
     /// If tracing has already stopped then this does nothing.
     /// Returning a result lets callers know when it's ok to, for example,
     /// start tracing again.
-    strict StopTracing(struct {
+    StopTracing(struct {
         options StopOptions;
     }) -> ();
 
     /// Return the set of registered providers.
-    strict GetProviders() -> (struct {
+    GetProviders() -> (struct {
         providers vector<ProviderInfo>:MAX_NUM_PROVIDERS;
     });
 
     // Gets the known categories.
-    strict GetKnownCategories() -> (struct {
+    GetKnownCategories() -> (struct {
         categories vector<fuchsia.tracing.KnownCategory>:fuchsia.tracing.MAX_NUM_KNOWN_CATEGORIES;
     });
 
     /// Event sent when the session state changes.
-    strict -> OnSessionStateChange(struct {
+    -> OnSessionStateChange(struct {
         state SessionState;
     });
 
     /// Returns the next alert when it arrives.
-    strict WatchAlert() -> (struct {
+    WatchAlert() -> (struct {
         alert_name string:MAX_ALERT_NAME_LENGTH;
     });
 };

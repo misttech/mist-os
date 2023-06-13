@@ -86,7 +86,7 @@ type ProofOfInterfaceAuthorization = resource struct {
 /// - Closing the client end causes the interface to be removed.
 /// - Observing a closure of the server end indicates the interface no longer
 ///   exists.
-closed protocol Control {
+protocol Control {
     // TODO(https://fxbug.dev/80621): Currently Netstack2's implementation
     // does not support any values being present in `parameters`, and will
     // cause an event containing `AddressRemovalReason.INVALID` to be sent
@@ -102,7 +102,7 @@ closed protocol Control {
     /// + request `parameters` additional address-specific options.
     /// + request `address_state_provider` provides address assignment state
     ///     and enables updating address properties.
-    strict AddAddress(resource struct {
+    AddAddress(resource struct {
         address fuchsia.net.Subnet;
         parameters AddressParameters;
         address_state_provider server_end:AddressStateProvider;
@@ -113,7 +113,7 @@ closed protocol Control {
     /// + request `address` the address to remove.
     /// - response `did_remove` `true` iff `address` was removed from the
     ///  interface as a consequence of this call.
-    strict RemoveAddress(struct {
+    RemoveAddress(struct {
         address fuchsia.net.Subnet;
     }) -> (struct {
         did_remove bool;
@@ -122,7 +122,7 @@ closed protocol Control {
     /// Gets the interface identifier.
     ///
     /// - response `id` the interface identifier.
-    strict GetId() -> (struct {
+    GetId() -> (struct {
         id fuchsia.net.InterfaceId;
     });
 
@@ -137,7 +137,7 @@ closed protocol Control {
     /// + request `config` the configuration fields to update on the interface.
     /// - response `previous_config` a snapshot of the interface's previous
     ///   configuration. Only supported fields present in `config` will be set.
-    strict SetConfiguration(struct {
+    SetConfiguration(struct {
         config Configuration;
     }) -> (struct {
         previous_config Configuration;
@@ -170,7 +170,7 @@ closed protocol Control {
     /// [`Configuration`].
     ///
     /// - response `config` a snapshot of the interface's configuration.
-    strict GetConfiguration() -> (struct {
+    GetConfiguration() -> (struct {
         config Configuration;
     }) error flexible enum {};
 
@@ -178,7 +178,7 @@ closed protocol Control {
     ///
     /// - response `did_enable` `true` iff the interface moved from disabled to
     /// enabled as a consequence of this call.
-    strict Enable() -> (struct {
+    Enable() -> (struct {
         did_enable bool;
     }) error flexible enum {};
 
@@ -186,7 +186,7 @@ closed protocol Control {
     ///
     /// - response `did_disable` `true` iff the interface moved from enabled to
     /// disabled as a consequence of this call.
-    strict Disable() -> (struct {
+    Disable() -> (struct {
         did_disable bool;
     }) error flexible enum {};
 
@@ -194,7 +194,7 @@ closed protocol Control {
     ///
     /// After calling `Detach`, closing this client end no longer causes the
     /// interface to be removed.
-    strict Detach();
+    Detach();
 
     /// Get an authentication credential for this interface.
     ///
@@ -207,7 +207,7 @@ closed protocol Control {
     /// to other clients.
     ///
     /// - response `credential` the authorization credential for this interface.
-    strict GetAuthorizationForInterface() -> (resource struct {
+    GetAuthorizationForInterface() -> (resource struct {
         credential @generated_name("GrantForInterfaceAuthorization") resource struct {
             /// The ID of the interface this credential is authenticating.
             interface_id fuchsia.net.InterfaceId;
@@ -221,7 +221,7 @@ closed protocol Control {
     /// This method returns success once interface removal has started. When the
     /// interface is removed, a `USER` removed reason is issued in
     /// [`OnInterfaceRemoved`] and the server end is closed.
-    strict Remove() -> () error flexible enum {
+    Remove() -> () error flexible enum {
         /// This interface can't be removed.
         NOT_ALLOWED = 1;
     };
@@ -230,7 +230,7 @@ closed protocol Control {
     /// the protocol.
     ///
     /// - response `reason` the removal reason.
-    strict -> OnInterfaceRemoved(struct {
+    -> OnInterfaceRemoved(struct {
         reason @generated_name("InterfaceRemovedReason") flexible enum {
             /// Interface failed to be instantiated because the requested name
             /// is in use.
@@ -250,12 +250,12 @@ closed protocol Control {
 
 /// Installs devices on the network stack.
 @discoverable
-closed protocol Installer {
+protocol Installer {
     /// Installs a device on the network stack.
     ///
     /// + request `device` the device to install on the network stack.
     /// + request `device_control` grants access to the installed device.
-    strict InstallDevice(resource struct {
+    InstallDevice(resource struct {
         device client_end:fuchsia.hardware.network.Device;
         device_control server_end:DeviceControl;
     });
@@ -283,12 +283,12 @@ closed protocol Installer {
 ///   interfaces created from it.
 /// - Observing a closure of the server end indicates the device (and all
 ///   interfaces created from it) no longer exists.
-closed protocol DeviceControl {
+protocol DeviceControl {
     /// Creates an interface on the network stack.
     ///
     /// + request `port` the device's port to instantiate as an interface.
     /// + request `control` grants access to the created interface.
-    strict CreateInterface(resource struct {
+    CreateInterface(resource struct {
         port fuchsia.hardware.network.PortId;
         control server_end:Control;
         options table {
@@ -309,5 +309,5 @@ closed protocol DeviceControl {
     /// device or any of the interfaces created from it to be removed. Note that
     /// the lifetime of any created interface will continue to be coupled with
     /// the associated [`Control`] client end.
-    strict Detach();
+    Detach();
 };

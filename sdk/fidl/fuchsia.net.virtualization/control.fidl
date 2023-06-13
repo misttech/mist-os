@@ -9,7 +9,7 @@ using fuchsia.net;
 
 /// Provides control over virtualization network configuration.
 @discoverable
-closed protocol Control {
+protocol Control {
     /// Create a new network with configurable upstream connectivity.
     ///
     /// The network itself is always guaranteed to be created, but upstream
@@ -20,7 +20,7 @@ closed protocol Control {
     /// + request `network` provides control over the created network. The
     ///     protocol will be terminated after emitting a terminal event if the
     ///     network cannot be added.
-    strict CreateNetwork(resource struct {
+    CreateNetwork(resource struct {
         config flexible union {
             // TODO(https://fxbug.dev/86068): Currently bridged networks are not
             // isolated from each other (they are all on the same bridge). Provide
@@ -93,12 +93,12 @@ closed protocol Control {
 ///     removed and destroyed, and the network will be removed;
 /// - if the server end is closed, all interfaces on the network and the
 ///     network itself have been destroyed.
-closed protocol Network {
+protocol Network {
     /// Adds a port to the network.
     ///
     /// + request `port` port to be added.
     /// + request `interface` provides control over the interface.
-    strict AddPort(resource struct {
+    AddPort(resource struct {
         port client_end:fuchsia.hardware.network.Port;
         interface server_end:Interface;
     });
@@ -107,7 +107,7 @@ closed protocol Network {
     /// this protocol.
     ///
     /// - response `reason` the removal reason.
-    strict -> OnRemoved(struct {
+    -> OnRemoved(struct {
         reason @generated_name("NetworkRemovalReason") flexible enum {
             /// Failed to create the network due to invalid configuration.
             INVALID_CONFIG = 1;
@@ -127,8 +127,8 @@ closed protocol Network {
 ///     from the network it belongs to and detach the network device;
 /// - if the server end is closed, the interface has been detached from
 ///     the network it was attached to and destroyed.
-closed protocol Interface {
-    strict -> OnRemoved(struct {
+protocol Interface {
+    -> OnRemoved(struct {
         reason @generated_name("InterfaceRemovalReason") flexible enum {
             // TODO(https://fxbug.dev/103705): Remove this variant once
             // multiple ports in networked mode is supported.

@@ -13,9 +13,9 @@ const DEVICE_NAME_MAX uint32 = 255;
 
 /// Interface for getting device names.
 @discoverable
-closed protocol NameProvider {
+protocol NameProvider {
     /// Return the name of this Fuchsia device.
-    strict GetDeviceName() -> (struct {
+    GetDeviceName() -> (struct {
         name string:DEVICE_NAME_MAX;
     }) error zx.Status;
 };

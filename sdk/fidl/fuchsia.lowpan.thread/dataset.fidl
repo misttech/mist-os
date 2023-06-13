@@ -19,7 +19,7 @@ alias OperationalDatasetTlvs = vector<uint8>:MAX_DATASET_TLV_LEN;
 
 /// Protocol for connecting to [`Dataset`] on a LoWPAN device.
 @discoverable
-closed protocol DatasetConnector {
+protocol DatasetConnector {
     /// Connects to the [`Dataset`] protocol on the
     /// named LoWPAN device.
     ///
@@ -36,7 +36,7 @@ closed protocol DatasetConnector {
     ///   given name.
     /// * `ZX_ERR_NOT_SUPPORTED`: The interface exists but
     ///   does not support this protocol.
-    strict Connect(resource struct {
+    Connect(resource struct {
         name fuchsia.lowpan.InterfaceName;
         server_end server_end:Dataset;
     });
@@ -48,7 +48,7 @@ closed protocol DatasetConnector {
 ///
 /// This protocol provides methods related to the management of the
 /// Thread operational dataset in raw TLV form.
-closed protocol Dataset {
+protocol Dataset {
     /// Fetches and returns the active Thread operational dataset in raw
     /// TLV form. Functionally equivalent to [`otDatasetGetActiveTlvs()`][2].
     ///
@@ -59,7 +59,7 @@ closed protocol Dataset {
     /// will result in the protocol being closed.
     ///
     /// [2]: https://openthread.io/reference/group/api-operational-dataset#otdatasetgetactivetlvs
-    strict GetActiveTlvs() -> (struct {
+    GetActiveTlvs() -> (struct {
         dataset OperationalDatasetTlvs:optional;
     });
 
@@ -72,12 +72,12 @@ closed protocol Dataset {
     /// will result in the protocol being closed.
     ///
     /// [3]: https://openthread.io/reference/group/api-operational-dataset#otdatasetsetactivetlvs
-    strict SetActiveTlvs(struct {
+    SetActiveTlvs(struct {
         dataset OperationalDatasetTlvs;
     }) -> ();
 
     @available(removed=8)
-    strict AttachAllNodesTo(struct {
+    AttachAllNodesTo(struct {
         dataset OperationalDatasetTlvs;
     }) -> ();
 
@@ -101,7 +101,7 @@ closed protocol Dataset {
     ///
     /// [4]: https://github.com/openthread/ot-br-posix/blob/f68c07702bef50f1cc4a153a59b5a3a8331ff43b/src/dbus/server/introspect.xml#L60-L72
     @available(added=8)
-    strict AttachAllNodesTo(struct {
+    AttachAllNodesTo(struct {
         /// The Operational Dataset that contains parameter values of the
         /// Thread network to attach to. It must be a full dataset.
         dataset OperationalDatasetTlvs;

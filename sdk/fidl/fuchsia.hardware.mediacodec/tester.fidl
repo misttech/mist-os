@@ -6,14 +6,14 @@ library fuchsia.hardware.mediacodec;
 using zx;
 
 /// This protocol is used by a client to run the amlogic video decoder tests.
-closed protocol Tester {
+protocol Tester {
     /// Takes a directory handle from the client and installs that as /tmp in the driver so that debugging files can be written there.
-    strict SetOutputDirectoryHandle(resource struct {
+    SetOutputDirectoryHandle(resource struct {
         handle zx.Handle:CHANNEL;
     });
 
     /// Runs the full suite of tests. Test output will go to klog.
-    strict RunTests() -> (struct {
+    RunTests() -> (struct {
         result zx.Status;
     });
 };

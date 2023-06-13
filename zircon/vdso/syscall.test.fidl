@@ -4,7 +4,7 @@
 library zx;
 
 @transport("Syscall")
-closed protocol Syscall {
+protocol Syscall {
     /// ## Summary
     ///
     /// TODO(fxbug.dev/32938)
@@ -37,7 +37,7 @@ closed protocol Syscall {
     ///
     /// TODO(fxbug.dev/32938)
     @testonly
-    strict Test_0() -> () error Status;
+    Test_0() -> () error Status;
 
     /// ## Summary
     ///
@@ -72,7 +72,7 @@ closed protocol Syscall {
     /// TODO(fxbug.dev/32938)
     @testonly
     @test_category1
-    strict Test_1(struct {
+    Test_1(struct {
         a int32;
     }) -> () error Status;
 
@@ -109,7 +109,7 @@ closed protocol Syscall {
     /// TODO(fxbug.dev/32938)
     @testonly
     @test_category1
-    strict Test_2(struct {
+    Test_2(struct {
         a int32;
         b int32;
     }) -> () error Status;
@@ -147,7 +147,7 @@ closed protocol Syscall {
     /// TODO(fxbug.dev/32938)
     @testonly
     @test_category2
-    strict Test_3(struct {
+    Test_3(struct {
         a int32;
         b int32;
         c int32;
@@ -185,7 +185,7 @@ closed protocol Syscall {
     ///
     /// TODO(fxbug.dev/32938)
     @testonly
-    strict Test_4(struct {
+    Test_4(struct {
         a int32;
         b int32;
         c int32;
@@ -225,7 +225,7 @@ closed protocol Syscall {
     ///
     /// TODO(fxbug.dev/32938)
     @testonly
-    strict Test_5(struct {
+    Test_5(struct {
         a int32;
         b int32;
         c int32;
@@ -266,7 +266,7 @@ closed protocol Syscall {
     ///
     /// TODO(fxbug.dev/32938)
     @testonly
-    strict Test_6(struct {
+    Test_6(struct {
         a int32;
         b int32;
         c int32;
@@ -313,7 +313,7 @@ closed protocol Syscall {
     ///
     /// TODO(fxbug.dev/32938)
     @testonly
-    strict Test_7(struct {
+    Test_7(struct {
         a int32;
         b int32;
         c int32;
@@ -362,7 +362,7 @@ closed protocol Syscall {
     ///
     /// TODO(fxbug.dev/32938)
     @testonly
-    strict Test_8(struct {
+    Test_8(struct {
         a int32;
         b int32;
         c int32;
@@ -375,7 +375,7 @@ closed protocol Syscall {
 
     @no_doc
     @next
-    strict Next_1(struct {
+    Next_1(struct {
         arg int32;
     }) -> () error Status;
 
@@ -411,7 +411,7 @@ closed protocol Syscall {
     ///
     /// TODO(fxbug.dev/32938)
     @testonly
-    strict TestWrapper(struct {
+    TestWrapper(struct {
         a int32;
         b int32;
         c int32;
@@ -450,14 +450,14 @@ closed protocol Syscall {
     ///
     /// TODO(fxbug.dev/32938)
     @testonly
-    strict TestHandleCreate(struct {
+    TestHandleCreate(struct {
         return_value Status;
     }) -> (resource struct {
         out Handle:EVENT;
     }) error Status;
 
     @testonly
-    strict TestWideningUnsignedNarrow(struct {
+    TestWideningUnsignedNarrow(struct {
         a uint64;
         b uint32;
         c uint16;
@@ -467,7 +467,7 @@ closed protocol Syscall {
     });
 
     @testonly
-    strict TestWideningSignedNarrow(struct {
+    TestWideningSignedNarrow(struct {
         a int64;
         b int32;
         c int16;
@@ -477,7 +477,7 @@ closed protocol Syscall {
     });
 
     @testonly
-    strict TestWideningUnsignedWide(struct {
+    TestWideningUnsignedWide(struct {
         a uint64;
         b uint32;
         c uint16;
@@ -487,7 +487,7 @@ closed protocol Syscall {
     });
 
     @testonly
-    strict TestWideningSignedWide(struct {
+    TestWideningSignedWide(struct {
         a int64;
         b int32;
         c int16;

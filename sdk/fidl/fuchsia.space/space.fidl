@@ -13,7 +13,7 @@ type ErrorCode = strict enum : uint32 {
 };
 
 @discoverable
-closed protocol Manager {
+protocol Manager {
     /// Trigger a garbage collection.
-    strict Gc() -> () error ErrorCode;
+    Gc() -> () error ErrorCode;
 };

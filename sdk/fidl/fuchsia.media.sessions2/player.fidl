@@ -21,50 +21,50 @@ alias Domain = string:1000;
 /// always know what capabilities will be supported when the method call reaches the service,
 /// calling a method that is not supported is simply ignored. In general, clients should not
 /// expect methods to work unless the player indicates sustained support.
-closed protocol PlayerControl {
+protocol PlayerControl {
     /// Plays media. If this method is not supported as indicated by the absence of the `PLAY`
     /// flag in `PlayerCapabilities`, this method does nothing.
-    strict Play();
+    Play();
 
     /// Pauses playback and retains position in media. If this method is not supported as indicated
     /// by the absence of the `PAUSE` flag in `PlayerCapabilities`, this method does nothing.
-    strict Pause();
+    Pause();
 
     /// Stops playback. The session should close.
-    strict Stop();
+    Stop();
 
     /// Seeks to a specific position in media. Implementations are free to
     /// enter an error state if the position is out of bounds. `position`
     /// is an offset from the beginning of the media. If this method is not supported as indicated
     /// by the absence of the `SEEK` flag in `PlayerCapabilities`, this method does nothing.
-    strict Seek(struct {
+    Seek(struct {
         position zx.Duration;
     });
 
     /// Skips forward in media by the player's default skip amount. If this method is not supported
     /// as indicated by the absence of the `SKIP_FORWARD` flag in `PlayerCapabilities`, this method
     /// does nothing.
-    strict SkipForward();
+    SkipForward();
 
     /// Skips in reverse in media by the player's default skip amount. If this method is not
     /// supported as indicated by the absence of the `SKIP_REVERSE` flag in `PlayerCapabilities`,
     /// this method does nothing.
-    strict SkipReverse();
+    SkipReverse();
 
     /// Changes media to the next item (e.g. next song in playlist). If this method is not
     /// supported as indicated by the absence of the `CHANGE_TO_NEXT_ITEM` flag in
     /// `PlayerCapabilities`, this method does nothing.
-    strict NextItem();
+    NextItem();
 
     /// Changes media to the previous item. If this method is not
     /// supported as indicated by the absence of the `CHANGE_TO_PREV_ITEM` flag in
     /// `PlayerCapabilities`, this method does nothing.
-    strict PrevItem();
+    PrevItem();
 
     /// Sets the playback rate of the media. This will not change the playback mode. If this method
     /// is not supported as indicated by the absense of the `SET_PLAYBACK_RATE` flag in
     /// `PlayerCapabilities`, this method does nothing.
-    strict SetPlaybackRate(struct {
+    SetPlaybackRate(struct {
         playback_rate float32;
     });
 
@@ -73,13 +73,13 @@ closed protocol PlayerControl {
     ///   * [`OFF`] is always supported.
     ///   * [`GROUP`] requires the `REPEAT_GROUPS` capability, and is otherwise ignored.
     ///   * [`SINGLE`] requires the `REPEAT_SINGLE` capability, and is otherwise ignored.
-    strict SetRepeatMode(struct {
+    SetRepeatMode(struct {
         repeat_mode RepeatMode;
     });
 
     /// Sets shuffle mode. If this method is not supported as indicated by the absence of the
     /// `SHUFFLE` flag in `PlayerCapabilities`, this method does nothing.
-    strict SetShuffleMode(struct {
+    SetShuffleMode(struct {
         shuffle_on bool;
     });
 
@@ -87,7 +87,7 @@ closed protocol PlayerControl {
     /// supported as indicated by the absence of the `HAS_GAIN_CONTROL` flag in
     /// `PlayerCapabilities`, the channel handle passed as `volume_control_request` is closed
     /// by the service.
-    strict BindVolumeControl(resource struct {
+    BindVolumeControl(resource struct {
         volume_control_request server_end:fuchsia.media.audio.VolumeControl;
     });
 };
@@ -304,11 +304,11 @@ type PlayerInfoDelta = table {
 /// `Player` is a handle for a media player. Unsupported commands are
 /// no-ops.  Consult `PlaybackCapabilities`, sent by to learn which
 /// commands are supported.
-closed protocol Player {
+protocol Player {
     compose PlayerControl;
 
     /// Gets the net player info change using the hanging get pattern.
-    strict WatchInfoChange() -> (struct {
+    WatchInfoChange() -> (struct {
         player_info_delta PlayerInfoDelta;
     });
 };

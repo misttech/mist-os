@@ -16,7 +16,7 @@ using zx;
 /// ViewProvider is given for the convenience of clients that don't require
 /// a more complex implementation.
 @discoverable
-closed protocol ViewProvider {
+protocol ViewProvider {
     /// Creates a new View under the control of the ViewProvider.
     ///
     /// `token` is one half of the shared eventpair which will bind the new View
@@ -31,7 +31,7 @@ closed protocol ViewProvider {
     /// `view_ref_control` must not have the ZX_RIGHT_DUPLICATE set, or view creation
     /// will fail.
     @transitional
-    strict CreateViewWithViewRef(resource struct {
+    CreateViewWithViewRef(resource struct {
         token zx.Handle:EVENTPAIR;
         view_ref_control fuchsia.ui.views.ViewRefControl;
         view_ref fuchsia.ui.views.ViewRef;
@@ -43,7 +43,7 @@ closed protocol ViewProvider {
     /// individual table fields.
     // TODO(fxbug.dev/81959): Rename this to `CreateView()`.
     @transitional
-    strict CreateView2(resource struct {
+    CreateView2(resource struct {
         args CreateView2Args;
     });
 };

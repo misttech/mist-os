@@ -105,9 +105,9 @@ type Config = table {
 };
 
 @discoverable
-closed protocol Session {
+protocol Session {
     /// Set up and prepare to profile
-    strict Configure(resource table {
+    Configure(resource table {
         1: output zx.Handle:SOCKET;
         2: config Config;
     }) -> () error flexible enum : uint32 {
@@ -118,7 +118,7 @@ closed protocol Session {
 
     /// Begin profiling and optionally begin writing data to the configured
     /// socket
-    strict Start(table {
+    Start(table {
         /// If true, delays writing data to the output socket until the profiling
         /// session ends. This reduces overhead, but also caps the maximum output
         /// size to the requested buffer size.
@@ -130,7 +130,7 @@ closed protocol Session {
 
     /// End the profiling session and write out data to the earlier
     /// configured socket if not already writing.
-    strict Stop() -> (table {
+    Stop() -> (table {
         1: samples_collected uint64;
         2: mean_sample_time uint64;
         3: median_sample_time uint64;
@@ -141,5 +141,5 @@ closed protocol Session {
     /// Clean up and unconfigure the profiler. Flushes the remaining data and
     /// closes the provided socket. Doesn't return until all data has been
     /// successfully written.
-    strict Reset() -> ();
+    Reset() -> ();
 };

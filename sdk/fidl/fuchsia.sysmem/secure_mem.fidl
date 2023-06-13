@@ -25,7 +25,7 @@ using zx;
 /// and which are fixed-location.
 //
 // TODO(fxb/114670): Move SecureMem from fuchsia.sysmem to fuchsia.sysmem2.
-closed protocol SecureMem {
+protocol SecureMem {
     /// Gets the physical address and length of any secure heap whose physical
     /// range is configured via the TEE.
     ///
@@ -47,7 +47,7 @@ closed protocol SecureMem {
     ///    with TEE which doesn't generate zx_status_t errors).
     ///  * other errors are possible, such as from communication failures or
     ///    server propagation of zx_status_t failures
-    strict GetPhysicalSecureHeaps() -> (struct {
+    GetPhysicalSecureHeaps() -> (struct {
         heaps SecureHeapsAndRanges;
     }) error zx.Status;
 
@@ -61,14 +61,14 @@ closed protocol SecureMem {
     /// temporary HW protection ranges will be deleted before this request
     /// completes.
     @available(added=9)
-    strict GetPhysicalSecureHeapProperties(struct {
+    GetPhysicalSecureHeapProperties(struct {
         entire_heap SecureHeapAndRange;
     }) -> (struct {
         properties SecureHeapProperties;
     }) error zx.Status;
 
     @available(added=7, deprecated=8, removed=9)
-    strict GetPhysicalSecureHeapProperties(struct {
+    GetPhysicalSecureHeapProperties(struct {
         heap HeapType;
     }) -> (struct {
         properties SecureHeapProperties;
@@ -109,7 +109,7 @@ closed protocol SecureMem {
     ///     with TEE which doesn't generate zx_status_t errors).
     ///   * other errors are possible, such as from communication failures or
     ///     server propagation of zx_status_t failures.
-    strict AddSecureHeapPhysicalRange(struct {
+    AddSecureHeapPhysicalRange(struct {
         heap_range SecureHeapAndRange;
     }) -> () error zx.Status;
 
@@ -151,7 +151,7 @@ closed protocol SecureMem {
     ///   * ZX_ERR_NOT_FOUND - the specified range is not found.
     ///   * other errors are possible, such as from communication failures or
     ///     server propagation of zx_status_t failures.
-    strict DeleteSecureHeapPhysicalRange(struct {
+    DeleteSecureHeapPhysicalRange(struct {
         heap_range SecureHeapAndRange;
     }) -> () error zx.Status;
 
@@ -196,7 +196,7 @@ closed protocol SecureMem {
     ///   * ZX_ERR_NOT_FOUND - the specified range is not found.
     ///   * other errors are possible, such as from communication failures or
     ///     server propagation of zx_status_t failures.
-    strict ModifySecureHeapPhysicalRange(struct {
+    ModifySecureHeapPhysicalRange(struct {
         range_modification SecureHeapAndRangeModification;
     }) -> () error zx.Status;
 
@@ -216,7 +216,7 @@ closed protocol SecureMem {
     ///     configuration is conveyed to sysmem via GetPhysicalSecureHeaps().
     ///
     /// Ongoing DMA is not disrupted by this request.
-    strict ZeroSubRange(struct {
+    ZeroSubRange(struct {
         is_covering_range_explicit bool;
         heap_range SecureHeapAndRange;
     }) -> () error zx.Status;

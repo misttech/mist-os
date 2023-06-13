@@ -8,9 +8,9 @@ using fuchsia.tracing;
 
 // TODO(fxbug.dev/30408): Allow providing a vmo of the buffer to use.
 @discoverable
-closed protocol Controller {
+protocol Controller {
     /// Start tracing.
-    strict Start(struct {
+    Start(struct {
         group_mask uint32;
         buffering_mode fuchsia.tracing.BufferingMode;
     }) -> (struct {
@@ -18,12 +18,12 @@ closed protocol Controller {
     });
 
     /// Stop tracing.
-    strict Stop() -> (struct {
+    Stop() -> (struct {
         status zx.Status;
     });
 
     /// Rewind the trace buffer.
-    strict Rewind() -> (struct {
+    Rewind() -> (struct {
         status zx.Status;
     });
 };
@@ -31,17 +31,17 @@ closed protocol Controller {
 const MAX_BUF uint32 = 8192;
 
 @discoverable
-closed protocol Reader {
+protocol Reader {
     /// Get the number of bytes written to the trace buffer.
     /// `size` is valid if, and only if, `status` is `ZX_OK`.
-    strict GetBytesWritten() -> (struct {
+    GetBytesWritten() -> (struct {
         status zx.Status;
         size uint64;
     });
 
     /// Read `count` bytes from ktrace buffer at `offset`
     /// and return `data` read upon success
-    strict ReadAt(struct {
+    ReadAt(struct {
         count uint64;
         offset uint64;
     }) -> (struct {

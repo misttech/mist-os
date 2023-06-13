@@ -60,7 +60,7 @@ type Seal = strict union {
 /// representation of the contents of the device which, if presented to
 /// `OpenForVerifiedRead`, ensures any contents read from the `verified` child
 /// device will match those last written while in `authoring` mode.
-closed protocol DeviceManager {
+protocol DeviceManager {
     /// Requests that the driver format the underlying block device as described
     /// by the parameters in `config`, and enter `authoring` mode.
     /// If `config` has any unpopulated fields, or those fields contain enum
@@ -73,7 +73,7 @@ closed protocol DeviceManager {
     /// On success, the driver will enter `authoring` mode, expose a child
     /// device named `mutable` which speaks the `fuchsia.hardware.block`
     /// protocol in the device tree, then return.
-    strict OpenForWrite(struct {
+    OpenForWrite(struct {
         config Config;
     }) -> () error zx.Status;
 
@@ -97,7 +97,7 @@ closed protocol DeviceManager {
     /// On success, the returned `seal` will contain a hash of the device
     /// superblock that should be stored in tamper-proof storage, so it can be
     /// retrieved and presented in a future `OpenForVerifiedRead` call.
-    strict CloseAndGenerateSeal() -> (struct {
+    CloseAndGenerateSeal() -> (struct {
         seal Seal;
     }) error zx.Status;
 
@@ -126,7 +126,7 @@ closed protocol DeviceManager {
     ///
     /// On success, the device binds a child device `verified`, enters
     /// `verified-read` mode, and returns from this call.
-    strict OpenForVerifiedRead(struct {
+    OpenForVerifiedRead(struct {
         config Config;
         seal Seal;
     }) -> () error zx.Status;
@@ -140,5 +140,5 @@ closed protocol DeviceManager {
     /// * If the device was in `verified-read` mode, removes the child `verified` device
     /// * Enters `closed` mode.
     /// * Returns from this call
-    strict Close() -> () error zx.Status;
+    Close() -> () error zx.Status;
 };

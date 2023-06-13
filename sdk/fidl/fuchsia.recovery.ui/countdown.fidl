@@ -17,11 +17,11 @@ type FactoryResetCountdownState = table {
 /// Protocol to watch for changes when a factory reset countdown is started or
 /// cancelled. An immediate factory reset does not start a countdown.
 @discoverable
-closed protocol FactoryResetCountdown {
+protocol FactoryResetCountdown {
     /// Hanging get that returns when a factory reset is scheduled or a
     /// scheduled factory reset is cancelled. Will return immediately on first
     /// call per connection and then on change after that.
-    strict Watch() -> (struct {
+    Watch() -> (struct {
         state FactoryResetCountdownState;
     });
 };

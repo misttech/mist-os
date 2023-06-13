@@ -4,20 +4,20 @@
 
 library test.transitional;
 
-closed protocol TransitionalEvent {
+protocol TransitionalEvent {
     @transitional
-    strict -> Event();
+    -> Event();
 };
 
 /// Protocol with a non-transitional method and transitional method.
 /// Only the non-transitional method should need to be implemented.
-closed protocol TransitionMethods {
-    strict ImplementedMethod() -> (struct {
+protocol TransitionMethods {
+    ImplementedMethod() -> (struct {
         value string;
     });
 
     @transitional("This method should not need to be implemented to build")
-    strict UnimplementedMethod() -> (struct {
+    UnimplementedMethod() -> (struct {
         value string;
     });
 };

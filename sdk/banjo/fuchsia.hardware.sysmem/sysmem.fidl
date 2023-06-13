@@ -7,11 +7,11 @@ using zx;
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-closed protocol Sysmem {
+protocol Sysmem {
     /// Takes the server end of a FIDL connection that'll serve
     /// fuchsia.sysmem.Allocator.  If the connection fails, the channel will
     /// close.
-    strict Connect(resource struct {
+    Connect(resource struct {
         allocator_request zx.Handle:CHANNEL;
     }) -> (struct {
         s zx.Status;
@@ -19,7 +19,7 @@ closed protocol Sysmem {
 
     /// Takes the client end of a FIDL connection that'll serve
     /// fuchsia.sysmem2.Heap.
-    strict RegisterHeap(resource struct {
+    RegisterHeap(resource struct {
         heap uint64;
         heap_connection zx.Handle:CHANNEL;
     }) -> (struct {
@@ -29,7 +29,7 @@ closed protocol Sysmem {
     /// Takes the client end of a FIDL connection that'll serve
     /// fuchsia.sysmem.SecureMem, which is a protocol that's specific to
     /// sysmem<->securemem concerns.
-    strict RegisterSecureMem(resource struct {
+    RegisterSecureMem(resource struct {
         secure_mem_connection zx.Handle:CHANNEL;
     }) -> (struct {
         s zx.Status;
@@ -38,7 +38,7 @@ closed protocol Sysmem {
     /// Informs sysmem that the channel previously passed to RegisterSecureMem()
     /// will be closing soon, and that this channel closure should not be
     /// considered an error.
-    strict UnregisterSecureMem() -> (struct {
+    UnregisterSecureMem() -> (struct {
         s zx.Status;
     });
 };

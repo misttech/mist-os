@@ -87,8 +87,8 @@ type PbusBootloaderInfo = struct {
 
 @transport("Banjo")
 @banjo_layout("ddk-callback")
-closed protocol PbusSysSuspend {
-    strict Callback(struct {
+protocol PbusSysSuspend {
+    Callback(struct {
         requested_state uint8;
         enable_wake bool;
         suspend_reason uint8;
@@ -101,10 +101,10 @@ closed protocol PbusSysSuspend {
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
 @default_protocol
-closed protocol PBus {
+protocol PBus {
     /// Adds a new platform device to the bus, using configuration provided by |dev|.
     /// Platform devices are created in their own separate devhosts.
-    strict DeviceAdd(struct {
+    DeviceAdd(struct {
         dev PbusDev;
     }) -> (struct {
         s zx.Status;
@@ -115,7 +115,7 @@ closed protocol PBus {
     /// to register its protocol with the platform bus.
     /// `pbus_protocol_device_add()` blocks until the protocol implementation driver
     /// registers its protocol (or times out).
-    strict ProtocolDeviceAdd(struct {
+    ProtocolDeviceAdd(struct {
         proto_id uint32;
         dev PbusDev;
     }) -> (struct {
@@ -123,7 +123,7 @@ closed protocol PBus {
     });
     /// Called by protocol implementation drivers to register their protocol
     /// with the platform bus.
-    strict RegisterProtocol(struct {
+    RegisterProtocol(struct {
         proto_id uint32;
         @buffer
         protocol vector<uint8>:MAX;
@@ -132,25 +132,25 @@ closed protocol PBus {
     });
     /// Board drivers may use this to get information about the board, and to
     /// differentiate between multiple boards that they support.
-    strict GetBoardInfo() -> (struct {
+    GetBoardInfo() -> (struct {
         s zx.Status;
         info fuchsia.hardware.platform.device.PdevBoardInfo;
     });
     /// Board drivers may use this to set information about the board
     /// (like the board revision number).
     /// Platform device drivers can access this via `pdev_get_board_info()`.
-    strict SetBoardInfo(struct {
+    SetBoardInfo(struct {
         info PbusBoardInfo;
     }) -> (struct {
         s zx.Status;
     });
     /// Board drivers may use this to set information about the bootloader.
-    strict SetBootloaderInfo(struct {
+    SetBootloaderInfo(struct {
         info PbusBootloaderInfo;
     }) -> (struct {
         s zx.Status;
     });
-    strict RegisterSysSuspendCallback(resource struct {
+    RegisterSysSuspendCallback(resource struct {
         suspend_cb client_end:PbusSysSuspend;
     }) -> (struct {
         s zx.Status;
@@ -164,7 +164,7 @@ closed protocol PBus {
     /// would cause the driver to spawn in the platform bus's driver host.
     // Note: fragments is of type device_fragment_t*.
     // TODO(fxb/69023): restore type.
-    strict CompositeDeviceAdd(struct {
+    CompositeDeviceAdd(struct {
         dev PbusDev;
         fragments uint64;
         fragments_count uint64;
@@ -175,7 +175,7 @@ closed protocol PBus {
 
     /// Adds a composite platform device to the bus.
     // TODO(fxb/69023): Restore |fragments| to device_fragment_t* type.
-    strict AddComposite(struct {
+    AddComposite(struct {
         dev PbusDev;
         fragments uint64;
         fragment_count uint64;

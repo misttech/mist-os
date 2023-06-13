@@ -13,7 +13,7 @@ alias DeviceId = uint64;
 /// not required to maintain a connection to the Watcher in order to use established Camera
 /// connections.
 @discoverable
-closed protocol DeviceWatcher {
+protocol DeviceWatcher {
     /// Returns a list of available camera IDs when it has changed from the previously returned
     /// list of IDs, or when it is called by a client for the first time. The returned list may be
     /// empty, indicating no cameras are available. The IDs returned to the client will remain
@@ -28,13 +28,13 @@ closed protocol DeviceWatcher {
     ///
     /// Camera applications should tolerate an empty list returned, and attempt to retry the
     /// `WatchDevices()` call.
-    strict WatchDevices() -> (struct {
+    WatchDevices() -> (struct {
         events vector<WatchDevicesEvent>:MAX_WATCH_DEVICES_EVENTS;
     });
 
     /// Acquires a camera interface for the given ID. If any clients already exist for this camera,
     /// the request is closed with the ZX_ERR_ALREADY_BOUND epitaph.
-    strict ConnectToDevice(resource struct {
+    ConnectToDevice(resource struct {
         id DeviceId;
         request server_end:Device;
     });

@@ -6,9 +6,9 @@ library fuchsia.hardware.demo;
 
 /// The protocol provides access to functions of the driver.
 @discoverable
-closed protocol Demo {
+protocol Demo {
     /// Returns a number
-    strict GetNumber() -> (struct {
+    GetNumber() -> (struct {
         response uint32;
     });
 };

@@ -29,7 +29,7 @@ type HandleDisposition = resource struct {
 type ChannelCallEtcArgs = resource struct {};
 
 @transport("Syscall")
-closed protocol Channel {
+protocol Channel {
     /// ## Summary
     ///
     /// Create a channel.
@@ -102,7 +102,7 @@ closed protocol Channel {
     /// [`zx_object_wait_async()`]: object_wait_async.md
     /// [`zx_object_wait_many()`]: object_wait_many.md
     /// [`zx_object_wait_one()`]: object_wait_one.md
-    strict Create(struct {
+    Create(struct {
         options uint32;
     }) -> (resource struct {
         out0 Handle;
@@ -214,7 +214,7 @@ closed protocol Channel {
     /// [`zx_object_wait_many()`]: object_wait_many.md
     /// [`zx_object_wait_one()`]: object_wait_one.md
     @handle_unchecked
-    strict Read(resource struct {
+    Read(resource struct {
         handle Handle:CHANNEL;
         options uint32;
         @out
@@ -334,7 +334,7 @@ closed protocol Channel {
     /// [`zx_object_wait_async()`]: object_wait_async.md
     /// [`zx_object_wait_many()`]: object_wait_many.md
     /// [`zx_object_wait_one()`]: object_wait_one.md
-    strict ReadEtc(resource struct {
+    ReadEtc(resource struct {
         handle Handle:CHANNEL;
         options uint32;
         @out
@@ -494,7 +494,7 @@ closed protocol Channel {
     /// [`zx_object_wait_async()`]: object_wait_async.md
     /// [`zx_object_wait_many()`]: object_wait_many.md
     /// [`zx_object_wait_one()`]: object_wait_one.md
-    strict Write(resource struct {
+    Write(resource struct {
         handle Handle:CHANNEL;
         options uint32;
         @voidptr
@@ -676,7 +676,7 @@ closed protocol Channel {
     /// [`zx_channel_write()`]: channel_write.md
     /// [`zx_handle_duplicate()`]: handle_duplicate.md
     /// [`zx_handle_replace()`]: handle_replace.md
-    strict WriteEtc(resource struct {
+    WriteEtc(resource struct {
         handle Handle:CHANNEL;
         options uint32;
         @voidptr
@@ -688,7 +688,7 @@ closed protocol Channel {
     }) -> () error Status;
 
     @internal
-    strict CallNoretry(resource struct {
+    CallNoretry(resource struct {
         handle Handle:CHANNEL;
         options uint32;
         deadline Time;
@@ -699,7 +699,7 @@ closed protocol Channel {
     }) error Status;
 
     @internal
-    strict CallFinish(resource struct {
+    CallFinish(resource struct {
         deadline Time;
         args ChannelCallArgs;
     }) -> (struct {
@@ -888,7 +888,7 @@ closed protocol Channel {
     /// [`zx_object_wait_one()`]: object_wait_one.md
     @blocking
     @vdsocall
-    strict Call(resource struct {
+    Call(resource struct {
         handle Handle:CHANNEL;
         options uint32;
         deadline Time;
@@ -899,7 +899,7 @@ closed protocol Channel {
     }) error Status;
 
     @internal
-    strict CallEtcNoretry(resource struct {
+    CallEtcNoretry(resource struct {
         handle Handle:CHANNEL;
         options uint32;
         deadline Time;
@@ -911,7 +911,7 @@ closed protocol Channel {
     }) error Status;
 
     @internal
-    strict CallEtcFinish(resource struct {
+    CallEtcFinish(resource struct {
         deadline Time;
         @inout
         args ChannelCallEtcArgs;
@@ -1059,7 +1059,7 @@ closed protocol Channel {
     @blocking
     @vdsocall
     // TODO(scottmg): Express "All wr_handles of args must have ZX_RIGHT_TRANSFER."
-    strict CallEtc(resource struct {
+    CallEtc(resource struct {
         handle Handle:CHANNEL;
         options uint32;
         deadline Time;

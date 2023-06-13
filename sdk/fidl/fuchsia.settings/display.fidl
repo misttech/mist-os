@@ -10,13 +10,13 @@ using fuchsia.ui.types;
 /// Supported SettingsEpitaph enums:
 /// REQUEST_NOT_SUPPORTED, INTERNAL_SERVICE_ERROR, PERSISTENT_STORAGE_ERROR
 @discoverable
-closed protocol Display {
+protocol Display {
     /// Gets the current [DisplaySettings]. Returns immediately on first call;
     /// subsequent calls return when the value changes.
     ///
     /// If this call fails, it is considered a fatal error and the channel
     /// will be closed.
-    strict Watch() -> (struct {
+    Watch() -> (struct {
         settings DisplaySettings;
     });
 
@@ -34,7 +34,7 @@ closed protocol Display {
     /// fuchsia.lightsensor.Sensor, which does handle autogain. This will be
     /// Removed in API Version 11.
     @available(deprecated=10, removed=HEAD, note="Use fuchsia.lightsensor.Sensor::Watch")
-    strict WatchLightSensor(struct {
+    WatchLightSensor(struct {
         delta float32;
     }) -> (struct {
         light_sensor_data LightSensorData;
@@ -42,7 +42,7 @@ closed protocol Display {
 
     /// Sets display settings. Any field not explicitly set in the table performs a
     /// no-op, and will not make any changes.
-    strict Set(struct {
+    Set(struct {
         settings DisplaySettings;
     }) -> () error Error;
 };

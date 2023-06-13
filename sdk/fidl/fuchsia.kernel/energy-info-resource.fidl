@@ -9,10 +9,10 @@ using zx;
 /// `ZX_RSRC_SYSTEM_ENERGY_INFO_BASE`.
 @discoverable
 @available(added=HEAD)
-closed protocol EnergyInfoResource {
+protocol EnergyInfoResource {
     /// Get an EnergyInfo resource handle.
     @available(added=HEAD)
-    strict Get() -> (resource struct {
+    Get() -> (resource struct {
         resource zx.Handle:RESOURCE;
     });
 };

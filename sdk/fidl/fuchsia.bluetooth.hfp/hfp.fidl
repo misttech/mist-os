@@ -66,7 +66,7 @@ alias Number = string:256;
 alias Memory = string:256;
 
 @discoverable
-closed protocol Hfp {
+protocol Hfp {
     /// Register as the call manager for this device.
     ///
     /// There can only be one call manager registered at a time. If one is
@@ -74,12 +74,12 @@ closed protocol Hfp {
     /// CallManager channel will be closed.
     ///
     /// A call manager can be unregistered by closing either end of the channel.
-    strict Register(resource struct {
+    Register(resource struct {
         manager client_end:CallManager;
     });
 };
 
-closed protocol CallManager {
+protocol CallManager {
     /// Signal that a peer that supports the HFP Hands-Free role is connected.
     ///
     /// `id` is the unique identifier associated with the peer.
@@ -90,7 +90,7 @@ closed protocol CallManager {
     /// Multiple concurrent PeerConnected requests can be made by the client.
     /// The empty response is used as a flow control mechanism to allow the
     /// client to limit the number of pending PeerConnected requests.
-    strict PeerConnected(resource struct {
+    PeerConnected(resource struct {
         id bt.PeerId;
         handle server_end:PeerHandler;
     }) -> ();
@@ -98,7 +98,7 @@ closed protocol CallManager {
 
 @available(added=12)
 @discoverable
-closed protocol HandsFree {
+protocol HandsFree {
     /// Hanging get that waits for a a peer that supports the HFP Audio Gateway
     /// role to connect.
     ///
@@ -107,7 +107,7 @@ closed protocol HandsFree {
     /// `handle` is the channel that the client should use to manage the peer.
     /// If the call manager does not intend to handle a given peer. it must
     /// close the handle,
-    strict WatchPeerConnected() -> (resource struct {
+    WatchPeerConnected() -> (resource struct {
         id bt.PeerId;
         handle client_end:PeerHandler;
     }) error zx.Status;
@@ -121,7 +121,7 @@ closed protocol HandsFree {
 /// associated with this peer handler are closed. This includes any Call, and
 /// HeadsetGain protocols. Channels closed by a server end will include an
 /// epitaph `ZX_ERR_HANDLE_CLOSED` in this situation.
-closed protocol PeerHandler {
+protocol PeerHandler {
     /// Hanging get to provide the Hfp service with an `update` on the
     /// `NetworkInformation`. Any fields in `update` that are not present will
     /// be treated as unmodified by the update.
@@ -132,7 +132,7 @@ closed protocol PeerHandler {
     /// The most up-to-date `NetworkInformation` is used during the connection
     /// initialization process of the peer, and updates are propagated to the
     /// peer if it supports AG Indicators.
-    strict WatchNetworkInformation() -> (struct {
+    WatchNetworkInformation() -> (struct {
         update NetworkInformation;
     });
 
@@ -140,7 +140,7 @@ closed protocol PeerHandler {
     /// manager or audio gateway peer, or an ongoing call is transferred to the
     /// headset.  `RequestOutgoingCall` can be called before or after
     /// `WatchNextCall`.
-    strict WatchNextCall() -> (resource struct {
+    WatchNextCall() -> (resource struct {
         call NextCall;
     });
 
@@ -156,14 +156,14 @@ closed protocol PeerHandler {
     ///
     /// - ZX_ERR_ALREADY_EXISTS can be used if there is alreadya call in
     ///   progress and the system does not support additional calls.
-    strict RequestOutgoingCall(struct {
+    RequestOutgoingCall(struct {
         action CallAction;
     }) -> () error zx.Status;
 
     /// Request the name of the network operator for the call manager or audio
     /// gateway peer. A null value is returned if there is no operator name
     /// available.
-    strict QueryOperator() -> (struct {
+    QueryOperator() -> (struct {
         operator string:<16, optional>;
     });
 
@@ -172,7 +172,7 @@ closed protocol PeerHandler {
     /// numbers is not supported at this time.
     // The length of `numbers` is constrained to keep the message size below the
     // maximum channel message size of 64KiB.
-    strict SubscriberNumberInformation() -> (struct {
+    SubscriberNumberInformation() -> (struct {
         numbers vector<Number>:128;
     });
 
@@ -180,13 +180,13 @@ closed protocol PeerHandler {
     /// functionality on the AG based on the `enabled` boolean.
     /// A `ZX_ERR_NOT_SUPPORTED` error is returned if Noice Reduction/Echo
     /// Cancellation is not supported by the device.
-    strict SetNrecMode(struct {
+    SetNrecMode(struct {
         enabled bool;
     }) -> () error zx.Status;
 
     /// Headset battery level from 0 ~ 100
     /// See https://www.bluetooth.com/specifications/assigned-numbers/hands-free-profile/
-    strict ReportHeadsetBatteryLevel(struct {
+    ReportHeadsetBatteryLevel(struct {
         level uint8;
     });
 
@@ -196,7 +196,7 @@ closed protocol PeerHandler {
     /// at any given time. Older HeadsetGain protocols are given preference. If
     /// a HeadsetGain protocol is active when a new GainControl request is made,
     /// the new HeadsetGain protocol will be closed immediately.
-    strict GainControl(resource struct {
+    GainControl(resource struct {
         control client_end:HeadsetGain;
     });
 };
@@ -224,13 +224,13 @@ closed protocol PeerHandler {
 /// This channel will be closed with a `ZX_ERR_INVALID_ARGUMENT` epitaph if
 /// invalid arguments are passed to requests. See documentation on specific
 /// requests for more details.
-closed protocol HeadsetGain {
+protocol HeadsetGain {
     /// Make a request to the headset to set the speaker gain to `requested`.
     ///
     /// `requested` must be in the range [0-15] inclusive. Any values outside of
     /// this range will result in the channel closing with a
     /// `ZX_ERR_INVALID_ARGUMENT` epitaph.
-    strict SetSpeakerGain(struct {
+    SetSpeakerGain(struct {
         requested uint8;
     });
 
@@ -238,7 +238,7 @@ closed protocol HeadsetGain {
     /// represent the current gain value that is set.
     ///
     /// The returned `gain` value will always be in the range [0-15] inclusive.
-    strict WatchSpeakerGain() -> (struct {
+    WatchSpeakerGain() -> (struct {
         gain uint8;
     });
 
@@ -247,7 +247,7 @@ closed protocol HeadsetGain {
     /// `requested` must be in the range [0-15] inclusive. Any values outside of
     /// this range will result in the channel closing with a
     /// `ZX_ERR_INVALID_ARGUMENT` epitaph.
-    strict SetMicrophoneGain(struct {
+    SetMicrophoneGain(struct {
         requested uint8;
     });
 
@@ -255,7 +255,7 @@ closed protocol HeadsetGain {
     /// represent the current gain value that is set.
     ///
     /// The returned `gain` value will always be in the range [0-15] inclusive.
-    strict WatchMicrophoneGain() -> (struct {
+    WatchMicrophoneGain() -> (struct {
         gain uint8;
     });
 };
@@ -347,27 +347,27 @@ type DtmfCode = strict enum : uint8 {
 };
 
 /// Controls the lifecycle of a call that has been routed through a headset.
-closed protocol Call {
+protocol Call {
     /// A hanging get method for call state. See the `CallState` documentation
     /// for information on possible states.
-    strict WatchState() -> (struct {
+    WatchState() -> (struct {
         state CallState;
     });
 
     /// Request that the Call be set to the ONGOING_HELD CallState
-    strict RequestHold();
+    RequestHold();
 
     /// Request that the Call be set to the ONGOING_ACTIVE CallState.
     /// This has the side effect of placing all other Calls that are routed to
     /// this peer in the ONGOING_HELD call state if it succeeds.
-    strict RequestActive();
+    RequestActive();
 
     /// Request that the Call be TERMINATED.
-    strict RequestTerminate();
+    RequestTerminate();
 
     /// Request that the Call's audio be transfered to the Audio Gateway and
     /// the call state set to TRANSFERRED_TO_AG.
-    strict RequestTransferAudio();
+    RequestTransferAudio();
 
     /// Send a code that the call manager or remote audio gateway peer should
     /// transmit to its network connection. The request returns after the code
@@ -375,7 +375,7 @@ closed protocol Call {
     ///
     /// Can return an error if the call manager or peer failed to transmit the
     /// code to the network.
-    strict SendDtmfCode(struct {
+    SendDtmfCode(struct {
         code DtmfCode;
     }) -> () error zx.Status;
 };

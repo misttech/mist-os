@@ -31,7 +31,7 @@ type HeapProperties = table {
 };
 
 /// Manages resources on a specific sysmem heap.
-closed protocol Heap {
+protocol Heap {
     /// Request a new memory allocation of `size` on heap.
     /// For heaps which don't permit CPU access to the buffer data, this
     /// will create a VMO with an official size, but which never has any
@@ -46,7 +46,7 @@ closed protocol Heap {
     ///
     /// The caller guarantees that CreateResource() will be called prior
     /// to the returned VMO or any associated child VMO being used.
-    strict AllocateVmo(struct {
+    AllocateVmo(struct {
         size uint64;
     }) -> (resource struct {
         s zx.Status;
@@ -73,7 +73,7 @@ closed protocol Heap {
     /// VMO, or any VMAR mapping to VMO, as any of those would keep VMO
     /// alive beyond all sysmem participant usages of the vmo; instead
     /// the heap can get the vmo's koid for the heap's mapping.
-    strict CreateResource(resource struct {
+    CreateResource(resource struct {
         vmo zx.Handle:VMO;
         buffer_settings SingleBufferSettings;
     }) -> (struct {
@@ -82,7 +82,7 @@ closed protocol Heap {
     });
 
     /// Destroy previously created resources.
-    strict DestroyResource(struct {
+    DestroyResource(struct {
         id uint64;
     }) -> ();
 
@@ -95,7 +95,7 @@ closed protocol Heap {
     // TODO(fxbug.dev/57690): Remove this event and pass in HeapProperties when
     // registering sysmem Heaps after we migrate sysmem banjo proxying
     // to FIDL.
-    strict -> OnRegister(struct {
+    -> OnRegister(struct {
         properties HeapProperties;
     });
 };

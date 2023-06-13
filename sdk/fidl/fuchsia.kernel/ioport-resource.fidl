@@ -7,9 +7,9 @@ using zx;
 
 /// Protocol for providing an IO Port resource with access to all valid ranges.
 @discoverable
-closed protocol IoportResource {
+protocol IoportResource {
     /// Get an IO Port resource handle.
-    strict Get() -> (resource struct {
+    Get() -> (resource struct {
         resource zx.Handle:RESOURCE;
     });
 };

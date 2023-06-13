@@ -18,7 +18,7 @@ library fuchsia.ui.policy;
 ///
 /// Reference. Related to fuchsia.hardware.display.Controller.
 @discoverable
-closed protocol DisplayBacklight {
+protocol DisplayBacklight {
     /// Submits a new minimum color channel value for display backlight.
     ///
     /// The valid range for a minimum value is [0, 255] (inclusive).  For a new
@@ -27,7 +27,7 @@ closed protocol DisplayBacklight {
     /// Flow control: The caller is allowed at most one in-flight
     /// |SetMinimumRgb| at at time. Subsequent calls must wait until the
     /// acknowledgment returns. Non-compliance results in channel closure.
-    strict SetMinimumRgb(struct {
+    SetMinimumRgb(struct {
         minimum_rgb uint8;
     }) -> ();
 };

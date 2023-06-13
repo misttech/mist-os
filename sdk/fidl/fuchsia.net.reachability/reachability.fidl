@@ -6,7 +6,7 @@ library fuchsia.net.reachability;
 
 /// Provides snapshots of reachability state.
 @discoverable
-closed protocol Monitor {
+protocol Monitor {
     /// Controls verbosity of results returned from calls to [`Watch`]. If
     /// options are set via this method, it must be in the first call made
     /// over the channel.
@@ -18,7 +18,7 @@ closed protocol Monitor {
     //
     // This table is currently empty, but is expected to provide the ability
     // to filter more detailed configuration and service state.
-    strict SetOptions(@generated_name("MonitorOptions") table {});
+    SetOptions(@generated_name("MonitorOptions") table {});
 
     /// Hanging-get API for changes in network reachability state.
     ///
@@ -36,7 +36,7 @@ closed protocol Monitor {
     /// closing the channel.
     ///
     /// - response a snapshot of current system reachability state.
-    strict Watch() -> (Snapshot);
+    Watch() -> (Snapshot);
 };
 
 /// Information about network configuration and apparent reachability status

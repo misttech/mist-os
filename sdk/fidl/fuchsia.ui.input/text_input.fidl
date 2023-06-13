@@ -75,24 +75,24 @@ type TextInputState = struct {
 };
 
 /// A interface for interacting with a text input control.
-closed protocol InputMethodEditor {
-    strict SetKeyboardType(struct {
+protocol InputMethodEditor {
+    SetKeyboardType(struct {
         keyboard_type KeyboardType;
     });
-    strict SetState(struct {
+    SetState(struct {
         state TextInputState;
     });
 
     // TODO(fxbug.dev/72752)
     @available(deprecated=8, note="Instead, use `fuchsia.ui.input3.KeyEventInjector`")
-    strict InjectInput(struct {
+    InjectInput(struct {
         event InputEvent;
     });
 
     // TODO(fxbug.dev/72752)
     @available(deprecated=8, note="Instead, use `fuchsia.ui.input3.KeyEventInjector`")
     @transitional
-    strict DispatchKey3(struct {
+    DispatchKey3(struct {
         event fuchsia.ui.input3.KeyEvent;
     }) -> (struct {
         handled bool;
@@ -100,17 +100,17 @@ closed protocol InputMethodEditor {
 
     // TODO(fxbug.dev/26729): remove these in a later change, after PlatformView has been
     // switched over to open/close on the input_connection_ instead.
-    strict Show();
-    strict Hide();
+    Show();
+    Hide();
 };
 
 /// An interface to receive information from `TextInputService`.
-closed protocol InputMethodEditorClient {
-    strict DidUpdateState(struct {
+protocol InputMethodEditorClient {
+    DidUpdateState(struct {
         state TextInputState;
         event InputEvent:optional;
     });
-    strict OnAction(struct {
+    OnAction(struct {
         action InputMethodAction;
     });
 };

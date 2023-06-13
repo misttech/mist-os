@@ -5,8 +5,8 @@
 library fuchsia.gizmo.protocol;
 
 @discoverable
-closed protocol TestingProtocol {
-    strict GetValue() -> (struct {
+protocol TestingProtocol {
+    GetValue() -> (struct {
         response uint32;
     });
 };

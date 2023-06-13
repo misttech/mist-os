@@ -21,12 +21,12 @@ type ReportType = strict enum : uint8 {
 /// Each `DeviceReportsReader` has its own FIFO of reports in the driver.
 /// Calling `ReadReports` drains the Report FIFO. If the Report FIFO fills up
 /// between calls to `ReadReports` the channel will be closed.
-closed protocol DeviceReportsReader {
+protocol DeviceReportsReader {
     /// This is a Hanging-Get function to read the reports in the Report FIFO.
     /// This will block until there is at least one report available.
     /// If there is already one outstanding Hanging-Get, calling this again will
     /// return ZX_ERR_ALREADY_BOUND.
-    strict ReadReports() -> (struct {
+    ReadReports() -> (struct {
         reports vector<@generated_name("Report") struct {
             /// The time the report was created, from the view of the monotonic
             /// clock.
@@ -40,9 +40,9 @@ closed protocol DeviceReportsReader {
 
 // TODO(fxbug.dev/49329): This API doesn't follow best practices and needs to be
 // cleaned up.
-closed protocol Device {
+protocol Device {
     /// Get the HID boot interface protocol this device supports
-    strict GetBootProtocol() -> (struct {
+    GetBootProtocol() -> (struct {
         protocol @generated_name("BootProtocol") strict enum : uint32 {
             NONE = 0;
             KBD = 1;
@@ -55,7 +55,7 @@ closed protocol Device {
     /// If this is a real HID device, then the id information will come from the
     /// device itself. Mock HID devices may assign the ids in the driver. If the
     /// mock HID driver does not assign ids, zeros will be used instead.
-    strict GetDeviceIds() -> (struct {
+    GetDeviceIds() -> (struct {
         ids @generated_name("DeviceIds") struct {
             vendor_id uint32;
             product_id uint32;
@@ -64,13 +64,13 @@ closed protocol Device {
     });
 
     /// Get the report descriptor
-    strict GetReportDesc() -> (struct {
+    GetReportDesc() -> (struct {
         desc vector<uint8>:MAX_DESC_LEN;
     });
 
     /// Open a new DeviceReportsReader on this device. Opening a DeviceReportsReader
     /// allocates a new FIFO for receiving input reports.
-    strict GetDeviceReportsReader(resource struct {
+    GetDeviceReportsReader(resource struct {
         reader server_end:DeviceReportsReader;
     }) -> () error zx.Status;
 
@@ -79,7 +79,7 @@ closed protocol Device {
     /// the view of the monotonic clock.
     /// If status is ZX_ERR_SHOULD_WAIT the client can wait on the event
     /// from `GetReportsEvent`.
-    strict ReadReport() -> (struct {
+    ReadReport() -> (struct {
         status zx.Status;
         data vector<uint8>:MAX_REPORT_DATA;
         time zx.Time;
@@ -92,7 +92,7 @@ closed protocol Device {
     /// It is guaranteed that only whole reports will be sent.
     /// If there are no reports, this will return ZX_ERR_SHOULD_WAIT, and the client can
     /// wait on the event from `GetReportsEvent`.
-    strict ReadReports() -> (struct {
+    ReadReports() -> (struct {
         status zx.Status;
         data vector<uint8>:MAX_REPORT_DATA;
     });
@@ -101,7 +101,7 @@ closed protocol Device {
     /// Device's report FIFO. This signal will be de-asserted when there are no
     /// reports in the Device's report FIFO. This event can be re-used each time
     /// the client wishes to know if there are reports in the FIFO.
-    strict GetReportsEvent() -> (resource struct {
+    GetReportsEvent() -> (resource struct {
         status zx.Status;
         event zx.Handle:EVENT;
     });
@@ -109,7 +109,7 @@ closed protocol Device {
     /// Send a request to the hardware for a given report described by type and id.
     /// Returns the hardware's response. This interface is not intended
     /// to be used for continuous polling of the reports.
-    strict GetReport(struct {
+    GetReport(struct {
         type ReportType;
         id ReportId;
     }) -> (struct {
@@ -118,7 +118,7 @@ closed protocol Device {
     });
 
     /// Set a single report of the given (type, id) pair.
-    strict SetReport(struct {
+    SetReport(struct {
         type ReportType;
         id ReportId;
         report vector<uint8>:MAX_REPORT_LEN;
@@ -127,14 +127,14 @@ closed protocol Device {
     });
 
     /// Set the trace ID that is used for HID report flow events.
-    strict SetTraceId(struct {
+    SetTraceId(struct {
         id uint32;
     });
 };
 
-closed protocol Controller {
+protocol Controller {
     /// Opens a new session on the device.
-    strict OpenSession(resource struct {
+    OpenSession(resource struct {
         session server_end:Device;
     });
 };

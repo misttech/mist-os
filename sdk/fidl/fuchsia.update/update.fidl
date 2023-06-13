@@ -9,7 +9,7 @@ library fuchsia.update;
 /// The Manager provides a mechanism for checking for updates via the
 /// [`Manager.CheckNow`] message.
 @discoverable
-closed protocol Manager {
+protocol Manager {
     /// Immediately check for an update, and optionally track the state and
     /// progress of that update check.
     ///
@@ -27,7 +27,7 @@ closed protocol Manager {
     ///
     /// * error If an update check cannot be started, an error will be returned.
     ///         The [`Monitor`], if provided, will not receive any notifications.
-    strict CheckNow(resource struct {
+    CheckNow(resource struct {
         options CheckOptions;
         monitor client_end:<Monitor, optional>;
     }) -> () error CheckNotStartedReason;
@@ -50,7 +50,7 @@ closed protocol Manager {
     ///
     /// - response `rebooting` true if the system is rebooting, false if no
     ///                        update was pending reboot.
-    strict PerformPendingReboot() -> (struct {
+    PerformPendingReboot() -> (struct {
         rebooting bool;
     });
 
@@ -60,7 +60,7 @@ closed protocol Manager {
     /// Arguments:
     /// * |attempts_monitor| A protocol on which to receive |Monitor| instances
     /// as update attempts start.
-    strict MonitorAllUpdateChecks(resource struct {
+    MonitorAllUpdateChecks(resource struct {
         attempts_monitor client_end:AttemptsMonitor;
     });
 };
@@ -101,13 +101,13 @@ type Initiator = strict enum {
 /// [`Manager.MonitorAllUpdateChecks`].
 /// The Manager will close the client end of the AttemptsMonitor if there are
 /// more than 2 outstanding requests.
-closed protocol AttemptsMonitor {
+protocol AttemptsMonitor {
     /// Called when a new update attempt has started.
     ///
     /// Arguments:
     /// * |options| Options for how this request should be performed.
     /// * |monitor| A protocol on which to receive progress updates.
-    strict OnStart(resource struct {
+    OnStart(resource struct {
         options AttemptOptions;
         monitor server_end:Monitor;
     }) -> ();
@@ -125,7 +125,7 @@ type AttemptOptions = table {
 /// Clients interested in receiving progress information for an update check
 /// should implement this protocol and provide the client end to
 /// [`Manager.CheckNow`].
-closed protocol Monitor {
+protocol Monitor {
     /// Receives a status update for this update check.
     ///
     /// This request will be called for all state changes, skipping none.
@@ -145,7 +145,7 @@ closed protocol Monitor {
     /// + request `state` The new state of the update check.
     /// - response        The implementation is ready to receive the next
     ///                   [`State`] from the [`Manager`].
-    strict OnState(struct {
+    OnState(struct {
         state State;
     }) -> ();
 };

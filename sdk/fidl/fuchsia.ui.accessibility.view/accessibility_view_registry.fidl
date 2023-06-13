@@ -8,7 +8,7 @@ using fuchsia.ui.views;
 /// Registry allows a privileged client to interpose an accessibility view between
 /// the root view of the scene graph and the view which embeds the system shell.
 @discoverable
-closed protocol Registry {
+protocol Registry {
     /// Creates a new accessibility `ViewHolder` as a child of the root view
     /// in the scene graph. The created ViewHolder holds an accessibility view.
     /// The accessibility view does not render any content; it's only used to
@@ -37,7 +37,7 @@ closed protocol Registry {
     /// - ZX_ERR_INVALID_ARGS, if the provided `ViewRef` is invalid.
     /// - ZX_ERR_PEER_CLOSED, if Scenic fails creating the accessibility `ViewHolder`.
     ///
-    strict CreateAccessibilityViewHolder(resource struct {
+    CreateAccessibilityViewHolder(resource struct {
         a11y_view_ref fuchsia.ui.views.ViewRef;
         a11y_view_token fuchsia.ui.views.ViewHolderToken;
     }) -> (resource struct {
@@ -69,7 +69,7 @@ closed protocol Registry {
     /// - ZX_ERR_PEER_CLOSED, if Scenic fails creating the accessibility `Viewport`.
     ///
     @transitional
-    strict CreateAccessibilityViewport(resource struct {
+    CreateAccessibilityViewport(resource struct {
         viewport_creation_token fuchsia.ui.views.ViewportCreationToken;
     }) -> (resource struct {
         client_viewport_creation_token fuchsia.ui.views.ViewportCreationToken;

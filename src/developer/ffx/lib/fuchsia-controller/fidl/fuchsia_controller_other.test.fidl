@@ -10,6 +10,6 @@ type CrossLibraryStruct = struct {
 };
 
 @discoverable
-closed protocol CrossLibraryNoop {
-    strict UnionNoop(fuchsia.controller.test.NoopUnion);
+protocol CrossLibraryNoop {
+    UnionNoop(fuchsia.controller.test.NoopUnion);
 };

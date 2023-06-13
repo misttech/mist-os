@@ -38,36 +38,36 @@ type Mmio = resource table {
 };
 
 @discoverable
-closed protocol Device {
+protocol Device {
     // TODO(fxb/112765): Combine these methods into a single GetResources
     // method.
 
-    strict GetMmio(struct {
+    GetMmio(struct {
         index uint32;
     }) -> (Mmio) error zx.Status;
 
-    strict GetInterrupt(struct {
+    GetInterrupt(struct {
         index uint32;
         flags uint32;
     }) -> (resource struct {
         irq zx.Handle:INTERRUPT;
     }) error zx.Status;
 
-    strict GetBti(struct {
+    GetBti(struct {
         index uint32;
     }) -> (resource struct {
         bti zx.Handle:BTI;
     }) error zx.Status;
 
-    strict GetSmc(struct {
+    GetSmc(struct {
         index uint32;
     }) -> (resource struct {
         smc zx.Handle:RESOURCE;
     }) error zx.Status;
 
-    strict GetDeviceInfo() -> (DeviceInfo) error zx.Status;
+    GetDeviceInfo() -> (DeviceInfo) error zx.Status;
 
-    strict GetBoardInfo() -> (BoardInfo) error zx.Status;
+    GetBoardInfo() -> (BoardInfo) error zx.Status;
 };
 
 service Service {

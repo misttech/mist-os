@@ -166,12 +166,12 @@ type BlockCommand = struct {
     };
 };
 
-closed protocol Common {
+protocol Common {
     /// Obtains the parameters of the block device (`block_info_t`) and the
     /// required size of `block_txn_t`. The `block_txn_t`s submitted via
     /// `Queue()` must have `block_op_size_out - sizeof(block_op_t)` bytes
     /// available at the end of the structure for the use of the driver.
-    strict Query() -> (struct {
+    Query() -> (struct {
         info fuchsia.hardware.block.BlockInfo;
         block_op_size uint64;
     });
@@ -181,7 +181,7 @@ closed protocol Common {
     /// reported via the `completion_cb`. This callback may be called before the
     /// `Queue()` method returns.
     @async
-    strict Queue(resource struct {
+    Queue(resource struct {
         @in_out
         txn BlockOp;
     }) -> (resource struct {
@@ -193,12 +193,12 @@ closed protocol Common {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-closed protocol BlockImpl {
+protocol BlockImpl {
     compose Common;
 };
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-closed protocol Block {
+protocol Block {
     compose Common;
 };

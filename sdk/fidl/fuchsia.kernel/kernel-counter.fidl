@@ -8,10 +8,10 @@ using zx;
 
 /// Protocol for retrieving kcounter information.
 @discoverable
-closed protocol Counter {
+protocol Counter {
     /// Retrives a VMO containining summarized kcounter data. The vmo returned
     /// in `buffer` is in "inspect-vmo" format, documented elsewhere.
-    strict GetInspectVmo() -> (resource struct {
+    GetInspectVmo() -> (resource struct {
         status zx.Status;
         buffer fuchsia.mem.Buffer;
     });
@@ -19,7 +19,7 @@ closed protocol Counter {
     /// Request that the previously-returned VMO buffer's data be updated. The
     /// data may not be updated if it was already recently updated (updates are
     /// limited to an unspecified rate, but approximately every few seconds).
-    strict UpdateInspectVmo() -> (struct {
+    UpdateInspectVmo() -> (struct {
         status zx.Status;
     });
 };

@@ -152,7 +152,7 @@ type ImageProperties = table {
 /// Puppet implementations may live outside of fuchsia.git, so they will encounter
 /// unknown methods and/or fields any time we extend the puppet API. In these cases,
 /// the puppet should always return `UNSUPPORTED`.
-closed protocol Puppet {
+protocol Puppet {
     // Graphics methods
 
     /// Embeds a view owned elsewhere.
@@ -161,7 +161,7 @@ closed protocol Puppet {
     /// and use the former to create a viewport with the specified `properties`.
     /// Once the puppet has presented a frame containing the new viewport, it should
     /// return the view creation token to the caller.
-    strict EmbedRemoteView(table {
+    EmbedRemoteView(table {
         1: id uint64;
         2: properties EmbeddedViewProperties;
     }) -> (resource table {
@@ -170,7 +170,7 @@ closed protocol Puppet {
     });
 
     /// Updates the properties of an embedded view.
-    strict SetEmbeddedViewProperties(table {
+    SetEmbeddedViewProperties(table {
         1: id uint64;
         2: properties EmbeddedViewProperties;
     }) -> (table {
@@ -178,7 +178,7 @@ closed protocol Puppet {
     });
 
     /// Draws an image composed of solid, monochrome-filled rectangles.
-    strict DrawImage(table {
+    DrawImage(table {
         1: id uint64;
         2: properties ImageProperties;
     }) -> (table {
@@ -186,7 +186,7 @@ closed protocol Puppet {
     });
 
     /// Updates the properties of an image.
-    strict SetImageProperties(table {
+    SetImageProperties(table {
         1: id uint64;
         2: properties ImageProperties;
     }) -> (table {
@@ -206,10 +206,10 @@ type PuppetCreationArgs = resource table {
 /// A helper to spawn a puppet instance, which will own a view created with a specific
 /// token.
 @discoverable
-closed protocol PuppetFactory {
+protocol PuppetFactory {
     /// Spawns a puppet instance, which will own a view created using `view_token`, and
     /// binds `puppet_server` to it.
-    strict Create(PuppetCreationArgs) -> (table {
+    Create(PuppetCreationArgs) -> (table {
         1: result Result;
     });
 };

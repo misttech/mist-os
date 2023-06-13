@@ -22,21 +22,21 @@ type PowerButtonEvent = flexible enum {
 /// It is intended for board-specific components that need to use the power
 /// button for their own purposes (e.g. as a physical presence check).
 @discoverable
-closed protocol Monitor {
+protocol Monitor {
     /// Get the current action for the power button.
     /// Always returns immediately, never fails.
-    strict GetAction() -> (struct {
+    GetAction() -> (struct {
         action Action;
     });
 
     /// Set the action that will be performed when the power button is pressed.
     /// Always returns immediately, never fails.
-    strict SetAction(struct {
+    SetAction(struct {
         action Action;
     }) -> ();
 
     /// Send a message to the client when the power button is pressed or released.
-    strict -> OnButtonEvent(struct {
+    -> OnButtonEvent(struct {
         event PowerButtonEvent;
     });
 };

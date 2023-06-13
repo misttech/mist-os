@@ -9,13 +9,13 @@ using fuchsia.process;
 using zx;
 
 /// The protocol used to initialize processes.
-closed protocol Bootstrap {
+protocol Bootstrap {
     /// Provide the interpreter (in the sense of PT_INTERP) with the capabilities and information it
     /// needs to load code.
     ///
     /// This method must be called at most once, and must come before all other method calls if it
     /// is sent at all.
-    strict InitializeInterpreter(resource struct {
+    InitializeInterpreter(resource struct {
         info InterpreterInfo;
     });
 
@@ -23,7 +23,7 @@ closed protocol Bootstrap {
     ///
     /// This method must be called exactly once. It must proceed all other messages except the
     /// optional call to `InitializeInterpreter`.
-    strict InitializeRuntime(resource struct {
+    InitializeRuntime(resource struct {
         info RuntimeInfo;
     });
 
@@ -31,7 +31,7 @@ closed protocol Bootstrap {
     ///
     /// Must be called after `InitializeInterpreter` and `InitializeRuntime`, and before
     /// `Start`. Can be called multiple times.
-    strict AddHandles(resource struct {
+    AddHandles(resource struct {
         handles vector<fuchsia.process.HandleInfo>:64;
     });
 
@@ -39,7 +39,7 @@ closed protocol Bootstrap {
     ///
     /// Must be called after `InitializeInterpreter` and `InitializeRuntime`, and before
     /// `Start`. Can be called multiple times.
-    strict AddNames(resource struct {
+    AddNames(resource struct {
         names vector<fuchsia.process.NameInfo>:64;
     });
 
@@ -57,7 +57,7 @@ closed protocol Bootstrap {
     /// first `argc` byte sequences in the payload are the command line
     /// arguments. The next `environc` byte sequences are the environment
     /// variables.
-    strict Start(resource struct {
+    Start(resource struct {
         argc uint32;
         environc uint32;
         data fuchsia.mem.Data;

@@ -59,19 +59,19 @@ type Case = table {
 };
 
 /// Iterator for listing available test cases.
-closed protocol CaseIterator {
+protocol CaseIterator {
     /// Returns the next batch of test cases.
     /// Empty vector if no more test cases.
-    strict GetNext() -> (struct {
+    GetNext() -> (struct {
         cases vector<Case>:MAX;
     });
 };
 
 // Query server for tests which implement `fuchsia.test.Suite` protocol.
 @discoverable
-closed protocol Query {
+protocol Query {
     /// Enumerates test cases.
-    strict Enumerate(resource struct {
+    Enumerate(resource struct {
         test_url fuchsia.url.Url;
         iterator server_end:CaseIterator;
     }) -> () error LaunchError;
@@ -80,12 +80,12 @@ closed protocol Query {
 /// This is the entry point of running test suites. A test "run" consists of
 /// multiple test "suites" which consists of running multiple "test cases".
 @discoverable
-closed protocol RunBuilder {
+protocol RunBuilder {
     /// Add a suite to this run. A suite is a component that implements
     /// `fuchsia.test.Suite`. Implementors of this API will talk to test suites
     /// using "Suite" protocol and return results using `controller`. The
     /// controller is also used to control the execution of the test suite.
-    strict AddSuite(resource struct {
+    AddSuite(resource struct {
         test_url fuchsia.url.Url;
         options RunOptions;
         controller server_end:SuiteController;
@@ -96,7 +96,7 @@ closed protocol RunBuilder {
     /// API will talk to test suites using "Suite" protocol and return results
     /// using `controller`. The controller is also used to control the execution
     /// of the test suite.
-    strict AddSuiteInRealm(resource struct {
+    AddSuiteInRealm(resource struct {
         /// The realm which contains the collection to launch the test in
         realm client_end:fuchsia.component.Realm;
         /// All offers from the realm to the test collection
@@ -110,7 +110,7 @@ closed protocol RunBuilder {
     });
 
     /// Specify scheduling options used for this run.
-    strict WithSchedulingOptions(struct {
+    WithSchedulingOptions(struct {
         options SchedulingOptions;
     });
 
@@ -118,7 +118,7 @@ closed protocol RunBuilder {
     ///
     /// This runs all suites added with their respective filters and closes the
     /// channel once it is done.
-    strict Build(resource struct {
+    Build(resource struct {
         controller server_end:RunController;
     });
 };
@@ -198,22 +198,22 @@ type LogsIteratorOption = flexible enum {
 /// If the client disconnects, the tests will be terminated immediately and all
 /// results discarded.
 @discoverable
-closed protocol RunController {
+protocol RunController {
     /// Stop the run gracefully. RunController will disconnect after all
     /// resources are released and all the events in this controller are drained.
     /// This method is used to allow the run to complete tests that are in progress,
     /// but will prevent starting new tests.
-    strict Stop();
+    Stop();
 
     /// Immediately terminate the run. RunController will disconnect after all
     /// resources are released. This method will terminate tests even if they
     /// are in progress.
-    strict Kill();
+    Kill();
 
     /// Iterator over events for the run. This method is a hanging get; it
     /// returns an empty vector only when there will be no further events
     /// (the run completed).
-    strict GetEvents() -> (resource struct {
+    GetEvents() -> (resource struct {
         events vector<RunEvent>:MAX;
     });
 };
@@ -246,20 +246,20 @@ type RunStopped = struct {
 /// all events are drained. If the client disconnects, the suite will be
 /// terminated immediately and all results discarded.
 @discoverable
-closed protocol SuiteController {
+protocol SuiteController {
     /// Stop the suite run gracefully. SuiteController will disconnect after
     /// all resources are released and all the events in this controller are drained.
-    strict Stop();
+    Stop();
 
     /// Immediately terminate the run. SuiteController will disconnect after
     /// all resources are released. This method will terminate tests even if
     /// they are in progress.
-    strict Kill();
+    Kill();
 
     /// Iterator over events for the run. This method is a hanging get; it
     /// returns an empty vector only when there will be no further events
     /// (the run completed).
-    strict GetEvents() -> (resource struct {
+    GetEvents() -> (resource struct {
         events vector<SuiteEvent>:MAX;
     }) error LaunchError;
 };
@@ -439,11 +439,11 @@ type SuiteArtifact = resource struct {
 };
 
 /// An iterator protocol over which a client may retrieve debug data information.
-closed protocol DebugDataIterator {
+protocol DebugDataIterator {
     /// Retrieve the next batch of debug data. This is a hanging get; if no data is
     /// immediately available, the call hangs until data is available. After all data has
     /// been returned, the call returns an empty vector.
-    strict GetNext() -> (resource struct {
+    GetNext() -> (resource struct {
         data vector<DebugData>:MAX;
     });
 };

@@ -7,17 +7,17 @@ using zx;
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-closed protocol Spi {
+protocol Spi {
     // TODO(67570): Remove these once all drivers have switched over to the FIDL protocol.
 
     /// Half-duplex transmit data to a SPI device; always transmits the entire buffer on success.
-    strict Transmit(struct {
+    Transmit(struct {
         txdata vector<uint8>:MAX;
     }) -> (struct {
         status zx.Status;
     });
     /// Half-duplex receive data from a SPI device; always reads the full size requested.
-    strict Receive(struct {
+    Receive(struct {
         size uint32;
     }) -> (struct {
         status zx.Status;
@@ -25,7 +25,7 @@ closed protocol Spi {
     });
     /// Full-duplex SPI transaction. Received data will exactly equal the length of the transmit
     /// buffer.
-    strict Exchange(struct {
+    Exchange(struct {
         txdata vector<uint8>:MAX;
     }) -> (struct {
         status zx.Status;

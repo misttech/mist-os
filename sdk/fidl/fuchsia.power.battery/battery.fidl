@@ -99,29 +99,29 @@ type BatteryInfo = table {
 };
 
 /// Provider interface used to obtain battery status details
-closed protocol BatteryInfoProvider {
+protocol BatteryInfoProvider {
     /// Gets battery info
-    strict GetBatteryInfo() -> (struct {
+    GetBatteryInfo() -> (struct {
         info BatteryInfo;
     });
 
     /// Registers a watcher for battery info changes
-    strict Watch(resource struct {
+    Watch(resource struct {
         watcher client_end:BatteryInfoWatcher;
     });
 };
 
 /// Watcher on battery info
-closed protocol BatteryInfoWatcher {
+protocol BatteryInfoWatcher {
     /// Callback triggered when battery info changes
-    strict OnChangeBatteryInfo(struct {
+    OnChangeBatteryInfo(struct {
         info BatteryInfo;
     }) -> ();
 };
 
 /// General manager interface for battery management
 @discoverable
-closed protocol BatteryManager {
+protocol BatteryManager {
     // Provides battery status information
     compose BatteryInfoProvider;
 };

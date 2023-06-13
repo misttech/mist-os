@@ -36,12 +36,12 @@ type PwmConfig = struct {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-closed protocol PwmImpl {
+protocol PwmImpl {
     /// Gets the current config of the PWM.
     /// |idx| : Index of requested PWM.
     /// @Returns: |s| : ZX_OK if success.
     /// @Returns : |config| : current config of PWM.
-    strict GetConfig(struct {
+    GetConfig(struct {
         idx uint32;
     }) -> (struct {
         s zx.Status;
@@ -52,7 +52,7 @@ closed protocol PwmImpl {
     /// |idx| : Index of requested PWM.
     /// |config| : Configurations.
     /// @Returns : |s| : ZX_OK if success.
-    strict SetConfig(struct {
+    SetConfig(struct {
         idx uint32;
         config PwmConfig;
     }) -> (struct {
@@ -62,7 +62,7 @@ closed protocol PwmImpl {
     /// Enables the PWM.
     /// |idx| : Index of requested PWM.
     /// @Returns : |s| : ZX_OK if success.
-    strict Enable(struct {
+    Enable(struct {
         idx uint32;
     }) -> (struct {
         s zx.Status;
@@ -71,7 +71,7 @@ closed protocol PwmImpl {
     /// Disables the PWM.
     /// |idx| : Index of requested PWM.
     /// @Returns : |s| : ZX_OK  if success.
-    strict Disable(struct {
+    Disable(struct {
         idx uint32;
     }) -> (struct {
         s zx.Status;

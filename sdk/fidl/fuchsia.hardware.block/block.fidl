@@ -24,18 +24,18 @@ const VMOID_INVALID uint16 = 0;
 /// - Observing a closure of the server end indicates the object no longer exists.
 ///
 /// The object can be destroyed synchronously using [`fuchsia.unknown/Closeable.Close`].
-closed protocol Session {
+protocol Session {
     compose fuchsia.unknown.Closeable;
 
     /// Returns a handle to the client end of the FIFO.
-    strict GetFifo() -> (resource struct {
+    GetFifo() -> (resource struct {
         fifo zx.Handle:<FIFO>;
     }) error zx.Status;
 
     /// Attaches a VMO to the session.
     ///
     /// Returns an identifer that can be used to refer to the VMO.
-    strict AttachVmo(resource struct {
+    AttachVmo(resource struct {
         vmo zx.Handle:VMO;
     }) -> (struct {
         // TODO(https://fxbug.dev/103484): consider removing the outer struct when the issue is
@@ -78,9 +78,9 @@ type BlockInfo = struct {
 
 /// Defines access to a device which is accessible in block-granularity chunks
 /// for reading and writing.
-closed protocol Block {
+protocol Block {
     /// Get information about the underlying block device.
-    strict GetInfo() -> (struct {
+    GetInfo() -> (struct {
         // TODO(https://fxbug.dev/103484): consider removing the outer struct when the issue is
         // resolved.
         info BlockInfo;
@@ -91,7 +91,7 @@ closed protocol Block {
     ///
     /// storage_metrics.CallStat.bytes_transferred is number of bytes requested
     /// to be transferred.
-    strict GetStats(struct {
+    GetStats(struct {
         clear bool;
     }) -> (struct {
         // TODO(https://fxbug.dev/103484): consider removing the outer struct when the issue is
@@ -112,7 +112,7 @@ closed protocol Block {
     }) error zx.Status;
 
     /// Opens a new FIFO-based session on the block device.
-    strict OpenSession(resource struct {
+    OpenSession(resource struct {
         session server_end:Session;
     });
 
@@ -124,7 +124,7 @@ closed protocol Block {
     /// This method is provided for backward compatibility, and is not intended for new code.
     /// New code should use the FIFO interface along with the client libraries to
     /// read and write from block devices.
-    strict ReadBlocks(resource struct {
+    ReadBlocks(resource struct {
         vmo zx.Handle:VMO;
         length uint64;
         dev_offset uint64;
@@ -139,7 +139,7 @@ closed protocol Block {
     /// This method is provided for backward compatibility, and is not intended for new code.
     /// New code should use the FIFO interface along with the client libraries to
     /// read and write from block devices.
-    strict WriteBlocks(resource struct {
+    WriteBlocks(resource struct {
         vmo zx.Handle:VMO;
         length uint64;
         dev_offset uint64;

@@ -13,8 +13,8 @@ type TestReport = struct {
 
 @transport("Banjo")
 @banjo_layout("ddk-callback")
-closed protocol TestFuncCallback {
-    strict Callback() -> (struct {
+protocol TestFuncCallback {
+    Callback() -> (struct {
         s zx.Status;
         report TestReport;
     });
@@ -22,33 +22,33 @@ closed protocol TestFuncCallback {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-closed protocol Test {
+protocol Test {
     /// Sets test output socket.
-    strict SetOutputSocket(resource struct {
+    SetOutputSocket(resource struct {
         handle zx.Handle:SOCKET;
     }) -> ();
 
     /// Gets test output socket.
-    strict GetOutputSocket() -> (resource struct {
+    GetOutputSocket() -> (resource struct {
         h zx.Handle:SOCKET;
     });
 
     /// Gets test channel.  This has per-test meaning.
-    strict GetChannel() -> (resource struct {
+    GetChannel() -> (resource struct {
         h zx.Handle:CHANNEL;
     });
 
     /// Sets test function.
-    strict SetTestFunc(resource struct {
+    SetTestFunc(resource struct {
         func client_end:TestFuncCallback;
     }) -> ();
 
     /// Run tests, calls the function set in |SetTestFunc|.
-    strict RunTests() -> (struct {
+    RunTests() -> (struct {
         s zx.Status;
         report TestReport;
     });
 
     /// Calls `device_remove()`.
-    strict Destroy() -> ();
+    Destroy() -> ();
 };

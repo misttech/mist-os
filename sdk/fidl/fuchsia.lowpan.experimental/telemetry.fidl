@@ -8,7 +8,7 @@ using zx;
 
 /// Protocol for connecting to [`TelemetryProvider`] on a LoWPAN interface.
 @discoverable
-closed protocol TelemetryProviderConnector {
+protocol TelemetryProviderConnector {
     /// Connects to the [`TelemetryProvider`] protocol on the named LoWPAN interface.
     ///
     /// The name of the interface can be learned by calling [`fuchsia.lowpan/Lookup.GetDevices`].
@@ -20,16 +20,16 @@ closed protocol TelemetryProviderConnector {
     ///   otherwise invalid.
     /// * `ZX_ERR_NOT_FOUND`: No interface was found with the given name.
     /// * `ZX_ERR_NOT_SUPPORTED`: The interface exists but does not support this protocol.
-    strict Connect(resource struct {
+    Connect(resource struct {
         name fuchsia.lowpan.InterfaceName;
         server_end server_end:TelemetryProvider;
     });
 };
 
 /// Provides telemetry data for an individual interface to the LoWPAN service.
-closed protocol TelemetryProvider {
+protocol TelemetryProvider {
     /// Returns a snapshot the telemetry information table.
-    strict GetTelemetry() -> (struct {
+    GetTelemetry() -> (struct {
         telemetry Telemetry;
     });
 };

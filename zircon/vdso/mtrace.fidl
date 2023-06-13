@@ -4,7 +4,7 @@
 library zx;
 
 @transport("Syscall")
-closed protocol Mtrace {
+protocol Mtrace {
     /// ## Summary
     ///
     /// TODO(fxbug.dev/32938)
@@ -45,7 +45,7 @@ closed protocol Mtrace {
     /// ## See also
     ///
     /// TODO(fxbug.dev/32938)
-    strict Control(resource struct {
+    Control(resource struct {
         handle Handle:RESOURCE;
         kind uint32;
         action uint32;

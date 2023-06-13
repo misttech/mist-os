@@ -40,17 +40,17 @@ type Utterance = table {
 /// set configuration parameters that control the speech.
 /// TODO(fxbug.dev/17829): Implement pause, stop and resume.
 @discoverable
-closed protocol Engine {
+protocol Engine {
     /// Enqueues  an utterance to be spoken. Speech is not started until Speak
     /// is called.
-    strict Enqueue(struct {
+    Enqueue(struct {
         utterance Utterance;
     }) -> () error Error;
 
     /// Speaks all enqueued utterances. The method returns the value when they
     /// are all finished playing.
-    strict Speak() -> () error Error;
+    Speak() -> () error Error;
 
     /// Cancels current speech and also empties the queue.
-    strict Cancel() -> ();
+    Cancel() -> ();
 };

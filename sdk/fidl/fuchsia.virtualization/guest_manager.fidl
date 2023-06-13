@@ -94,7 +94,7 @@ type GuestInfo = table {
 };
 
 @discoverable
-closed protocol GuestManager {
+protocol GuestManager {
     /// Launch a new guest instance.
     ///
     /// Possible errors:
@@ -103,42 +103,42 @@ closed protocol GuestManager {
     ///     - ALREADY_RUNNING: The guest is already running. Stop the guest before launching again.
     ///     - START_FAILURE: Failed to initialize the VMM and devices, and start the guest. See
     ///         component logs for a more specific failure.
-    strict Launch(resource struct {
+    Launch(resource struct {
         guest_config GuestConfig;
         controller server_end:Guest;
     }) -> () error GuestManagerError;
 
     /// Forcibly shuts down a running guest. Immediately after ForceShutdown returns, Launch can
     /// be used to launch another guest.
-    strict ForceShutdown() -> ();
+    ForceShutdown() -> ();
 
     /// Connect to a currently running guest.
     ///
     /// Possible errors:
     ///     - NOT_RUNNING: Attempted to connect to a guest in a non-running state. Ensure the guest
     ///         has launched before attempting to reconnect.
-    strict Connect(resource struct {
+    Connect(resource struct {
         controller server_end:Guest;
     }) -> () error GuestManagerError;
 
     /// Query guest info
-    strict GetInfo() -> (resource struct {
+    GetInfo() -> (resource struct {
         guest_info GuestInfo;
     });
 };
 
 // TODO(fxbug.dev/100515): Reconsider the use of composition here
 @discoverable
-closed protocol ZirconGuestManager {
+protocol ZirconGuestManager {
     compose GuestManager;
 };
 
 @discoverable
-closed protocol DebianGuestManager {
+protocol DebianGuestManager {
     compose GuestManager;
 };
 
 @discoverable
-closed protocol TerminaGuestManager {
+protocol TerminaGuestManager {
     compose GuestManager;
 };

@@ -5,7 +5,6 @@
     "output_index_json",
     "simple_empty_response_syntax",
     "unknown_interactions",
-    "unknown_interactions_mandate",
     "unknown_interactions_new_defaults"
   ],
   "library_dependencies": [],

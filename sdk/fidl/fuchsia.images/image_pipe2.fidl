@@ -68,7 +68,7 @@ const MAX_ACQUIRE_RELEASE_FENCE_COUNT int32 = 16;
 /// (or one of its delegates) has crashed.  The safest course of action is to
 /// close the image pipe, release all resources which were shared with the
 /// other party, and re-establish the connection to recover.
-closed protocol ImagePipe2 {
+protocol ImagePipe2 {
     /// Adds a BufferCollection resource to the image pipe.
     ///
     /// The producer is expected to set constraints on this resource for images added
@@ -80,7 +80,7 @@ closed protocol ImagePipe2 {
     ///
     /// The following errors will cause the connection to be closed:
     /// - `buffer_collection_id` is already registered
-    strict AddBufferCollection(resource struct {
+    AddBufferCollection(resource struct {
         buffer_collection_id uint32;
         buffer_collection_token client_end:fuchsia.sysmem.BufferCollectionToken;
     });
@@ -104,7 +104,7 @@ closed protocol ImagePipe2 {
     /// - `buffer_collection_index` points to a resource index out of the initialized
     ///     BufferCollection bounds
     /// - No resource is allocated in the registered BufferCollection.
-    strict AddImage(struct {
+    AddImage(struct {
         image_id uint32;
         buffer_collection_id uint32;
         buffer_collection_index uint32;
@@ -123,7 +123,7 @@ closed protocol ImagePipe2 {
     ///
     /// The following errors will cause the connection to be closed:
     /// - `buffer_collection_id` does not reference a currently registered BufferCollection
-    strict RemoveBufferCollection(struct {
+    RemoveBufferCollection(struct {
         buffer_collection_id uint32;
     });
 
@@ -141,7 +141,7 @@ closed protocol ImagePipe2 {
     ///
     /// The following errors will cause the connection to be closed:
     /// - `image_id` does not reference a currently registered image resource
-    strict RemoveImage(struct {
+    RemoveImage(struct {
         image_id uint32;
     });
 
@@ -180,7 +180,7 @@ closed protocol ImagePipe2 {
     ///
     /// The following errors will cause the connection to be closed:
     /// - `image_id` does not reference a currently registered image resource
-    strict PresentImage(resource struct {
+    PresentImage(resource struct {
         image_id uint32;
         presentation_time uint64;
         acquire_fences vector<zx.Handle:EVENT>:MAX_ACQUIRE_RELEASE_FENCE_COUNT;

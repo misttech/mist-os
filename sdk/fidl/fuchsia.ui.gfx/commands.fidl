@@ -404,8 +404,8 @@ type SetViewPropertiesCmd = struct {
     properties ViewProperties;
 };
 
-closed protocol SnapshotCallbackDEPRECATED {
-    strict OnData(resource struct {
+protocol SnapshotCallbackDEPRECATED {
+    OnData(resource struct {
         data fuchsia.mem.Buffer;
     });
 };

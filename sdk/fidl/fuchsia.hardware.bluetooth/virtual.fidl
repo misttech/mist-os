@@ -9,27 +9,27 @@ using zx;
 const MAX_NAME_LENGTH uint32 = 32;
 
 /// Used for spawning virtual Bluetooth devices.
-closed protocol VirtualController {
+protocol VirtualController {
     /// Creates a child device, and returns the name of the child created.
-    strict CreateEmulator() -> (struct {
+    CreateEmulator() -> (struct {
         name string:<MAX_NAME_LENGTH, optional>;
     }) error zx.Status;
 
     /// Creates a virtual Bluetooth serial device, speaking the BT HCI UART
     /// protocol on the provided handle.
     /// The zircon channel is closed in the event of an error.
-    strict CreateLoopbackDevice(resource struct {
+    CreateLoopbackDevice(resource struct {
         channel zx.Handle:CHANNEL;
     });
 };
 
 /// Represents the bt-emulator device protocol. A bt-emulator device is used for configuring and
 /// publishing fake bt-hci devices.
-closed protocol Emulator {
+protocol Emulator {
     /// Opens a fake controller management channel.
     /// Only one channel to this protocol can be open on a given bt-hci-emulator
     /// device.
-    strict Open(resource struct {
+    Open(resource struct {
         channel server_end:fuchsia.bluetooth.test.HciEmulator;
     });
 };

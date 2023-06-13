@@ -12,13 +12,13 @@ using zx;
 /// description of this and related process bootstrapping protocols, and
 /// for specifics about the default global loader service's
 /// interpretation of names, paths, and configurations.
-closed protocol Loader {
+protocol Loader {
     /// Cleanly shutdown the connection to the Loader service.
-    strict Done();
+    Done();
 
     /// The dynamic linker sends `object_name` and gets back a VMO
     /// handle containing the file.
-    strict LoadObject(struct {
+    LoadObject(struct {
         object_name string:1024;
     }) -> (resource struct {
         rv zx.Status;
@@ -29,14 +29,14 @@ closed protocol Loader {
     /// configuration.  This is intended to affect how later
     /// `LoadObject` requests decide what particular implementation
     /// file to supply for a given name.
-    strict Config(struct {
+    Config(struct {
         config string:1024;
     }) -> (struct {
         rv zx.Status;
     });
 
     /// Obtain a new loader service connection.
-    strict Clone(resource struct {
+    Clone(resource struct {
         loader server_end:Loader;
     }) -> (struct {
         rv zx.Status;

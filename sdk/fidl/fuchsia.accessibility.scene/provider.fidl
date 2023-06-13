@@ -7,7 +7,7 @@ library fuchsia.accessibility.scene;
 using fuchsia.ui.views;
 
 @discoverable
-closed protocol Provider {
+protocol Provider {
     /// Prompts the server (a11y manager) to create a new accessibility `View`,
     /// which the client (scene manager) must connect to the root of the scene
     /// graph.
@@ -58,7 +58,7 @@ closed protocol Provider {
     ///
     /// - ZX_ERR_INVALID_ARGS, if either of the provided tokens is invalid.
     /// - ZX_ERR_PEER_CLOSED, if Scenic fails creating the accessibility `Viewport`.
-    strict CreateView(resource struct {
+    CreateView(resource struct {
         a11y_view_token fuchsia.ui.views.ViewCreationToken;
         proxy_viewport_token fuchsia.ui.views.ViewportCreationToken;
     });

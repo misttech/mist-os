@@ -28,7 +28,7 @@ const MAX_RESOLVE_NAME_SIZE uint32 = 2048;
 // TODO(https://fxbug.dev/105486): Delete this protocol once it is no longer needed.
 @deprecated
 @discoverable
-closed protocol Resolver {
+protocol Resolver {
     /// Resolves the given `name` to an `executable` and an shared library
     /// loader.
     ///
@@ -40,7 +40,7 @@ closed protocol Resolver {
     /// For example, the resolver might locate the given `name` inside a package
     /// and return the executable binary from the package as well as a shared
     /// library loader scoped to that package.
-    strict Resolve(struct {
+    Resolve(struct {
         name string:MAX_RESOLVE_NAME_SIZE;
     }) -> (resource struct {
         status zx.Status;

@@ -77,7 +77,7 @@ type PortStatus = table {
 
 /// Provides a way to receive updates on port status changes.
 @available(added=HEAD)
-closed protocol StatusWatcher {
+protocol StatusWatcher {
     /// `WatchStatus` blocks until the port's status has changed.
     ///
     /// The first call to `WatchStatus` returns immediately with the current
@@ -89,7 +89,7 @@ closed protocol StatusWatcher {
     /// status changed happened since the last call to `WatchStatus`.
     ///
     /// - response `device_status` the most recent port status.
-    strict WatchStatus() -> (struct {
+    WatchStatus() -> (struct {
         port_status PortStatus;
     });
 };
@@ -129,17 +129,17 @@ type PortInfo = table {
 
 /// A logical port belonging to a [`Device`].
 @available(added=HEAD)
-closed protocol Port {
+protocol Port {
     /// Obtain information about port.
     ///
     /// - response `info` port information.
-    strict GetInfo() -> (struct {
+    GetInfo() -> (struct {
         info PortInfo;
     });
     /// Obtain the operating port status.
     ///
     /// - response `status` snapshot of port's current status.
-    strict GetStatus() -> (struct {
+    GetStatus() -> (struct {
         status PortStatus;
     });
     /// Connects to a [`StatusWatcher`] to observe port status changes.
@@ -153,7 +153,7 @@ closed protocol Port {
     /// to set a buffer value larger than 1, so that all edges can be observed.
     /// If `StatusWatcher`'s internal queue is filled and new status changes
     /// occur, the oldest samples will be dropped to make room for new ones.
-    strict GetStatusWatcher(resource struct {
+    GetStatusWatcher(resource struct {
         watcher server_end:StatusWatcher;
         buffer uint32;
     });
@@ -161,23 +161,23 @@ closed protocol Port {
     ///
     /// + request `mac` mac handle. Closed with `ZX_ERR_NOT_SUPPORTED` if this
     /// port does not support mac addressing.
-    strict GetMac(resource struct {
+    GetMac(resource struct {
         mac server_end:MacAddressing;
     });
     /// Connects to the [`Device`] this port belongs to.
     ///
     /// + request `device` grants access to the parent device.
-    strict GetDevice(resource struct {
+    GetDevice(resource struct {
         device server_end:Device;
     });
     /// Establishes a new connection to this port.
     ///
     /// + request `port` the server end for the new connection.
-    strict Clone(resource struct {
+    Clone(resource struct {
         port server_end:Port;
     });
     /// Retrieves a snapshot of traffic counters on this port.
-    strict GetCounters() -> (table {
+    GetCounters() -> (table {
         /// The total number of ingress frames on this port.
         1: rx_frames uint64;
         /// The total number of ingress bytes on this port.
@@ -190,7 +190,7 @@ closed protocol Port {
     /// Grants access to [`Diagnostics`] for this port.
     ///
     /// + request `diagnostics` grants access to diagnostics information.
-    strict GetDiagnostics(resource struct {
+    GetDiagnostics(resource struct {
         diagnostics server_end:Diagnostics;
     });
 };

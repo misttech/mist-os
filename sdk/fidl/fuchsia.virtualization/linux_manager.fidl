@@ -36,11 +36,11 @@ type LinuxGuestInfo = table {
 
 /// A `LinuxManager` provides access to the status of Linux guest instances.
 @discoverable
-closed protocol LinuxManager {
+protocol LinuxManager {
     /// Get Linux guest environment info.
     ///
     /// Returns ZX_ERR_UNAVAILABLE if the Linux guest is not available.
-    strict StartAndGetLinuxGuestInfo(struct {
+    StartAndGetLinuxGuestInfo(struct {
         label string:MAX;
     }) -> (struct {
         info LinuxGuestInfo;
@@ -49,7 +49,7 @@ closed protocol LinuxManager {
     /// Linux guest info event.
     ///
     /// Sent to the client when the status of the container changed.
-    strict -> OnGuestInfoChanged(struct {
+    -> OnGuestInfoChanged(struct {
         label string:MAX;
         info LinuxGuestInfo;
     });
@@ -60,7 +60,7 @@ closed protocol LinuxManager {
     /// Returns ZX_ERR_BAD_STATE if this is called while the VM is running.
     /// Returns ZX_ERR_IO if there was an IO failure while performing the
     /// operation.
-    strict WipeData() -> () error zx.Status;
+    WipeData() -> () error zx.Status;
 
     /// Attempts to gracefully shut down a running guest. The caller must ensure that the guest
     /// has actually stopped (such as by waiting on a Guest client PEER_CLOSED signal and checking
@@ -69,5 +69,5 @@ closed protocol LinuxManager {
     /// On a clean shutdown the Guest client will contain a ZX_OK epitaph, and on an unexpected
     /// shutdown the client will contain a ZX_ERR_INTERNAL epitaph (or no epitaph if there was
     /// a component crash).
-    strict GracefulShutdown();
+    GracefulShutdown();
 };

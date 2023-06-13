@@ -6,7 +6,7 @@
 library fuchsia.gizmo.protocol;
 
 @discoverable
-closed protocol TestingProtocol {
-    strict Get();
+protocol TestingProtocol {
+    Get();
 };
 // [END fidl]

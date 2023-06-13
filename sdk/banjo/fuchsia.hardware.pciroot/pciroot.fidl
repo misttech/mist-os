@@ -70,9 +70,9 @@ type PciAddressSpace = strict enum : uint8 {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-closed protocol Pciroot {
+protocol Pciroot {
     /// Legacy methods
-    strict GetBti(struct {
+    GetBti(struct {
         bdf uint32;
         index uint32;
     }) -> (resource struct {
@@ -80,7 +80,7 @@ closed protocol Pciroot {
         bti zx.Handle:BTI;
     });
     /// Get the platform information structure from the pciroot protocol to be used for bus init.
-    strict GetPciPlatformInfo() -> (resource struct {
+    GetPciPlatformInfo() -> (resource struct {
         s zx.Status;
         info PciPlatformInfo;
     });
@@ -89,11 +89,11 @@ closed protocol Pciroot {
     /// Returns true if the bus driver should proxy all device config access to pciroot. This is
     /// necessary in cases of IO config on x86, or for controllers that require configuration to
     /// map in device config headers.
-    strict DriverShouldProxyConfig() -> (struct {
+    DriverShouldProxyConfig() -> (struct {
         use_proxy bool;
     });
     /// Read 8 bytes from config space for device at bdf address |address|:we, offset |offset|.
-    strict ReadConfig8(struct {
+    ReadConfig8(struct {
         address PciBdf;
         offset uint16;
     }) -> (struct {
@@ -101,7 +101,7 @@ closed protocol Pciroot {
         value uint8;
     });
     /// Read 16 bytes from config space for device at bdf address |address|, offset |offset|.
-    strict ReadConfig16(struct {
+    ReadConfig16(struct {
         address PciBdf;
         offset uint16;
     }) -> (struct {
@@ -109,7 +109,7 @@ closed protocol Pciroot {
         value uint16;
     });
     /// Read 32 bytes from config space for device at bdf address |address|, offset |offset|.
-    strict ReadConfig32(struct {
+    ReadConfig32(struct {
         address PciBdf;
         offset uint16;
     }) -> (struct {
@@ -117,7 +117,7 @@ closed protocol Pciroot {
         value uint32;
     });
     /// Write 8 bytes to config space for device at bdf |address| offset |offset|.
-    strict WriteConfig8(struct {
+    WriteConfig8(struct {
         address PciBdf;
         offset uint16;
         value uint8;
@@ -125,7 +125,7 @@ closed protocol Pciroot {
         s zx.Status;
     });
     /// Write 16 bytes to config space for device at bdf |address| offset |offset|.
-    strict WriteConfig16(struct {
+    WriteConfig16(struct {
         address PciBdf;
         offset uint16;
         value uint16;
@@ -133,7 +133,7 @@ closed protocol Pciroot {
         s zx.Status;
     });
     /// Write 32 bytes to config space for device at bdf |address| offset |offset|.
-    strict WriteConfig32(struct {
+    WriteConfig32(struct {
         address PciBdf;
         offset uint16;
         value uint32;
@@ -149,7 +149,7 @@ closed protocol Pciroot {
     ///
     /// An error will be returned if |size| cannot be fulfilled, |low| is set with |in_base|+|size|
     /// being >=4GB, or if a requested |in_base| cannot be provided.
-    strict GetAddressSpace(struct {
+    GetAddressSpace(struct {
         in_base uint64;
         size uint64;
         type PciAddressSpace;
@@ -161,7 +161,7 @@ closed protocol Pciroot {
         token zx.Handle:EVENTPAIR;
     });
     /// Allocate |msi_count| MSIs and return a handle to the backing MsiAllocation.
-    strict AllocateMsi(struct {
+    AllocateMsi(struct {
         msi_count uint32;
         can_target_64bit bool;
     }) -> (resource struct {

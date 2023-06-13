@@ -6,9 +6,9 @@ library fuchsia.examples.inspect;
 // [START reverser_fidl]
 // Implementation of a string reverser.
 @discoverable
-closed protocol Reverser {
+protocol Reverser {
     // Returns the input string reversed character-by-character.
-    strict Reverse(struct {
+    Reverse(struct {
         input string:1024;
     }) -> (struct {
         response string:1024;

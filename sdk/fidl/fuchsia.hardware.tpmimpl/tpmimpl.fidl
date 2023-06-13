@@ -32,9 +32,9 @@ type RegisterAddress = flexible enum : uint16 {
 const TPM_MAX_DATA_TRANSFER uint32 = 64;
 
 /// Provides access to a TPM device.
-closed protocol TpmImpl {
+protocol TpmImpl {
     /// Read |count| bytes from |address| in locality |locality|.
-    strict Read(struct {
+    Read(struct {
         locality Locality;
         address RegisterAddress;
         count uint32;
@@ -43,7 +43,7 @@ closed protocol TpmImpl {
     }) error zx.Status;
 
     /// Write |data| to |address| in |locality|.
-    strict Write(struct {
+    Write(struct {
         locality Locality;
         address RegisterAddress;
         data vector<uint8>:TPM_MAX_DATA_TRANSFER;

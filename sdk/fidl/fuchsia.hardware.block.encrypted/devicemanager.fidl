@@ -16,12 +16,12 @@ const MAX_KEY_SIZE uint32 = 256;
 /// This protocol allows the caller to make requests to unseal the device (by
 /// providing the appropriate key) and to seal the device (rendering its
 /// contents inaccessible).
-closed protocol DeviceManager {
+protocol DeviceManager {
     /// Formats the device, destroying any previously-secured data.  A new data
     /// key is generated and wrapped with the provided `key` into key slot `slot`,
     /// Returns `ZX_ERR_BAD_STATE` if the device is not currently sealed.
     /// Returns `ZX_OK` on success.
-    strict Format(struct {
+    Format(struct {
         key vector<uint8>:MAX_KEY_SIZE;
         slot uint8;
     }) -> (struct {
@@ -37,7 +37,7 @@ closed protocol DeviceManager {
     /// Returns `ZX_ERR_BAD_STATE` and keeps the device open if the device is already unsealed.
     /// Returns other errors if operations on the underlying block device return errors.
     /// Returns `ZX_OK` on success.
-    strict Unseal(struct {
+    Unseal(struct {
         key vector<uint8>:MAX_KEY_SIZE;
         slot uint8;
     }) -> (struct {
@@ -49,7 +49,7 @@ closed protocol DeviceManager {
     /// the unsealed child device is removed, but that's not straightforward today.)
     /// Returns `ZX_ERR_BAD_STATE` if the device is already sealed.
     /// Returns `ZX_OK` on success.
-    strict Seal() -> (struct {
+    Seal() -> (struct {
         status zx.Status;
     });
 
@@ -60,7 +60,7 @@ closed protocol DeviceManager {
     /// or the device is unbound.
     /// Returns `ZX_OK` on success.
     /// Returns other errors if operations on the underlying block device return errors.
-    strict Shred() -> (struct {
+    Shred() -> (struct {
         status zx.Status;
     });
 };

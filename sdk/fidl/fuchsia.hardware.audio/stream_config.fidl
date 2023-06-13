@@ -106,7 +106,7 @@ type StreamProperties = table {
 
 /// For an overview see
 /// [Audio Driver Streaming Interface](https://fuchsia.dev/fuchsia-src/concepts/drivers/driver_architectures/audio_drivers/audio_streaming)
-closed protocol StreamConfig {
+protocol StreamConfig {
     /// Allows providing driver health state.
     compose Health;
 
@@ -114,7 +114,7 @@ closed protocol StreamConfig {
     compose fuchsia.hardware.audio.signalprocessing.Connector;
 
     /// Retrieves top level static properties.
-    strict GetProperties() -> (struct {
+    GetProperties() -> (struct {
         properties StreamProperties;
     });
 
@@ -127,7 +127,7 @@ closed protocol StreamConfig {
     /// bits per sample. In the case where the driver supports either 16 or 32 bits samples at
     /// either 48 or 96KHz, the driver would reply with 1 `SupportedFormats`:
     /// <<16bits,32bits>,<48KHz,96KHz>>.
-    strict GetSupportedFormats() -> (struct {
+    GetSupportedFormats() -> (struct {
         supported_formats vector<SupportedFormats>:MAX_COUNT_FORMATS;
     });
 
@@ -137,7 +137,7 @@ closed protocol StreamConfig {
     /// ring buffer channel had been established and was still active, the driver must close that
     /// (ring buffer) channel and make every attempt to gracefully quiesce any on-going streaming
     /// operations in the process.
-    strict CreateRingBuffer(resource struct {
+    CreateRingBuffer(resource struct {
         format Format;
         ring_buffer server_end:RingBuffer;
     });
@@ -146,19 +146,19 @@ closed protocol StreamConfig {
     /// sent by the client and this reply must include a `gain_db` set to 0dB or lower. The driver
     /// will not respond to subsequent client `WatchGainState` calls until the gain state changes
     /// from what was most recently reported.
-    strict WatchGainState() -> (struct {
+    WatchGainState() -> (struct {
         gain_state GainState;
     });
 
     /// Client update of the gain state.
-    strict SetGain(struct {
+    SetGain(struct {
         target_state GainState;
     });
 
     /// Get the plug detect state via a hanging get. The driver will reply to the first
     /// `WatchPlugState` sent by the client. The driver will not respond to subsequent client
     /// `WatchPlugState` calls until the plug state changes from what was most recently reported.
-    strict WatchPlugState() -> (struct {
+    WatchPlugState() -> (struct {
         plug_state PlugState;
     });
 };

@@ -40,16 +40,16 @@ type Object = struct {
 // The `Inspect` interface provides a point for Components to expose
 // structured Objects for inspection. An Object may have 0 or more children.
 @discoverable
-closed protocol Inspect {
-    strict ReadData() -> (struct {
+protocol Inspect {
+    ReadData() -> (struct {
         object Object;
     });
-    strict ListChildren() -> (struct {
+    ListChildren() -> (struct {
         children_names vector<string:MAX>:MAX;
     });
     // Open a child of this Object by name.
     // The name should match what is returned by ListChildren.
-    strict OpenChild(resource struct {
+    OpenChild(resource struct {
         child_name string:MAX;
         child_channel server_end:Inspect;
     }) -> (struct {

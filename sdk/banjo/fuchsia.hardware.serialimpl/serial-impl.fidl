@@ -18,44 +18,44 @@ type SerialState = strict enum : uint32 {
 /// from these callbacks.
 @transport("Banjo")
 @banjo_layout("ddk-callback")
-closed protocol SerialNotify {
-    strict Callback(struct {
+protocol SerialNotify {
+    Callback(struct {
         state SerialState;
     }) -> ();
 };
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-closed protocol SerialImpl {
-    strict GetInfo() -> (struct {
+protocol SerialImpl {
+    GetInfo() -> (struct {
         s zx.Status;
         info fuchsia.hardware.serial.SerialPortInfo;
     });
     /// Configures the given serial port.
-    strict Config(struct {
+    Config(struct {
         baud_rate uint32;
         flags uint32;
     }) -> (struct {
         s zx.Status;
     });
-    strict Enable(struct {
+    Enable(struct {
         enable bool;
     }) -> (struct {
         s zx.Status;
     });
-    strict Read() -> (struct {
+    Read() -> (struct {
         s zx.Status;
         @buffer
         buf vector<uint8>:MAX;
     });
-    strict Write(struct {
+    Write(struct {
         @buffer
         buf vector<uint8>:MAX;
     }) -> (struct {
         s zx.Status;
         actual uint64;
     });
-    strict SetNotifyCallback(resource struct {
+    SetNotifyCallback(resource struct {
         cb client_end:SerialNotify;
     }) -> (struct {
         s zx.Status;

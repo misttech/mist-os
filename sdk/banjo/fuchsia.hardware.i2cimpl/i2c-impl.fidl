@@ -25,13 +25,13 @@ type I2cImplOp = struct {
 /// Low-level protocol for i2c drivers.
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-closed protocol I2cImpl {
-    strict GetMaxTransferSize() -> (struct {
+protocol I2cImpl {
+    GetMaxTransferSize() -> (struct {
         s zx.Status;
         size uint64;
     });
     /// Sets the bitrate for the i2c bus in KHz units.
-    strict SetBitrate(struct {
+    SetBitrate(struct {
         bitrate uint32;
     }) -> (struct {
         s zx.Status;
@@ -39,7 +39,7 @@ closed protocol I2cImpl {
     /// |Transact| assumes that all ops buf are not null.
     /// |Transact| assumes that all ops length are not zero.
     /// |Transact| assumes that at least the last op has stop set to true.
-    strict Transact(struct {
+    Transact(struct {
         op vector<I2cImplOp>:MAX;
     }) -> (struct {
         status zx.Status;

@@ -43,7 +43,7 @@ using zx;
 ///
 ///  TODO(fxbug.dev/24402): Migrate all implementations of `ViewProvider` to use `View`.
 @discoverable
-closed protocol View {
+protocol View {
     /// Updates the View's configuration.
     ///
     /// To prevent triggering UI changes shortly after a client starts up, the
@@ -51,7 +51,7 @@ closed protocol View {
     /// `AttachView()` unless the default is adequate.
     ///
     /// May be called again at any time to modify the view's configuration.
-    strict SetConfig(struct {
+    SetConfig(struct {
         config ViewConfig;
     });
 
@@ -60,7 +60,7 @@ closed protocol View {
     ///
     /// The View's implementation should pass the `view_token` to Scenic
     /// using a `fuchsia.ui.view.CreateViewCmd`.
-    strict Attach(resource struct {
+    Attach(resource struct {
         view_token zx.Handle:EVENTPAIR;
     });
 };

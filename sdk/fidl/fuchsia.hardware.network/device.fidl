@@ -104,11 +104,11 @@ type DeviceInfo = table {
 
 /// A Network Device.
 @available(added=HEAD)
-closed protocol Device {
+protocol Device {
     /// Obtain information about device
     ///
     /// - response `info` device information.
-    strict GetInfo() -> (struct {
+    GetInfo() -> (struct {
         info DeviceInfo;
     });
     /// Opens a new session with the network device.
@@ -125,7 +125,7 @@ closed protocol Device {
     /// contains invalid information.
     /// * error `ZX_ERR_INTERNAL` if the data VMO is rejected by the underlying
     /// device.
-    strict OpenSession(resource struct {
+    OpenSession(resource struct {
         session_name string:MAX_SESSION_NAME;
         session_info SessionInfo;
     }) -> (resource struct {
@@ -139,27 +139,27 @@ closed protocol Device {
     ///
     /// `port` is closed with a `ZX_ERR_NOT_FOUND` epitaph if no port with `id`
     /// exists.
-    strict GetPort(resource struct {
+    GetPort(resource struct {
         id PortId;
         port server_end:Port;
     });
     /// Connects a [`PortWatcher`] to this device.
     ///
     /// + request `watcher` server end of watcher channel.
-    strict GetPortWatcher(resource struct {
+    GetPortWatcher(resource struct {
         watcher server_end:PortWatcher;
     });
     /// Establishes a new connection to this device.
     ///
     /// + request `device` the server end for the new connection.
-    strict Clone(resource struct {
+    Clone(resource struct {
         device server_end:Device;
     });
 };
 
 /// Provides iteration over and updates for ports attached to a device.
 @available(added=HEAD)
-closed protocol PortWatcher {
+protocol PortWatcher {
     /// Get the next port event.
     ///
     /// The first N calls return [`DevicePortEvent.existing`] where N is the
@@ -174,7 +174,7 @@ closed protocol PortWatcher {
     /// hanging call to `Watch` at all times to avoid triggering this condition.
     ///
     /// - response `event` next port event.
-    strict Watch() -> (struct {
+    Watch() -> (struct {
         event DevicePortEvent;
     });
 };

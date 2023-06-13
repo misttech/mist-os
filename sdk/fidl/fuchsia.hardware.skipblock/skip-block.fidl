@@ -71,18 +71,18 @@ type WriteBytesOperation = resource struct {
 /// Skip-block partitions are used when data needs to be accessible by the bootloader. The
 /// bootloader doesn't understand the more advanced FTL partitions and this data isn't written
 /// frequently enough for performance or wear-leveling to be an issue.
-closed protocol SkipBlock {
+protocol SkipBlock {
     /// Returns information about the skip-block partition.
     ///
     /// The block count can shrink in the event that a bad block is grown. It is
     /// recommended to call this again after a bad block is grown.
-    strict GetPartitionInfo() -> (struct {
+    GetPartitionInfo() -> (struct {
         status zx.Status;
         partition_info PartitionInfo;
     });
 
     /// Reads the specified blocks into the provided vmo.
-    strict Read(resource struct {
+    Read(resource struct {
         op ReadWriteOperation;
     }) -> (struct {
         status zx.Status;
@@ -95,7 +95,7 @@ closed protocol SkipBlock {
     /// physical block map to change, all previously written blocks at logical
     /// addresses after the section being written should be considered corrupted,
     /// and rewritten if applicable.
-    strict Write(resource struct {
+    Write(resource struct {
         op ReadWriteOperation;
     }) -> (struct {
         status zx.Status;
@@ -112,7 +112,7 @@ closed protocol SkipBlock {
     /// physical block map to change, all previously written blocks at logical
     /// addresses after the section being written should be considered corrupted,
     /// and rewritten if applicable.
-    strict WriteBytes(resource struct {
+    WriteBytes(resource struct {
         op WriteBytesOperation;
     }) -> (struct {
         status zx.Status;
@@ -135,7 +135,7 @@ closed protocol SkipBlock {
     /// block range that covers the write range. If the method returns failure, fall back and
     /// re-write the backed-up data (can be updated with the new data) to the minimal block
     /// range using either WriteBytes or Write method.
-    strict WriteBytesWithoutErase(resource struct {
+    WriteBytesWithoutErase(resource struct {
         op WriteBytesOperation;
     }) -> (struct {
         status zx.Status;

@@ -16,8 +16,8 @@ using fuchsia.ui.views;
 /// Teardown may occur via the session shell calling StoryController.Stop(), the
 /// sessionmgr being terminated, or by the system shutting down.
 @discoverable // Created by story shell applications.
-closed protocol StoryShell {
-    strict Initialize(resource struct {
+protocol StoryShell {
+    Initialize(resource struct {
         story_shell_context client_end:StoryShellContext;
     });
 
@@ -28,30 +28,30 @@ closed protocol StoryShell {
     /// `view_connection` the new view and the associated Surface ID.
     /// `surface_info` metadata relating to the Surface.
     @transitional("Implement AddSurface3 instead")
-    strict AddSurface(resource struct {
+    AddSurface(resource struct {
         view_connection ViewConnection;
         surface_info SurfaceInfo;
     });
     /// DEPRECATED.  For transition purposes only.
     @transitional("Implement AddSurface3 instead")
-    strict AddSurface2(resource struct {
+    AddSurface2(resource struct {
         view_connection ViewConnection2;
         surface_info SurfaceInfo;
     });
     /// For transition purposes only.
     @transitional("Only implement while AddSurface is transitional")
-    strict AddSurface3(resource struct {
+    AddSurface3(resource struct {
         view_connection ViewConnection;
         surface_info SurfaceInfo2;
     });
 
     /// Focuses the surface with surface_id, bringing it to the foreground.
-    strict FocusSurface(struct {
+    FocusSurface(struct {
         surface_id string:MAX;
     });
 
     /// Defocuses the surface with surface_id, dismissing it to the background.
-    strict DefocusSurface(struct {
+    DefocusSurface(struct {
         surface_id string:MAX;
     }) -> ();
 
@@ -59,7 +59,7 @@ closed protocol StoryShell {
     /// a user interaction or requested by the framework through
     /// StoryController#FocusModule.
     /// EXPERIMENTAL
-    strict -> OnSurfaceFocused(struct {
+    -> OnSurfaceFocused(struct {
         surface_id string:MAX;
     });
 
@@ -67,7 +67,7 @@ closed protocol StoryShell {
     /// final. The Surface is removed from the graph. If necessary, the
     /// associated Surface is defocused. There is no expectation that
     /// DefocusSurface is called before this.
-    strict RemoveSurface(struct {
+    RemoveSurface(struct {
         surface_id string:MAX;
     });
 
@@ -80,19 +80,19 @@ closed protocol StoryShell {
     /// E.g called when an intent resolves to a module that is known by the
     /// caller to already be running, to update associated metadata.
     @transitional("Implement UpdateSurface3 instead")
-    strict UpdateSurface(resource struct {
+    UpdateSurface(resource struct {
         view_connection ViewConnection;
         surface_info SurfaceInfo;
     });
     /// DEPRECATED.  For transition purposes only.
     @transitional("Implement UpdateSurface3 instead")
-    strict UpdateSurface2(resource struct {
+    UpdateSurface2(resource struct {
         view_connection ViewConnection2;
         surface_info SurfaceInfo;
     });
     /// For transition purposes only.
     @transitional("Only implement while UpdateSurface is transitional")
-    strict UpdateSurface3(resource struct {
+    UpdateSurface3(resource struct {
         view_connection ViewConnection;
         surface_info SurfaceInfo2;
     });
@@ -159,7 +159,7 @@ type SurfaceInfo2 = resource table {
 };
 
 /// The story shell receives this protocol upon initialization.
-closed protocol StoryShellContext {};
+protocol StoryShellContext {};
 
 /// Defines the visual state of the Story shell.
 type StoryVisualState = strict enum {

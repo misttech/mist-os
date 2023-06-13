@@ -467,7 +467,7 @@ type GetMeshPathTableRequest = struct {
 
 // Because these methods rely on an external entity to provide a response, events are used instead
 // of return values.
-closed protocol MLME {
+protocol MLME {
     // We deviate from the spec for scanning in order to support incremental
     // scan results easily. We could stay closer to 802.11ai, but the protocol
     // that is described there is more difficult to implement correctly.
@@ -484,28 +484,28 @@ closed protocol MLME {
     // in response (unless the channel is closed first).
     //
     // After `OnScanEnd`, no further events with the same `txn_id` shall be sent.
-    strict StartScan(struct {
+    StartScan(struct {
         req ScanRequest;
     });
 
     // An incremental scan result containing information about a single BSS.
     // Only one event per unique BSSID per transaction will be sent.
-    strict -> OnScanResult(struct {
+    -> OnScanResult(struct {
         result ScanResult;
     });
 
     // An event that signals the end of a scan transaction.
-    strict -> OnScanEnd(struct {
+    -> OnScanEnd(struct {
         end ScanEnd;
     });
 
-    strict ConnectReq(struct {
+    ConnectReq(struct {
         req ConnectRequest;
     });
-    strict -> ConnectConf(struct {
+    -> ConnectConf(struct {
         resp ConnectConfirm;
     });
-    strict ReconnectReq(struct {
+    ReconnectReq(struct {
         req ReconnectRequest;
     });
 
@@ -513,188 +513,188 @@ closed protocol MLME {
     /// Note that an unsuccessful roam attempt does not imply disassociation. Where a roam
     /// failure causes underlying driver (e.g. fullmac) to disassociate, the underlying
     /// driver must explicitly disassociate.
-    strict -> RoamConf(struct {
+    -> RoamConf(struct {
         resp RoamConfirm;
     });
 
-    strict -> AuthenticateInd(struct {
+    -> AuthenticateInd(struct {
         ind AuthenticateIndication;
     });
-    strict AuthenticateResp(struct {
+    AuthenticateResp(struct {
         resp AuthenticateResponse;
     });
 
-    strict DeauthenticateReq(struct {
+    DeauthenticateReq(struct {
         req DeauthenticateRequest;
     });
-    strict -> DeauthenticateConf(struct {
+    -> DeauthenticateConf(struct {
         resp DeauthenticateConfirm;
     });
 
-    strict -> DeauthenticateInd(struct {
+    -> DeauthenticateInd(struct {
         ind DeauthenticateIndication;
     });
 
-    strict -> AssociateInd(struct {
+    -> AssociateInd(struct {
         ind AssociateIndication;
     });
-    strict AssociateResp(struct {
+    AssociateResp(struct {
         resp AssociateResponse;
     });
 
-    strict DisassociateReq(struct {
+    DisassociateReq(struct {
         req DisassociateRequest;
     });
-    strict -> DisassociateConf(struct {
+    -> DisassociateConf(struct {
         resp DisassociateConfirm;
     });
 
-    strict -> DisassociateInd(struct {
+    -> DisassociateInd(struct {
         ind DisassociateIndication;
     });
 
-    strict ResetReq(struct {
+    ResetReq(struct {
         req ResetRequest;
     });
 
-    strict StartReq(struct {
+    StartReq(struct {
         req StartRequest;
     });
-    strict -> StartConf(struct {
+    -> StartConf(struct {
         resp StartConfirm;
     });
 
-    strict StopReq(struct {
+    StopReq(struct {
         req StopRequest;
     });
-    strict -> StopConf(struct {
+    -> StopConf(struct {
         resp StopConfirm;
     });
 
-    strict SetKeysReq(struct {
+    SetKeysReq(struct {
         req SetKeysRequest;
     });
-    strict -> SetKeysConf(struct {
+    -> SetKeysConf(struct {
         conf SetKeysConfirm;
     });
 
-    strict DeleteKeysReq(struct {
+    DeleteKeysReq(struct {
         req DeleteKeysRequest;
     });
 
-    strict EapolReq(struct {
+    EapolReq(struct {
         req EapolRequest;
     });
-    strict -> EapolConf(struct {
+    -> EapolConf(struct {
         resp EapolConfirm;
     });
 
     // The following are extensions to the 802.11 MLME SAP interface.
 
-    strict -> IncomingMpOpenAction(struct {
+    -> IncomingMpOpenAction(struct {
         action MeshPeeringOpenAction;
     });
-    strict SendMpOpenAction(struct {
+    SendMpOpenAction(struct {
         action MeshPeeringOpenAction;
     });
-    strict -> IncomingMpConfirmAction(struct {
+    -> IncomingMpConfirmAction(struct {
         action MeshPeeringConfirmAction;
     });
-    strict SendMpConfirmAction(struct {
+    SendMpConfirmAction(struct {
         action MeshPeeringConfirmAction;
     });
 
-    strict MeshPeeringEstablished(struct {
+    MeshPeeringEstablished(struct {
         peering MeshPeeringParams;
     });
 
-    strict GetMeshPathTableReq(struct {
+    GetMeshPathTableReq(struct {
         req GetMeshPathTableRequest;
     }) -> (struct {
         table fuchsia.wlan.mesh.MeshPathTable;
     });
 
-    strict -> SignalReport(struct {
+    -> SignalReport(struct {
         ind internal.SignalReportIndication;
     });
 
-    strict -> EapolInd(struct {
+    -> EapolInd(struct {
         ind EapolIndication;
     });
-    strict SetControlledPort(struct {
+    SetControlledPort(struct {
         req SetControlledPortRequest;
     });
 
-    strict QueryDeviceInfo() -> (struct {
+    QueryDeviceInfo() -> (struct {
         info DeviceInfo;
     });
 
-    strict QueryDiscoverySupport() -> (struct {
+    QueryDiscoverySupport() -> (struct {
         resp fuchsia.wlan.common.DiscoverySupport;
     });
-    strict QueryMacSublayerSupport() -> (struct {
+    QueryMacSublayerSupport() -> (struct {
         resp fuchsia.wlan.common.MacSublayerSupport;
     });
-    strict QuerySecuritySupport() -> (struct {
+    QuerySecuritySupport() -> (struct {
         resp fuchsia.wlan.common.SecuritySupport;
     });
-    strict QuerySpectrumManagementSupport() -> (struct {
+    QuerySpectrumManagementSupport() -> (struct {
         resp fuchsia.wlan.common.SpectrumManagementSupport;
     });
 
-    strict GetIfaceCounterStats() -> (struct {
+    GetIfaceCounterStats() -> (struct {
         resp GetIfaceCounterStatsResponse;
     });
-    strict GetIfaceHistogramStats() -> (struct {
+    GetIfaceHistogramStats() -> (struct {
         resp GetIfaceHistogramStatsResponse;
     });
 
-    strict ListMinstrelPeers() -> (struct {
+    ListMinstrelPeers() -> (struct {
         resp MinstrelListResponse;
     });
-    strict GetMinstrelStats(struct {
+    GetMinstrelStats(struct {
         req MinstrelStatsRequest;
     }) -> (struct {
         resp MinstrelStatsResponse;
     });
 
-    strict StartCaptureFrames(struct {
+    StartCaptureFrames(struct {
         req StartCaptureFramesRequest;
     }) -> (struct {
         resp StartCaptureFramesResponse;
     });
-    strict StopCaptureFrames();
-    strict -> RelayCapturedFrame(struct {
+    StopCaptureFrames();
+    -> RelayCapturedFrame(struct {
         result CapturedFrameResult;
     });
 
-    strict -> OnChannelSwitched(struct {
+    -> OnChannelSwitched(struct {
         info internal.ChannelSwitchInfo;
     });
 
-    strict -> OnPmkAvailable(struct {
+    -> OnPmkAvailable(struct {
         info PmkInfo;
     });
 
     /// MLME notification that SME will handle SAE authentication.
-    strict -> OnSaeHandshakeInd(struct {
+    -> OnSaeHandshakeInd(struct {
         ind SaeHandshakeIndication;
     });
     /// Notifies that SAE authentication is completed.
-    strict SaeHandshakeResp(struct {
+    SaeHandshakeResp(struct {
         resp SaeHandshakeResponse;
     });
     /// Transmits SAE frame (if SME is managing SAE authentication).
-    strict SaeFrameTx(struct {
+    SaeFrameTx(struct {
         frame SaeFrame;
     });
     /// Receives SAE frame (if SME is managing SAE authentication).
-    strict -> OnSaeFrameRx(struct {
+    -> OnSaeFrameRx(struct {
         frame SaeFrame;
     });
 
-    strict WmmStatusReq();
-    strict -> OnWmmStatusResp(struct {
+    WmmStatusReq();
+    -> OnWmmStatusResp(struct {
         status int32;
         resp internal.WmmStatusResponse;
     });
@@ -702,7 +702,7 @@ closed protocol MLME {
     // For SoftMAC drivers only. Let SME inform MLME about the capability negotiation outcome.
     // TODO(fxbug.dev/43063): If we are able to intersect the capabilities with beacon before associating,
     // remove this function and the capabilities from AssociateConfirm and use AssociateRequest.
-    strict FinalizeAssociationReq(struct {
+    FinalizeAssociationReq(struct {
         negotiated_capabilities NegotiatedCapabilities;
     });
 };
@@ -710,8 +710,8 @@ closed protocol MLME {
 // Temporary interface for bridging between the devhost-owned channel model and
 // the driver-owned channel model of connection management.
 /// This protocol is used to connect to the interface's underlying MLME.
-closed protocol Connector {
-    strict Connect(resource struct {
+protocol Connector {
+    Connect(resource struct {
         request server_end:MLME;
     });
 };

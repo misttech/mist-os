@@ -23,30 +23,30 @@ type NoopTable = table {
 };
 
 @discoverable
-closed protocol Noop {
-    strict DoStringNoop(struct {
+protocol Noop {
+    DoStringNoop(struct {
         value string:255;
     }) -> ();
 
-    strict DoIntNoop(struct {
+    DoIntNoop(struct {
         value int32;
     }) -> ();
 
-    strict DoTableNoop(struct {
+    DoTableNoop(struct {
         tab NoopTable;
     }) -> ();
 
-    strict DoHandleNoop(resource struct {
+    DoHandleNoop(resource struct {
         server_end zx.Handle:CHANNEL;
     }) -> ();
 
-    strict DoVectorNoop(struct {
+    DoVectorNoop(struct {
         v vector<string:255>:255;
     }) -> ();
 
-    strict DoBitsNoop(struct {
+    DoBitsNoop(struct {
         b SomeBits;
     }) -> ();
 
-    strict DoNoop() -> ();
+    DoNoop() -> ();
 };

@@ -10,12 +10,10 @@ using fuchsia.hardware.audio.signalprocessing;
 const MAX_UI_STRING_SIZE uint32 = 256;
 const MAX_FORMAT_RANGES uint32 = 64;
 // Can't have more ring buffers than processing elements.
-
-        const MAX_COUNT_RING_BUFFERS uint32
+const MAX_COUNT_RING_BUFFERS uint32
         = fuchsia.hardware.audio.signalprocessing.MAX_COUNT_PROCESSING_ELEMENTS;
 // Can't have more DAI interconnects than processing elements.
-
-        const MAX_COUNT_DAI_INTERCONNECTS uint32
+const MAX_COUNT_DAI_INTERCONNECTS uint32
         = fuchsia.hardware.audio.signalprocessing.MAX_COUNT_PROCESSING_ELEMENTS;
 
 const CONTROL_NODE_NAME string = "sys/platform/00:00:2f/virtual_audio";
@@ -36,9 +34,9 @@ type Direction = table {
 /// This protocol provides methods for adding and removing virtual audio
 /// devices. This protocol is made available through the device tree via
 /// `CONTROL_NODE_NAME`.
-closed protocol Control {
+protocol Control {
     /// Returns the default configuration for the given device type and direction.
-    strict GetDefaultConfiguration(struct {
+    GetDefaultConfiguration(struct {
         type DeviceType;
         direction Direction;
     }) -> (struct {
@@ -47,7 +45,7 @@ closed protocol Control {
 
     /// Adds a device to the device tree.
     /// The device lives until the `Device` FIDL channel is closed.
-    strict AddDevice(resource struct {
+    AddDevice(resource struct {
         config Configuration;
         server server_end:Device;
     }) -> () error Error;
@@ -55,14 +53,14 @@ closed protocol Control {
     /// Returns the number of active input and output devices and devices with unspecified
     /// direction.
     // TODO(fxbug.dev/124865): Consider adding per-driver type info here.
-    strict GetNumDevices() -> (struct {
+    GetNumDevices() -> (struct {
         num_input_devices uint32;
         num_output_devices uint32;
         num_unspecified_direction_devices uint32;
     });
 
     /// Synchronously remove all all active input and output devices.
-    strict RemoveAll() -> ();
+    RemoveAll() -> ();
 };
 
 /// Configures a virtual audio device.
@@ -371,10 +369,10 @@ type PlugProperties = table {
 /// This protocol represents the base functionality of active audio devices. A
 /// device is active until this protocol is closed, at which point the device is
 /// automatically removed.
-closed protocol Device {
+protocol Device {
     /// Returns the format selected by the client, or `NO_RING_BUFFER` if the
     /// client has not yet selected a ring buffer format.
-    strict GetFormat() -> (struct {
+    GetFormat() -> (struct {
         frames_per_second uint32;
         sample_format uint32;
         num_channels uint32;
@@ -382,7 +380,7 @@ closed protocol Device {
     }) error Error;
 
     /// Notifies all subscribed listeners when the above format is set or changed.
-    strict -> OnSetFormat(struct {
+    -> OnSetFormat(struct {
         frames_per_second uint32;
         sample_format uint32;
         num_channels uint32;
@@ -390,14 +388,14 @@ closed protocol Device {
     });
 
     /// Returns the current gain state for this device.
-    strict GetGain() -> (struct {
+    GetGain() -> (struct {
         current_mute bool;
         current_agc bool;
         current_gain_db float32;
     }) error Error;
 
     /// Notifies all subscribed listeners when the above gain is set or changed.
-    strict -> OnSetGain(struct {
+    -> OnSetGain(struct {
         current_mute bool;
         current_agc bool;
         current_gain_db float32;
@@ -405,7 +403,7 @@ closed protocol Device {
 
     /// Returns details about the ring buffer. Returns `NO_RING_BUFFER` if the
     /// client has not yet created the ring buffer.
-    strict GetBuffer() -> (resource struct {
+    GetBuffer() -> (resource struct {
         ring_buffer zx.Handle:VMO;
         num_ring_buffer_frames uint32;
         notifications_per_ring uint32;
@@ -413,7 +411,7 @@ closed protocol Device {
 
     /// Notifies all subscribed listeners when the above buffer has been
     /// created.
-    strict -> OnBufferCreated(resource struct {
+    -> OnBufferCreated(resource struct {
         ring_buffer zx.Handle:VMO;
         num_ring_buffer_frames uint32;
         notifications_per_ring uint32;
@@ -423,14 +421,14 @@ closed protocol Device {
     /// This affects the frequency of `OnPositionNotify` events only. It does
     /// not affect the frequency of notification events sent through the audio
     /// driver APIs.
-    strict SetNotificationFrequency(struct {
+    SetNotificationFrequency(struct {
         notifications_per_ring uint32;
     }) -> () error Error;
 
     /// Notifies all subscribed listeners when the device is commanded to Start
     /// streaming. This can only occur after a device is fully configured
     /// (format is set; ring buffer is established and fetched).
-    strict -> OnStart(struct {
+    -> OnStart(struct {
         start_time zx.Time;
     });
 
@@ -439,7 +437,7 @@ closed protocol Device {
     /// returns the device to a fully-configured state. Upon this command, the
     /// already-set format and ring buffer are retained without change, but
     /// position will re-begin at 0, if the device is again Started.
-    strict -> OnStop(struct {
+    -> OnStop(struct {
         stop_time zx.Time;
         ring_position uint32;
     });
@@ -448,7 +446,7 @@ closed protocol Device {
     /// with the time (per MONOTONIC clock) that corresponds with that position.
     /// This can only be called after the ring buffer is established. Returns
     /// `NOT_STARTED` if the device has not yet Started streaming.
-    strict GetPosition() -> (struct {
+    GetPosition() -> (struct {
         monotonic_time zx.Time;
         ring_position uint32; // position in bytes
     }) error Error;
@@ -457,14 +455,14 @@ closed protocol Device {
     /// issued by the driver. The frequency of these per-stream notifications is
     /// set by whoever opened the device,, though the frequency can be overriden
     /// by `SetNotificationFrequency`.
-    strict -> OnPositionNotify(struct {
+    -> OnPositionNotify(struct {
         monotonic_time zx.Time;
         ring_position uint32; // position in bytes
     });
 
     /// Hot-plugs or hot-unplugs an active virtual device, at the specified
     /// time.
-    strict ChangePlugState(struct {
+    ChangePlugState(struct {
         plug_change_time zx.Time;
         plugged bool;
     }) -> () error Error;
@@ -473,7 +471,7 @@ closed protocol Device {
     /// timing and content of position notifications the driver emits.
     /// 'ppm_monotonic' cannot exceed [-1000,+1000]. Each rate change in rate is
     /// standalone; i.e. successive rate changes are not cumulative.
-    strict AdjustClockRate(struct {
+    AdjustClockRate(struct {
         ppm_from_monotonic int32;
     }) -> () error Error;
 };

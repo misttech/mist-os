@@ -61,12 +61,12 @@ type PublicKey = struct {
 };
 
 @discoverable
-closed protocol KeyManager {
+protocol KeyManager {
     /// Seal data to an encrypted form.
     ///
     /// Seal data to an encrypted form. The sealed data can only be unsealed by the same KMS instance
     /// by using UnsealData. `plain_text` needs to be less than `MAX_DATA_SIZE` bytes.
-    strict SealData(resource struct {
+    SealData(resource struct {
         plain_text mem.Buffer;
     }) -> (resource struct {
         cipher_text mem.Buffer;
@@ -75,7 +75,7 @@ closed protocol KeyManager {
     /// Unseal sealed data.
     ///
     /// Unseal data previously sealed by this KMS instance.
-    strict UnsealData(resource struct {
+    UnsealData(resource struct {
         cipher_text mem.Buffer;
     }) -> (resource struct {
         plain_text mem.Buffer;
@@ -87,7 +87,7 @@ closed protocol KeyManager {
     /// asymmetric key interface request. If the `key_name` is not unique, you would get
     /// `KEY_ALREADY_EXISTS`. The generated key can be used to sign data. The algorithm used for
     /// generating asymmetric key is `ECDSA_SHA512_P521`.
-    strict GenerateAsymmetricKey(resource struct {
+    GenerateAsymmetricKey(resource struct {
         key_name string:MAX_KEY_NAME_SIZE;
         key server_end:AsymmetricPrivateKey;
     }) -> () error Error;
@@ -97,7 +97,7 @@ closed protocol KeyManager {
     /// Generate an asymmetric key using `key_name` as the unique name and `key_algorithm` as
     /// algorithm. `key` is the generated asymmetric key interface request. If the `key_name` is not
     /// unique, you would get `KEY_ALREADY_EXISTS`.
-    strict GenerateAsymmetricKeyWithAlgorithm(resource struct {
+    GenerateAsymmetricKeyWithAlgorithm(resource struct {
         key_name string:MAX_KEY_NAME_SIZE;
         key_algorithm AsymmetricKeyAlgorithm;
         key server_end:AsymmetricPrivateKey;
@@ -109,7 +109,7 @@ closed protocol KeyManager {
     /// algorithm and `data` as key data. `key` is imported asymmetric key interface request. Key
     /// data should be in asn.1 encoded DER format. If the `key_name` is not unique, you would get
     /// `KEY_ALREADY_EXISTS`.
-    strict ImportAsymmetricPrivateKey(resource struct {
+    ImportAsymmetricPrivateKey(resource struct {
         data vector<uint8>:MAX;
         key_name string:MAX_KEY_NAME_SIZE;
         key_algorithm AsymmetricKeyAlgorithm;
@@ -120,7 +120,7 @@ closed protocol KeyManager {
     ///
     /// Get an asymmetric private key handle using the `key_name`. If such key is not found, would
     /// return `KEY_NOT_FOUND`.
-    strict GetAsymmetricPrivateKey(resource struct {
+    GetAsymmetricPrivateKey(resource struct {
         key_name string:MAX_KEY_NAME_SIZE;
         key server_end:AsymmetricPrivateKey;
     }) -> () error Error;
@@ -130,38 +130,38 @@ closed protocol KeyManager {
     /// Delete a key for `key_name`.  For all the current handle to the deleted key, they would
     /// become invalid and all following requests on those handles would return `KEY_NOT_FOUND`, user
     /// should close the invalid handles once get `KEY_NOT_FOUND` error.
-    strict DeleteKey(struct {
+    DeleteKey(struct {
         key_name string:MAX_KEY_NAME_SIZE;
     }) -> () error Error;
 };
 
-closed protocol Key {
+protocol Key {
     /// Get the key origin (generated/imported).
-    strict GetKeyOrigin() -> (struct {
+    GetKeyOrigin() -> (struct {
         key_origin KeyOrigin;
     }) error Error;
 
     /// Get the name for the crypto provider backing up the key.
-    strict GetKeyProvider() -> (struct {
+    GetKeyProvider() -> (struct {
         key_provider KeyProvider;
     }) error Error;
 };
 
-closed protocol AsymmetricPrivateKey {
+protocol AsymmetricPrivateKey {
     compose Key;
 
     /// Sign `data` using the current key. `data` needs to be less than `MAX_DATA_SIZE` bytes.
-    strict Sign(resource struct {
+    Sign(resource struct {
         data mem.Buffer;
     }) -> (struct {
         signature Signature;
     }) error Error;
     /// Get the DER format public key for the current private key.
-    strict GetPublicKey() -> (struct {
+    GetPublicKey() -> (struct {
         public_key PublicKey;
     }) error Error;
     /// Get the key algorithm.
-    strict GetKeyAlgorithm() -> (struct {
+    GetKeyAlgorithm() -> (struct {
         key_algorithm AsymmetricKeyAlgorithm;
     }) error Error;
 };

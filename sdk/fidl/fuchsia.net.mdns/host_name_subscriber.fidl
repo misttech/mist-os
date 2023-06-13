@@ -7,13 +7,13 @@ library fuchsia.net.mdns;
 /// Discoverable protocol for subscribing to address changes for given host names.
 @available(added=9)
 @discoverable
-closed protocol HostNameSubscriber {
+protocol HostNameSubscriber {
     /// Gets the addresses for the specified host.
     ///
     /// + request `host` the simple name of the host.
     /// + request `options` options to be applied to the subscription.
     /// + request `listener` client end of the `HostNameSubscriptionListener` channel.
-    strict SubscribeToHostName(resource struct {
+    SubscribeToHostName(resource struct {
         host host_name;
         options HostNameSubscriptionOptions;
         listener client_end:HostNameSubscriptionListener;
@@ -42,9 +42,9 @@ type HostNameSubscriptionOptions = table {
 /// throttle traffic. The service won't necessarily wait for a reply before
 /// calling another method.
 @available(added=9)
-closed protocol HostNameSubscriptionListener {
+protocol HostNameSubscriptionListener {
     /// Notifies the subscriber that the addresses associated with a host name have changed.
-    strict OnAddressesChanged(struct {
+    OnAddressesChanged(struct {
         addresses vector<HostAddress>:MAX_ADDRESSES;
     }) -> ();
 };

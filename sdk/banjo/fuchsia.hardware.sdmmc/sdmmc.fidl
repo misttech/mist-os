@@ -119,46 +119,46 @@ type SdmmcVmoRight = strict enum : uint32 {
 
 @transport("Banjo")
 @banjo_layout("ddk-interface")
-closed protocol InBandInterrupt {
-    strict Callback() -> ();
+protocol InBandInterrupt {
+    Callback() -> ();
 };
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-closed protocol Sdmmc {
+protocol Sdmmc {
     /// Get host info.
-    strict HostInfo() -> (struct {
+    HostInfo() -> (struct {
         s zx.Status;
         info SdmmcHostInfo;
     });
     /// Set signal voltage.
-    strict SetSignalVoltage(struct {
+    SetSignalVoltage(struct {
         voltage SdmmcVoltage;
     }) -> (struct {
         s zx.Status;
     });
     /// Set bus width.
-    strict SetBusWidth(struct {
+    SetBusWidth(struct {
         bus_width SdmmcBusWidth;
     }) -> (struct {
         s zx.Status;
     });
     /// Set bus frequency, zero means disable the clock to the card.
-    strict SetBusFreq(struct {
+    SetBusFreq(struct {
         bus_freq uint32;
     }) -> (struct {
         s zx.Status;
     });
     /// Set mmc timing.
-    strict SetTiming(struct {
+    SetTiming(struct {
         timing SdmmcTiming;
     }) -> (struct {
         s zx.Status;
     });
     /// Issue a hw reset.
-    strict HwReset() -> ();
+    HwReset() -> ();
     /// Perform tuning.
-    strict PerformTuning(struct {
+    PerformTuning(struct {
         cmd_idx uint32;
     }) -> (struct {
         s zx.Status;
@@ -167,13 +167,13 @@ closed protocol Sdmmc {
     /// card. Before calling the callback the protocol implementation will disable the in-band
     /// interrupt in the controller. In-band interrupts can be re-enabled by calling
     /// `AckInBandInterrupt()` once the previous interrupt has been handled by the client.
-    strict RegisterInBandInterrupt(resource struct {
+    RegisterInBandInterrupt(resource struct {
         @in_out
         interrupt_cb client_end:InBandInterrupt;
     }) -> (struct {
         s zx.Status;
     });
-    strict AckInBandInterrupt();
+    AckInBandInterrupt();
 
     /// In the methods below, vmo_id is used to uniquely identify a VMO that will be passed to
     /// Request in an SdmmcBufferRegion. VMO IDs are chosen by the caller, and may be any uint32
@@ -185,7 +185,7 @@ closed protocol Sdmmc {
     /// unregistered. client_id may be in [0, SDMMC_MAX_CLIENT_ID] and identifies the ID space for
     /// this VMO to be registered in (that is, two different VMOs may use the same ID if they are
     /// registered for different clients).
-    strict RegisterVmo(resource struct {
+    RegisterVmo(resource struct {
         vmo_id uint32;
         client_id uint8;
         vmo zx.Handle:VMO;
@@ -196,7 +196,7 @@ closed protocol Sdmmc {
         status zx.Status;
     });
     /// The callee unmaps/unpins the VMO and returns ownership to the caller.
-    strict UnregisterVmo(struct {
+    UnregisterVmo(struct {
         vmo_id uint32;
         client_id uint8;
     }) -> (resource struct {
@@ -221,7 +221,7 @@ closed protocol Sdmmc {
     /// - Call zx_cache_flush with ZX_CACHE_FLUSH_DATA on buffers that have been mapped by the
     ///   client.
     /// - Call zx_vmo_op_range with ZX_VMO_OP_CACHE_CLEAN on all other buffers.
-    strict Request(resource struct {
+    Request(resource struct {
         req SdmmcReq;
     }) -> (struct {
         status zx.Status;

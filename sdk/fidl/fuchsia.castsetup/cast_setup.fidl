@@ -5,10 +5,10 @@ library fuchsia.castsetup;
 
 /// Interface that allows watching of changes to the cast setup state.
 @discoverable
-closed protocol StateWatcher {
+protocol StateWatcher {
     /// Will immediately return on first call; subsequent calls will return on
     /// change.
-    strict Watch() -> (struct {
+    Watch() -> (struct {
         state State;
     });
 };

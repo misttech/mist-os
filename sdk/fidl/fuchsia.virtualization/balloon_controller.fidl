@@ -13,7 +13,7 @@ type MemStat = struct {
 
 /// A `BalloonController` controls a guest instance's memory balloon.
 @discoverable
-closed protocol BalloonController {
+protocol BalloonController {
     /// Get the current and requested number of pages in the memory balloon.
     ///
     /// current_num_pages is the number of pages balloon has right now.
@@ -21,7 +21,7 @@ closed protocol BalloonController {
     ///
     /// 'current_num_pages' corresponds to the 'actual' virtio-balloon config field
     /// 'requested_num_pages' corresponds to the 'num_pages' virtio-balloon config field.
-    strict GetBalloonSize() -> (struct {
+    GetBalloonSize() -> (struct {
         current_num_pages uint32;
         requested_num_pages uint32;
     });
@@ -32,12 +32,12 @@ closed protocol BalloonController {
     /// value, the guest driver SHOULD provide additional pages to the memory balloon.
     /// If `requested_num_pages` is less than the 'current_num_pages' config value,
     /// the guest driver MAY reclaim pages from the memory balloon.
-    strict RequestNumPages(struct {
+    RequestNumPages(struct {
         requested_num_pages uint32;
     });
 
     /// Get memory statistics of the guest instance.
-    strict GetMemStats() -> (struct {
+    GetMemStats() -> (struct {
         status zx.Status;
         mem_stats vector<MemStat>:<MAX, optional>;
     });

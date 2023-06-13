@@ -5,7 +5,6 @@
 // fidl_experiment = output_index_json
 // fidl_experiment = simple_empty_response_syntax
 // fidl_experiment = unknown_interactions
-// fidl_experiment = unknown_interactions_mandate
 
 library fidl_test_typesinprotocols_test;
 

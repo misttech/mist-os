@@ -147,7 +147,7 @@ const INO_UNKNOWN uint64 = 0xFFFFFFFFFFFFFFFF;
 /// path to the entry the event is refering to. It will be empty if
 /// the event isn't referencing a particular entry (e.g. for the
 /// `IDLE` event).
-closed protocol DirectoryWatcher {};
+protocol DirectoryWatcher {};
 
 type WatchEvent = strict enum : uint8 {
     /// Indicates the directory being watched has been deleted. The name returned for this event
@@ -177,13 +177,13 @@ type WatchMask = strict bits : uint32 {
     IDLE = 0x00000010;
 };
 
-closed protocol Directory {
+protocol Directory {
     compose Directory1;
     compose Directory2;
 };
 
 // Extracted from Directory1 for composition with protocols in other libraries.
-closed protocol Openable {
+protocol Openable {
     /// Opens a new object relative to this directory object.
     ///
     /// `path` may contain multiple segments, separated by "/" characters, and should never be
@@ -205,7 +205,7 @@ closed protocol Openable {
     /// `mode` is ignored.
     @available(deprecated=11, removed=12, note="Use the new signature of Open.")
     @selector("fuchsia.io1/Directory.Open")
-    strict Open(resource struct {
+    Open(resource struct {
         flags OpenFlags;
         mode ModeType;
         path string:MAX_PATH;
@@ -233,7 +233,7 @@ closed protocol Openable {
     /// `mode` is ignored.
     @available(added=12)
     @selector("fuchsia.io1/Directory.Open")
-    strict Open(resource struct {
+    Open(resource struct {
         flags OpenFlags;
         mode ModeType;
         path string:MAX_PATH_LENGTH;
@@ -242,7 +242,7 @@ closed protocol Openable {
 };
 
 /// Directory defines a node which is capable of containing other Objects.
-closed protocol Directory1 {
+protocol Directory1 {
     compose Node1;
     compose Openable;
 
@@ -272,7 +272,7 @@ closed protocol Directory1 {
     /// This method does not require any rights, since one could always probe for
     /// directory contents by triggering name conflicts during file creation.
     @selector("fuchsia.io1/Directory.ReadDirents")
-    strict ReadDirents(struct {
+    ReadDirents(struct {
         max_bytes uint64;
     }) -> (struct {
         s zx.Status;
@@ -283,7 +283,7 @@ closed protocol Directory1 {
     ///
     /// This method does not require any rights, similar to ReadDirents.
     @selector("fuchsia.io1/Directory.Rewind")
-    strict Rewind() -> (struct {
+    Rewind() -> (struct {
         s zx.Status;
     });
 
@@ -294,7 +294,7 @@ closed protocol Directory1 {
     /// This method requires following rights: `OpenFlags.RIGHT_WRITABLE`, otherwise returns
     /// `ZX_ERR_BAD_HANDLE`.
     @selector("fuchsia.io1/Directory.GetToken")
-    strict GetToken() -> (resource struct {
+    GetToken() -> (resource struct {
         s zx.Status;
         token zx.Handle:optional;
     });
@@ -311,7 +311,7 @@ closed protocol Directory1 {
     /// This method requires following rights: `OpenFlags.RIGHT_WRITABLE`, otherwise returns
     /// `ZX_ERR_BAD_HANDLE`.
     @selector("fuchsia.io1/Directory.Link")
-    strict Link(resource struct {
+    Link(resource struct {
         src string:MAX_FILENAME;
         dst_parent_token zx.Handle;
         dst string:MAX_FILENAME;
@@ -326,7 +326,7 @@ closed protocol Directory1 {
     ///
     /// This method does not require any rights, similar to ReadDirents.
     @selector("fuchsia.io1/Directory.Watch")
-    strict Watch(resource struct {
+    Watch(resource struct {
         mask WatchMask;
         options uint32;
         watcher server_end:DirectoryWatcher;

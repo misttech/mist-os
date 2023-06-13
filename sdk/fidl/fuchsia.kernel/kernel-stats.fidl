@@ -73,16 +73,16 @@ type CpuStats = struct {
 /// the protocol fails to retrieve stats, which will be an un-recoverable error, it will close the
 /// channel.
 @discoverable
-closed protocol Stats {
-    strict GetMemoryStats() -> (struct {
+protocol Stats {
+    GetMemoryStats() -> (struct {
         stats MemoryStats;
     });
 
-    strict GetMemoryStatsExtended() -> (struct {
+    GetMemoryStatsExtended() -> (struct {
         stats MemoryStatsExtended;
     });
 
-    strict GetCpuStats() -> (struct {
+    GetCpuStats() -> (struct {
         stats CpuStats;
     });
 
@@ -91,7 +91,7 @@ closed protocol Stats {
     ///
     /// Load is calculated as (100 - %idle), where %idle is the percentage value of idle_time (from
     /// PerCpuStats) over a time duration.
-    strict GetCpuLoad(struct {
+    GetCpuLoad(struct {
         duration zx.Duration;
     }) -> (struct {
         per_cpu_load vector<float32>:zx.MAX_CPUS;

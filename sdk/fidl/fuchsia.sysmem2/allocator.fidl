@@ -8,7 +8,7 @@ using zx;
 /// Allocates system memory buffers.
 @available(added=HEAD)
 @discoverable
-closed protocol Allocator {
+protocol Allocator {
     /// Allocates a BufferCollection on behalf of a single client (aka initiator)
     /// who is also the only participant (from the point of view of sysmem).
     ///
@@ -28,7 +28,7 @@ closed protocol Allocator {
     /// keep the client end of this channel open while using the
     /// BufferCollection, and should notice when this channel closes and stop
     /// using the BufferCollection ASAP.
-    strict AllocateNonSharedCollection(resource table {
+    AllocateNonSharedCollection(resource table {
         1: collection_request server_end:BufferCollection;
     });
 
@@ -38,7 +38,7 @@ closed protocol Allocator {
     ///
     /// Success/failure to populate the BufferCollection with buffers is
     /// determined via the BufferCollection interface.
-    strict AllocateSharedCollection(resource table {
+    AllocateSharedCollection(resource table {
         1: token_request server_end:BufferCollectionToken;
     });
 
@@ -62,7 +62,7 @@ closed protocol Allocator {
     /// BufferCollection channel is a single participant's connection to the
     /// logical BufferCollection.  There typically will be other participants
     /// with their own BufferCollection channel to the logical BufferCollection.
-    strict BindSharedCollection(resource table {
+    BindSharedCollection(resource table {
         1: token client_end:BufferCollectionToken;
         2: buffer_collection_request server_end:BufferCollection;
     });
@@ -112,7 +112,7 @@ closed protocol Allocator {
     /// `token_server_koid` the koid of the server end of a channel that might
     /// be a BufferCollectionToken channel.  This can be obtained from
     /// zx_object_get_info() ZX_INFO_HANDLE_BASIC related_koid.
-    strict ValidateBufferCollectionToken(table {
+    ValidateBufferCollectionToken(table {
         1: token_server_koid zx.Koid;
     }) -> (table {
         1: is_known bool;
@@ -129,7 +129,7 @@ closed protocol Allocator {
     /// BindSharedCollection() or AllocateNonSharedCollection() from this
     /// allocator. It does not affect BufferCollectionTokens, since they are
     /// often passed cross-process and should have their names managed manually.
-    strict SetDebugClientInfo(table {
+    SetDebugClientInfo(table {
         1: name string:64;
         2: id uint64;
     });

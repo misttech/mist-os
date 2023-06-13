@@ -7,14 +7,14 @@ const MAX_HARDWARE_DERIVE_KEY_INFO_SIZE uint8 = 32;
 const MAX_HARDWARE_DERIVED_KEY_SIZE uint8 = 32;
 
 @discoverable
-closed protocol StatelessKeyManager {
+protocol StatelessKeyManager {
     /// Get a hardware key derived key.
     ///
     /// Get a key derived from hardware root key using `key_info` as info and the trusted app ID
     /// as salt. This call is deterministic and always returns the same result if given the same
     /// `key_info` on the same device and would be different across different devices if they have
     /// different hardware keys.
-    strict GetHardwareDerivedKey(struct {
+    GetHardwareDerivedKey(struct {
         key_info vector<uint8>:MAX_HARDWARE_DERIVE_KEY_INFO_SIZE;
     }) -> (struct {
         derived_key vector<uint8>:MAX_HARDWARE_DERIVED_KEY_SIZE;

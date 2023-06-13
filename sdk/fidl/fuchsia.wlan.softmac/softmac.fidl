@@ -202,9 +202,9 @@ type WlanTxPacket = struct {
 @discoverable
 @transport("Driver")
 @banjo_layout("ddk-interface")
-closed protocol WlanSoftmacIfc {
+protocol WlanSoftmacIfc {
     /// Forward up a packet received over the wireless medium.
-    strict Recv(struct {
+    Recv(struct {
         packet WlanRxPacket;
     }) -> ();
 
@@ -212,7 +212,7 @@ closed protocol WlanSoftmacIfc {
     ///
     /// A device driver indicates support for `ReportTxResult()` using
     /// `fuchsia.wlan.common/DeviceExtension.report_tx_result_supported`.
-    strict ReportTxResult(struct {
+    ReportTxResult(struct {
         tx_result fuchsia.wlan.common.WlanTxResult;
     }) -> ();
 
@@ -227,7 +227,7 @@ closed protocol WlanSoftmacIfc {
     ///       incompatible request (e.g. connect).
     ///   ZX_ERR_OUT_OF_RANGE: The scan request included a prohibited channel.
     ///       This may be due to the current country setting.
-    strict NotifyScanComplete(table {
+    NotifyScanComplete(table {
         1: status zx.Status;
         2: scan_id uint64;
     }) -> ();
@@ -345,21 +345,21 @@ type WlanAssociationConfig = table {
 /// TODO(fxbug.dev/124830): This protocol allows wlansoftmac to eventually delete the
 /// use of Banjo from wlansoftmac. This TODO comment will exist until the migration off
 /// Banjo is complete.
-closed protocol WlanSoftmacBridge {
+protocol WlanSoftmacBridge {
     /// Notify the device of a successful association and configure additional
     /// parameters necessary to participate in that association.
     ///
     /// Common errors include:
     ///   ZX_ERR_BAD_STATE: The device was not previously informed of this BSS
     ///       via WlanSoftmac.JoinBss().
-    strict NotifyAssociationComplete(struct {
+    NotifyAssociationComplete(struct {
         assoc_cfg WlanAssociationConfig;
     }) -> () error zx.Status;
 };
 
 @discoverable
 @transport("Driver")
-closed protocol WlanSoftmac {
+protocol WlanSoftmac {
     compose WlanSoftmacBridge;
 
     // TODO(fxbug.dev/87050): the need to nest query response within a struct {} is no longer
@@ -369,30 +369,30 @@ closed protocol WlanSoftmac {
 
     /// Obtain information about the device and supported features
     /// Safe to call when the softmac is not started.
-    strict Query() -> (WlanSoftmacQueryResponse) error zx.Status;
+    Query() -> (WlanSoftmacQueryResponse) error zx.Status;
 
     /// Query the underlying device for feature support related to station
     /// discovery (e.g. scans and probes). Safe to call when the softmac is not
     /// started.
-    strict QueryDiscoverySupport() -> (struct {
+    QueryDiscoverySupport() -> (struct {
         resp fuchsia.wlan.common.DiscoverySupport;
     }) error zx.Status;
 
     /// Query the underlying device for information related to how it implements
     /// MAC-level functionality. Safe to call when the softmac is not started.
-    strict QueryMacSublayerSupport() -> (struct {
+    QueryMacSublayerSupport() -> (struct {
         resp fuchsia.wlan.common.MacSublayerSupport;
     }) error zx.Status;
 
     /// Query the underlying device for features related to specific
     /// security modes. Safe to call when the softmac is not started.
-    strict QuerySecuritySupport() -> (struct {
+    QuerySecuritySupport() -> (struct {
         resp fuchsia.wlan.common.SecuritySupport;
     }) error zx.Status;
 
     /// Query the underlying device for features related to spectrum usage, e.g.
     /// DFS. Safe to call when the softmac is not started.
-    strict QuerySpectrumManagementSupport() -> (struct {
+    QuerySpectrumManagementSupport() -> (struct {
         resp fuchsia.wlan.common.SpectrumManagementSupport;
     }) error zx.Status;
 
@@ -409,7 +409,7 @@ closed protocol WlanSoftmac {
     ///
     /// Common errors include: \
     ///   ZX_ERR_ALREADY_BOUND: `Start` was already called on this softmac.
-    strict Start(resource struct {
+    Start(resource struct {
         ifc client_end:WlanSoftmacIfc;
     }) -> (resource struct {
         sme_channel zx.Handle:CHANNEL;
@@ -417,7 +417,7 @@ closed protocol WlanSoftmac {
 
     /// Shut down the softmac if it is running.
     /// Safe to call when the softmac is not running.
-    strict Stop() -> ();
+    Stop() -> ();
 
     /// Queue a packet for transmission. May return before a packet has actually
     /// been transmitted. This call does not take ownership of the buffer passed in
@@ -426,7 +426,7 @@ closed protocol WlanSoftmac {
     /// Errors result from a failure to queue the packet for transmission.
     /// An OK result thus only indicates that the packet was queued, *not* that
     /// it was successfully transmitted.
-    strict QueueTx(struct {
+    QueueTx(struct {
         packet WlanTxPacket;
     }) -> () error zx.Status;
 
@@ -437,7 +437,7 @@ closed protocol WlanSoftmac {
     ///
     /// Common errors include: \
     ///   ZX_ERR_NOT_SUPPORTED: The device cannot switch to the requested channel.
-    strict SetChannel(table {
+    SetChannel(table {
         1: channel fuchsia.wlan.common.WlanChannel;
     }) -> () error zx.Status;
 
@@ -450,7 +450,7 @@ closed protocol WlanSoftmac {
     ///
     /// Common errors include: \
     ///   ZX_ERR_NOT_SUPPORTED: The device does not support the given bss config.
-    strict JoinBss(struct {
+    JoinBss(struct {
         join_request fuchsia.wlan.common.JoinBssRequest;
     }) -> () error zx.Status;
 
@@ -461,7 +461,7 @@ closed protocol WlanSoftmac {
     ///   ZX_ERR_NOT_SUPPORTED: The device does not support hardware beacons. \
     ///   ZX_ERR_INVALID_ARGS: The device cannot transmit the requested beacon. \
     ///   ZX_ERR_BAD_STATE: The device is already beaconing.
-    strict EnableBeaconing(table {
+    EnableBeaconing(table {
         /// Points to the beacon template. Since this is just the template, some packet content can
         /// contain only minimum valid info. They will be changed later by hardware/firmware or
         /// software.
@@ -476,7 +476,7 @@ closed protocol WlanSoftmac {
     }) -> () error zx.Status;
 
     /// Disables hardware beaconing.
-    strict DisableBeaconing() -> () error zx.Status;
+    DisableBeaconing() -> () error zx.Status;
 
     /// Install a key for encryption when transmitting or receiving protected
     /// frames.
@@ -484,10 +484,10 @@ closed protocol WlanSoftmac {
     /// Common errors include:
     ///   ZX_ERR_INVALID_ARGS: The given config does not specify a valid key.
     ///   ZX_ERR_NOT_SUPPORTED: The device does not support the given cipher.
-    strict InstallKey(WlanKeyConfiguration) -> () error zx.Status;
+    InstallKey(WlanKeyConfiguration) -> () error zx.Status;
 
     /// Notifies MAC and PHY that the peer has been de-associated.
-    strict ClearAssociation(table {
+    ClearAssociation(table {
         1: peer_addr ieee80211.MacAddr;
     }) -> () error zx.Status;
 
@@ -504,7 +504,7 @@ closed protocol WlanSoftmac {
     ///       requested scan, e.g. because an incompatible channel was requested. \
     ///   ZX_ERR_UNAVAILABLE: The device cannot currently perform scans. \
     ///   ZX_ERR_SHOULD_WAIT: Another scan is already in-progress.
-    strict StartPassiveScan(table {
+    StartPassiveScan(table {
         /// List of channels to scan on. An empty list of channels will cause a
         /// scan request to immediately return ZX_ERR_INVALID_ARGS.
         ///
@@ -549,7 +549,7 @@ closed protocol WlanSoftmac {
     ///       requested scan, e.g. because an incompatible channel was requested. \
     ///   ZX_ERR_UNAVAILABLE: The device cannot currently perform scans. \
     ///   ZX_ERR_SHOULD_WAIT: Another scan is already in-progress.
-    strict StartActiveScan(WlanSoftmacStartActiveScanRequest) -> (table {
+    StartActiveScan(WlanSoftmacStartActiveScanRequest) -> (table {
         1: scan_id uint64;
     }) error zx.Status;
 
@@ -566,13 +566,13 @@ closed protocol WlanSoftmac {
     /// Common errors include: \
     ///   ZX_ERR_NOT_FOUND: The given scan_id does not match an ongoing scan. \
     ///   ZX_ERR_NOT_SUPPORTED: The device does not support scan cancellation.
-    strict CancelScan(table {
+    CancelScan(table {
         1: scan_id uint64;
     }) -> () error zx.Status;
 
     /// Indicate the device of modified WiFi Multimedia (WMM) parameters for a
     /// particular access category (AC).
-    strict UpdateWmmParameters(table {
+    UpdateWmmParameters(table {
         1: ac ieee80211.WlanAccessCategory;
         2: params fuchsia.wlan.common.WlanWmmParameters;
     }) -> () error zx.Status;

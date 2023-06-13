@@ -10,19 +10,19 @@ using fuchsia.media;
 /// Supported SettingsEpitaph enums:
 /// REQUEST_NOT_SUPPORTED, INTERNAL_SERVICE_ERROR, PERSISTENT_STORAGE_ERROR
 @discoverable
-closed protocol Audio {
+protocol Audio {
     /// Gets the current [AudioSettings]. Returns immediately on first call;
     /// subsequent calls return when the value changes.
     ///
     /// If this call fails, it is considered a fatal error and the channel
     /// will be closed.
-    strict Watch() -> (struct {
+    Watch() -> (struct {
         settings AudioSettings;
     });
 
     /// Sets audio settings. Any field not explicitly set in the table performs a
     /// no-op, and will not make any changes.
-    strict Set(struct {
+    Set(struct {
         settings AudioSettings;
     }) -> () error Error;
 };

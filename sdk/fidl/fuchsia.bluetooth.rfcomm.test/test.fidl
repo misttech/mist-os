@@ -19,13 +19,13 @@ type Status = strict enum {
 /// Provides additional methods to initiate RFCOMM protocol behavior. These methods
 /// are strictly for testing.
 @discoverable
-closed protocol RfcommTest {
+protocol RfcommTest {
     /// Disconnect the RFCOMM session with the connected peer.
     ///
     /// This is a no-op if there is no connected peer with identifier `id`.
     ///
     /// + request `id` is the unique identifier associated with the connected RFCOMM peer.
-    strict Disconnect(struct {
+    Disconnect(struct {
         id bt.PeerId;
     });
 
@@ -36,7 +36,7 @@ closed protocol RfcommTest {
     /// + request `id` is the unique identifier associated with the connected RFCOMM peer.
     /// + request `channel_number` is the identifier of the RFCOMM channel whose line status changed.
     /// + request `status` is the status of the line.
-    strict RemoteLineStatus(struct {
+    RemoteLineStatus(struct {
         id bt.PeerId;
         channel_number bredr.RfcommChannel;
         status Status;

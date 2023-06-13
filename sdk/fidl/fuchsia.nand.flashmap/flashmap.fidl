@@ -39,14 +39,14 @@ type Area = struct {
 /// A protocol that allows clients to read, write, and erase areas of a NAND
 /// flash device whose layout is defined by a coreboot flashmap.
 /// https://doc.coreboot.org/lib/flashmap.html
-closed protocol Flashmap {
+protocol Flashmap {
     /// Get all the areas in the flashmap.
-    strict GetAreas() -> (struct {
+    GetAreas() -> (struct {
         areas vector<Area>:MAX_NUM_AREAS;
     });
 
     /// Get the smallest unit of flash that can be erased, in bytes.
-    strict GetEraseBlockSize() -> (struct {
+    GetEraseBlockSize() -> (struct {
         erase_block_size uint32;
     });
 
@@ -58,7 +58,7 @@ closed protocol Flashmap {
     /// * ZX_ERR_INTERNAL - if an internal error occurred, e.g. failure to send
     ///   FIDL requests to the underlying flash device.
     /// * Any errors that are returned by the underlying NAND implementation.
-    strict Read(struct {
+    Read(struct {
         name string:MAX_NAME_LEN;
         offset uint32;
         size uint32;
@@ -77,7 +77,7 @@ closed protocol Flashmap {
     /// * ZX_ERR_IO_DATA_INTEGRITY - if data read back after writing did not
     ///   match what was written.
     /// * Any errors that are returned by the underlying NAND implementation.
-    strict Write(resource struct {
+    Write(resource struct {
         name string:MAX_NAME_LEN;
         offset uint32;
         data fuchsia.mem.Buffer;
@@ -93,7 +93,7 @@ closed protocol Flashmap {
     /// * ZX_ERR_INVALID_ARGS - if |offset| or |range| were not
     ///   erase-block-aligned.
     /// * Any errors that are returned by the underlying NAND implementation.
-    strict Erase(struct {
+    Erase(struct {
         name string:MAX_NAME_LEN;
         offset uint32;
         range uint32;
@@ -101,10 +101,10 @@ closed protocol Flashmap {
 };
 
 @discoverable
-closed protocol Manager {
+protocol Manager {
     /// Find and parse the flashmap on NAND device |device| and start serving a |Flashmap| on
     /// |server|.
-    strict Start(resource struct {
+    Start(resource struct {
         device client_end:fuchsia.nand.Broker;
         server server_end:Flashmap;
     });

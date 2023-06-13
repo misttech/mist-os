@@ -10,17 +10,17 @@ type Error = strict enum : int32 {
 };
 
 @discoverable
-closed protocol ProtocolFactory {
-    strict CreateProtocol(resource struct {
+protocol ProtocolFactory {
+    CreateProtocol(resource struct {
         protocol server_end:Protocol;
     }) -> () error Error;
 };
 
-closed protocol Protocol {
-    strict DoAction() -> () error Error;
+protocol Protocol {
+    DoAction() -> () error Error;
 };
 
 @discoverable
-closed protocol SimpleProtocol {
-    strict DoAction() -> () error Error;
+protocol SimpleProtocol {
+    DoAction() -> () error Error;
 };

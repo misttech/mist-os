@@ -8,7 +8,7 @@ using fuchsia.lowpan;
 /// Protocol for connecting to [`Counters`] on a LoWPAN
 /// interface.
 @discoverable
-closed protocol CountersConnector {
+protocol CountersConnector {
     /// Connects to the [`DeviceCounters`] protocol on the
     /// named LoWPAN interface.
     ///
@@ -25,21 +25,21 @@ closed protocol CountersConnector {
     ///   given name.
     /// * `ZX_ERR_NOT_SUPPORTED`: The interface exists but
     ///   does not support this protocol.
-    strict Connect(resource struct {
+    Connect(resource struct {
         name fuchsia.lowpan.InterfaceName;
         server_end server_end:Counters;
     });
 };
 
-closed protocol Counters {
+protocol Counters {
     /// Returns a snapshot of the counters without resetting the counters.
-    strict Get() -> (struct {
+    Get() -> (struct {
         counters AllCounters;
     });
 
     /// Resets all of the counters to zero returning the counter values
     /// immediately prior.
-    strict Reset() -> (struct {
+    Reset() -> (struct {
         counters AllCounters;
     });
 };

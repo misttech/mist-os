@@ -116,8 +116,8 @@ type TemporaryBoardInfo = struct {
     board_revision uint32;
 };
 
-closed protocol SysSuspend {
-    strict Callback(struct {
+protocol SysSuspend {
+    Callback(struct {
         requested_state uint8;
         enable_wake bool;
         suspend_reason uint8;
@@ -129,11 +129,11 @@ closed protocol SysSuspend {
 
 @discoverable
 @transport("Driver")
-closed protocol PlatformBus {
+protocol PlatformBus {
     /// Adds a new platform device node to the bus, using configuration provided
     /// by |node|. Platform device nodes are created in their own separate
     /// devhosts.
-    strict NodeAdd(struct {
+    NodeAdd(struct {
         node Node;
     }) -> () error zx.Status;
 
@@ -144,7 +144,7 @@ closed protocol PlatformBus {
     /// `pbus_protocol_device_add()` blocks until the protocol implementation driver
     /// registers its protocol (or times out).
     /// Extremely deprecated, please do not use this.
-    strict ProtocolNodeAdd(struct {
+    ProtocolNodeAdd(struct {
         proto_id uint32;
         node Node;
     }) -> () error zx.Status;
@@ -152,7 +152,7 @@ closed protocol PlatformBus {
     /// Called by protocol implementation drivers to register their protocol
     /// with the platform bus.
     /// Extremely deprecated, please do not use this.
-    strict RegisterProtocol(struct {
+    RegisterProtocol(struct {
         proto_id uint32;
         /// This is the *_protocol_t buffer. In the future we will probably pass
         /// a FIDL client end.
@@ -162,22 +162,22 @@ closed protocol PlatformBus {
 
     /// Board drivers may use this to get information about the board, and to
     /// differentiate between multiple boards that they support.
-    strict GetBoardInfo() -> (struct {
+    GetBoardInfo() -> (struct {
         info TemporaryBoardInfo;
     }) error zx.Status;
 
     /// Board drivers may use this to set information about the board
     /// (like the board revision number).
     /// Platform device drivers can access this via `pdev_get_board_info()`.
-    strict SetBoardInfo(struct {
+    SetBoardInfo(struct {
         info BoardInfo;
     }) -> () error zx.Status;
     /// Board drivers may use this to set information about the bootloader.
-    strict SetBootloaderInfo(struct {
+    SetBootloaderInfo(struct {
         info BootloaderInfo;
     }) -> () error zx.Status;
 
-    strict RegisterSysSuspendCallback(resource struct {
+    RegisterSysSuspendCallback(resource struct {
         suspend_cb client_end:SysSuspend;
     }) -> () error zx.Status;
 
@@ -185,7 +185,7 @@ closed protocol PlatformBus {
     /// This will not implicitly include the platform device specified by |dev|
     /// in the final composite.
     /// Deprecated, prefer to use |NodeAdd| and |AddCompositeNodeSpec|.
-    strict AddComposite(struct {
+    AddComposite(struct {
         node Node;
         fragments vector<fuchsia.device.manager.DeviceFragment>:MAX;
         primary_fragment string:<MAX, optional>;
@@ -193,7 +193,7 @@ closed protocol PlatformBus {
 
     /// Adds a composite node specification to the bus. This will add a platform device
     /// specified by |node| and insert a parent into the spec that matches the device.
-    strict AddCompositeNodeSpec(struct {
+    AddCompositeNodeSpec(struct {
         node Node;
         spec fuchsia.driver.framework.CompositeNodeSpec;
     }) -> () error zx.Status;
@@ -205,7 +205,7 @@ closed protocol PlatformBus {
     /// |primary_fragment| if it is specified, or a new driver host if it is is
     /// NULL. It is not possible to set the primary fragment to "pdev" as that
     /// would cause the driver to spawn in the platform bus's driver host.
-    strict AddCompositeImplicitPbusFragment(struct {
+    AddCompositeImplicitPbusFragment(struct {
         node Node;
         fragments vector<fuchsia.device.manager.DeviceFragment>:MAX;
         primary_fragment string:<MAX, optional>;

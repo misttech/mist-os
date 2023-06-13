@@ -25,8 +25,8 @@ type Metrics = table {
 // TODO(fxbug.dev/23687): in the future there will probably be a DisplayManager, and
 // info about which displays to use will be explicitly specified to Scenic.
 @discoverable
-closed protocol Info {
-    strict GetMetrics() -> (struct {
+protocol Info {
+    GetMetrics() -> (struct {
         info Metrics;
     });
 };

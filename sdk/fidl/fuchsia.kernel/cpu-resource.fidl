@@ -8,9 +8,9 @@ using zx;
 /// Protocol for providing a `ZX_RSRC_KIND_SYSTEM` with base
 /// `ZX_RSRC_SYSTEM_CPU_BASE`.
 @discoverable
-closed protocol CpuResource {
+protocol CpuResource {
     /// Get a CPU resource handle.
-    strict Get() -> (resource struct {
+    Get() -> (resource struct {
         resource zx.Handle:RESOURCE;
     });
 };

@@ -25,10 +25,10 @@ type I2cBusLayout = struct {
     sda_in uint32;
 };
 
-closed protocol Device {
+protocol Device {
     /// Create an I2c bus on the FTDI device with a given `layout` and
     /// with `device` attached to it.
-    strict CreateI2C(struct {
+    CreateI2C(struct {
         layout I2cBusLayout;
         device I2cDevice;
     });

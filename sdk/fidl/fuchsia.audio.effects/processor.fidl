@@ -23,7 +23,7 @@ const MAX_PROCESS_STAGE_NAME_LENGTH uint32 = 64;
 /// or more output streams. On creation, this protocol must be tied to a
 /// [`fuchsia.audio.effects.Processor/ProcessorConfiguration`], which defines
 /// the processor's input and output streams.
-closed protocol Processor {
+protocol Processor {
     /// Processes the given number of frames. This will consume `num_frames` from
     /// each `ProcessorConfiguration.inputs[i]` and produce an equivalent number of
     /// frames in each `ProcessorConfiguration.outputs[i]`.
@@ -47,7 +47,7 @@ closed protocol Processor {
     /// - response `per_stage_metrics `Metrics about this process call, possibly
     ///     subdivided into multiple stages.
     /// * error A zx.Status value indicating success or failure.
-    strict Process(struct {
+    Process(struct {
         num_frames uint64;
         options ProcessOptions;
     }) -> (struct {

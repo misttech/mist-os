@@ -14,7 +14,7 @@ using fuchsia.ui.observation.geometry;
 /// factory function (see |fuchsia.ui.composition.ViewBoundProtocols|), which
 /// securely ties observation protocols to a specific view client.
 @discoverable
-closed protocol Registry {
+protocol Registry {
     /// Sets up a channel for receiving global view geometry.
     ///
     /// This method may be called multiple times to obtain multiple geometry
@@ -27,7 +27,7 @@ closed protocol Registry {
     ///
     /// Client can freely disconnect this `Registry` endpoint after this method
     /// returns.
-    strict RegisterGlobalViewTreeWatcher(resource struct {
+    RegisterGlobalViewTreeWatcher(resource struct {
         watcher server_end:fuchsia.ui.observation.geometry.ViewTreeWatcher;
     }) -> ();
 };

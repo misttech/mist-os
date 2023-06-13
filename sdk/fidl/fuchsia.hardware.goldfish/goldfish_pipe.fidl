@@ -19,28 +19,28 @@ const SIGNAL_HANGUP uint32 = 0x04000000; // ZX_USER_SIGNAL_2
 
 /// This is the interface for the Goldfish pipe driver. It is used
 /// to connect to a PipeDevice.
-closed protocol Controller {
+protocol Controller {
     /// Opens a new PipeDevice session.
-    strict OpenSession(resource struct {
+    OpenSession(resource struct {
         session server_end:PipeDevice;
     });
 };
 
 /// Interface for the Goldfish pipe driver.
-closed protocol PipeDevice {
+protocol PipeDevice {
     /// Open pipe. A protocol request `pipe_request` provides an interface
     /// to the pipe. Multiple pipes can be opened for a single device.
     /// Closing the device connection will also close all pipe connections.
-    strict OpenPipe(resource struct {
+    OpenPipe(resource struct {
         pipe_request server_end:Pipe;
     });
 };
 
-closed protocol Pipe {
+protocol Pipe {
     /// Request new IO buffer size. Can fail if out of memory. Discards
     /// contents of existing buffer on success. Leaves existing buffer
     /// intact on failure.
-    strict SetBufferSize(struct {
+    SetBufferSize(struct {
         size uint64;
     }) -> (struct {
         res zx.Status;
@@ -48,20 +48,20 @@ closed protocol Pipe {
 
     /// Set event used to signal device state. Discards existing event
     /// after having transferred device state to the new event.
-    strict SetEvent(resource struct {
+    SetEvent(resource struct {
         event zx.Handle:EVENT;
     });
 
     /// Acquire VMO for IO buffer. Can be called multiple times. Each call
     /// returns a new handle to the VMO.
-    strict GetBuffer() -> (resource struct {
+    GetBuffer() -> (resource struct {
         res zx.Status;
         vmo zx.Handle:<VMO, optional>;
     });
 
     /// Attempt to read up to count bytes into IO buffer at specified offset.
     /// Returns `ZX_ERR_SHOULD_WAIT` if pipe device is not readable.
-    strict Read(struct {
+    Read(struct {
         count uint64;
         offset uint64;
     }) -> (struct {
@@ -71,7 +71,7 @@ closed protocol Pipe {
 
     /// Writes up to count bytes from the IO buffer at specified offset.
     /// Returns `ZX_ERR_SHOULD_WAIT` if pipe device is not writable.
-    strict Write(struct {
+    Write(struct {
         count uint64;
         offset uint64;
     }) -> (struct {
@@ -92,7 +92,7 @@ closed protocol Pipe {
     /// The name "DoCall" (instead of "Call") is to avoid collision with LLCPP
     /// generated code "class Call" (generated per protocol).  We don't want
     /// this method attempting to compile as if it were a constructor.
-    strict DoCall(struct {
+    DoCall(struct {
         count uint64;
         offset uint64;
         read_count uint64;

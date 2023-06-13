@@ -8,7 +8,7 @@ using fuchsia.memorypressure;
 
 /// Helps debug memory-pressure related features on a fuchsia device.
 @discoverable
-closed protocol MemoryPressure {
+protocol MemoryPressure {
     /// Signals registered watchers of the fuchsia.memorypressure service with the
     /// specified memory pressure level. Intended for debugging only.
     /// Does not on its own change the memory pressure level of the system, or trigger any
@@ -16,7 +16,7 @@ closed protocol MemoryPressure {
     /// However the components listening will receive a memory pressure signal which can
     /// lead to a change in the memory usage of the device, and an actual change in the
     /// memory pressure level of the system.
-    strict Signal(struct {
+    Signal(struct {
         level fuchsia.memorypressure.Level;
     });
 };

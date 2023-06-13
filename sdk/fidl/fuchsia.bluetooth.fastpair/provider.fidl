@@ -14,19 +14,19 @@ using zx;
 ///
 /// The system may close the protocol to communicate that the service was terminated
 /// for internal reasons.
-closed protocol ProviderWatcher {
+protocol ProviderWatcher {
     /// Called if the Fast Pair pairing procedure for a peer is successfully complete.
     ///
     /// + request `id` The unique ID associated with the connected Fast Pair Seeker peer.
     /// - response Each `OnPairingComplete` request should be acknowledged.
-    strict OnPairingComplete(struct {
+    OnPairingComplete(struct {
         id fuchsia.bluetooth.PeerId;
     }) -> ();
 };
 
 /// Protocol to enable the Bluetooth Fast Pair Provider service on the system.
 @discoverable
-closed protocol Provider {
+protocol Provider {
     /// Request to enable the Fast Pair Provider service.
     ///
     /// Only one client can register to enable the Fast Pair service. An Error will be returned
@@ -41,7 +41,7 @@ closed protocol Provider {
     ///   request.
     /// * error Returns `ALREADY_BOUND` if a subsequent request is made to enable
     ///   the service.
-    strict Enable(resource struct {
+    Enable(resource struct {
         watcher client_end:ProviderWatcher;
     }) -> () error zx.Status;
 };

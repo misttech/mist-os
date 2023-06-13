@@ -17,7 +17,7 @@ type EnableDisableInterfaceError = strict enum {
 /// A protocol for filtering TCP/IP traffic and Network Address Translation.
 // TODO(https://fxbug.dev/91503): Modernize/upgrade filter/NAT APIs.
 @discoverable
-closed protocol Filter {
+protocol Filter {
     /// Enable the filter on a specific interface.
     ///
     /// The filter is disabled by default. If the filter is already enabled,
@@ -25,7 +25,7 @@ closed protocol Filter {
     ///
     /// + request `id` The id of the network interface.
     /// * error Reports `NOT_FOUND` if `id` is not a valid interface.
-    strict EnableInterface(struct {
+    EnableInterface(struct {
         id fuchsia.net.InterfaceId;
     }) -> () error EnableDisableInterfaceError;
 
@@ -36,7 +36,7 @@ closed protocol Filter {
     ///
     /// + request `id` The id of the network interface.
     /// * error Reports `NOT_FOUND` if `id` is not a valid interface.
-    strict DisableInterface(struct {
+    DisableInterface(struct {
         id fuchsia.net.InterfaceId;
     }) -> () error EnableDisableInterfaceError;
 
@@ -46,7 +46,7 @@ closed protocol Filter {
     /// - response `rules` The current filter rules.
     /// - response `generation` The generation number associated with the current
     ///   rules.
-    strict GetRules() -> (struct {
+    GetRules() -> (struct {
         rules vector<Rule>:MAX_RULES;
         generation uint32;
     });
@@ -65,7 +65,7 @@ closed protocol Filter {
     /// * error Reports `GENERATION_MISMATCH` if `generation` is not the
     ///   generation number for the current rules.
     /// * error Reports `BAD_RULE` if `rules` are not valid.
-    strict UpdateRules(struct {
+    UpdateRules(struct {
         rules vector<Rule>:MAX_RULES;
         generation uint32;
     }) -> () error strict enum {
@@ -78,7 +78,7 @@ closed protocol Filter {
     /// - response `rules` The current NAT rules.
     /// - response `generation` The generation number associated with the current
     ///   NAT rules.
-    strict GetNatRules() -> (struct {
+    GetNatRules() -> (struct {
         rules vector<Nat>:MAX_RULES;
         generation uint32;
     });
@@ -96,7 +96,7 @@ closed protocol Filter {
     /// * error Reports `GENERATION_MISMATCH` if `generation` is not the
     ///   generation number for the current rules.
     /// * error Reports `BAD_RULE` if `rules` are not valid.
-    strict UpdateNatRules(struct {
+    UpdateNatRules(struct {
         rules vector<Nat>:MAX_RULES;
         generation uint32;
     }) -> () error strict enum {
@@ -109,7 +109,7 @@ closed protocol Filter {
     /// - response `rules` The current RDR rules.
     /// - response `generation` The generation number associated with the current
     ///   RDR rules.
-    strict GetRdrRules() -> (struct {
+    GetRdrRules() -> (struct {
         rules vector<Rdr>:MAX_RULES;
         generation uint32;
     });
@@ -125,7 +125,7 @@ closed protocol Filter {
     /// + request `generation` The generation number previously returned from
     ///   GetRDRRules.
     /// * error Reports `NOT_SUPPORTED` if the operation is not supported.
-    strict UpdateRdrRules(struct {
+    UpdateRdrRules(struct {
         rules vector<Rdr>:MAX_RULES;
         generation uint32;
     }) -> () error strict enum {

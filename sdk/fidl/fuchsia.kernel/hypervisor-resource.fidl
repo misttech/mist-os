@@ -7,9 +7,9 @@ using zx;
 
 /// Protocol for providing the hypervisor resource.
 @discoverable
-closed protocol HypervisorResource {
+protocol HypervisorResource {
     /// Get a hypervisor resource handle.
-    strict Get() -> (resource struct {
+    Get() -> (resource struct {
         resource zx.Handle:RESOURCE;
     });
 };

@@ -7,19 +7,19 @@ using fuchsia.io;
 using fuchsia.unknown;
 
 @discoverable
-closed protocol Echo {
+protocol Echo {
     compose fuchsia.unknown.Cloneable;
 
-    strict EchoString(struct {
+    EchoString(struct {
         value string:optional;
     }) -> (struct {
         response string:optional;
     });
 };
 
-closed protocol Empty {};
+protocol Empty {};
 
-closed protocol EmptyCloneableNode {
+protocol EmptyCloneableNode {
     compose fuchsia.unknown.Cloneable;
     compose fuchsia.io.Node;
 };

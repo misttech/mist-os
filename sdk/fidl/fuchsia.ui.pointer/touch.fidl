@@ -22,7 +22,7 @@ const TOUCH_MAX_EVENT uint32 = 128;
 /// swipe will be observed at a constant scale, even under effects such as
 /// magnification or panning. However, other effects, such as enlargening the
 /// view's clip bounds, may trigger a change in the viewport extents.
-closed protocol TouchSource {
+protocol TouchSource {
     /// A method for a client to receive touch pointer events.
     ///
     /// This call is formulated as a "hanging get" pattern: the client asks for
@@ -63,7 +63,7 @@ closed protocol TouchSource {
     ///
     /// [1] The hanging get pattern enables straightforward API evolution, but
     /// unfortunately does not admit an idiomatic matching of response to event.
-    strict Watch(struct {
+    Watch(struct {
         responses vector<TouchResponse>:TOUCH_MAX_EVENT;
     }) -> (struct {
         events vector<TouchEvent>:TOUCH_MAX_EVENT;
@@ -85,7 +85,7 @@ closed protocol TouchSource {
     ///
     /// Validity. This TouchResponse must not be another "hold" response, and
     /// the overwritten response is expected to be a "hold" response.
-    strict UpdateResponse(struct {
+    UpdateResponse(struct {
         interaction TouchInteractionId;
         response TouchResponse;
     }) -> ();

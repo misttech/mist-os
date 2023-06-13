@@ -6,7 +6,7 @@ library fuchsia.modular;
 /// A capability, typically offered from `sessionmgr` to select child components,
 /// allowing them to request the session to be restarted.
 @discoverable
-closed protocol SessionRestartController {
+protocol SessionRestartController {
     /// Requests to cleanly terminate and then immediately restart the session.
-    strict Restart();
+    Restart();
 };

@@ -33,8 +33,8 @@ type AddressSpaceChildDriverType = strict enum : uint32 {
 /// permanently associate a particular goldfish address space driver connection
 /// with a particular type of child driver, discussed next.
 @discoverable
-closed protocol AddressSpaceDevice {
-    strict OpenChildDriver(resource struct {
+protocol AddressSpaceDevice {
+    OpenChildDriver(resource struct {
         type AddressSpaceChildDriverType;
         req server_end:AddressSpaceChildDriver;
     });
@@ -72,9 +72,9 @@ type AddressSpaceChildDriverPingMessage = struct {
     data3 uint32;
 };
 
-closed protocol AddressSpaceChildDriver {
+protocol AddressSpaceChildDriver {
     /// Allocates goldfish address space of given size.
-    strict AllocateBlock(struct {
+    AllocateBlock(struct {
         size uint64;
     }) -> (resource struct {
         res zx.Status;
@@ -82,7 +82,7 @@ closed protocol AddressSpaceChildDriver {
         vmo zx.Handle:<VMO, optional>;
     });
     /// Free goldfish address space associated with given ID.
-    strict DeallocateBlock(struct {
+    DeallocateBlock(struct {
         paddr uint64;
     }) -> (struct {
         res zx.Status;
@@ -93,7 +93,7 @@ closed protocol AddressSpaceChildDriver {
     /// regions across different connections, but within a connection, we
     /// require the claimed regions to be disjoint. Otherwise,
     /// `ZX_ERROR_INVALID_ARGS1` is returned.
-    strict ClaimSharedBlock(struct {
+    ClaimSharedBlock(struct {
         offset uint64;
         size uint64;
     }) -> (resource struct {
@@ -104,14 +104,14 @@ closed protocol AddressSpaceChildDriver {
     /// Unclaim a hardware-shared region. This must correspond to an existing 
     /// claimed region in the current connection. Otherwise,
     /// `ZX_ERROR_INVALID_ARGS` is returned.
-    strict UnclaimSharedBlock(struct {
+    UnclaimSharedBlock(struct {
         offset uint64;
     }) -> (struct {
         res zx.Status;
     });
 
     /// Ping (General notification for child drivers)
-    strict Ping(struct {
+    Ping(struct {
         ping AddressSpaceChildDriverPingMessage;
     }) -> (struct {
         res zx.Status;

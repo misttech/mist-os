@@ -10,11 +10,11 @@ const MAX_VOLUME float32 = 1.0;
 const MIN_VOLUME float32 = 0.0;
 
 /// A protocol for controlling volume.
-closed protocol VolumeControl {
+protocol VolumeControl {
     /// Sets the volume of the audio element to the given value in
     /// [0.0, 1.0]. If the value is provided is outside of [0.0, 1.0],
     /// the value is clamped before application.
-    strict SetVolume(struct {
+    SetVolume(struct {
         volume float32;
     });
 
@@ -22,12 +22,12 @@ closed protocol VolumeControl {
     /// as setting volume to 0.0; volume will persist for the duration of
     /// a mute. If volume was 0.5 before mute, volume will resume at 0.5
     /// following unmute.
-    strict SetMute(struct {
+    SetMute(struct {
         mute bool;
     });
 
     /// Emitted when the volume or mute state of the audio element changes.
-    strict -> OnVolumeMuteChanged(struct {
+    -> OnVolumeMuteChanged(struct {
         new_volume float32;
         new_muted bool;
     });

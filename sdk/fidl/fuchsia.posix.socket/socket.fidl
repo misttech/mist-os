@@ -47,17 +47,17 @@ type TimestampOption = strict enum {
 };
 
 /// A socket.
-closed protocol BaseSocket {
+protocol BaseSocket {
     compose fuchsia.unknown.Cloneable;
     compose fuchsia.unknown.Closeable;
     compose fuchsia.unknown.Queryable;
 
     /// Set `SOL_SOCKET` -> `SO_REUSEADDR`.
-    strict SetReuseAddress(struct {
+    SetReuseAddress(struct {
         value bool;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_SOCKET` -> `SO_REUSEADDR`.
-    strict GetReuseAddress() -> (struct {
+    GetReuseAddress() -> (struct {
         value bool;
     }) error fuchsia.posix.Errno;
 
@@ -66,79 +66,79 @@ closed protocol BaseSocket {
 
     /// Get `SOL_SOCKET` -> `SO_ERROR`.
     /// Returns the last error if there is an error set on the socket.
-    strict GetError() -> () error fuchsia.posix.Errno;
+    GetError() -> () error fuchsia.posix.Errno;
 
     /// Set `SOL_SOCKET` -> `SO_BROADCAST`.
-    strict SetBroadcast(struct {
+    SetBroadcast(struct {
         value bool;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_SOCKET` -> `SO_BROADCAST`.
-    strict GetBroadcast() -> (struct {
+    GetBroadcast() -> (struct {
         value bool;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_SOCKET` -> `SO_SNDBUF`.
-    strict SetSendBuffer(struct {
+    SetSendBuffer(struct {
         value_bytes uint64;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_SOCKET` -> `SO_SNDBUF`.
-    strict GetSendBuffer() -> (struct {
+    GetSendBuffer() -> (struct {
         value_bytes uint64;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_SOCKET` -> `SO_RCVBUF`.
-    strict SetReceiveBuffer(struct {
+    SetReceiveBuffer(struct {
         value_bytes uint64;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_SOCKET` -> `SO_RCVBUF`.
-    strict GetReceiveBuffer() -> (struct {
+    GetReceiveBuffer() -> (struct {
         value_bytes uint64;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_SOCKET` -> `SO_KEEPALIVE`.
-    strict SetKeepAlive(struct {
+    SetKeepAlive(struct {
         value bool;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_SOCKET` -> `SO_KEEPALIVE`.
-    strict GetKeepAlive() -> (struct {
+    GetKeepAlive() -> (struct {
         value bool;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_SOCKET` -> `SO_OOBINLINE`.
-    strict SetOutOfBandInline(struct {
+    SetOutOfBandInline(struct {
         value bool;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_SOCKET` -> `SO_OOBINLINE`.
-    strict GetOutOfBandInline() -> (struct {
+    GetOutOfBandInline() -> (struct {
         value bool;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_SOCKET` -> `SO_NO_CHECK`.
-    strict SetNoCheck(struct {
+    SetNoCheck(struct {
         value bool;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_SOCKET` -> `SO_NO_CHECK`.
-    strict GetNoCheck() -> (struct {
+    GetNoCheck() -> (struct {
         value bool;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_SOCKET` -> `SO_LINGER`.
-    strict SetLinger(struct {
+    SetLinger(struct {
         linger bool;
         length_secs uint32;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_SOCKET` -> `SO_LINGER`.
-    strict GetLinger() -> (struct {
+    GetLinger() -> (struct {
         linger bool;
         length_secs uint32;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_SOCKET` -> `SO_REUSEPORT`.
-    strict SetReusePort(struct {
+    SetReusePort(struct {
         value bool;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_SOCKET` -> `SO_REUSEPORT`.
-    strict GetReusePort() -> (struct {
+    GetReusePort() -> (struct {
         value bool;
     }) error fuchsia.posix.Errno;
 
@@ -150,16 +150,16 @@ closed protocol BaseSocket {
     // (libfdio).
 
     /// Get `SOL_SOCKET` -> `SO_ACCEPTCONN`.
-    strict GetAcceptConn() -> (struct {
+    GetAcceptConn() -> (struct {
         value bool;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_SOCKET` -> `SO_BINDTODEVICE`.
-    strict SetBindToDevice(struct {
+    SetBindToDevice(struct {
         value fuchsia.net.interfaces.Name;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_SOCKET` -> `SO_BINDTODEVICE`.
-    strict GetBindToDevice() -> (struct {
+    GetBindToDevice() -> (struct {
         value fuchsia.net.interfaces.Name;
     }) error fuchsia.posix.Errno;
 
@@ -167,143 +167,143 @@ closed protocol BaseSocket {
     // These two options are mutually exclusive. Enabling one disables the
     // other. Disabling either disables both.
     // https://github.com/torvalds/linux/blob/dcd68326d29/net/core/sock.c#L790-L801
-    strict SetTimestamp(struct {
+    SetTimestamp(struct {
         value TimestampOption;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_SOCKET` -> `SO_TIMESTAMP` or `SO_TIMESTAMPNS`.
-    strict GetTimestamp() -> (struct {
+    GetTimestamp() -> (struct {
         value TimestampOption;
     }) error fuchsia.posix.Errno;
 };
 
 /// A network socket.
-closed protocol BaseNetworkSocket {
+protocol BaseNetworkSocket {
     compose BaseSocket;
 
     /// Sets the local address used for the socket.
-    strict Bind(struct {
+    Bind(struct {
         addr fuchsia.net.SocketAddress;
     }) -> () error fuchsia.posix.Errno;
     /// Initiates a connection to a remote address.
-    strict Connect(struct {
+    Connect(struct {
         addr fuchsia.net.SocketAddress;
     }) -> () error fuchsia.posix.Errno;
     /// Clears connection information from this socket.
-    strict Disconnect() -> () error fuchsia.posix.Errno;
+    Disconnect() -> () error fuchsia.posix.Errno;
     /// Retrieves the local socket address.
-    strict GetSockName() -> (struct {
+    GetSockName() -> (struct {
         addr fuchsia.net.SocketAddress;
     }) error fuchsia.posix.Errno;
     /// Retrieves the remote socket address.
-    strict GetPeerName() -> (struct {
+    GetPeerName() -> (struct {
         addr fuchsia.net.SocketAddress;
     }) error fuchsia.posix.Errno;
     /// Shuts down part of the socket.
-    strict Shutdown(struct {
+    Shutdown(struct {
         mode ShutdownMode;
     }) -> () error fuchsia.posix.Errno;
 
     /// Set `SOL_IP` -> `IP_TOS`.
-    strict SetIpTypeOfService(struct {
+    SetIpTypeOfService(struct {
         value uint8;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_IP` -> `IP_TOS`.
-    strict GetIpTypeOfService() -> (struct {
+    GetIpTypeOfService() -> (struct {
         value uint8;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_IP` -> `IP_TTL`.
     // [1, 255] but unset means default, which is `sysctl net.ipv4.ip_default_ttl`.
     // https://github.com/torvalds/linux/blob/6f38be8f2cc/net/ipv4/ip_sockglue.c#L1605-L1612
-    strict SetIpTtl(struct {
+    SetIpTtl(struct {
         value OptionalUint8;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_IP` -> `IP_TTL`.
-    strict GetIpTtl() -> (struct {
+    GetIpTtl() -> (struct {
         value uint8;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_IP` -> `IP_PKTINFO`.
-    strict SetIpPacketInfo(struct {
+    SetIpPacketInfo(struct {
         value bool;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_IP` -> `IP_PKTINFO`.
-    strict GetIpPacketInfo() -> (struct {
+    GetIpPacketInfo() -> (struct {
         value bool;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_IP` -> `IP_RECVTOS`.
-    strict SetIpReceiveTypeOfService(struct {
+    SetIpReceiveTypeOfService(struct {
         value bool;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_IP` -> `IP_RECVTOS`.
-    strict GetIpReceiveTypeOfService() -> (struct {
+    GetIpReceiveTypeOfService() -> (struct {
         value bool;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_IP` -> `IP_RECVTTL`.
-    strict SetIpReceiveTtl(struct {
+    SetIpReceiveTtl(struct {
         value bool;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_IP` -> `IP_RECVTTL`.
-    strict GetIpReceiveTtl() -> (struct {
+    GetIpReceiveTtl() -> (struct {
         value bool;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_IP` -> `IP_MULTICAST_IF`.
-    strict SetIpMulticastInterface(struct {
+    SetIpMulticastInterface(struct {
         iface fuchsia.net.InterfaceId;
         address fuchsia.net.Ipv4Address;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_IP` -> `IP_MULTICAST_IF`.
-    strict GetIpMulticastInterface() -> (struct {
+    GetIpMulticastInterface() -> (struct {
         value fuchsia.net.Ipv4Address;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_IP` -> `IP_MULTICAST_TTL`.
     // [1, 255] but unset means kernel default, which is 1.
     // https://github.com/torvalds/linux/blob/6f38be8f2cc/net/ipv4/ip_sockglue.c#L1088-L1098
-    strict SetIpMulticastTtl(struct {
+    SetIpMulticastTtl(struct {
         value OptionalUint8;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_IP` -> `IP_MULTICAST_TTL`.
-    strict GetIpMulticastTtl() -> (struct {
+    GetIpMulticastTtl() -> (struct {
         value uint8;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_IP` -> `IP_MULTICAST_LOOP`.
-    strict SetIpMulticastLoopback(struct {
+    SetIpMulticastLoopback(struct {
         value bool;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_IP` -> `IP_MULTICAST_LOOP`.
-    strict GetIpMulticastLoopback() -> (struct {
+    GetIpMulticastLoopback() -> (struct {
         value bool;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_IP` -> `IP_ADD_MEMBERSHIP`
-    strict AddIpMembership(struct {
+    AddIpMembership(struct {
         membership IpMulticastMembership;
     }) -> () error fuchsia.posix.Errno;
     /// Set `SOL_IP` -> `IP_DROP_MEMBERSHIP`
-    strict DropIpMembership(struct {
+    DropIpMembership(struct {
         membership IpMulticastMembership;
     }) -> () error fuchsia.posix.Errno;
 
     /// Set `SOL_IPV6` -> `IPV6_ADD_MEMBERSHIP`.
-    strict AddIpv6Membership(struct {
+    AddIpv6Membership(struct {
         membership Ipv6MulticastMembership;
     }) -> () error fuchsia.posix.Errno;
     /// Set `SOL_IPV6` -> `IPV6_DROP_MEMBERSHIP`.
-    strict DropIpv6Membership(struct {
+    DropIpv6Membership(struct {
         membership Ipv6MulticastMembership;
     }) -> () error fuchsia.posix.Errno;
 
     /// Set `SOL_IPV6` -> `IPV6_MULTICAST_IF`.
-    strict SetIpv6MulticastInterface(struct {
+    SetIpv6MulticastInterface(struct {
         value fuchsia.net.InterfaceId;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_IPV6` -> `IPV6_MULTICAST_IF`.
-    strict GetIpv6MulticastInterface() -> (struct {
+    GetIpv6MulticastInterface() -> (struct {
         value fuchsia.net.InterfaceId;
     }) error fuchsia.posix.Errno;
 
@@ -311,60 +311,60 @@ closed protocol BaseNetworkSocket {
     // [0, 255] but unset means use default, which is `sysctl net.ipv6.conf.<device>.hop_limit`.
     // https://github.com/torvalds/linux/blob/6f38be8f2cc/net/ipv6/ipv6_sockglue.c#L742-L749
     // https://github.com/torvalds/linux/blob/6f38be8f2cc/net/ipv6/ip6_output.c#L291-L294
-    strict SetIpv6UnicastHops(struct {
+    SetIpv6UnicastHops(struct {
         value OptionalUint8;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_IPV6` -> `IPV6_UNICAST_HOPS`.
-    strict GetIpv6UnicastHops() -> (struct {
+    GetIpv6UnicastHops() -> (struct {
         value uint8;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_IPV6` -> `IPV6_RECVHOPLIMIT`.
-    strict SetIpv6ReceiveHopLimit(struct {
+    SetIpv6ReceiveHopLimit(struct {
         value bool;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_IPV6` -> `IPV6_RECVHOPLIMIT`.
-    strict GetIpv6ReceiveHopLimit() -> (struct {
+    GetIpv6ReceiveHopLimit() -> (struct {
         value bool;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_IPV6` -> `IPV6_MULTICAST_HOPS`.
     // [0, 255] but unset means kernel default, which is 1.
     // https://github.com/torvalds/linux/blob/6f38be8f2cc/net/ipv6/ipv6_sockglue.c#L751-L760
-    strict SetIpv6MulticastHops(struct {
+    SetIpv6MulticastHops(struct {
         value OptionalUint8;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_IPV6` -> `IPV6_MULTICAST_HOPS`.
-    strict GetIpv6MulticastHops() -> (struct {
+    GetIpv6MulticastHops() -> (struct {
         value uint8;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_IPV6` -> `IPV6_MULTICAST_LOOP`.
-    strict SetIpv6MulticastLoopback(struct {
+    SetIpv6MulticastLoopback(struct {
         value bool;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_IPV6` -> `IPV6_MULTICAST_LOOP`.
-    strict GetIpv6MulticastLoopback() -> (struct {
+    GetIpv6MulticastLoopback() -> (struct {
         value bool;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_IPV6` -> `IPV6_V6ONLY`.
-    strict SetIpv6Only(struct {
+    SetIpv6Only(struct {
         value bool;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_IPV6` -> `IPV6_V6ONLY`.
-    strict GetIpv6Only() -> (struct {
+    GetIpv6Only() -> (struct {
         value bool;
     }) error fuchsia.posix.Errno;
 
     // NOTE: get `SOL_IPV6` -> `IPV6_PATHMTU` not supported in netstack.
 
     /// Set `SOL_IPV6` -> `IPV6_RECVTCLASS`.
-    strict SetIpv6ReceiveTrafficClass(struct {
+    SetIpv6ReceiveTrafficClass(struct {
         value bool;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_IPV6` -> `IPV6_RECVTCLASS`.
-    strict GetIpv6ReceiveTrafficClass() -> (struct {
+    GetIpv6ReceiveTrafficClass() -> (struct {
         value bool;
     }) error fuchsia.posix.Errno;
 
@@ -373,20 +373,20 @@ closed protocol BaseNetworkSocket {
     //
     // [0, 255] but unset means kernel default, which is 0.
     // https://github.com/torvalds/linux/blob/6f38be8f2cc/net/ipv6/ipv6_sockglue.c#L594-L611
-    strict SetIpv6TrafficClass(struct {
+    SetIpv6TrafficClass(struct {
         value OptionalUint8;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_IPV6` -> `IPV6_TCLASS`.
-    strict GetIpv6TrafficClass() -> (struct {
+    GetIpv6TrafficClass() -> (struct {
         value uint8;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_IPV6` -> `IPV6_RECVPKTINFO`.
-    strict SetIpv6ReceivePacketInfo(struct {
+    SetIpv6ReceivePacketInfo(struct {
         value bool;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_IPV6` -> `IPV6_RECVPKTINFO`.
-    strict GetIpv6ReceivePacketInfo() -> (struct {
+    GetIpv6ReceivePacketInfo() -> (struct {
         value bool;
     }) error fuchsia.posix.Errno;
 };
@@ -575,14 +575,14 @@ type SendMsgFlags = strict bits : uint16 {
 /// Base protocol shared by all datagram sockets.
 ///
 /// Complete implementations of a datagram socket should compose this protocol.
-closed protocol BaseDatagramSocket {
+protocol BaseDatagramSocket {
     compose BaseNetworkSocket;
 
     /// Retrieves creation information from the socket.
     ///
     /// - response `domain` the socket's associated domain.
     /// - response `proto` the socket's associated protocol.
-    strict GetInfo() -> (struct {
+    GetInfo() -> (struct {
         domain Domain;
         proto DatagramSocketProtocol;
     }) error fuchsia.posix.Errno;
@@ -629,10 +629,10 @@ const FAST_UDP_WAIT_MANY_MAXIMUM_ITEMS uint32 = 63;
 const DATAGRAM_SOCKET_PROTOCOL_NAME string = "fuchsia.posix.socket/DatagramSocket";
 
 /// A datagram socket.
-closed protocol DatagramSocket {
+protocol DatagramSocket {
     compose BaseDatagramSocket;
 
-    strict Describe() -> (resource table {
+    Describe() -> (resource table {
         /// `ZX_SOCKET_DATAGRAM` on which data is sent and received.
         1: socket zx.Handle:SOCKET;
         /// Size of the buffer used to receive Tx metadata.
@@ -653,7 +653,7 @@ closed protocol DatagramSocket {
     /// + request `args` the requested disposition of data to be sent.
     /// - response the constraints sent data must satisfy.
     /// * error the error code indicating the reason for validation failure.
-    strict SendMsgPreflight(table {
+    SendMsgPreflight(table {
         /// The destination address.
         ///
         /// If absent, interpreted as the method receiver's connected address and
@@ -690,7 +690,7 @@ closed protocol DatagramSocket {
     /// Returns the set of requested control messages.
     ///
     /// - response the set of currently requested control messages.
-    strict RecvMsgPostflight() -> (resource table {
+    RecvMsgPostflight() -> (resource table {
         /// Represents the validity of this structure.
         ///
         /// The structure is invalid if the peer is closed.
@@ -731,10 +731,10 @@ const SYNCHRONOUS_DATAGRAM_SOCKET_PROTOCOL_NAME string
 /// Instead, clients should use the BSD sockets API to interact with sockets.
 /// We plan to change this protocol substantially and clients that couple
 /// directly to this protocol will make those changes more difficult.
-closed protocol SynchronousDatagramSocket {
+protocol SynchronousDatagramSocket {
     compose BaseDatagramSocket;
 
-    strict Describe() -> (resource table {
+    Describe() -> (resource table {
         /// Signals additional information about the state of the socket such as
         /// readiness or shutdown-ness.
         1: event zx.Handle:EVENTPAIR;
@@ -754,7 +754,7 @@ closed protocol SynchronousDatagramSocket {
     /// - response `control` control messages, if requested.
     /// - response `truncated` indicates whether or not the returned message
     ///   was truncated.
-    strict RecvMsg(struct {
+    RecvMsg(struct {
         want_addr bool;
         data_len uint32;
         want_control bool;
@@ -774,7 +774,7 @@ closed protocol SynchronousDatagramSocket {
     /// + request `control` ancillary data.
     /// + request `flags` flags for the send request.
     /// - response `len` the number of bytes sent.
-    strict SendMsg(struct {
+    SendMsg(struct {
         addr fuchsia.net.SocketAddress:optional;
         data vector<uint8>:MAX;
         control DatagramSocketSendControlData;
@@ -796,21 +796,21 @@ const STREAM_SOCKET_PROTOCOL_NAME string = "fuchsia.posix.socket/StreamSocket";
 /// Instead, clients should use the BSD sockets API to interact with sockets.
 /// We plan to change this protocol substantially and clients that couple
 /// directly to this protocol will make those changes more difficult.
-closed protocol StreamSocket {
+protocol StreamSocket {
     compose BaseNetworkSocket;
 
-    strict Describe() -> (resource table {
+    Describe() -> (resource table {
         /// `ZX_SOCKET_STREAM` on which data is sent and received.
         1: socket zx.Handle:SOCKET;
     });
 
     /// Begins listening for new incoming connections. At most `backlog`
     /// connections will be buffered.
-    strict Listen(struct {
+    Listen(struct {
         backlog int16;
     }) -> () error fuchsia.posix.Errno;
     /// Accepts a buffered incoming connection.
-    strict Accept(struct {
+    Accept(struct {
         want_addr bool;
     }) -> (resource struct {
         addr fuchsia.net.SocketAddress:optional;
@@ -818,130 +818,130 @@ closed protocol StreamSocket {
     }) error fuchsia.posix.Errno;
 
     /// Retrieves creation information from the socket.
-    strict GetInfo() -> (struct {
+    GetInfo() -> (struct {
         domain Domain;
         proto StreamSocketProtocol;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_TCP` -> `TCP_NODELAY`.
-    strict SetTcpNoDelay(struct {
+    SetTcpNoDelay(struct {
         value bool;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_TCP` -> `TCP_NODELAY`.
-    strict GetTcpNoDelay() -> (struct {
+    GetTcpNoDelay() -> (struct {
         value bool;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_TCP` -> `TCP_MAXSEG`.
-    strict SetTcpMaxSegment(struct {
+    SetTcpMaxSegment(struct {
         value_bytes uint32;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_TCP` -> `TCP_MAXSEG`.
-    strict GetTcpMaxSegment() -> (struct {
+    GetTcpMaxSegment() -> (struct {
         value_bytes uint32;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_TCP` -> `TCP_CORK`.
-    strict SetTcpCork(struct {
+    SetTcpCork(struct {
         value bool;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_TCP` -> `TCP_CORK`.
-    strict GetTcpCork() -> (struct {
+    GetTcpCork() -> (struct {
         value bool;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_TCP` -> `TCP_KEEPIDLE`.
-    strict SetTcpKeepAliveIdle(struct {
+    SetTcpKeepAliveIdle(struct {
         value_secs uint32;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_TCP` -> `TCP_KEEPIDLE`.
-    strict GetTcpKeepAliveIdle() -> (struct {
+    GetTcpKeepAliveIdle() -> (struct {
         value_secs uint32;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_TCP` -> `TCP_KEEPINTVL`.
-    strict SetTcpKeepAliveInterval(struct {
+    SetTcpKeepAliveInterval(struct {
         value_secs uint32;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_TCP` -> `TCP_KEEPINTVL`.
-    strict GetTcpKeepAliveInterval() -> (struct {
+    GetTcpKeepAliveInterval() -> (struct {
         value_secs uint32;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_TCP` -> `TCP_KEEPCNT`.
-    strict SetTcpKeepAliveCount(struct {
+    SetTcpKeepAliveCount(struct {
         value uint32;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_TCP` -> `TCP_KEEPCNT`.
-    strict GetTcpKeepAliveCount() -> (struct {
+    GetTcpKeepAliveCount() -> (struct {
         value uint32;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_TCP` -> `TCP_SYNCNT`.
-    strict SetTcpSynCount(struct {
+    SetTcpSynCount(struct {
         value uint32;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_TCP` -> `TCP_SYNCNT`.
-    strict GetTcpSynCount() -> (struct {
+    GetTcpSynCount() -> (struct {
         value uint32;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_TCP` -> `TCP_LINGER2`.
-    strict SetTcpLinger(struct {
+    SetTcpLinger(struct {
         value_secs OptionalUint32;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_TCP` -> `TCP_LINGER2`.
-    strict GetTcpLinger() -> (struct {
+    GetTcpLinger() -> (struct {
         value_secs OptionalUint32;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_TCP` -> `TCP_DEFER_ACCEPT`.
-    strict SetTcpDeferAccept(struct {
+    SetTcpDeferAccept(struct {
         value_secs uint32;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_TCP` -> `TCP_DEFER_ACCEPT`.
-    strict GetTcpDeferAccept() -> (struct {
+    GetTcpDeferAccept() -> (struct {
         value_secs uint32;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_TCP` -> `TCP_WINDOW_CLAMP`.
-    strict SetTcpWindowClamp(struct {
+    SetTcpWindowClamp(struct {
         value uint32;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_TCP` -> `TCP_WINDOW_CLAMP`.
-    strict GetTcpWindowClamp() -> (struct {
+    GetTcpWindowClamp() -> (struct {
         value uint32;
     }) error fuchsia.posix.Errno;
 
     /// Get `SOL_TCP` -> `TCP_INFO`.
-    strict GetTcpInfo() -> (struct {
+    GetTcpInfo() -> (struct {
         info TcpInfo;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_TCP` -> `TCP_QUICKACK`.
-    strict SetTcpQuickAck(struct {
+    SetTcpQuickAck(struct {
         value bool;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_TCP` -> `TCP_QUICKACK`.
-    strict GetTcpQuickAck() -> (struct {
+    GetTcpQuickAck() -> (struct {
         value bool;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_TCP` -> `TCP_CONGESTION`.
-    strict SetTcpCongestion(struct {
+    SetTcpCongestion(struct {
         value TcpCongestionControl;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_TCP` -> `TCP_CONGESTION`.
-    strict GetTcpCongestion() -> (struct {
+    GetTcpCongestion() -> (struct {
         value TcpCongestionControl;
     }) error fuchsia.posix.Errno;
 
     /// Set `SOL_TCP` -> `TCP_USER_TIMEOUT`.
-    strict SetTcpUserTimeout(struct {
+    SetTcpUserTimeout(struct {
         value_millis uint32;
     }) -> () error fuchsia.posix.Errno;
     /// Get `SOL_TCP` -> `TCP_USER_TIMEOUT`.
-    strict GetTcpUserTimeout() -> (struct {
+    GetTcpUserTimeout() -> (struct {
         value_millis uint32;
     }) error fuchsia.posix.Errno;
 
@@ -1129,9 +1129,9 @@ type InterfaceFlags = strict bits : uint16 {
 /// We plan to change this protocol substantially and clients that couple
 /// directly to this protocol will make those changes more difficult.
 @discoverable
-closed protocol Provider {
+protocol Provider {
     /// Requests a stream socket with the specified parameters.
-    strict StreamSocket(struct {
+    StreamSocket(struct {
         domain Domain;
         proto StreamSocketProtocol;
     }) -> (resource struct {
@@ -1140,7 +1140,7 @@ closed protocol Provider {
     /// Requests a datagram socket with the specified parameters.
     /// TODO(https://fxbug.dev/85027): Remove this method once no more callers rely on it.
     @selector("fuchsia.posix.socket/Provider.DatagramSocket")
-    strict DatagramSocketDeprecated(struct {
+    DatagramSocketDeprecated(struct {
         domain Domain;
         proto DatagramSocketProtocol;
     }) -> (resource struct {
@@ -1148,7 +1148,7 @@ closed protocol Provider {
     }) error fuchsia.posix.Errno;
     /// Requests a datagram socket with the specified parameters.
     @selector("fuchsia.posix.socket/Provider.DatagramSocketTransitional")
-    strict DatagramSocket(struct {
+    DatagramSocket(struct {
         domain Domain;
         proto DatagramSocketProtocol;
     }) -> (strict resource union {
@@ -1158,21 +1158,21 @@ closed protocol Provider {
 
     /// Looks up an interface by its index and returns its name. Returns
     /// `ZX_ERR_NOT_FOUND` if the specified index doesn't exist.
-    strict InterfaceIndexToName(struct {
+    InterfaceIndexToName(struct {
         index uint64;
     }) -> (struct {
         name fuchsia.net.interfaces.Name;
     }) error zx.Status;
     /// Looks up an interface by its name and returns its index. Returns
     /// `ZX_ERR_NOT_FOUND` if the specified name doesn't exist.
-    strict InterfaceNameToIndex(struct {
+    InterfaceNameToIndex(struct {
         name fuchsia.net.interfaces.Name;
     }) -> (struct {
         index uint64;
     }) error zx.Status;
     /// Looks up an interface by its name and returns its flags. Returns
     /// `ZX_ERR_NOT_FOUND` if the specified name doesn't exist.
-    strict InterfaceNameToFlags(struct {
+    InterfaceNameToFlags(struct {
         name fuchsia.net.interfaces.Name;
     }) -> (struct {
         flags InterfaceFlags;
@@ -1180,7 +1180,7 @@ closed protocol Provider {
 
     /// Requests a list of [`fuchsia.posix.socket.InterfaceAddresses`]
     /// describing the network interfaces on the system.
-    strict GetInterfaceAddresses() -> (struct {
+    GetInterfaceAddresses() -> (struct {
         interfaces vector<InterfaceAddresses>:MAX;
     });
 };

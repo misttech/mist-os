@@ -16,10 +16,10 @@ type SuggestMacAddressError = strict enum {
 // NOTE: This FIDL protocol is deprecated.  Please do not add new uses that depend on it.
 /// Allows for the configuration of WLAN devices to support legacy applications.
 @discoverable
-closed protocol DeprecatedConfigurator {
+protocol DeprecatedConfigurator {
     /// Suggests a MAC address for [`fuchsia.wlan.policy/AccessPointProvider`] to use when creating
     /// new soft access point interfaces and notifies when the request is complete.
-    strict SuggestAccessPointMacAddress(struct {
+    SuggestAccessPointMacAddress(struct {
         mac fuchsia.net.MacAddress;
     }) -> () error SuggestMacAddressError;
 };

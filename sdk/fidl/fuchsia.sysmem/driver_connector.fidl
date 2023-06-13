@@ -25,16 +25,16 @@ using fuchsia.io;
 /// constraints from other participants.
 @available(added=7, deprecated=9, removed=HEAD)
 @discoverable
-closed protocol DriverConnector {
+protocol DriverConnector {
     /// This one-way message sends in the server end of an Allocator channel.
     ///
     /// `allocator_request` will be served by the sysmem driver (or the channel
     /// will close).
-    strict Connect(resource struct {
+    Connect(resource struct {
         allocator_request server_end:Allocator;
     });
 
-    strict SetAuxServiceDirectory(resource struct {
+    SetAuxServiceDirectory(resource struct {
         service_directory client_end:fuchsia.io.Directory;
     });
 };

@@ -8,9 +8,9 @@ using zx;
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-closed protocol RawNand {
+protocol RawNand {
     /// Read one NAND page and its out-of-band data with hardware ECC.
-    strict ReadPageHwecc(struct {
+    ReadPageHwecc(struct {
         nandpage uint32;
     }) -> (struct {
         s zx.Status;
@@ -24,7 +24,7 @@ closed protocol RawNand {
     /// Write one NAND page and its out-of-band data with hardware ECC.
     ///
     /// Should return ZX_ERR_IO *only* when an error occurred due to underlying hardware.
-    strict WritePageHwecc(struct {
+    WritePageHwecc(struct {
         @buffer
         data vector<uint8>:MAX;
         @buffer
@@ -37,13 +37,13 @@ closed protocol RawNand {
     /// Erase NAND block.
     ///
     /// Should return ZX_ERR_IO *only* when error occurred due to underlying hardware.
-    strict EraseBlock(struct {
+    EraseBlock(struct {
         nandpage uint32;
     }) -> (struct {
         s zx.Status;
     });
 
-    strict GetNandInfo() -> (struct {
+    GetNandInfo() -> (struct {
         s zx.Status;
         info fuchsia.hardware.nandinfo.NandInfo;
     });

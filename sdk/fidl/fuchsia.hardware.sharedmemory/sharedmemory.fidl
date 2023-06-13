@@ -20,21 +20,21 @@ type SharedVmoBuffer = struct {
 };
 
 /// This is a generic protocol for sharing VMOs that drivers may compose.
-closed protocol SharedVmoRegister {
+protocol SharedVmoRegister {
     /// Registers a VMO and transfers ownership to the driver.
     /// vmo_id: The ID chosen by the client that will be used in operations on this VMO.
     /// vmo: The handle, offset, and size of this VMO. IO operations on this VMO will be relative to
     /// the offset and size specified here.
     /// rights: A bit field of SharedVmoRight values indicating how this VMO may be used. Callers
     /// should assume that the driver will map and/or pin the VMO using these rights.
-    strict RegisterVmo(resource struct {
+    RegisterVmo(resource struct {
         vmo_id uint32;
         vmo fuchsia.mem.Range;
         rights SharedVmoRight;
     }) -> () error zx.Status;
 
     /// Unmaps and/or unpins the VMO and returns the handle to the caller.
-    strict UnregisterVmo(struct {
+    UnregisterVmo(struct {
         vmo_id uint32;
     }) -> (resource struct {
         vmo zx.Handle:VMO;
@@ -44,20 +44,20 @@ closed protocol SharedVmoRegister {
 /// This is a generic protocol for driver IO using shared VMOs. Drivers may compose this protocol
 /// and choose which methods to implement based on the uses of the hardware. This protocol is only
 /// intended for simple use cases.
-closed protocol SharedVmoIo {
+protocol SharedVmoIo {
     /// Sends the data in buffer to the device.
-    strict Transmit(struct {
+    Transmit(struct {
         buffer SharedVmoBuffer;
     }) -> () error zx.Status;
 
     /// Receives data from the device into buffer.
-    strict Receive(struct {
+    Receive(struct {
         buffer SharedVmoBuffer;
     }) -> () error zx.Status;
 
     /// Simultaneously transmits and receives data. The size fields of tx_buffer and rx_buffer must
     /// be the same.
-    strict Exchange(struct {
+    Exchange(struct {
         tx_buffer SharedVmoBuffer;
         rx_buffer SharedVmoBuffer;
     }) -> () error zx.Status;

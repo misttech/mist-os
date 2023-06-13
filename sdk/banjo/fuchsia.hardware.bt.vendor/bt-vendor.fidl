@@ -48,9 +48,9 @@ type BtVendorCommand = strict enum {
 /// and vendor command encoding.
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-closed protocol BtVendor {
+protocol BtVendor {
     /// Returns bitmask of the features the vendor supports.
-    strict GetFeatures() -> (struct {
+    GetFeatures() -> (struct {
         features BtVendorFeatures;
     });
 
@@ -58,7 +58,7 @@ closed protocol BtVendor {
     /// a buffer. `params` must contain the parameter struct for the specified command, as
     /// documented in `BtVendorCommand`.
     /// Returns an error status if the command is not supported or the paramaters are invalid.
-    strict EncodeCommand(struct {
+    EncodeCommand(struct {
         command BtVendorCommand;
         params BtVendorParams;
     }) -> (struct {

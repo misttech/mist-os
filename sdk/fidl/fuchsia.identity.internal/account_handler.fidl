@@ -74,7 +74,7 @@ alias AccountPreAuthState = vector<uint8>:ACCOUNT_PRE_AUTH_STATE_MAX_SIZE;
 /// * `Finished` - the handler is in the process of shutting down and will soon
 ///   terminate.
 @discoverable
-closed protocol AccountHandlerControl {
+protocol AccountHandlerControl {
     /// Creates a completely new system account, optionally protecting the
     /// account with a single enrollment of an authentication mechanism.
     ///
@@ -92,7 +92,7 @@ closed protocol AccountHandlerControl {
     /// - `INVALID_REQUEST` if policy requires authentication factors for the
     ///    new account but no `interaction` channel was supplied.
     /// - `ABORTED` if the client closes the `interaction` channel.
-    strict CreateAccount(resource table {
+    CreateAccount(resource table {
         1: id fuchsia.identity.account.AccountId;
         2: metadata fuchsia.identity.account.AccountMetadata;
         3: interaction server_end:fuchsia.identity.authentication.Interaction;
@@ -108,7 +108,7 @@ closed protocol AccountHandlerControl {
     ///
     /// Fails with `FAILED_PRECONDITION` if the AccountHandler is not in the
     /// `Uninitialized` state.
-    strict Preload(struct {
+    Preload(struct {
         pre_auth_state AccountPreAuthState;
     }) -> () error fuchsia.identity.account.Error;
 
@@ -125,7 +125,7 @@ closed protocol AccountHandlerControl {
     /// - `FAILED_PRECONDITION` if the AccountHandler is not in the `Locked` or
     ///   `Initialized` state.
     /// - `ABORTED` if the client closes the `interaction` channel.
-    strict UnlockAccount(resource table {
+    UnlockAccount(resource table {
         1: interaction server_end:fuchsia.identity.authentication.Interaction;
     }) -> (struct {
         pre_auth_state AccountPreAuthState:optional;
@@ -139,7 +139,7 @@ closed protocol AccountHandlerControl {
     ///
     /// Fails with `FAILED_PRECONDITION` if the AccountHandler is not in the
     /// `Initialized` or `Locked` state.
-    strict LockAccount() -> (struct {
+    LockAccount() -> (struct {
         pre_auth_state AccountPreAuthState:optional;
     }) error fuchsia.identity.account.Error;
 
@@ -148,7 +148,7 @@ closed protocol AccountHandlerControl {
     /// After a successful call to RemoveAccount, all other open interfaces for
     /// this account handler will be closed and any subsequent calls on the
     /// current interface will fail.
-    strict RemoveAccount() -> () error fuchsia.identity.account.Error;
+    RemoveAccount() -> () error fuchsia.identity.account.Error;
 
     /// Connects an interface to read properties of and perform operations on
     /// the account handled by this handler. The AccountHandler must be in the
@@ -158,12 +158,12 @@ closed protocol AccountHandlerControl {
     ///
     /// Fails with `FAILED_PRECONDITION` if the AccountHandler is not in the
     /// `Initialized` state.
-    strict GetAccount(resource struct {
+    GetAccount(resource struct {
         account server_end:fuchsia.identity.account.Account;
     }) -> () error fuchsia.identity.account.Error;
 
     /// Signals that the AccountHandler should tear itself down. After the
     /// receiver responds by closing its handle, the caller may terminate the
     /// component if it hasn't already exited.
-    strict Terminate();
+    Terminate();
 };

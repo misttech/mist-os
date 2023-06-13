@@ -19,7 +19,7 @@ type ClientType = flexible enum {
 /// Allows a client to connect a [`Watcher`] to the power level of a given
 /// [`ClientType`].
 @discoverable
-closed protocol Connector {
+protocol Connector {
     /// Connects a [`Watcher`] to the power level of the specified
     /// [`ClientType`].
     ///
@@ -37,7 +37,7 @@ closed protocol Connector {
     ///
     /// + `watcher` is the server endpoint of a [`Watcher`] channel that will be
     /// connected to the [`ClientType`] power level.
-    strict Connect(resource struct {
+    Connect(resource struct {
         client_type ClientType;
         watcher server_end:Watcher;
     });
@@ -51,7 +51,7 @@ closed protocol Connector {
 /// level of the desired [`ClientType`] using the [`Connector.Connect`] method.
 /// The client endpoint of a `Watcher` channel is only useful after it has been
 /// connected in this way.
-closed protocol Watcher {
+protocol Watcher {
     /// Watches for changes to the power level of the connected [`ClientType`].
     ///
     /// The power level for a given [`ClientType`] is determined according to
@@ -68,7 +68,7 @@ closed protocol Watcher {
     ///
     /// - `level` is an unsigned integer representing the power level of the
     /// connected [`ClientType`].
-    strict Watch() -> (struct {
+    Watch() -> (struct {
         level uint64;
     });
 };

@@ -46,40 +46,40 @@ type Error = strict enum {
 };
 
 @discoverable
-closed protocol Stack {
+protocol Stack {
     /// Add a new entry to the forwarding table.
     ///
     /// If the table already contains an entry with the same subnet and
     /// destination, an already exists error is returned.
-    strict AddForwardingEntry(struct {
+    AddForwardingEntry(struct {
         entry ForwardingEntry;
     }) -> () error Error;
 
     /// Removes the forwarding entry. The entry must exactly match an entry in
     /// the forwarding table, with the exception of the metric value, which is
     /// ignored.
-    strict DelForwardingEntry(struct {
+    DelForwardingEntry(struct {
         entry ForwardingEntry;
     }) -> () error Error;
 
     /// Sets the IP forwarding state for an interface.
     // TODO(https://fxbug.dev/94475): Remove this.
     @deprecated("Use fuchsia.net.interfaces.admin/Control.SetConfiguration")
-    strict SetInterfaceIpForwardingDeprecated(struct {
+    SetInterfaceIpForwardingDeprecated(struct {
         id fuchsia.net.InterfaceId;
         ip_version fuchsia.net.IpVersion;
         enabled bool;
     }) -> () error Error;
 
     /// Get a [`fuchsia.net.name/DnsServerWatcher`].
-    strict GetDnsServerWatcher(resource struct {
+    GetDnsServerWatcher(resource struct {
         watcher server_end:fuchsia.net.name.DnsServerWatcher;
     });
 
     /// Enables or disables the DHCP client on an interface.
     /// TODO(https://fxbug.dev/81593): Remove this once the DHCP client is moved
     /// out of the netstack.
-    strict SetDhcpClientEnabled(resource struct {
+    SetDhcpClientEnabled(resource struct {
         id fuchsia.net.InterfaceId;
         enable bool;
     }) -> () error Error;
@@ -96,18 +96,18 @@ closed protocol Stack {
     ///
     /// Bridge lifetime is controlled through the `bridge` handle.
     // TODO(https://fxbug.dev/86661): Redesign and re-home this.
-    strict BridgeInterfaces(resource struct {
+    BridgeInterfaces(resource struct {
         interfaces vector<fuchsia.net.InterfaceId>:MAX;
         bridge server_end:fuchsia.net.interfaces.admin.Control;
     });
 };
 
 @discoverable
-closed protocol Log {
+protocol Log {
     /// Dynamically set packet logging.
     // TODO(fxbug.dev/42432): replace with optional packet captures in Inspect
     // output.
-    strict SetLogPackets(struct {
+    SetLogPackets(struct {
         enabled bool;
     }) -> ();
 };

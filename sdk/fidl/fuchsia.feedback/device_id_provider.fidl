@@ -9,12 +9,12 @@ library fuchsia.feedback;
 /// is not intended to be used for any reporting purposes other than feedback,
 /// e.g., not intended to be used for telemetry.
 @discoverable
-closed protocol DeviceIdProvider {
+protocol DeviceIdProvider {
     /// Returns the device's feedback ID.
     ///
     /// This method follows the hanging-get pattern and won't return a value until the ID since the
     /// last call has changed.
-    strict GetId() -> (struct {
+    GetId() -> (struct {
         feedback_id string:64;
     });
 };

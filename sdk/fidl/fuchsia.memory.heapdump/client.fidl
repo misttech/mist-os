@@ -131,12 +131,12 @@ type SnapshotElement = flexible union {
 };
 
 /// Protocol to transmit a snapshot as a stream of elements.
-closed protocol SnapshotReceiver {
+protocol SnapshotReceiver {
     /// Delivers a batch of snapshot elements.
     ///
     /// It will be called repeatedly until no elements are left, and then one final time with an
     /// empty vector to signal the end of the stream.
-    strict Batch(struct {
+    Batch(struct {
         batch vector<SnapshotElement>:MAX;
     }) -> ();
 };
@@ -159,20 +159,20 @@ type StoredSnapshot = table {
 };
 
 /// Protocol to retrieve a list of StoredSnapshots.
-closed protocol StoredSnapshotIterator {
+protocol StoredSnapshotIterator {
     /// Retrieves the next batch of StoredSnapshots elements.
     ///
     /// An empty response signals the end of the list.
-    strict GetNext() -> (struct {
+    GetNext() -> (struct {
         batch vector<StoredSnapshot>:MAX;
     });
 };
 
 /// Protocol to request and retrieve memory profiles.
 @discoverable
-closed protocol Collector {
+protocol Collector {
     /// Obtains a snapshot of the current live allocations in an instrumented process.
-    strict TakeLiveSnapshot(table {
+    TakeLiveSnapshot(table {
         /// The instrumented process to operate on.
         ///
         /// Required.
@@ -187,7 +187,7 @@ closed protocol Collector {
     }) error CollectorError;
 
     /// Retrieves the list of all the available stored snapshots.
-    strict ListStoredSnapshots(resource table {
+    ListStoredSnapshots(resource table {
         /// The server_end of the StoredSnapshotIterator that will be used to retrieve the results.
         ///
         /// Required.
@@ -198,7 +198,7 @@ closed protocol Collector {
     }) -> () error CollectorError;
 
     /// Retrieves a stored snapshot.
-    strict DownloadStoredSnapshot(struct {
+    DownloadStoredSnapshot(struct {
         /// The identifier of the snapshot to be downloaded.
         ///
         /// The list of the available snapshots can be retrieved with ListStoredSnapshots.

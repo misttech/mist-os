@@ -16,13 +16,13 @@ type ErrorCode = strict enum {
 
 /// Interface that provides cast config data.
 @discoverable
-closed protocol Provider {
+protocol Provider {
     /// Requests a buffer containing cast config data.
     /// This call implements the Hanging Get protocol as detailed in
     /// https://fuchsia.dev/fuchsia-src/concepts/api/fidl#hanging-get
     ///
     /// All error cases are terminal, clients should not retry on error.
-    strict Watch() -> (resource struct {
+    Watch() -> (resource struct {
         config fuchsia.mem.Buffer;
     }) error ErrorCode;
 
@@ -31,7 +31,7 @@ closed protocol Provider {
     /// `processed`: `true` if successfully received and processed
     /// `retry`: If `processed` is `false` config provider determines if a retry
     ///  is appropriate.
-    strict Notify(struct {
+    Notify(struct {
         processed bool;
     }) -> (struct {
         retry bool;

@@ -45,13 +45,13 @@ type CheckCredentialResponse = table {
 /// is intended only for use by highly trusted components such as the
 /// Password Authenticator.
 @discoverable
-closed protocol Manager {
+protocol Manager {
     /// Adds a low entropy credential into the system.
     /// `params` see `AddCredentialParams`.
     /// Success returns a label for the newly provisioned credential. This
     /// acts as a identifier which is used to check the credential or remove it
     /// later on. This should be stored by the caller.
-    strict AddCredential(struct {
+    AddCredential(struct {
         params AddCredentialParams;
     }) -> (struct {
         label Label;
@@ -61,7 +61,7 @@ closed protocol Manager {
     ///
     /// On Failure:
     /// INVALID_LABEL if a label is provided which is not in the tree.
-    strict RemoveCredential(struct {
+    RemoveCredential(struct {
         label Label;
     }) -> () error CredentialError;
 
@@ -76,7 +76,7 @@ closed protocol Manager {
     ///                   `delay_schedule` set on AddCredential.
     /// INVALID_SECRET for an incorrect authentication attempt.
     /// CORRUPT_METADATA for invalid credential metadata.
-    strict CheckCredential(struct {
+    CheckCredential(struct {
         params CheckCredentialParams;
     }) -> (struct {
         response CheckCredentialResponse;

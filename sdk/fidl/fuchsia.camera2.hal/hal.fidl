@@ -43,10 +43,10 @@ type Config = struct {
 /// which allows setting up a given configuration
 /// and setting up a stream.
 @discoverable
-closed protocol Controller {
+protocol Controller {
     /// Returns the next available configuration which the camera driver supports.
     /// Returns ZX_ERR_STOP if no new configurations are available.
-    strict GetNextConfig() -> (struct {
+    GetNextConfig() -> (struct {
         config box<Config>;
         status zx.Status;
     });
@@ -61,7 +61,7 @@ closed protocol Controller {
     /// and honor this new setup call.
     /// If the new stream requested is already part of the existing running configuration
     /// the HAL will just be creating this new stream while the other stream still exists as is.
-    strict CreateStream(resource struct {
+    CreateStream(resource struct {
         config_index uint32;
         stream_index uint32;
         image_format_index uint32;
@@ -69,11 +69,11 @@ closed protocol Controller {
     });
 
     /// Enable/Disable Streaming
-    strict EnableStreaming();
-    strict DisableStreaming();
+    EnableStreaming();
+    DisableStreaming();
 
     // Get identifying information about the device:
-    strict GetDeviceInfo() -> (struct {
+    GetDeviceInfo() -> (struct {
         info fuchsia.camera2.DeviceInfo;
     });
 };

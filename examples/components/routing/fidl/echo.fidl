@@ -8,9 +8,9 @@ library fidl.examples.routing.echo;
 const MAX_STRING_LENGTH uint64 = 64;
 
 @discoverable
-closed protocol Echo {
+protocol Echo {
     /// Returns the input.
-    strict EchoString(struct {
+    EchoString(struct {
         value string:<MAX_STRING_LENGTH, optional>;
     }) -> (struct {
         response string:<MAX_STRING_LENGTH, optional>;

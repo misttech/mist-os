@@ -7,9 +7,9 @@ using zx;
 
 /// Protocol for providing the root resource.
 @discoverable
-closed protocol RootResource {
+protocol RootResource {
     /// Get the root `resource`.
-    strict Get() -> (resource struct {
+    Get() -> (resource struct {
         resource zx.Handle:RESOURCE;
     });
 };

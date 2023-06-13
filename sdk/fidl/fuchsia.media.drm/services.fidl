@@ -9,7 +9,7 @@ using fuchsia.io;
 /// to create a [`ContentDecryptionModule`] without a client data store.
 const NO_DATA_STORE uint32 = 0;
 
-closed protocol KeySystem {
+protocol KeySystem {
     /// Get various static properties of the `KeySystem` implementation.
     ///
     /// The properties include the capabilities and requirements of the
@@ -18,7 +18,7 @@ closed protocol KeySystem {
     ///
     /// - response `properties` the properties of the `KeySystem`
     ///   implementation.
-    strict GetProperties() -> (struct {
+    GetProperties() -> (struct {
         properties KeySystemProperties;
     });
 
@@ -36,7 +36,7 @@ closed protocol KeySystem {
     ///   added `data_store_id` and the server should close the channel.
     /// + request `data_store_params` the parameters to be used for this data
     ///   store.
-    strict AddDataStore(resource struct {
+    AddDataStore(resource struct {
         data_store_id uint32;
         data_store_params DataStoreParams;
     }) -> () error Error;
@@ -51,7 +51,7 @@ closed protocol KeySystem {
     ///  store to be removed. It is invalid for the client to provide
     ///  [`NO_DATA_STORE`] or a `data_store_id` value that has not previously
     ///  been added or has been previously destroyed.
-    strict DestroyDataStoreAndConfirm(struct {
+    DestroyDataStoreAndConfirm(struct {
         data_store_id uint32;
     }) -> ();
 
@@ -73,7 +73,7 @@ closed protocol KeySystem {
     /// + request `data_store_id` the data store that should be used by the
     ///   `ContentDecryptionModule`.
     /// + request `cdm` the server endpoint of the `ContentDecryptionModule`.
-    strict CreateContentDecryptionModule2(resource struct {
+    CreateContentDecryptionModule2(resource struct {
         data_store_id uint32;
         cdm server_end:ContentDecryptionModule;
     });
@@ -107,7 +107,7 @@ type DataStoreParams = resource table {
 /// [`W3C Encrypted Media Extensions`]:
 ///   https://www.w3.org/TR/encrypted-media
 @discoverable
-closed protocol ClearKey {
+protocol ClearKey {
     compose KeySystem;
 };
 
@@ -116,7 +116,7 @@ closed protocol ClearKey {
 /// If the client closes the `Widevine` channel, derived
 /// `ContentDecryptionModule`s will remain active.
 @discoverable
-closed protocol Widevine {
+protocol Widevine {
     compose KeySystem;
 };
 
@@ -125,6 +125,6 @@ closed protocol Widevine {
 /// If the client closes the `PlayReady` channel, derived
 /// `ContentDecryptionModule`s will remain active.
 @discoverable
-closed protocol PlayReady {
+protocol PlayReady {
     compose KeySystem;
 };

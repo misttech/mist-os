@@ -32,20 +32,20 @@ type InteractionProtocolServerEnd = flexible resource union {
 /// password authenticator (the server), both during enrollment and during
 /// authentication. The server will close the channel when enrollment or
 /// authentication is complete.
-closed protocol PasswordInteraction {
+protocol PasswordInteraction {
     /// Sets the password. Calling this method is guaranteed to lead to a
     /// change in state and therefore a response to `WatchState`. During
     /// password enrollment some server implementations may verify the supplied
     /// password against rules defined by the product or policy and move to
     /// an error state if the password does not meet these rules.
-    strict SetPassword(struct {
+    SetPassword(struct {
         password string:PASSWORD_BYTES_MAX_SIZE;
     });
 
     /// Wait for a change in the state of the server. This method follows the
     /// "hanging get" interface pattern, returning immediately on the first call
     /// and hanging until a change in state on subsequent calls.
-    strict WatchState() -> (strict union {
+    WatchState() -> (strict union {
         /// The server is waiting for the supplied set of conditions.
         1: waiting vector<PasswordCondition>:8;
         /// The server is verifying the password. Reporting a verification state
@@ -109,14 +109,14 @@ type PasswordError = flexible union {
 /// Enrollment always completes immediately and successfully without any action
 /// from the client. Authentication completes successfully when the client calls
 /// SetSuccess.
-closed protocol TestInteraction {
+protocol TestInteraction {
     /// (authentication) Causes this test authenticator to immediately succeed.
-    strict SetSuccess();
+    SetSuccess();
 
     /// Wait for a change in the state of the server. This method follows the
     /// "hanging get" interface pattern, returning immediately on the first call
     /// and hanging until a change in state on subsequent calls.
-    strict WatchState() -> (strict union {
+    WatchState() -> (strict union {
         /// The server is waiting for the supplied set of conditions.
         1: waiting vector<TestAuthenticatorCondition>:8;
     });

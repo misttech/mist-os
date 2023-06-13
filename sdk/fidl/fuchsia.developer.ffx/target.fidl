@@ -103,9 +103,9 @@ type TargetRebootState = strict enum {
 };
 
 @discoverable
-closed protocol TargetControl {
+protocol TargetControl {
     @deprecated("Please use target collection -> target handle instead.")
-    strict Reboot(struct {
+    Reboot(struct {
         state TargetRebootState;
     }) -> () error TargetRebootError;
 };
@@ -117,8 +117,8 @@ closed protocol TargetControl {
 ///
 /// When there are no more targets to be sent to the client, an empty vector
 /// will be sent as the last call to `Next`.
-closed protocol TargetCollectionReader {
-    strict Next(struct {
+protocol TargetCollectionReader {
+    Next(struct {
         entry vector<TargetInfo>:MAX;
     }) -> ();
 };
@@ -214,12 +214,12 @@ type AddTargetError = table {
 
 /// Defines the responses from the `AddTarget` method of the [TargetCollection]
 /// protocol. This is to assist in reporting structured errors to the client.
-closed protocol AddTargetResponder {
+protocol AddTargetResponder {
     /// Called when `AddTarget()` succeeds.
-    strict Success();
+    Success();
 
     /// Called when `AddTarget()` fails.
-    strict Error(struct {
+    Error(struct {
         err AddTargetError;
     });
 };
@@ -227,7 +227,7 @@ closed protocol AddTargetResponder {
 /// A protocol defining a collection of Fuchsia targets. This is used to inspect
 /// and interact with fuchsia targets that the daemon has discovered.
 @discoverable
-closed protocol TargetCollection {
+protocol TargetCollection {
     /// Sends a list of all active targets in the collection. An active target
     /// is one that has responded over the network recently.
     ///
@@ -237,7 +237,7 @@ closed protocol TargetCollection {
     ///
     /// The client receives updates by handling calls to `Next` in the
     /// `TargetCollectionReader` protocol.
-    strict ListTargets(resource struct {
+    ListTargets(resource struct {
         query TargetQuery;
         reader client_end:TargetCollectionReader;
     });
@@ -246,7 +246,7 @@ closed protocol TargetCollection {
     /// target. If a target does not yet exist in the cache that matches the
     /// query, then this will hang until one is found. It is the caller's
     /// responsibility to time out if this call takes too long.
-    strict OpenTarget(resource struct {
+    OpenTarget(resource struct {
         query TargetQuery;
         target_handle server_end:Target;
     }) -> () error OpenTargetError;
@@ -270,7 +270,7 @@ closed protocol TargetCollection {
     ///
     /// If `verify_connection` is passed as `false`, this function will return
     /// immediately, ignoring possible connection issues with the target.
-    strict AddTarget(resource struct {
+    AddTarget(resource struct {
         ip TargetAddrInfo;
         config AddTargetConfig;
         add_target_responder client_end:AddTargetResponder;
@@ -279,7 +279,7 @@ closed protocol TargetCollection {
     /// Manually adds a target that cannot be discovered via mDNS. This target
     /// will be retained in the target collection until it establishes an RCS
     /// connection, or until the associated connection timeout has elapsed.
-    strict AddEphemeralTarget(struct {
+    AddEphemeralTarget(struct {
         ip TargetAddrInfo;
         connect_timeout_seconds uint64;
     }) -> ();
@@ -288,7 +288,7 @@ closed protocol TargetCollection {
     ///
     /// If the target_id doesn't match a device name, the daaemon will attempt
     /// to interpret it as an IP.
-    strict RemoveTarget(struct {
+    RemoveTarget(struct {
         target_id string:fuchsia.device.DEVICE_NAME_MAX;
     }) -> (struct {
         removed bool;
@@ -296,7 +296,7 @@ closed protocol TargetCollection {
 
     /// Manually adds a temporary fastboot target at runtime.
     /// The target is removed after execution.
-    strict AddInlineFastbootTarget(struct {
+    AddInlineFastbootTarget(struct {
         serial_number string:fuchsia.hwinfo.MAX_VALUE_SIZE;
     }) -> ();
 };
@@ -305,10 +305,10 @@ closed protocol TargetCollection {
 /// Not to be confused with the `TargetControl` protocol. This is exclusively
 /// for use with the target collection service.
 @discoverable
-closed protocol Target {
+protocol Target {
     /// Returns:
     /// * As much information identifying the target as is currently available.
-    strict Identity() -> (struct {
+    Identity() -> (struct {
         target_info TargetInfo;
     });
 
@@ -317,7 +317,7 @@ closed protocol Target {
     /// Returns:
     /// * SSH host pipe error logs for the target. If there aren't any, will
     /// return an empty string.
-    strict GetSshLogs() -> (struct {
+    GetSshLogs() -> (struct {
         entry string:MAX;
     });
 
@@ -327,7 +327,7 @@ closed protocol Target {
     /// * The first cached address viable for SSH. If there isn't one, will
     ///   wait until there is. It is the client's responsibility to handle
     ///   potential timeouts.
-    strict GetSshAddress() -> (struct {
+    GetSshAddress() -> (struct {
         address TargetAddrInfo;
     });
 
@@ -346,7 +346,7 @@ closed protocol Target {
     /// Returns:
     /// * An error if the `ip` does not exist within the target. Otherwise,
     ///   nothing on success.
-    strict SetPreferredSshAddress(struct {
+    SetPreferredSshAddress(struct {
         ip TargetIp;
     }) -> () error TargetError;
 
@@ -359,7 +359,7 @@ closed protocol Target {
     ///
     /// Returns:
     /// * Nothing on success.
-    strict ClearPreferredSshAddress() -> ();
+    ClearPreferredSshAddress() -> ();
 
     /// Opens a connection to the RemoteControlService for a given
     /// target. If the target is not in a state that allows opening up the
@@ -371,12 +371,12 @@ closed protocol Target {
     ///
     /// Errors:
     /// * See [TargetError] for failure states.
-    strict OpenRemoteControl(resource struct {
+    OpenRemoteControl(resource struct {
         remote_control server_end:rc.RemoteControl;
     }) -> () error TargetConnectionError;
 
     /// Opens a Fastboot controller for a given target.
-    strict OpenFastboot(resource struct {
+    OpenFastboot(resource struct {
         fastboot server_end:Fastboot;
     });
 
@@ -387,13 +387,13 @@ closed protocol Target {
     ///
     /// Errors:
     /// * See [TargetRebootError] for failure states.
-    strict Reboot(struct {
+    Reboot(struct {
         state TargetRebootState;
     }) -> () error TargetRebootError;
 
 
     /// Runs an iterator over diagnostics data. At present, this means cached log data.
-    strict StreamActiveDiagnostics(resource struct {
+    StreamActiveDiagnostics(resource struct {
         parameters DaemonDiagnosticsStreamParameters;
         iterator server_end:rc.ArchiveIterator;
     }) -> (struct {

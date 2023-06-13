@@ -6,10 +6,10 @@ library fuchsia.pkg;
 /// This protocol gives access to persisted CUP data for eager packages in
 /// pkg-resolver.
 @discoverable
-closed protocol Cup {
+protocol Cup {
     /// Resolve the eager package given by the pinned package URL, and write the
     /// CUP data to storage.
-    strict Write(struct {
+    Write(struct {
         /// The pinned eager package URL from Omaha, must appear in CUP data.
         url PackageUrl;
         /// The CUP data from the update check.
@@ -17,7 +17,7 @@ closed protocol Cup {
     }) -> () error WriteError;
 
     /// Returns the eager package version and channel of the given package URL.
-    strict GetInfo(struct {
+    GetInfo(struct {
         /// The eager package URL, must be unpinned.
         url PackageUrl;
     }) -> (struct {

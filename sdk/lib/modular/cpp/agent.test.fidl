@@ -4,6 +4,6 @@
 library test.modular.agent;
 
 @discoverable
-closed protocol Pinger {
-    strict Ping();
+protocol Pinger {
+    Ping();
 };

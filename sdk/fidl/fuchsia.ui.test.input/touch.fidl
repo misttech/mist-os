@@ -14,9 +14,9 @@ const MAX_FINGERS uint8 = 10;
 /// A tool to inject touch events into Input Pipeline.
 ///
 /// Please extend as necessary.
-closed protocol TouchScreen {
+protocol TouchScreen {
     /// Simulates a tap at the requested location.
-    strict SimulateTap(table {
+    SimulateTap(table {
         /// Location of the tap event, in the coordinate units specified during
         /// registration.
         1: tap_location fuchsia.math.Vec;
@@ -24,7 +24,7 @@ closed protocol TouchScreen {
 
     /// Simulates multi finger tap at the requested locations.
     @available(added=12)
-    strict SimulateMultiTap(table {
+    SimulateMultiTap(table {
         /// Locations of the tap event, in the coordinate units specified during
         /// registration.
         1: tap_locations vector<fuchsia.math.Vec>:MAX_FINGERS;
@@ -40,7 +40,7 @@ closed protocol TouchScreen {
     /// Events are injected with no explicit delay in between; in other words, the
     /// observed delay between successive events will be approximately equal to the
     /// time required to inject a single event.
-    strict SimulateSwipe(table {
+    SimulateSwipe(table {
         /// Starting location of the swipe, in the coordinate units specified during
         /// registration.
         1: start_location fuchsia.math.Vec;
@@ -65,7 +65,7 @@ closed protocol TouchScreen {
     ///
     /// Events are injected with a small explicit delay in between.
     @available(added=12)
-    strict SimulateMultiFingerGesture(table {
+    SimulateMultiFingerGesture(table {
         /// Starting locations of the gesture, in the coordinate units specified during
         /// registration.
         1: start_locations array<fuchsia.math.Vec, MAX_FINGERS>;
@@ -82,9 +82,9 @@ closed protocol TouchScreen {
 /// A tool for applications to report touch input to interested parties (e.g. a test
 /// fixture).
 @discoverable
-closed protocol TouchInputListener {
+protocol TouchInputListener {
     /// Report that component under test has received expected input.
-    strict ReportTouchInput(table {
+    ReportTouchInput(table {
         /// The horizontal coordinate, in the reporter's coordinate system.
         1: local_x float64;
 

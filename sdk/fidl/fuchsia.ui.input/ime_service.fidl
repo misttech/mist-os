@@ -5,14 +5,14 @@ library fuchsia.ui.input;
 
 /// The service provided by an IME
 @discoverable
-closed protocol ImeService {
-    strict GetInputMethodEditor(resource struct {
+protocol ImeService {
+    GetInputMethodEditor(resource struct {
         keyboard_type KeyboardType;
         action InputMethodAction;
         initial_state TextInputState;
         client client_end:InputMethodEditorClient;
         editor server_end:InputMethodEditor;
     });
-    strict ShowKeyboard();
-    strict HideKeyboard();
+    ShowKeyboard();
+    HideKeyboard();
 };

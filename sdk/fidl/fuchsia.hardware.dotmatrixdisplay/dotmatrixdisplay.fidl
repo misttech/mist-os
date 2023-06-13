@@ -38,13 +38,13 @@ type DotmatrixDisplayConfig = struct {
 /// of pixels. The display could be monochromatic or have RGB values. This
 /// protocol is NOT for a display with lots of pixels or extra hardware like an
 /// HDMI or DP display.
-closed protocol DotmatrixDisplay {
+protocol DotmatrixDisplay {
     /// Get the configuration to display the screen.
-    strict GetConfig() -> (struct {
+    GetConfig() -> (struct {
         config DotmatrixDisplayConfig;
     });
     /// Set the screen memory. Calling this function will update the display.
-    strict SetScreen(struct {
+    SetScreen(struct {
         screen_buffer vector<uint8>:MAX_BUFFER_SIZE;
     }) -> (struct {
         s zx.Status;

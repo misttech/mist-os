@@ -8,12 +8,12 @@ using fuchsia.media.audio;
 
 /// Interface for creating audio consumers bound to a session.
 @discoverable
-closed protocol SessionAudioConsumerFactory {
+protocol SessionAudioConsumerFactory {
     /// Creates an `AudioConsumer`, which is an interface for playing audio, bound
     /// to a particular session. `session_id` is the identifier of the media session
     /// for which audio is to be rendered.
     // TODO(dalesat): Can't use fuchsia.media.sessions2.SessionId here, because dependencies.
-    strict CreateAudioConsumer(resource struct {
+    CreateAudioConsumer(resource struct {
         session_id uint64;
         audio_consumer_request server_end:AudioConsumer;
     });
@@ -21,17 +21,17 @@ closed protocol SessionAudioConsumerFactory {
 
 /// Interface for creating audio consumers for local rendering.
 @discoverable
-closed protocol UsageAudioConsumerFactory {
+protocol UsageAudioConsumerFactory {
     /// Creates an `AudioConsumer`, which is an interface for playing audio, given a usage value.
     /// Audio submitted to such a consumer is always rendered locally.
-    strict CreateAudioConsumer(resource struct {
+    CreateAudioConsumer(resource struct {
         usage AudioRenderUsage;
         audio_consumer_request server_end:AudioConsumer;
     });
 };
 
 /// Interface for playing and controlling audio.
-closed protocol AudioConsumer {
+protocol AudioConsumer {
     /// Creates a `StreamSink` for the consumer with the indicated properties.
     ///
     /// Multiple stream sinks may be acquired using this method, but they are intended to be used
@@ -43,7 +43,7 @@ closed protocol AudioConsumer {
     /// If an unsupported compression type is supplied, the
     /// `stream_sink_request` request will be closed with an epitaph value of
     /// `ZX_ERR_INVALID_ARGS`.
-    strict CreateStreamSink(resource struct {
+    CreateStreamSink(resource struct {
         buffers vector<zx.Handle:VMO>:16;
         stream_type AudioStreamType;
         compression box<Compression>;
@@ -51,7 +51,7 @@ closed protocol AudioConsumer {
     });
 
     /// Indicates that the last packet prior to the end of the stream has been rendered.
-    strict -> OnEndOfStream();
+    -> OnEndOfStream();
 
     /// Starts rendering as indicated by `flags`.
     ///
@@ -76,7 +76,7 @@ closed protocol AudioConsumer {
     /// specified.
     ///
     /// The actual start time will be reflected in the updated status.
-    strict Start(struct {
+    Start(struct {
         flags AudioConsumerStartFlags;
         reference_time zx.Time;
         media_time int64;
@@ -84,24 +84,24 @@ closed protocol AudioConsumer {
 
     /// Stops rendering as soon as possible after this method is called. The actual stop time will
     /// be reflected in the updated status.
-    strict Stop();
+    Stop();
 
     /// Requests to change the playback rate of the renderer. 1.0 means normal
     /// playback. Negative rates are not supported. The new rate will be
     /// reflected in the updated status. The default rate of any newly created `StreamSink` is 1.0.
-    strict SetRate(struct {
+    SetRate(struct {
         rate float32;
     });
 
     /// Binds to this `AudioConsumer` volume control for control and notifications.
-    strict BindVolumeControl(resource struct {
+    BindVolumeControl(resource struct {
         volume_control_request server_end:fuchsia.media.audio.VolumeControl;
     });
 
     /// Gets the current status of the consumer using the long get pattern. The consumer responds
     /// to this method when the status changes - initially with respect to the initial status value
     /// and thereafter with respect to the previously-reported status value.
-    strict WatchStatus() -> (struct {
+    WatchStatus() -> (struct {
         status AudioConsumerStatus;
     });
 };

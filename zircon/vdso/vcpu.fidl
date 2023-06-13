@@ -4,7 +4,7 @@
 library zx;
 
 @transport("Syscall")
-closed protocol Vcpu {
+protocol Vcpu {
     /// ## Summary
     ///
     /// Create a VCPU.
@@ -98,7 +98,7 @@ closed protocol Vcpu {
     /// [`zx_vcpu_kick()`]: vcpu_kick.md
     /// [`zx_vcpu_read_state()`]: vcpu_read_state.md
     /// [`zx_vcpu_write_state()`]: vcpu_write_state.md
-    strict Create(resource struct {
+    Create(resource struct {
         guest Handle:GUEST;
         options uint32;
         entry Vaddr;
@@ -179,7 +179,7 @@ closed protocol Vcpu {
     /// [`zx_vcpu_read_state()`]: vcpu_read_state.md
     /// [`zx_vcpu_write_state()`]: vcpu_write_state.md
     @blocking
-    strict Enter(resource struct {
+    Enter(resource struct {
         handle Handle:VCPU;
     }) -> (struct {
         packet PortPacket;
@@ -239,7 +239,7 @@ closed protocol Vcpu {
     /// [`zx_vcpu_interrupt()`]: vcpu_interrupt.md
     /// [`zx_vcpu_read_state()`]: vcpu_read_state.md
     /// [`zx_vcpu_write_state()`]: vcpu_write_state.md
-    strict Kick(resource struct {
+    Kick(resource struct {
         handle Handle:VCPU;
     }) -> () error Status;
 
@@ -297,7 +297,7 @@ closed protocol Vcpu {
     /// [`zx_vcpu_kick()`]: vcpu_kick.md
     /// [`zx_vcpu_read_state()`]: vcpu_read_state.md
     /// [`zx_vcpu_write_state()`]: vcpu_write_state.md
-    strict Interrupt(resource struct {
+    Interrupt(resource struct {
         handle Handle:VCPU;
         vector uint32;
     }) -> () error Status;
@@ -367,7 +367,7 @@ closed protocol Vcpu {
     /// [`zx_vcpu_interrupt()`]: vcpu_interrupt.md
     /// [`zx_vcpu_kick()`]: vcpu_kick.md
     /// [`zx_vcpu_write_state()`]: vcpu_write_state.md
-    strict ReadState(resource struct {
+    ReadState(resource struct {
         handle Handle:VCPU;
         kind uint32;
     }) -> (struct {
@@ -440,7 +440,7 @@ closed protocol Vcpu {
     /// [`zx_vcpu_interrupt()`]: vcpu_interrupt.md
     /// [`zx_vcpu_kick()`]: vcpu_kick.md
     /// [`zx_vcpu_read_state()`]: vcpu_read_state.md
-    strict WriteState(resource struct {
+    WriteState(resource struct {
         handle Handle:VCPU;
         kind uint32;
         @voidptr

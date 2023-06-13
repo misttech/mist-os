@@ -7,13 +7,13 @@ library fuchsia.device.fs;
 using zx;
 
 /// A connector lets a client forward the server end of a protocol.
-closed protocol Connector {
+protocol Connector {
     /// Forward a server end of a protocol so that it can be connected.
     /// + request `server` the server end of the protocol to be served. The FIDL protocol that
     ///     this speaks is determined out-of-band.
     /// - response This function has no response. The function is one-way to match the pipelining
     ///     behaviors of other virtual filesystems.
-    strict Connect(resource struct {
+    Connect(resource struct {
         server zx.Handle:CHANNEL;
     });
 };

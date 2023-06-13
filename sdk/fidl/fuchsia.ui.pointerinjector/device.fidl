@@ -54,7 +54,7 @@ const MAX_INJECT uint32 = 128;
 /// final CANCEL event following channel closure; this CANCEL event is then
 /// propagated according to dispatch policy.
 @discoverable
-closed protocol Registry {
+protocol Registry {
     /// Sets up a context for a |Device|, the target for the |Device|, and
     /// directs the |Device| at the target via a viewport, positioned in the
     /// context. These parameters are specified in a |Config|.
@@ -64,7 +64,7 @@ closed protocol Registry {
     ///
     /// The return event tells the caller that (1) the server has processed the
     /// call, and (2) the |Device| is connected.
-    strict Register(resource struct {
+    Register(resource struct {
         config Config;
         injector server_end:Device;
     }) -> ();
@@ -76,7 +76,7 @@ closed protocol Registry {
 /// A |Device| may *inject* pointer events into a target in the scene, but the
 /// *dispatch* of pointer events to UI clients within that target's view tree
 /// will depend on the dispatch policy and the scene topology.
-closed protocol Device {
+protocol Device {
     /// Injects events into a target.
     ///
     /// Batching: The caller is expected to batch-inject all events that share the
@@ -86,7 +86,7 @@ closed protocol Device {
     /// Flow control: The caller is allowed at most one in-flight |Inject| call
     /// at at time: subsequent |Inject| calls must wait until the acknowledgment
     /// returns. Non-compliance results in channel closure.
-    strict Inject(struct {
+    Inject(struct {
         events vector<Event>:MAX_INJECT;
     }) -> ();
 };

@@ -8,7 +8,7 @@ using zx;
 /// Protocol meant for clients interested in handling exceptions for a
 /// particular service.
 @discoverable
-closed protocol Handler {
+protocol Handler {
     /// Requests the exception handler to send a signal indicating the server is
     /// active and able to respond to requests.
     ///
@@ -20,7 +20,7 @@ closed protocol Handler {
     /// Note: a response guarantees the server was active when it sent the
     /// response, but doesn't preclcude the server being unresponsive after the
     /// reply was sent.
-    strict IsActive() -> ();
+    IsActive() -> ();
 
     /// This exception mirrors closely the information provided by exception
     /// channels. The design is to have clients of this API behave as closely as
@@ -32,7 +32,7 @@ closed protocol Handler {
     ///
     /// `info` represents basic exception information as provided by the
     /// exception channel.
-    strict OnException(resource struct {
+    OnException(resource struct {
         exception zx.Handle:EXCEPTION;
         info ExceptionInfo;
     }) -> ();

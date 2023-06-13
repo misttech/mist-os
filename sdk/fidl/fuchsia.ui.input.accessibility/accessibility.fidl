@@ -51,10 +51,10 @@ type PointerEvent = table {
 /// pointer event listener, so that it can intercept pointer events before they
 /// reach clients.
 @discoverable
-closed protocol PointerEventRegistry {
+protocol PointerEventRegistry {
     /// Registers a listener to start receiving incoming pointer events. For
     /// now, only one listener is allowed and the first to register is honored.
-    strict Register(resource struct {
+    Register(resource struct {
         pointer_event_listener client_end:PointerEventListener;
     }) -> (struct {
         success bool;
@@ -64,7 +64,7 @@ closed protocol PointerEventRegistry {
 /// A PointerEventListener receives pointer events and decides to consume them
 /// or not.
 /// TODO(fxbug.dev/36429): Investigate flow control mechanisms for a11y input events.
-closed protocol PointerEventListener {
+protocol PointerEventListener {
     /// Sends a PointerEvent to an accessibility service. An event is returned
     /// at any time to indicate whether the pointer event stream was consumed /
     /// rejected for a particular stream of pointer events related to a
@@ -73,11 +73,11 @@ closed protocol PointerEventListener {
     /// ending in an UP phase event. The event can arrive while the stream is in
     /// progress or when it has already finished. The resulting
     /// behavior depends on how it was handled, please see EventHandling above.
-    strict OnEvent(struct {
+    OnEvent(struct {
         pointer_event PointerEvent;
     });
 
-    strict -> OnStreamHandled(struct {
+    -> OnStreamHandled(struct {
         device_id uint32;
         pointer_id uint32;
         handled EventHandling;

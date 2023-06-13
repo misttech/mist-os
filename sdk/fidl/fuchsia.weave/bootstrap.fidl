@@ -10,14 +10,14 @@ using zx;
 /// an existing Weave implementation to ensure continuity of the Weave fabric and
 /// other Weave settings or configuration data.
 @discoverable
-closed protocol Bootstrap {
+protocol Bootstrap {
     /// Import a JSON-formatted Weave config providing data in the format
     /// expected to satisfy the Weave DeviceLayer
     /// [ConfigurationManager](https://github.com/openweave/openweave-core/blob/master/src/adaptations/device-layer/include/Weave/DeviceLayer/ConfigurationManager.h).
     ///
     /// Configuration is guaranteed to have been persisted upon successful
     /// completion of this call.
-    strict ImportWeaveConfig(resource struct {
+    ImportWeaveConfig(resource struct {
         config_json mem.Buffer;
     }) -> () error zx.Status;
 };

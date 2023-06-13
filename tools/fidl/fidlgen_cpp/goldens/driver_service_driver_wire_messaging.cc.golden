@@ -4,7 +4,6 @@
 // fidl_experiment = output_index_json
 // fidl_experiment = simple_empty_response_syntax
 // fidl_experiment = unknown_interactions
-// fidl_experiment = unknown_interactions_mandate
 
 #include <fidl/test.driverservice/cpp/driver/wire_messaging.h>
 #include <lib/fidl_driver/cpp/unknown_interactions.h>

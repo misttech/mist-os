@@ -36,7 +36,7 @@ type CoordinateUnit = flexible enum {
 /// Enables clients to register fake input devices, which can be used to
 /// inject input events directly into Input Pipeline.
 @discoverable
-closed protocol Registry {
+protocol Registry {
 
     /// Enables the client to inject touch events using the corresponding
     /// client end to `device`.
@@ -47,7 +47,7 @@ closed protocol Registry {
     ///
     /// The `fuchsia.ui.test.input.TouchScreen` channel will remain open even
     /// if the `Registry` connection closes.
-    strict RegisterTouchScreen(resource table {
+    RegisterTouchScreen(resource table {
         1: device server_end:TouchScreen;
 
         /// Indicates the coordinate space in which to describe touch events.
@@ -64,7 +64,7 @@ closed protocol Registry {
     ///
     /// The `fuchsia.ui.test.input.MediaButtonsDevice` channel will remain open
     /// even if the `Registry` connection closes.
-    strict RegisterMediaButtonsDevice(resource table {
+    RegisterMediaButtonsDevice(resource table {
         1: device server_end:MediaButtonsDevice;
     }) -> ();
 
@@ -77,7 +77,7 @@ closed protocol Registry {
     ///
     /// The `fuchsia.ui.test.input.Keyboard` channel will remain open even
     /// if the `Registry` connection closes.
-    strict RegisterKeyboard(resource table {
+    RegisterKeyboard(resource table {
         1: device server_end:Keyboard;
     }) -> ();
 
@@ -90,7 +90,7 @@ closed protocol Registry {
     ///
     /// The `fuchsia.ui.test.input.Mouse` channel will remain open even
     /// if the `Registry` connection closes.
-    strict RegisterMouse(resource table {
+    RegisterMouse(resource table {
         1: device server_end:Mouse;
     }) -> ();
 };

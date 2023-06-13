@@ -5,8 +5,8 @@ library fuchsia.hardware.gpu.clock;
 
 using zx;
 
-closed protocol Clock {
-    strict SetFrequencySource(struct {
+protocol Clock {
+    SetFrequencySource(struct {
         source uint32;
     }) -> (struct {
         s zx.Status;

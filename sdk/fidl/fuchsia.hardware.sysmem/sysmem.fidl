@@ -11,25 +11,25 @@ using zx;
 /// both sysmem/sysmem2 `Allocator`, and special-purpose connection for custom heaps and secure
 /// memory.
 @discoverable
-closed protocol Sysmem {
+protocol Sysmem {
     /// Takes the server end of a FIDL connection that'll serve
     /// fuchsia.sysmem.Allocator.  If the connection fails, the channel will
     /// close.
     //
     // TODO(fxb/104188): Maybe remove this method (see discussion in bug).
-    strict ConnectServer(resource struct {
+    ConnectServer(resource struct {
         allocator_request server_end:fuchsia.sysmem.Allocator;
     });
 
     // TODO(fxb/104188): Maybe remove this method (see discussion in bug).
     //@transitional("Switch to requesting Allocator instead of serving this method.")
-    strict ConnectServerV2(resource table {
+    ConnectServerV2(resource table {
         1: allocator_request server_end:fuchsia.sysmem2.Allocator;
     });
 
     /// Takes the client end of a FIDL connection that'll serve
     /// fuchsia.sysmem2.Heap.
-    strict RegisterHeap(resource struct {
+    RegisterHeap(resource struct {
         heap uint64;
         heap_connection client_end:fuchsia.sysmem2.Heap;
     });
@@ -37,14 +37,14 @@ closed protocol Sysmem {
     /// Takes the client end of a FIDL connection that'll serve
     /// fuchsia.sysmem.SecureMem, which is a protocol that's specific to
     /// sysmem<->securemem concerns.
-    strict RegisterSecureMem(resource struct {
+    RegisterSecureMem(resource struct {
         secure_mem_connection client_end:fuchsia.sysmem.SecureMem;
     });
 
     /// Informs sysmem that the channel previously passed to RegisterSecureMem()
     /// will be closing soon, and that this channel closure should not be
     /// considered an error.
-    strict UnregisterSecureMem() -> () error zx.Status;
+    UnregisterSecureMem() -> () error zx.Status;
 };
 
 service Service {

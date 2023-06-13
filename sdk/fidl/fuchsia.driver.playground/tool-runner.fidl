@@ -17,9 +17,9 @@ type StdioParams = resource table {
 };
 
 /// Protocol for receiving an event when a tool terminates.
-closed protocol CloseController {
+protocol CloseController {
     /// This event fires when the tool has terminated.
-    strict -> OnTerminated(struct {
+    -> OnTerminated(struct {
         /// The process exit code of the tool.
         return_code int32;
     });
@@ -27,9 +27,9 @@ closed protocol CloseController {
 
 /// Protocol for running driver tools in the playground.
 @discoverable
-closed protocol ToolRunner {
+protocol ToolRunner {
     /// Run a tool.
-    strict RunTool(resource struct {
+    RunTool(resource struct {
         /// The path to the tool executable, eg: 'fuchsia-pkg://fuchsia.com/package#bin/tool'.
         tool string:fuchsia.url.MAX_URL_LENGTH;
         /// The argv to pass into the tool executable.

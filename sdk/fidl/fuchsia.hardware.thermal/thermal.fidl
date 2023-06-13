@@ -96,25 +96,25 @@ type ThermalDeviceInfo = struct {
 };
 
 @deprecated
-closed protocol Device {
+protocol Device {
     compose fuchsia.hardware.fan.Fan;
     compose fuchsia.hardware.temperature.Device;
 
     /// Get information about the device's current state.
-    strict GetInfo() -> (struct {
+    GetInfo() -> (struct {
         status zx.Status;
         info box<ThermalInfo>;
     });
 
     /// Get information about the device's thermal capabilities and trip points.
-    strict GetDeviceInfo() -> (struct {
+    GetDeviceInfo() -> (struct {
         status zx.Status;
         info box<ThermalDeviceInfo>;
     });
 
     /// Get the device's operating points.
     /// TODO(bradenkell): Can this be removed? GetDeviceInfo() provides the same information.
-    strict GetDvfsInfo(struct {
+    GetDvfsInfo(struct {
         power_domain PowerDomain;
     }) -> (struct {
         status zx.Status;
@@ -123,20 +123,20 @@ closed protocol Device {
 
     /// Get an event to get trip point notifications on. `ZX_USER_SIGNAL_`0 is changed when either
     /// trip point is reached. It is deasserted when the state is read via GetInfo.
-    strict GetStateChangeEvent() -> (resource struct {
+    GetStateChangeEvent() -> (resource struct {
         status zx.Status;
         handle zx.Handle:<EVENT, optional>;
     });
 
     /// Get a port to get trip point notification packets.
-    strict GetStateChangePort() -> (resource struct {
+    GetStateChangePort() -> (resource struct {
         status zx.Status;
         handle zx.Handle:<PORT, optional>;
     });
 
     /// Sets a trip point in degrees Celsius. When the sensor reaches the trip point temperature the
     /// device will notify on an event.
-    strict SetTripCelsius(struct {
+    SetTripCelsius(struct {
         id uint32;
         temp float32;
     }) -> (struct {
@@ -144,7 +144,7 @@ closed protocol Device {
     });
 
     /// Get the current operating point index.
-    strict GetDvfsOperatingPoint(struct {
+    GetDvfsOperatingPoint(struct {
         power_domain PowerDomain;
     }) -> (struct {
         status zx.Status;
@@ -152,7 +152,7 @@ closed protocol Device {
     });
 
     /// Set the operating point index.
-    strict SetDvfsOperatingPoint(struct {
+    SetDvfsOperatingPoint(struct {
         op_idx uint16;
         power_domain PowerDomain;
     }) -> (struct {

@@ -25,25 +25,25 @@ using zx;
 /// recommended to prevent excessive blocking, but this protocol does not mandate a specific
 /// approach to handling records generated while buffers are full.
 @discoverable
-closed protocol Source {
+protocol Source {
     /// Notifies the connected retriever of a new stream buffer. Should be emitted as soon as each
     /// buffer is (re)initialized.
     ///
     /// `latest` should be read-only.
-    strict -> OnBufferInit(resource struct {
+    -> OnBufferInit(resource struct {
         latest zx.Handle:VMO;
     });
 
     /// Asks the connected retriever to finish working with `buffer`, usually because the `Source`
     /// does not intend to write further records.
-    strict -> OnBufferDone(struct {
+    -> OnBufferDone(struct {
         buffer zx.Koid;
     });
 
     /// Notifies the `Source` that the retriever is done reading from the buffer. If the `Source`
     /// wishes it should zero the buffer's contents and recycle it for future records. Buffers must
     /// be re-sent via `OnBufferInit` after they're zeroed.
-    strict RetireBuffer(struct {
+    RetireBuffer(struct {
         buffer zx.Koid;
     });
 };

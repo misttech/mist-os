@@ -15,16 +15,16 @@ const MAX_PASSWORD_SIZE uint32 = 128;
 /// account system and is intended only for use by the most trusted parts of the
 /// system.
 @discoverable
-closed protocol AccountManager {
+protocol AccountManager {
     /// Returns a vector of all accounts provisioned on the device.
-    strict GetAccountIds() -> (struct {
+    GetAccountIds() -> (struct {
         account_ids vector<AccountId>:MAX_ACCOUNTS_PER_DEVICE;
     });
 
     /// Returns the metadata for a single account.
     ///
     /// `id` The account's identifier as returned by GetAccountIds()
-    strict GetAccountMetadata(struct {
+    GetAccountMetadata(struct {
         id AccountId;
     }) -> (struct {
         metadata AccountMetadata;
@@ -44,7 +44,7 @@ closed protocol AccountManager {
     /// - `FAILED_PRECONDITION` if the account is locked but no `interaction`
     ///   channel was supplied to perform authentication.
     /// - `ABORTED` if the client closes the `interaction` channel.
-    strict GetAccount(resource table {
+    GetAccount(resource table {
         1: id AccountId;
         2: interaction server_end:fuchsia.identity.authentication.Interaction;
         3: reserved; // 3 is reserved for auto_lock in a near-future CL
@@ -67,7 +67,7 @@ closed protocol AccountManager {
     ///
     /// Fails with `FAILED_AUTHENTICATION` if the password was not correct.
     @deprecated
-    strict DeprecatedGetAccount(resource struct {
+    DeprecatedGetAccount(resource struct {
         id AccountId;
         password string:MAX_PASSWORD_SIZE;
         account server_end:Account;
@@ -89,7 +89,7 @@ closed protocol AccountManager {
     ///               change in authentication state that will lead to
     ///               AuthStateChange events. If absent, AuthStateChange events
     ///               will not be sent.
-    strict RegisterAccountListener(resource table {
+    RegisterAccountListener(resource table {
         1: listener client_end:AccountListener;
         2: initial_state bool;
         3: add_account bool;
@@ -100,7 +100,7 @@ closed protocol AccountManager {
     /// Removes an account from the device.
     ///
     /// `id` The account's identifier as returned by GetAccountIds()
-    strict RemoveAccount(struct {
+    RemoveAccount(struct {
         id AccountId;
     }) -> () error Error;
 
@@ -119,7 +119,7 @@ closed protocol AccountManager {
     /// - `INVALID_REQUEST` if policy requires authentication factors for the
     ///    new account but no `interaction` channel was supplied.
     /// - `ABORTED` if the client closes the `interaction` channel.
-    strict ProvisionNewAccount(resource table {
+    ProvisionNewAccount(resource table {
         1: lifetime Lifetime;
         2: metadata AccountMetadata;
         3: interaction server_end:fuchsia.identity.authentication.Interaction;
@@ -145,7 +145,7 @@ closed protocol AccountManager {
     /// Fails with `INVALID_REQUEST` if the password does not meet
     /// minimum strength requirements.
     @deprecated
-    strict DeprecatedProvisionNewAccount(resource struct {
+    DeprecatedProvisionNewAccount(resource struct {
         password string:MAX_PASSWORD_SIZE;
         metadata AccountMetadata;
         account server_end:Account;
@@ -170,7 +170,7 @@ type AccountAuthState = struct {
 ///
 /// All methods include an empty response to follow the "Throttle push using
 /// acknowledgements" FIDL design pattern.
-closed protocol AccountListener {
+protocol AccountListener {
     /// A method that is called to communicate the initial set of accounts and
     /// their authentication states. OnInitialize is called exactly once if and
     /// only if AccountListenerOptions.initial_state was set when creating the
@@ -179,7 +179,7 @@ closed protocol AccountListener {
     /// empty.
     ///
     /// `account_states` The set of initial states.
-    strict OnInitialize(struct {
+    OnInitialize(struct {
         account_states vector<AccountAuthState>:MAX_ACCOUNTS_PER_DEVICE;
     }) -> ();
 
@@ -188,20 +188,20 @@ closed protocol AccountListener {
     /// set when creating the AccountListener.
     ///
     /// `account_state` The initial state for the newly added account.
-    strict OnAccountAdded(struct {
+    OnAccountAdded(struct {
         account_state AccountAuthState;
     }) -> ();
 
     /// A method that is called when a provisioned account is removed.
     /// This method is only called if AccountListenerOptions.remove_account was
     /// set when creating the AccountListener.
-    strict OnAccountRemoved(struct {
+    OnAccountRemoved(struct {
         account_id AccountId;
     }) -> ();
 
     /// A method that is called when the authentication state of any provisioned
     /// account changes.
-    strict OnAuthStateChanged(struct {
+    OnAuthStateChanged(struct {
         account_auth_state AccountAuthState;
     }) -> ();
 };

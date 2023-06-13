@@ -30,8 +30,8 @@ type MailboxChannel = struct {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-closed protocol Mailbox {
-    strict SendCommand(struct {
+protocol Mailbox {
+    SendCommand(struct {
         channel MailboxChannel;
         mdata MailboxDataBuf;
     }) -> (struct {

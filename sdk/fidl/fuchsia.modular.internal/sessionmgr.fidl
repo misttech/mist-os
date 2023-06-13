@@ -10,7 +10,7 @@ using fuchsia.ui.views;
 /// The basemgr application (there is no `Basemgr` service) requests
 /// an instance of this service in order to launch and display a `Sessionmgr`.
 @discoverable // Created by sessionmgr application.
-closed protocol Sessionmgr {
+protocol Sessionmgr {
     /// Launches a sessionmgr instance identified by a unique device-local
     /// `session_id`. The uniqueness of `session_id` must be guaranteed by the
     /// caller, because `sessionmgr` creates an Environment namespace with the
@@ -28,7 +28,7 @@ closed protocol Sessionmgr {
     /// CFv1 components (such as agent services and modular APIs like
     /// PuppetMaster) so they can also be used by CFv2 components hosted by
     /// basemgr.
-    strict Initialize(resource struct {
+    Initialize(resource struct {
         session_id string:MAX;
         session_context client_end:SessionContext;
         additional_services_for_agents fuchsia.sys.ServiceList;
@@ -59,11 +59,11 @@ closed protocol Sessionmgr {
 
 
 /// This interface is provided by basemgr to `Sessionmgr`.
-closed protocol SessionContext {
+protocol SessionContext {
     /// Restarts the session.
-    strict Restart();
+    Restart();
 
     /// Restarts the session due to an unrecoverable error. This may reboot the
     /// device.
-    strict RestartDueToCriticalFailure();
+    RestartDueToCriticalFailure();
 };

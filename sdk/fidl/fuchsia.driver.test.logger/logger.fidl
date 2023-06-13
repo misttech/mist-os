@@ -16,14 +16,14 @@ type TestCaseResult = struct {
     skipped uint64;
 };
 
-closed protocol Logger {
+protocol Logger {
     /// Logs a message from the driver unit test.
-    strict LogMessage(struct {
+    LogMessage(struct {
         msg string:LOG_MESSAGE_MAX;
     });
 
     /// Logs the results of a test case.
-    strict LogTestCase(struct {
+    LogTestCase(struct {
         name string:TEST_CASE_NAME_MAX;
         result TestCaseResult;
     });

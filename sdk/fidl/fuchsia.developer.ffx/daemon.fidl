@@ -38,15 +38,15 @@ type DaemonError = strict enum {
 };
 
 @discoverable
-closed protocol Daemon {
+protocol Daemon {
     /// Requests for the Daemon to exit. Receives 'true' to indicate the request
     /// was received and the Daemon will then shut down shortly thereafter.
-    strict Quit() -> (struct {
+    Quit() -> (struct {
         success bool;
     });
 
     // Retrieves version information about this daemon instance.
-    strict GetVersionInfo() -> (struct {
+    GetVersionInfo() -> (struct {
         info VersionInfo;
     });
 
@@ -60,7 +60,7 @@ closed protocol Daemon {
     ///
     /// Again for emphasis: if you are a developer and you are invoking this
     /// function directly, you should reconsider your actions.
-    strict ConnectToProtocol(resource struct {
+    ConnectToProtocol(resource struct {
         name fuchsia.io.Name;
         server_end zx.Handle:CHANNEL;
     }) -> () error DaemonError;

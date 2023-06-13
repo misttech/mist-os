@@ -6,24 +6,24 @@ library fuchsia.examples.diagnostics;
 
 // [START profile_store_fidl]
 @discoverable
-closed protocol ProfileStore {
-    strict Open(resource struct {
+protocol ProfileStore {
+    Open(resource struct {
         key string:KEY_LENGTH;
         channel server_end:Profile;
     });
 
-    strict OpenReader(resource struct {
+    OpenReader(resource struct {
         key string:KEY_LENGTH;
         channel server_end:ProfileReader;
     });
 
-    strict Delete(struct {
+    Delete(struct {
         key string:KEY_LENGTH;
     }) -> (struct {
         success bool;
     });
 
-    strict CreateOrOpen(resource struct {
+    CreateOrOpen(resource struct {
         key string:KEY_LENGTH;
         channel server_end:Profile;
     });

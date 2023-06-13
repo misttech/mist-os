@@ -7,7 +7,7 @@ using fuchsia.url;
 
 /// A protocol used to launch sessions.
 @discoverable
-closed protocol Launcher {
+protocol Launcher {
     /// Launches the session detailed in `configuration`.
     ///
     /// If a session is currently running, the component associated with the running
@@ -21,7 +21,7 @@ closed protocol Launcher {
     ///   could not be destroyed. The existing session remains running at this point.
     /// * error `LaunchError.CREATE_COMPONENT_FAILED` if the session component
     ///   could not be started. No session will be running at this point.
-    strict Launch(struct {
+    Launch(struct {
         configuration LaunchConfiguration;
     }) -> () error LaunchError;
 };

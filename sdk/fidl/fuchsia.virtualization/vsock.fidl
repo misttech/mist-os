@@ -13,8 +13,8 @@ const DEFAULT_GUEST_CID uint32 = 3;
 /// Exposed by a host capable of listening via vsocks. A variant of a
 /// `GuestVsockAcceptor` that is responsible for creating the `socket` with which
 /// to communicate.
-closed protocol HostVsockAcceptor {
-    strict Accept(struct {
+protocol HostVsockAcceptor {
+    Accept(struct {
         src_cid uint32;
         src_port uint32;
         port uint32;
@@ -33,13 +33,13 @@ type Listener = resource struct {
 /// Exposed by a host to provide the ability for listeners to be multiplexed by
 /// port and to manage dynamic port allocation for outbound connections.
 @discoverable
-closed protocol HostVsockEndpoint {
+protocol HostVsockEndpoint {
     /// Instructs the device to listen for guest initiated connections to a given port by
     /// using `acceptor` when the guest creates a connection.
     ///
     /// Possible errors:
     ///     - ZX_ERR_ALREADY_BOUND: A client is already listening on this port.
-    strict Listen(Listener) -> () error zx.Status;
+    Listen(Listener) -> () error zx.Status;
 
     /// Attempts to create a vsock connection to a guest on 'guest_port'. Uses a dynamically chosen
     /// ephemeral host port.
@@ -50,7 +50,7 @@ closed protocol HostVsockEndpoint {
     ///
     /// Other errors are related to socket creation, see
     /// [zx_socket_create](https://fuchsia.dev/fuchsia-src/reference/syscalls/socket_create.md)
-    strict Connect(struct {
+    Connect(struct {
         guest_port uint32;
     }) -> (resource struct {
         socket zx.Handle:SOCKET;

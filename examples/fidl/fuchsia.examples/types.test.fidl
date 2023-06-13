@@ -94,18 +94,18 @@ type GameState = struct {};
 // NOTE: a version of this protocol using error types is also used in the
 // bindings reference docs, but is not tested
 // [START protocols]
-closed protocol TicTacToe {
-    strict StartGame(struct {
+protocol TicTacToe {
+    StartGame(struct {
         start_first bool;
     });
-    strict MakeMove(struct {
+    MakeMove(struct {
         row uint8;
         col uint8;
     }) -> (struct {
         success bool;
         new_state box<GameState>;
     });
-    strict -> OnOpponentMove(struct {
+    -> OnOpponentMove(struct {
         new_state GameState;
     });
 };

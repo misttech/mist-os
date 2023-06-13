@@ -21,9 +21,9 @@ type TableInfo = struct {
 /// Defines access to raw system ACPI data.
 ///
 /// This interface is intended only for low-level debugging tools.
-closed protocol Tables {
+protocol Tables {
     /// Return the list of ACPI tables present in the system.
-    strict ListTableEntries() -> (struct {
+    ListTableEntries() -> (struct {
         entries vector<TableInfo>:MAX_ACPI_TABLE_ENTRIES;
     }) error zx.Status;
 
@@ -36,7 +36,7 @@ closed protocol Tables {
     /// |instance| should be 0.
     ///
     /// On success, returns the number of bytes written into result.
-    strict ReadNamedTable(resource struct {
+    ReadNamedTable(resource struct {
         name AcpiTableSignature;
         instance uint32;
         result zx.Handle:VMO;

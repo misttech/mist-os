@@ -4,7 +4,7 @@
 library zx;
 
 @transport("Syscall")
-closed protocol Fifo {
+protocol Fifo {
     /// ## Summary
     ///
     /// Create a fifo.
@@ -65,7 +65,7 @@ closed protocol Fifo {
     ///
     /// [`zx_fifo_read()`]: fifo_read.md
     /// [`zx_fifo_write()`]: fifo_write.md
-    strict Create(struct {
+    Create(struct {
         elem_count usize64;
         elem_size usize64;
         options uint32;
@@ -144,7 +144,7 @@ closed protocol Fifo {
     ///
     /// [`zx_fifo_create()`]: fifo_create.md
     /// [`zx_fifo_write()`]: fifo_write.md
-    strict Read(resource struct {
+    Read(resource struct {
         handle Handle:FIFO;
         elem_size usize64;
     }) -> (struct {
@@ -221,7 +221,7 @@ closed protocol Fifo {
     ///
     /// [`zx_fifo_create()`]: fifo_create.md
     /// [`zx_fifo_read()`]: fifo_read.md
-    strict Write(resource struct {
+    Write(resource struct {
         handle Handle:FIFO;
         elem_size usize64;
         // TODO(joshuaseaton): vector<byte>

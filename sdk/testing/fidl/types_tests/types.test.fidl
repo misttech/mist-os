@@ -105,8 +105,8 @@ type SampleTable = table {
 /// Verifies that an empty table compiles.
 type SampleEmptyTable = table {};
 
-closed protocol TestInterface {
-    strict TestMethod(resource struct {
+protocol TestInterface {
+    TestMethod(resource struct {
         u TestUnion;
     }) -> (resource struct {
         u TestUnion;
@@ -126,13 +126,13 @@ type FooEvent = struct {
     bar int32;
 };
 
-closed protocol Baz {
-    strict Foo(struct {
+protocol Baz {
+    Foo(struct {
         req FooRequest;
     }) -> (struct {
         res FooResponse;
     });
-    strict -> FooEvent(FooEvent);
+    -> FooEvent(FooEvent);
 };
 
 type TableWithSubTables = table {
@@ -204,29 +204,29 @@ type TableMaxOrdinal3WithReserved2 = table {
 /// do:
 ///   - add method `MyUnion() -> (MyUnion result);`
 ///   - write tests in C++ using MsgWrapper::MyUnionResponse
-closed protocol MsgWrapper {
-    strict TestXUnion() -> (resource struct {
+protocol MsgWrapper {
+    TestXUnion() -> (resource struct {
         result TestXUnion;
     });
-    strict TestNonResourceXUnion() -> (struct {
+    TestNonResourceXUnion() -> (struct {
         result TestNonResourceXUnion;
     });
-    strict TestTable() -> (struct {
+    TestTable() -> (struct {
         result TestTable;
     });
-    strict TestResourceTable() -> (resource struct {
+    TestResourceTable() -> (resource struct {
         result TestResourceTable;
     });
 };
 
-closed protocol TypesTest {
-    strict NonNullableChannel(resource struct {
+protocol TypesTest {
+    NonNullableChannel(resource struct {
         channel zx.Handle:CHANNEL;
     });
 };
 
-closed protocol UsesAnonymous {
-    strict FooMethod(struct {
+protocol UsesAnonymous {
+    FooMethod(struct {
         req_member table {
             1: inner_table union {
                 1: data uint8;
@@ -237,11 +237,11 @@ closed protocol UsesAnonymous {
     };
 };
 
-closed protocol ErrorSyntax {
-    strict EmptyPayload() -> () error int32;
-    strict FooPayload() -> (FooResponse) error int32;
-    strict -> EventEmptyPayload() error int32;
-    strict -> EventFooPayload(FooEvent) error int32;
+protocol ErrorSyntax {
+    EmptyPayload() -> () error int32;
+    FooPayload() -> (FooResponse) error int32;
+    -> EventEmptyPayload() error int32;
+    -> EventFooPayload(FooEvent) error int32;
 };
 
 type StructOfOptionals = struct {

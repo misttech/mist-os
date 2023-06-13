@@ -6,9 +6,9 @@ library fuchsia.hardware.interrupt;
 using zx;
 
 @discoverable
-closed protocol Provider {
+protocol Provider {
     /// Get the interrupt represented by this provider.
-    strict Get() -> (resource struct {
+    Get() -> (resource struct {
         interrupt zx.Handle:INTERRUPT;
     }) error zx.Status;
 };

@@ -7,12 +7,12 @@ using zx;
 
 /// This protocol represents watching a specific class of devices. Each client
 /// that connects will be able to poll `NextDevice` to be able to get all devices.
-closed protocol DeviceWatcher {
+protocol DeviceWatcher {
     /// A Hanging-Get API that returns the next device. This will not return until
     /// there is a new device available. Call this repeatedly to get all devices.
     /// If there is already an outstanding request then calling this again will return
     /// ZX_ERR_ALREADY_BOUND.
-    strict NextDevice() -> (resource struct {
+    NextDevice() -> (resource struct {
         device zx.Handle:CHANNEL;
     }) error zx.Status;
 };

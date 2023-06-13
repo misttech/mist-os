@@ -10,9 +10,9 @@ const MAX_SYSTEM_POWER_STATES uint32 = 8;
 
 /// Provides protocol for fetching relevant information during a system state transition.
 @discoverable
-closed protocol SystemStateTransition {
+protocol SystemStateTransition {
     /// Gets the termination state.
-    strict GetTerminationSystemState() -> (struct {
+    GetTerminationSystemState() -> (struct {
         // TODO(ravoorir): When the system power states are properly defined,
         // remove the suspend flags. For now, treat each suspend flag as a system
         // power state.
@@ -41,7 +41,7 @@ closed protocol SystemStateTransition {
     ///
     /// Returns
     /// * ZX_ERR_BAD_STATE: The termination system state is not set to MEXEC.
-    strict GetMexecZbis() -> (resource struct {
+    GetMexecZbis() -> (resource struct {
         kernel_zbi zx.Handle:VMO;
         data_zbi zx.Handle:VMO;
     }) error zx.Status;

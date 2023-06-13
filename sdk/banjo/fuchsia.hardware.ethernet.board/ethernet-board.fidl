@@ -7,8 +7,8 @@ using zx;
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-closed protocol EthBoard {
-    strict ResetPhy() -> (struct {
+protocol EthBoard {
+    ResetPhy() -> (struct {
         s zx.Status;
     });
 };

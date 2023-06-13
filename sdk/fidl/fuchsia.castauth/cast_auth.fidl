@@ -23,13 +23,13 @@ type ErrorCode = strict enum {
 /// It is intended for short-term use only and will not be supported on all
 /// devices. It will eventually be replaced by an attestation service.
 @discoverable
-closed protocol CastKeySigner {
+protocol CastKeySigner {
     /// Use Cast key to sign a hash value.
     ///
     /// The input is hash value.
     /// The return value is the error code or the signature if the operation
     /// succeeds. The signature algorithm is RSA-2048-PKCS1.
-    strict SignHash(struct {
+    SignHash(struct {
         hash Asn1EncodedHash;
     }) -> (struct {
         signature array<byte, 256>;
@@ -40,7 +40,7 @@ closed protocol CastKeySigner {
     /// The return value is the error code or the certificate chain if
     /// the operation succeeds. The chain contains Cast key cert,
     /// one or more intermediate CA certs and root CA cert.
-    strict GetCertificateChain() -> (struct {
+    GetCertificateChain() -> (struct {
         cert_chain vector<vector<uint8>:2048>:16;
     }) error ErrorCode;
 };

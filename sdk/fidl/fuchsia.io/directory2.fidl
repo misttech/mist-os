@@ -11,7 +11,7 @@ type DirectoryInfo = table {
     1: attributes NodeAttributes2;
 };
 
-closed protocol DirectoryIterator {
+protocol DirectoryIterator {
     /// Reads a collection of variably sized directory entries into a buffer.
     ///
     /// The number of entries in a directory may be very large: akin to
@@ -26,7 +26,7 @@ closed protocol DirectoryIterator {
     /// This method does not require any rights, as the rights are checked
     /// in the [`Directory.Enumerate`] call.
     @selector("fuchsia.io/DirectoryIterator.GetNext")
-    strict GetNext() -> (struct {
+    GetNext() -> (struct {
         /// Information about an immediate child node of a directory.
         ///
         /// If a particular attribute is not applicable or not supported,
@@ -52,7 +52,7 @@ closed protocol DirectoryIterator {
 const DIRECTORY_PROTOCOL_NAME string = "fuchsia.io/Directory";
 
 /// A [`Node2`] that is capable of containing other nodes.
-closed protocol Directory2 {
+protocol Directory2 {
     compose Node2;
     compose AdvisoryLocking;
 
@@ -69,7 +69,7 @@ closed protocol Directory2 {
     ///   what is allowed.
     /// * error `ZX_ERR_BAD_PATH` if `path` is invalid.
     @selector("fuchsia.io/Directory.Open")
-    strict Open2(resource struct {
+    Open2(resource struct {
         /// Identifies the node to open.
         ///
         /// If it contains multiple segments, then the directory is traversed,
@@ -255,7 +255,7 @@ closed protocol Directory2 {
     @available(deprecated=12, removed=13, note="Never fully implemented", legacy=true)
     @selector("fuchsia.io/Directory.AddInotifyFilter")
     @transitional
-    strict AddInotifyFilter(resource struct {
+    AddInotifyFilter(resource struct {
         path Path;
         filter InotifyWatchMask;
         watch_descriptor uint32;
@@ -287,7 +287,7 @@ closed protocol Directory2 {
     /// * [`Rights.ENUMERATE`]
     /// * [`Rights.MODIFY_DIRECTORY`]
     @selector("fuchsia.io/Directory.Unlink")
-    strict Unlink(struct {
+    Unlink(struct {
         name Name;
         options @generated_name("UnlinkOptions") table {
             1: flags @generated_name("UnlinkFlags") strict bits : uint64 {
@@ -304,7 +304,7 @@ closed protocol Directory2 {
     /// This method requires the [`Rights.ENUMERATE`] right. If this right is
     /// absent, `iterator` will be closed with a `ZX_ERR_ACCESS_DENIED` epitaph.
     @selector("fuchsia.io/Directory.Enumerate")
-    strict Enumerate(resource struct {
+    Enumerate(resource struct {
         options @generated_name("DirectoryEnumerateOptions") table {};
         iterator server_end:DirectoryIterator;
     });
@@ -323,7 +323,7 @@ closed protocol Directory2 {
     ///
     /// * error `ZX_ERR_INVALID_ARGS` if `src` or `dst` is invalid.
     @selector("fuchsia.io/Directory.Rename")
-    strict Rename(resource struct {
+    Rename(resource struct {
         src Name;
         dst_parent_token Token;
         dst Name;
@@ -370,7 +370,7 @@ closed protocol Directory2 {
     @available(added=HEAD)
     @selector("fuchsia.io/Directory.CreateSymlink")
     @transitional
-    strict CreateSymlink(resource struct {
+    CreateSymlink(resource struct {
         name Name;
         target SymlinkTarget;
         connection server_end:<Symlink, optional>;

@@ -52,14 +52,14 @@ type VolumeInfo = struct {
 const ALLOCATE_PARTITION_FLAG_INACTIVE uint32 = 0x00000001;
 
 /// VolumeManager controls a collection of Volumes.
-closed protocol VolumeManager {
+protocol VolumeManager {
     /// Allocates a virtual partition with the requested features.
     ///
     /// `slice_count` is the number of slices initially allocated to the partition, at
     /// offset zero. The number of slices allocated to a new partition must be at least one.
     /// `type` and `value` indicate type and instance GUIDs for the partition, respectively.
     /// `name` indicates the name of the new partition.
-    strict AllocatePartition(struct {
+    AllocatePartition(struct {
         slice_count uint64;
         type partition.Guid;
         instance partition.Guid;
@@ -75,7 +75,7 @@ closed protocol VolumeManager {
     /// the `VolumeManager` have been added to devfs. Assuming that the `VolumeManager` is visible
     /// in devfs, clients are guaranteed that the child partitions will also be visible in devfs on
     /// return of GetInfo().
-    strict GetInfo() -> (struct {
+    GetInfo() -> (struct {
         status zx.Status;
         info box<VolumeManagerInfo>;
     });
@@ -95,7 +95,7 @@ closed protocol VolumeManager {
     ///
     /// This function may be useful for A/B updates within the FVM,
     /// since it will allow activating updated partitions.
-    strict Activate(struct {
+    Activate(struct {
         old_guid partition.Guid;
         new_guid partition.Guid;
     }) -> (struct {
@@ -111,7 +111,7 @@ closed protocol VolumeManager {
     ///
     /// Currently the partition limit is not persisted across reboots but this may change in the
     /// future.
-    strict GetPartitionLimit(struct {
+    GetPartitionLimit(struct {
         guid partition.Guid;
     }) -> (struct {
         status zx.Status;
@@ -129,7 +129,7 @@ closed protocol VolumeManager {
     ///
     /// Currently the partition limit is not persisted across reboots but this may change in the
     /// future.
-    strict SetPartitionLimit(struct {
+    SetPartitionLimit(struct {
         guid partition.Guid;
         slice_count uint64;
     }) -> (struct {
@@ -139,7 +139,7 @@ closed protocol VolumeManager {
     /// Renames the specified partition. Any existing devices that include the name of the partition
     /// in their topological path might *not* reflect the name change until the next time that the
     /// device is instantiated.
-    strict SetPartitionName(struct {
+    SetPartitionName(struct {
         guid partition.Guid;
         name string:<partition.NAME_LENGTH>;
     }) -> () error zx.Status;
@@ -162,14 +162,14 @@ type VsliceRange = struct {
 };
 
 /// Volume is a partition which may access virtually-mapped blocks within a device.
-closed protocol Volume {
+protocol Volume {
     compose partition.Partition;
 
     /// Returns the number of contiguous allocated (or unallocated) vslices
     /// starting from each vslice.
     ///
     // TODO(smklein): Replace array with vector; doing so would be non-simple.
-    strict QuerySlices(struct {
+    QuerySlices(struct {
         start_slices vector<uint64>:MAX_SLICE_REQUESTS;
     }) -> (struct {
         status zx.Status;
@@ -178,7 +178,7 @@ closed protocol Volume {
     });
 
     /// Returns the information about this volume and the volume manager it is embedded in.
-    strict GetVolumeInfo() -> (struct {
+    GetVolumeInfo() -> (struct {
         status zx.Status;
         manager box<VolumeManagerInfo>;
         volume box<VolumeInfo>;
@@ -189,7 +189,7 @@ closed protocol Volume {
     /// The ability to extend the partition is dependent on having sufficient free space on the
     /// underlying device, having sufficient free slots for tracking the bytes in the volume
     /// manager header, and the partition limit (see VolumeManager.SetPartitionLimit).
-    strict Extend(struct {
+    Extend(struct {
         start_slice uint64;
         slice_count uint64;
     }) -> (struct {
@@ -198,7 +198,7 @@ closed protocol Volume {
 
     /// Shrinks a virtual partition. Returns `ZX_OK` if ANY slices are
     /// freed, even if part of the requested range contains unallocated slices.
-    strict Shrink(struct {
+    Shrink(struct {
         start_slice uint64;
         slice_count uint64;
     }) -> (struct {
@@ -207,7 +207,7 @@ closed protocol Volume {
 
     /// Destroys the current partition, removing it from the VolumeManager, and
     /// freeing all underlying storage. The connection to the volume is also closed.
-    strict Destroy() -> (struct {
+    Destroy() -> (struct {
         status zx.Status;
     });
 };

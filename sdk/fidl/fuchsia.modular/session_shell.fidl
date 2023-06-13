@@ -10,23 +10,23 @@ using fuchsia.ui.views;
 /// sessionmgr to hand to the session shell views of stories, or to notify that
 /// the view of a story is about to be closed.
 @discoverable
-closed protocol SessionShell {
+protocol SessionShell {
     /// Displays the given story view. The story this view belongs to is
     /// identified by `view_id.story_id`.
     /// DEPRECATED.  For transitional purposes only.
     @transitional
-    strict AttachView(resource struct {
+    AttachView(resource struct {
         view_id ViewIdentifier;
         view_holder_token fuchsia.ui.views.ViewHolderToken;
     });
     @transitional
-    strict AttachView2(resource struct {
+    AttachView2(resource struct {
         view_id ViewIdentifier;
         view_holder_token fuchsia.ui.views.ViewHolderToken;
     });
     @transitional
     @available(added=9)
-    strict AttachView3(resource struct {
+    AttachView3(resource struct {
         view_id ViewIdentifier;
         viewport_creation_token fuchsia.ui.views.ViewportCreationToken;
     });
@@ -47,7 +47,7 @@ closed protocol SessionShell {
     /// terminated, or the session shell is stopped because it's replaced by
     /// another session shell, DetachView() will *not* be called at all, and the
     /// shell will rather observe a call to Lifecycle.Terminate().
-    strict DetachView(struct {
+    DetachView(struct {
         view_id ViewIdentifier;
     }) -> ();
 };
@@ -66,22 +66,22 @@ type ViewIdentifier = struct {
 /// creator in a way that is more explicit about the services that are
 /// offered than a generic `ServiceProvider`.
 @discoverable
-closed protocol SessionShellContext {
-    strict GetComponentContext(resource struct {
+protocol SessionShellContext {
+    GetComponentContext(resource struct {
         request server_end:ComponentContext;
     });
-    strict GetPresentation(resource struct {
+    GetPresentation(resource struct {
         @available(deprecated=10, note="implementation deleted")
         request server_end:fuchsia.ui.policy.Presentation;
     });
-    strict GetStoryProvider(resource struct {
+    GetStoryProvider(resource struct {
         request server_end:StoryProvider;
     });
 
     /// Restarts the session.
-    strict Restart();
+    Restart();
 
     /// Deprecated: Equivalent to Restart().
     @transitional
-    strict Logout();
+    Logout();
 };

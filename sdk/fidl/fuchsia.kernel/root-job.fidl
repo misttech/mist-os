@@ -9,9 +9,9 @@ using zx;
 ///
 /// TODO(fxbug.dev/33856): Do not use this without first consulting the Zircon team.
 @discoverable
-closed protocol RootJob {
+protocol RootJob {
     /// Get the root `job`.
-    strict Get() -> (resource struct {
+    Get() -> (resource struct {
         job zx.Handle:JOB;
     });
 };
@@ -19,6 +19,6 @@ closed protocol RootJob {
 /// Protocol for providing the root job with restricted rights, specifically:
 /// INSPECT | ENUMERATE | DUPLICATE | TRANSFER
 @discoverable
-closed protocol RootJobForInspect {
+protocol RootJobForInspect {
     compose RootJob;
 };

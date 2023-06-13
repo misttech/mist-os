@@ -8,14 +8,14 @@ using fuchsia.intl;
 /// Interface for a service that, given a `fuchsia.intl.Profile` and some basic parameters, can
 /// provide pithy strings of wisdom to demonstrate the use of `Profile`.
 @discoverable
-closed protocol IntlWisdomServer {
+protocol IntlWisdomServer {
     /// Asks for a wisdom string.
     ///
     /// Params:
     ///   intl_profile: Provides the i18n context for the request
     ///   timestamp_ms: Timestamp in milliseconds since the epoch. Used as an input for the wisdom
     ///   text.
-    strict AskForWisdom(struct {
+    AskForWisdom(struct {
         intl_profile fuchsia.intl.Profile;
         timestamp_ms int64;
     }) -> (struct {

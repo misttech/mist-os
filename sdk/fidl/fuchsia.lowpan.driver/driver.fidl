@@ -28,10 +28,10 @@ type Protocols = resource table {
 };
 
 /// Protocol representing a LoWPAN driver instance.
-closed protocol Driver {
+protocol Driver {
     /// Request protocols to control this device.
     /// Unsupported protocols are closed.
-    strict GetProtocols(resource struct {
+    GetProtocols(resource struct {
         protocols Protocols;
     });
 };
@@ -39,10 +39,10 @@ closed protocol Driver {
 /// Protocol for registering LoWPAN interfaces and their
 /// associated control protocols with the LoWPAN service.
 @discoverable
-closed protocol Register {
+protocol Register {
     /// Registers the given LoWPAN device with the LoWPAN Service
     /// using the given interface name.
-    strict RegisterDevice(resource struct {
+    RegisterDevice(resource struct {
         name fuchsia.lowpan.InterfaceName;
         driver client_end:Driver;
     });

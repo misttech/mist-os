@@ -10,10 +10,10 @@ using zx;
 /// `ZX_RSRC_SYSTEM_MEXEC_BASE`.
 @discoverable
 @available(added=HEAD)
-closed protocol MexecResource {
+protocol MexecResource {
     /// Get an MEXEC resource handle as `resource`.
     @available(added=HEAD)
-    strict Get() -> (resource struct {
+    Get() -> (resource struct {
         resource zx.Handle:RESOURCE;
     });
 };

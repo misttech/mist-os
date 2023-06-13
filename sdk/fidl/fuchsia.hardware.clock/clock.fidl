@@ -13,79 +13,79 @@ type FrequencyInfo = struct {
 };
 
 /// Used for driver-to-non-driver communication.
-closed protocol Device {
-    strict Measure(struct {
+protocol Device {
+    Measure(struct {
         clock uint32;
     }) -> (struct {
         info FrequencyInfo;
     });
-    strict GetCount() -> (struct {
+    GetCount() -> (struct {
         count uint32;
     });
 
     // For debugging
-    strict Enable(struct {
+    Enable(struct {
         clock uint32;
     }) -> () error zx.Status;
 
-    strict Disable(struct {
+    Disable(struct {
         clock uint32;
     }) -> () error zx.Status;
 };
 
 /// Used for driver-to-driver communication.
 @discoverable
-closed protocol Clock {
+protocol Clock {
 
     /// Enables (ungates) this clock.
     /// Drivers *must* call enable on all clocks they depend upon.
-    strict Enable() -> () error zx.Status;
+    Enable() -> () error zx.Status;
 
     /// Disables (gates) this clock.
     /// Drivers should call this method to indicate to the clock subsystem that
     /// a particular clock signal is no longer necessary.
-    strict Disable() -> () error zx.Status;
+    Disable() -> () error zx.Status;
 
     /// Returns `true` if a given clock is running.
     /// May query the hardware or return a cached value.
-    strict IsEnabled() -> (struct {
+    IsEnabled() -> (struct {
         enabled bool;
     }) error zx.Status;
 
     /// Attempt to set the rate of the clock provider.
-    strict SetRate(struct {
+    SetRate(struct {
         hz uint64;
     }) -> () error zx.Status;
 
     /// Query the hardware for the highest supported rate that does not
     /// exceed hz_in.
-    strict QuerySupportedRate(struct {
+    QuerySupportedRate(struct {
         hz_in uint64;
     }) -> (struct {
         hz_out uint64;
     }) error zx.Status;
 
     /// Returns the current rate that a given clock is running at.
-    strict GetRate() -> (struct {
+    GetRate() -> (struct {
         hz uint64;
     }) error zx.Status;
 
     /// Sets the input of this clock by index. I.e. by selecting a mux.
     /// This clock has N inputs defined 0 through N-1, which are valid arguemts
     /// as the index to SetInput.
-    strict SetInput(struct {
+    SetInput(struct {
         idx uint32;
     }) -> () error zx.Status;
 
     /// Returns the number of inputs this clock has.
     /// Any value between 0 and UINT32_MAX is a valid return for this method.
     /// A Root Oscillator may return 0 for instance, if it has no inputs.
-    strict GetNumInputs() -> (struct {
+    GetNumInputs() -> (struct {
         n uint32;
     }) error zx.Status;
 
     /// Returns the index of the current input of this clock.
-    strict GetInput() -> (struct {
+    GetInput() -> (struct {
         index uint32;
     }) error zx.Status;
 };

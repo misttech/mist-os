@@ -41,7 +41,7 @@ const MAX_LOWPAN_DEVICES uint32 = 8;
 /// Protocol for discovering and resolving LoWPAN interfaces and their
 /// associated control protocol instances.
 @discoverable
-closed protocol DeviceWatcher {
+protocol DeviceWatcher {
     /// Observes when devices are added or removed.
     ///
     /// The first call to this method returns immediately with a
@@ -64,7 +64,7 @@ closed protocol DeviceWatcher {
     /// removed and a new device instance started in its place. However, while
     /// the client should be able to handle this condition, it should not depend
     /// on the server will always have this behavior.
-    strict WatchDevices() -> (struct {
+    WatchDevices() -> (struct {
         added vector<InterfaceName>:MAX_LOWPAN_DEVICES;
         removed vector<InterfaceName>:MAX_LOWPAN_DEVICES;
     });

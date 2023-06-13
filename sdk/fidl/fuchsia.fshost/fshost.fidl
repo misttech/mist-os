@@ -10,12 +10,12 @@ using fuchsia.io;
 /// Manages the block watcher.
 /// TODO(fxbug.dev/110342): Gracefully handle multiple users of the BlockWatcher API.
 @discoverable
-closed protocol BlockWatcher {
+protocol BlockWatcher {
     /// Pauses the block watcher. This will return when the block watcher has stopped processing
     /// new device events.
     ///
     /// Returns ZX_ERR_BAD_STATE if the block watcher is paused more than once.
-    strict Pause() -> (struct {
+    Pause() -> (struct {
         status zx.Status;
     });
 
@@ -23,7 +23,7 @@ closed protocol BlockWatcher {
     /// new device events.
     ///
     /// Returns ZX_ERR_BAD_STATE if the watcher isn't paused.
-    strict Resume() -> (struct {
+    Resume() -> (struct {
         status zx.Status;
     });
 };
@@ -39,23 +39,23 @@ type MountOptions = resource table {
 
 /// Manages fshost lifecycle
 @discoverable
-closed protocol Admin {
+protocol Admin {
     /// Mounts the filesystem on the block device. The filesystem will be mounted in /fs/mnt/<name>
     /// (in fshost's outgoing directory). This may or may not be supported depending on fshost
     /// configuration.
-    strict Mount(resource struct {
+    Mount(resource struct {
         device client_end:fuchsia.hardware.block.Block;
         name string:fuchsia.io.MAX_FILENAME;
         options MountOptions;
     }) -> () error zx.Status;
 
     /// Unmounts a previously mounted filesystem.
-    strict Unmount(struct {
+    Unmount(struct {
         name string:fuchsia.io.MAX_FILENAME;
     }) -> () error zx.Status;
 
     /// Returns the device path for the filesystem with the given fs_id.
-    strict GetDevicePath(struct {
+    GetDevicePath(struct {
         fs_id uint64;
     }) -> (struct {
         path fuchsia.io.Path;
@@ -66,7 +66,7 @@ closed protocol Admin {
     ///
     /// This can only be called while the data partition isn't already mounted, which is typically
     /// in recovery builds where fshost is running with the `ramdisk_image` flag set.
-    strict WriteDataFile(resource struct {
+    WriteDataFile(resource struct {
         filename fuchsia.io.Path;
         payload zx.Handle:VMO;
     }) -> () error zx.Status;
@@ -82,11 +82,11 @@ closed protocol Admin {
     /// TODO(fxbug.dev/112142): This function unbinds all child drivers of the volume to be wiped.
     /// This can race with the fshost block device manager, which attempts to bind the FVM driver
     /// and unseal the zxcrypt volume.
-    strict WipeStorage(resource struct {
+    WipeStorage(resource struct {
         blobfs_root server_end:<fuchsia.io.Directory>;
     }) -> () error zx.Status;
 
     /// Wipes the data volume which will get reinitialised upon next boot.  This is not
     /// cryptographically secure; the caller should take care to reset hardware keys.
-    strict ShredDataVolume() -> () error zx.Status;
+    ShredDataVolume() -> () error zx.Status;
 };

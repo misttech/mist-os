@@ -4,7 +4,7 @@
 library zx;
 
 @transport("Syscall")
-closed protocol Exception {
+protocol Exception {
     /// ## Summary
     ///
     /// Create a handle for the exception's thread.
@@ -50,7 +50,7 @@ closed protocol Exception {
     /// [exceptions]: /docs/concepts/kernel/exceptions.md
     /// [`zx_exception_get_process()`]: exception_get_process.md
     /// [`zx_task_create_exception_channel()`]: task_create_exception_channel.md
-    strict GetThread(resource struct {
+    GetThread(resource struct {
         handle Handle:EXCEPTION;
     }) -> (resource struct {
         out Handle:THREAD;
@@ -106,7 +106,7 @@ closed protocol Exception {
     /// [exceptions]: /docs/concepts/kernel/exceptions.md
     /// [`zx_exception_get_thread()`]: exception_get_thread.md
     /// [`zx_task_create_exception_channel()`]: task_create_exception_channel.md
-    strict GetProcess(resource struct {
+    GetProcess(resource struct {
         handle Handle:EXCEPTION;
     }) -> (resource struct {
         out Handle:PROCESS;

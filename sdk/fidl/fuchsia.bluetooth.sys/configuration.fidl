@@ -40,7 +40,7 @@ type Settings = table {
 /// This protocol should only be exposed to highly privileged components (e.g. Bluetooth developer
 /// tools in a testing/qualification environment).
 @discoverable
-closed protocol Configuration {
+protocol Configuration {
     /// Applies the fields present in `settings` to all bt-host drivers known to the system. Any
     /// fields not present in `settings` will remain unchanged.
     ///
@@ -48,7 +48,7 @@ closed protocol Configuration {
     ///   need be present.
     /// - response `result` A fully-populated table with the resultant settings after the new
     ///   settings are applied.
-    strict Update(struct {
+    Update(struct {
         settings Settings;
     }) -> (struct {
         result Settings;

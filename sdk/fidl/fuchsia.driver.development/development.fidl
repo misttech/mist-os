@@ -135,9 +135,9 @@ type NodeBindingInfo = table {
     2: driver_url string:fuchsia.url.MAX_URL_LENGTH;
 };
 
-closed protocol DriverInfoIterator {
+protocol DriverInfoIterator {
     /// Return 0 drivers when no more entries left.
-    strict GetNext() -> (struct {
+    GetNext() -> (struct {
         drivers vector<DriverInfo>:MAX;
     });
 };
@@ -196,10 +196,10 @@ type CompositeInfo = table {
 };
 
 /// Used to page through a CompositeList.
-closed protocol CompositeInfoIterator {
+protocol CompositeInfoIterator {
     /// Returns up to 100 entries at a time. Return empty when no more
     /// composites are left.
-    strict GetNext() -> (struct {
+    GetNext() -> (struct {
         composites vector<CompositeInfo>:MAX;
     });
 };
@@ -224,9 +224,9 @@ type CompositeNodeSpecInfo = table {
     5: parents vector<fuchsia.driver.framework.ParentSpec>:MAX;
 };
 
-closed protocol CompositeNodeSpecIterator {
+protocol CompositeNodeSpecIterator {
     /// Return empty when no more node groups are left.
-    strict GetNext() -> (struct {
+    GetNext() -> (struct {
         specs vector<CompositeNodeSpecInfo>:MAX;
     });
 };
@@ -234,7 +234,7 @@ closed protocol CompositeNodeSpecIterator {
 /// Interface for developing and debugging drivers.
 /// This interface should only be used for development and disabled in release builds.
 @discoverable
-closed protocol DriverIndex {
+protocol DriverIndex {
     /// Returns a list of all drivers that are known to the system.
     /// If a |driver_filter| is provided, the returned list will be filtered to
     /// only include drivers specified in the filter.
@@ -244,7 +244,7 @@ closed protocol DriverIndex {
     /// one driver in |driver_filter|.
     /// ZX_ERR_BUFFER_TOO_SMALL indicates that the driver's bind program is longer than the
     /// maximum number of instructions (BIND_PROGRAM_INSTRUCTIONS_MAX).
-    strict GetDriverInfo(resource struct {
+    GetDriverInfo(resource struct {
         driver_filter vector<string:MAX>:MAX;
         iterator server_end:DriverInfoIterator;
     });
@@ -256,15 +256,15 @@ closed protocol DriverIndex {
     /// |iterator| is closed with following epitaphs on error:
     /// ZX_ERR_NOT_FOUND indicates that there are no specs or if a |name_filter| is provided,
     /// that there are no specs with that name.
-    strict GetCompositeNodeSpecs(resource struct {
+    GetCompositeNodeSpecs(resource struct {
         name_filter string:<MAX, optional>;
         iterator server_end:CompositeNodeSpecIterator;
     });
 };
 
-closed protocol DeviceInfoIterator {
+protocol DeviceInfoIterator {
     /// Return 0 devices when no more entries left.
-    strict GetNext() -> (struct {
+    GetNext() -> (struct {
         drivers vector<DeviceInfo>:MAX;
     });
 };
@@ -281,12 +281,12 @@ type TestNodeAddArgs = table {
 /// Interface for developing and debugging drivers.
 /// This interface should only be used for development and disabled in release builds.
 @discoverable
-closed protocol DriverDevelopment {
+protocol DriverDevelopment {
     compose DriverIndex;
 
     /// Restarts all driver hosts containing the driver specified by `driver path`, and returns the
     /// number of driver hosts that were restarted.
-    strict RestartDriverHosts(struct {
+    RestartDriverHosts(struct {
         driver_path string:fuchsia.device.manager.DEVICE_PATH_MAX;
     }) -> (struct {
         count uint32;
@@ -304,7 +304,7 @@ closed protocol DriverDevelopment {
     /// ZX_ERR_BAD_PATH indicates that the given path is not valid.
     /// ZX_ERR_BUFFER_TOO_SMALL indicates either that the given path is too long,
     /// or that the device has more than the maximum number of properties (PROPERTIES_MAX).
-    strict GetDeviceInfo(resource struct {
+    GetDeviceInfo(resource struct {
         device_filter vector<string:MAX>:MAX;
         iterator server_end:DeviceInfoIterator;
         exact_match bool;
@@ -312,14 +312,14 @@ closed protocol DriverDevelopment {
 
     /// Returns the list of composites in the system. This includes composites 
     /// that are not yet assembled and added into the node topology.
-    strict GetCompositeInfo(resource struct {
+    GetCompositeInfo(resource struct {
         iterator server_end:CompositeInfoIterator;
     });
 
 
     /// (DFv2) Attempts to bind all unbound nodes in the topology.
     /// Returns new successful binds.
-    strict BindAllUnboundNodes() -> (struct {
+    BindAllUnboundNodes() -> (struct {
         /// List of new bindings that happened as a result of this.
         binding_result vector<NodeBindingInfo>:BINDING_RESULT_MAX;
     }) error zx.Status;
@@ -328,18 +328,18 @@ closed protocol DriverDevelopment {
     // used.
     // Returns a boolean value of whether or not driver framework version 2 is
     // enabled.
-    strict IsDfv2() -> (struct {
+    IsDfv2() -> (struct {
         response bool;
     });
 
     /// (DFv2) Adds test node under the root node.
-    strict AddTestNode(struct {
+    AddTestNode(struct {
         args TestNodeAddArgs;
     }) -> () error fuchsia.driver.framework.NodeError;
 
     /// (DFv2) Removes the test node. The node is removed asynchronously and is
     /// not guaranteed to be removed by the time this returns.
-    strict RemoveTestNode(struct {
+    RemoveTestNode(struct {
         name string:fuchsia.device.manager.DEVICE_PATH_MAX;
     }) -> () error zx.Status;
 };

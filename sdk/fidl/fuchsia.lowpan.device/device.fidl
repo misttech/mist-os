@@ -268,7 +268,7 @@ type DeviceState = table {
 /// Protocol for connecting to [`Device`] on a LoWPAN
 /// interface.
 @discoverable
-closed protocol DeviceConnector {
+protocol DeviceConnector {
     /// Connects to the [`Device`] protocol on the
     /// named LoWPAN interface.
     ///
@@ -285,7 +285,7 @@ closed protocol DeviceConnector {
     ///   given name.
     /// * `ZX_ERR_NOT_SUPPORTED`: The interface exists but
     ///   does not support this protocol.
-    strict Connect(resource struct {
+    Connect(resource struct {
         name fuchsia.lowpan.InterfaceName;
         server_end server_end:Device;
     });
@@ -298,7 +298,7 @@ closed protocol DeviceConnector {
 ///
 /// Note that aspects of the device that deal with PII must
 /// be monitored and controlled via the [`DeviceExtra`] protocol.
-closed protocol Device {
+protocol Device {
     /// Provision the interface for the network described by identity
     /// and credential. This is similar to `JoinNetwork`, except that
     /// (assuming the identity and credential are valid) it will (assuming
@@ -325,7 +325,7 @@ closed protocol Device {
     /// The resulting change in state can be monitored via `WatchDeviceState()`.
     /// Any error that prevents the operation from completing successfully
     /// will result in the protocol being closed.
-    strict ProvisionNetwork(struct {
+    ProvisionNetwork(struct {
         params ProvisioningParams;
     }) -> ();
 
@@ -346,7 +346,7 @@ closed protocol Device {
     ///
     /// If the interface was not previously provisioned,
     /// calling this method does nothing.
-    strict LeaveNetwork() -> ();
+    LeaveNetwork() -> ();
 
     /// Activate ("bring-up") or deactivate ("shut-down") the
     /// network interface.
@@ -360,7 +360,7 @@ closed protocol Device {
     /// The resulting change in state can be monitored via `WatchDeviceState()`.
     /// Any error that prevents the operation from completing successfully
     /// will result in the protocol being closed.
-    strict SetActive(struct {
+    SetActive(struct {
         active bool;
     }) -> ();
 
@@ -369,7 +369,7 @@ closed protocol Device {
     /// LoWPAN devices typically only support a single network type,
     /// but some devices may support more than one. Up to `MAX_NETWORK_TYPES`
     /// network types may be returned.
-    strict GetSupportedNetworkTypes() -> (struct {
+    GetSupportedNetworkTypes() -> (struct {
         network_types vector<NetworkType>:MAX_NETWORK_TYPES;
     });
 
@@ -382,7 +382,7 @@ closed protocol Device {
     /// Changes are not queued. The returned value always represents
     /// the latest and most accurate state values, even if several changes
     /// had happened in-between calls.
-    strict WatchDeviceState() -> (struct {
+    WatchDeviceState() -> (struct {
         device_combined_state DeviceState;
     });
 };
@@ -390,7 +390,7 @@ closed protocol Device {
 /// Protocol for connecting to [`DeviceExtra`] on a LoWPAN
 /// interface.
 @discoverable
-closed protocol DeviceExtraConnector {
+protocol DeviceExtraConnector {
     /// Connects to the [`DeviceExtra`] protocol on the
     /// named LoWPAN interface.
     ///
@@ -407,7 +407,7 @@ closed protocol DeviceExtraConnector {
     ///   given name.
     /// * `ZX_ERR_NOT_SUPPORTED`: The interface exists but
     ///   does not support this protocol.
-    strict Connect(resource struct {
+    Connect(resource struct {
         name fuchsia.lowpan.InterfaceName;
         server_end server_end:DeviceExtra;
     });
@@ -418,7 +418,7 @@ closed protocol DeviceExtraConnector {
 /// This protocol provides clients with a way to control and
 /// monitor aspects of the LoWPAN device that can, either
 /// directly or indirectly, leak PII or cryptographic keys.
-closed protocol DeviceExtra {
+protocol DeviceExtra {
     // *****************************************************
     // ALL METHODS IN THIS CLASS DEAL WITH PII.
     // *****************************************************
@@ -429,7 +429,7 @@ closed protocol DeviceExtra {
     /// to `ProvisionNetwork`, `JoinNetwork`, or `FormNetwork`. If the
     /// device is not provisioned (for example, by calling `LeaveNetwork()`)
     /// then this method returns nothing.
-    strict GetCredential() -> (struct {
+    GetCredential() -> (struct {
         credential Credential:optional;
     });
 
@@ -456,7 +456,7 @@ closed protocol DeviceExtra {
     /// * `Device.LeaveNetwork()`
     /// * `DeviceExtra.JoinNetwork()`
     /// * `DeviceExtra.FormNetwork()`
-    strict WatchIdentity() -> (struct {
+    WatchIdentity() -> (struct {
         identity Identity;
     });
 
@@ -467,7 +467,7 @@ closed protocol DeviceExtra {
     /// device is re-associated to a different network or a factory
     /// reset is performed.
     @available(added=9)
-    strict GetCurrentMacAddress() -> (struct {
+    GetCurrentMacAddress() -> (struct {
         address fuchsia.lowpan.MacAddress;
     });
 };

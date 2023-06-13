@@ -49,48 +49,48 @@ type SessionInfoDelta = table {
 /// Controls a media session and views its status.
 ///
 /// The channel will close if the media session is stopped.
-closed protocol SessionControl {
+protocol SessionControl {
     /// Plays media.
-    strict Play();
+    Play();
     /// Pauses playback and retains position in media
-    strict Pause();
+    Pause();
     /// Stops playback. The session should close.
-    strict Stop();
+    Stop();
     /// Seeks to a specific position in media. Implementations are free to
     /// enter an error state if the position is out of bounds. `position`
     /// is an offset from the beginning of the media.
-    strict Seek(struct {
+    Seek(struct {
         position zx.Duration;
     });
     /// Skips forward in media by the player's default skip amount.
-    strict SkipForward();
+    SkipForward();
     /// Skips in reverse in media by the player's default skip amount.
-    strict SkipReverse();
+    SkipReverse();
     /// Changes media to the next item (e.g. next song in playlist).
-    strict NextItem();
+    NextItem();
     /// Changes media to the previous item.
-    strict PrevItem();
+    PrevItem();
     /// Sets the playback rate of the media. This will not change the
     /// playback mode.
-    strict SetPlaybackRate(struct {
+    SetPlaybackRate(struct {
         playback_rate float32;
     });
     /// Sets repeat mode to any of the supported repeat modes.
-    strict SetRepeatMode(struct {
+    SetRepeatMode(struct {
         repeat_mode RepeatMode;
     });
     /// Sets shuffle mode.
-    strict SetShuffleMode(struct {
+    SetShuffleMode(struct {
         shuffle_on bool;
     });
     /// Binds to the session's volume control for control and notifications.
-    strict BindVolumeControl(resource struct {
+    BindVolumeControl(resource struct {
         volume_control_request server_end:fuchsia.media.audio.VolumeControl;
     });
     /// Watches the session status. Leave a request hanging to receive a reply when
     /// the session status changes. The first request will be answered immediately with
     /// the current state.
-    strict WatchStatus() -> (struct {
+    WatchStatus() -> (struct {
         session_info_delta SessionInfoDelta;
     });
 };
@@ -98,11 +98,11 @@ closed protocol SessionControl {
 /// Views a media session's status.
 ///
 /// The channel will close if the media session is stopped.
-closed protocol SessionObserver {
+protocol SessionObserver {
     /// Watches the session status. Leave a request hanging to receive a reply when
     /// the session status changes. The first request will be answered immediately with
     /// the current state.
-    strict WatchStatus() -> (struct {
+    WatchStatus() -> (struct {
         session_info_delta SessionInfoDelta;
     });
 };
@@ -118,14 +118,14 @@ type WatchOptions = table {
 };
 
 /// `SessionsWatcher` watches the collection of published sessions.
-closed protocol SessionsWatcher {
+protocol SessionsWatcher {
     /// Called by the registry service when a session is updated. On first connection,
     /// this will be called as many times as needed to communicate the state of the
     /// world.
     ///
     /// `SessionsWatcher` must reply to acknowledge receipt of the session info delta.
     /// Delinquent watchers who do not reply will eventually be disconnected.
-    strict SessionUpdated(struct {
+    SessionUpdated(struct {
         session_id SessionId;
         session_info_delta SessionInfoDelta;
     }) -> ();
@@ -135,7 +135,7 @@ closed protocol SessionsWatcher {
     ///
     /// `SessionsWatcher` must reply to acknlowledge receipt of the session removal.
     /// Delinquent watchers who do not reply will eventually be disconnected.
-    strict SessionRemoved(struct {
+    SessionRemoved(struct {
         session_id SessionId;
     }) -> ();
 };
@@ -143,16 +143,16 @@ closed protocol SessionsWatcher {
 /// `Discovery` observes the collection of published media sessions
 /// and connects clients to them.
 @discoverable
-closed protocol Discovery {
+protocol Discovery {
     /// Connects a session watcher configured with the given options.
-    strict WatchSessions(resource struct {
+    WatchSessions(resource struct {
         watch_options WatchOptions;
         session_watcher client_end:SessionsWatcher;
     });
 
     /// Connects to a `SessionControl` for `session_id` if present. Drops the
     /// given channel otherwise.
-    strict ConnectToSession(resource struct {
+    ConnectToSession(resource struct {
         session_id SessionId;
         session_control_request server_end:SessionControl;
     });
@@ -161,16 +161,16 @@ closed protocol Discovery {
 /// `ObserverDiscovery` observes the collection of published media sessions
 /// and connects clients to them for observation without playback controls.
 @discoverable
-closed protocol ObserverDiscovery {
+protocol ObserverDiscovery {
     /// Connects a session watcher configured with the given options.
-    strict WatchSessions(resource struct {
+    WatchSessions(resource struct {
         watch_options WatchOptions;
         sessions_watcher client_end:SessionsWatcher;
     });
 
     /// Connects to a `SessionObserver` for `session_id` if present. Drops the
     /// given channel otherwise.
-    strict ConnectToSession(resource struct {
+    ConnectToSession(resource struct {
         session_id SessionId;
         session_request server_end:SessionObserver;
     });
@@ -181,11 +181,11 @@ closed protocol ObserverDiscovery {
 /// The currently active media session is the most recent existing media session
 /// to announce a "Playing" state on the local device, even if it is now paused.
 @discoverable
-closed protocol ActiveSession {
+protocol ActiveSession {
     /// Watches the active session. The first request will be answered immediately
     /// with the current active session. Always leave a request hanging to receive
     /// a reply when the active session changes.
-    strict WatchActiveSession() -> (resource struct {
+    WatchActiveSession() -> (resource struct {
         session client_end:<SessionControl, optional>;
     });
 };

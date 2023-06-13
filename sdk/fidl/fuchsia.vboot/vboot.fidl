@@ -120,12 +120,12 @@ type Key = flexible enum {
 };
 
 @discoverable
-closed protocol FirmwareParam {
+protocol FirmwareParam {
     /// Get |key|.
     /// Returns ZX_ERR_NOT_SUPPORTED if the given key is unsupported.
     /// Returns ZX_ERR_INTERNAL if an internal error occurred (e.g.
     /// communicating to the firmware parameter storage).
-    strict Get(struct {
+    Get(struct {
         key Key;
     }) -> (struct {
         result uint32;
@@ -137,7 +137,7 @@ closed protocol FirmwareParam {
     /// Returns ZX_ERR_INVALID_ARGS if the value written to the key is invalid.
     /// Returns ZX_ERR_INTERNAL if an internal error occurred (e.g.
     /// communicating to the firmware parameter storage).
-    strict Set(struct {
+    Set(struct {
         key Key;
         value uint32;
     }) -> () error zx.Status;

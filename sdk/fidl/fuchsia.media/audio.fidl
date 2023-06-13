@@ -4,8 +4,8 @@
 library fuchsia.media;
 
 @discoverable
-closed protocol Audio {
-    strict CreateAudioRenderer(resource struct {
+protocol Audio {
+    CreateAudioRenderer(resource struct {
         audio_renderer_request server_end:AudioRenderer;
     });
 
@@ -19,7 +19,7 @@ closed protocol Audio {
     // Eventually, I suspect that all of this will move up into the audio policy
     // manager and application clients will obtain AudioCapturers from and control
     // through the policy manager.
-    strict CreateAudioCapturer(resource struct {
+    CreateAudioCapturer(resource struct {
         audio_capturer_request server_end:AudioCapturer;
         loopback bool;
     });
@@ -27,17 +27,17 @@ closed protocol Audio {
     // TODO(fxbug.dev/38104): Remove these methods.
     @transitional
     @deprecated
-    strict SetSystemMute(struct {
+    SetSystemMute(struct {
         muted bool;
     });
     @transitional
     @deprecated
-    strict SetSystemGain(struct {
+    SetSystemGain(struct {
         gain_db float32;
     });
     @transitional
     @deprecated
-    strict -> SystemGainMuteChanged(struct {
+    -> SystemGainMuteChanged(struct {
         gain_db float32;
         muted bool;
     });

@@ -6,19 +6,19 @@ library fuchsia.blobfs;
 using zx;
 
 @discoverable
-closed protocol Blobfs {
+protocol Blobfs {
     /// Assign the handler for blob corruption callbacks. Only one handler will receive callbacks at
     /// any given time.
-    strict SetCorruptBlobHandler(resource struct {
+    SetCorruptBlobHandler(resource struct {
         handler client_end:CorruptBlobHandler;
     }) -> (struct {
         status zx.Status;
     });
 };
 
-closed protocol CorruptBlobHandler {
+protocol CorruptBlobHandler {
     /// Notify that a particular blob is corrupted to the CorruptBlobHandler service.
-    strict CorruptBlob(struct {
+    CorruptBlob(struct {
         merkleroot vector<uint8>:64;
     });
 };

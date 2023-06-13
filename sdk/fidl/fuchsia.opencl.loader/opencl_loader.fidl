@@ -22,11 +22,11 @@ type ConnectToManifestOptions = flexible bits {
 
 /// Service to provide opencl libraries to the loader.
 @discoverable
-closed protocol Loader {
+protocol Loader {
     /// Requests a client driver library with the given name from the opencl loader
     /// service. Returns a VMO suitable for loading as a dynamic library on
     /// success, a null handle on failure.
-    strict Get(struct {
+    Get(struct {
         name string:64;
     }) -> (resource struct {
         lib zx.Handle:<VMO, optional>;
@@ -35,7 +35,7 @@ closed protocol Loader {
     /// Connects to a FS serving fuchsia.io containing all OpenCL ICD manifests.
     /// Manifests will always appear in this directory after the relevant device
     /// appears in `ConnectToDeviceFs()`.
-    strict ConnectToManifestFs(resource struct {
+    ConnectToManifestFs(resource struct {
         options ConnectToManifestOptions;
         channel zx.Handle:CHANNEL;
     });
@@ -43,12 +43,12 @@ closed protocol Loader {
     /// Connects to a FS serving fuchsia.io containing all device nodes
     /// potentially relevant to ICDs.  /dev/<devname> will be served under
     /// <devname> in this directory.
-    strict ConnectToDeviceFs(resource struct {
+    ConnectToDeviceFs(resource struct {
         channel zx.Handle:CHANNEL;
     });
 
     /// Returns the set of features the loader service supports.
-    strict GetSupportedFeatures() -> (struct {
+    GetSupportedFeatures() -> (struct {
         features Features;
     });
 };

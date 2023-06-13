@@ -45,12 +45,12 @@ type SoftwareDistributionInfo = table {
 /// the SystemProfile in Cobalt. The changes are global and affect all loggers
 /// running on the device.
 @discoverable
-closed protocol SystemDataUpdater {
+protocol SystemDataUpdater {
     /// Sets Cobalt's view of the system-wide distribution information replacing the
     /// existing values.
     ///
     /// `info` The specifications of the current system's software distribution.
-    strict SetSoftwareDistributionInfo(struct {
+    SetSoftwareDistributionInfo(struct {
         info SoftwareDistributionInfo;
     }) -> (struct {
         status Status;
@@ -73,6 +73,6 @@ closed protocol SystemDataUpdater {
 /// the operation succeeds or is cancelled due to exceeding a specified
 /// timeout.
 @discoverable
-closed protocol AggregateAndUpload {
-    strict AggregateAndUploadMetricEvents() -> ();
+protocol AggregateAndUpload {
+    AggregateAndUploadMetricEvents() -> ();
 };

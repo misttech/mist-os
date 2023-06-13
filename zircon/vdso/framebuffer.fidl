@@ -4,7 +4,7 @@
 library zx;
 
 @transport("Syscall")
-closed protocol Framebuffer {
+protocol Framebuffer {
     /// ## Summary
     ///
     /// TODO(fxbug.dev/32938)
@@ -40,7 +40,7 @@ closed protocol Framebuffer {
     /// ## See also
     ///
     /// TODO(fxbug.dev/32938)
-    strict GetInfo(resource struct {
+    GetInfo(resource struct {
         resource Handle:RESOURCE;
     }) -> (struct {
         format uint32;
@@ -87,7 +87,7 @@ closed protocol Framebuffer {
     /// ## See also
     ///
     /// TODO(fxbug.dev/32938)
-    strict SetRange(resource struct {
+    SetRange(resource struct {
         resource Handle:RESOURCE;
         vmo Handle:VMO;
         len uint32;

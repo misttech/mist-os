@@ -59,12 +59,12 @@ type DashNamespaceLayout = strict enum {
 };
 
 @discoverable
-closed protocol Launcher {
+protocol Launcher {
     /// Launch a dash process scoped to the component with the given moniker, forwarding the given
     /// stdio PTY.
     // TODO(fxbug.dev/127317) This is the old name for `ExploreComponentOverPty`. Remove it once
     // no ffx binaries depend on it.
-    strict LaunchWithPty(resource struct {
+    LaunchWithPty(resource struct {
         /// The moniker of the component that dash should be scoped to
         moniker string:MAX;
         /// The PTY device that should be forwarded to the dash process
@@ -80,7 +80,7 @@ closed protocol Launcher {
 
     /// Launch a dash process scoped to the component with the given moniker, forwarding the given
     /// stdio PTY.
-    strict ExploreComponentOverPty(resource struct {
+    ExploreComponentOverPty(resource struct {
         /// The moniker of the component that dash should be scoped to
         moniker string:MAX;
         /// The PTY device that should be forwarded to the dash process
@@ -101,7 +101,7 @@ closed protocol Launcher {
     /// the socket.
     // TODO(fxbug.dev/127317) This is the old name for `ExploreComponentOverSocket`. Remove it once
     // no ffx binaries depend on it.
-    strict LaunchWithSocket(resource struct {
+    LaunchWithSocket(resource struct {
         /// The moniker of the component that dash should be scoped to
         moniker string:MAX;
         /// The raw socket to connect to the dash process
@@ -120,7 +120,7 @@ closed protocol Launcher {
     ///
     /// The dash launcher will implicitly create a PTY and transfer bytes between the PTY and
     /// the socket.
-    strict ExploreComponentOverSocket(resource struct {
+    ExploreComponentOverSocket(resource struct {
         /// The moniker of the component that dash should be scoped to
         moniker string:MAX;
         /// The raw socket to connect to the dash process
@@ -139,7 +139,7 @@ closed protocol Launcher {
     ///
     /// The dash launcher will implicitly create a PTY and transfer bytes between the PTY and
     /// the socket.
-    strict ExplorePackageOverSocket(resource struct {
+    ExplorePackageOverSocket(resource struct {
         /// The absolute package URL to resolve.
         /// If `subpackages` is empty the resolved package directory will be loaded into the dash
         /// namespace at `/pkg`.
@@ -160,7 +160,7 @@ closed protocol Launcher {
     }) -> () error LauncherError;
 
     /// This event fires when a shell has terminated.
-    strict -> OnTerminated(struct {
+    -> OnTerminated(struct {
         /// The process exit code of the shell.
         return_code int32;
     });

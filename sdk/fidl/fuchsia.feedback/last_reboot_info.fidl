@@ -8,8 +8,8 @@ using zx;
 /// since many developers phrase their questions about shutdowns in terms of reboots and most
 /// components are interested in knowing why the system just rebooted.
 @discoverable
-closed protocol LastRebootInfoProvider {
-    strict Get() -> (struct {
+protocol LastRebootInfoProvider {
+    Get() -> (struct {
         last_reboot LastReboot;
     });
 };

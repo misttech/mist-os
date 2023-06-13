@@ -22,81 +22,81 @@ type GpioPolarity = strict enum : uint32 {
     HIGH = 0x1;
 };
 
-closed protocol Gpio {
+protocol Gpio {
     /// Get the pin of a GPIO
-    strict GetPin() -> (struct {
+    GetPin() -> (struct {
         pin uint32;
     }) error zx.Status;
 
     /// Get the name of a GPIO.
-    strict GetName() -> (struct {
+    GetName() -> (struct {
         name string:MAX_GPIO_NAME_LEN;
     }) error zx.Status;
 
     /// Configures a GPIO for input.
-    strict ConfigIn(struct {
+    ConfigIn(struct {
         flags GpioFlags;
     }) -> () error zx.Status;
 
     /// Configures a GPIO for output.
-    strict ConfigOut(struct {
+    ConfigOut(struct {
         initial_value uint8;
     }) -> () error zx.Status;
 
     /// Configures the GPIO pin for an alternate function (I2C, SPI, etc)
     /// the interpretation of "function" is platform dependent.
-    strict SetAltFunction(struct {
+    SetAltFunction(struct {
         function uint64;
     }) -> () error zx.Status;
 
     /// Reads the current value of a GPIO (0 or 1).
-    strict Read() -> (struct {
+    Read() -> (struct {
         value uint8;
     }) error zx.Status;
 
     /// Sets the current value of the GPIO (any non-zero value maps to 1).
-    strict Write(struct {
+    Write(struct {
         value uint8;
     }) -> () error zx.Status;
 
     /// Set GPIO polarity.
-    strict SetPolarity(struct {
+    SetPolarity(struct {
         polarity GpioPolarity;
     }) -> () error zx.Status;
 
     /// Sets the drive strength of the GPIO.
     /// actual_ds_ua is always >= ds_ua. If ds_ua is larger than max value, the drive strength will be set to the max value.
     /// Return error if unable to set drive strength. actual_ds_ua is not set in this case.
-    strict SetDriveStrength(struct {
+    SetDriveStrength(struct {
         ds_ua uint64;
     }) -> (struct {
         actual_ds_ua uint64;
     }) error zx.Status;
 
     /// Gets the configured drive strength of the GPIO in microamps (ua).
-    strict GetDriveStrength() -> (struct {
+    GetDriveStrength() -> (struct {
         result_ua uint64;
     }) error zx.Status;
 
     /// Gets an interrupt object pertaining to a particular GPIO pin. `flags`
     /// is passed as the `options` parameter when
     /// [creating the interrupt](https://fuchsia.dev/fuchsia-src/reference/syscalls/interrupt_create).
-    strict GetInterrupt(struct {
+    GetInterrupt(struct {
         flags uint32;
     }) -> (resource struct {
         irq zx.Handle:INTERRUPT;
     }) error zx.Status;
 
     /// Release the interrupt.
-    strict ReleaseInterrupt() -> () error zx.Status;
+    ReleaseInterrupt() -> () error zx.Status;
 };
 
-closed protocol Device {
+protocol Device {
     /// Opens a new session on the device.
     ///
     /// At most one session is permitted at one time; the server end will be
     /// closed with `ZX_ERR_ALREADY_BOUND` if a session already exists.
-    strict OpenSession(resource struct {
+    OpenSession(resource struct {
         session server_end:Gpio;
     });
 };

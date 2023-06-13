@@ -18,7 +18,7 @@ using fuchsia.ui.activity;
 /// fuchsia.ui.activity.Tracker protocol, and instead will only report state
 /// transitions occuring through the Control protocol.
 @discoverable
-closed protocol Control {
+protocol Control {
     /// Sets the Activity Service's state to `state`.
     /// All listeners registered through the Provider protocol will immediately
     /// be notified of the new state.
@@ -28,7 +28,7 @@ closed protocol Control {
     @available(
             deprecated=9,
             note="Unsupported, instead report activity via `fuchsia.input.interaction.observation.Aggregator`")
-    strict SetState(struct {
+    SetState(struct {
         state fuchsia.ui.activity.State;
     });
 };

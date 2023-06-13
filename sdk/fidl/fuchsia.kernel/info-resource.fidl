@@ -8,9 +8,9 @@ using zx;
 /// Protocol for providing a `ZX_RSRC_KIND_SYSTEM` with base
 /// `ZX_RSRC_SYSTEM_INFO_BASE`.
 @discoverable
-closed protocol InfoResource {
+protocol InfoResource {
     /// Get an info resource handle.
-    strict Get() -> (resource struct {
+    Get() -> (resource struct {
         resource zx.Handle:RESOURCE;
     });
 };

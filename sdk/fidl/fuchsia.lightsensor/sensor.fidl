@@ -6,10 +6,10 @@ library fuchsia.lightsensor;
 /// `Sensor` will return calibrated readings from a product-configured light
 /// sensor.
 @discoverable
-closed protocol Sensor {
+protocol Sensor {
     /// Gets the current [LightSensorData]. Returns immediately on first call;
     /// subsequent calls return when the value changes.
-    strict Watch() -> (struct {
+    Watch() -> (struct {
         data LightSensorData;
     });
 };

@@ -42,17 +42,17 @@ type VideoStreamV2 = struct {
 ///    wish to connect.
 /// 3) You request a Stream interface using CreateStream.
 @discoverable
-closed protocol Manager {
+protocol Manager {
     /// Returns a list of all the video devices that are currently plugged in
     /// and enumerated.  The camera_id field of the DeviceInfo is used to specify
     /// a device in GetFormats, GetStream and GetStreamAndBufferCollection.
-    strict GetDevices() -> (struct {
+    GetDevices() -> (struct {
         descriptions vector<DeviceInfo>;
     });
 
     /// Get all the available formats for a camera.
     /// `camera_id` is obtained from a DeviceInfo returned by GetDevices.
-    strict GetFormats(struct {
+    GetFormats(struct {
         camera_id uint64;
         index uint32;
     }) -> (struct {
@@ -64,7 +64,7 @@ closed protocol Manager {
     /// If it does succeed, the Stream will have the rights indicated.
     /// `buffer_info` contains a set of buffers to be used with the Stream.
     /// This is being deprecated - please use CreateStreamV2.
-    strict CreateStream(resource struct {
+    CreateStream(resource struct {
         request VideoStream;
         buffer_info fuchsia.sysmem.BufferCollectionInfo;
         stream server_end:Stream;
@@ -75,7 +75,7 @@ closed protocol Manager {
     /// If it does succeed, the Stream will have the rights indicated.
     /// `buffer_info` contains a set of buffers to be used with the Stream.
     @transitional("This is meant to replace CreateStream")
-    strict CreateStreamV2(resource struct {
+    CreateStreamV2(resource struct {
         request VideoStreamV2;
         buffer_info fuchsia.sysmem.BufferCollectionInfo;
         stream server_end:Stream;

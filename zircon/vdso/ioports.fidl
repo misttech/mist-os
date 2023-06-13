@@ -4,7 +4,7 @@
 library zx;
 
 @transport("Syscall")
-closed protocol Ioports {
+protocol Ioports {
     /// ## Summary
     ///
     /// TODO(fxbug.dev/32938)
@@ -38,7 +38,7 @@ closed protocol Ioports {
     /// ## See also
     ///
     /// TODO(fxbug.dev/32938)
-    strict Request(resource struct {
+    Request(resource struct {
         resource Handle:RESOURCE;
         io_addr uint16;
         len uint32;
@@ -77,7 +77,7 @@ closed protocol Ioports {
     /// ## See also
     ///
     /// TODO(fxbug.dev/32938)
-    strict Release(resource struct {
+    Release(resource struct {
         resource Handle:RESOURCE;
         io_addr uint16;
         len uint32;

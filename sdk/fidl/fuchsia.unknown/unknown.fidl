@@ -10,15 +10,15 @@ using zx;
 ///
 /// See the composing protocol's documentation for a description of
 /// connection-scoped state, if any.
-closed protocol Cloneable {
+protocol Cloneable {
     @selector("Clone")
-    strict Clone2(resource struct {
+    Clone2(resource struct {
         request server_end:Cloneable;
     });
 };
 
 /// Provides a means of synchronously closing a connection.
-closed protocol Closeable {
+protocol Closeable {
     /// Terminates the connection.
     ///
     /// After calling `Close`, the client must not send any other requests.
@@ -30,12 +30,12 @@ closed protocol Closeable {
     /// to calling `Close` without knowing when the close has completed or its
     /// status.
     @selector("fuchsia.io/Node.Close")
-    strict Close() -> () error zx.Status;
+    Close() -> () error zx.Status;
 };
 
 /// Provides a means of identifying a type-erased protocol.
-closed protocol Queryable {
-    strict Query() -> (struct {
+protocol Queryable {
+    Query() -> (struct {
         /// Identifies the underlying protocol.
         protocol vector<uint8>:MAX;
     });

@@ -22,7 +22,7 @@ const LOCAL_COMPONENT_NAME_KEY string = "LOCAL_COMPONENT_NAME";
 /// This protocol can be used to instruct the Realm Builder Server to begin
 /// creating a new realm.
 @discoverable
-closed protocol RealmBuilderFactory {
+protocol RealmBuilderFactory {
     /// Creates a new RealmBuilder. The client end of `realm_server_end` can be
     /// used to mutate the realm that is being constructed, by doing things such
     /// as adding new children to the realm or adding capability routes between
@@ -32,7 +32,7 @@ closed protocol RealmBuilderFactory {
     /// `pkg_dir_handle` is a handle to the test package. The realm builder
     /// client typically passes a handle to its own `/pkg` directory, and
     /// bundles the `other-component` into the same package.
-    strict Create(resource struct {
+    Create(resource struct {
         pkg_dir_handle client_end:fuchsia.io.Directory;
         realm_server_end server_end:Realm;
         builder_server_end server_end:Builder;
@@ -43,7 +43,7 @@ closed protocol RealmBuilderFactory {
     /// the path indicated by `relative_url`, which must be a fragment-only URL
     /// (for example, `#meta/other-component.cm`; see
     /// https://fuchsia.dev/fuchsia-src/reference/components/url#relative-fragment-only).
-    strict CreateFromRelativeUrl(resource struct {
+    CreateFromRelativeUrl(resource struct {
         pkg_dir_handle client_end:fuchsia.io.Directory;
         relative_url fuchsia.url.Url;
         realm_server_end server_end:Realm;
@@ -139,7 +139,7 @@ type RealmBuilderError = strict enum : uint32 {
     CONFIG_OVERRIDE_UNSUPPORTED = 21;
 };
 
-closed protocol Builder {
+protocol Builder {
     /// Assembles the realm being constructed and returns the URL for the root
     /// component in the realm, which may then be used to create a new component
     /// in any collection where fuchsia-test-component is properly set up. Once
@@ -153,7 +153,7 @@ closed protocol Builder {
     /// - `INVALID_COMPONENT_DECL`: A component declaration failed validaiton.
     /// - `BUILD_ALREADY_CALLED`: The `Build` function has been called multiple
     ///   times on this channel.
-    strict Build(resource struct {
+    Build(resource struct {
         runner client_end:fuchsia.component.runner.ComponentRunner;
     }) -> (struct {
         root_component_url string:fuchsia.component.types.MAX_URL_LENGTH;
@@ -359,7 +359,7 @@ type DirectoryEntry = resource struct {
     file_contents fuchsia.mem.Buffer;
 };
 
-closed protocol Realm {
+protocol Realm {
     /// Adds a component to the realm.
     ///
     /// The `url` can be in one of the following formats:
@@ -396,7 +396,7 @@ closed protocol Realm {
     ///   the test package.
     /// - `BUILD_ALREADY_CALLED`: The `Builder.Build` function has been called
     ///   for this realm, and thus this `Realm` channel can no longer be used.
-    strict AddChild(struct {
+    AddChild(struct {
         /// The name of the child that is being added.
         name fuchsia.component.child_name;
 
@@ -426,7 +426,7 @@ closed protocol Realm {
     /// - `BUILD_ALREADY_CALLED`: The `Builder.Build` function has been called
     ///   for this realm, and thus this `Realm` channel can no longer be used.
     @available(removed=12)
-    strict AddLegacyChild(struct {
+    AddLegacyChild(struct {
         /// The name of the child that is being added.
         name fuchsia.component.child_name;
 
@@ -447,7 +447,7 @@ closed protocol Realm {
     /// - `INVALID_COMPONENT_DECL`: `decl` failed validation.
     /// - `BUILD_ALREADY_CALLED`: The `Builder.Build` function has been called
     ///   for this realm, and thus this `Realm` channel can no longer be used.
-    strict AddChildFromDecl(struct {
+    AddChildFromDecl(struct {
         /// The name of the child that is being added.
         name fuchsia.component.child_name;
 
@@ -470,7 +470,7 @@ closed protocol Realm {
     ///   given name.
     /// - `BUILD_ALREADY_CALLED`: The `Builder.Build` function has been called
     ///   for this realm, and thus this `Realm` channel can no longer be used.
-    strict AddLocalChild(struct {
+    AddLocalChild(struct {
         /// The name of the child that is being added.
         name fuchsia.component.child_name;
 
@@ -486,7 +486,7 @@ closed protocol Realm {
     ///   given name.
     /// - `BUILD_ALREADY_CALLED`: The `Builder.Build` function has been called
     ///   for this realm, and thus this `Realm` channel can no longer be used.
-    strict AddChildRealm(resource struct {
+    AddChildRealm(resource struct {
         /// The name of the child realm that is being added.
         name fuchsia.component.name;
 
@@ -518,7 +518,7 @@ closed protocol Realm {
     ///   path URL.
     /// - `BUILD_ALREADY_CALLED`: The `Builder.Build` function has been called
     ///   for this realm, and thus this `Realm` channel can no longer be used.
-    strict GetComponentDecl(struct {
+    GetComponentDecl(struct {
         /// The name of the component whose declaration is being retrieved.
         name fuchsia.component.child_name;
     }) -> (struct {
@@ -548,7 +548,7 @@ closed protocol Realm {
     /// - `INVALID_COMPONENT_DECL`: `component_decl` failed validation.
     /// - `BUILD_ALREADY_CALLED`: The `Builder.Build` function has been called
     ///   for this realm, and thus this `Realm` channel can no longer be used.
-    strict ReplaceComponentDecl(struct {
+    ReplaceComponentDecl(struct {
         /// The name of the component whose declaration is being replaced.
         name fuchsia.component.child_name;
 
@@ -561,7 +561,7 @@ closed protocol Realm {
     /// Errors:
     /// - `BUILD_ALREADY_CALLED`: The `Builder.Build` function has been called
     ///   for this realm, and thus this `Realm` channel can no longer be used.
-    strict GetRealmDecl() -> (struct {
+    GetRealmDecl() -> (struct {
         component_decl fuchsia.component.decl.Component;
     }) error RealmBuilderError;
 
@@ -571,7 +571,7 @@ closed protocol Realm {
     /// - `INVALID_COMPONENT_DECL`: `component_decl` failed validation.
     /// - `BUILD_ALREADY_CALLED`: The `Builder.Build` function has been called
     ///   for this realm, and thus this `Realm` channel can no longer be used.
-    strict ReplaceRealmDecl(struct {
+    ReplaceRealmDecl(struct {
         /// The new component declaration for this realm.
         component_decl fuchsia.component.decl.Component;
     }) -> () error RealmBuilderError;
@@ -591,7 +591,7 @@ closed protocol Realm {
     ///   involved manifests to fail validation.
     /// - `BUILD_ALREADY_CALLED`: The `Builder.Build` function has been called
     ///   for this realm, and thus this `Realm` channel can no longer be used.
-    strict AddRoute(struct {
+    AddRoute(struct {
         /// The capabilities that are to be routed.
         capabilities vector<Capability>:MAX;
 
@@ -610,7 +610,7 @@ closed protocol Realm {
     /// - `NO_SUCH_TARGET`: `offer-to` references a non-existent child.
     /// - `BUILD_ALREADY_CALLED`: The `Builder.Build` function has been called
     ///   for this realm, and thus this `Realm` channel can no longer be used.
-    strict ReadOnlyDirectory(resource struct {
+    ReadOnlyDirectory(resource struct {
         /// The name of the directory capability.
         name fuchsia.component.name;
 
@@ -626,7 +626,7 @@ closed protocol Realm {
     ///
     /// Allows calling `SetConfigValue` to override packaged configuration.
     @available(added=9)
-    strict InitMutableConfigFromPackage(struct {
+    InitMutableConfigFromPackage(struct {
         name fuchsia.component.name;
     }) -> () error RealmBuilderError;
 
@@ -634,12 +634,12 @@ closed protocol Realm {
     ///
     /// Allows calling `SetConfigValue` to provide configuration.
     @available(added=9)
-    strict InitMutableConfigToEmpty(struct {
+    InitMutableConfigToEmpty(struct {
         name fuchsia.component.name;
     }) -> () error RealmBuilderError;
 
     @available(removed=12)
-    strict ReplaceConfigValue(struct {
+    ReplaceConfigValue(struct {
         name fuchsia.component.name;
         key fuchsia.component.decl.ConfigKey;
         value fuchsia.component.config.ValueSpec;
@@ -657,7 +657,7 @@ closed protocol Realm {
     /// - `NO_SUCH_CONFIG_FIELD`: `key` could not be found in component's config schema
     /// - `CONFIG_VALUE_INVALID`: `value` does not meet config schema constraints
     @available(added=13)
-    strict SetConfigValue(struct {
+    SetConfigValue(struct {
         /// The name of the component whose config value is being replaced.
         name fuchsia.component.name;
 
@@ -670,7 +670,7 @@ closed protocol Realm {
 
     // replaced by ABI-compatible type above
     @available(added=9, removed=13)
-    strict SetConfigValue(struct {
+    SetConfigValue(struct {
         /// The name of the component whose config value is being replaced.
         name fuchsia.component.name;
 

@@ -11,7 +11,7 @@ const MAX_NEIGHBORS uint32 = 1024;
 /// Protocol for connecting to [`DeviceTest`] on a LoWPAN
 /// interface.
 @discoverable
-closed protocol DeviceTestConnector {
+protocol DeviceTestConnector {
     /// Connects to the [`DeviceTest`] protocol on the
     /// named LoWPAN interface.
     ///
@@ -28,13 +28,13 @@ closed protocol DeviceTestConnector {
     ///   given name.
     /// * `ZX_ERR_NOT_SUPPORTED`: The interface exists but
     ///   does not support this protocol.
-    strict Connect(resource struct {
+    Connect(resource struct {
         name fuchsia.lowpan.InterfaceName;
         server_end server_end:DeviceTest;
     });
 };
 
-closed protocol DeviceTest {
+protocol DeviceTest {
     /// Resets this network interface, returning
     /// all volatile state to default values. Any
     /// information stored in non-volatile memory
@@ -44,63 +44,63 @@ closed protocol DeviceTest {
     /// interface has finished initialization the
     /// interface will attempt to reattach to the
     /// previous network.
-    strict Reset() -> ();
+    Reset() -> ();
 
     /// Returns the version string describing the firmware/stack
     /// version that is in use.
-    strict GetNcpVersion() -> (struct {
+    GetNcpVersion() -> (struct {
         version string:256;
     });
 
     /// Returns the current RSSI measured by the radio.
-    strict GetCurrentRssi() -> (struct {
+    GetCurrentRssi() -> (struct {
         rssi fuchsia.lowpan.PowerDbm;
     });
 
     /// Returns the factory-assigned static MAC address.
-    strict GetFactoryMacAddress() -> (struct {
+    GetFactoryMacAddress() -> (struct {
         address fuchsia.lowpan.MacAddress;
     });
 
     /// Returns the currently used MAC address, which can
     /// differ from the static factory-assigned MAC address.
-    strict GetCurrentMacAddress() -> (struct {
+    GetCurrentMacAddress() -> (struct {
         address fuchsia.lowpan.MacAddress;
     });
 
     /// Returns the current channel index for the radio.
-    strict GetCurrentChannel() -> (struct {
+    GetCurrentChannel() -> (struct {
         channel_index fuchsia.lowpan.ChannelIndex;
     });
 
     /// Returns the partition ID of the currently associated
     /// network partition.
-    strict GetPartitionId() -> (struct {
+    GetPartitionId() -> (struct {
         pid uint32;
     });
 
-    strict GetThreadRloc16() -> (struct {
+    GetThreadRloc16() -> (struct {
         rloc uint16;
     });
 
-    strict GetThreadRouterId() -> (struct {
+    GetThreadRouterId() -> (struct {
         router_id uint8;
     });
 
     /// Updates the address filter settings.
     ///
     /// Responds once the filter settings have taken effect.
-    strict ReplaceMacAddressFilterSettings(struct {
+    ReplaceMacAddressFilterSettings(struct {
         settings MacAddressFilterSettings;
     }) -> ();
 
     /// Returns the current address filter settings.
-    strict GetMacAddressFilterSettings() -> (struct {
+    GetMacAddressFilterSettings() -> (struct {
         settings MacAddressFilterSettings;
     });
 
     /// Returns a snapshot of the current neighbor table.
-    strict GetNeighborTable() -> (struct {
+    GetNeighborTable() -> (struct {
         neighbor_table vector<NeighborInfo>:MAX_NEIGHBORS;
     });
 };

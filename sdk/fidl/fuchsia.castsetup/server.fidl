@@ -11,10 +11,10 @@ type SecurityState = strict enum : uint32 {
 };
 
 /// Registered API that handles an incoming request.
-closed protocol ApiRequestHandler {
+protocol ApiRequestHandler {
     /// Called to handle a request to this setup API. The request `data` is JSON.
     /// The response `data` must be JSON.
-    strict HandleRequest(struct {
+    HandleRequest(struct {
         data string:<MAX, optional>;
     }) -> (struct {
         response_code uint32;
@@ -30,7 +30,7 @@ type ApiMode = strict enum : uint32 {
 
 /// Registry that hosts APIs on behalf of clients.
 @discoverable
-closed protocol ApiRegistry {
+protocol ApiRegistry {
     /// Registers an API that may accept incoming data.
     ///
     /// `path` identifies how to access the API. If multiple registrations occur with
@@ -41,7 +41,7 @@ closed protocol ApiRegistry {
     ///
     /// `security_state` indicates what level of security the caller must
     /// adhere to.
-    strict RegisterApi(resource struct {
+    RegisterApi(resource struct {
         path string:1024;
         api_mode ApiMode;
         security_state SecurityState;

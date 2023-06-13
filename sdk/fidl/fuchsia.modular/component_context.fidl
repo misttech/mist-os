@@ -8,7 +8,7 @@ using zx;
 
 /// Provided to all component instances in their incoming namespace.
 @discoverable
-closed protocol ComponentContext {
+protocol ComponentContext {
     /// DEPRECATED: use the component's incoming namespace (for C++, see sys.ComponentContext)
     /// to connect to services provided by agents. See
     /// /docs/concepts/modular/guide/how_to_write_an_agent_cc.md for an example.
@@ -16,7 +16,7 @@ closed protocol ComponentContext {
     /// Used to start an agent in the user scope if it isn't already running, and
     /// connect to it.
     @transitional
-    strict DeprecatedConnectToAgent(resource struct {
+    DeprecatedConnectToAgent(resource struct {
         url string:MAX;
         incoming_services server_end:fuchsia.sys.ServiceProvider;
         controller server_end:AgentController;
@@ -36,7 +36,7 @@ closed protocol ComponentContext {
     ///   * `ZX_ERR_PEER_CLOSED` -- if `request.service_name` is not available from
     ///     the agent (either specified or discovered)
     @transitional
-    strict DeprecatedConnectToAgentService(resource struct {
+    DeprecatedConnectToAgentService(resource struct {
         request AgentServiceRequest;
     });
 };

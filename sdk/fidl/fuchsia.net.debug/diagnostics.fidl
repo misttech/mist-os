@@ -8,17 +8,17 @@ using zx;
 
 /// Provides access to Network stack diagnostics information.
 @discoverable
-closed protocol Diagnostics {
+protocol Diagnostics {
     /// Requests that the network stack produces debugging information in the
     /// system logs.
     ///
     /// The call returns once debug information has been produced.
-    strict LogDebugInfoToSyslog() -> ();
+    LogDebugInfoToSyslog() -> ();
     /// Requests a handle to the netstack's process.
     ///
     /// This handle is not meant to be used for anything other than diagnostics,
     /// so only the `INSPECT` right is provided to the caller.
-    strict GetProcessHandleForInspection() -> (resource struct {
+    GetProcessHandleForInspection() -> (resource struct {
         process zx.Handle:<PROCESS, zx.Rights.INSPECT>;
     });
 };

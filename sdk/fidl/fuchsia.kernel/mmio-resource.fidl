@@ -7,9 +7,9 @@ using zx;
 
 /// Protocol for providing an MMIO resource with access to all valid ranges.
 @discoverable
-closed protocol MmioResource {
+protocol MmioResource {
     /// Get an MMIO resource handle.
-    strict Get() -> (resource struct {
+    Get() -> (resource struct {
         resource zx.Handle:RESOURCE;
     });
 };

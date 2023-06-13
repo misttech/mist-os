@@ -28,7 +28,7 @@ using zx;
 /// * `ZX_ERR_ALREADY_EXISTS`: The same environment service is being provided
 ///   twice.
 @discoverable
-closed protocol TestHarness {
+protocol TestHarness {
     /// Initializes an instance of the modular runtime in an enclosed
     /// environment, configured with parameters provided in `spec`. Closing the
     /// `TestHarness` connection will kill the enclosed environment.
@@ -39,7 +39,7 @@ closed protocol TestHarness {
     ///  * `ZX_ERR_ALREADY_EXISTS`: The same environment service is being provided
     ///    twice in `spec.env_services`
     ///  * `ZX_ERR_ALREADY_BOUND`: Run() was already called.
-    strict Run(resource struct {
+    Run(resource struct {
         spec TestHarnessSpec;
     });
 
@@ -50,7 +50,7 @@ closed protocol TestHarness {
     /// Closing `intercepted_component` will signal to the component manager
     /// that this component has exited unexpectedly. Prefer to use
     /// InterceptedComponent/Exit to provide exit code and reason.
-    strict -> OnNewComponent(resource struct {
+    -> OnNewComponent(resource struct {
         startup_info fuchsia.sys.StartupInfo;
         intercepted_component client_end:InterceptedComponent;
     });
@@ -64,20 +64,20 @@ closed protocol TestHarness {
     ///  * `ZX_ERR_BAD_STATE`: if `ConnectToModularService()` is called before
     ///   `Run()`.
     ///  * `ZX_ERR_INVALID_ARGS`: if `service` is not set to a value.
-    strict ConnectToModularService(resource struct {
+    ConnectToModularService(resource struct {
         service ModularService;
     });
 
     /// Connects to environment services injected into the TestHarness
     /// environment.
-    strict ConnectToEnvironmentService(resource struct {
+    ConnectToEnvironmentService(resource struct {
         service_name string;
         request zx.Handle:CHANNEL;
     });
 
     /// Parses a JSON modular configuration string into BasemgrConfig and
     /// SessionmgrConfig. This method may be called before `Run()` is called.
-    strict ParseConfig(struct {
+    ParseConfig(struct {
         config string;
     }) -> (struct {
         basemgr_config fuchsia.modular.session.BasemgrConfig;
@@ -96,19 +96,19 @@ type ModularService = strict resource union {
 /// InterceptedComponent represents an intercepted component's lifecycle.
 /// Closing this connection causes the component to be killed, and is
 /// equivalent in behaviour to the `ComponentController` being closed.
-closed protocol InterceptedComponent {
+protocol InterceptedComponent {
     /// Signals that component has exit'd with the specified exit code. The
     /// values here are bubbled up to the
     /// `fuchsia.sys.ComponentController.OnTerminated` event. The `OnKill` event
     /// is sent, and this InterceptedComponent handle is closed.
-    strict Exit(struct {
+    Exit(struct {
         exit_code int64;
         reason fuchsia.sys.TerminationReason;
     });
 
     /// The event is sent when the component is killed by the associated
     /// `fuchsia.sys.ComponentController`, or when `Exit()` is called.
-    strict -> OnKill();
+    -> OnKill();
 };
 
 /// Defines the setup of an environment running an instance of the modular

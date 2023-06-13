@@ -72,14 +72,14 @@ type Error = strict enum : int32 {
 };
 
 // No need to be a discoverable protocol since this is used for driver only.
-closed protocol DeviceSetup {
-    strict SetChannel(resource struct {
+protocol DeviceSetup {
+    SetChannel(resource struct {
         req server_end:Device;
     }) -> () error zx.Status;
 };
 
 @discoverable
-closed protocol Device {
+protocol Device {
     /// Opens the Spinel connection and performs initialization.
     ///
     /// This method will block until the Device is ready to use or
@@ -96,7 +96,7 @@ closed protocol Device {
     /// * `Error::IO_ERROR`: An IO error occurred.
     /// * `Error::UNSPECIFIED`: An unspecified error occurred.
     ///                         See logs for more details.
-    strict Open() -> () error Error;
+    Open() -> () error Error;
 
     /// Close the Spinel connection.
     ///
@@ -117,7 +117,7 @@ closed protocol Device {
     /// * `Error::IO_ERROR`: An IO error occurred.
     /// * `Error::UNSPECIFIED`: An unspecified error occurred.
     ///                         See logs for more details.
-    strict Close() -> () error Error;
+    Close() -> () error Error;
 
     /// Fetch the max frame size.
     ///
@@ -126,7 +126,7 @@ closed protocol Device {
     ///
     /// @return The size of the largest frame that this implementation
     /// supports being passed into `SendFrame()`.
-    strict GetMaxFrameSize() -> (struct {
+    GetMaxFrameSize() -> (struct {
         size uint32;
     });
 
@@ -136,7 +136,7 @@ closed protocol Device {
     /// the frame to be dropped and `->OnError()` to emit `Error::CLOSED`.
     ///
     /// See `->OnReadyForSendFrames()` for flow-control considerations.
-    strict SendFrame(struct {
+    SendFrame(struct {
         data vector<uint8>:MAX_FRAME_SIZE;
     });
 
@@ -166,7 +166,7 @@ closed protocol Device {
     /// every second received inbound frame.
     ///
     /// Outbound flow control is similarly accomplished via `->OnReadyForSendFrames()`.
-    strict ReadyToReceiveFrames(struct {
+    ReadyToReceiveFrames(struct {
         number_of_frames uint32;
     });
 
@@ -192,7 +192,7 @@ closed protocol Device {
     /// a value of 2 after every second received outbound frame.
     ///
     /// Inbound flow control is similarly accomplished via `ReadyToReceiveFrames()`.
-    strict -> OnReadyForSendFrames(struct {
+    -> OnReadyForSendFrames(struct {
         number_of_frames uint32;
     });
 
@@ -200,7 +200,7 @@ closed protocol Device {
     /// host stack.
     ///
     /// See `ReadyToReceiveFrames()` for flow-control considerations.
-    strict -> OnReceiveFrame(struct {
+    -> OnReceiveFrame(struct {
         data vector<uint8>:MAX_FRAME_SIZE;
     });
 
@@ -208,7 +208,7 @@ closed protocol Device {
     ///
     /// If the resulting error caused the device to automatically close,
     /// this is indicated via the `did_close` argument.
-    strict -> OnError(struct {
+    -> OnError(struct {
         error Error;
         did_close bool;
     });

@@ -7,15 +7,15 @@ using fuchsia.media;
 using zx;
 
 /// Manages sources on behalf of a Player.
-closed protocol SourceManager {
+protocol SourceManager {
     /// Creates a source that reads from a file.
-    strict CreateFileSource(resource struct {
+    CreateFileSource(resource struct {
         file_channel zx.Handle:CHANNEL;
         source_request server_end:Source;
     });
 
     /// Creates a source that reads from a `SeekingReader`.
-    strict CreateReaderSource(resource struct {
+    CreateReaderSource(resource struct {
         seeking_reader client_end:SeekingReader;
         source_request server_end:Source;
     });
@@ -25,7 +25,7 @@ closed protocol SourceManager {
     /// all included in the SourceStatus and, when the `ElementarySource` is used by
     /// the player, in the `PlayerStatus` as well. `can_pause` and `can_seek`, when
     /// false, constrain the capabilities of the player.
-    strict CreateElementarySource(resource struct {
+    CreateElementarySource(resource struct {
         duration_ns zx.Duration;
         can_pause bool;
         can_seek bool;
@@ -35,7 +35,7 @@ closed protocol SourceManager {
 
     /// Sets the source for this player to use. If source is null, the player
     /// becomes idle.
-    strict SetSource(resource struct {
+    SetSource(resource struct {
         source client_end:<Source, optional>;
     });
 
@@ -43,7 +43,7 @@ closed protocol SourceManager {
     /// reaches transition_pts. The new source starts playback at start_pts. If
     /// a transition is already pending, it will be discarded in favor of the new
     /// transition.
-    strict TransitionToSource(resource struct {
+    TransitionToSource(resource struct {
         source client_end:Source;
         transition_pts int64;
         start_pts int64;
@@ -51,22 +51,22 @@ closed protocol SourceManager {
 
     /// Cancels a pending transition, returning the source. If no transition is
     /// pending, the request channel is closed.
-    strict CancelSourceTransition(resource struct {
+    CancelSourceTransition(resource struct {
         returned_source_request server_end:Source;
     });
 };
 
 /// A source of content that may be used by a player.
-closed protocol Source {
+protocol Source {
     // Provides current status immediately after binding and whenever status
     // changes thereafter.
-    strict -> OnStatusChanged(struct {
+    -> OnStatusChanged(struct {
         source_status SourceStatus;
     });
 };
 
 /// `Source` variant for providing elementary streams directly to the player.
-closed protocol ElementarySource {
+protocol ElementarySource {
     compose Source;
 
     /// Adds an elementary stream. The elementary stream can be removed by
@@ -81,7 +81,7 @@ closed protocol ElementarySource {
     // SimpleStreamSink methods not currently implemented:
     //     DiscardAllPackets
     //     DiscardAllPacketsNoReply
-    strict AddStream(resource struct {
+    AddStream(resource struct {
         type fuchsia.media.StreamType;
         ticks_per_second_numerator uint32;
         ticks_per_second_denominator uint32;
@@ -99,7 +99,7 @@ closed protocol ElementarySource {
     // original CreateStreamSource call. That is, a connection established
     // using AddBinding cannot be passed to SourceManager.SetSource.
     // TODO(dalesat): Remove this limitation.
-    strict AddBinding(resource struct {
+    AddBinding(resource struct {
         source_request server_end:ElementarySource;
     });
 };

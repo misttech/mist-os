@@ -15,14 +15,14 @@ type ContextError = strict enum : int32 {
 // TODO(fxbug.dev/29926): Remove ContextProvider in favor of launching Context instances directly.
 /// The top-level service interface which allows for the creation of Context resources.
 @discoverable
-closed protocol ContextProvider {
+protocol ContextProvider {
     /// Creates a new browser [`Context`] whose state is wholly independent and isolated from other
     /// [`Context`](`Contexts`).
     ///
     /// - `params`: The configuration used to create the [`Context`].
     /// - `context`: An interface request which will receive a bound [`Context`]
     ///   service.
-    strict Create(resource struct {
+    Create(resource struct {
         params CreateContextParams;
         context server_end:Context;
     });
@@ -238,13 +238,13 @@ type CreateContextParams = resource table {
 
 /// Manages browsing state (e.g. LocalStorage, cookies, etc) associated with a set of [`Frame`].
 @discoverable
-closed protocol Context {
+protocol Context {
     /// Creates a new [`Frame`] under this [`Context`]. Destruction of a [`Context`] triggers the
     /// destruction of all of its associated [`Frame`]. [`Frame`] can be transferred to another
     /// component but cannot be shared across multiple components.
     ///
     /// - `frame`: An interface request that will be bound to the created [`Frame`].
-    strict CreateFrame(resource struct {
+    CreateFrame(resource struct {
         frame server_end:Frame;
     });
 
@@ -255,13 +255,13 @@ closed protocol Context {
     /// - `frame`: An interface request that will be bound to the created [`Frame`].
     // TODO(fxbug.dev/65750): Consider removing the clonable params restriction if clients
     // become responsible for providing parameters for [each] popup.
-    strict CreateFrameWithParams(resource struct {
+    CreateFrameWithParams(resource struct {
         params CreateFrameParams;
         frame server_end:Frame;
     });
 
     /// Used to observe cookies for sites hosted under this Context.
-    strict GetCookieManager(resource struct {
+    GetCookieManager(resource struct {
         manager server_end:CookieManager;
     });
 
@@ -271,7 +271,7 @@ closed protocol Context {
     /// If an error occurred, the [`ContextError`] will be set to this value:
     /// - `REMOTE_DEBUGGING_PORT_NOT_OPENED`: `remote_debugging_port` was not set in
     ///   [`CreateContextParams`] or the remote debugging service failed to start.
-    strict GetRemoteDebuggingPort() -> (struct {
+    GetRemoteDebuggingPort() -> (struct {
         port uint16;
     }) error ContextError;
 };
@@ -313,9 +313,9 @@ type CreateFrameParams = resource table {
 
 /// Used by [`Context`] clients to delegate [`Frame`] hosting capabilities to selected peers.
 @discoverable
-closed protocol FrameHost {
+protocol FrameHost {
     /// Behaves identically to [`Context.CreateFrameWithParams`].
-    strict CreateFrameWithParams(resource struct {
+    CreateFrameWithParams(resource struct {
         params CreateFrameParams;
         frame server_end:Frame;
     });

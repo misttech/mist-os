@@ -47,12 +47,12 @@ type MouseEventPhase = flexible enum {
 /// A tool to inject mouse events into Input Pipeline.
 ///
 /// Please extend as necessary.
-closed protocol Mouse {
+protocol Mouse {
     /// Injects an input report corresponding to the event specified.
     ///
     /// NOTE: the `movement` parameters have a range of [-1000, 1000],
     /// and the `scroll` parameters have a range of [-100, 100].
-    strict SimulateMouseEvent(table {
+    SimulateMouseEvent(table {
         /// Set of buttons that are currently pressed.
         /// Must NOT contain duplicates.
         1: pressed_buttons vector<MouseButton>:MOUSE_MAX_NUM_BUTTONS;
@@ -82,9 +82,9 @@ closed protocol Mouse {
 /// A tool for applications to report touch input to interested parties (e.g. a test
 /// fixture).
 @discoverable
-closed protocol MouseInputListener {
+protocol MouseInputListener {
     /// Report that component under test has received expected input.
-    strict ReportMouseInput(table {
+    ReportMouseInput(table {
         /// The horizontal coordinate in the reporter's coordinate system.
         1: local_x float64;
 

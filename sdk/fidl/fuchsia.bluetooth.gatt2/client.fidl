@@ -29,22 +29,22 @@ type ReadByTypeResult = table {
 };
 
 /// Listens to characteristic notifications & indications.
-closed protocol CharacteristicNotifier {
+protocol CharacteristicNotifier {
     /// Called when a characteristic value notification or indication is
     /// received from the server.
     ///
     /// + request `value` the value of the updated characteristic.
     /// - response An empty response should be sent immediately as an
     ///   acknowledgement that the notification was received (for flow control).
-    strict OnNotification(struct {
+    OnNotification(struct {
         value ReadValue;
     }) -> ();
 };
 
-closed protocol RemoteService {
+protocol RemoteService {
     /// Returns the characteristics and characteristic descriptors that belong to
     /// this service.
-    strict DiscoverCharacteristics() -> (struct {
+    DiscoverCharacteristics() -> (struct {
         characteristics vector<Characteristic>:MAX_CHARACTERISTIC_COUNT;
     });
 
@@ -65,7 +65,7 @@ closed protocol RemoteService {
     ///         individually after performing discovery.
     /// * error Returns `FAILURE` if the server returns an error not specific to
     ///         a single result.
-    strict ReadByType(struct {
+    ReadByType(struct {
         uuid bt.Uuid;
     }) -> (struct {
         results vector<ReadByTypeResult>:MAX_ATTRIBUTE_COUNT;
@@ -81,7 +81,7 @@ closed protocol RemoteService {
     /// * error Returns `READ_NOT_PERMITTED` or `INSUFFICIENT_*` if the server
     ///         rejects the read request.
     /// * error Returns `FAILURE` if the server returns an error.
-    strict ReadCharacteristic(struct {
+    ReadCharacteristic(struct {
         handle Handle;
         options ReadOptions;
     }) -> (struct {
@@ -105,7 +105,7 @@ closed protocol RemoteService {
     /// * error Returns `WRITE_NOT_PERMITTED` or `INSUFFICIENT_*`if the server
     ///         rejects the write request with a reason.
     /// * error Returns `FAILURE` if the server returns an error.
-    strict WriteCharacteristic(struct {
+    WriteCharacteristic(struct {
         handle Handle;
         value vector<uint8>:MAX_VALUE_LENGTH;
         options WriteOptions;
@@ -122,7 +122,7 @@ closed protocol RemoteService {
     /// * error Returns `READ_NOT_PERMITTED` or `INSUFFICIENT_*` if the server
     ///         rejects the read request.
     /// * error Returns `FAILURE` if the server returns an error.
-    strict ReadDescriptor(struct {
+    ReadDescriptor(struct {
         handle Handle;
         options ReadOptions;
     }) -> (struct {
@@ -146,7 +146,7 @@ closed protocol RemoteService {
     /// * error Returns `WRITE_NOT_PERMITTED` or `INSUFFICIENT_*` if the server
     ///         rejects the write with a reason.
     /// * error Returns `FAILURE` if the server returns an error.
-    strict WriteDescriptor(struct {
+    WriteDescriptor(struct {
         handle Handle;
         value vector<uint8>:MAX_VALUE_LENGTH;
         options WriteOptions;
@@ -179,13 +179,13 @@ closed protocol RemoteService {
     /// * error Returns a `INVALID_HANDLE` if `handle` is invalid.
     /// * error Returns a `WRITE_NOT_PERMITTED`  or `INSUFFICIENT_*`for a
     ///         descriptor write error.
-    strict RegisterCharacteristicNotifier(resource struct {
+    RegisterCharacteristicNotifier(resource struct {
         handle Handle;
         notifier client_end:CharacteristicNotifier;
     }) -> () error Error;
 };
 
-closed protocol Client {
+protocol Client {
     /// Enumerates services found on the peer that this Client represents.
     ///
     /// Results can be filtered by specifying a list of UUIDs in `uuids`. This
@@ -213,7 +213,7 @@ closed protocol Client {
     ///   be present in `removed`, not `updated`.
     /// - response `removed` the handles of the services that have been removed
     ///   since the last call to WatchServices().
-    strict WatchServices(struct {
+    WatchServices(struct {
         uuids vector<bt.Uuid>:MAX;
     }) -> (struct {
         updated vector<ServiceInfo>:MAX_SERVICE_COUNT;
@@ -230,7 +230,7 @@ closed protocol Client {
     /// * error Returns a `ZX_ERR_CONNECTION_RESET` if the service is removed.
     /// * error Returns a `ZX_ERR_NOT_CONNECTED` if the peer disconnects.
     /// * error Returns a `ZX_ERR_ALREADY_EXISTS` if the service is already connected.
-    strict ConnectToService(resource struct {
+    ConnectToService(resource struct {
         handle ServiceHandle;
         service server_end:RemoteService;
     });

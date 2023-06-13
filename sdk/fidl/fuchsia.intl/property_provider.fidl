@@ -12,12 +12,12 @@ library fuchsia.intl;
 ///
 /// See also `fuchsia.ui.views.View`.
 @discoverable
-closed protocol PropertyProvider {
+protocol PropertyProvider {
     /// Gets the user's internationalization profile.
-    strict GetProfile() -> (struct {
+    GetProfile() -> (struct {
         profile Profile;
     });
 
     /// Indicates that the properties may have changed and the client should query them again.
-    strict -> OnChange();
+    -> OnChange();
 };

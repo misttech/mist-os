@@ -7,11 +7,11 @@ using zx;
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-closed protocol TpmImpl {
+protocol TpmImpl {
     /// Tells the TPM implementation driver to start listening for fuchsia.hardware.tpmimpl messages
     /// on |server|.
     /// See //sdk/fidl/fuchsia.hardware.tpmimpl/tpmimpl.fidl.
-    strict ConnectServer(resource struct {
+    ConnectServer(resource struct {
         server zx.Handle:CHANNEL;
     }) -> ();
 };

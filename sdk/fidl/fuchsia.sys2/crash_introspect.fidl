@@ -18,7 +18,7 @@ type ComponentCrashInfo = table {
 /// koid along with other information is stored. This protocol can be used to
 /// retrieve that stored information.
 @discoverable
-closed protocol CrashIntrospect {
+protocol CrashIntrospect {
     /// Given a thread koid, returns the information that was stored when the
     /// ELF runner observed a crash from that thread.
     ///
@@ -27,7 +27,7 @@ closed protocol CrashIntrospect {
     ///
     /// If there is no information available on the given thread koid,
     /// `zx::Status::NOT_FOUND` is returned.
-    strict FindComponentByThreadKoid(resource struct {
+    FindComponentByThreadKoid(resource struct {
         thread_koid zx.Koid;
     }) -> (struct {
         info ComponentCrashInfo;

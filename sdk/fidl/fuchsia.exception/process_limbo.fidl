@@ -22,7 +22,7 @@ const MAX_FILTERS_PER_CALL uint64 = 32;
 /// As the debugger got a notification that the limbo is now active, it can
 /// correctly handle newly excepted processes and do its normal workflow.
 @discoverable
-closed protocol ProcessLimbo {
+protocol ProcessLimbo {
     /// Set the active state of the limbo. Will trigger the `WatchActive` event
     /// if there was a change, meaning that any listening components will receive
     /// a notification. This includes the caller of `SetActive`.
@@ -30,20 +30,20 @@ closed protocol ProcessLimbo {
     /// When a limbo is inactive, there will not be any processes waiting on it,
     /// meaning that any waiting processes will be freed upon deactivating the
     /// limbo.
-    strict SetActive(struct {
+    SetActive(struct {
         active bool;
     }) -> ();
 
     /// Get whether the limbo is currently active. An active limbo could be empty
     /// (not have any processes waiting on an exception). When a limbo is inactive,
     /// there will not be any processes waiting on it.
-    strict GetActive() -> (struct {
+    GetActive() -> (struct {
         is_active bool;
     });
 
     /// Watch for changes determining whether the limbo is currently active,
     /// using a Hanging Get pattern.
-    strict WatchActive() -> (struct {
+    WatchActive() -> (struct {
         is_active bool;
     });
 
@@ -57,7 +57,7 @@ closed protocol ProcessLimbo {
     /// MAX_EXCEPTIONS exceptions held in the limbo, so that no pagination is needed.
     ///
     /// Returns ZX_ERR_UNAVAILABLE if limbo is not active.
-    strict ListProcessesWaitingOnException() -> (struct {
+    ListProcessesWaitingOnException() -> (struct {
         exception_list vector<ProcessExceptionInfo>:MAX_EXCEPTIONS;
     }) error zx.Status;
 
@@ -75,7 +75,7 @@ closed protocol ProcessLimbo {
     ///
     /// NOTE: The `process` and `thread` handle will only have the ZX_RIGHT_READ
     ///       right, so no modification will be able to be done on them.
-    strict WatchProcessesWaitingOnException() -> (resource struct {
+    WatchProcessesWaitingOnException() -> (resource struct {
         exception_list vector<ProcessExceptionMetadata>:MAX_EXCEPTIONS;
     }) error zx.Status;
 
@@ -87,7 +87,7 @@ closed protocol ProcessLimbo {
     ///
     /// Returns ZX_ERR_NOT_FOUND if the process is not waiting on an exception.
     /// Returns ZX_ERR_UNAVAILABLE if limbo is not active.
-    strict RetrieveException(struct {
+    RetrieveException(struct {
         process_koid zx.Koid;
     }) -> (resource struct {
         process_exception ProcessException;
@@ -96,7 +96,7 @@ closed protocol ProcessLimbo {
     /// Removes the process from limbo, releasing the exception. This will make
     /// it "bubble up" beyond the scope of of this limbo, making it
     /// unretrievable in the future from here.
-    strict ReleaseProcess(struct {
+    ReleaseProcess(struct {
         process_koid zx.Koid;
     }) -> () error zx.Status;
 
@@ -122,7 +122,7 @@ closed protocol ProcessLimbo {
     /// the limbo.
     ///
     /// Returns ZX_ERR_UNAVAILABLE if limbo is not active.
-    strict AppendFilters(struct {
+    AppendFilters(struct {
         filters vector<string:MAX_FILTER_LENGTH>:MAX_FILTERS_PER_CALL;
     }) -> () error zx.Status;
 
@@ -130,13 +130,13 @@ closed protocol ProcessLimbo {
     /// on the limbo will be ignored.
     ///
     /// Returns ZX_ERR_UNAVAILABLE if limbo is not active.
-    strict RemoveFilters(struct {
+    RemoveFilters(struct {
         filters vector<string:MAX_FILTER_LENGTH>:MAX_FILTERS_PER_CALL;
     }) -> () error zx.Status;
 
     /// Returns filters that are currently active within the limbo. If the limbo
     /// is inactive, it will return an empty vector.
-    strict GetFilters() -> (struct {
+    GetFilters() -> (struct {
         filters vector<string:MAX_FILTER_LENGTH>:MAX_FILTERS_PER_CALL;
     });
 };

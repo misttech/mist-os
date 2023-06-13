@@ -4,7 +4,7 @@
 library zx;
 
 @transport("Syscall")
-closed protocol Interrupt {
+protocol Interrupt {
     /// ## Summary
     ///
     /// Create an interrupt object.
@@ -90,7 +90,7 @@ closed protocol Interrupt {
     /// [`zx_interrupt_trigger()`]: interrupt_trigger.md
     /// [`zx_interrupt_wait()`]: interrupt_wait.md
     /// [`zx_port_wait()`]: port_wait.md
-    strict Create(resource struct {
+    Create(resource struct {
         src_obj Handle:RESOURCE;
         src_num uint32;
         options uint32;
@@ -193,7 +193,7 @@ closed protocol Interrupt {
     /// [`zx_interrupt_trigger()`]: interrupt_trigger.md
     /// [`zx_interrupt_wait()`]: interrupt_wait.md
     /// [`zx_port_wait()`]: port_wait.md
-    strict Bind(resource struct {
+    Bind(resource struct {
         handle Handle:INTERRUPT;
         port_handle Handle:PORT;
         key uint64;
@@ -266,7 +266,7 @@ closed protocol Interrupt {
     /// [`zx_interrupt_trigger()`]: interrupt_trigger.md
     /// [`zx_port_wait()`]: port_wait.md
     @blocking
-    strict Wait(resource struct {
+    Wait(resource struct {
         handle Handle:INTERRUPT;
     }) -> (struct {
         out_timestamp Time;
@@ -339,7 +339,7 @@ closed protocol Interrupt {
     /// [`zx_interrupt_trigger()`]: interrupt_trigger.md
     /// [`zx_interrupt_wait()`]: interrupt_wait.md
     /// [`zx_port_wait()`]: port_wait.md
-    strict Destroy(resource struct {
+    Destroy(resource struct {
         handle Handle:INTERRUPT;
     }) -> () error Status;
 
@@ -409,7 +409,7 @@ closed protocol Interrupt {
     /// [`zx_interrupt_trigger()`]: interrupt_trigger.md
     /// [`zx_interrupt_wait()`]: interrupt_wait.md
     /// [`zx_port_wait()`]: port_wait.md
-    strict Ack(resource struct {
+    Ack(resource struct {
         handle Handle:INTERRUPT;
     }) -> () error Status;
 
@@ -475,7 +475,7 @@ closed protocol Interrupt {
     /// [`zx_interrupt_destroy()`]: interrupt_destroy.md
     /// [`zx_interrupt_wait()`]: interrupt_wait.md
     /// [`zx_port_wait()`]: port_wait.md
-    strict Trigger(resource struct {
+    Trigger(resource struct {
         handle Handle:INTERRUPT;
         options uint32;
         timestamp Time;

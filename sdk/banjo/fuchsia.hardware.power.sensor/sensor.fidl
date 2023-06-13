@@ -6,10 +6,10 @@ using zx;
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-closed protocol PowerSensor {
+protocol PowerSensor {
     /// Tells the driver to start listening for fuchsia.hardware.power.sensor messages on server.
     /// See sdk/fidl/fuchsia.hardware.power.sensor/sensor.fidl.
-    strict ConnectServer(resource struct {
+    ConnectServer(resource struct {
         server zx.Handle:CHANNEL;
     }) -> (struct {
         status zx.Status;

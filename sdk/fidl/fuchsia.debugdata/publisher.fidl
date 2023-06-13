@@ -9,7 +9,7 @@ using fuchsia.io;
 
 /// Publisher defines the interface for publishing instrumentation data.
 @discoverable
-closed protocol Publisher {
+protocol Publisher {
     /// The program runtime sends a string naming a `data_sink` and transfers
     /// the handle to a VMO containing the `data` it wants published
     /// there.  The `data_sink` string identifies a type of data, and the
@@ -24,7 +24,7 @@ closed protocol Publisher {
     /// receiver will not process the VMO until the peer of `vmo_token` handle
     /// is closed. Therefore, the client should retain the peer handle until
     /// it has completed all writes to the VMO.
-    strict Publish(resource struct {
+    Publish(resource struct {
         data_sink string:fuchsia.io.MAX_NAME_LENGTH;
         data zx.Handle:VMO;
         vmo_token zx.Handle:EVENTPAIR;

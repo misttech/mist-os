@@ -53,10 +53,10 @@ type HostInfo = table {
 
 /// Protocol used to observe and manage the Bluetooth controllers on the system.
 @discoverable
-closed protocol HostWatcher {
+protocol HostWatcher {
     /// Obtain a list of all available Bluetooth controllers and their state. A response is sent
     /// only if this list has changed since the last time the client has sent this message.
-    strict Watch() -> (struct {
+    Watch() -> (struct {
         hosts vector<HostInfo>:MAX;
     });
 
@@ -65,7 +65,7 @@ closed protocol HostWatcher {
     /// procedures will be terminated.
     ///
     /// * error This can fail if a host with `id` was not found.
-    strict SetActive(struct {
+    SetActive(struct {
         id bt.HostId;
     }) -> () error zx.Status;
 };

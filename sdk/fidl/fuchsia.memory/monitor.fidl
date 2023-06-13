@@ -8,21 +8,21 @@ using zx;
 
 /// Interface used to register for memory notifications.
 @discoverable
-closed protocol Monitor {
-    strict Watch(resource struct {
+protocol Monitor {
+    Watch(resource struct {
         watcher client_end:Watcher;
     });
 
     /// Writes to `socket` a JSON capture as a well-formed UTF-8 string.
     @deprecated("Use fuchsia.memory.inspection.Collector")
-    strict WriteJsonCapture(resource struct {
+    WriteJsonCapture(resource struct {
         socket zx.Handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
     });
 
     /// Writes to `socket` a JSON capture of the memory usage and the memory
     /// bucket definition, as a well-formed UTF-8 string.
     @deprecated("Use fuchsia.memory.inspection.Collector")
-    strict WriteJsonCaptureAndBuckets(resource struct {
+    WriteJsonCaptureAndBuckets(resource struct {
         socket zx.Handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
     });
 };
@@ -62,21 +62,21 @@ type Stats = struct {
 };
 
 /// A watcher for memory changes
-closed protocol Watcher {
-    strict OnChange(struct {
+protocol Watcher {
+    OnChange(struct {
         stats Stats;
     });
 };
 
 /// Interface used to debug the singleton memory_monitor instance.
 @discoverable
-closed protocol Debugger {
+protocol Debugger {
     /// Signals registered watchers of the fuchsia.memorypressure service with
     /// the specified memory pressure level. Intended for debugging only. Does
     /// not affect the real memory pressure level on the system, or trigger any
     /// kernel memory reclamation tasks.
     @deprecated("Use fuchsia.memory.debug.Signaler")
-    strict SignalMemoryPressure(struct {
+    SignalMemoryPressure(struct {
         level fuchsia.memorypressure.Level;
     });
 };

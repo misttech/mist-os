@@ -16,7 +16,7 @@ using zx;
 /// graphics factory function (see |fuchsia.ui.composition.ViewBoundProtocols|),
 /// which securely ties observation protocols to a specific view client.
 @discoverable
-closed protocol Registry {
+protocol Registry {
     /// Sets up a geometry `ViewTreeWatcher` channel which reports the view tree
     /// geometry for a specific view, identified by `context_view`. The data
     /// received describes the `context_view` and its descendant views.
@@ -44,7 +44,7 @@ closed protocol Registry {
     ///   a view tree
     /// + request `geometry` a channel to observe `context_view`'s view tree
     /// - response acknowledgement that `geometry` is connected to the server
-    strict RegisterScopedViewTreeWatcher(resource struct {
+    RegisterScopedViewTreeWatcher(resource struct {
         context_view zx.Koid;
         watcher server_end:fuchsia.ui.observation.geometry.ViewTreeWatcher;
     }) -> ();

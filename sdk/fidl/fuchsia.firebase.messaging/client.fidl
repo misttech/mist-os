@@ -5,9 +5,9 @@ library fuchsia.firebase.messaging;
 
 /// Client protocol created for a messaging client. This client is registered
 /// and connected.
-closed protocol Client {
+protocol Client {
     /// Sends an upstream message to the service.
-    strict Send(struct {
+    Send(struct {
         message Message;
     }) -> (struct {
         error box<Error>;
@@ -17,7 +17,7 @@ closed protocol Client {
     /// the service. While FCM is always aware of connectivity events, the
     /// service handling this device will only be notified if the events are
     /// enabled and the service is signed up for them.
-    strict NotifyConnectivityEvents(struct {
+    NotifyConnectivityEvents(struct {
         events ConnectivityEvent;
     });
 
@@ -25,19 +25,19 @@ closed protocol Client {
 
     /// Wait for next message. Returns immediately if a message is waiting to be
     /// consumed.
-    strict NextMessage() -> (struct {
+    NextMessage() -> (struct {
         message DownstreamMessage;
     });
 
     /// Blocks until an error is received. Returns exactly once for each error.
     /// This includes errors specific to this particular app and service-wide
     /// errors in the client multiplexer.
-    strict WaitForError() -> (struct {
+    WaitForError() -> (struct {
         error Error;
     });
 
     /// Returns on connection setup/reset. Connections are automatically
     /// restarted on internal errors (eg. missing heartbeat ack, unexpected
     /// login response). This call is just informational.
-    strict WaitForConnectionReset() -> ();
+    WaitForConnectionReset() -> ();
 };

@@ -36,9 +36,9 @@ type AudioGainValidFlags = strict bits : uint32 {
 };
 
 @discoverable
-closed protocol AudioDeviceEnumerator {
+protocol AudioDeviceEnumerator {
     /// Obtain the list of currently active audio devices.
-    strict GetDevices() -> (struct {
+    GetDevices() -> (struct {
         devices vector<AudioDeviceInfo>;
     });
 
@@ -55,18 +55,18 @@ closed protocol AudioDeviceEnumerator {
     //
     // Con: Having filters like this means that the server needs to maintain a
     // bit more per-client state.
-    strict -> OnDeviceAdded(struct {
+    -> OnDeviceAdded(struct {
         device AudioDeviceInfo;
     });
-    strict -> OnDeviceRemoved(struct {
+    -> OnDeviceRemoved(struct {
         device_token uint64;
     });
-    strict -> OnDeviceGainChanged(struct {
+    -> OnDeviceGainChanged(struct {
         device_token uint64;
         gain_info AudioGainInfo;
     });
     @deprecated
-    strict -> OnDefaultDeviceChanged(struct {
+    -> OnDefaultDeviceChanged(struct {
         old_default_token uint64;
         new_default_token uint64;
     });
@@ -90,13 +90,13 @@ closed protocol AudioDeviceEnumerator {
     /// gain_info structure, while passing (SetAudioGainFlag_GainValid |
     /// SetAudioGainFlag_MuteValid) will cause both the mute and the gain
     /// status to be changed simultaneously.
-    strict GetDeviceGain(struct {
+    GetDeviceGain(struct {
         device_token uint64;
     }) -> (struct {
         device_token uint64;
         gain_info AudioGainInfo;
     });
-    strict SetDeviceGain(struct {
+    SetDeviceGain(struct {
         device_token uint64;
         gain_info AudioGainInfo;
         valid_flags AudioGainValidFlags;
@@ -121,16 +121,16 @@ closed protocol AudioDeviceEnumerator {
     /// `ZX_KOID_INVALID` if no such device exists.
     @deprecated
     @transitional
-    strict GetDefaultInputDevice() -> (struct {
+    GetDefaultInputDevice() -> (struct {
         device_token uint64;
     });
     @deprecated
     @transitional
-    strict GetDefaultOutputDevice() -> (struct {
+    GetDefaultOutputDevice() -> (struct {
         device_token uint64;
     });
 
-    strict AddDeviceByChannel(resource struct {
+    AddDeviceByChannel(resource struct {
         device_name string:256;
         is_input bool;
         channel client_end:fuchsia.hardware.audio.StreamConfig;

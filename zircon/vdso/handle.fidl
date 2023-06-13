@@ -5,7 +5,7 @@ library zx;
 
 @transport("Syscall")
 @no_protocol_prefix
-closed protocol Handlefuncs {
+protocol Handlefuncs {
     /// ## Summary
     ///
     /// Close a handle.
@@ -59,7 +59,7 @@ closed protocol Handlefuncs {
     /// [`zx_handle_replace()`]: handle_replace.md
     /// [`zx_object_wait_many()`]: object_wait_many.md
     /// [`zx_object_wait_one()`]: object_wait_one.md
-    strict HandleClose(resource struct {
+    HandleClose(resource struct {
         @release
         handle Handle;
     }) -> () error Status;
@@ -123,7 +123,7 @@ closed protocol Handlefuncs {
     /// [`zx_handle_replace()`]: handle_replace.md
     /// [`zx_object_wait_many()`]: object_wait_many.md
     /// [`zx_object_wait_one()`]: object_wait_one.md
-    strict HandleCloseMany(resource struct {
+    HandleCloseMany(resource struct {
         @release
         handles vector<Handle>:MAX;
     }) -> () error Status;
@@ -186,7 +186,7 @@ closed protocol Handlefuncs {
     /// [`zx_handle_close()`]: handle_close.md
     /// [`zx_handle_close_many()`]: handle_close_many.md
     /// [`zx_handle_replace()`]: handle_replace.md
-    strict HandleDuplicate(resource struct {
+    HandleDuplicate(resource struct {
         handle Handle;
         rights Rights;
     }) -> (resource struct {
@@ -247,7 +247,7 @@ closed protocol Handlefuncs {
     /// [`zx_handle_close()`]: handle_close.md
     /// [`zx_handle_close_many()`]: handle_close_many.md
     /// [`zx_handle_duplicate()`]: handle_duplicate.md
-    strict HandleReplace(resource struct {
+    HandleReplace(resource struct {
         @release
         handle Handle;
         rights Rights;

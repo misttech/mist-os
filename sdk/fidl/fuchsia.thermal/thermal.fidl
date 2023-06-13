@@ -64,7 +64,7 @@ type TripPoint = struct {
         deprecated=7,
         removed=8,
         note="fuchsia.thermal.Controller and supporting protocols/types replaced by fuchsia.thermal.ClientStateWatcher")
-closed protocol Controller {
+protocol Controller {
     /// Subscribes with the Controller to receive thermal state changes on the specified
     /// [fuchsia.thermal/Actor] proxy handle.
     ///
@@ -89,7 +89,7 @@ closed protocol Controller {
     ///   Failure to meet these conditions will cause [fuchsia.thermal/Error].INVALID_ARGUMENTS to
     ///   be returned.
     /// * error a [fuchsia.thermal/Error] value indicating the reason (if any) that Subscribe failed
-    strict Subscribe(resource struct {
+    Subscribe(resource struct {
         actor client_end:Actor;
         actor_type ActorType;
         trip_points vector<TripPoint>:MAX_TRIP_POINT_COUNT;
@@ -101,7 +101,7 @@ closed protocol Controller {
         deprecated=7,
         removed=8,
         note="fuchsia.thermal.Controller and supporting protocols/types replaced by fuchsia.thermal.ClientStateWatcher")
-closed protocol Actor {
+protocol Actor {
     /// Sets the Actor's thermal state.
     ///
     /// The Actor is expected to ACK each call before subsequent calls will be made. `state` is
@@ -128,7 +128,7 @@ closed protocol Actor {
     ///
     /// + request `state` the new thermal state as an index into the Actor's reported thermal
     ///     ranges, which are defined based on the Actor's specified `trip_points`.
-    strict SetThermalState(struct {
+    SetThermalState(struct {
         state uint32;
     }) -> ();
 };

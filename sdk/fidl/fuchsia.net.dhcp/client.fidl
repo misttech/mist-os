@@ -54,12 +54,12 @@ type ConfigurationToRequest = table {
 
 /// Provides a method to create new DHCP clients.
 @discoverable
-closed protocol ClientProvider {
+protocol ClientProvider {
     /// Provides a DHCPv4 client.
     ///
     /// + request `params` the parameters to create the client with.
     /// + request `request` grants control over the client.
-    strict NewClient(resource struct {
+    NewClient(resource struct {
         /// The ID of the interface the client runs on.
         interface_id fuchsia.net.InterfaceId;
 
@@ -95,7 +95,7 @@ closed protocol ClientProvider {
     /// TODO(https://fxbug.dev/125773): Remove this once the DHCP out-of-stack
     /// client is always being used.
     @deprecated("For DHCP client migration only, see https://fxbug.dev/125773 for details")
-    strict CheckPresence() -> ();
+    CheckPresence() -> ();
 };
 
 /// Provides methods to watch for discovered network configurations and control
@@ -108,7 +108,7 @@ closed protocol ClientProvider {
 /// - Closing the client end causes the DHCP client to be destroyed.
 /// - Observing a closure of the server end indicates the DHCP client no longer
 ///   exists.
-closed protocol Client {
+protocol Client {
     /// Returns acquired DHCP configuration.
     ///
     /// Yields a value whenever the client acquires new configuration. Notably,
@@ -136,7 +136,7 @@ closed protocol Client {
     ///     server. If absent, must be interpreted as empty (the client's
     ///     configuration indicates no routers, even if previously-yielded
     ///     configuration included routers).
-    strict WatchConfiguration() -> (resource table {
+    WatchConfiguration() -> (resource table {
         1: address resource table {
             /// The assigned address and prefix length.
             1: address fuchsia.net.Ipv4AddressWithPrefix;
@@ -158,12 +158,12 @@ closed protocol Client {
     /// Instructs the client to shut down gracefully (releasing any DHCP lease
     /// currently held). When the client is finished shutting down, it yields
     /// the `ClientExitReason::GRACEFUL_SHUTDOWN` `OnExit` event.
-    strict Shutdown();
+    Shutdown();
 
     /// Terminal event yielded by the server before the server end is closed.
     ///
     /// - response `reason` the reason the DHCP client was closed.
-    strict -> OnExit(struct {
+    -> OnExit(struct {
         reason @generated_name("ClientExitReason") strict enum {
             /// A client already exists on the interface.
             CLIENT_ALREADY_EXISTS_ON_INTERFACE = 1;

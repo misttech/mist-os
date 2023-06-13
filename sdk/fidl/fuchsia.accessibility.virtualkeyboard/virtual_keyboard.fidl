@@ -18,7 +18,7 @@ using fuchsia.ui.views;
 ///   For example, a11y_manager.
 /// * Consumed by components which provide a GUI affordance for text input.
 @discoverable
-closed protocol Registry {
+protocol Registry {
     /// Registers the `View` referenced by `view_ref` as a `View`
     /// which may contain a virtual keyboard.
     ///
@@ -37,7 +37,7 @@ closed protocol Registry {
     /// * If the request would exceed the simultaneous registration limit,
     ///   or when the `ViewRef` receives `ZX_EVENTPAIR_PEER_CLOSED`, the
     ///   implementer should dispose of `listener`.
-    strict Register(resource struct {
+    Register(resource struct {
         view_ref fuchsia.ui.views.ViewRef;
         is_visible bool;
         listener server_end:Listener;
@@ -57,12 +57,12 @@ closed protocol Registry {
 /// When the consumer of this protocol observes that the channel is closed,
 /// it (the protocol consumer) should retry `Registry.Register()`, applying
 /// back-off logic to avoid tight loops.
-closed protocol Listener {
+protocol Listener {
     /// Informs the `Listener` of a change in keyboard visibility.
     ///
     /// Consumers of this protocol should wait for each call to be acknowledged
     /// before calling again, to avoid queueing large numbers of updates.
-    strict OnVisibilityChanged(struct {
+    OnVisibilityChanged(struct {
         updated_visibility bool;
     }) -> ();
 };

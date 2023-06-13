@@ -9,10 +9,10 @@ using fuchsia.input.report;
 /// A tool to inject media button events into Input Pipeline.
 ///
 /// Please extend as necessary.
-closed protocol MediaButtonsDevice {
+protocol MediaButtonsDevice {
     /// Simulates a button press and release on the requested button on the
     /// device.
-    strict SimulateButtonPress(table {
+    SimulateButtonPress(table {
         /// The button receiving the button press.
         1: button fuchsia.input.report.ConsumerControlButton;
     }) -> ();

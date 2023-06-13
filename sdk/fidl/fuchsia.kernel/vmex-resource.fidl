@@ -9,9 +9,9 @@ using zx;
 /// `ZX_SYS_RSRC_BASE_VMEX` to programs that should be able to mark VMOs as
 /// executable.
 @discoverable
-closed protocol VmexResource {
+protocol VmexResource {
     /// Get a VMEX resource handle.
-    strict Get() -> (resource struct {
+    Get() -> (resource struct {
         resource zx.Handle:RESOURCE;
     });
 };

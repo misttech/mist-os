@@ -4,7 +4,7 @@
 library zx;
 
 @transport("Syscall")
-closed protocol Pc {
+protocol Pc {
     /// ## Summary
     ///
     /// TODO(fxbug.dev/32938)
@@ -38,7 +38,7 @@ closed protocol Pc {
     /// ## See also
     ///
     /// TODO(fxbug.dev/32938)
-    strict FirmwareTables(resource struct {
+    FirmwareTables(resource struct {
         handle Handle:RESOURCE;
     }) -> (struct {
         acpi_rsdp Paddr;

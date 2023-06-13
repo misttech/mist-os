@@ -15,7 +15,7 @@ library fuchsia.feedback;
 /// The epitaph ZX_ERR_NO_RESOURCES indicates that the server can no longer store additional
 /// component data and will not service new connections.
 @discoverable
-closed protocol ComponentDataRegister {
+protocol ComponentDataRegister {
     /// Upserts, i.e. updates or inserts, extra component data to be included in feedback reports.
     ///
     /// The namespace and each annotation key are used to decide whether to update or insert an
@@ -59,7 +59,7 @@ closed protocol ComponentDataRegister {
     ///
     /// Note that the server will only hold at most MAX_NUM_ANNOTATIONS_PER_NAMESPACE distinct
     /// annotation keys per namespace, picking up the latest values.
-    strict Upsert(struct {
+    Upsert(struct {
         data ComponentData;
     }) -> ();
 };

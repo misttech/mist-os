@@ -57,8 +57,8 @@ type ArchiveIteratorError = strict enum : uint32 {
 };
 
 @discoverable
-closed protocol ArchiveIterator {
-    strict GetNext() -> (resource struct {
+protocol ArchiveIterator {
+    GetNext() -> (resource struct {
         entry vector<ArchiveIteratorEntry>:MAX_ENTRIES;
     }) error ArchiveIteratorError;
 };
@@ -69,8 +69,8 @@ closed protocol ArchiveIterator {
 /// When there's support for sending VMOs over Overnet, ffx tooling will be able
 /// to talk directly to `fuchsia.diagnostics.ArchiveAccessor` instead of this protocol.
 @discoverable
-closed protocol RemoteDiagnosticsBridge {
-    strict StreamDiagnostics(resource struct {
+protocol RemoteDiagnosticsBridge {
+    StreamDiagnostics(resource struct {
         parameters BridgeStreamParameters;
         iterator server_end:ArchiveIterator;
     }) -> () error StreamError;
@@ -79,5 +79,5 @@ closed protocol RemoteDiagnosticsBridge {
     // before the frontend attempts to connect to it.
     // TODO: remove this once fxbug.dev/60910 has been fixed.
     @deprecated("Hack method - will be removed shortly.")
-    strict Hello() -> ();
+    Hello() -> ();
 };

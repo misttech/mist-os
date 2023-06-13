@@ -7,14 +7,14 @@ using zx;
 
 @discoverable
 // Provides introspection information about crashed threads in appmgr.
-closed protocol CrashIntrospect {
+protocol CrashIntrospect {
     // Finds the component whose job contains a process with a thread `thread_koid`.
     // This can only be called for threads that have crashed and once per `thread_koid`. Subsequent
     // calls will return |ZX_ERR_NOT_FOUND|.
     // Returns component's source identity.
     // Errors:
     // - `ZX_ERR_NOT_FOUND`: If thread_koid is not found in the crashed thread list.
-    strict FindComponentByThreadKoid(struct {
+    FindComponentByThreadKoid(struct {
         thread_koid zx.Koid;
     }) -> (struct {
         component_info SourceIdentity;

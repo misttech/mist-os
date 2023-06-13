@@ -29,9 +29,9 @@ type WlanStatus = struct {
 // NOTE: This FIDL protocol is deprecated.  Please do not add new uses that depend on it.
 /// Allows legacy interactions with a WLAN client interface.
 @discoverable
-closed protocol DeprecatedClient {
+protocol DeprecatedClient {
     /// Queries the status of the most recently discovered WLAN client interface.
-    strict Status() -> (struct {
+    Status() -> (struct {
         status WlanStatus;
     });
 };

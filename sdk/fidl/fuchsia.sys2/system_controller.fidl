@@ -6,9 +6,9 @@ library fuchsia.sys2;
 /// An interface implemented by ComponentManager that requests the
 /// ComponentManager stop all components and exit.
 @discoverable
-closed protocol SystemController {
+protocol SystemController {
     /// Stop all components, return an empty result, close this protocol's
     /// channel, and exit ComponentManager. If this is the root ComponentManager
     /// is exited we expect the system will reboot.
-    strict Shutdown() -> ();
+    Shutdown() -> ();
 };

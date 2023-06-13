@@ -16,16 +16,16 @@ type MboxRx = struct {
 };
 
 @discoverable
-closed protocol Device {
+protocol Device {
     // |channel| : vendor specific identifier used to communicate with different hardware blocks.
-    strict SendCommand(struct {
+    SendCommand(struct {
         channel uint8;
         mdata MboxTx;
     }) -> () error zx.Status;
 
     // |channel| : vendor specific identifier used to communicate with different hardware blocks.
     // |rx_len | : rx_len is equal to the number of bytes of the transmitted data MboxTx.tx_buffer.
-    strict ReceiveData(struct {
+    ReceiveData(struct {
         channel uint8;
         rx_len uint8;
     }) -> (struct {

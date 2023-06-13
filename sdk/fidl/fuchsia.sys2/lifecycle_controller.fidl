@@ -99,7 +99,7 @@ type CreateError = flexible enum {
 
 /// Mutates the component instance state in a realm.
 @discoverable
-closed protocol LifecycleController {
+protocol LifecycleController {
     /// Starts the instance identified by the given relative moniker. Relative
     /// monikers must start with "./".
     ///
@@ -111,7 +111,7 @@ closed protocol LifecycleController {
     /// StartInstance() when the instance is already running is a no-op, but
     /// it will connect the Binder channel if a valid handle is provided.
     @available(added=11)
-    strict StartInstance(resource struct {
+    StartInstance(resource struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         binder server_end:fuchsia.component.Binder;
     }) -> () error StartError;
@@ -121,7 +121,7 @@ closed protocol LifecycleController {
     ///
     /// The function returns once the instance has been stopped.
     @available(added=11)
-    strict StopInstance(struct {
+    StopInstance(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> () error StopError;
 
@@ -130,7 +130,7 @@ closed protocol LifecycleController {
     ///
     /// The function returns once the instance has been resolved.
     @available(added=11)
-    strict ResolveInstance(struct {
+    ResolveInstance(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> () error ResolveError;
 
@@ -139,7 +139,7 @@ closed protocol LifecycleController {
     ///
     /// The function returns once the instance has been unresolved.
     @available(added=11)
-    strict UnresolveInstance(struct {
+    UnresolveInstance(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> () error UnresolveError;
 
@@ -148,7 +148,7 @@ closed protocol LifecycleController {
     ///
     /// The function returns once the child instance has been added to the topology.
     @available(added=11)
-    strict CreateInstance(resource struct {
+    CreateInstance(resource struct {
         parent_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         collection fuchsia.component.decl.CollectionRef;
         decl fuchsia.component.decl.Child;
@@ -160,7 +160,7 @@ closed protocol LifecycleController {
     ///
     /// The function returns once the child instance no longer exists in the topology.
     @available(added=11)
-    strict DestroyInstance(struct {
+    DestroyInstance(struct {
         parent_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         child fuchsia.component.decl.ChildRef;
     }) -> () error DestroyError;
@@ -175,7 +175,7 @@ closed protocol LifecycleController {
     ///
     /// The function returns once the instance has been started.
     @available(added=7, deprecated=11, removed=12, note="Use StartInstance instead")
-    strict Start(struct {
+    Start(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> (struct {
         result StartResult;
@@ -189,7 +189,7 @@ closed protocol LifecycleController {
     /// Note: `is_recursive` is no longer supported by component manager.
     ///       Setting it to true will return Error::Unsupported.
     @available(added=7, deprecated=11, removed=12, note="Use StopInstance instead")
-    strict Stop(struct {
+    Stop(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         is_recursive bool;
     }) -> () error fuchsia.component.Error;
@@ -199,7 +199,7 @@ closed protocol LifecycleController {
     ///
     /// The function returns once the instance has been resolved
     @available(added=7, deprecated=11, removed=12, note="Use ResolveInstance instead")
-    strict Resolve(struct {
+    Resolve(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> () error fuchsia.component.Error;
 
@@ -209,7 +209,7 @@ closed protocol LifecycleController {
     /// The function returns once the component successfully unresolves, or the
     /// operation fails.
     @available(added=7, deprecated=11, removed=12, note="Use UnresolveInstance instead")
-    strict Unresolve(struct {
+    Unresolve(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> () error fuchsia.component.Error;
 
@@ -220,7 +220,7 @@ closed protocol LifecycleController {
     ///
     /// The function returns once the child instance has been added to the topology.
     @available(added=7, deprecated=11, removed=12, note="Use CreateInstance instead")
-    strict CreateChild(resource struct {
+    CreateChild(resource struct {
         parent_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         collection fuchsia.component.decl.CollectionRef;
         decl fuchsia.component.decl.Child;
@@ -234,7 +234,7 @@ closed protocol LifecycleController {
     ///
     /// The function returns once the child instance no longer exists in the topology.
     @available(added=7, deprecated=11, removed=12, note="Use DestroyInstance instead")
-    strict DestroyChild(struct {
+    DestroyChild(struct {
         parent_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         child fuchsia.component.decl.ChildRef;
     }) -> () error fuchsia.component.Error;
@@ -244,7 +244,7 @@ closed protocol LifecycleController {
     ///
     /// TODO(http://fxbug.dev/97774): Move this function to [`fuchsia.sys2/RealmQuery`]
     @available(added=11, deprecated=11, removed=12)
-    strict GetStorageAdmin(resource struct {
+    GetStorageAdmin(resource struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         capability string:fuchsia.component.MAX_CAPABILITY_ID_LENGTH;
         admin_server server_end:StorageAdmin;

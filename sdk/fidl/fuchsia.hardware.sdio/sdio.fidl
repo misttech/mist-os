@@ -64,47 +64,47 @@ type SdioRwTxn = resource struct {
     buf_offset uint64;
 };
 
-closed protocol Device {
-    strict GetDevHwInfo() -> (struct {
+protocol Device {
+    GetDevHwInfo() -> (struct {
         hw_info SdioHwInfo;
         /// The function number of this device.
         function uint8;
     }) error zx.Status;
-    strict EnableFn() -> () error zx.Status;
-    strict DisableFn() -> () error zx.Status;
-    strict EnableFnIntr() -> () error zx.Status;
-    strict DisableFnIntr() -> () error zx.Status;
-    strict UpdateBlockSize(struct {
+    EnableFn() -> () error zx.Status;
+    DisableFn() -> () error zx.Status;
+    EnableFnIntr() -> () error zx.Status;
+    DisableFnIntr() -> () error zx.Status;
+    UpdateBlockSize(struct {
         blk_sz uint16;
         deflt bool;
     }) -> () error zx.Status;
-    strict GetBlockSize() -> (struct {
+    GetBlockSize() -> (struct {
         cur_blk_size uint16;
     }) error zx.Status;
-    strict DoRwTxn(resource struct {
+    DoRwTxn(resource struct {
         txn SdioRwTxn;
     }) -> (resource struct {
         txn SdioRwTxn;
     }) error zx.Status;
-    strict DoRwByte(struct {
+    DoRwByte(struct {
         write bool;
         addr uint32;
         write_byte uint8;
     }) -> (struct {
         read_byte uint8;
     }) error zx.Status;
-    strict GetInBandIntr() -> (resource struct {
+    GetInBandIntr() -> (resource struct {
         irq zx.Handle:INTERRUPT;
     }) error zx.Status;
     /// The following functions access the card common control registers (CCCR) on function 0.
     /// Aborts an I/O operation occurring on the specified function.
-    strict IoAbort() -> () error zx.Status;
+    IoAbort() -> () error zx.Status;
     /// Returns true if an interrupt is pending for function fn_idx, false otherwise.
-    strict IntrPending() -> (struct {
+    IntrPending() -> (struct {
         pending bool;
     }) error zx.Status;
     /// Reads or writes to a vendor CCCR register. addr must be in [0xF0, 0xFF].
-    strict DoVendorControlRwByte(struct {
+    DoVendorControlRwByte(struct {
         write bool;
         addr uint8;
         write_byte uint8;

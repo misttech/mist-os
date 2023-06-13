@@ -15,7 +15,7 @@ type Role = strict enum {
 
 /// A protocol for specifying which A2DP role this device should operate.
 @discoverable
-closed protocol AudioMode {
+protocol AudioMode {
     /// Switch the device to act as the specified A2DP Role. If the device is already
     /// set to the requested role, calling this method is a no-op.
     ///
@@ -27,7 +27,7 @@ closed protocol AudioMode {
     ///
     /// If the role cannot be set due to an internal error, the server will close
     /// the channel.
-    strict SetRole(struct {
+    SetRole(struct {
         role Role;
     }) -> ();
 };

@@ -143,26 +143,26 @@ def protocol_names(f, idents: List[ScopedIdentifier]):
     # a protocols with every dangerous name
     for ident in idents:
         f.write(ident.decl_attributes)
-        f.write(f"closed protocol {ident} {{ strict JustOneMethod(); }};\n")
+        f.write(f"protocol {ident} {{ JustOneMethod(); }};\n")
 
 
 @use
 def method_names(f, idents: List[ScopedIdentifier]):
     # a protocol with every dangerous name as a method name
-    f.write("closed protocol DangerousMethods {\n")
+    f.write("protocol DangerousMethods {\n")
     for ident in idents:
         f.write(ident.decl_attributes)
-        f.write(f"  strict {ident}();\n")
+        f.write(f"  {ident}();\n")
     f.write("};\n")
 
 
 @use
 def event_names(f, idents: List[ScopedIdentifier]):
     # a protocol with every dangerous name as an event name
-    f.write("closed protocol DangerousEvents {\n")
+    f.write("protocol DangerousEvents {\n")
     for ident in idents:
         f.write(ident.decl_attributes)
-        f.write(f"  strict -> {ident}();\n")
+        f.write(f"  -> {ident}();\n")
     f.write("};\n")
 
 
@@ -170,10 +170,10 @@ def event_names(f, idents: List[ScopedIdentifier]):
 def method_request_arguments(f, idents: List[ScopedIdentifier]):
     # a protocol with every dangerous name as a request argument
     f.write("alias argtype = uint32;\n")
-    f.write("closed protocol DangerousRequestArguments {\n")
+    f.write("protocol DangerousRequestArguments {\n")
     for i, ident in enumerate(idents):
         f.write(ident.decl_attributes)
-        f.write(f"  strict Method{i}(struct {{ {ident} argtype; }});\n")
+        f.write(f"  Method{i}(struct {{ {ident} argtype; }});\n")
     f.write("};\n")
 
 
@@ -181,10 +181,10 @@ def method_request_arguments(f, idents: List[ScopedIdentifier]):
 def method_response_arguments(f, idents: List[ScopedIdentifier]):
     # a protocol with every dangerous name as a response argument
     f.write("alias argtype = uint32;\n")
-    f.write("closed protocol DangerousResponseArguments {\n")
+    f.write("protocol DangerousResponseArguments {\n")
     for i, ident in enumerate(idents):
         f.write(ident.decl_attributes)
-        f.write(f"  strict Method{i}() -> (struct {{ {ident} argtype; }});\n")
+        f.write(f"  Method{i}() -> (struct {{ {ident} argtype; }});\n")
     f.write("};\n")
 
 
@@ -192,17 +192,17 @@ def method_response_arguments(f, idents: List[ScopedIdentifier]):
 def method_event_arguments(f, idents: List[ScopedIdentifier]):
     # a protocol with every dangerous name as a event argument
     f.write("alias argtype = uint32;\n")
-    f.write("closed protocol DangerousResponseArguments {\n")
+    f.write("protocol DangerousResponseArguments {\n")
     for i, ident in enumerate(idents):
         f.write(ident.decl_attributes)
-        f.write(f"  strict -> Event{i}(struct {{ {ident} argtype; }});\n")
+        f.write(f"  -> Event{i}(struct {{ {ident} argtype; }});\n")
     f.write("};\n")
 
 
 @use
 def service_names(f, idents: List[ScopedIdentifier]):
     # a service with every dangerous name
-    f.write("closed protocol SampleProtocol { strict Method(); };\n")
+    f.write("protocol SampleProtocol { Method(); };\n")
     for ident in idents:
         f.write(ident.decl_attributes)
         f.write(f"service {ident} {{ member client_end:SampleProtocol; }};\n")
@@ -213,7 +213,7 @@ def service_member_types(f, idents: List[ScopedIdentifier]):
     # protocols with every dangerous name
     for ident in idents:
         f.write(ident.decl_attributes)
-        f.write(f"closed protocol {ident} {{ strict JustOneMethod(); }};\n")
+        f.write(f"protocol {ident} {{ JustOneMethod(); }};\n")
 
     # a service with every dangerous name as the member type
     f.write("service DangerousServiceMemberTypes {\n")
@@ -227,7 +227,7 @@ def service_member_types(f, idents: List[ScopedIdentifier]):
 @use
 def service_member_names(f, idents: List[ScopedIdentifier]):
     # a service with every dangerous name as the member name
-    f.write("closed protocol SampleProtocol { strict Method(); };\n")
+    f.write("protocol SampleProtocol { Method(); };\n")
     f.write("service DangerousServiceMemberNames {\n")
     for ident in idents:
         f.write(ident.decl_attributes)

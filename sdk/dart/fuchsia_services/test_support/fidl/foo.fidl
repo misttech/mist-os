@@ -4,8 +4,8 @@
 library test.fuchsia.service.foo;
 
 @discoverable
-closed protocol Foo {
-    strict echo(struct {
+protocol Foo {
+    echo(struct {
         value string:optional;
     }) -> (struct {
         response string:optional;

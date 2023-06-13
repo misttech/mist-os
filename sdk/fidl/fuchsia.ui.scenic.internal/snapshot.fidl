@@ -16,11 +16,11 @@ type SnapshotResult = resource struct {
 /// Defines an internal interface to take snapshots of the entire scene graph. This
 /// is only to be used by trusted clients.
 @discoverable
-closed protocol Snapshot {
+protocol Snapshot {
     /// Takes a snapshot of the entire scene-graph, starting with the first
     /// compositor found. A separate buffer is returned for each compositor,
     /// with an empty array being returned if no compositors were found at all.
-    strict TakeSnapshot() -> (resource struct {
+    TakeSnapshot() -> (resource struct {
         snapshots vector<SnapshotResult>;
     });
 };

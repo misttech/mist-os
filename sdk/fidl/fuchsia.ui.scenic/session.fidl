@@ -50,8 +50,8 @@ type Present2Args = resource table {
 
 /// Client use Sessions to interact with a Scenic instance by enqueuing commands
 /// that create or modify resources.
-closed protocol Session {
-    strict Enqueue(resource struct {
+protocol Session {
+    Enqueue(resource struct {
         cmds vector<Command>;
     });
 
@@ -165,7 +165,7 @@ closed protocol Session {
     /// access to memory (and other external resources).  Any modification to
     /// resources made via the Session API are automatically synchronized.
     @transitional
-    strict Present(resource struct {
+    Present(resource struct {
         presentation_time uint64;
         acquire_fences vector<zx.Handle:EVENT>;
         release_fences vector<zx.Handle:EVENT>;
@@ -194,7 +194,7 @@ closed protocol Session {
     ///
     /// See `Present2Args` documentation above for more detailed information on
     /// what arguments are passed in and their role.
-    strict Present2(resource struct {
+    Present2(resource struct {
         args Present2Args;
     }) -> (struct {
         request_presentation_times_info fuchsia.scenic.scheduling.FuturePresentationTimes;
@@ -202,7 +202,7 @@ closed protocol Session {
 
     /// This event is fired whenever a set of one or more Present2s are
     /// presented simultaenously, and are therefore no longer in flight.
-    strict -> OnFramePresented(struct {
+    -> OnFramePresented(struct {
         frame_presented_info fuchsia.scenic.scheduling.FramePresentedInfo;
     });
 
@@ -216,7 +216,7 @@ closed protocol Session {
     /// `requested_prediction_span`, up to a limit.
     ///
     /// A value of 0 is guaranteed to give at least one future presentation info.
-    strict RequestPresentationTimes(struct {
+    RequestPresentationTimes(struct {
         requested_prediction_span zx.Duration;
     }) -> (struct {
         request_presentation_times_info fuchsia.scenic.scheduling.FuturePresentationTimes;
@@ -228,7 +228,7 @@ closed protocol Session {
     ///
     /// A value of 0 for the `buffer_id` is invalid. All other values are valid as long as they
     /// are not currently in use.
-    strict RegisterBufferCollection(resource struct {
+    RegisterBufferCollection(resource struct {
         buffer_id uint32;
         token client_end:fuchsia.sysmem.BufferCollectionToken;
     });
@@ -237,27 +237,27 @@ closed protocol Session {
     /// to be garbage collected as soon as it is no longer referenced by any resources.
     ///
     /// Only `buffer_id` that have been previously registered and not yet deregistered are valid.
-    strict DeregisterBufferCollection(struct {
+    DeregisterBufferCollection(struct {
         buffer_id uint32;
     });
 
     /// Set an optional debug name for the session. The debug name will be
     /// output in things such as logging and trace events.
-    strict SetDebugName(struct {
+    SetDebugName(struct {
         debug_name string;
     });
 };
 
 /// Listens for events which occur within the session.
-closed protocol SessionListener {
+protocol SessionListener {
     /// Called when an error has occurred and the session will be torn down.
-    strict OnScenicError(struct {
+    OnScenicError(struct {
         error string;
     });
 
     /// Called to deliver a batch of one or more events to the listener.
     /// Use `SetEventMaskCmd` to enable event delivery for a resource.
-    strict OnScenicEvent(resource struct {
+    OnScenicEvent(resource struct {
         events vector<Event>;
     });
 };

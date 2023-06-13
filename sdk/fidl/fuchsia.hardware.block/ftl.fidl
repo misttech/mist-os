@@ -6,19 +6,19 @@ library fuchsia.hardware.block;
 using zx;
 
 /// It is treated as a separate protocol for extension if necessary.
-closed protocol InspectVmoProvider {
+protocol InspectVmoProvider {
     /// Requests the inspect vmo from the entity.
     ///  - |vmo| has |ZX_RIGHTS_DUPLICATE|, |ZX_RIGHTS_TRANSFER|, |ZX_RIGHTS_READ|
-    strict GetVmo() -> (resource struct {
+    GetVmo() -> (resource struct {
         vmo zx.Handle:VMO;
     }) error zx.Status;
 };
 
-closed protocol Ftl {
+protocol Ftl {
     compose InspectVmoProvider;
 
     /// Discards previous contents and reinitializes the device.
-    strict Format() -> (struct {
+    Format() -> (struct {
         status zx.Status;
     });
 };

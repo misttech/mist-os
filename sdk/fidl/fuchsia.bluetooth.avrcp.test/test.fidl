@@ -17,11 +17,11 @@ using zx;
 /// clients interacting with the same remote peer while using the test
 /// controller.
 @discoverable
-closed protocol PeerManagerExt {
+protocol PeerManagerExt {
     /// Returns a test browse controller client to a remote target service at
     /// the peer specified by `peer_id`. This client is to be used alongside the
     /// primary browse controller client.
-    strict GetBrowseControllerForTarget(resource struct {
+    GetBrowseControllerForTarget(resource struct {
         peer_id bt.PeerId;
         client server_end:BrowseControllerExt;
     }) -> () error zx.Status;
@@ -29,30 +29,30 @@ closed protocol PeerManagerExt {
     /// Returns a test controller client to a remote target service at the
     /// peer specified by `peer_id`. This client is to be used alongside the
     /// primary controller client.
-    strict GetControllerForTarget(resource struct {
+    GetControllerForTarget(resource struct {
         peer_id bt.PeerId;
         client server_end:ControllerExt;
     }) -> () error zx.Status;
 };
 
 /// Provides additional methods not in `Controller` that are strictly for testing and debug.
-closed protocol ControllerExt {
+protocol ControllerExt {
     /// Returns whether there is an underlying connection open with the remote device currently.
-    strict IsConnected() -> (struct {
+    IsConnected() -> (struct {
         connected bool;
     });
 
     /// Queries the target and returns what events are supported for notification.
     /// Sends GetCapabilties(0x03 (`EVENTS_SUPPORTED`)) command for all events supported by
     /// the negoitated version of AVRCP.
-    strict GetEventsSupported() -> (struct {
+    GetEventsSupported() -> (struct {
         events_supported vector<avrcp.NotificationEvent>:avrcp.MAX_NOTIFICATIONS;
     }) error avrcp.ControllerError;
 
     /// Send raw vendor depedent "Control" command packet to a specific PDU on the remote peer.
     /// Returns the entire response packet including the headers or error if the remote endpoint
     /// disconnects or does not return a response in set amount of time.
-    strict SendRawVendorDependentCommand(struct {
+    SendRawVendorDependentCommand(struct {
         pdu_id uint8;
         command vector<uint8>:MAX;
     }) -> (struct {
@@ -62,9 +62,9 @@ closed protocol ControllerExt {
 
 /// Provides additional methods not in `BrowseController` that are strictly for
 /// testing and debug.
-closed protocol BrowseControllerExt {
+protocol BrowseControllerExt {
     /// Returns whether there is an underlying connection open with the remote device currently.
-    strict IsConnected() -> (struct {
+    IsConnected() -> (struct {
         connected bool;
     });
 
@@ -73,7 +73,7 @@ closed protocol BrowseControllerExt {
     /// disconnects or does not return a response in set amount of time.
     /// + request `command` contains a specific browse command's encoded
     ///         parameters.
-    strict SendRawBrowseCommand(struct {
+    SendRawBrowseCommand(struct {
         pdu_id uint8;
         command vector<uint8>:MAX;
     }) -> (struct {

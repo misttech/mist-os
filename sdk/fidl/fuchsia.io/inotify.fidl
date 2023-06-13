@@ -10,7 +10,7 @@ library fuchsia.io;
 /// return events for the directory itself, and for files inside the
 /// directory.
 @available(deprecated=12, removed=13, note="inotify was never fully implemented", legacy=true)
-closed protocol Inotifier {};
+protocol Inotifier {};
 
 /// Used by InotifyAddWatch to indicate the server the events to be watched on.
 /// Also used by [`Node.Inotify`] to indicate the types of events

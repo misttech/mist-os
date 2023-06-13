@@ -11,9 +11,9 @@ using zx;
 /// The client does not own the UTC clock, but is given
 /// a lease in order to keep the time synchronized.
 @discoverable
-closed protocol Maintenance {
+protocol Maintenance {
     /// Retrieve a UTC clock handle with write rights.
-    strict GetWritableUtcClock() -> (resource struct {
+    GetWritableUtcClock() -> (resource struct {
         utc_clock zx.Handle:CLOCK;
     });
 };

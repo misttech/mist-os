@@ -71,7 +71,7 @@ type CompositeProperties = table {
 /// generic and provides more flexible routing within audio subsystems. Also see
 /// [Audio Driver Composite](https://fuchsia.dev/fuchsia-src/development/audio/drivers/composite.md)
 @available(added=12)
-closed protocol Composite {
+protocol Composite {
     /// Allows providing driver health state.
     compose Health;
 
@@ -87,10 +87,10 @@ closed protocol Composite {
     ///
     /// If the driver can't successfully reset the hardware, it will return an error and then close
     /// the protocol channel, in this case the client may obtain a new protocol channel and retry.
-    strict Reset() -> () error DriverError;
+    Reset() -> () error DriverError;
 
     /// Retrieves top level static properties.
-    strict GetProperties() -> (struct {
+    GetProperties() -> (struct {
         properties CompositeProperties;
     });
 
@@ -105,7 +105,7 @@ closed protocol Composite {
     /// `ENDPOINT` with `EndpointType` `RING_BUFFER`.
     /// Retrieving multiple `SupportedFormats` allows for cases where exclusive combinations of
     /// the parameters in `SupportedFormats` may be supported.
-    strict GetRingBufferFormats(struct {
+    GetRingBufferFormats(struct {
         processing_element_id uint64;
     }) -> (struct {
         ring_buffer_formats vector<SupportedFormats>:MAX_COUNT_FORMATS;
@@ -121,7 +121,7 @@ closed protocol Composite {
     /// by `GetElements`.
     /// Returns `WRONG_TYPE` if the `ElementType` of the element represented by the id is not
     /// `ENDPOINT` with `EndpointType` `RING_BUFFER`.
-    strict CreateRingBuffer(resource struct {
+    CreateRingBuffer(resource struct {
         processing_element_id uint64;
         format Format;
         ring_buffer server_end:RingBuffer;
@@ -138,7 +138,7 @@ closed protocol Composite {
     /// `ENDPOINT` with `EndpointType` `DAI_INTERCONNECT`.
     /// Retrieving multiple `DaiSupportedFormats` allows for cases where exclusive combinations of
     /// the parameters in SupportedFormats may be supported.
-    strict GetDaiFormats(struct {
+    GetDaiFormats(struct {
         processing_element_id uint64;
     }) -> (struct {
         dai_formats vector<DaiSupportedFormats>:MAX_COUNT_FORMATS;
@@ -152,7 +152,7 @@ closed protocol Composite {
     /// by `GetElements`.
     /// Returns `WRONG_TYPE` if the `ElementType` of the element represented by the id is not
     /// `ENDPOINT` with `EndpointType` `DAI_INTERCONNECT`.
-    strict SetDaiFormat(struct {
+    SetDaiFormat(struct {
         processing_element_id uint64;
         format DaiFormat;
     }) -> () error DriverError;

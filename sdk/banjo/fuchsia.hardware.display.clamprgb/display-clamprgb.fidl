@@ -11,9 +11,9 @@ using zx;
 /// part of the SDK.
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-closed protocol DisplayClampRgbImpl {
+protocol DisplayClampRgbImpl {
     /// Set the minimum value of rgb channels. Value range [0 255] inclusive
-    strict SetMinimumRgb(struct {
+    SetMinimumRgb(struct {
         minimum_rgb uint8;
     }) -> (struct {
         s zx.Status;

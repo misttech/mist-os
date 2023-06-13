@@ -11,7 +11,7 @@ type Clock = strict enum : uint32 {
 
 @transport("Syscall")
 @no_protocol_prefix
-closed protocol Clockfuncs {
+protocol Clockfuncs {
     /// ## Summary
     ///
     /// Acquire the current monotonic time.
@@ -43,7 +43,7 @@ closed protocol Clockfuncs {
     ///
     /// `zx_clock_get_monotonic()` cannot fail.
     @vdsocall
-    strict ClockGetMonotonic() -> (@wrapped_return struct {
+    ClockGetMonotonic() -> (@wrapped_return struct {
         time Time;
     });
 
@@ -53,7 +53,7 @@ closed protocol Clockfuncs {
     // See the notes for ticks_get_via_kernel; this is not a syscall meant
     // to be used by application code.
     @internal
-    strict ClockGetMonotonicViaKernel() -> (@wrapped_return struct {
+    ClockGetMonotonicViaKernel() -> (@wrapped_return struct {
         time Time;
     });
 
@@ -166,7 +166,7 @@ closed protocol Clockfuncs {
     /// [`zx_clock_get_details()`]: clock_get_details.md
     /// [`zx_clock_read()`]: clock_read.md
     /// [`zx_clock_update()`]: clock_update.md
-    strict ClockCreate(struct {
+    ClockCreate(struct {
         options uint64;
         @voidptr
         args experimental_pointer<byte>;
@@ -216,7 +216,7 @@ closed protocol Clockfuncs {
     /// [`zx_clock_create()`]: clock_create.md
     /// [`zx_clock_get_details()`]: clock_get_details.md
     /// [`zx_clock_update()`]: clock_update.md
-    strict ClockRead(resource struct {
+    ClockRead(resource struct {
         handle Handle;
     }) -> (struct {
         now Time;
@@ -291,7 +291,7 @@ closed protocol Clockfuncs {
     /// [`zx_clock_create()`]: clock_create.md
     /// [`zx_clock_read()`]: clock_read.md
     /// [`zx_clock_update()`]: clock_update.md
-    strict ClockGetDetails(resource struct {
+    ClockGetDetails(resource struct {
         handle Handle;
         options uint64;
     }) -> (struct {
@@ -524,7 +524,7 @@ closed protocol Clockfuncs {
     /// [`zx_clock_create()`]: clock_create.md
     /// [`zx_clock_get_details()`]: clock_get_details.md
     /// [`zx_clock_read()`]: clock_read.md
-    strict ClockUpdate(resource struct {
+    ClockUpdate(resource struct {
         handle Handle;
         options uint64;
         @voidptr

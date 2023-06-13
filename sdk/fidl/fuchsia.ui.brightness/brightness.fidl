@@ -11,14 +11,14 @@ alias brightness = float32;
 
 /// Control provides an interface to manage the brightness component.
 @discoverable
-closed protocol Control {
+protocol Control {
     /// Turns the auto-brightness mode on.
     /// SetManualBrightness will turn it off.
-    strict SetAutoBrightness();
+    SetAutoBrightness();
 
     /// Requests the current auto-brightness mode.
     /// This call implements the Hanging Get protocol.
-    strict WatchAutoBrightness() -> (struct {
+    WatchAutoBrightness() -> (struct {
         enabled bool;
     });
 
@@ -26,13 +26,13 @@ closed protocol Control {
     /// Used by e.g. Settings to set manual brightness using a slider
     /// Value is in the range 0.0 to 1.0 representing min to max and
     /// will be clamped if out of range.
-    strict SetManualBrightness(struct {
+    SetManualBrightness(struct {
         value brightness;
     });
 
     /// Set manual brightness specifying the duration over which the
     /// target brightness will be set.
-    strict SetManualBrightnessSmooth(struct {
+    SetManualBrightnessSmooth(struct {
         value brightness;
         duration zx.Duration;
     });
@@ -41,20 +41,20 @@ closed protocol Control {
     /// This result is valid for both manual and auto-brightness modes
     /// and is typically used to show the current brightness on a slider.
     /// This call implements the Hanging Get protocol.
-    strict WatchCurrentBrightness() -> (struct {
+    WatchCurrentBrightness() -> (struct {
         value brightness;
     });
 
     /// Sets the brightness adjustment.
     /// This will change the brightness curve by the factor of the adjustment.
     /// The adjustment is in the range of -1.0 to 1.0.
-    strict SetAutoBrightnessAdjustment(struct {
+    SetAutoBrightnessAdjustment(struct {
         adjustment float32;
     });
 
     /// Gets the current auto brightness adjustment.
     /// This call implements the Hanging Get protocol.
-    strict WatchAutoBrightnessAdjustment() -> (struct {
+    WatchAutoBrightnessAdjustment() -> (struct {
         adjustment float32;
     });
 
@@ -62,12 +62,12 @@ closed protocol Control {
     /// This will override the built-in brightness curve.
     /// The default brightness curve will be used if the table is empty.
     /// The connection will be closed if table errors are detected.
-    strict SetBrightnessTable(struct {
+    SetBrightnessTable(struct {
         table BrightnessTable;
     });
 
     /// Gets the maximum supported backlight brightness in nits, if known.
-    strict GetMaxAbsoluteBrightness() -> (struct {
+    GetMaxAbsoluteBrightness() -> (struct {
         max_brightness float64;
     }) error zx.Status;
 };

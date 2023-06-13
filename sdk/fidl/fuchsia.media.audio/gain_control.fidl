@@ -13,9 +13,9 @@ using zx;
 /// has a `BindGainControl` method that binds to a gain control that controls
 /// gain for the renderer.
 // TODO(35393, 35311, 35309): Deprecate and remove.
-closed protocol GainControl {
+protocol GainControl {
     /// Sets the gain in decibels.
-    strict SetGain(struct {
+    SetGain(struct {
         gain_db float32;
     });
 
@@ -55,7 +55,7 @@ closed protocol GainControl {
     /// Time 8: Ramp 3 replaces Ramp 2 and starts from current scale
     ///         (approx 0.5).
     /// Time 9: Ramp 3 completes; current scale value is now 0.0 (`MUTED_GAIN_DB`).
-    strict SetGainWithRamp(struct {
+    SetGainWithRamp(struct {
         gain_db float32;
         duration zx.Duration;
         rampType RampType;
@@ -63,7 +63,7 @@ closed protocol GainControl {
 
     /// Sets the mute value. Ramping and mute are fully independent, although
     /// they both affect the scaling that is applied.
-    strict SetMute(struct {
+    SetMute(struct {
         muted bool;
     });
 
@@ -73,7 +73,7 @@ closed protocol GainControl {
     //
     // TODO(mpuryear): notify upon ramp milestones (not just SetGain/Mute) --
     // upon the start/pause/restart/completion of an active ramp?
-    strict -> OnGainMuteChanged(struct {
+    -> OnGainMuteChanged(struct {
         gain_db float32;
         muted bool;
     });

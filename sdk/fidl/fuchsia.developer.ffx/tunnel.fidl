@@ -13,16 +13,16 @@ type TunnelError = strict enum {
 };
 
 @discoverable
-closed protocol Tunnel {
+protocol Tunnel {
     /// Forwards a TCP port on the host to the target address, from the target node.
-    strict ForwardPort(struct {
+    ForwardPort(struct {
         target string:<fuchsia.device.DEVICE_NAME_MAX>;
         host_address fuchsia.net.SocketAddress;
         target_address fuchsia.net.SocketAddress;
     }) -> () error TunnelError;
 
     /// Forwards a TCP port on the target to the host address, from the host.
-    strict ReversePort(struct {
+    ReversePort(struct {
         target string:<fuchsia.device.DEVICE_NAME_MAX>;
         host_address fuchsia.net.SocketAddress;
         target_address fuchsia.net.SocketAddress;

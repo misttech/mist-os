@@ -18,44 +18,44 @@ type MigrationState = table {
     2: progress_percentage uint8;
 };
 
-closed protocol Provider {
-    strict Get(resource struct {
+protocol Provider {
+    Get(resource struct {
         dir server_end:fuchsia.io.Directory;
     });
-    strict Processed();
+    Processed();
 };
 
 @discoverable
-closed protocol CastProvider {
+protocol CastProvider {
     compose Provider;
 };
 
 @discoverable
-closed protocol DisplayProvider {
+protocol DisplayProvider {
     compose Provider;
 };
 
 @discoverable
-closed protocol KronkProvider {
+protocol KronkProvider {
     compose Provider;
 };
 
 @discoverable
-closed protocol UltrasoundProvider {
+protocol UltrasoundProvider {
     compose Provider;
 };
 
 @discoverable
-closed protocol ProductPolicyProvider {
+protocol ProductPolicyProvider {
     compose Provider;
 };
 
 /// Protocol to watch for changes when a migration of system data is started.
 @discoverable
-closed protocol State {
+protocol State {
     /// Hanging get. Will return immediatedly on first call per connection
     /// and then on change after that.
-    strict Watch() -> (struct {
+    Watch() -> (struct {
         state MigrationState;
     });
 };

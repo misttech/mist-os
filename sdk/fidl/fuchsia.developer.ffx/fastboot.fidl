@@ -44,29 +44,29 @@ type RebootError = strict enum {
 };
 
 /// Callback event listener for upload progress.
-closed protocol UploadProgressListener {
-    strict OnError(struct {
+protocol UploadProgressListener {
+    OnError(struct {
         error string:MAX;
     });
-    strict OnStarted(struct {
+    OnStarted(struct {
         size uint64;
     });
-    strict OnProgress(struct {
+    OnProgress(struct {
         bytes_written uint64;
     });
-    strict OnFinished();
+    OnFinished();
 };
 
 /// Callback event listener for when the device reboots to the
 /// bootloader.
-closed protocol RebootListener {
-    strict OnReboot();
+protocol RebootListener {
+    OnReboot();
 };
 
 
 /// Callback event listener for listing all variables.
-closed protocol VariableListener {
-    strict OnVariable(struct {
+protocol VariableListener {
+    OnVariable(struct {
         name string:64;
         value string:64;
     });
@@ -74,43 +74,43 @@ closed protocol VariableListener {
 
 
 @discoverable
-closed protocol Fastboot {
-    strict Prepare(resource struct {
+protocol Fastboot {
+    Prepare(resource struct {
         listener client_end:RebootListener;
     }) -> () error RebootError;
-    strict GetVar(struct {
+    GetVar(struct {
         name string:64;
     }) -> (struct {
         value string:64;
     }) error FastbootError;
-    strict GetAllVars(resource struct {
+    GetAllVars(resource struct {
         listener client_end:VariableListener;
     }) -> () error FastbootError;
-    strict Flash(resource struct {
+    Flash(resource struct {
         partition_name string:64;
         path string:256;
         listener client_end:UploadProgressListener;
     }) -> () error FastbootError;
-    strict Erase(struct {
+    Erase(struct {
         partition_name string:64;
     }) -> () error FastbootError;
-    strict Boot() -> () error FastbootError;
-    strict Reboot() -> () error FastbootError;
-    strict RebootBootloader(resource struct {
+    Boot() -> () error FastbootError;
+    Reboot() -> () error FastbootError;
+    RebootBootloader(resource struct {
         listener client_end:RebootListener;
     }) -> () error RebootError;
-    strict ContinueBoot() -> () error FastbootError;
-    strict GetStaged(resource struct {
+    ContinueBoot() -> () error FastbootError;
+    GetStaged(resource struct {
         path string:256;
     }) -> () error FastbootError;
-    strict Stage(resource struct {
+    Stage(resource struct {
         path string:256;
         listener client_end:UploadProgressListener;
     }) -> () error FastbootError;
-    strict SetActive(struct {
+    SetActive(struct {
         slot string:64;
     }) -> () error FastbootError;
-    strict Oem(struct {
+    Oem(struct {
         command string:64;
     }) -> () error FastbootError;
 };
@@ -121,10 +121,10 @@ type FastbootTarget = table {
 };
 
 @discoverable
-closed protocol FastbootTargetStream {
+protocol FastbootTargetStream {
     /// Gets the next target from the protocol. Intended to be used as a hanging get
     /// on the client side.
-    strict GetNext() -> (struct {
+    GetNext() -> (struct {
         target FastbootTarget;
     });
 };

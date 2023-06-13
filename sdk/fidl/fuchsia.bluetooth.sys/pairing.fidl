@@ -8,7 +8,7 @@ using fuchsia.bluetooth as bt;
 /// Allows system clients to enable Bluetooth pairing.
 @available(added=HEAD)
 @discoverable
-closed protocol Pairing {
+protocol Pairing {
     /// Assign a PairingDelegate to respond to pairing procedures. The provided I/O capabilities
     /// will be used to determine the pairing methods used.
     ///
@@ -23,7 +23,7 @@ closed protocol Pairing {
     /// + request `input` Bluetooth input capability, see `InputCapability`
     /// + request `output` Bluetooth output capability, see `OutputCapability`
     /// + request `delegate` PairingDelegate which will receive pairing requests
-    strict SetPairingDelegate(resource struct {
+    SetPairingDelegate(resource struct {
         input InputCapability;
         output OutputCapability;
         delegate client_end:PairingDelegate;
@@ -46,7 +46,7 @@ closed protocol Pairing {
     /// + request `input` Bluetooth input capability, see `InputCapability`
     /// + request `output` Bluetooth output capability, see `OutputCapability`
     /// + request `delegate` PairingDelegate2 which will receive pairing requests
-    strict SetDelegate(resource struct {
+    SetDelegate(resource struct {
         input InputCapability;
         output OutputCapability;
         delegate client_end:PairingDelegate2;
@@ -133,7 +133,7 @@ type PairingKeypress = strict enum {
 ///
 /// Only one delegate is allowed to be set per system at a time. See
 /// `fuchsia.bluetooth.sys.Pairing` for how to set the pairing delegate.
-closed protocol PairingDelegate {
+protocol PairingDelegate {
     /// Called to confirm a pairing. The pairing process will be continued if
     /// `accept` response is true and rejected otherwise.
     /// If the pairing method requires a passkey it must be included as well.
@@ -152,7 +152,7 @@ closed protocol PairingDelegate {
     /// - response `accept` true if the pairing is accepted
     /// - response `entered_passkey` passkey entered by the user. Ignored unless
     ///   method is PASSKEY_ENTRY.
-    strict OnPairingRequest(struct {
+    OnPairingRequest(struct {
         peer Peer;
         method PairingMethod;
         displayed_passkey uint32;
@@ -166,7 +166,7 @@ closed protocol PairingDelegate {
     /// by the peer, a timeout, or disconnection).
     /// * request `id` The Bluetooth peer ID of the peer which was being paired.
     /// * request `success` true if the pairing succeeded, otherwise false.
-    strict OnPairingComplete(struct {
+    OnPairingComplete(struct {
         id bt.PeerId;
         success bool;
     });
@@ -184,7 +184,7 @@ closed protocol PairingDelegate {
     /// Note: many devices do not send these events
     /// * request `id` The peer id of the peer that sent the keypress event.
     /// * request `keypress` The type of event which was received.
-    strict OnRemoteKeypress(struct {
+    OnRemoteKeypress(struct {
         id bt.PeerId;
         keypress PairingKeypress;
     });
@@ -201,7 +201,7 @@ closed protocol PairingDelegate {
     ///
     /// * request `id` id of a peer with a pairing request active
     /// * request `keypress` the type of notification which should be sent
-    strict -> OnLocalKeypress(struct {
+    -> OnLocalKeypress(struct {
         id bt.PeerId;
         keypress PairingKeypress;
     });
@@ -238,29 +238,29 @@ type PairingProperties = flexible union {
 ///                       PairingProperties.passkey_entry
 ///  - ZX_ERR_TIMED_OUT - no activity was detected, and the pairing was stopped
 @available(added=HEAD)
-closed protocol PairingRequest {
+protocol PairingRequest {
     /// Accept the pairing request.
     /// entered_passkey is required if the PairingProperties.passkey_entry
     /// method is used, ignored otherwise.
-    strict Accept(table {
+    Accept(table {
         1: entered_passkey uint32;
     });
 
     /// Reject the pairing request.
     /// Closing this protocol will also reject the pairing request.
-    strict Reject();
+    Reject();
 
     /// Used to communicate local keypresses to update the remote peer on
     /// the progress of the pairing. The responses to this method should
     /// be used for flow control.
-    strict Keypress(struct {
+    Keypress(struct {
         keypress PairingKeypress;
     }) -> ();
 
 
     /// Sent when the pairing method is passkey_display.  Can be used to
     /// update the UI to indicate reception of keypresses.
-    strict -> OnKeypress(struct {
+    -> OnKeypress(struct {
         keypress PairingKeypress;
     });
 
@@ -268,7 +268,7 @@ closed protocol PairingRequest {
     /// closed.
     /// The success value along with the PeerId will also be sent to the
     /// delegate using the `PairingDelegate.RequestComplete` call.
-    strict -> OnComplete(struct {
+    -> OnComplete(struct {
         success bool;
     });
 };
@@ -285,7 +285,7 @@ closed protocol PairingRequest {
 /// Only one delegate is allowed to be set per system at a time. See
 /// `fuchsia.bluetooth.sys.Pairing` for how to set the pairing delegate.
 @available(added=HEAD)
-closed protocol PairingDelegate2 {
+protocol PairingDelegate2 {
     /// Called when a pairing with `peer` is started. The pairing process is
     /// continued using the PairingRequest protocol.
     ///
@@ -297,7 +297,7 @@ closed protocol PairingDelegate2 {
     /// automatically reject the pairing.
     ///
     /// All fields will always be present.
-    strict StartRequest(resource table {
+    StartRequest(resource table {
         /// Peer making the request.
         1: peer Peer;
         /// Properties of the pairing.
@@ -312,7 +312,7 @@ closed protocol PairingDelegate2 {
     ///
     /// + request `id` The Bluetooth peer ID of the peer which was being paired
     /// + request `success` true if the pairing succeeded, otherwise false
-    strict RequestComplete(struct {
+    RequestComplete(struct {
         id bt.PeerId;
         success bool;
     });

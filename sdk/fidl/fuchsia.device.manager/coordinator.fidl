@@ -134,26 +134,26 @@ type CompositeNodeSpecDescriptor = struct {
 };
 
 /// Protocol for controlling devices in a devhost process from the devcoordinator
-closed protocol DeviceController {
+protocol DeviceController {
     /// Connect to the device's FIDL, but also include other FIDLs multiplexed on the same channel.
     ///
     /// + request `include_node` if this is true then include fuchsia.io/Node on the channel.
     /// + request `include_controller` if this is true then include fuchsia.device/Controller on the channel.
-    strict ConnectMultiplexed(resource struct {
+    ConnectMultiplexed(resource struct {
         server zx.Handle:CHANNEL;
         include_node bool;
         include_controller bool;
     });
 
     /// Connect to the device's fuchsia.device/Controller API.
-    strict ConnectToController(resource struct {
+    ConnectToController(resource struct {
         controller server_end:fuchsia.device.Controller;
     });
 
     /// Connect to the device's API.
     ///
     /// NOTE: This is not multiplexed with fuchsia.io/Node or fuchsia.device/Controller.
-    strict ConnectToDeviceProtocol(resource struct {
+    ConnectToDeviceProtocol(resource struct {
         server zx.Handle:CHANNEL;
     });
 
@@ -171,7 +171,7 @@ closed protocol DeviceController {
     /// thread pool. Setting a scheduler role is on a best-effort basis. If an invalid
     /// scheduler role is specified, the dispatcher will be serviced by the default
     /// thread pool, and this will not cause an error to be returned.
-    strict BindDriver(resource struct {
+    BindDriver(resource struct {
         driver_path string:DEVICE_PATH_MAX;
         driver zx.Handle:VMO;
         default_dispatcher_scheduler_role string:MAX_SCHEDULER_ROLE_LENGTH;
@@ -181,26 +181,26 @@ closed protocol DeviceController {
     });
 
     /// Give this device a channel to its shadow in another process.
-    strict ConnectProxy(resource struct {
+    ConnectProxy(resource struct {
         shadow zx.Handle:CHANNEL;
     });
 
     /// Ask devhost to call the device init hook.
-    strict Init() -> (struct {
+    Init() -> (struct {
         status zx.Status;
     });
 
     /// Ask devhost to unbind this device. On success, the remote end of this
     /// interface channel will close instead of returning a result.
-    strict Unbind() -> () error zx.Status;
+    Unbind() -> () error zx.Status;
 
     /// Ask the devhost to complete the removal of this device, which previously had
     /// invoked `ScheduleRemove`. This is a special case that can be removed
     /// once `device_remove` invokes `unbind`.
-    strict CompleteRemoval() -> () error zx.Status;
+    CompleteRemoval() -> () error zx.Status;
 
     /// Ask devhost to suspend this device, using the target state indicated by `flags`.
-    strict Suspend(struct {
+    Suspend(struct {
         flags uint32;
     }) -> (struct {
         status zx.Status;
@@ -208,7 +208,7 @@ closed protocol DeviceController {
 
     /// Ask devhost to resume this device, using the target system state indicated by
     /// 'target_system_state'.
-    strict Resume(struct {
+    Resume(struct {
         target_system_state uint32;
     }) -> (struct {
         status zx.Status;
@@ -263,12 +263,12 @@ type DeviceType = strict resource union {
 };
 
 /// Protocol for controlling a driver host process from the driver manager
-closed protocol DriverHostController {
+protocol DriverHostController {
     /// Create a device in the driver host. |type| describes what type of device
     /// is set up, how it communicates with its parent (if it has one).
     ///
     /// `local_device_id` will be a unique value within the device's devhost
-    strict CreateDevice(resource struct {
+    CreateDevice(resource struct {
         coordinator client_end:Coordinator;
         device_controller server_end:DeviceController;
         type DeviceType;
@@ -278,7 +278,7 @@ closed protocol DriverHostController {
     });
 
     /// Start a DFv2 driver within a driver host.
-    strict Start(resource struct {
+    Start(resource struct {
         start_args fdf.DriverStartArgs;
         driver server_end:fuchsia.driver.host.Driver;
     });
@@ -286,7 +286,7 @@ closed protocol DriverHostController {
     // TODO(fxbug.dev/68309): Currently unimplemented.
     /// Request to restart the driver host. Also restarts all children devices and drivers and
     /// rebinds them once the Driver Host has restarted.
-    strict Restart() -> (struct {
+    Restart() -> (struct {
         status zx.Status;
     });
 };
@@ -315,11 +315,11 @@ type AddDeviceArgs = struct {
 
 /// Interface for drivers in driver host to coordinate with the driver
 /// manager.
-closed protocol Coordinator {
+protocol Coordinator {
     /// Record the addition of a new device that can be communicated with via `device_controller`.
     /// On success, the returned `local_device_id` is the identifier assigned by devmgr.
     // TODO(fxb/74654): String properties are unimplemented.
-    strict AddDevice(resource struct {
+    AddDevice(resource struct {
         args AddDeviceArgs;
         coordinator server_end:Coordinator;
         device_controller client_end:DeviceController;
@@ -332,13 +332,13 @@ closed protocol Coordinator {
     /// Requests the devcoordinator schedule the removal of this device,
     /// and the unbinding of its children.
     /// If `unbind_self` is true, the unbind hook for this device will also be called.
-    strict ScheduleRemove(struct {
+    ScheduleRemove(struct {
         unbind_self bool;
     });
 
     /// Requests the devcoordinator schedule the unbinding of this device's children.
     /// If the device has no children, no request will be sent, and `has_children` will be false.
-    strict ScheduleUnbindChildren() -> (struct {
+    ScheduleUnbindChildren() -> (struct {
         has_children bool;
     }) error zx.Status;
 
@@ -348,17 +348,17 @@ closed protocol Coordinator {
     ///           If this is null, the API will autobind.
     /// * error `ZX_ERR_ALREADY_BOUND` if the device is already bound.
     /// * error `ZX_ERR_NOT_FOUND` no drivers were found.
-    strict BindDevice(struct {
+    BindDevice(struct {
         driver_url_suffix string:<DEVICE_PATH_MAX, optional>;
     }) -> () error zx.Status;
 
     /// Returns the topological path of this device.
-    strict GetTopologicalPath() -> (struct {
+    GetTopologicalPath() -> (struct {
         path string:DEVICE_PATH_MAX;
     }) error zx.Status;
 
     /// Requests that the firmware at the given path be loaded and returned.
-    strict LoadFirmware(struct {
+    LoadFirmware(struct {
         driver_path string:DEVICE_PATH_MAX;
         fw_path string:DEVICE_PATH_MAX;
     }) -> (resource struct {
@@ -367,14 +367,14 @@ closed protocol Coordinator {
     }) error zx.Status;
 
     /// Retrieve the metadata blob associated with this device and the given key.
-    strict GetMetadata(struct {
+    GetMetadata(struct {
         key uint32;
     }) -> (struct {
         data vector<uint8>:METADATA_BYTES_MAX;
     }) error zx.Status;
 
     /// Retrieve the metadata size associated with this device and the given key.
-    strict GetMetadataSize(struct {
+    GetMetadataSize(struct {
         key uint32;
     }) -> (struct {
         size uint64;
@@ -385,7 +385,7 @@ closed protocol Coordinator {
     /// ignored in favor of the data from first call with the specified key.
     // TODO(fxbug.dev/112547): Return ZX_ERR_ALREADY_EXISTS on duplicate key
     // instead.
-    strict AddMetadata(struct {
+    AddMetadata(struct {
         key uint32;
         data vector<uint8>:<METADATA_BYTES_MAX, optional>;
     }) -> () error zx.Status;
@@ -393,7 +393,7 @@ closed protocol Coordinator {
     /// Adds the given composite device.  This causes the driver manager to try to match the
     /// fragments against the existing device tree, and to monitor all new device additions
     /// in order to find the fragments as they are created.
-    strict AddCompositeDevice(struct {
+    AddCompositeDevice(struct {
         name string:DEVICE_NAME_MAX;
         comp_desc CompositeDeviceDescriptor;
     }) -> () error zx.Status;
@@ -402,7 +402,7 @@ closed protocol Coordinator {
     /// the driver index, and then try to match the parents against the node topology.
     /// All device additions will be monitored to see if they matched to the remaining
     /// unbound nodes.
-    strict AddCompositeNodeSpec(struct {
+    AddCompositeNodeSpec(struct {
         name string:DEVICE_NAME_MAX;
         spec CompositeNodeSpecDescriptor;
     }) -> () error zx.Status;
@@ -419,7 +419,7 @@ closed protocol Coordinator {
     /// * error Reports `ZX_ERR_NOT_FOUND` if |fragment_name| is not the name of a parent.
     /// * error Reports `ZX_ERR_NOT_SUPPORTED` if |fragment_name| is specified by the device is not
     ///   a composite node
-    strict ConnectFidlProtocol(resource struct {
+    ConnectFidlProtocol(resource struct {
         fragment_name string:<DEVICE_NAME_MAX, optional>;
         service_name string:<STR_LENGTH_MAX, optional>;
         protocol_name string:STR_LENGTH_MAX;

@@ -256,13 +256,13 @@ type TxResult = struct {
 
 @transport("Driver")
 @banjo_layout("ddk-interface")
-closed protocol NetworkPort {
+protocol NetworkPort {
     /// Gets information about the port.
     ///
     /// Port information must not change over the port's lifetime.
     ///
     /// - response `info` port information.
-    strict GetInfo() -> (struct {
+    GetInfo() -> (struct {
         info PortInfo;
     });
     /// Gets operational status of the port.
@@ -271,7 +271,7 @@ closed protocol NetworkPort {
     /// [`NetworkDeviceIfc.StatusChanged`]
     ///
     /// - response `status` snapshot of port's operational status.
-    strict GetStatus() -> (struct {
+    GetStatus() -> (struct {
         status PortStatus;
     });
     /// Notifies the port that there are sessions interested in it.
@@ -286,7 +286,7 @@ closed protocol NetworkPort {
     ///
     /// + request `active` `true` if port has sessions attached to it, `false`
     /// otherwise.
-    strict SetActive(struct {
+    SetActive(struct {
         active bool;
     });
     /// Gets an interface to the MAC addressing layer of the port.
@@ -298,14 +298,14 @@ closed protocol NetworkPort {
     /// - response `mac_ifc` mac addressing handle.
     // TODO(https://fxbug.dev/67196): Make this an optional interface return
     // once this is FIDL.
-    strict GetMac() -> (resource struct {
+    GetMac() -> (resource struct {
         mac_ifc client_end:MacAddr;
     });
     /// Notifies this port has been removed from the interface.
     ///
     /// Resources associated with the port must only be freed upon receiving the
     /// `Removed` call.
-    strict Removed();
+    Removed();
 };
 
 /// The maximum number of `TxResult` structs that could be sent in a single FIDL
@@ -332,7 +332,7 @@ const MAX_RX_BUFFERS uint32 = 629;
 
 @transport("Driver")
 @banjo_layout("ddk-interface")
-closed protocol NetworkDeviceIfc {
+protocol NetworkDeviceIfc {
     /// Notifies the interface of status changes on port with `id`.
     ///
     /// Port status changes must always be notified through `StatusChanged`. The
@@ -340,7 +340,7 @@ closed protocol NetworkDeviceIfc {
     ///
     /// + request `id` port identifier.
     /// + request `new_status` new port's status.
-    strict PortStatusChanged(struct {
+    PortStatusChanged(struct {
         id PortId;
         new_status PortStatus;
     });
@@ -355,7 +355,7 @@ closed protocol NetworkDeviceIfc {
     ///
     /// + request `id` new port identifier.
     /// + request `port` handle to network port implementation.
-    strict AddPort(resource struct {
+    AddPort(resource struct {
         id PortId;
         port client_end:NetworkPort;
     });
@@ -365,7 +365,7 @@ closed protocol NetworkDeviceIfc {
     /// [`NetworkPort.Removed`] is called.
     ///
     /// + request `id` removed port identifier.
-    strict RemovePort(struct {
+    RemovePort(struct {
         id PortId;
     });
     /// Notifies interface of incoming rx data, contained in [`RxBuffer`].
@@ -384,7 +384,7 @@ closed protocol NetworkDeviceIfc {
     /// that are being marked as complete.
     ///
     /// + request `rx` buffers containing incoming data.
-    strict CompleteRx(struct {
+    CompleteRx(struct {
         rx vector<RxBuffer>:MAX_RX_BUFFERS;
     });
     /// Notifies interface of complete transmit buffers.
@@ -400,7 +400,7 @@ closed protocol NetworkDeviceIfc {
     /// that are being returned.
     ///
     /// + request `tx` transmit results.
-    strict CompleteTx(struct {
+    CompleteTx(struct {
         tx vector<TxResult>:MAX_TX_RESULTS;
     });
     /// Notifies interface of a snooped tx frame.
@@ -418,7 +418,7 @@ closed protocol NetworkDeviceIfc {
     ///
     /// + request `rx` snooped transmit frames to be looped back as incoming
     /// data.
-    strict Snoop(struct {
+    Snoop(struct {
         rx vector<RxBuffer>:MAX_RX_BUFFERS;
     });
 };
@@ -557,7 +557,7 @@ const MAX_RX_SPACE_BUFFERS uint32 = 2047;
 
 @transport("Driver")
 @banjo_layout("ddk-protocol")
-closed protocol NetworkDeviceImpl {
+protocol NetworkDeviceImpl {
     /// Initializes the network device.
     ///
     /// `Init` is only called once during the lifetime of the device to register
@@ -570,7 +570,7 @@ closed protocol NetworkDeviceImpl {
     /// + request `iface` handle to the device interface.
     /// - response `s` initialization status. A value other than `ZX_OK` will
     /// cause the device to unbind.
-    strict Init(resource struct {
+    Init(resource struct {
         iface client_end:NetworkDeviceIfc;
     }) -> (struct {
         s zx.Status;
@@ -592,7 +592,7 @@ closed protocol NetworkDeviceImpl {
     /// successfully started. Any other status value indicates an implementation
     /// specific error.
     @async
-    strict Start() -> (struct {
+    Start() -> (struct {
         s zx.Status;
     });
     /// Stops the network device.
@@ -606,14 +606,14 @@ closed protocol NetworkDeviceImpl {
     /// The device implementation may perform any power saving measures after
     /// observing stop.
     @async
-    strict Stop() -> ();
+    Stop() -> ();
     /// Gets information about the device.
     ///
     /// Device information must not change over the course of the lifetime of
     /// the device.
     ///
     /// - response `info` device information.
-    strict GetInfo() -> (struct {
+    GetInfo() -> (struct {
         info DeviceInfo;
     });
     /// Enqueues a list of buffers for transmission on the network device.
@@ -632,7 +632,7 @@ closed protocol NetworkDeviceImpl {
     /// error codes.
     ///
     /// + request `buffers` tx buffers to enqueue for sending.
-    strict QueueTx(struct {
+    QueueTx(struct {
         buffers vector<TxBuffer>:MAX_TX_BUFFERS;
     });
     /// Enqueues a list of rx buffer space on the network device.
@@ -651,7 +651,7 @@ closed protocol NetworkDeviceImpl {
     ///
     /// + request `buffers` rx space buffers to be filled with network data when
     /// it arrives.
-    strict QueueRxSpace(struct {
+    QueueRxSpace(struct {
         buffers vector<RxSpaceBuffer>:MAX_RX_SPACE_BUFFERS;
     });
     /// Informs device that a new VMO is being used to store frame data.
@@ -666,7 +666,7 @@ closed protocol NetworkDeviceImpl {
     /// specific error and causes the client session which owns the VMO to be
     /// closed.
     @async
-    strict PrepareVmo(resource struct {
+    PrepareVmo(resource struct {
         id VmoId;
         vmo zx.Handle:VMO;
     }) -> (struct {
@@ -680,7 +680,7 @@ closed protocol NetworkDeviceImpl {
     /// holds no buffers that reference that `id`.
     ///
     /// + request `id` VMO identifier.
-    strict ReleaseVmo(struct {
+    ReleaseVmo(struct {
         id VmoId;
     });
     /// Informs the device that it should start or stop reporting snooped
@@ -689,7 +689,7 @@ closed protocol NetworkDeviceImpl {
     /// + request `snoop` if `true` device should start reporting snooping
     /// frames. If `false` device should stop reporting snooped frames. Upon
     /// initialization, device assumes `snop` is `false`.
-    strict SetSnoop(struct {
+    SetSnoop(struct {
         snoop bool;
     });
 };

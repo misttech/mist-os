@@ -139,9 +139,9 @@ type DirectoryEntry = strict resource union {
 };
 
 @discoverable
-closed protocol Io1Harness {
+protocol Io1Harness {
     /// Returns the list of properties of the filesystem.
-    strict GetConfig() -> (struct {
+    GetConfig() -> (struct {
         config Io1Config;
     });
 
@@ -151,7 +151,7 @@ closed protocol Io1Harness {
     /// used for the test case. The root directory that is served (returned via
     /// `directory_request`) will have the equivalent contents, served with the
     /// given `flags`.
-    strict GetDirectory(resource struct {
+    GetDirectory(resource struct {
         root Directory;
         flags fuchsia.io.OpenFlags;
         directory_request server_end:fuchsia.io.Directory;
@@ -163,7 +163,7 @@ closed protocol Io1Harness {
 /// good enough set of functions that we have enough flexibility to create
 /// variable directory structures to with explicit permission settings for tests.
 @discoverable
-closed protocol Io2Harness {
+protocol Io2Harness {
     /// Prepares a test case with an empty directory. The directory metadata
     /// and directory entires should be read-only.
     ///
@@ -179,7 +179,7 @@ closed protocol Io2Harness {
     ///     * [`fuchsia.io/Rights.GET_ATTRIBUTES`].
     ///     * [`fuchsia.io/Rights.UPDATE_ATTRIBUTES`].
     ///
-    strict GetEmptyDirectory(resource struct {
+    GetEmptyDirectory(resource struct {
         directory_request zx.Handle:CHANNEL;
     });
 };

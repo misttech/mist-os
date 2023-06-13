@@ -40,10 +40,10 @@ type FileHandle = resource struct {
 
 /// Protocol that gives the binder driver access to the client process'
 /// resources.
-closed protocol ProcessAccessor {
+protocol ProcessAccessor {
     /// Writes the contents of `content` to `address` in the process memory,
     /// using the vmo content size to determine the number of bytes to write.
-    strict WriteMemory(resource struct {
+    WriteMemory(resource struct {
         address uint64;
         content zx.Handle:VMO;
     }) -> () error fuchsia.posix.Errno;
@@ -54,7 +54,7 @@ closed protocol ProcessAccessor {
     /// The implementator of this protocol should handle these requests as best
     /// it can so that a failure doesn't have visible side-effects.
     @transitional
-    strict FileRequest(@generated_name("FileRequest") resource table {
+    FileRequest(@generated_name("FileRequest") resource table {
         /// The list of file descriptor the client must close.
         1: close_requests vector<Fd>:MAX_REQUEST_COUNT;
         /// The list of file descriptor the client must duplicate and transfer to
@@ -75,9 +75,9 @@ closed protocol ProcessAccessor {
 
 /// Give access to the binder nodes.
 @discoverable
-closed protocol DevBinder {
+protocol DevBinder {
     /// Open the binder device node.
-    strict Open(resource table {
+    Open(resource table {
         /// The path to the binder device in the starnix process.
         /// Mandatory
         1: path vector<uint8>:MAX_PATH_LENGTH;
@@ -98,7 +98,7 @@ closed protocol DevBinder {
     /// Close the binder device node, previously opened with `Open`. The handle
     /// is passed back to the service so that it can identify the device being
     /// closed.
-    strict Close(resource table {
+    Close(resource table {
         /// The Binder protocol opened previously.
         1: binder client_end:Binder;
     });
@@ -107,24 +107,24 @@ closed protocol DevBinder {
 /// Protocol that allows Starnix to control binder servers and clients in other
 /// Fuchsia components.
 @discoverable
-closed protocol RemoteController {
+protocol RemoteController {
     /// Called by the Starnix kernel when it requires the remote Fuchsia
     /// component to start servicing the binder protocol.
-    strict Start(resource table {
+    Start(resource table {
         1: dev_binder client_end:DevBinder;
     });
 };
 
 /// An opened connection to a binder driver.
-closed protocol Binder {
+protocol Binder {
     /// Set the VMO to used as a share resource between the driver and the
     /// client. `mapped_address` is the address where the vmo is mapped in the
     /// client address space.
-    strict SetVmo(resource struct {
+    SetVmo(resource struct {
         vmo zx.Handle:VMO;
         mapped_address uint64;
     });
-    strict Ioctl(struct {
+    Ioctl(struct {
         tid zx.Koid;
         request uint32;
         parameter uint64;

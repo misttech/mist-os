@@ -139,7 +139,7 @@ type CodecFormatInfo = table {
 
 /// For an overview see
 /// [[Audio Codec Interface]](https://fuchsia.dev/fuchsia-src/concepts/drivers/driver_architectures/audio_drivers/audio_codec).
-closed protocol Codec {
+protocol Codec {
     /// Allows providing driver health state.
     compose Health;
 
@@ -150,17 +150,17 @@ closed protocol Codec {
     /// `Reset` returns when the reset is completed. If the driver can't successfully reset the
     /// codec it will close the codec protocol channel, in this case the client may obtain a new
     /// codec protocol channel and retry.
-    strict Reset() -> ();
+    Reset() -> ();
 
     /// Retrieves textual information about the codec.
     @available(deprecated=11, removed=12)
-    strict GetInfo() -> (struct {
+    GetInfo() -> (struct {
         info CodecInfo;
     });
 
     /// Retrieves top level static properties.
     @available(added=HEAD)
-    strict GetProperties() -> (struct {
+    GetProperties() -> (struct {
         properties CodecProperties;
     });
 
@@ -172,7 +172,7 @@ closed protocol Codec {
     /// the codec to stop is completed.
     /// If the driver can't successfully configure the codec to stop it will close the codec
     /// protocol channel, in this case the client may obtain a new codec protocol channel and retry.
-    strict Stop() -> (struct {
+    Stop() -> (struct {
         start_time zx.Time;
     });
 
@@ -184,18 +184,18 @@ closed protocol Codec {
     /// the codec to start is completed.
     /// If the driver can't successfully start the codec it will close the codec protocol channel,
     /// in this case the client may obtain a new codec protocol channel and retry.
-    strict Start() -> (struct {
+    Start() -> (struct {
         start_time zx.Time;
     });
 
     /// Returns whether a codec is bridgeable.
-    strict IsBridgeable() -> (struct {
+    IsBridgeable() -> (struct {
         supports_bridged_mode bool;
     });
 
     /// Sets a codec's bridged mode.  Only required if the codec supports bridged mode as specified
     /// by IsBridgeable's reply.
-    strict SetBridgedMode(struct {
+    SetBridgedMode(struct {
         enable_bridged_mode bool;
     });
 
@@ -203,13 +203,13 @@ closed protocol Codec {
     /// may reply with an error status and the controller may retry at a later time.
     /// Retrieving multiple DaiSupportedFormats allows for cases where exclusive
     /// combinations of the parameters in DaiSupportedFormats may be supported.
-    strict GetDaiFormats() -> (struct {
+    GetDaiFormats() -> (struct {
         formats vector<DaiSupportedFormats>:MAX_COUNT_FORMATS;
     }) error zx.Status;
 
     /// Sets the DAI format to be used in the interface between the controller and codec.
     /// Returns an error if not supported at the time of the request (e.g. for removable hardware).
-    strict SetDaiFormat(struct {
+    SetDaiFormat(struct {
         format DaiFormat;
     }) -> (struct {
         state CodecFormatInfo;
@@ -223,13 +223,13 @@ closed protocol Codec {
     // at //sdk/fidl/fuchsia.hardware.audio.signalprocessing. Use a `Gain` `Element` instead, see
     // //sdk/fidl/fuchsia.hardware.audio.signalprocessing/gain.fidl.
     @available(deprecated=9, removed=12)
-    strict GetGainFormat() -> (struct {
+    GetGainFormat() -> (struct {
         gain_format GainFormat;
     });
 
     /// Retrieves Plug Detect Capabilities.
     @available(deprecated=11, removed=12)
-    strict GetPlugDetectCapabilities() -> (struct {
+    GetPlugDetectCapabilities() -> (struct {
         plug_detect_capabilities PlugDetectCapabilities;
     });
 
@@ -244,7 +244,7 @@ closed protocol Codec {
     // at //sdk/fidl/fuchsia.hardware.audio.signalprocessing. Use a `Gain` `Element` instead, see
     // //sdk/fidl/fuchsia.hardware.audio.signalprocessing/gain.fidl.
     @available(deprecated=9, removed=12)
-    strict WatchGainState() -> (struct {
+    WatchGainState() -> (struct {
         gain_state GainState;
     });
 
@@ -256,14 +256,14 @@ closed protocol Codec {
     // at //sdk/fidl/fuchsia.hardware.audio.signalprocessing. Use a `Gain` `Element` instead, see
     // //sdk/fidl/fuchsia.hardware.audio.signalprocessing/gain.fidl.
     @available(deprecated=9, removed=12)
-    strict SetGainState(struct {
+    SetGainState(struct {
         target_state GainState;
     });
 
     /// Get the plug detect state via a hanging get. The driver will reply to the first
     /// `WatchPlugState` sent by the client. The driver will not respond to subsequent client
     /// `WatchPlugState` calls until the plug state changes from what was most recently reported.
-    strict WatchPlugState() -> (struct {
+    WatchPlugState() -> (struct {
         plug_state PlugState;
     });
 };

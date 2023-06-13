@@ -15,31 +15,31 @@ type Info = struct {
 
 const READ_SIZE uint32 = 3;
 
-closed protocol Device {
+protocol Device {
     /// Get information about the type of MIDI device
-    strict GetInfo() -> (struct {
+    GetInfo() -> (struct {
         info Info;
     });
 
     /// Reads data from the midi device. Only applicable if GetInfo returns
     /// is_source.
-    strict Read() -> (struct {
+    Read() -> (struct {
         event vector<uint8>:READ_SIZE;
     }) error zx.Status;
 
     /// Writes data to the midi device. Only applicable if GetInfo returns
     /// is_sink.
-    strict Write(struct {
+    Write(struct {
         data vector<uint8>:MAX;
     }) -> () error zx.Status;
 };
 
-closed protocol Controller {
+protocol Controller {
     /// Opens a new session on the device.
     ///
     /// At most one session is permitted at one time; the server end will be
     /// closed with `ZX_ERR_ALREADY_BOUND` if a session already exists.
-    strict OpenSession(resource struct {
+    OpenSession(resource struct {
         session server_end:Device;
     });
 };

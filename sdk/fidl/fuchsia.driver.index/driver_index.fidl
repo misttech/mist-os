@@ -108,22 +108,22 @@ type MatchDriverArgs = table {
 
 /// Protocol through which the driver index can be queried.
 @discoverable
-closed protocol DriverIndex {
+protocol DriverIndex {
     /// Match a set of device arguments to a driver package URL.
-    strict MatchDriver(struct {
+    MatchDriver(struct {
         args MatchDriverArgs;
     }) -> (struct {
         driver MatchedDriver;
     }) error zx.Status;
 
     /// This function will block until base drivers are loaded.
-    strict WaitForBaseDrivers() -> ();
+    WaitForBaseDrivers() -> ();
 
     /// Adds a composite node spec to the driver index. The driver index stores the
     /// composite node spec and maps it by the name. The stored composite node specs are
     /// included in the driver matching process.
     // TODO(fxbug.dev/111076): Return just the status.
-    strict AddCompositeNodeSpec(fuchsia.driver.framework.CompositeNodeSpec) -> (struct {
+    AddCompositeNodeSpec(fuchsia.driver.framework.CompositeNodeSpec) -> (struct {
         composite_driver MatchedCompositeInfo;
         node_names vector<string:MAX>:MAX;
     }) error zx.Status;

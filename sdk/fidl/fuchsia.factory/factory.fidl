@@ -15,8 +15,8 @@ using fuchsia.io;
 /// surfaced by a component that implements FactoryStoreProvider (or any
 /// protocol that depends on it) are expected to be validated for consistency
 /// before being exposed to clients.
-closed protocol FactoryStoreProvider {
-    strict GetFactoryStore(resource struct {
+protocol FactoryStoreProvider {
+    GetFactoryStore(resource struct {
         dir server_end:fuchsia.io.Directory;
     });
 };
@@ -25,7 +25,7 @@ closed protocol FactoryStoreProvider {
 /// Cast-specific factory data: public certificates and keys for
 /// authentication with Cast servers.
 @discoverable
-closed protocol CastCredentialsFactoryStoreProvider {
+protocol CastCredentialsFactoryStoreProvider {
     compose FactoryStoreProvider;
 };
 
@@ -33,7 +33,7 @@ closed protocol CastCredentialsFactoryStoreProvider {
 /// Widevine-specific factory data: public certificates and keys for
 /// authentication with Widevine systems.
 @discoverable
-closed protocol WidevineFactoryStoreProvider {
+protocol WidevineFactoryStoreProvider {
     compose FactoryStoreProvider;
 };
 
@@ -41,7 +41,7 @@ closed protocol WidevineFactoryStoreProvider {
 /// PlayReady-specific factory data: public certificates and keys for
 /// authentication with PlayReady systems.
 @discoverable
-closed protocol PlayReadyFactoryStoreProvider {
+protocol PlayReadyFactoryStoreProvider {
     compose FactoryStoreProvider;
 };
 
@@ -49,7 +49,7 @@ closed protocol PlayReadyFactoryStoreProvider {
 /// Weave-specific factory data: public certificates, signing keys, and
 /// identity files for interoperation with a Weave-based home-area-network.
 @discoverable
-closed protocol WeaveFactoryStoreProvider {
+protocol WeaveFactoryStoreProvider {
     compose FactoryStoreProvider;
 };
 
@@ -59,11 +59,11 @@ closed protocol WeaveFactoryStoreProvider {
 /// covered by other FactoryStoreProviders or methods in fuchsia.hwinfo will
 /// appear here.
 @discoverable
-closed protocol MiscFactoryStoreProvider {
+protocol MiscFactoryStoreProvider {
     compose FactoryStoreProvider;
 };
 
 @discoverable
-closed protocol AlphaFactoryStoreProvider {
+protocol AlphaFactoryStoreProvider {
     compose FactoryStoreProvider;
 };

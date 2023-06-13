@@ -34,6 +34,6 @@ closed protocol BlobfsVerifier {
 
 /// An update verifier to determine if Netstack is working as expected.
 @discoverable
-closed protocol NetstackVerifier {
+protocol NetstackVerifier {
     compose Verifier;
 };

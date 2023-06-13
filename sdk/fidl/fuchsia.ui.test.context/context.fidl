@@ -19,10 +19,10 @@ using fuchsia.ui.views;
 /// Each Context connection is scoped to a single test case. When the
 /// client closes the connection, the server will clean up all resources
 /// associated with the corresponding test.
-closed protocol Context {
+protocol Context {
 
     /// Returns the dimensions of the display, in physical pixels.
-    strict GetDisplayDimensions() -> (table {
+    GetDisplayDimensions() -> (table {
         1: width_in_physical_px uint32;
         2: height_in_physical_px uint32;
     });
@@ -37,7 +37,7 @@ closed protocol Context {
     /// returning.
     ///
     /// Tests should call this method exactly once.
-    strict GetRootViewToken() -> (resource struct {
+    GetRootViewToken() -> (resource struct {
         root_view_token fuchsia.ui.views.ViewCreationToken;
     });
 
@@ -50,7 +50,7 @@ closed protocol Context {
     /// to crash.
     ///
     /// Returns when the puppet under test is fully initialized.
-    strict ConnectToPuppetUnderTest(fuchsia.ui.test.conformance.PuppetCreationArgs) -> ();
+    ConnectToPuppetUnderTest(fuchsia.ui.test.conformance.PuppetCreationArgs) -> ();
 
     /// Connects to an instance of a generic puppet implementation, which
     /// NOT considered to be "under test".
@@ -70,23 +70,23 @@ closed protocol Context {
     /// method.
     ///
     /// Returns when the auxiliary puppet instance is fully initialized.
-    strict ConnectToAuxiliaryPuppet(fuchsia.ui.test.conformance.PuppetCreationArgs) -> ();
+    ConnectToAuxiliaryPuppet(fuchsia.ui.test.conformance.PuppetCreationArgs) -> ();
 
     /// Enables tests to interact with the graphics compositor.
-    strict ConnectToFlatland(resource struct {
+    ConnectToFlatland(resource struct {
         server_end server_end:<fuchsia.ui.composition.Flatland>;
     });
 
     /// Enables tests to simulate hardware input interactions, e.g. touch
     /// screen gestures or keyboard strokes.
-    strict ConnectToInputRegistry(resource struct {
+    ConnectToInputRegistry(resource struct {
         server_end server_end:<fuchsia.ui.test.input.Registry>;
     });
 };
 
 /// Helper to create a `Context` on behalf of a test.
 @discoverable
-closed protocol Factory {
+protocol Factory {
 
     /// Spawns a `Context` server instance, and binds `context_server`
     /// to it.
@@ -95,7 +95,7 @@ closed protocol Factory {
     /// When the client closes the connection, the server will clean up
     /// all resources associated with the corresponding test, so tests
     /// MUST hold the connection open until teardown.
-    strict Create(resource table {
+    Create(resource table {
         1: context_server server_end:<Context>;
     });
 };

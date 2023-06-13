@@ -7,7 +7,7 @@ using fuchsia.io;
 
 /// A collection of TUF repositories contained in an attached storage device.
 @discoverable
-closed protocol LocalMirror {
+protocol LocalMirror {
     /// Obtains and returns a named TUF metadata file from an attached storage
     /// device.
     ///
@@ -22,7 +22,7 @@ closed protocol LocalMirror {
     ///     `Status::NOT_FOUND`.
     /// * error a `GetMetadataError` value
     // TODO(fxbug.dev/121253): Make this method one-way.
-    strict GetMetadata(resource struct {
+    GetMetadata(resource struct {
         repo_url RepositoryUrl;
         path fuchsia.io.Path;
         metadata server_end:fuchsia.io.File;
@@ -38,7 +38,7 @@ closed protocol LocalMirror {
     ///     `Status::NOT_FOUND`.
     /// * error a `GetBlobError` value
     // TODO(fxbug.dev/121253): Make this method one-way.
-    strict GetBlob(resource struct {
+    GetBlob(resource struct {
         blob_id BlobId;
         blob server_end:fuchsia.io.File;
     }) -> () error GetBlobError;

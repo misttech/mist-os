@@ -173,17 +173,17 @@ type DeviceSelector = table {
 };
 
 /// Cancels an AudioDaemonRecordRequest if no duration was specified.
-closed protocol AudioDaemonCanceler {
+protocol AudioDaemonCanceler {
     /// Finish sending audio data back to the client.
-    strict Cancel() -> () error zx.Status;
+    Cancel() -> () error zx.Status;
 };
 
 /// The main entry point for ffx audio.
 @discoverable
-closed protocol AudioDaemon {
+protocol AudioDaemon {
     /// Plays audio data from socket on either AudioRenderer or on device ring buffer.
     /// Returns sockets for transmitting info back to stdout and stderr on host.
-    strict Play(resource table {
+    Play(resource table {
         /// Socket for audio data. Should transmit entire file in WAV format.
         ///
         /// Required.
@@ -212,7 +212,7 @@ closed protocol AudioDaemon {
 
     /// Records audio data from either AudioCapturer or device ring buffer.
     /// Returns sockets containing audio data and errors back to host.
-    strict Record(resource table {
+    Record(resource table {
         /// Record from AudioCapturer or ring buffer.
         ///
         /// Required.
@@ -257,7 +257,7 @@ closed protocol AudioDaemon {
     }) error zx.Status;
 
     /// Lists all available audio devices on target.
-    strict ListDevices() -> (resource table {
+    ListDevices() -> (resource table {
         /// List of available devices, sorted by name.
         ///
         /// Required.
@@ -265,7 +265,7 @@ closed protocol AudioDaemon {
     }) error zx.Status;
 
     /// Returns details about a specific audio device.
-    strict DeviceInfo(resource table {
+    DeviceInfo(resource table {
         /// Id of device to retrieve information about, and
         /// whether it is an input or output device.
         ///
@@ -279,7 +279,7 @@ closed protocol AudioDaemon {
     }) error zx.Status;
 
     /// Sets the gain of the stream in decibels.
-    strict DeviceSetGainState(resource table {
+    DeviceSetGainState(resource table {
         /// Id of the device to set the gain state.
         ///
         /// Required.

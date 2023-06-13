@@ -50,14 +50,14 @@ type MipiAdapInfo = struct {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-closed protocol MipiCsi {
-    strict Init(struct {
+protocol MipiCsi {
+    Init(struct {
         mipi_info MipiInfo;
         adap_info MipiAdapInfo;
     }) -> (struct {
         s zx.Status;
     });
-    strict DeInit() -> (struct {
+    DeInit() -> (struct {
         s zx.Status;
     });
 };

@@ -48,7 +48,7 @@ type ExecuteResult = struct {
 // within them, any agents that run to support the mods and the various UI
 // shells (session and story shells).
 @discoverable
-closed protocol PuppetMaster {
+protocol PuppetMaster {
     // Requests a capability to control a story by name. The name acts as the
     // story's unique ID.  Calling ControlStory() for the same story name will
     // control the same story.
@@ -61,30 +61,30 @@ closed protocol PuppetMaster {
     // `request` is closed if control cannot be granted.
     //
     // TODO(thatguy): We want story names to be scoped to the client's namespace.
-    strict ControlStory(resource struct {
+    ControlStory(resource struct {
         story_name string:MAX;
         request server_end:StoryPuppetMaster;
     });
 
     // Deletes a story associated to `story_name`.
     // Any active StoryPuppetMaster connections to the Story will be closed.
-    strict DeleteStory(struct {
+    DeleteStory(struct {
         story_name string:MAX;
     }) -> ();
 
     // Returns a list of all the names of stories in the session.
-    strict GetStories() -> (struct {
+    GetStories() -> (struct {
         story_names vector<string:MAX>:MAX;
     });
 };
 
-closed protocol StoryPuppetMaster {
+protocol StoryPuppetMaster {
     // Enqueues the given `commands` in the order they are given.
     // Can be called as many times as necessary to specify the full
     // set of changes to the story.
     //
     // To execute all enqueued commands, call Execute().
-    strict Enqueue(resource struct {
+    Enqueue(resource struct {
         commands vector<StoryCommand>:MAX;
     });
 
@@ -93,7 +93,7 @@ closed protocol StoryPuppetMaster {
     //
     // If an error occurs, execution is stopped and an error code
     // and message are returned in `result`.
-    strict Execute() -> (struct {
+    Execute() -> (struct {
         result ExecuteResult;
     });
 
@@ -102,7 +102,7 @@ closed protocol StoryPuppetMaster {
     ///
     /// Existing annotations with the same key will be overwritten, or
     /// deleted if new value is null.
-    strict Annotate(resource struct {
+    Annotate(resource struct {
         annotations vector<Annotation>:MAX_ANNOTATIONS_PER_UPDATE;
     }) -> () error AnnotationError;
 
@@ -113,7 +113,7 @@ closed protocol StoryPuppetMaster {
     /// annotations once they are updated.
     ///
     /// Returns AnnotationError.NOT_FOUND if the story does not exist.
-    strict WatchAnnotations() -> (resource struct {
+    WatchAnnotations() -> (resource struct {
         annotations vector<Annotation>:MAX_ANNOTATIONS_PER_STORY;
     }) error AnnotationError;
 };

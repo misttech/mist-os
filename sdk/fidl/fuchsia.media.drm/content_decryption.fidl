@@ -21,7 +21,7 @@ type DecryptorParams = table {
 ///
 /// From an EME client's perspective, this protocol has a 1:1 relationship with
 /// the MediaKeys object.
-closed protocol ContentDecryptionModule {
+protocol ContentDecryptionModule {
     /// Indicates that the `ContentDecryptionModule` is provisioned.
     ///
     /// In order to create `LicenseSession`s, a `ContentDecryptionModule` must
@@ -40,13 +40,13 @@ closed protocol ContentDecryptionModule {
     /// If the DRM system does not require provisioning at all, this
     /// event should still be sent to notify the client that it can create
     /// `LicenseSession`s.
-    strict -> OnProvisioned();
+    -> OnProvisioned();
 
     /// Sets the certificate to be used for encrypting outgoing messages.
     ///
     /// + request `certificate` a buffer containing the certificate to be used.
     /// * error an [`Error`] indicating the reason for failure.
-    strict SetServerCertificate(struct {
+    SetServerCertificate(struct {
         certificate vector<uint8>:MAX;
     }) -> () error Error;
 
@@ -64,7 +64,7 @@ closed protocol ContentDecryptionModule {
     ///   [`LicenseSession`]
     /// - response `session_id` an identifier that can be used to reload the
     ///   session later (if persistent).
-    strict CreateLicenseSession(resource struct {
+    CreateLicenseSession(resource struct {
         session_type LicenseSessionType;
         license_session server_end:LicenseSession;
     }) -> (struct {
@@ -79,7 +79,7 @@ closed protocol ContentDecryptionModule {
     ///   loaded from storage.
     /// + request `license_session` the server endpoint of the
     ///   [`LicenseSession`].
-    strict LoadLicenseSession(resource struct {
+    LoadLicenseSession(resource struct {
         session_id SessionId;
         license_session server_end:LicenseSession;
     });
@@ -93,7 +93,7 @@ closed protocol ContentDecryptionModule {
     /// + request `params` the parameters with which to create the `decryptor`.
     /// + request `decryptor` the server endpoint of the
     ///   `fuchsia.media/StreamProcessor`.
-    strict CreateDecryptor(resource struct {
+    CreateDecryptor(resource struct {
         params DecryptorParams;
         decryptor server_end:fuchsia.media.StreamProcessor;
     });
@@ -109,7 +109,7 @@ closed protocol ContentDecryptionModule {
     ///   such as "1.2" or "2.0".
     /// - response `key_status` a field indicating what the status of a
     ///   hypothetical key would be for this device if one could be licensed.
-    strict GetKeyStatusForHdcpVersion(struct {
+    GetKeyStatusForHdcpVersion(struct {
         hdcp_version HdcpVersion;
     }) -> (struct {
         key_status KeyStatus;
@@ -125,7 +125,7 @@ closed protocol ContentDecryptionModule {
     ///
     /// - response `encryption_schemes` a list of the supported encryption
     ///   schemes.
-    strict GetSupportedEncryptionSchemes() -> (struct {
+    GetSupportedEncryptionSchemes() -> (struct {
         encryption_schemes vector<EncryptionScheme>:MAX;
     });
 };

@@ -97,7 +97,7 @@ type ExternalRoute = table {
 /// Protocol for connecting to `fuchsia.lowpan.device.DeviceRoute` on a LoWPAN
 /// interface.
 @discoverable
-closed protocol DeviceRouteConnector {
+protocol DeviceRouteConnector {
     /// Connects to the `fuchsia.lowpan.device.DeviceRoute` protocol on the
     /// named LoWPAN interface.
     ///
@@ -114,7 +114,7 @@ closed protocol DeviceRouteConnector {
     ///   given name.
     /// * `ZX_ERR_NOT_SUPPORTED`: The interface exists but
     ///   does not support this protocol.
-    strict Connect(resource struct {
+    Connect(resource struct {
         name fuchsia.lowpan.InterfaceName;
         server_end server_end:DeviceRoute;
     });
@@ -125,7 +125,7 @@ closed protocol DeviceRouteConnector {
 ///
 /// Note that methods that deal with PII are located in the
 /// `DeviceRouteExtra` protocol.
-closed protocol DeviceRoute {
+protocol DeviceRoute {
     /// Registers an on-mesh prefix to be advertised on the
     /// current network.
     ///
@@ -143,7 +143,7 @@ closed protocol DeviceRoute {
     /// If registering a new on-mesh prefix and the maximum number of
     /// on-mesh prefixes has already been registered, this channel will
     /// be closed with the epitaph `ZX_ERR_NO_RESOURCES`.
-    strict RegisterOnMeshPrefix(struct {
+    RegisterOnMeshPrefix(struct {
         prefix OnMeshPrefix;
     }) -> ();
 
@@ -153,7 +153,7 @@ closed protocol DeviceRoute {
     ///
     /// If the given mesh prefix was not previously registered,
     /// no action is taken.
-    strict UnregisterOnMeshPrefix(struct {
+    UnregisterOnMeshPrefix(struct {
         subnet fuchsia.net.Ipv6AddressWithPrefix;
     }) -> ();
 
@@ -174,7 +174,7 @@ closed protocol DeviceRoute {
     /// If registering a new external route and the maximum number of
     /// external routes has already been registered, this channel will
     /// be closed with the epitaph `ZX_ERR_NO_RESOURCES`.
-    strict RegisterExternalRoute(struct {
+    RegisterExternalRoute(struct {
         external_route ExternalRoute;
     }) -> ();
 
@@ -184,7 +184,7 @@ closed protocol DeviceRoute {
     ///
     /// If the given external route was not previously registered,
     /// no action is taken.
-    strict UnregisterExternalRoute(struct {
+    UnregisterExternalRoute(struct {
         subnet fuchsia.net.Ipv6AddressWithPrefix;
     }) -> ();
 };
@@ -192,7 +192,7 @@ closed protocol DeviceRoute {
 /// Protocol for connecting to [`DeviceRouteExtra`] on a LoWPAN
 /// interface.
 @discoverable
-closed protocol DeviceRouteExtraConnector {
+protocol DeviceRouteExtraConnector {
     /// Connects to the [`DeviceRouteExtra`] protocol on the
     /// named LoWPAN interface.
     ///
@@ -209,7 +209,7 @@ closed protocol DeviceRouteExtraConnector {
     ///   given name.
     /// * `ZX_ERR_NOT_SUPPORTED`: The interface exists but
     ///   does not support this protocol.
-    strict Connect(resource struct {
+    Connect(resource struct {
         name fuchsia.lowpan.InterfaceName;
         server_end server_end:DeviceRouteExtra;
     });
@@ -220,12 +220,12 @@ closed protocol DeviceRouteExtraConnector {
 ///
 /// Note that methods that do not deal with PII are located in the
 /// `DeviceRoute` protocol.
-closed protocol DeviceRouteExtra {
+protocol DeviceRouteExtra {
     /// Returns a vector containing all of the locally-added on-mesh prefixes.
     ///
     /// Locally-added on-mesh prefixes are those that have been registered
     /// with a prior call to [`DeviceRoute.RegisterOnMeshPrefix`].
-    strict GetLocalOnMeshPrefixes() -> (struct {
+    GetLocalOnMeshPrefixes() -> (struct {
         prefixes vector<OnMeshPrefix>:MAX_ON_MESH_PREFIXES;
     });
 
@@ -233,7 +233,7 @@ closed protocol DeviceRouteExtra {
     ///
     /// Locally-added external routes are those that have been registered
     /// with a prior call to [`DeviceRoute.RegisterExternalRoute`].
-    strict GetLocalExternalRoutes() -> (struct {
+    GetLocalExternalRoutes() -> (struct {
         external_routes vector<ExternalRoute>:MAX_EXTERNAL_ROUTES;
     });
 };

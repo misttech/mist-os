@@ -5,10 +5,10 @@ library fuchsia.recovery.policy;
 
 /// A protocol for determining whether factory reset can be triggered.
 @discoverable
-closed protocol FactoryReset {
+protocol FactoryReset {
     /// A hanging-get style api that returns whether local factory reset is
     /// enabled.
-    strict GetEnabled() -> (struct {
+    GetEnabled() -> (struct {
         fdr_enabled bool;
     });
 };

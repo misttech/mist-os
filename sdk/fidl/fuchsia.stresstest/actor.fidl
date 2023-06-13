@@ -20,10 +20,10 @@ type Error = flexible union {
 };
 
 /// Iterator for listing available actions.
-closed protocol ActionIterator {
+protocol ActionIterator {
     /// Returns the next batch of actions. When all actions have been read, an empty
     /// vector will be returned.
-    strict GetNext() -> (struct {
+    GetNext() -> (struct {
         actions vector<Action>:MAX;
     });
 };
@@ -32,15 +32,15 @@ closed protocol ActionIterator {
 /// run actions. Actors expect exactly one connection to the Actor protocol from
 /// the test runner during the actor's lifetime.
 @discoverable
-closed protocol Actor {
+protocol Actor {
     /// Enumerate the actions available in this actor.
-    strict GetActions() -> (resource struct {
+    GetActions() -> (resource struct {
         iterator client_end:ActionIterator;
     });
 
     /// Runs a single action with a given seed. Returns when the action has completed.
     /// If the action failed, the corresponding error message is returned.
-    strict Run(struct {
+    Run(struct {
         action_name ActionName;
         seed uint64;
     }) -> (struct {

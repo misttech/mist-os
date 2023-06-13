@@ -9,7 +9,7 @@ library fuchsia.web;
 alias CookieName = string:MAX;
 
 /// Provides methods for monitoring and accessing browser cookie state.
-closed protocol CookieManager {
+protocol CookieManager {
     /// Observe changes to all cookies named `name` that would be sent in a request to `url`.
     ///
     /// If neither `url` nor `name` are set then all cookies are observed. If only `url` is set
@@ -18,7 +18,7 @@ closed protocol CookieManager {
     ///
     /// `changes` iterates over a stream of cookie changes. Additions or updates are expressed as
     /// complete cookies, while deletions are expressed as cookies with no `value` set.
-    strict ObserveCookieChanges(resource struct {
+    ObserveCookieChanges(resource struct {
         url Url:optional;
         name CookieName:optional;
         changes server_end:CookiesIterator;
@@ -26,7 +26,7 @@ closed protocol CookieManager {
 
     /// Returns a list of Cookies, optionally limited to those matching `url`, and optionally
     /// `name`. `cookies` iterates over the matching cookies, including their `value`s.
-    strict GetCookieList(resource struct {
+    GetCookieList(resource struct {
         url Url:optional;
         name CookieName:optional;
         cookies server_end:CookiesIterator;
@@ -34,11 +34,11 @@ closed protocol CookieManager {
 };
 
 /// Used to iterator over a set of cookies, or a stream of changes to cookies.
-closed protocol CookiesIterator {
+protocol CookiesIterator {
     /// Fetches the next batch of cookies, or of changes to cookies.
     /// RFC6265 does not specify an upper-bound on the number of cookies which
     /// may be stored.
-    strict GetNext() -> (resource struct {
+    GetNext() -> (resource struct {
         changed_cookies vector<Cookie>:MAX;
     });
 };

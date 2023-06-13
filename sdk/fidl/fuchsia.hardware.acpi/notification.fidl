@@ -13,10 +13,10 @@ type NotificationMode = flexible bits {
 
 /// Notification handler protocol.
 /// Closing the channel will disable the notification handler.
-closed protocol NotifyHandler {
+protocol NotifyHandler {
     /// Called when a notification is received. |value| is the notification number.
     /// Another notification will not be sent until Reply() is called.
-    strict Handle(struct {
+    Handle(struct {
         value uint32;
     }) -> ();
 };

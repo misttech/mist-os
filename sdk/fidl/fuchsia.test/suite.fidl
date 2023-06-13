@@ -75,10 +75,10 @@ type Result = table {
 };
 
 /// Listens to updates from an individual test case run.
-closed protocol CaseListener {
+protocol CaseListener {
     /// Indicates that an invididual test case has completed and result is
     /// available.
-    strict Finished(struct {
+    Finished(struct {
         result Result;
     });
 };
@@ -93,30 +93,30 @@ type StdHandles = resource table {
 };
 
 /// Listens to updates from test runs.
-closed protocol RunListener {
+protocol RunListener {
     /// Indicates that an individual test invocation has started execution.
-    strict OnTestCaseStarted(resource struct {
+    OnTestCaseStarted(resource struct {
         invocation Invocation;
         std_handles StdHandles;
         listener server_end:CaseListener;
     });
 
     /// Indicates that the last test case that started has finished, and no more test cases will start.
-    strict OnFinished();
+    OnFinished();
 };
 
 /// Iterator for listing available test cases.
-closed protocol CaseIterator {
+protocol CaseIterator {
     /// Returns the next batch of test cases.
-    strict GetNext() -> (struct {
+    GetNext() -> (struct {
         cases vector<Case>:MAX;
     });
 };
 
 @discoverable
-closed protocol Suite {
+protocol Suite {
     /// Enumerate the test cases available in this test suite.
-    strict GetTests(resource struct {
+    GetTests(resource struct {
         iterator server_end:CaseIterator;
     });
 
@@ -126,7 +126,7 @@ closed protocol Suite {
     /// `tests` may contain duplicate elements, in which case the same test is
     /// run multiple times as indicated.
     /// Closing `listener` marks the end of this call.
-    strict Run(resource struct {
+    Run(resource struct {
         tests vector<Invocation>:MAX;
         options RunOptions;
         listener client_end:RunListener;

@@ -7,9 +7,9 @@ using zx;
 
 /// Protocol for providing an IRQ resource with access to all valid ranges.
 @discoverable
-closed protocol IrqResource {
+protocol IrqResource {
     /// Get an IRQ resource handle.
-    strict Get() -> (resource struct {
+    Get() -> (resource struct {
         resource zx.Handle:RESOURCE;
     });
 };

@@ -127,7 +127,7 @@ const DONE_MARKER string = "DONE: A long-running `fuchsia.fuzzer.Controller` wor
 ///
 /// The channel is closed when the fuzzer is no longer needed, and on error.
 /// Clients should exit and not attempt to reconnect.
-closed protocol Controller {
+protocol Controller {
     /// Sets various execution and error detection parameters. This may be
     /// called multiple times; only the most recently received options are used.
     /// If the `Options` parameter omits one or more fields, those parameters
@@ -137,7 +137,7 @@ closed protocol Controller {
     /// + request `options` the execution and error detection parameters.
     /// * error `ZX_ERR_BAD_STATE` if a long-running call such as `Execute`,
     /// *     `Cleanse`, `Minimize`, `Fuzz`, or `Merge` is in progress.
-    strict Configure(struct {
+    Configure(struct {
         options Options;
     }) -> () error zx.Status;
 
@@ -145,7 +145,7 @@ closed protocol Controller {
     /// parameters.
     ///
     /// - response `options` the execution and error detection parameters.
-    strict GetOptions() -> (struct {
+    GetOptions() -> (struct {
         options Options;
     });
 
@@ -158,7 +158,7 @@ closed protocol Controller {
     /// * error one of the following:
     ///     * `ZX_ERR_INVALID_ARGS` if corpus type is invalid.
     ///     * A socket error if transferring the input fails.
-    strict AddToCorpus(resource struct {
+    AddToCorpus(resource struct {
         corpus Corpus;
         input Input;
     }) -> () error zx.Status;
@@ -167,7 +167,7 @@ closed protocol Controller {
     ///
     /// + request `corpus` the type of corpus to read from.
     /// + request `corpus_reader` the client used to send test inputs.
-    strict ReadCorpus(resource struct {
+    ReadCorpus(resource struct {
         corpus Corpus;
         corpus_reader client_end:CorpusReader;
     }) -> ();
@@ -183,14 +183,14 @@ closed protocol Controller {
     /// * error one of the following:
     ///     * A socket error if transferring the input fails.
     ///     *`ZX_ERR_INVALID_ARGS` if parsing the dictionary fails.
-    strict WriteDictionary(resource struct {
+    WriteDictionary(resource struct {
         dictionary Input;
     }) -> () error zx.Status;
 
     /// Returns the current dictionary as an Input, which may be empty.
     ///
     /// - response `dictionary` the current AFL-style dictionary.
-    strict ReadDictionary() -> (resource struct {
+    ReadDictionary() -> (resource struct {
         dictionary Input;
     });
 
@@ -198,7 +198,7 @@ closed protocol Controller {
     /// `GetStatus`.
     ///
     /// + request `monitor` the client used to send status updates.
-    strict AddMonitor(resource struct {
+    AddMonitor(resource struct {
         monitor client_end:Monitor;
     }) -> ();
 
@@ -222,7 +222,7 @@ closed protocol Controller {
     ///
     /// * error `ZX_ERR_BAD_STATE` if another long-running workflow is in
     /// *     progress.
-    strict Fuzz() -> () error zx.Status;
+    Fuzz() -> () error zx.Status;
 
     /// Executes the target code with a single `test_input`.
     ///
@@ -234,7 +234,7 @@ closed protocol Controller {
     ///     * `ZX_ERR_BAD_STATE` if another long-running workflow is in
     ///       progress.
     ///     *  A socket error if transferring the input fails.
-    strict TryOne(resource struct {
+    TryOne(resource struct {
         test_input Input;
     }) -> () error zx.Status;
 
@@ -252,7 +252,7 @@ closed protocol Controller {
     ///     * A socket error if transferring the input fails.
     ///     * `ZX_ERR_INVALID_ARGS` if the provided `test_input` does not cause
     ///       an error.
-    strict Minimize(resource struct {
+    Minimize(resource struct {
         test_input Input;
     }) -> () error zx.Status;
 
@@ -271,7 +271,7 @@ closed protocol Controller {
     ///     * `ZX_ERR_BAD_STATE` if another long-running workflow is in
     ///       progress.
     ///     * A socket error if transferring the input fails.
-    strict Cleanse(resource struct {
+    Cleanse(resource struct {
         test_input Input;
     }) -> () error zx.Status;
 
@@ -288,12 +288,12 @@ closed protocol Controller {
     ///       progress.
     ///     * `ZX_ERR_INVALID_ARGS` if an input in the seed corpus causes an
     ///       error. Inputs in the live corpus that cause errors are skipped.
-    strict Merge() -> () error zx.Status;
+    Merge() -> () error zx.Status;
 
     /// Returns various fuzzing metrics, e.g. total coverage, speed, etc.
     ///
     /// - response `status` the current value of fuzzing metrics.
-    strict GetStatus() -> (struct {
+    GetStatus() -> (struct {
         status Status;
     });
 
@@ -326,7 +326,7 @@ closed protocol Controller {
     /// amount of time.
     ///
     /// - response `artifact` the most recent result and/or error-causing input.
-    strict WatchArtifact() -> (resource struct {
+    WatchArtifact() -> (resource struct {
         artifact Artifact;
     });
 };
@@ -340,7 +340,7 @@ closed protocol Controller {
 ///
 /// The fuzz-registry will close the channel upon error, or upon its own exit.
 /// The fuzzer should exit and not attempt to reconnect when on channel close.
-closed protocol ControllerProvider {
+protocol ControllerProvider {
     /// Connects a client to the fuzzer.
     ///
     /// Within the component fuzzing framework, the fuzz-manager forwards
@@ -353,11 +353,11 @@ closed protocol ControllerProvider {
     /// connection.
     ///
     /// + request `controller` the connection from the client.
-    strict Connect(resource struct {
+    Connect(resource struct {
         controller server_end:Controller;
     }) -> ();
 
     /// Interrupt any current workflow, closes the channel, and exits the
     /// fuzzing engine.
-    strict Stop();
+    Stop();
 };

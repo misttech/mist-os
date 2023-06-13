@@ -9,9 +9,9 @@ using zx;
 /// Protocol for providing a `ZX_RSRC_KIND_SYSTEM` with base
 /// `ZX_RSRC_SYSTEM_POWER_BASE`.
 @discoverable
-closed protocol PowerResource {
+protocol PowerResource {
     /// Get a power resource handle.
-    strict Get() -> (resource struct {
+    Get() -> (resource struct {
         resource zx.Handle:RESOURCE;
     });
 };

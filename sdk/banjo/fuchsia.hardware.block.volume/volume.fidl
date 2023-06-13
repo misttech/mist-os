@@ -60,23 +60,23 @@ type SliceRegion = struct {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-closed protocol BlockVolume {
+protocol BlockVolume {
     /// Attempts to extend a virtual partition.
-    strict Extend(struct {
+    Extend(struct {
         extent SliceExtent;
     }) -> (struct {
         status zx.Status;
     });
 
     /// Shrinks a virtual partition.
-    strict Shrink(struct {
+    Shrink(struct {
         extent SliceExtent;
     }) -> (struct {
         status zx.Status;
     });
 
     /// Returns the information about the volume manager.
-    strict GetInfo() -> (struct {
+    GetInfo() -> (struct {
         status zx.Status;
         manager VolumeManagerInfo;
         volume VolumeInfo;
@@ -84,7 +84,7 @@ closed protocol BlockVolume {
 
     /// Returns the number of contiguous slices from a collection
     /// of start offsets.
-    strict QuerySlices(struct {
+    QuerySlices(struct {
         start vector<uint64>:MAX_SLICE_QUERY_REQUESTS;
     }) -> (struct {
         status zx.Status;
@@ -93,7 +93,7 @@ closed protocol BlockVolume {
 
     /// Destroys the current partition, removing it from the Volume Manager, and
     /// freeing all underlying storage.
-    strict Destroy() -> (struct {
+    Destroy() -> (struct {
         status zx.Status;
     });
 };

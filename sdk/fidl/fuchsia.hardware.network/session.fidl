@@ -32,7 +32,7 @@ using zx;
 ///    - tx buffers not respecting [`Info.min_tx_buffer_head`] or
 ///      [`Info.min_tx_buffer_tail`].
 @available(added=HEAD)
-closed protocol Session {
+protocol Session {
     /// Attaches the session to `port`.
     ///
     /// Once attached, the session starts to receive the subscribed frames over
@@ -44,7 +44,7 @@ closed protocol Session {
     /// * error `ZX_ERR_INVALID_ARGS` if `rx_frames` is not a subset of the
     /// port's supported frames.
     /// * error `ZX_ERR_ALREADY_BOUND` if `port` is already attached.
-    strict Attach(struct {
+    Attach(struct {
         port PortId;
         rx_frames vector<FrameType>:MAX_FRAME_TYPES;
     }) -> () error zx.Status;
@@ -58,7 +58,7 @@ closed protocol Session {
     /// + request `port` port to subscribe to.
     /// * error `ZX_ERR_NOT_FOUND` if the session is not currently attached to
     /// the port.
-    strict Detach(struct {
+    Detach(struct {
         port PortId;
     }) -> () error zx.Status;
     /// Cleanly closes a session.
@@ -68,7 +68,7 @@ closed protocol Session {
     /// own all the buffers that are currently owned by the session (sent over
     /// either the rx or tx FIFOs) once the epitaph is received. Closing the rx
     /// or tx FIFO is equivalent to calling `Close`.
-    strict Close();
+    Close();
 };
 
 /// Additional session options.

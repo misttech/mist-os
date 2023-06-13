@@ -5,9 +5,9 @@ library fuchsia.hardware.usb.phy;
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-closed protocol UsbPhy {
+protocol UsbPhy {
     /// Informs the PHY when peripheral role connect status changed.
-    strict ConnectStatusChanged(struct {
+    ConnectStatusChanged(struct {
         connected bool;
     });
 };

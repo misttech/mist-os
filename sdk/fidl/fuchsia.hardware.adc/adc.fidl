@@ -5,19 +5,19 @@
 library fuchsia.hardware.adc;
 using zx;
 
-closed protocol Device {
+protocol Device {
     /// Get adc resolution in number of bits
-    strict GetResolution() -> (struct {
+    GetResolution() -> (struct {
         resolution uint8;
     }) error zx.Status;
 
     /// Get sample - raw count from adc
-    strict GetSample() -> (struct {
+    GetSample() -> (struct {
         value uint32;
     }) error zx.Status;
 
     /// Get sample normalized to [0.0-1.0]
-    strict GetNormalizedSample() -> (struct {
+    GetNormalizedSample() -> (struct {
         value float32;
     }) error zx.Status;
 };

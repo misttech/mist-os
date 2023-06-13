@@ -91,8 +91,8 @@ type AppConfig = struct {
 /// used for any subsequent authorize calls. The UI contexts created by this
 /// interface are used to display OAuth login and permission screens to the end
 /// user.
-closed protocol AuthenticationContextProvider {
-    strict GetAuthenticationUIContext(resource struct {
+protocol AuthenticationContextProvider {
+    GetAuthenticationUIContext(resource struct {
         request server_end:AuthenticationUIContext;
     });
 };
@@ -101,7 +101,7 @@ closed protocol AuthenticationContextProvider {
 /// instances for each user, and to supply auth provider configuration
 /// information using the structs defined in `auth_provider.fidl`.
 @discoverable
-closed protocol TokenManagerFactory {
+protocol TokenManagerFactory {
     /// Creates an OAuth TokenManager instance scoped for the component specified
     /// by `application_url`, the Fuchsia user specified by `user_id`, and the list
     /// of auth providers specified in `auth_provider_configs`.
@@ -109,7 +109,7 @@ closed protocol TokenManagerFactory {
     /// `auth_context_provider` is used to generate AuthenticationUIContexts during
     /// TokenManager methods that require UI, unless the caller of those methods
     /// supplies an alternative AuthenticationUIContext.
-    strict GetTokenManager(resource struct {
+    GetTokenManager(resource struct {
         user_id string;
         application_url string;
         auth_provider_configs vector<AuthProviderConfig>;
@@ -128,7 +128,7 @@ closed protocol TokenManagerFactory {
 /// Framework to components like Ledger and Agents. These components fetch
 /// OAuth tokens from any configured auth provider, and use the
 /// `auth_context_provider` initialized above for new authorizations.
-closed protocol TokenManager {
+protocol TokenManager {
     /// The first step of OAuth is to get authorization from the user. For Fuchsia
     /// components, this is accomplished by displaying OAuth permissions in a view
     /// provided by the caller. This view will use `auth_ui_context` if supplied,
@@ -152,7 +152,7 @@ closed protocol TokenManager {
     /// profile information in `user_profile_info` such as the user's email,
     /// image_url, profile_url, and first and last names as configured on the auth
     /// provider backend system.
-    strict Authorize(resource struct {
+    Authorize(resource struct {
         app_config AppConfig;
         auth_ui_context client_end:<AuthenticationUIContext, optional>;
         app_scopes vector<string>;
@@ -176,7 +176,7 @@ closed protocol TokenManager {
     /// The access token is returned from cache if possible, otherwise the auth
     /// provider is used to exchange the persistent credential for a new access
     /// token.
-    strict GetAccessToken(struct {
+    GetAccessToken(struct {
         app_config AppConfig;
         user_profile_id string;
         app_scopes vector<string>;
@@ -197,7 +197,7 @@ closed protocol TokenManager {
     /// The identity token is returned from cache if possible, otherwise the auth
     /// provider is used to exchange the persistant credential for a new identity
     /// token.
-    strict GetIdToken(struct {
+    GetIdToken(struct {
         app_config AppConfig;
         user_profile_id string;
         audience string:optional;
@@ -223,7 +223,7 @@ closed protocol TokenManager {
     /// then steps 2&3 will be performed and the method will return OK even if
     /// step 1 fails, ensuring the local credentials are wiped in all
     /// circumstances.
-    strict DeleteAllTokens(struct {
+    DeleteAllTokens(struct {
         app_config AppConfig;
         user_profile_id string;
         force bool;
@@ -233,7 +233,7 @@ closed protocol TokenManager {
 
     /// Returns a vector of all currently authorized user_profile_ids for a
     /// component's OAuth configuration provided in `app_config`.
-    strict ListProfileIds(struct {
+    ListProfileIds(struct {
         app_config AppConfig;
     }) -> (struct {
         status Status;

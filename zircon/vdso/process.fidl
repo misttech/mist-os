@@ -4,7 +4,7 @@
 library zx;
 
 @transport("Syscall")
-closed protocol Process {
+protocol Process {
     /// ## Summary
     ///
     /// Exits the currently running process.
@@ -43,7 +43,7 @@ closed protocol Process {
     /// [`zx_object_get_info()`]: object_get_info.md
     /// [`zx_process_create()`]: process_create.md
     @noreturn
-    strict Exit(struct {
+    Exit(struct {
         retcode int64;
     });
 
@@ -144,7 +144,7 @@ closed protocol Process {
     /// [`zx_thread_create()`]: thread_create.md
     /// [`zx_thread_exit()`]: thread_exit.md
     /// [`zx_thread_start()`]: thread_start.md
-    strict Create(resource struct {
+    Create(resource struct {
         job Handle:JOB;
         name vector<uchar>:MAX_NAME_LEN;
         options uint32;
@@ -222,7 +222,7 @@ closed protocol Process {
     ///
     /// [`zx_process_create()`]: process_create.md
     @next
-    strict CreateShared(resource struct {
+    CreateShared(resource struct {
         shared_proc Handle:PROCESS;
         options uint32;
         name vector<uchar>:MAX_NAME_LEN;
@@ -333,7 +333,7 @@ closed protocol Process {
     /// [`zx_thread_exit()`]: thread_exit.md
     /// [`zx_thread_start()`]: thread_start.md
     /// [`zx_vmo_create()`]: vmo_create.md
-    strict Start(resource struct {
+    Start(resource struct {
         handle Handle:PROCESS;
         thread Handle:THREAD;
         entry Vaddr;
@@ -412,7 +412,7 @@ closed protocol Process {
     ///  - [`zx_process_write_memory()`]
     ///
     /// [`zx_process_write_memory()`]: process_write_memory.md
-    strict ReadMemory(resource struct {
+    ReadMemory(resource struct {
         handle Handle:PROCESS;
         vaddr Vaddr;
     }) -> (struct {
@@ -496,7 +496,7 @@ closed protocol Process {
     ///  - [`zx_process_read_memory()`]
     ///
     /// [`zx_process_read_memory()`]: process_read_memory.md
-    strict WriteMemory(resource struct {
+    WriteMemory(resource struct {
         handle Handle:PROCESS;
         vaddr Vaddr;
         @voidptr

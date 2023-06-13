@@ -82,7 +82,7 @@ type ServiceList = resource struct {
 ///
 /// Typically obtained via `Environment.GetLauncher`.
 @discoverable
-closed protocol Launcher {
+protocol Launcher {
     /// Creates a new instance of the component described by `launch_info`.
     ///
     /// The component instance is created in the `Environment`
@@ -93,7 +93,7 @@ closed protocol Launcher {
     /// The `controller` can be used to control the lifecycle of the created
     /// component instance. If an `ComponentController`'s interface is
     /// requested, the component instance is killed when the interface is closed.
-    strict CreateComponent(resource struct {
+    CreateComponent(resource struct {
         launch_info LaunchInfo;
         controller server_end:<ComponentController, optional>;
     });

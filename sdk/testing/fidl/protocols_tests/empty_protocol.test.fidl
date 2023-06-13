@@ -4,4 +4,4 @@
 
 library test.empty.protocol;
 
-closed protocol Empty {};
+protocol Empty {};

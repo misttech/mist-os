@@ -112,22 +112,22 @@ type ConnectionState = strict enum {
 };
 
 /// Protocol used to drive the state of a fake peer device.
-closed protocol Peer {
+protocol Peer {
     /// Assign a HCI `status` for the controller to generate in response to connection requests.
     /// Applies to all successive HCI_Create_Connection and HCI_LE_Create_Connection commands. The
     /// procedure is acknowledged with an empty response.
-    strict AssignConnectionStatus(struct {
+    AssignConnectionStatus(struct {
         status HciError;
     }) -> ();
 
     /// Emulates a LE connection event. Does nothing if the peer is already connected. The
     /// `role` parameter determines the link layer connection role.
-    strict EmulateLeConnectionComplete(struct {
+    EmulateLeConnectionComplete(struct {
         role bt.ConnectionRole;
     });
 
     /// Emulate disconnection. Does nothing if the peer is not connected.
-    strict EmulateDisconnectionComplete();
+    EmulateDisconnectionComplete();
 
     /// Watch connection state changes using the
     /// [hanging get pattern](https://fuchsia.dev/fuchsia-src/concepts/api/fidl#delay-responses-using-hanging-gets).
@@ -136,18 +136,18 @@ closed protocol Peer {
     ///
     /// Multiple calls to this method can be outstanding at a given time. All calls will resolve in
     /// a response as soon as there is a change to the connection state.
-    strict WatchConnectionStates() -> (struct {
+    WatchConnectionStates() -> (struct {
         states vector<ConnectionState>:MAX;
     });
 };
 
 /// Protocol used to emulate a Bluetooth controller that supports the standard Bluetooth HCI.
 @discoverable
-closed protocol HciEmulator {
+protocol HciEmulator {
     /// Publish a bt-hci device using the provided `settings`. Each HciEmulator instance can only
     /// manage a single bt-hci device. Returns Emulator.`HCI_ALREADY_PUBLISHED` if the device has
     /// already been published.
-    strict Publish(struct {
+    Publish(struct {
         settings EmulatorSettings;
     }) -> () error EmulatorError;
 
@@ -163,7 +163,7 @@ closed protocol HciEmulator {
     /// configuration as long as the `peer` channel is open. The emulator stops emulating this peer
     /// when the channel gets closed, which makes it no longer discoverable and not respond to any
     /// requests.
-    strict AddLowEnergyPeer(resource struct {
+    AddLowEnergyPeer(resource struct {
         parameters LowEnergyPeerParameters;
         peer server_end:Peer;
     }) -> () error EmulatorPeerError;
@@ -180,7 +180,7 @@ closed protocol HciEmulator {
     /// configuration as long as the `peer` channel is open. The emulator stops emulating this peer
     /// when the channel gets closed, which makes it no longer discoverable and not respond to any
     /// requests.
-    strict AddBredrPeer(resource struct {
+    AddBredrPeer(resource struct {
         parameters BredrPeerParameters;
         peer server_end:Peer;
     }) -> () error EmulatorPeerError;
@@ -189,7 +189,7 @@ closed protocol HciEmulator {
     /// last time this message was received, then this method does not return until there is a
     /// change.
     /// (see [hanging get pattern](https://fuchsia.dev/fuchsia-src/concepts/api/fidl#delay-responses-using-hanging-gets))
-    strict WatchControllerParameters() -> (struct {
+    WatchControllerParameters() -> (struct {
         parameters ControllerParameters;
     });
 
@@ -200,7 +200,7 @@ closed protocol HciEmulator {
     /// Multiple calls to this method can be outstanding at a given time. All calls will resolve in
     /// a response as soon as there is a change to the scan state.
     /// (see [hanging get pattern](https://fuchsia.dev/fuchsia-src/concepts/api/fidl#delay-responses-using-hanging-gets))
-    strict WatchLeScanStates() -> (struct {
+    WatchLeScanStates() -> (struct {
         states vector<LeScanState>:MAX;
     });
 
@@ -212,7 +212,7 @@ closed protocol HciEmulator {
     /// [`fuchsia.bluetooth.test/HciEmulator`] channel will be closed if a call received when one is
     /// already pending.
     /// (see [hanging get pattern](https://fuchsia.dev/fuchsia-src/concepts/api/fidl#delay-responses-using-hanging-gets))
-    strict WatchLegacyAdvertisingStates() -> (struct {
+    WatchLegacyAdvertisingStates() -> (struct {
         states vector<LegacyAdvertisingState>:MAX;
     });
 };

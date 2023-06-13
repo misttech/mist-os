@@ -9,22 +9,22 @@ using zx;
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-closed protocol UsbFunction {
+protocol UsbFunction {
     /// Registers callbacks to the USB function driver.
-    strict SetInterface(resource struct {
+    SetInterface(resource struct {
         interface client_end:UsbFunctionInterface;
     }) -> (struct {
         s zx.Status;
     });
 
     /// Allocates a unique interface descriptor number.
-    strict AllocInterface() -> (struct {
+    AllocInterface() -> (struct {
         s zx.Status;
         intf_num uint8;
     });
 
     /// Allocates a unique endpoint descriptor number.
-    strict AllocEp(struct {
+    AllocEp(struct {
         direction uint8;
     }) -> (struct {
         s zx.Status;
@@ -32,7 +32,7 @@ closed protocol UsbFunction {
     });
 
     /// Configures an endpoint based on provided descriptors.
-    strict ConfigEp(struct {
+    ConfigEp(struct {
         ep_desc fuchsia.hardware.usb.descriptor.UsbEndpointDescriptor;
         ss_comp_desc fuchsia.hardware.usb.descriptor.UsbSsEpCompDescriptor;
     }) -> (struct {
@@ -40,14 +40,14 @@ closed protocol UsbFunction {
     });
 
     /// Disables the specified endpoint.
-    strict DisableEp(struct {
+    DisableEp(struct {
         address uint8;
     }) -> (struct {
         s zx.Status;
     });
 
     /// Adds a string descriptor to the device configuration.
-    strict AllocStringDesc(struct {
+    AllocStringDesc(struct {
         string string:MAX;
     }) -> (struct {
         s zx.Status;
@@ -55,7 +55,7 @@ closed protocol UsbFunction {
     });
 
     /// Queues a USB request with the lower level driver.
-    strict RequestQueue(resource struct {
+    RequestQueue(resource struct {
         @in_out
         usb_request fuchsia.hardware.usb.request.UsbRequest;
         @in_out
@@ -63,14 +63,14 @@ closed protocol UsbFunction {
     }) -> ();
 
     /// Stalls the specified endpoint.
-    strict EpSetStall(struct {
+    EpSetStall(struct {
         ep_address uint8;
     }) -> (struct {
         s zx.Status;
     });
 
     /// Clears a stall condition for the specified endpoint.
-    strict EpClearStall(struct {
+    EpClearStall(struct {
         ep_address uint8;
     }) -> (struct {
         s zx.Status;
@@ -78,12 +78,12 @@ closed protocol UsbFunction {
 
     /// Returns the size needed for a |usb_request_t|, including private storage needed by the
     /// HCI driver.
-    strict GetRequestSize() -> (struct {
+    GetRequestSize() -> (struct {
         size uint64;
     });
 
     /// Cancels all transactions currently queued on the specified endpoint.
-    strict CancelAll(struct {
+    CancelAll(struct {
         ep_address uint8;
     }) -> (struct {
         s zx.Status;
@@ -93,9 +93,9 @@ closed protocol UsbFunction {
 /// Interface implemented by the USB function driver.
 @transport("Banjo")
 @banjo_layout("ddk-interface")
-closed protocol UsbFunctionInterface {
+protocol UsbFunctionInterface {
     /// Returns the size of the descriptor list for the function.
-    strict GetDescriptorsSize() -> (struct {
+    GetDescriptorsSize() -> (struct {
         size uint64;
     });
 
@@ -103,13 +103,13 @@ closed protocol UsbFunctionInterface {
     /// TODO(voydanoff) - descriptors will likely vary (different max packet sizes, etc)
     /// depending on whether we are in low/full, high or super speed mode.
     /// We will need to add a usb_speed_t argument to this callback.
-    strict GetDescriptors() -> (struct {
+    GetDescriptors() -> (struct {
         @buffer
         descriptors vector<uint8>:MAX;
     });
 
     /// Callback for handling ep0 control requests.
-    strict Control(struct {
+    Control(struct {
         setup fuchsia.hardware.usb.descriptor.UsbSetup;
         @buffer
         write vector<uint8>:MAX;
@@ -124,7 +124,7 @@ closed protocol UsbFunctionInterface {
     /// should call usb_function_config_ep() to configure its endpoints.
     /// Called with configured == false when configuration is disabled or USB is disconnected.
     /// The function driver should then call usb_function_disable_ep() to disable its endpoints.
-    strict SetConfigured(struct {
+    SetConfigured(struct {
         configured bool;
         speed fuchsia.hardware.usb.descriptor.UsbSpeed;
     }) -> (struct {
@@ -134,7 +134,7 @@ closed protocol UsbFunctionInterface {
     /// Called to set an alternate setting for an interface due to a SET_INTERFACE control request.
     /// The function driver should call usb_function_config_ep() and/or usb_function_config_ep()
     /// to configure or disable the interface's endpoints as appropriate.
-    strict SetInterface(struct {
+    SetInterface(struct {
         interface uint8;
         alt_setting uint8;
     }) -> (struct {

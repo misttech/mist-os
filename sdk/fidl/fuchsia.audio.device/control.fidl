@@ -65,9 +65,9 @@ type DelayInfo = table {
 /// A `ControlCreator` interface creates `Control` instances. Each `Control` binds
 /// to a single device. A device can only be bound to one `Control` at any time.
 @discoverable
-closed protocol ControlCreator {
+protocol ControlCreator {
     // Create a `Control` for the specified device.
-    strict Create(resource table {
+    Create(resource table {
         /// The token id for the device to be controlled.
         ///
         /// Required.
@@ -105,7 +105,7 @@ type ControlCreatorError = flexible enum {
 /// client and device. Each `Control` is associated with an initialized audio
 /// device; conversely each device is associated with either zero or one
 /// `Control` at any time.
-closed protocol Control {
+protocol Control {
     /// Change the processing topology (via `SetTopology`) or the state of a
     /// single processing node (via `SetElementState`).
     compose fuchsia.hardware.audio.signalprocessing.SignalProcessing;
@@ -114,7 +114,7 @@ closed protocol Control {
     //
     // TODO(fxbug.dev/102027): Remove legacy gain aspects once driver API does.
     // Going forward, gain will be handled by `SignalProcessing`.
-    strict SetGain(table {
+    SetGain(table {
         /// The gain state to be set.
         ///
         /// Required.
@@ -123,13 +123,13 @@ closed protocol Control {
 
     /// Retrieve the subset of formats that are possible, as the device is
     /// currently configured.
-    strict GetCurrentlyPermittedFormats() -> (table {
+    GetCurrentlyPermittedFormats() -> (table {
         /// Possible formats, as configured. Must contain at least one entry.
         1: permitted_formats vector<PcmFormatSet>:MAX_COUNT_FORMATS;
     }) error ControlGetCurrentlyPermittedFormatsError;
 
     /// Create the ring buffer used to pass audio to/from this device.
-    strict CreateRingBuffer(resource table {
+    CreateRingBuffer(resource table {
         /// Additional requirements about the actual ring buffer being created.
         ///
         /// Required.
@@ -208,7 +208,7 @@ type ControlCreateRingBufferError = flexible enum {
 };
 
 /// A `RingBuffer` instance controls data flow for the associated audio stream.
-closed protocol RingBuffer {
+protocol RingBuffer {
     /// Request that specific individual channels be powered down/up, if the
     /// device supports this. This is intended for idle power conservation.
     ///
@@ -223,7 +223,7 @@ closed protocol RingBuffer {
     /// still be played.
     ///
     /// If not called, then by default all channels will be active.
-    strict SetActiveChannels(table {
+    SetActiveChannels(table {
         /// The channels to be activated (all others should be deactivated). No
         /// bit should be set above the `channel_count` specified in the ring
         /// buffer format (e.g. for a four-channel stream, `channel_bitmask`
@@ -240,7 +240,7 @@ closed protocol RingBuffer {
     }) error RingBufferSetActiveChannelsError;
 
     /// Start the ring buffer, beginning at the first frame of the ring buffer.
-    strict Start(table {}) -> (table {
+    Start(table {}) -> (table {
         /// The CLOCK_MONOTONIC time when the stream was started.
         ///
         /// Required.
@@ -248,13 +248,13 @@ closed protocol RingBuffer {
     }) error RingBufferStartError;
 
     /// Stop the ring buffer.
-    strict Stop(table {}) -> (table {}) error RingBufferStopError;
+    Stop(table {}) -> (table {}) error RingBufferStopError;
 
     /// Request delay information via a hanging get. The RingBuffer will respond
     /// immediately to the first `WatchDelayInfo` call. Subsequent calls will
     /// only be completed when the delay info has changed from previously
     /// communicated values.
-    strict WatchDelayInfo() -> (table {
+    WatchDelayInfo() -> (table {
         /// Required.
         1: delay_info DelayInfo;
     }) error RingBufferWatchDelayInfoError;

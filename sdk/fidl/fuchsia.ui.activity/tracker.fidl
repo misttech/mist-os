@@ -10,14 +10,14 @@ alias OngoingActivityId = uint32;
 /// The Tracker protocol collects evidence of user activity and uses this
 /// evidence to set the system's activity state.
 @available(deprecated=10, removed=11)
-closed protocol Tracker {
+protocol Tracker {
     /// Reports a discrete activity such as a keystroke.
     /// `event_time` is in nanoseconds in the `CLOCK_MONOTONIC` time base.
     @available(
             deprecated=9,
             removed=10,
             note="Instead, use `fuchsia.input.interaction.observation.Aggregator`")
-    strict ReportDiscreteActivity(struct {
+    ReportDiscreteActivity(struct {
         activity DiscreteActivity;
         event_time zx.Time;
     }) -> ();
@@ -30,7 +30,7 @@ closed protocol Tracker {
             deprecated=9,
             removed=10,
             note="Instead, use `fuchsia.input.interaction.observation.Aggregator`")
-    strict StartOngoingActivity(struct {
+    StartOngoingActivity(struct {
         activity_id OngoingActivityId;
         activity OngoingActivity;
         start_time zx.Time;
@@ -43,7 +43,7 @@ closed protocol Tracker {
             deprecated=9,
             removed=10,
             note="Instead, use `fuchsia.input.interaction.observation.Aggregator`")
-    strict EndOngoingActivity(struct {
+    EndOngoingActivity(struct {
         activity_id OngoingActivityId;
         end_time zx.Time;
     }) -> ();

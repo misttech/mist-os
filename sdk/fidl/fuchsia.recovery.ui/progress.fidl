@@ -15,13 +15,13 @@ type Status = strict enum {
 
 /// Protocol to receive progress updates to display a carnelian based progress bar UI.
 @discoverable
-closed protocol ProgressRenderer {
+protocol ProgressRenderer {
     /// Called to send progress updates to the renderer.
     ///
     /// The return value is used for flow control, and implementers should acknowledge receipt of
     /// each message in order to continue receiving future messages.
     @available(deprecated=9)
-    strict Render(struct {
+    Render(struct {
         status Status;
         percent_complete float32;
     }) -> ();
@@ -34,7 +34,7 @@ closed protocol ProgressRenderer {
     /// The return value is used for flow control, and implementers should acknowledge receipt of
     /// each message in order to continue receiving future messages.
     @available(added=9)
-    strict Render2(table {
+    Render2(table {
         1: status Status;
         /// Optional, only used with status ACTIVE
         /// No value or an invalid value sets the progress bar to 0%

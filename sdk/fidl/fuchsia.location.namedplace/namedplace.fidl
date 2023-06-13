@@ -17,7 +17,7 @@ alias RegionCode = string:2;
 /// determine the regulatory region whose rules should govern the
 /// operation of radios on the system.
 @discoverable
-closed protocol RegulatoryRegionConfigurator {
+protocol RegulatoryRegionConfigurator {
     /// Sets the region.
     ///
     /// Clients should take care that their calls to this API arrive in a
@@ -46,7 +46,7 @@ closed protocol RegulatoryRegionConfigurator {
     /// ```
     ///
     /// + request `region` the current regulatory region.
-    strict SetRegion(struct {
+    SetRegion(struct {
         region RegionCode;
     });
 };
@@ -55,7 +55,7 @@ closed protocol RegulatoryRegionConfigurator {
 /// radio subsystems to learn the currently applicable regulatory
 /// region, and to be notified when that value changes.
 @discoverable
-closed protocol RegulatoryRegionWatcher {
+protocol RegulatoryRegionWatcher {
     /// This call is deprecated. Use GetRegionUpdate instead.
     ///
     /// Returns the new RegionCode, when it changes.
@@ -74,7 +74,7 @@ closed protocol RegulatoryRegionWatcher {
     ///     closed with `ZX_ERR_BAD_STATE`.
     ///
     /// - response `new_region` the current regulatory region.
-    strict GetUpdate() -> (struct {
+    GetUpdate() -> (struct {
         new_region RegionCode;
     });
 
@@ -94,7 +94,7 @@ closed protocol RegulatoryRegionWatcher {
     ///     closed with `ZX_ERR_BAD_STATE`.
     ///
     /// - response `new_region` the current regulatory region.
-    strict GetRegionUpdate() -> (struct {
+    GetRegionUpdate() -> (struct {
         new_region RegionCode:optional;
     });
 };

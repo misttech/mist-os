@@ -11,12 +11,12 @@ type CpuSet = struct {
 };
 
 @discoverable
-closed protocol ProfileProvider {
+protocol ProfileProvider {
     /// Obtain a profile handle.
     ///
     /// TODO(fxbug.dev/40858): This API will be deprecated and removed in the future, use
     /// SetProfileByRole instead.
-    strict GetProfile(struct {
+    GetProfile(struct {
         priority uint32;
         name string:64;
     }) -> (resource struct {
@@ -28,7 +28,7 @@ closed protocol ProfileProvider {
     ///
     /// TODO(fxbug.dev/40858): This API will be deprecated and removed in the future, use
     /// SetProfileByRole instead.
-    strict GetDeadlineProfile(struct {
+    GetDeadlineProfile(struct {
         capacity uint64;
         deadline uint64;
         period uint64;
@@ -42,7 +42,7 @@ closed protocol ProfileProvider {
     ///
     /// TODO(fxbug.dev/40858): This API will be deprecated and removed in the future, use
     /// SetProfileByRole instead.
-    strict GetCpuAffinityProfile(struct {
+    GetCpuAffinityProfile(struct {
         cpu_mask CpuSet;
     }) -> (resource struct {
         status zx.Status;
@@ -52,7 +52,7 @@ closed protocol ProfileProvider {
     /// Sets the given object's profile based on the requested role. The exact
     /// parameters of the profile are system dependent and may vary based on
     /// device-specific tuning and/or runtime system goals.
-    strict SetProfileByRole(resource struct {
+    SetProfileByRole(resource struct {
         handle zx.Handle;
         role string:2048;
     }) -> (struct {

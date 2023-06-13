@@ -68,31 +68,31 @@ type WriteFirmwareResult = strict union {
 const MAX_FIRMWARE_TYPE_LENGTH uint32 = 256;
 
 /// Protocol for streaming the FVM payload.
-closed protocol PayloadStream {
+protocol PayloadStream {
     /// Registers a VMO to stream into.
     ///
     /// This can be called once per PayloadStream.
     /// Any subsequent calls will return ZX_ERR_ALREADY_BOUND.
-    strict RegisterVmo(resource struct {
+    RegisterVmo(resource struct {
         vmo zx.Handle:VMO;
     }) -> (struct {
         status zx.Status;
     });
 
     /// Reads data into the pre-registered vmo.
-    strict ReadData() -> (struct {
+    ReadData() -> (struct {
         result ReadResult;
     });
 };
 
 @discoverable
-closed protocol Paver {
+protocol Paver {
     /// Attempts to auto-discover the data sink where assets and volumes will get paved to.
     /// On devices with GPT, the partition must have a valid FVM partition in order for
     /// auto-discovery to find it. If multiple devices are found suitable, error is returned.
     ///
     /// `data_sink` will be closed on error, with an epitaph provided on failure reason.
-    strict FindDataSink(resource struct {
+    FindDataSink(resource struct {
         data_sink server_end:DataSink;
     });
 
@@ -102,7 +102,7 @@ closed protocol Paver {
     /// It assumes that channel backing `block_device` also implements `fuchsia.io.Node` for now.
     ///
     /// `data_sink` will be closed on error, with an epitaph provided on failure reason.
-    strict UseBlockDevice(resource struct {
+    UseBlockDevice(resource struct {
         block_device client_end:fuchsia.hardware.block.Block;
         block_controller client_end:fuchsia.device.Controller;
         data_sink server_end:DynamicDataSink;
@@ -112,12 +112,12 @@ closed protocol Paver {
     ///
     /// `boot_manager` will be closed on error, with an epitaph provided on failure reason.
     /// ZX_ERR_NOT_SUPPORTED indicates lack of support and configuration A is always booted from.
-    strict FindBootManager(resource struct {
+    FindBootManager(resource struct {
         boot_manager server_end:BootManager;
     });
 
     /// Find Sysconfig service.
-    strict FindSysconfig(resource struct {
+    FindSysconfig(resource struct {
         sysconfig server_end:Sysconfig;
     });
 };
@@ -140,10 +140,10 @@ closed protocol Paver {
 /// before new system images.
 /// DataSink.Write[...]() --> DataSink.Flush() --> BootManager.Set[...]() --> BootManager.Flush()
 /// DataSink.Write[...]() --> BootManager.Set[...]() --> DataSink.Flush() --> BootManager.Flush()
-closed protocol DataSink {
+protocol DataSink {
     /// Reads partition corresponding to `configuration` and `asset` into a
     /// vmo and returns it.
-    strict ReadAsset(struct {
+    ReadAsset(struct {
         configuration Configuration;
         asset Asset;
     }) -> (resource struct {
@@ -158,7 +158,7 @@ closed protocol DataSink {
     ///
     ///
     /// Returns `ZX_ERR_INVALID_ARGS` if `configuration` specifies active configuration.
-    strict WriteAsset(resource struct {
+    WriteAsset(resource struct {
         configuration Configuration;
         asset Asset;
         payload fuchsia.mem.Buffer;
@@ -180,7 +180,7 @@ closed protocol DataSink {
     /// `payload` may need to be resized to the partition size, so the provided
     /// vmo must have been created with `ZX_VMO_RESIZABLE` or must be a child
     /// VMO that was created with `ZX_VMO_CHILD_RESIZABLE`.
-    strict WriteFirmware(resource struct {
+    WriteFirmware(resource struct {
         configuration Configuration;
         type string:MAX_FIRMWARE_TYPE_LENGTH;
         payload fuchsia.mem.Buffer;
@@ -194,7 +194,7 @@ closed protocol DataSink {
     ///
     /// If ReadFirmware returns error, caller should assume that firmware image does not exist
     /// or is in a bad state, or firmware read is not defined for the product.
-    strict ReadFirmware(resource struct {
+    ReadFirmware(resource struct {
         configuration Configuration;
         type string:MAX_FIRMWARE_TYPE_LENGTH;
     }) -> (resource struct {
@@ -203,7 +203,7 @@ closed protocol DataSink {
 
     /// Writes FVM with data from streamed via `payload`. This potentially affects all
     /// configurations.
-    strict WriteVolumes(resource struct {
+    WriteVolumes(resource struct {
         payload client_end:PayloadStream;
     }) -> (struct {
         status zx.Status;
@@ -217,7 +217,7 @@ closed protocol DataSink {
     /// susceptible to an outdated paver.
     ///
     /// Returns ZX_ERR_NOT_SUPPORTED if the backend does not support opaque volume blobs.
-    strict WriteOpaqueVolume(resource struct {
+    WriteOpaqueVolume(resource struct {
         payload fuchsia.mem.Buffer;
     }) -> () error zx.Status;
 
@@ -233,22 +233,22 @@ closed protocol DataSink {
     /// `fuchsia.io.Node` for now.
     ///
     /// On success, returns a channel to the initialized FVM volume.
-    strict WipeVolume() -> (resource struct {
+    WipeVolume() -> (resource struct {
         volume client_end:fuchsia.hardware.block.volume.VolumeManager;
     }) error zx.Status;
 
     /// Flush all previously buffered writes to persistent storage.
-    strict Flush() -> (struct {
+    Flush() -> (struct {
         status zx.Status;
     });
 };
 
 /// Specialized DataSink with dynamic partition tables.
-closed protocol DynamicDataSink {
+protocol DynamicDataSink {
     compose DataSink;
 
     /// Initializes partitions on given block device.
-    strict InitializePartitionTables() -> (struct {
+    InitializePartitionTables() -> (struct {
         status zx.Status;
     });
 
@@ -257,7 +257,7 @@ closed protocol DynamicDataSink {
     ///
     /// *WARNING*: This API may destructively remove non-fuchsia maintained partitions from
     /// the block device.
-    strict WipePartitionTables() -> (struct {
+    WipePartitionTables() -> (struct {
         status zx.Status;
     });
 };
@@ -267,12 +267,12 @@ closed protocol DynamicDataSink {
 /// All functions will first check the A/B/R metadata and reset it to
 /// the default state if it's invalid.
 /// The new configuration is not guaranteed to persist to storage before Flush() is called.
-closed protocol BootManager {
+protocol BootManager {
     /// Queries the configuration the system is currently running.
     ///
     /// Returns `ZX_ERR_NOT_SUPPORTED` if the `zvb.current_slot` boot argument cannot be read
     /// or is an unexpected value.
-    strict QueryCurrentConfiguration() -> (struct {
+    QueryCurrentConfiguration() -> (struct {
         configuration Configuration;
     }) error zx.Status;
 
@@ -281,7 +281,7 @@ closed protocol BootManager {
     /// should never be active.
     ///
     /// Returns `ZX_ERR_NOT_SUPPORTED` if `Configuration.RECOVERY` is active.
-    strict QueryActiveConfiguration() -> (struct {
+    QueryActiveConfiguration() -> (struct {
         configuration Configuration;
     }) error zx.Status;
 
@@ -293,14 +293,14 @@ closed protocol BootManager {
     ///
     /// Returns `ZX_ERR_IO` if fail to load abr metadata. Returns `ZX_ERR_INTERNAL` if invalid
     /// slot index is returned by libabr routine.
-    strict QueryConfigurationLastSetActive() -> (struct {
+    QueryConfigurationLastSetActive() -> (struct {
         configuration Configuration;
     }) error zx.Status;
 
     /// Queries status of `configuration`.
     ///
     /// Returns `ZX_ERR_INVALID_ARGS` if `Configuration.RECOVERY` is passed in via `configuration`.
-    strict QueryConfigurationStatus(struct {
+    QueryConfigurationStatus(struct {
         configuration Configuration;
     }) -> (struct {
         status ConfigurationStatus;
@@ -311,7 +311,7 @@ closed protocol BootManager {
     /// `VERIFIED_BOOT_METADATA` assets for specified `configuration` were written successfully.
     ///
     /// Returns `ZX_ERR_INVALID_ARGS` if `Configuration.RECOVERY` is passed in via `configuration`.
-    strict SetConfigurationActive(struct {
+    SetConfigurationActive(struct {
         configuration Configuration;
     }) -> (struct {
         status zx.Status;
@@ -329,7 +329,7 @@ closed protocol BootManager {
     /// If the configuration is unbootable, no action is taken.
     ///
     /// Returns `ZX_ERR_INVALID_ARGS` if `Configuration.RECOVERY` is passed in via `configuration`.
-    strict SetConfigurationUnbootable(struct {
+    SetConfigurationUnbootable(struct {
         configuration Configuration;
     }) -> (struct {
         status zx.Status;
@@ -355,7 +355,7 @@ closed protocol BootManager {
     /// + request `configuration` the `Configuration` to mark as healthy. Must
     ///   not be `RECOVERY`.
     /// - response `status` a zx_status value indicating success or failure.
-    strict SetConfigurationHealthy(struct {
+    SetConfigurationHealthy(struct {
         configuration Configuration;
     }) -> (struct {
         status zx.Status;
@@ -364,10 +364,10 @@ closed protocol BootManager {
     /// Force device to boot to recovery in the next reboot/power cycle. This will only be
     /// triggered once and will be reset after the reboot. State of A/B configuration slot will not
     /// be affected.
-    strict SetOneShotRecovery() -> () error zx.Status;
+    SetOneShotRecovery() -> () error zx.Status;
 
     /// Flush all previously buffered writes to persistent storage.
-    strict Flush() -> (struct {
+    Flush() -> (struct {
         status zx.Status;
     });
 };
@@ -375,31 +375,31 @@ closed protocol BootManager {
 /// Protocol that provides access to sysconfig-data sub-partition in sysconfig partition.
 /// The main user of the protocol are pkg-solver and system update-checker, which need to
 /// read/write sysconfig-data channel.
-closed protocol Sysconfig {
+protocol Sysconfig {
     /// Read from the sub-partition
-    strict Read() -> (resource struct {
+    Read() -> (resource struct {
         data fuchsia.mem.Buffer;
     }) error zx.Status;
 
     /// Writes to the sub-partition
-    strict Write(resource struct {
+    Write(resource struct {
         payload fuchsia.mem.Buffer;
     }) -> (struct {
         status zx.Status;
     });
 
     /// Get sub-partition size.
-    strict GetPartitionSize() -> (struct {
+    GetPartitionSize() -> (struct {
         size uint64;
     }) error zx.Status;
 
     /// Flush all previously buffered data to persistent storage.
-    strict Flush() -> (struct {
+    Flush() -> (struct {
         status zx.Status;
     });
 
     /// Wipe all data in the sub-partition (write 0 to all bytes).
-    strict Wipe() -> (struct {
+    Wipe() -> (struct {
         status zx.Status;
     });
 };
