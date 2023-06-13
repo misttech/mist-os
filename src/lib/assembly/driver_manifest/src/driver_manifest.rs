@@ -42,6 +42,21 @@ impl DriverManifestBuilder {
         Ok(())
     }
 
+    /// Create the driver manifest.
+    pub fn create_manifest_file(&self, manifest_path: &Utf8Path) -> Result<()> {
+        if let Some(parent) = manifest_path.parent() {
+            std::fs::create_dir_all(parent).context(format!(
+                "Creating parent dir {} for {} in gendir",
+                parent, manifest_path
+            ))?;
+        }
+        let manifest_file = File::create(&manifest_path)
+            .context(format!("Creating the driver manifest file: {}", manifest_path))?;
+        serde_json::to_writer(manifest_file, &self.drivers)
+            .context(format!("Writing the manifest file {}", manifest_path))?;
+        Ok(())
+    }
+
     /// Build the driver manifest package and return the driver manifest path.
     pub fn build_driver_manifest_package(
         &self,

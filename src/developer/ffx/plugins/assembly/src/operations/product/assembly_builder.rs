@@ -12,7 +12,7 @@ use assembly_config_schema::{
     DriverDetails, FileEntry,
 };
 use assembly_domain_config::DomainConfigPackage;
-use assembly_driver_manifest::DriverManifestBuilder;
+use assembly_driver_manifest::{DriverManifestBuilder, BOOTFS_BASE_DRIVER_MANIFEST_PATH};
 use assembly_package_utils::{PackageInternalPathBuf, PackageManifestPathBuf};
 use assembly_platform_configuration::{
     ComponentConfigs, DomainConfig, DomainConfigs, PackageConfigs, PackageConfiguration,
@@ -582,6 +582,15 @@ impl ImageAssemblyConfigBuilder {
                 .context("building driver manifest package")?;
 
             base.add_package(PackageEntry::parse_from(driver_manifest_package_manifest_path)?)?;
+
+            // TODO(fxbug.dev/128391): Add a base-driver manifest file to /boot
+            // while Driver Manager transitions to no longer reading the manifest from a package.
+            let manifest_path = outdir.join(BOOTFS_BASE_DRIVER_MANIFEST_PATH);
+            driver_manifest_builder.create_manifest_file(&manifest_path)?;
+            bootfs_files.add_entry(FileEntry {
+                destination: BOOTFS_BASE_DRIVER_MANIFEST_PATH.trim_end_matches(".json").to_string(),
+                source: manifest_path,
+            })?;
         }
 
         // Build the config_data package
@@ -942,11 +951,13 @@ mod tests {
         assert_eq!(result.bootfs_packages, vec![outdir.join("bootfs_package0")]);
         assert_eq!(result.boot_args, vec!("boot_arg0".to_string()));
         assert_eq!(
-            result.bootfs_files,
-            vec!(FileEntry {
-                source: outdir.join("source/path/to/file"),
-                destination: "dest/file/path".into()
-            })
+            result
+                .bootfs_files
+                .iter()
+                .map(|f| f.destination.to_owned())
+                .sorted()
+                .collect::<Vec<_>>(),
+            vec![BOOTFS_BASE_DRIVER_MANIFEST_PATH, "dest/file/path"]
         );
 
         assert_eq!(result.kernel.path, outdir.join("kernel/path"));
@@ -968,6 +979,47 @@ mod tests {
             builder.add_parsed_bundle(&vars.bundle_path, bundle).unwrap();
         }
         builder
+    }
+
+    #[test]
+    fn test_builder_generates_driver_manifest_in_bootfs() -> Result<()> {
+        let tools = FakeToolProvider::default();
+        let temp = TempDir::new().unwrap();
+        let root = Utf8Path::from_path(temp.path()).unwrap();
+
+        let mut aib = make_test_assembly_bundle(root);
+        let base_driver_1 = make_test_driver("base-driver1", root)?;
+        let base_driver_2 = make_test_driver("base-driver2", root)?;
+        aib.base_drivers = vec![base_driver_1, base_driver_2];
+
+        let mut builder = ImageAssemblyConfigBuilder::default();
+        builder.add_parsed_bundle(root, aib).unwrap();
+        let result: assembly_config_schema::ImageAssemblyConfig =
+            builder.build(root, &tools).unwrap();
+
+        assert_eq!(
+            result.bootfs_files.iter().map(|f| f.destination.clone()).sorted().collect::<Vec<_>>(),
+            vec![BOOTFS_BASE_DRIVER_MANIFEST_PATH, "dest/file/path"],
+        );
+
+        let base_driver_manifest: Vec<DriverManifest> = serde_json::from_reader(BufReader::new(
+            File::open(root.join(BOOTFS_BASE_DRIVER_MANIFEST_PATH))?,
+        ))?;
+
+        assert_eq!(
+            base_driver_manifest,
+            vec![
+                DriverManifest {
+                    driver_url: "fuchsia-pkg://testrepository.com/base-driver1#meta/foobar.cm"
+                        .to_owned()
+                },
+                DriverManifest {
+                    driver_url: "fuchsia-pkg://testrepository.com/base-driver2#meta/foobar.cm"
+                        .to_owned()
+                }
+            ]
+        );
+        Ok(())
     }
 
     #[test]

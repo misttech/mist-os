@@ -10,3 +10,6 @@ mod driver_manifest;
 
 pub use driver_manifest::DriverManifest;
 pub use driver_manifest::DriverManifestBuilder;
+
+/// The path to the base driver manifest in /boot.
+pub const BOOTFS_BASE_DRIVER_MANIFEST_PATH: &str = "config/driver_index/base_driver_manifest";
