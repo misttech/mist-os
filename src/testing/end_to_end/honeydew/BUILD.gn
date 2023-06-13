@@ -6,7 +6,7 @@ import("//build/python/python_library.gni")
 
 python_library("honeydew") {
   library_name = "honeydew"
-  source_root = "."
+  source_root = "//src/testing/end_to_end/honeydew/honeydew"
   sources = [
     "__init__.py",
     "affordances/__init__.py",

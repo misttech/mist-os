@@ -6,14 +6,14 @@
 
 import logging
 
-from honeydew import transports
+from mobly import asserts
+from mobly import test_runner
+from test_fuchsia_device import test_fuchsia_device
+
 from honeydew.device_classes.fuchsia_controller import \
     generic_fuchsia_device as fc_generic_fuchsia_device
 from honeydew.device_classes.sl4f import \
     generic_fuchsia_device as sl4f_generic_fuchsia_device
-from mobly import asserts
-from mobly import test_runner
-from test_fuchsia_device import test_fuchsia_device
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

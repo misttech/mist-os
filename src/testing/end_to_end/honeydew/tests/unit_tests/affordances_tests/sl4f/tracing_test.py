@@ -10,10 +10,11 @@ from typing import Any, Dict
 import unittest
 from unittest import mock
 
+from parameterized import parameterized
+
 from honeydew import errors
 from honeydew.affordances.sl4f import tracing as sl4f_tracing
 from honeydew.transports import sl4f as sl4f_transport
-from parameterized import parameterized
 
 
 def _custom_test_name_func(testcase_func, _, param) -> str:

@@ -7,17 +7,16 @@
 import logging
 import os
 import tempfile
-from typing import Dict
 
 from fuchsia_base_test import fuchsia_base_test
+from mobly import asserts
+from mobly import test_runner
+
 from honeydew import custom_types
-from honeydew import transports
 from honeydew.device_classes.fuchsia_controller import \
     fuchsia_device as fc_fuchsia_device
 from honeydew.device_classes.sl4f import fuchsia_device as sl4f_fuchsia_device
 from honeydew.interfaces.device_classes import fuchsia_device
-from mobly import asserts
-from mobly import test_runner
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

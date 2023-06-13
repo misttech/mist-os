@@ -7,8 +7,9 @@
 import ipaddress
 import unittest
 
-from honeydew import custom_types
 from parameterized import parameterized
+
+from honeydew import custom_types
 
 
 class CustomTypesTests(unittest.TestCase):

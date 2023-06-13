@@ -9,10 +9,11 @@ from typing import Any, Dict, List
 import unittest
 from unittest import mock
 
+from parameterized import parameterized
+
 from honeydew import custom_types
 from honeydew import errors
 from honeydew.transports import ffx
-from parameterized import parameterized
 
 # pylint: disable=protected-access
 _SSH_ADDRESS = "fe80::3804:df7d:daa8:ce6c"

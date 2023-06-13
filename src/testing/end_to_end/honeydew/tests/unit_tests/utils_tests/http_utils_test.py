@@ -10,9 +10,10 @@ from typing import Any, Dict
 import unittest
 from unittest import mock
 
+from parameterized import parameterized
+
 from honeydew import errors
 from honeydew.utils import http_utils
-from parameterized import parameterized
 
 # pylint: disable=protected-access
 _PARAMS: Dict[str, Any] = {

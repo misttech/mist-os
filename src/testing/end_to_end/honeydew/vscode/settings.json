@@ -1,7 +1,7 @@
 {
     "python.linting.lintOnSave": true,
     "python.linting.pylintEnabled": true,
-    "python.linting.pylintPath": "pylint",
+    "python.linting.pylintPath": "${env:FUCHSIA_DIR}/.venvs/fuchsia_python_venv/bin/pylint",
     "python.linting.pylintArgs": [
         "--rcfile=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/linter/pylintrc"
     ],
@@ -9,21 +9,14 @@
         "--rcfile=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/linter/pylintrc"
     ],
     "python.linting.mypyEnabled": true,
-    "python.linting.mypyPath": "mypy",
+    "python.linting.mypyPath": "${env:FUCHSIA_DIR}/.venvs/fuchsia_python_venv/bin/mypy",
     "python.linting.mypyArgs": [
-        "--config-file=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/linter/mypy.ini"
+        "--config-file=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/pyproject.toml"
     ],
     "mypy-type-checker.args": [
-        "--config-file=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/linter/mypy.ini"
+        "--config-file=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/pyproject.toml"
     ],
     "python.formatting.provider": "yapf",
-    "isort.args": [
-        "--profile",
-        "google",
-        "--line-length",
-        "80"
-    ],
-    "isort.check": true,
     "editor.rulers": [
         80
     ],
@@ -32,9 +25,6 @@
     "editor.formatOnPaste": false,
     "editor.detectIndentation": false,
     "editor.tabSize": 4,
-    "editor.codeActionsOnSave": {
-        "source.organizeImports": true
-    },
     "editor.formatOnType": true,
     "files.insertFinalNewline": true,
     "files.trimTrailingWhitespace": true,

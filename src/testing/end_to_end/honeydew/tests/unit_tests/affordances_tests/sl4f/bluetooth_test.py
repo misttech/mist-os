@@ -8,9 +8,10 @@ from typing import Any, Dict
 import unittest
 from unittest import mock
 
+from parameterized import parameterized
+
 from honeydew.affordances.sl4f import bluetooth as sl4f_bluetooth
 from honeydew.transports import sl4f as sl4f_transport
-from parameterized import parameterized
 
 
 def _custom_test_name_func(testcase_func, _, param) -> str:

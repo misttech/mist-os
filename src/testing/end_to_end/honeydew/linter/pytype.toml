@@ -28,8 +28,7 @@ platform = 'linux'
 pythonpath = '../'
 
 # Python version (major.minor) of the target code.
-# Commenting this for now as unable to run pytpye using fuchsia-vendored-python
-# python_version = '3.8'
+python_version = '3.8'
 
 # Always use function return type annotations. This flag is temporary and will
 # be removed once this behavior is enabled by default.

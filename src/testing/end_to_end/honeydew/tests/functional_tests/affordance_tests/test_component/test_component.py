@@ -8,9 +8,10 @@ import logging
 from typing import List
 
 from fuchsia_base_test import fuchsia_base_test
-from honeydew.interfaces.device_classes import fuchsia_device
 from mobly import asserts
 from mobly import test_runner
+
+from honeydew.interfaces.device_classes import fuchsia_device
 
 ROOT_CM_URL = "fuchsia-boot:///#meta/root.cm"
 SYS_MGR_V1_CMX_NAME = "sysmgr.cmx"

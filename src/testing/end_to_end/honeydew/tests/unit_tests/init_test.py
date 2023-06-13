@@ -10,6 +10,8 @@ from typing import Any, Dict, List, Set, Type
 import unittest
 from unittest import mock
 
+from parameterized import parameterized
+
 import honeydew
 from honeydew import custom_types
 from honeydew import errors
@@ -20,7 +22,6 @@ from honeydew.device_classes.sl4f import \
     generic_fuchsia_device as sl4f_generic_fuchsia_device
 from honeydew.device_classes.sl4f import x64 as sl4f_x64
 from honeydew.interfaces.device_classes import fuchsia_device
-from parameterized import parameterized
 
 
 def _custom_test_name_func(testcase_func, _, param) -> str:

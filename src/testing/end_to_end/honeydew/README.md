@@ -22,21 +22,71 @@ Assumptions:
       the `fssh tunnel` command manually again in order to re-establish the
       appropriate port forwards.
 
+## Installation
+**Running** `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/install.sh`
+**will automatically perform the below mentioned installation steps**
+
+If you like to try HoneyDew locally, you can [pip] install HoneyDew along with
+all of its dependencies inside a [python virtual environment]
+
+Note - Use `fuchsia-vendored-python` while creating the virtual environment
+as all of the in-tree code is developed using `fuchsia-vendored-python`
+
+```shell
+# cd to Fuchsia root directory
+~$ cd $FUCHSIA_DIR
+
+# create a virtual environment using `fuchsia-vendored-python`
+~/fuchsia$ mkdir -p $FUCHSIA_DIR/.venvs/
+~/fuchsia$ fuchsia-vendored-python -m venv $FUCHSIA_DIR/.venvs/fuchsia_python_venv
+
+# activate the virtual environment
+~/fuchsia$ source $FUCHSIA_DIR/.venvs/fuchsia_python_venv/bin/activate
+
+# upgrade the `pip` module
+(fuchsia_python_venv)~/fuchsia$ python -m pip install --upgrade pip
+
+# install honeydew
+(fuchsia_python_venv)~/fuchsia$ cd $FUCHSIA_DIR/src/testing/end_to_end/honeydew
+(fuchsia_python_venv)~/fuchsia/src/testing/end_to_end/honeydew$ python -m pip install --editable ".[test,guidelines]"
+
+# verify you are able to import honeydew from a python terminal running inside this virtual environment
+(fuchsia_python_venv)~/fuchsia/src/testing/end_to_end/honeydew$ cd $FUCHSIA_DIR
+(fuchsia_python_venv)~/fuchsia$
+(fuchsia_python_venv)~/fuchsia$ python
+Python 3.8.8+chromium.12 (tags/v3.8.8-dirty:024d8058b0, Feb 19 2021, 16:18:16)
+[GCC 4.8.2 20140120 (Red Hat 4.8.2-15)] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+>>> import honeydew
+```
+
+## Uninstallation
+**Running** `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/uninstall.sh`
+**will automatically perform the below mentioned uninstallation steps**
+
+To fully uninstall HoneyDew, delete the virtual environment that was crated
+```shell
+(fuchsia_python_venv)~/fuchsia$ deactivate
+~/fuchsia$ rm -rf $FUCHSIA_DIR/.venvs/fuchsia_python_venv
+```
+
 ## Usage
 
 ### Device object creation
 ```python
->>> import os
->>> import logging
->>> logging.basicConfig(level=logging.INFO)
-
 # Update `sys.path` to include HoneyDew's path before importing it
+# Do this step only if you have not pip installed HoneyDew
 >>> import sys
 >>> FUCHSIA_ROOT = os.environ.get("FUCHSIA_DIR")
 >>> HONEYDEW_ROOT = f"{FUCHSIA_ROOT}/src/testing/end_to_end"
 >>> sys.path.append(HONEYDEW_ROOT)
->>> import honeydew
 
+# Enable Info logging
+>>> import os
+>>> import logging
+>>> logging.basicConfig(level=logging.INFO)
+
+>>> import honeydew
 # honeydew.create_device() will look for a specific Fuchsia device class implementation that matches the device type specified and if it finds, it returns that specific device type object, else returns GenericFuchsiaDevice object.
 # In below examples,
 #   * "fuchsia-54b2-038b-6e90" is a x64 device whose implementation is present in HoneyDew. Hence returning honeydew.device_classes.x64.X64 object.
@@ -79,7 +129,6 @@ INFO:honeydew.transports.sl4f:Starting SL4F server on fuchsia-d88c-796c-e57e...
 
 >>> type(fd_remote)
 <class 'honeydew.device_classes.generic_fuchsia_device.GenericFuchsiaDevice'>
-
 ```
 
 ### Access the static properties
@@ -141,6 +190,15 @@ INFO:honeydew.device_classes.fuchsia_device_base:Snapshot file has been saved @ 
 ```
 
 ## HoneyDew code guidelines
+
+### Install dependencies
+Below guidelines requires certain dependencies that are not yet available in
+[Fuchsia third-party]. So for the time being you need to [pip] install
+these dependencies inside a [python virtual environment].
+
+Follow [Installation](#Installation) to install HoneyDew which will also install
+all of these dependencies.
+
 ### Python Style Guide
 HoneyDew code follows [Google Python Style Guide] and it is important to ensure
 any new code written continue to follow these guidelines.
@@ -149,41 +207,50 @@ At this point, we do not have an automated way (in CQ) for identifying this and
 alerting the CL author prior to submitting the CL. Until then CL author need to
 follow the below instructions every time HoneyDew code is changed.
 
-#### Install dependencies
-* Below guidelines requires certain dependencies that are not yet available
-  in [Fuchsia third-party]. So for the time being you need to [pip] install
-  each of these dependent module inside a [python virtual environment]
-  * Note - Create virtual environment using `fuchsia-vendored-python` as all
-    the in-tree code is written using `fuchsia-vendored-python`
-    ```sh
-    ~/fuchsia$ mkdir -p ~/venvs/
-    ~/fuchsia$ fuchsia-vendored-python -m venv ~/venvs/fuchsia_python_venv
-    ~/fuchsia$ source ~/venvs/fuchsia_python_venv/bin/activate
-    (fuchsia_python_venv)~/fuchsia$ pip install <dependency-module>
-    ```
-* List of all these dependencies can be found in `guidelines` and `test` lists
-  defined in `[project.optional-dependencies]` section of the
-  [pyproject.toml](pyproject.toml) file
-
-
 #### formatting
+**Running** `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/format.sh`
+**will automatically perform the below mentioned formatting steps**
+
+* Remove unused code by running below command
+    ```shell
+    autoflake --in-place --remove-unused-variables --remove-all-unused-imports --remove-duplicate-keys --recursive $FUCHSIA_DIR/src/testing/end_to_end/honeydew/
+    ```
+* Sort the imports within python sources by running below command
+    ```shell
+    isort $FUCHSIA_DIR/src/testing/end_to_end/honeydew/
+    ```
 * Ensure code is formatted using [yapf]
-* `fx format-code` underneath uses [yapf] for formatting the python code. So
-   just run `fx format-code`
+    * `fx format-code` underneath uses [yapf] for formatting the python code.
+    * Run below command to format the code
+    ```shell
+    (fuchsia_python_venv)~/fuchsia$ fx format-code
+    ```
 
 #### linting
 * Ensure code is [pylint] compliant
 * Verify `pylint` is properly installed by running `pylint --help`
-* Run `pylint --rcfile=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/pylintrc $FUCHSIA_DIR/src/testing/end_to_end/honeydew/` and fix all the issues pointed by `pylint`
+* Run below commands and fix all the issues pointed by `pylint`
+```shell
+(fuchsia_python_venv)~/fuchsia$ pylint --rcfile=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/pylintrc $FUCHSIA_DIR/src/testing/end_to_end/honeydew/honeydew/
+
+(fuchsia_python_venv)~/fuchsia$ pylint --rcfile=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/pylintrc $FUCHSIA_DIR/src/testing/end_to_end/honeydew/tests/
+```
 
 #### type-checking
 * Ensure code is [mypy] and [pytype] compliant
 * For `mypy`,
   * Verify `mypy` is properly installed by running `mypy --help`
-  * Run `mypy --config-file=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/mypy.toml $FUCHSIA_DIR/src/testing/end_to_end/honeydew/` and fix all the issues pointed by `mypy`
+  * Run below command and fix all the issues pointed by `mypy`
+    ```shell
+    (fuchsia_python_venv)~/fuchsia$ mypy --config-file=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/pyproject.toml $FUCHSIA_DIR/src/testing/end_to_end/honeydew/
+    ```
 * For `pytype`,
   * Verify `pytype` is properly installed by running `pytype --help`
-  * Run `pytype --config=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/pytype.toml $FUCHSIA_DIR/src/testing/end_to_end/honeydew/` and fix all the issues pointed by `pytype`
+  * Run below command and fix all the issues pointed by `pytype`
+    ```shell
+    (fuchsia_python_venv)~/fuchsia$ pytype --config=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/pytype.toml $FUCHSIA_DIR/src/testing/end_to_end/honeydew/
+    ```
+
 
 ### Code Coverage
 It is a hard requirement that HoneyDew code is well tested using a combination
@@ -211,19 +278,20 @@ follow the below instructions every time HoneyDew code is changed:
 * Verify `coverage` is properly installed by running `coverage --help`
 * Verify `parameterized` is properly installed by running
   `pip show parameterized`
-* Run the below commands sequence and ensure code you have touched has unit test
-  coverage
+* Run the below commands and ensure code you have touched has unit test coverage
 ```shell
-# For coverage to identify `honeydew` code as it is not pip installed
-# CD to directory where `honeydew` folder exists
-$ cd ${FUCHSIA_DIR}/src/testing/end_to_end
-
-# Run unit tests using coverage tool which will run the tests
-$ coverage run -m unittest discover --top-level-directory ~/fuchsia/src/testing/end_to_end/honeydew --start-directory ~/fuchsia/src/testing/end_to_end/honeydew/tests/unit_tests --pattern "*_test.py"
+# Run unit tests using coverage tool
+(fuchsia_python_venv)~/fuchsia$ coverage run -m unittest discover --top-level-directory ~/fuchsia/src/testing/end_to_end/honeydew --start-directory ~/fuchsia/src/testing/end_to_end/honeydew/tests/unit_tests --pattern "*_test.py"
 
 # Run below command to generate code coverage stats
-$ coverage report -m
+(fuchsia_python_venv)~/fuchsia$ coverage report -m
+
+# Delete the .coverage file
+(fuchsia_python_venv)~/fuchsia$ rm -rf .coverage
 ```
+
+### Cleanup
+Finally, follow [Uninstallation](#Uninstallation) for the cleanup.
 
 ## Contributing
 One of the primary goal while designing HoneyDew was to make it easy to

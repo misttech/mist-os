@@ -8,6 +8,8 @@ from typing import Any, Dict
 import unittest
 from unittest import mock
 
+from parameterized import parameterized
+
 from honeydew import custom_types
 from honeydew import errors
 from honeydew.device_classes.sl4f import fuchsia_device
@@ -15,7 +17,6 @@ from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.device_classes import \
     fuchsia_device as fuchsia_device_interface
 from honeydew.interfaces.device_classes import transports_capable
-from parameterized import parameterized
 
 # pylint: disable=protected-access
 # pytype: disable=attribute-error

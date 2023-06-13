@@ -4,12 +4,12 @@
 # found in the LICENSE file.
 """Mobly test for x64.py device class."""
 
-from honeydew import transports
-from honeydew.device_classes.fuchsia_controller import x64 as fc_x64
-from honeydew.device_classes.sl4f import x64 as sl4f_x64
 from mobly import asserts
 from mobly import test_runner
 from test_fuchsia_device import test_fuchsia_device
+
+from honeydew.device_classes.fuchsia_controller import x64 as fc_x64
+from honeydew.device_classes.sl4f import x64 as sl4f_x64
 
 
 class X64Tests(test_fuchsia_device.FuchsiaDeviceTests):
