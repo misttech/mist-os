@@ -959,7 +959,7 @@ func connect(sender tcpip.Endpoint, addr tcpip.FullAddress, senderWaitQueue, rec
 
 	select {
 	case <-sendReadyNotifyCh:
-	case <-time.After(1 * time.Second):
+	case <-time.After(3 * time.Second):
 		return timeoutSendReady
 	}
 	select {
