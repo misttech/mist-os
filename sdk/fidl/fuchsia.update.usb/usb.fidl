@@ -8,7 +8,7 @@ using fuchsia.pkg;
 
 /// The front door of an OTA via USB.
 @discoverable
-protocol Checker {
+closed protocol Checker {
 
     /// Triggers a USB OTA.
     ///
@@ -24,7 +24,7 @@ protocol Checker {
     ///   newer than the system version, and no update was necessary.
     /// - error - a `CheckError` value, indicating that the `Check` failed and did not complete a
     ///   system update.
-    Check(resource struct {
+    strict Check(resource struct {
         update_url fuchsia.pkg.PackageUrl;
         logs_dir client_end:<fuchsia.io.Directory, optional>;
         monitor client_end:<Monitor, optional>;
@@ -44,11 +44,11 @@ type CheckSuccess = strict enum {
 };
 
 /// Monitors a single update check.
-protocol Monitor {
+closed protocol Monitor {
     /// Called if and when `Checker.Check` triggers a system update.
     ///
     /// Never called if no update is needed.
-    OnUpdateStarted();
+    strict OnUpdateStarted();
 };
 
 /// Error type for [`fuchsia.update.usb/Checker.Check`]

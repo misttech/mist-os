@@ -18,9 +18,9 @@ type AddressSpace = flexible enum {
     PLATFORM_COMM = 10;
 };
 
-protocol AddressSpaceHandler {
+closed protocol AddressSpaceHandler {
     /// Read a value from this address space.
-    Read(struct {
+    strict Read(struct {
         /// Address to be read.
         address uint64;
         /// Bit width of the operation (usually 8, 16, 32, or 64).
@@ -31,7 +31,7 @@ protocol AddressSpaceHandler {
     }) error Status;
 
     /// Write a value to this address space.
-    Write(struct {
+    strict Write(struct {
         /// Address to be written.
         address uint64;
         /// Bit width of the operation (usually 8, 16, 32, or 64).

@@ -4,7 +4,7 @@
 library zx;
 
 @transport("Syscall")
-protocol Debug {
+closed protocol Debug {
     /// ## Summary
     ///
     /// Read a message from the debug serial port.
@@ -65,7 +65,7 @@ protocol Debug {
     /// [`zx_debug_write()`]: debug_write.md
     /// [`zx_debuglog_read()`]: debuglog_read.md
     /// [`zx_debuglog_write()`]: debuglog_write.md
-    Read(resource struct {
+    strict Read(resource struct {
         handle Handle:RESOURCE;
     }) -> (struct {
         buffer vector<uchar>:MAX;
@@ -123,7 +123,7 @@ protocol Debug {
     /// [`zx_debug_read()`]: debug_read.md
     /// [`zx_debuglog_read()`]: debuglog_read.md
     /// [`zx_debuglog_write()`]: debuglog_write.md
-    Write(struct {
+    strict Write(struct {
         buffer vector<uchar>:MAX;
     }) -> () error Status;
 
@@ -164,7 +164,7 @@ protocol Debug {
     /// ## See also
     ///
     /// TODO(fxbug.dev/32938)
-    SendCommand(resource struct {
+    strict SendCommand(resource struct {
         resource Handle:RESOURCE;
         buffer vector<uchar>:MAX;
     }) -> () error Status;

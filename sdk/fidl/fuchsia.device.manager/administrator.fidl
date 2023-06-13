@@ -7,7 +7,7 @@ using zx;
 
 /// Provides administration services for the device manager service and the device tree it controls.
 @discoverable
-protocol Administrator {
+closed protocol Administrator {
     // TODO(fxbug.dev/68529): Remove this API.
     /// This is a temporary API until DriverManager can ensure that base drivers
     /// will be shut down automatically before fshost exits. This will happen
@@ -20,11 +20,11 @@ protocol Administrator {
     /// the exited fshost. This function will not return until the devices are
     /// suspended. If there are no devices that live in storage, this function
     /// will immediatetly return.
-    UnregisterSystemStorageForShutdown() -> (struct {
+    strict UnregisterSystemStorageForShutdown() -> (struct {
         status zx.Status;
     });
 
     /// Tell DriverManager to go through the suspend process, but don't exit
     /// afterwards. This is used in tests to check that suspend works correctly.
-    SuspendWithoutExit();
+    strict SuspendWithoutExit();
 };

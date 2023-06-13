@@ -6,9 +6,9 @@ library fuchsia.rebind.test;
 
 using zx;
 
-protocol RebindParent {
-    AddChild() -> () error zx.Status;
-    RemoveChild() -> () error zx.Status;
+closed protocol RebindParent {
+    strict AddChild() -> () error zx.Status;
+    strict RemoveChild() -> () error zx.Status;
 };
 
-protocol RebindChild {};
+closed protocol RebindChild {};

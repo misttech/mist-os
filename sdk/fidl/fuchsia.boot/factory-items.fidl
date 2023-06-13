@@ -7,12 +7,12 @@ using zx;
 
 /// Protocol for retrieving factory boot item payloads.
 @discoverable
-protocol FactoryItems {
+closed protocol FactoryItems {
     /// Gets a `payload` for a `ZBI_TYPE_STORAGE_BOOTFS_FACTORY` boot item with
     /// extra field set to `extra`.
     ///
     /// NOTE: We return the `length` of the item, as VMOs must be page-aligned.
-    Get(struct {
+    strict Get(struct {
         extra uint32;
     }) -> (resource struct {
         payload zx.Handle:<VMO, optional>;

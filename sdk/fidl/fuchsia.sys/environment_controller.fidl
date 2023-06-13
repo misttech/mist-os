@@ -11,20 +11,20 @@ library fuchsia.sys;
 /// If the environment is destroyed, this interface will be closed.
 ///
 /// Typically obtained via `Environment.CreateNestedEnvironment`.
-protocol EnvironmentController {
+closed protocol EnvironmentController {
     /// Terminates the environment.
     ///
     /// When an `Environment` is terminated, all applications launched
     /// in the environment (and in all transitively nested environments) are also
     /// killed.
-    Kill() -> ();
+    strict Kill() -> ();
 
     /// Decouples the lifetime of the environment from this controller.
     ///
     /// After calling `Detach`, the environment will not be implicitly killed when
     /// this interface is closed.
-    Detach();
+    strict Detach();
 
     /// Event that is triggered when the environment is created.
-    -> OnCreated();
+    strict -> OnCreated();
 };

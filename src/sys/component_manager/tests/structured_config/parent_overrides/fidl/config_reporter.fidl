@@ -5,8 +5,8 @@
 library test.config.parentoverrides;
 
 @discoverable
-protocol Reporter {
-    GetParentProvidedConfigString() -> (struct {
+closed protocol Reporter {
+    strict GetParentProvidedConfigString() -> (struct {
         value string:MAX;
     });
 };

@@ -17,28 +17,28 @@ type StreamType = strict enum : uint8 {
 
 @transport("Banjo")
 @banjo_layout("ddk-callback")
-protocol IspStreamShutdownCallback {
+closed protocol IspStreamShutdownCallback {
     // This is called by the ISP after completing all cleanup of a stream.
-    ShutdownComplete(struct {
+    strict ShutdownComplete(struct {
         status zx.Status;
     });
 };
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol OutputStream {
+closed protocol OutputStream {
     // Starts the streaming of frames.
-    Start() -> (struct {
+    strict Start() -> (struct {
         s zx.Status;
     });
 
     // Stops the streaming of frames.
-    Stop() -> (struct {
+    strict Stop() -> (struct {
         s zx.Status;
     });
 
     // Unlocks the specified frame, allowing the driver to reuse the memory.
-    ReleaseFrame(struct {
+    strict ReleaseFrame(struct {
         buffer_id uint32;
     }) -> (struct {
         s zx.Status;
@@ -46,7 +46,7 @@ protocol OutputStream {
 
     // Shutdown the stream and release all resources that are no longer needed.
     // |shutdown_callback| : Informs the caller that all cleanup is complete.
-    Shutdown(resource struct {
+    strict Shutdown(resource struct {
         shutdown_callback client_end:IspStreamShutdownCallback;
     }) -> (struct {
         s zx.Status;
@@ -55,7 +55,7 @@ protocol OutputStream {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Isp {
+closed protocol Isp {
     // The driver returns the Stream protocol for this particular stream.
     // |buffer_collection| : Hold the format and pool of VMOs that the ISP will
     //                       produce
@@ -66,7 +66,7 @@ protocol Isp {
     //            writing to a buffer.
     // @Returns: |status| : indicates if the stream was created.
     // @Returns: |st| : Protocol over which the flow of frames is controlled.
-    CreateOutputStream(resource struct {
+    strict CreateOutputStream(resource struct {
         buffer_collection fuchsia.sysmem.BufferCollectionInfo_2;
         image_format fuchsia.sysmem.ImageFormat_2;
         rate fuchsia.hardware.camera.FrameRate;
@@ -83,7 +83,7 @@ protocol Isp {
     // |max_frame_rate|  : Maximum allowed frame rate.
     // Returns:
     //   ZX_ERR_NOT_SUPPORTED if sensor doesn't support a specific frame rate.
-    SetFrameRateRange(struct {
+    strict SetFrameRateRange(struct {
         min_frame_rate fuchsia.hardware.camera.FrameRate;
         max_frame_rate fuchsia.hardware.camera.FrameRate;
     }) -> (struct {
@@ -96,7 +96,7 @@ protocol Isp {
     /// Returns ZX_OK if the mode was successfully applied.
     /// Returns ZX_ERR_INVALID_ARGS if |mode| is invalid
     ///         or if |data| is invalid for the given |mode|.
-    SetTestPattern(struct {
+    strict SetTestPattern(struct {
         mode uint8;
         data vector<uint8>:MAX;
     }) -> (struct {
@@ -104,7 +104,7 @@ protocol Isp {
     });
 
     /// Sets the ISP driver's idea of default sensor mode.
-    SetDefaultSensorMode(struct {
+    strict SetDefaultSensorMode(struct {
         mode uint32;
     }) -> (struct {
         status zx.Status;

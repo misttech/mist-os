@@ -10,7 +10,7 @@ using fuchsia.ui.types;
 /// Supported SettingsEpitaph enums:
 /// REQUEST_NOT_SUPPORTED, INTERNAL_SERVICE_ERROR, PERSISTENT_STORAGE_ERROR
 @discoverable
-protocol Accessibility {
+closed protocol Accessibility {
     /// Gets the current value of all accessibility settings. Returns
     /// immediately on first call; subsequent calls return when any of the
     /// values change.
@@ -20,13 +20,13 @@ protocol Accessibility {
     ///
     /// If this call fails, it is considered a fatal error and the channel
     /// will be closed.
-    Watch() -> (struct {
+    strict Watch() -> (struct {
         settings AccessibilitySettings;
     });
 
     /// Sets [AccessibilitySettings] settings. Any field not explicitly set in the table performs a
     /// no-op, and will not make any changes.
-    Set(struct {
+    strict Set(struct {
         settings AccessibilitySettings;
     }) -> () error Error;
 };

@@ -5,9 +5,9 @@ library fuchsia.hardware.audio;
 
 /// For an overview of the DAI protocols see
 /// [Digital Audio Interface](//docs/concepts/drivers/driver_architectures/audio_drivers/audio_dai.md)
-protocol DaiConnector {
+closed protocol DaiConnector {
     /// This connects to a DAI protocol server.
-    Connect(resource struct {
+    strict Connect(resource struct {
         dai_protocol server_end:Dai;
     });
 };

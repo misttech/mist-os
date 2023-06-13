@@ -52,24 +52,24 @@ type FlushError = strict enum {
 
 /// The iterator returned when a series of keys are being listed. Returns an
 /// empty vector when there are no more remaining ListItems.
-protocol ListIterator {
-    GetNext() -> (struct {
+closed protocol ListIterator {
+    strict GetNext() -> (struct {
         keys vector<ListItem>:MAX;
     });
 };
 
 /// The iterator returned when a series of keys are being read. Returns an
 /// empty vector when there are no more remaining KeyValues.
-protocol GetIterator {
-    GetNext() -> (resource struct {
+closed protocol GetIterator {
+    strict GetNext() -> (resource struct {
         kvs vector<KeyValue>:MAX;
     });
 };
 
 /// The interface returned when a new accessor is created.
-protocol StoreAccessor {
+closed protocol StoreAccessor {
     /// Gets a single value from the store.
-    GetValue(struct {
+    strict GetValue(struct {
         key string:MAX_KEY_SIZE;
     }) -> (resource struct {
         val Value:optional;
@@ -77,60 +77,60 @@ protocol StoreAccessor {
 
     /// Sets a single value in the store. Overwrites existing values. Commit()
     /// must be called for this change to take effect.
-    SetValue(resource struct {
+    strict SetValue(resource struct {
         key string:MAX_KEY_SIZE;
         val Value;
     });
 
     /// Deletes a single value in the store. Does nothing if the value doesn't
     /// exist. Commit() must be called for this change to take effect.
-    DeleteValue(struct {
+    strict DeleteValue(struct {
         key string:MAX_KEY_SIZE;
     });
 
     /// Lists all keys under a given prefix.
-    ListPrefix(resource struct {
+    strict ListPrefix(resource struct {
         prefix string:MAX_KEY_SIZE;
         it server_end:ListIterator;
     });
 
     /// Reads the values of all keys under a given prefix.
-    GetPrefix(resource struct {
+    strict GetPrefix(resource struct {
         prefix string:MAX_KEY_SIZE;
         it server_end:GetIterator;
     });
 
     /// Deletes the all keys under a given prefix.
-    DeletePrefix(struct {
+    strict DeletePrefix(struct {
         prefix string:MAX_KEY_SIZE;
     });
 
     /// Atomically causes all of the state modifications that happened in this
     /// accessor to take place.
-    Commit();
+    strict Commit();
 
     /// Atomically causes all of the state modifications that happened
     /// in this accessor to take place, returning only when those
     /// modifications were written to disk.
     /// This operation is equivalent to Commit.
     /// Returns a FlushError if this operations could not be committed.
-    Flush() -> () error FlushError;
+    strict Flush() -> () error FlushError;
 };
 
 /// Interface used to interact with a given client's key/value store
 @discoverable
-protocol Store {
+closed protocol Store {
     /// Identify should be called at the beginning of a connection to identify
     /// which client service's store is to be accessed. In the future this will
     /// be deprecated in favor of component monikers, and each client will only
     /// be able to access its own store.
-    Identify(struct {
+    strict Identify(struct {
         name string:MAX_KEY_SIZE;
     });
 
     /// Creates a accessor for interacting with the store. The resulting
     /// interface can be used to inspect and modify the state of the store.
-    CreateAccessor(resource struct {
+    strict CreateAccessor(resource struct {
         read_only bool;
         accessor_request server_end:StoreAccessor;
     });
@@ -139,13 +139,13 @@ protocol Store {
 /// A copy of |Store| in all but name. Behaves identically to |Store|.
 /// See: fxbug.dev/48802
 @discoverable
-protocol Store2 {
+closed protocol Store2 {
     compose Store;
 };
 
 /// Interface used to interact with a given client's key/value store. The bytes
 /// type is disabled in this store.
 @discoverable
-protocol SecureStore {
+closed protocol SecureStore {
     compose Store;
 };

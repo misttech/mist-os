@@ -110,8 +110,8 @@ type UsbRequest = resource struct {
 
 @transport("Banjo")
 @banjo_layout("ddk-callback")
-protocol UsbRequestCompleteCallback {
-    Callback(resource struct {
+closed protocol UsbRequestCompleteCallback {
+    strict Callback(resource struct {
         @in_out
         req UsbRequest;
     }) -> ();

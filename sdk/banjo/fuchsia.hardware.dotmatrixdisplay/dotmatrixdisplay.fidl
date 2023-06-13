@@ -38,13 +38,13 @@ type DotmatrixDisplayConfig = struct {
 /// HDMI or DP display.
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol DotmatrixDisplay {
+closed protocol DotmatrixDisplay {
     /// Get the configuration to display the screen.
-    GetConfig() -> (struct {
+    strict GetConfig() -> (struct {
         config DotmatrixDisplayConfig;
     });
     /// Set the screen memory. Calling this function will update the display.
-    SetScreen(struct {
+    strict SetScreen(struct {
         screen_buffer vector<uint8>:MAX;
     }) -> (struct {
         s zx.Status;

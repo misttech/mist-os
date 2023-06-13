@@ -8,7 +8,7 @@ using zx;
 
 /// Protocol for registering ephemeral driver packages.
 @discoverable
-protocol DriverRegistrar {
+closed protocol DriverRegistrar {
     /// Informs the driver framework of an ephemeral driver. The metadata will
     /// be cached by the driver index to be used in future matching operations.
     /// * error a zx_status value indicating failure. One of the following:
@@ -23,7 +23,7 @@ protocol DriverRegistrar {
     ///     * `ZX_ERR_NO_SPACE` if the device is out of space.
     ///     * `ZX_ERR_UNAVAILABLE` if the package resolver could not be reached.
     ///     * `ZX_ERR_INTERNAL` if an unspecified error was encountered.
-    Register(struct {
+    strict Register(struct {
         package_url fuchsia.pkg.PackageUrl;
     }) -> () error zx.Status;
 };

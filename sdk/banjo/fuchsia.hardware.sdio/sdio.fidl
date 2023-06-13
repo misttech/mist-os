@@ -63,34 +63,34 @@ type SdioRwTxn = resource struct {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Sdio {
-    GetDevHwInfo() -> (struct {
+closed protocol Sdio {
+    strict GetDevHwInfo() -> (struct {
         s zx.Status;
         hw_info SdioHwInfo;
     });
-    EnableFn() -> (struct {
+    strict EnableFn() -> (struct {
         s zx.Status;
     });
-    DisableFn() -> (struct {
+    strict DisableFn() -> (struct {
         s zx.Status;
     });
-    EnableFnIntr() -> (struct {
+    strict EnableFnIntr() -> (struct {
         s zx.Status;
     });
-    DisableFnIntr() -> (struct {
+    strict DisableFnIntr() -> (struct {
         s zx.Status;
     });
-    UpdateBlockSize(struct {
+    strict UpdateBlockSize(struct {
         blk_sz uint16;
         deflt bool;
     }) -> (struct {
         s zx.Status;
     });
-    GetBlockSize() -> (struct {
+    strict GetBlockSize() -> (struct {
         s zx.Status;
         cur_blk_size uint16;
     });
-    DoRwByte(struct {
+    strict DoRwByte(struct {
         write bool;
         addr uint32;
         write_byte uint8;
@@ -101,25 +101,25 @@ protocol Sdio {
     /// Returns a virtual interrupt that will be triggered by the SDIO driver when the card signals
     /// an interrupt corresponding to this function. No additional interrupts will be triggered
     /// until `AckInBandIntr()` is called.
-    GetInBandIntr() -> (resource struct {
+    strict GetInBandIntr() -> (resource struct {
         s zx.Status;
         irq zx.Handle:INTERRUPT;
     });
     /// See above. Clients should call `AckInBandIntr()` after starting to wait on the interrupt
     /// object just in case there is already an in-band interrupt pending for this function.
-    AckInBandIntr();
+    strict AckInBandIntr();
     /// The following functions access the card common control registers (CCCR) on function 0.
     /// Aborts an I/O operation occurring on the specified function.
-    IoAbort() -> (struct {
+    strict IoAbort() -> (struct {
         s zx.Status;
     });
     /// Returns true if an interrupt is pending for function fn_idx, false otherwise.
-    IntrPending() -> (struct {
+    strict IntrPending() -> (struct {
         s zx.Status;
         pending bool;
     });
     /// Reads or writes to a vendor CCCR register. addr must be in [0xF0, 0xFF].
-    DoVendorControlRwByte(struct {
+    strict DoVendorControlRwByte(struct {
         write bool;
         addr uint8;
         write_byte uint8;
@@ -129,7 +129,7 @@ protocol Sdio {
     });
 
     // See fuchsia.hardware.sdmmc.
-    RegisterVmo(resource struct {
+    strict RegisterVmo(resource struct {
         vmo_id uint32;
         vmo zx.Handle:VMO;
         offset uint64;
@@ -138,7 +138,7 @@ protocol Sdio {
     }) -> (struct {
         status zx.Status;
     });
-    UnregisterVmo(struct {
+    strict UnregisterVmo(struct {
         vmo_id uint32;
     }) -> (resource struct {
         status zx.Status;
@@ -159,7 +159,7 @@ protocol Sdio {
     /// - Call zx_cache_flush with ZX_CACHE_FLUSH_DATA on buffers that have been mapped by the
     ///   client.
     /// - Call zx_vmo_op_range with ZX_VMO_OP_CACHE_CLEAN on all other buffers.
-    DoRwTxn(resource struct {
+    strict DoRwTxn(resource struct {
         txn SdioRwTxn;
     }) -> (struct {
         status zx.Status;
@@ -171,7 +171,7 @@ protocol Sdio {
     /// Note: SDIO devices may have different drivers bound to different functions. Clients must not
     /// call RunDiagnostics in these cases, since doing so could interfere with other clients.
     /// TODO(fxbug.dev/64166): Remove this when the SDIO issues have been investigated.
-    RunDiagnostics();
+    strict RunDiagnostics();
 
     /// Requests that the core driver hard reset the card and perform the SDIO initialization
     /// sequence again. The callback will be called after the card has been re-initialized, and in
@@ -188,7 +188,7 @@ protocol Sdio {
     /// The specific method used to hard reset the card is platform- or board-specific; examples
     /// include toggling a reset GPIO or power cycling the card.
     @async
-    RequestCardReset() -> (struct {
+    strict RequestCardReset() -> (struct {
         status zx.Status;
     });
 };

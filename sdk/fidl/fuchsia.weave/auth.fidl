@@ -25,7 +25,7 @@ alias PrivateKey = vector<uint8>:MAX;
 
 /// This protocol is used for just-in-time provisioning operations.
 @discoverable
-protocol Provisioner {
+closed protocol Provisioner {
     /// Generate key for just-in-time provisioning operations, used when
     /// working with Weave operational certificates. On success, a wrapped
     /// private key and public key pair is returned in `result`. The
@@ -34,7 +34,7 @@ protocol Provisioner {
     ///
     /// Currently, Weave only supports ECDSA signatures. This protocol returns
     /// a key-pair compatible with the Signer protocol (e.g. P256).
-    GenerateKeyPair() -> (struct {
+    strict GenerateKeyPair() -> (struct {
         wrapped_private_key PrivateKey;
         public_key vector<uint8>:MAX_PUBLIC_KEY_SIZE;
     }) error ErrorCode;
@@ -43,12 +43,12 @@ protocol Provisioner {
 /// This protocol is used for signing operations with the factory-provisioned
 /// Weave key or generated private keys.
 @discoverable
-protocol Signer {
+closed protocol Signer {
     /// Sign the provided `hash` with the factory provisioned key. On success
     /// the result is returned in `signature`. The signature must be of a type
     /// that is supported by Weave, and must take the standard form of an ASN.1
     /// DER SEQUENCE. This operation must support SHA1 and SHA256 hash values.
-    SignHash(struct {
+    strict SignHash(struct {
         hash vector<uint8>:32;
     }) -> (struct {
         signature vector<uint8>:MAX_SIGNATURE_SIZE;
@@ -60,7 +60,7 @@ protocol Signer {
     /// of an ASN.1 DER SEQUENCE. This operation must support SHA1 and SHA256
     /// hash values.
     @transitional
-    SignHashWithPrivateKey(struct {
+    strict SignHashWithPrivateKey(struct {
         hash vector<uint8>:32;
         wrapped_private_key PrivateKey;
     }) -> (struct {
@@ -71,14 +71,14 @@ protocol Signer {
 /// This protocol is used to retrieve factory data that may be encrypted at
 /// rest.
 @discoverable
-protocol FactoryDataManager {
+closed protocol FactoryDataManager {
     /// Return the device `pairing_code` on success.
-    GetPairingCode() -> (struct {
+    strict GetPairingCode() -> (struct {
         pairing_code vector<uint8>:16;
     }) error ErrorCode;
 
     /// Returns the factory provisioned Weave certificate in PEM format.
-    GetWeaveCertificate() -> (resource struct {
+    strict GetWeaveCertificate() -> (resource struct {
         certificate fuchsia.mem.Buffer;
     }) error ErrorCode;
 };

@@ -7,9 +7,9 @@ library fuchsia.lightsensor;
 /// product-configured light sensor. It is only intended to be used internally.
 @discoverable
 @available(added=7, deprecated=9, removed=HEAD)
-protocol Calibrator {
+closed protocol Calibrator {
     /// Calibrates the supplied raw [Rgbc] and returns calibrated [Rgbc].
-    Calibrate(struct {
+    strict Calibrate(struct {
         data Rgbc;
     }) -> (struct {
         data Rgbc;

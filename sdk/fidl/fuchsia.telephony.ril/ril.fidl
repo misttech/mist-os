@@ -27,8 +27,8 @@ type RilError = strict enum : uint32 {
     TRANSPORT_ERROR = 0x05;
 };
 
-protocol NetworkConnection {
-    Stop() -> (struct {
+closed protocol NetworkConnection {
+    strict Stop() -> (struct {
         success bool;
     });
 };
@@ -44,7 +44,7 @@ type NetworkSettings = struct {
 
 /// The Standard Fuchsia RIL (FRIL)
 @discoverable
-protocol Setup {
+closed protocol Setup {
     /// Hand a transport `channel` to the RIL service connecting it to the modem. Most
     /// modems will require this to be the first method called, since they are dependent
     /// on this. If a connection is already active, it will return false. If the channel
@@ -54,43 +54,43 @@ protocol Setup {
     ///
     /// Implementation Detail: current services speak QMI but others will most likely speak other
     /// binary formats.
-    ConnectTransport(resource struct {
+    strict ConnectTransport(resource struct {
         channel zx.Handle:CHANNEL;
     }) -> () error RilError;
 };
 
 /// The Standard Fuchsia RIL (FRIL)
 @discoverable
-protocol RadioInterfaceLayer {
+closed protocol RadioInterfaceLayer {
     /// Retrieve the identity of the modem (currently `imei` only).
-    GetDeviceIdentity() -> (struct {
+    strict GetDeviceIdentity() -> (struct {
         imei string:MAX;
     }) error RilError;
 
     /// Power state of the radio. Currently on On or Off.
-    RadioPowerStatus() -> (struct {
+    strict RadioPowerStatus() -> (struct {
         state RadioPowerState;
     }) error RilError;
 
     /// Activate a network connection.
-    StartNetwork(struct {
+    strict StartNetwork(struct {
         apn string:MAX;
     }) -> (resource struct {
         conn client_end:NetworkConnection;
     }) error RilError;
 
     /// Network settings known to the modem.
-    GetNetworkSettings() -> (struct {
+    strict GetNetworkSettings() -> (struct {
         settings NetworkSettings;
     }) error RilError;
 
     /// Signal Strength (dBm) for LTE networks (total received wideband power).
-    GetSignalStrength() -> (struct {
+    strict GetSignalStrength() -> (struct {
         dbm float32;
     }) error RilError;
 
     /// Raw string to send to modem for development.
-    RawCommand(struct {
+    strict RawCommand(struct {
         command string:MAX;
     }) -> (struct {
         result string:MAX;

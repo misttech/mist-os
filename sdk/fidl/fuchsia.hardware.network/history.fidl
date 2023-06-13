@@ -104,11 +104,11 @@ type DeviceInfo = table {
 
 /// A Network Device.
 @available(removed=12)
-protocol Device {
+closed protocol Device {
     /// Obtain information about device
     ///
     /// - response `info` device information.
-    GetInfo() -> (struct {
+    strict GetInfo() -> (struct {
         info DeviceInfo;
     });
     /// Opens a new session with the network device.
@@ -125,7 +125,7 @@ protocol Device {
     /// contains invalid information.
     /// * error `ZX_ERR_INTERNAL` if the data VMO is rejected by the underlying
     /// device.
-    OpenSession(resource struct {
+    strict OpenSession(resource struct {
         session_name string:MAX_SESSION_NAME;
         session_info SessionInfo;
     }) -> (resource struct {
@@ -139,27 +139,27 @@ protocol Device {
     ///
     /// `port` is closed with a `ZX_ERR_NOT_FOUND` epitaph if no port with `id`
     /// exists.
-    GetPort(resource struct {
+    strict GetPort(resource struct {
         id PortId;
         port server_end:Port;
     });
     /// Connects a [`PortWatcher`] to this device.
     ///
     /// + request `watcher` server end of watcher channel.
-    GetPortWatcher(resource struct {
+    strict GetPortWatcher(resource struct {
         watcher server_end:PortWatcher;
     });
     /// Establishes a new connection to this device.
     ///
     /// + request `device` the server end for the new connection.
-    Clone(resource struct {
+    strict Clone(resource struct {
         device server_end:Device;
     });
 };
 
 /// Provides iteration over and updates for ports attached to a device.
 @available(removed=12)
-protocol PortWatcher {
+closed protocol PortWatcher {
     /// Get the next port event.
     ///
     /// The first N calls return [`DevicePortEvent.existing`] where N is the
@@ -174,7 +174,7 @@ protocol PortWatcher {
     /// hanging call to `Watch` at all times to avoid triggering this condition.
     ///
     /// - response `event` next port event.
-    Watch() -> (struct {
+    strict Watch() -> (struct {
         event DevicePortEvent;
     });
 };
@@ -417,11 +417,11 @@ type TxReturnFlags = strict bits : uint32 {
 // pattern will be improved with Unified Services (https://fxbug.dev/8035) and
 // Drivers as Components (https://fxbug.dev/33183).
 @available(removed=12)
-protocol DeviceInstance {
+closed protocol DeviceInstance {
     /// Connects to the [`Device`] implementation.
     ///
     /// + request `device` device handle.
-    GetDevice(resource struct {
+    strict GetDevice(resource struct {
         device server_end:Device;
     });
 };
@@ -440,7 +440,7 @@ type MacFilterMode = strict enum {
 };
 
 @available(removed=12)
-protocol MacAddressing {
+closed protocol MacAddressing {
     /// Gets the Device's current unicast MAC address.
     ///
     /// Implementers of this API do not need to return a uniquely identifiable
@@ -451,7 +451,7 @@ protocol MacAddressing {
     /// instances.
     ///
     /// - response `address` device's unicast MAC address.
-    GetUnicastAddress() -> (struct {
+    strict GetUnicastAddress() -> (struct {
         address fuchsia.net.MacAddress;
     });
 
@@ -478,7 +478,7 @@ protocol MacAddressing {
     /// + request `mode` request mode to attach to.
     /// - response `status` `ZX_ERR_NOT_SUPPORTED` it the device only supports
     /// mode more restrictive than the one requested.
-    SetMode(struct {
+    strict SetMode(struct {
         mode MacFilterMode;
     }) -> (struct {
         status zx.Status;
@@ -493,7 +493,7 @@ protocol MacAddressing {
     /// + request `address` multicast address to add to the list.
     /// - response `status` `ZX_ERR_INVALID_ARGS` if `address` is not a
     /// multicast address.
-    AddMulticastAddress(struct {
+    strict AddMulticastAddress(struct {
         address fuchsia.net.MacAddress;
     }) -> (struct {
         status zx.Status;
@@ -503,7 +503,7 @@ protocol MacAddressing {
     /// + request `address` multicast address to remove from the list.
     /// - response `status` `ZX_ERR_INVALID_ARGS` if `address` is not a
     /// multicast address.
-    RemoveMulticastAddress(struct {
+    strict RemoveMulticastAddress(struct {
         address fuchsia.net.MacAddress;
     }) -> (struct {
         status zx.Status;
@@ -562,7 +562,7 @@ type PortStatus = table {
 
 /// Provides a way to receive updates on port status changes.
 @available(removed=12)
-protocol StatusWatcher {
+closed protocol StatusWatcher {
     /// `WatchStatus` blocks until the port's status has changed.
     ///
     /// The first call to `WatchStatus` returns immediately with the current
@@ -574,7 +574,7 @@ protocol StatusWatcher {
     /// status changed happened since the last call to `WatchStatus`.
     ///
     /// - response `device_status` the most recent port status.
-    WatchStatus() -> (struct {
+    strict WatchStatus() -> (struct {
         port_status PortStatus;
     });
 };
@@ -607,17 +607,17 @@ type PortInfo = table {
 
 /// A logical port belonging to a [`Device`].
 @available(removed=12)
-protocol Port {
+closed protocol Port {
     /// Obtain information about port.
     ///
     /// - response `info` port information.
-    GetInfo() -> (struct {
+    strict GetInfo() -> (struct {
         info PortInfo;
     });
     /// Obtain the operating port status.
     ///
     /// - response `status` snapshot of port's current status.
-    GetStatus() -> (struct {
+    strict GetStatus() -> (struct {
         status PortStatus;
     });
     /// Connects to a [`StatusWatcher`] to observe port status changes.
@@ -631,7 +631,7 @@ protocol Port {
     /// to set a buffer value larger than 1, so that all edges can be observed.
     /// If `StatusWatcher`'s internal queue is filled and new status changes
     /// occur, the oldest samples will be dropped to make room for new ones.
-    GetStatusWatcher(resource struct {
+    strict GetStatusWatcher(resource struct {
         watcher server_end:StatusWatcher;
         buffer uint32;
     });
@@ -639,24 +639,24 @@ protocol Port {
     ///
     /// + request `mac` mac handle. Closed with `ZX_ERR_NOT_SUPPORTED` if this
     /// port does not support mac addressing.
-    GetMac(resource struct {
+    strict GetMac(resource struct {
         mac server_end:MacAddressing;
     });
     /// Connects to the [`Device`] this port belongs to.
     ///
     /// + request `device` grants access to the parent device.
-    GetDevice(resource struct {
+    strict GetDevice(resource struct {
         device server_end:Device;
     });
     /// Establishes a new connection to this port.
     ///
     /// + request `port` the server end for the new connection.
-    Clone(resource struct {
+    strict Clone(resource struct {
         port server_end:Port;
     });
     /// Retrieves a snapshot of traffic counters on this port.
     @available(added=10)
-    GetCounters() -> (table {
+    strict GetCounters() -> (table {
         /// The total number of ingress frames on this port.
         1: rx_frames uint64;
         /// The total number of ingress bytes on this port.
@@ -695,7 +695,7 @@ protocol Port {
 ///    - tx buffers not respecting [`Info.min_tx_buffer_head`] or
 ///      [`Info.min_tx_buffer_tail`].
 @available(removed=12)
-protocol Session {
+closed protocol Session {
     /// Attaches the session to `port`.
     ///
     /// Once attached, the session starts to receive the subscribed frames over
@@ -707,7 +707,7 @@ protocol Session {
     /// * error `ZX_ERR_INVALID_ARGS` if `rx_frames` is not a subset of the
     /// port's supported frames.
     /// * error `ZX_ERR_ALREADY_BOUND` if `port` is already attached.
-    Attach(struct {
+    strict Attach(struct {
         port PortId;
         rx_frames vector<FrameType>:MAX_FRAME_TYPES;
     }) -> () error zx.Status;
@@ -721,7 +721,7 @@ protocol Session {
     /// + request `port` port to subscribe to.
     /// * error `ZX_ERR_NOT_FOUND` if the session is not currently attached to
     /// the port.
-    Detach(struct {
+    strict Detach(struct {
         port PortId;
     }) -> () error zx.Status;
     /// Cleanly closes a session.
@@ -731,7 +731,7 @@ protocol Session {
     /// own all the buffers that are currently owned by the session (sent over
     /// either the rx or tx FIFOs) once the epitaph is received. Closing the rx
     /// or tx FIFO is equivalent to calling `Close`.
-    Close();
+    strict Close();
 };
 
 /// Additional session options.

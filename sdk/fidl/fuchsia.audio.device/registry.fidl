@@ -250,10 +250,10 @@ type PlugState = flexible enum {
 /// `Registry` instances notify clients as devices arrive and depart, and they
 /// create observers (see `Observer`) that notify of more detailed state changes.
 @discoverable
-protocol Registry {
+closed protocol Registry {
     /// Register for notification when one or more devices are added.
     /// The `devices` vector will always contain at least one `Info` entry.
-    WatchDevicesAdded() -> (table {
+    strict WatchDevicesAdded() -> (table {
         /// Devices added since `WatchDevicesAdded` was last called. This method
         /// returns all audio devices when called for the first time.
         1: devices vector<Info>:MAX_COUNT_DEVICES;
@@ -262,13 +262,13 @@ protocol Registry {
     /// Register for notification when an (active, added) device is removed.
     /// Because the method only notifies of one removal, upon completion it
     /// should immediately be re-called, in case other removals have occurred.
-    WatchDeviceRemoved() -> (table {
+    strict WatchDeviceRemoved() -> (table {
         /// The token of the device least-recently removed.
         1: token_id TokenId;
     }) error RegistrWatchDeviceRemovedyError;
 
     /// Request an `Observer` for the specified device.
-    CreateObserver(resource table {
+    strict CreateObserver(resource table {
         /// The token of the device to be observed.
         ///
         /// Required.
@@ -313,7 +313,7 @@ type RegistryCreateObserverError = flexible enum {
 /// audio device, and to stay informed as its state changes over time. Each
 /// `Observer` is associated with an initialized audio device. An audio device
 /// may be observed by multiple `Observer` instances.
-protocol Observer {
+closed protocol Observer {
     /// Query the device's available processing topologies and individual
     /// elements, and watch for changes to those elements.
     compose fuchsia.hardware.audio.signalprocessing.Reader;
@@ -327,14 +327,14 @@ protocol Observer {
     //
     // TODO(fxbug.dev/102027): Remove legacy gain aspects once driver API does.
     // Going forward, gain will be handled by `SignalProcessing`.
-    WatchGainState() -> (table {
+    strict WatchGainState() -> (table {
         /// The device's most recent gain state.
         1: state GainState;
     }) error ObserverWatchGainStateError;
 
     /// Request notification of any change to the device's plug state. When
     /// called for the first time, it will return immediately.
-    WatchPlugState() -> (table {
+    strict WatchPlugState() -> (table {
         /// The device's current plug state.
         1: state PlugState;
 
@@ -345,7 +345,7 @@ protocol Observer {
     /// Retrieve the device's reference clock.
     ///
     /// This clock will be in the domain specified in the device's `Info` table.
-    GetReferenceClock() -> (resource table {
+    strict GetReferenceClock() -> (resource table {
         /// The device's reference clock.
         1: reference_clock zx.Handle:CLOCK;
     }) error ObserverGetReferenceClockError;

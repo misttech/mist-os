@@ -55,14 +55,14 @@ const FILE_PROTOCOL_NAME string = "fuchsia.io/File";
 ///
 /// NOTE: cloned connections do not share their seek offset with their source
 /// connection.
-protocol File {
+closed protocol File {
     compose AdvisoryLocking;
     compose Node;
     compose Readable;
     compose Writable;
 
     @selector("fuchsia.io/File.Describe")
-    Describe() -> (FileInfo);
+    strict Describe() -> (FileInfo);
 
     /// Moves the offset at which the next invocation of [`Read`] or [`Write`]
     /// will occur. The seek offset is specific to each file connection.
@@ -74,7 +74,7 @@ protocol File {
     ///
     /// This method does not require any rights.
     @selector("fuchsia.io/File.Seek")
-    Seek(struct {
+    strict Seek(struct {
         origin SeekOrigin;
         offset int64;
     }) -> (struct {
@@ -99,7 +99,7 @@ protocol File {
     ///
     /// Returns `ZX_ERR_OUT_OF_RANGE` if `count` is greater than `MAX_TRANSFER_SIZE`.
     @selector("fuchsia.io/File.ReadAt")
-    ReadAt(struct {
+    strict ReadAt(struct {
         count uint64;
         offset uint64;
     }) -> (struct {
@@ -128,7 +128,7 @@ protocol File {
     ///
     /// This method requires the [`Rights.WRITE_BYTES`] right.
     @selector("fuchsia.io/File.WriteAt")
-    WriteAt(struct {
+    strict WriteAt(struct {
         data Transfer;
         offset uint64;
     }) -> (struct {
@@ -144,7 +144,7 @@ protocol File {
     ///
     /// This method requires the [`Rights.WRITE_BYTES`] right.
     @selector("fuchsia.io/File.Resize")
-    Resize(struct {
+    strict Resize(struct {
         length uint64;
     }) -> () error zx.Status;
 
@@ -169,7 +169,7 @@ protocol File {
     /// * [`Rights.WRITE_BYTES`] if `flags` includes [`VmoFlags.WRITE`].
     /// * [`Rights.EXECUTE`] if `flags` includes [`VmoFlags.EXECUTE`].
     @selector("fuchsia.io/File.GetBackingMemory")
-    GetBackingMemory(struct {
+    strict GetBackingMemory(struct {
         flags @generated_name("VmoFlags") strict bits : uint32 {
             /// Requests that the VMO be readable.
             READ = 0x00000001;
@@ -217,7 +217,7 @@ protocol File {
     }) error zx.Status;
 };
 
-protocol Readable {
+closed protocol Readable {
     /// Reads up to 'count' bytes at the seek offset.
     /// The seek offset is moved forward by the number of bytes read.
     ///
@@ -237,14 +237,14 @@ protocol Readable {
     ///
     /// Returns `ZX_ERR_OUT_OF_RANGE` if `count` is greater than `MAX_TRANSFER_SIZE`.
     @selector("fuchsia.io/File.Read")
-    Read(struct {
+    strict Read(struct {
         count uint64;
     }) -> (struct {
         data Transfer;
     }) error zx.Status;
 };
 
-protocol Writable {
+closed protocol Writable {
     /// Writes data at the seek offset.
     /// The seek offset is moved forward by the number of bytes written.
     /// If the file is in append mode, the seek offset is first set to the end
@@ -269,7 +269,7 @@ protocol Writable {
     ///
     /// This method requires the [`Rights.WRITE_BYTES`] right.
     @selector("fuchsia.io/File.Write")
-    Write(struct {
+    strict Write(struct {
         data Transfer;
     }) -> (struct {
         actual_count uint64;

@@ -8,7 +8,7 @@ using fuchsia.camera2.debug;
 using fuchsia.camera2.hal;
 using zx;
 
-protocol Device {
+closed protocol Device {
     /// Note: this method obtains a channel to the capture device which
     /// communicates using a non-simple fidl interface.  Once the
     /// system has been updated to support normal fidl protocols, this method
@@ -16,13 +16,13 @@ protocol Device {
     /// Additionally, while the camera stack is migrating from camera to
     /// camera2, two methods are available, corresponding to the two
     /// versions of the protocol.
-    GetChannel(resource struct {
+    strict GetChannel(resource struct {
         ch zx.Handle:CHANNEL;
     });
-    GetChannel2(resource struct {
+    strict GetChannel2(resource struct {
         server_end server_end:fuchsia.camera2.hal.Controller;
     });
-    GetDebugChannel(resource struct {
+    strict GetDebugChannel(resource struct {
         server_end server_end:fuchsia.camera2.debug.Debug;
     });
 };

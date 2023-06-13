@@ -14,18 +14,18 @@ type SpiVmoRight = strict enum : uint32 {
 /// Low-level protocol for spi drivers.
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol SpiImpl {
+closed protocol SpiImpl {
     /// Returns the number of chip select lines available or provided by the driver instance.
     /// To be used as a limit on the acceptable values for the `chip_select' field in the Exchange()
     /// and ExchangeVmo() methods.
-    GetChipSelectCount() -> (struct {
+    strict GetChipSelectCount() -> (struct {
         count uint32;
     });
 
     /// Perform a SPI bus transaction of the specified length. Either txdata or rxdata may be
     /// NULL, in which case the transaction will be half-duplex in the appropriate direction.
     /// Regardless, both vectors must have the same length.
-    Exchange(struct {
+    strict Exchange(struct {
         chip_select uint32;
         txdata vector<uint8>:MAX;
     }) -> (struct {
@@ -34,13 +34,13 @@ protocol SpiImpl {
     });
 
     /// Lock the bus.
-    LockBus(struct {
+    strict LockBus(struct {
         chip_select uint32;
     }) -> (struct {
         status zx.Status;
     });
     /// Unlock the bus.
-    UnlockBus(struct {
+    strict UnlockBus(struct {
         chip_select uint32;
     }) -> (struct {
         status zx.Status;
@@ -48,7 +48,7 @@ protocol SpiImpl {
 
     /// rights is a bit field containing SpiVmoRight values, and determines the read/write
     /// permissions used by the implementation when pinning or mapping the VMO.
-    RegisterVmo(resource struct {
+    strict RegisterVmo(resource struct {
         chip_select uint32;
         vmo_id uint32;
         vmo zx.Handle:VMO;
@@ -58,7 +58,7 @@ protocol SpiImpl {
     }) -> (struct {
         status zx.Status;
     });
-    UnregisterVmo(struct {
+    strict UnregisterVmo(struct {
         chip_select uint32;
         vmo_id uint32;
     }) -> (resource struct {
@@ -68,11 +68,11 @@ protocol SpiImpl {
 
     /// Release all VMOs registered to this chip_select. Called by the core driver after the client
     /// has disconnected and the VMOs are no longer needed.
-    ReleaseRegisteredVmos(struct {
+    strict ReleaseRegisteredVmos(struct {
         chip_select uint32;
     });
 
-    TransmitVmo(struct {
+    strict TransmitVmo(struct {
         chip_select uint32;
         vmo_id uint32;
         offset uint64;
@@ -80,7 +80,7 @@ protocol SpiImpl {
     }) -> (struct {
         status zx.Status;
     });
-    ReceiveVmo(struct {
+    strict ReceiveVmo(struct {
         chip_select uint32;
         vmo_id uint32;
         offset uint64;
@@ -88,7 +88,7 @@ protocol SpiImpl {
     }) -> (struct {
         status zx.Status;
     });
-    ExchangeVmo(struct {
+    strict ExchangeVmo(struct {
         chip_select uint32;
         tx_vmo_id uint32;
         tx_offset uint64;

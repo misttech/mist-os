@@ -17,7 +17,7 @@ using zx;
 ///
 /// [1]: https://wayland.app/protocols/wayland#wl_keyboard:event:keymap
 @discoverable
-protocol Keymap {
+closed protocol Keymap {
 
     /// Delivers the contents of the keymap in the XKB_V1 format.
     ///
@@ -26,7 +26,7 @@ protocol Keymap {
     /// The first call to [Watch] returns immediately. Subsequent calls will only
     /// return when the keymap changes from what was previously reported.
     ///
-    Watch() -> (resource struct {
+    strict Watch() -> (resource struct {
         /// The contents of the keymap file to apply, mapped into memory.
         ///
         /// The Wayland API takes a file descriptor, but Fuchsia's Wayland bridge

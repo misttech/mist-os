@@ -12,21 +12,21 @@ type Metadata = resource struct {
 };
 
 /// This API communicates with the DFv1 parent device.
-protocol Device {
+closed protocol Device {
     /// Get this device's topological path that it is exporting in /dev.
-    GetTopologicalPath() -> (struct {
+    strict GetTopologicalPath() -> (struct {
         path string:MAX;
     });
 
     /// Get all of the metadata associated with this device.
-    GetMetadata() -> (resource struct {
+    strict GetMetadata() -> (resource struct {
         metadata vector<Metadata>:MAX;
     }) error zx.Status;
 
     /// Connect to a banjo protocol that this device is exposing.
     /// The caller needs to send a copy of their process koid so the callee can verify
     /// that both drivers are in the same process.
-    GetBanjoProtocol(struct {
+    strict GetBanjoProtocol(struct {
         proto_id uint32;
         process_koid zx.Koid;
     }) -> (struct {

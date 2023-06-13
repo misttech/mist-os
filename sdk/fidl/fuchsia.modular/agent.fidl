@@ -33,7 +33,7 @@ using fuchsia.sys;
 /// - fuchsia.modular.ComponentContext for capabilities an agent has.
 /// - fuchsia.modular.Lifecycle for how Components get lifecycle events.
 @discoverable // Created by each agent.
-protocol Agent {
+closed protocol Agent {
     /// Called when some component tries to connect to this agent. `requestor_url`
     /// identifies the requesting client. Different client roles are identified differently:
     ///    * For Module clients in the general case, `requestor_url` will be the name provided at
@@ -55,7 +55,7 @@ protocol Agent {
     /// StoryCommand.AddMod/surface_relation_parent.
     ///
     /// The full path is encoded into `requestor_url` as escape_colons(module_path).join(':').
-    Connect(resource struct {
+    strict Connect(resource struct {
         requestor_url string:MAX;
         services server_end:fuchsia.sys.ServiceProvider;
     });

@@ -11,9 +11,9 @@ using fuchsia.hardware.audio;
 /// own, isolated, synthetic monotonic clock, which advances on demand. See
 /// [`SyntheticClockRealm.AdvanceBy`]. Within a realm, all clocks advance
 /// atomically relative to the realm's synthetic montonic clock.
-protocol SyntheticClockRealm {
+closed protocol SyntheticClockRealm {
     /// Creates a new synthetic clock.
-    CreateClock(resource table {
+    strict CreateClock(resource table {
         /// Name of this clock, used for diagnostics only.
         /// If specified, ideally this should be globally unique and have a
         /// printable CamelCase format, but uniqueness is not required.
@@ -63,7 +63,7 @@ protocol SyntheticClockRealm {
     /// * error `ZX_ERR_NOT_FOUND` if `handle` was not created by
     ///   [`CreateClock`] or if was already forgotten
     /// * error `ZX_ERR_BAD_STATE` if `handle` is still in use
-    ForgetClock(resource table {
+    strict ForgetClock(resource table {
         /// The clock to forget.
         ///
         /// Required.
@@ -77,7 +77,7 @@ protocol SyntheticClockRealm {
     /// * error `ZX_ERR_INVALID_ARGS` if missing a required field
     /// * error `ZX_ERR_NOT_FOUND` if `handle` was not created by this realm or
     ///   if has been forgotten
-    ObserveClock(resource table {
+    strict ObserveClock(resource table {
         /// The clock to observe.
         ///
         /// Required.
@@ -92,7 +92,7 @@ protocol SyntheticClockRealm {
     }) -> (table {}) error zx.Status;
 
     /// Reads the current synthetic monotonic time.
-    Now(table {}) -> (table {
+    strict Now(table {}) -> (table {
         1: now zx.Time;
     });
 
@@ -101,23 +101,23 @@ protocol SyntheticClockRealm {
     /// must occur over the given duration.
     ///
     /// * error `ZX_ERR_INVALID_ARGS` if the duration is not positive
-    AdvanceBy(table {
+    strict AdvanceBy(table {
         /// Required.
         1: duration zx.Duration;
     }) -> (table {}) error zx.Status;
 };
 
 /// Reads and adjusts a synthetic clock.
-protocol SyntheticClock {
+closed protocol SyntheticClock {
     /// Reads the clock's current time.
-    Now(table {}) -> (table {
+    strict Now(table {}) -> (table {
         1: now zx.Time;
     });
 
     /// Sets the clock's rate adjustment, in parts-per-million, relative to the
     /// realm's synthetic monotonic clock. The semantics are identical to
     /// `zx_clock_update`.
-    SetRate(table {
+    strict SetRate(table {
         /// Required.
         1: rate_adjust_ppm int32;
     }) -> (table {}) error zx.Status;

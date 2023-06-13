@@ -98,9 +98,9 @@ type NodeAddArgs = resource table {
 };
 
 /// Protocol through which a parent node controls one of its children.
-protocol NodeController {
+closed protocol NodeController {
     /// Removes the node and all of its children.
-    Remove();
+    strict Remove();
 
     /// Request that the framework attempts to bind a driver to this node.
     /// This is an *additional* request for binding as the framework attempts to bind a node once
@@ -108,7 +108,7 @@ protocol NodeController {
     /// * error `ZX_ERR_ALREADY_BOUND` if the node is already bound and `force_rebind` is false.
     /// * error `ZX_ERR_ALREADY_EXISTS` if the node has an outstanding |RequestBind| call which has
     /// not completed.
-    RequestBind(table {
+    strict RequestBind(table {
         /// If this is true, then the node unbinds from its matched driver before it attempts to
         /// bind through the normal bind process.
         1: force_rebind bool;
@@ -120,7 +120,7 @@ protocol NodeController {
 
 
     /// Event that is triggered when the associated `Node` is bound to a driver.
-    -> OnBind();
+    strict -> OnBind();
 };
 
 /// Error codes for the Node protocol.
@@ -149,13 +149,13 @@ type NodeError = strict enum {
 };
 
 /// Protocol through which a driver manages a node that it is bound to.
-protocol Node {
+closed protocol Node {
     /// Adds a child node to this node.
     ///
     /// If `node` is present, this driver takes responsibility for binding to
     /// the newly created child. Otherwise, the driver framework will locate an
     /// appropriate driver to bind the child to.
-    AddChild(resource struct {
+    strict AddChild(resource struct {
         args NodeAddArgs;
         controller server_end:NodeController;
         node server_end:<Node, optional>;

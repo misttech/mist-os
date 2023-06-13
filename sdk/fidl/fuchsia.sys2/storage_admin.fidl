@@ -43,10 +43,10 @@ type DeletionError = strict enum {
 };
 
 @discoverable
-protocol StorageAdmin {
+closed protocol StorageAdmin {
     /// Opens the isolated directory for the given component. The open request will provision
     /// the storage if it hasn't been already.
-    OpenComponentStorage(resource struct {
+    strict OpenComponentStorage(resource struct {
         relative_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         flags fuchsia.io.OpenFlags;
         mode fuchsia.io.ModeType;
@@ -57,41 +57,41 @@ protocol StorageAdmin {
     /// capability.
     /// Returns INSTANCE_NOT_FOUND if the realm does not exist, and INVALID_ARGS if
     /// |relative_moniker| is malformed.
-    ListStorageInRealm(resource struct {
+    strict ListStorageInRealm(resource struct {
         relative_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         iterator server_end:StorageIterator;
     }) -> () error fuchsia.component.Error;
 
     /// Opens the isolated directory for the given storage ID. The open request will provision
     /// the storage if it hasn't been already.
-    OpenComponentStorageById(resource struct {
+    strict OpenComponentStorageById(resource struct {
         id string:MAX_STORAGE_ID_LENGTH;
         object server_end:fuchsia.io.Node;
     }) -> () error fuchsia.component.Error;
 
     /// Deletes the contents of the storage for this component. Does not delete the component's
     /// subdirectory itself from the backing directory.
-    DeleteComponentStorage(struct {
+    strict DeleteComponentStorage(struct {
         relative_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> () error fuchsia.component.Error;
 
     /// Get the current status of the storage.
-    GetStatus() -> (StorageStatus) error StatusError;
+    strict GetStatus() -> (StorageStatus) error StatusError;
 
     /// Deletes the contents of all the storage. Storage directories are retained so any components
     /// using storage will be able to continue using it to create new files and directories.
     /// Returns fuchsia.component.Error::INTERNAL only if no storage at all could be cleared.
     /// Returns successfully even if some errors happen during the deletion progress.
-    DeleteAllStorageContents() -> () error DeletionError;
+    strict DeleteAllStorageContents() -> () error DeletionError;
 };
 
 /// An iterator protocol for returning a set of components using a storage capability. See
 /// |StorageAdmin.ListStorageInRealm| for more information.
-protocol StorageIterator {
+closed protocol StorageIterator {
     /// Retrieve the next set of components using the storage capability. The returned monikers
     /// are relative to the component that declares the storage capability. Returns an empty
     /// vector after all components have been returned.
-    Next() -> (struct {
+    strict Next() -> (struct {
         relative_monikers vector<string:fuchsia.component.MAX_MONIKER_LENGTH>:MAX;
     });
 };

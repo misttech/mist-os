@@ -14,10 +14,10 @@ type HealthState = table {
     1: healthy bool;
 };
 
-protocol Health {
+closed protocol Health {
     /// Retrieves top level health state.
     /// A driver not responding promptly can be used as an indication of an unhealthy driver.
-    GetHealthState() -> (struct {
+    strict GetHealthState() -> (struct {
         state HealthState;
     });
 };

@@ -15,8 +15,8 @@ using fuchsia.io;
 /// surfaced by a component that implements FactoryStoreProvider (or any
 /// protocol that depends on it) are expected to be validated for consistency
 /// before being exposed to clients.
-protocol FactoryStoreProvider {
-    GetFactoryStore(resource struct {
+closed protocol FactoryStoreProvider {
+    strict GetFactoryStore(resource struct {
         dir server_end:fuchsia.io.Directory;
     });
 };
@@ -25,7 +25,7 @@ protocol FactoryStoreProvider {
 /// Cast-specific factory data: public certificates and keys for
 /// authentication with Cast servers.
 @discoverable
-protocol CastCredentialsFactoryStoreProvider {
+closed protocol CastCredentialsFactoryStoreProvider {
     compose FactoryStoreProvider;
 };
 
@@ -33,7 +33,7 @@ protocol CastCredentialsFactoryStoreProvider {
 /// Widevine-specific factory data: public certificates and keys for
 /// authentication with Widevine systems.
 @discoverable
-protocol WidevineFactoryStoreProvider {
+closed protocol WidevineFactoryStoreProvider {
     compose FactoryStoreProvider;
 };
 
@@ -41,7 +41,7 @@ protocol WidevineFactoryStoreProvider {
 /// PlayReady-specific factory data: public certificates and keys for
 /// authentication with PlayReady systems.
 @discoverable
-protocol PlayReadyFactoryStoreProvider {
+closed protocol PlayReadyFactoryStoreProvider {
     compose FactoryStoreProvider;
 };
 
@@ -49,7 +49,7 @@ protocol PlayReadyFactoryStoreProvider {
 /// Weave-specific factory data: public certificates, signing keys, and
 /// identity files for interoperation with a Weave-based home-area-network.
 @discoverable
-protocol WeaveFactoryStoreProvider {
+closed protocol WeaveFactoryStoreProvider {
     compose FactoryStoreProvider;
 };
 
@@ -59,11 +59,11 @@ protocol WeaveFactoryStoreProvider {
 /// covered by other FactoryStoreProviders or methods in fuchsia.hwinfo will
 /// appear here.
 @discoverable
-protocol MiscFactoryStoreProvider {
+closed protocol MiscFactoryStoreProvider {
     compose FactoryStoreProvider;
 };
 
 @discoverable
-protocol AlphaFactoryStoreProvider {
+closed protocol AlphaFactoryStoreProvider {
     compose FactoryStoreProvider;
 };

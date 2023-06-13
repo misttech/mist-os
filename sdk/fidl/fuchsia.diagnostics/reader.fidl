@@ -155,7 +155,7 @@ type StreamParameters = table {
 
 /// Outer protocol for interacting with the different diagnostics data sources.
 @discoverable
-protocol ArchiveAccessor {
+closed protocol ArchiveAccessor {
     /// Creates an iterator over diagnostics data on the system.
     ///   * The iterator may be finite by streaming in SNAPSHOT mode, serving only the
     ///     current state of diagnostics data on the system.
@@ -173,7 +173,7 @@ protocol ArchiveAccessor {
     ///
     /// + request `stream_parameters` is a [fuchsia.diagnostics/StreamParameter] which
     ///   specifies how to configure the stream.
-    StreamDiagnostics(resource struct {
+    strict StreamDiagnostics(resource struct {
         stream_parameters StreamParameters;
         result_stream server_end:BatchIterator;
     });
@@ -181,7 +181,7 @@ protocol ArchiveAccessor {
 
 /// Conceptually, a directory iterator, where each element in the iterator is a single
 /// complete file that can be concatenated with other results.
-protocol BatchIterator {
+closed protocol BatchIterator {
     /// Returns a vector of [fuchsia.diagnostics/FormattedContent] structs
     /// with a format dictated by the format_settings argument provided to the Reader protocol
     /// which spawned this BatchIterator.
@@ -206,7 +206,7 @@ protocol BatchIterator {
     ///   dropped, but future calls to GetNext will provide new subsets of
     ///   FormattedDataHierarchies.
     ///
-    GetNext() -> (resource struct {
+    strict GetNext() -> (resource struct {
         batch vector<FormattedContent>:MAXIMUM_ENTRIES_PER_BATCH;
     }) error ReaderError;
 };

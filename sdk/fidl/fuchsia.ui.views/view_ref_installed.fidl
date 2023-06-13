@@ -21,7 +21,7 @@ type ViewRefInstalledError = strict enum {
 ///       "currently connected to view tree"; even a hypothetical
 ///       "ViewRefConnected" protocol is fundamentally racy.
 @discoverable
-protocol ViewRefInstalled {
+closed protocol ViewRefInstalled {
     /// Sets up a callback to fire when the requested |view_ref| is installed.
     /// - If |view_ref| has not already been installed, the |Watch| response
     ///   will fire when it is.
@@ -37,7 +37,7 @@ protocol ViewRefInstalled {
     ///
     /// Note: Prior to installation, this |Watch| call is kept alive as long as
     ///       the ViewRef is valid.
-    Watch(resource struct {
+    strict Watch(resource struct {
         view_ref ViewRef;
     }) -> () error ViewRefInstalledError;
 };

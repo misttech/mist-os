@@ -132,7 +132,7 @@ type BufferHandleInfo = table {
 
 /// Interface for the Goldfish control driver providing color buffers and
 /// data buffers.
-protocol ControlDevice {
+closed protocol ControlDevice {
     /// Create shared color buffer. Color buffer is automatically freed when
     /// all references to `vmo` have been closed. Fails if VMO is not
     /// associated with goldfish heap memory.
@@ -151,7 +151,7 @@ protocol ControlDevice {
     ///            memory property bits, this value is a non-negative
     ///            integer in [0, 4095]. For non-HOST_VISIBLE memory or
     ///            failed allocation, this value is negative.
-    CreateColorBuffer2(resource struct {
+    strict CreateColorBuffer2(resource struct {
         vmo zx.Handle:VMO;
         create_params CreateColorBuffer2Params;
     }) -> (struct {
@@ -178,7 +178,7 @@ protocol ControlDevice {
     ///         For buffers with HOST_VISIBLE memory property bits, this
     ///         value is a non-negative integer in [0, 4095]. For
     ///         non-HOST_VISIBLE memory, this value is negative.
-    CreateBuffer2(resource struct {
+    strict CreateBuffer2(resource struct {
         vmo zx.Handle:VMO;
         create_params CreateBuffer2Params;
     }) -> (struct {
@@ -190,7 +190,7 @@ protocol ControlDevice {
     ///
     /// Deprecated. Use `GetBufferHandleInfo()` instead.
     @deprecated
-    GetBufferHandle(resource struct {
+    strict GetBufferHandle(resource struct {
         vmo zx.Handle:VMO;
     }) -> (struct {
         res zx.Status;
@@ -208,7 +208,7 @@ protocol ControlDevice {
     ///
     ///     `info`: a BufferHandleInfo object containing the buffer id, type
     ///             and memory information.
-    GetBufferHandleInfo(resource struct {
+    strict GetBufferHandleInfo(resource struct {
         vmo zx.Handle:VMO;
     }) -> (struct {
         info BufferHandleInfo;
@@ -222,7 +222,7 @@ protocol ControlDevice {
     /// Errors:
     ///     - ZX_ERR_INTERNAL if device fail to create the fence or fail to
     ///       trigger the wait.
-    CreateSyncFence(resource struct {
+    strict CreateSyncFence(resource struct {
         event zx.Handle:EVENTPAIR;
     }) -> () error zx.Status;
 };

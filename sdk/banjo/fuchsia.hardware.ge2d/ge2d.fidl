@@ -37,7 +37,7 @@ type WaterMarkInfo = resource struct {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Ge2d {
+closed protocol Ge2d {
     // Registers the buffer collections and configuration which the GE2D will be using
     // for this task and also the callback functions for a particular task and
     // returns a task index.
@@ -55,7 +55,7 @@ protocol Ge2d {
     // The resize task only supports dynamically changing the output resolution
     // (not the input resolution). Since the input resolution never changes after
     // Init, we just pass a single input ImageFormat.
-    InitTaskResize(resource struct {
+    strict InitTaskResize(resource struct {
         input_buffer_collection fuchsia.sysmem.BufferCollectionInfo_2;
         output_buffer_collection fuchsia.sysmem.BufferCollectionInfo_2;
         info ResizeInfo;
@@ -75,7 +75,7 @@ protocol Ge2d {
     // resolution, setting them to the same new resolution. Therefore we pass
     // a single ImageFormat table, with a single ImageFormat table index, which
     // applies to both input and output frames. Watermark info is per-resolution.
-    InitTaskWaterMark(resource struct {
+    strict InitTaskWaterMark(resource struct {
         input_buffer_collection fuchsia.sysmem.BufferCollectionInfo_2;
         output_buffer_collection fuchsia.sysmem.BufferCollectionInfo_2;
         info vector<WaterMarkInfo>:MAX;
@@ -92,7 +92,7 @@ protocol Ge2d {
     // This watermark task modifies the images in the input buffer collection.  The output image
     // index will be identical with the input image index, so the caller must manage the output
     // buffer lifetimes.  Watermark info is per-resolution.
-    InitTaskInPlaceWaterMark(resource struct {
+    strict InitTaskInPlaceWaterMark(resource struct {
         buffer_collection fuchsia.sysmem.BufferCollectionInfo_2;
         info vector<WaterMarkInfo>:MAX;
         image_format_table vector<fuchsia.sysmem.ImageFormat_2>:MAX;
@@ -106,7 +106,7 @@ protocol Ge2d {
     });
 
     // De-registers the task.
-    RemoveTask(struct {
+    strict RemoveTask(struct {
         task_index uint32;
     });
 
@@ -115,7 +115,7 @@ protocol Ge2d {
     // |output_buffer_collection| after applying the correct configuration.
     // After processing we call the callback registered for this task with the
     // output buffer index. |capture_timestamp| is forwarded to derived frames.
-    ProcessFrame(struct {
+    strict ProcessFrame(struct {
         task_index uint32;
         input_buffer_index uint32;
         capture_timestamp uint64;
@@ -125,7 +125,7 @@ protocol Ge2d {
 
     // Releases the frame |buffer_index| from the |output_buffer_collection| to be
     // used again by the GE2D driver again. Not valid for in-place watermark tasks.
-    ReleaseFrame(struct {
+    strict ReleaseFrame(struct {
         task_index uint32;
         buffer_index uint32;
     });
@@ -133,7 +133,7 @@ protocol Ge2d {
     // Set the output resolution. This call sets the resolution on all the output canvas
     // ids, for the specified task. This operation is queued to the worker thread to be
     // performed in sequence.
-    SetOutputResolution(struct {
+    strict SetOutputResolution(struct {
         task_index uint32;
         new_output_image_format_index uint32;
     }) -> (struct {
@@ -142,7 +142,7 @@ protocol Ge2d {
 
     // Similar to SetOutputResolution, this call sets the input and output resolution on all
     // input and output canvas ids.
-    SetInputAndOutputResolution(struct {
+    strict SetInputAndOutputResolution(struct {
         task_index uint32;
         new_image_format_index uint32;
     }) -> (struct {
@@ -151,7 +151,7 @@ protocol Ge2d {
 
     // Sets/Changes the crop rectangle (on a Resize Task). Typically called when
     // the camera controller is notified by Smart Framing to crop and resize.
-    SetCropRect(struct {
+    strict SetCropRect(struct {
         task_index uint32;
         crop fuchsia.hardware.camera.Rect;
     });

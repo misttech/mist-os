@@ -20,13 +20,13 @@ type DeviceType = flexible enum {
 /// When ReadInputReports is called it drains the InputReports FIFO.
 /// If too many InputReports are created before the FIFO is drained, then
 /// the oldest InputReport will be silently discarded.
-protocol InputReportsReader {
+closed protocol InputReportsReader {
     /// This is a Hanging-Get function to read the reports in the
     /// InputReport FIFO. This will not reply until there is at least one
     /// report available.
     /// If there is already one outstanding Hanging-Get, calling this
     /// again will return ZX_ERR_ALREADY_BOUND.
-    ReadInputReports() -> (struct {
+    strict ReadInputReports() -> (struct {
         reports vector<InputReport>:MAX_DEVICE_REPORT_COUNT;
     }) error zx.Status;
 };
@@ -37,33 +37,33 @@ protocol InputReportsReader {
 /// once they are read by the client. If the FIFO is full, it will drop the
 /// oldest report to make room for an incoming report.
 @discoverable
-protocol InputDevice {
+closed protocol InputDevice {
     /// Open a new InputReportsReader on this device. Each reader receives
     /// their own reports.
-    GetInputReportsReader(resource struct {
+    strict GetInputReportsReader(resource struct {
         reader server_end:InputReportsReader;
     });
 
     /// Gets the device descriptor for this device.
-    GetDescriptor() -> (struct {
+    strict GetDescriptor() -> (struct {
         descriptor DeviceDescriptor;
     });
 
     /// Send a single output report to the device. This will throw an error
     /// if the output report does not follow the OutputDescriptor.
-    SendOutputReport(struct {
+    strict SendOutputReport(struct {
         report OutputReport;
     }) -> () error zx.Status;
 
     /// Get the feature report for a given device. This requests the state of
     /// the device's features.
-    GetFeatureReport() -> (struct {
+    strict GetFeatureReport() -> (struct {
         report FeatureReport;
     }) error zx.Status;
 
     /// Set the feature report for a given device. This sets the state of
     /// the device's features.
-    SetFeatureReport(struct {
+    strict SetFeatureReport(struct {
         report FeatureReport;
     }) -> () error zx.Status;
 
@@ -72,7 +72,7 @@ protocol InputDevice {
     /// method can be used to request a report from the device type indicated.
     /// Does not block, and returns ZX_ERR_NOT_SUPPORTED if `GetInputReport` or
     /// `device_type` are not supported.
-    GetInputReport(struct {
+    strict GetInputReport(struct {
         device_type DeviceType;
     }) -> (struct {
         report InputReport;

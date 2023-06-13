@@ -30,7 +30,7 @@ const MAX_CHILD_COUNT uint32 = 128;
 /// The component framework provides this service to components that use
 /// `fuchsia.component.Realm`.
 @discoverable
-protocol Realm {
+closed protocol Realm {
     /// Opens the exposed directory of a child component instance. When this
     /// function successfully returns, `exposed_dir` is bound to a directory
     /// that contains the capabilities which the child exposed to its realm
@@ -46,7 +46,7 @@ protocol Realm {
     /// - `INSTANCE_NOT_FOUND`: `child` does not exist.
     /// - `INSTANCE_CANNOT_RESOLVE`: `child`'s component declaration failed to resolve.
     /// - `INSTANCE_DIED`: This realm no longer exists.
-    OpenExposedDir(resource struct {
+    strict OpenExposedDir(resource struct {
         child fuchsia.component.decl.ChildRef;
         exposed_dir server_end:fuchsia.io.Directory;
     }) -> () error Error;
@@ -66,7 +66,7 @@ protocol Realm {
     ///   in a `SingleRun` collection.
     /// - `NO_SPACE`: Could not allocate storage for the new instance.
     /// - `INSTANCE_DIED`: This realm no longer exists.
-    CreateChild(resource struct {
+    strict CreateChild(resource struct {
         collection fuchsia.component.decl.CollectionRef;
         decl fuchsia.component.decl.Child;
         args CreateChildArgs;
@@ -83,7 +83,7 @@ protocol Realm {
     /// - `INSTANCE_NOT_FOUND`: `child` does not exist.
     /// - `COLLECTION_NOT_FOUND`: `collection` does not exist.
     /// - `INSTANCE_DIED`: This realm no longer exists.
-    DestroyChild(struct {
+    strict DestroyChild(struct {
         child fuchsia.component.decl.ChildRef;
     }) -> () error Error;
 
@@ -100,7 +100,7 @@ protocol Realm {
     /// - `INSTANCE_DIED`: This realm no longer exists.
     /// - If `iter` does not have standard channel rights, this function may
     ///   return `ACCESS_DENIED` or component manager may close `iter`.
-    ListChildren(resource struct {
+    strict ListChildren(resource struct {
         collection fuchsia.component.decl.CollectionRef;
         iter server_end:ChildIterator;
     }) -> () error Error;
@@ -144,12 +144,12 @@ type CreateChildArgs = resource table {
 };
 
 /// A protocol to iterate over the list of children in a realm.
-protocol ChildIterator {
+closed protocol ChildIterator {
     /// Advance the iterator and return the next batch of children.
     ///
     /// Returns a vector of `ChildRef`. Returns an empty vector when there are
     /// no more children.
-    Next() -> (struct {
+    strict Next() -> (struct {
         children vector<fuchsia.component.decl.ChildRef>:MAX_CHILD_COUNT;
     });
 };

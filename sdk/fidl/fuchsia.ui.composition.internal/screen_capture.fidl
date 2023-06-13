@@ -76,7 +76,7 @@ type FrameInfo = resource table {
 /// [`fuchsia.ui.composition/Allocator`] protocols as those are necessary to
 /// create the BufferCollections and images ScreenCapture uses.
 @discoverable
-protocol ScreenCapture {
+closed protocol ScreenCapture {
     /// Clients should first use the ['fuchsia.ui.composition/Allocator']
     /// protocol to register a BufferCollection.
     ///
@@ -84,7 +84,7 @@ protocol ScreenCapture {
     /// enough for the image. If the buffer is too small, an
     /// attempt will be made to render the image, however, it will not be
     /// guaranteed to contain the complete image.
-    Configure(ScreenCaptureConfig) -> () error ScreenCaptureError;
+    strict Configure(ScreenCaptureConfig) -> () error ScreenCaptureError;
 
     /// [`GetNextFrame`] returns the latest unseen-by-the-client frame as soon
     /// as possible. On the first call to [`GetNextFrame`] and any subsequent
@@ -100,5 +100,5 @@ protocol ScreenCapture {
     /// It is invalid to call [`GetNextFrame`] while a previous call is still
     /// pending. Doing so will return a BAD_HANGING_GET error and cause the
     /// channel to close.
-    GetNextFrame() -> (FrameInfo) error ScreenCaptureError;
+    strict GetNextFrame() -> (FrameInfo) error ScreenCaptureError;
 };

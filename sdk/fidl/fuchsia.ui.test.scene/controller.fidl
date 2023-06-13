@@ -12,7 +12,7 @@ using zx;
 /// Controls a UI test scene. Allows a test to attach test Views to the scene
 /// and add View-related instrumentation.
 @discoverable
-protocol Controller {
+closed protocol Controller {
     /// *** NOTE: `ViewProvider` is no longer the preferred way for a parent
     /// and child view to agree on a ViewportCreationToken / ViewCreationToken
     /// pair. Flatland-based clients are encouraged to use `PresentView` (below)
@@ -36,7 +36,7 @@ protocol Controller {
     ///
     /// Clients may drop the `Controller` connection once `AttachClientView` has
     /// returned.
-    AttachClientView(resource table {
+    strict AttachClientView(resource table {
         1: view_provider client_end:fuchsia.ui.app.ViewProvider;
     }) -> (struct {
         view_ref_koid zx.Koid;
@@ -49,7 +49,7 @@ protocol Controller {
     /// Clients may drop the `Controller` connection once `PresentClientView` has
     /// returned.
     @available(added=10)
-    PresentClientView(resource table {
+    strict PresentClientView(resource table {
         @available(added=10)
         1: viewport_creation_token fuchsia.ui.views.ViewportCreationToken;
     });
@@ -62,7 +62,7 @@ protocol Controller {
     ///
     /// For more information on geometry observation, see the documentation
     /// in //sdk/fidl/fuchsia.ui.observation.geometry/watcher.fidl.
-    RegisterViewTreeWatcher(resource struct {
+    strict RegisterViewTreeWatcher(resource struct {
         watcher server_end:fuchsia.ui.observation.geometry.ViewTreeWatcher;
     }) -> ();
 };

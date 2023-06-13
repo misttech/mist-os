@@ -5,21 +5,21 @@ library fuchsia.hardware.usb.virtual.bus;
 
 using zx;
 
-protocol Bus {
+closed protocol Bus {
     /// Enables the virtual bus.
-    Enable() -> (struct {
+    strict Enable() -> (struct {
         status zx.Status;
     });
     /// Disables the virtual bus.
-    Disable() -> (struct {
+    strict Disable() -> (struct {
         status zx.Status;
     });
     /// Simulates a USB connected event.
-    Connect() -> (struct {
+    strict Connect() -> (struct {
         status zx.Status;
     });
     /// Simulates a USB connected event.
-    Disconnect() -> (struct {
+    strict Disconnect() -> (struct {
         status zx.Status;
     });
 };

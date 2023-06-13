@@ -6,11 +6,11 @@ library fuchsia.hardware.power.sensor;
 using zx;
 
 @discoverable
-protocol Device {
-    GetPowerWatts() -> (struct {
+closed protocol Device {
+    strict GetPowerWatts() -> (struct {
         power float32;
     }) error zx.Status;
-    GetVoltageVolts() -> (struct {
+    strict GetVoltageVolts() -> (struct {
         voltage float32;
     }) error zx.Status;
 };

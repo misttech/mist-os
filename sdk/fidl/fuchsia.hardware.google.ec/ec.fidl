@@ -51,9 +51,9 @@ type EcStatus = flexible enum {
 };
 
 @discoverable
-protocol Device {
+closed protocol Device {
     /// Run the given command on the EC.
-    RunCommand(struct {
+    strict RunCommand(struct {
         /// Command code.
         command uint16;
         /// Command version.

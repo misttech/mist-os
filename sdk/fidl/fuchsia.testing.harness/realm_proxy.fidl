@@ -29,9 +29,9 @@ const MAX_PROTOCOL_LEN uint64 = fuchsia.io.MAX_NAME_LENGTH;
 /// Prefer to connect to RealmFactory instead to obtain an instance of RealmProxy;
 /// in the future RealmProxy will no longer be discoverable TODO(fxb/126679).
 @discoverable
-protocol RealmProxy {
+closed protocol RealmProxy {
     /// Connects [server_end] to the [protocol] from this proxy's namespace.
-    ConnectToNamedProtocol(resource struct {
+    strict ConnectToNamedProtocol(resource struct {
         protocol string:MAX_PROTOCOL_LEN;
         server_end zx.Handle:CHANNEL;
     }) -> () error OperationError;
@@ -82,7 +82,7 @@ protocol RealmProxy {
 @discoverable
 closed protocol RealmFactory {
     /// Creates a new realm and binds the given RealmProxy server end to it.
-    CreateRealm(resource struct {
+    strict CreateRealm(resource struct {
         realm_server server_end:RealmProxy;
     }) -> () error OperationError;
 };

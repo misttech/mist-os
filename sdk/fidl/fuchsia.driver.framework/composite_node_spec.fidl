@@ -63,7 +63,7 @@ type CompositeNodeSpecError = strict enum {
 /// static bind rules of a composite driver with the dynamic bind properties
 /// of nodes in the system so that the driver bind rules are more generic and reusable.
 @discoverable
-protocol CompositeNodeManager {
+closed protocol CompositeNodeManager {
     /// Adds the given composite node specification to the driver framework.
-    AddSpec(CompositeNodeSpec) -> () error CompositeNodeSpecError;
+    strict AddSpec(CompositeNodeSpec) -> () error CompositeNodeSpecError;
 };

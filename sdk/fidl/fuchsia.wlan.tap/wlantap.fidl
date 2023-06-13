@@ -28,8 +28,8 @@ type WlantapPhyConfig = struct {
 /// Instruct the wlantap-ctl device to creates a fake wlantap-phy device based on the
 /// `WlantapPhyConfig` passed in. The newly created wlantap-phy device will use the channel to
 /// allow a `WlantapPhy` client to observe and control its behavior.
-protocol WlantapCtl {
-    CreatePhy(resource struct {
+closed protocol WlantapCtl {
+    strict CreatePhy(resource struct {
         config WlantapPhyConfig;
         proxy server_end:WlantapPhy;
     }) -> (struct {
@@ -97,27 +97,27 @@ type SetCountryArgs = struct {
 /// fuchsia.wlan.softmac/softmac.fidl
 /// Implements a subset of `WlanPhyImpl` protocol defined in
 /// fuchsia.hardware.phyimpl/wlanphy-impl.fidl
-protocol WlantapPhy {
+closed protocol WlantapPhy {
     /// Shutdown the phy device so that it does not respond to any further calls.
     /// Once shutdown, there is no way to restart the device.
     /// It can only be called at the end of a test.
-    Shutdown() -> ();
+    strict Shutdown() -> ();
 
     // wlan_softmac_ifc_t callbacks
     // simulating events happening at the devices side that are passed up to the driver.
 
     /// The device "receives" a frame "over the air" and pass it up to driver.
-    Rx(struct {
+    strict Rx(struct {
         data vector<uint8>:MAX;
         info WlanRxInfo;
     });
     /// For rate selection (Minstrel), the device's last frame transmission is a success/failure,
     /// with a certain number of retries.
-    ReportTxResult(struct {
+    strict ReportTxResult(struct {
         txr fuchsia.wlan.common.WlanTxResult;
     });
 
-    ScanComplete(struct {
+    strict ScanComplete(struct {
         scan_id uint64;
         status zx.Status;
     });
@@ -126,31 +126,31 @@ protocol WlantapPhy {
     // events indicating that the wlan-softmac device received interface request calls from the driver.
 
     /// The device is to send a frame "over the air".
-    -> Tx(struct {
+    strict -> Tx(struct {
         args TxArgs;
     });
     /// The device created by its parent device (wlantap-phy: wlanphy) is
     /// detected and being connected by wlanstack/wlancfg.
     /// The device is to enter the "running" state.
-    -> WlanSoftmacStart();
+    strict -> WlanSoftmacStart();
     /// The device is to switch to the specified channel.
-    -> SetChannel(struct {
+    strict -> SetChannel(struct {
         args SetChannelArgs;
     });
     /// AP: The device is to use args.config as a template for beacon frames.
     /// Client: The device is to be configured with this BSS as it peer.
-    -> JoinBss(struct {
+    strict -> JoinBss(struct {
         args JoinBssArgs;
     });
 
-    -> StartScan(struct {
+    strict -> StartScan(struct {
         args StartScanArgs;
     });
 
     // TODO: Enable/Disable Beaconing.
 
     /// The device is to install the keys (often coming from RSN, exceptions apply).
-    -> SetKey(struct {
+    strict -> SetKey(struct {
         args SetKeyArgs;
     });
 
@@ -159,7 +159,7 @@ protocol WlantapPhy {
 
     /// The device is to change its radio and power settings to conform to the regulation of the
     /// specified country.
-    -> SetCountry(struct {
+    strict -> SetCountry(struct {
         args SetCountryArgs;
     });
 };

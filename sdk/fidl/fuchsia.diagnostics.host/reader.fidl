@@ -7,7 +7,7 @@ using fuchsia.diagnostics;
 using zx;
 
 @discoverable
-protocol ArchiveAccessor {
+closed protocol ArchiveAccessor {
     /// Creates an iterator over diagnostics data on the system.
     ///   * The iterator may be finite by streaming in SNAPSHOT mode, serving only the
     ///     current state of diagnostics data on the system.
@@ -20,7 +20,7 @@ protocol ArchiveAccessor {
     ///
     /// `parameters` is a [fuchsia.diagnostics/StreamParameter] which
     ///   specifies how to configure the stream.
-    StreamDiagnostics(resource struct {
+    strict StreamDiagnostics(resource struct {
         parameters fuchsia.diagnostics.StreamParameters;
         stream zx.Handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
     }) -> ();

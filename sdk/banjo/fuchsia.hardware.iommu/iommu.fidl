@@ -7,8 +7,8 @@ using zx;
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Iommu {
-    GetBti(struct {
+closed protocol Iommu {
+    strict GetBti(struct {
         iommu_index uint32;
         bti_id uint32;
     }) -> (resource struct {

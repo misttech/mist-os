@@ -19,63 +19,63 @@ type GpioPolarity = strict enum : uint32 {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Gpio {
+closed protocol Gpio {
     /// Configures a GPIO for input.
-    ConfigIn(struct {
+    strict ConfigIn(struct {
         flags uint32;
     }) -> (struct {
         s zx.Status;
     });
     /// Configures a GPIO for output.
-    ConfigOut(struct {
+    strict ConfigOut(struct {
         initial_value uint8;
     }) -> (struct {
         s zx.Status;
     });
     /// Configures the GPIO pin for an alternate function (I2C, SPI, etc)
     /// the interpretation of "function" is platform dependent.
-    SetAltFunction(struct {
+    strict SetAltFunction(struct {
         function uint64;
     }) -> (struct {
         s zx.Status;
     });
     /// Reads the current value of a GPIO (0 or 1).
-    Read() -> (struct {
+    strict Read() -> (struct {
         s zx.Status;
         value uint8;
     });
     /// Sets the current value of the GPIO (any non-zero value maps to 1).
-    Write(struct {
+    strict Write(struct {
         value uint8;
     }) -> (struct {
         s zx.Status;
     });
     /// Gets an interrupt object pertaining to a particular GPIO pin.
-    GetInterrupt(struct {
+    strict GetInterrupt(struct {
         flags uint32;
     }) -> (resource struct {
         s zx.Status;
         irq zx.Handle:INTERRUPT;
     });
     /// Release the interrupt.
-    ReleaseInterrupt() -> (struct {
+    strict ReleaseInterrupt() -> (struct {
         s zx.Status;
     });
     /// Set GPIO polarity.
-    SetPolarity(struct {
+    strict SetPolarity(struct {
         polarity GpioPolarity;
     }) -> (struct {
         s zx.Status;
     });
     /// Set GPIO drive strength.
-    SetDriveStrength(struct {
+    strict SetDriveStrength(struct {
         ds_ua uint64;
     }) -> (struct {
         s zx.Status;
         actual_ds_ua uint64;
     });
     /// Get GPIO drive strength.
-    GetDriveStrength() -> (struct {
+    strict GetDriveStrength() -> (struct {
         s zx.Status;
         value uint64;
     });

@@ -33,14 +33,14 @@ type UserProfileInfo = struct {
 
 /// This interface is implemented by base shell. It is used to notify the
 /// base shell that a view for login needs to be started / stopped.
-protocol AuthenticationUIContext {
+closed protocol AuthenticationUIContext {
     /// Requests base shell to display `view_holder_token` for authentication.
     /// Another call to StartOverlay() will not be made until StopOverlay()
     /// has been called.
-    StartOverlay(resource struct {
+    strict StartOverlay(resource struct {
         view_holder_token fuchsia.ui.views.ViewHolderToken;
     });
 
     /// Requests base shell to stop displaying the auth view.
-    StopOverlay();
+    strict StopOverlay();
 };

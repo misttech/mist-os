@@ -6,9 +6,9 @@ library fuchsia.hardware.mediacodec;
 using fuchsia.io;
 using zx;
 
-protocol Device {
+closed protocol Device {
     /// This method connects the caller with a fuchsia.mediacodec.CodecFactory.
-    GetCodecFactory(resource struct {
+    strict GetCodecFactory(resource struct {
         request zx.Handle:CHANNEL;
     });
 
@@ -17,7 +17,7 @@ protocol Device {
     /// available via this service directory are services we'd prefer to get via the DDK.  A device
     /// can simply close this channel if the device doesn't need to use any services available via
     /// this service directory.
-    SetAuxServiceDirectory(resource struct {
+    strict SetAuxServiceDirectory(resource struct {
         service_directory client_end:fuchsia.io.Directory;
     });
 };

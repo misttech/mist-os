@@ -14,7 +14,7 @@ library fuchsia.examples.calculator;
 /// + [`fuchsia.examples.calculator/Calculator.Divide`]
 /// + [`fuchsia.examples.calculator/Calculator.Pow`]
 @discoverable
-protocol Calculator {
+closed protocol Calculator {
     /// Adds two numbers together and returns their `sum`.
     ///
     /// For example, with `a` being 4.5 and `b` being 3.2, the response `sum` is
@@ -23,7 +23,7 @@ protocol Calculator {
     /// + request `a` the first number to be added.
     /// + request `b` the second number to be added.
     /// - response `sum` the sum of a and b.
-    Add(struct {
+    strict Add(struct {
         a float64;
         b float64;
     }) -> (struct {
@@ -38,7 +38,7 @@ protocol Calculator {
     /// + request `a` the number to be subracted _from_.
     /// + request `b` the number to subtract.
     /// - response `difference` the difference between `a` and `b`.
-    Subtract(struct {
+    strict Subtract(struct {
         a float64;
         b float64;
     }) -> (struct {
@@ -53,7 +53,7 @@ protocol Calculator {
     /// + request `a` the first number used to calculatorulate the `product`.
     /// + request `b` the second number used to calculatorulate the `product`.
     /// - response `product` the result of multiplying `a` and `b`.
-    Multiply(struct {
+    strict Multiply(struct {
         a float64;
         b float64;
     }) -> (struct {
@@ -68,7 +68,7 @@ protocol Calculator {
     /// + request `dividend` the number to divide with.
     /// + request `divisor` the number to divide into.
     /// - response `quotient` the result of dividing the `dividend` into the `divisor`.
-    Divide(struct {
+    strict Divide(struct {
         dividend float64;
         divisor float64;
     }) -> (struct {
@@ -85,7 +85,7 @@ protocol Calculator {
     /// `base`.
     /// - response `power` the result of multiplying `base` by itself `exponent`
     /// times..
-    Pow(struct {
+    strict Pow(struct {
         base float64;
         exponent float64;
     }) -> (struct {

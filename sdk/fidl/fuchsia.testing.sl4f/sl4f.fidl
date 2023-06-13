@@ -7,8 +7,8 @@ using zx;
 
 /// Implemented by a backend component hosting one or more facades. Used to acquire the list of
 /// facades hosted by a `FacadeProvider` instance.
-protocol FacadeIterator {
-    GetNext() -> (struct {
+closed protocol FacadeIterator {
+    strict GetNext() -> (struct {
         facades vector<string:MAX>:MAX;
     });
 };
@@ -18,14 +18,14 @@ protocol FacadeIterator {
 /// NOTE: The current implementation uses ComponentsV1 and only supports a single `FacadeProvider`
 /// instance. This is intended to change and may result in changes to the protocol.
 @discoverable
-protocol FacadeProvider {
+closed protocol FacadeProvider {
     /// Connect to a `FacadeIterator` to obtain the list of facades hosted by this `FacadeProvider`.
-    GetFacades(resource struct {
+    strict GetFacades(resource struct {
         iterator server_end:FacadeIterator;
     });
 
     /// Executes 'command' on 'facade'. Returns an optional result JSON blob and error string.
-    Execute(resource struct {
+    strict Execute(resource struct {
         facade string:MAX;
         command string:MAX;
         params_blob zx.Handle:VMO;
@@ -36,8 +36,8 @@ protocol FacadeProvider {
 
     /// Cleans up any resources and transient state associated with SL4F facades hosted by this
     /// `FacadeProvider`. Returns on completion.
-    Cleanup() -> ();
+    strict Cleanup() -> ();
 
     /// Prints the state of all facades hosted by this `FacadeProvider`. Returns on completion.
-    Print() -> ();
+    strict Print() -> ();
 };

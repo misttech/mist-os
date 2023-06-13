@@ -7,7 +7,7 @@ using zx;
 
 /// This protocol currently is a temporary measure to allow for services to get the physical address
 /// of a previously pinned VMO until trusted services can be handed BTI handles.
-protocol Device {
+closed protocol Device {
     /// Gets the physical address of a previously pinned VMO.
     ///
     /// Note:
@@ -16,7 +16,7 @@ protocol Device {
     ///    entity. The protocol implementation should not be expected to keep the VMO pinned.
     ///  * The server implementation must not use an IOMMU-backed BTI handle, as the physical
     ///    address of the VMO being pinned must be stable.
-    GetSecureMemoryPhysicalAddress(resource struct {
+    strict GetSecureMemoryPhysicalAddress(resource struct {
         secure_mem zx.Handle:VMO;
     }) -> (struct {
         s zx.Status;

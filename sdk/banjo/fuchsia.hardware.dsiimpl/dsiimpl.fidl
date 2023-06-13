@@ -82,61 +82,61 @@ type MipiDsiCmd = struct {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol DsiImpl {
+closed protocol DsiImpl {
     /// This function is used to configure all the DSI parameters needed to operated in both
     /// Command and Video Mode
-    Config(struct {
+    strict Config(struct {
         dsi_config DsiConfig;
     }) -> (struct {
         s zx.Status;
     });
     /// This function is called to power up the DSI interface
-    PowerUp() -> ();
+    strict PowerUp() -> ();
     /// This function is called to power down the DSI interface
-    PowerDown() -> ();
+    strict PowerDown() -> ();
     /// This function is used to change modes between Video and Command.
-    SetMode(struct {
+    strict SetMode(struct {
         mode DsiMode;
     }) -> ();
     /// This function is used to send a MIPI-DSI command through the DSI block
-    SendCmd(struct {
+    strict SendCmd(struct {
         cmd vector<MipiDsiCmd>:MAX;
     }) -> (struct {
         s zx.Status;
     });
     /// This function return true if the DSI block is powered on and not in reset
-    IsPoweredUp() -> (struct {
+    strict IsPoweredUp() -> (struct {
         on bool;
     });
     /// This function resets the DSI IP block
-    Reset() -> ();
+    strict Reset() -> ();
 
     /// This function configures the PHY IP (inf within the DSI block)
-    PhyConfig(struct {
+    strict PhyConfig(struct {
         dsi_config DsiConfig;
     }) -> (struct {
         s zx.Status;
     });
     /// This function is used to power up the MIPI D-PHY block
-    PhyPowerUp() -> ();
+    strict PhyPowerUp() -> ();
     /// This function is used to power up the MIPI D-PHY block
-    PhyPowerDown() -> ();
+    strict PhyPowerDown() -> ();
     /// This function is used to communicate the MIPI D-PHY
-    PhySendCode(struct {
+    strict PhySendCode(struct {
         code uint32;
         parameter uint32;
     }) -> ();
     /// This function checks two things in order to decide whether the PHY is
     /// ready or not. LOCK Bit and StopStateClk bit. According to spec, once these
     /// are set, PHY has completed initialization
-    PhyWaitForReady() -> (struct {
+    strict PhyWaitForReady() -> (struct {
         s zx.Status;
     });
 
     /// This function allows writing to any register within the DSI block. This could be used
     /// for debug purposes during development stages without needing to modify the DSI IMPL
     /// protocol or to write to registers that don't really belong in the DSI IP block.
-    WriteReg(struct {
+    strict WriteReg(struct {
         reg uint32;
         val uint32;
     }) -> (struct {
@@ -144,7 +144,7 @@ protocol DsiImpl {
     });
 
     /// This function returns the value of any register within the DSI IP block
-    ReadReg(struct {
+    strict ReadReg(struct {
         reg uint32;
     }) -> (struct {
         s zx.Status;
@@ -152,12 +152,12 @@ protocol DsiImpl {
     });
 
     /// This function enable BIST pattern generation. This is useful during development stages
-    EnableBist(struct {
+    strict EnableBist(struct {
         pattern uint32;
     }) -> (struct {
         s zx.Status;
     });
 
     /// This function prints the value of all DSI registers
-    PrintDsiRegisters() -> ();
+    strict PrintDsiRegisters() -> ();
 };

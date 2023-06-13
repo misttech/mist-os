@@ -5,7 +5,7 @@ library fuchsia.web;
 
 /// The debug service which allows to enable the DevTools service on Contexts.
 @discoverable
-protocol Debug {
+closed protocol Debug {
     /// Enables the DevTools service on every subsequent [`Context`] creation and delivers
     /// subsequent DevTools events to the supplied `listener`. The callback indicates when the
     /// WebEngine is in a debuggable state. Events will be sent to every `listener` registered with
@@ -14,29 +14,29 @@ protocol Debug {
     /// Because DevTools debugging is exposed using TCP as its transport, only
     /// [`Context`]s created with access to network capabilities will report
     /// themselves as available for debugging.
-    EnableDevTools(resource struct {
+    strict EnableDevTools(resource struct {
         listener client_end:DevToolsListener;
     }) -> ();
 };
 
 /// Interface used to observe DevTools service availability events.
-protocol DevToolsListener {
+closed protocol DevToolsListener {
     /// Called when the DevTools service is available on a new [`Context`].
     ///
     /// - `listener`: Channel over which DevTools events for the new [`Context`] will
     ///   be delivered. This channel will disconnect when the [`Context`] is destroyed.
-    OnContextDevToolsAvailable(resource struct {
+    strict OnContextDevToolsAvailable(resource struct {
         listener server_end:DevToolsPerContextListener;
     });
 };
 
 /// Interface supplied by the debugging component to observe the DevTools service opening event.
-protocol DevToolsPerContextListener {
+closed protocol DevToolsPerContextListener {
     /// Called when the DevTools service starts accepting TCP connections on `port`. `port` will
     /// remain open until the [`Context`] is destroyed.
     ///
     /// - `port`: The port used by the service.
-    OnHttpPortOpen(struct {
+    strict OnHttpPortOpen(struct {
         port uint16;
     });
 };

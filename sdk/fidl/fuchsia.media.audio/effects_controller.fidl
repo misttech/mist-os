@@ -11,7 +11,7 @@ type UpdateEffectError = strict enum {
 const MAX_EFFECT_NAME_LENGTH uint32 = 128;
 
 @discoverable
-protocol EffectsController {
+closed protocol EffectsController {
     /// Sends the `config` message to an audio effect named `effect_name`. If the
     /// server closes the `EffectsController` connection for any reason, that
     /// indicates that the effects have been reset and any state associated with
@@ -29,7 +29,7 @@ protocol EffectsController {
     ///
     /// Returns `UpdateEffectError.NOT_FOUND` if no effect with name `effect_name`
     /// could be located.
-    UpdateEffect(struct {
+    strict UpdateEffect(struct {
         effect_name string:MAX_EFFECT_NAME_LENGTH;
         config string:MAX;
     }) -> () error UpdateEffectError;

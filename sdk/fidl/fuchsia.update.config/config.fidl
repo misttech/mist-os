@@ -25,26 +25,26 @@ type OptOutAdminError = flexible enum {
 
 /// The state of the update system's opt-out functionality.
 @discoverable
-protocol OptOut {
+closed protocol OptOut {
 
     /// Gets the current update opt-out status.
     ///
     /// - response `value` The user's current opt-out preference.
-    Get() -> (struct {
+    strict Get() -> (struct {
         value OptOutPreference;
     });
 };
 
 /// Management for the state of the update system's opt-out functionality.
 @discoverable
-protocol OptOutAdmin {
+closed protocol OptOutAdmin {
 
     /// Sets the update opt-out preference to `value`.
     ///
     /// + request `value` The user's new opt-out preference.
     ///
     /// * error Any error encountered while persisting the new setting.
-    Set(struct {
+    strict Set(struct {
         value OptOutPreference;
     }) -> () error OptOutAdminError;
 };

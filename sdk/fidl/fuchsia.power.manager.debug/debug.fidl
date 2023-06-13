@@ -14,7 +14,7 @@ type MessageError = flexible enum {
 
 /// Exposes a debug control interface to the Power Manager.
 @discoverable
-protocol Debug {
+closed protocol Debug {
     /// Sends a debug message to the specified Power Manager node.
     ///
     /// + `node_name` is the name of the Power Manager node to message. A list
@@ -39,7 +39,7 @@ protocol Debug {
     ///     )
     ///     ```
     ///
-    Message(struct {
+    strict Message(struct {
         node_name string:MAX;
         command string:MAX;
         args vector<string:MAX>:MAX;

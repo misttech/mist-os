@@ -43,7 +43,7 @@ type CanvasInfo = struct {
 };
 
 @discoverable
-protocol Device {
+closed protocol Device {
     /// Configures a canvas. Canvases are a special construct in the AMLogic
     /// memory controller, used to turn image data accesses into memory accesses
     /// while respecting block/tiling, stride, and endianness.
@@ -51,7 +51,7 @@ protocol Device {
     /// `vmo` is the backing memory to use for this canvas.
     /// `offset` is the relative address for image data within `vmo`.
     /// `info` describes the canvas layout (see CanvasInfo for details).
-    Config(resource struct {
+    strict Config(resource struct {
         vmo zx.Handle:VMO;
         offset uint64;
         info CanvasInfo;
@@ -59,7 +59,7 @@ protocol Device {
         canvas_idx uint8;
     }) error zx.Status;
     /// Frees up a canvas.
-    Free(struct {
+    strict Free(struct {
         canvas_idx uint8;
     }) -> () error zx.Status;
 };

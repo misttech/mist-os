@@ -39,14 +39,14 @@ type Error = enum {
 /// This protocol is associated with the lifetime of the IP masquerade
 /// between interfaces for the configured network. This configuration will
 /// be torn down whenever either end of the protocol is closed.
-protocol Control {
+closed protocol Control {
     /// SetEnabled enables or disabled IP masquerading for the configured
     /// instance. Newly created instances are disabled and must be enabled
     /// via this API.
     ///
     /// + request `enabled` True to enable masquerade; false to disable.
     /// - response `was_enabled` True if the interface was enabled before this call.
-    SetEnabled(struct {
+    strict SetEnabled(struct {
         enabled bool;
     }) -> (struct {
         was_enabled bool;
@@ -58,7 +58,7 @@ protocol Control {
 /// This protocol is used to create instances allowing for the control of
 /// IP masquerade of a particular network.
 @discoverable
-protocol Factory {
+closed protocol Factory {
     /// Create a new IP masquerade instance using the supplied
     /// configuration.
     ///
@@ -73,7 +73,7 @@ protocol Factory {
     ///   instance.
     /// + request `control` Control handle to use for configuring the
     ///   instance.
-    Create(resource struct {
+    strict Create(resource struct {
         config @generated_name("ControlConfig") struct {
             /// The interface carrying the network to be masqueraded.
             input_interface fuchsia.net.InterfaceId;

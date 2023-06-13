@@ -24,7 +24,7 @@ type ConversionProperties = table {
 };
 
 @discoverable
-protocol Converter {
+closed protocol Converter {
 
     /// Modifies the color of final display output of rendered content. The sole parameter is a
     /// table of |ConversionProperties|, which contains the parameters required to apply the
@@ -56,7 +56,7 @@ protocol Converter {
     /// do not depend on pre and post offsets since some hardware do not have support for that.
     /// For cases where pre and post offset values need to be used, the range should be limited to
     /// (-1, 1).
-    SetValues(resource struct {
+    strict SetValues(resource struct {
         properties ConversionProperties;
     }) -> (struct {
         res zx.Status;
@@ -75,7 +75,7 @@ protocol Converter {
     ///
     /// Not all hardware supports this feature. So this function returns |true|
     /// if successfully applied and |false| if unsupported.
-    SetMinimumRgb(struct {
+    strict SetMinimumRgb(struct {
         minimum_rgb uint8;
     }) -> (struct {
         supported bool;

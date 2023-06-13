@@ -7,9 +7,9 @@ using zx;
 
 /// Protocol for providing an SMC resource with access to all valid ranges.
 @discoverable
-protocol SmcResource {
+closed protocol SmcResource {
     /// Get an SMC resource handle.
-    Get() -> (resource struct {
+    strict Get() -> (resource struct {
         resource zx.Handle:RESOURCE;
     });
 };

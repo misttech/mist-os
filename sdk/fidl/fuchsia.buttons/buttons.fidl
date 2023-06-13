@@ -20,11 +20,11 @@ type ButtonType = strict enum : uint8 {
 /// Protocol for other devices to get the state of buttons and register for
 /// notifications of state change.
 @discoverable
-protocol Buttons {
+closed protocol Buttons {
     /// Gets the state of the button requested.
     /// `type` : Button type.
     /// @Returns: `pressed` : True if button is pressed.
-    GetState(struct {
+    strict GetState(struct {
         type ButtonType;
     }) -> (struct {
         pressed bool;
@@ -37,14 +37,14 @@ protocol Buttons {
     ///           the state of the VOLUME_UP button changes. Types not listed
     ///           in subsequent calls are removed.
     /// @Returns: `status` : ZX_OK if succeeds.
-    RegisterNotify(struct {
+    strict RegisterNotify(struct {
         types uint8;
     }) -> () error zx.Status;
 
     /// Notify event. Called when state of previously registered button changes.
     /// `type` : Button type.
     /// `pressed` : True if button is pressed.
-    -> OnNotify(struct {
+    strict -> OnNotify(struct {
         type ButtonType;
         pressed bool;
     });

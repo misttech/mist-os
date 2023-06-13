@@ -14,11 +14,11 @@ using fuchsia.net.routes;
 
 /// Vends isolated administrative access to the system's routing table.
 @discoverable
-protocol SetProviderV6 {
+closed protocol SetProviderV6 {
     /// Creates an empty route set.
     ///
     /// + request `route_set` grants access to the [`RouteSetV6`] protocol.
-    NewRouteSet(resource struct {
+    strict NewRouteSet(resource struct {
         route_set server_end:RouteSetV6;
     });
 };
@@ -39,12 +39,12 @@ protocol SetProviderV6 {
 /// Note that the system reserves the right to remove routes out from underneath
 /// this route set. This will always manifest as a `removed` event on the
 /// [`fuchsia.net.routes/WatcherV6`] protocol.
-protocol RouteSetV6 {
+closed protocol RouteSetV6 {
     /// Authenticate this route set to manage routes on the provided interface.
     /// Authentication is valid for the lifetime of the route set.
     ///
     /// + request `interface` the authentication credential for an interface.
-    AuthenticateForInterface(resource struct {
+    strict AuthenticateForInterface(resource struct {
         credential fuchsia.net.interfaces.admin.ProofOfInterfaceAuthorization;
     }) -> () error AuthenticateForInterfaceError;
 
@@ -53,7 +53,7 @@ protocol RouteSetV6 {
     /// + request `route` the route to add.
     /// - response `did_add` true iff the route was added to this `RouteSet`
     ///            as a result of this call.
-    AddRoute(resource struct {
+    strict AddRoute(resource struct {
         route fuchsia.net.routes.RouteV6;
     }) -> (struct {
         did_add bool;
@@ -67,7 +67,7 @@ protocol RouteSetV6 {
     /// + request `route` the route to remove.
     /// - response `did_remove` true iff the route was removed from this
     ///            `RouteSet` as a result of this call.
-    RemoveRoute(resource struct {
+    strict RemoveRoute(resource struct {
         route fuchsia.net.routes.RouteV6;
     }) -> (struct {
         did_remove bool;

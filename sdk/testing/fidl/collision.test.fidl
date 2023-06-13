@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 library fidl.test.collision;
 
-protocol NameCollision {};
+closed protocol NameCollision {};
 
 type UnionCollision = strict union {
     1: foo uint32;
@@ -13,14 +13,14 @@ type NullableUnionCollision = strict union {
     1: foo uint32;
 };
 
-protocol ReturnsCollision {
-    NameCollision() -> (resource struct {
+closed protocol ReturnsCollision {
+    strict NameCollision() -> (resource struct {
         collision client_end:NameCollision;
     });
-    UnionCollision(struct {
+    strict UnionCollision(struct {
         collision UnionCollision;
     }) -> ();
-    NullableUnionCollision(struct {
+    strict NullableUnionCollision(struct {
         collision NullableUnionCollision:optional;
     }) -> ();
 };

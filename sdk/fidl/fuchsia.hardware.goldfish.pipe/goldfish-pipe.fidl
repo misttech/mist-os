@@ -38,17 +38,17 @@ type PipeError = strict enum : int32 {
 /// opened pipe. Failure to do so may result in host side resources that are
 /// not cleaned up properly.
 @discoverable
-protocol GoldfishPipe {
+closed protocol GoldfishPipe {
     /// Create a new pipe connection. The |id| identifies the pipe and must be
     /// used for all subsequent commands. The memory that will be used as
     /// command structure is returned in |vmo|.
-    Create() -> (resource struct {
+    strict Create() -> (resource struct {
         id int32;
         vmo zx.Handle:VMO;
     }) error zx.Status;
 
     /// Destroy a previously created pipe connection.
-    Destroy(struct {
+    strict Destroy(struct {
         id int32;
     }) -> ();
 
@@ -59,7 +59,7 @@ protocol GoldfishPipe {
     /// Return error states from `zx_object_wait_one` and `zx_object_signal`
     /// if existing events on `pipe_event` cannot be transferred to the call.
     /// Otherwise returns `ZX_OK`.
-    SetEvent(resource struct {
+    strict SetEvent(resource struct {
         id int32;
         pipe_event zx.Handle:EVENT;
     }) -> () error zx.Status;
@@ -69,27 +69,27 @@ protocol GoldfishPipe {
     /// command structure to be a associated with the pipe. The command
     /// structure must contain {.cmd = OPEN, .id = id} at the time this
     /// request is issued.
-    Open(struct {
+    strict Open(struct {
         id int32;
     }) -> ();
 
     /// Execute pipe command stored in associated command structure.
-    Exec(struct {
+    strict Exec(struct {
         id int32;
     }) -> ();
 
     /// Get BTI that can be used create IO buffers for read/write commands.
-    GetBti() -> (resource struct {
+    strict GetBti() -> (resource struct {
         bti zx.Handle:BTI;
     }) error zx.Status;
 
     /// Create a sysmem connection - used to implement fuchsia.hardware.sysmem.
-    ConnectSysmem(resource struct {
+    strict ConnectSysmem(resource struct {
         connection zx.Handle:CHANNEL;
     }) -> () error zx.Status;
 
     /// Register a sysmem heap.
-    RegisterSysmemHeap(resource struct {
+    strict RegisterSysmemHeap(resource struct {
         heap uint64;
         connection zx.Handle:CHANNEL;
     }) -> () error zx.Status;

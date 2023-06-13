@@ -45,7 +45,7 @@ type SnoopPacket = struct {
 /// Packets are received by the client as datagrams through the fidl channel as `OnPacket`
 /// events.
 @discoverable
-protocol Snoop {
+closed protocol Snoop {
     /// Subscribe to receive packets from the server. Packets that have been recorded are sent
     /// first.
     ///
@@ -60,7 +60,7 @@ protocol Snoop {
     ///   `Start` can only be called once per connection. After the first request, subsequent requests
     ///   always return an error.
     ///   `host_device` values that are not recognized by the server return an error.
-    Start(struct {
+    strict Start(struct {
         follow bool;
         host_device string:<io.MAX_FILENAME, optional>;
     }) -> (struct {
@@ -69,7 +69,7 @@ protocol Snoop {
 
     /// An event containing a packet that the client has registered interest in receiving and the
     /// `host_device` which generated the packet.
-    -> OnPacket(struct {
+    strict -> OnPacket(struct {
         host_device string:io.MAX_FILENAME;
         packet SnoopPacket;
     });

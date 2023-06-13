@@ -8,7 +8,7 @@ library zx;
 // generator to exclude putting "Misc" in the name.
 @transport("Syscall")
 @no_protocol_prefix
-protocol Misc {
+closed protocol Misc {
     /// ## Summary
     ///
     /// High resolution sleep.
@@ -60,7 +60,7 @@ protocol Misc {
     /// [`zx_timer_create()`]: timer_create.md
     /// [`zx_timer_set()`]: timer_set.md
     @blocking
-    Nanosleep(struct {
+    strict Nanosleep(struct {
         deadline Time;
     }) -> () error Status;
 
@@ -108,7 +108,7 @@ protocol Misc {
     ///
     /// [ticks_per_second](ticks_per_second.md)
     @vdsocall
-    TicksGet() -> (@wrapped_return struct {
+    strict TicksGet() -> (@wrapped_return struct {
         ticks Ticks;
     });
 
@@ -168,7 +168,7 @@ protocol Misc {
     /// [`zx_ticks_get()`]: ticks_get.md
     @const
     @vdsocall
-    TicksPerSecond() -> (@wrapped_return struct {
+    strict TicksPerSecond() -> (@wrapped_return struct {
         ticks Ticks;
     });
 
@@ -215,7 +215,7 @@ protocol Misc {
     ///
     /// [ticks_get](ticks_get.md)
     @vdsocall
-    DeadlineAfter(struct {
+    strict DeadlineAfter(struct {
         nanoseconds Duration;
     }) -> (@wrapped_return struct {
         time Time;
@@ -289,7 +289,7 @@ protocol Misc {
     /// [`zx_thread_exit()`]: thread_exit.md
     /// [`zx_vmar_unmap()`]: vmar_unmap.md
     @vdsocall
-    VmarUnmapHandleCloseThreadExit(resource struct {
+    strict VmarUnmapHandleCloseThreadExit(resource struct {
         vmar_handle Handle:VMAR;
         addr Vaddr;
         size usize64;
@@ -370,7 +370,7 @@ protocol Misc {
     /// [`zx_vmar_unmap_handle_close_thread_exit()`]: vmar_unmap_handle_close_thread_exit.md
     @noreturn
     @vdsocall
-    FutexWakeHandleCloseThreadExit(resource struct {
+    strict FutexWakeHandleCloseThreadExit(resource struct {
         @embedded_alias("zx/Futex")
         value_ptr experimental_pointer<Futex>;
         wake_count uint32;
@@ -388,7 +388,7 @@ protocol Misc {
     // backing the tick counter, or by making a syscall if the register is not
     // accessible from user mode code (for whatever reason).
     @internal
-    TicksGetViaKernel() -> (@wrapped_return struct {
+    strict TicksGetViaKernel() -> (@wrapped_return struct {
         ticks Ticks;
     });
 };

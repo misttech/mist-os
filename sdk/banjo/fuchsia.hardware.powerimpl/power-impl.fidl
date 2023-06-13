@@ -12,28 +12,28 @@ type PowerDomainStatus = strict enum : uint8 {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol PowerImpl {
+closed protocol PowerImpl {
     /// Get status of a power domain
-    GetPowerDomainStatus(struct {
+    strict GetPowerDomainStatus(struct {
         index uint32;
     }) -> (struct {
         s zx.Status;
         status PowerDomainStatus;
     });
     /// Enable a power domain
-    EnablePowerDomain(struct {
+    strict EnablePowerDomain(struct {
         index uint32;
     }) -> (struct {
         s zx.Status;
     });
     /// Disable a power domain
-    DisablePowerDomain(struct {
+    strict DisablePowerDomain(struct {
         index uint32;
     }) -> (struct {
         s zx.Status;
     });
     /// Get Supported Voltage Range. min and max are in uV.
-    GetSupportedVoltageRange(struct {
+    strict GetSupportedVoltageRange(struct {
         index uint32;
     }) -> (struct {
         s zx.Status;
@@ -41,7 +41,7 @@ protocol PowerImpl {
         max uint32;
     });
     /// Request for a particular voltage. "voltage" and actual_voltage are in microvolts(uV)
-    RequestVoltage(struct {
+    strict RequestVoltage(struct {
         index uint32;
         voltage uint32;
     }) -> (struct {
@@ -49,14 +49,14 @@ protocol PowerImpl {
         actual_voltage uint32;
     });
     /// Get current voltage in uV.
-    GetCurrentVoltage(struct {
+    strict GetCurrentVoltage(struct {
         index uint32;
     }) -> (struct {
         s zx.Status;
         current_voltage uint32;
     });
     /// Write to ctrl register of PMIC
-    WritePmicCtrlReg(struct {
+    strict WritePmicCtrlReg(struct {
         index uint32;
         reg_addr uint32;
         value uint32;
@@ -64,7 +64,7 @@ protocol PowerImpl {
         s zx.Status;
     });
     /// Read ctrl register of PMIC
-    ReadPmicCtrlReg(struct {
+    strict ReadPmicCtrlReg(struct {
         index uint32;
         reg_addr uint32;
     }) -> (struct {

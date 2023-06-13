@@ -15,15 +15,15 @@ using fuchsia.io;
 ///
 /// All methods include an empty response to follow the "Throttle push using
 /// acknowledgements" FIDL design pattern.
-protocol AuthListener {
+closed protocol AuthListener {
     /// A method that is called when the AccountListener is first connected.
-    OnInitialize(struct {
+    strict OnInitialize(struct {
         auth_state AuthState;
     }) -> ();
 
     /// A method that is called when the authentication state of the account
     /// changes.
-    OnAuthStateChanged(struct {
+    strict OnAuthStateChanged(struct {
         auth_state AuthState;
     }) -> ();
 };
@@ -34,11 +34,11 @@ protocol AuthListener {
 ///
 /// AuthTarget defines a set of methods to monitor the current authentication
 /// state of an entity and to request changes in that authentication state.
-protocol AuthTarget {
+closed protocol AuthTarget {
     /// Returns the current `AuthState` of the target.
     ///
     /// Returns: `auth_state` The target's current authentication state.
-    GetAuthState() -> (struct {
+    strict GetAuthState() -> (struct {
         auth_state AuthState;
     }) error Error;
 
@@ -51,7 +51,7 @@ protocol AuthTarget {
     /// `granularity` An `AuthChangeGranularity` expressing the magnitude of
     ///               change in authentication state that will lead to
     ///               AuthStateChange events.
-    RegisterAuthListener(resource table {
+    strict RegisterAuthListener(resource table {
         1: listener client_end:AuthListener;
         2: initial_state bool;
         3: granularity AuthChangeGranularity;
@@ -68,20 +68,20 @@ protocol AuthTarget {
 ///
 /// An Account provides access to sensitive long term identifiers and is only
 /// intended only for use by a small number of trusted system components.
-protocol Account {
+closed protocol Account {
     compose AuthTarget;
 
     // Note: an AccountID accessor method may be added if and when the
     // first valid use case arrives.
 
     /// Returns the account's lifetime.
-    GetLifetime() -> (struct {
+    strict GetLifetime() -> (struct {
         lifetime Lifetime;
     });
 
     /// Returns a vector of all the personae defined for the account.
     /// NOTE: Currently all accounts have exactly one persona.
-    GetPersonaIds() -> (struct {
+    strict GetPersonaIds() -> (struct {
         persona_ids vector<PersonaId>:MAX_PERSONAE_PER_ACCOUNT;
     });
 
@@ -91,7 +91,7 @@ protocol Account {
     /// `persona` The server end of a `Persona` channel
     ///
     /// Returns: `id` The identifier for the default persona
-    GetDefaultPersona(resource struct {
+    strict GetDefaultPersona(resource struct {
         persona server_end:Persona;
     }) -> (struct {
         id PersonaId;
@@ -102,7 +102,7 @@ protocol Account {
     ///
     /// `id` The persona's identifier as returned by GetPersonaIds()
     /// `persona` The server end of a `Persona` channel
-    GetPersona(resource struct {
+    strict GetPersona(resource struct {
         id PersonaId;
         persona server_end:Persona;
     }) -> () error Error;
@@ -110,7 +110,7 @@ protocol Account {
     // TODO(fxbug.dev/563): Add methods to create, delete, and manage personae.
 
     /// Returns all authentication mechanism enrollments.
-    GetAuthMechanismEnrollments() -> (struct {
+    strict GetAuthMechanismEnrollments() -> (struct {
         enrollments vector<AuthMechanismEnrollmentMetadata>:MAX_AUTH_MECHANISM_ENROLLMENTS;
     }) error Error;
 
@@ -123,7 +123,7 @@ protocol Account {
     ///               necessary.
     ///
     /// Returns: The `AuthMechanismEnrollmentId` of the created enrollment.
-    CreateAuthMechanismEnrollment(resource struct {
+    strict CreateAuthMechanismEnrollment(resource struct {
         interaction server_end:fuchsia.identity.authentication.Interaction;
     }) -> (struct {
         enrollment_id AuthMechanismEnrollmentId;
@@ -132,20 +132,20 @@ protocol Account {
     /// Remove an authentication mechanism enrollment for the account.
     ///
     /// `enrollment_id` The id of the enrollment to remove.
-    RemoveAuthMechanismEnrollment(struct {
+    strict RemoveAuthMechanismEnrollment(struct {
         enrollment_id AuthMechanismEnrollmentId;
     }) -> () error Error;
 
     /// Locks all access to an account and its storage. After a successful call,
     /// all Account and Persona channels for this account will be terminated.
-    StorageLock() -> () error Error;
+    strict StorageLock() -> () error Error;
 
     /// Locks interaction with an account. After a successful call, the account
     /// AuthStateSummary will be set to `INTERACTION_LOCKED`.
     ///
     /// Fails with FailedPrecondition if authentication is not enabled for the
     /// account.
-    InteractionLock() -> () error Error;
+    strict InteractionLock() -> () error Error;
 
     /// Connects a channel to access a data directory of the account. The
     /// directory is writable, and is initially empty for a newly created
@@ -158,7 +158,7 @@ protocol Account {
     ///
     /// `data_directory` The server end of a `fuchsia.io.Directory` channel
     // TODO(fxbug.dev/45799): Support multiple component instance clients.
-    GetDataDirectory(resource struct {
+    strict GetDataDirectory(resource struct {
         data_directory server_end:fuchsia.io.Directory;
     }) -> () error Error;
 };
@@ -170,11 +170,11 @@ protocol Account {
 /// identifier for the persona. This is to support components in the system that
 /// work with short lived identifiers (e.g. SessionManager), but note that long
 /// term identifiers can usually still be derived via the TokenManger protocol.
-protocol Persona {
+closed protocol Persona {
     compose AuthTarget;
 
     /// Returns the lifetime of this persona.
-    GetLifetime() -> (struct {
+    strict GetLifetime() -> (struct {
         lifetime Lifetime;
     });
 };

@@ -6,10 +6,10 @@ using zx;
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Codec {
+closed protocol Codec {
     /// This method connects a channel in order to serve FIDL over it outside the driver host
     /// control.
-    Connect(resource struct {
+    strict Connect(resource struct {
         channel zx.Handle:CHANNEL;
     }) -> (struct {
         status zx.Status;
@@ -17,10 +17,10 @@ protocol Codec {
 };
 
 @transport("Banjo")
-protocol Dai {
+closed protocol Dai {
     /// This method connects a channel in order to serve FIDL over it outside the driver host
     /// control.
-    Connect(resource struct {
+    strict Connect(resource struct {
         channel zx.Handle:CHANNEL;
     }) -> (struct {
         status zx.Status;

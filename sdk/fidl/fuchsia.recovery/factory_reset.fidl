@@ -8,10 +8,10 @@ using zx;
 
 /// A protocol for intitiating a factory reset.
 @discoverable
-protocol FactoryReset {
+closed protocol FactoryReset {
     /// Request an immediate factory reset. If unsuccessful will return an
     /// error.
-    Reset() -> (struct {
+    strict Reset() -> (struct {
         status zx.Status;
     });
 };

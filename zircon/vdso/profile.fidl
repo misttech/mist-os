@@ -33,7 +33,7 @@ type ProfileInfo = struct {
 };
 
 @transport("Syscall")
-protocol Profile {
+closed protocol Profile {
     /// ## Summary
     ///
     /// Create a scheduler profile.
@@ -163,7 +163,7 @@ protocol Profile {
     ///
     /// [`zx_object_set_profile()`]: object_set_profile.md
     /// [`zx_futex_wait()`]: futex_wait.md
-    Create(resource struct {
+    strict Create(resource struct {
         root_job Handle:JOB;
         options uint32;
         profile ProfileInfo;

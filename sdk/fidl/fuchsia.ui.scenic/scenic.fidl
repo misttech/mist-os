@@ -46,9 +46,9 @@ type SessionEndpoints = resource table {
 };
 
 @discoverable
-protocol Scenic {
+closed protocol Scenic {
     /// Create a new Session, which is the primary way to interact with Scenic.
-    CreateSession(resource struct {
+    strict CreateSession(resource struct {
         session server_end:Session;
         listener client_end:<SessionListener, optional>;
     });
@@ -60,7 +60,7 @@ protocol Scenic {
     /// this coupling acts as a security boundary: the ViewRef used as the basis
     /// for authority by `view_focuser` must come from `session`.
     @transitional
-    CreateSession2(resource struct {
+    strict CreateSession2(resource struct {
         session server_end:Session;
         listener client_end:<SessionListener, optional>;
         view_focuser server_end:<fuchsia.ui.views.Focuser, optional>;
@@ -77,19 +77,19 @@ protocol Scenic {
     /// The response acknowledges the request to create a Session, but actual
     /// creation may happen later.
     @transitional
-    CreateSessionT(resource struct {
+    strict CreateSessionT(resource struct {
         endpoints SessionEndpoints;
     }) -> ();
 
     /// Get information about the Scenic's primary display.
     // TODO(fxbug.dev/23687): in the future there will probably be a DisplayManager, and
     // info about which displays to use will be provided to the Scenic.
-    GetDisplayInfo() -> (struct {
+    strict GetDisplayInfo() -> (struct {
         info fuchsia.ui.gfx.DisplayInfo;
     });
     /// Gets an event signaled with displayOwnedSignal or displayNotOwnedSignal
     /// when display ownership changes.
-    GetDisplayOwnershipEvent() -> (resource struct {
+    strict GetDisplayOwnershipEvent() -> (resource struct {
         ownership_event zx.Handle:EVENT;
     });
 
@@ -97,7 +97,7 @@ protocol Scenic {
     /// not contain BGRA data if `success` is false.
     // TODO(fxbug.dev/23901): The permissions here are too wide (anyone can take a
     // screenshot), we should narrow them.
-    TakeScreenshot() -> (resource struct {
+    strict TakeScreenshot() -> (resource struct {
         img_data ScreenshotData;
         success bool;
     });
@@ -106,7 +106,7 @@ protocol Scenic {
     /// interact with Scenic instead.
     // TODO(fxbug.dev/64206): Remove after Flatland migration is completed.
     @transitional
-    UsesFlatland() -> (struct {
+    strict UsesFlatland() -> (struct {
         flatland_enabled bool;
     });
 };

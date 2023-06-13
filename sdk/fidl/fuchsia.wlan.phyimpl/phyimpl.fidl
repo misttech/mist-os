@@ -26,9 +26,9 @@ type WlanPhyCountry = flexible union {
 
 @discoverable
 @transport("Driver")
-protocol WlanPhyImpl {
+closed protocol WlanPhyImpl {
     /// MAC roles supported for ifaces on the physical device.
-    GetSupportedMacRoles() -> (table {
+    strict GetSupportedMacRoles() -> (table {
         1: supported_mac_roles
                 vector<fuchsia.wlan.common.WlanMacRole>:fuchsia.wlan.common.MAX_SUPPORTED_MAC_ROLES;
     }) error zx.Status;
@@ -37,7 +37,7 @@ protocol WlanPhyImpl {
     /// Some common error codes are: \
     /// ZX_ERR_NO_RESOURCES: maximum number of interfaces have already been created. \
     /// ZX_ERR_NOT_SUPPORTED: device does not support the specified role.
-    CreateIface(resource table {
+    strict CreateIface(resource table {
         /// The station role for this interface. A device may support multiple roles,
         /// but an interface is instantiated with a single role. This field is required.
         1: role fuchsia.wlan.common.WlanMacRole;
@@ -56,7 +56,7 @@ protocol WlanPhyImpl {
     /// Some common error codes are: \
     /// ZX_ERR_NOT_FOUND: Specified iface does not exist or has already been removed. \
     /// ZX_ERR_SHOULD_WAIT: Device is busy and cannot be removed, try again later.
-    DestroyIface(table {
+    strict DestroyIface(table {
         /// This field is required.
         1: iface_id uint16;
     }) -> () error zx.Status;
@@ -64,30 +64,30 @@ protocol WlanPhyImpl {
     /// Set country with a WlanPhyCountry. \
     /// Some common error codes are: \
     /// ZX_ERR_NOT_FOUND: Specified country code not supported. PHY state is left unchanged.
-    SetCountry(WlanPhyCountry) -> () error zx.Status;
+    strict SetCountry(WlanPhyCountry) -> () error zx.Status;
 
     /// Set device to a world-safe country, i.e. a mode that conforms to all
     /// regulatory constraints globally. \
     /// Generally expected to succeed if the device is in a functional state.
-    ClearCountry() -> () error zx.Status;
+    strict ClearCountry() -> () error zx.Status;
 
     /// Read currently configured country. Implementations are advised to read the
     /// country directly from the firmware, where possible. \
     /// Generally expected to succeed if the device is in a functional state.
-    GetCountry() -> (WlanPhyCountry) error zx.Status;
+    strict GetCountry() -> (WlanPhyCountry) error zx.Status;
 
     /// Set Power Save mode on device. In most implementations this
     /// likely to be set in Firmware. \
     /// Some common error codes are: \
     /// ZX_ERR_NOT_SUPPORTED: Specified Power Save mode not supported.
-    SetPowerSaveMode(table {
+    strict SetPowerSaveMode(table {
         /// This field is required.
         1: ps_mode fuchsia.wlan.common.PowerSaveType;
     }) -> () error zx.Status;
 
     /// Get current Power Save mode from device. In most implementation this
     /// likely to be retrieved from Firmware.
-    GetPowerSaveMode() -> (table {
+    strict GetPowerSaveMode() -> (table {
         /// This field is required.
         1: ps_mode fuchsia.wlan.common.PowerSaveType;
     }) error zx.Status;

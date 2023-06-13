@@ -7,9 +7,9 @@ library fuchsia.ui.brightness;
 /// The UI component that controls brightness and screen tint uses this protocol to request changes
 /// to the screen's color adjustment matrix.
 @discoverable
-protocol ColorAdjustmentHandler {
+closed protocol ColorAdjustmentHandler {
     /// Called when the color adjustment  has changed.
-    SetColorAdjustment(struct {
+    strict SetColorAdjustment(struct {
         color_adjustment ColorAdjustmentTable;
     });
 };

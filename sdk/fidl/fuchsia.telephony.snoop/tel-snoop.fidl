@@ -23,21 +23,21 @@ type Message = strict union {
 };
 
 /// Protocol for forwarding messages to Snooper.
-protocol Publisher {
-    SendMessage(struct {
+closed protocol Publisher {
+    strict SendMessage(struct {
         msg Message;
     });
 };
 
 /// Protocol for forwarding Message from Snooper.
 @discoverable
-protocol Snooper {
+closed protocol Snooper {
     /// Get number of devices that connect to Snooper.
-    GetDeviceNum() -> (struct {
+    strict GetDeviceNum() -> (struct {
         device_num uint32;
     });
     /// Snoop message which receives by Snooper client.
-    -> OnMessage(struct {
+    strict -> OnMessage(struct {
         msg Message;
     });
 };

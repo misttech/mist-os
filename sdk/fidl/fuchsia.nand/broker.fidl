@@ -27,15 +27,15 @@ type BrokerRequestDataBytes = resource struct {
 /// ever talking to the nand device, and all higher level clients have disconnected. In addition,
 /// access to raw nand is restricted from the system during production where nand-broker is not
 /// present.
-protocol Broker {
+closed protocol Broker {
     // Retrieves the nand info from the underlying device.
-    GetInfo() -> (struct {
+    strict GetInfo() -> (struct {
         status zx.Status;
         info box<fuchsia.hardware.nand.Info>;
     });
 
     // Reads from the nand device.
-    Read(resource struct {
+    strict Read(resource struct {
         request BrokerRequestData;
     }) -> (struct {
         status zx.Status;
@@ -43,28 +43,28 @@ protocol Broker {
     });
 
     // Writes to the nand device.
-    Write(resource struct {
+    strict Write(resource struct {
         request BrokerRequestData;
     }) -> (struct {
         status zx.Status;
     });
 
     // Reads from the nand device.
-    ReadBytes(resource struct {
+    strict ReadBytes(resource struct {
         request BrokerRequestDataBytes;
     }) -> (struct {
         status zx.Status;
     });
 
     // Writes to the nand device.
-    WriteBytes(resource struct {
+    strict WriteBytes(resource struct {
         request BrokerRequestDataBytes;
     }) -> (struct {
         status zx.Status;
     });
 
     // Erases part of the nand device.
-    Erase(resource struct {
+    strict Erase(resource struct {
         request BrokerRequestData;
     }) -> (struct {
         status zx.Status;

@@ -11,8 +11,8 @@ const IMAGE_TYPE_YF_TILED uint32 = 3;
 
 @transport("Banjo")
 @banjo_layout("ddk-callback")
-protocol IntelGpuCoreInterrupt {
-    Callback(struct {
+closed protocol IntelGpuCoreInterrupt {
+    strict Callback(struct {
         master_interrupt_control uint32;
         timestamp uint64;
     }) -> ();
@@ -20,9 +20,9 @@ protocol IntelGpuCoreInterrupt {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol IntelGpuCore {
+closed protocol IntelGpuCore {
     /// Reads 16 bits from pci config space; returned in |value_out|.
-    ReadPciConfig16(struct {
+    strict ReadPciConfig16(struct {
         addr uint16;
     }) -> (struct {
         s zx.Status;
@@ -31,7 +31,7 @@ protocol IntelGpuCore {
 
     /// Maps the given |pci_bar|; address returned in |addr_out|, size in bytes returned in
     /// |size_out|.
-    MapPciMmio(struct {
+    strict MapPciMmio(struct {
         pci_bar uint32;
     }) -> (struct {
         s zx.Status;
@@ -41,14 +41,14 @@ protocol IntelGpuCore {
     });
 
     /// Unmaps the given |pci_bar|.
-    UnmapPciMmio(struct {
+    strict UnmapPciMmio(struct {
         pci_bar uint32;
     }) -> (struct {
         s zx.Status;
     });
 
     /// Returns a bus transaction initiator.
-    GetPciBti(struct {
+    strict GetPciBti(struct {
         index uint32;
     }) -> (resource struct {
         s zx.Status;
@@ -57,7 +57,7 @@ protocol IntelGpuCore {
 
     /// Registers the given |callback| to be invoked with parameter |data| when an interrupt occurs
     /// matching |interrupt_mask|.
-    RegisterInterruptCallback(resource struct {
+    strict RegisterInterruptCallback(resource struct {
         callback client_end:IntelGpuCoreInterrupt;
         interrupt_mask uint32;
     }) -> (struct {
@@ -65,18 +65,18 @@ protocol IntelGpuCore {
     });
 
     /// Un-registers a previously registered interrupt callback.
-    UnregisterInterruptCallback() -> (struct {
+    strict UnregisterInterruptCallback() -> (struct {
         s zx.Status;
     });
 
     /// Returns the size of the GTT (global translation table) in bytes.
-    GttGetSize() -> (struct {
+    strict GttGetSize() -> (struct {
         size uint64;
     });
 
     /// Allocates a region of the GTT of the given |page_count|, returning the page-aligned virtual
     /// address in |addr_out|.
-    GttAlloc(struct {
+    strict GttAlloc(struct {
         page_count uint64;
     }) -> (struct {
         s zx.Status;
@@ -84,14 +84,14 @@ protocol IntelGpuCore {
     });
 
     /// Frees the GTT allocation given by |addr|.
-    GttFree(struct {
+    strict GttFree(struct {
         addr uint64;
     }) -> (struct {
         s zx.Status;
     });
 
     /// Clears the page table entries for the GTT allocation given by |addr|.
-    GttClear(struct {
+    strict GttClear(struct {
         addr uint64;
     }) -> (struct {
         s zx.Status;
@@ -99,7 +99,7 @@ protocol IntelGpuCore {
 
     /// Inserts page tables entries for the GTT allocation given by |addr| for the vmo represented by
     /// handle |buffer|, at the given |page_offset| and |page_count|. Takes ownership of |buffer|.
-    GttInsert(resource struct {
+    strict GttInsert(resource struct {
         addr uint64;
         buffer zx.Handle:VMO;
         page_offset uint64;

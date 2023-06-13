@@ -6,20 +6,20 @@ library fuchsia.hardware.telephony.transport;
 using zx;
 using fuchsia.telephony.snoop as qmi_snoop;
 
-protocol Qmi {
+closed protocol Qmi {
     /// Give a channel handle that transports bi-directional QMI messages
-    SetChannel(resource struct {
+    strict SetChannel(resource struct {
         transport zx.Handle:<CHANNEL, zx.Rights.WAIT | zx.Rights.WRITE | zx.Rights.READ>;
     }) -> () error zx.Status;
 
     /// Configure the network used by the transport
     /// Currently only sets network up/down
-    SetNetwork(struct {
+    strict SetNetwork(struct {
         connected bool;
     }) -> ();
 
     /// Pass an interface for QMI message snooping
-    SetSnoopChannel(resource struct {
+    strict SetSnoopChannel(resource struct {
         interface client_end:qmi_snoop.Publisher;
     }) -> () error zx.Status;
 };

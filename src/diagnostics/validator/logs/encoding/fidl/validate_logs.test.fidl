@@ -30,9 +30,9 @@ closed protocol EncodingValidator {
     });
 };
 
-protocol ValidateResultsIterator {
+closed protocol ValidateResultsIterator {
     /// Returns the result of a test case execution.
-    GetNext() -> (resource table {
+    strict GetNext() -> (resource table {
         1: result ValidateResult;
     });
 };

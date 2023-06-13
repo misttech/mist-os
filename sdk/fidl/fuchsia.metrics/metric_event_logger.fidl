@@ -69,9 +69,9 @@ type ProjectSpec = table {
 
 /// A factory that is used to create a MetricEventLogger for a specific project.
 @discoverable
-protocol MetricEventLoggerFactory {
+closed protocol MetricEventLoggerFactory {
     /// Create a MetricEventLogger for the project specified by `project_spec`.
-    CreateMetricEventLogger(resource struct {
+    strict CreateMetricEventLogger(resource struct {
         project_spec ProjectSpec;
         logger server_end:MetricEventLogger;
     }) -> () error Error;
@@ -84,7 +84,7 @@ protocol MetricEventLoggerFactory {
     /// using this interface.
     ///
     /// To update experiment state create a new logger.
-    CreateMetricEventLoggerWithExperiments(resource struct {
+    strict CreateMetricEventLoggerWithExperiments(resource struct {
         project_spec ProjectSpec;
         experiment_ids vector<uint32>:MAX_EXPERIMENT_IDS;
         logger server_end:MetricEventLogger;
@@ -103,7 +103,7 @@ alias EventVector = vector<uint32>:MAX_METRIC_DIMENSIONS;
 alias IntegerHistogram = vector<HistogramBucket>:MAX_HISTOGRAM_BUCKETS;
 
 /// A logger for events that are associated with one project's metrics.
-protocol MetricEventLogger {
+closed protocol MetricEventLogger {
     /// Logs the fact that an event has occurred a number of times.
     ///
     /// `metric_id` ID of the metric being logged.
@@ -114,7 +114,7 @@ protocol MetricEventLogger {
     /// `event_codes` Ordered list of parameters, one for each of the metric's
     /// dimensions. Occurrence counts with the same event codes are aggregated
     /// based on these parameters.
-    LogOccurrence(struct {
+    strict LogOccurrence(struct {
         metric_id uint32;
         count uint64;
         event_codes EventVector;
@@ -129,7 +129,7 @@ protocol MetricEventLogger {
     /// `event_codes` Ordered list of parameters, one for each of the metric's
     /// dimensions. Integer values with the same event codes are aggregated
     /// based on these parameters.
-    LogInteger(struct {
+    strict LogInteger(struct {
         metric_id uint32;
         value int64;
         event_codes EventVector;
@@ -145,7 +145,7 @@ protocol MetricEventLogger {
     /// `event_codes` Ordered list of parameters, one for each of the metric's
     /// dimensions. Histograms with the same event codes are aggregated together
     /// based on these parameters.
-    LogIntegerHistogram(struct {
+    strict LogIntegerHistogram(struct {
         metric_id uint32;
         histogram IntegerHistogram;
         event_codes EventVector;
@@ -160,7 +160,7 @@ protocol MetricEventLogger {
     /// `event_codes` Ordered list of parameters, one for each of the metric's
     /// dimensions. Counts of logged strings are aggregated separately based on
     /// these parameters.
-    LogString(struct {
+    strict LogString(struct {
         metric_id uint32;
         string_value string:MAX_STRING_EVENT_SIZE;
         event_codes EventVector;
@@ -168,7 +168,7 @@ protocol MetricEventLogger {
 
     /// Bulk logging method, equivalent to making many of the above Log*() calls
     /// at once.
-    LogMetricEvents(struct {
+    strict LogMetricEvents(struct {
         events vector<MetricEvent>:MAX_BATCHED_EVENTS;
     }) -> () error Error;
 
@@ -180,7 +180,7 @@ protocol MetricEventLogger {
     /// for each dimension of the metric and the types of the values must
     /// be consistent with the dimensions declared in the metric definition.
     @available(deprecated=9, removed=10)
-    LogCustomEvent(struct {
+    strict LogCustomEvent(struct {
         metric_id uint32;
         event_values vector<CustomEventValue>:MAX;
     }) -> () error Error;

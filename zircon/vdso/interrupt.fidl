@@ -4,7 +4,7 @@
 library zx;
 
 @transport("Syscall")
-protocol Interrupt {
+closed protocol Interrupt {
     /// ## Summary
     ///
     /// Create an interrupt object.
@@ -90,7 +90,7 @@ protocol Interrupt {
     /// [`zx_interrupt_trigger()`]: interrupt_trigger.md
     /// [`zx_interrupt_wait()`]: interrupt_wait.md
     /// [`zx_port_wait()`]: port_wait.md
-    Create(resource struct {
+    strict Create(resource struct {
         src_obj Handle:RESOURCE;
         src_num uint32;
         options uint32;
@@ -193,7 +193,7 @@ protocol Interrupt {
     /// [`zx_interrupt_trigger()`]: interrupt_trigger.md
     /// [`zx_interrupt_wait()`]: interrupt_wait.md
     /// [`zx_port_wait()`]: port_wait.md
-    Bind(resource struct {
+    strict Bind(resource struct {
         handle Handle:INTERRUPT;
         port_handle Handle:PORT;
         key uint64;
@@ -266,7 +266,7 @@ protocol Interrupt {
     /// [`zx_interrupt_trigger()`]: interrupt_trigger.md
     /// [`zx_port_wait()`]: port_wait.md
     @blocking
-    Wait(resource struct {
+    strict Wait(resource struct {
         handle Handle:INTERRUPT;
     }) -> (struct {
         out_timestamp Time;
@@ -339,7 +339,7 @@ protocol Interrupt {
     /// [`zx_interrupt_trigger()`]: interrupt_trigger.md
     /// [`zx_interrupt_wait()`]: interrupt_wait.md
     /// [`zx_port_wait()`]: port_wait.md
-    Destroy(resource struct {
+    strict Destroy(resource struct {
         handle Handle:INTERRUPT;
     }) -> () error Status;
 
@@ -409,7 +409,7 @@ protocol Interrupt {
     /// [`zx_interrupt_trigger()`]: interrupt_trigger.md
     /// [`zx_interrupt_wait()`]: interrupt_wait.md
     /// [`zx_port_wait()`]: port_wait.md
-    Ack(resource struct {
+    strict Ack(resource struct {
         handle Handle:INTERRUPT;
     }) -> () error Status;
 
@@ -475,7 +475,7 @@ protocol Interrupt {
     /// [`zx_interrupt_destroy()`]: interrupt_destroy.md
     /// [`zx_interrupt_wait()`]: interrupt_wait.md
     /// [`zx_port_wait()`]: port_wait.md
-    Trigger(resource struct {
+    strict Trigger(resource struct {
         handle Handle:INTERRUPT;
         options uint32;
         timestamp Time;

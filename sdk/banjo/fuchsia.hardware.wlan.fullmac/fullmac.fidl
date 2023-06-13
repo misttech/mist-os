@@ -592,72 +592,72 @@ type WlanFullmacPmkInfo = struct {
 
 @transport("Banjo")
 @banjo_layout("ddk-interface")
-protocol WlanFullmacImplIfc {
+closed protocol WlanFullmacImplIfc {
     // MLME operations
-    OnScanResult(struct {
+    strict OnScanResult(struct {
         result WlanFullmacScanResult;
     }) -> ();
-    OnScanEnd(struct {
+    strict OnScanEnd(struct {
         end WlanFullmacScanEnd;
     }) -> ();
-    ConnectConf(struct {
+    strict ConnectConf(struct {
         resp WlanFullmacConnectConfirm;
     }) -> ();
     /// Result of a roam attempt.
-    RoamConf(struct {
+    strict RoamConf(struct {
         resp WlanFullmacRoamConfirm;
     }) -> ();
-    AuthInd(struct {
+    strict AuthInd(struct {
         resp WlanFullmacAuthInd;
     }) -> ();
-    DeauthConf(struct {
+    strict DeauthConf(struct {
         resp WlanFullmacDeauthConfirm;
     }) -> ();
-    DeauthInd(struct {
+    strict DeauthInd(struct {
         ind WlanFullmacDeauthIndication;
     }) -> ();
-    AssocInd(struct {
+    strict AssocInd(struct {
         resp WlanFullmacAssocInd;
     }) -> ();
-    DisassocConf(struct {
+    strict DisassocConf(struct {
         resp WlanFullmacDisassocConfirm;
     }) -> ();
-    DisassocInd(struct {
+    strict DisassocInd(struct {
         ind WlanFullmacDisassocIndication;
     }) -> ();
-    StartConf(struct {
+    strict StartConf(struct {
         resp WlanFullmacStartConfirm;
     }) -> ();
-    StopConf(struct {
+    strict StopConf(struct {
         resp WlanFullmacStopConfirm;
     }) -> ();
-    EapolConf(struct {
+    strict EapolConf(struct {
         resp WlanFullmacEapolConfirm;
     }) -> ();
-    OnChannelSwitch(struct {
+    strict OnChannelSwitch(struct {
         ind WlanFullmacChannelSwitchInfo;
     }) -> ();
 
     // MLME extensions
-    SignalReport(struct {
+    strict SignalReport(struct {
         ind WlanFullmacSignalReportIndication;
     }) -> ();
-    EapolInd(struct {
+    strict EapolInd(struct {
         ind WlanFullmacEapolIndication;
     }) -> ();
-    RelayCapturedFrame(struct {
+    strict RelayCapturedFrame(struct {
         result WlanFullmacCapturedFrameResult;
     }) -> ();
-    OnPmkAvailable(struct {
+    strict OnPmkAvailable(struct {
         info WlanFullmacPmkInfo;
     }) -> ();
-    SaeHandshakeInd(struct {
+    strict SaeHandshakeInd(struct {
         ind WlanFullmacSaeHandshakeInd;
     }) -> ();
-    SaeFrameRx(struct {
+    strict SaeFrameRx(struct {
         frame WlanFullmacSaeFrame;
     }) -> ();
-    OnWmmStatusResp(struct {
+    strict OnWmmStatusResp(struct {
         status zx.Status;
         wmm_params fuchsia.wlan.common.WlanWmmParameters;
     }) -> ();
@@ -665,98 +665,98 @@ protocol WlanFullmacImplIfc {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol WlanFullmacImpl {
+closed protocol WlanFullmacImpl {
     // Lifecycle operations
-    Start(resource struct {
+    strict Start(resource struct {
         ifc client_end:WlanFullmacImplIfc;
     }) -> (resource struct {
         status zx.Status;
         sme_channel zx.Handle:CHANNEL;
     });
-    Stop() -> ();
+    strict Stop() -> ();
 
     // State operation
-    Query() -> (struct {
+    strict Query() -> (struct {
         info WlanFullmacQueryInfo;
     });
-    QueryMacSublayerSupport() -> (struct {
+    strict QueryMacSublayerSupport() -> (struct {
         resp fuchsia.wlan.common.MacSublayerSupport;
     });
-    QuerySecuritySupport() -> (struct {
+    strict QuerySecuritySupport() -> (struct {
         resp fuchsia.wlan.common.SecuritySupport;
     });
-    QuerySpectrumManagementSupport() -> (struct {
+    strict QuerySpectrumManagementSupport() -> (struct {
         resp fuchsia.wlan.common.SpectrumManagementSupport;
     });
 
     // MLME operations
-    StartScan(struct {
+    strict StartScan(struct {
         req WlanFullmacScanReq;
     }) -> ();
-    ConnectReq(struct {
+    strict ConnectReq(struct {
         req WlanFullmacConnectReq;
     }) -> ();
-    ReconnectReq(struct {
+    strict ReconnectReq(struct {
         req WlanFullmacReconnectReq;
     }) -> ();
-    AuthResp(struct {
+    strict AuthResp(struct {
         resp WlanFullmacAuthResp;
     }) -> ();
-    DeauthReq(struct {
+    strict DeauthReq(struct {
         req WlanFullmacDeauthReq;
     }) -> ();
-    AssocResp(struct {
+    strict AssocResp(struct {
         resp WlanFullmacAssocResp;
     }) -> ();
-    DisassocReq(struct {
+    strict DisassocReq(struct {
         req WlanFullmacDisassocReq;
     }) -> ();
-    ResetReq(struct {
+    strict ResetReq(struct {
         req WlanFullmacResetReq;
     }) -> ();
-    StartReq(struct {
+    strict StartReq(struct {
         req WlanFullmacStartReq;
     }) -> ();
-    StopReq(struct {
+    strict StopReq(struct {
         req WlanFullmacStopReq;
     }) -> ();
-    SetKeysReq(struct {
+    strict SetKeysReq(struct {
         req WlanFullmacSetKeysReq;
     }) -> (struct {
         resp WlanFullmacSetKeysResp;
     });
-    DelKeysReq(struct {
+    strict DelKeysReq(struct {
         req WlanFullmacDelKeysReq;
     }) -> ();
-    EapolReq(struct {
+    strict EapolReq(struct {
         req WlanFullmacEapolReq;
     }) -> ();
 
     // MLME extensions
-    GetIfaceCounterStats() -> (struct {
+    strict GetIfaceCounterStats() -> (struct {
         status int32;
         stats WlanFullmacIfaceCounterStats;
     });
-    GetIfaceHistogramStats() -> (struct {
+    strict GetIfaceHistogramStats() -> (struct {
         status int32;
         stats WlanFullmacIfaceHistogramStats;
     });
-    StartCaptureFrames(struct {
+    strict StartCaptureFrames(struct {
         req WlanFullmacStartCaptureFramesReq;
     }) -> (struct {
         resp WlanFullmacStartCaptureFramesResp;
     });
-    StopCaptureFrames() -> ();
-    SaeHandshakeResp(struct {
+    strict StopCaptureFrames() -> ();
+    strict SaeHandshakeResp(struct {
         resp WlanFullmacSaeHandshakeResp;
     }) -> ();
-    SaeFrameTx(struct {
+    strict SaeFrameTx(struct {
         frame WlanFullmacSaeFrame;
     }) -> ();
-    WmmStatusReq() -> ();
+    strict WmmStatusReq() -> ();
 
     // Configuration operations
-    SetMulticastPromisc(struct {
+    strict SetMulticastPromisc(struct {
         enable bool;
     }) -> (struct {
         status zx.Status;
@@ -778,7 +778,7 @@ protocol WlanFullmacImpl {
     // above where a call to stop an AP has been made there will be a call to OnLinkStateChanged.
     // However when the driver confirms this there will be no additional call to OnLinkStateChanged
     // because it was already offline.
-    OnLinkStateChanged(struct {
+    strict OnLinkStateChanged(struct {
         online bool;
     }) -> ();
 };

@@ -8,7 +8,7 @@ using zx;
 
 /// Obtains the memory usage of a fuchsia device.
 @discoverable
-protocol Collector {
+closed protocol Collector {
     /// Writes to `socket` a JSON capture of the memory usage and the memory
     /// bucket definition, as a well-formed UTF-8 string.
     /// The socket is closed by the server after all the data is written into
@@ -59,7 +59,7 @@ protocol Collector {
     ///    - Processes and Vmos have an initial entry that contains the names of the the fields in
     ///      the rest of the entries.
     ///    - The names of the VMOs are an index into the VMONames array.
-    CollectJsonStats(resource struct {
+    strict CollectJsonStats(resource struct {
         socket zx.Handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
     });
 };

@@ -18,7 +18,7 @@ type ScreenshotFormat = flexible enum : uint8 {
 /// Collects the current graphical content of a display.
 @available(added=12)
 @discoverable
-protocol Screenshot {
+closed protocol Screenshot {
     /// Collects the current graphical content of a display in a specified buffer `format` in the
     /// sRGB color space. Note that the sRGB color space is non-linear, meaning that unit tests
     /// doing pixel equality checks making use of non-fully saturated colors should convert to a
@@ -34,7 +34,7 @@ protocol Screenshot {
     ///
     /// If capture fails due to an internal error, the server will close the Screenshot connection
     /// with a ZX_ERR_INTERNAL epitaph.
-    Take(resource table {
+    strict Take(resource table {
         /// Format of the requested screenshot.
         1: format ScreenshotFormat;
     }) -> (resource table {
@@ -71,7 +71,7 @@ protocol Screenshot {
     ///
     /// This call should be used if the client is on the host and does not support VMOs,
     /// as is the case for ffx tools.
-    TakeFile(resource table {
+    strict TakeFile(resource table {
         /// Format of the requested screenshot.
         1: format ScreenshotFormat;
     }) -> (resource table {

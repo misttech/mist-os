@@ -4,9 +4,9 @@
 
 library fuchsia.hardware.sample;
 
-protocol Echo {
+closed protocol Echo {
     /// Returns the input.
-    EchoString(struct {
+    strict EchoString(struct {
         value string:MAX;
     }) -> (struct {
         response string:MAX;

@@ -171,9 +171,9 @@ type ProbeSelector = strict bits : uint64 {
 /// Diagnostic information exported by Overnet peers.
 /// This interface is additionally exported to the Overnet mesh.
 @discoverable
-protocol Diagnostic {
+closed protocol Diagnostic {
     /// Probe some basic statistics from this node
-    Probe(struct {
+    strict Probe(struct {
         selector ProbeSelector;
     }) -> (struct {
         result ProbeResult;

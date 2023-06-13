@@ -22,7 +22,7 @@ type Profile = strict enum {
 
 /// Protocol for observing changes to the system power profile.
 @discoverable
-protocol Watcher {
+closed protocol Watcher {
     /// Watches for changes to the system power profile.
     ///
     /// On a given connection, the first call will return immediately with the current system power
@@ -30,7 +30,7 @@ protocol Watcher {
     /// changes. This follows the
     /// [hanging get](https://fuchsia.dev/fuchsia-src/concepts/api/fidl#hanging-get) pattern. Any
     /// errors are considered fatal and will result in the channel being closed.
-    Watch() -> (struct {
+    strict Watch() -> (struct {
         profile Profile;
     });
 };

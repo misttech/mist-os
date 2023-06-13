@@ -4,7 +4,7 @@
 library zx;
 
 @transport("Syscall")
-protocol Socket {
+closed protocol Socket {
     /// ## Summary
     ///
     /// Create a socket.
@@ -61,7 +61,7 @@ protocol Socket {
     /// [`zx_socket_read()`]: socket_read.md
     /// [`zx_socket_set_disposition()`]: socket_set_disposition.md
     /// [`zx_socket_write()`]: socket_write.md
-    Create(struct {
+    strict Create(struct {
         options uint32;
     }) -> (resource struct {
         out0 Handle;
@@ -148,7 +148,7 @@ protocol Socket {
     /// [`zx_socket_create()`]: socket_create.md
     /// [`zx_socket_read()`]: socket_read.md
     /// [`zx_socket_set_disposition()`]: socket_set_disposition.md
-    Write(resource struct {
+    strict Write(resource struct {
         handle Handle:SOCKET;
         options uint32;
         @voidptr
@@ -232,7 +232,7 @@ protocol Socket {
     /// [`zx_socket_create()`]: socket_create.md
     /// [`zx_socket_set_disposition()`]: socket_set_disposition.md
     /// [`zx_socket_write()`]: socket_write.md
-    Read(resource struct {
+    strict Read(resource struct {
         handle Handle:SOCKET;
         options uint32;
     }) -> (struct {
@@ -315,7 +315,7 @@ protocol Socket {
     /// [`zx_socket_create()`]: socket_create.md
     /// [`zx_socket_read()`]: socket_read.md
     /// [`zx_socket_write()`]: socket_write.md
-    SetDisposition(resource struct {
+    strict SetDisposition(resource struct {
         handle Handle:<SOCKET, Rights.MANAGE_SOCKET>;
         disposition uint32;
         disposition_peer uint32;

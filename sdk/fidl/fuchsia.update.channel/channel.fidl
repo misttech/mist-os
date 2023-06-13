@@ -6,11 +6,11 @@ library fuchsia.update.channel;
 
 /// Information about the state of the update system.
 @discoverable
-protocol Provider {
+closed protocol Provider {
     /// Retrieve the currently active update channel.
     ///
     /// - response `channel` the currently active update channel.
-    GetCurrent() -> (struct {
+    strict GetCurrent() -> (struct {
         channel string:128;
     });
 };

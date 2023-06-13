@@ -22,11 +22,11 @@ type ScoSampleRate = strict enum : uint8 {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol BtHci {
+closed protocol BtHci {
     /// Open the two-way HCI command channel for sending HCI commands and
     /// receiving event packets.  Returns ZX_ERR_ALREADY_BOUND if the channel
     /// is already open.
-    OpenCommandChannel(resource struct {
+    strict OpenCommandChannel(resource struct {
         channel zx.Handle:CHANNEL;
     }) -> (struct {
         s zx.Status;
@@ -34,7 +34,7 @@ protocol BtHci {
 
     /// Open the two-way HCI ACL data channel.
     /// Returns ZX_ERR_ALREADY_BOUND if the channel is already open.
-    OpenAclDataChannel(resource struct {
+    strict OpenAclDataChannel(resource struct {
         channel zx.Handle:CHANNEL;
     }) -> (struct {
         s zx.Status;
@@ -46,7 +46,7 @@ protocol BtHci {
     /// Returns ZX_ERR_NOT_SUPPORTED if SCO is not supported by the current vendor or transport
     /// driver.
     /// Returns ZX_ERR_ALREADY_BOUND if the channel is already open.
-    OpenScoChannel(resource struct {
+    strict OpenScoChannel(resource struct {
         channel zx.Handle:CHANNEL;
     }) -> (struct {
         s zx.Status;
@@ -57,7 +57,7 @@ protocol BtHci {
     /// Returns ZX_ERR_NOT_SUPPORTED if SCO is not supported by the current vendor or transport
     /// driver.
     @async
-    ConfigureSco(struct {
+    strict ConfigureSco(struct {
         coding_format ScoCodingFormat;
         encoding ScoEncoding;
         sample_rate ScoSampleRate;
@@ -70,7 +70,7 @@ protocol BtHci {
     /// Returns ZX_ERR_NOT_SUPPORTED if SCO is not supported by the current vendor or transport
     /// driver.
     @async
-    ResetSco() -> (struct {
+    strict ResetSco() -> (struct {
         s zx.Status;
     });
 
@@ -81,7 +81,7 @@ protocol BtHci {
     ///          controller.
     ///  - 0x01: The payload represents an event packet sent by the controller.
     /// Returns ZX_ERR_ALREADY_BOUND if the channel is already open.
-    OpenSnoopChannel(resource struct {
+    strict OpenSnoopChannel(resource struct {
         channel zx.Handle:CHANNEL;
     }) -> (struct {
         s zx.Status;

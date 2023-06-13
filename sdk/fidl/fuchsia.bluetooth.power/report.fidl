@@ -33,7 +33,7 @@ type Information = table {
 
 /// Protocol used to observe peripherals owned & discovered by the system.
 @discoverable
-protocol Watcher {
+closed protocol Watcher {
     /// A hanging get to obtain a list of discovered peripherals and their information.
     ///
     /// A response is sent only if this list has changed since the last time the client has sent
@@ -44,7 +44,7 @@ protocol Watcher {
     /// + request `ids` is a list of identifiers to filter the peripheral information on. Use an
     ///          empty list to receive updates about all peripherals.
     /// - response `peripherals` is a list of information about the requested peripherals.
-    Watch(struct {
+    strict Watch(struct {
         ids vector<Identifier>:MAX;
     }) -> (struct {
         peripherals vector<Information>:MAX;
@@ -54,7 +54,7 @@ protocol Watcher {
 
 /// A protocol used to report information about a peripheral to the system.
 @discoverable
-protocol Reporter {
+closed protocol Reporter {
     /// Report information about a connected peripheral.
     ///
     /// Each `Report` request will be acknowledged. The client shall wait for the acknowledgement
@@ -63,7 +63,7 @@ protocol Reporter {
     /// + request `info` is the current information associated with the peripheral.
     /// - response An empty response will be sent when the server has processed the request.
     /// * error Returns `ZX_ERR_INVALID_ARGS` if the provided `info` is invalidly formatted.
-    Report(resource struct {
+    strict Report(resource struct {
         info Information;
     }) -> () error zx.Status;
 };

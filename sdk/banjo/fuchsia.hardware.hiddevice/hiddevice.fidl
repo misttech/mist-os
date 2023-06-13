@@ -17,10 +17,10 @@ const HID_MAX_REPORT_IDS uint16 = 256;
 
 @transport("Banjo")
 @banjo_layout("ddk-interface")
-protocol HidReportListener {
+closed protocol HidReportListener {
     /// Sends a single report to the listener. This comes with a timestamp that was gotten
     /// from the computer's monotonic clock.
-    ReceiveReport(struct {
+    strict ReceiveReport(struct {
         report vector<uint8>:HID_MAX_REPORT_LEN;
         report_time zx.Time;
     });
@@ -37,23 +37,23 @@ type HidDeviceInfo = struct {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol HidDevice {
+closed protocol HidDevice {
     /// Register a listener to begin receiving HID Reports. At the moment only a single listener
     /// is supported. It is an error to call this without unregistering.
-    RegisterListener(resource struct {
+    strict RegisterListener(resource struct {
         listener client_end:HidReportListener;
     }) -> (struct {
         s zx.Status;
     });
 
     /// Unregister the listener.
-    UnregisterListener();
+    strict UnregisterListener();
 
-    GetHidDeviceInfo() -> (struct {
+    strict GetHidDeviceInfo() -> (struct {
         info HidDeviceInfo;
     });
 
-    GetDescriptor() -> (struct {
+    strict GetDescriptor() -> (struct {
         s zx.Status;
         descriptor vector<uint8>:HID_MAX_DESC_LEN;
     });
@@ -61,7 +61,7 @@ protocol HidDevice {
     /// Request a given report. Can be used to get FEATURE and INPUT reports. Getting an OUTPUT
     /// report is an error. This should be used most frequently to get FEATURE reports,
     /// since most devices will send normal INPUT reports through the Listener API.
-    GetReport(struct {
+    strict GetReport(struct {
         rpt_type HidReportType;
         rpt_id uint8;
     }) -> (struct {
@@ -71,7 +71,7 @@ protocol HidDevice {
 
     /// Set a given report. Only FEATURE and OUTPUT type reports can be set. Setting an INPUT
     /// report is an error.
-    SetReport(struct {
+    strict SetReport(struct {
         rpt_type HidReportType;
         rpt_id uint8;
         report vector<uint8>:HID_MAX_REPORT_LEN;

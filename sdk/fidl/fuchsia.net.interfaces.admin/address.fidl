@@ -68,7 +68,7 @@ type AddressRemovalReason = strict enum {
 /// - Closing the client end causes the object to be destroyed.
 /// - Observing a closure of the server end indicates the object no longer
 ///   exists.
-protocol AddressStateProvider {
+closed protocol AddressStateProvider {
     // TODO(https://fxbug.dev/80621): Currently Netstack2's implementation does
     // not support this method due to lack of support for updating addresses'
     // valid and preferred lifetimes, and will send an
@@ -82,7 +82,7 @@ protocol AddressStateProvider {
     /// expected to cache address properties.
     ///
     /// + request `address_properties` the updated properties of the address.
-    UpdateAddressProperties(struct {
+    strict UpdateAddressProperties(struct {
         address_properties AddressProperties;
     }) -> ();
 
@@ -99,7 +99,7 @@ protocol AddressStateProvider {
     /// Doing so will cause the server end of the protocol to be closed.
     ///
     /// - response `assignment_state` the assignment state of the address.
-    WatchAddressAssignmentState() -> (struct {
+    strict WatchAddressAssignmentState() -> (struct {
         assignment_state fuchsia.net.interfaces.AddressAssignmentState;
     });
 
@@ -107,13 +107,13 @@ protocol AddressStateProvider {
     ///
     /// The client end of the protocol can be closed immediately after
     /// calling this method, and the address will not be removed.
-    Detach();
+    strict Detach();
 
     /// Terminal event. Immediately precedes the closure of the server end of
     /// the protocol.
     ///
     /// - response `error` the removal reason.
-    -> OnAddressRemoved(struct {
+    strict -> OnAddressRemoved(struct {
         error AddressRemovalReason;
     });
 };

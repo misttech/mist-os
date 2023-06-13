@@ -16,34 +16,34 @@ type Addr = struct {
 
 // Callbacks sent from the device to whomever registered them (typically a service)
 // in response to events from host.
-protocol Callbacks {
+closed protocol Callbacks {
     // Indicates a 'request' op was received from the host. One of Device.SendResponse
     // or Device.SendRst should be done in response to this.
-    Request(struct {
+    strict Request(struct {
         addr Addr;
     });
     // Indicates a response was received for a connection that was trying to be
     // established from Device.SendRequest.
-    Response(struct {
+    strict Response(struct {
         addr Addr;
     });
     // Indicates a 'rst' op was received from the host, and that the driver has
     // has freed the resources for any potential connection relating to `addr`.
-    Rst(struct {
+    strict Rst(struct {
         addr Addr;
     });
     // Indicates a 'shutdown' op was received from the host.
-    Shutdown(struct {
+    strict Shutdown(struct {
         addr Addr;
     });
     // Indicates a 'transport reset' op was received from the host. Responding to
     // this method indicates that you have processed all preceding Callbacks and
     // dropped any active connections.
-    TransportReset(struct {
+    strict TransportReset(struct {
         new_cid uint32;
     }) -> ();
     // Indicates that a previous Device.SendVmo request has completed.
-    SendVmoComplete(struct {
+    strict SendVmoComplete(struct {
         addr Addr;
     });
 };
@@ -52,12 +52,12 @@ protocol Callbacks {
 // adhering to the vsock protocol and must use ensure they do not reuse addresses
 // for active connections, perform SendRst and SendResponse only when it is correct
 // to do so, etc.
-protocol Device {
+closed protocol Device {
     // Causes the device to start and gives it Callbacks to use for forwarding messages
     // from the host. The rest of the methods on this interface are only valid to use
     // after calling Start and whilst the passed Callbacks remain valid. The device
     // will stop if it detects the other end of the Callbacks channel has closed.
-    Start(resource struct {
+    strict Start(resource struct {
         cb client_end:Callbacks;
     }) -> (struct {
         status zx.Status;
@@ -68,7 +68,7 @@ protocol Device {
     // the handle. The `status` returned indicates whether the request was sent
     // successfully. Callbacks.Response or Callbacks.Rst will be called to indicate
     // if the connection was successfully established or not.
-    SendRequest(resource struct {
+    strict SendRequest(resource struct {
         addr Addr;
         data zx.Handle:SOCKET;
     }) -> (struct {
@@ -79,14 +79,14 @@ protocol Device {
     // data may still be received up until Callbacks.Rst is called to indicate the
     // shutdown has complete. This is only valid on a connection established with
     // SendRequest or SendResponse.
-    SendShutdown(struct {
+    strict SendShutdown(struct {
         addr Addr;
     }) -> (struct {
         status zx.Status;
     });
     // Request a rst be sent to the host. The device will also release the resources
     // for any connection that may exist for `addr`.
-    SendRst(struct {
+    strict SendRst(struct {
         addr Addr;
     }) -> (struct {
         status zx.Status;
@@ -94,7 +94,7 @@ protocol Device {
     // Causes a 'response' to get sent to the host, gives the driver a `data` socket
     // to use for sending and receiving data on the established connection. It is
     // only correct to use this in response to a Callbacks.Request.
-    SendResponse(resource struct {
+    strict SendResponse(resource struct {
         addr Addr;
         data zx.Handle:SOCKET;
     }) -> (struct {
@@ -104,7 +104,7 @@ protocol Device {
     // in interactions with the same device, and retrieving it is only useful for
     // debugging or if you have some other communication channel to a different host
     // and you would like to send them your CID to then establish a vsock connection on.
-    GetCid() -> (struct {
+    strict GetCid() -> (struct {
         local_cid uint32;
     });
     // Send the contents of a vmo over an already established connection. A
@@ -113,7 +113,7 @@ protocol Device {
     // is pending data to transmit in the `data` socket of a connection and there
     // is a vmo pending then it is undefined which one will be sent. Once the vmo
     // contents have finished sending Callbacks.SendVmoComplete will be called.
-    SendVmo(resource struct {
+    strict SendVmo(resource struct {
         addr Addr;
         vmo zx.Handle:VMO;
         off uint64;

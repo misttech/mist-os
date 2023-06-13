@@ -12,19 +12,19 @@ library fuchsia.settings;
 /// Supported SettingsEpitaph enums:
 /// REQUEST_NOT_SUPPORTED, INTERNAL_SERVICE_ERROR, PERSISTENT_STORAGE_ERROR
 @discoverable
-protocol DoNotDisturb {
+closed protocol DoNotDisturb {
     /// Gets the current [`DoNotDisturbSettings`]. Returns immediately on first
     /// call; subsequent calls return when the values change.
     ///
     /// If this call fails, it is considered a fatal error and the channel
     /// will be closed.
-    Watch() -> (struct {
+    strict Watch() -> (struct {
         settings DoNotDisturbSettings;
     });
 
     /// Sets [`DoNotDisturbSettings`] settings. Any field not explicitly set in
     /// the table performs a no-op, and will not make any changes.
-    Set(struct {
+    strict Set(struct {
         settings DoNotDisturbSettings;
     }) -> () error Error;
 };

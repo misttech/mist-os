@@ -62,11 +62,11 @@ type CivilToAbsoluteTimeOptions = table {
 ///
 /// TODO(fxbug.dev/81902): Add time zone info methods, including offsets from UTC.
 @discoverable
-protocol TimeZones {
+closed protocol TimeZones {
 
     /// Converts the given absolute time to a civil date and time in the given time zone, using the
     /// Gregorian calendar.
-    AbsoluteToCivilTime(struct {
+    strict AbsoluteToCivilTime(struct {
         /// The time zone in which to calculate a civil date and time.
         time_zone_id TimeZoneId;
         /// The number of nanoseconds since the Unix epoch.
@@ -78,7 +78,7 @@ protocol TimeZones {
 
     /// Converts the given civil date and time in the given time zone to nanoseconds since the Unix
     /// epoch.
-    CivilToAbsoluteTime(struct {
+    strict CivilToAbsoluteTime(struct {
         /// The civil date and time to convert.
         ///
         /// Note that `civil_time.weekday` and `civil_time.year_day` may be omitted for this method.
@@ -91,7 +91,7 @@ protocol TimeZones {
     }) error TimeZonesError;
 
     /// Retrieves details about a time zone at a specified one.
-    GetTimeZoneInfo(struct {
+    strict GetTimeZoneInfo(struct {
         /// The time zone ID for which to retrieve information.
         time_zone_id TimeZoneId;
         /// The date and time at which to calculate values, in nanoseconds since the Unix epoch.

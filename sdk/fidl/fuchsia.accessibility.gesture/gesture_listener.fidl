@@ -35,7 +35,7 @@ type Type = strict enum {
 /// Because those gestures can conflict with assistive technology gestures,
 /// accessibility services offer some alternative ones which can be bound to the
 /// UI actions.
-protocol Listener {
+closed protocol Listener {
     /// When accessibility services detect a gesture, the listener is informed
     /// of which gesture was performed. The listener has the chance to handle
     /// the gesture, setting the result in |handled|. In addition, an
@@ -44,7 +44,7 @@ protocol Listener {
     /// same locale that the UI component is displaying its content.
     /// If the utterance is empty, it is assumed that no spoken output is
     /// necessary to describe the result of the action.
-    OnGesture(struct {
+    strict OnGesture(struct {
         gesture_type Type;
     }) -> (struct {
         handled bool;
@@ -54,7 +54,7 @@ protocol Listener {
 
 /// An interface for registering a listener of accessibility gestures.
 @discoverable
-protocol ListenerRegistry {
+closed protocol ListenerRegistry {
     /// A UI registers itself to start listening for accessibility gestures
     /// through `listener`.
     /// Only one listener can be registered at a time.
@@ -62,7 +62,7 @@ protocol ListenerRegistry {
     /// is closed.
     /// In case of any failure, the channel of the listener is closed with an
     /// epitaph.
-    Register(resource struct {
+    strict Register(resource struct {
         listener client_end:Listener;
     }) -> ();
 };

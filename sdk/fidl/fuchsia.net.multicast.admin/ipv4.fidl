@@ -20,7 +20,7 @@ type Ipv4UnicastSourceAndMulticastDestination = struct {
 /// Closing the client-end of the controller will disable multicast routing and
 /// clear the multicast routing table.
 @discoverable
-protocol Ipv4RoutingTableController {
+closed protocol Ipv4RoutingTableController {
     /// Adds a route such that packets matching the addresses will be forwarded
     /// accordingly.
     ///
@@ -31,7 +31,7 @@ protocol Ipv4RoutingTableController {
     ///
     /// + request `addresses` the addresses used to identify a route.
     /// + request `route` the multicast route.
-    AddRoute(struct {
+    strict AddRoute(struct {
         addresses Ipv4UnicastSourceAndMulticastDestination;
         route Route;
     }) -> () error strict enum {
@@ -53,7 +53,7 @@ protocol Ipv4RoutingTableController {
     /// Delete a route.
     ///
     /// + request `addresses` the addresses used to identify a route.
-    DelRoute(struct {
+    strict DelRoute(struct {
         addresses Ipv4UnicastSourceAndMulticastDestination;
     }) -> () error strict enum {
         /// Indicates that the address is invalid (not a unicast source address
@@ -67,7 +67,7 @@ protocol Ipv4RoutingTableController {
     /// Get a snapshot of statistics about a specific route.
     ///
     /// + request `addresses` the addresses used to identify a route.
-    GetRouteStats(struct {
+    strict GetRouteStats(struct {
         addresses Ipv4UnicastSourceAndMulticastDestination;
     }) -> (struct {
         stats RouteStats;
@@ -98,7 +98,7 @@ protocol Ipv4RoutingTableController {
     /// - response `input_interface` the interface the multicast packet
     ///   triggering the event arrived at.
     /// - response `event` the event.
-    WatchRoutingEvents() -> (struct {
+    strict WatchRoutingEvents() -> (struct {
         dropped_events uint64;
         addresses Ipv4UnicastSourceAndMulticastDestination;
         input_interface fuchsia.net.InterfaceId;
@@ -109,7 +109,7 @@ protocol Ipv4RoutingTableController {
     /// the protocol.
     ///
     /// - response `error` the removal reason.
-    -> OnClose(struct {
+    strict -> OnClose(struct {
         error TableControllerCloseReason;
     });
 };

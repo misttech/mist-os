@@ -19,13 +19,13 @@ type AttestationSignerStatus = strict enum {
     SIGNING_ERROR = 2;
 };
 
-protocol AttestationSigner {
+closed protocol AttestationSigner {
     /// Cryptographically signs the `plaintext` data sent in request using a
     /// crypto key configured at initialization.
     ///
     /// Returns the raw bytes of the `signature` string on success. Otherwise,
     /// an error status is returned.
-    SignData(struct {
+    strict SignData(struct {
         plaintext vector<uint8>:MAX;
     }) -> (struct {
         status AttestationSignerStatus;

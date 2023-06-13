@@ -11,49 +11,49 @@ type PowerDomainStatus = strict enum : uint8 {
 };
 
 @discoverable
-protocol Device {
+closed protocol Device {
     /// Register the callee for this power domain. The callee will be registered until
     /// UnregisterPowerDomain is called. Any voltage changes to the power domain will
     /// be made considering the min_needed_voltage(in uV) and max_supported_voltage(in uV) published here.
     /// If voltages mentioned are out of supported voltage range of domain(obtained by calling
     /// GetSupportedVoltageRange), the callee will be registered with the supported voltage range.
-    RegisterPowerDomain(struct {
+    strict RegisterPowerDomain(struct {
         min_needed_voltage uint32;
         max_supported_voltage uint32;
     }) -> () error zx.Status;
     /// Unregister the callee for this power domain. The callee will no longer be considered as
     /// a dependent of this power domain.
-    UnregisterPowerDomain() -> () error zx.Status;
+    strict UnregisterPowerDomain() -> () error zx.Status;
     /// Get Supported Voltage Range. min and max are in micorVolts(uV)
-    GetSupportedVoltageRange() -> (struct {
+    strict GetSupportedVoltageRange() -> (struct {
         min uint32;
         max uint32;
     }) error zx.Status;
     /// Request a particular voltage. The actual_voltage is the voltage that the power domain
     /// is transitioned to after considering supported voltage ranges of all the registered
     /// dependents. "voltage" should be in uV.
-    RequestVoltage(struct {
+    strict RequestVoltage(struct {
         voltage uint32;
     }) -> (struct {
         actual_voltage uint32;
     }) error zx.Status;
     /// Get current voltage in uV.
-    GetCurrentVoltage(struct {
+    strict GetCurrentVoltage(struct {
         index uint32;
     }) -> (struct {
         current_voltage uint32;
     }) error zx.Status;
     /// Get power domain status
-    GetPowerDomainStatus() -> (struct {
+    strict GetPowerDomainStatus() -> (struct {
         status PowerDomainStatus;
     }) error zx.Status;
     /// Write to ctrl register of PMIC
-    WritePmicCtrlReg(struct {
+    strict WritePmicCtrlReg(struct {
         reg_addr uint32;
         value uint32;
     }) -> () error zx.Status;
     /// Read ctrl register of PMIC
-    ReadPmicCtrlReg(struct {
+    strict ReadPmicCtrlReg(struct {
         reg_addr uint32;
     }) -> (struct {
         value uint32;

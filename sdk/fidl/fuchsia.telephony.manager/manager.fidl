@@ -7,15 +7,15 @@ using fuchsia.telephony.ril;
 
 /// Primary Telephony management interface
 @discoverable
-protocol Manager {
+closed protocol Manager {
     /// Returns whether or not a modem is currently available on the system.
-    IsAvailable() -> (struct {
+    strict IsAvailable() -> (struct {
         available bool;
     });
 
     /// Get access to a RIL
     // TODO(bwb): get per modem, not just first one on the system
-    GetRilHandle(resource struct {
+    strict GetRilHandle(resource struct {
         ril_iface server_end:fuchsia.telephony.ril.RadioInterfaceLayer;
     }) -> (struct {
         status bool;

@@ -19,9 +19,9 @@ type LogInterestSelector = struct {
 /// This protocol allows clients to modify the logging behavior of components
 /// in the system.
 @discoverable
-protocol LogSettings {
+closed protocol LogSettings {
     @available(deprecated=12)
-    RegisterInterest(struct {
+    strict RegisterInterest(struct {
         selectors vector<LogInterestSelector>:MAX_LOG_SELECTORS;
     });
 
@@ -41,7 +41,7 @@ protocol LogSettings {
     /// undone. Each matched component minimum interest is updated with the
     /// new minimum interest in the set.
     @available(added=12)
-    SetInterest(struct {
+    strict SetInterest(struct {
         selectors vector<LogInterestSelector>:MAX_LOG_SELECTORS;
     }) -> ();
 };

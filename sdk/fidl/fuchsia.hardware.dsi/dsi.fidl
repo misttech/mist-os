@@ -75,9 +75,9 @@ type MipiDsiCmd = table {
 };
 
 @discoverable
-protocol DsiBase {
+closed protocol DsiBase {
     /// This function is used to send a MIPI-DSI command.
-    SendCmd(struct {
+    strict SendCmd(struct {
         cmd MipiDsiCmd;
         txdata vector<uint8>:MAX_PAYLOAD_SIZE;
     }) -> (struct {
@@ -86,59 +86,59 @@ protocol DsiBase {
 };
 
 @discoverable
-protocol DsiExtended {
+closed protocol DsiExtended {
     compose DsiBase;
     /// This function is used to configure all the DSI parameters needed to operated in both
     /// Command and Video Mode.
-    Config(struct {
+    strict Config(struct {
         dsi_config DsiConfig;
     }) -> () error zx.Status;
     /// This function is called to power up the DSI interface.
-    PowerUp() -> ();
+    strict PowerUp() -> ();
     /// This function is called to power down the DSI interface.
-    PowerDown() -> ();
+    strict PowerDown() -> ();
     /// This function is used to change modes between Video and Command.
-    SetMode(struct {
+    strict SetMode(struct {
         mode DsiMode;
     }) -> ();
     /// This function returns true if the DSI IP block is powered on and not in reset.
-    IsPoweredUp() -> (struct {
+    strict IsPoweredUp() -> (struct {
         on bool;
     });
     /// This function resets the DSI IP block.
-    Reset() -> ();
+    strict Reset() -> ();
     /// This function configures the MIPI D-PHY block if it exists within the DSI IP block.
-    PhyConfig(struct {
+    strict PhyConfig(struct {
         dsi_config DsiConfig;
     }) -> () error zx.Status;
     /// This function is used to power up the MIPI D-PHY block.
-    PhyPowerUp() -> ();
+    strict PhyPowerUp() -> ();
     /// This function is used to power down the MIPI D-PHY block.
-    PhyPowerDown() -> ();
+    strict PhyPowerDown() -> ();
     /// This function is used to communicate with the MIPI D-PHY block.
-    PhySendCode(struct {
+    strict PhySendCode(struct {
         code uint32;
         parameter uint32;
     }) -> ();
     /// This function returns ZX_OK once MIPI D-PHY block is ready. MIPI D-PHY block is
     /// considered ready once the LOCK Bit and StopStateClk bit are set.
-    PhyWaitForReady() -> () error zx.Status;
+    strict PhyWaitForReady() -> () error zx.Status;
     /// This function allows writing to any register within the DSI IP block. This could be used
     /// for debug purposes during development stages.
-    WriteReg(struct {
+    strict WriteReg(struct {
         reg uint32;
         val uint32;
     }) -> () error zx.Status;
     /// This function returns the value of any register within the DSI IP block.
-    ReadReg(struct {
+    strict ReadReg(struct {
         reg uint32;
     }) -> (struct {
         val uint32;
     }) error zx.Status;
     /// This function enables Built-In Self-Test (BIST) pattern generation.
-    EnableBist(struct {
+    strict EnableBist(struct {
         pattern uint32;
     }) -> () error zx.Status;
     /// This function prints the value of all DSI IP block registers.
-    PrintDsiRegisters() -> ();
+    strict PrintDsiRegisters() -> ();
 };

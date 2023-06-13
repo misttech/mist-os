@@ -14,10 +14,10 @@ type ReadByTypeResult = table {
     3: error Error;
 };
 
-protocol RemoteService {
+closed protocol RemoteService {
     /// Returns the characteristics and characteristic descriptors that belong to
     /// this service.
-    DiscoverCharacteristics() -> (struct {
+    strict DiscoverCharacteristics() -> (struct {
         status bt.Status;
         characteristics vector<Characteristic>:MAX_CHARACTERISTIC_COUNT;
     });
@@ -29,7 +29,7 @@ protocol RemoteService {
     /// this method will return only the first (MTU - 1) bytes of the value. Use
     /// ReadLongCharacteristic() to read larger values or starting at a non-zero
     /// offset.
-    ReadCharacteristic(struct {
+    strict ReadCharacteristic(struct {
         id uint64;
     }) -> (struct {
         status bt.Status;
@@ -48,7 +48,7 @@ protocol RemoteService {
     ///   b. The `offset` is invalid;
     ///   c. The characteristic does not have a long value;
     ///   d. The server does not support the long read procedure.
-    ReadLongCharacteristic(struct {
+    strict ReadLongCharacteristic(struct {
         id uint64;
         offset uint16;
         max_bytes uint16;
@@ -62,7 +62,7 @@ protocol RemoteService {
     ///   a. The size of `value` exceeds the current MTU.
     ///   b. The characteristic referred to by `id` does not have the 'write'
     ///      property.
-    WriteCharacteristic(struct {
+    strict WriteCharacteristic(struct {
         id uint64;
         value vector<uint8>:MAX;
     }) -> (struct {
@@ -83,7 +83,7 @@ protocol RemoteService {
     /// while a long write is in process to the same id and data range. The order
     /// of the responses from this function signify the order in which the remote
     /// service received them, not necessarily the order in which it is called.
-    WriteLongCharacteristic(struct {
+    strict WriteLongCharacteristic(struct {
         id uint64;
         offset uint16;
         value vector<uint8>:MAX_VALUE_LENGTH;
@@ -95,7 +95,7 @@ protocol RemoteService {
     /// Writes `value` to the characteristic with `id` without soliciting an
     /// acknowledgement from the peer. This method has no response and its delivery
     /// cannot be confirmed.
-    WriteCharacteristicWithoutResponse(struct {
+    strict WriteCharacteristicWithoutResponse(struct {
         id uint64;
         value vector<uint8>:MAX;
     });
@@ -107,7 +107,7 @@ protocol RemoteService {
     /// this method will return only the first (MTU - 1) bytes of the value. Use
     /// ReadLongDescriptor() to read larger values or starting at a non-zero
     /// offset.
-    ReadDescriptor(struct {
+    strict ReadDescriptor(struct {
         id uint64;
     }) -> (struct {
         status bt.Status;
@@ -125,7 +125,7 @@ protocol RemoteService {
     ///   a. `max_bytes` is 0;
     ///   b. The `offset` is invalid;
     ///   c. The server does not support the long read procedure.
-    ReadLongDescriptor(struct {
+    strict ReadLongDescriptor(struct {
         id uint64;
         offset uint16;
         max_bytes uint16;
@@ -139,7 +139,7 @@ protocol RemoteService {
     ///   a. The size of `value` exceeds the current MTU.
     ///   b. `id` refers to an internally reserved descriptor type (e.g. the Client
     ///      Characteristic Configuration descriptor).
-    WriteDescriptor(struct {
+    strict WriteDescriptor(struct {
         id uint64;
         value vector<uint8>:MAX;
     }) -> (struct {
@@ -160,7 +160,7 @@ protocol RemoteService {
     /// while a long write is in process to the same id and data range. The order
     /// of the responses from this function signify the order in which the remote
     /// service received them, not necessarily the order in which it is called.
-    WriteLongDescriptor(struct {
+    strict WriteLongDescriptor(struct {
         id uint64;
         offset uint16;
         value vector<uint8>:MAX_VALUE_LENGTH;
@@ -178,7 +178,7 @@ protocol RemoteService {
     ///
     /// This method is useful for reading values before discovery has completed, thereby
     /// reducing latency.
-    ReadByType(struct {
+    strict ReadByType(struct {
         uuid bt.Uuid;
     }) -> (struct {
         results vector<ReadByTypeResult>:MAX_READ_BY_TYPE_RESULTS;
@@ -203,7 +203,7 @@ protocol RemoteService {
     /// On success, the OnCharacteristicValueUpdated event will be sent whenever
     /// the peer sends a notification or indication. The local host will
     /// automically confirm indications.
-    NotifyCharacteristic(struct {
+    strict NotifyCharacteristic(struct {
         id uint64;
         enable bool;
     }) -> (struct {
@@ -212,13 +212,13 @@ protocol RemoteService {
 
     /// Events:
     /// Called when a characteristic value notification or indication is received.
-    -> OnCharacteristicValueUpdated(struct {
+    strict -> OnCharacteristicValueUpdated(struct {
         id uint64;
         value vector<uint8>:MAX;
     });
 };
 
-protocol Client {
+closed protocol Client {
     /// Enumerates services found on the peer that this Client represents. Results
     /// can be restricted by specifying a list of UUIDs in `uuids`. The returned
     /// ServiceInfo structures will contain only basic information about each
@@ -226,7 +226,7 @@ protocol Client {
     ///
     /// To further interact with services, clients must obtain a RemoteService
     /// handle by calling ConnectToService().
-    ListServices(struct {
+    strict ListServices(struct {
         uuids vector<bt.UuidString>:<MAX, optional>;
     }) -> (struct {
         status bt.Status;
@@ -234,7 +234,7 @@ protocol Client {
     });
 
     /// Connects the RemoteService with the given identifier.
-    ConnectToService(resource struct {
+    strict ConnectToService(resource struct {
         id uint64;
         service server_end:RemoteService;
     });

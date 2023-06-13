@@ -136,7 +136,7 @@ const NODE_PROTOCOL_NAME string = "fuchsia.io/Node";
 
 /// Node defines the minimal protocol for entities which can be accessed
 /// in a filesystem.
-protocol Node2 {
+closed protocol Node2 {
     @available(added=9)
     compose fuchsia.unknown.Closeable;
     @available(added=9)
@@ -144,7 +144,7 @@ protocol Node2 {
 
     /// Creates another connection to the same node.
     @selector("fuchsia.io/Node.Reopen")
-    Reopen(resource struct {
+    strict Reopen(resource struct {
         // [`Rights`] can't be optional or boxed, hence a table.
         rights_request @generated_name("RightsRequest") table {
             /// Requested rights on the new connection.
@@ -172,7 +172,7 @@ protocol Node2 {
     /// This method does not require any rights.
     @available(removed=9)
     @selector("fuchsia.io/Node.Close")
-    Close() -> () error zx.Status;
+    strict Close() -> () error zx.Status;
 
     /// An event produced eagerly by the server if requested by
     /// [`NodeFlags.GET_REPRESENTATION`]. This event will be the first message
@@ -193,7 +193,7 @@ protocol Node2 {
     /// inherent `Describe` methods on the specific protocols. It exists as
     /// an optimization to avoid an additional round trip.
     @selector("fuchsia.io/Node.OnRepresentation")
-    -> OnRepresentation(@generated_name("Representation") flexible resource union {
+    strict -> OnRepresentation(@generated_name("Representation") flexible resource union {
         /// Auxiliary data for the connector representation of a node, used
         /// for protocol discovery and connection.
         ///
@@ -244,7 +244,7 @@ protocol Node2 {
     ///
     /// This method does not require any rights.
     @selector("fuchsia.io/Node.GetConnectionInfo")
-    GetConnectionInfo() -> (ConnectionInfo);
+    strict GetConnectionInfo() -> (ConnectionInfo);
 
     /// Acquires information about the node.
     ///
@@ -260,7 +260,7 @@ protocol Node2 {
     ///
     /// This method requires the [`Rights.GET_ATTRIBUTES`] right.
     @selector("fuchsia.io/Node.GetAttributes")
-    GetAttributes(struct {
+    strict GetAttributes(struct {
         /// Set the corresponding bit to one to query that particular attribute.
         ///
         /// The elements here correspond one-to-one with [`NodeAttributes`].
@@ -274,7 +274,7 @@ protocol Node2 {
     ///
     /// This method requires the [`Rights.UPDATE_ATTRIBUTES`] right.
     @selector("fuchsia.io/Node.UpdateAttributes")
-    UpdateAttributes(MutableNodeAttributes) -> () error zx.Status;
+    strict UpdateAttributes(MutableNodeAttributes) -> () error zx.Status;
 
     /// Synchronizes updates to the node to the underlying media, if it exists.
     ///
@@ -286,7 +286,7 @@ protocol Node2 {
     ///
     /// This method does not require any rights.
     @selector("fuchsia.io/Node.Sync")
-    Sync() -> () error zx.Status;
+    strict Sync() -> () error zx.Status;
 
     /// Creates an iterator over all the extended attribute names associated
     /// with this node. If an error occurs it is returned as an epitaph on the
@@ -299,7 +299,7 @@ protocol Node2 {
     @available(added=HEAD)
     @selector("fuchsia.io/Node.ListExtendedAttributes")
     @transitional
-    ListExtendedAttributes(resource struct {
+    strict ListExtendedAttributes(resource struct {
         iterator server_end:ExtendedAttributeIterator;
     });
 
@@ -312,7 +312,7 @@ protocol Node2 {
     @available(added=HEAD)
     @selector("fuchsia.io/Node.GetExtendedAttribute")
     @transitional
-    GetExtendedAttribute(struct {
+    strict GetExtendedAttribute(struct {
         name ExtendedAttributeName;
     }) -> (ExtendedAttributeValue) error zx.Status;
 
@@ -326,7 +326,7 @@ protocol Node2 {
     @available(added=HEAD)
     @selector("fuchsia.io/Node.SetExtendedAttribute")
     @transitional
-    SetExtendedAttribute(resource struct {
+    strict SetExtendedAttribute(resource struct {
         name ExtendedAttributeName;
         value ExtendedAttributeValue;
     }) -> () error zx.Status;
@@ -339,18 +339,18 @@ protocol Node2 {
     @available(added=HEAD)
     @selector("fuchsia.io/Node.RemoveExtendedAttribute")
     @transitional
-    RemoveExtendedAttribute(struct {
+    strict RemoveExtendedAttribute(struct {
         name ExtendedAttributeName;
     }) -> () error zx.Status;
 };
 
 @available(added=HEAD)
-protocol ExtendedAttributeIterator {
+closed protocol ExtendedAttributeIterator {
     /// Get the next chunk of extended attribute names. If this is the last
     /// chunk, last will be true, and the channel will be closed after the
     /// call.
     @selector("fuchsia.io/ExtendedAttributeIterator.GetNext")
-    GetNext() -> (struct {
+    strict GetNext() -> (struct {
         attributes vector<ExtendedAttributeName>:MAX_LIST_ATTRIBUTES_CHUNK;
         last bool;
     }) error zx.Status;

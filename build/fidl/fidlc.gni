@@ -32,6 +32,7 @@ template("fidlc") {
   experimental_flags = [
     "no_optional_structs",
     "unknown_interactions",
+    "unknown_interactions_mandate",
   ]
 
   # TODO(fxbug.dev/112767): Remove once soft transition is done.

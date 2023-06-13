@@ -21,14 +21,14 @@ type ReportSpec = table {
 /// The Controller is primarily useful for testing the Cobalt service.
 /// Cobalt clients should use the Logger.
 @discoverable
-protocol Controller {
+closed protocol Controller {
     /// Requests that the collection of Observations that are currently cached
     /// locally be sent to the Cobalt server soon. Cobalt will send the
     /// Observations in one or more batches and will retry several times upon
     /// failure. The response occurs only after that procedure is completed. A
     /// return value of true indicates that all Observations were successfully
     /// sent. A return value of false indicates otherwise.
-    RequestSendSoon() -> (struct {
+    strict RequestSendSoon() -> (struct {
         success bool;
     });
 
@@ -48,7 +48,7 @@ protocol Controller {
     /// Returns a vector whose k-th element is the number of observations
     /// generated for the k-th element of `report_specs`. If `report_specs`
     /// is the empty vector, then an empty vector is returned.
-    GenerateAggregatedObservations(struct {
+    strict GenerateAggregatedObservations(struct {
         day_index uint32;
         report_specs vector<ReportSpec>:MAX;
     }) -> (struct {
@@ -72,5 +72,5 @@ protocol Controller {
     ///
     /// The callback to this method will be invoked after Cobalt transistions
     // to the fully-initialized state. This may never happen.
-    ListenForInitialized() -> ();
+    strict ListenForInitialized() -> ();
 };

@@ -5,7 +5,7 @@ library fuchsia.hardware.registers;
 
 using zx;
 
-protocol Device {
+closed protocol Device {
     /// Reads from the register from the specified MMIO offset in register width equal to 8, 16, 32, and
     /// 64 bit variants.
     /// |offset| : Offset from base of MMIO to read from. Offset must be aligned to beginning of register. For
@@ -14,25 +14,25 @@ protocol Device {
     /// |mask| : Mask of bits to read. For example, to read the lower 2 bytes of data in a 32 bit
     ///          register, mask should be 0x0000FFFF.
     /// @Returns: |value| : Value of register at the specified address.
-    ReadRegister8(struct {
+    strict ReadRegister8(struct {
         offset uint64;
         mask uint8;
     }) -> (struct {
         value uint8;
     }) error zx.Status;
-    ReadRegister16(struct {
+    strict ReadRegister16(struct {
         offset uint64;
         mask uint16;
     }) -> (struct {
         value uint16;
     }) error zx.Status;
-    ReadRegister32(struct {
+    strict ReadRegister32(struct {
         offset uint64;
         mask uint32;
     }) -> (struct {
         value uint32;
     }) error zx.Status;
-    ReadRegister64(struct {
+    strict ReadRegister64(struct {
         offset uint64;
         mask uint64;
     }) -> (struct {
@@ -47,22 +47,22 @@ protocol Device {
     /// |mask| : Mask of bits to write. For example, to write to the lower 2 bytes of data in a 32
     ///          bit register, mask should be 0x0000FFFF.
     /// |value| : Value of register at the specified address.
-    WriteRegister8(struct {
+    strict WriteRegister8(struct {
         offset uint64;
         mask uint8;
         value uint8;
     }) -> () error zx.Status;
-    WriteRegister16(struct {
+    strict WriteRegister16(struct {
         offset uint64;
         mask uint16;
         value uint16;
     }) -> () error zx.Status;
-    WriteRegister32(struct {
+    strict WriteRegister32(struct {
         offset uint64;
         mask uint32;
         value uint32;
     }) -> () error zx.Status;
-    WriteRegister64(struct {
+    strict WriteRegister64(struct {
         offset uint64;
         mask uint64;
         value uint64;

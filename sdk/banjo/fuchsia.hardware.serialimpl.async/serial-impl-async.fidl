@@ -13,19 +13,19 @@ type SerialState = strict enum : uint32 {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol SerialImplAsync {
-    GetInfo() -> (struct {
+closed protocol SerialImplAsync {
+    strict GetInfo() -> (struct {
         s zx.Status;
         info fuchsia.hardware.serial.SerialPortInfo;
     });
     /// Configures the given serial port.
-    Config(struct {
+    strict Config(struct {
         baud_rate uint32;
         flags uint32;
     }) -> (struct {
         s zx.Status;
     });
-    Enable(struct {
+    strict Enable(struct {
         enable bool;
     }) -> (struct {
         s zx.Status;
@@ -36,7 +36,7 @@ protocol SerialImplAsync {
     /// if the write completes immediately.
     /// ZX_ERR_NOT_SUPPORTED will be returned if a read is already pending.
     @async
-    ReadAsync() -> (struct {
+    strict ReadAsync() -> (struct {
         s zx.Status;
         @buffer
         buf vector<uint8>:MAX;
@@ -46,12 +46,12 @@ protocol SerialImplAsync {
     /// on the interrupt thread, or the calling thread if data is available.
     /// ZX_ERR_NOT_SUPPORTED will be returned if a write is already pending.
     @async
-    WriteAsync(struct {
+    strict WriteAsync(struct {
         @buffer
         buf vector<uint8>:MAX;
     }) -> (struct {
         s zx.Status;
     });
     /// Immediately cancels all outstanding asynchronous I/O
-    CancelAll() -> ();
+    strict CancelAll() -> ();
 };

@@ -62,11 +62,11 @@ type DeviceIdentificationRecord = table {
 
 /// Represents an active device identification advertisement. Close the handle with any epitaph to
 /// unregister the device identification request.
-protocol DeviceIdentificationHandle {};
+closed protocol DeviceIdentificationHandle {};
 
 /// An interface for setting the identification of a Fuchsia device.
 @discoverable
-protocol DeviceIdentification {
+closed protocol DeviceIdentification {
     /// Request to set the device information to be advertised over Bluetooth.
     ///
     /// The device information can only be set once per provided `token`. To cancel the request,
@@ -90,7 +90,7 @@ protocol DeviceIdentification {
     ///         device information advertisements.
     /// * error Returns `ZX_ERR_CANCELLED` if the request was cancelled by the server for all other
     ///         errors.
-    SetDeviceIdentification(resource struct {
+    strict SetDeviceIdentification(resource struct {
         records vector<DeviceIdentificationRecord>:MAX_RECORDS;
         token server_end:DeviceIdentificationHandle;
     }) -> () error zx.Status;

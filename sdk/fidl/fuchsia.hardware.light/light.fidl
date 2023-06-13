@@ -41,24 +41,24 @@ type LightError = strict enum {
 };
 
 @discoverable
-protocol Light {
+closed protocol Light {
     /// Returns the total number of physical lights.
     /// This will typically be 1 for a simple LED light, but may be greater than one for an array of
     /// lights or a more complicated lighting device.
     /// The multiple lights are addressed using "index" parameter in the calls below.
-    GetNumLights() -> (struct {
+    strict GetNumLights() -> (struct {
         count uint32;
     });
 
     /// Returns the total number of light groups (does not count single lights).
     /// The light groups are addressed using "group_id" parameter in the calls below.
-    GetNumLightGroups() -> (struct {
+    strict GetNumLightGroups() -> (struct {
         count uint32;
     });
 
     /// Returns info for the single light.
     /// index: Index of the light defined by board. Must be less than value returned by GetNumLights.
-    GetInfo(struct {
+    strict GetInfo(struct {
         index uint32;
     }) -> (struct {
         info Info;
@@ -69,7 +69,7 @@ protocol Light {
     /// If the capability 'SIMPLE' is not supported by this light, returns NOT_SUPPORTED.
     /// Use GetInfo to check if light supports this operation.
     /// index: a number between 0 inclusive and the count received from GetNumLights.
-    GetCurrentSimpleValue(struct {
+    strict GetCurrentSimpleValue(struct {
         index uint32;
     }) -> (struct {
         value bool;
@@ -80,7 +80,7 @@ protocol Light {
     /// If the capability 'SIMPLE' is not supported by this light, returns NOT_SUPPORTED.
     /// Use GetInfo to check if light supports this operation.
     /// index: a number between 0 inclusive and the count received from GetNumLights.
-    SetSimpleValue(struct {
+    strict SetSimpleValue(struct {
         index uint32;
         value bool;
     }) -> () error LightError;
@@ -90,7 +90,7 @@ protocol Light {
     /// If the capability 'BRIGHTNESS' is not supported by this light, returns NOT_SUPPORTED.
     /// Use GetInfo to check if light supports this operation.
     /// index: a number between 0 inclusive and the count received from GetNumLights.
-    GetCurrentBrightnessValue(struct {
+    strict GetCurrentBrightnessValue(struct {
         index uint32;
     }) -> (struct {
         value float64;
@@ -101,7 +101,7 @@ protocol Light {
     /// If the capability 'BRIGHTNESS' is not supported by this light, returns NOT_SUPPORTED.
     /// Use GetInfo to check if light supports this operation.
     /// index: a number between 0 inclusive and the count received from GetNumLights.
-    SetBrightnessValue(struct {
+    strict SetBrightnessValue(struct {
         index uint32;
         value float64;
     }) -> () error LightError;
@@ -110,7 +110,7 @@ protocol Light {
     /// If the capability 'RGB' is not supported by this light, returns NOT_SUPPORTED.
     /// Use GetInfo to check if light supports this operation.
     /// index: a number between 0 inclusive and the count received from GetNumLights.
-    GetCurrentRgbValue(struct {
+    strict GetCurrentRgbValue(struct {
         index uint32;
     }) -> (struct {
         value Rgb;
@@ -120,14 +120,14 @@ protocol Light {
     /// If the capability 'RGB' is not supported by this light, returns NOT_SUPPORTED.
     /// Use GetInfo to check if light supports this operation.
     /// index: a number between 0 inclusive and the count received from GetNumLights.
-    SetRgbValue(struct {
+    strict SetRgbValue(struct {
         index uint32;
         value Rgb;
     }) -> () error LightError;
 
     /// Returns group info for the light group.
     /// group_id: a number between 0 inclusive and the count received from GetNumLightGroups.
-    GetGroupInfo(struct {
+    strict GetGroupInfo(struct {
         group_id uint32;
     }) -> (struct {
         info GroupInfo;
@@ -139,7 +139,7 @@ protocol Light {
     /// If the capability 'SIMPLE' is not supported by this group, returns NOT_SUPPORTED.
     /// Use GetGroupInfo to check if group supports this operation.
     /// group_id: a number between 0 inclusive and the count received from GetNumLightGroups.
-    GetGroupCurrentSimpleValue(struct {
+    strict GetGroupCurrentSimpleValue(struct {
         group_id uint32;
     }) -> (struct {
         values vector<bool>:<MAX, optional>;
@@ -151,7 +151,7 @@ protocol Light {
     /// If the capability 'SIMPLE' is not supported by this group, returns NOT_SUPPORTED.
     /// Use GetGroupInfo to check if group supports this operation.
     /// group_id: a number between 0 inclusive and the count received from GetNumLightGroups.
-    SetGroupSimpleValue(struct {
+    strict SetGroupSimpleValue(struct {
         group_id uint32;
         values vector<bool>:MAX;
     }) -> () error LightError;
@@ -162,7 +162,7 @@ protocol Light {
     /// If the capability 'BRIGHTNESS' is not supported by this group, returns NOT_SUPPORTED.
     /// Use GetGroupInfo to check if group supports this operation.
     /// group_id: a number between 0 inclusive and the count received from GetNumLightGroups.
-    GetGroupCurrentBrightnessValue(struct {
+    strict GetGroupCurrentBrightnessValue(struct {
         group_id uint32;
     }) -> (struct {
         values vector<float64>:<MAX, optional>;
@@ -174,7 +174,7 @@ protocol Light {
     /// If the capability 'BRIGHTNESS' is not supported by this group, returns NOT_SUPPORTED.
     /// Use GetGroupInfo to check if group supports this operation.
     /// group_id: a number between 0 inclusive and the count received from GetNumLightGroups.
-    SetGroupBrightnessValue(struct {
+    strict SetGroupBrightnessValue(struct {
         group_id uint32;
         values vector<float64>:MAX;
     }) -> () error LightError;
@@ -184,7 +184,7 @@ protocol Light {
     /// If the capability 'RGB' is not supported by this group, returns NOT_SUPPORTED.
     /// Use GetGroupInfo to check if group supports this operation.
     /// group_id: a number between 0 inclusive and the count received from GetNumLightGroups.
-    GetGroupCurrentRgbValue(struct {
+    strict GetGroupCurrentRgbValue(struct {
         group_id uint32;
     }) -> (struct {
         values vector<Rgb>:<MAX, optional>;
@@ -195,7 +195,7 @@ protocol Light {
     /// If the capability 'RGB' is not supported by this group, returns NOT_SUPPORTED.
     /// Use GetGroupInfo to check if group supports this operation.
     /// group_id: a number between 0 inclusive and the count received from GetNumLightGroups.
-    SetGroupRgbValue(struct {
+    strict SetGroupRgbValue(struct {
         group_id uint32;
         values vector<Rgb>:MAX;
     }) -> () error LightError;

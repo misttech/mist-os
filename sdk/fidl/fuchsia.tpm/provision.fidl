@@ -18,13 +18,13 @@ type OwnershipStatus = flexible enum : uint8 {
 /// The fuchsia.tpm.Provision interface is intended to check if the TPM has
 /// an owner and to take ownership of the TPM if it isn't owned.
 @discoverable
-protocol Provision {
+closed protocol Provision {
     /// Returns the OwnershipStatus of the TPM.
-    IsOwned() -> (struct {
+    strict IsOwned() -> (struct {
         ownership OwnershipStatus;
     }) error zx.Status;
 
     /// TakeOwnership is a one time setup call that is required on operating
     /// system install or after a factory reset.
-    TakeOwnership(table {}) -> () error zx.Status;
+    strict TakeOwnership(table {}) -> () error zx.Status;
 };

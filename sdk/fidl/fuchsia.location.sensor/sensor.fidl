@@ -9,10 +9,10 @@ using fuchsia.wlan.policy;
 
 /// Passively accepts WLAN scan results.
 @discoverable
-protocol WlanBaseStationWatcher {
+closed protocol WlanBaseStationWatcher {
     /// Provides a handle with which to enumerate the stations currently visible
     /// to the device.
-    ReportCurrentStations(resource struct {
+    strict ReportCurrentStations(resource struct {
         stations client_end:fuchsia.wlan.policy.ScanResultIterator;
     });
 };

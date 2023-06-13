@@ -13,9 +13,9 @@ type TestResults = struct {
     got_correct_number_of_bytes_in_short_transfers bool;
 };
 
-protocol Device {
+closed protocol Device {
     /// Runs the tests
-    Run() -> (struct {
+    strict Run() -> (struct {
         results TestResults;
     }) error zx.Status;
 };

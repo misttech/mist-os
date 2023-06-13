@@ -8,12 +8,12 @@ library fuchsia.recovery.policy;
 /// This protocol will be used by Settings service to make root_presenter aware
 /// of a new FactoryReset policy.
 @discoverable
-protocol Device {
+closed protocol Device {
     /// Sets whether local factory reset is enabled, and persists the setting
     /// after reboot.
     /// If this function has never been called on this device, then local
     /// factory reset is allowed by default.
-    SetIsLocalResetAllowed(struct {
+    strict SetIsLocalResetAllowed(struct {
         allowed bool;
     });
 };

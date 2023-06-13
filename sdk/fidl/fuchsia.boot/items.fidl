@@ -9,7 +9,7 @@ const MAX_FILE_NAME_LENGTH uint8 = 255;
 
 /// Protocol for retrieving boot item payloads.
 @discoverable
-protocol Items {
+closed protocol Items {
     /// Get a `payload` for a boot item of `type` and `extra`.
     /// NOTE: We return the `length` of the item, as VMOs must be page-aligned.
     ///
@@ -17,7 +17,7 @@ protocol Items {
     ///
     /// For a list of `type`s, refer to <lib/zbi-format/zbi.h>.
     /// For a list of `extra`s, refer to <lib/zbi-format/driver-config.h>.
-    Get(struct {
+    strict Get(struct {
         type uint32;
         extra uint32;
     }) -> (resource struct {
@@ -30,7 +30,7 @@ protocol Items {
     ///
     /// Returns ZX_ERR_NOT_SUPPORTED if this is an untracked item which will never be stored.
     @transitional
-    Get2(struct {
+    strict Get2(struct {
         type uint32;
         extra box<struct {
             n uint32;
@@ -45,7 +45,7 @@ protocol Items {
 
     /// Gets the `payload` for a `ZBI_TYPE_BOOTLOADER_FILE` boot item.
     /// Note: ZX_PROP_VMO_CONTENT_SIZE will be set to the actual file content size
-    GetBootloaderFile(struct {
+    strict GetBootloaderFile(struct {
         filename string:MAX_FILE_NAME_LENGTH;
     }) -> (resource struct {
         payload zx.Handle:<VMO, optional>;

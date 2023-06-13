@@ -39,14 +39,14 @@ type Message = table {
 
 /// All defined values and fields for this protocol come from the CTAP specification at
 /// https://fidoalliance.org/specs/fido-v2.1-ps-20210615/fido-client-to-authenticator-protocol-v2.1-ps-20210615.html#usb-message-and-packet-structure
-protocol SecurityKeyDevice {
+closed protocol SecurityKeyDevice {
     /// Send a message (request) to a FIDO key.
-    SendMessage(Message) -> () error zx.Status;
+    strict SendMessage(Message) -> () error zx.Status;
 
     /// Wait for and receive a message (response) from a FIDO key.
     /// Returns ZX_ERR_ACCESS_DENIED if `channel_id` does not match the
     /// channel_id in `response`.
-    GetMessage(struct {
+    strict GetMessage(struct {
         channel_id uint32;
     }) -> (Message) error zx.Status;
 };

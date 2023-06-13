@@ -24,9 +24,9 @@ const MAX_GAIN_CONTROLS_PER_EDGE uint32 = 32;
 
 /// A factory for creating [`Graph`] protocols.
 @discoverable
-protocol GraphCreator {
+closed protocol GraphCreator {
     /// Creates a new graph that lives until the channel is closed.
-    Create(resource table {
+    strict Create(resource table {
         /// Required.
         1: graph server_end:Graph;
 
@@ -155,14 +155,14 @@ protocol GraphCreator {
 /// Consumer uses a client-controlled clock, the `Graph` will adjust the
 /// Producer clock's rate to synchronize the Producer and Consumer clocks,
 /// eliminating the need for SRC.
-protocol Graph {
+closed protocol Graph {
     /// Creates a Producer node with the given options.
     ///
     /// Producer nodes generate audio which can be consumed by other nodes. For
     /// example, a Producer node might encapsulate audio coming from an
     /// application or from a microphone. Producer nodes cannot have any
     /// incoming edges and may have at most one outgoing edge.
-    CreateProducer(resource table {
+    strict CreateProducer(resource table {
         /// Name of this node, used for diagnostics only. See "IDs and names" in the
         /// comments for [`Graph`].
         ///
@@ -204,7 +204,7 @@ protocol Graph {
     ///
     /// For more details, see "Execution Model" under the description for
     /// [`Graph`].
-    CreateConsumer(resource table {
+    strict CreateConsumer(resource table {
         /// Name of this node, used for diagnostics only. See "IDs and names" in the
         /// comments for [`Graph`].
         ///
@@ -252,7 +252,7 @@ protocol Graph {
     /// destination stream. Mixers apply format conversion and sample rate
     /// conversion to the source streams to produce a destination stream with a
     /// fixed format.
-    CreateMixer(resource table {
+    strict CreateMixer(resource table {
         /// Name of this node, used for diagnostics only. See "IDs and names" in the
         /// comments for [`Graph`].
         ///
@@ -306,7 +306,7 @@ protocol Graph {
     /// unless it has at least one destination stream that is started and that
     /// is assigned to the same thread as the Splitter. This limitation may be
     /// lifted at a future time.
-    CreateSplitter(resource table {
+    strict CreateSplitter(resource table {
         /// Name of this node, used for diagnostics only. See "IDs and names" in the
         /// comments for [`Graph`].
         ///
@@ -358,7 +358,7 @@ protocol Graph {
     /// source and destination nodes. The returned `id` cannot be used in
     /// [`CreateEdge`]. Edges must target a specific source or destination slot
     /// as described above.
-    CreateCustom(resource table {
+    strict CreateCustom(resource table {
         /// Name of this node, used for diagnostics only. See "IDs and names" in the
         /// comments for [`Graph`].
         ///
@@ -394,7 +394,7 @@ protocol Graph {
     /// The node must exist. `DeleteNode(x)` will delete all incoming and
     /// outgoing edges of node `x` before deleting the node itself. Once the node
     /// has been deleted it cannot be mentioned by any future method calls.
-    DeleteNode(table {
+    strict DeleteNode(table {
         /// ID of the node to delete.
         1: id NodeId;
     }) -> (table {}) error DeleteNodeError;
@@ -410,7 +410,7 @@ protocol Graph {
     ///
     /// If the source's direction is `INPUT`, the dest's direction cannot be
     /// `OUTPUT`. See [`PipelineDirection`] for additional discussion.
-    CreateEdge(resource table {
+    strict CreateEdge(resource table {
         /// ID of the destination node.
         /// Required.
         1: dest_id NodeId;
@@ -435,7 +435,7 @@ protocol Graph {
     /// Deletes the edge connecting the source node to the destination node.
     ///
     /// The edge must exist.
-    DeleteEdge(table {
+    strict DeleteEdge(table {
         /// ID of the destination node.
         1: dest_id NodeId;
 
@@ -451,7 +451,7 @@ protocol Graph {
     ///
     /// For more details, see "Execution Model" under the description for
     /// [`Graph`].
-    CreateThread(resource table {
+    strict CreateThread(resource table {
         /// Name of this thread, used for diagnostics only. See "IDs and names" in the
         /// comments for [`Graph`].
         ///
@@ -483,7 +483,7 @@ protocol Graph {
     ///
     /// The thread must exist. A thread cannot be deleted until all Consumer
     /// nodes assigned to that thread have been deleted.
-    DeleteThread(table {
+    strict DeleteThread(table {
         /// ID of the thread to delete.
         /// Required.
         1: id ThreadId;
@@ -497,7 +497,7 @@ protocol Graph {
     /// muted.
     ///
     /// By default, a GainControl applies no gain and is not muted.
-    CreateGainControl(resource table {
+    strict CreateGainControl(resource table {
         /// Name of this GainControl, used for diagnostics only. See "IDs and names"
         /// in the comments for [`Graph`].
         ///
@@ -522,7 +522,7 @@ protocol Graph {
     ///
     /// The GainControl must exist. A GainControl cannot be deleted until all
     /// associated edges have been deleted.
-    DeleteGainControl(table {
+    strict DeleteGainControl(table {
         /// ID of the GainControl to delete.
         /// Required.
         1: id GainControlId;
@@ -538,7 +538,7 @@ protocol Graph {
     /// For more details, see "Clocks" under the description for [`Graph`].
     ///
     /// * error Error from `zx_clock_create`
-    CreateGraphControlledReferenceClock() -> (resource table {
+    strict CreateGraphControlledReferenceClock() -> (resource table {
         /// The new clock.
         1: reference_clock zx.Handle:CLOCK;
 
@@ -561,7 +561,7 @@ protocol Graph {
     /// If a `Start` or `Stop` request is received when a previous `Start` or
     /// `Stop` request is pending, the connection is closed. This request can be
     /// canceled using the `CancelStartOrStop` method.
-    Start(table {
+    strict Start(table {
         /// ID of the consumer or producer node.
         ///
         /// Required.
@@ -614,7 +614,7 @@ protocol Graph {
     /// If a `Start` or `Stop` request is received when a previous `Start` or
     /// `Stop` request is pending, the connection is closed. This request can be
     /// canceled using the `CancelStartOrStop` method.
-    Stop(table {
+    strict Stop(table {
         /// ID of the consumer or producer node.
         ///
         /// Required.
@@ -652,7 +652,7 @@ protocol Graph {
     /// the outcome of the race. In typical usage, a `CancelStartOrStop` request
     /// should be followed in short order by a `Stop` or `Start` request so that
     /// the state of the service is known.
-    CancelStartOrStop(table {
+    strict CancelStartOrStop(table {
         /// ID of the consumer or producer node.
         ///
         /// Required.
@@ -664,7 +664,7 @@ protocol Graph {
     /// frame to be presented on time. If a client wishes to present an audio
     /// frame at time T, that frame must be delivered to this producer by time
     /// `T - LeadTime`.
-    BindProducerLeadTimeWatcher(resource table {
+    strict BindProducerLeadTimeWatcher(resource table {
         /// ID of a node that was created with CreateProducer. The producer must
         /// have `direction == OUTPUT`.
         1: id NodeId;

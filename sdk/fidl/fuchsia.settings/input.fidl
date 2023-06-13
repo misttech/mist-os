@@ -8,7 +8,7 @@ library fuchsia.settings;
 /// Supported SettingsEpitaph enums:
 /// REQUEST_NOT_SUPPORTED, INTERNAL_SERVICE_ERROR, PERSISTENT_STORAGE_ERROR
 @discoverable
-protocol Input {
+closed protocol Input {
     /// Gets the current |InputSettings|. Returns immediately on first call;
     /// subsequent calls return when the value changes.
     ///
@@ -25,7 +25,7 @@ protocol Input {
     ///
     /// If this call fails, it is considered a fatal error and the channel
     /// will be closed.
-    Watch() -> (struct {
+    strict Watch() -> (struct {
         settings InputSettings;
     });
 
@@ -35,17 +35,17 @@ protocol Input {
     /// device if a known device_name and device_type are passed. Otherwise
     /// it will add a new input device. Devices not included in input_states
     /// will not be modified.
-    Set(struct {
+    strict Set(struct {
         input_states vector<InputState>:MAX;
     }) -> () error Error;
 
     @available(deprecated=7, removed=9)
-    Watch2() -> (struct {
+    strict Watch2() -> (struct {
         settings InputSettings;
     });
 
     @available(deprecated=7, removed=9)
-    SetStates(struct {
+    strict SetStates(struct {
         input_states vector<InputState>:MAX;
     }) -> () error Error;
 };

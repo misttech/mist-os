@@ -36,18 +36,18 @@ type TerminationReason = strict enum {
 /// If the component exits, this interface will be closed.
 ///
 /// Typically obtained via `Launcher.CreateComponent`.
-protocol ComponentController {
+closed protocol ComponentController {
     /// Terminates the component.
     ///
     /// This ComponentController connection is closed when the component has
     /// terminated.
-    Kill();
+    strict Kill();
 
     /// Decouples the lifetime of the component from this controller.
     ///
     /// After calling `Detach`, the component will not be implicitly killed when
     /// this interface is closed.
-    Detach();
+    strict Detach();
 
     // DEPRECATED: Use OnTerminated instead of Wait().
     // 3: Wait()
@@ -58,7 +58,7 @@ protocol ComponentController {
     /// its termination. The return_code is only valid if the termination
     /// reason is EXITED. If the termination reason is not EXITED, the
     /// return code is guaranteed not to be 0.
-    -> OnTerminated(struct {
+    strict -> OnTerminated(struct {
         return_code int64;
         termination_reason TerminationReason;
     });
@@ -67,5 +67,5 @@ protocol ComponentController {
     ///
     /// This event will not be triggered for every component, only those that
     /// serve a directory over their `PA_DIRECTORY_REQUEST` handle.
-    -> OnDirectoryReady();
+    strict -> OnDirectoryReady();
 };

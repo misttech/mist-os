@@ -11,14 +11,14 @@ using zx;
 
 /// Allows clients to play fire-and-forget sounds.
 @discoverable
-protocol Player {
+closed protocol Player {
     /// Adds a sound to the collection maintained for the client, reading the sound from a file.
     /// If `id` identifies an existing sound in the collection, the service will close the
     /// connection. Returns the duration of the sound or an error status returned from an I/O
     /// operation.
     ///
     /// Currently, only PCM WAV files and Ogg/Opus files are supported.
-    AddSoundFromFile(resource struct {
+    strict AddSoundFromFile(resource struct {
         id uint32;
         file client_end:fuchsia.io.File;
     }) -> (struct {
@@ -31,7 +31,7 @@ protocol Player {
     ///
     /// If `id` identifies an existing sound in the collection, the service will close the
     /// connection.
-    AddSoundBuffer(resource struct {
+    strict AddSoundBuffer(resource struct {
         id uint32;
         buffer fuchsia.mem.Buffer;
         stream_type fuchsia.media.AudioStreamType;
@@ -46,7 +46,7 @@ protocol Player {
     ///
     /// Removing an unneeded sound frees the resources associated with that sound, principally
     /// the VMO required to store the uncompressed sound.
-    RemoveSound(struct {
+    strict RemoveSound(struct {
         id uint32;
     });
 
@@ -56,7 +56,7 @@ protocol Player {
     /// `PlaySoundError.NO_SUCH_SOUND`. The most recent `PlaySound` call for a given valid id can
     /// be stopped using `StopPlayingSound`, in which case, this method returns
     /// `PlaySoundError.STOPPED`.
-    PlaySound(struct {
+    strict PlaySound(struct {
         id uint32;
         usage fuchsia.media.AudioRenderUsage;
     }) -> () error PlaySoundError;
@@ -66,7 +66,7 @@ protocol Player {
     /// or if the sound is not currently playing, this method does nothing. If more than one
     /// `PlaySound` method is currently pending for that sound, only the most recent is stopped.
     @transitional
-    StopPlayingSound(struct {
+    strict StopPlayingSound(struct {
         id uint32;
     });
 };

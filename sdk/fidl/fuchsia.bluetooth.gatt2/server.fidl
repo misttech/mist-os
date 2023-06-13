@@ -33,7 +33,7 @@ type ValueChangedParameters = table {
 /// Interface for serving a local GATT service. Closing the server_end of this protocol causes the
 /// GATT service to be removed from the local GATT database. Similarly, closure of the client_end
 /// of this protocol means the Bluetooth stack has removed this service from its GATT database.
-protocol LocalService {
+closed protocol LocalService {
     /// This notifies the current configuration of a particular characteristic/descriptor for a
     /// particular peer. It will be called when the peer GATT client changes the configuration.
     ///
@@ -48,7 +48,7 @@ protocol LocalService {
     /// + request `notify` True if the client has enabled notifications, false otherwise.
     /// + request `indicate` True if the client has enabled indications, false otherwise.
     /// - response empty Returns nothing to acknowledge the characteristic configuration.
-    CharacteristicConfiguration(struct {
+    strict CharacteristicConfiguration(struct {
         peer_id bt.PeerId;
         handle Handle;
         notify bool;
@@ -63,7 +63,7 @@ protocol LocalService {
     /// + request `offset` The offset at which to start reading the requested value.
     /// - response `value` The value of the characteristic.
     /// * error See `gatt2.Error` documentation for possible errors.
-    ReadValue(struct {
+    strict ReadValue(struct {
         peer_id bt.PeerId;
         handle Handle;
         offset int32;
@@ -84,7 +84,7 @@ protocol LocalService {
     /// - response  The implementation must send an empty response once the value has been updated
     ///   as confirmation.
     /// * error See `gatt2.Error` documentation for possible errors.
-    WriteValue(table {
+    strict WriteValue(table {
         1: peer_id bt.PeerId;
         2: handle Handle;
         3: offset uint32;
@@ -106,7 +106,7 @@ protocol LocalService {
     ///   Optional.
     /// - response An empty response to acknowledge that the update was received.
     @transitional("Not currently sent. Comment on fxbug.dev/96397 to request support")
-    PeerUpdate(table {
+    strict PeerUpdate(table {
         1: peer_id bt.PeerId;
         2: mtu uint16;
     }) -> ();
@@ -115,7 +115,7 @@ protocol LocalService {
     /// which have already discovered this service may still access it. This should be sent once per
     /// service lifetime; sending more than once closes the protocol and disconnects GATT clients.
     @transitional("Not currently supported. Comment on fxbug.dev/98598 to request support")
-    -> OnSuppressDiscovery();
+    strict -> OnSuppressDiscovery();
 
     /// This event is used to send a notification to a peer. Notifications should be used instead of
     /// indications when the service does *not* require peer confirmation of the update.
@@ -128,7 +128,7 @@ protocol LocalService {
     /// method and send at most that many `OnNotifyValue` and `OnIndicateValue` events. If more
     /// events are sent than available credits, or the parameters are invalid, the protocol will be
     /// closed.
-    -> OnNotifyValue(ValueChangedParameters);
+    strict -> OnNotifyValue(ValueChangedParameters);
 
     /// This event is used to send an indication to a peer. Indications should be used instead of
     /// notifications when the service *does* require peer confirmation of the update.
@@ -152,7 +152,7 @@ protocol LocalService {
     // `confirmation` is an EventPair instead of an Event because the language bindings for Events
     // treat them as resources/move-only, but the LocalService will need to retain a handle to the
     // `confirmation` kernel object in order to wait on the signal from the other side.
-    -> OnIndicateValue(resource struct {
+    strict -> OnIndicateValue(resource struct {
         update ValueChangedParameters;
         confirmation zx.Handle:EVENTPAIR;
     });
@@ -162,13 +162,13 @@ protocol LocalService {
     /// track of the available credit they have. The implementor can send exactly one OnNotifyValue
     /// or OnIndicateValue event for each credit. Note that `ValueChangedCredit` will only be called
     /// if at least one indication/notification has been sent since the prior call. 
-    ValueChangedCredit(struct {
+    strict ValueChangedCredit(struct {
         additional_credit uint8;
     });
 };
 
 @discoverable
-protocol Server {
+closed protocol Server {
     /// Publishes the given `service` so that it is available to all remote peers. Upon publication,
     /// the service is defined to have INITIAL_VALUE_CHANGED_CREDITS credits available for sending
     /// indications/notifications.
@@ -184,7 +184,7 @@ protocol Server {
     /// - response An empty response indicates the service was successfully published.
     /// * error See `gatt2.PublishServiceError` for possible failure modes.
     @transitional("Implementation and migration progress tracked in http://fxbug.dev/36375")
-    PublishService(resource struct {
+    strict PublishService(resource struct {
         info ServiceInfo;
         service client_end:LocalService;
     }) -> () error PublishServiceError;

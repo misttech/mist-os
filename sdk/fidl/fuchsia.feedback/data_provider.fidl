@@ -10,11 +10,11 @@ using zx;
 /// Provides data useful to attach to feedback reports, e.g., a crash report filed by the system, a
 /// user feedback report filed by a user or a bug report filed by a developer.
 @discoverable
-protocol DataProvider {
+closed protocol DataProvider {
     /// Returns a snapshot of the device's state.
     ///
     /// `snapshot` may be empty if there was an issue generating the snapshot.
-    GetSnapshot(resource struct {
+    strict GetSnapshot(resource struct {
         params GetSnapshotParameters;
     }) -> (resource struct {
         snapshot Snapshot;
@@ -28,7 +28,7 @@ protocol DataProvider {
     /// The screenshot is provided separately from the snapshot as callers might want to block on
     /// this call before changing the view while collecting a snapshot in the background is fine.
     /// There are also a lot of clients that are not interested in the screenshot.
-    GetScreenshot(struct {
+    strict GetScreenshot(struct {
         encoding ImageEncoding;
     }) -> (resource struct {
         screenshot box<Screenshot>;
@@ -42,7 +42,7 @@ protocol DataProvider {
     /// the annotations while others want both the annotations and the snapshot and generating the
     /// snapshot can take significantly more time than collecting the annotations, e.g., logs are
     /// only part of the snapshot and not part of the annotations and can take some time.
-    GetAnnotations(struct {
+    strict GetAnnotations(struct {
         params GetAnnotationsParameters;
     }) -> (struct {
         annotations Annotations;

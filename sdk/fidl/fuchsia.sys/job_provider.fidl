@@ -9,9 +9,9 @@ using zx;
 /// created in the context of an already-identified realm, so there is no need
 /// to explicitly identify the realm below.
 @discoverable
-protocol JobProvider {
+closed protocol JobProvider {
     /// Gets the root job associated with the realm.
-    GetJob() -> (resource struct {
+    strict GetJob() -> (resource struct {
         job zx.Handle:JOB;
     });
 };

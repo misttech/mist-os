@@ -56,7 +56,7 @@ using zx;
 /// an EntryIterator. This snapshot consists of `existing` entries followed by
 /// an [`IdleEvent`]. No other types of events will be sent before an
 /// [`IdleEvent`].
-protocol EntryIterator {
+closed protocol EntryIterator {
     /// Take items from the iterator. If no items are available, block until one
     /// is; otherwise, return immediately with items queued since the last
     /// invocation.
@@ -70,7 +70,7 @@ protocol EntryIterator {
     ///
     /// - response `events` a list of events that occurred since the last
     ///     invocation of this method.
-    GetNext() -> (struct {
+    strict GetNext() -> (struct {
         events vector<@generated_name("EntryIteratorItem") strict union {
             /// An existing entry in the neighbor table. Does not indicate that
             /// an event occurred.
@@ -113,13 +113,13 @@ const MAX_ITEM_BATCH_SIZE uint64 = 256;
 
 /// Inspect the neighbor table and related interface configuration.
 @discoverable
-protocol View {
+closed protocol View {
     /// Open a connection to an [`EntryIterator`] for listing existing entries
     /// and optionally watching for state changes.
     ///
     /// + request `it` grants access to the [`EntryIterator`].
     /// + request `options` specifies the behavior of the [`EntryIterator`].
-    OpenEntryIterator(resource struct {
+    strict OpenEntryIterator(resource struct {
         it server_end:EntryIterator;
         /// Options for modifying the behavior of an [`EntryIterator`].
         options @generated_name("EntryIteratorOptions") table {};
@@ -133,7 +133,7 @@ protocol View {
     /// * error `ZX_ERR_NOT_FOUND` if `interface` does not exist.
     // TODO(fxbug.dev/59058): Reading configuration should be moved to
     // interface-scoped protocols in fuchsia.net.interfaces.
-    GetUnreachabilityConfig(struct {
+    strict GetUnreachabilityConfig(struct {
         interface fuchsia.net.InterfaceId;
         ip_version fuchsia.net.IpVersion;
     }) -> (struct {
@@ -143,7 +143,7 @@ protocol View {
 
 /// Modify the neighbor table and related interface configuration.
 @discoverable
-protocol Controller {
+closed protocol Controller {
     /// Create a static entry. If a conflict is found, overwrite the existing
     /// entry. Conflicts occur when two entries have the same interface
     /// identifier and IP address.
@@ -155,7 +155,7 @@ protocol Controller {
     /// * error `ZX_ERR_NOT_FOUND` if `interface` does not exist.
     /// * error `ZX_ERR_NOT_SUPPORTED` if `interface` does not keep a neighbor
     ///     table (e.g. point-to-point links).
-    AddEntry(struct {
+    strict AddEntry(struct {
         interface fuchsia.net.InterfaceId;
         neighbor fuchsia.net.IpAddress;
         mac fuchsia.net.MacAddress;
@@ -170,7 +170,7 @@ protocol Controller {
     ///   `neighbor`.
     /// * error `ZX_ERR_NOT_SUPPORTED` if `interface` does not keep a neighbor
     ///     table (e.g. point-to-point links).
-    RemoveEntry(struct {
+    strict RemoveEntry(struct {
         interface fuchsia.net.InterfaceId;
         neighbor fuchsia.net.IpAddress;
     }) -> () error zx.Status;
@@ -183,7 +183,7 @@ protocol Controller {
     /// * error `ZX_ERR_NOT_FOUND` if `interface` does not exist.
     /// * error `ZX_ERR_NOT_SUPPORTED` if `interface` does not keep a neighbor
     ///     table (e.g. point-to-point links).
-    ClearEntries(struct {
+    strict ClearEntries(struct {
         interface fuchsia.net.InterfaceId;
         ip_version fuchsia.net.IpVersion;
     }) -> () error zx.Status;
@@ -205,7 +205,7 @@ protocol Controller {
     ///     constraints.
     // TODO(fxbug.dev/59058): Updating configuration should be moved to
     // interface-scoped protocols in fuchsia.net.interfaces.
-    UpdateUnreachabilityConfig(struct {
+    strict UpdateUnreachabilityConfig(struct {
         interface fuchsia.net.InterfaceId;
         ip_version fuchsia.net.IpVersion;
         config UnreachabilityConfig;

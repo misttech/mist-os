@@ -7,18 +7,18 @@ using zx;
 
 /// Protocol for providing the kernel log, readable.
 @discoverable
-protocol ReadOnlyLog {
+closed protocol ReadOnlyLog {
     /// Get read-only handle to the kernel `log`.
-    Get() -> (resource struct {
+    strict Get() -> (resource struct {
         log zx.Handle:LOG;
     });
 };
 
 /// Protocol for providing the kernel log, writable.
 @discoverable
-protocol WriteOnlyLog {
+closed protocol WriteOnlyLog {
     /// Get write-only handle to the kernel `log`.
-    Get() -> (resource struct {
+    strict Get() -> (resource struct {
         log zx.Handle:LOG;
     });
 };

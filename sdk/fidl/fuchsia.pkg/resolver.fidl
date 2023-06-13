@@ -48,7 +48,7 @@ type ResolveError = strict enum : int32 {
 /// This is intended to be implemented by package resolver components, and used by
 /// repository administration tools.
 @discoverable
-protocol PackageResolver {
+closed protocol PackageResolver {
     /// Populates or updates the cache of a package using an absolute package
     /// URL.
     ///
@@ -67,7 +67,7 @@ protocol PackageResolver {
     /// * error indicates failure. See `ResolveError` for values and error
     ///   scenarios.
     // TODO(fxbug.dev/45811) change `package_url` from string to PackageUrl
-    Resolve(resource struct {
+    strict Resolve(resource struct {
         package_url string;
         dir server_end:fuchsia.io.Directory;
     }) -> (struct {
@@ -94,7 +94,7 @@ protocol PackageResolver {
     /// * error indicates failure. See `ResolveError` for values and error
     ///   scenarios.
     // TODO(fxbug.dev/45811) change `package_url` from string to PackageUrl
-    ResolveWithContext(resource struct {
+    strict ResolveWithContext(resource struct {
         package_url string;
         context ResolutionContext;
         dir server_end:fuchsia.io.Directory;
@@ -113,7 +113,7 @@ protocol PackageResolver {
     ///       `package_url`.
     ///     * `ZX_ERR_BAD_STATE` if the resolver does not know about the repository specified by
     ///       `package_url`.
-    GetHash(struct {
+    strict GetHash(struct {
         package_url PackageUrl;
     }) -> (struct {
         meta_far_blob_id BlobId;

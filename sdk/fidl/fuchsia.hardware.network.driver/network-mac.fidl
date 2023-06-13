@@ -60,17 +60,17 @@ type Features = struct {
 
 @transport("Driver")
 @banjo_layout("ddk-interface")
-protocol MacAddr {
+closed protocol MacAddr {
     /// Gets this device's MAC address.
     // TODO(https://fxbug.dev/44065) we need an address changed event (in
     // lockstep with FIDL definition).
     // TODO(brunodalbo) use fuchsia.net.MacAddress here and in SetMode when we
     // can use FIDL types in Banjo.
-    GetAddress() -> (struct {
+    strict GetAddress() -> (struct {
         mac array<uint8, MAC_SIZE>;
     });
     /// Gets this device's features.
-    GetFeatures() -> (struct {
+    strict GetFeatures() -> (struct {
         features Features;
     });
     /// Sets this device's operating mode.
@@ -80,7 +80,7 @@ protocol MacAddr {
     /// is only provided (though it can still be empty) when `mode` is
     /// `MULTICAST_FILTER`. `multicast_macs` is always guaranteed to be at most
     /// `multicast_filter_count` entries.
-    SetMode(struct {
+    strict SetMode(struct {
         mode Mode;
         multicast_macs vector<array<uint8, MAC_SIZE>>:MAX_MAC_FILTER;
     }) -> ();

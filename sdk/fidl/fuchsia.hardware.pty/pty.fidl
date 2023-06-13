@@ -42,7 +42,7 @@ const EVENT_MASK uint32 = 15;
 const DEVICE_PROTOCOL_NAME string = "fuchsia.hardware.pty/Device";
 
 @discoverable
-protocol Device {
+closed protocol Device {
     compose fuchsia.unknown.Cloneable;
     compose fuchsia.unknown.Closeable;
     compose fuchsia.unknown.Queryable;
@@ -50,7 +50,7 @@ protocol Device {
     compose fuchsia.io.Readable;
     compose fuchsia.io.Writable;
 
-    Describe() -> (resource table {
+    strict Describe() -> (resource table {
         /// An optional event which transmits information about a device's state.
         ///
         /// The [`DeviceSignal`] values may be observed on this event.
@@ -66,7 +66,7 @@ protocol Device {
     /// current device is not a controlling client, `ZX_ERR_ACCESS_DENIED` will be
     /// returned. If `id` is not unique, `ZX_ERR_INVALID_ARGS` will be returned.
     /// Otherwise the status code from `device_add` is passed on.
-    OpenClient(resource struct {
+    strict OpenClient(resource struct {
         id uint32;
         client server_end:Device;
     }) -> (struct {
@@ -76,7 +76,7 @@ protocol Device {
     /// allowed on Client PTYs
     /// -----------------------------
     /// Clear and/or Set PTY Features
-    ClrSetFeature(struct {
+    strict ClrSetFeature(struct {
         clr uint32;
         set uint32;
     }) -> (struct {
@@ -85,7 +85,7 @@ protocol Device {
     });
 
     /// Obtain the window size (in character cells)
-    GetWindowSize() -> (struct {
+    strict GetWindowSize() -> (struct {
         status zx.Status;
         size WindowSize;
     });
@@ -94,14 +94,14 @@ protocol Device {
     /// -------------------------------------
     /// Select which Client PTY receives input.
     /// Reads will simply block on non-active PTYs.
-    MakeActive(struct {
+    strict MakeActive(struct {
         client_pty_id uint32;
     }) -> (struct {
         status zx.Status;
     });
 
     /// Returns pending OOB events, simultaneously clearing them
-    ReadEvents() -> (struct {
+    strict ReadEvents() -> (struct {
         status zx.Status;
         events uint32;
     });
@@ -109,7 +109,7 @@ protocol Device {
     /// allowed on the Server PTY
     /// --------------------------------
     /// Sets the window size
-    SetWindowSize(struct {
+    strict SetWindowSize(struct {
         size WindowSize;
     }) -> (struct {
         status zx.Status;

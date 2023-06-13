@@ -80,14 +80,14 @@ type LightError = strict enum {
 };
 
 @discoverable
-protocol Light {
+closed protocol Light {
     /// Fetches information on the controllable light groups on the device.
     /// Returns immediately on first call; subsequent calls return when the
     /// value changes.
     ///
     /// If this call fails, it is considered a fatal error and the channel
     /// will be closed.
-    WatchLightGroups() -> (struct {
+    strict WatchLightGroups() -> (struct {
         groups vector<LightGroup>:MAX;
     });
 
@@ -98,7 +98,7 @@ protocol Light {
     /// If this call fails, it is considered a fatal error and the channel
     /// will be closed. If the failure is due to an invalid light group name,
     /// the channel will be closed with a NOT_FOUND epitaph.
-    WatchLightGroup(struct {
+    strict WatchLightGroup(struct {
         name string:MAX_LIGHT_NAME_LENGTH;
     }) -> (struct {
         group LightGroup;
@@ -112,7 +112,7 @@ protocol Light {
     /// The requested changes may not take immediate effect if
     /// the light is forced to a certain state by the device's hardware. This
     /// call will still succeed, but the light's value may not change.
-    SetLightGroupValues(struct {
+    strict SetLightGroupValues(struct {
         name string:MAX_LIGHT_NAME_LENGTH;
         state vector<LightState>:MAX;
     }) -> () error LightError;

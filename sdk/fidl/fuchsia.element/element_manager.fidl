@@ -22,7 +22,7 @@ using fuchsia.url;
 /// the element proposer may be part of an interactive user interface that
 /// proposes elements based on user input.
 @discoverable
-protocol Manager {
+closed protocol Manager {
     /// Proposes to add an element to the session.
     ///
     /// If `ProposeElement` returns without error, the caller can assume
@@ -41,7 +41,7 @@ protocol Manager {
     /// * error `ProposeElementError.NOT_FOUND` if `spec.component_url` could not be resolved
     /// * error `ProposeElementError.INVALID_ARGS` if a required field is not present or annotations
     ///   are invalid
-    ProposeElement(resource struct {
+    strict ProposeElement(resource struct {
         spec Spec;
         controller server_end:<Controller, optional>;
     }) -> () error ProposeElementError;
@@ -84,6 +84,6 @@ type ProposeElementError = strict enum {
 /// remains in the session and is not destroyed. Once `Controller` is closed,
 /// the element and its component will be terminated. The element may also terminate
 /// itself, which will cause `Controller` to close.
-protocol Controller {
+closed protocol Controller {
     compose AnnotationController;
 };

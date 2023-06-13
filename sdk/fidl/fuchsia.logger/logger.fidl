@@ -88,25 +88,25 @@ type LogMessage = struct {
 
 /// Interface for LogListenerSafe to register to listen to logs.
 @discoverable
-protocol Log {
+closed protocol Log {
     /// Dumps all cached logs by calling LogMany() in batches followed by Log() for each new log
     /// message.
     /// A null `options` indicates no filtering is requested.
-    ListenSafe(resource struct {
+    strict ListenSafe(resource struct {
         log_listener client_end:LogListenerSafe;
         options box<LogFilterOptions>;
     });
 
     /// Dumps all cached logs by calling LogMany() followed by Done() on `log_listener`.
     /// A null `options` indicates no filtering is requested.
-    DumpLogsSafe(resource struct {
+    strict DumpLogsSafe(resource struct {
         log_listener client_end:LogListenerSafe;
         options box<LogFilterOptions>;
     });
 
     /// Listens to new log entries by calling Log() on `log_listener`.
     /// A null `options` indicates no filtering is requested.
-    ListenSafeWithSelectors(resource struct {
+    strict ListenSafeWithSelectors(resource struct {
         log_listener client_end:LogListenerSafe;
         options box<LogFilterOptions>;
         selectors
@@ -123,12 +123,12 @@ type InterestChangeError = strict enum : uint32 {
 
 /// Drains a program's logs.
 @discoverable
-protocol LogSink {
+closed protocol LogSink {
     /// Send this socket to be drained.
     ///
     /// See [wire_format.h](https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/system/ulib/syslog/include/lib/syslog/wire_format.h)
     /// for what is expected to be received over the socket.
-    Connect(resource struct {
+    strict Connect(resource struct {
         socket zx.Handle:SOCKET;
     });
 
@@ -139,7 +139,7 @@ protocol LogSink {
     /// e.g. compile time configuration. Each client may only poll this once at a time.
     /// Invoking WaitForInterestChange a second time before the first call returns will
     /// result in an error being returned.
-    WaitForInterestChange() -> (struct {
+    strict WaitForInterestChange() -> (struct {
         data fuchsia.diagnostics.Interest;
     }) error InterestChangeError;
 
@@ -147,7 +147,7 @@ protocol LogSink {
     ///
     /// See [Encoding structured records](https://fuchsia.dev/fuchsia-src/reference/platform-spec/diagnostics/logs-encoding)
     /// for what is expected to be received over the socket.
-    ConnectStructured(resource struct {
+    strict ConnectStructured(resource struct {
         socket zx.Handle:SOCKET;
     });
 };
@@ -156,12 +156,12 @@ protocol LogSink {
 const MAX_LOG_MANY_SIZE_BYTES uint64 = 16384;
 
 /// A listener who will notify the `Log` of the receipt of each message.
-protocol LogListenerSafe {
+closed protocol LogListenerSafe {
     /// Called for single messages.
     ///
     /// The return value is used for flow control, and implementers should acknowledge receipt of
     /// each message in order to continue receiving future messages.
-    Log(struct {
+    strict Log(struct {
         log LogMessage;
     }) -> ();
 
@@ -171,10 +171,10 @@ protocol LogListenerSafe {
     ///
     /// The return value is used for flow control, and implementers should acknowledge receipt of
     /// each batch in order to continue receiving future messages.
-    LogMany(struct {
+    strict LogMany(struct {
         log vector<LogMessage>:MAX;
     }) -> ();
 
     /// Called when this listener was passed to `DumpLogsSafe()` and all cached logs have been sent.
-    Done();
+    strict Done();
 };

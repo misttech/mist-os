@@ -29,9 +29,9 @@ type BuildInfo = table {
 
 /// Returns build information about a Fuchsia system.
 @discoverable
-protocol Provider {
+closed protocol Provider {
     /// Returns a table of build information.
-    GetBuildInfo() -> (struct {
+    strict GetBuildInfo() -> (struct {
         build_info BuildInfo;
     });
 };

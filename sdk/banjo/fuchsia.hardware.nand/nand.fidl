@@ -131,12 +131,12 @@ type NandOperation = strict resource union {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Nand {
+closed protocol Nand {
     /// Obtains the parameters of the nand device and the required
     /// size of |NandOperation|. The |NandOperation| submitted via Queue() must have
     /// `nand_op_size - sizeof(NandOperation)` bytes available at the end of the
     /// structure for the use of the driver.
-    Query() -> (struct {
+    strict Query() -> (struct {
         info fuchsia.hardware.nandinfo.NandInfo;
         nand_op_size uint64;
     });
@@ -147,7 +147,7 @@ protocol Nand {
     /// When the hardware is not able to correct all bitflips for a page, the
     /// driver should return ZX_ERR_IO_DATA_INTEGRITY.
     @async
-    Queue(resource struct {
+    strict Queue(resource struct {
         @in_out
         op NandOperation;
     }) -> (resource struct {
@@ -160,7 +160,7 @@ protocol Nand {
     /// This should only be called before writing any data to the nand, and the
     /// returned data should be saved somewhere else, along blocks that become
     /// bad after they've been in use.
-    GetFactoryBadBlockList() -> (struct {
+    strict GetFactoryBadBlockList() -> (struct {
         status zx.Status;
         bad_blocks vector<uint32>:MAX;
     });

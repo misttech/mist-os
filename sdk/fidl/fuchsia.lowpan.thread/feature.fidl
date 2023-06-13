@@ -48,7 +48,7 @@ type FeatureConfig = table {
 /// Protocol for connecting to [`Feature`] on a LoWPAN device.
 @discoverable
 @available(added=11)
-protocol FeatureConnector {
+closed protocol FeatureConnector {
     /// Connects to the [`Feature`] protocol on the
     /// named LoWPAN device.
     ///
@@ -65,7 +65,7 @@ protocol FeatureConnector {
     ///   given name.
     /// * `ZX_ERR_NOT_SUPPORTED`: The interface exists but
     ///   does not support this protocol.
-    Connect(resource struct {
+    strict Connect(resource struct {
         name fuchsia.lowpan.InterfaceName;
         server_end server_end:Feature;
     });
@@ -74,12 +74,12 @@ protocol FeatureConnector {
 /// Protocol for fetching and updating the OpenThread feature configuration
 /// for a specific LoWPAN interface.
 @available(added=11)
-protocol Feature {
+closed protocol Feature {
     /// Updates the current OpenThread feature configuration for this
     /// interface.
     ///
     /// Any unset field in `config` will leave that field unchanged.
-    UpdateFeatureConfig(struct {
+    strict UpdateFeatureConfig(struct {
         config FeatureConfig;
     }) -> ();
 
@@ -88,7 +88,7 @@ protocol Feature {
     ///
     /// A unset field in the returned value means that feature is not
     /// supported.
-    GetFeatureConfig() -> (struct {
+    strict GetFeatureConfig() -> (struct {
         config FeatureConfig;
     });
 };

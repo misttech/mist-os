@@ -29,17 +29,17 @@ type DictError = flexible enum {
     BAD_HANDLE = 3;
 };
 
-protocol Dict {
+closed protocol Dict {
     /// Inserts a key-value pair into the dict.
     ///
     /// * error `DictError.ALREADY_EXISTS` if the dict already contains an
     /// item with the same key.
-    Insert(DictItem) -> () error DictError;
+    strict Insert(DictItem) -> () error DictError;
 
     /// Removes a key from the dict, returning the [`Capability`] value.
     ///
     /// * error `DictError.NOT_FOUND` if the dict does not contain the key.
-    Remove(struct {
+    strict Remove(struct {
         key DictKey;
     }) -> (resource struct {
         capability Capability;
@@ -51,18 +51,18 @@ type SenderError = flexible enum {
     BAD_HANDLE = 1;
 };
 
-protocol Sender {
+closed protocol Sender {
     /// Sends a single Capability handle over this sender.
-    Send(resource struct {
+    strict Send(resource struct {
         capability Capability;
     }) -> () error SenderError;
 };
 
-protocol Receiver {
+closed protocol Receiver {
     /// Receives a single Capability handle.
     ///
     /// This is a hanging get that returns the next available handle.
-    Receive() -> (resource struct {
+    strict Receive() -> (resource struct {
         capability Capability;
     });
 };

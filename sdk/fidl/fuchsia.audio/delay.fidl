@@ -7,11 +7,11 @@ library fuchsia.audio;
 using zx;
 
 /// Watches for a delay to change.
-protocol DelayWatcher {
+closed protocol DelayWatcher {
     /// The first call returns immediately with the current delay, if known.
     /// Subsequent calls block until the delay changes. There can be at most one
     /// outstanding call, otherwise the channel may be closed.
-    WatchDelay(table {}) -> (table {
+    strict WatchDelay(table {}) -> (table {
         /// Optional. If not specified, the delay is unknown.
         1: delay zx.Duration;
     });

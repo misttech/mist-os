@@ -31,7 +31,7 @@ type EnvironmentOptions = struct {
 /// Applications run inside environments, which provide ambient services and
 /// support for their lifecycle.
 @discoverable
-protocol Environment {
+closed protocol Environment {
     /// Creates a new environment nested inside this environment.
     ///
     /// When applications are created inside the nested environment using the
@@ -57,7 +57,7 @@ protocol Environment {
     ///
     /// `options` provides additional options, see `EnvironmentOptions` for
     /// details.
-    CreateNestedEnvironment(resource struct {
+    strict CreateNestedEnvironment(resource struct {
         environment server_end:Environment;
         controller server_end:EnvironmentController;
         label string;
@@ -69,19 +69,19 @@ protocol Environment {
     ///
     /// Applications created using this application launcher will be given the
     /// environment services provided by this environment's `host_directory`.
-    GetLauncher(resource struct {
+    strict GetLauncher(resource struct {
         launcher server_end:Launcher;
     });
 
     /// Gets a superset of services provided by this environment's
     /// `host_directory`.
-    GetServices(resource struct {
+    strict GetServices(resource struct {
         services server_end:ServiceProvider;
     });
 
     /// Gets a superset of services provided by this environment's
     /// `host_directory`.
-    GetDirectory(resource struct {
+    strict GetDirectory(resource struct {
         @available(removed=10)
         directory_request zx.Handle:CHANNEL;
         @available(added=10)

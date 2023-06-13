@@ -4,7 +4,7 @@
 library zx;
 
 @transport("Syscall")
-protocol Thread {
+closed protocol Thread {
     /// ## Summary
     ///
     /// Terminate the current running thread.
@@ -52,7 +52,7 @@ protocol Thread {
     /// [`zx_thread_create()`]: thread_create.md
     /// [`zx_thread_start()`]: thread_start.md
     @noreturn
-    Exit();
+    strict Exit();
 
     /// ## Summary
     ///
@@ -130,7 +130,7 @@ protocol Thread {
     /// [`zx_object_wait_one()`]: object_wait_one.md
     /// [`zx_thread_exit()`]: thread_exit.md
     /// [`zx_thread_start()`]: thread_start.md
-    Create(resource struct {
+    strict Create(resource struct {
         process Handle:PROCESS;
         name vector<uchar>:MAX_NAME_LEN;
         options uint32;
@@ -228,7 +228,7 @@ protocol Thread {
     /// [`zx_thread_create()`]: thread_create.md
     /// [`zx_thread_exit()`]: thread_exit.md
     /// [`zx_vmar_unmap_handle_close_thread_exit()`]: vmar_unmap_handle_close_thread_exit.md
-    Start(resource struct {
+    strict Start(resource struct {
         handle Handle:THREAD;
         thread_entry Vaddr;
         stack Vaddr;
@@ -324,7 +324,7 @@ protocol Thread {
     /// ## See also
     ///
     /// [thread_write_state](thread_write_state.md).
-    ReadState(resource struct {
+    strict ReadState(resource struct {
         handle Handle:THREAD;
         kind uint32;
     }) -> (struct {
@@ -441,7 +441,7 @@ protocol Thread {
     ///  - [`zx_thread_read_state()`]
     ///
     /// [`zx_thread_read_state()`]: thread_read_state.md
-    WriteState(resource struct {
+    strict WriteState(resource struct {
         handle Handle:THREAD;
         kind uint32;
         @voidptr
@@ -483,7 +483,7 @@ protocol Thread {
     ///  - [`zx_nanosleep()`]
     ///
     /// [`zx_nanosleep()`]: nanosleep.md
-    LegacyYield(resource struct {
+    strict LegacyYield(resource struct {
         options uint32;
     }) -> () error Status;
 };

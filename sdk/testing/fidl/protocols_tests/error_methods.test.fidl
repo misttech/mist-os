@@ -9,12 +9,12 @@ type MyError = strict enum : int32 {
     REALLY_BAD_ERROR = 2;
 };
 
-protocol ErrorMethods {
-    NoArgsPrimitiveError(struct {
+closed protocol ErrorMethods {
+    strict NoArgsPrimitiveError(struct {
         should_error bool;
     }) -> () error int32;
 
-    ManyArgsCustomError(struct {
+    strict ManyArgsCustomError(struct {
         should_error bool;
     }) -> (struct {
         a int32;

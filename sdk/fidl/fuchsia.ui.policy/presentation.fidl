@@ -6,16 +6,16 @@ library fuchsia.ui.policy;
 using fuchsia.ui.input;
 
 @available(deprecated=10, note="Implementation deleted. Do not use.")
-protocol PointerCaptureListenerHACK {
-    OnPointerEvent(struct {
+closed protocol PointerCaptureListenerHACK {
+    strict OnPointerEvent(struct {
         event fuchsia.ui.input.PointerEvent;
     });
 };
 
 @discoverable
 @available(deprecated=10, note="Implementation deleted. Do not use.")
-protocol Presentation {
-    CapturePointerEventsHACK(resource struct {
+closed protocol Presentation {
+    strict CapturePointerEventsHACK(resource struct {
         listener client_end:PointerCaptureListenerHACK;
     });
 };

@@ -7,9 +7,9 @@ using zx;
 
 @transport("Banjo")
 @banjo_layout("ddk-interface")
-protocol UsbHubInterface {
+closed protocol UsbHubInterface {
     /// Resets the specified port on the hub.
-    ResetPort(struct {
+    strict ResetPort(struct {
         port uint32;
     }) -> (struct {
         s zx.Status;

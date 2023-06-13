@@ -125,7 +125,7 @@ type Response = resource table {
 /// all the outstanding requests and will cancel them all if the client closes
 /// the loader interface.
 @discoverable
-protocol Loader {
+closed protocol Loader {
     /// Initiate the given HTTP or HTTPS request, follow redirects, and return the final
     /// response.
     ///
@@ -133,7 +133,7 @@ protocol Loader {
     /// and return the final response as a reply to this message. To cancel the
     /// request, either close the loader interface or close the peer to the
     /// `event` included in the `request`.
-    Fetch(resource struct {
+    strict Fetch(resource struct {
         request Request;
     }) -> (resource struct {
         response Response;
@@ -145,7 +145,7 @@ protocol Loader {
     /// Unlike `Fetch`, `Start` does not automatically follow all redirects.
     /// Instead, each individual response along the redirect chain is delivered
     /// to the `LoaderClient`.
-    Start(resource struct {
+    strict Start(resource struct {
         request Request;
         client client_end:LoaderClient;
     });
@@ -154,14 +154,14 @@ protocol Loader {
 /// A client interface used with `Loader.Start`.
 ///
 /// Closing the underlying channel will cancel the associated HTTP transaction.
-protocol LoaderClient {
+closed protocol LoaderClient {
     /// Called by the loader when the loader receives an HTTP response.
     ///
     /// If the server has requested a redirect, then `redirect` in `response`
     /// table will describe the target the server requested. To follow the
     /// redirect, reply to this message. To not follow the redirect, close the
     /// underlying channel.
-    OnResponse(resource struct {
+    strict OnResponse(resource struct {
         response Response;
     }) -> ();
 };

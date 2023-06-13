@@ -158,49 +158,49 @@ type Resource = resource struct {
     vector_union vector<ResourceUnion>;
 };
 
-protocol Protocol {
-    OneWayBasic(Basic);
-    TwoWayBasic(Basic) -> (Basic);
-    ErrorBasic() -> (Basic) error uint32;
-    -> EventBasic(Basic);
+closed protocol Protocol {
+    strict OneWayBasic(Basic);
+    strict TwoWayBasic(Basic) -> (Basic);
+    strict ErrorBasic() -> (Basic) error uint32;
+    strict -> EventBasic(Basic);
 
-    OneWayCompound(Compound);
-    TwoWayCompound(Compound) -> (Compound);
-    ErrorCompound() -> (Compound) error uint32;
-    -> EventCompound(Compound);
+    strict OneWayCompound(Compound);
+    strict TwoWayCompound(Compound) -> (Compound);
+    strict ErrorCompound() -> (Compound) error uint32;
+    strict -> EventCompound(Compound);
 
-    OneWayArrayBasic(ArrayBasic);
-    TwoWayArrayBasic(ArrayBasic) -> (ArrayBasic);
-    ErrorArrayBasic() -> (ArrayBasic) error uint32;
-    -> EventArrayBasic(ArrayBasic);
+    strict OneWayArrayBasic(ArrayBasic);
+    strict TwoWayArrayBasic(ArrayBasic) -> (ArrayBasic);
+    strict ErrorArrayBasic() -> (ArrayBasic) error uint32;
+    strict -> EventArrayBasic(ArrayBasic);
 
-    OneWayArrayCompound(ArrayCompound);
-    TwoWayArrayCompound(ArrayCompound) -> (ArrayCompound);
-    ErrorArrayCompound() -> (ArrayCompound) error uint32;
-    -> EventArrayCompound(ArrayCompound);
+    strict OneWayArrayCompound(ArrayCompound);
+    strict TwoWayArrayCompound(ArrayCompound) -> (ArrayCompound);
+    strict ErrorArrayCompound() -> (ArrayCompound) error uint32;
+    strict -> EventArrayCompound(ArrayCompound);
 
-    OneWayVectorBasic(VectorBasic);
-    TwoWayVectorBasic(VectorBasic) -> (VectorBasic);
-    ErrorVectorBasic() -> (VectorBasic) error uint32;
-    -> EventVectorBasic(VectorBasic);
+    strict OneWayVectorBasic(VectorBasic);
+    strict TwoWayVectorBasic(VectorBasic) -> (VectorBasic);
+    strict ErrorVectorBasic() -> (VectorBasic) error uint32;
+    strict -> EventVectorBasic(VectorBasic);
 
-    OneWayVectorCompound(VectorCompound);
-    TwoWayVectorCompound(VectorCompound) -> (VectorCompound);
-    ErrorVectorCompound() -> (VectorCompound) error uint32;
-    -> EventVectorCompound(VectorCompound);
+    strict OneWayVectorCompound(VectorCompound);
+    strict TwoWayVectorCompound(VectorCompound) -> (VectorCompound);
+    strict ErrorVectorCompound() -> (VectorCompound) error uint32;
+    strict -> EventVectorCompound(VectorCompound);
 
-    OneWayVectorOptional(VectorOptional);
-    TwoWayVectorOptional(VectorOptional) -> (VectorOptional);
-    ErrorVectorOptional() -> (VectorOptional) error uint32;
-    -> EventVectorOptional(VectorOptional);
+    strict OneWayVectorOptional(VectorOptional);
+    strict TwoWayVectorOptional(VectorOptional) -> (VectorOptional);
+    strict ErrorVectorOptional() -> (VectorOptional) error uint32;
+    strict -> EventVectorOptional(VectorOptional);
 
-    OneWayArrayVectorNested(ArrayVectorNested);
-    TwoWayArrayVectorNested(ArrayVectorNested) -> (ArrayVectorNested);
-    ErrorArrayVectorNested() -> (ArrayVectorNested) error uint32;
-    -> EventArrayVectorNested(ArrayVectorNested);
+    strict OneWayArrayVectorNested(ArrayVectorNested);
+    strict TwoWayArrayVectorNested(ArrayVectorNested) -> (ArrayVectorNested);
+    strict ErrorArrayVectorNested() -> (ArrayVectorNested) error uint32;
+    strict -> EventArrayVectorNested(ArrayVectorNested);
 
-    OneWayResource(Resource);
-    TwoWayResource(Resource) -> (Resource);
-    ErrorResource() -> (Resource) error uint32;
-    -> EventResource(Resource);
+    strict OneWayResource(Resource);
+    strict TwoWayResource(Resource) -> (Resource);
+    strict ErrorResource() -> (Resource) error uint32;
+    strict -> EventResource(Resource);
 };

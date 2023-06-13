@@ -52,7 +52,7 @@ type VisibilityChangeReason = flexible enum {
 ///   For example, Root Presenter, or the Workstation Session.
 /// * Consumed by application runtimes. For example, Flutter, Chromium.
 @discoverable
-protocol ControllerCreator {
+closed protocol ControllerCreator {
     /// Requests that the `Controller` at the other end of the
     /// `server_end:Controller` channel be associated with the `View`
     /// referenced by `view_ref`.
@@ -69,7 +69,7 @@ protocol ControllerCreator {
     ///
     /// Consumers of `ControllerCreator` may freely drop their Creator
     /// connection, without affecting their Controller(s).
-    Create(resource struct {
+    strict Create(resource struct {
         view_ref fuchsia.ui.views.ViewRef;
         text_type TextType;
         controller_request server_end:Controller;
@@ -111,7 +111,7 @@ protocol ControllerCreator {
 /// of spuriously rejecting valid calls, due to the race condition above.
 /// Instead, implementations _should_ buffer requests as described in the
 /// per-method comments.
-protocol Controller {
+closed protocol Controller {
     /// Requests a change in text type for the virtual keyboard.
     ///
     /// * If the callee determines that the `View` for this Controller is
@@ -121,7 +121,7 @@ protocol Controller {
     ///   focus.
     /// * If the callee receives multiple calls before the `View` regains
     ///   focus, the  callee will apply the value from the most recent call.
-    SetTextType(struct {
+    strict SetTextType(struct {
         text_type TextType;
     });
 
@@ -134,7 +134,7 @@ protocol Controller {
     ///   regains focus. However, a call to `RequestHide()` will nullify
     ///   such a pending request.
     /// * Calls to this method are idempotent.
-    RequestShow();
+    strict RequestShow();
 
     /// Requests that the keyboard be hidden.
     ///
@@ -146,7 +146,7 @@ protocol Controller {
     ///     that request.
     ///   * Otherwise, the call has no effect.
     /// * Calls to this method are idempotent.
-    RequestHide();
+    strict RequestHide();
 
     /// Waits for the visibility to change, then reports the new value.
     ///
@@ -169,7 +169,7 @@ protocol Controller {
     ///      be visible due to a request from this Controller (this
     ///      does not guarantee that the keyboard is visible on screen)
     ///    * `false` otherwise
-    WatchVisibility() -> (struct {
+    strict WatchVisibility() -> (struct {
         is_visible bool;
     });
 };
@@ -182,7 +182,7 @@ protocol Controller {
 ///   For example, Root Presenter, or the Workstation Session.
 /// * Consumed by components which provide a GUI affordance for text input.
 @discoverable
-protocol Manager {
+closed protocol Manager {
     /// Waits for a change in intended `text_type` or visibility, then
     /// reports the new value. In response to a status change, the caller
     /// should set the requested type and visibility, then call `Notify`
@@ -194,7 +194,7 @@ protocol Manager {
     /// In the event that `text_type` is not supported, the caller should
     /// implement a fallback that provides as many of the necessary keys
     /// as possible.
-    WatchTypeAndVisibility() -> (struct {
+    strict WatchTypeAndVisibility() -> (struct {
         text_type TextType;
         is_visible bool;
     });
@@ -204,7 +204,7 @@ protocol Manager {
     ///
     /// The caller _should_ wait for a result before invoking invoking this
     /// method again, to avoid overloading the callee.
-    Notify(struct {
+    strict Notify(struct {
         is_visible bool;
         reason VisibilityChangeReason;
     }) -> ();

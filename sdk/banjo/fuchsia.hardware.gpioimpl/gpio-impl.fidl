@@ -8,16 +8,16 @@ using zx;
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol GpioImpl {
+closed protocol GpioImpl {
     /// Configures a GPIO for input.
-    ConfigIn(struct {
+    strict ConfigIn(struct {
         index uint32;
         flags uint32;
     }) -> (struct {
         s zx.Status;
     });
     /// Configures a GPIO for output.
-    ConfigOut(struct {
+    strict ConfigOut(struct {
         index uint32;
         initial_value uint8;
     }) -> (struct {
@@ -25,14 +25,14 @@ protocol GpioImpl {
     });
     /// Configures the GPIO pin for an alternate function (I2C, SPI, etc)
     /// the interpretation of "function" is platform dependent.
-    SetAltFunction(struct {
+    strict SetAltFunction(struct {
         index uint32;
         function uint64;
     }) -> (struct {
         s zx.Status;
     });
     /// Configures the GPIO pin drive strength.
-    SetDriveStrength(struct {
+    strict SetDriveStrength(struct {
         index uint32;
         ua uint64;
     }) -> (struct {
@@ -40,28 +40,28 @@ protocol GpioImpl {
         actual_ua uint64;
     });
     /// Returns the configured drive strength for a GPIO pin in microamps (ua).
-    GetDriveStrength(struct {
+    strict GetDriveStrength(struct {
         index uint32;
     }) -> (struct {
         s zx.Status;
         value uint64;
     });
     /// Reads the current value of a GPIO (0 or 1).
-    Read(struct {
+    strict Read(struct {
         index uint32;
     }) -> (struct {
         s zx.Status;
         value uint8;
     });
     /// Sets the current value of the GPIO (any non-zero value maps to 1).
-    Write(struct {
+    strict Write(struct {
         index uint32;
         value uint8;
     }) -> (struct {
         s zx.Status;
     });
     /// Gets an interrupt object pertaining to a particular GPIO pin.
-    GetInterrupt(struct {
+    strict GetInterrupt(struct {
         index uint32;
         flags uint32;
     }) -> (resource struct {
@@ -69,13 +69,13 @@ protocol GpioImpl {
         irq zx.Handle:INTERRUPT;
     });
     /// Release the interrupt.
-    ReleaseInterrupt(struct {
+    strict ReleaseInterrupt(struct {
         index uint32;
     }) -> (struct {
         s zx.Status;
     });
     /// Set GPIO polarity.
-    SetPolarity(struct {
+    strict SetPolarity(struct {
         index uint32;
         polarity fuchsia.hardware.gpio.GpioPolarity;
     }) -> (struct {

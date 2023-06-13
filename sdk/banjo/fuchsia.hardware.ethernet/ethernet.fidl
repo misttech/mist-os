@@ -59,13 +59,13 @@ type EthernetNetbuf = struct {
 
 @transport("Banjo")
 @banjo_layout("ddk-interface")
-protocol EthernetIfc {
+closed protocol EthernetIfc {
     /// Value with bits set from the |ETHERNET_STATUS_*| flags
-    Status(struct {
+    strict Status(struct {
         status uint32;
     }) -> ();
 
-    Recv(struct {
+    strict Recv(struct {
         @buffer
         data vector<uint8>:MAX;
         flags uint32;
@@ -107,10 +107,10 @@ const ETHERNET_SETPARAM_DUMP_REGS uint32 = 4;
 /// methods.
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol EthernetImpl {
+closed protocol EthernetImpl {
     /// Obtain information about the ethermac device and supported features
     /// Safe to call at any time.
-    Query(struct {
+    strict Query(struct {
         options uint32;
     }) -> (struct {
         s zx.Status;
@@ -119,11 +119,11 @@ protocol EthernetImpl {
 
     /// Shut down a running ethermac
     /// Safe to call if the ethermac is already stopped.
-    Stop() -> ();
+    strict Stop() -> ();
 
     /// Start ethermac running with ifc_virt
     /// Callbacks on ifc may be invoked from now until stop() is called
-    Start(resource struct {
+    strict Start(resource struct {
         ifc client_end:EthernetIfc;
     }) -> (struct {
         s zx.Status;
@@ -143,7 +143,7 @@ protocol EthernetImpl {
     /// Upon a return of ZX_OK, the packet has been enqueued, but no information is returned as to
     /// the completion state of the transmission itself.
     @async
-    QueueTx(struct {
+    strict QueueTx(struct {
         options uint32;
         @in_out
         netbuf EthernetNetbuf;
@@ -162,7 +162,7 @@ protocol EthernetImpl {
     ///
     /// set_param() may be called at any time after start() is called including from multiple threads
     /// simultaneously.
-    SetParam(struct {
+    strict SetParam(struct {
         param uint32;
         value int32;
         @buffer
@@ -174,7 +174,7 @@ protocol EthernetImpl {
     /// Get the BTI handle (needed to pin DMA memory) for this device.
     /// This method is only valid on devices that advertise ETHERNET_FEATURE_DMA
     /// The caller takes ownership of the BTI handle.
-    GetBti() -> (resource struct {
+    strict GetBti() -> (resource struct {
         bti zx.Handle:BTI;
     });
 };

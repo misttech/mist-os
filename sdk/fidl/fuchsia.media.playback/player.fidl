@@ -11,56 +11,56 @@ using zx;
 
 /// Plays media.
 @discoverable
-protocol Player {
+closed protocol Player {
     compose SourceManager;
 
     /// Sets a file channel to read from.
-    SetFileSource(resource struct {
+    strict SetFileSource(resource struct {
         file_channel zx.Handle:CHANNEL;
     });
 
     /// Sets a file channel to read from.
-    SetFileSourceWithOptions(resource struct {
+    strict SetFileSourceWithOptions(resource struct {
         file_channel zx.Handle:CHANNEL;
         options PlayerOptions;
     });
 
     /// Starts playback.
-    Play();
+    strict Play();
 
     /// Pauses playback.
-    Pause();
+    strict Pause();
 
     /// Provides current status immediately after binding and whenever status
     /// changes thereafter.
-    -> OnStatusChanged(struct {
+    strict -> OnStatusChanged(struct {
         player_status PlayerStatus;
     });
 
     /// Seeks to the specified position, specified in nanoseconds.
-    Seek(struct {
+    strict Seek(struct {
         position int64;
     });
 
     /// Creates a video view.
-    CreateView(resource struct {
+    strict CreateView(resource struct {
         view_token fuchsia.ui.views.ViewToken;
     });
 
     /// Binds to the gain control for this player.
-    BindGainControl(resource struct {
+    strict BindGainControl(resource struct {
         gain_control_request server_end:fuchsia.media.audio.GainControl;
     });
 
     /// Adds a new binding to this player.
-    AddBinding(resource struct {
+    strict AddBinding(resource struct {
         player_request server_end:Player;
     });
 
     /// Sets the rate to be used when the player is playing. `rate` must be positive. The
     /// `timeline_function` field of `PlayerStatus` indicates the actual rate when the player
     /// is playing.
-    SetPlaybackRate(struct {
+    strict SetPlaybackRate(struct {
         playback_rate float32;
     });
 };

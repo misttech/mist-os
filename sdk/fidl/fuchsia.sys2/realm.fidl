@@ -196,10 +196,10 @@ type ChildLocation = flexible union {
 
 /// Offers detailed introspection into component instances under a realm.
 @discoverable
-protocol RealmQuery {
+closed protocol RealmQuery {
     /// Gets an instance identified by its relative moniker.
     @available(added=11)
-    GetInstance(struct {
+    strict GetInstance(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> (struct {
         instance Instance;
@@ -212,7 +212,7 @@ protocol RealmQuery {
     /// Zircon channel and we can't use a VMO because we need an approach that is
     /// compatible with overnet.
     @available(added=13)
-    GetResolvedDeclaration(struct {
+    strict GetResolvedDeclaration(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> (resource struct {
         iterator client_end:ManifestBytesIterator;
@@ -221,7 +221,7 @@ protocol RealmQuery {
     // TODO(https://fxbug.dev/127340) delete once no longer required for ffx compat window
     /// Prefer `GetResolvedDeclaration` if available for your target API level.
     @available(added=11)
-    GetManifest(struct {
+    strict GetManifest(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> (resource struct {
         iterator client_end:ManifestBytesIterator;
@@ -235,7 +235,7 @@ protocol RealmQuery {
     /// Zircon channel and we can't use a VMO because we need an approach that is
     /// compatible with overnet.
     @available(added=12)
-    ResolveDeclaration(struct {
+    strict ResolveDeclaration(struct {
         parent string:fuchsia.component.MAX_MONIKER_LENGTH;
         child_location ChildLocation;
         url fuchsia.url.Url;
@@ -245,7 +245,7 @@ protocol RealmQuery {
 
     /// Gets the structured config of an instance identified by its relative moniker.
     @available(added=13)
-    GetStructuredConfig(struct {
+    strict GetStructuredConfig(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> (struct {
         config fuchsia.component.decl.ResolvedConfig;
@@ -253,7 +253,7 @@ protocol RealmQuery {
 
     // replaced by ABI-compatible version above
     @available(added=11, removed=13)
-    GetStructuredConfig(struct {
+    strict GetStructuredConfig(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> (struct {
         config fuchsia.component.config.ResolvedConfig;
@@ -261,14 +261,14 @@ protocol RealmQuery {
 
     /// Returns an iterator over all instances in this realm.
     @available(added=11)
-    GetAllInstances() -> (resource struct {
+    strict GetAllInstances() -> (resource struct {
         iterator client_end:InstanceIterator;
     }) error GetAllInstancesError;
 
     /// Constructs the namespace of an instance exactly as it would be given to the component's
     /// runner.
     @available(added=11)
-    ConstructNamespace(struct {
+    strict ConstructNamespace(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> (resource struct {
         /// The directory handles + paths that constitute the component's namespace.
@@ -277,7 +277,7 @@ protocol RealmQuery {
 
     /// Makes an fuchsia.io.Directory/Open call on a directory in an instance.
     @available(added=11)
-    Open(resource struct {
+    strict Open(resource struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         dir_type OpenDirType;
         flags fuchsia.io.OpenFlags;
@@ -288,7 +288,7 @@ protocol RealmQuery {
 
     /// Connects to the StorageAdmin protocol of a storage declared by an instance.
     @available(added=11)
-    ConnectToStorageAdmin(resource struct {
+    strict ConnectToStorageAdmin(resource struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         storage_name fuchsia.component.decl.name;
         server_end server_end:StorageAdmin;
@@ -298,7 +298,7 @@ protocol RealmQuery {
     /// This response contains handles to resources of the instance. As a result, component manager
     /// pays a non-trivial cost when this method is invoked.
     @available(added=11, deprecated=11, removed=12, note="Use GetInstance instead")
-    GetInstanceInfo(struct {
+    strict GetInstanceInfo(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> (resource struct {
         /// Basic information about the component instance.
@@ -313,7 +313,7 @@ protocol RealmQuery {
     /// This response contains directory handles served by component manager. As a result,
     /// component manager pays a non-trivial cost when this method is invoked.
     @available(added=11, deprecated=11, removed=12, note="Use Open instead")
-    GetInstanceDirectories(struct {
+    strict GetInstanceDirectories(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> (resource struct {
         /// The directories available because the component instance is in resolved state
@@ -324,16 +324,16 @@ protocol RealmQuery {
 
 /// An iterator over all instances in the realm
 @available(added=11)
-protocol InstanceIterator {
-    Next() -> (struct {
+closed protocol InstanceIterator {
+    strict Next() -> (struct {
         infos vector<Instance>:MAX;
     });
 };
 
 /// An iterator over the bytes of an instance's manifest
 @available(added=11)
-protocol ManifestBytesIterator {
-    Next() -> (struct {
+closed protocol ManifestBytesIterator {
+    strict Next() -> (struct {
         infos vector<uint8>:MAX;
     });
 };
@@ -449,8 +449,8 @@ type ExecutionDirectories = resource struct {
 
 /// An iterator over basic information of all instances in the realm
 @available(added=11, deprecated=11, removed=12, note="Use InstanceIterator instead")
-protocol InstanceInfoIterator {
-    Next() -> (struct {
+closed protocol InstanceInfoIterator {
+    strict Next() -> (struct {
         infos vector<InstanceInfo>:MAX;
     });
 };
@@ -474,13 +474,13 @@ type RealmExplorerError = flexible enum {
 
 /// Offers basic introspection into component instances under a realm.
 @discoverable
-protocol RealmExplorer {
+closed protocol RealmExplorer {
     /// Returns an iterator over basic information of each instance scoped to this realm.
     /// When the server receives this call, it will take a snapshot of the current component
     /// topology and relays that over the iterator. Any changes to the topology *after* this method
     /// call is received by the server will not be shown by the iterator.
     @available(added=11, deprecated=11, removed=12, note="Use RealmQuery.GetAllInstances instead")
-    GetAllInstanceInfos() -> (resource struct {
+    strict GetAllInstanceInfos() -> (resource struct {
         iterator client_end:InstanceInfoIterator;
     }) error RealmExplorerError;
 };

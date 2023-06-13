@@ -64,7 +64,7 @@ alias AnnotationKeys = vector<AnnotationKey>:MAX_ANNOTATIONS_PER_ELEMENT;
 
 /// An interface to create, read, update, and delete annotations,
 /// typically on an element or its view.
-protocol AnnotationController {
+closed protocol AnnotationController {
     /// Adds, updates, and removes annotations.
     ///
     /// The server is expected to adhere to the following conventions:
@@ -88,7 +88,7 @@ protocol AnnotationController {
     ///   `annotations_to_set` could not be read.
     /// * error `UpdateAnnotationsError.TOO_MANY_ANNOTATIONS` if the operation results
     ///   in more than `MAX_ANNOTATIONS_PER_ELEMENT` annotations existing.
-    UpdateAnnotations(resource struct {
+    strict UpdateAnnotations(resource struct {
         annotations_to_set Annotations;
         annotations_to_delete AnnotationKeys;
     }) -> () error UpdateAnnotationsError;
@@ -96,7 +96,7 @@ protocol AnnotationController {
     /// Returns the current `Annotations` for the element.
     ///
     /// * error `GetAnnotationsError` if the annotations could not be returned.
-    GetAnnotations() -> (resource struct {
+    strict GetAnnotations() -> (resource struct {
         annotations Annotations;
     }) error GetAnnotationsError;
 
@@ -110,7 +110,7 @@ protocol AnnotationController {
     ///
     /// * error `WatchAnnotationsError` if the annotations could not be returned.
     @transitional
-    WatchAnnotations() -> (resource struct {
+    strict WatchAnnotations() -> (resource struct {
         annotations Annotations;
     }) error WatchAnnotationsError;
 };

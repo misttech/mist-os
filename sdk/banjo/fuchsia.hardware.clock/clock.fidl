@@ -7,30 +7,30 @@ using zx;
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Clock {
+closed protocol Clock {
 
     /// Enables (ungates) this clock.
     /// Drivers *must* call enable on all clocks they depend upon.
-    Enable() -> (struct {
+    strict Enable() -> (struct {
         s zx.Status;
     });
 
     /// Disables (gates) this clock.
     /// Drivers should call this method to indicate to the clock subsystem that
     /// a particular clock signal is no longer necessary.
-    Disable() -> (struct {
+    strict Disable() -> (struct {
         s zx.Status;
     });
 
     /// Returns `true` if a given clock is running.
     /// May query the hardware or return a cached value.
-    IsEnabled() -> (struct {
+    strict IsEnabled() -> (struct {
         s zx.Status;
         enabled bool;
     });
 
     /// Attempt to set the rate of the clock provider.
-    SetRate(struct {
+    strict SetRate(struct {
         hz uint64;
     }) -> (struct {
         s zx.Status;
@@ -38,7 +38,7 @@ protocol Clock {
 
     /// Query the hardware for the highest supported rate that does not
     /// exceed hz_in.
-    QuerySupportedRate(struct {
+    strict QuerySupportedRate(struct {
         hz_in uint64;
     }) -> (struct {
         s zx.Status;
@@ -46,7 +46,7 @@ protocol Clock {
     });
 
     /// Returns the current rate that a given clock is running at.
-    GetRate() -> (struct {
+    strict GetRate() -> (struct {
         s zx.Status;
         hz uint64;
     });
@@ -54,7 +54,7 @@ protocol Clock {
     /// Sets the input of this clock by index. I.e. by selecting a mux.
     /// This clock has N inputs defined 0 through N-1, which are valid arguemts
     /// as the index to SetInput.
-    SetInput(struct {
+    strict SetInput(struct {
         idx uint32;
     }) -> (struct {
         s zx.Status;
@@ -63,13 +63,13 @@ protocol Clock {
     /// Returns the number of inputs this clock has.
     /// Any value between 0 and UINT32_MAX is a valid return for this method.
     /// A Root Oscillator may return 0 for instance, if it has no inputs.
-    GetNumInputs() -> (struct {
+    strict GetNumInputs() -> (struct {
         s zx.Status;
         n uint32;
     });
 
     /// Returns the index of the current input of this clock.
-    GetInput() -> (struct {
+    strict GetInput() -> (struct {
         s zx.Status;
         index uint32;
     });

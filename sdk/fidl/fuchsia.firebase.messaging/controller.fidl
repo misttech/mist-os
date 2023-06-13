@@ -4,11 +4,11 @@
 library fuchsia.firebase.messaging;
 
 @discoverable
-protocol Controller {
+closed protocol Controller {
     /// Registers the app with the FCM backend and binds a handle for app
     /// specific operations.
     /// On error, client is left unbound.
-    CreateClient(resource struct {
+    strict CreateClient(resource struct {
         application Application;
         client server_end:Client;
     }) -> (struct {

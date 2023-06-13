@@ -80,13 +80,13 @@ type AdvertisingParameters = table {
 /// Capability that is valid for the duration of advertising. The caller can close the handle to
 /// stop advertising. If the system internally stops advertising for any reason, the handle will be
 /// closed to communicate this to the client.
-protocol AdvertisingHandle {};
+closed protocol AdvertisingHandle {};
 
 /// Protocol that is valid for the duration of advertising. The caller can close
 /// the protocol to stop advertising. If the system internally stops advertising
 /// for any reason, the protocol will be closed to communicate this to the
 /// client.
-protocol AdvertisedPeripheral {
+closed protocol AdvertisedPeripheral {
     /// Called when a remote LE central connects to this peripheral when
     /// connectable advertising is enabled via
     /// [`fuchsia.bluetooth.le/Peripheral.Advertise`]. When this call is made,
@@ -104,14 +104,14 @@ protocol AdvertisedPeripheral {
     /// + request `connection` Represents the connection.
     /// - response An empty response should be sent to acknowledge the
     ///   connection and resume advertising (for flow control).
-    OnConnected(resource struct {
+    strict OnConnected(resource struct {
         peer Peer;
         connection client_end:Connection;
     }) -> ();
 };
 
 @discoverable
-protocol Peripheral {
+closed protocol Peripheral {
     /// Start advertising continuously as a LE peripheral. If advertising cannot
     /// be initiated then `advertised_peripheral` will be closed and an error
     /// will be returned.
@@ -139,7 +139,7 @@ protocol Peripheral {
     ///   recommended before calling `Advertise` again.
     /// * error If an error occurs, `advertised_peripheral` will be closed and a
     ///   `PeripheralError` will be returned.
-    Advertise(resource struct {
+    strict Advertise(resource struct {
         parameters AdvertisingParameters;
         advertised_peripheral client_end:AdvertisedPeripheral;
     }) -> () error PeripheralError;
@@ -165,7 +165,7 @@ protocol Peripheral {
     /// * error Returns a [`fuchsia.bluetooth.le/PeripheralError`] if advertising cannot be
     ///         initiated. In this case the `handle` will be closed.
     @deprecated
-    StartAdvertising(resource struct {
+    strict StartAdvertising(resource struct {
         parameters AdvertisingParameters;
         handle server_end:AdvertisingHandle;
     }) -> () error PeripheralError;
@@ -182,7 +182,7 @@ protocol Peripheral {
     /// + request `peer` Information about the central that initiated the connection.
     /// + request `connection` Represents the connection.
     @deprecated
-    -> OnPeerConnected(resource struct {
+    strict -> OnPeerConnected(resource struct {
         peer Peer;
         connection client_end:Connection;
     });

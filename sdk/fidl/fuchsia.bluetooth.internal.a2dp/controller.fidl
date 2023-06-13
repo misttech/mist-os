@@ -6,15 +6,15 @@ library fuchsia.bluetooth.internal.a2dp;
 using fuchsia.bluetooth;
 
 /// Represents a hold on a media stream.
-protocol StreamSuspender {
+closed protocol StreamSuspender {
     /// An event produced by the server when the A2DP media stream has been suspended.
     /// This event will only be generated once.
-    -> OnSuspended();
+    strict -> OnSuspended();
 };
 
 /// Service provides clients a way to manage the state of media in A2DP.
 @discoverable
-protocol Controller {
+closed protocol Controller {
     /// Request to suspend the A2DP media stream.
     ///
     /// Any active stream with the specified peer will be suspended. No new streams can
@@ -35,7 +35,7 @@ protocol Controller {
     ///
     /// If the suspend request cannot be processed due to an internal error, the server will close
     /// the `token` channel with the zx::Status::INTERNAL signal and the method will resolve.
-    Suspend(resource struct {
+    strict Suspend(resource struct {
         peer_id box<fuchsia.bluetooth.PeerId>;
         token server_end:StreamSuspender;
     }) -> ();

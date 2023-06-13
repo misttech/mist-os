@@ -24,12 +24,12 @@ using fuchsia.sysmem;
 /// constraints from other participants.
 @available(added=HEAD)
 @discoverable
-protocol DriverConnector {
+closed protocol DriverConnector {
     /// This one-way message sends in the server end of an Allocator channel.
     ///
     /// `allocator_request` will be served by the sysmem driver (or the channel
     /// will close).
-    ConnectV1(resource struct {
+    strict ConnectV1(resource struct {
         allocator_request server_end:fuchsia.sysmem.Allocator;
     });
 
@@ -37,11 +37,11 @@ protocol DriverConnector {
     ///
     /// `allocator_request` will be served by the sysmem driver (or the channel
     /// will close).
-    ConnectV2(resource struct {
+    strict ConnectV2(resource struct {
         allocator_request server_end:Allocator;
     });
 
-    SetAuxServiceDirectory(resource struct {
+    strict SetAuxServiceDirectory(resource struct {
         service_directory client_end:fuchsia.io.Directory;
     });
 };

@@ -36,9 +36,9 @@ type StackTrace = table {
 
 /// Interface used to exfiltrate process allocation information.
 @discoverable
-protocol Sampler {
+closed protocol Sampler {
     /// Record an allocation.
-    RecordAllocation(struct {
+    strict RecordAllocation(struct {
         /// Address of the allocation, to uniquely identify it.
         address uint64;
         /// Stack frames collected at the allocation point.
@@ -53,7 +53,7 @@ protocol Sampler {
         size uint64;
     });
     /// Record a deallocation.
-    RecordDeallocation(struct {
+    strict RecordDeallocation(struct {
         /// Address of the deallocation, to uniquely identify it.
         address uint64;
         /// Stack frames collected at the deallocation point.
@@ -71,7 +71,7 @@ protocol Sampler {
     /// `module_map` is added to the existing map for the process. If a client
     /// needs to send a `module_map` that does not fit in a single message, they
     /// can split it and send it across several messages.
-    SetProcessInfo(table {
+    strict SetProcessInfo(table {
         /// Name of the instrumented process.
         1: process_name string:zx.MAX_NAME_LEN;
         /// Current module layout, for symbolization.

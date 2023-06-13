@@ -8,14 +8,14 @@ using zx;
 
 /// The protocol provides access to functions of the driver.
 @discoverable
-protocol Device {
+closed protocol Device {
     /// Returns a unique identifier for this device.
-    GetHardwareId() -> (struct {
+    strict GetHardwareId() -> (struct {
         response uint32;
     }) error zx.Status;
 
     /// Returns the current device firmware version
-    GetFirmwareVersion() -> (struct {
+    strict GetFirmwareVersion() -> (struct {
         major uint32;
         minor uint32;
     }) error zx.Status;

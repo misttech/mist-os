@@ -13,13 +13,13 @@ type RealmOptions = resource table {
 };
 
 @discoverable
-protocol RealmFactory {
+closed protocol RealmFactory {
     compose fuchsia.testing.harness.RealmFactory;
 
     /// Specifies the options to use when creating the realm.
     ///
     /// Returns OperationError.INVALID if called more than once.
-    SetRealmOptions(resource struct {
+    strict SetRealmOptions(resource struct {
         options RealmOptions;
     }) -> () error fuchsia.testing.harness.OperationError;
 };

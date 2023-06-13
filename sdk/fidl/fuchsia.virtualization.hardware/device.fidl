@@ -52,10 +52,10 @@ type StartInfo = resource struct {
     vmo zx.Handle:VMO;
 };
 
-protocol VirtioDevice {
+closed protocol VirtioDevice {
     /// Configure a `queue` for the device. This specifies the `size` and the
     /// guest physical addresses of the queue: `desc`, `avail`, and `used`.
-    ConfigureQueue(struct {
+    strict ConfigureQueue(struct {
         queue uint16;
         size uint16;
         desc uint64;
@@ -64,39 +64,39 @@ protocol VirtioDevice {
     }) -> ();
 
     /// Notify a `queue` for the device. Primarily used for black-box testing.
-    NotifyQueue(struct {
+    strict NotifyQueue(struct {
         queue uint16;
     });
 
     /// Ready a device. This provides the set of `negotiated_features` that the
     /// driver and device have agreed upon.
-    Ready(struct {
+    strict Ready(struct {
         negotiated_features uint32;
     }) -> ();
 };
 
 @discoverable
-protocol VirtioBalloon {
+closed protocol VirtioBalloon {
     compose VirtioDevice;
 
     /// Start the balloon device.
-    Start(resource struct {
+    strict Start(resource struct {
         start_info StartInfo;
     }) -> ();
 
     /// Get memory statistics from the balloon device.
-    GetMemStats() -> (struct {
+    strict GetMemStats() -> (struct {
         status zx.Status;
         mem_stats vector<fuchsia.virtualization.MemStat>:optional;
     });
 };
 
 @discoverable
-protocol VirtioBlock {
+closed protocol VirtioBlock {
     compose VirtioDevice;
 
     /// Start the block device.
-    Start(resource struct {
+    strict Start(resource struct {
         start_info StartInfo;
         spec fuchsia.virtualization.BlockSpec;
     }) -> (struct {
@@ -106,29 +106,29 @@ protocol VirtioBlock {
 };
 
 @discoverable
-protocol VirtioConsole {
+closed protocol VirtioConsole {
     compose VirtioDevice;
 
     /// Start the console device. This uses `socket` to handle input and output.
-    Start(resource struct {
+    strict Start(resource struct {
         start_info StartInfo;
         socket zx.Handle:SOCKET;
     }) -> ();
 };
 
 @discoverable
-protocol VirtioGpu {
+closed protocol VirtioGpu {
     compose VirtioDevice;
 
     /// Start the GPU device.
-    Start(resource struct {
+    strict Start(resource struct {
         start_info StartInfo;
         keyboard_listener client_end:<fuchsia.ui.input3.KeyboardListener, optional>;
         mouse_source server_end:<fuchsia.ui.pointer.MouseSource, optional>;
     }) -> ();
 
     /// Called when a device's configuration is changed.
-    -> OnConfigChanged();
+    strict -> OnConfigChanged();
 };
 
 type InputType = strict resource union {
@@ -137,22 +137,22 @@ type InputType = strict resource union {
 };
 
 @discoverable
-protocol VirtioInput {
+closed protocol VirtioInput {
     compose VirtioDevice;
 
     /// Start the input device.
-    Start(resource struct {
+    strict Start(resource struct {
         start_info StartInfo;
         input_type InputType;
     }) -> ();
 };
 
 @discoverable
-protocol VirtioMagma {
+closed protocol VirtioMagma {
     compose VirtioDevice;
 
     /// Start the magma device.
-    Start(resource struct {
+    strict Start(resource struct {
         start_info StartInfo;
         vmar zx.Handle:VMAR;
         wayland_importer client_end:<VirtioWaylandImporter, optional>;
@@ -162,11 +162,11 @@ protocol VirtioMagma {
 };
 
 @discoverable
-protocol VirtioNet {
+closed protocol VirtioNet {
     compose VirtioDevice;
 
     /// Start the net device.
-    Start(resource struct {
+    strict Start(resource struct {
         start_info StartInfo;
         mac_address fuchsia.net.MacAddress;
         enable_bridge bool;
@@ -174,17 +174,17 @@ protocol VirtioNet {
 };
 
 @discoverable
-protocol VirtioRng {
+closed protocol VirtioRng {
     compose VirtioDevice;
 
     /// Start the RNG device.
-    Start(resource struct {
+    strict Start(resource struct {
         start_info StartInfo;
     }) -> ();
 };
 
 @discoverable
-protocol VirtioSound {
+closed protocol VirtioSound {
     compose VirtioDevice;
 
     /// Start the sound device.
@@ -197,7 +197,7 @@ protocol VirtioSound {
     /// - response `jacks` the virtio_snd_config.jacks value to advertise
     /// - response `streams` the virtio_snd_config.streams value to advertise
     /// - response `chmaps` the virtio_snd_config.chaps value to advertise
-    Start(resource struct {
+    strict Start(resource struct {
         start_info StartInfo;
         enable_input bool;
         enable_verbose_logging bool;
@@ -210,7 +210,7 @@ protocol VirtioSound {
 };
 
 @discoverable
-protocol VirtioVsock {
+closed protocol VirtioVsock {
     compose VirtioDevice;
 
     /// Start the vsock device, setting the guest_cid to the provided value.
@@ -219,7 +219,7 @@ protocol VirtioVsock {
     ///   - ZX_OK if device startup succeeded
     ///   - ZX_ERR_INVALID_ARGS if guest_cid is a reserved value
     ///   - Any errors returned from fuchsia.virtualization.HostVsockEndpoint::Listen
-    Start(resource struct {
+    strict Start(resource struct {
         start_info StartInfo;
         guest_cid uint32;
         listeners vector<fuchsia.virtualization.Listener>:MAX;
@@ -242,13 +242,13 @@ type VirtioImage = resource struct {
 const VIRTIO_WAYLAND_INVALID_VFD_ID uint32 = 0;
 
 // Provides an interface to import images into the wayland device.
-protocol VirtioWaylandImporter {
-    ImportImage(resource struct {
+closed protocol VirtioWaylandImporter {
+    strict ImportImage(resource struct {
         image VirtioImage;
     }) -> (struct {
         vfd_id uint32;
     });
-    ExportImage(struct {
+    strict ExportImage(struct {
         vfd_id uint32;
     }) -> (resource struct {
         status zx.Status;
@@ -257,11 +257,11 @@ protocol VirtioWaylandImporter {
 };
 
 @discoverable
-protocol VirtioWayland {
+closed protocol VirtioWayland {
     compose VirtioDevice;
 
     /// Start the wayland device using the built-in wayland server.
-    Start(resource struct {
+    strict Start(resource struct {
         start_info StartInfo;
         vmar zx.Handle:VMAR;
         sysmem_allocator client_end:fuchsia.sysmem.Allocator;
@@ -269,7 +269,7 @@ protocol VirtioWayland {
     }) -> ();
 
     /// Start the wayland device using the provided wayland server.
-    StartWithWaylandServer(resource struct {
+    strict StartWithWaylandServer(resource struct {
         start_info StartInfo;
         vmar zx.Handle:VMAR;
         wayland_server client_end:<fuchsia.wayland.Server, optional>;
@@ -278,17 +278,17 @@ protocol VirtioWayland {
     }) -> ();
 
     // Get the VMO importer for this wayland device.
-    GetImporter(resource struct {
+    strict GetImporter(resource struct {
         importer server_end:VirtioWaylandImporter;
     });
 };
 
 @discoverable
-protocol VirtioMem {
+closed protocol VirtioMem {
     compose VirtioDevice;
 
     /// Start the mem device.
-    Start(resource struct {
+    strict Start(resource struct {
         start_info StartInfo;
         region_addr uint64;
         plugged_block_size uint64;
@@ -296,7 +296,7 @@ protocol VirtioMem {
     }) -> ();
 
     /// Called when a device's configuration is changed.
-    -> OnConfigChanged(struct {
+    strict -> OnConfigChanged(struct {
         plugged_size uint64;
     });
 };

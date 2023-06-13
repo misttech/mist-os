@@ -8,10 +8,10 @@ using fuchsia.io;
 /// Service exposed by appmgr that enables a component (such as archivist) to listen for
 /// lifecycle events of components in the realm tree.
 @discoverable
-protocol ComponentEventProvider {
+closed protocol ComponentEventProvider {
     /// Requests a hook to get lifecycle events for the realm from where this service
     /// was connected to.
-    SetListener(resource struct {
+    strict SetListener(resource struct {
         listener client_end:ComponentEventListener;
     });
 };
@@ -20,15 +20,15 @@ protocol ComponentEventProvider {
 ///
 /// If some sub-realm has a listener attached, events for components under that realm's subtree
 /// won't be synthesized.
-protocol ComponentEventListener {
+closed protocol ComponentEventListener {
     /// Notifies the client that a component has stopped.
-    OnStop(struct {
+    strict OnStop(struct {
         component SourceIdentity;
     });
 
     /// Notifies the client that the out/diagnostics directory of a component is ready
     /// and provides a handle to it.
-    OnDiagnosticsDirReady(resource struct {
+    strict OnDiagnosticsDirReady(resource struct {
         component SourceIdentity;
         directory client_end:fuchsia.io.Directory;
     });

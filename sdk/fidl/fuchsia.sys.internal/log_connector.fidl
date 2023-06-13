@@ -25,22 +25,22 @@ type LogConnection = resource struct {
 /// consumer must be started before other components in the realm. The consumer does not need to
 /// begin executing, just have its namespace constructed.
 @discoverable
-protocol LogConnector {
+closed protocol LogConnector {
     /// Removes the `LogConnectionListener` from this realm, returning the request-side if it had not already been taken.
     /// Clients should bind an implementation to the `LogConnectionListener` protocol in order to receive LogSinks.
     ///
     /// This method returns a `server_end:LogConnectionListener` instead of accepting a `LogConnectionListener` directly
     /// in order to allow appmgr to construct and buffer `LogConnectionListener` with `LogConnection`s.
-    TakeLogConnectionListener() -> (resource struct {
+    strict TakeLogConnectionListener() -> (resource struct {
         consumer server_end:<LogConnectionListener, optional>;
     });
 };
 
 /// `LogConnectorListener` receives attributed log connections from a consumer such as the Archivist.
 /// This protocol is meant to be used with a `LogConnector`.
-protocol LogConnectionListener {
+closed protocol LogConnectionListener {
     /// Adds a new connection.
-    OnNewConnection(resource struct {
+    strict OnNewConnection(resource struct {
         connection LogConnection;
     });
 };

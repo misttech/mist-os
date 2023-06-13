@@ -14,9 +14,9 @@ alias UsbSpeed = uint32;
 // TODO(fxb/69023): restore types.
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol UsbBus {
+closed protocol UsbBus {
     /// Configures a new hub based on its USB hub descriptor.
-    ConfigureHub(struct {
+    strict ConfigureHub(struct {
         @in_out
         hub_device uint64;
         speed UsbSpeed;
@@ -26,7 +26,7 @@ protocol UsbBus {
         s zx.Status;
     });
     /// Informs the USB bus that a new device has been added.
-    DeviceAdded(struct {
+    strict DeviceAdded(struct {
         @in_out
         hub_device uint64;
         port uint32;
@@ -35,7 +35,7 @@ protocol UsbBus {
         s zx.Status;
     });
     /// Informs the USB bus that a device has been removed.
-    DeviceRemoved(struct {
+    strict DeviceRemoved(struct {
         @in_out
         hub_device uint64;
         port uint32;
@@ -43,7 +43,7 @@ protocol UsbBus {
         s zx.Status;
     });
     /// Used by USB hub driver to register its USB hub protocol with the USB bus driver.
-    SetHubInterface(resource struct {
+    strict SetHubInterface(resource struct {
         @in_out
         usb_device uint64;
         hub client_end:fuchsia.hardware.usb.hub.UsbHubInterface;
@@ -51,7 +51,7 @@ protocol UsbBus {
         s zx.Status;
     });
     /// Queues a USB request with the host stack.
-    RequestQueue(resource struct {
+    strict RequestQueue(resource struct {
         @in_out
         usb_request fuchsia.hardware.usb.request.UsbRequest;
         @in_out
@@ -62,9 +62,9 @@ protocol UsbBus {
 /// Interface for use by the HCI controller to use to notify when devices are added and removed.
 @transport("Banjo")
 @banjo_layout("ddk-interface")
-protocol UsbBusInterface {
+closed protocol UsbBusInterface {
     /// Notifies the USB bus driver that a new device has been added.
-    AddDevice(struct {
+    strict AddDevice(struct {
         device_id uint32;
         hub_id uint32;
         speed UsbSpeed;
@@ -72,13 +72,13 @@ protocol UsbBusInterface {
         s zx.Status;
     });
     /// Notifies the USB bus driver that a device has been removed.
-    RemoveDevice(struct {
+    strict RemoveDevice(struct {
         device_id uint32;
     }) -> (struct {
         s zx.Status;
     });
     /// Used by the HCI controller to reset a port on a USB hub.
-    ResetPort(struct {
+    strict ResetPort(struct {
         hub_id uint32;
         port uint32;
         enumerating bool;
@@ -86,7 +86,7 @@ protocol UsbBusInterface {
         s zx.Status;
     });
     /// Used by the HCI controller to reinitialize a device after it has been reset.
-    ReinitializeDevice(struct {
+    strict ReinitializeDevice(struct {
         device_id uint32;
     }) -> (struct {
         s zx.Status;

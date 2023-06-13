@@ -7,14 +7,14 @@ using fuchsia.hardware.pty;
 
 /// Manages virtual console sessions.
 @discoverable
-protocol SessionManager {
+closed protocol SessionManager {
     /// Create a new virtual console session.
-    CreateSession(resource struct {
+    strict CreateSession(resource struct {
         session server_end:fuchsia.hardware.pty.Device;
     });
 
     /// Returns true if virtcon currently has a display that it can display something on.
-    HasPrimaryConnected() -> (struct {
+    strict HasPrimaryConnected() -> (struct {
         connected bool;
     });
 };

@@ -211,16 +211,16 @@ type TryAuthRateLimited = table {
 /// if the correct low entropy secret is provided and the rate limit has not
 /// been reached.
 @discoverable
-protocol PinWeaver {
+closed protocol PinWeaver {
     /// Returns the current protocol version.
-    GetVersion() -> (struct {
+    strict GetVersion() -> (struct {
         protocol_version uint8;
     });
 
     /// Creates an empty Merkle tree with `bits_per_level` and `height`.
     /// On Success
     /// Returns the `root_hash` of the empty tree with the given parameters.
-    ResetTree(struct {
+    strict ResetTree(struct {
         bits_per_level uint8;
         height uint8;
     }) -> (struct {
@@ -231,7 +231,7 @@ protocol PinWeaver {
     /// `params` see `InsertLeafParams`.
     /// On Success
     /// `result` see `InsertLeafResponse`.
-    InsertLeaf(struct {
+    strict InsertLeaf(struct {
         params InsertLeafParams;
     }) -> (struct {
         result InsertLeafResponse;
@@ -241,7 +241,7 @@ protocol PinWeaver {
     /// `params` see `RemoveLeafParams`.
     /// On Success
     /// `root_hash` is the updated root hash of the tree.
-    RemoveLeaf(struct {
+    strict RemoveLeaf(struct {
         params RemoveLeafParams;
     }) -> (struct {
         root_hash Hash;
@@ -251,7 +251,7 @@ protocol PinWeaver {
     /// On Success: TryAuthSuccess is returned in the union.
     /// On Authentication Failure: TryAuthFailed is returned in the union.
     /// On Rate Limited Error: TryAuthRateLimited is returned in the union.
-    TryAuth(struct {
+    strict TryAuth(struct {
         params TryAuthParams;
     }) -> (struct {
         result TryAuthResponse;
@@ -261,7 +261,7 @@ protocol PinWeaver {
     /// If Found: Returns all log entries including and starting from the
     /// operation specified by the root hash parameter.
     /// If Not Found: Returns all known log entries.
-    GetLog(struct {
+    strict GetLog(struct {
         root_hash Hash;
     }) -> (struct {
         logs vector<LogEntry>:MAX_LOG_ENTRIES;
@@ -273,7 +273,7 @@ protocol PinWeaver {
     /// label, whether or not it matches the exact state in history.
     /// On Success: Returns the updated leaf hmac and credential metadata.
     /// On Failure: Returns an error.
-    LogReplay(struct {
+    strict LogReplay(struct {
         params LogReplayParams;
     }) -> (struct {
         result LogReplayResponse;

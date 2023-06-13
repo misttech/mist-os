@@ -4,7 +4,7 @@
 library zx;
 
 @transport("Syscall")
-protocol Pager {
+closed protocol Pager {
     /// ## Summary
     ///
     /// Create a new pager object.
@@ -50,7 +50,7 @@ protocol Pager {
     /// [`zx_pager_create_vmo()`]: pager_create_vmo.md
     /// [`zx_pager_detach_vmo()`]: pager_detach_vmo.md
     /// [`zx_pager_supply_pages()`]: pager_supply_pages.md
-    Create(struct {
+    strict Create(struct {
         options uint32;
     }) -> (resource struct {
         out Handle:PAGER;
@@ -162,7 +162,7 @@ protocol Pager {
     /// [`zx_pager_supply_pages()`]: pager_supply_pages.md
     /// [`zx_port_wait()`]: port_wait.md
     /// [`zx_vmo_create()`]: vmo_create.md
-    CreateVmo(resource struct {
+    strict CreateVmo(resource struct {
         pager Handle:PAGER;
         options uint32;
         port Handle:PORT;
@@ -227,7 +227,7 @@ protocol Pager {
     /// [`zx_pager_create_vmo()`]: pager_create_vmo.md
     /// [`zx_pager_op_range()`]: pager_op_range.md
     /// [`zx_pager_query_dirty_ranges()`]: pager_query_dirty_ranges.md
-    DetachVmo(resource struct {
+    strict DetachVmo(resource struct {
         pager Handle:PAGER;
         vmo Handle:VMO;
     }) -> () error Status;
@@ -304,7 +304,7 @@ protocol Pager {
     /// [`zx_pager_detach_vmo()`]: pager_detach_vmo.md
     /// [`zx_pager_op_range()`]: pager_op_range.md
     /// [`zx_vmo_create()`]: vmo_create.md
-    SupplyPages(resource struct {
+    strict SupplyPages(resource struct {
         pager Handle:PAGER;
         pager_vmo Handle:VMO;
         offset uint64;
@@ -436,7 +436,7 @@ protocol Pager {
     /// [`zx_vmo_op_range()`]: vmo_op_range.md
     /// [`zx_vmo_read()`]: vmo_read.md
     /// [`zx_vmo_write()`]: vmo_write.md
-    OpRange(resource struct {
+    strict OpRange(resource struct {
         pager Handle:PAGER;
         op uint32;
         pager_vmo Handle:VMO;
@@ -566,7 +566,7 @@ protocol Pager {
     /// [`zx_pager_query_vmo_stats()`]: pager_query_vmo_stats.md
     /// [`zx_pager_supply_pages()`]: pager_supply_pages.md
     @next
-    QueryDirtyRanges(resource struct {
+    strict QueryDirtyRanges(resource struct {
         pager Handle:PAGER;
         pager_vmo Handle:VMO;
         offset uint64;
@@ -655,7 +655,7 @@ protocol Pager {
     /// [`zx_pager_query_dirty_ranges()`]: pager_query_dirty_ranges.md
     /// [`zx_pager_supply_pages()`]: pager_supply_pages.md
     @next
-    QueryVmoStats(resource struct {
+    strict QueryVmoStats(resource struct {
         pager Handle:PAGER;
         pager_vmo Handle:VMO;
         options uint32;

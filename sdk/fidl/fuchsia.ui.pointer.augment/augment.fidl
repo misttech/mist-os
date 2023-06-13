@@ -61,13 +61,13 @@ type ErrorForGlobalMouse = resource struct {
 /// A method for a client to receive view-global visibility for mouse behavior.
 /// - The augmented data are scoped to the view of the client.
 @discoverable
-protocol GlobalMouse {
+closed protocol GlobalMouse {
     /// An exchange from an `original` mouse protocol endpoint to an `augmented`
     /// mouse protocol endpoint. If successful, `error` is empty, `original` is
     /// consumed, and `augmented` is returned for the client's use. Otherwise,
     /// the `error` carries back `original` for the client's use, and
     /// `augmented` is null.
-    Upgrade(resource struct {
+    strict Upgrade(resource struct {
         original client_end:pointer.MouseSource;
     }) -> (resource struct {
         augmented client_end:<MouseSourceWithGlobalMouse, optional>;
@@ -79,10 +79,10 @@ protocol GlobalMouse {
 /// about the global position of mouse events, and otherwise identical in
 /// operation. See [`fuchsia.ui.pointer.MouseSource`] for regular usage
 /// information.
-protocol MouseSourceWithGlobalMouse {
+closed protocol MouseSourceWithGlobalMouse {
     /// Identical usage to [`fuchsia.ui.pointer.MouseSource.Watch`], but with
     /// augmented data.
-    Watch() -> (struct {
+    strict Watch() -> (struct {
         events vector<MouseEventWithGlobalMouse>:pointer.MOUSE_MAX_EVENT;
     });
 };
@@ -126,13 +126,13 @@ type ErrorForLocalHit = resource struct {
 /// A method for a client to upgrade its touch event protocol to additionally
 /// receive local-hit data for touch events.
 @discoverable
-protocol LocalHit {
+closed protocol LocalHit {
     /// An exchange from an `original` touch protocol endpoint to an `augmented`
     /// touch protocol endpoint. If successful, `error` is empty, `original` is
     /// consumed, and `augmented` is returned for the client's use. Otherwise,
     /// the `error` carries back `original` for the client's use, and
     /// `augmented` is null.
-    Upgrade(resource struct {
+    strict Upgrade(resource struct {
         original client_end:pointer.TouchSource;
     }) -> (resource struct {
         augmented client_end:<TouchSourceWithLocalHit, optional>;
@@ -144,16 +144,16 @@ protocol LocalHit {
 /// about the local-hit position of touch events, and otherwise identical in
 /// operation. See [`fuchsia.ui.pointer.TouchSource`] for regular usage
 /// information.
-protocol TouchSourceWithLocalHit {
+closed protocol TouchSourceWithLocalHit {
     /// Identical usage to [`fuchsia.ui.pointer.TouchSource.Watch`], but with
     /// augmented data.
-    Watch(struct {
+    strict Watch(struct {
         responses vector<pointer.TouchResponse>:pointer.TOUCH_MAX_EVENT;
     }) -> (struct {
         events vector<TouchEventWithLocalHit>:pointer.TOUCH_MAX_EVENT;
     });
     /// Identical usage to [`fuchsia.ui.pointer.TouchSource.UpdateResponse`].
-    UpdateResponse(struct {
+    strict UpdateResponse(struct {
         interaction pointer.TouchInteractionId;
         response pointer.TouchResponse;
     }) -> ();

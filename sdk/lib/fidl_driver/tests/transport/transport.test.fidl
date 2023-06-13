@@ -8,11 +8,11 @@ using zx;
 using fdf;
 
 @transport("Driver")
-protocol EmptyProtocol {};
+closed protocol EmptyProtocol {};
 
 @transport("Driver")
-protocol TwoWayTest {
-    TwoWay(struct {
+closed protocol TwoWayTest {
+    strict TwoWay(struct {
         payload uint32;
     }) -> (struct {
         payload uint32;
@@ -20,13 +20,13 @@ protocol TwoWayTest {
 };
 
 @transport("Driver")
-protocol TwoWayEmptyArgsTest {
-    TwoWayEmptyArgs() -> ();
+closed protocol TwoWayEmptyArgsTest {
+    strict TwoWayEmptyArgs() -> ();
 };
 
 @transport("Driver")
-protocol OneWayTest {
-    OneWay(struct {
+closed protocol OneWayTest {
+    strict OneWay(struct {
         // The choice of byte vectors is intentional:
         // It gives coverage to a case which potentially uses multiple iovec entries.
         payload vector<uint8>;
@@ -34,8 +34,8 @@ protocol OneWayTest {
 };
 
 @transport("Driver")
-protocol SendDriverTransportEndTest {
-    SendDriverTransportEnd(resource struct {
+closed protocol SendDriverTransportEndTest {
+    strict SendDriverTransportEnd(resource struct {
         c client_end:OneWayTest;
         s server_end:OneWayTest;
     }) -> (resource struct {
@@ -45,8 +45,8 @@ protocol SendDriverTransportEndTest {
 };
 
 @transport("Driver")
-protocol SendZirconHandleTest {
-    SendZirconHandle(resource struct {
+closed protocol SendZirconHandleTest {
+    strict SendZirconHandle(resource struct {
         h zx.Handle:EVENT;
     }) -> (resource struct {
         h zx.Handle:EVENT;
@@ -54,8 +54,8 @@ protocol SendZirconHandleTest {
 };
 
 @transport("Driver")
-protocol SendFdfChannelTest {
-    SendFdfChannel(resource struct {
+closed protocol SendFdfChannelTest {
+    strict SendFdfChannel(resource struct {
         h fdf.handle:CHANNEL;
     }) -> (resource struct {
         h fdf.handle:CHANNEL;
@@ -63,24 +63,24 @@ protocol SendFdfChannelTest {
 };
 
 @transport("Driver")
-protocol OnErrorCloseHandlesTest {
+closed protocol OnErrorCloseHandlesTest {
     // The first string member is used to trigger an encoding error.
-    SendZirconHandle(resource struct {
+    strict SendZirconHandle(resource struct {
         s string:1;
         h zx.Handle:CHANNEL;
     });
 
     // The first string member is used to trigger an encoding error.
-    SendDriverClientEnd(resource struct {
+    strict SendDriverClientEnd(resource struct {
         s string:1;
         h client_end:OneWayTest;
     });
 };
 
 @transport("Driver")
-protocol SendEventTest {
+closed protocol SendEventTest {
     // Send an event.
-    -> OnSendEvent(resource struct {
+    strict -> OnSendEvent(resource struct {
         s string:10;
     });
 };

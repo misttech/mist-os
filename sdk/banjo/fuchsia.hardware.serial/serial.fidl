@@ -49,13 +49,13 @@ type SerialPortInfo = struct {
 /// list of serial ports.
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Serial {
-    GetInfo() -> (struct {
+closed protocol Serial {
+    strict GetInfo() -> (struct {
         s zx.Status;
         info SerialPortInfo;
     });
     /// Configures the given serial port.
-    Config(struct {
+    strict Config(struct {
         baud_rate uint32;
         flags uint32;
     }) -> (struct {

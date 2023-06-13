@@ -73,7 +73,7 @@ type ChannelInfo = table {
 /// Protocol for connecting to [`Device`] on a LoWPAN
 /// interface.
 @discoverable
-protocol DeviceConnector {
+closed protocol DeviceConnector {
     /// Connects to the [`Device`] protocol on the
     /// named LoWPAN interface.
     ///
@@ -90,7 +90,7 @@ protocol DeviceConnector {
     ///   given name.
     /// * `ZX_ERR_NOT_SUPPORTED`: The interface exists but
     ///   does not support this protocol.
-    Connect(resource struct {
+    strict Connect(resource struct {
         name fuchsia.lowpan.InterfaceName;
         server_end server_end:Device;
     });
@@ -103,10 +103,10 @@ protocol DeviceConnector {
 ///
 /// Note that aspects of the device that deal with PII must
 /// be monitored and controlled via the [`DeviceExtra`] protocol.
-protocol Device {
+closed protocol Device {
     /// Returns a vector of information about the
     /// channels supported by this interface.
-    GetSupportedChannels() -> (struct {
+    strict GetSupportedChannels() -> (struct {
         channels_info vector<ChannelInfo>:fuchsia.lowpan.device.MAX_CHANNELS;
     });
 };
@@ -145,12 +145,12 @@ type BeaconInfo = table {
 ///
 /// Closing the client end of an instance of this protocol will effectively
 /// cancel the scan operation.
-protocol BeaconInfoStream {
+closed protocol BeaconInfoStream {
     /// Called to fetch the next set of received beacons.
     ///
     /// The last set will have zero items. Once all received
     /// beacons have been returned, this channel will close.
-    Next() -> (struct {
+    strict Next() -> (struct {
         beacons vector<BeaconInfo>:fuchsia.lowpan.device.MAX_STREAM_SET_SIZE;
     });
 };
@@ -179,7 +179,7 @@ type NetworkScanParameters = table {
 /// Protocol for connecting to [`DeviceExtra`] on a LoWPAN
 /// interface.
 @discoverable
-protocol DeviceExtraConnector {
+closed protocol DeviceExtraConnector {
     /// Connects to the [`DeviceExtra`] protocol on the
     /// named LoWPAN interface.
     ///
@@ -196,7 +196,7 @@ protocol DeviceExtraConnector {
     ///   given name.
     /// * `ZX_ERR_NOT_SUPPORTED`: The interface exists but
     ///   does not support this protocol.
-    Connect(resource struct {
+    strict Connect(resource struct {
         name fuchsia.lowpan.InterfaceName;
         server_end server_end:DeviceExtra;
     });
@@ -207,7 +207,7 @@ protocol DeviceExtraConnector {
 /// This protocol provides clients with a way to control and
 /// monitor aspects of the LoWPAN device that can, either
 /// directly or indirectly, leak PII or cryptographic keys.
-protocol DeviceExtra {
+closed protocol DeviceExtra {
     // *****************************************************
     // ALL METHODS IN THIS CLASS DEAL WITH PII.
     // *****************************************************
@@ -234,7 +234,7 @@ protocol DeviceExtra {
     ///
     /// Calling this method will cause any current form, join, or
     /// commission operation to be canceled.
-    FormNetwork(resource struct {
+    strict FormNetwork(resource struct {
         params fuchsia.lowpan.device.ProvisioningParams;
         progress server_end:ProvisioningMonitor;
     });
@@ -253,7 +253,7 @@ protocol DeviceExtra {
     ///
     /// Calling this method will cause any current form, join, or
     /// commission operation to be canceled.
-    JoinNetwork(resource struct {
+    strict JoinNetwork(resource struct {
         params JoinParams;
         progress server_end:ProvisioningMonitor;
     });
@@ -277,7 +277,7 @@ protocol DeviceExtra {
     ///
     /// A [`BeaconInfoStream`] instance could be used to expose coarse
     /// location information.
-    StartNetworkScan(resource struct {
+    strict StartNetworkScan(resource struct {
         params NetworkScanParameters;
         stream server_end:BeaconInfoStream;
     });
