@@ -7676,7 +7676,7 @@ From //sdk/config.gni:13
 
 Identifier for the Core SDK.
 
-**Current value (from the default):** `"12.99991231.0.1"`
+**Current value (from the default):** `"13.99991231.0.1"`
 
 From //sdk/config.gni:7
 
