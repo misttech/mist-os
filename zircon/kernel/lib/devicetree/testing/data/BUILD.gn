@@ -15,8 +15,10 @@ import("//build/testing/host_test_data.gni")
 #
 # Synthetic devicetree blobs meant for testing, they are not required to reflect any real node.
 dtbs_all = [
-  "qemu-gic2.dtb",
-  "qemu-gic3.dtb",
+  "qemu-arm-gic2.dtb",
+  "qemu-arm-gic3.dtb",
+  "qemu-riscv.dtb",
+  "vision-five-2.dtb",
   "synthetic/complex_no_properties.dtb",
   "synthetic/complex_with_alias.dtb",
   "synthetic/complex_with_alias_first.dtb",
