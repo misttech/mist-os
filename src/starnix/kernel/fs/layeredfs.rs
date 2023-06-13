@@ -39,8 +39,8 @@ pub struct LayeredFsRootNodeOps {
 }
 
 impl FileSystemOps for Arc<LayeredFs> {
-    fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
-        self.base_fs.statfs()
+    fn statfs(&self, _fs: &FileSystem, current_task: &CurrentTask) -> Result<statfs, Errno> {
+        self.base_fs.statfs(current_task)
     }
     fn name(&self) -> &'static FsStr {
         self.base_fs.name()

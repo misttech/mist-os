@@ -3757,7 +3757,7 @@ impl From<fbinder::FileFlags> for OpenFlags {
 
 pub struct BinderFs;
 impl FileSystemOps for BinderFs {
-    fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
+    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
         Ok(statfs::default(BINDERFS_SUPER_MAGIC))
     }
     fn name(&self) -> &'static FsStr {

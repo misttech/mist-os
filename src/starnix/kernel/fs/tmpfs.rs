@@ -17,7 +17,7 @@ use crate::{
 pub struct TmpFs(());
 
 impl FileSystemOps for Arc<TmpFs> {
-    fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
+    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
         Ok(statfs {
             // Pretend we have a ton of free space.
             f_blocks: 0x100000000,

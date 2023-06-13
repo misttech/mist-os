@@ -95,7 +95,7 @@ impl RemoteBundle {
 }
 
 impl FileSystemOps for RemoteBundle {
-    fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
+    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
         const REMOTE_BUNDLE_FS_MAGIC: u32 = u32::from_be_bytes(*b"bndl");
         Ok(statfs::default(REMOTE_BUNDLE_FS_MAGIC))
     }

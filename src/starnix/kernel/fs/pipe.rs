@@ -258,7 +258,7 @@ pub fn new_pipe(current_task: &CurrentTask) -> Result<(FileHandle, FileHandle), 
 
 struct PipeFs;
 impl FileSystemOps for PipeFs {
-    fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
+    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
         Ok(statfs::default(PIPEFS_MAGIC))
     }
     fn name(&self) -> &'static FsStr {

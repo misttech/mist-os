@@ -18,7 +18,7 @@ use crate::{
         errno,
         errno::{EINTR, EINVAL, ENOSYS},
         errno_from_code, error, off_t, statfs, time_from_timespec, uapi, DeviceType, Errno,
-        FileMode, OpenFlags,
+        FileMode, OpenFlags, FUSE_SUPER_MAGIC,
     },
 };
 use std::{
@@ -129,8 +129,31 @@ impl FileSystemOps for FuseFs {
         true
     }
 
-    fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
-        error!(ENOTSUP)
+    fn statfs(&self, fs: &FileSystem, current_task: &CurrentTask) -> Result<statfs, Errno> {
+        let node = if let Ok(node) = FuseNode::from_node(&fs.root().node) {
+            node
+        } else {
+            log_error!("Unexpected file type");
+            return error!(EINVAL);
+        };
+        let response =
+            self.connection.execute_operation(current_task, node, FuseOperation::Statfs)?;
+        let statfs_out = if let FuseResponse::Statfs(statfs_out) = response {
+            statfs_out
+        } else {
+            return error!(EINVAL);
+        };
+        Ok(statfs {
+            f_blocks: statfs_out.st.blocks.try_into().map_err(|_| errno!(EINVAL))?,
+            f_bfree: statfs_out.st.bfree.try_into().map_err(|_| errno!(EINVAL))?,
+            f_bavail: statfs_out.st.bavail.try_into().map_err(|_| errno!(EINVAL))?,
+            f_files: statfs_out.st.files.try_into().map_err(|_| errno!(EINVAL))?,
+            f_ffree: statfs_out.st.ffree.try_into().map_err(|_| errno!(EINVAL))?,
+            f_bsize: statfs_out.st.bsize.try_into().map_err(|_| errno!(EINVAL))?,
+            f_namelen: statfs_out.st.namelen.try_into().map_err(|_| errno!(EINVAL))?,
+            f_frsize: statfs_out.st.frsize.try_into().map_err(|_| errno!(EINVAL))?,
+            ..statfs::default(FUSE_SUPER_MAGIC)
+        })
     }
     fn name(&self) -> &'static FsStr {
         b"fuse"
@@ -147,6 +170,10 @@ struct FuseNode {
 }
 
 impl FuseNode {
+    fn from_node(node: &FsNode) -> Result<&Arc<FuseNode>, Errno> {
+        node.downcast_ops::<Arc<FuseNode>>().ok_or_else(|| errno!(ENOENT))
+    }
+
     fn update_node_info(info: &mut FsNodeInfo, attributes: uapi::fuse_attr) -> Result<(), Errno> {
         info.ino = attributes.ino as uapi::ino_t;
         info.mode = FileMode::from_bits(attributes.mode);
@@ -209,7 +236,7 @@ struct FuseFileObject {
 impl FuseFileObject {
     /// Returns the `FuseNode` associated with the opened file.
     fn get_fuse_node<'a>(&self, file: &'a FileObject) -> Result<&'a Arc<FuseNode>, Errno> {
-        file.node().downcast_ops::<Arc<FuseNode>>().ok_or_else(|| errno!(ENOENT))
+        FuseNode::from_node(file.node())
     }
 }
 
@@ -866,6 +893,7 @@ enum FuseOperation {
     Open(OpenFlags),
     Read(uapi::fuse_read_in),
     Release(uapi::fuse_open_out),
+    Statfs,
     Write(uapi::fuse_write_in, Vec<u8>),
 }
 
@@ -877,7 +905,7 @@ impl FuseOperation {
                     uapi::fuse_flush_in { fh: open_in.fh, unused: 0, padding: 0, lock_owner: 0 };
                 data.write_all(message.as_bytes())
             }
-            Self::GetAttr => Ok(0),
+            Self::GetAttr | Self::Statfs => Ok(0),
             Self::Init => {
                 let message = uapi::fuse_init_in {
                     major: uapi::FUSE_KERNEL_VERSION,
@@ -930,6 +958,7 @@ impl FuseOperation {
             Self::Open(_) => uapi::fuse_opcode_FUSE_OPEN,
             Self::Read(_) => uapi::fuse_opcode_FUSE_READ,
             Self::Release(_) => uapi::fuse_opcode_FUSE_RELEASE,
+            Self::Statfs => uapi::fuse_opcode_FUSE_STATFS,
             Self::Write(_, _) => uapi::fuse_opcode_FUSE_WRITE,
         }
     }
@@ -937,7 +966,7 @@ impl FuseOperation {
     fn len(&self) -> u32 {
         match self {
             Self::Flush(_) => std::mem::size_of::<uapi::fuse_flush_in>() as u32,
-            Self::GetAttr => 0,
+            Self::GetAttr | Self::Statfs => 0,
             Self::Init => std::mem::size_of::<uapi::fuse_init_in>() as u32,
             Self::Interrupt(_) => std::mem::size_of::<uapi::fuse_interrupt_in>() as u32,
             Self::Lookup(name) => name.as_bytes().len() as u32,
@@ -983,6 +1012,9 @@ impl FuseOperation {
             }
             Self::Read(_) => Ok(FuseResponse::Read(buffer)),
             Self::Release(_) | Self::Flush(_) => Ok(FuseResponse::None),
+            Self::Statfs => {
+                Ok(FuseResponse::Statfs(Self::to_response::<uapi::fuse_statfs_out>(&buffer)))
+            }
             Self::Write(_, _) => {
                 Ok(FuseResponse::Write(Self::to_response::<uapi::fuse_write_out>(&buffer)))
             }
@@ -1037,6 +1069,7 @@ enum FuseResponse {
     Init(uapi::fuse_init_out),
     Open(uapi::fuse_open_out),
     Read(Vec<u8>),
+    Statfs(uapi::fuse_statfs_out),
     Write(uapi::fuse_write_out),
     None,
 }

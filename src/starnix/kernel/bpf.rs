@@ -389,7 +389,7 @@ impl BpfFs {
 }
 
 impl FileSystemOps for BpfFs {
-    fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
+    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
         Ok(statfs::default(BPF_FS_MAGIC))
     }
     fn name(&self) -> &'static FsStr {

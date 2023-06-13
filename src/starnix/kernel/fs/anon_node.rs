@@ -48,7 +48,7 @@ impl Anon {
 
 struct AnonFs;
 impl FileSystemOps for AnonFs {
-    fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
+    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
         Ok(statfs::default(ANON_INODE_FS_MAGIC))
     }
     fn name(&self) -> &'static FsStr {

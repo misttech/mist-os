@@ -17,7 +17,7 @@ use std::{
 use super::*;
 use crate::{
     lock::Mutex,
-    task::Kernel,
+    task::{CurrentTask, Kernel},
     types::{as_any::AsAny, *},
 };
 
@@ -283,8 +283,8 @@ impl FileSystem {
     /// the filesystem.
     ///
     /// Returns `ENOSYS` if the `FileSystemOps` don't implement `stat`.
-    pub fn statfs(&self) -> Result<statfs, Errno> {
-        let mut stat = self.ops.statfs(self)?;
+    pub fn statfs(&self, current_task: &CurrentTask) -> Result<statfs, Errno> {
+        let mut stat = self.ops.statfs(self, current_task)?;
         if stat.f_frsize == 0 {
             stat.f_frsize = stat.f_bsize as i64;
         }
@@ -365,7 +365,7 @@ pub trait FileSystemOps: AsAny + Send + Sync + 'static {
     ///     ..statfs::default(FILE_SYSTEM_MAGIC)
     /// })
     /// ```
-    fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno>;
+    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno>;
 
     fn name(&self) -> &'static FsStr;
 

@@ -8,8 +8,10 @@
 #include <fcntl.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
+#include <sys/statfs.h>
 
 #include <gtest/gtest.h>
+#include <linux/magic.h>
 
 #include "src/starnix/tests/syscalls/syscall_matchers.h"
 #include "src/starnix/tests/syscalls/test_helper.h"
@@ -171,6 +173,13 @@ TEST_F(FuseTest, Write) {
   ScopedFD fd(open(filename.c_str(), O_WRONLY | O_CREAT));
   ASSERT_TRUE(fd.is_valid());
   EXPECT_EQ(write(fd.get(), "hello\n", 6), 6);
+}
+
+TEST_F(FuseTest, Statfs) {
+  ASSERT_TRUE(Mount());
+  struct statfs stats;
+  ASSERT_EQ(statfs((GetMountDir() + "/witness").c_str(), &stats), 0);
+  ASSERT_EQ(stats.f_type, FUSE_SUPER_MAGIC);
 }
 
 #endif  // SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_

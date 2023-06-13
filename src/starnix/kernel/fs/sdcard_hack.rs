@@ -23,7 +23,7 @@ impl FileSystemOps for SdcardHackFs {
     fn name(&self) -> &'static FsStr {
         b"fuse"
     }
-    fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
+    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
         Ok(statfs {
             // Pretend we have a ton of free space.
             f_blocks: 0x100000000,

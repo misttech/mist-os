@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 struct SysFs;
 impl FileSystemOps for SysFs {
-    fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
+    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
         Ok(statfs::default(SYSFS_MAGIC))
     }
     fn name(&self) -> &'static FsStr {

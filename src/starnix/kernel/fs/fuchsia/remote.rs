@@ -27,7 +27,7 @@ use crate::{
 
 pub struct RemoteFs;
 impl FileSystemOps for RemoteFs {
-    fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
+    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
         const REMOTE_FS_MAGIC: u32 = u32::from_be_bytes(*b"f.io");
         Ok(statfs::default(REMOTE_FS_MAGIC))
     }

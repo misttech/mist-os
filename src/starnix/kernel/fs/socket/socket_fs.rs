@@ -4,7 +4,7 @@
 
 use crate::{
     fs::*,
-    task::Kernel,
+    task::{CurrentTask, Kernel},
     types::{statfs, Errno, SOCKFS_MAGIC},
 };
 
@@ -12,7 +12,7 @@ use crate::{
 /// `sys_socket`.
 pub struct SocketFs;
 impl FileSystemOps for SocketFs {
-    fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
+    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
         Ok(statfs::default(SOCKFS_MAGIC))
     }
     fn name(&self) -> &'static FsStr {

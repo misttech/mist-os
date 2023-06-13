@@ -306,7 +306,7 @@ pub fn sys_fstatfs(
     user_buf: UserRef<statfs>,
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
-    let stat = file.fs.statfs()?;
+    let stat = file.fs.statfs(current_task)?;
     current_task.mm.write_object(user_buf, &stat)?;
     Ok(())
 }
@@ -318,7 +318,7 @@ pub fn sys_statfs(
 ) -> Result<(), Errno> {
     let node = lookup_at(current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
     let file_system = node.entry.node.fs();
-    let stat = file_system.statfs()?;
+    let stat = file_system.statfs(current_task)?;
     current_task.mm.write_object(user_buf, &stat)?;
 
     Ok(())

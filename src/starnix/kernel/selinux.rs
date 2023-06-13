@@ -23,7 +23,7 @@ const SELINUX_PERMS: &[&[u8]] = &[b"add", b"find", b"read", b"set"];
 
 struct SeLinuxFs;
 impl FileSystemOps for SeLinuxFs {
-    fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
+    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
         Ok(statfs::default(SELINUX_MAGIC))
     }
     fn name(&self) -> &'static FsStr {

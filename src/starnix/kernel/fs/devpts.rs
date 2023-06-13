@@ -83,7 +83,7 @@ fn init_devpts(kernel: &Kernel, options: FileSystemOptions) -> FileSystemHandle 
 
 struct DevPtsFs;
 impl FileSystemOps for DevPtsFs {
-    fn statfs(&self, _fs: &FileSystem) -> Result<statfs, Errno> {
+    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
         Ok(statfs::default(DEVPTS_SUPER_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
