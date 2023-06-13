@@ -448,9 +448,9 @@ class TraceSession {
   ///
   /// After a call to [terminateAndDownload], further calls on the
   /// [TraceSession] object will throw a [StateError].
-  Future<File?> terminateAndDownload(String traceName) async {
+  Future<File> terminateAndDownload(String traceName) async {
     final traceData = await terminateAndDownloadAsBytes();
-    return _dump.writeAsBytes('$traceName-trace', 'fxt', traceData);
+    return (await _dump.writeAsBytes('$traceName-trace', 'fxt', traceData))!;
   }
 
   /// Terminate the trace session and download the trace data, returning a list

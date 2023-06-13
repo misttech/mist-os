@@ -4916,7 +4916,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "terminateAndDownload",
-              "returnType": "Future<File?>",
+              "returnType": "Future<File>",
               "type": "MethodDeclarationImpl"
             },
             "terminateAndDownloadAsBytes": {

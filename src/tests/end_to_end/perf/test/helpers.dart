@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 // Helper code for setting up SL4F, running performance tests, and
 // uploading the tests' results to the Catapult performance dashboard.
@@ -12,7 +11,6 @@ import 'dart:io' show File, Platform;
 
 import 'package:args/args.dart';
 import 'package:logging/logging.dart';
-import 'package:meta/meta.dart';
 import 'package:sl4f/sl4f.dart' as sl4f;
 import 'package:test/test.dart';
 
@@ -54,11 +52,11 @@ class PerfTestHelper {
   static const String componentOutputPath =
       '/custom_artifacts/results.fuchsiaperf.json';
 
-  sl4f.Sl4f sl4fDriver;
-  sl4f.Performance performance;
-  sl4f.Dump dump;
-  sl4f.Storage storage;
-  sl4f.Component component;
+  late sl4f.Sl4f sl4fDriver;
+  late sl4f.Performance performance;
+  late sl4f.Dump dump;
+  late sl4f.Storage storage;
+  late sl4f.Component component;
 
   // The simpler test cases depend on only on SSH and not on the SL4F
   // server.  These can be run without starting the SL4F server.  That
@@ -100,7 +98,7 @@ class PerfTestHelper {
   //
   // It would be better to use scp to copy the file, but the Ssh class
   // does not provide an interface for that at the moment.
-  Future<File> dumpFile(
+  Future<File?> dumpFile(
       String remoteFilename, String dumpName, String extension) async {
     final String command = 'cat $remoteFilename';
     final processResult = await sl4fDriver.ssh.runWithOutput(command);
@@ -118,10 +116,11 @@ class PerfTestHelper {
   // process described in summarize.dart, and publishes that as
   // results for the current test.
   Future<void> processResultsSummarized(List<File> jsonFiles,
-      {@required String expectedMetricNamesFile}) async {
+      {required String expectedMetricNamesFile}) async {
     final jsonSummaryData = summarizeFuchsiaPerfFiles(jsonFiles);
 
-    final File jsonSummaryFile = dump.createFile('results', 'fuchsiaperf.json');
+    final File jsonSummaryFile =
+        dump.createFile('results', 'fuchsiaperf.json')!;
     await writeFuchsiaPerfJson(jsonSummaryFile, jsonSummaryData);
 
     await performance.convertResults('runtime_deps/catapult_converter',
@@ -138,7 +137,7 @@ class PerfTestHelper {
   // results to, in fuchsiaperf.json format.
   Future<void> runTestCommand(
       String Function(String resultsFilename) getCommand,
-      {@required String expectedMetricNamesFile}) async {
+      {required String expectedMetricNamesFile}) async {
     // Make a filename that is very likely to be unique.  Using a
     // unique filename should not be strictly necessary, but it should
     // avoid potential problems.  We do not expect performance tests
@@ -152,7 +151,7 @@ class PerfTestHelper {
     expect(result.exitCode, equals(0));
     try {
       final File localResultsFile =
-          await dumpFile(resultsFile, 'results', 'fuchsiaperf_full.json');
+          (await dumpFile(resultsFile, 'results', 'fuchsiaperf_full.json'))!;
       await processResultsSummarized([localResultsFile],
           expectedMetricNamesFile: expectedMetricNamesFile);
     } finally {
@@ -167,10 +166,10 @@ class PerfTestHelper {
   // is returned.  The argument resultsFileSuffix is included in the
   // name of that file.
   Future<File> runTestComponentReturningResultsFile(
-      {@required String packageName,
-      @required String componentName,
-      @required String commandArgs,
-      @required String resultsFileSuffix}) async {
+      {required String packageName,
+      required String componentName,
+      required String commandArgs,
+      required String resultsFileSuffix}) async {
     // Make a name for the output directory that is very likely to be
     // unique.
     final timestamp = DateTime.now().microsecondsSinceEpoch;
@@ -195,8 +194,8 @@ class PerfTestHelper {
       final List<String> targetOutputFiles = findOutput.split('\n');
       expect(targetOutputFiles.length, equals(1));
 
-      return await dumpFile(targetOutputFiles[0],
-          'results_$packageName$resultsFileSuffix', 'fuchsiaperf_full.json');
+      return (await dumpFile(targetOutputFiles[0],
+          'results_$packageName$resultsFileSuffix', 'fuchsiaperf_full.json'))!;
     } finally {
       // Clean up: remove the output tree.
       final result = await sl4fDriver.ssh.run('rm -r $targetOutputDir');
@@ -207,9 +206,9 @@ class PerfTestHelper {
   // Runs a component without processing any results.  This is useful when
   // the caller retrieves performance results via tracing.
   Future<void> runTestComponentWithNoResults(
-      {@required String packageName,
-      @required String componentName,
-      @required String commandArgs}) async {
+      {required String packageName,
+      required String componentName,
+      required String commandArgs}) async {
     final String command = 'run-test-suite'
         ' fuchsia-pkg://fuchsia.com/$packageName#meta/$componentName'
         ' -- $commandArgs';
@@ -222,10 +221,10 @@ class PerfTestHelper {
 // produces, which the component should write to the file
 // PerfTestHelper.componentOutputPath.
 Future<void> runTestComponent(
-    {@required String packageName,
-    @required String componentName,
-    @required String commandArgs,
-    @required String expectedMetricNamesFile,
+    {required String packageName,
+    required String componentName,
+    required String commandArgs,
+    required String expectedMetricNamesFile,
     int processRuns = 1}) async {
   final helper = PerfTestHelper();
   await helper.setUp(requiresSl4fServer: false);

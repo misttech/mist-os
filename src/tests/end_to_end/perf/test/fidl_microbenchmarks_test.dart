@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import 'dart:io' show File;
 
@@ -35,10 +34,10 @@ void runPerftestFidlBenchmark(
         final result = await helper.sl4fDriver.ssh
             .run('/bin/$benchmarkBinary -p --quiet --out $resultsFile');
         expect(result.exitCode, equals(0));
-        resultsFiles.add(await helper.storage.dumpFile(
+        resultsFiles.add((await helper.storage.dumpFile(
             resultsFile,
             'results_fidl_microbenchmarks_process$process',
-            'fuchsiaperf_full.json'));
+            'fuchsiaperf_full.json'))!);
       }
       await helper.processResultsSummarized(resultsFiles,
           expectedMetricNamesFile: expectedMetricNamesFile);

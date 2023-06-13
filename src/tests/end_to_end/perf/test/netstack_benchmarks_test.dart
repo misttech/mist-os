@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import 'dart:io';
 
@@ -36,7 +35,7 @@ Future<void> runSocketBenchmarksWithTracing(String componentName) async {
         .run('find $targetOutputDir -name trace.fxt');
     final String findOutput = findResult.stdout.trim();
     expect(findOutput, isNot(anyOf(equals(''), contains('\n'))));
-    final File traceFile = await helper.storage
+    final File? traceFile = await helper.storage
         .dumpFile(findOutput, '$componentName-trace', 'fxt');
   } finally {
     // Clean up: remove the output tree.
