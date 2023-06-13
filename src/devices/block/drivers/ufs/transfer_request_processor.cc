@@ -4,6 +4,8 @@
 
 #include "transfer_request_processor.h"
 
+#include <lib/trace/event.h>
+
 #include <safemath/checked_math.h>
 #include <safemath/safe_conversions.h>
 
@@ -140,6 +142,8 @@ zx::result<void *> TransferRequestProcessor::SendUpiu(RequestUpiu &request) {
 
 zx::result<ResponseUpiu> TransferRequestProcessor::SendScsiUpiu(std::unique_ptr<scsi_xfer> xfer,
                                                                 uint8_t slot, bool sync) {
+  TRACE_DURATION("ufs", "SendScsiUpiu", "offset", xfer->start_lba, "length", xfer->block_count);
+
   ScsiCommandUpiu *request = xfer->upiu.get();
 
   const uint16_t response_offset = request->GetResponseOffset();
@@ -221,6 +225,9 @@ zx::result<ResponseUpiu> TransferRequestProcessor::SendScsiUpiu(std::unique_ptr<
 
 void TransferRequestProcessor::ScsiCompletion(uint8_t slot_num, RequestSlot &request_slot,
                                               TransferRequestDescriptor *descriptor) {
+  TRACE_DURATION("ufs", "ScsiCompletion", "offset", request_slot.xfer->start_lba, "length",
+                 request_slot.xfer->block_count, "slot", slot_num);
+
   // TODO(fxbug.dev/124835): Support large size transfer.
   ResponseUpiu *response =
       request_list_.GetDescriptorBuffer<ResponseUpiu>(slot_num, CommandUpiu::GetDataSize());
@@ -233,6 +240,8 @@ void TransferRequestProcessor::ScsiCompletion(uint8_t slot_num, RequestSlot &req
 }
 
 zx::result<> TransferRequestProcessor::SendRequest(uint8_t slot_num, bool sync) {
+  TRACE_DURATION("ufs", "SendRequest", "slot", slot_num);
+
   ZX_DEBUG_ASSERT_MSG(UtrListRunStopReg::Get().ReadFrom(&register_).value(),
                       "Transfer request list is not running");
 
@@ -242,6 +251,7 @@ zx::result<> TransferRequestProcessor::SendRequest(uint8_t slot_num, bool sync) 
   }
 
   sync_completion_t *complete;
+  uint64_t start_lba = 0, block_count = 0;
   {
     std::lock_guard lock(request_list_lock_);
     RequestSlot &request_slot = request_list_.GetSlot(slot_num);
@@ -249,6 +259,10 @@ zx::result<> TransferRequestProcessor::SendRequest(uint8_t slot_num, bool sync) 
     sync_completion_reset(complete);
     ZX_ASSERT(request_slot.state == SlotState::kReserved);
     request_slot.state = SlotState::kScheduled;
+    if (request_slot.xfer) {
+      start_lba = request_slot.xfer->start_lba;
+      block_count = request_slot.xfer->block_count;
+    }
 
     // TODO(fxbug.dev/124835): Set the UtrInterruptAggregationControlReg.
 
@@ -260,6 +274,8 @@ zx::result<> TransferRequestProcessor::SendRequest(uint8_t slot_num, bool sync) 
   }
 
   // Wait for completion.
+  TRACE_DURATION("ufs", "SendRequest::sync_completion_wait", "offset", start_lba, "length",
+                 block_count, "slot", slot_num);
   if (zx_status_t status = sync_completion_wait(complete, ZX_MSEC(GetTimeoutMsec()));
       status != ZX_OK) {
     return zx::error(status);

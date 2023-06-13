@@ -6,6 +6,7 @@
 
 #include <lib/ddk/binding_driver.h>
 #include <lib/fit/defer.h>
+#include <lib/trace/event.h>
 #include <lib/zx/clock.h>
 #include <zircon/errors.h>
 #include <zircon/threads.h>
@@ -295,6 +296,9 @@ zx::result<> Ufs::QueueScsiCommand(std::unique_ptr<ScsiCommandUpiu> upiu, uint8_
 
   xfer->done = event ? event : &xfer->local_event;
   sync_completion_reset(xfer->done);
+
+  TRACE_DURATION("ufs", "QueueScsiCommand::lock_guard,sync_completion_wait", "offset",
+                 xfer->start_lba, "length", xfer->block_count);
 
   // Queue SCSI command to xfer list.
   {

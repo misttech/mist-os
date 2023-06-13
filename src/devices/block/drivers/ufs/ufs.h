@@ -23,7 +23,7 @@
 
 namespace ufs {
 
-constexpr uint32_t kMaxLun = 8;
+constexpr uint32_t kMaxLun = 32;
 constexpr uint32_t kDeviceInitTimeoutMs = 2000;
 constexpr uint32_t kHostControllerTimeoutUs = 1000;
 

@@ -38,7 +38,7 @@ TEST_F(InitTest, GetControllerDescriptor) {
             static_cast<uint8_t>(DescriptorType::kGeometry));
   EXPECT_EQ(UnalignedLoad64(&ufs_->GetGeometryDescriptor().qTotalRawDeviceCapacity),
             htobe64(kMockTotalDeviceCapacity >> 9));
-  EXPECT_EQ(ufs_->GetGeometryDescriptor().bMaxNumberLU, 0x00);
+  EXPECT_EQ(ufs_->GetGeometryDescriptor().bMaxNumberLU, 0x01);
 }
 
 TEST_F(InitTest, ScanLogicalUnits) {
