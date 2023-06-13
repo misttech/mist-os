@@ -151,10 +151,12 @@ fuchsia_package("pkg-resolver-eng") {
   deps = [ ":eng-component-and-config" ]
 }
 
-fuchsia_component("unit-tests-root") {
+fuchsia_test_component("unit-tests-root") {
   component_name = "test_root"
-  testonly = true
   manifest = "meta/test_root.cml"
+
+  # Depends on root ssl certificate which is a system capability.
+  test_type = "system"
 }
 
 fuchsia_component("unit-tests-driver") {
