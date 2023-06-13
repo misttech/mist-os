@@ -575,8 +575,7 @@ impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for Udp 
 
 impl<I: icmp::IcmpIpExt> udp::NonSyncContext<I> for SocketCollection<I, Udp> {
     fn receive_icmp_error(&mut self, id: udp::SocketId<I>, err: I::ErrorCode) {
-        // NB: Logging at error as a means of failing tests that provoke this condition.
-        error!("unimplemented receive_icmp_error {:?} on {:?}", err, id)
+        warn!("unimplemented receive_icmp_error {:?} on {:?}", err, id)
     }
 }
 
