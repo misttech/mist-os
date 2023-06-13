@@ -256,9 +256,11 @@ static void iwl_pcie_txq_inval_byte_cnt_tbl(struct iwl_trans* trans, struct iwl_
 /*
  * iwl_pcie_txq_inc_wr_ptr - Send new write index to hardware
  */
-static void iwl_pcie_txq_inc_wr_ptr(struct iwl_trans* trans, struct iwl_txq* txq) {
+static void iwl_pcie_txq_inc_wr_ptr(struct iwl_trans *trans,
+            struct iwl_txq *txq)
+{
   struct iwl_trans_pcie* trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
-  uint32_t reg = 0;
+  u32 reg = 0;
   int txq_id = txq->id;
 
   iwl_assert_lock_held(&txq->lock);
@@ -279,8 +281,10 @@ static void iwl_pcie_txq_inc_wr_ptr(struct iwl_trans* trans, struct iwl_txq* txq
     reg = iwl_read32(trans, CSR_UCODE_DRV_GP1);
 
     if (reg & CSR_UCODE_DRV_GP1_BIT_MAC_SLEEP) {
-      IWL_DEBUG_INFO(trans, "Tx queue %d requesting wakeup, GP1 = 0x%x\n", txq_id, reg);
-      iwl_set_bit(trans, CSR_GP_CNTRL, CSR_GP_CNTRL_REG_FLAG_MAC_ACCESS_REQ);
+      IWL_DEBUG_INFO(trans, "Tx queue %d requesting wakeup, GP1 = 0x%x\n",
+               txq_id, reg);
+      iwl_set_bit(trans, CSR_GP_CNTRL,
+            CSR_GP_CNTRL_REG_FLAG_MAC_ACCESS_REQ);
       txq->need_update = true;
       return;
     }
@@ -291,14 +295,15 @@ static void iwl_pcie_txq_inc_wr_ptr(struct iwl_trans* trans, struct iwl_txq* txq
    * trying to tx (during RFKILL, we're not trying to tx).
    */
   IWL_DEBUG_TX(trans, "Q:%d WR: 0x%x\n", txq_id, txq->write_ptr);
-  if (!txq->block) {
-    iwl_write32(trans, HBUS_TARG_WRPTR, txq->write_ptr | (txq_id << 8));
-  }
+  if (!txq->block)
+    iwl_write32(trans, HBUS_TARG_WRPTR,
+          txq->write_ptr | (txq_id << 8));
 
   iwl_stats_inc(IWL_STATS_CNT_CMD_TO_FW);
 }
 
-void iwl_pcie_txq_check_wrptrs(struct iwl_trans* trans) {
+void iwl_pcie_txq_check_wrptrs(struct iwl_trans *trans)
+{
   struct iwl_trans_pcie* trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
   int i;
 
@@ -323,7 +328,7 @@ static inline void iwl_pcie_tfd_set_tb(struct iwl_trans* trans, void* tfd, uint8
   struct iwl_tfd* tfd_fh = (void*)tfd;
   struct iwl_tfd_tb* tb = &tfd_fh->tbs[idx];
 
-  uint16_t hi_n_len = len << 4;
+  u16 hi_n_len = len << 4;
 
   tb->lo = cpu_to_le32(addr);
   hi_n_len |= iwl_get_dma_hi_addr(addr);
@@ -1112,32 +1117,32 @@ static zx_status_t iwl_pcie_set_cmd_in_flight(struct iwl_trans* trans,
     return ZX_ERR_BAD_STATE;
   }
 
-	if (!trans->trans_cfg->base_params->apmg_wake_up_wa) {
-		return ZX_OK;
+  if (!trans->trans_cfg->base_params->apmg_wake_up_wa) {
+    return ZX_OK;
   }
 
   /*
    * wake up the NIC to make sure that the firmware will see the host
    * command - we will let the NIC sleep once all the host commands
    * returned. This needs to be done only on NICs that have
-	 * apmg_wake_up_wa set (see above.)
+   * apmg_wake_up_wa set (see above.)
    */
   if (!_iwl_trans_pcie_grab_nic_access(trans)) {
     return ZX_ERR_IO;
   }
 
-	/*
-	 * In iwl_trans_grab_nic_access(), we've acquired the reg_lock.
-	 * There, we also returned immediately if cmd_hold_nic_awake is
-	 * already true, so it's OK to unconditionally set it to true.
-	 */
-	trans_pcie->cmd_hold_nic_awake = true;
+  /*
+   * In iwl_trans_grab_nic_access(), we've acquired the reg_lock.
+   * There, we also returned immediately if cmd_hold_nic_awake is
+   * already true, so it's OK to unconditionally set it to true.
+   */
+  trans_pcie->cmd_hold_nic_awake = true;
 
   // When _iwl_trans_pcie_grab_nic_access() returns true, it leaves `trans_pcie->reg_lock` locked.
   // Hence, we need to unlock it here.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wthread-safety-analysis"
-	mtx_unlock(&trans_pcie->reg_lock);
+  mtx_unlock(&trans_pcie->reg_lock);
 #pragma GCC diagnostic pop
 
   return ZX_OK;
