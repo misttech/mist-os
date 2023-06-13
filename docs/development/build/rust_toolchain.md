@@ -21,6 +21,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
 
    ```posix-terminal
    DEV_ROOT={{ '<var>' }}DEV_ROOT{{ '</var> '}} # parent of your Rust directory
+
    mkdir -p $DEV_ROOT/infra && \
    ( \
      builtin cd $DEV_ROOT/infra && \
@@ -39,6 +40,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
 
    ```posix-terminal
    DEV_ROOT={{ '<var>' }}DEV_ROOT{{ '</var>' }}
+
    cat <<"EOF" > cipd.ensure
    @Subdir sdk
    fuchsia/sdk/core/${platform} latest
@@ -47,6 +49,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
    @Subdir clang
    fuchsia/third_party/clang/${platform} integration
    EOF
+
    $DEV_ROOT/infra/fuchsia/prebuilt/tools/cipd ensure --root $DEV_ROOT --ensure-file cipd.ensure
    ```
 
@@ -62,7 +65,9 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
 
    ```posix-terminal
    DEV_ROOT={{ '<var>' }}DEV_ROOT{{ '</var>' }}
+
    chmod 0644 $DEV_ROOT/sdk/pkg/sysroot/meta.json
+
    $DEV_ROOT/infra/fuchsia/prebuilt/tools/vpython3 \
      $DEV_ROOT/fuchsia/scripts/clang/generate_sysroot.py \
        --sdk-dir=$DEV_ROOT/sdk \
@@ -111,6 +116,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
 
    ```posix-terminal
    echo fuchsia-config.toml >> .git/info/exclude
+
    echo fuchsia-env.sh >> .git/info/exclude
    ```
 
