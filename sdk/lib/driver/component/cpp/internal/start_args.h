@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_COMPONENT_CPP_START_ARGS_H_
-#define LIB_DRIVER_COMPONENT_CPP_START_ARGS_H_
+#ifndef LIB_DRIVER_COMPONENT_CPP_INTERNAL_START_ARGS_H_
+#define LIB_DRIVER_COMPONENT_CPP_INTERNAL_START_ARGS_H_
 
 #include <fidl/fuchsia.component.runner/cpp/fidl.h>
 #include <fidl/fuchsia.data/cpp/fidl.h>
-#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <lib/driver/symbols/symbols.h>
 #include <lib/zx/result.h>
 #include <zircon/status.h>
 
 #include <vector>
 
-namespace fdf {
+namespace fdf_internal {
 
 // |AdoptEncodedFidlMessage| adopts ownership of the handles in the message
 // referenced by an |EncodedFidlMessage| C object. Once constructed, one may
@@ -29,7 +28,7 @@ namespace fdf {
 //         EncodedDriverStartArgs encoded_start_args, fdf_dispatcher_t* dispatcher, void** driver) {
 //       auto wire_format_metadata =
 //           fidl::WireFormatMetadata::FromOpaque(encoded_start_args.wire_format_metadata);
-//       fdf::AdoptEncodedFidlMessage encoded{encoded_start_args.msg};
+//       fdf_internal::AdoptEncodedFidlMessage encoded{encoded_start_args.msg};
 //       fit::result start_args = fidl::StandaloneDecode<fuchsia_driver_framework::DriverStartArgs>(
 //           encoded.TakeMessage(), wire_format_metadata);
 //       // ...
@@ -67,49 +66,6 @@ class AdoptEncodedFidlMessage {
   std::vector<fidl_channel_handle_metadata_t> metadata_;
   std::optional<fidl::EncodedMessage> message_;
 };
-
-template <typename T>
-zx::result<T> SymbolValue(const fuchsia_driver_framework::wire::DriverStartArgs& args,
-                          std::string_view name) {
-  if (!args.has_symbols()) {
-    return zx::error(ZX_ERR_NOT_FOUND);
-  }
-  const fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol>& symbols = args.symbols();
-  static_assert(sizeof(T) == sizeof(zx_vaddr_t), "T must match zx_vaddr_t in size");
-  for (auto& symbol : symbols) {
-    if (std::equal(name.begin(), name.end(), symbol.name().begin())) {
-      T value;
-      memcpy(&value, &symbol.address(), sizeof(zx_vaddr_t));
-      return zx::ok(value);
-    }
-  }
-  return zx::error(ZX_ERR_NOT_FOUND);
-}
-
-template <typename T>
-zx::result<T> SymbolValue(
-    const std::optional<std::vector<fuchsia_driver_framework::NodeSymbol>>& symbols,
-    std::string_view name) {
-  if (!symbols.has_value()) {
-    return zx::error(ZX_ERR_NOT_FOUND);
-  }
-  static_assert(sizeof(T) == sizeof(zx_vaddr_t), "T must match zx_vaddr_t in size");
-  for (auto& symbol : *symbols) {
-    if (name == symbol.name().value()) {
-      T value;
-      memcpy(&value, &symbol.address().value(), sizeof(zx_vaddr_t));
-      return zx::ok(value);
-    }
-  }
-  return zx::error(ZX_ERR_NOT_FOUND);
-}
-
-template <typename T>
-T GetSymbol(const std::optional<std::vector<fuchsia_driver_framework::NodeSymbol>>& symbols,
-            std::string_view name, T default_value = nullptr) {
-  auto value = fdf::SymbolValue<T>(symbols, name);
-  return value.is_ok() ? *value : default_value;
-}
 
 inline zx::result<std::string> ProgramValue(const fuchsia_data::wire::Dictionary& program,
                                             std::string_view key) {
@@ -217,6 +173,6 @@ inline zx::result<fidl::UnownedClientEnd<fuchsia_io::Directory>> NsValue(
   return zx::error(ZX_ERR_NOT_FOUND);
 }
 
-}  // namespace fdf
+}  // namespace fdf_internal
 
-#endif  // LIB_DRIVER_COMPONENT_CPP_START_ARGS_H_
+#endif  // LIB_DRIVER_COMPONENT_CPP_INTERNAL_START_ARGS_H_

@@ -5,8 +5,8 @@
 #include "src/devices/bin/driver_manager/v2/node.h"
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <lib/driver/component/cpp/internal/start_args.h>
 #include <lib/driver/component/cpp/node_add_args.h>
-#include <lib/driver/component/cpp/start_args.h>
 
 #include <deque>
 #include <unordered_set>
@@ -981,7 +981,8 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
                        fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller,
                        fit::callback<void(zx::result<>)> cb) {
   auto url = start_info.resolved_url().get();
-  bool colocate = fdf::ProgramValue(start_info.program(), "colocate").value_or("") == "true";
+  bool colocate =
+      fdf_internal::ProgramValue(start_info.program(), "colocate").value_or("") == "true";
 
   if (colocate && !driver_host_) {
     LOGF(ERROR,

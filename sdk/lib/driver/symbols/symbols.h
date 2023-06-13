@@ -10,7 +10,7 @@
 
 // Lightweight reference to an encoded FIDL message.
 //
-// You may use |fdf::AdoptEncodedFidlMessage| to take ownership of the handles
+// You may use |fdf_internal::AdoptEncodedFidlMessage| to take ownership of the handles
 // in the message.
 //
 // It is intended as a stable ABI.

@@ -4,7 +4,7 @@
 
 #include "src/devices/bin/driver_manager/v2/driver_host.h"
 
-#include <lib/driver/component/cpp/start_args.h>
+#include <lib/driver/component/cpp/internal/start_args.h>
 
 #include <memory>
 
@@ -110,7 +110,7 @@ void DriverHostComponent::Start(
     fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
     frunner::wire::ComponentStartInfo start_info,
     fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) {
-  auto binary = fdf::ProgramValue(start_info.program(), "binary").value_or("");
+  auto binary = fdf_internal::ProgramValue(start_info.program(), "binary").value_or("");
   fidl::Arena arena;
   auto args = fdf::wire::DriverStartArgs::Builder(arena);
   args.node(std::move(client_end))

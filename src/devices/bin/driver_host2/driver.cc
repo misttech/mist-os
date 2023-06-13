@@ -5,7 +5,7 @@
 #include "src/devices/bin/driver_host2/driver.h"
 
 #include <lib/async/cpp/task.h>
-#include <lib/driver/component/cpp/start_args.h>
+#include <lib/driver/component/cpp/internal/start_args.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/cpp/env.h>
 #include <lib/fdio/directory.h>
@@ -49,13 +49,13 @@ class FileEventHandler : public fidl::AsyncEventHandler<fio::File> {
 zx::result<fidl::ClientEnd<fio::File>> OpenDriverFile(
     const fdf::DriverStartArgs& start_args, const fuchsia_data::wire::Dictionary& program) {
   const auto& incoming = start_args.incoming();
-  auto pkg = incoming ? fdf::NsValue(*incoming, "/pkg") : zx::error(ZX_ERR_INVALID_ARGS);
+  auto pkg = incoming ? fdf_internal::NsValue(*incoming, "/pkg") : zx::error(ZX_ERR_INVALID_ARGS);
   if (pkg.is_error()) {
     LOGF(ERROR, "Failed to start driver, missing '/pkg' directory: %s", pkg.status_string());
     return pkg.take_error();
   }
 
-  zx::result<std::string> binary = fdf::ProgramValue(program, "binary");
+  zx::result<std::string> binary = fdf_internal::ProgramValue(program, "binary");
   if (binary.is_error()) {
     LOGF(ERROR, "Failed to start driver, missing 'binary' argument: %s", binary.status_string());
     return binary.take_error();
@@ -262,7 +262,8 @@ void Driver::Start(fuchsia_driver_framework::DriverStartArgs start_args,
 }
 
 uint32_t ExtractDefaultDispatcherOpts(const fuchsia_data::wire::Dictionary& program) {
-  auto default_dispatcher_opts = fdf::ProgramValueAsVector(program, "default_dispatcher_opts");
+  auto default_dispatcher_opts =
+      fdf_internal::ProgramValueAsVector(program, "default_dispatcher_opts");
 
   uint32_t opts = 0;
   if (default_dispatcher_opts.is_ok()) {
@@ -325,7 +326,8 @@ void LoadDriver(fuchsia_driver_framework::DriverStartArgs start_args,
   uint32_t default_dispatcher_opts = dfv2::ExtractDefaultDispatcherOpts(wire_program);
   std::string default_dispatcher_scheduler_role = "";
   {
-    auto scheduler_role = fdf::ProgramValue(wire_program, "default_dispatcher_scheduler_role");
+    auto scheduler_role =
+        fdf_internal::ProgramValue(wire_program, "default_dispatcher_scheduler_role");
     if (scheduler_role.is_ok()) {
       default_dispatcher_scheduler_role = *scheduler_role;
     } else if (scheduler_role.status_value() != ZX_ERR_NOT_FOUND) {

@@ -6,6 +6,7 @@
 #define LIB_DRIVER_COMPONENT_CPP_LIFECYCLE_H_
 
 #include <lib/driver/component/cpp/basic_factory.h>
+#include <lib/driver/component/cpp/internal/start_args.h>
 
 namespace fdf {
 
@@ -60,7 +61,7 @@ class Lifecycle {
     // Decode the incoming `msg`.
     auto wire_format_metadata =
         fidl::WireFormatMetadata::FromOpaque(encoded_start_args.wire_format_metadata);
-    fdf::AdoptEncodedFidlMessage encoded{encoded_start_args.msg};
+    fdf_internal::AdoptEncodedFidlMessage encoded{encoded_start_args.msg};
     fit::result start_args = fidl::StandaloneDecode<fuchsia_driver_framework::DriverStartArgs>(
         encoded.TakeMessage(), wire_format_metadata);
     ZX_ASSERT_MSG(start_args.is_ok(), "Failed to decode start_args: %s",

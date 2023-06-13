@@ -12,6 +12,7 @@
 #include <fuchsia/lifecycle/test/cpp/banjo.h>
 #include <lib/driver/compat/cpp/symbols.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
+#include <lib/driver/component/cpp/internal/symbols.h>
 #include <lib/driver/devfs/cpp/connector.h>
 
 namespace fdf {
@@ -33,7 +34,8 @@ class LifecycleDriver : public fdf::DriverBase, public fidl::WireServer<ft::Devi
     FDF_LOG(INFO, "Starting lifecycle driver");
 
     // Get our parent banjo symbol.
-    auto parent_symbol = fdf::GetSymbol<compat::device_t*>(symbols(), compat::kDeviceSymbol);
+    auto parent_symbol =
+        fdf_internal::GetSymbol<compat::device_t*>(symbols(), compat::kDeviceSymbol);
     if (!parent_symbol) {
       FDF_LOG(ERROR, "Failed to find parent symbol");
       return zx::error(ZX_ERR_NOT_FOUND);

@@ -10,7 +10,8 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/binding_priv.h>
 #include <lib/driver/compat/cpp/connect.h>
-#include <lib/driver/component/cpp/start_args.h>
+#include <lib/driver/component/cpp/internal/start_args.h>
+#include <lib/driver/component/cpp/internal/symbols.h>
 #include <lib/driver/promise/cpp/promise.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fit/defer.h>
@@ -713,13 +714,13 @@ zx::result<std::string> Driver::GetVariable(const char* name) {
 void DriverFactory::CreateDriver(fdf::DriverStartArgs start_args,
                                  fdf::UnownedSynchronizedDispatcher driver_dispatcher,
                                  fdf::StartCompleter completer) {
-  auto compat_device =
-      fdf::GetSymbol<const device_t*>(start_args.symbols(), kDeviceSymbol, &kDefaultDevice);
+  auto compat_device = fdf_internal::GetSymbol<const device_t*>(start_args.symbols(), kDeviceSymbol,
+                                                                &kDefaultDevice);
   const zx_protocol_device_t* ops =
-      fdf::GetSymbol<const zx_protocol_device_t*>(start_args.symbols(), kOps);
+      fdf_internal::GetSymbol<const zx_protocol_device_t*>(start_args.symbols(), kOps);
 
   // Open the compat driver's binary within the package.
-  auto compat = fdf::ProgramValue(start_args.program(), "compat");
+  auto compat = fdf_internal::ProgramValue(start_args.program(), "compat");
   if (compat.is_error()) {
     completer(compat.take_error());
     return;

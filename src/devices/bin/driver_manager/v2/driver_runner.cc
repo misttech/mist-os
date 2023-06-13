@@ -10,7 +10,6 @@
 #include <fidl/fuchsia.process/cpp/wire.h>
 #include <lib/async/cpp/task.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/driver/component/cpp/start_args.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/fidl/cpp/wire/wire_messaging.h>

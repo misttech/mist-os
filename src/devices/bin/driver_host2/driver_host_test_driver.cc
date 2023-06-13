@@ -5,7 +5,8 @@
 #include <fidl/fuchsia.driverhost.test/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/driver/component/cpp/start_args.h>
+#include <lib/driver/component/cpp/internal/start_args.h>
+#include <lib/driver/component/cpp/internal/symbols.h>
 #include <lib/driver/symbols/symbols.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/epitaph.h>
@@ -21,25 +22,25 @@ class TestDriver {
       : dispatcher_(dispatcher), outgoing_(fdf_dispatcher_get_async_dispatcher(dispatcher)) {}
 
   zx::result<> Init(fdf::wire::DriverStartArgs& start_args) {
-    auto error = fdf::SymbolValue<zx_status_t*>(start_args, "error");
+    auto error = fdf_internal::SymbolValue<zx_status_t*>(start_args, "error");
     if (error.is_ok()) {
       return zx::error(**error);
     }
 
     // Call the "func" driver symbol.
-    auto func = fdf::SymbolValue<void (*)()>(start_args, "func");
+    auto func = fdf_internal::SymbolValue<void (*)()>(start_args, "func");
     if (func.is_ok()) {
       (*func)();
     }
 
     // Set the "dispatcher" driver symbol.
-    auto dispatcher = fdf::SymbolValue<fdf_dispatcher_t**>(start_args, "dispatcher");
+    auto dispatcher = fdf_internal::SymbolValue<fdf_dispatcher_t**>(start_args, "dispatcher");
     if (dispatcher.is_ok()) {
       **dispatcher = dispatcher_;
     }
 
     // Connect to the incoming service.
-    auto svc_dir = fdf::NsValue(start_args.incoming(), "/svc");
+    auto svc_dir = fdf_internal::NsValue(start_args.incoming(), "/svc");
     if (svc_dir.is_error()) {
       return svc_dir.take_error();
     }
@@ -69,7 +70,7 @@ void test_driver_start(EncodedDriverStartArgs encoded_start_args, fdf_dispatcher
                        StartCompleteCallback* complete, void* complete_cookie) {
   auto wire_format_metadata =
       fidl::WireFormatMetadata::FromOpaque(encoded_start_args.wire_format_metadata);
-  fdf::AdoptEncodedFidlMessage encoded{encoded_start_args.msg};
+  fdf_internal::AdoptEncodedFidlMessage encoded{encoded_start_args.msg};
   fit::result decoded = fidl::StandaloneInplaceDecode<fdf::wire::DriverStartArgs>(
       encoded.TakeMessage(), wire_format_metadata);
   if (!decoded.is_ok()) {

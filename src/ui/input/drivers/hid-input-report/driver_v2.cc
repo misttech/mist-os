@@ -9,6 +9,7 @@
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/compat/cpp/symbols.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
+#include <lib/driver/component/cpp/internal/symbols.h>
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/inspect/component/cpp/component.h>
 #include <zircon/errors.h>
@@ -30,7 +31,8 @@ class InputReportDriver : public fdf::DriverBase {
         devfs_connector_(fit::bind_member<&InputReportDriver::Serve>(this)) {}
 
   zx::result<> Start() override {
-    auto parent_symbol = fdf::GetSymbol<compat::device_t*>(symbols(), compat::kDeviceSymbol);
+    auto parent_symbol =
+        fdf_internal::GetSymbol<compat::device_t*>(symbols(), compat::kDeviceSymbol);
 
     hid_device_protocol_t proto = {};
     if (parent_symbol->proto_ops.id != ZX_PROTOCOL_HID_DEVICE) {
