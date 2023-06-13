@@ -869,9 +869,9 @@ zx_status_t Controller::CreateClient(
   return task.release()->Post(loop_.dispatcher());
 }
 
-uint64_t Controller::GetNextBufferCollectionId() {
+display::DriverBufferCollectionId Controller::GetNextDriverBufferCollectionId() {
   fbl::AutoLock lock(mtx());
-  return next_buffer_collection_id_++;
+  return next_driver_buffer_collection_id_++;
 }
 
 void Controller::OpenCoordinatorForVirtcon(OpenCoordinatorForVirtconRequestView request,

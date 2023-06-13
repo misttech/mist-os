@@ -40,6 +40,7 @@
 #include <fbl/string_printf.h>
 
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
+#include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/edid/edid.h"
@@ -74,7 +75,9 @@ void DisplayConfig::InitializeInspect(inspect::Node* parent) {
 }
 
 void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::Sync& completer) {
-  auto it = collection_map_.find(request->collection_id);
+  const display::BufferCollectionId buffer_collection_id =
+      ToBufferCollectionId(request->collection_id);
+  auto it = collection_map_.find(buffer_collection_id);
   if (it == collection_map_.end()) {
     completer.Reply(ZX_ERR_INVALID_ARGS);
     return;
@@ -93,8 +96,10 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
   dc_image.width = request->image_config.width;
   dc_image.type = request->image_config.type;
 
-  zx_status_t status = controller_->dc()->ImportImage(
-      &dc_image, collections.display_controller_buffer_collection_id, request->index);
+  const uint64_t banjo_driver_buffer_collection_id =
+      display::ToBanjoDriverBufferCollectionId(collections.driver_buffer_collection_id);
+  zx_status_t status =
+      controller_->dc()->ImportImage(&dc_image, banjo_driver_buffer_collection_id, request->index);
   if (status != ZX_OK) {
     completer.Reply(status);
     return;
@@ -150,36 +155,45 @@ void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
     return;
   }
 
+  const display::BufferCollectionId buffer_collection_id =
+      ToBufferCollectionId(request->collection_id);
   // TODO: Switch to .contains() when C++20.
-  if (collection_map_.count(request->collection_id)) {
+  if (collection_map_.count(buffer_collection_id)) {
     completer.Reply(ZX_ERR_INVALID_ARGS);
     return;
   }
 
-  uint64_t display_controller_buffer_collection_id = controller_->GetNextBufferCollectionId();
+  const display::DriverBufferCollectionId driver_buffer_collection_id =
+      controller_->GetNextDriverBufferCollectionId();
+  const uint64_t banjo_driver_buffer_collection_id =
+      display::ToBanjoDriverBufferCollectionId(driver_buffer_collection_id);
   zx_status_t import_status = controller_->dc()->ImportBufferCollection(
-      display_controller_buffer_collection_id, request->collection_token.TakeChannel());
+      banjo_driver_buffer_collection_id, request->collection_token.TakeChannel());
   if (import_status != ZX_OK) {
     zxlogf(WARNING, "Cannot import BufferCollection to display driver: %s",
            zx_status_get_string(import_status));
     completer.Reply(ZX_ERR_INTERNAL);
   }
 
-  collection_map_[request->collection_id] = Collections{
-      .display_controller_buffer_collection_id = display_controller_buffer_collection_id,
+  collection_map_[buffer_collection_id] = Collections{
+      .driver_buffer_collection_id = driver_buffer_collection_id,
   };
   completer.Reply(ZX_OK);
 }
 
 void Client::ReleaseBufferCollection(ReleaseBufferCollectionRequestView request,
                                      ReleaseBufferCollectionCompleter::Sync& /*_completer*/) {
-  auto it = collection_map_.find(request->collection_id);
+  const display::BufferCollectionId buffer_collection_id =
+      ToBufferCollectionId(request->collection_id);
+  auto it = collection_map_.find(buffer_collection_id);
   if (it == collection_map_.end()) {
     return;
   }
 
+  const uint64_t banjo_driver_buffer_collection_id =
+      display::ToBanjoDriverBufferCollectionId(it->second.driver_buffer_collection_id);
   // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-  controller_->dc()->ReleaseBufferCollection(it->second.display_controller_buffer_collection_id);
+  controller_->dc()->ReleaseBufferCollection(banjo_driver_buffer_collection_id);
 
   collection_map_.erase(it);
 }
@@ -187,7 +201,9 @@ void Client::ReleaseBufferCollection(ReleaseBufferCollectionRequestView request,
 void Client::SetBufferCollectionConstraints(
     SetBufferCollectionConstraintsRequestView request,
     SetBufferCollectionConstraintsCompleter::Sync& completer) {
-  auto it = collection_map_.find(request->collection_id);
+  const display::BufferCollectionId buffer_collection_id =
+      ToBufferCollectionId(request->collection_id);
+  auto it = collection_map_.find(buffer_collection_id);
   if (it == collection_map_.end()) {
     completer.Reply(ZX_ERR_INVALID_ARGS);
     return;
@@ -201,8 +217,10 @@ void Client::SetBufferCollectionConstraints(
 
   zx_status_t status = ZX_ERR_INTERNAL;
 
-  status = controller_->dc()->SetBufferCollectionConstraints(
-      &dc_image, collections.display_controller_buffer_collection_id);
+  const uint64_t banjo_driver_buffer_collection_id =
+      display::ToBanjoDriverBufferCollectionId(collections.driver_buffer_collection_id);
+  status = controller_->dc()->SetBufferCollectionConstraints(&dc_image,
+                                                             banjo_driver_buffer_collection_id);
   if (status != ZX_OK) {
     zxlogf(WARNING,
            "Cannot set BufferCollection constraints using imported buffer collection (id=%lu) %s.",
@@ -640,7 +658,9 @@ void Client::ImportImageForCapture(ImportImageForCaptureRequestView request,
   }
 
   // Ensure a previously imported collection id is being used for import.
-  auto it = collection_map_.find(request->collection_id);
+  const display::BufferCollectionId buffer_collection_id =
+      ToBufferCollectionId(request->collection_id);
+  auto it = collection_map_.find(buffer_collection_id);
   if (it == collection_map_.end()) {
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
@@ -651,8 +671,10 @@ void Client::ImportImageForCapture(ImportImageForCaptureRequestView request,
   // capture start/release.
   image_t capture_image = {};
 
+  const uint64_t banjo_driver_buffer_collection_id =
+      display::ToBanjoDriverBufferCollectionId(collections.driver_buffer_collection_id);
   zx_status_t status = controller_->dc()->ImportImageForCapture(
-      collections.display_controller_buffer_collection_id, request->index, &capture_image.handle);
+      banjo_driver_buffer_collection_id, request->index, &capture_image.handle);
 
   if (status == ZX_OK) {
     auto release_image = fit::defer(
@@ -1259,7 +1281,9 @@ void Client::TearDown() {
 
   // Release all imported buffer collections on display drivers.
   for (const auto& [k, v] : collection_map_) {
-    controller_->dc()->ReleaseBufferCollection(v.display_controller_buffer_collection_id);
+    const uint64_t banjo_driver_buffer_collection_id =
+        display::ToBanjoDriverBufferCollectionId(v.driver_buffer_collection_id);
+    controller_->dc()->ReleaseBufferCollection(banjo_driver_buffer_collection_id);
   }
   collection_map_.clear();
 

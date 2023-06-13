@@ -35,6 +35,7 @@
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/edid/edid.h"
 #include "src/lib/async-watchdog/watchdog.h"
 
@@ -133,7 +134,7 @@ class Controller : public DeviceType,
                            fidl::ServerEnd<fuchsia_hardware_display::Coordinator> client,
                            fit::function<void()> on_client_dead = nullptr);
 
-  uint64_t GetNextBufferCollectionId();
+  display::DriverBufferCollectionId GetNextDriverBufferCollectionId();
 
  private:
   friend ControllerTest;
@@ -169,7 +170,8 @@ class Controller : public DeviceType,
 
   bool supports_capture_ = false;
 
-  uint64_t next_buffer_collection_id_ __TA_GUARDED(mtx()) = 1;
+  display::DriverBufferCollectionId next_driver_buffer_collection_id_ __TA_GUARDED(mtx()) =
+      display::DriverBufferCollectionId(1);
   uint32_t next_client_id_ __TA_GUARDED(mtx()) = 1;
   ClientProxy* vc_client_ __TA_GUARDED(mtx()) = nullptr;
   bool vc_ready_ __TA_GUARDED(mtx());

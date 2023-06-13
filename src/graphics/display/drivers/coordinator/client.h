@@ -47,8 +47,10 @@
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/layer.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
+#include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 
 namespace display {
 
@@ -304,9 +306,9 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   struct Collections {
     // The BufferCollection ID used in fuchsia.hardware.display.Controller
     // protocol.
-    uint64_t display_controller_buffer_collection_id;
+    display::DriverBufferCollectionId driver_buffer_collection_id;
   };
-  std::map<uint64_t, Collections> collection_map_;
+  std::map<display::BufferCollectionId, Collections> collection_map_;
 
   FenceCollection fences_;
 
