@@ -223,8 +223,8 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #     documentation of the `--length` parameter of the `fvm` binary host tool
 #     for details.
 #
-#   assembly_fxfs_reserved_space_bytes (optional; default: 16777216)
-#     [int] The number of extra bytes reserved in Fxfs.
+#   assembly_fxfs_image_size_bytes (optional; default: 536870912)
+#     [int] The size of image to generate.  The system contents must fit within this.
 #
 # Board: ZBI arguments
 #
@@ -801,8 +801,8 @@ template("assembled_system") {
     }
     if (generate_fxfs) {
       fxfs = {
-        if (defined(invoker.assembly_fxfs_reserved_space_bytes)) {
-          reserved_space_bytes = invoker.assembly_fxfs_reserved_space_bytes
+        if (defined(invoker.assembly_fxfs_image_size_bytes)) {
+          size_bytes = invoker.assembly_fxfs_image_size_bytes
         }
       }
     }

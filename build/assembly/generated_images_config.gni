@@ -113,12 +113,12 @@
 #     }
 #
 #   fxfs (optional)
-#     [struct] Arguments for generating optional Fxfs images containing a nested Blobfs instance.
+#     [struct] Arguments for generating optional Fxfs images containing the base system packages.
 #     {
 #
 #     ### Parameters
-#       reserved_space_bytes
-#         [int] How many extra bytes to allocate in Fxfs.
+#       size_bytes
+#         [int] How large the image should be.  The base system must fit within this.
 #
 #     }
 #
@@ -345,8 +345,8 @@ template("generated_images_config") {
     fxfs = {
       type = "fxfs"
 
-      if (defined(invoker_fxfs.reserved_space_bytes)) {
-        reserved_space_bytes = invoker_fxfs.reserved_space_bytes
+      if (defined(invoker_fxfs.size_bytes)) {
+        size_bytes = invoker_fxfs.size_bytes
       } else {
         not_needed([ "invoker_fxfs" ])
       }

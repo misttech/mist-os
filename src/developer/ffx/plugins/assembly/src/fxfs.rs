@@ -22,7 +22,7 @@ pub async fn construct_fxfs(
 ) -> Result<(Utf8PathBuf, BlobfsContents)> {
     let mut contents = BlobfsContents::default();
     let mut fxfs_builder = FxfsBuilder::new();
-    fxfs_builder.reserve_space(fxfs_config.reserved_space_bytes);
+    fxfs_builder.set_size(fxfs_config.size_bytes);
 
     // Add the base and cache packages.
     for package_manifest_path in &image_config.base {
@@ -151,30 +151,23 @@ mod tests {
             path_relative_from_current_dir(dir.join("base/meta.far")).unwrap()
         );
 
-        let mut sizes = vec![];
-        let reserved_space_byteses = [0, 1024];
-        for reserved_space_bytes in reserved_space_byteses {
-            let (image_path, blobs) = construct_fxfs(
-                dir,
-                dir,
-                &image_config,
-                &base_package,
-                &Fxfs { reserved_space_bytes },
-            )
-            .await
-            .unwrap();
+        let (image_path, blobs) = construct_fxfs(
+            dir,
+            dir,
+            &image_config,
+            &base_package,
+            &Fxfs { size_bytes: 32 * 1024 * 1024 },
+        )
+        .await
+        .unwrap();
 
-            // Ensure something was created.
-            assert!(image_path.exists());
-            sizes.push(std::fs::metadata(image_path).unwrap().len());
+        // Ensure something was created.
+        assert!(image_path.exists());
+        assert_eq!(32 * 1024 * 1024, std::fs::metadata(image_path).unwrap().len());
 
-            // Ensure the blobs match expectations.
-            let blobs = blobs.relativize(dir).unwrap();
-            assert!(!blobs.packages.base.0.is_empty());
-            assert!(blobs.packages.cache.0.is_empty());
-        }
-
-        // Ensure the space reservation was respected.
-        assert!(sizes[1] >= sizes[0] + 1024);
+        // Ensure the blobs match expectations.
+        let blobs = blobs.relativize(dir).unwrap();
+        assert!(!blobs.packages.base.0.is_empty());
+        assert!(blobs.packages.cache.0.is_empty());
     }
 }

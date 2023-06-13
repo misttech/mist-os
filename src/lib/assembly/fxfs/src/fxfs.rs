@@ -24,18 +24,18 @@ use {
 ///
 pub struct FxfsBuilder {
     manifest: BlobManifest,
-    reserved_space_bytes: u64,
+    size_bytes: u64,
 }
 
 impl FxfsBuilder {
     /// Construct a new FxfsBuilder.
     pub fn new() -> Self {
-        FxfsBuilder { manifest: BlobManifest::default(), reserved_space_bytes: 0 }
+        FxfsBuilder { manifest: BlobManifest::default(), size_bytes: 0 }
     }
 
-    /// Reserves |reserve_space_bytes| of free space in the Fxfs image.
-    pub fn reserve_space(&mut self, reserved_space_bytes: u64) {
-        self.reserved_space_bytes += reserved_space_bytes
+    /// Sets the target image size.
+    pub fn set_size(&mut self, size_bytes: u64) {
+        self.size_bytes += size_bytes
     }
 
     /// Add a package to fxfs by inserting every blob mentioned in the `package_manifest` on the
@@ -90,19 +90,9 @@ impl FxfsBuilder {
             output.as_str(),
             blob_manifest_path.as_str(),
             blobs_json_path.as_str(),
+            self.size_bytes,
         )
         .await?;
-        if self.reserved_space_bytes > 0 {
-            let len = std::fs::metadata(output)?.len();
-            std::fs::OpenOptions::new()
-                .write(true)
-                .open(output)?
-                .set_len(len + self.reserved_space_bytes)
-                .context(format!(
-                    "Failed to reserve {} bytes in Fxfs image",
-                    self.reserved_space_bytes
-                ))?;
-        }
         cleanup.0 = None;
         Ok(blobs_json_path)
     }
@@ -169,6 +159,7 @@ mod tests {
         let output_path_clone = output_path.clone();
 
         let mut builder = FxfsBuilder::new();
+        builder.set_size(32 * 1024 * 1024);
         builder.add_package(manifest).unwrap();
 
         let blobs_json_path = builder.build(&dir, output_path).await.unwrap();

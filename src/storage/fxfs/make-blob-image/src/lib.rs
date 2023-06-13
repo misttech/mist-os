@@ -46,10 +46,12 @@ type BlobsJsonOutput = Vec<BlobsJsonOutputEntry>;
 /// Generates an Fxfs image containing a blob volume with the blobs specified in `manifest_path`.
 /// Creates the block image at `output_image_path` and writes a blobs.json file to
 /// `json_output_path`.
+/// The image will be `size` bytes; if the contents exceed this size, an error is returned.
 pub async fn make_blob_image(
     output_image_path: &str,
     manifest_path: &str,
     json_output_path: &str,
+    size: u64,
 ) -> Result<(), Error> {
     let output_image = std::fs::OpenOptions::new()
         .read(true)
@@ -59,16 +61,16 @@ pub async fn make_blob_image(
         .open(output_image_path)?;
     let blobs = parse_manifest(manifest_path).context("Failed to parse manifest")?;
 
-    // Arbitrarily set the maximum image size to 64GiB.  The actual image size will be determined
-    // by the greatest offset Fxfs writes to (which, when using a sequential allocator, results in
-    // an optimally sized image).
     const BLOCK_SIZE: u32 = 4096;
-    const BLOCK_COUNT: u64 = 1024 * 1024 * 16;
+    if size < BLOCK_SIZE as u64 {
+        return Err(anyhow!("Size {} is too small", size));
+    }
+    let block_count = size / BLOCK_SIZE as u64;
     let device = DeviceHolder::new(FileBackedDevice::new_with_block_count(
         output_image,
         BLOCK_SIZE,
-        BLOCK_COUNT,
-    ));
+        block_count,
+    )?);
     let filesystem =
         FxFilesystem::new_empty(device).await.context("Failed to format filesystem")?;
     let blobs_json = install_blobs(filesystem.clone(), "blob", blobs).await?;
