@@ -125,7 +125,6 @@ if (is_fuchsia) {
 
   _core_realm_deps =
       core_realm_aib_shards + core_realm_network_aib_shards + [
-        "//src/developer/forensics:core_shard",
         "//src/diagnostics/realm:core_shard",
         "//src/firmware/fastboot-tcp:fastboot-tcp-core-shard",
         "//src/firmware/fastboot-usb:fastboot-usb-core-shard",
@@ -206,7 +205,6 @@ if (is_fuchsia) {
         "//src/settings/service:setui_service",
 
         # Forensics and crash reporting
-        "//src/developer/forensics:pkg",
         "//src/developer/forensics:user_configs",
         "//src/developer/forensics:feedback_remote_device_id_provider",
       ]

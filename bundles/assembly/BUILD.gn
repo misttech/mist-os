@@ -212,6 +212,9 @@ assembly_input_bundle("core_realm") {
 
     # Driver system memory connector
     "//src/devices/sysmem/bin/sysmem_connector:pkg",
+
+    # Developer.
+    "//src/developer/forensics:pkg-real",
   ]
 
   compiled_packages = [
@@ -227,7 +230,10 @@ assembly_input_bundle("core_realm") {
 
           component_name = "core"
           shards = rebase_path(
-                  [ "//src/developer/build_info/meta/build_info.core_shard.cml" ],
+                  [
+                    "//src/developer/build_info/meta/build_info.core_shard.cml",
+                    "//src/developer/forensics/forensics.core_shard.cml",
+                  ],
                   root_build_dir)
         },
       ]
@@ -412,6 +418,7 @@ assembly_input_bundle("core_realm_development_access") {
                   [
                     "//src/developer/sshd-host/meta/sshd-host.core_shard.cml",
                     "//src/developer/remote-control/meta/remote-control-base.core_shard.cml",
+                    "//src/developer/debug/debug_agent/meta/debug_agent.core_shard.cml",
                   ],
                   root_build_dir)
         },
@@ -548,7 +555,6 @@ assembly_input_bundle("common_minimal") {
     "//src/sys/activity",
 
     # Developer
-    "//src/developer/forensics:pkg",
     "//src/developer/memory/monitor",
   ]
 

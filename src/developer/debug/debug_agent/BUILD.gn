@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 # Set manually to true to compile helper executables for manual debugger
 # testing of various conditions. Use `ffx component explore /core/debug_agent`
@@ -200,8 +199,8 @@ fuchsia_package("debug_agent") {
   }
 }
 
-core_shard("core_shard") {
-  shard_file = "meta/debug_agent.core_shard.cml"
+# TODO(fxbug.dev/122864) Remove transitional labels
+group("core_shard") {
 }
 
 # Common functionality used by tests.

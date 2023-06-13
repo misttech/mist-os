@@ -12,7 +12,6 @@ bootfs_only = false
 
 core_realm_shards = [
   "//src/connectivity/network:virtualization-core-shard",
-  "//src/developer/forensics:core_shard",
   "//src/developer/memory/monitor:memory_monitor_core_shard",
   "//src/recovery/factory_reset:factory_reset_core_shard",
   "//src/sys/pkg/bin/system-updater:system-updater-core-shard",

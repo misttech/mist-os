@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/config.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 ###############################################################################
 # GROUPS
@@ -55,7 +54,11 @@ group("workstation_configs") {
 ###############################################################################
 # PACKAGES
 ###############################################################################
-fuchsia_package("pkg") {
+# TODO(fxbug.dev/122864) Remove transitional labels
+group("pkg") {
+}
+
+fuchsia_package("pkg-real") {
   package_name = "forensics"
 
   deps = [
@@ -91,8 +94,8 @@ fuchsia_component("feedback") {
 ###############################################################################
 # CORE SHARDS
 ###############################################################################
-core_shard("core_shard") {
-  shard_file = "forensics.core_shard.cml"
+# TODO(fxbug.dev/122864) Remove transitional labels
+group("core_shard") {
 }
 
 ###############################################################################
