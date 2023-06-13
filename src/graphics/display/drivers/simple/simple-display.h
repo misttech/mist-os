@@ -12,6 +12,7 @@
 #include <fbl/mutex.h>
 
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 
 #if __cplusplus
 
@@ -62,12 +63,15 @@ class SimpleDisplay : public DeviceType,
       const display_capture_interface_protocol_t* intf) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  zx_status_t DisplayControllerImplImportBufferCollection(uint64_t collection_id,
-                                                          zx::channel collection_token);
-  zx_status_t DisplayControllerImplReleaseBufferCollection(uint64_t collection_id);
-  zx_status_t DisplayControllerImplImportImage(image_t* image, uint64_t collection_id,
+  zx_status_t DisplayControllerImplImportBufferCollection(
+      uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
+  zx_status_t DisplayControllerImplReleaseBufferCollection(
+      uint64_t banjo_driver_buffer_collection_id);
+  zx_status_t DisplayControllerImplImportImage(image_t* image,
+                                               uint64_t banjo_driver_buffer_collection_id,
                                                uint32_t index);
-  zx_status_t DisplayControllerImplImportImageForCapture(uint64_t collection_id, uint32_t index,
+  zx_status_t DisplayControllerImplImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
+                                                         uint32_t index,
                                                          uint64_t* out_capture_handle) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -81,8 +85,8 @@ class SimpleDisplay : public DeviceType,
   void DisplayControllerImplSetEld(uint64_t display_id, const uint8_t* raw_eld_list,
                                    size_t raw_eld_count) {}  // No ELD required for non-HDA systems.
   zx_status_t DisplayControllerImplGetSysmemConnection(zx::channel connection);
-  zx_status_t DisplayControllerImplSetBufferCollectionConstraints(const image_t* config,
-                                                                  uint64_t collection_id);
+  zx_status_t DisplayControllerImplSetBufferCollectionConstraints(
+      const image_t* config, uint64_t banjo_driver_buffer_collection_id);
   zx_status_t DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -94,7 +98,8 @@ class SimpleDisplay : public DeviceType,
   }
   bool DisplayControllerImplIsCaptureCompleted() { return false; }
 
-  const std::unordered_map<uint64_t, fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>>&
+  const std::unordered_map<display::DriverBufferCollectionId,
+                           fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>>&
   GetBufferCollectionsForTesting() const {
     return buffer_collections_;
   }
@@ -110,7 +115,8 @@ class SimpleDisplay : public DeviceType,
   fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client_;
 
   // Imported sysmem buffer collections.
-  std::unordered_map<uint64_t, fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>>
+  std::unordered_map<display::DriverBufferCollectionId,
+                     fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>>
       buffer_collections_;
 
   async::Loop loop_;

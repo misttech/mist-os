@@ -21,6 +21,7 @@
 #include <fake-mmio-reg/fake-mmio-reg.h>
 #include <gtest/gtest.h>
 
+#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/predicates/status.h"
 
@@ -232,13 +233,15 @@ TEST(SimpleDisplay, ImportBufferCollection) {
   ASSERT_TRUE(token2_endpoints.is_ok());
 
   // Test ImportBufferCollection().
-  const uint64_t kValidCollectionId = 1u;
+  const display::DriverBufferCollectionId kValidCollectionId(1);
+  const uint64_t kBanjoValidCollectionId =
+      display::ToBanjoDriverBufferCollectionId(kValidCollectionId);
   EXPECT_OK(display.DisplayControllerImplImportBufferCollection(
-      kValidCollectionId, token1_endpoints->client.TakeChannel()));
+      kBanjoValidCollectionId, token1_endpoints->client.TakeChannel()));
 
   // `collection_id` must be unused.
   EXPECT_EQ(display.DisplayControllerImplImportBufferCollection(
-                kValidCollectionId, token2_endpoints->client.TakeChannel()),
+                kBanjoValidCollectionId, token2_endpoints->client.TakeChannel()),
             ZX_ERR_ALREADY_EXISTS);
 
   loop.RunUntilIdle();
@@ -263,10 +266,10 @@ TEST(SimpleDisplay, ImportBufferCollection) {
   }
 
   // Test ReleaseBufferCollection().
-  const uint64_t kInvalidCollectionId = 2u;
-  EXPECT_EQ(display.DisplayControllerImplReleaseBufferCollection(kInvalidCollectionId),
+  const uint64_t kBanjoInvalidCollectionId = 2u;
+  EXPECT_EQ(display.DisplayControllerImplReleaseBufferCollection(kBanjoInvalidCollectionId),
             ZX_ERR_NOT_FOUND);
-  EXPECT_OK(display.DisplayControllerImplReleaseBufferCollection(kValidCollectionId));
+  EXPECT_OK(display.DisplayControllerImplReleaseBufferCollection(kBanjoValidCollectionId));
 
   loop.RunUntilIdle();
 
@@ -311,9 +314,9 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
   ASSERT_TRUE(token_endpoints.is_ok());
 
   // Import BufferCollection.
-  const uint64_t kCollectionId = 1u;
+  const uint64_t kBanjoCollectionId = 1u;
   EXPECT_OK(display.DisplayControllerImplImportBufferCollection(
-      kCollectionId, token_endpoints->client.TakeChannel()));
+      kBanjoCollectionId, token_endpoints->client.TakeChannel()));
 
   // Import kernel framebuffer.
   zx::vmo heap_vmo;
@@ -334,41 +337,45 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
       .type = IMAGE_TYPE_SIMPLE,
       .handle = 0,
   };
-  EXPECT_OK(
-      display.DisplayControllerImplSetBufferCollectionConstraints(&kDefaultImage, kCollectionId));
+  EXPECT_OK(display.DisplayControllerImplSetBufferCollectionConstraints(&kDefaultImage,
+                                                                        kBanjoCollectionId));
 
   // Invalid import: bad collection id
   image_t invalid_image = kDefaultImage;
-  uint64_t kInvalidCollectionId = 100;
-  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kInvalidCollectionId, 0),
+  uint64_t kBanjoInvalidCollectionId = 100;
+  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kBanjoInvalidCollectionId, 0),
             ZX_ERR_NOT_FOUND);
 
   // Invalid import: bad index
   invalid_image = kDefaultImage;
   uint32_t kInvalidIndex = 100;
-  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kCollectionId, kInvalidIndex),
-            ZX_ERR_OUT_OF_RANGE);
+  EXPECT_EQ(
+      display.DisplayControllerImplImportImage(&invalid_image, kBanjoCollectionId, kInvalidIndex),
+      ZX_ERR_OUT_OF_RANGE);
 
   // Invalid import: bad width
   invalid_image = kDefaultImage;
   invalid_image.width = invalid_image.width * 2;
-  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kCollectionId, /*index=*/0),
-            ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(
+      display.DisplayControllerImplImportImage(&invalid_image, kBanjoCollectionId, /*index=*/0),
+      ZX_ERR_INVALID_ARGS);
 
   // Invalid import: bad height
   invalid_image = kDefaultImage;
   invalid_image.height = invalid_image.height * 2;
-  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kCollectionId, /*index=*/0),
-            ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(
+      display.DisplayControllerImplImportImage(&invalid_image, kBanjoCollectionId, /*index=*/0),
+      ZX_ERR_INVALID_ARGS);
 
   // Valid import
   image_t valid_image = kDefaultImage;
   EXPECT_EQ(valid_image.handle, 0u);
-  EXPECT_OK(display.DisplayControllerImplImportImage(&valid_image, kCollectionId, /*index=*/0));
+  EXPECT_OK(
+      display.DisplayControllerImplImportImage(&valid_image, kBanjoCollectionId, /*index=*/0));
   EXPECT_NE(valid_image.handle, 0u);
 
   // Release buffer collection.
-  EXPECT_OK(display.DisplayControllerImplReleaseBufferCollection(kCollectionId));
+  EXPECT_OK(display.DisplayControllerImplReleaseBufferCollection(kBanjoCollectionId));
 
   loop.RunUntilIdle();
 
