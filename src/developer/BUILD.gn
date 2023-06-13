@@ -8,19 +8,13 @@ group("developer") {
   testonly = true
   deps = [
     ":tests",
+    "debug",
     "ffx",
+    "forensics",
     "fuchsia-criterion",
     "lib",
     "remote-control",
   ]
-
-  # TODO(fxbug.dev/127655): Move package above once Crashpad supports RISC-V.
-  if (current_cpu != "riscv64") {
-    deps += [
-      "debug",
-      "forensics",
-    ]
-  }
 }
 
 group("tests") {
