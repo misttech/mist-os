@@ -28,6 +28,7 @@ test_list = [
   "microbenchmarks_test",
   "netstack3_benchmarks_test",
   "netstack_benchmarks_test",
+  "netstack_benchmarks_with_tracing_test",
   "netstack_tun_socket_benchmarks_test",
   "network_device_microbenchmarks_test",
   "perftest_trace_events_test",

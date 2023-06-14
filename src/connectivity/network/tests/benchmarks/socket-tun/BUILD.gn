@@ -19,14 +19,19 @@ rustc_binary("tun_socket_benchmarks") {
     "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_rust",
     "//sdk/fidl/fuchsia.net.tun:fuchsia.net.tun_rust",
     "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
+    "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller_rust",
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/lib/net-types",
     "//src/connectivity/network/testing/netemul/rust:lib",
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
     "//src/lib/network/fidl_fuchsia_net_ext",
     "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
+    "//src/lib/trace/rust:trace",
+    "//src/lib/trace/rust:trace-provider",
     "//src/performance/lib/fuchsiaperf",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:futures",
@@ -45,29 +50,44 @@ common_deps = [
 ]
 
 fuchsia_test_component("tun-socket-benchmarks-ns2") {
-  deps = [
+  deps = common_deps + [
            "//src/connectivity/network/netstack:component",
            "//src/sys/stash:stash_secure_v2",
-         ] + common_deps
+         ]
   manifest = "meta/tun-socket-benchmarks-ns2.cml"
 }
 
-fuchsia_test_component("tun-socket-benchmarks-ns3") {
-  deps = [
-           "//src/connectivity/network/netstack3:component",
+fuchsia_test_component("tun-socket-benchmarks-ns2-with-tracing") {
+  deps = common_deps +
+         [ "//src/connectivity/network/netstack:component-with-tracing" ]
+  manifest = "meta/tun-socket-benchmarks-ns2-with-tracing.cml"
+}
 
-           # TODO(https://fxbug.dev/125773): remove this when the production Netstack3
-           # component no longer brings its own DHCPv4 client, given that it is
-           # otherwise unused in this benchmark.
-           "//src/connectivity/network/dhcpv4/client/bindings:component",
-         ] + common_deps
+netstack3_deps = common_deps + [
+                   "//src/connectivity/network/netstack3:component",
+
+                   # TODO(https://fxbug.dev/125773): remove this when the production Netstack3
+                   # component no longer brings its own DHCPv4 client, given that it is
+                   # otherwise unused in this benchmark.
+                   "//src/connectivity/network/dhcpv4/client/bindings:component",
+                 ]
+
+fuchsia_test_component("tun-socket-benchmarks-ns3") {
+  deps = netstack3_deps
   manifest = "meta/tun-socket-benchmarks-ns3.cml"
+}
+
+fuchsia_test_component("tun-socket-benchmarks-ns3-with-tracing") {
+  deps = netstack3_deps
+  manifest = "meta/tun-socket-benchmarks-ns3-with-tracing.cml"
 }
 
 fuchsia_test_package("tun-socket-benchmarks") {
   test_components = [
     ":tun-socket-benchmarks-ns2",
+    ":tun-socket-benchmarks-ns2-with-tracing",
     ":tun-socket-benchmarks-ns3",
+    ":tun-socket-benchmarks-ns3-with-tracing",
   ]
 }
 

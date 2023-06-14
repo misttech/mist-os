@@ -1,0 +1,16 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/connectivity/network/tests/benchmarks/socket-tun/meta/common.shard.cml",
+        "sys/testing/system-test.shard.cml",
+        "trace/client.shard.cml",
+    ],
+    use: [
+        {
+            protocol: [ "fuchsia.tracing.controller.Controller" ],
+            from: "parent",
+        },
+    ],
+}
