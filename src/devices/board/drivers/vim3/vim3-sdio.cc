@@ -48,7 +48,7 @@ static const std::vector<fpbus::Bti> sdio_btis{
 static aml_sdmmc_config_t config = {
     .supports_dma = true,
     .min_freq = 400'000,
-    .max_freq = 200'000'000,
+    .max_freq = 100'000'000,
     .version_3 = true,
     .prefs = 0,
     .use_new_tuning = true,
@@ -101,12 +101,26 @@ zx_status_t Vim3::SdioInit() {
   sdio_dev.bti() = sdio_btis;
   sdio_dev.metadata() = sdio_metadata;
 
+  gpio_impl_.ConfigIn(A311D_SDIO_D0, GPIO_NO_PULL);
+  gpio_impl_.ConfigIn(A311D_SDIO_D1, GPIO_NO_PULL);
+  gpio_impl_.ConfigIn(A311D_SDIO_D2, GPIO_NO_PULL);
+  gpio_impl_.ConfigIn(A311D_SDIO_D3, GPIO_NO_PULL);
+  gpio_impl_.ConfigIn(A311D_SDIO_CLK, GPIO_NO_PULL);
+  gpio_impl_.ConfigIn(A311D_SDIO_CMD, GPIO_NO_PULL);
+
   gpio_impl_.SetAltFunction(A311D_SDIO_D0, A311D_GPIOX_0_SDIO_D0_FN);
   gpio_impl_.SetAltFunction(A311D_SDIO_D1, A311D_GPIOX_1_SDIO_D1_FN);
   gpio_impl_.SetAltFunction(A311D_SDIO_D2, A311D_GPIOX_2_SDIO_D2_FN);
   gpio_impl_.SetAltFunction(A311D_SDIO_D3, A311D_GPIOX_3_SDIO_D3_FN);
   gpio_impl_.SetAltFunction(A311D_SDIO_CLK, A311D_GPIOX_4_SDIO_CLK_FN);
   gpio_impl_.SetAltFunction(A311D_SDIO_CMD, A311D_GPIOX_5_SDIO_CMD_FN);
+
+  gpio_impl_.SetDriveStrength(A311D_SDIO_D0, 4'000, nullptr);
+  gpio_impl_.SetDriveStrength(A311D_SDIO_D1, 4'000, nullptr);
+  gpio_impl_.SetDriveStrength(A311D_SDIO_D2, 4'000, nullptr);
+  gpio_impl_.SetDriveStrength(A311D_SDIO_D3, 4'000, nullptr);
+  gpio_impl_.SetDriveStrength(A311D_SDIO_CLK, 4'000, nullptr);
+  gpio_impl_.SetDriveStrength(A311D_SDIO_CMD, 4'000, nullptr);
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('SDIO');
