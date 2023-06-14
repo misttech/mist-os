@@ -105,7 +105,7 @@ impl Archivist {
         let serial_task = if !config.allow_serial_logs.is_empty() {
             Some(fasync::Task::spawn(
                 SerialConfig::new(config.allow_serial_logs, config.deny_serial_log_tags)
-                    .write_logs(Arc::clone(&logs_repo), SerialSink::default()),
+                    .write_logs(Arc::clone(&logs_repo), SerialSink),
             ))
         } else {
             None
