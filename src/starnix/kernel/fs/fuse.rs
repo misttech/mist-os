@@ -6,9 +6,10 @@ use crate::{
     auth::FsCred,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, fs_args, CacheMode, DirentSink, FdEvents, FdNumber, FileObject,
-        FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode,
-        FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SymlinkTarget, XattrOp,
+        default_seek, fileops_impl_nonseekable, fs_args, CacheMode, DirentSink, FdEvents, FdNumber,
+        FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
+        FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SymlinkTarget,
+        XattrOp,
     },
     lock::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard},
     logging::{log_error, log_trace, not_implemented},
@@ -22,7 +23,7 @@ use crate::{
     },
 };
 use std::{
-    collections::{btree_map::Entry, BTreeMap, VecDeque},
+    collections::{hash_map::Entry, HashMap, VecDeque},
     sync::Arc,
 };
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
@@ -349,13 +350,44 @@ impl FileOps for FuseFileObject {
 
     fn seek(
         &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _current_offset: off_t,
-        _target: SeekTarget,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        current_offset: off_t,
+        target: SeekTarget,
     ) -> Result<off_t, Errno> {
-        not_implemented!("FileOps::seek");
-        error!(ENOTSUP)
+        // Only delegate SEEK_DATA and SEEK_HOLE to the userspace process.
+        if matches!(target, SeekTarget::Data(_) | SeekTarget::Hole(_)) {
+            let node = self.get_fuse_node(file)?;
+            let response = self.connection.execute_operation(
+                current_task,
+                node,
+                FuseOperation::Seek(uapi::fuse_lseek_in {
+                    fh: self.open_out.fh,
+                    offset: target.offset().try_into().map_err(|_| errno!(EINVAL))?,
+                    whence: target.whence(),
+                    padding: 0,
+                }),
+            );
+            match response {
+                Ok(response) => {
+                    let seek_out = if let FuseResponse::Seek(seek_out) = response {
+                        seek_out
+                    } else {
+                        return error!(EINVAL);
+                    };
+                    return seek_out.offset.try_into().map_err(|_| errno!(EINVAL));
+                }
+                // If errno is ENOSYS, the userspace process doesn't support the seek operation and
+                // the default seek must be used.
+                Err(errno) if errno == ENOSYS => {}
+                Err(errno) => return Err(errno),
+            };
+        }
+
+        default_seek(current_offset, target, |offset| {
+            let file_size = file.node().stat(current_task)?.st_size as off_t;
+            offset.checked_add(file_size).ok_or_else(|| errno!(EINVAL))
+        })
     }
 
     fn readdir(
@@ -588,8 +620,8 @@ impl FuseConnection {
         let waiter = Waiter::new();
         let is_async = operation.is_async();
         let mut state = self.state.lock();
-        if let Some(result) = operation.short_circuit(&state.operations_state) {
-            return result;
+        if let Some(result) = state.operations_state.get(&operation.opcode()) {
+            return result.clone();
         }
         let unique_id = state.queue_operation(task, node, operation, Some(&waiter))?;
         if is_async {
@@ -644,12 +676,10 @@ impl FuseConnection {
 ///
 /// For a number of Fuse operation, Fuse protocol specifies that if they fail in a specific way,
 /// they should not be sent to the server again and must be handled in a predefined way. This
-/// structure keep track of these operations for a given connection.
-#[derive(Debug, Default)]
-struct OperationsState {
-    /// Whether flush calls must be discarded and considered successful.
-    discard_flush: bool,
-}
+/// map keep track of these operations for a given connection. If this map contains a result for a
+/// given opcode, any further attempt to send this opcode to userspace will be answered with the
+/// content of the map.
+type OperationsState = HashMap<uapi::fuse_opcode, Result<FuseResponse, Errno>>;
 
 #[derive(Debug, Default)]
 struct FuseMutableState {
@@ -660,7 +690,7 @@ struct FuseMutableState {
     last_unique_id: u64,
 
     /// In progress operations.
-    operations: BTreeMap<u64, RunningOperation>,
+    operations: HashMap<u64, RunningOperation>,
 
     /// Enqueued messages. These messages have not yet been sent to userspace. There should be
     /// multiple queues, but for now, push every messages to the same queue.
@@ -670,6 +700,7 @@ struct FuseMutableState {
     /// Queue to notify of new messages.
     waiters: WaitQueue,
 
+    /// The state of the different operations, to allow short-circuiting the userspace process.
     operations_state: OperationsState,
 }
 
@@ -893,8 +924,22 @@ enum FuseOperation {
     Open(OpenFlags),
     Read(uapi::fuse_read_in),
     Release(uapi::fuse_open_out),
+    Seek(uapi::fuse_lseek_in),
     Statfs,
     Write(uapi::fuse_write_in, Vec<u8>),
+}
+
+#[derive(Clone, Debug)]
+enum FuseResponse {
+    Attr(uapi::fuse_attr_out),
+    Entry(uapi::fuse_entry_out),
+    Init(uapi::fuse_init_out),
+    Seek(uapi::fuse_lseek_out),
+    Open(uapi::fuse_open_out),
+    Read(Vec<u8>),
+    Statfs(uapi::fuse_statfs_out),
+    Write(uapi::fuse_write_out),
+    None,
 }
 
 impl FuseOperation {
@@ -939,6 +984,7 @@ impl FuseOperation {
                 };
                 data.write_all(message.as_bytes())
             }
+            Self::Seek(seek_in) => data.write_all(seek_in.as_bytes()),
             Self::Write(fuse_write_in, content) => {
                 let mut len = data.write_all(fuse_write_in.as_bytes())?;
                 len += data.write_all(content)?;
@@ -958,6 +1004,7 @@ impl FuseOperation {
             Self::Open(_) => uapi::fuse_opcode_FUSE_OPEN,
             Self::Read(_) => uapi::fuse_opcode_FUSE_READ,
             Self::Release(_) => uapi::fuse_opcode_FUSE_RELEASE,
+            Self::Seek(_) => uapi::fuse_opcode_FUSE_LSEEK,
             Self::Statfs => uapi::fuse_opcode_FUSE_STATFS,
             Self::Write(_, _) => uapi::fuse_opcode_FUSE_WRITE,
         }
@@ -976,6 +1023,7 @@ impl FuseOperation {
             Self::Open(_) => std::mem::size_of::<uapi::fuse_open_in>() as u32,
             Self::Read(_) => std::mem::size_of::<uapi::fuse_read_in>() as u32,
             Self::Release(_) => std::mem::size_of::<uapi::fuse_release_in>() as u32,
+            Self::Seek(_) => std::mem::size_of::<uapi::fuse_lseek_in>() as u32,
             Self::Write(_, content) => {
                 (std::mem::size_of::<uapi::fuse_write_in>() + content.len()) as u32
             }
@@ -1015,6 +1063,9 @@ impl FuseOperation {
             Self::Statfs => {
                 Ok(FuseResponse::Statfs(Self::to_response::<uapi::fuse_statfs_out>(&buffer)))
             }
+            Self::Seek(_) => {
+                Ok(FuseResponse::Seek(Self::to_response::<uapi::fuse_lseek_out>(&buffer)))
+            }
             Self::Write(_, _) => {
                 Ok(FuseResponse::Write(Self::to_response::<uapi::fuse_write_out>(&buffer)))
             }
@@ -1033,16 +1084,6 @@ impl FuseOperation {
         Ok(())
     }
 
-    /// Short circuit calling the userspace daemon if required.
-    ///
-    /// Returns None if the userspace daemon needs to be called. Returns Some(response) otherwise.
-    fn short_circuit(&self, state: &OperationsState) -> Option<Result<FuseResponse, Errno>> {
-        match self {
-            Self::Flush(_) if state.discard_flush => Some(Ok(FuseResponse::None)),
-            _ => None,
-        }
-    }
-
     /// Handles an error from the userspace daemon.
     ///
     /// Given the `errno` returned by the userspace daemon, returns the response the caller should
@@ -1054,22 +1095,14 @@ impl FuseOperation {
     ) -> Result<FuseResponse, Errno> {
         match self {
             Self::Flush(_) if errno == ENOSYS => {
-                state.discard_flush = true;
+                state.insert(uapi::fuse_opcode_FUSE_FLUSH, Ok(FuseResponse::None));
                 Ok(FuseResponse::None)
+            }
+            Self::Seek(_) if errno == ENOSYS => {
+                state.insert(uapi::fuse_opcode_FUSE_LSEEK, Err(errno.clone()));
+                Err(errno)
             }
             _ => Err(errno),
         }
     }
-}
-
-#[derive(Debug)]
-enum FuseResponse {
-    Attr(uapi::fuse_attr_out),
-    Entry(uapi::fuse_entry_out),
-    Init(uapi::fuse_init_out),
-    Open(uapi::fuse_open_out),
-    Read(Vec<u8>),
-    Statfs(uapi::fuse_statfs_out),
-    Write(uapi::fuse_write_out),
-    None,
 }

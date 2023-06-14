@@ -182,4 +182,24 @@ TEST_F(FuseTest, Statfs) {
   ASSERT_EQ(stats.f_type, FUSE_SUPER_MAGIC);
 }
 
+TEST_F(FuseTest, Seek) {
+  ASSERT_TRUE(Mount());
+  ScopedFD fd(open((GetMountDir() + "/witness").c_str(), O_RDONLY));
+  ASSERT_TRUE(fd.is_valid());
+  char buffer[100];
+  ASSERT_EQ(read(fd.get(), buffer, 100), 6);
+  ASSERT_EQ(strncmp(buffer, "hello\n", 6), 0);
+  ASSERT_EQ(lseek(fd.get(), 0, SEEK_CUR), 6);
+  ASSERT_EQ(lseek(fd.get(), -5, SEEK_END), 1);
+  ASSERT_EQ(read(fd.get(), buffer, 100), 5);
+  ASSERT_EQ(strncmp(buffer, "ello\n", 5), 0);
+
+  ASSERT_EQ(lseek(fd.get(), 1, SEEK_DATA), 1);
+  ASSERT_EQ(lseek(fd.get(), 7, SEEK_DATA), -1);
+  ASSERT_EQ(errno, ENXIO);
+  ASSERT_EQ(lseek(fd.get(), 0, SEEK_HOLE), 6);
+  ASSERT_EQ(lseek(fd.get(), 7, SEEK_HOLE), -1);
+  ASSERT_EQ(errno, ENXIO);
+}
+
 #endif  // SRC_STARNIX_TESTS_SYSCALLS_PROC_TEST_H_

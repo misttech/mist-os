@@ -49,6 +49,26 @@ impl SeekTarget {
             _ => error!(EINVAL),
         }
     }
+
+    pub fn whence(&self) -> u32 {
+        match self {
+            Self::Set(_) => SEEK_SET,
+            Self::Cur(_) => SEEK_CUR,
+            Self::End(_) => SEEK_END,
+            Self::Data(_) => SEEK_DATA,
+            Self::Hole(_) => SEEK_HOLE,
+        }
+    }
+
+    pub fn offset(&self) -> off_t {
+        match self {
+            Self::Set(off)
+            | Self::Cur(off)
+            | Self::End(off)
+            | Self::Data(off)
+            | Self::Hole(off) => *off,
+        }
+    }
 }
 
 /// This function adds `POLLRDNORM` and `POLLWRNORM` to the FdEvents
