@@ -297,7 +297,14 @@ zx_status_t ForEachModule(const zx::process& process, ModuleAction action) {
           break;
         }
         if (dyn.d_tag == DT_STRTAB) {
-          strtab = map.base + dyn.d_un.d_val;
+          // Glibc will relocate the entries in the dynamic table if it's not readonly. Other libc's
+          // such as bionic or musl won't. Use a heuristic here to detect: if the value is larger
+          // than map.base, it's considered an address. Otherwise it's an offset.
+          if (dyn.d_un.d_val >= map.base) {
+            strtab = dyn.d_un.d_val;
+          } else {
+            strtab = map.base + dyn.d_un.d_val;
+          }
         } else if (dyn.d_tag == DT_SONAME) {
           soname_offset = dyn.d_un.d_val;
         } else if (dyn.d_tag == DT_NULL) {

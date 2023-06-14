@@ -199,12 +199,16 @@ TEST(ElfSearchTest, ForEachModule) {
   constexpr uint8_t mod3_build_id[] = {0x12, 0x34, 0x56, 0x78};
   constexpr Elf64_Dyn mod3_dyns[] = {{DT_STRTAB, {0x1900}}, {DT_SONAME, {1}}, {DT_NULL, {}}};
   constexpr const char* mod3_soname = "soname";
-  // mod4 has `-z noseparate-code`, i.e., multiple PT_LOAD segments live on the same page.
+  // mod4 has `-z noseparate-code`, i.e., multiple PT_LOAD segments live on the same page,
+  // and has r/w dynamic table so the values in it are absolute addresses rather than offsets.
   constexpr Elf64_Phdr mod4_phdrs[] = {MakePhdr(PT_LOAD, 0x950, 0, 0, PF_R, 0x1000),
                                        MakePhdr(PT_LOAD, 0x2b0, 0x950, 0x1950, PF_R | PF_X, 0x1000),
                                        MakePhdr(PT_LOAD, 0x258, 0xc00, 0x2c00, PF_R | PF_W, 0x1000),
+                                       MakePhdr(PT_DYNAMIC, 0x100, 0xc00, 0x2c00, PF_R | PF_W, 8),
                                        MakePhdr(PT_NOTE, 20, 0x270, 0x270, PF_R, 4)};
   constexpr uint8_t mod4_build_id[] = {0x44, 0x33, 0x22, 0x11};
+  Elf64_Dyn mod4_dyns[] = {{DT_STRTAB, {0x900}}, {DT_SONAME, {1}}, {DT_NULL, {}}};
+  constexpr const char* mod4_soname = "another_soname";
   Module mods[] = {
       {"mod0", mod0_phdrs, mod0_build_id, {}}, {"mod1", mod1_phdrs, mod1_build_id, {}},
       {"mod2", mod2_phdrs, mod2_build_id, {}}, {"mod3", mod3_phdrs, mod3_build_id, {}},
@@ -235,7 +239,17 @@ TEST(ElfSearchTest, ForEachModule) {
       EXPECT_OK(mods[3].vmo.write(&mod3_dyns, 0x1800, sizeof(mod3_dyns)));
       EXPECT_OK(mods[3].vmo.write(mod3_soname, 0x1901, strlen(mod3_soname) + 1));
     }
+    if (mod.name == "mod4") {
+      // Setup mod4's dynamic table, otherwise LoadElf will fail.
+      EXPECT_OK(mods[4].vmo.write(&mod4_dyns, 0xc00, sizeof(mod4_dyns)));
+    }
     ASSERT_OK(LoadElf(vmar, mod.vmo, base, entry), "Unable to load extra ELF");
+    if (mod.name == "mod4") {
+      // Relocate the dynamic table and populate the soname.
+      mod4_dyns[0].d_un.d_val += base;
+      EXPECT_OK(mods[4].vmo.write(&mod4_dyns, 0xc00, sizeof(mod4_dyns)));
+      EXPECT_OK(mods[4].vmo.write(mod4_soname, 0x901, strlen(mod4_soname) + 1));
+    }
   }
   zx::process process;
   EXPECT_NE(ZX_HANDLE_INVALID,
@@ -267,11 +281,13 @@ TEST(ElfSearchTest, ForEachModule) {
         char name[ZX_MAX_NAME_LEN];
         zx_koid_t vmo_koid = 0;
         ASSERT_NO_FATAL_FAILURE(GetKoid(mod.vmo, &vmo_koid));
-        if (mod.name != "mod3") {
+        if (mod.name == "mod3") {
+          snprintf(name, sizeof(name), "%s", mod3_soname);
+        } else if (mod.name == "mod4") {
+          snprintf(name, sizeof(name), "%s", mod4_soname);
+        } else {
           snprintf(name, sizeof(name), "<VMO#%" PRIu64 "=%.*s>", vmo_koid,
                    static_cast<int>(mod.name.size()), mod.name.data());
-        } else {
-          snprintf(name, sizeof(name), "%s", mod3_soname);
         }
         EXPECT_STREQ(info.name, name);
         EXPECT_EQ(mod.phdrs.size(), info.phdrs.size(), "expected same number of phdrs");
