@@ -9,6 +9,11 @@ import("//build/dart/dart_test_component.gni")
 import("//build/dart/test.gni")
 import("//build/testing/environments.gni")  # Do we need this?
 
+group("tests") {
+  testonly = true
+  deps = [ ":inspect_validator_test_dart" ]
+}
+
 dart_library("lib") {
   package_name = "validator_puppet"
   sources = [ "main.dart" ]
@@ -34,8 +39,25 @@ dart_component("puppet_component") {
   deps = [ ":lib" ]
 }
 
+# The parent component of #validator and #puppet.
+fuchsia_test_component("inspect_validator_test_component") {
+  component_name = "validator_test"
+  manifest = "meta/test.cml"
+}
+
 fuchsia_package("dart") {
   testonly = true
   package_name = "dart_puppet"
   deps = [ ":puppet_component" ]
+}
+
+fuchsia_test_package("inspect_validator_test_dart") {
+  subpackages = [ "//src/diagnostics/validator/inspect:validator" ]
+  renameable_subpackages = [
+    {
+      name = "puppet"
+      package = "//sdk/dart/fuchsia_inspect/test/validator_puppet:dart"
+    },
+  ]
+  test_components = [ ":inspect_validator_test_component" ]
 }

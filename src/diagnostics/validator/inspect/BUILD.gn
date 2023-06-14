@@ -10,7 +10,6 @@ group("tests") {
 
   deps = [
     ":inspect_validator_test_cpp",
-    ":inspect_validator_test_dart",
     ":inspect_validator_test_rust",
     ":inspect_validator_unittest",
   ]
@@ -131,17 +130,6 @@ fuchsia_test_package("inspect_validator_test_cpp") {
     {
       name = "puppet"
       package = "//src/diagnostics/validator/inspect/lib/cpp"
-    },
-  ]
-  test_components = [ ":inspect_validator_test_executor" ]
-}
-
-fuchsia_test_package("inspect_validator_test_dart") {
-  subpackages = [ ":validator" ]
-  renameable_subpackages = [
-    {
-      name = "puppet"
-      package = "//sdk/dart/fuchsia_inspect/test/validator_puppet:dart"
     },
   ]
   test_components = [ ":inspect_validator_test_executor" ]
