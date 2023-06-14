@@ -70,7 +70,7 @@ static const zbi_dcfg_arm_generic_timer_driver_t timer_driver = {
 static const zbi_platform_id_t platform_id = {
     .vid = PDEV_VID_QEMU,
     .pid = PDEV_PID_QEMU,
-    .board_name = "qemu",
+    .board_name = "qemu-arm64",
 };
 
 static int saved_gic_version = -1;
