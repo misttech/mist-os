@@ -458,3 +458,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0220_the_future_of_in_tree_products.md
   - title: "RFC-0221: Python for out-of-tree system testing"
     path: /docs/contribute/governance/rfcs/0221_python_for_out-of-tree_system_testing.md
+  - title: "RFC-0222: Fuchsia Controller"
+    path: /docs/contribute/governance/rfcs/0222_fuchsia_controller.md

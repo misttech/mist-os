@@ -2892,3 +2892,16 @@
   reviewers: ['abarth@google.com', 'cpu@google.com', 'jamesr@google.com', 'keir@google.com', 'rlb@google.com']
   submitted: '2023-04-27'
   reviewed: '2023-06-13'
+
+- name: 'RFC-0222'
+  title: 'Introduce Fuchsia Controller'
+  short_description: 'Adding the Fuchsia Controller for host-side scripting and testing of Fuchsia Devices'
+  authors: ['awdavies@google.com']
+  file: '0222_fuchsia_controller.md'
+  area: ['Developer', 'FIDL', 'Testing']
+  gerrit_change_id: ['761117']
+  status: 'Accepted'
+  issue: []
+  reviewers: ['jeremymanson@google.com', 'mgnb@google.com', 'ianloic@google.com', 'chok@google.com', 'hjfreyer@google.com', 'jzgriffin@google.com']
+  submitted: '2022-11-17'
+  reviewed: '2023-06-13'
