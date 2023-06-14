@@ -235,8 +235,12 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// the Linux UAPI.
     ///
     /// See https://linux.die.net/man/2/poll
-    fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
-        FdEvents::POLLIN | FdEvents::POLLOUT
+    fn query_events(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        Ok(FdEvents::POLLIN | FdEvents::POLLOUT)
     }
 
     fn ioctl(
@@ -664,8 +668,12 @@ impl FileOps for ProxyFileOps {
         ) -> Result<SyscallResult, Errno>;
     }
     // These don't take &FileObject making it too hard to handle them properly in the macro
-    fn query_events(&self, current_task: &CurrentTask) -> FdEvents {
-        self.0.ops().query_events(current_task)
+    fn query_events(
+        &self,
+        file: &FileObject,
+        current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        self.0.ops().query_events(file, current_task)
     }
     fn has_persistent_offsets(&self) -> bool {
         self.0.ops().has_persistent_offsets()
@@ -1151,8 +1159,8 @@ impl FileObject {
     }
 
     /// The events currently active on this file.
-    pub fn query_events(&self, current_task: &CurrentTask) -> FdEvents {
-        add_equivalent_fd_events(self.ops().query_events(current_task))
+    pub fn query_events(&self, current_task: &CurrentTask) -> Result<FdEvents, Errno> {
+        self.ops().query_events(self, current_task).map(add_equivalent_fd_events)
     }
 
     pub fn record_lock(

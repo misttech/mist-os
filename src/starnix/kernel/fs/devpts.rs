@@ -310,8 +310,12 @@ impl FileOps for DevPtmxFile {
         Some(self.terminal.main_wait_async(waiter, events, handler))
     }
 
-    fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
-        self.terminal.main_query_events()
+    fn query_events(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        Ok(self.terminal.main_query_events())
     }
 
     fn ioctl(
@@ -401,8 +405,12 @@ impl FileOps for DevPtsFile {
         Some(self.terminal.replica_wait_async(waiter, events, handler))
     }
 
-    fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
-        self.terminal.replica_query_events()
+    fn query_events(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        Ok(self.terminal.replica_query_events())
     }
 
     fn ioctl(
@@ -995,8 +1003,9 @@ mod tests {
         let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
         let pts = open_file(&task, fs, b"0").expect("open file");
 
-        let has_data_ready_to_read =
-            |fd: &FileHandle| fd.query_events(&task).contains(FdEvents::POLLIN);
+        let has_data_ready_to_read = |fd: &FileHandle| {
+            fd.query_events(&task).expect("query_events").contains(FdEvents::POLLIN)
+        };
 
         let write_and_assert = |fd: &FileHandle, data: &[u8]| {
             assert_eq!(fd.write(&task, &mut VecInputBuffer::new(data)).expect("write"), data.len());

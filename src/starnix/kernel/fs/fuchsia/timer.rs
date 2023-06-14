@@ -257,11 +257,15 @@ impl FileOps for TimerFile {
         }))
     }
 
-    fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
+    fn query_events(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
         let observed = match self.timer.wait_handle(zx::Signals::TIMER_SIGNALED, zx::Time::ZERO) {
             Err(zx::Status::TIMED_OUT) => zx::Signals::empty(),
             res => res.unwrap(),
         };
-        TimerFile::get_events_from_signals(observed)
+        Ok(TimerFile::get_events_from_signals(observed))
     }
 }

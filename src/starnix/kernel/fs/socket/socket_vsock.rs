@@ -185,7 +185,11 @@ impl SocketOps for VsockSocket {
         }
     }
 
-    fn query_events(&self, _socket: &Socket, current_task: &CurrentTask) -> FdEvents {
+    fn query_events(
+        &self,
+        _socket: &Socket,
+        current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
         self.lock().query_events(current_task)
     }
 
@@ -264,10 +268,10 @@ impl VsockSocket {
 }
 
 impl VsockSocketInner {
-    fn query_events(&self, current_task: &CurrentTask) -> FdEvents {
-        match &self.state {
+    fn query_events(&self, current_task: &CurrentTask) -> Result<FdEvents, Errno> {
+        Ok(match &self.state {
             VsockSocketState::Disconnected => FdEvents::empty(),
-            VsockSocketState::Connected(file) => file.query_events(current_task),
+            VsockSocketState::Connected(file) => file.query_events(current_task)?,
             VsockSocketState::Listening(queue) => {
                 if !queue.sockets.is_empty() {
                     FdEvents::POLLIN
@@ -276,7 +280,7 @@ impl VsockSocketInner {
                 }
             }
             VsockSocketState::Closed => FdEvents::POLLHUP,
-        }
+        })
     }
 }
 
@@ -406,7 +410,10 @@ mod tests {
         downcast_socket_to_vsock(&socket_object).lock().state = VsockSocketState::Connected(pipe);
         let socket = Socket::new_file(&current_task, socket_object, OpenFlags::RDWR);
 
-        assert_eq!(socket.query_events(&current_task), FdEvents::POLLOUT | FdEvents::POLLWRNORM);
+        assert_eq!(
+            socket.query_events(&current_task),
+            Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM)
+        );
 
         let epoll_object = EpollFileObject::new_file(&current_task);
         let epoll_file = epoll_object.downcast_file::<EpollFileObject>().unwrap();
@@ -420,14 +427,17 @@ mod tests {
 
         assert_eq!(
             socket.query_events(&current_task),
-            FdEvents::POLLOUT | FdEvents::POLLWRNORM | FdEvents::POLLIN | FdEvents::POLLRDNORM
+            Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM | FdEvents::POLLIN | FdEvents::POLLRDNORM)
         );
         let fds = epoll_file.wait(&current_task, 1, zx::Time::ZERO).expect("wait");
         assert_eq!(fds.len(), 1);
 
         assert_eq!(socket.read(&current_task, &mut VecOutputBuffer::new(64)).expect("read"), 1);
 
-        assert_eq!(socket.query_events(&current_task), FdEvents::POLLOUT | FdEvents::POLLWRNORM);
+        assert_eq!(
+            socket.query_events(&current_task),
+            Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM)
+        );
         let fds = epoll_file.wait(&current_task, 1, zx::Time::ZERO).expect("wait");
         assert!(fds.is_empty());
     }

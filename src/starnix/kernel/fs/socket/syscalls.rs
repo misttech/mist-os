@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon as zx;
-use std::convert::TryInto;
-use std::mem::size_of;
+use std::{convert::TryInto, mem::size_of};
 use zerocopy::AsBytes;
 
 use super::*;
@@ -274,7 +273,7 @@ pub fn sys_connect(
                 FdEvents::POLLOUT,
                 WaitCallback::none(),
             );
-            if !client_socket.query_events(current_task).contains(FdEvents::POLLOUT) {
+            if !client_socket.query_events(current_task)?.contains(FdEvents::POLLOUT) {
                 waiter.wait_until(current_task, zx::Time::INFINITE)?;
             }
             client_socket.connect(current_task, peer)

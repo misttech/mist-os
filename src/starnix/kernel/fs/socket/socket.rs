@@ -102,7 +102,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     ) -> WaitCanceler;
 
     /// Return the events that are currently active on the `socket`.
-    fn query_events(&self, socket: &Socket, current_task: &CurrentTask) -> FdEvents;
+    fn query_events(&self, socket: &Socket, current_task: &CurrentTask) -> Result<FdEvents, Errno>;
 
     /// Shuts down this socket according to how, preventing any future reads and/or writes.
     ///
@@ -404,7 +404,7 @@ impl Socket {
         self.ops.wait_async(self, current_task, waiter, events, handler)
     }
 
-    pub fn query_events(&self, current_task: &CurrentTask) -> FdEvents {
+    pub fn query_events(&self, current_task: &CurrentTask) -> Result<FdEvents, Errno> {
         self.ops.query_events(self, current_task)
     }
 

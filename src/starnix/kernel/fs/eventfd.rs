@@ -135,7 +135,11 @@ impl FileOps for EventFdFileObject {
         Some(self.inner.lock().wait_queue.wait_async_events(waiter, events, handler))
     }
 
-    fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
+    fn query_events(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
         let inner = self.inner.lock();
         // TODO check for error and HUP events
         let mut events = FdEvents::empty();
@@ -145,6 +149,6 @@ impl FileOps for EventFdFileObject {
         if inner.value < u64::MAX - 1 {
             events |= FdEvents::POLLOUT;
         }
-        events
+        Ok(events)
     }
 }

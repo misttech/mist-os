@@ -130,7 +130,7 @@ impl EpollFileObject {
         //
         // That said, if an event happens between the wait and the query_events, we'll get two
         // notifications. We handle this by deduping on the epoll_wait end.
-        let events = target.query_events(current_task);
+        let events = target.query_events(current_task)?;
         if !(events & wait_object.events).is_empty() {
             self.waiter.wake_immediately(events, self.new_wait_handler(key));
             wait_object
@@ -271,7 +271,7 @@ impl EpollFileObject {
         current_task: &CurrentTask,
         pending_list: &mut Vec<ReadyObject>,
         max_events: usize,
-    ) {
+    ) -> Result<(), Errno> {
         let mut state = self.state.write();
         while pending_list.len() < max_events && !state.trigger_list.is_empty() {
             if let Some(pending) = state.trigger_list.pop_front() {
@@ -280,18 +280,17 @@ impl EpollFileObject {
                     // out from under us. If this happens it is not an error: ignore it and
                     // continue.
                     if let Some(target) = wait.target.upgrade() {
-                        let observed = target.query_events(current_task);
+                        let observed = target.query_events(current_task)?;
                         let ready = ReadyObject { key: pending.key, observed };
                         if observed.intersects(wait.events) {
                             pending_list.push(ready);
                         } else {
                             // Another thread already handled this event, wait for another one.
                             // Files can be legitimately closed out from under us so bad file
-                            // descriptors are not an error. We do not currently expect any other
-                            // errors and it's not clear how to handle them, so warn for now.
+                            // descriptors are not an error.
                             match self.wait_on_file(current_task, pending.key, wait) {
                                 Err(err) if err == EBADF => {} // File closed.
-                                Err(err) => log_warn!("Unexpected wait result {:#?}", err),
+                                Err(err) => return Err(err),
                                 _ => {}
                             }
                         }
@@ -299,6 +298,7 @@ impl EpollFileObject {
                 }
             }
         }
+        Ok(())
     }
 
     /// Waits until an event exists in `pending_list` or until `timeout` has
@@ -344,7 +344,7 @@ impl EpollFileObject {
                 result => result?,
             }
 
-            self.process_triggered_events(current_task, pending_list, max_events);
+            self.process_triggered_events(current_task, pending_list, max_events)?;
 
             if pending_list.len() == max_events {
                 break; // No input events or output list full, nothing more we can do.
@@ -387,7 +387,7 @@ impl EpollFileObject {
         // Process any events that are already available in the triggered queue.
         // TODO(tbodt) fold this into the wait_until_pending_event loop
         let mut pending_list = vec![];
-        self.process_triggered_events(current_task, &mut pending_list, max_events);
+        self.process_triggered_events(current_task, &mut pending_list, max_events)?;
         if !pending_list.is_empty() {
             // TODO(tbodt) delete this block
             // If there are events synchronously available, don't actually wait for any more.
@@ -478,12 +478,16 @@ impl FileOps for EpollFileObject {
         Some(self.state.read().waiters.wait_async_events(waiter, events, handler))
     }
 
-    fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
+    fn query_events(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
         let mut events = FdEvents::empty();
         if self.state.read().trigger_list.is_empty() {
             events |= FdEvents::POLLIN;
         }
-        events
+        Ok(events)
     }
 }
 

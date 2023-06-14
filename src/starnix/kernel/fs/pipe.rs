@@ -367,8 +367,12 @@ impl FileOps for PipeFileObject {
         Some(self.pipe.lock().waiters.wait_async_events(waiter, events, handler))
     }
 
-    fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
-        self.pipe.lock().query_events()
+    fn query_events(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        Ok(self.pipe.lock().query_events())
     }
 
     fn fcntl(

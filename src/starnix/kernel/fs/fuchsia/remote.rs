@@ -671,8 +671,12 @@ impl FileOps for RemoteFileObject {
         Some(zxio_wait_async(&self.zxio, waiter, events, handler))
     }
 
-    fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
-        zxio_query_events(&self.zxio)
+    fn query_events(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        Ok(zxio_query_events(&self.zxio))
     }
 
     fn to_handle(
@@ -742,8 +746,12 @@ impl FileOps for RemotePipeObject {
         Some(zxio_wait_async(&self.zxio, waiter, events, handler))
     }
 
-    fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
-        zxio_query_events(&self.zxio)
+    fn query_events(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        Ok(zxio_query_events(&self.zxio))
     }
 
     fn to_handle(
@@ -844,7 +852,7 @@ mod test {
             .expect("create_fuchsia_pipe");
         let server_zxio = Zxio::create(server.into_handle()).expect("Zxio::create");
 
-        assert_eq!(pipe.query_events(&current_task), FdEvents::POLLOUT | FdEvents::POLLWRNORM);
+        assert_eq!(pipe.query_events(&current_task), Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM));
 
         let epoll_object = EpollFileObject::new_file(&current_task);
         let epoll_file = epoll_object.downcast_file::<EpollFileObject>().unwrap();
@@ -858,14 +866,14 @@ mod test {
 
         assert_eq!(
             pipe.query_events(&current_task),
-            FdEvents::POLLOUT | FdEvents::POLLWRNORM | FdEvents::POLLIN | FdEvents::POLLRDNORM
+            Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM | FdEvents::POLLIN | FdEvents::POLLRDNORM)
         );
         let fds = epoll_file.wait(&current_task, 1, zx::Time::ZERO).expect("wait");
         assert_eq!(fds.len(), 1);
 
         assert_eq!(pipe.read(&current_task, &mut VecOutputBuffer::new(64)).expect("read"), 1);
 
-        assert_eq!(pipe.query_events(&current_task), FdEvents::POLLOUT | FdEvents::POLLWRNORM);
+        assert_eq!(pipe.query_events(&current_task), Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM));
         let fds = epoll_file.wait(&current_task, 1, zx::Time::ZERO).expect("wait");
         assert!(fds.is_empty());
     }

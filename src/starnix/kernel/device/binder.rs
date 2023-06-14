@@ -139,8 +139,12 @@ impl Drop for BinderConnection {
 impl FileOps for BinderConnection {
     fileops_impl_nonseekable!();
 
-    fn query_events(&self, current_task: &CurrentTask) -> FdEvents {
-        match self.proc(current_task) {
+    fn query_events(
+        &self,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        Ok(match self.proc(current_task) {
             Ok(proc) => {
                 let binder_thread = proc.lock().find_or_register_thread(current_task.get_tid());
                 let mut thread_state = binder_thread.lock();
@@ -149,7 +153,7 @@ impl FileOps for BinderConnection {
                     .query_events()
             }
             Err(_) => FdEvents::POLLERR,
-        }
+        })
     }
 
     fn wait_async(

@@ -200,8 +200,12 @@ impl FileOps for InotifyFileObject {
         Some(waiter.fake_wait())
     }
 
-    fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
-        FdEvents::empty()
+    fn query_events(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        Ok(FdEvents::empty())
     }
 
     fn close(&self, file: &FileObject) {

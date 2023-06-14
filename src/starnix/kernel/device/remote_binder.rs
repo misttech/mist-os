@@ -101,8 +101,12 @@ impl RemoteBinderFileOps {
 impl FileOps for RemoteBinderFileOps {
     fileops_impl_nonseekable!();
 
-    fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
-        FdEvents::empty()
+    fn query_events(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        Ok(FdEvents::empty())
     }
 
     fn close(&self, _file: &FileObject) {

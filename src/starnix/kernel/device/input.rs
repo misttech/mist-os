@@ -352,12 +352,12 @@ impl FileOps for Arc<InputFile> {
         Some(self.inner.lock().waiters.wait_async_events(waiter, events, handler))
     }
 
-    fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
-        if self.inner.lock().events.is_empty() {
-            FdEvents::empty()
-        } else {
-            FdEvents::POLLIN
-        }
+    fn query_events(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        Ok(if self.inner.lock().events.is_empty() { FdEvents::empty() } else { FdEvents::POLLIN })
     }
 }
 
@@ -840,11 +840,11 @@ mod test {
     async fn query_events() {
         // Set up resources.
         let (input_file, mut touch_source_stream, relay_thread) = start_input();
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
 
         // Check initial expectation.
         assert_eq!(
-            input_file.query_events(&current_task),
+            input_file.query_events(&file_object, &current_task).expect("query_events"),
             FdEvents::empty(),
             "events should be empty before data arrives"
         );
@@ -858,7 +858,7 @@ mod test {
 
         // Check post-watch expectation.
         assert_eq!(
-            input_file.query_events(&current_task),
+            input_file.query_events(&file_object, &current_task).expect("query_events"),
             FdEvents::POLLIN,
             "events should be POLLIN after data arrives"
         );

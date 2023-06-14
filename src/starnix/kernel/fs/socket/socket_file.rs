@@ -57,7 +57,11 @@ impl FileOps for SocketFile {
         Some(self.socket.wait_async(current_task, waiter, events, handler))
     }
 
-    fn query_events(&self, current_task: &CurrentTask) -> FdEvents {
+    fn query_events(
+        &self,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
         self.socket.query_events(current_task)
     }
 
@@ -155,7 +159,7 @@ impl SocketFile {
 
             let should_wait_all = self.socket.socket_type == SocketType::Stream
                 && flags.contains(SocketMessageFlags::WAITALL)
-                && !self.socket.query_events(current_task).contains(FdEvents::POLLHUP);
+                && !self.socket.query_events(current_task)?.contains(FdEvents::POLLHUP);
             if should_wait_all && data.available() > 0 {
                 return error!(EAGAIN);
             }

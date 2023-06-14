@@ -216,8 +216,12 @@ impl SocketOps for InetSocket {
         zxio_wait_async(&self.zxio, waiter, events, handler)
     }
 
-    fn query_events(&self, _socket: &Socket, _current_task: &CurrentTask) -> FdEvents {
-        zxio_query_events(&self.zxio)
+    fn query_events(
+        &self,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        Ok(zxio_query_events(&self.zxio))
     }
 
     fn shutdown(&self, _socket: &Socket, how: SocketShutdownFlags) -> Result<(), Errno> {

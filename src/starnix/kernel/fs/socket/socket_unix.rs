@@ -521,7 +521,11 @@ impl SocketOps for UnixSocket {
         self.lock().waiters.wait_async_events(waiter, events, handler)
     }
 
-    fn query_events(&self, _socket: &Socket, _current_task: &CurrentTask) -> FdEvents {
+    fn query_events(
+        &self,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
         // Note that self.lock() must be dropped before acquiring peer.inner.lock() to avoid
         // potential deadlocks.
         let (mut events, peer) = {
@@ -564,7 +568,7 @@ impl SocketOps for UnixSocket {
             }
         }
 
-        events
+        Ok(events)
     }
 
     /// Shuts down this socket according to how, preventing any future reads and/or writes.
@@ -895,7 +899,7 @@ mod tests {
         connecting_socket
             .connect(&current_task, SocketPeer::Handle(socket.clone()))
             .expect("Failed to connect socket.");
-        assert_eq!(FdEvents::POLLIN, socket.query_events(&current_task));
+        assert_eq!(Ok(FdEvents::POLLIN), socket.query_events(&current_task));
         let server_socket = socket.accept().unwrap();
 
         let opt_size = std::mem::size_of::<socklen_t>();

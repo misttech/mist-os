@@ -114,12 +114,16 @@ impl FileOps for SignalFd {
         Some(task_state.signals.signal_wait.wait_async_events(waiter, events, handler))
     }
 
-    fn query_events(&self, current_task: &CurrentTask) -> FdEvents {
+    fn query_events(
+        &self,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
         let mut events = FdEvents::empty();
         if current_task.read().signals.is_any_allowed_by_mask(self.mask.lock().to_inverted()) {
             events |= FdEvents::POLLIN;
         }
-        events
+        Ok(events)
     }
 
     fn write(

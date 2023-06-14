@@ -69,8 +69,12 @@ impl FileOps for DevFuse {
         self.connection.wait_async(waiter, events, handler)
     }
 
-    fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
-        self.connection.query_events()
+    fn query_events(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        Ok(self.connection.query_events())
     }
 }
 

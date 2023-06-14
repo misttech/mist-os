@@ -460,8 +460,12 @@ impl SocketOps for BaseNetlinkSocket {
         self.lock().wait_async(waiter, events, handler)
     }
 
-    fn query_events(&self, _socket: &Socket, _current_task: &CurrentTask) -> FdEvents {
-        self.lock().query_events() & FdEvents::POLLIN
+    fn query_events(
+        &self,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        Ok(self.lock().query_events() & FdEvents::POLLIN)
     }
 
     fn shutdown(&self, _socket: &Socket, _how: SocketShutdownFlags) -> Result<(), Errno> {
@@ -615,8 +619,12 @@ impl SocketOps for UEventNetlinkSocket {
         self.lock().wait_async(waiter, events, handler)
     }
 
-    fn query_events(&self, _socket: &Socket, _current_task: &CurrentTask) -> FdEvents {
-        self.lock().query_events() & FdEvents::POLLIN
+    fn query_events(
+        &self,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        Ok(self.lock().query_events() & FdEvents::POLLIN)
     }
 
     fn shutdown(&self, _socket: &Socket, _how: SocketShutdownFlags) -> Result<(), Errno> {
@@ -916,9 +924,13 @@ impl SocketOps for RouteNetlinkSocket {
         inner.lock().wait_async(waiter, events, handler)
     }
 
-    fn query_events(&self, _socket: &Socket, _current_task: &CurrentTask) -> FdEvents {
+    fn query_events(
+        &self,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
         let RouteNetlinkSocket { inner, client: _, message_sender: _ } = self;
-        inner.lock().query_events() & FdEvents::POLLIN
+        Ok(inner.lock().query_events() & FdEvents::POLLIN)
     }
 
     fn shutdown(&self, _socket: &Socket, _how: SocketShutdownFlags) -> Result<(), Errno> {
