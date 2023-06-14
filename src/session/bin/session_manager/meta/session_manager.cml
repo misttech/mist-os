@@ -343,6 +343,17 @@
             availability: "same_as_target",
         },
         {
+            // Routed to session-manager via audio_device_registry
+            protocol: [
+                "fuchsia.audio.device.ControlCreator",
+                "fuchsia.audio.device.Provider",
+                "fuchsia.audio.device.Registry",
+            ],
+            from: "parent",
+            to: "#session",
+            availability: "same_as_target",
+        },
+        {
             // Routed to session-manager from core.cml in all products.
             // i.e. not via a core realm shard.
             protocol: [

@@ -6,28 +6,6 @@
         {
             name: "audio_device_registry",
             url: "fuchsia-pkg://fuchsia.com/audio_device_registry#meta/audio_device_registry.cm",
-            startup: "eager",
-        },
-    ],
-    capabilities: [
-        {
-            // Make these available to v1 components...
-            protocol: [
-                "fuchsia.audio.device.ControlCreator",
-                "fuchsia.audio.device.Provider",
-                "fuchsia.audio.device.Registry",
-            ],
-        },
-    ],
-    use: [
-        {
-            // ... after consuming them from v2 components...
-            protocol: [
-                "fuchsia.audio.device.ControlCreator",
-                "fuchsia.audio.device.Provider",
-                "fuchsia.audio.device.Registry",
-            ],
-            from: "#audio_device_registry",
         },
     ],
     offer: [

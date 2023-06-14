@@ -35,6 +35,16 @@
             source_availability: "unknown",
         },
         {
+            protocol: [
+                "fuchsia.audio.device.ControlCreator",
+                "fuchsia.audio.device.Provider",
+                "fuchsia.audio.device.Registry",
+            ],
+            from: "#audio_device_registry",
+            to: "#session-manager",
+            source_availability: "unknown",
+        },
+        {
             protocol: "fuchsia.power.battery.BatteryManager",
             from: "#battery_manager",
             to: "#session-manager",
