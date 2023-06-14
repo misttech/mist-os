@@ -17,7 +17,10 @@ use {
     anyhow::{bail, Context, Error},
     async_trait::async_trait,
     fs_management::format::DiskFormat,
-    std::collections::BTreeMap,
+    std::{
+        collections::BTreeMap,
+        sync::atomic::{AtomicBool, Ordering},
+    },
 };
 
 #[async_trait]
@@ -187,17 +190,24 @@ struct FxblobMatcher {
     // If this partition is required to exist on a ramdisk, then this contains the prefix it should
     // have.
     ramdisk_required: Option<String>,
+    // Because this matcher binds to the system Fxfs component, we can only match on it once.
+    // TODO(fxbug.dev/128655): Can we be more precise here, e.g. give the matcher an expected device
+    // path based on system configuration?
+    already_matched: AtomicBool,
 }
 
 impl FxblobMatcher {
     fn new(ramdisk_required: Option<String>) -> Self {
-        Self { ramdisk_required }
+        Self { ramdisk_required, already_matched: AtomicBool::new(false) }
     }
 }
 
 #[async_trait]
 impl Matcher for FxblobMatcher {
     async fn match_device(&self, device: &mut dyn Device) -> bool {
+        if self.already_matched.load(Ordering::Relaxed) {
+            return false;
+        }
         if let Some(ramdisk_prefix) = &self.ramdisk_required {
             if !device.topological_path().starts_with(ramdisk_prefix) {
                 return false;
@@ -211,6 +221,7 @@ impl Matcher for FxblobMatcher {
         device: &mut dyn Device,
         env: &mut dyn Environment,
     ) -> Result<(), Error> {
+        self.already_matched.store(true, Ordering::Relaxed);
         env.mount_fxblob(device).await?;
         env.mount_blob_volume().await?;
         env.mount_data_volume().await?;
@@ -915,6 +926,21 @@ mod tests {
         );
 
         assert!(matchers
+            .match_device(
+                &mut MockDevice::new()
+                    .set_content_format(DiskFormat::Fxfs)
+                    .set_partition_label(DATA_PARTITION_LABEL)
+                    .set_partition_type(&DATA_TYPE_GUID),
+                &mut MockEnv::new()
+                    .expect_mount_fxblob()
+                    .expect_mount_blob_volume()
+                    .expect_mount_data_volume()
+            )
+            .await
+            .expect("match_device failed"));
+
+        // We should only be able to match Fxblob once.
+        assert!(!matchers
             .match_device(
                 &mut MockDevice::new()
                     .set_content_format(DiskFormat::Fxfs)
