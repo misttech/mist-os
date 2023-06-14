@@ -4,3 +4,6 @@
 set noparent
 
 include /sdk/fidl/OWNERS
+
+# Add access for platform version roller
+per-file version_history.json=global-integration-roller@fuchsia-infra.iam.gserviceaccount.com
