@@ -564,6 +564,10 @@ impl PagedObjectHandle {
     }
 
     async fn flush_impl(&self) -> Result<(), Error> {
+        if !self.needs_flush() {
+            return Ok(());
+        }
+
         let store = self.handle.store();
         let fs = store.filesystem();
         // If the VMO is shrunk between getting the VMO's size and calling query_dirty_ranges or
@@ -785,11 +789,25 @@ impl PagedObjectHandle {
 
     /// Returns true if the handle needs flushing.
     pub fn needs_flush(&self) -> bool {
-        let inner = self.inner.lock().unwrap();
-        inner.dirty_crtime.needs_flush()
+        let mut inner = self.inner.lock().unwrap();
+        if inner.dirty_crtime.needs_flush()
             || inner.dirty_mtime.needs_flush()
             || inner.dirty_page_count > 0
             || inner.pending_shrink != PendingShrink::None
+        {
+            return true;
+        }
+        match self.was_file_modified_since_last_call() {
+            Ok(true) => {
+                inner.dirty_mtime = DirtyTimestamp::Some(Timestamp::now());
+                true
+            }
+            Ok(false) => false,
+            Err(_) => {
+                // We can't return errors, so play it safe and assume the file needs flushing.
+                true
+            }
+        }
     }
 }
 
@@ -1679,5 +1697,35 @@ mod tests {
         volume.volume().scope().wait().await;
         volume.volume().terminate().await;
         fs.close().await.expect("close filesystem failed");
+    }
+
+    // Growing the file isn't tracked by `truncate` and if it's to a page boundary then the
+    // kernel won't mark a page as dirty.
+    #[fuchsia::test]
+    async fn test_needs_flush_after_growing_file_to_page_boundary() {
+        let fixture = TestFixture::new_unencrypted().await;
+        let root = fixture.root();
+
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+        let page_size = zx::system_get_page_size() as u64;
+        file.resize(page_size).await.unwrap().map_err(zx::ok).unwrap();
+        close_file_checked(file).await;
+
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+        let attrs = get_attrs_checked(&file).await;
+        assert_eq!(attrs.content_size, page_size);
+
+        close_file_checked(file).await;
+        fixture.close().await;
     }
 }

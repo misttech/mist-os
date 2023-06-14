@@ -107,7 +107,7 @@ impl<S: crate::NonMetaStorage> vfs::file::File for MetaAsFile<S> {
         Err(zx::Status::NOT_SUPPORTED)
     }
 
-    async fn sync(&self) -> Result<(), zx::Status> {
+    async fn sync(&self, _mode: vfs::file::SyncMode) -> Result<(), zx::Status> {
         Err(zx::Status::NOT_SUPPORTED)
     }
 }
@@ -394,6 +394,9 @@ mod tests {
     async fn file_sync() {
         let (_env, meta_as_file) = TestEnv::new().await;
 
-        assert_eq!(File::sync(&meta_as_file).await, Err(zx::Status::NOT_SUPPORTED));
+        assert_eq!(
+            File::sync(&meta_as_file, Default::default()).await,
+            Err(zx::Status::NOT_SUPPORTED)
+        );
     }
 }

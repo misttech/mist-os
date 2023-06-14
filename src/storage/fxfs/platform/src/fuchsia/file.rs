@@ -29,7 +29,7 @@ use {
     std::{
         ops::Range,
         sync::{
-            atomic::{AtomicBool, AtomicUsize, Ordering},
+            atomic::{AtomicUsize, Ordering},
             Arc,
         },
     },
@@ -38,7 +38,7 @@ use {
         common::rights_to_posix_mode_bits,
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
-        file::{File, FileOptions, GetVmo, StreamIoConnection},
+        file::{File, FileOptions, GetVmo, StreamIoConnection, SyncMode},
         path::Path,
         ObjectRequestRef, ProtocolsExt, ToObjectRequest,
     },
@@ -53,7 +53,6 @@ const PURGED: usize = 1 << (usize::BITS - 1);
 pub struct FxFile {
     handle: PagedObjectHandle,
     open_count: AtomicUsize,
-    has_written: AtomicBool,
 }
 
 impl FxFile {
@@ -61,7 +60,6 @@ impl FxFile {
         let file = Arc::new(Self {
             handle: PagedObjectHandle::new(handle),
             open_count: AtomicUsize::new(0),
-            has_written: AtomicBool::new(false),
         });
 
         file.handle.owner().pager().register_file(&file);
@@ -126,7 +124,6 @@ impl FxFile {
             .overwrite(offset, buf.as_mut(), true)
             .await
             .map_err(map_to_status)?;
-        self.has_written.store(true, Ordering::Relaxed);
         Ok(content.len() as u64)
     }
 
@@ -313,7 +310,6 @@ impl File for FxFile {
 
     async fn truncate(&self, length: u64) -> Result<(), Status> {
         self.handle.truncate(length).await.map_err(map_to_status)?;
-        self.has_written.store(true, Ordering::Relaxed);
         Ok(())
     }
 
@@ -374,7 +370,6 @@ impl File for FxFile {
             return Ok(());
         }
         self.handle.write_timestamps(crtime, mtime).await.map_err(map_to_status)?;
-        self.has_written.store(true, Ordering::Relaxed);
         Ok(())
     }
 
@@ -398,11 +393,21 @@ impl File for FxFile {
         basic.remove_extended_attribute(name).await.map_err(map_to_status)
     }
 
-    async fn sync(&self) -> Result<(), Status> {
+    async fn sync(&self, mode: SyncMode) -> Result<(), Status> {
         self.handle.flush().await.map_err(map_to_status)?;
+
         // TODO(fxbug.dev/96085): at the moment, this doesn't send a flush to the device, which
         // doesn't match minfs.
-        self.handle.store().filesystem().sync(SyncOptions::default()).await.map_err(map_to_status)
+        if mode == SyncMode::Normal {
+            self.handle
+                .store()
+                .filesystem()
+                .sync(SyncOptions::default())
+                .await
+                .map_err(map_to_status)?;
+        }
+
+        Ok(())
     }
 
     fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {
@@ -507,7 +512,6 @@ impl PagerBackedVmo for FxFile {
 
     async fn mark_dirty(self: Arc<Self>, range: Range<u64>) {
         async_enter!("mark_dirty");
-        self.has_written.store(true, Ordering::Relaxed);
         self.handle.mark_dirty(range).await;
     }
 

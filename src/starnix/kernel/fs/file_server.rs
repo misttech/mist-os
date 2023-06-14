@@ -422,7 +422,7 @@ impl file::File for StarnixNodeConnection {
         StarnixNodeConnection::set_attrs(self, flags, attributes)?;
         Ok(())
     }
-    async fn sync(&self) -> Result<(), zx::Status> {
+    async fn sync(&self, _mode: file::SyncMode) -> Result<(), zx::Status> {
         Ok(())
     }
 }

@@ -26,7 +26,7 @@ use {
     vfs::{
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
-        file::{FidlIoConnection, File as VfsFile, FileIo as VfsFileIo, FileOptions},
+        file::{FidlIoConnection, File as VfsFile, FileIo as VfsFileIo, FileOptions, SyncMode},
         path::Path,
         ObjectRequestRef, ToObjectRequest,
     },
@@ -309,7 +309,7 @@ impl VfsFile for FatFile {
         Ok(file.len() as u64)
     }
 
-    async fn sync(&self) -> Result<(), Status> {
+    async fn sync(&self, _mode: SyncMode) -> Result<(), Status> {
         let fs_lock = self.filesystem.lock().unwrap();
         let file = self.borrow_file_mut(&fs_lock).ok_or(Status::BAD_HANDLE)?;
 

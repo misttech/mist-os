@@ -15,7 +15,7 @@ use {
     vfs::{
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
-        file::{FidlIoConnection, File, FileIo, FileOptions},
+        file::{FidlIoConnection, File, FileIo, FileOptions, SyncMode},
         path::Path,
         pseudo_directory,
         symlink::Symlink,
@@ -300,7 +300,7 @@ impl File for XattrFile {
     ) -> Result<(), Status> {
         unimplemented!()
     }
-    async fn sync(&self) -> Result<(), Status> {
+    async fn sync(&self, _mode: SyncMode) -> Result<(), Status> {
         Ok(())
     }
     async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, Status> {

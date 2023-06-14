@@ -12,7 +12,7 @@ use {
         execution_scope::ExecutionScope,
         file::{
             common::{get_backing_memory_validate_flags, new_connection_validate_options},
-            File, FileIo, FileOptions, RawFileIoConnection,
+            File, FileIo, FileOptions, RawFileIoConnection, SyncMode,
         },
         node::OpenNode,
         object_request::Representation,
@@ -447,11 +447,13 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             }
         }
 
-        // If the file was opened with write permissions, sync the file as we're closing.  The file
-        // will subsequently get closed and this reduces the chance that it has to spawn a new task
-        // to perform the close since close is not async.
-        if self.options.rights.contains(fio::Operations::WRITE_BYTES) {
-            let _ = self.file.sync().await;
+        if self
+            .options
+            .rights
+            .intersects(fio::Operations::WRITE_BYTES | fio::Operations::UPDATE_ATTRIBUTES)
+        {
+            let _guard = self.scope.active_guard();
+            let _ = self.file.sync(SyncMode::PreClose).await;
         }
     }
 
@@ -471,11 +473,15 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             }
             fio::FileRequest::Close { responder } => {
                 fuchsia_trace::duration!("storage", "File::Close");
-                responder.send(if self.options.rights.contains(fio::Operations::WRITE_BYTES) {
-                    self.file.sync().await.map_err(|status| status.into_raw())
-                } else {
-                    Ok(())
-                })?;
+                responder.send(
+                    if self.options.rights.intersects(
+                        fio::Operations::WRITE_BYTES | fio::Operations::UPDATE_ATTRIBUTES,
+                    ) {
+                        self.file.sync(SyncMode::PreClose).await.map_err(|status| status.into_raw())
+                    } else {
+                        Ok(())
+                    },
+                )?;
                 return Ok(ConnectionState::Closed);
             }
             fio::FileRequest::Describe { responder } => {
@@ -497,7 +503,9 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             }
             fio::FileRequest::Sync { responder } => {
                 fuchsia_trace::duration!("storage", "File::Sync");
-                responder.send(self.file.sync().await.map_err(|status| status.into_raw()))?;
+                responder.send(
+                    self.file.sync(SyncMode::Normal).await.map_err(|status| status.into_raw()),
+                )?;
             }
             fio::FileRequest::GetAttr { responder } => {
                 fuchsia_trace::duration!("storage", "File::GetAttr");
@@ -927,7 +935,7 @@ mod tests {
             Ok(())
         }
 
-        async fn sync(&self) -> Result<(), zx::Status> {
+        async fn sync(&self, _mode: SyncMode) -> Result<(), zx::Status> {
             self.handle_operation(FileOperation::Sync)
         }
     }

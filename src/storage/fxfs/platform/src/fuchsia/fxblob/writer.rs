@@ -43,7 +43,7 @@ use {
         common::rights_to_posix_mode_bits,
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
-        file::{FidlIoConnection, File, FileIo, FileOptions},
+        file::{FidlIoConnection, File, FileIo, FileOptions, SyncMode},
         path::Path,
         ToObjectRequest,
     },
@@ -276,7 +276,7 @@ impl File for FxUnsealedBlob {
         Err(Status::ACCESS_DENIED)
     }
 
-    async fn sync(&self) -> Result<(), Status> {
+    async fn sync(&self, _mode: SyncMode) -> Result<(), Status> {
         // TODO(fxbug.dev/122125): Implement this.
         Ok(())
     }

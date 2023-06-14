@@ -48,7 +48,7 @@ use {
         common::rights_to_posix_mode_bits,
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
-        file::{File, FileOptions, GetVmo, StreamIoConnection},
+        file::{File, FileOptions, GetVmo, StreamIoConnection, SyncMode},
         path::Path,
         ObjectRequestRef, ProtocolsExt, ToObjectRequest,
     },
@@ -351,7 +351,7 @@ impl File for FxBlob {
         Err(Status::ACCESS_DENIED)
     }
 
-    async fn sync(&self) -> Result<(), Status> {
+    async fn sync(&self, _mode: SyncMode) -> Result<(), Status> {
         Ok(())
     }
 

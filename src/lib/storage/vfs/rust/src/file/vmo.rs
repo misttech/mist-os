@@ -12,7 +12,7 @@ use crate::{
     common::rights_to_posix_mode_bits,
     directory::entry::{DirectoryEntry, EntryInfo},
     execution_scope::ExecutionScope,
-    file::{common::vmo_flags_to_rights, FidlIoConnection, File, FileIo, FileOptions},
+    file::{common::vmo_flags_to_rights, FidlIoConnection, File, FileIo, FileOptions, SyncMode},
     node::Node,
     path::Path,
     ToObjectRequest,
@@ -404,7 +404,7 @@ impl File for VmoFile {
         Err(Status::NOT_SUPPORTED)
     }
 
-    async fn sync(&self) -> Result<(), Status> {
+    async fn sync(&self, _mode: SyncMode) -> Result<(), Status> {
         Ok(())
     }
 }

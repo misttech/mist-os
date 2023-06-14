@@ -20,7 +20,7 @@ use {
         common::rights_to_posix_mode_bits,
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
-        file::{FidlIoConnection, File, FileIo, FileOptions},
+        file::{FidlIoConnection, File, FileIo, FileOptions, SyncMode},
         node::Node,
         path::Path,
         pseudo_directory, ToObjectRequest,
@@ -113,7 +113,7 @@ impl File for BlockFile {
         Err(zx::Status::NOT_SUPPORTED)
     }
 
-    async fn sync(&self) -> Result<(), zx::Status> {
+    async fn sync(&self, _mode: SyncMode) -> Result<(), zx::Status> {
         self.block_client.flush().await.map_err(map_to_status)
     }
 

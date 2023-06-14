@@ -62,6 +62,25 @@ impl FileOptions {
     }
 }
 
+#[derive(Default, PartialEq)]
+pub enum SyncMode {
+    /// Used when the Sync fuchsia.io method is used.
+    #[default]
+    Normal,
+
+    /// Used when the connection is about to be closed. Typically this will involve flushing data
+    /// from caches, but performance is a consideration, so it should only perform what might be
+    /// necessary for closing the file. If anything *must* happen when a file is closed, it must be
+    /// implemented in the `Node::close` function, not here; a call to sync with this mode is not
+    /// guaranteed and not implementing/supporting it should have no effect on correctness. If
+    /// `Node::close` needs to flush data in an async context, it has to spawn a task.  Supporting
+    /// this mode means that in most cases there's no need to spawn a task because there should be
+    /// nothing that needs to be flushed (but it must check). This will only be called if the
+    /// connection has write permissions; a connection that only has read permissions should not
+    /// have made any changes that need flushing.
+    PreClose,
+}
+
 /// Trait used for all files.
 #[async_trait]
 pub trait File: Node {
@@ -129,7 +148,7 @@ pub trait File: Node {
     /// This does not necessarily guarantee that the file will be completely written to disk once
     /// the call returns. It merely guarantees that any changes to the file have been propagated
     /// to the next layer in the storage stack.
-    async fn sync(&self) -> Result<(), Status>;
+    async fn sync(&self, mode: SyncMode) -> Result<(), Status>;
 
     /// Returns information about the filesystem.
     fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {
