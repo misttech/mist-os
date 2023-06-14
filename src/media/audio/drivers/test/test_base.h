@@ -91,8 +91,8 @@ struct DeviceEntry {
 //
 // See googletest/docs/advanced.md for details
 //
-// Devices are displayed in the 'audio-output/<8-digit-hex>' format, or simply the filename, if the
-// special dir_fd value is observed (an example might be 'Bluetooth-A2DP' for Bluetooth devices).
+// Devices are displayed in the 'audio-output/a1b2c3d4' format, with 'Virtual' as the filename if
+// this is a virtualaudio instance we added, or 'A2DP' if this is a Bluetooth instance we added.
 std::string inline DevNameForEntry(const DeviceEntry& device_entry) {
   std::string device_name =
       (device_entry.device_type == DeviceType::Virtual ? "Virtual" : device_entry.filename);

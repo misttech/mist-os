@@ -11,11 +11,16 @@
 
 #include <algorithm>
 #include <cstring>
+#include <numeric>
 #include <optional>
 
 #include <gtest/gtest.h>
 
 namespace media::audio::drivers::test {
+
+// TODO(fxbug.dev/116355): Once A2DP driver issues are fixed, remove these flags.
+constexpr bool kRequireA2dpNonZeroDriverTransferBytes = false;
+constexpr bool kRequireA2dpVmoSizeContribution = false;
 
 void AdminTest::TearDown() {
   DropRingBuffer();
@@ -56,8 +61,7 @@ void AdminTest::RequestRingBufferChannel() {
   if (device_entry().isComposite()) {
     RequestTopologies();
 
-    // If there is a ring buffer id request it, not an error if a driver does not have a
-    // ring buffer.
+    // If a ring_buffer_id exists, request it - but don't fail if the driver has no ring buffer.
     if (ring_buffer_id().has_value()) {
       composite()->CreateRingBuffer(
           ring_buffer_id().value(), std::move(format), ring_buffer_handle.NewRequest(),
@@ -132,17 +136,25 @@ void AdminTest::RequestRingBufferProperties() {
   // This field is required.
   EXPECT_TRUE(ring_buffer_props_->has_needs_cache_flush_or_invalidate());
 
-  // TODO(fxbug.dev/123475): After BT adds support, mandate a non-zero driver_transfer_bytes.
-
   if (ring_buffer_props_->has_turn_on_delay()) {
     // As a zx::duration, a negative value is theoretically possible, but this is disallowed.
     EXPECT_GE(ring_buffer_props_->turn_on_delay(), 0);
   }
+
+  // TODO(fxbug.dev/123475): After BT adds support, remove this flag.
+  if (kRequireA2dpNonZeroDriverTransferBytes || !device_entry().isA2DP()) {
+    // This field is required, but was recently added (HEAD). It must be non-zero.
+    ASSERT_TRUE(ring_buffer_props_->has_driver_transfer_bytes());
+    EXPECT_GT(ring_buffer_props_->driver_transfer_bytes(), 0u);
+  }
 }
 
 // Request the ring buffer's VMO handle, at the current format (relies on the ring buffer channel).
+// `RequestRingBufferProperties` must be called before `RequestBuffer`.
 void AdminTest::RequestBuffer(uint32_t min_ring_buffer_frames,
                               uint32_t notifications_per_ring = 0) {
+  ASSERT_TRUE(ring_buffer_props_) << "RequestBuffer was called before RequestRingBufferChannel";
+
   min_ring_buffer_frames_ = min_ring_buffer_frames;
   notifications_per_ring_ = notifications_per_ring;
   zx::vmo ring_buffer_vmo;
@@ -150,7 +162,6 @@ void AdminTest::RequestBuffer(uint32_t min_ring_buffer_frames,
       min_ring_buffer_frames, notifications_per_ring,
       AddCallback("GetVmo", [this, &ring_buffer_vmo](
                                 fuchsia::hardware::audio::RingBuffer_GetVmo_Result result) {
-        EXPECT_GE(result.response().num_frames, min_ring_buffer_frames_);
         ring_buffer_frames_ = result.response().num_frames;
         ring_buffer_vmo = std::move(result.response().ring_buffer);
         EXPECT_TRUE(ring_buffer_vmo.is_valid());
@@ -158,6 +169,18 @@ void AdminTest::RequestBuffer(uint32_t min_ring_buffer_frames,
   ExpectCallbacks();
   if (HasFailure()) {
     return;
+  }
+
+  // TODO(fxbug.dev/116355): Once driver issues are fixed, remove these flags.
+  if ((kRequireA2dpVmoSizeContribution && kRequireA2dpNonZeroDriverTransferBytes) ||
+      !device_entry().isA2DP()) {
+    ASSERT_TRUE(ring_buffer_props_->has_driver_transfer_bytes());
+    uint32_t driver_transfer_frames =
+        (ring_buffer_props_->driver_transfer_bytes() + (frame_size_ - 1)) / frame_size_;
+    EXPECT_GE(ring_buffer_frames_, min_ring_buffer_frames_ + driver_transfer_frames)
+        << "Driver must add at least driver_transfer_bytes to the client-requested ring buffer size";
+  } else {
+    EXPECT_GE(ring_buffer_frames_, min_ring_buffer_frames_);
   }
 
   ring_buffer_mapper_.Unmap();
@@ -355,22 +378,48 @@ DEFINE_ADMIN_TEST_CLASS(GetRingBufferProperties, {
 DEFINE_ADMIN_TEST_CLASS(GetBuffer, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMinFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
 
   RequestBuffer(100);
   WaitForError();
+});
+
+// Clients request minimum VMO sizes for their requirements, and drivers must respond with VMOs that
+// satisfy those requests as well as their own constraints for proper operation. A driver or device
+// reads/writes a ring buffer in batches, so it must reserve part of the ring buffer for safe
+// copying. This test case validates that drivers set aside a non-zero amount of their ring buffers.
+//
+// Many drivers automatically "round up" their VMO to a memory page boundary, regardless of space
+// needed for proper DMA. To factor this out, here the client requests enough frames to exactly fill
+// an integral number of memory pages. The driver should nonetheless return a larger buffer.
+DEFINE_ADMIN_TEST_CLASS(DriverReservesRingBufferSpace, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
+
+  uint32_t page_frame_aligned_rb_frames =
+      std::lcm<uint32_t>(frame_size(), PAGE_SIZE) / frame_size();
+  FX_LOGS(DEBUG) << "frame_size is " << frame_size() << ", requesting a ring buffer of "
+                 << page_frame_aligned_rb_frames << " frames";
+  RequestBuffer(page_frame_aligned_rb_frames);
+  WaitForError();
+
+  // Calculate the driver's needed ring-buffer space, from retrieved fifo_size|safe_offset values.
+  EXPECT_GT(ring_buffer_frames(), page_frame_aligned_rb_frames);
 });
 
 // Verify valid responses: set active channels
 DEFINE_ADMIN_TEST_CLASS(SetActiveChannels, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   ASSERT_NO_FAILURE_OR_SKIP(ActivateChannelsAndExpectSuccess(0));
 
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(8000));
   ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
 
-  uint64_t all_channels = (1 << ring_buffer_pcm_format().number_of_channels) - 1;
-  ActivateChannelsAndExpectSuccess(all_channels);
+  uint64_t all_channels_mask = (1 << ring_buffer_pcm_format().number_of_channels) - 1;
+  ActivateChannelsAndExpectSuccess(all_channels_mask);
   WaitForError();
 });
 
@@ -387,6 +436,7 @@ DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsTooHigh, {
 DEFINE_ADMIN_TEST_CLASS(Start, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMinFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(32000));
 
   RequestStart();
@@ -405,6 +455,7 @@ DEFINE_ADMIN_TEST_CLASS(StartBeforeGetVmoShouldDisconnect, {
 DEFINE_ADMIN_TEST_CLASS(StartWhileStartedShouldDisconnect, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(8000));
   ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
 
@@ -415,6 +466,7 @@ DEFINE_ADMIN_TEST_CLASS(StartWhileStartedShouldDisconnect, {
 DEFINE_ADMIN_TEST_CLASS(Stop, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
   ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
 
@@ -433,6 +485,7 @@ DEFINE_ADMIN_TEST_CLASS(StopBeforeGetVmoShouldDisconnect, {
 DEFINE_ADMIN_TEST_CLASS(StopWhileStoppedIsPermitted, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMinFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
   ASSERT_NO_FAILURE_OR_SKIP(RequestStop());
 
@@ -464,6 +517,7 @@ DEFINE_ADMIN_TEST_CLASS(ExternalDelayIsValid, {
 DEFINE_ADMIN_TEST_CLASS(GetDelayInfoSecondTimeNoResponse, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
 
   WatchDelayAndExpectUpdate();
   WatchDelayAndExpectNoUpdate();
@@ -479,6 +533,7 @@ DEFINE_ADMIN_TEST_CLASS(GetDelayInfoSecondTimeNoResponse, {
 DEFINE_ADMIN_TEST_CLASS(GetDelayInfoAfterStart, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
   ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
 
@@ -546,9 +601,9 @@ DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsAfterDroppingFirstRingBuffer, {
   WaitForError();
 });
 
-// Register separate test case instances for each enumerated device
+// Register separate test case instances for each enumerated device.
 //
-// See googletest/docs/advanced.md for details
+// See googletest/docs/advanced.md for details.
 #define REGISTER_ADMIN_TEST(CLASS_NAME, DEVICE)                                              \
   testing::RegisterTest("AdminTest", TestNameForEntry(#CLASS_NAME, DEVICE).c_str(), nullptr, \
                         DevNameForEntry(DEVICE).c_str(), __FILE__, __LINE__,                 \
@@ -570,6 +625,13 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
   if (device_entry.isA2DP() || expect_audio_core_not_connected) {
     REGISTER_ADMIN_TEST(GetRingBufferProperties, device_entry);
     REGISTER_ADMIN_TEST(GetBuffer, device_entry);
+    // TODO(fxbug.dev/116355): Once driver issues are fixed, remove this check.
+    if ((kRequireA2dpVmoSizeContribution && kRequireA2dpNonZeroDriverTransferBytes) ||
+        !device_entry.isA2DP()) {
+      REGISTER_ADMIN_TEST(DriverReservesRingBufferSpace, device_entry);
+    } else {
+      REGISTER_DISABLED_ADMIN_TEST(DriverReservesRingBufferSpace, device_entry);
+    }
     REGISTER_ADMIN_TEST(InternalDelayIsValid, device_entry);
     REGISTER_ADMIN_TEST(ExternalDelayIsValid, device_entry);
 
