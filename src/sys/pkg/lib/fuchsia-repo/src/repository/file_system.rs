@@ -8,7 +8,7 @@ use {
         repository::{Error, RepoProvider, RepoStorage, Resource},
         util::file_stream,
     },
-    anyhow::{Context as _, Result},
+    anyhow::{anyhow, Context as _, Result},
     async_fs::DirBuilder,
     camino::{Utf8Component, Utf8Path, Utf8PathBuf},
     delivery_blob::DeliveryBlobType,
@@ -23,6 +23,7 @@ use {
         collections::BTreeSet,
         ffi::OsStr,
         io::{Seek as _, SeekFrom},
+        os::unix::fs::MetadataExt,
         pin::Pin,
         task::{Context, Poll},
         time::SystemTime,
@@ -358,30 +359,73 @@ impl TufRepositoryStorage<Pouf1> for FileSystemRepository {
 }
 
 impl RepoStorage for FileSystemRepository {
-    fn store_blob<'a>(&'a self, hash: &Hash, src: &Utf8Path) -> BoxFuture<'a, Result<()>> {
+    fn store_blob<'a>(
+        &'a self,
+        hash: &Hash,
+        len: u64,
+        src: &Utf8Path,
+    ) -> BoxFuture<'a, Result<()>> {
         let src = src.to_path_buf();
-        let hash = hash.to_string();
+        let hash_str = hash.to_string();
+        let hash = *hash;
 
         async move {
-            let dst = sanitize_path(&self.blob_repo_path, &hash)?;
+            let dst = sanitize_path(&self.blob_repo_path, &hash_str)?;
+
+            let src_metadata = async_fs::metadata(&src).await?;
+            let dst_metadata = match async_fs::metadata(&dst).await {
+                Ok(metadata) => Some(metadata),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+                Err(e) => return Err(anyhow!(e)),
+            };
+
+            let dst_is_hardlink = if let Some(dst_metadata) = &dst_metadata {
+                dst_metadata.nlink() > 1
+            } else {
+                false
+            };
+
+            if src_metadata.len() != len {
+                return Err(anyhow!(BlobSizeMismatchError {
+                    hash,
+                    path: src.clone(),
+                    manifest_size: len,
+                    file_size: src_metadata.len(),
+                }));
+            }
+
+            let dst_len = dst_metadata.as_ref().map(|m| m.len());
+            let dst_exists = dst_metadata.is_some();
+            let dst_dirty = !dst_exists || dst_len != Some(len);
 
             match self.copy_mode {
                 CopyMode::Copy => {
-                    if !path_exists(&dst).await? {
+                    if dst_dirty || dst_is_hardlink {
                         copy_blob(&src, &dst).await?
                     }
                 }
                 CopyMode::CopyOverwrite => copy_blob(&src, &dst).await?,
                 CopyMode::HardLink => {
-                    if async_fs::hard_link(&src, &dst).await.is_err() && !path_exists(&dst).await? {
+                    let is_hardlink = if let Some(dst_metadata) = &dst_metadata {
+                        src_metadata.dev() == dst_metadata.dev()
+                            && src_metadata.ino() == dst_metadata.ino()
+                    } else {
+                        false
+                    };
+                    if is_hardlink {
+                        // No work to do if src and dest are already hardlinks,
+                        // but only if we want it to be a hardlink.
+                    } else if async_fs::hard_link(&src, &dst).await.is_err() && dst_dirty {
                         copy_blob(&src, &dst).await?
                     }
                 }
             }
 
             if let Some(blob_type) = self.delivery_blob_type {
-                let dst =
-                    sanitize_path(&self.blob_repo_path, &format!("{}/{hash}", blob_type as u32))?;
+                let dst = sanitize_path(
+                    &self.blob_repo_path,
+                    &format!("{}/{hash_str}", blob_type as u32),
+                )?;
                 if self.copy_mode == CopyMode::CopyOverwrite || !path_exists(&dst).await? {
                     generate_delivery_blob(&src, &dst, blob_type).await?;
                 }
@@ -484,6 +528,18 @@ fn sanitize_path(repo_path: &Utf8Path, resource_path: &str) -> Result<Utf8PathBu
 
     let path = parts.into_iter().collect::<Utf8PathBuf>();
     Ok(repo_path.join(path))
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error(
+    "blob {hash} at {path:?} is {file_size} bytes in size, \
+     but the package manifest indicates it should be {manifest_size} bytes in size"
+)]
+struct BlobSizeMismatchError {
+    hash: Hash,
+    path: Utf8PathBuf,
+    manifest_size: u64,
+    file_size: u64,
 }
 
 #[cfg(test)]
@@ -627,7 +683,7 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_store_blob_copy() {
+    async fn test_store_blob_verifies_src_length() {
         let tmp = tempfile::tempdir().unwrap();
         let dir = Utf8Path::from_path(tmp.path()).unwrap();
 
@@ -646,7 +702,71 @@ mod tests {
         std::fs::write(&path, contents).unwrap();
 
         let hash = fuchsia_merkle::from_slice(contents).root();
-        assert_matches!(repo.store_blob(&hash, &path).await, Ok(()));
+        let err = repo.store_blob(&hash, contents.len() as u64 + 1, &path).await.unwrap_err();
+        assert_matches!(err.downcast_ref::<BlobSizeMismatchError>(), Some(_));
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_store_blob_copy_detects_length_mismatch() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = Utf8Path::from_path(tmp.path()).unwrap();
+
+        let metadata_repo_path = dir.join("metadata");
+        let blob_repo_path = dir.join("blobs");
+        std::fs::create_dir(&metadata_repo_path).unwrap();
+        std::fs::create_dir(&blob_repo_path).unwrap();
+
+        let repo = FileSystemRepository::builder(metadata_repo_path, blob_repo_path.clone())
+            .copy_mode(CopyMode::Copy)
+            .build();
+
+        // Store the blob.
+        let contents = b"hello world";
+        let path = dir.join("my-blob");
+        std::fs::write(&path, contents).unwrap();
+
+        let hash = fuchsia_merkle::from_slice(contents).root();
+        assert_matches!(repo.store_blob(&hash, contents.len() as u64, &path).await, Ok(()));
+
+        // Make sure we can read it back.
+        let blob_path = blob_repo_path.join(hash.to_string());
+        let actual = std::fs::read(&blob_path).unwrap();
+        assert_eq!(&actual, &contents[..]);
+
+        assert!(std::fs::metadata(&blob_path).unwrap().permissions().readonly());
+
+        // Next, overwrite a blob that already exists.
+        let contents2 = b"another hello world";
+        let path2 = dir.join("my-blob2");
+        std::fs::write(&path2, contents2).unwrap();
+        assert_matches!(repo.store_blob(&hash, contents2.len() as u64, &path2).await, Ok(()));
+
+        // Make sure we get the new contents back.
+        let actual = std::fs::read(&blob_path).unwrap();
+        assert_eq!(&actual, &contents2[..]);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_store_blob_copy_skips_present_blobs_of_correct_length() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = Utf8Path::from_path(tmp.path()).unwrap();
+
+        let metadata_repo_path = dir.join("metadata");
+        let blob_repo_path = dir.join("blobs");
+        std::fs::create_dir(&metadata_repo_path).unwrap();
+        std::fs::create_dir(&blob_repo_path).unwrap();
+
+        let repo = FileSystemRepository::builder(metadata_repo_path, blob_repo_path.clone())
+            .copy_mode(CopyMode::Copy)
+            .build();
+
+        // Store the blob.
+        let contents = b"hello world.";
+        let path = dir.join("my-blob");
+        std::fs::write(&path, contents).unwrap();
+
+        let hash = fuchsia_merkle::from_slice(contents).root();
+        assert_matches!(repo.store_blob(&hash, contents.len() as u64, &path).await, Ok(()));
 
         // Make sure we can read it back.
         let blob_path = blob_repo_path.join(hash.to_string());
@@ -656,14 +776,65 @@ mod tests {
         assert!(std::fs::metadata(&blob_path).unwrap().permissions().readonly());
 
         // Next, we won't overwrite a blob that already exists.
-        let contents2 = b"another blob";
+        let contents2 = b"Hello World!";
         let path2 = dir.join("my-blob2");
         std::fs::write(&path2, contents2).unwrap();
-        assert_matches!(repo.store_blob(&hash, &path2).await, Ok(()));
+        assert_matches!(repo.store_blob(&hash, contents2.len() as u64, &path2).await, Ok(()));
 
         // Make sure we get the original contents back.
         let actual = std::fs::read(&blob_path).unwrap();
         assert_eq!(&actual, &contents[..]);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_store_blob_copy_breaks_hardlinks() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = Utf8Path::from_path(tmp.path()).unwrap();
+
+        let metadata_repo_path = dir.join("metadata");
+        let blob_repo_path = dir.join("blobs");
+        std::fs::create_dir(&metadata_repo_path).unwrap();
+        std::fs::create_dir(&blob_repo_path).unwrap();
+
+        let repo =
+            FileSystemRepository::builder(metadata_repo_path.clone(), blob_repo_path.clone())
+                .copy_mode(CopyMode::HardLink)
+                .build();
+
+        // Store the blob.
+        let contents = b"hello world.";
+        let path = dir.join("my-blob");
+        std::fs::write(&path, contents).unwrap();
+
+        let hash = fuchsia_merkle::from_slice(contents).root();
+        assert_matches!(repo.store_blob(&hash, contents.len() as u64, &path).await, Ok(()));
+
+        // Make sure we can read it back.
+        let blob_path = blob_repo_path.join(hash.to_string());
+        let actual = std::fs::read(&blob_path).unwrap();
+        assert_eq!(&actual, &contents[..]);
+        assert_eq!(std::fs::metadata(&blob_path).unwrap().nlink(), 2);
+
+        // Switch to Copy mode.
+        drop(repo);
+        let repo = FileSystemRepository::builder(metadata_repo_path, blob_repo_path.clone())
+            .copy_mode(CopyMode::Copy)
+            .build();
+
+        // Store the blob again
+        let contents2 = b"Hello World!";
+        let path2 = dir.join("my-blob2");
+        std::fs::write(&path2, contents2).unwrap();
+
+        assert_matches!(repo.store_blob(&hash, contents2.len() as u64, &path2).await, Ok(()));
+
+        // Make sure we can read it back.
+        let blob_path = blob_repo_path.join(hash.to_string());
+        let actual = std::fs::read(&blob_path).unwrap();
+        assert_eq!(&actual, &contents2[..]);
+
+        assert!(std::fs::metadata(&blob_path).unwrap().permissions().readonly());
+        assert_eq!(std::fs::metadata(&blob_path).unwrap().nlink(), 1);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -686,7 +857,7 @@ mod tests {
         std::fs::write(&path, contents).unwrap();
 
         let hash = fuchsia_merkle::from_slice(contents).root();
-        assert_matches!(repo.store_blob(&hash, &path).await, Ok(()));
+        assert_matches!(repo.store_blob(&hash, contents.len() as u64, &path).await, Ok(()));
 
         // Make sure we can read it back.
         let blob_path = blob_repo_path.join(hash.to_string());
@@ -699,7 +870,7 @@ mod tests {
         let contents2 = b"another blob";
         let path2 = dir.join("my-blob2");
         std::fs::write(&path2, contents2).unwrap();
-        assert_matches!(repo.store_blob(&hash, &path2).await, Ok(()));
+        assert_matches!(repo.store_blob(&hash, contents2.len() as u64, &path2).await, Ok(()));
 
         // Make sure we get the new contents back.
         let actual = std::fs::read(&blob_path).unwrap();
@@ -726,7 +897,7 @@ mod tests {
         std::fs::write(&path, contents).unwrap();
 
         let hash = fuchsia_merkle::from_slice(contents).root();
-        assert_matches!(repo.store_blob(&hash, &path).await, Ok(()));
+        assert_matches!(repo.store_blob(&hash, contents.len() as u64, &path).await, Ok(()));
 
         // Make sure we can read it back.
         let blob_path = blob_repo_path.join(hash.to_string());
@@ -767,7 +938,7 @@ mod tests {
         std::fs::write(&path, contents).unwrap();
 
         let hash = fuchsia_merkle::from_slice(contents).root();
-        assert_matches!(repo.store_blob(&hash, &path).await, Ok(()));
+        assert_matches!(repo.store_blob(&hash, contents.len() as u64, &path).await, Ok(()));
 
         // Make sure we can read the delivery blob.
         let blob_path = blob_repo_path.join("1").join(hash.to_string());
@@ -780,7 +951,7 @@ mod tests {
         let contents2 = b"another blob";
         let path2 = dir.join("my-blob2");
         std::fs::write(&path2, contents2).unwrap();
-        assert_matches!(repo.store_blob(&hash, &path2).await, Ok(()));
+        assert_matches!(repo.store_blob(&hash, contents2.len() as u64, &path2).await, Ok(()));
 
         // Make sure we get the original contents back.
         let actual = std::fs::read(&blob_path).unwrap();

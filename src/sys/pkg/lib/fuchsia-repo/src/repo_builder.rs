@@ -634,7 +634,7 @@ where
             .try_for_each_concurrent(
                 std::thread::available_parallelism()?.get(),
                 |(blob_hash, blob)| {
-                    self.repo.store_blob(blob_hash, Utf8Path::new(&blob.source_path))
+                    self.repo.store_blob(blob_hash, blob.size, Utf8Path::new(&blob.source_path))
                 },
             )
             .await?;

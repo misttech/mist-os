@@ -189,7 +189,12 @@ impl TufRepositoryStorage<Pouf1> for PmRepository {
 }
 
 impl RepoStorage for PmRepository {
-    fn store_blob<'a>(&'a self, hash: &Hash, path: &Utf8Path) -> BoxFuture<'a, Result<()>> {
-        self.repo.store_blob(hash, path)
+    fn store_blob<'a>(
+        &'a self,
+        hash: &Hash,
+        len: u64,
+        path: &Utf8Path,
+    ) -> BoxFuture<'a, Result<()>> {
+        self.repo.store_blob(hash, len, path)
     }
 }
