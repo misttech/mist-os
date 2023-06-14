@@ -148,6 +148,7 @@ pub(crate) async fn serve(
         .await
 }
 
+#[derive(PartialEq, Eq)]
 pub(crate) enum PackageStatus {
     Base,
     Active(fuchsia_pkg::PackageName),

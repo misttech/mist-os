@@ -102,10 +102,14 @@ async fn main_inner() -> Result<(), Error> {
     info!("starting package cache service");
     let inspector = finspect::Inspector::default();
 
-    let use_system_image = {
+    let (use_system_image, pkgfs_versions_visibility) = {
         let config = pkg_cache_config::Config::take_from_startup_handle();
         inspector.root().record_child("config", |config_node| config.record_inspect(config_node));
-        config.use_system_image
+        let pkgfs_versions_visibility = match config.pkgfs_versions_base_only {
+            true => compat::pkgfs::versions::Visibility::BaseOnly,
+            false => compat::pkgfs::versions::Visibility::BaseAndDynamic,
+        };
+        (config.use_system_image, pkgfs_versions_visibility)
     };
 
     let mut package_index = PackageIndex::new(inspector.root().create_child("index"));
@@ -292,6 +296,7 @@ async fn main_inner() -> Result<(), Error> {
                 executability_restrictions,
                 blobfs.clone(),
                 system_image,
+                pkgfs_versions_visibility
             )
             .context("serve pkgfs compat directories")?,
         inspect_runtime::DIAGNOSTICS_DIR => inspect_runtime::create_diagnostics_dir(inspector),

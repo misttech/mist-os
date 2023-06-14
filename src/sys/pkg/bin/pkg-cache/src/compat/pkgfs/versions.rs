@@ -11,7 +11,11 @@ use {
     fuchsia_hash::Hash,
     fuchsia_zircon as zx,
     futures::FutureExt,
-    std::{collections::BTreeMap, str::FromStr, sync::Arc},
+    std::{
+        collections::{BTreeMap, HashMap},
+        str::FromStr,
+        sync::Arc,
+    },
     system_image::{ExecutabilityRestrictions, NonStaticAllowList},
     tracing::error,
     vfs::{
@@ -25,6 +29,13 @@ use {
     },
 };
 
+/// Which packages can be listed and opened from the Versions directory.
+#[derive(Debug)]
+pub enum Visibility {
+    BaseOnly,
+    BaseAndDynamic,
+}
+
 #[derive(Debug)]
 pub struct PkgfsVersions {
     base_packages: Arc<BasePackages>,
@@ -32,6 +43,7 @@ pub struct PkgfsVersions {
     non_static_allow_list: Arc<NonStaticAllowList>,
     executability_restrictions: ExecutabilityRestrictions,
     blobfs: blobfs::Client,
+    visibility: Visibility,
 }
 
 impl PkgfsVersions {
@@ -41,6 +53,7 @@ impl PkgfsVersions {
         non_static_allow_list: Arc<NonStaticAllowList>,
         executability_restrictions: ExecutabilityRestrictions,
         blobfs: blobfs::Client,
+        visibility: Visibility,
     ) -> Self {
         Self {
             base_packages,
@@ -48,11 +61,15 @@ impl PkgfsVersions {
             non_static_allow_list,
             executability_restrictions,
             blobfs,
+            visibility,
         }
     }
 
     async fn directory_entries(&self) -> BTreeMap<String, super::DirentType> {
-        let active_packages = self.non_base_packages.read().await.active_packages();
+        let active_packages = match self.visibility {
+            Visibility::BaseOnly => HashMap::new(),
+            Visibility::BaseAndDynamic => self.non_base_packages.read().await.active_packages(),
+        };
         self.base_packages
             .root_paths_and_hashes()
             .map(|(_path, hash)| hash.to_string())
@@ -144,8 +161,20 @@ impl vfs::directory::entry::DirectoryEntry for PkgfsVersions {
                                 &package_hash,
                             )
                             .await;
-                            if let crate::cache_service::PackageStatus::Other = package_status {
-                                return Err(zx::Status::NOT_FOUND);
+
+                            match self.visibility {
+                                Visibility::BaseOnly => {
+                                    if package_status != crate::cache_service::PackageStatus::Base {
+                                        return Err(zx::Status::NOT_FOUND);
+                                    }
+                                }
+                                Visibility::BaseAndDynamic => {
+                                    if let crate::cache_service::PackageStatus::Other =
+                                        package_status
+                                    {
+                                        return Err(zx::Status::NOT_FOUND);
+                                    }
+                                }
                             }
 
                             let executability_status = crate::cache_service::executability_status(
@@ -244,6 +273,7 @@ mod tests {
             non_static_allow_list: NonStaticAllowList,
             executability_restrictions: ExecutabilityRestrictions,
             packages_on_disk: &[&Package],
+            visibility: Visibility,
         ) -> (Self, Arc<PkgfsVersions>) {
             let blobfs = BlobfsRamdisk::start().await.unwrap();
 
@@ -260,6 +290,7 @@ mod tests {
                 Arc::new(non_static_allow_list),
                 executability_restrictions,
                 blobfs.client(),
+                visibility,
             );
 
             (Self { _blobfs: blobfs, package_index: index }, Arc::new(versions))
@@ -288,6 +319,7 @@ mod tests {
             non_static_allow_list(&[]),
             ExecutabilityRestrictions::Enforce,
             &[],
+            Visibility::BaseAndDynamic,
         )
         .await;
 
@@ -303,10 +335,34 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entries_base_only_visibility() {
+        let (env, pkgfs_versions) = TestEnv::new(
+            [(create_path("base_package"), hash(0))],
+            non_static_allow_list(&[]),
+            ExecutabilityRestrictions::Enforce,
+            &[],
+            Visibility::BaseOnly,
+        )
+        .await;
+
+        register_dynamic_package(&env.package_index, create_path("dynamic_package"), hash(1)).await;
+
+        assert_eq!(
+            pkgfs_versions.directory_entries().await,
+            BTreeMap::from([(hash(0).to_string(), super::super::DirentType::Directory),])
+        );
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
     async fn readdir_empty() {
-        let (_env, pkgfs_versions) =
-            TestEnv::new([], non_static_allow_list(&[]), ExecutabilityRestrictions::Enforce, &[])
-                .await;
+        let (_env, pkgfs_versions) = TestEnv::new(
+            [],
+            non_static_allow_list(&[]),
+            ExecutabilityRestrictions::Enforce,
+            &[],
+            Visibility::BaseAndDynamic,
+        )
+        .await;
 
         // Given adequate buffer space, the only entry is itself (".").
         let (pos, sealed) = Directory::read_dirents(
@@ -335,6 +391,7 @@ mod tests {
             non_static_allow_list(&[]),
             ExecutabilityRestrictions::Enforce,
             &[],
+            Visibility::BaseAndDynamic,
         )
         .await;
 
@@ -372,9 +429,14 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn executable_open_access_denied_not_allowlisted() {
-        let (env, pkgfs_versions) =
-            TestEnv::new([], non_static_allow_list(&[]), ExecutabilityRestrictions::Enforce, &[])
-                .await;
+        let (env, pkgfs_versions) = TestEnv::new(
+            [],
+            non_static_allow_list(&[]),
+            ExecutabilityRestrictions::Enforce,
+            &[],
+            Visibility::BaseAndDynamic,
+        )
+        .await;
 
         register_dynamic_package(&env.package_index, create_path("dynamic"), hash(1)).await;
 
@@ -401,6 +463,7 @@ mod tests {
             non_static_allow_list(&[]),
             ExecutabilityRestrictions::Enforce,
             &[&pkg],
+            Visibility::BaseAndDynamic,
         )
         .await;
 
@@ -439,9 +502,14 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_strips_posix_write() {
-        let (_env, pkgfs_versions) =
-            TestEnv::new([], non_static_allow_list(&[]), ExecutabilityRestrictions::Enforce, &[])
-                .await;
+        let (_env, pkgfs_versions) = TestEnv::new(
+            [],
+            non_static_allow_list(&[]),
+            ExecutabilityRestrictions::Enforce,
+            &[],
+            Visibility::BaseAndDynamic,
+        )
+        .await;
 
         let proxy =
             pkgfs_versions.proxy(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_WRITABLE);
@@ -453,9 +521,14 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_not_found_takes_precedence_over_access_denied() {
-        let (_env, pkgfs_versions) =
-            TestEnv::new([], non_static_allow_list(&[]), ExecutabilityRestrictions::Enforce, &[])
-                .await;
+        let (_env, pkgfs_versions) = TestEnv::new(
+            [],
+            non_static_allow_list(&[]),
+            ExecutabilityRestrictions::Enforce,
+            &[],
+            Visibility::BaseAndDynamic,
+        )
+        .await;
 
         let proxy =
             pkgfs_versions.proxy(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE);
@@ -478,6 +551,7 @@ mod tests {
             non_static_allow_list(&[]),
             ExecutabilityRestrictions::DoNotEnforce,
             &[],
+            Visibility::BaseAndDynamic,
         )
         .await;
 
@@ -512,6 +586,7 @@ mod tests {
             non_static_allow_list(&[]),
             ExecutabilityRestrictions::DoNotEnforce,
             &[],
+            Visibility::BaseAndDynamic,
         )
         .await;
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
@@ -546,6 +621,7 @@ mod tests {
             non_static_allow_list(&["dynamic"]),
             ExecutabilityRestrictions::Enforce,
             &[&pkg],
+            Visibility::BaseAndDynamic,
         )
         .await;
 
@@ -588,5 +664,35 @@ mod tests {
         .unwrap();
         let message = fuchsia_fs::file::read_to_string(&file).await.unwrap();
         assert_eq!(message, "test-content");
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open_base_only_visibility() {
+        let pkg = PackageBuilder::new("dynamic").build().await.unwrap();
+        let (env, pkgfs_versions) = TestEnv::new(
+            [],
+            non_static_allow_list(&[]),
+            ExecutabilityRestrictions::Enforce,
+            &[&pkg],
+            Visibility::BaseOnly,
+        )
+        .await;
+        register_dynamic_package(
+            &env.package_index,
+            create_path("dynamic"),
+            *pkg.meta_far_merkle_root(),
+        )
+        .await;
+        let proxy = pkgfs_versions.proxy(fio::OpenFlags::RIGHT_READABLE);
+
+        assert_matches!(
+            fuchsia_fs::directory::open_directory(
+                &proxy,
+                &pkg.meta_far_merkle_root().to_string(),
+                fio::OpenFlags::RIGHT_READABLE,
+            )
+            .await,
+            Err(fuchsia_fs::node::OpenError::OpenError(zx::Status::NOT_FOUND))
+        );
     }
 }

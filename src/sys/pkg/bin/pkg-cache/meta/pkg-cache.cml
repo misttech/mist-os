@@ -102,6 +102,10 @@
         },
     ],
     config: {
+        // If true, the exposed pkgfs/versions directory will only contain base packages.
+        // Otherwise, it will contain both base packages and packages active in the dynamic index.
+        pkgfs_versions_base_only: { type: "bool" },
+
         // If true, pkg-cache will load the system_image package and use the settings contained
         // therein.
         // This is true except on some configurations that do not have a system_image package, such

@@ -16,7 +16,7 @@ use {
 
 mod packages;
 mod validation;
-mod versions;
+pub mod versions;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DirentType {
@@ -106,6 +106,7 @@ pub fn make_dir(
     executability_restrictions: system_image::ExecutabilityRestrictions,
     blobfs: blobfs::Client,
     system_image: Option<system_image::SystemImage>,
+    pkgfs_versions_visibility: versions::Visibility,
 ) -> Result<Arc<dyn DirectoryEntry>, anyhow::Error> {
     let dir = vfs::pseudo_directory! {
         "packages" => Arc::new(packages::PkgfsPackages::new(
@@ -118,6 +119,7 @@ pub fn make_dir(
             Arc::clone(&non_static_allow_list),
             executability_restrictions,
             blobfs.clone(),
+            pkgfs_versions_visibility,
         )),
         "ctl" => vfs::pseudo_directory! {
             "validation" => Arc::new(validation::Validation::new(
