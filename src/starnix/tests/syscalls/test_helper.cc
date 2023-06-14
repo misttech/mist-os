@@ -15,6 +15,9 @@
 
 #include <gtest/gtest.h>
 
+#include "src/lib/fxl/strings/split_string.h"
+#include "src/lib/fxl/strings/string_number_conversions.h"
+
 namespace {
 ::testing::AssertionResult WaitForChildrenInternal(int death_signum) {
   ::testing::AssertionResult result = ::testing::AssertionSuccess();
@@ -162,4 +165,53 @@ std::string get_tmp_path() {
     return tmp;
   }();
   return tmp_path;
+}
+
+std::optional<MemoryMapping> find_memory_mapping(uintptr_t addr, std::string_view maps) {
+  std::vector<std::string_view> lines =
+      fxl::SplitString(maps, "\n", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
+  // format:
+  // start-end perms offset device inode path
+  for (auto line : lines) {
+    std::vector<std::string_view> parts =
+        fxl::SplitString(line, " ", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
+    if (parts.size() < 5) {
+      return std::nullopt;
+    }
+    std::vector<std::string_view> addrs =
+        fxl::SplitString(parts[0], "-", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
+    if (addrs.size() != 2) {
+      return std::nullopt;
+    }
+
+    uintptr_t start;
+    uintptr_t end;
+
+    if (!fxl::StringToNumberWithError(addrs[0], &start, fxl::Base::k16) ||
+        !fxl::StringToNumberWithError(addrs[1], &end, fxl::Base::k16)) {
+      return std::nullopt;
+    }
+
+    if (addr >= start && addr < end) {
+      size_t offset;
+      size_t inode;
+      if (!fxl::StringToNumberWithError(parts[2], &offset, fxl::Base::k16) ||
+          !fxl::StringToNumberWithError(parts[4], &inode, fxl::Base::k10)) {
+        return std::nullopt;
+      }
+
+      std::string pathname;
+      if (parts.size() > 5) {
+        // The pathname always starts at pos 73.
+        pathname = line.substr(73);
+      }
+
+      MemoryMapping mapping = {
+          start, end, std::string(parts[1]), offset, std::string(parts[3]), inode, pathname,
+      };
+
+      return mapping;
+    }
+  }
+  return std::nullopt;
 }

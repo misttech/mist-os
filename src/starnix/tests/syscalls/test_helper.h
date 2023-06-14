@@ -7,6 +7,8 @@
 #include <unistd.h>
 
 #include <functional>
+#include <optional>
+#include <string_view>
 
 #include "syscall_matchers.h"
 
@@ -167,5 +169,17 @@ void waitForChildFails(unsigned int waitFlag, int cloneFlags, int (*childRunFunc
                        int (*parentRunFunction)(void *));
 
 std::string get_tmp_path();
+
+struct MemoryMapping {
+  uintptr_t start;
+  uintptr_t end;
+  std::string perms;
+  size_t offset;
+  std::string device;
+  size_t inode;
+  std::string pathname;
+};
+
+std::optional<MemoryMapping> find_memory_mapping(uintptr_t addr, std::string_view maps);
 
 #endif  // SRC_STARNIX_TESTS_SYSCALLS_TEST_HELPER_H_
