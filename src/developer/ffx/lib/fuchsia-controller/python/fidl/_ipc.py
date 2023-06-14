@@ -13,8 +13,29 @@ from fidl_codec import encode_fidl_message
 import fuchsia_controller_py as fc
 
 TXID: int = 0
-LOOP_STARTED = False
 HANDLE_READY_QUEUES: typing.Dict[int, asyncio.Queue] = {}
+
+
+# Small helper class to track pending handle reads for an async loop.
+class _LoopPendingReads:
+
+    def __init__(self, fd: int):
+        self._fd: int = fd
+        self._pending_handles: typing.Set[int] = set()
+
+    @property
+    def fd(self) -> int:
+        return self._fd
+
+    def add_handle(self, handle: int) -> None:
+        self._pending_handles.add(handle)
+
+    def remove_handle(self, handle: int) -> None:
+        self._pending_handles.remove(handle)
+
+
+EVENT_LOOP_PENDING_READS: typing.Dict[asyncio.AbstractEventLoop,
+                                      _LoopPendingReads] = {}
 
 
 def enqueue_ready_zx_handle_from_fd(
@@ -182,13 +203,17 @@ def construct_result(constructed_obj, parsed_obj):
 
 
 async def read_and_decode(chan: fc.FidlChannel):
-    global LOOP_STARTED
+    global HANDLE_READY_QUEUES
+    channel_number = chan.as_int()
+
+    if channel_number in HANDLE_READY_QUEUES:
+        raise RuntimeError(
+            "Only one instance of this handle should be the queue at a time")
+    ready_queue: asyncio.Queue[int] = asyncio.Queue(1)
+    HANDLE_READY_QUEUES[channel_number] = ready_queue
+
     loop = asyncio.get_running_loop()
-    if not LOOP_STARTED:
-        # TODO(fxbug.dev/128194): This assumption (that there is only ever going to be one
-        # executor), will cause failures in vanilla rust interfaces that call into Fuchsia
-        # controller multiple times via asyncio.run(). This should keep a mapping to publish to more
-        # than one executor.
+    if loop not in EVENT_LOOP_PENDING_READS:
         notification_fd = fc.connect_handle_notifier()
         loop.add_reader(
             notification_fd,
@@ -196,34 +221,49 @@ async def read_and_decode(chan: fc.FidlChannel):
             notification_fd,
             HANDLE_READY_QUEUES,
         )
-        LOOP_STARTED = True
-    if chan.as_int() in HANDLE_READY_QUEUES:
-        raise RuntimeError(
-            "Only one instance of this handle should be the queue at a time")
-    queue: asyncio.Queue[int] = asyncio.Queue(1)
-    HANDLE_READY_QUEUES[chan.as_int()] = queue
+        EVENT_LOOP_PENDING_READS[loop] = _LoopPendingReads(notification_fd)
+    EVENT_LOOP_PENDING_READS[loop].add_handle(channel_number)
 
     def do_read():
         (b, chans) = chan.read()
         res = decode_fidl_response(bytes=b, handles=chans)
         return res
 
+    def pending_reads_cleanup(
+            loop: asyncio.AbstractEventLoop, channel_number: int):
+        pending_reads = EVENT_LOOP_PENDING_READS.get(loop)
+        if pending_reads is not None:
+            pending_reads.remove_handle(channel_number)
+            if not pending_reads:  # Set is empty
+                loop.remove_reader(EVENT_LOOP_PENDING_READS[loop].fd)
+                EVENT_LOOP_PENDING_READS.pop(loop)
+        HANDLE_READY_QUEUES.pop(channel_number)
+
+    # Attempt to read the handle, re-trying if the first read required a wait.
+    read_result = None
     try:
-        result = do_read()
-        # In the event that the channel is already ready, remove oneself from the queue.
-        HANDLE_READY_QUEUES.pop(chan.as_int())
-        return result
+        read_result = do_read()
     except fc.ZxStatus as e:
         if e.args[0] != fc.ZxStatus.ZX_ERR_SHOULD_WAIT:
             raise e
-        loop = asyncio.get_running_loop()
-        chan_no = await queue.get()
-        assert chan.as_int() == chan_no
+
+        # Handle was not ready for reading yet, wait for the it to be ready
+        # before trying again.
+        queued_chan_no = await ready_queue.get()
+        assert channel_number == queued_chan_no
+
+        # Waiting is finished, so attempt the read again.  If this second read
+        # raises any exceptions they will be propagated outwards.
+        read_result = do_read()
     finally:
-        # Always want to clear out the ready queue, even if there is an exception (as PEER_CLOSED,
-        # for example, will always notify the handle).
-        HANDLE_READY_QUEUES.pop(chan.as_int())
-    return do_read()
+        # Always want to clear out pending reads map and the ready queue, even
+        # if there is an exception (as PEER_CLOSED, for example, will always
+        # notify the handle).
+        #
+        # Because this is in the finally block, it will always run, even if
+        # `do_read` was successful above.
+        pending_reads_cleanup(loop, channel_number)
+    return read_result
 
 
 async def send_two_way_fidl_request(
@@ -243,7 +283,8 @@ async def send_two_way_fidl_request(
     send_one_way_fidl_request(chan, ordinal, library, msg_obj)
     res = await read_and_decode(chan)
     result_obj = make_default_obj_from_ident(response_ident)
-    construct_result(result_obj, res)
+    if result_obj is not None:
+        construct_result(result_obj, res)
     return result_obj
 
 

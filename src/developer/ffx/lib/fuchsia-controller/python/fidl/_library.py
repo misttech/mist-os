@@ -21,6 +21,11 @@ from ._ipc import send_two_way_fidl_request
 LIB_MAP: Dict[str, str] = {}
 MAP_INIT = False
 
+# Defines a mapping from import names, e.g. "fidl.foo_bar_baz" to IR representations.
+#
+# load_ir_from_import should be the only function that touches the IR_MAP.
+IR_MAP: Dict[str, IR] = {}
+
 
 class Method(dict):
     """A light wrapper around a dict that represents a FIDL method."""
@@ -579,12 +584,6 @@ def protocol_client_method(
     setattr(method_impl, "__fidl_type__", method.name())
     setattr(method_impl, "__name__", method.name())
     return method_impl
-
-
-# Defines a mapping from import names, e.g. "fidl.foo_bar_baz" to IR representations.
-#
-# load_ir_from_import should be the only function that touches the IR_MAP.
-IR_MAP: Dict[str, IR] = {}
 
 
 def load_ir_from_import(import_name: str) -> IR:
