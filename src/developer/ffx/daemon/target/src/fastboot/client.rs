@@ -333,7 +333,10 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
                     .and_then(|interface| async { boot(interface).await })
                     .await;
                 match res {
-                    Ok(_) => responder.send(Ok(()))?,
+                    Ok(_) => {
+                        self.clear_interface().await;
+                        responder.send(Ok(()))?;
+                    }
                     Err(e) => {
                         tracing::error!("Error booting: {:?}", e);
                         responder
@@ -348,7 +351,10 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
                     .and_then(|interface| async { reboot(interface).await })
                     .await;
                 match res {
-                    Ok(_) => responder.send(Ok(()))?,
+                    Ok(_) => {
+                        self.clear_interface().await;
+                        responder.send(Ok(()))?;
+                    }
                     Err(e) => {
                         tracing::error!("Error rebooting: {:?}", e);
                         responder
@@ -419,7 +425,10 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
                     .and_then(|interface| async { continue_boot(interface).await })
                     .await;
                 match res {
-                    Ok(_) => responder.send(Ok(()))?,
+                    Ok(_) => {
+                        self.clear_interface().await;
+                        responder.send(Ok(()))?;
+                    }
                     Err(e) => {
                         tracing::error!("Error continuing boot: {:?}", e);
                         responder
