@@ -260,6 +260,98 @@ async fn bench_tcp<'a, I: IpExt>(
     }
 }
 
+async fn bench_udp<'a, I: IpExt>(
+    test_suite: &'static str,
+    iter_count: usize,
+    client_realm: &netemul::TestRealm<'a>,
+    server_realm: &netemul::TestRealm<'a>,
+    message_size: usize,
+    message_count: usize,
+) -> fuchsiaperf::FuchsiaPerfBenchmarkResult {
+    let label = if message_count > 1 {
+        format!(
+            "MultiWriteRead/UDP/{}/{}/{}Messages",
+            I::NAME,
+            format_byte_count(message_size),
+            message_count
+        )
+    } else {
+        format!("WriteRead/UDP/{}/{}", I::NAME, format_byte_count(message_size))
+    };
+
+    let (mut client_sock, mut server_sock) = {
+        let (server_sock, client_sock) = futures::future::join(
+            server_realm
+                .datagram_socket(I::DOMAIN, fposix_socket::DatagramSocketProtocol::Udp)
+                .map(|r| r.expect("create server socket")),
+            client_realm
+                .datagram_socket(I::DOMAIN, fposix_socket::DatagramSocketProtocol::Udp)
+                .map(|r| r.expect("create client socket")),
+        )
+        .await;
+
+        // Since we want to avoid including the async executor from the benchmark,
+        // here we "manually" use non-blocking calls to connect sockets instead of
+        // using the normal async facilities.
+        let bind_sockaddr = {
+            let fnet_ext::IpAddress(listen_addr) = I::SERVER_SUBNET.addr.into();
+            socket2::SockAddr::from(std::net::SocketAddr::from((listen_addr, 0)))
+        };
+        server_sock.bind(&bind_sockaddr).expect("bind");
+        let server_sockaddr = server_sock.local_addr().expect("local addr");
+
+        // Set receive buffer to the total size of the write to ensure the
+        // entire write can complete before reading.
+        server_sock
+            .set_recv_buffer_size(message_size * message_count)
+            .expect("set receive buffer size");
+        assert!(
+            server_sock.recv_buffer_size().expect("get receive buffer size")
+                >= message_size * message_count
+        );
+
+        client_sock.connect(&server_sockaddr).expect("connect");
+
+        (client_sock, server_sock)
+    };
+
+    fuchsia_trace::duration!("tun_socket_benchmarks", "test_group", "label" => &*label);
+    let values = (0..iter_count)
+        .map(|_| {
+            // Avoid large memory regions with zeroes that can cause the system to
+            // try and reclaim pages from us. For more information see Zircon page
+            // scanner and eviction strategies.
+            let send_buf = vec![0xAA; message_size];
+            let mut recv_buf = vec![0xBB; message_size];
+
+            fuchsia_trace::duration!("tun_socket_benchmarks", "test_case");
+            let now = std::time::Instant::now();
+            for _ in 0..message_count {
+                let wrote = {
+                    fuchsia_trace::duration!("tun_socket_benchmarks", "udp_write");
+                    client_sock.write(send_buf.as_ref()).expect("write failed")
+                };
+                assert_eq!(wrote, message_size);
+            }
+            for _ in 0..message_count {
+                let read = {
+                    fuchsia_trace::duration!("tun_socket_benchmarks", "udp_read");
+                    server_sock.read(recv_buf.as_mut()).expect("read failed")
+                };
+                assert_eq!(read, message_size);
+            }
+            now.elapsed().as_nanos() as f64
+        })
+        .collect();
+
+    fuchsiaperf::FuchsiaPerfBenchmarkResult {
+        test_suite: test_suite.into(),
+        label: label.clone(),
+        unit: "ns".into(),
+        values,
+    }
+}
+
 #[derive(argh::FromArgs)]
 /// E2E socket benchmark arguments.
 struct Args {
@@ -369,6 +461,36 @@ async fn main() {
                 )
                 .await,
             );
+        }
+
+        // NB: All of these message sizes are kept below the MTU of 1500 bytes
+        // so that fragmentation is not needed (NS3 doesn't currently support
+        // fragmentation c.f. https://fxbug.dev/128588).
+        for message_size in [1, 100, 1 << 10] {
+            for message_count in [1, 10, 50] {
+                metrics.push(
+                    bench_udp::<net_types::ip::Ipv4>(
+                        test_suite,
+                        iter_count,
+                        &client_realm,
+                        &server_realm,
+                        message_size,
+                        message_count,
+                    )
+                    .await,
+                );
+                metrics.push(
+                    bench_udp::<net_types::ip::Ipv6>(
+                        test_suite,
+                        iter_count,
+                        &client_realm,
+                        &server_realm,
+                        message_size,
+                        message_count,
+                    )
+                    .await,
+                );
+            }
         }
         metrics
     };
