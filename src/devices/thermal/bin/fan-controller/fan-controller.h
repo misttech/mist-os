@@ -25,6 +25,14 @@ class FanController {
         device_watcher_(fsl::DeviceWatcher::Create(
             kFanDirectory, fit::bind_member<&FanController::ExistsCallback>(this), dispatcher)) {}
 
+#ifdef FAN_CONTROLLER_TEST
+  size_t controller_fan_count(const std::string& client_type) {
+    return controllers_.find(client_type) == controllers_.end()
+               ? 0
+               : controllers_.at(client_type).fans_.size();
+  }
+#endif
+
  private:
   void ExistsCallback(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
                       const std::string& filename);

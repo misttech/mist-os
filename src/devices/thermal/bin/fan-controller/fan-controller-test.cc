@@ -40,13 +40,15 @@ class FakeClientStateServer : public fidl::Server<fuchsia_thermal::ClientStateCo
                       std::forward_as_tuple(loop_.dispatcher(), std::move(request.watcher())));
   }
 
-  void RunLoopUntilWatch(const std::string& client_type, async::Loop& loop) {
-    do {
-      loop.RunUntilIdle();
-    } while (watchers_.find(client_type) == watchers_.end() && !usleep(100));
-    watchers_.at(client_type).WaitForWatch();
+  void WaitForWatch() {
+    for (auto& [_, w] : watchers_) {
+      w.WaitForWatch();
+    }
   }
+  void WaitForWatch(const std::string& client_type) { watchers_.at(client_type).WaitForWatch(); }
   void ReplyToWatch(const std::string& client_type, uint64_t state) {
+    while (watchers_.find(client_type) == watchers_.end()) {
+    }
     watchers_.at(client_type).ReplyToWatch(state);
   }
 
@@ -84,6 +86,8 @@ class FakeClientStateServer : public fidl::Server<fuchsia_thermal::ClientStateCo
       sync_completion_reset(&watch_called_);
     }
     void ReplyToWatch(uint64_t state) {
+      WaitForWatch();
+
       fbl::AutoLock _(&lock_);
       ASSERT_TRUE(completers_.has_value());
       completers_->Reply(state);
@@ -165,6 +169,8 @@ class FanControllerTest : public zxtest::Test {
   }
 
   void TearDown() override {
+    client_state_->WaitForWatch();
+
     // Scoped directory entries have gone out of scope, but to avoid races we remove all entries.
     sync_completion_t wait;
     async::PostTask(fs_loop_.dispatcher(), [this, &wait]() {
@@ -207,6 +213,12 @@ class FanControllerTest : public zxtest::Test {
     return {name, dir_, fs_loop_.dispatcher()};
   }
 
+  auto ExpectFanCount(const std::string& client_type, size_t fan_count) {
+    return [this, client_type, fan_count] {
+      return fan_controller_->controller_fan_count(client_type) != fan_count;
+    };
+  }
+
  protected:
   async::Loop fan_controller_loop_{&kAsyncLoopConfigNeverAttachToThread};
   std::unique_ptr<FakeClientStateServer> client_state_;
@@ -224,6 +236,13 @@ class FanControllerTest : public zxtest::Test {
   fbl::RefPtr<fs::PseudoDir> dir_{fbl::MakeRefCounted<fs::PseudoDir>()};
 };
 
+// condition() returns false when we want to stop running the loop.
+void RunLoopUntil(async::Loop& loop, std::function<bool()>&& condition) {
+  do {
+    loop.RunUntilIdle();
+  } while (condition() && !usleep(100));
+}
+
 TEST_F(FanControllerTest, DeviceBeforeStart) {
   const std::string kClientType = "fan";
   auto fan = std::make_shared<FakeFanDevice>(kClientType);
@@ -231,11 +250,11 @@ TEST_F(FanControllerTest, DeviceBeforeStart) {
   [[maybe_unused]] auto dev = AddDevice(fan);
 
   StartFanController();
-  client_state_->RunLoopUntilWatch(kClientType, fan_controller_loop_);
+  RunLoopUntil(fan_controller_loop_, ExpectFanCount(kClientType, 1));
 
   fan->ExpectSetFanLevel(3);
   client_state_->ReplyToWatch(kClientType, 3);
-  client_state_->RunLoopUntilWatch(kClientType, fan_controller_loop_);
+  fan_controller_loop_.RunUntilIdle();
 }
 
 TEST_F(FanControllerTest, DeviceAfterStart) {
@@ -247,11 +266,11 @@ TEST_F(FanControllerTest, DeviceAfterStart) {
   client_state_->ExpectConnect(kClientType);
   [[maybe_unused]] auto dev = AddDevice(fan);
 
-  client_state_->RunLoopUntilWatch(kClientType, fan_controller_loop_);
+  RunLoopUntil(fan_controller_loop_, ExpectFanCount(kClientType, 1));
 
   fan->ExpectSetFanLevel(3);
   client_state_->ReplyToWatch(kClientType, 3);
-  client_state_->RunLoopUntilWatch(kClientType, fan_controller_loop_);
+  fan_controller_loop_.RunUntilIdle();
 }
 
 TEST_F(FanControllerTest, MultipleDevicesSameClientType) {
@@ -263,16 +282,16 @@ TEST_F(FanControllerTest, MultipleDevicesSameClientType) {
   client_state_->ExpectConnect(kClientType);
   [[maybe_unused]] auto dev0 = AddDevice(fan0);
 
-  client_state_->RunLoopUntilWatch(kClientType, fan_controller_loop_);
+  RunLoopUntil(fan_controller_loop_, ExpectFanCount(kClientType, 1));
 
   auto fan1 = std::make_shared<FakeFanDevice>(kClientType);
   [[maybe_unused]] auto dev1 = AddDevice(fan1);
-  client_state_->RunLoopUntilWatch(kClientType, fan_controller_loop_);
+  RunLoopUntil(fan_controller_loop_, ExpectFanCount(kClientType, 2));
 
   fan0->ExpectSetFanLevel(3);
   fan1->ExpectSetFanLevel(3);
   client_state_->ReplyToWatch(kClientType, 3);
-  client_state_->RunLoopUntilWatch(kClientType, fan_controller_loop_);
+  fan_controller_loop_.RunUntilIdle();
 }
 
 TEST_F(FanControllerTest, MultipleDevicesDifferentClientTypes) {
@@ -284,22 +303,22 @@ TEST_F(FanControllerTest, MultipleDevicesDifferentClientTypes) {
   client_state_->ExpectConnect(kClientType0);
   [[maybe_unused]] auto dev0 = AddDevice(fan0);
 
-  client_state_->RunLoopUntilWatch(kClientType0, fan_controller_loop_);
+  RunLoopUntil(fan_controller_loop_, ExpectFanCount(kClientType0, 1));
 
   const std::string kClientType1 = "fan1";
   auto fan1 = std::make_shared<FakeFanDevice>(kClientType1);
   client_state_->ExpectConnect(kClientType1);
   [[maybe_unused]] auto dev1 = AddDevice(fan1);
 
-  client_state_->RunLoopUntilWatch(kClientType1, fan_controller_loop_);
+  RunLoopUntil(fan_controller_loop_, ExpectFanCount(kClientType1, 1));
 
   fan0->ExpectSetFanLevel(3);
   client_state_->ReplyToWatch(kClientType0, 3);
-  client_state_->RunLoopUntilWatch(kClientType0, fan_controller_loop_);
+  fan_controller_loop_.RunUntilIdle();
 
   fan1->ExpectSetFanLevel(2);
   client_state_->ReplyToWatch(kClientType1, 2);
-  client_state_->RunLoopUntilWatch(kClientType1, fan_controller_loop_);
+  fan_controller_loop_.RunUntilIdle();
 }
 
 TEST_F(FanControllerTest, DeviceRemoval) {
@@ -309,24 +328,24 @@ TEST_F(FanControllerTest, DeviceRemoval) {
   [[maybe_unused]] auto dev0 = AddDevice(fan0);
 
   StartFanController();
-  client_state_->RunLoopUntilWatch(kClientType, fan_controller_loop_);
+  RunLoopUntil(fan_controller_loop_, ExpectFanCount(kClientType, 1));
 
   {
     auto fan1 = std::make_shared<FakeFanDevice>(kClientType);
     [[maybe_unused]] auto dev1 = AddDevice(fan1);
-    client_state_->RunLoopUntilWatch(kClientType, fan_controller_loop_);
+    RunLoopUntil(fan_controller_loop_, ExpectFanCount(kClientType, 2));
 
     fan0->ExpectSetFanLevel(3);
     fan1->ExpectSetFanLevel(3);
     client_state_->ReplyToWatch(kClientType, 3);
-    client_state_->RunLoopUntilWatch(kClientType, fan_controller_loop_);
+    fan_controller_loop_.RunUntilIdle();
 
     // Remove fan1 by letting it go out of scope. This expects an error log.
   }
 
   fan0->ExpectSetFanLevel(6);
   client_state_->ReplyToWatch(kClientType, 6);
-  client_state_->RunLoopUntilWatch(kClientType, fan_controller_loop_);
+  fan_controller_loop_.RunUntilIdle();
 }
 
 }  // namespace
