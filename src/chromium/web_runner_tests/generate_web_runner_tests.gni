@@ -22,7 +22,6 @@ template("generate_web_runner_tests") {
       # The deps below are necessary on minimal product configs.
       "//src/graphics/bin/vulkan_loader",
       "//src/ui/bin/text:text_manager",
-      "//src/ui/scenic",
 
       # This dependency is used to provide a fake `fuchsia.intl.PropertyProvider`.
       "//src/testing/fidl/intl_property_manager",
