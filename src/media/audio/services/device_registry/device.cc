@@ -68,7 +68,7 @@ Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
                fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig> stream_config)
     : presence_watcher_(std::move(presence_watcher)),
       dispatcher_(dispatcher),
-      name_(name),
+      name_(name.substr(0, name.find('\0'))),
       device_type_(device_type),
       stream_config_(fidl::Client(std::move(stream_config), dispatcher, this)),
       token_id_(NextTokenId()),
@@ -419,13 +419,34 @@ void Device::RetrieveStreamProperties() {
         }
 
         FX_CHECK(!stream_config_properties_)
-            << "StreamCOnfig/GetProperties response: stream_config_properties_ already set";
+            << "StreamConfig/GetProperties response: stream_config_properties_ already set";
         stream_config_properties_ = result->properties();
+        SanitizeStreamPropertiesStrings(stream_config_properties_);
         // We have our clock domain now. Create the device clock.
         CreateDeviceClock();
 
         OnInitializationResponse();
       });
+}
+
+// Some drivers return manufacturer or product strings with embedded '\0' characters. Trim them.
+void Device::SanitizeStreamPropertiesStrings(
+    std::optional<fuchsia_hardware_audio::StreamProperties>& stream_properties) {
+  if (!stream_properties) {
+    FX_LOGS(ERROR) << __func__ << " called with unspecified StreamProperties";
+    return;
+  }
+
+  if (stream_properties->manufacturer()) {
+    stream_properties->manufacturer(stream_properties->manufacturer()->substr(
+        0, std::min<uint64_t>(stream_properties->manufacturer()->find('\0'),
+                              fuchsia_hardware_audio::kMaxUiStringSize - 1)));
+  }
+  if (stream_properties->product()) {
+    stream_properties->product(stream_properties->product()->substr(
+        0, std::min<uint64_t>(stream_properties->product()->find('\0'),
+                              fuchsia_hardware_audio::kMaxUiStringSize - 1)));
+  }
 }
 
 void Device::RetrieveSupportedFormats() {

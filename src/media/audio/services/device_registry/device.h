@@ -157,6 +157,8 @@ class Device : public std::enable_shared_from_this<Device>,
   template <typename ResultT>
   bool LogResultFrameworkError(const ResultT& result, const char* debug_context);
 
+  static void SanitizeStreamPropertiesStrings(
+      std::optional<fuchsia_hardware_audio::StreamProperties>& stream_properties);
   fuchsia_audio_device::Info CreateDeviceInfo();
   void SetDeviceInfo();
 

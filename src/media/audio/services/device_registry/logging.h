@@ -32,7 +32,8 @@ namespace media_audio {
 inline constexpr bool kLogDeviceDetection = false;
 inline constexpr bool kLogDeviceInitializationProgress = false;
 inline constexpr bool kLogAudioDeviceRegistryMethods = false;
-inline constexpr bool kLogFinalDeviceInfo = true;
+inline constexpr bool kLogSummaryFinalDeviceInfoOnly = true;
+inline constexpr bool kLogDetailedFinalDeviceInfo = false;
 
 inline constexpr bool kLogDeviceMethods = false;
 inline constexpr bool kLogStreamConfigFidlCalls = false;

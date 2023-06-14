@@ -225,7 +225,18 @@ void LogPlugState(const fuchsia_hardware_audio::PlugState& plug_state) {
 }
 
 void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
-  if constexpr (!kLogFinalDeviceInfo) {
+  if constexpr (kLogSummaryFinalDeviceInfoOnly) {
+    FX_LOGS(INFO) << "Detected " << device_info.device_type() << " device "
+                  << (device_info.device_name()
+                          ? std::string("'") + *device_info.device_name() + "'"
+                          : "[nameless]")
+                  << ", assigned token_id "
+                  << (device_info.token_id() ? std::to_string(*device_info.token_id())
+                                             : "NONE (non-compliant)");
+
+    return;
+  }
+  if constexpr (!kLogDetailedFinalDeviceInfo) {
     return;
   }
 
@@ -242,18 +253,9 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
                                               : "NONE");
 
   FX_LOGS(INFO) << "   manufacturer      "
-                << (device_info.manufacturer() ? ("'" +
-                                                  std::string(device_info.manufacturer()->data(),
-                                                              device_info.manufacturer()->size()) +
-                                                  "'")
-                                               : "NONE");
-
+                << (device_info.manufacturer() ? "'" + *device_info.manufacturer() + "'" : "NONE");
   FX_LOGS(INFO) << "   product           "
-                << (device_info.product() ? ("'" +
-                                             std::string(device_info.product()->data(),
-                                                         device_info.product()->size()) +
-                                             "'")
-                                          : "NONE");
+                << (device_info.product() ? "'" + *device_info.product() + "'" : "NONE");
 
   FX_LOGS(INFO) << "   unique_instance_id " << UidToString(device_info.unique_instance_id());
 
