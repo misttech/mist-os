@@ -126,13 +126,18 @@ int main(int argc, const char** argv) {
   }
   auto& [client, server] = endpoints.value();
 
-  if (zx_status_t status = ConnectListener(std::move(client), opts.allowed_log_tags);
-      status != ZX_OK) {
-    return status;
-  }
+  // TODO(fxbug.dev/100486): delete everything related to logs as it's moving to the Archivist.
+  // Treat no tags as "log nothing".
+  if (!opts.allowed_log_tags.empty()) {
+    if (zx_status_t status = ConnectListener(std::move(client), opts.allowed_log_tags);
+        status != ZX_OK) {
+      return status;
+    }
 
-  fidl::BindServer(loop.dispatcher(), std::move(server),
-                   static_cast<fidl::WireServer<fuchsia_logger::LogListenerSafe>*>(console.get()));
+    fidl::BindServer(
+        loop.dispatcher(), std::move(server),
+        static_cast<fidl::WireServer<fuchsia_logger::LogListenerSafe>*>(console.get()));
+  }
 
   component::OutgoingDirectory outgoing = component::OutgoingDirectory(loop.dispatcher());
   if (zx::result status = outgoing.AddProtocol<fuchsia_hardware_pty::Device>(std::move(console));

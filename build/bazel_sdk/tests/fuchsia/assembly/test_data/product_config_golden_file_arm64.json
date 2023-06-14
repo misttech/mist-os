@@ -1,9 +1,6 @@
 {
     "platform": {
-        "additional_serial_log_tags": [
-            "session-manager",
-            "session:session"
-        ],
+        "additional_serial_log_tags": [],
         "build_type": "user",
         "connectivity": {
             "wlan": {

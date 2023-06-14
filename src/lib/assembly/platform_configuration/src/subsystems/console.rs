@@ -8,26 +8,10 @@ use fidl_fuchsia_logger::MAX_TAGS;
 
 use crate::subsystems::prelude::*;
 
-const BASE_CONSOLE_ALLOWED_TAGS: &[&str] = &[
-    "blobfs",
-    "console-launcher",
-    "devfs",
-    "device",
-    "driver",
-    "driver_host2.cm",
-    "driver_manager.cm",
-    "fshost",
-    "fxfs",
-    "mdns",
-    "minfs",
-    "netcfg",
-    "netstack",
-    "sshd-host",
-    "wlan",
-];
+const BASE_CONSOLE_ALLOWED_TAGS: &[&str] = &[];
 static_assertions::const_assert!(BASE_CONSOLE_ALLOWED_TAGS.len() <= MAX_TAGS as usize);
 
-const BASE_CONSOLE_DENIED_TAGS: &[&str] = &["NUD", "klog"];
+const BASE_CONSOLE_DENIED_TAGS: &[&str] = &[];
 
 pub(crate) struct ConsoleSubsystemConfig;
 impl DefineSubsystemConfiguration<Vec<String>> for ConsoleSubsystemConfig {
