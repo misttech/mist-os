@@ -229,30 +229,6 @@ static void iwl_pcie_txq_update_byte_cnt_tbl(struct iwl_trans* trans, struct iwl
   }
 }
 
-#if 0   // NEEDS_PORTING
-static void iwl_pcie_txq_inval_byte_cnt_tbl(struct iwl_trans* trans, struct iwl_txq* txq) {
-    struct iwl_trans_pcie* trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
-    struct iwlagn_scd_bc_tbl* scd_bc_tbl = trans_pcie->scd_bc_tbls.addr;
-    int txq_id = txq->id;
-    int read_ptr = txq->read_ptr;
-    uint8_t sta_id = 0;
-    __le16 bc_ent;
-    struct iwl_tx_cmd* tx_cmd = (void*)txq->entries[read_ptr].cmd->payload;
-
-    WARN_ON(read_ptr >= TFD_QUEUE_SIZE_MAX);
-
-    if (txq_id != trans_pcie->cmd_queue) { sta_id = tx_cmd->sta_id; }
-
-    bc_ent = cpu_to_le16(1 | (sta_id << 12));
-
-    scd_bc_tbl[txq_id].tfd_offset[read_ptr] = bc_ent;
-
-    if (read_ptr < TFD_QUEUE_SIZE_BC_DUP) {
-        scd_bc_tbl[txq_id].tfd_offset[TFD_QUEUE_SIZE_MAX + read_ptr] = bc_ent;
-    }
-}
-#endif  // NEEDS_PORTING
-
 /*
  * iwl_pcie_txq_inc_wr_ptr - Send new write index to hardware
  */
