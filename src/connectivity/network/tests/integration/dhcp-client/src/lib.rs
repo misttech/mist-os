@@ -40,6 +40,14 @@ struct DhcpTestRealm<'a> {
 
 impl<'a> DhcpTestRealm<'a> {
     async fn start_dhcp_server(&self) {
+        self.start_dhcp_server_with_options([], []).await
+    }
+
+    async fn start_dhcp_server_with_options(
+        &self,
+        parameters: impl IntoIterator<Item = fnet_dhcp::Parameter>,
+        options: impl IntoIterator<Item = fnet_dhcp::Option_>,
+    ) {
         let Self { server_realm, server_iface, client_realm: _, client_iface: _, _network: _ } =
             self;
 
@@ -56,13 +64,15 @@ impl<'a> DhcpTestRealm<'a> {
 
         dhcpv4_helper::set_server_settings(
             &server_proxy,
-            dhcpv4_helper::DEFAULT_TEST_CONFIG.dhcp_parameters().into_iter().chain([
-                fnet_dhcp::Parameter::BoundDeviceNames(vec![server_iface
+            dhcpv4_helper::DEFAULT_TEST_CONFIG
+                .dhcp_parameters()
+                .into_iter()
+                .chain([fnet_dhcp::Parameter::BoundDeviceNames(vec![server_iface
                     .get_interface_name()
                     .await
-                    .expect("get interface name should succeed")]),
-            ]),
-            [],
+                    .expect("get interface name should succeed")])])
+                .chain(parameters),
+            options,
         )
         .await;
 
@@ -71,6 +81,15 @@ impl<'a> DhcpTestRealm<'a> {
             .await
             .expect("start_serving should not encounter FIDL error")
             .expect("start_serving should succeed");
+    }
+
+    async fn stop_dhcp_server(&self) {
+        let Self { server_realm, server_iface: _, client_realm: _, client_iface: _, _network: _ } =
+            self;
+        let server_proxy = server_realm
+            .connect_to_protocol::<fnet_dhcp::Server_Marker>()
+            .expect("connect to Server_ protocol should succeed");
+        server_proxy.stop_serving().await.expect("stop_serving should not encounter FIDL error");
     }
 }
 
@@ -317,6 +336,35 @@ async fn client_provider_shutdown<N: Netstack>(name: &str) {
     assert_matches!(on_exit, ClientEvent::OnExit { reason: ClientExitReason::GracefulShutdown })
 }
 
+async fn assert_client_shutdown(
+    client: fnet_dhcp::ClientProxy,
+    address_state_provider: fidl::endpoints::ServerEnd<
+        fnet_interfaces_admin::AddressStateProviderMarker,
+    >,
+) {
+    let asp_server_fut = async move {
+        let request_stream =
+            address_state_provider.into_stream().expect("into_stream should succeed");
+        pin_mut!(request_stream);
+
+        let control_handle = assert_matches!(
+            request_stream.try_next().await.expect("should succeed").expect("should not have ended"),
+            fnet_interfaces_admin::AddressStateProviderRequest::Remove { control_handle } => control_handle,
+            "client should explicitly remove address on shutdown"
+        );
+        control_handle
+            .send_on_address_removed(fnet_interfaces_admin::AddressRemovalReason::UserRemoved)
+            .expect("should succeed");
+    };
+    let client_fut = async move {
+        // Shut down the client so it won't complain about us dropping the AddressStateProvider
+        // without sending a terminal event.
+        client.shutdown_ext(client.take_event_stream()).await.expect("shutdown should succeed");
+    };
+
+    let ((), ()) = join!(asp_server_fut, client_fut);
+}
+
 #[netstack_test]
 async fn client_provider_watch_configuration_acquires_lease<N: Netstack>(name: &str) {
     let sandbox: netemul::TestSandbox = netemul::TestSandbox::new().unwrap();
@@ -350,11 +398,8 @@ async fn client_provider_watch_configuration_acquires_lease<N: Netstack>(name: &
     assert_eq!(dns_servers, Vec::new());
     assert_eq!(routers, Vec::new());
 
-    let fnet_dhcp_ext::Address {
-        address,
-        address_parameters: _,
-        address_state_provider: _address_state_provider,
-    } = address.expect("address should be present in response");
+    let fnet_dhcp_ext::Address { address, address_parameters: _, address_state_provider } =
+        address.expect("address should be present in response");
     assert_eq!(
         address,
         fnet::Ipv4AddressWithPrefix {
@@ -366,9 +411,88 @@ async fn client_provider_watch_configuration_acquires_lease<N: Netstack>(name: &
         }
     );
 
-    // Shut down the client so it won't complain about us dropping the AddressStateProvider
-    // without sending a terminal event.
-    client.shutdown_ext(client.take_event_stream()).await.expect("shutdown should succeed");
+    assert_client_shutdown(client, address_state_provider).await;
+}
+
+#[netstack_test]
+async fn client_explicitly_removes_address_when_lease_expires<N: Netstack>(name: &str) {
+    let sandbox: netemul::TestSandbox = netemul::TestSandbox::new().unwrap();
+    let test_realm @ DhcpTestRealm {
+        client_realm,
+        client_iface,
+        server_realm: _,
+        server_iface: _,
+        _network: _,
+    } = &create_test_realm::<N>(&sandbox, name).await;
+
+    test_realm
+        .start_dhcp_server_with_options(
+            [fnet_dhcp::Parameter::Lease(fnet_dhcp::LeaseLength {
+                default: Some(5), // short enough to expire during this test
+                ..Default::default()
+            })],
+            [],
+        )
+        .await;
+
+    let provider =
+        client_realm.connect_to_protocol::<ClientProviderMarker>().expect("connect should succeed");
+
+    let client = provider.new_client_ext(
+        client_iface.id().try_into().expect("should be nonzero"),
+        fnet_dhcp_ext::default_new_client_params(),
+    );
+
+    let config_stream = fnet_dhcp_ext::configuration_stream(client.clone()).fuse();
+    pin_mut!(config_stream);
+
+    let fnet_dhcp_ext::Configuration { address, dns_servers, routers } = config_stream
+        .try_next()
+        .await
+        .expect("watch configuration should succeed")
+        .expect("configuration stream should not have ended");
+
+    assert_eq!(dns_servers, Vec::new());
+    assert_eq!(routers, Vec::new());
+
+    let fnet_dhcp_ext::Address { address, address_parameters: _, address_state_provider } =
+        address.expect("address should be present in response");
+    assert_eq!(
+        address,
+        fnet::Ipv4AddressWithPrefix {
+            addr: net_types::ip::Ipv4Addr::from(
+                dhcpv4_helper::DEFAULT_TEST_CONFIG.managed_addrs.pool_range_start
+            )
+            .into_ext(),
+            prefix_len: dhcpv4_helper::DEFAULT_TEST_ADDRESS_POOL_PREFIX_LENGTH.get(),
+        }
+    );
+
+    // Install the address so that the client doesn't error while trying to renew.
+    client_iface
+        .add_address_and_subnet_route(fnet::Subnet {
+            addr: fnet::IpAddress::Ipv4(address.addr),
+            prefix_len: address.prefix_len,
+        })
+        .await
+        .expect("should succeed");
+
+    // Stop the DHCP server to prevent it from renewing the lease.
+    test_realm.stop_dhcp_server().await;
+
+    // The client should fail to renew and have the lease expire, causing it to
+    // remove the address.
+    let request_stream = address_state_provider.into_stream().expect("should succeed");
+    pin_mut!(request_stream);
+
+    let control_handle = assert_matches!(
+        request_stream.try_next().await.expect("should succeed").expect("should not have ended"),
+        fnet_interfaces_admin::AddressStateProviderRequest::Remove { control_handle } => control_handle,
+        "client should explicitly remove address on shutdown"
+    );
+    control_handle
+        .send_on_address_removed(fnet_interfaces_admin::AddressRemovalReason::UserRemoved)
+        .expect("should succeed");
 }
 
 const DEBUG_PRINT_INTERVAL: std::time::Duration = std::time::Duration::from_secs(10);
@@ -582,11 +706,8 @@ async fn client_handles_address_removal<N: Netstack>(
         .expect("watch configuration should succeed")
         .expect("configuration stream should not have ended");
 
-    let fnet_dhcp_ext::Address {
-        address,
-        address_parameters: _,
-        address_state_provider: _address_state_provider,
-    } = address.expect("address should be present in response");
+    let fnet_dhcp_ext::Address { address, address_parameters: _, address_state_provider } =
+        address.expect("address should be present in response");
     assert_eq!(
         address,
         fnet::Ipv4AddressWithPrefix {
@@ -598,7 +719,5 @@ async fn client_handles_address_removal<N: Netstack>(
         }
     );
 
-    // Shut down the client so it won't complain about us dropping the AddressStateProvider
-    // without sending a terminal event.
-    client.shutdown_ext(client.take_event_stream()).await.expect("shutdown should succeed");
+    assert_client_shutdown(client, address_state_provider).await;
 }

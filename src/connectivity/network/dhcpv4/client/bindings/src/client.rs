@@ -219,7 +219,7 @@ impl Client {
         })
     }
 
-    fn handle_newly_acquired_lease(
+    async fn handle_newly_acquired_lease(
         &mut self,
         dhcp_client_core::client::NewlyAcquiredLease {
             ip_address,
@@ -278,10 +278,8 @@ impl Client {
             ip_address,
         });
 
-        if let Some(Lease { event_stream: _, address_state_provider: _, ip_address }) =
-            previous_lease
-        {
-            tracing::warn!("dropping previous lease for address {}", ip_address);
+        if let Some(previous_lease) = previous_lease {
+            self.handle_lease_drop(previous_lease).await?;
         }
 
         Ok(ClientWatchConfigurationResponse {
@@ -371,6 +369,39 @@ impl Client {
         })
     }
 
+    async fn handle_lease_drop(&mut self, mut lease: Lease) -> Result<(), Error> {
+        lease.address_state_provider.remove().map_err(Error::Fidl)?;
+        let watch_result = lease.watch_for_address_removal().await;
+        let Lease { address_state_provider: _, event_stream: _, ip_address } = lease;
+
+        match watch_result {
+            Err(e) => {
+                tracing::error!(
+                    "error watching for \
+                     AddressRemovalReason after explicitly removing address \
+                     {}: {:?}",
+                    ip_address,
+                    e
+                );
+            }
+            Ok(reason) => match reason {
+                fnet_interfaces_admin::AddressRemovalReason::UserRemoved => (),
+                reason @ (fnet_interfaces_admin::AddressRemovalReason::Invalid
+                | fnet_interfaces_admin::AddressRemovalReason::AlreadyAssigned
+                | fnet_interfaces_admin::AddressRemovalReason::DadFailed
+                | fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved) => {
+                    tracing::error!(
+                        "unexpected removal reason \
+                        after explicitly removing address {}: {:?}",
+                        ip_address,
+                        reason
+                    );
+                }
+            },
+        };
+        Ok(())
+    }
+
     async fn watch_configuration(
         &mut self,
         packet_socket_provider: &crate::packetsocket::PacketSocketProviderImpl,
@@ -385,10 +416,6 @@ impl Client {
                 self;
             match step {
                 WatchConfigurationStep::CurrentLeaseAddressRemoved((reason, ip_address)) => {
-                    // TODO(https://fxbug.dev/126747): Explicitly remove this
-                    // address and observe the OnAddressRemoved event to ensure
-                    // we don't race with netstack-side teardown if we end up
-                    // re-adding the same address later.
                     *current_lease = None;
                     match reason {
                         None => {
@@ -430,45 +457,43 @@ impl Client {
                         }
                     }
                 }
-                WatchConfigurationStep::CoreStep(core_step) => {
-                    match core_step? {
-                        dhcp_client_core::client::Step::NextState(transition) => {
-                            let (next_core, effect) = core.apply(transition);
-                            *core = next_core;
-                            match effect {
-                                Some(dhcp_client_core::client::TransitionEffect::DropLease) => {
-                                    // TODO(https://fxbug.dev/126747):
-                                    // Explicitly remove this address and
-                                    // observe the OnAddressRemoved event to
-                                    // ensure we don't race with netstack-side
-                                    // teardown if we end up re-adding the same
-                                    // address later.
-                                    assert!(current_lease.take().is_some());
-                                }
-                                Some(
-                                    dhcp_client_core::client::TransitionEffect::HandleNewLease(
-                                        newly_acquired_lease,
-                                    ),
-                                ) => {
-                                    return self.handle_newly_acquired_lease(newly_acquired_lease);
-                                }
-                                Some(
-                                    dhcp_client_core::client::TransitionEffect::HandleRenewedLease(
-                                        lease_renewal,
-                                    ),
-                                ) => {
-                                    return self.handle_lease_renewal(lease_renewal).await;
-                                }
-                                None => (),
+                WatchConfigurationStep::CoreStep(core_step) => match core_step? {
+                    dhcp_client_core::client::Step::NextState(transition) => {
+                        let (next_core, effect) = core.apply(transition);
+                        *core = next_core;
+                        match effect {
+                            Some(dhcp_client_core::client::TransitionEffect::DropLease) => {
+                                let current_lease =
+                                    self.current_lease.take().expect("should have current lease");
+                                self.handle_lease_drop(current_lease).await?;
                             }
+                            Some(dhcp_client_core::client::TransitionEffect::HandleNewLease(
+                                newly_acquired_lease,
+                            )) => {
+                                return self
+                                    .handle_newly_acquired_lease(newly_acquired_lease)
+                                    .await;
+                            }
+                            Some(
+                                dhcp_client_core::client::TransitionEffect::HandleRenewedLease(
+                                    lease_renewal,
+                                ),
+                            ) => {
+                                return self.handle_lease_renewal(lease_renewal).await;
+                            }
+                            None => (),
                         }
-                        dhcp_client_core::client::Step::Exit(reason) => match reason {
-                            dhcp_client_core::client::ExitReason::GracefulShutdown => {
-                                return Err(Error::Exit(ClientExitReason::GracefulShutdown))
-                            }
-                        },
                     }
-                }
+                    dhcp_client_core::client::Step::Exit(reason) => match reason {
+                        dhcp_client_core::client::ExitReason::GracefulShutdown => {
+                            if let Some(current_lease) = self.current_lease.take() {
+                                // TODO(https://fxbug.dev/128999): Send DHCPRELEASE.
+                                self.handle_lease_drop(current_lease).await?;
+                            }
+                            return Err(Error::Exit(ClientExitReason::GracefulShutdown));
+                        }
+                    },
+                },
             };
         }
     }
