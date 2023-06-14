@@ -23,7 +23,6 @@ pub mod factory_reset_handler;
 pub mod ime_handler;
 pub mod input_handler;
 pub mod inspect_handler;
-pub mod keyboard_handler;
 pub mod keymap_handler;
 pub mod light_sensor;
 pub use light_sensor::{light_sensor_binding, light_sensor_handler};

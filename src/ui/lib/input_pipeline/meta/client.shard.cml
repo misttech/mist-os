@@ -69,11 +69,6 @@
                 "fuchsia.ui.scenic.Scenic",
             ],
         },
-        {
-            // Used to report activity.
-            protocol: "fuchsia.input.interaction.observation.Aggregator",
-            from: "self",
-        },
     ],
     expose: [
         {

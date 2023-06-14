@@ -8,9 +8,8 @@ use {
     anyhow::{Context, Error},
     async_trait::async_trait,
     fidl::endpoints::Proxy,
-    fidl_fuchsia_input_interaction_observation as interaction_observation,
     fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_ui_input as fidl_ui_input,
-    fidl_fuchsia_ui_policy as fidl_ui_policy, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_ui_policy as fidl_ui_policy, fuchsia_async as fasync,
     fuchsia_zircon::AsHandleRef,
     futures::{channel::mpsc, StreamExt, TryStreamExt},
     std::cell::RefCell,
@@ -23,10 +22,6 @@ use {
 pub struct MediaButtonsHandler {
     /// The mutable fields of this handler.
     inner: RefCell<MediaButtonsHandlerInner>,
-
-    /// The FIDL proxy used to report media button activity to the activity
-    /// service.
-    aggregator_proxy: Option<interaction_observation::AggregatorProxy>,
 }
 
 #[derive(Debug)]
@@ -52,7 +47,7 @@ impl UnhandledInputHandler for MediaButtonsHandler {
                 device_event:
                     input_device::InputDeviceEvent::ConsumerControls(ref media_buttons_event),
                 device_descriptor: input_device::InputDeviceDescriptor::ConsumerControls(_),
-                event_time,
+                event_time: _,
                 trace_id: _,
             } => {
                 let media_buttons_event = Self::create_media_buttons_event(media_buttons_event);
@@ -62,11 +57,6 @@ impl UnhandledInputHandler for MediaButtonsHandler {
 
                 // Store the sent event.
                 self.inner.borrow_mut().last_event = Some(media_buttons_event);
-
-                // Report the event to the Activity Service.
-                if let Err(e) = self.report_media_buttons_activity(event_time).await {
-                    tracing::error!("report_media_buttons_activity failed: {}", e);
-                }
 
                 // Consume the input event.
                 vec![input_device::InputEvent::from(unhandled_input_event).into_handled()]
@@ -79,24 +69,7 @@ impl UnhandledInputHandler for MediaButtonsHandler {
 impl MediaButtonsHandler {
     /// Creates a new [`MediaButtonsHandler`] that sends media button events to listeners.
     pub fn new() -> Rc<Self> {
-        let aggregator_proxy = match fuchsia_component::client::connect_to_protocol::<
-            interaction_observation::AggregatorMarker,
-        >() {
-            Ok(proxy) => Some(proxy),
-            Err(e) => {
-                tracing::error!("MedaButtonsHandler failed to connect to fuchsia.input.interaction.observation.Aggregator: {}", e);
-                None
-            }
-        };
-
-        Self::new_internal(aggregator_proxy)
-    }
-
-    fn new_internal(
-        aggregator_proxy: Option<interaction_observation::AggregatorProxy>,
-    ) -> Rc<Self> {
         let media_buttons_handler = Self {
-            aggregator_proxy,
             inner: RefCell::new(MediaButtonsHandlerInner {
                 listeners: HashMap::new(),
                 last_event: None,
@@ -232,15 +205,6 @@ impl MediaButtonsHandler {
             tracker.track(fasync::Task::local(fut));
         }
     }
-
-    /// Reports the given event_time to the activity service, if available.
-    async fn report_media_buttons_activity(&self, event_time: zx::Time) -> Result<(), fidl::Error> {
-        if let Some(proxy) = self.aggregator_proxy.clone() {
-            return proxy.report_discrete_activity(event_time.into_nanos()).await;
-        }
-
-        Ok(())
-    }
 }
 
 /// Maintains a collection of pending local [`Task`]s, allowing them to be dropped (and cancelled)
@@ -285,6 +249,7 @@ mod tests {
         assert_matches::assert_matches,
         fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_input_report as fidl_input_report, fuchsia_async as fasync,
+        fuchsia_zircon as zx,
         futures::{channel::oneshot, StreamExt},
         pretty_assertions::assert_eq,
         std::{cell::RefCell, rc::Rc, task::Poll},
@@ -322,34 +287,6 @@ mod tests {
         }
     }
 
-    fn spawn_aggregator_request_server(
-        expected_time: i64,
-    ) -> Option<interaction_observation::AggregatorProxy> {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>()
-                .expect("Failed to create interaction observation Aggregator proxy and stream.");
-
-        fasync::Task::local(async move {
-            if let Some(request) = stream.next().await {
-                match request {
-                    Ok(interaction_observation::AggregatorRequest::ReportDiscreteActivity {
-                        event_time,
-                        responder,
-                    }) => {
-                        assert_eq!(event_time, expected_time);
-                        responder.send().expect("failed to respond");
-                    }
-                    other => panic!("expected aggregator report request, but got {:?}", other),
-                };
-            } else {
-                panic!("AggregatorRequestStream failed.");
-            }
-        })
-        .detach();
-
-        Some(proxy)
-    }
-
     /// Makes a `Task` that waits for a `oneshot`'s value to be set, and then forwards that value to
     /// a reference-counted container that can be observed outside the task.
     fn make_signalable_task<T: Default + 'static>(
@@ -369,12 +306,7 @@ mod tests {
     /// registration.
     #[fasync::run_singlethreaded(test)]
     async fn register_media_buttons_listener() {
-        // Set up DeviceListenerRegistry.
-        let (aggregator_proxy, _) =
-            fidl::endpoints::create_proxy_and_stream::<interaction_observation::AggregatorMarker>()
-                .expect("Failed to create interaction observation Aggregator proxy and stream.");
         let media_buttons_handler = Rc::new(MediaButtonsHandler {
-            aggregator_proxy: Some(aggregator_proxy),
             inner: RefCell::new(MediaButtonsHandlerInner {
                 listeners: HashMap::new(),
                 last_event: Some(create_ui_input_media_buttons_event(Some(1), None, None, None)),
@@ -415,8 +347,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn listener_receives_all_buttons() {
         let event_time = zx::Time::get_monotonic();
-        let aggregator_proxy = spawn_aggregator_request_server(event_time.into_nanos());
-        let media_buttons_handler = MediaButtonsHandler::new_internal(aggregator_proxy);
+        let media_buttons_handler = MediaButtonsHandler::new();
         let device_listener_proxy =
             spawn_device_listener_registry_server(media_buttons_handler.clone());
 
@@ -456,8 +387,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn multiple_listeners_receive_event() {
         let event_time = zx::Time::get_monotonic();
-        let aggregator_proxy = spawn_aggregator_request_server(event_time.into_nanos());
-        let media_buttons_handler = MediaButtonsHandler::new_internal(aggregator_proxy);
+        let media_buttons_handler = MediaButtonsHandler::new();
         let device_listener_proxy =
             spawn_device_listener_registry_server(media_buttons_handler.clone());
 
@@ -502,8 +432,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let event_time = zx::Time::get_monotonic();
-        let aggregator_proxy = spawn_aggregator_request_server(event_time.into_nanos());
-        let media_buttons_handler = MediaButtonsHandler::new_internal(aggregator_proxy);
+        let media_buttons_handler = MediaButtonsHandler::new();
         let media_buttons_handler_clone = media_buttons_handler.clone();
 
         let mut task = fasync::Task::local(async move {
@@ -588,8 +517,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn stuck_reader_wont_block_input_pipeline() {
         let event_time = zx::Time::get_monotonic();
-        let aggregator_proxy = spawn_aggregator_request_server(event_time.into_nanos());
-        let media_buttons_handler = MediaButtonsHandler::new_internal(aggregator_proxy);
+        let media_buttons_handler = MediaButtonsHandler::new();
         let device_listener_proxy =
             spawn_device_listener_registry_server(media_buttons_handler.clone());
 

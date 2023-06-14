@@ -1,6 +1,6 @@
 # input_pipeline > Activity
 
-Reviewed on: 2022-08-10
+Reviewed on: 2023-06-09
 
 `activity` is a library for creating an activity service.
 
@@ -118,6 +118,10 @@ fuchsia_structured_config_values("test_config") {
   }
 }
 ```
+
+## Integration with Scene Manager
+
+As there are no current use cases for the activity service, integration of the ActivityManager via the Scene Manager component has been removed. This means that `fuchsia.input.interaction.observation.Aggregator` and `fuchsia.input.interaction.Notifier` are not actively being served on any product configurations. If you have a use case for this library, please contact OWNERS.
 
 ## Future work
 

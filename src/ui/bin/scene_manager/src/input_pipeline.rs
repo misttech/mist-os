@@ -38,7 +38,7 @@ use {
         ime_handler::ImeHandler,
         input_device,
         input_pipeline::{InputDeviceBindingHashMap, InputPipeline, InputPipelineAssembly},
-        keyboard_handler, keymap_handler,
+        keymap_handler,
         light_sensor_handler::CalibratedLightSensorHandler,
         media_buttons_handler::MediaButtonsHandler,
         mouse_injector_handler::MouseInjectorHandler,
@@ -307,7 +307,6 @@ async fn register_keyboard_related_input_handlers(
     // Add the text settings handler early in the pipeline to use the
     // keymap settings in the remainder of the pipeline.
     assembly = add_text_settings_handler(assembly);
-    assembly = add_keyboard_handler(assembly);
     assembly = add_keymap_handler(assembly);
     assembly = add_wayland_handler(assembly, wayland_input_handler);
     assembly = add_key_meaning_modifier_handler(assembly);
@@ -497,11 +496,6 @@ fn add_text_settings_handler(assembly: InputPipelineAssembly) -> InputPipelineAs
     let text_handler = TextSettingsHandler::new(None, None);
     text_handler.clone().serve(proxy);
     assembly.add_handler(text_handler)
-}
-
-/// Hooks up the keyboard handler.
-fn add_keyboard_handler(assembly: InputPipelineAssembly) -> InputPipelineAssembly {
-    assembly.add_handler(keyboard_handler::KeyboardHandler::new())
 }
 
 /// Hooks up the keymapper.  The keymapper requires the text settings handler to

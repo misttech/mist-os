@@ -10,7 +10,6 @@ group("common_tests") {
   testonly = true
 
   deps = [
-    "activity:tests",
     "focus:tests",
     "mouse:tests",
     "text-input:tests",

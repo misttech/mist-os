@@ -121,7 +121,6 @@ icu_rustc_library("input_pipeline") {
     "src/input_pipeline.rs",
     "src/inspect_handler.rs",
     "src/keyboard_binding.rs",
-    "src/keyboard_handler.rs",
     "src/keymap_handler.rs",
     "src/lib.rs",
     "src/light_sensor.rs",

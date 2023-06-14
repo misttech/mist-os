@@ -901,7 +901,6 @@ pub async fn assert_handler_ignores_input_event_sequence(
     input_events: Vec<input_device::InputEvent>,
     // The listener request stream.
     mut injector_request_stream: impl futures::StreamExt + std::marker::Unpin,
-    mut aggregator_request_stream: impl futures::StreamExt + std::marker::Unpin,
 ) {
     for input_event in input_events {
         assert_matches!(
@@ -912,5 +911,4 @@ pub async fn assert_handler_ignores_input_event_sequence(
 
     // Request streams should not receive any events.
     assert!(injector_request_stream.next().now_or_never().is_none());
-    assert!(aggregator_request_stream.next().now_or_never().is_none());
 }
