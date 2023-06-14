@@ -2,7 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{fs::*, lock::Mutex, mm::*, syscalls::*, task::*, types::*};
+use crate::{
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        *,
+    },
+    lock::Mutex,
+    mm::*,
+    syscalls::*,
+    task::*,
+    types::*,
+};
 use bitflags::bitflags;
 use std::collections::btree_map::{BTreeMap, Entry};
 use std::sync::Arc;
@@ -98,6 +108,10 @@ impl LoopDevice {
         Box::new(LoopDeviceFile { device: self.clone() })
     }
 
+    fn backing_file(&self) -> Option<FileHandle> {
+        self.state.lock().backing_file.clone()
+    }
+
     fn is_bound(&self) -> bool {
         self.state.lock().backing_file.is_some()
     }
@@ -120,10 +134,35 @@ struct LoopDeviceFile {
 }
 
 impl FileOps for LoopDeviceFile {
-    fileops_impl_seekless!();
+    fileops_impl_seekable!();
 
-    // TODO: Implement data operations.
-    fileops_impl_dataless!();
+    fn read(
+        &self,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
+        if let Some(backing_file) = self.device.backing_file() {
+            backing_file.read_at(current_task, offset, data)
+        } else {
+            Ok(0)
+        }
+    }
+
+    fn write(
+        &self,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        if let Some(backing_file) = self.device.backing_file() {
+            backing_file.write_at(current_task, offset, data)
+        } else {
+            error!(ENOSPC)
+        }
+    }
 
     fn ioctl(
         &self,
