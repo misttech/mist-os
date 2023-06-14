@@ -12,8 +12,7 @@ use crate::{
 
 macro_rules! log {
     (level = $level:ident, $($arg:tt)*) => {{
-        #[cfg(not(feature = "disable_logging"))]
-        {
+        if !cfg!(feature = "disable_logging") {
             $crate::logging::with_current_task_info(|_task_info| {
                 tracing::$level!(tag = %_task_info, $($arg)*);
             });
