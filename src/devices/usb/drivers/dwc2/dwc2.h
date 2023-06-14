@@ -204,8 +204,6 @@ class Dwc2 : public Dwc2Type,
   dwc2_metadata_t metadata_;
   bool connected_ = false;
   bool configured_ = false;
-  // True if recovering from diepint.timeout interrupt.
-  bool timeout_recovering_ = false;
   // The length of the last IN-data sent to the host.
   uint32_t last_transmission_len_;
   // Raw IRQ timestamp from kernel

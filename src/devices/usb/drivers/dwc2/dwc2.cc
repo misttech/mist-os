@@ -120,14 +120,6 @@ void Dwc2::HandleEnumDone() {
 
 // Handler for inepintr interrupt.
 void Dwc2::HandleInEpInterrupt() {
-  if (timeout_recovering_) {
-    // TODO(105382) remove logging once timeout recovery has stabilized.
-    zxlogf(ERROR, "(diepint.timeout) IN-ep interrupt with timeout_recovering_ = true");
-
-    // We'll assume the condition is cleaned up as a side effect of irq dispatching.
-    timeout_recovering_ = false;
-  }
-
   auto* mmio = get_mmio();
   uint8_t ep_num = 0;
 
@@ -144,24 +136,9 @@ void Dwc2::HandleInEpInterrupt() {
     if (ep_bits & 1) {
       auto diepint = DIEPINT::Get(ep_num).ReadFrom(mmio);
       auto diepmsk = DIEPMSK::Get().ReadFrom(mmio);
-
-      if (diepint.timeout()) {
-        // TODO(105382) remove logging once timeout recovery has stabilized.
-        zxlogf(ERROR, "(diepint.timeout) (ep%u) DIEPINT=0x%08x DIEPMSK=0x%08x", ep_num,
-               diepint.reg_value(), diepmsk.reg_value());
-      }
-
       diepint.set_reg_value(diepint.reg_value() & diepmsk.reg_value());
 
       if (diepint.xfercompl()) {
-        if (timeout_recovering_) {
-          // (special case) We're recovering from a diepint.timeout interrupt.
-          // TODO(105382) remove logging once timeout recovery has stabilized.
-          //   The current control logic should account for this.
-          zxlogf(ERROR, "(diepint.timeout recovery) IN-EP0 xfer-complete interrupt");
-          timeout_recovering_ = false;
-        }
-
         DIEPINT::Get(ep_num).FromValue(0).set_xfercompl(1).WriteTo(mmio);
 
         if (ep_num == DWC_EP0_IN) {
@@ -185,6 +162,9 @@ void Dwc2::HandleInEpInterrupt() {
         DIEPINT::Get(ep_num).ReadFrom(mmio).set_ahberr(1).WriteTo(mmio);
       }
       if (diepint.timeout()) {
+        zxlogf(ERROR, "(diepint.timeout) (ep%u) DIEPINT=0x%08x DIEPMSK=0x%08x", ep_num,
+               diepint.reg_value(), diepmsk.reg_value());
+
         // The timeout is due to one of two cases:
         //   1. The core never received an ACK to sent IN-data. In this case, the host
         //      successfully received IN-data, and will subsequently ACK the transmission. That
@@ -228,11 +208,6 @@ void Dwc2::HandleInEpInterrupt() {
 
 // Handler for outepintr interrupt.
 void Dwc2::HandleOutEpInterrupt() {
-  if (timeout_recovering_) {
-    // TODO(105382) remove logging once timeout recovery has stabilized.
-    zxlogf(ERROR, "(diepint.timeout) OUT-ep interrupt with timeout_recovering_ = true");
-  }
-
   auto* mmio = get_mmio();
 
   uint8_t ep_num = DWC_EP0_OUT;
@@ -251,15 +226,6 @@ void Dwc2::HandleOutEpInterrupt() {
   while (ep_bits) {
     if (ep_bits & 1) {
       auto doepint = DOEPINT::Get(ep_num).ReadFrom(mmio);
-      auto doepmsk = DOEPMSK::Get().ReadFrom(mmio);
-
-      if (timeout_recovering_) {
-        // TODO(105382) remove logging once timeout recovery has stabilized.
-        // N.B. the use of "(diepint.timeout)" here is used for a searchable-term.
-        zxlogf(ERROR, "(diepint.timeout) OUT-ep (ep%u, state=%s) DOEPINT=0x%08x DOEPMSK=0x%08x",
-               ep_num, Ep0StateToStr(ep0_state_), doepint.reg_value(), doepmsk.reg_value());
-      }
-
       doepint.set_reg_value(doepint.reg_value() & DOEPMSK::Get().ReadFrom(mmio).reg_value());
 
       if (doepint.sr()) {
@@ -308,14 +274,6 @@ void Dwc2::HandleOutEpInterrupt() {
     }
     ep_num++;
     ep_bits >>= 1;
-  }
-
-  if (timeout_recovering_) {
-    // TODO(105382) remove logging once timeout recovery has stabilized.
-    // We'll assume the condition is cleaned up as a side effect of irq dispatching.
-    zxlogf(ERROR, "(diepint.timeout) clearing timeout_recovering_ condition in state=%s",
-           Ep0StateToStr(ep0_state_));
-    timeout_recovering_ = false;
   }
 }
 
@@ -1082,39 +1040,13 @@ int Dwc2::IrqThread() {
       zxlogf(ERROR, "dwc_usb: irq wait failed, retcode = %d", wait_res);
     }
 
-    if (timeout_recovering_) {
-      // TODO(105382) remove logging once timeout recovery has stabilized.
-      zxlogf(ERROR, "(diepint.timeout) Got interrupt with timeout_recovering_ = true");
-    }
-
     // It doesn't seem that this inner loop should be necessary,
     // but without it we miss interrupts on some versions of the IP.
     while (1) {
       auto gintsts = GINTSTS::Get().ReadFrom(mmio);
-
-      // After experiencing a diepint.timeout interrupt, this (inner) loop whips back seemingly one
-      // more time. To determine why (and figure out why the timeout isn't being handled correctly),
-      // we need to know what pending interrupt(s) is/are remaining after servicing the interrupt
-      // handlers below.
-      if (timeout_recovering_) {
-        // TODO(105382) remove logging once timeout recovery has stabilized.
-        zxlogf(ERROR, "(diepint.timeout) interrupt with timeout_recovering_ = true in loop");
-      }
-
       auto gintmsk = GINTMSK::Get().ReadFrom(mmio);
       gintsts.WriteTo(mmio);
-
-      if (timeout_recovering_) {
-        // TODO(105382) remove logging once timeout recovery has stabilized.
-        zxlogf(ERROR, "(diepint.timeout) GINTSTS=0x%08x (pre-mask)", gintsts.reg_value());
-      }
-
       gintsts.set_reg_value(gintsts.reg_value() & gintmsk.reg_value());
-
-      if (timeout_recovering_) {
-        // TODO(105382) remove logging once timeout recovery has stabilized.
-        zxlogf(ERROR, "(diepint.timeout) GINTSTS=0x%08x (post-mask)", gintsts.reg_value());
-      }
 
       if (gintsts.reg_value() == 0) {
         break;
