@@ -20,7 +20,10 @@
         // in the network realm and can get the packet socket provider
         // capability from there.
         {
-            protocol: "fuchsia.posix.socket.packet.Provider",
+            protocol: [
+                "fuchsia.posix.socket.packet.Provider",
+                "fuchsia.posix.socket.Provider",
+            ],
             from: "self",
             to: "#dhcp-client",
         },
