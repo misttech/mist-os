@@ -514,8 +514,8 @@ template("assembled_system") {
   }
 
   # Split out driver packages into a separate list so that we
-  # can generate a driver-manager-base-config package.
-  # We do not generate the package when there is no fvm and drivers
+  # can generate a driver-manager-base-config manifest.
+  # We do not generate the manifest when there is no fvm and drivers
   # go directly into bootfs.
   if (defined(invoker.base_driver_packages) && _supports_blobs) {
     _base_driver_packages = invoker.base_driver_packages

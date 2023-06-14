@@ -131,11 +131,10 @@ digraph {
     pa [label="ffx_action(labels.product_assembler)"]
     hifia [label="hermetic_inputs_for_image_assembly(labels.image_assembly_inputs)"]
     image_assembler [label="ffx_action(labels.image_assembler)"]
-    fuch [label="fuchsia_package($image_name.driver-manager-base-config)"]
     fvm [label="src/storage/bin/fvm($host_toolchain)"]
     shell_commands [label="shell_commands(labels.shell_commands)"]
     component_id_index_config [label="component_id_index_config($compidic)"]
-    bpacman -> {gic, cdm } -> { hifia, pa, giac} -> {iaccomp, image_assembler, shell_commands, laib, confp, fuch, component_id_index_config} [style=invis]
+    bpacman -> {gic, cdm } -> { hifia, pa, giac} -> {iaccomp, image_assembler, shell_commands, laib, confp, component_id_index_config} [style=invis]
   }
 
   subgraph cluster_outputs {
@@ -182,7 +181,6 @@ digraph {
 
   }
 
-  cdm -> fuch
   paf -> {laib, pa} -> {riac}
   img_conf -> {gic, hifia, image_assembler}
   iaf -> {hifia, image_assembler}
@@ -218,8 +216,8 @@ digraph {
   fvm -> image_assembler
 
   /*
-  test -> {cdm, component_id_index_config, confp, fuch, giac, gic, hifia, iaccomp, image_assembler, laib, pa, shell_commands}
-  tv -> {gic, cdm, component_id_index_config, confp, fuch, giac, hifia, image_assembler, laib, pa, shell_commands}
+  test -> {cdm, component_id_index_config, confp, giac, gic, hifia, iaccomp, image_assembler, laib, pa, shell_commands}
+  tv -> {gic, cdm, component_id_index_config, confp, giac, hifia, image_assembler, laib, pa, shell_commands}
   */
 
 }

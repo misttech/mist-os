@@ -22,7 +22,6 @@ rustc_library("driver_manifest") {
   ]
   test_deps = [
     "//src/lib/assembly/test_util",
-    "//src/sys/pkg/lib/far/rust:fuchsia-archive",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:tempfile",
   ]

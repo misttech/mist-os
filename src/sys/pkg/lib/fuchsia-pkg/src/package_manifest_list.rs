@@ -222,7 +222,6 @@ mod tests {
             "obj/build/images/config-data/package_manifest.json".into(),
             "obj/build/images/shell-commands/package_manifest.json".into(),
             "obj/src/sys/component_index/component_index/package_manifest.json".into(),
-            "obj/build/images/driver-manager-base-config/package_manifest.json".into(),
         ]);
 
         assert_eq!(
@@ -234,7 +233,6 @@ mod tests {
                             "obj/build/images/config-data/package_manifest.json",
                             "obj/build/images/shell-commands/package_manifest.json",
                             "obj/src/sys/component_index/component_index/package_manifest.json",
-                            "obj/build/images/driver-manager-base-config/package_manifest.json",
                         ]
                     },
                     "version": "1"
@@ -260,8 +258,7 @@ mod tests {
                 "manifests": [
                     "obj/build/images/config-data/package_manifest.json",
                     "obj/build/images/shell-commands/package_manifest.json",
-                    "obj/src/sys/component_index/component_index/package_manifest.json",
-                    "obj/build/images/driver-manager-base-config/package_manifest.json"
+                    "obj/src/sys/component_index/component_index/package_manifest.json"
                 ]
             }
         }"#;
@@ -277,7 +274,6 @@ mod tests {
                     "obj/build/images/config-data/package_manifest.json".into(),
                     "obj/build/images/shell-commands/package_manifest.json".into(),
                     "obj/src/sys/component_index/component_index/package_manifest.json".into(),
-                    "obj/build/images/driver-manager-base-config/package_manifest.json".into(),
                 ]
             })),
             package_manifest_list
@@ -289,7 +285,6 @@ mod tests {
                 "obj/build/images/config-data/package_manifest.json",
                 "obj/build/images/shell-commands/package_manifest.json",
                 "obj/src/sys/component_index/component_index/package_manifest.json",
-                "obj/build/images/driver-manager-base-config/package_manifest.json",
             ]
         );
 
@@ -301,8 +296,7 @@ mod tests {
                 "manifests": [
                     "obj/build/images/config-data/package_manifest.json",
                     "obj/build/images/shell-commands/package_manifest.json",
-                    "obj/src/sys/component_index/component_index/package_manifest.json",
-                    "obj/build/images/driver-manager-base-config/package_manifest.json"
+                    "obj/src/sys/component_index/component_index/package_manifest.json"
                 ]
             }
         }"#;
@@ -319,8 +313,6 @@ mod tests {
                     manifest_dir.join("obj/build/images/shell-commands/package_manifest.json"),
                     manifest_dir
                         .join("obj/src/sys/component_index/component_index/package_manifest.json"),
-                    manifest_dir
-                        .join("obj/build/images/driver-manager-base-config/package_manifest.json"),
                 ]
             })),
             package_manifest_list
@@ -333,8 +325,6 @@ mod tests {
                 manifest_dir.join("obj/build/images/shell-commands/package_manifest.json"),
                 manifest_dir
                     .join("obj/src/sys/component_index/component_index/package_manifest.json"),
-                manifest_dir
-                    .join("obj/build/images/driver-manager-base-config/package_manifest.json"),
             ]
         );
     }
@@ -345,7 +335,6 @@ mod tests {
             "obj/build/images/config-data/package_manifest.json".into(),
             "obj/build/images/shell-commands/package_manifest.json".into(),
             "obj/src/sys/component_index/component_index/package_manifest.json".into(),
-            "obj/build/images/driver-manager-base-config/package_manifest.json".into(),
         ]);
 
         let mut out = vec![];
@@ -354,16 +343,15 @@ mod tests {
         assert_eq!(
             String::from_utf8(out).unwrap(),
             "{\
-                \"version\":\"1\",\
-                \"content\":{\
-                    \"manifests\":[\
-                        \"obj/build/images/config-data/package_manifest.json\",\
-                        \"obj/build/images/shell-commands/package_manifest.json\",\
-                        \"obj/src/sys/component_index/component_index/package_manifest.json\",\
-                        \"obj/build/images/driver-manager-base-config/package_manifest.json\"\
-                    ]\
-                }\
-            }"
+              \"version\":\"1\",\
+              \"content\":{\
+                  \"manifests\":[\
+                      \"obj/build/images/config-data/package_manifest.json\",\
+                      \"obj/build/images/shell-commands/package_manifest.json\",\
+                      \"obj/src/sys/component_index/component_index/package_manifest.json\"\
+                  ]\
+              }\
+          }"
         );
     }
 
@@ -438,7 +426,6 @@ mod tests {
             "obj/build/images/config-data/package_manifest.json".into(),
             "obj/build/images/shell-commands/package_manifest.json".into(),
             "obj/src/sys/component_index/component_index/package_manifest.json".into(),
-            "obj/build/images/driver-manager-base-config/package_manifest.json".into(),
         ]);
 
         assert_eq!(
@@ -447,7 +434,6 @@ mod tests {
                 "obj/build/images/config-data/package_manifest.json",
                 "obj/build/images/shell-commands/package_manifest.json",
                 "obj/src/sys/component_index/component_index/package_manifest.json",
-                "obj/build/images/driver-manager-base-config/package_manifest.json",
             ]
         );
     }
@@ -458,7 +444,6 @@ mod tests {
             "obj/build/images/config-data/package_manifest.json".into(),
             "obj/build/images/shell-commands/package_manifest.json".into(),
             "obj/src/sys/component_index/component_index/package_manifest.json".into(),
-            "obj/build/images/driver-manager-base-config/package_manifest.json".into(),
         ];
         let package_manifest_list = PackageManifestList::from(entries.clone());
 
