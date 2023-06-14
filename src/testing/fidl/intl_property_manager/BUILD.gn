@@ -81,3 +81,24 @@ fuchsia_test_package("intl_property_manager_tests") {
     }
   }
 }
+
+fuchsia_component_manifest("fake_intl_services_manifest") {
+  testonly = true
+  component_name = "intl"
+  manifest = "meta/intl_property_manager.cml"
+}
+
+fuchsia_component("fake_intl_services_component") {
+  testonly = true
+  cm_label = ":fake_intl_services_manifest"
+  deps = [ ":intl_property_manager_bin" ]
+}
+
+# Fake intl_services package, only use for testing.
+# Standing up real intl_services needs more backends, which sometimes
+# can be impractical.
+fuchsia_package("fake_intl_services_package") {
+  testonly = true
+  package_name = "intl_services"
+  deps = [ ":fake_intl_services_component" ]
+}
