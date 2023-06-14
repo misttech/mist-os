@@ -1661,20 +1661,6 @@ Controls whether to promote warnings to errors.
 
 From //build/config/BUILD.gn:35
 
-### deprecated_x86_legacy_boot_protocol
-
-**TODO(fxbug.dev/32255): This is a temporary switch that will be removed.**
-
-Set this to make the ZBI compatible with older boot loaders such as a
-gigaboot or zedboot image already installed on a machine that's hard to
-update.  This is an interim workaround only for people who have machines
-that are not physically accessible to update their boot images, and will
-be removed after everyone has had a chance to get hold of their machines.
-
-**Current value (from the default):** `false`
-
-From //zircon/kernel/BUILD.gn:37
-
 ### dev_bootfs_labels
 
 List of labels for objects to include in the ZBI.
@@ -4420,6 +4406,21 @@ status of the fuchsia git repository.
 **Current value (from the default):** `""`
 
 From //zircon/kernel/lib/version/BUILD.gn:15
+
+### kernel_zbi_extra_deps
+
+A list of GN labels reaching zbi_input()-style targets to include in the
+kernel ZBI.  These targets can be zbi_input(), kernel_cmdline(), etc. to
+inject ZBI items or resource(), etc. to inject items into the filesystem
+image that physboot decodes.
+
+These are injected first, so an item that's itself a zbi_executable() or
+the like can be listed here to be used as a ZBI-to-ZBI boot shim
+(e.g. //zircon/kernel/arch/x86/phys/boot-shim:x86-legacy-zbi-boot-shim)
+
+**Current value (from the default):** `[]`
+
+From //zircon/kernel/BUILD.gn:35
 
 ### known_variants
 
