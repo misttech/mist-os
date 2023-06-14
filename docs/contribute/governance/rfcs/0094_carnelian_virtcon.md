@@ -80,7 +80,9 @@ Virtcon are not changing.
 
 Carnelian-based Virtcon will be similar to the recovery UI application but
 connect to the display controller as a _Virtcon_ client instead of as a
-_Primary_ client (See the [display-controller API](/sdk/fidl/fuchsia.hardware.display/controller.fidl) for details about the difference).
+_Primary_ client (See the
+[display-coordinator API](/sdk/fidl/fuchsia.hardware.display/coordinator.fidl)
+for details about the difference).
 
 Maximum code reuse with the Terminal application will be accomplished by
 implementing all shared logic as rust libraries that both components can
