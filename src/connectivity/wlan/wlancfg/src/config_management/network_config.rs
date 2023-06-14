@@ -5,12 +5,15 @@
 #[cfg(test)]
 use fidl_fuchsia_wlan_common_security as fidl_security;
 use {
-    crate::client::{bss_selection::SignalData, types as client_types},
+    crate::{
+        client::{bss_selection::SignalData, types as client_types},
+        util::historical_list::{HistoricalList, Timestamped},
+    },
     arbitrary::Arbitrary,
     fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_async as fasync, fuchsia_zircon as zx,
     std::{
         cmp::Reverse,
-        collections::{HashMap, HashSet, VecDeque},
+        collections::{HashMap, HashSet},
         convert::TryFrom,
         fmt::{self, Debug},
     },
@@ -74,109 +77,16 @@ impl HiddenProbabilityStats {
 /// and maintain connection with a network and if it is weakening. Used in choosing best network.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PerformanceStats {
-    pub connect_failures: ConnectFailuresByBssid,
-    pub past_connections: PastConnectionsByBssid,
+    pub connect_failures: HistoricalListsByBssid<ConnectFailure>,
+    pub past_connections: HistoricalListsByBssid<PastConnectionData>,
 }
 
 impl PerformanceStats {
     pub fn new() -> Self {
         Self {
-            connect_failures: ConnectFailuresByBssid::new(),
-            past_connections: PastConnectionsByBssid::new(),
+            connect_failures: HistoricalListsByBssid::new(),
+            past_connections: HistoricalListsByBssid::new(),
         }
-    }
-}
-
-/// Trait for time function, for use in HistoricalList get_recent functions and AddAndGetRecent
-/// associated type
-pub trait Time {
-    fn time(&self) -> fasync::Time;
-}
-
-/// Trait for use in HistoricalListsByBssid generic
-pub trait AddAndGetRecent {
-    type Data;
-
-    fn add(&mut self, historical_data: Self::Data);
-    fn get_recent(&self, earliest_time: fasync::Time) -> Vec<Self::Data>;
-}
-
-/// Generic struct for list that stores historical data in a VecDeque, up to the some number of most
-/// recent entries.
-#[derive(Clone, Debug, PartialEq)]
-pub struct HistoricalList<T: Time>(VecDeque<T>);
-
-impl<T> HistoricalList<T>
-where
-    T: Time + Clone,
-{
-    pub fn new() -> Self {
-        Self(VecDeque::with_capacity(NUM_CONNECTION_RESULTS_PER_BSS))
-    }
-}
-
-impl<T> AddAndGetRecent for HistoricalList<T>
-where
-    T: Time + Clone,
-{
-    type Data = T;
-
-    /// Add a new entry, purging the oldest if at capacity
-    fn add(&mut self, historical_data: T) {
-        if self.0.len() == self.0.capacity() {
-            let _ = self.0.pop_front();
-        }
-        self.0.push_back(historical_data);
-    }
-
-    /// Retrieve list of entries with a time more recent than earliest_time, sorted from oldest to
-    /// newest. May be empty.
-    fn get_recent(&self, earliest_time: fasync::Time) -> Vec<T> {
-        let i = self.0.partition_point(|data| data.time() < earliest_time);
-        return self.0.iter().skip(i).cloned().collect();
-    }
-}
-
-impl<T> Default for HistoricalList<T>
-where
-    T: Time + Clone,
-{
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// Generic struct for map from BSSID to HistoricalList
-#[derive(Clone, Debug, PartialEq)]
-pub struct HistoricalListsByBssid<List>(HashMap<client_types::Bssid, List>);
-
-impl<Data, List> HistoricalListsByBssid<List>
-where
-    Data: Time + Clone,
-    List: AddAndGetRecent<Data = Data> + Default + Clone,
-{
-    pub fn new() -> Self {
-        Self(HashMap::new())
-    }
-
-    pub fn add(&mut self, bssid: client_types::Bssid, data: Data) {
-        self.0.entry(bssid).or_default().add(data);
-    }
-
-    /// Retrieve list of Data entries to any BSS with a time more recent than earliest_time, sorted
-    /// from oldest to newest. May be empty.
-    pub fn get_recent_for_network(&self, earliest_time: fasync::Time) -> Vec<Data> {
-        let mut recents: Vec<Data> = vec![];
-        for bssid in self.0.keys() {
-            recents.append(&mut self.get_list_for_bss(bssid).get_recent(earliest_time));
-        }
-        recents.sort_by_key(|a| a.time());
-        recents
-    }
-
-    /// Retrieve List for a particular BSS, in order to retrieve BSS specific Data entries.
-    pub fn get_list_for_bss(&self, bssid: &client_types::Bssid) -> List {
-        self.0.get(bssid).cloned().unwrap_or_default()
     }
 }
 
@@ -198,7 +108,7 @@ pub struct ConnectFailure {
     pub bssid: client_types::Bssid,
 }
 
-impl Time for ConnectFailure {
+impl Timestamped for ConnectFailure {
     fn time(&self) -> fasync::Time {
         self.time
     }
@@ -248,19 +158,55 @@ impl PastConnectionData {
     }
 }
 
-impl Time for PastConnectionData {
+impl Timestamped for PastConnectionData {
     fn time(&self) -> fasync::Time {
         self.disconnect_time
     }
 }
 
 /// Data structures for storing historical connection information for a BSS.
-pub type ConnectFailureList = HistoricalList<ConnectFailure>;
 pub type PastConnectionList = HistoricalList<PastConnectionData>;
+impl Default for PastConnectionList {
+    fn default() -> Self {
+        Self::new(NUM_CONNECTION_RESULTS_PER_BSS)
+    }
+}
 
-/// Data structures storing historical connection information for whole networks (one or more BSSs)
-pub type ConnectFailuresByBssid = HistoricalListsByBssid<ConnectFailureList>;
-pub type PastConnectionsByBssid = HistoricalListsByBssid<PastConnectionList>;
+/// Struct for map from BSSID to HistoricalList
+#[derive(Clone, Debug, PartialEq)]
+pub struct HistoricalListsByBssid<T: Timestamped>(HashMap<client_types::Bssid, HistoricalList<T>>);
+
+impl<T> HistoricalListsByBssid<T>
+where
+    T: Timestamped + Clone,
+{
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
+
+    pub fn add(&mut self, bssid: client_types::Bssid, data: T) {
+        self.0
+            .entry(bssid)
+            .or_insert(HistoricalList::new(NUM_CONNECTION_RESULTS_PER_BSS))
+            .add(data);
+    }
+
+    /// Retrieve list of Data entries to any BSS with a time more recent than earliest_time, sorted
+    /// from oldest to newest. May be empty.
+    pub fn get_recent_for_network(&self, earliest_time: fasync::Time) -> Vec<T> {
+        let mut recents: Vec<T> = vec![];
+        for bssid in self.0.keys() {
+            recents.append(&mut self.get_list_for_bss(bssid).get_recent(earliest_time));
+        }
+        recents.sort_by_key(|a| a.time());
+        recents
+    }
+
+    /// Retrieve List for a particular BSS, in order to retrieve BSS specific Data entries.
+    pub fn get_list_for_bss(&self, bssid: &client_types::Bssid) -> HistoricalList<T> {
+        self.0.get(bssid).cloned().unwrap_or(HistoricalList::new(NUM_CONNECTION_RESULTS_PER_BSS))
+    }
+}
 
 /// Used to allow hidden probability calculations to make use of what happened most recently
 #[derive(Clone, Copy)]
@@ -817,7 +763,7 @@ mod tests {
     use {
         super::*,
         crate::util::testing::random_connection_data,
-        std::iter::FromIterator,
+        std::{collections::VecDeque, iter::FromIterator},
         test_case::test_case,
         wlan_common::assert_variant,
         wlan_common::security::{
@@ -1083,7 +1029,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_connect_failures_by_bssid_add_and_get() {
-        let mut connect_failures = ConnectFailuresByBssid::new();
+        let mut connect_failures = HistoricalListsByBssid::new();
         let curr_time = fasync::Time::now();
 
         // Add two failures for BSSID_1
@@ -1132,21 +1078,21 @@ mod tests {
         // Verify get_recent_for_network(curr_time) is empty
         assert_eq!(connect_failures.get_recent_for_network(curr_time), vec![]);
 
-        // Verify get_list_for_bss retrieves correct ConnectFailureLists
+        // Verify get_list_for_bss retrieves correct connect failures
         assert_eq!(
             connect_failures.get_list_for_bss(&bssid_1),
-            ConnectFailureList { 0: VecDeque::from_iter([failure_1_bssid_1, failure_2_bssid_1]) }
+            HistoricalList { 0: VecDeque::from_iter([failure_1_bssid_1, failure_2_bssid_1]) }
         );
 
         assert_eq!(
             connect_failures.get_list_for_bss(&bssid_2),
-            ConnectFailureList { 0: VecDeque::from_iter([failure_1_bssid_2]) }
+            HistoricalList { 0: VecDeque::from_iter([failure_1_bssid_2]) }
         );
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn failure_list_add_and_get() {
-        let mut connect_failures = ConnectFailureList::new();
+        let mut connect_failures = HistoricalList::new(NUM_CONNECTION_RESULTS_PER_BSS);
 
         // Get time before adding so we can get back everything we added.
         let curr_time = fasync::Time::now();
@@ -1167,7 +1113,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_failure_list_add_when_full() {
-        let mut connect_failures = ConnectFailureList::new();
+        let mut connect_failures = HistoricalList::new(NUM_CONNECTION_RESULTS_PER_BSS);
         let curr_time = fasync::Time::now();
 
         // Add to list, exceeding the capacity by one entry
@@ -1187,7 +1133,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_past_connections_by_bssid_add_and_get() {
-        let mut past_connections_list = PastConnectionsByBssid::new();
+        let mut past_connections_list = HistoricalListsByBssid::new();
         let curr_time = fasync::Time::now();
 
         // Add two past_connections for BSSID_1
@@ -1245,7 +1191,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_past_connections_list_add_when_full() {
-        let mut past_connections_list = PastConnectionList::new();
+        let mut past_connections_list = PastConnectionList::default();
         let curr_time = fasync::Time::now();
 
         // Add to list, exceeding the capacity by one entry
@@ -1264,7 +1210,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_past_connections_list_add_and_get() {
-        let mut past_connections_list = PastConnectionList::new();
+        let mut past_connections_list = PastConnectionList::default();
         let curr_time = fasync::Time::now();
         assert!(past_connections_list.get_recent(curr_time).is_empty());
 

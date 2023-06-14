@@ -837,7 +837,7 @@ mod tests {
         super::*,
         crate::{
             config_management::{
-                network_config::{self, AddAndGetRecent, Credential, FailureReason},
+                network_config::{self, Credential, FailureReason},
                 PastConnectionList, SavedNetworksManager,
             },
             util::{
@@ -2632,7 +2632,7 @@ mod tests {
             types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
 
         // Add a PastConnectionData for the connected network to be send in BSS quality data.
-        let mut past_connections = PastConnectionList::new();
+        let mut past_connections = PastConnectionList::default();
         let mut past_connection_data = random_connection_data();
         past_connection_data.bssid = ieee80211::Bssid(bss_description.bssid);
         past_connections.add(past_connection_data);

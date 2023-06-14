@@ -10,9 +10,8 @@ use {
             types::{self, Bss, InternalSavedNetworkData, SecurityType, SecurityTypeDetailed},
         },
         config_management::{
-            network_config::AddAndGetRecent, select_authentication_method,
-            select_subset_potentially_hidden_networks, Credential, FailureReason,
-            SavedNetworksManagerApi,
+            select_authentication_method, select_subset_potentially_hidden_networks, Credential,
+            FailureReason, SavedNetworksManagerApi,
         },
         telemetry::{self, TelemetryEvent, TelemetrySender},
     },
@@ -715,7 +714,7 @@ mod tests {
         super::*,
         crate::{
             config_management::{
-                network_config::{PastConnectionData, PastConnectionsByBssid},
+                network_config::{HistoricalListsByBssid, PastConnectionData},
                 ConnectFailure, FailureReason, SavedNetworksManager,
             },
             util::testing::{
@@ -934,7 +933,7 @@ mod tests {
         let expected_internal_data_1 = InternalSavedNetworkData {
             has_ever_connected: true,
             recent_failures: recent_failures.clone(),
-            past_connections: PastConnectionsByBssid::new(),
+            past_connections: HistoricalListsByBssid::new(),
         };
         let hasher = create_wlan_hasher();
         let wpa3_authenticator = select_authentication_method(
@@ -984,7 +983,7 @@ mod tests {
                 saved_network_info: InternalSavedNetworkData {
                     has_ever_connected: false,
                     recent_failures: Vec::new(),
-                    past_connections: PastConnectionsByBssid::new(),
+                    past_connections: HistoricalListsByBssid::new(),
                 },
                 bss: mock_scan_results[1].entries[0].clone(),
                 authenticator: open_authenticator.clone(),

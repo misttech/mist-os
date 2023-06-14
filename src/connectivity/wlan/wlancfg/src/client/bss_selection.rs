@@ -298,7 +298,7 @@ mod test {
         let weak_signal_bss = BssQualityData::new(
             SignalData::new(-90, 5, 10, EWMA_VELOCITY_SMOOTHING_FACTOR),
             channel::Channel::new(11, channel::Cbw::Cbw20),
-            PastConnectionList::new(),
+            PastConnectionList::default(),
         );
         let (_, roam_reasons) = evaluate_current_bss(weak_signal_bss);
         assert!(roam_reasons.iter().any(|&r| r == RoamReason::SuboptimalSignal));
@@ -307,7 +307,7 @@ mod test {
         let low_snr_bss = BssQualityData::new(
             SignalData::new(-65, 5, 10, EWMA_VELOCITY_SMOOTHING_FACTOR),
             channel::Channel::new(11, channel::Cbw::Cbw20),
-            PastConnectionList::new(),
+            PastConnectionList::default(),
         );
         let (_, roam_reasons) = evaluate_current_bss(low_snr_bss);
         assert!(roam_reasons.iter().any(|&r| r == RoamReason::SuboptimalSignal));

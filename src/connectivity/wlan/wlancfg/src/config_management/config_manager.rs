@@ -714,9 +714,8 @@ mod tests {
         super::*,
         crate::{
             config_management::{
-                network_config::AddAndGetRecent, PastConnectionsByBssid, PROB_HIDDEN_DEFAULT,
-                PROB_HIDDEN_IF_CONNECT_ACTIVE, PROB_HIDDEN_IF_CONNECT_PASSIVE,
-                PROB_HIDDEN_IF_SEEN_PASSIVE,
+                HistoricalListsByBssid, PROB_HIDDEN_DEFAULT, PROB_HIDDEN_IF_CONNECT_ACTIVE,
+                PROB_HIDDEN_IF_CONNECT_PASSIVE, PROB_HIDDEN_IF_SEEN_PASSIVE,
             },
             util::testing::random_connection_data,
         },
@@ -2143,7 +2142,7 @@ mod tests {
         let credential = Credential::Password(b"some_password".to_vec());
         let mut config = NetworkConfig::new(id.clone(), credential.clone(), true)
             .expect("failed to create config");
-        let mut past_connections = PastConnectionsByBssid::new();
+        let mut past_connections = HistoricalListsByBssid::new();
 
         // Add two past connections with the same bssid
         let data_1 = random_connection_data();
@@ -2168,14 +2167,14 @@ mod tests {
             .is_none());
 
         // Check that get_past_connections gets the two PastConnectionLists for the BSSIDs.
-        let mut expected_past_connections = PastConnectionList::new();
+        let mut expected_past_connections = PastConnectionList::default();
         expected_past_connections.add(data_1);
         expected_past_connections.add(data_2);
         let actual_past_connections =
             saved_networks_manager.get_past_connections(&id, &credential, &bssid_1).await;
         assert_eq!(actual_past_connections, expected_past_connections);
 
-        let mut expected_past_connections = PastConnectionList::new();
+        let mut expected_past_connections = PastConnectionList::default();
         expected_past_connections.add(data_3);
         let actual_past_connections =
             saved_networks_manager.get_past_connections(&id, &credential, &bssid_2).await;
@@ -2186,7 +2185,7 @@ mod tests {
         let actual_past_connections = saved_networks_manager
             .get_past_connections(&id, &Credential::Password(b"other-password".to_vec()), &bssid_1)
             .await;
-        assert_eq!(actual_past_connections, PastConnectionList::new());
+        assert_eq!(actual_past_connections, PastConnectionList::default());
     }
 
     fn fake_successful_connect_result() -> fidl_sme::ConnectResult {

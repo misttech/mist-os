@@ -5,6 +5,7 @@
 pub mod atomic_oneshot_stream;
 pub mod fuse_pending;
 pub mod future_with_metadata;
+pub mod historical_list;
 pub mod listener;
 pub mod pseudo_energy;
 pub mod state_machine;

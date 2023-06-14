@@ -80,7 +80,7 @@ impl FakeSavedNetworksManager {
             fail_all_stores: false,
             lookup_compatible_response: Mutex::new(LookupCompatibleResponse::new()),
             scan_result_records: Arc::new(Mutex::new(vec![])),
-            past_connections_response: PastConnectionList::new(),
+            past_connections_response: PastConnectionList::default(),
         }
     }
 
@@ -109,7 +109,7 @@ impl FakeSavedNetworksManager {
             fail_all_stores: false,
             lookup_compatible_response: Mutex::new(LookupCompatibleResponse::new()),
             scan_result_records: Arc::new(Mutex::new(vec![])),
-            past_connections_response: PastConnectionList::new(),
+            past_connections_response: PastConnectionList::default(),
         }
     }
 
