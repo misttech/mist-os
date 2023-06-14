@@ -710,6 +710,7 @@
                 target_monikers: [
                     "/core/network",
                     "/core/network/netstack",
+                    "/core/network/test-components:**",
                     "/core/starnix_runner",
                     "/core/starnix_runner/kernels:**",
 
