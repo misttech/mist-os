@@ -981,18 +981,11 @@ mod tests {
     use netlink_packet_route::rtnl::RouteMessage;
     use test_case::test_case;
 
-    // TODO(https://github.com/frondeus/test-case/issues/66): Remove once fixed
-    // at ToT.
-    #[allow(clippy::unused_unit)]
     // Successfully send the message and observe it's stored in the queue.
     #[test_case(true; "sufficient_capacity")]
-    // TODO(https://github.com/frondeus/test-case/issues/66): Remove once fixed
-    // at ToT.
-    #[allow(clippy::unused_unit)]
     // Attempting to send when the queue is full should succeed without changing
     // the contents of the queue.
     #[test_case(false; "insufficient_capacity")]
-    #[allow(clippy::unused_init)]
     fn test_netlink_to_client_sender(sufficient_capacity: bool) {
         const MODERN_GROUP: u32 = 5;
 
