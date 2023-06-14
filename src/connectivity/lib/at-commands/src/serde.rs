@@ -234,7 +234,7 @@ impl DeserializeBytes {
     }
 
     /// Creates an empty `SerializeBytes`.  This is the only method clients should use--
-    /// the only other way to get an instance is to get one returned from `deserialize_multiple`.
+    /// the only other way to get an instance is to get one returned from `deserialize`.
     pub fn new() -> Self {
         DeserializeBytes { bytes: Vec::new() }
     }
@@ -247,7 +247,7 @@ impl Default for DeserializeBytes {
 }
 
 /// Result from attempt to deserialize multiple items, including the successfully serialized
-/// items, an error if one occurred, and the remaining bytes that were not seriialized.
+/// items, an error if one occurred, and the remaining bytes that were not serialized.
 #[derive(Debug, PartialEq)]
 pub struct DeserializeResult<T> {
     pub values: Vec<T>,

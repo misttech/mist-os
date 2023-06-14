@@ -13,8 +13,10 @@ rustc_binary("bin") {
 
   deps = [
     ":hfp_hands_free_profile_config",
+    "//sdk/fidl/fuchsia.bluetooth:fuchsia.bluetooth_rust",
     "//sdk/fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_rust",
     "//sdk/fidl/fuchsia.bluetooth.hfp:fuchsia.bluetooth.hfp_rust",
+    "//src/connectivity/bluetooth/lib/bt-rfcomm",
     "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
     "//src/connectivity/bluetooth/lib/profile-client",
     "//src/connectivity/lib/at-commands",
@@ -26,10 +28,10 @@ rustc_binary("bin") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bitflags",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:tracing",
   ]
   test_deps = [
+    "//src/connectivity/bluetooth/lib/profile-client:test-profile-server",
     "//src/lib/async-utils",
     "//src/lib/fidl/rust/fidl",
     "//third_party/rust_crates:assert_matches",
@@ -43,6 +45,7 @@ rustc_binary("bin") {
     "src/main.rs",
     "src/peer.rs",
     "src/peer/indicators.rs",
+    "src/peer/peer_task.rs",
     "src/peer/procedure.rs",
     "src/peer/procedure/codec_connection_setup.rs",
     "src/peer/procedure/phone_status.rs",

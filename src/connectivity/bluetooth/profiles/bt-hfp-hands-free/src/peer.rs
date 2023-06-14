@@ -1,320 +1,192 @@
-// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{format_err, Error};
-use at_commands as at;
-use at_commands::{DeserializeBytes, SerDe};
+use anyhow::{format_err, Result};
+use bt_rfcomm::profile as rfcomm;
+use fidl_fuchsia_bluetooth as fidl_bt;
 use fidl_fuchsia_bluetooth_bredr as bredr;
 use fuchsia_async as fasync;
+use fuchsia_bluetooth::profile::ProtocolDescriptor;
 use fuchsia_bluetooth::types::{Channel, PeerId};
-use futures::StreamExt;
-use parking_lot::Mutex;
 use profile_client::ProfileEvent;
-use std::io::Cursor;
-use std::sync::Arc;
-use tracing::{debug, trace, warn};
+use tracing::info;
 
-use self::procedure::ProcedureMarker;
-use self::service_level_connection::{write_commands_to_channel, SlcState};
+use peer_task::PeerTask;
 
 use crate::config::HandsFreeFeatureSupport;
 
-pub mod indicators;
-pub mod procedure;
-pub mod service_level_connection;
+mod indicators;
+mod peer_task;
+mod procedure;
+mod service_level_connection;
 
 /// Represents a Bluetooth peer that supports the AG role. Manages the Service Level Connection,
 /// Audio Connection, and FIDL APIs
 pub struct Peer {
-    _id: PeerId,
-    _config: HandsFreeFeatureSupport,
-    _profile_svc: bredr::ProfileProxy,
+    peer_id: PeerId,
+    config: HandsFreeFeatureSupport,
+    profile_proxy: bredr::ProfileProxy,
     /// The processing task for data received from the remote peer over RFCOMM
     /// or FIDL APIs.
     /// This value is None if there is no RFCOMM channel present.
     /// If set, there is no guarantee that the RFCOMM channel is open.
-    rfcomm_task: Option<fasync::Task<()>>,
-    /// Tracks the current state associated with the service level connection
-    /// to the given peer
-    state: Arc<Mutex<SlcState>>,
+    task: Option<fasync::Task<()>>,
 }
 
 impl Peer {
     pub fn new(
-        id: PeerId,
+        peer_id: PeerId,
         config: HandsFreeFeatureSupport,
-        profile_svc: bredr::ProfileProxy,
+        profile_proxy: bredr::ProfileProxy,
     ) -> Self {
-        Self {
-            _id: id,
-            _config: config,
-            _profile_svc: profile_svc,
-            rfcomm_task: None,
-            state: Arc::new(Mutex::new(SlcState::new(config))),
-        }
+        Self { peer_id, config, profile_proxy, task: None }
     }
 
-    pub fn profile_event(&mut self, event: ProfileEvent) -> Result<(), Error> {
+    pub async fn handle_profile_event(&mut self, event: ProfileEvent) -> Result<()> {
         match event {
-            ProfileEvent::PeerConnected { id: _, protocol: _, channel } => {
-                if self.rfcomm_task.take().is_some() {
-                    debug!("Closing existing RFCOMM processing task.");
+            ProfileEvent::PeerConnected { channel, .. } => {
+                info!("Received peer_connected for peer {}; spawning new task.", self.peer_id);
+                if self.task.take().is_some() {
+                    info!(peer = %self.peer_id, "Shutdown existing task on incoming RFCOMM channel");
                 }
-                let processed_channel = process_function(channel, self.state.clone());
-                let my_task = fasync::Task::spawn(async move {
-                    if let Err(e) = processed_channel.await {
-                        warn!("Error processing channel: {:?}", e);
-                    }
-                });
-
-                self.rfcomm_task = Some(my_task);
+                let task = PeerTask::spawn(self.peer_id, self.config, channel);
+                self.task = Some(task);
             }
-            ProfileEvent::SearchResult { id, protocol, attributes } => {
-                trace!("Received search results for {}: {:?}, {:?}", id, protocol, attributes);
+            ProfileEvent::SearchResult { protocol, attributes, .. } => {
+                info!(
+                    "Received search results for peer {}: {:?}, {:?}",
+                    self.peer_id, protocol, attributes
+                );
+                if !self.task.is_some() {
+                    // If we haven't started the task, connect to the peer and do so.
+                    info!("Connecting RFCOMM to peer {}", self.peer_id);
+                    let protocol =
+                        protocol.map(|p| p.iter().map(ProtocolDescriptor::from).collect());
+                    let channel = self.connect_from_protocol(protocol).await?;
+                    let task = PeerTask::spawn(self.peer_id, self.config, channel);
+                    self.task = Some(task);
+                }
             }
         }
         Ok(())
     }
-}
 
-/// Processes and handles received AT responses from the remote peer through the RFCOMM channel
-async fn process_function(mut channel: Channel, state: Arc<Mutex<SlcState>>) -> Result<(), Error> {
-    // Scope is used so lock is not held beyond initial command setup.
-    {
-        let mut slc_state = state.lock();
-        let init_proc_id = ProcedureMarker::SlcInitialization;
-        let init_proc = ProcedureMarker::SlcInitialization.initialize();
-        if slc_state.procedures.insert(init_proc_id, init_proc).is_some() {
-            trace!("SLCI already active for peer, restarting SLCI");
-        }
-        write_commands_to_channel(
-            &mut channel,
-            &mut vec![at::Command::Brsf { features: slc_state.shared_state.hf_features.bits() }],
-        );
+    async fn connect_from_protocol(
+        &mut self,
+        protocol_option: Option<Vec<ProtocolDescriptor>>,
+    ) -> Result<Channel> {
+        let protocol = protocol_option.ok_or_else(|| {
+            format_err!("Got no protocols for peer {:} in search result.", self.peer_id)
+        })?;
+
+        let server_channel_option = rfcomm::server_channel_from_protocol(&protocol);
+        let server_channel = server_channel_option.ok_or_else(|| {
+            format_err!(
+                "Search result received for non-RFCOMM protocol {:?} from peer {:}.",
+                protocol,
+                self.peer_id
+            )
+        })?;
+
+        let params = bredr::ConnectParameters::Rfcomm(bredr::RfcommParameters {
+            channel: Some(server_channel.into()),
+            ..bredr::RfcommParameters::default()
+        });
+        let peer_id: fidl_bt::PeerId = self.peer_id.into();
+
+        let fidl_channel_result_result = self.profile_proxy.connect(&peer_id, &params).await;
+        let fidl_channel = fidl_channel_result_result
+            .map_err(|e| {
+                format_err!(
+                    "Unable to connect RFCOMM to peer {:} with FIDL error {:?}",
+                    self.peer_id,
+                    e
+                )
+            })?
+            .map_err(|e| {
+                format_err!(
+                    "Unable to connect RFCOMM to peer {:} with Bluetooth error {:?}",
+                    self.peer_id,
+                    e
+                )
+            })?;
+
+        // Convert a bredr::Channel into a fuchsia_bluetooth::types::Channel
+        let channel = fidl_channel.try_into()?;
+
+        Ok(channel)
     }
 
-    while let Some(bytes_result) = channel.next().await {
-        match bytes_result {
-            Ok(bytes) => {
-                let mut cursor = Cursor::new(&bytes);
-                let empty_deserialized_bytes = DeserializeBytes::new();
-                let parse_results =
-                    at::Response::deserialize(&mut cursor, empty_deserialized_bytes);
-                if let Some(error) = parse_results.error {
-                    warn!("Could not deserialize correctly {:?}", error);
-                }
-                if parse_results.values.is_empty() {
-                    continue;
-                }
-                handle_parsed_messages(state.clone(), &parse_results.values, &mut channel);
-            }
-            Err(e) => return Err(format_err!("Error in RFCOMM connection: {:?}", e)),
-        }
-    }
-    Ok(())
-}
-
-/// Matches the AT responses to a procedure and updates procedure
-/// by writing to the RFCOMM channel if necessary.
-pub fn handle_parsed_messages(
-    state: Arc<Mutex<SlcState>>,
-    parse_results: &Vec<at::Response>,
-    channel: &mut Channel,
-) {
-    let mut slc_state = state.lock();
-    let mut shared_state_clone = slc_state.shared_state.clone();
-    // TODO (fxbug.dev/106180): Handle remaining bytes.
-    trace!("Received: {:?}", parse_results);
-    let specific_procedure =
-        slc_state.match_to_procedure(shared_state_clone.initialized, &parse_results[0]);
-    match specific_procedure {
-        Ok(procedure_id) => {
-            let procedure = slc_state
-                .procedures
-                .get_mut(&procedure_id)
-                .expect("Initialized in match_to_procedure.");
-            match procedure.ag_update(&mut shared_state_clone, &parse_results) {
-                Ok(mut commands_to_send) => {
-                    trace!("Writing to channel: {:?}", commands_to_send);
-                    if procedure.is_terminated() {
-                        trace!(
-                            "Procedure {:?} has terminated, removing from active procedures.",
-                            procedure_id
-                        );
-                        let _ = slc_state.procedures.remove(&procedure_id);
-                    }
-                    write_commands_to_channel(channel, &mut commands_to_send);
-                    slc_state.shared_state = shared_state_clone;
-                }
-                Err(e) => {
-                    warn!("Error updating procedure: {:?}", e);
-                    let _ = slc_state.procedures.remove(&procedure_id);
-                }
-            }
-        }
-        Err(e) => {
-            warn!("Cannot process AT Response: {:?}", e);
-        }
+    #[cfg(test)]
+    fn get_task(&self) -> &Option<fasync::Task<()>> {
+        &self.task
     }
 }
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
-    use assert_matches::assert_matches;
     use async_utils::PollExt;
     use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
-    use fuchsia_async as fasync;
-    use fuchsia_bluetooth::types::Channel;
     use futures::pin_mut;
+    use test_profile_server;
 
     use crate::config::HandsFreeFeatureSupport;
-    use crate::features::HfFeatures;
-
-    async fn receive_and_parse(mut channel: Channel) -> Result<Vec<at::Command>, Error> {
-        if let Some(bytes_result) = channel.next().await {
-            match bytes_result {
-                Ok(bytes) => {
-                    let mut cursor = Cursor::new(&bytes);
-                    let empty_deserialized_bytes = DeserializeBytes::new();
-                    let parse_results =
-                        at::Command::deserialize(&mut cursor, empty_deserialized_bytes);
-                    if let Some(error) = parse_results.error {
-                        return Err(format_err!("Could not deserialize correctly {:?}", error));
-                    }
-                    return Ok(parse_results.values);
-                }
-                Err(e) => {
-                    return Err(format_err!("Remote channel not longer connected: {:?}", e));
-                }
-            }
-        } else {
-            return Err(format_err!("No longer polling RFCOMM channel"));
-        }
-    }
 
     #[fuchsia::test]
-    fn peer_channel_properly_extracted() {
-        let _exec = fasync::TestExecutor::new();
-        let (channel_1, _channel_2) = Channel::create();
+    fn peer_channel_starts_task() {
+        let mut exec = fasync::TestExecutor::new();
+        let (_near, far) = Channel::create();
         let (profile_proxy, _profile_server) =
             fidl::endpoints::create_proxy_and_stream::<ProfileMarker>().unwrap();
-        let event = ProfileEvent::PeerConnected {
-            id: PeerId::random(),
-            protocol: Vec::new(),
-            channel: channel_1,
-        };
+        let event =
+            ProfileEvent::PeerConnected { id: PeerId(1), protocol: Vec::new(), channel: far };
         let mut peer =
             Peer::new(PeerId::random(), HandsFreeFeatureSupport::default(), profile_proxy.clone());
-        peer.profile_event(event).expect("Profile event terminated incorrectly.");
-        assert!(peer.rfcomm_task.is_some());
+        exec.run_singlethreaded(peer.handle_profile_event(event))
+            .expect("Error handling profile event.");
+        let _: &fasync::Task<()> = peer.get_task().as_ref().expect("Peer task does not exists.");
     }
 
     #[fuchsia::test]
-    fn at_responses_are_accepted() {
+    fn search_result_connects_channel_and_starts_task() {
         let mut exec = fasync::TestExecutor::new();
-        let (local, remote) = Channel::create();
-        let config = HandsFreeFeatureSupport::default();
-        let state = Arc::new(Mutex::new(SlcState::new(config)));
-        let processed_channel = process_function(local, state);
-        pin_mut!(processed_channel);
-        let () = exec.run_until_stalled(&mut processed_channel).expect_pending("still active");
 
-        // Sending an at::Response is OK
-        let _ = remote.as_ref().write(b"+BRSF:0\r").unwrap();
-        // The data should be received by the process function and gracefully handled.
-        let () = exec.run_until_stalled(&mut processed_channel).expect_pending("still active");
+        let test_profile_server::TestProfileServerEndpoints {
+            proxy: profile_proxy,
+            client: _profile_client,
+            test_server: mut profile_server,
+        } = test_profile_server::TestProfileServer::new(None, None);
 
-        // Remote end disconnects.
-        drop(remote);
-        let result = exec.run_until_stalled(&mut processed_channel).expect("terminated");
-        assert_matches!(result, Ok(_));
-    }
+        let protocol_descriptor = bredr::ProtocolDescriptor {
+            protocol: bredr::ProtocolIdentifier::Rfcomm,
+            params: vec![/* Server Channel */ bredr::DataElement::Uint8(1)],
+        };
 
-    #[fuchsia::test]
-    fn at_commands_are_handled_gracefully() {
-        let mut exec = fasync::TestExecutor::new();
-        let (local, remote) = Channel::create();
-        let config = HandsFreeFeatureSupport::default();
-        let state = Arc::new(Mutex::new(SlcState::new(config)));
-        let processed_channel = process_function(local, state);
-        pin_mut!(processed_channel);
-        let () = exec.run_until_stalled(&mut processed_channel).expect_pending("still active");
+        let event = ProfileEvent::SearchResult {
+            id: PeerId(1),
+            protocol: Some(vec![protocol_descriptor]),
+            attributes: vec![],
+        };
 
-        // While unexpected, sending an at::Command is OK
-        let _ = remote.as_ref().write(b"AT+BRSF=0\r").unwrap();
-        // The data should be received by the process function and gracefully handled.
-        let () = exec.run_until_stalled(&mut processed_channel).expect_pending("still active");
+        let mut peer =
+            Peer::new(PeerId(1), HandsFreeFeatureSupport::default(), profile_proxy.clone());
 
-        // Remote end disconnects.
-        drop(remote);
-        let result = exec.run_until_stalled(&mut processed_channel).expect("terminated");
-        assert_matches!(result, Ok(_));
-    }
+        {
+            let profile_event_fut = peer.handle_profile_event(event);
+            pin_mut!(profile_event_fut);
+            exec.run_until_stalled(&mut profile_event_fut)
+                .expect_pending("Start handling profile event");
+            let _near_rfcomm = exec.run_singlethreaded(
+                profile_server
+                    .expect_connect(Some(test_profile_server::ConnectChannel::RfcommChannel(1))),
+            );
+            exec.run_singlethreaded(profile_event_fut)
+                .expect("Profile event terminated incorrectly.");
+        }
 
-    #[fuchsia::test]
-    /// Checks that active procedure is added to map of active procedures and
-    /// that the initial command is properly sent through the RFCOMM channel.
-    fn peer_updates_map_of_active_procedures_and_sends_commands() {
-        let mut exec = fasync::TestExecutor::new();
-        let (local, remote) = Channel::create();
-        let config = HandsFreeFeatureSupport::default();
-        let state = Arc::new(Mutex::new(SlcState::new(config)));
-        let processed_channel = process_function(local, state.clone());
-        pin_mut!(processed_channel);
-        let () = exec.run_until_stalled(&mut processed_channel).expect_pending("still active");
-
-        // Sending an at::Response is OK
-        let _ = remote.as_ref().write(b"+BRSF:0\rOK\r").unwrap();
-        let () = exec.run_until_stalled(&mut processed_channel).expect_pending("still active");
-
-        let clone = state.clone();
-        let state_size = clone.lock().procedures.len();
-        let expected_message = vec![at::Command::Brsf {
-            features: <HandsFreeFeatureSupport as Into<HfFeatures>>::into(
-                HandsFreeFeatureSupport::default(),
-            )
-            .bits(),
-        }];
-        let expect_fut = receive_and_parse(remote);
-        pin_mut!(expect_fut);
-        let received_message = exec
-            .run_until_stalled(&mut expect_fut)
-            .expect("Message received.")
-            .expect("Message is ok");
-
-        assert_eq!(state_size, 1);
-        assert_eq!(expected_message, received_message);
-    }
-
-    #[fuchsia::test]
-    /// Checks that parsed results are correctly handled by matching parsed command to valid
-    /// procedure, proper command is written based on procedure, and shared state is
-    /// is properly updated.
-    fn properly_matches_procedure_and_updates_state() {
-        let mut exec = fasync::TestExecutor::new();
-        let (mut local, remote) = Channel::create();
-        let config = HandsFreeFeatureSupport::default();
-        let state = Arc::new(Mutex::new(SlcState::new(config)));
-        let clone = state.clone();
-
-        // Random non-zero feature flag set to see change in state.
-        let parse_results =
-            vec![at::Response::Success(at::Success::Brsf { features: 1 }), at::Response::Ok];
-        handle_parsed_messages(state.clone(), &parse_results, &mut local);
-
-        let expected_message = vec![at::Command::CindTest {}];
-        let expect_fut = receive_and_parse(remote);
-        pin_mut!(expect_fut);
-        let received_message = exec
-            .run_until_stalled(&mut expect_fut)
-            .expect("Message received.")
-            .expect("Message is ok");
-
-        assert_eq!(expected_message, received_message);
-        assert_eq!(clone.lock().shared_state.ag_features.bits(), 1);
+        let _: &fasync::Task<()> = peer.get_task().as_ref().expect("Peer task does not exists.");
     }
 }

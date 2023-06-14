@@ -54,6 +54,8 @@ impl SlcState {
     }
 
     /// Identifies procedure from the response and inserts the identifying procedure marker into map.
+    // TODO(fxr/127086) Procedure management
+    #[allow(unused)]
     pub fn match_to_procedure(
         &mut self,
         initialized: bool,
@@ -67,7 +69,7 @@ impl SlcState {
                 Ok(id)
             }
             Err(e) => {
-                warn!("Could not match parsed value to specific procedure: {:?}", response);
+                warn!(?response, "Did not match to procedure");
                 return Err(e);
             }
         }
@@ -111,6 +113,8 @@ impl SharedState {
 }
 
 /// Serializes the AT commands and sends them through the provided RFCOMM channel
+// TODO(127086) Move to AT connection and use in task.rs.
+#[allow(unused)]
 pub fn write_commands_to_channel(channel: &mut Channel, commands: &mut [at::Command]) {
     if commands.len() > 0 {
         let mut bytes = Vec::new();

@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{format_err, Error};
+use anyhow::Error;
 use fidl_fuchsia_bluetooth_bredr as bredr;
 use fidl_fuchsia_bluetooth_hfp as fidl_hfp;
 use fuchsia_bluetooth::types::PeerId;
 use futures::channel::mpsc;
 use futures::StreamExt;
 use profile_client::{ProfileClient, ProfileEvent};
-use std::collections::hash_map::{Entry, HashMap};
+use std::collections::hash_map::HashMap;
 
 use crate::config::HandsFreeFeatureSupport;
 use crate::peer::Peer;
@@ -37,22 +37,20 @@ impl Hfp {
     /// Run the Hfp object to completion. Runs until an unrecoverable error occurs or there is no
     /// more work to perform because all managed resources have been closed.
     pub async fn run(mut self) -> Result<(), Error> {
-        while let Some(event) = self.profile_client.next().await {
-            self.handle_profile_event(event?)?;
+        while let Some(event_result) = self.profile_client.next().await {
+            let event = event_result?;
+            self.handle_profile_event(event).await?;
         }
-        Err(format_err!("Profile client terminated early."))
+        Ok(())
     }
 
-    fn handle_profile_event(&mut self, event: ProfileEvent) -> Result<(), Error> {
+    async fn handle_profile_event(&mut self, event: ProfileEvent) -> Result<(), Error> {
         let id = event.peer_id();
-        let peer = match self.peers.entry(id) {
-            Entry::Vacant(entry) => {
-                let peer = Peer::new(id, self.config, self.profile_svc.clone());
-                entry.insert(peer)
-            }
-            Entry::Occupied(entry) => entry.into_mut(),
-        };
-        peer.profile_event(event)?;
+        let peer = self
+            .peers
+            .entry(id)
+            .or_insert_with(|| Peer::new(id, self.config, self.profile_svc.clone()));
+        peer.handle_profile_event(event).await?;
         Ok(())
     }
 }
@@ -83,7 +81,7 @@ mod tests {
 
         drop(receiver);
         let result = hfp.run().await;
-        assert_matches!(result, Err(_));
+        assert_matches!(result, Ok(_));
     }
 
     #[fuchsia::test]
