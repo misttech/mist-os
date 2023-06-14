@@ -53,6 +53,10 @@ class StepThroughPltThreadController : public ThreadController {
   // and we'll step by instructions. Usually the PLTs are short enough where this is reasonable.
   std::unique_ptr<ThreadController> until_;
 
+  // Return controller. This catches the return of the PLT call in case we never hit the PLT
+  // destination.
+  std::unique_ptr<ThreadController> catch_return_;
+
   fxl::WeakPtrFactory<StepThroughPltThreadController> weak_factory_;
 };
 

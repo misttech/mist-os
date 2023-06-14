@@ -4,6 +4,7 @@
 
 #include "src/developer/debug/zxdb/client/step_through_plt_thread_controller.h"
 
+#include "src/developer/debug/zxdb/client/finish_thread_controller.h"
 #include "src/developer/debug/zxdb/client/frame.h"
 #include "src/developer/debug/zxdb/client/function_step.h"
 #include "src/developer/debug/zxdb/client/process.h"
@@ -22,10 +23,24 @@ void StepThroughPltThreadController::InitWithThread(Thread* thread,
                                                     fit::callback<void(const Err&)> cb) {
   SetThread(thread);
 
-  const Stack& stack = thread->GetStack();
+  Stack& stack = thread->GetStack();
   if (stack.empty())
     return cb(Err("Can't step, no frames."));
   const Frame* top_frame = stack[0];
+
+  // Catch returns from the PLT call. This will handle cases where the logic below fails to prevent
+  // execution from running away from us.
+  //
+  // One case where the logic below fails is if the imported ELF function is redirected somewhere
+  // else. Libc does this for some functions like memset() to redirect them to platform-specific
+  // implementations like __memset_avx2_unaligned(). In this case, a breakpoint on $elf(memset)
+  // will never be hit.
+  //
+  // GDB seems to have more specialized PLT trampoline handling code to actually get through the
+  // import function and stop at the proper destination. As of this writing, LLDB has a similar
+  // problem as this code does.
+  catch_return_ = std::make_unique<FinishThreadController>(stack, 0);
+  catch_return_->InitWithThread(thread, [](const Err&) {});
 
   // Extract the ELF PLT symbol for the current location (the thread should be stopped at a PLT
   // symbol when InitWithThread() is called).
@@ -47,6 +62,11 @@ void StepThroughPltThreadController::InitWithThread(Thread* thread,
   // for example, "open" and they'll all be a PLT type (so "$plt(open)" in zxdb naming).
   // Currently ELF symbol lookup only takes mangled names, so we need to construct an identifier
   // based on the linkage name.
+  //
+  // TODO(fxbug.dev/128935) this may fail in some cases because the destination symbol doesn't
+  // match. To properly handle this we will need to do a lot of PLT trampoline-specific work.
+  // Currently failures end up in the catch_return_ handler which has the effect of stepping out of
+  // them.
   Identifier plt_name(IdentifierComponent(SpecialIdentifier::kPlt, linkage_name));
   FX_DCHECK(plt_name.components().size() == 1);  // Expect one component for all ELF symbols.
 
@@ -81,7 +101,7 @@ void StepThroughPltThreadController::InitWithThread(Thread* thread,
 
   // When no matches were found, the destination can never be hit. Using the "until" controller at
   // this point will be like continuing the program which will lose the current location. In this
-  // case, give up and stop the program so the user can figure out what they want to do.
+  // case, give up. The return controller will catch the result so this will be like "step out".
   if (found.empty()) {
     cb(Err("Could not find destination of PLT trampoline."));
     return;
@@ -117,6 +137,11 @@ ThreadController::ContinueOp StepThroughPltThreadController::GetContinueOp() {
 ThreadController::StopOp StepThroughPltThreadController::OnThreadStop(
     debug_ipc::ExceptionType stop_type,
     const std::vector<fxl::WeakPtr<Breakpoint>>& hit_breakpoints) {
+  if (catch_return_->OnThreadStop(stop_type, hit_breakpoints) == kStopDone) {
+    // Caught the return for the PLT call before we thought we stepped through it, stop.
+    Log("PLT stepping failed, it just stepped out of the call. Stopping.");
+    return StopOp::kStopDone;
+  }
   if (until_) {
     // Delegate to thread controller.
     Log("Checking with until controller to see if PLT stepping is complete.");
@@ -144,8 +169,16 @@ ThreadController::StopOp StepThroughPltThreadController::OnThreadStop(
     return ThreadController::StopOp::kContinue;
   }
 
-  Log("No destination for PLT step, stopping execution.");
-  return ThreadController::StopOp::kStopDone;
+  // If there were no address matches, we probably can't step through this. The catch_return_
+  // controller will fire when the function returns, so this will will be the equivalent to "step
+  // over."
+  //
+  // If the user wants to step into the PLT when this happens, they'll have to step by instruction.
+  // For this use-case, it would be safer to stop here. But the most common time this fires is when
+  // stepping over library functions that the user doesn't actually want to step into (this
+  // controller is just being used as a sub-controller) and stopping is extremely annoying.
+  Log("No destination for PLT step, continuing until return.");
+  return ThreadController::StopOp::kContinue;
 }
 
 void StepThroughPltThreadController::OnUntilControllerInitializationFailed() {
