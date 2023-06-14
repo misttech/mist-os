@@ -145,17 +145,20 @@ template("generate_final_idk") {
     action(target_name) {
       script = "//scripts/sdk/merger/merge.py"
       outputs = [ _output_archive ]
+      inputs = [
+        # Invoked at runtime by this action's script.
+        "//prebuilt/third_party/pigz/pigz",
+      ]
       mnemonic = "IDK_ARCHIVE"
-      stamp_file = "$target_out_dir/$target_name.stamp"
       args = [
         "--input-directory",
         rebase_path(_exported_dir, root_build_dir),
         "--output-archive",
         rebase_path(outputs[0], root_build_dir),
-        "--stamp-file",
-        rebase_path(stamp_file, root_build_dir),
       ]
       deps = [ ":" + _exported_dir_target ]
+
+      hermetic_inputs_file = "$target_gen_dir/$target_name.hermetic_inputs"
 
       forward_variables_from(invoker,
                              [

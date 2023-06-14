@@ -63,10 +63,7 @@ group("non_hermetic_deps") {
   visibility += [ "//sdk:cts_generate" ]
 
   # See: fxbug.dev/44889
-  visibility += [
-    "//sdk:final_fuchsia_idk",
-    "//sdk:final_fuchsia_idk.exported",
-  ]
+  visibility += [ "//sdk:final_fuchsia_idk.exported" ]
 
   # TODO(http://fxbug.dev/92612): Remove entries when
   # assembly input bundle creation no longer triggers false-positives in the

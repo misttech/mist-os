@@ -413,7 +413,7 @@ class MergeState(object):
         """Return the lists of inputs and outputs that should appear in the depfile."""
 
         def make_relative_paths(paths):
-            return sorted([os.path.relpath(p) for p in paths])
+            return sorted([os.path.relpath(os.path.realpath(p)) for p in paths])
 
         return make_relative_paths(self._all_inputs), make_relative_paths(
             self._all_outputs)
