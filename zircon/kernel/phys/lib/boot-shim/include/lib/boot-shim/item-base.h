@@ -18,6 +18,8 @@
 #include <type_traits>
 #include <variant>
 
+#include <hwreg/internal.h>
+
 namespace boot_shim {
 
 // This is the base class and API model for item types used with BootShim.
@@ -167,6 +169,11 @@ class SingleVariantItemBase : public ItemBase {
   static constexpr fit::result<DataZbi::Error> Append(Args&&... args) {
     static_assert((std::is_void_v<Args> && ...));
     return fit::ok();
+  }
+
+  template <typename PayloadVisitor>
+  void VisitPayload(PayloadVisitor&& visitor) {
+    hwreg::internal::Visit(visitor, payload_);
   }
 
  private:

@@ -10,6 +10,7 @@
 #include <lib/devicetree/devicetree.h>
 #include <lib/devicetree/matcher.h>
 #include <lib/fit/result.h>
+#include <lib/zbitl/storage-traits.h>
 
 #include <type_traits>
 #include <utility>
@@ -59,7 +60,6 @@ class DevicetreeBootShim : public BootShim<Items...> {
   template <typename T>
   using IsDevicetreeItem = std::conditional_t<HasInit<T>::value && devicetree::kIsMatcher<T>,
                                               std::true_type, std::false_type>;
-
   devicetree::Devicetree dt_;
 };
 

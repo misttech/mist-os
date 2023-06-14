@@ -101,6 +101,74 @@ class ArmDevicetreePsciItem
                                        const devicetree::PropertyDecoder& decoder);
 };
 
+// Parses either GIC v2 or GIC v3 device node into proper ZBI item.
+//
+// This item will scan the devicetree for either a node compatible with GIC v2 bindings or GIC v3
+// bindings. Upon finding such node it will generate either a |zbi_dcfg_arm_gic_v2_driver_t| for GIC
+// v2 or a |zbi_dcfg_arm_gic_v3_driver_t| for GIC v3.
+//
+// In case of GIC v2, it will determine whether the MSI extension is supported or not by looking at
+// the children of the GIC v2 node.
+//
+// Each interrupt controller contains uses a custom format for their 'reg' property, which defines
+// the different address ranges required for the driver.
+//
+// See for GIC v2:
+// * https://www.kernel.org/doc/Documentation/devicetree/bindings/interrupt-controller/arm%2Cgic.txt
+// See for GIC v3:
+// * https://www.kernel.org/doc/Documentation/devicetree/bindings/interrupt-controller/arm%2Cgic-v3.txt
+class ArmDevicetreeGicItem
+    : public DevicetreeItemBase<ArmDevicetreeGicItem, 1>,
+      public SingleVariantItemBase<ArmDevicetreeGicItem, zbi_dcfg_arm_gic_v2_driver_t,
+                                   zbi_dcfg_arm_gic_v3_driver_t> {
+ public:
+  static constexpr auto kGicV2CompatibleDevices = cpp20::to_array<std::string_view>({
+      "arm,gic-400",
+      "arm,cortex-a15-gic",
+      "arm,cortex-a9-gic",
+      "arm,cortex-a7-gic",
+      "arm,arm11mp-gic",
+      "brcm,brahma-b15-gic",
+      "arm,arm1176jzf-devchip-gic",
+      "qcom,msm-8660-qgic",
+      "qcom,msm-qgic2",
+  });
+
+  static constexpr auto kGicV3CompatibleDevices = cpp20::to_array<std::string_view>({"arm,gic-v3"});
+
+  // Matcher API.
+  devicetree::ScanState OnNode(const devicetree::NodePath& path,
+                               const devicetree::PropertyDecoder& decoder);
+  devicetree::ScanState OnSubtree(const devicetree::NodePath& path);
+
+  devicetree::ScanState OnWalk() {
+    return matched_ ? devicetree::ScanState::kDone : devicetree::ScanState::kActive;
+  }
+
+  // Boot Shim Item API.
+  static constexpr zbi_header_t ItemHeader(const zbi_dcfg_arm_gic_v2_driver_t& driver) {
+    return {.type = ZBI_TYPE_KERNEL_DRIVER, .extra = ZBI_KERNEL_DRIVER_ARM_GIC_V2};
+  }
+
+  static constexpr zbi_header_t ItemHeader(const zbi_dcfg_arm_gic_v3_driver_t& driver) {
+    return {.type = ZBI_TYPE_KERNEL_DRIVER, .extra = ZBI_KERNEL_DRIVER_ARM_GIC_V3};
+  }
+
+ private:
+  devicetree::ScanState HandleGicV2(const devicetree::NodePath& path,
+                                    const devicetree::PropertyDecoder& decoder);
+  devicetree::ScanState HandleGicV3(const devicetree::NodePath& path,
+                                    const devicetree::PropertyDecoder& decoder);
+  devicetree::ScanState HandleGicChildNode(const devicetree::NodePath& path,
+                                           const devicetree::PropertyDecoder& decoder);
+
+  constexpr bool IsGicChildNode() const { return gic_ != nullptr; }
+
+  std::optional<devicetree::RangesProperty> ranges_;
+  const devicetree::Node* gic_ = nullptr;
+  bool matched_ = false;
+};
+
 }  // namespace boot_shim
 
 #endif  // ZIRCON_KERNEL_PHYS_LIB_BOOT_SHIM_INCLUDE_LIB_BOOT_SHIM_DEVICETREE_H_
