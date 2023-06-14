@@ -151,6 +151,19 @@ TEST(MMapTest, MapFileThenGrow) {
   unlink(path.c_str());
 }
 
+TEST(MMapTest, MapFixedUnalignedFails) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  void* mmap_addr = mmap(NULL, page_size * 2, PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(mmap_addr, MAP_FAILED);
+
+  void* unaligned_addr = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(mmap_addr) + 1);
+
+  EXPECT_EQ(
+      mmap(unaligned_addr, page_size, PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0),
+      MAP_FAILED);
+  EXPECT_EQ(errno, EINVAL);
+}
+
 class MMapProcTest : public ProcTestBase {};
 
 TEST_F(MMapProcTest, CommonMappingsHavePathnames) {
