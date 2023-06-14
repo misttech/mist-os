@@ -123,56 +123,12 @@ template("fuchsia_test_package") {
       manifest_name = get_target_outputs(test)
       manifest_name = get_path_info(manifest_name[0], "file")
 
-      _wrapped_legacy_test = false
-      if (get_path_info(manifest_name, "extension") == "cmx") {
-        _wrapped_legacy_test = true
-        modern_generated_name =
-            "${target_name}_${test_target_name}_modern_generated"
-        generated_manifest_target = "${modern_generated_name}_manifest"
-        fuchsia_test_component_manifest(generated_manifest_target) {
-          metadata = {
-            test_component_manifest_program = [
-              {
-                program = {
-                  legacy_manifest = "meta/$manifest_name"
-                }
-              },
-            ]
-            test_component_manifest_cml = [
-              {
-                include =
-                    [ "//src/sys/test_runners/legacy_test/default.shard.cml" ]
-              },
-            ]
-          }
-          visibility = [ ":*" ]
-        }
-
-        manifest = get_target_outputs(":$generated_manifest_target")
-        manifest = manifest[0]
-
-        name = get_path_info(manifest_name, "name")
-
-        fuchsia_test_component("$modern_generated_name") {
-          component_name = name
-          manifest = manifest
-          visibility = [ ":*" ]
-          manifest_deps = [ ":$generated_manifest_target" ]
-        }
-
-        manifest_name = get_target_outputs(":$modern_generated_name")
-        manifest_name = get_path_info(manifest_name[0], "file")
-
-        test_deps += [ ":$modern_generated_name" ]
-      }
-
       test_spec(test_target) {
         forward_variables_from(test_specs, "*")
         if (!defined(build_rule)) {
           build_rule = "fuchsia_test_package"
         }
         target = get_label_info(":$target_name", "label_with_toolchain")
-        wrapped_legacy_test = _wrapped_legacy_test
         package_label = package_label
         component_label = component_label
         package_manifests = [ package_manifest ]

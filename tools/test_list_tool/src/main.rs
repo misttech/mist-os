@@ -51,7 +51,6 @@ struct TestEntry {
     log_settings: Option<LogSettings>,
     build_rule: Option<String>,
     has_generated_manifest: Option<bool>,
-    wrapped_legacy_test: Option<bool>,
 }
 
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -239,10 +238,9 @@ fn to_test_list_entry(test_entry: &TestEntry, realm: Option<String>) -> TestList
 
 fn update_tags_with_test_entry(tags: &mut FuchsiaTestTags, test_entry: &TestEntry) {
     let realm = &tags.realm;
-    let (build_rule, has_generated_manifest, wrapped_legacy_test) = (
+    let (build_rule, has_generated_manifest) = (
         test_entry.build_rule.as_ref().map(|s| s.as_str()),
         test_entry.has_generated_manifest.unwrap_or_default(),
-        test_entry.wrapped_legacy_test.unwrap_or_default(),
     );
 
     // Determine the type of a test as follows:
@@ -259,20 +257,19 @@ fn update_tags_with_test_entry(tags: &mut FuchsiaTestTags, test_entry: &TestEntr
     } else if test_entry.name.ends_with("_host_test.sh") {
         "host_shell"
     } else {
-        match (build_rule, has_generated_manifest, wrapped_legacy_test, realm) {
-            (_, _, true, _) => "wrapped_legacy",
-            (_, _, false, Some(realm)) if realm != HERMETIC_TEST_REALM => "system",
-            (Some("fuchsia_unittest_package"), true, _, _) => "unit",
-            (Some("fuchsia_unittest_package"), false, _, _) => "integration",
-            (Some("fuchsia_test_package"), true, _, _) => "unit",
-            (Some("fuchsia_test_package"), false, _, _) => "integration",
-            (Some("fuchsia_test"), true, _, _) => "unit",
-            (Some("fuchsia_test"), false, _, _) => "integration",
-            (Some("prebuilt_test_package"), _, _, _) => "prebuilt",
-            (Some("fuchsia_fuzzer_package"), _, _, _) => "fuzzer",
-            (Some("fuzzer_package"), _, _, _) => "fuzzer",
-            (Some("bootfs_test"), _, _, _) => "bootfs",
-            (None, _, _, _) => "unknown",
+        match (build_rule, has_generated_manifest, realm) {
+            (_, _, Some(realm)) if realm != HERMETIC_TEST_REALM => "system",
+            (Some("fuchsia_unittest_package"), true, _) => "unit",
+            (Some("fuchsia_unittest_package"), false, _) => "integration",
+            (Some("fuchsia_test_package"), true, _) => "unit",
+            (Some("fuchsia_test_package"), false, _) => "integration",
+            (Some("fuchsia_test"), true, _) => "unit",
+            (Some("fuchsia_test"), false, _) => "integration",
+            (Some("prebuilt_test_package"), _, _) => "prebuilt",
+            (Some("fuchsia_fuzzer_package"), _, _) => "fuzzer",
+            (Some("fuzzer_package"), _, _) => "fuzzer",
+            (Some("bootfs_test"), _, _) => "bootfs",
+            (None, _, _) => "unknown",
             _ => "uncategorized",
         }
     };
@@ -746,24 +743,6 @@ mod tests {
                 TestEntry {
                     cpu: "x64".to_string(),
                     os: "fuchsia".to_string(),
-                    wrapped_legacy_test: Some(true),
-                    ..TestEntry::default()
-                },
-                FuchsiaTestTags { ..FuchsiaTestTags::default() },
-                vec![
-                    TestTag { key: "cpu".to_string(), value: "x64".to_string() },
-                    TestTag { key: "hermetic".to_string(), value: "".to_string() },
-                    TestTag { key: "legacy_test".to_string(), value: "".to_string() },
-                    TestTag { key: "os".to_string(), value: "fuchsia".to_string() },
-                    TestTag { key: "realm".to_string(), value: "".to_string() },
-                    TestTag { key: "scope".to_string(), value: "wrapped_legacy".to_string() },
-                ],
-            ),
-            (
-                TestEntry {
-                    cpu: "x64".to_string(),
-                    os: "fuchsia".to_string(),
-                    wrapped_legacy_test: Some(false),
                     build_rule: Some("fuchsia_unittest_package".to_string()),
                     has_generated_manifest: Some(true),
                     ..TestEntry::default()
@@ -782,7 +761,6 @@ mod tests {
                 TestEntry {
                     cpu: "x64".to_string(),
                     os: "fuchsia".to_string(),
-                    wrapped_legacy_test: Some(false),
                     build_rule: Some("fuchsia_unittest_package".to_string()),
                     has_generated_manifest: Some(false),
                     ..TestEntry::default()
@@ -801,7 +779,6 @@ mod tests {
                 TestEntry {
                     cpu: "x64".to_string(),
                     os: "fuchsia".to_string(),
-                    wrapped_legacy_test: Some(false),
                     build_rule: Some("fuchsia_test_package".to_string()),
                     has_generated_manifest: Some(true),
                     ..TestEntry::default()
@@ -820,7 +797,6 @@ mod tests {
                 TestEntry {
                     cpu: "x64".to_string(),
                     os: "fuchsia".to_string(),
-                    wrapped_legacy_test: Some(false),
                     build_rule: Some("fuchsia_test_package".to_string()),
                     has_generated_manifest: Some(false),
                     ..TestEntry::default()
@@ -839,7 +815,6 @@ mod tests {
                 TestEntry {
                     cpu: "x64".to_string(),
                     os: "fuchsia".to_string(),
-                    wrapped_legacy_test: Some(false),
                     build_rule: Some("fuchsia_test_package".to_string()),
                     has_generated_manifest: Some(false),
                     ..TestEntry::default()
@@ -858,7 +833,6 @@ mod tests {
                 TestEntry {
                     cpu: "x64".to_string(),
                     os: "fuchsia".to_string(),
-                    wrapped_legacy_test: Some(false),
                     build_rule: Some("fuchsia_test".to_string()),
                     has_generated_manifest: Some(true),
                     ..TestEntry::default()
@@ -880,7 +854,6 @@ mod tests {
                 TestEntry {
                     cpu: "x64".to_string(),
                     os: "fuchsia".to_string(),
-                    wrapped_legacy_test: Some(false),
                     build_rule: Some("fuchsia_fuzzer_package".to_string()),
                     has_generated_manifest: Some(false),
                     ..TestEntry::default()
@@ -902,7 +875,6 @@ mod tests {
                 TestEntry {
                     cpu: "x64".to_string(),
                     os: "fuchsia".to_string(),
-                    wrapped_legacy_test: Some(false),
                     build_rule: Some("fuzzer_package".to_string()),
                     has_generated_manifest: Some(false),
                     ..TestEntry::default()
@@ -924,7 +896,6 @@ mod tests {
                 TestEntry {
                     cpu: "x64".to_string(),
                     os: "fuchsia".to_string(),
-                    wrapped_legacy_test: Some(false),
                     build_rule: Some("prebuilt_test_package".to_string()),
                     has_generated_manifest: Some(false),
                     ..TestEntry::default()
@@ -946,7 +917,6 @@ mod tests {
                 TestEntry {
                     cpu: "x64".to_string(),
                     os: "fuchsia".to_string(),
-                    wrapped_legacy_test: None,
                     build_rule: Some("bootfs_test".to_string()),
                     has_generated_manifest: None,
                     ..TestEntry::default()

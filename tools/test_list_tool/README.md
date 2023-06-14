@@ -19,8 +19,6 @@ This tool extends the test-list.json schema with a specific set of tags that wil
 | scope | The scope of the test. For example: "unit" or "integration". | See description below this table. |
 | realm | The test realm that the on-device Test Manager will run this test in. For example: "hermetic" or "system". | Copied from the "fuchsia.test" facet of the test's component manifest file. |
 | hermetic | "true" if this test is hermetic, "false" if not hermetic, empty if not applicable. | A test is hermetic if it does not depend on system capabilities or packages. |
-| legacy_test | "true" if this test is a legacy test, empty otherwise. | A test is a legacy test if its component URL ends in ".cmx" |
-
 #### Test Scopes
 
 This section describes how we categorize a [Test's
@@ -37,7 +35,6 @@ The valid scopes supported by this tool are:
 | unit | The test runs in a hermetic realm and uses a generated default manifest. |
 | integration | The test runs in a hermetic realm and uses a non-generated custom manifest. |
 | system | The test runs in a non-hermetic realm. |
-| wrapped_legacy | The test uses the legacy_test_runner and wraps a v1 test. These tests are not hermetic. |
 | fuzzer | The test uses the "fuzzer_package" build rule, and it is hermetic. |
 | prebuilt | The test uses the "prebuilt_test_package" build rule and does not run in a non-hermetic realm. |
 | bootfs | The test is an ELF binary executed out of /boot on the device. |

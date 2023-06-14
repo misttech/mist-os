@@ -52,7 +52,6 @@ group("allow_non_hermetic_packages") {
     "//src/sys/test_runners/gtest/tests:*",
     "//src/sys/test_runners/gunit/tests:*",
     "//src/sys/test_runners/inspect/tests:*",
-    "//src/sys/test_runners/legacy_test/tests:*",
     "//src/sys/test_runners/rust/tests:*",
     "//src/sys/test_runners/stress_test/tests:*",
     "//src/testing/system-validation/web:*",

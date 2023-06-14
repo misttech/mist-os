@@ -324,7 +324,6 @@ hlcpp_visibility = [
   "//src/sys/test_manager/debug_data_processor:*",
   "//src/sys/test_manager/fidl/fuchsia.test.debug:*",
   "//src/sys/test_runners/gtest/test_data:*",
-  "//src/sys/test_runners/legacy_test:*",
   "//src/sys/tools/activity-ctl:*",
   "//src/sys/tools/log:*",
   "//src/testing/loadbench:*",

@@ -803,7 +803,6 @@ assembly_input_bundle("testing_support") {
     "//src/sys/test_runners/gtest:gtest-runner",
     "//src/sys/test_runners/gunit:gunit-runner",
     "//src/sys/test_runners/inspect:inspect-test-runner",
-    "//src/sys/test_runners/legacy_test:legacy-test-runner",
     "//src/sys/test_runners/lib_loader_cache:lib_loader_runner_cache",
     "//src/sys/test_runners/rust:rust-test-next-vdso-runner",
     "//src/sys/test_runners/rust:rust-test-runner",

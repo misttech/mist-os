@@ -38,7 +38,6 @@ class GenerateMetadataTests(unittest.TestCase):
                         "package_label": identifier,
                         "package_manifests": ["unused"],
                         "package_url": url,
-                        "wrapped_legacy_test": False
                     }
             }, {
                 "test_types": ["a", "b"],
