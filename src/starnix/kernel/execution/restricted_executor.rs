@@ -471,8 +471,7 @@ fn process_completed_exception<E: ExceptionContext>(
 
             let mut registers = exception.read_registers();
 
-            // TODO: Should this be 0, does it matter?
-            registers.set_flags_register(0);
+            registers.reset_flags();
 
             deliver_signal(&task, signal, &mut registers);
 

@@ -91,9 +91,9 @@ impl RegisterState {
         self.real_registers.rax
     }
 
-    /// Sets the register that contains the application status flags.
-    pub fn set_flags_register(&mut self, flags: u64) {
-        self.real_registers.rflags = flags;
+    /// Resets the register that contains the application status flags.
+    pub fn reset_flags(&mut self) {
+        self.real_registers.rflags = 0;
     }
 }
 

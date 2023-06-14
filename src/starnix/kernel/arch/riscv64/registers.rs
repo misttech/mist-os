@@ -81,7 +81,7 @@ impl RegisterState {
 
     /// Sets the register that indicates the third argument to a function.
     pub fn set_arg2_register(&mut self, x2: u64) {
-        self.real_registers.a0 = x2;
+        self.real_registers.a2 = x2;
     }
 
     /// Returns the register that contains the syscall number.
@@ -89,9 +89,9 @@ impl RegisterState {
         self.real_registers.a7
     }
 
-    /// Sets the register that contains the application status flags.
-    pub fn set_flags_register(&mut self, _flags: u64) {
-        // TODO(fxbug.dev/128554): There is no flags register in RISC-V. Do we need this method?
+    /// Resets the register that contains the application status flags.
+    pub fn reset_flags(&mut self) {
+        // No-op on RISC-V since there is no flags register.
     }
 
     pub fn to_user_regs_struct(self) -> user_regs_struct {
