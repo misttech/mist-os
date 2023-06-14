@@ -842,6 +842,11 @@ impl NamespaceNode {
         Ok(())
     }
 
+    /// Create or open a node in the file system.
+    ///
+    /// Works for any type of node other than a symlink.
+    ///
+    /// Will return an existing node unless `flags` contains `OpenFlags::EXCL`.
     pub fn open_create_node(
         &self,
         current_task: &CurrentTask,
@@ -850,6 +855,7 @@ impl NamespaceNode {
         dev: DeviceType,
         flags: OpenFlags,
     ) -> Result<NamespaceNode, Errno> {
+        self.check_readonly_filesystem()?;
         let owner = current_task.as_fscred();
         let mode = current_task.fs().apply_umask(mode);
         Ok(self.with_new_entry(self.entry.open_create_node(
@@ -862,6 +868,11 @@ impl NamespaceNode {
         )?))
     }
 
+    /// Create a node in the file system.
+    ///
+    /// Works for any type of node other than a symlink.
+    ///
+    /// Does not return an existing node.
     pub fn create_node(
         &self,
         current_task: &CurrentTask,
@@ -869,17 +880,22 @@ impl NamespaceNode {
         mode: FileMode,
         dev: DeviceType,
     ) -> Result<NamespaceNode, Errno> {
+        self.check_readonly_filesystem()?;
         let owner = current_task.as_fscred();
         let mode = current_task.fs().apply_umask(mode);
         Ok(self.with_new_entry(self.entry.create_node(current_task, name, mode, dev, owner)?))
     }
 
-    pub fn symlink(
+    /// Create a symlink in the file system.
+    ///
+    /// To create another type of node, use `create_node`.
+    pub fn create_symlink(
         &self,
         current_task: &CurrentTask,
         name: &FsStr,
         target: &FsStr,
     ) -> Result<NamespaceNode, Errno> {
+        self.check_readonly_filesystem()?;
         let owner = current_task.as_fscred();
         Ok(self.with_new_entry(self.entry.create_symlink(current_task, name, target, owner)?))
     }
@@ -891,6 +907,7 @@ impl NamespaceNode {
         kind: UnlinkKind,
         must_be_directory: bool,
     ) -> Result<(), Errno> {
+        self.check_readonly_filesystem()?;
         if DirEntry::is_reserved_name(name) {
             match kind {
                 UnlinkKind::Directory => {

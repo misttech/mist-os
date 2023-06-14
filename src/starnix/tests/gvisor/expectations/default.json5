@@ -314,7 +314,6 @@
                 "MountTest.MaxMounts",
                 "MountTest.MountInfo",
                 "MountTest.MountNoExec",
-                "MountTest.MountReadonly",
                 "MountTest.MountTmpfsMagicValIgnored",
                 "MountTest.OpenFileBusy",
                 "MountTest.PropagateUmountEvent",

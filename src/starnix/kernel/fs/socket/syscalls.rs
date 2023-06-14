@@ -146,6 +146,7 @@ pub fn sys_bind(
                     &name,
                 )?;
 
+                parent.check_readonly_filesystem()?;
                 let _dir_entry = parent
                     .entry
                     .bind_socket(

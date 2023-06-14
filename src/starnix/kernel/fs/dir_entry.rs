@@ -293,8 +293,11 @@ impl DirEntry {
         })
     }
 
-    /// Ask the filesystem to create a node. This is the equivalent of mknod. Works for any type of
-    /// file other than a symlink.
+    /// Create a node in the file system.
+    ///
+    /// Works for any type of node other than a symlink.
+    ///
+    /// Does not return an existing node.
     pub fn create_node(
         self: &DirEntryHandle,
         current_task: &CurrentTask,
@@ -308,6 +311,11 @@ impl DirEntry {
         })
     }
 
+    /// Create or open a node in the file system.
+    ///
+    /// Works for any type of node other than a symlink.
+    ///
+    /// Will return an existing node unless `flags` contains `OpenFlags::EXCL`.
     pub fn open_create_node(
         self: &DirEntryHandle,
         current_task: &CurrentTask,
@@ -383,6 +391,9 @@ impl DirEntry {
         })
     }
 
+    /// Create a symlink in the file system.
+    ///
+    /// To create another type of node, use `create_node`.
     pub fn create_symlink(
         self: &DirEntryHandle,
         current_task: &CurrentTask,
@@ -524,7 +535,9 @@ impl DirEntry {
         }
 
         // This task must have write access to the old and new parent nodes.
+        old_parent_name.check_readonly_filesystem()?;
         old_parent.node.check_access(current_task, Access::WRITE)?;
+        new_parent_name.check_readonly_filesystem()?;
         new_parent.node.check_access(current_task, Access::WRITE)?;
 
         // The mount_eq check in sys_renameat ensures that the nodes we're touching are part of the

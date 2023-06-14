@@ -936,7 +936,7 @@ mod test {
             let fs = RemoteFs::new_fs(&kernel, client, "/", rights).expect("new_fs failed");
             let ns = Namespace::new(fs);
             let root = ns.root();
-            root.symlink(&current_task, b"symlink", b"target").expect("symlink failed");
+            root.create_symlink(&current_task, b"symlink", b"target").expect("symlink failed");
 
             let mut context = LookupContext::new(SymlinkMode::NoFollow);
             let child = root

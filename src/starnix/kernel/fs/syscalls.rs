@@ -1155,7 +1155,7 @@ pub fn sys_symlinkat(
         if context.must_be_directory {
             return error!(ENOENT);
         }
-        parent.symlink(current_task, basename, target)
+        parent.create_symlink(current_task, basename, target)
     });
     res?;
     Ok(())
