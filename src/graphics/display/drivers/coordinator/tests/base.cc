@@ -23,6 +23,7 @@ void TestBase::SetUp() {
       std::make_unique<GenericSysmemDeviceWrapper<sysmem_driver::Device>>(mock_root.get());
   static constexpr fake_display::FakeDisplayDeviceConfig kDeviceConfig = {
       .manual_vsync_trigger = true,
+      .no_buffer_access = false,
   };
   tree_ =
       std::make_unique<FakeDisplayStack>(std::move(mock_root), std::move(sysmem), kDeviceConfig);

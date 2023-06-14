@@ -26,6 +26,7 @@ ProviderService::ProviderService(std::shared_ptr<zx_device> mock_root,
       mock_root.get());
   static constexpr FakeDisplayDeviceConfig kDeviceConfig = {
       .manual_vsync_trigger = false,
+      .no_buffer_access = false,
   };
   state_ =
       std::make_shared<State>(State{.dispatcher = dispatcher,

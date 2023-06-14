@@ -39,16 +39,20 @@ class FakeDisplayTest : public testing::Test {
     std::shared_ptr<zx_device> mock_root = MockDevice::FakeRootParent();
     auto sysmem = std::make_unique<display::GenericSysmemDeviceWrapper<sysmem_driver::Device>>(
         mock_root.get());
-    static constexpr FakeDisplayDeviceConfig kDeviceConfig = {
-        .manual_vsync_trigger = true,
-    };
     tree_ = std::make_unique<display::FakeDisplayStack>(std::move(mock_root), std::move(sysmem),
-                                                        kDeviceConfig);
+                                                        GetFakeDisplayDeviceConfig());
   }
 
   void TearDown() override {
     tree_->AsyncShutdown();
     tree_.reset();
+  }
+
+  virtual FakeDisplayDeviceConfig GetFakeDisplayDeviceConfig() const {
+    return FakeDisplayDeviceConfig{
+        .manual_vsync_trigger = true,
+        .no_buffer_access = false,
+    };
   }
 
   fake_display::FakeDisplay* display() { return tree_->display(); }
@@ -61,15 +65,15 @@ class FakeDisplayTest : public testing::Test {
   std::unique_ptr<display::FakeDisplayStack> tree_;
 };
 
-class FakeDisplaySysmemTest : public FakeDisplayTest {
+class FakeDisplayRealSysmemTest : public FakeDisplayTest {
  public:
   struct BufferCollectionAndToken {
     fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection_client;
     fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken> token;
   };
 
-  FakeDisplaySysmemTest() = default;
-  ~FakeDisplaySysmemTest() override = default;
+  FakeDisplayRealSysmemTest() = default;
+  ~FakeDisplayRealSysmemTest() override = default;
 
   zx::result<BufferCollectionAndToken> CreateBufferCollection() {
     zx::result<fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>> token_endpoints =
@@ -297,7 +301,7 @@ void FillImageWithColor(cpp20::span<uint8_t> image_buffer, const std::vector<uin
   }
 }
 
-TEST_F(FakeDisplaySysmemTest, ImportBufferCollection) {
+TEST_F(FakeDisplayRealSysmemTest, ImportBufferCollection) {
   zx::result<BufferCollectionAndToken> new_buffer_collection_result = CreateBufferCollection();
   ASSERT_OK(new_buffer_collection_result.status_value());
   auto [collection_client, token] = std::move(new_buffer_collection_result.value());
@@ -357,7 +361,7 @@ TEST_F(FakeDisplaySysmemTest, ImportBufferCollection) {
   EXPECT_OK(display()->DisplayControllerImplReleaseBufferCollection(kBanjoValidBufferCollectionId));
 }
 
-TEST_F(FakeDisplaySysmemTest, ImportImage) {
+TEST_F(FakeDisplayRealSysmemTest, ImportImage) {
   zx::result<BufferCollectionAndToken> new_buffer_collection_result = CreateBufferCollection();
   ASSERT_OK(new_buffer_collection_result.status_value());
   auto [collection_client, token] = std::move(new_buffer_collection_result.value());
@@ -439,7 +443,7 @@ TEST_F(FakeDisplaySysmemTest, ImportImage) {
   EXPECT_OK(display()->DisplayControllerImplReleaseBufferCollection(kBanjoBufferCollectionId));
 }
 
-TEST_F(FakeDisplaySysmemTest, ImportImageForCapture) {
+TEST_F(FakeDisplayRealSysmemTest, ImportImageForCapture) {
   zx::result<BufferCollectionAndToken> new_buffer_collection_result = CreateBufferCollection();
   ASSERT_OK(new_buffer_collection_result.status_value());
   auto [collection_client, token] = std::move(new_buffer_collection_result.value());
@@ -512,7 +516,7 @@ TEST_F(FakeDisplaySysmemTest, ImportImageForCapture) {
   EXPECT_OK(display()->DisplayControllerImplReleaseBufferCollection(kBanjoBufferCollectionId));
 }
 
-TEST_F(FakeDisplaySysmemTest, Capture) {
+TEST_F(FakeDisplayRealSysmemTest, Capture) {
   zx::result<BufferCollectionAndToken> new_capture_buffer_collection_result =
       CreateBufferCollection();
   ASSERT_OK(new_capture_buffer_collection_result.status_value());
@@ -696,6 +700,44 @@ TEST_F(FakeDisplaySysmemTest, Capture) {
       display()->DisplayControllerImplReleaseBufferCollection(kBanjoFramebufferBufferCollectionId));
   EXPECT_OK(
       display()->DisplayControllerImplReleaseBufferCollection(kBanjoCaptureBufferCollectionId));
+}
+
+class FakeDisplayWithoutCaptureRealSysmemTest : public FakeDisplayRealSysmemTest {
+ public:
+  FakeDisplayDeviceConfig GetFakeDisplayDeviceConfig() const override {
+    return {
+        .manual_vsync_trigger = true,
+        .no_buffer_access = true,
+    };
+  }
+};
+
+TEST_F(FakeDisplayWithoutCaptureRealSysmemTest, SetDisplayCaptureInterface) {
+  DisplayCaptureCompletion display_capture_completion = {};
+  const display_capture_interface_protocol_t& capture_protocol =
+      display_capture_completion.GetDisplayCaptureInterfaceProtocol();
+  EXPECT_EQ(display()->DisplayControllerImplSetDisplayCaptureInterface(&capture_protocol),
+            ZX_ERR_NOT_SUPPORTED);
+}
+
+TEST_F(FakeDisplayWithoutCaptureRealSysmemTest, ImportImageForCapture) {
+  constexpr uint64_t kFakeCollectionId = 1;
+  constexpr uint32_t kFakeCollectionIndex = 0;
+  uint64_t out_capture_handle;
+  EXPECT_EQ(display()->DisplayControllerImplImportImageForCapture(
+                kFakeCollectionId, kFakeCollectionIndex, &out_capture_handle),
+            ZX_ERR_NOT_SUPPORTED);
+}
+
+TEST_F(FakeDisplayWithoutCaptureRealSysmemTest, StartCapture) {
+  constexpr uint64_t kFakeCaptureHandle = 1;
+  EXPECT_EQ(display()->DisplayControllerImplStartCapture(kFakeCaptureHandle), ZX_ERR_NOT_SUPPORTED);
+}
+
+TEST_F(FakeDisplayWithoutCaptureRealSysmemTest, ReleaseCapture) {
+  constexpr uint64_t kFakeCaptureHandle = 1;
+  EXPECT_EQ(display()->DisplayControllerImplReleaseCapture(kFakeCaptureHandle),
+            ZX_ERR_NOT_SUPPORTED);
 }
 
 }  // namespace

@@ -41,6 +41,20 @@ struct FakeDisplayDeviceConfig {
   // If enabled, the fake display device will not automatically emit Vsync
   // events. `SendVsync()` must be called to emit a Vsync event manually.
   bool manual_vsync_trigger = false;
+
+  // If true, the fake display device will never access imported image buffers,
+  // and it will not add extra image format constraints to the imported buffer
+  // collection.
+  // Otherwise, it may add extra BufferCollection constraints to ensure that the
+  // allocated image buffers support CPU access, and may access the imported
+  // image buffers for capturing.
+  // Display capture is supported iff this field is false.
+  //
+  // TODO(fxbug.dev/128891): This is a temporary workaround to support fake
+  // display device for GPU devices that cannot render into CPU-accessible
+  // formats directly. Remove this option when we have a fake Vulkan
+  // implementation.
+  bool no_buffer_access = false;
 };
 
 class FakeDisplay : public DeviceType,

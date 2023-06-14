@@ -499,6 +499,10 @@ zx_status_t FakeDisplay::DisplayControllerImplSetDisplayPower(uint64_t display_i
 
 zx_status_t FakeDisplay::DisplayControllerImplSetDisplayCaptureInterface(
     const display_capture_interface_protocol_t* intf) {
+  if (device_config_.no_buffer_access) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
   fbl::AutoLock lock(&capture_lock_);
   capture_interface_client_ = ddk::DisplayCaptureInterfaceProtocolClient(intf);
   current_capture_target_image_ = nullptr;
@@ -507,6 +511,10 @@ zx_status_t FakeDisplay::DisplayControllerImplSetDisplayCaptureInterface(
 
 zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture(
     uint64_t banjo_driver_buffer_collection_id, uint32_t index, uint64_t* out_capture_handle) {
+  if (device_config_.no_buffer_access) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
@@ -573,6 +581,10 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture(
 }
 
 zx_status_t FakeDisplay::DisplayControllerImplStartCapture(uint64_t capture_handle) {
+  if (device_config_.no_buffer_access) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
   fbl::AutoLock lock(&capture_lock_);
   if (current_capture_target_image_ != nullptr) {
     return ZX_ERR_SHOULD_WAIT;
@@ -591,6 +603,10 @@ zx_status_t FakeDisplay::DisplayControllerImplStartCapture(uint64_t capture_hand
 }
 
 zx_status_t FakeDisplay::DisplayControllerImplReleaseCapture(uint64_t capture_handle) {
+  if (device_config_.no_buffer_access) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
   fbl::AutoLock lock(&capture_lock_);
   if (current_capture_target_image_ != nullptr &&
       reinterpret_cast<uint64_t>(current_capture_target_image_) == capture_handle) {
@@ -618,8 +634,10 @@ void FakeDisplay::DdkRelease() {
     // Ignore return value here in case the vsync_thread_ isn't running.
     thrd_join(vsync_thread_, nullptr);
   }
-  capture_shutdown_flag_.store(true);
-  thrd_join(capture_thread_, nullptr);
+  if (!device_config_.no_buffer_access) {
+    capture_shutdown_flag_.store(true);
+    thrd_join(capture_thread_, nullptr);
+  }
   delete this;
 }
 
@@ -808,13 +826,15 @@ zx_status_t FakeDisplay::Bind() {
     vsync_thread_running_ = true;
   }
 
-  status = thrd_status_to_zx_status(thrd_create_with_name(
-      &capture_thread_,
-      [](void* context) { return static_cast<FakeDisplay*>(context)->CaptureThread(); }, this,
-      "capture_thread"));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to not create image capture thread: %s", zx_status_get_string(status));
-    return status;
+  if (!device_config_.no_buffer_access) {
+    status = thrd_status_to_zx_status(thrd_create_with_name(
+        &capture_thread_,
+        [](void* context) { return static_cast<FakeDisplay*>(context)->CaptureThread(); }, this,
+        "capture_thread"));
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to not create image capture thread: %s", zx_status_get_string(status));
+      return status;
+    }
   }
 
   status = DdkAdd("fake-display");
