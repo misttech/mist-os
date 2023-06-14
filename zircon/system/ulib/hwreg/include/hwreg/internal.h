@@ -6,6 +6,7 @@
 #define HWREG_INTERNAL_H_
 
 #include <inttypes.h>
+#include <lib/stdcompat/atomic.h>
 #include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -253,6 +254,35 @@ void VisitEach(F&& f, V&& v, A&&... args, std::index_sequence<I...>) {
        ...);
   ZX_DEBUG_ASSERT(visited_one);
 }
+
+// This is used in the implementation of hwreg::AtomicArrayIo.
+template <typename ElementType, std::memory_order MemoryOrder>
+class AtomicArrayIoRef {
+ public:
+  AtomicArrayIoRef(const AtomicArrayIoRef&) = default;
+
+  explicit AtomicArrayIoRef(ElementType& ref) : ref_(ref) {}
+
+  AtomicArrayIoRef& operator=(ElementType value) {
+    ref_.store(value, MemoryOrder);
+    return *this;
+  }
+
+  explicit operator ElementType() const { return ref_.load(MemoryOrder); }
+
+  ElementType fetch_add(ElementType n) { return ref_.fetch_add(n, MemoryOrder); }
+
+  ElementType fetch_sub(ElementType n) { return ref_.fetch_sub(n, MemoryOrder); }
+
+  ElementType fetch_and(ElementType bits) { return ref_.fetch_and(bits, MemoryOrder); }
+
+  ElementType fetch_or(ElementType bits) { return ref_.fetch_or(bits, MemoryOrder); }
+
+  ElementType fetch_xor(ElementType bits) { return ref_.fetch_xor(bits, MemoryOrder); }
+
+ private:
+  cpp20::atomic_ref<ElementType> ref_;
+};
 
 }  // namespace internal
 

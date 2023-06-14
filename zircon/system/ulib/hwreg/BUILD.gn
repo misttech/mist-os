@@ -19,6 +19,9 @@ library_headers("headers") {
   public_deps = [
     # <hwreg/mmio.h> has #include <lib/mmio-ptr/mmio-ptr.h>.
     "//zircon/system/ulib/mmio-ptr",
+
+    # <hwreg/array.h> has #include <lib/stdcompat/span.h>.
+    "//sdk/lib/stdcompat",
   ]
 
   # TODO(mcgrathr): remove old multiboot environment
