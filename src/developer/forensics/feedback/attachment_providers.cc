@@ -16,7 +16,7 @@ AttachmentProviders::AttachmentProviders(async_dispatcher_t* dispatcher,
                                          std::set<std::string> allowlist)
     : kernel_log_(dispatcher, services, AttachmentProviderBackoff(), redactor),
       system_log_(dispatcher, services, clock, redactor, feedback_data::kActiveLoggingPeriod),
-      inspect_(dispatcher, services, AttachmentProviderBackoff(), inspect_data_budget),
+      inspect_(dispatcher, services, AttachmentProviderBackoff(), inspect_data_budget, redactor),
       previous_boot_log_(dispatcher, clock, delete_previous_boot_log_at,
                          feedback_data::kPreviousLogsFilePath),
       build_snapshot_(feedback_data::kBuildSnapshotPath),

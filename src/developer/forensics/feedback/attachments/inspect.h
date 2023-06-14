@@ -15,6 +15,7 @@
 #include "src/developer/forensics/feedback/attachments/provider.h"
 #include "src/developer/forensics/feedback/attachments/types.h"
 #include "src/developer/forensics/feedback_data/inspect_data_budget.h"
+#include "src/developer/forensics/utils/redact/redactor.h"
 #include "src/lib/backoff/backoff.h"
 #include "src/lib/fxl/memory/weak_ptr.h"
 
@@ -26,7 +27,8 @@ namespace forensics::feedback {
 class Inspect : public AttachmentProvider {
  public:
   Inspect(async_dispatcher_t* dispatcher, std::shared_ptr<sys::ServiceDirectory> services,
-          std::unique_ptr<backoff::Backoff> backoff, feedback_data::InspectDataBudget* data_budget);
+          std::unique_ptr<backoff::Backoff> backoff, feedback_data::InspectDataBudget* data_budget,
+          RedactorBase* redactor);
 
   // Returns a promise to the inspect data and allows collection to be terminated early with
   // |ticket|.
@@ -41,6 +43,7 @@ class Inspect : public AttachmentProvider {
   std::shared_ptr<sys::ServiceDirectory> services_;
   std::unique_ptr<backoff::Backoff> backoff_;
   feedback_data::InspectDataBudget* data_budget_;
+  RedactorBase* redactor_;
 
   fuchsia::diagnostics::ArchiveAccessorPtr archive_accessor_;
 

@@ -7,6 +7,7 @@
 #include <fuchsia/mem/cpp/fidl.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/fpromise/result.h>
+#include <lib/inspect/cpp/vmo/types.h>
 #include <lib/sys/cpp/service_directory.h>
 #include <lib/zx/time.h>
 
@@ -26,6 +27,7 @@
 #include "src/developer/forensics/testing/unit_test_fixture.h"
 #include "src/developer/forensics/utils/cobalt/logger.h"
 #include "src/developer/forensics/utils/errors.h"
+#include "src/developer/forensics/utils/redact/redactor.h"
 #include "src/lib/timekeeper/async_test_clock.h"
 
 namespace forensics::feedback {
@@ -50,7 +52,8 @@ class InspectTest : public UnitTestFixture {
         cobalt_(dispatcher(), services(), &clock_),
         inspect_node_manager_(&InspectRoot()),
         inspect_data_budget_(std::make_unique<feedback_data::InspectDataBudget>(
-            true, &inspect_node_manager_, &cobalt_)) {}
+            true, &inspect_node_manager_, &cobalt_)),
+        redactor_(std::make_unique<IdentityRedactor>(inspect::BoolProperty())) {}
 
  protected:
   void SetUpInspectServer(std::unique_ptr<stubs::DiagnosticsArchiveBase> server) {
@@ -81,6 +84,9 @@ class InspectTest : public UnitTestFixture {
     return attachment;
   }
 
+  RedactorBase* GetRedactor() const { return redactor_.get(); }
+  void SetRedactor(std::unique_ptr<RedactorBase> redactor) { redactor_ = std::move(redactor); }
+
   feedback_data::InspectDataBudget* DataBudget() { return inspect_data_budget_.get(); }
 
  private:
@@ -90,6 +96,7 @@ class InspectTest : public UnitTestFixture {
   InspectNodeManager inspect_node_manager_;
   std::unique_ptr<feedback_data::InspectDataBudget> inspect_data_budget_;
   std::unique_ptr<stubs::DiagnosticsArchiveBase> inspect_server_;
+  std::unique_ptr<RedactorBase> redactor_;
 };
 
 TEST_F(InspectTest, DataBudget) {
@@ -98,7 +105,7 @@ TEST_F(InspectTest, DataBudget) {
   SetUpInspectServer(std::make_unique<stubs::DiagnosticsArchiveCaptureParameters>(&parameters));
 
   const size_t kBudget = DataBudget()->SizeInBytes().value();
-  Inspect inspect(dispatcher(), services(), MonotonicBackoff::Make(), DataBudget());
+  Inspect inspect(dispatcher(), services(), MonotonicBackoff::Make(), DataBudget(), GetRedactor());
 
   inspect.Get(kTicket);
   RunLoopUntilIdle();
@@ -115,7 +122,7 @@ TEST_F(InspectTest, NoDataBudget) {
   SetUpInspectServer(std::make_unique<stubs::DiagnosticsArchiveCaptureParameters>(&parameters));
 
   DisableDataBudget();
-  Inspect inspect(dispatcher(), services(), MonotonicBackoff::Make(), DataBudget());
+  Inspect inspect(dispatcher(), services(), MonotonicBackoff::Make(), DataBudget(), GetRedactor());
 
   inspect.Get(kTicket);
   RunLoopUntilIdle();
@@ -131,7 +138,7 @@ TEST_F(InspectTest, Get) {
           {},
       }))));
 
-  Inspect inspect(dispatcher(), services(), MonotonicBackoff::Make(), DataBudget());
+  Inspect inspect(dispatcher(), services(), MonotonicBackoff::Make(), DataBudget(), GetRedactor());
   const auto attachment = Run(inspect.Get(1234));
 
   EXPECT_THAT(attachment, AttachmentValueIs(R"([
@@ -147,7 +154,7 @@ TEST_F(InspectTest, GetTerminatesDueToForceCompletion) {
       std::make_unique<stubs::DiagnosticsBatchIteratorNeverRespondsAfterOneBatch>(
           std::vector<std::string>({"foo1", "foo2"}))));
 
-  Inspect inspect(dispatcher(), services(), MonotonicBackoff::Make(), DataBudget());
+  Inspect inspect(dispatcher(), services(), MonotonicBackoff::Make(), DataBudget(), GetRedactor());
   const auto attachment = Run(inspect.Get(kTicket));
 
   // Giving some time to actually collect some inspect data
@@ -174,7 +181,7 @@ TEST_F(InspectTest, ForceCompletionCalledAfterTermination) {
           {},
       }))));
 
-  Inspect inspect(dispatcher(), services(), MonotonicBackoff::Make(), DataBudget());
+  Inspect inspect(dispatcher(), services(), MonotonicBackoff::Make(), DataBudget(), GetRedactor());
   const auto attachment = Run(inspect.Get(kTicket));
 
   inspect.ForceCompletion(kTicket, Error::kDefault);
@@ -188,7 +195,7 @@ bar1
 
 TEST_F(InspectTest, GetCalledWithSameTicket) {
   const uint64_t kTicket = 1234;
-  Inspect inspect(dispatcher(), services(), MonotonicBackoff::Make(), DataBudget());
+  Inspect inspect(dispatcher(), services(), MonotonicBackoff::Make(), DataBudget(), GetRedactor());
 
   // Expect a crash because a ticket cannot be reused.
   ASSERT_DEATH(
@@ -203,7 +210,7 @@ TEST_F(InspectTest, GetConnectionError) {
   const uint64_t kTicket = 1234;
   SetUpInspectServer(std::make_unique<stubs::DiagnosticsArchiveClosesIteratorConnection>());
 
-  Inspect inspect(dispatcher(), services(), MonotonicBackoff::Make(), DataBudget());
+  Inspect inspect(dispatcher(), services(), MonotonicBackoff::Make(), DataBudget(), GetRedactor());
   const auto attachment = Run(inspect.Get(kTicket));
 
   EXPECT_THAT(attachment.Error(), AttachmentValueIs(Error::kConnectionError));
@@ -214,7 +221,7 @@ TEST_F(InspectTest, GetIteratorReturnsError) {
   SetUpInspectServer(std::make_unique<stubs::DiagnosticsArchive>(
       std::make_unique<stubs::DiagnosticsBatchIteratorReturnsError>()));
 
-  Inspect inspect(dispatcher(), services(), MonotonicBackoff::Make(), DataBudget());
+  Inspect inspect(dispatcher(), services(), MonotonicBackoff::Make(), DataBudget(), GetRedactor());
   const auto attachment = Run(inspect.Get(kTicket));
 
   EXPECT_THAT(attachment.Error(), AttachmentValueIs(Error::kMissingValue));
@@ -226,7 +233,7 @@ TEST_F(InspectTest, Reconnects) {
 
   InjectServiceProvider(archive.get(), feedback_data::kArchiveAccessorName);
 
-  Inspect inspect(dispatcher(), services(), MonotonicBackoff::Make(), DataBudget());
+  Inspect inspect(dispatcher(), services(), MonotonicBackoff::Make(), DataBudget(), GetRedactor());
   RunLoopUntilIdle();
 
   EXPECT_TRUE(archive->IsBound());
@@ -240,5 +247,38 @@ TEST_F(InspectTest, Reconnects) {
   EXPECT_TRUE(archive->IsBound());
 }
 
+TEST_F(InspectTest, RedactsWithJsonReplacers) {
+  std::string json(
+      "[\"1.2.3.4\",\n"  // IPv4 Addresses are redacted
+      "\"5.6.7.8\",\n"
+      "\"2001::1\",\n"  // IPv6 Addresses are redacted
+      "\"2001::2\",\n"
+      "\"AA-BB-CC-DD-EE-FF\",\n"  // MAC Addresses are redacted with manufacturer component
+                                  // unredacted
+      "\"11-22-33-44-55-66\",\n"
+      "1234567890abcdefABCDEF0123456789,\n"  // Long Hex numbers are not redacted
+      "\"106986199446298680449\"]");         // Obfuscated Gaia IDs are not redacted
+  SetUpInspectServer(std::make_unique<stubs::DiagnosticsArchive>(
+      std::make_unique<stubs::DiagnosticsBatchIterator>(std::vector<std::vector<std::string>>({
+          {json},
+          {},
+      }))));
+  inspect::BoolProperty redaction_enabled;
+  redaction_enabled.Set(true);
+  SetRedactor(std::make_unique<Redactor>(0, inspect::UintProperty(), std::move(redaction_enabled)));
+
+  Inspect inspect(dispatcher(), services(), MonotonicBackoff::Make(), DataBudget(), GetRedactor());
+  const auto attachment = Run(inspect.Get(1234));
+  EXPECT_EQ(attachment.Value(), R"([
+["<REDACTED-IPV4: 1>",
+"<REDACTED-IPV4: 2>",
+"<REDACTED-IPV6: 3>",
+"<REDACTED-IPV6: 4>",
+"AA-BB-CC-<REDACTED-MAC: 5>",
+"11-22-33-<REDACTED-MAC: 6>",
+1234567890abcdefABCDEF0123456789,
+"106986199446298680449"]
+])");
+}
 }  // namespace
 }  // namespace forensics::feedback

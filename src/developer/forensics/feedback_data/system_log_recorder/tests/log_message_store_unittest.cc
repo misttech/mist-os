@@ -57,6 +57,8 @@ class SimpleRedactor : public RedactorBase {
     return text;
   }
 
+  std::string& RedactJson(std::string& text) override { return Redact(text); }
+
   std::string UnredactedCanary() const override { return ""; }
   std::string RedactedCanary() const override { return ""; }
 

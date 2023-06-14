@@ -30,6 +30,7 @@ executable("redactor_unittest_exe") {
   deps = [
     "//src/developer/forensics/testing:gtest_with_syslog_main",
     "//src/developer/forensics/utils/redact",
+    "//src/lib/json_parser",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
   ]

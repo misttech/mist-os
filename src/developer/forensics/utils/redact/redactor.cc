@@ -108,6 +108,9 @@ Redactor::Redactor(const int starting_id, inspect::UintProperty cache_size,
   Add(ReplaceIPv4())
       .Add(ReplaceIPv6())
       .Add(ReplaceMac())
+      .AddJsonReplacer(ReplaceIPv4())
+      .AddJsonReplacer(ReplaceIPv6())
+      .AddJsonReplacer(ReplaceMac())
       .AddTextReplacer(kUrlPattern, "<REDACTED-URL>")
       .AddTextReplacer(kEmailPattern, "<REDACTED-EMAIL>")
       .AddTextReplacer(kUuidPattern, "<REDACTED-UUID>")
@@ -118,6 +121,13 @@ Redactor::Redactor(const int starting_id, inspect::UintProperty cache_size,
 
 std::string& Redactor::Redact(std::string& text) {
   for (const auto& replacer : replacers_) {
+    replacer(cache_, text);
+  }
+  return text;
+}
+
+std::string& Redactor::RedactJson(std::string& text) {
+  for (const auto& replacer : json_replacers_) {
     replacer(cache_, text);
   }
   return text;
@@ -143,6 +153,12 @@ Redactor& Redactor::AddIdReplacer(std::string_view pattern, std::string_view for
   return Add(std::move(replacer));
 }
 
+Redactor& Redactor::AddJsonReplacer(Replacer replacer) {
+  FX_CHECK(replacer != nullptr);
+  json_replacers_.push_back(std::move(replacer));
+  return *this;
+}
+
 std::string Redactor::UnredactedCanary() const { return std::string(kUnredactedCanary); }
 
 std::string Redactor::RedactedCanary() const { return std::string(kRedactedCanary); }
@@ -151,6 +167,8 @@ IdentityRedactor::IdentityRedactor(inspect::BoolProperty redaction_enabled)
     : RedactorBase(std::move(redaction_enabled)) {}
 
 std::string& IdentityRedactor::Redact(std::string& text) { return text; }
+
+std::string& IdentityRedactor::RedactJson(std::string& text) { return text; }
 
 std::string IdentityRedactor::UnredactedCanary() const { return std::string(kUnredactedCanary); }
 

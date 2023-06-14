@@ -28,11 +28,12 @@ namespace forensics::feedback {
 
 Inspect::Inspect(async_dispatcher_t* dispatcher, std::shared_ptr<sys::ServiceDirectory> services,
                  std::unique_ptr<backoff::Backoff> backoff,
-                 feedback_data::InspectDataBudget* data_budget)
+                 feedback_data::InspectDataBudget* data_budget, RedactorBase* redactor)
     : dispatcher_(dispatcher),
       services_(std::move(services)),
       backoff_(std::move(backoff)),
-      data_budget_(data_budget) {
+      data_budget_(data_budget),
+      redactor_(redactor) {
   archive_accessor_.set_error_handler([this](const zx_status_t status) {
     FX_LOGS(WARNING) << "Lost connection to " << feedback_data::kArchiveAccessorName;
     auto self = ptr_factory_.GetWeakPtr();
@@ -198,6 +199,7 @@ void InspectCollector::Run() {
     std::string joined_data = "[\n";
     joined_data += fxl::JoinStrings(inspect, ",\n");
     joined_data += "\n]";
+    joined_data = self->redactor_->RedactJson(joined_data);
 
     AttachmentValue value = (result.is_ok())
                                 ? AttachmentValue(std::move(joined_data))

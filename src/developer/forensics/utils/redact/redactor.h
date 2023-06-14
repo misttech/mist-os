@@ -23,6 +23,9 @@ class RedactorBase {
   //
   // Redacts |text| in-place and returns a reference to |text|.
   virtual std::string& Redact(std::string& text) = 0;
+  // Redacts |text| in-place and returns a reference to |text| where text is a
+  // JSON string.
+  virtual std::string& RedactJson(std::string& text) = 0;
 
   // Unredacted / redacted version of canary message for confirming log redaction.
   virtual std::string UnredactedCanary() const = 0;
@@ -40,6 +43,7 @@ class Redactor : public RedactorBase {
   ~Redactor() override = default;
 
   std::string& Redact(std::string& text) override;
+  std::string& RedactJson(std::string& text) override;
 
   std::string UnredactedCanary() const override;
   std::string RedactedCanary() const override;
@@ -48,9 +52,11 @@ class Redactor : public RedactorBase {
   Redactor& Add(Replacer replacer);
   Redactor& AddTextReplacer(std::string_view pattern, std::string_view replacement);
   Redactor& AddIdReplacer(std::string_view pattern, std::string_view format);
+  Redactor& AddJsonReplacer(Replacer replacer);
 
   RedactionIdCache cache_;
   std::vector<Replacer> replacers_;
+  std::vector<Replacer> json_replacers_;
 };
 
 // Do-nothing redactor
@@ -60,6 +66,7 @@ class IdentityRedactor : public RedactorBase {
   ~IdentityRedactor() override = default;
 
   std::string& Redact(std::string& text) override;
+  std::string& RedactJson(std::string& text) override;
 
   std::string UnredactedCanary() const override;
   std::string RedactedCanary() const override;
