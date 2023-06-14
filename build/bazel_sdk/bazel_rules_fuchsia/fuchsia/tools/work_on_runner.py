@@ -11,6 +11,8 @@ import signal
 import subprocess
 import time
 
+from copy import deepcopy
+
 
 class FfxRunner():
 
@@ -135,22 +137,24 @@ class SetDefaults(Step):
 
     def __init__(self) -> None:
         super().__init__()
-        self.original_config_entries = {}
         self.config_keys = [
             "product.experimental", "ffx-repo-add", "ffx_repository"
         ]
-        self.original_target = None
+        self.original_build_config = None
 
     def run(self, ctx):
         build_config_file = SetDefaults.find_build_config_path(ctx)
         if build_config_file is None:
-            return StepEarlyExit("cannot find build config file. do you have a fuchsia_env.toml file?")
+            return StepEarlyExit(
+                "cannot find build config file. do you have a fuchsia_env.toml file?"
+            )
 
         ctx.log(f"Writing build config entry to {build_config_file}")
 
         try:
             with open(build_config_file, "r") as f:
                 build_config = json.load(f)
+                self.original_build_config = deepcopy(build_config)
         except:
             build_config = {}
 
@@ -167,11 +171,6 @@ class SetDefaults(Step):
 
         set_nested_key("product.path", ctx.pb_path)
 
-        try:
-            self.original_target = ctx.ffx().run("target", "default", "get")
-        except:
-            self.original_target = None
-
         ctx.log(f"Setting {ctx.target} as default target")
         set_nested_key("target.default", ctx.target)
 
@@ -179,18 +178,22 @@ class SetDefaults(Step):
             f"Setting 'devhost.fuchsia.com' as the default package repository")
         set_nested_key("repository.default", "devhost.fuchsia.com")
 
-        json_object = json.dumps(build_config, indent=4)
         with open(build_config_file, "w") as f:
-            f.write(json_object)
+            f.write(json.dumps(build_config, indent=4))
 
     def cleanup(self, ctx):
-        if ctx.keep_build_config:
-            return
         try:
-            os.remove(SetDefaults.find_build_config_path(ctx))
+            config_file = SetDefaults.find_build_config_path(ctx)
+            if not ctx.keep_build_config:
+                os.remove(config_file)
+
+            # Restore our original build config if we had one
+            if self.original_build_config:
+                with open(config_file, "w") as f:
+                    print(self.original_build_config)
+                    f.write(json.dumps(self.original_build_config, indent=2))
         except:
             pass
-
 
     def find_build_config_path(ctx):
         # tomllib was introduced in python 3.11 which is too new for most of our
@@ -226,16 +229,18 @@ class SetDefaults(Step):
                 else:
                     return os.path.join(os.path.dirname(file), config_path)
             except Exception as e:
-                ctx.log('fuchsia_env.toml file does not contain fuchsia.config.build_config_path entry')
+                ctx.log(
+                    'fuchsia_env.toml file does not contain fuchsia.config.build_config_path entry'
+                )
         return None
 
     def build_config_from_regex(ctx, file):
         regex = re.compile("build_config_path = \"(.*)\"")
         with open(file, 'r') as f:
-          for line in f:
-              m = regex.match(line)
-              if m:
-                  return m.group(1)
+            for line in f:
+                m = regex.match(line)
+                if m:
+                    return m.group(1)
         return None
 
 
