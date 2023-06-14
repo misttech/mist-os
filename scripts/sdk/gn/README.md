@@ -1,6 +1,11 @@
 # GN SDK
 
 The GN SDK frontend produces a [GN](https://gn.googlesource.com/gn/+/HEAD/README.md) workspace.
+Note that this directory has been deprecated. The GN SDK will be removed soon.
+Changes made to this directory will no longer take effect. Further changes
+should be made to
+https://chromium.googlesource.com/chromium/src/third_party/fuchsia-gn-sdk/
+instead.
 
 ## Directory structure
 
