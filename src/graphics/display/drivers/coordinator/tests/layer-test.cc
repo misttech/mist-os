@@ -17,6 +17,7 @@
 #include "src/graphics/display/drivers/coordinator/tests/base.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace fhd = fuchsia_hardware_display;
@@ -59,7 +60,7 @@ class LayerTest : public TestBase {
 };
 
 TEST_F(LayerTest, PrimaryBasic) {
-  Layer layer(1);
+  Layer layer(DriverLayerId(1));
   fhd::wire::ImageConfig image_config = {
       .width = kDisplayWidth, .height = kDisplayHeight, .type = fhd::wire::kTypeSimple};
   fhd::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
@@ -72,7 +73,7 @@ TEST_F(LayerTest, PrimaryBasic) {
 }
 
 TEST_F(LayerTest, CursorBasic) {
-  Layer layer(1);
+  Layer layer(DriverLayerId(1));
   layer.SetCursorConfig({});
   layer.SetCursorPosition(/*x=*/4, /*y=*/10);
   auto image = CreateReadyImage();
@@ -81,7 +82,7 @@ TEST_F(LayerTest, CursorBasic) {
 }
 
 TEST_F(LayerTest, CleanUpImage) {
-  Layer layer(1);
+  Layer layer(DriverLayerId(1));
   fhd::wire::ImageConfig image_config = {
       .width = kDisplayWidth, .height = kDisplayHeight, .type = fhd::wire::kTypeSimple};
   fhd::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
@@ -154,7 +155,7 @@ TEST_F(LayerTest, CleanUpImage) {
 TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
   fbl::DoublyLinkedList<LayerNode*> current_layers;
 
-  Layer layer(1);
+  Layer layer(DriverLayerId(1));
   fhd::wire::ImageConfig image_config = {
       .width = kDisplayWidth, .height = kDisplayHeight, .type = fhd::wire::kTypeSimple};
   fhd::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
@@ -201,7 +202,7 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
 }
 
 TEST_F(LayerTest, CleanUpAllImages) {
-  Layer layer(1);
+  Layer layer(DriverLayerId(1));
   fhd::wire::ImageConfig image_config = {
       .width = kDisplayWidth, .height = kDisplayHeight, .type = fhd::wire::kTypeSimple};
   fhd::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
@@ -251,7 +252,7 @@ TEST_F(LayerTest, CleanUpAllImages) {
 TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
   fbl::DoublyLinkedList<LayerNode*> current_layers;
 
-  Layer layer(1);
+  Layer layer(DriverLayerId(1));
   fhd::wire::ImageConfig image_config = {
       .width = kDisplayWidth, .height = kDisplayHeight, .type = fhd::wire::kTypeSimple};
   fhd::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};

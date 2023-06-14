@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/coordinator/layer.h"
 
+#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <zircon/assert.h>
 
@@ -12,9 +13,9 @@
 #include <fbl/auto_lock.h>
 #include <fbl/intrusive_double_list.h>
 
-#include "fuchsia/hardware/display/controller/c/banjo.h"
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
 
 namespace fhd = fuchsia_hardware_display;
 
@@ -40,7 +41,7 @@ static void populate_image(const fhd::wire::ImageConfig& image, image_t* image_o
 
 }  // namespace
 
-Layer::Layer(uint64_t id) {
+Layer::Layer(DriverLayerId id) {
   this->id = id;
   memset(&pending_layer_, 0, sizeof(layer_t));
   memset(&current_layer_, 0, sizeof(layer_t));

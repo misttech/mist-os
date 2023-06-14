@@ -17,6 +17,7 @@
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
 
 namespace display {
 
@@ -30,10 +31,11 @@ struct LayerNode : public fbl::DoublyLinkedListable<LayerNode*> {
 };
 
 // Almost-POD used by Client to manage layer state. Public state is used by Controller.
-class Layer : public IdMappable<std::unique_ptr<Layer>, /*IdType=*/uint64_t> {
+class Layer : public IdMappable<std::unique_ptr<Layer>, DriverLayerId> {
  public:
-  explicit Layer(uint64_t id);
+  explicit Layer(DriverLayerId id);
   ~Layer();
+
   fbl::RefPtr<Image> current_image() const { return displayed_image_; }
   bool is_skipped() const { return is_skipped_; }
 

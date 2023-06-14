@@ -51,6 +51,7 @@
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
 
 namespace display {
 
@@ -313,7 +314,11 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   FenceCollection fences_;
 
   Layer::Map layers_;
-  uint64_t next_layer_id = 1;
+
+  // TODO(fxbug.com/129082): Move to Controller, so values issued using this
+  // counter are globally unique. Do not pass to DriverLayerId values to drivers
+  // until this issue is fixed.
+  DriverLayerId next_driver_layer_id = DriverLayerId(1);
 
   // TODO(stevensd): Delete this when client stop using SetDisplayImage
   uint64_t display_image_layer_ = INVALID_ID;

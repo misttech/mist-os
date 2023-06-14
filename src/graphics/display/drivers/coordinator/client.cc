@@ -27,6 +27,7 @@
 #include <zircon/types.h>
 
 #include <algorithm>
+#include <cinttypes>
 #include <cstdint>
 #include <memory>
 #include <random>
@@ -43,6 +44,8 @@
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
+#include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/lib/edid/edid.h"
 #include "src/lib/fsl/handles/object_info.h"
 
@@ -236,28 +239,41 @@ void Client::ReleaseEvent(ReleaseEventRequestView request,
 }
 
 void Client::CreateLayer(CreateLayerCompleter::Sync& completer) {
+  // TODO(fxbug.dev/129036): Layer IDs should be client-managed.
+
   if (layers_.size() == kMaxLayers) {
     completer.Reply(ZX_ERR_NO_RESOURCES, 0);
     return;
   }
 
-  fbl::AllocChecker ac;
-  uint64_t layer_id = next_layer_id++;
-  auto new_layer = fbl::make_unique_checked<Layer>(&ac, layer_id);
-  if (!ac.check()) {
-    --layer_id;
+  fbl::AllocChecker alloc_checker;
+  DriverLayerId driver_layer_id = next_driver_layer_id++;
+  auto new_layer = fbl::make_unique_checked<Layer>(&alloc_checker, driver_layer_id);
+  if (!alloc_checker.check()) {
+    --driver_layer_id;
     completer.Reply(ZX_ERR_NO_MEMORY, 0);
     return;
   }
 
   layers_.insert(std::move(new_layer));
 
-  completer.Reply(ZX_OK, layer_id);
+  // Driver-side layer IDs are currently exposed to coordinator clients.
+  // fxbug.dev/129036 tracks having client-managed IDs. When that happens,
+  // Client instances will be responsible for translating between driver-side
+  // and client-side IDs.
+  LayerId layer_id(driver_layer_id.value());
+  completer.Reply(ZX_OK, ToFidlLayerId(layer_id));
 }
 
 void Client::DestroyLayer(DestroyLayerRequestView request,
                           DestroyLayerCompleter::Sync& /*_completer*/) {
-  auto layer = layers_.find(request->layer_id);
+  LayerId layer_id = ToLayerId(request->layer_id);
+
+  // TODO(fxbug.dev/192036): When switching to client-managed IDs, the
+  // driver-side ID will have to be looked up in a map.
+  DriverLayerId driver_layer_id(layer_id.value());
+
+  auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
     zxlogf(ERROR, "Tried to destroy invalid layer %ld", request->layer_id);
     TearDown();
@@ -269,7 +285,7 @@ void Client::DestroyLayer(DestroyLayerRequestView request,
     return;
   }
 
-  layers_.erase(request->layer_id);
+  layers_.erase(driver_layer_id);
 }
 
 void Client::SetDisplayMode(SetDisplayModeRequestView request,
@@ -350,13 +366,22 @@ void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
   config->pending_layer_change_property_.Set(true);
   config->pending_layers_.clear();
   for (uint64_t i = request->layer_ids.count() - 1; i != UINT64_MAX; i--) {
-    auto layer = layers_.find(request->layer_ids[i]);
+    LayerId layer_id = ToLayerId(request->layer_ids[i]);
+
+    // TODO(fxbug.dev/192036): When switching to client-managed IDs, the
+    // driver-side ID will have to be looked up in a map.
+    DriverLayerId driver_layer_id(layer_id.value());
+    auto layer = layers_.find(driver_layer_id);
     if (!layer.IsValid()) {
       zxlogf(ERROR, "Unknown layer %lu", request->layer_ids[i]);
       TearDown();
       return;
     }
-    if (!layer->AddToConfig(&config->pending_layers_, /*z_index=*/static_cast<uint32_t>(i))) {
+
+    // The cast is lossless because FIDL vector size is capped at 2^32-1.
+    const uint32_t z_index = static_cast<uint32_t>(i);
+
+    if (!layer->AddToConfig(&config->pending_layers_, z_index)) {
       zxlogf(ERROR, "Tried to reuse an in-use layer");
       TearDown();
       return;
@@ -368,7 +393,12 @@ void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
 
 void Client::SetLayerPrimaryConfig(SetLayerPrimaryConfigRequestView request,
                                    SetLayerPrimaryConfigCompleter::Sync& /*_completer*/) {
-  auto layer = layers_.find(request->layer_id);
+  LayerId layer_id = ToLayerId(request->layer_id);
+
+  // TODO(fxbug.dev/192036): When switching to client-managed IDs, the
+  // driver-side ID will have to be looked up in a map.
+  DriverLayerId driver_layer_id(layer_id.value());
+  auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
     zxlogf(ERROR, "SetLayerPrimaryConfig on invalid layer");
     TearDown();
@@ -382,7 +412,12 @@ void Client::SetLayerPrimaryConfig(SetLayerPrimaryConfigRequestView request,
 
 void Client::SetLayerPrimaryPosition(SetLayerPrimaryPositionRequestView request,
                                      SetLayerPrimaryPositionCompleter::Sync& /*_completer*/) {
-  auto layer = layers_.find(request->layer_id);
+  LayerId layer_id = ToLayerId(request->layer_id);
+
+  // TODO(fxbug.dev/192036): When switching to client-managed IDs, the
+  // driver-side ID will have to be looked up in a map.
+  DriverLayerId driver_layer_id(layer_id.value());
+  auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid() || layer->pending_type() != LAYER_TYPE_PRIMARY) {
     zxlogf(ERROR, "SetLayerPrimaryPosition on invalid layer");
     TearDown();
@@ -400,7 +435,12 @@ void Client::SetLayerPrimaryPosition(SetLayerPrimaryPositionRequestView request,
 
 void Client::SetLayerPrimaryAlpha(SetLayerPrimaryAlphaRequestView request,
                                   SetLayerPrimaryAlphaCompleter::Sync& /*_completer*/) {
-  auto layer = layers_.find(request->layer_id);
+  LayerId layer_id = ToLayerId(request->layer_id);
+
+  // TODO(fxbug.dev/192036): When switching to client-managed IDs, the
+  // driver-side ID will have to be looked up in a map.
+  DriverLayerId driver_layer_id(layer_id.value());
+  auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid() || layer->pending_type() != LAYER_TYPE_PRIMARY) {
     zxlogf(ERROR, "SetLayerPrimaryAlpha on invalid layer");
     TearDown();
@@ -420,7 +460,12 @@ void Client::SetLayerPrimaryAlpha(SetLayerPrimaryAlphaRequestView request,
 
 void Client::SetLayerCursorConfig(SetLayerCursorConfigRequestView request,
                                   SetLayerCursorConfigCompleter::Sync& /*_completer*/) {
-  auto layer = layers_.find(request->layer_id);
+  LayerId layer_id = ToLayerId(request->layer_id);
+
+  // TODO(fxbug.dev/192036): When switching to client-managed IDs, the
+  // driver-side ID will have to be looked up in a map.
+  DriverLayerId driver_layer_id(layer_id.value());
+  auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
     zxlogf(ERROR, "SetLayerCursorConfig on invalid layer");
     TearDown();
@@ -434,7 +479,12 @@ void Client::SetLayerCursorConfig(SetLayerCursorConfigRequestView request,
 
 void Client::SetLayerCursorPosition(SetLayerCursorPositionRequestView request,
                                     SetLayerCursorPositionCompleter::Sync& /*_completer*/) {
-  auto layer = layers_.find(request->layer_id);
+  LayerId layer_id = ToLayerId(request->layer_id);
+
+  // TODO(fxbug.dev/192036): When switching to client-managed IDs, the
+  // driver-side ID will have to be looked up in a map.
+  DriverLayerId driver_layer_id(layer_id.value());
+  auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid() || layer->pending_type() != LAYER_TYPE_CURSOR) {
     zxlogf(ERROR, "SetLayerCursorPosition on invalid layer");
     TearDown();
@@ -447,7 +497,12 @@ void Client::SetLayerCursorPosition(SetLayerCursorPositionRequestView request,
 
 void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
                                  SetLayerColorConfigCompleter::Sync& /*_completer*/) {
-  auto layer = layers_.find(request->layer_id);
+  LayerId layer_id = ToLayerId(request->layer_id);
+
+  // TODO(fxbug.dev/192036): When switching to client-managed IDs, the
+  // driver-side ID will have to be looked up in a map.
+  DriverLayerId driver_layer_id(layer_id.value());
+  auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
     zxlogf(ERROR, "SetLayerColorConfig on invalid layer");
     return;
@@ -469,7 +524,12 @@ void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
 
 void Client::SetLayerImage(SetLayerImageRequestView request,
                            SetLayerImageCompleter::Sync& /*_completer*/) {
-  auto layer = layers_.find(request->layer_id);
+  LayerId layer_id = ToLayerId(request->layer_id);
+
+  // TODO(fxbug.dev/192036): When switching to client-managed IDs, the
+  // driver-side ID will have to be looked up in a map.
+  DriverLayerId driver_layer_id(layer_id.value());
+  auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
     zxlogf(ERROR, "SetLayerImage ordinal with invalid layer %lu", request->layer_id);
     TearDown();
@@ -480,6 +540,7 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
     TearDown();
     return;
   }
+
   auto image = images_.find(request->image_id);
   if (!image.IsValid() || !image->Acquire()) {
     zxlogf(ERROR, "SetLayerImage ordinal with %s image", !image.IsValid() ? "invl" : "busy");
@@ -565,13 +626,14 @@ void Client::ApplyConfig(ApplyConfigCompleter::Sync& /*_completer*/) {
     // that needs to know if there are any waiting images.
     for (auto& layer_node : display_config.pending_layers_) {
       if (!layer_node.layer->ResolvePendingLayerProperties()) {
-        zxlogf(ERROR, "Failed to resolve pending layer properties for layer %lu",
-               layer_node.layer->id);
+        zxlogf(ERROR, "Failed to resolve pending layer properties for layer %" PRIu64,
+               layer_node.layer->id.value());
         TearDown();
         return;
       }
       if (!layer_node.layer->ResolvePendingImage(&fences_, latest_config_stamp_)) {
-        zxlogf(ERROR, "Failed to resolve pending images for layer %lu", layer_node.layer->id);
+        zxlogf(ERROR, "Failed to resolve pending images for layer %" PRIu64,
+               layer_node.layer->id.value());
         TearDown();
         return;
       }
@@ -950,13 +1012,19 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
         }
       }
 
+      const uint64_t fidl_display_id = ToFidlDisplayId(display_config.id);
+
+      // TODO(fxbug.dev/192036): When switching to client-managed IDs, the
+      // client-side ID will have to be looked up in a map.
+      LayerId layer_id(layer_node.layer->id.value());
+      const uint64_t fidl_layer_id = ToFidlLayerId(layer_id);
+
       for (uint8_t i = 0; i < 32; i++) {
         if (err & (1 << i)) {
           ops->emplace_back(fhd::wire::ClientCompositionOp{
-              .display_id = ToFidlDisplayId(display_config.id),
-              .layer_id = layer_node.layer->id,
+              .display_id = fidl_display_id,
+              .layer_id = fidl_layer_id,
               .opcode = static_cast<fhd::wire::ClientCompositionOpcode>(i),
-
           });
         }
       }
