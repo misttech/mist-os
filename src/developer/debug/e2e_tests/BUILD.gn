@@ -59,9 +59,12 @@ if (is_host) {
     _is_thinlto =
         select_variant + [ "thinlto" ] - [ "thinlto" ] != select_variant
 
+    build_type = "optimize=$optimize:target_cpu=$target_cpu:is_lto=$_is_lto:" +
+                 "is_thinlto=$_is_thinlto:is_asan=$is_asan"
+
     defines = [
-      "ZXDB_E2E_TESTS_BUILD_TYPE=\"optimize=$optimize:target_cpu=$target_cpu:is_lto=$_is_lto:is_thinlto=$_is_thinlto\"",
-      "ZXDB_E2E_TESTS_SYMBOL_DIR=\"${symbol_dir}\"",
+      "ZXDB_E2E_TESTS_BUILD_TYPE=\"" + build_type + "\"",
+      "ZXDB_E2E_TESTS_SYMBOL_DIR=\"" + symbol_dir + "\"",
       "ZXDB_E2E_TESTS_SCRIPTS_DIR=\"" + rebase_path("scripts", root_out_dir) +
           "\"",
       "ZXDB_E2E_TESTS_FFX_TEST_DATA=\"" + _ffx_test_data_path + "\"",
@@ -134,6 +137,7 @@ if (is_host) {
       "inferiors:zxdb_e2e_inferiors($target_toolchain)",
       "//src/developer/forensics/crasher:crasher($target_toolchain)",
       "//src/developer/forensics/crasher:crasher_test($target_toolchain)",
+      "//src/starnix/kernel:starnix_kernel_package($target_toolchain)",
     ]
   }
 }

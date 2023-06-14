@@ -67,6 +67,7 @@ group("allowed_to_use_subpackages") {
     "//examples/components/subpackages:echo_client_with_subpackaged_server",
     "//sdk/ctf:*",
     "//sdk/ctf/release:*",
+    "//src/developer/debug/e2e_tests/inferiors:*",
     "//src/developer/ffx/tools/target-package/tests:verify_ffx_target_package_explore_subpackage",
     "//src/developer/ffx/tools/target-package/tests:verify_ffx_target_package_explore_superpackage",
     "//src/performance/trace_manager:trace_manager",

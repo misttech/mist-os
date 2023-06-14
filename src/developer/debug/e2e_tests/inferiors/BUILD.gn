@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
+import("//src/starnix/kernel/starnix.gni")
 
 # Declare an inferior with a default manifest.
 template("inferior") {
@@ -101,6 +102,31 @@ inferior("rust_functions") {
   source_root = "rust_functions.rs"
 }
 
+## Starnix
+
+if (is_linux) {
+  executable("hello_starnix_bin") {
+    output_name = "hello_starnix"
+    sources = [ "hello_starnix.cc" ]
+  }
+}
+
+# By default, executables in another toolchain will not be included in the package.
+resource("hello_starnix_resource") {
+  out_dir = get_label_info(":hello_starnix_bin($target_linux_toolchain)",
+                           "root_out_dir")
+  sources = [ "${out_dir}/hello_starnix" ]
+
+  # Cannot be in /bin because it's not a Fuchsia executable.
+  outputs = [ "data/bin/hello_starnix" ]
+  deps = [ ":hello_starnix_bin($target_linux_toolchain)" ]
+}
+
+fuchsia_component("hello_starnix") {
+  deps = [ ":hello_starnix_resource" ]
+  manifest = "hello_starnix.cml"
+}
+
 fuchsia_package("zxdb_e2e_inferiors") {
   deps = [
     ":async_rust",
@@ -113,4 +139,13 @@ fuchsia_package("zxdb_e2e_inferiors") {
     ":step_plt",
     ":wait_for_debugger",
   ]
+
+  # Starnix
+  deps += [
+    ":hello_starnix",
+    "//src/starnix/containers:data_tmp_target",
+    "//src/starnix/containers:default_init",
+    "//src/starnix/containers/debian:system_image",
+  ]
+  subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
 }
