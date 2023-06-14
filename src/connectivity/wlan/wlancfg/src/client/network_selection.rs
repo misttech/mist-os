@@ -503,7 +503,7 @@ impl types::ScannedCandidate {
 
     pub fn to_string_without_pii(&self) -> String {
         let channel = self.bss.channel;
-        let rssi = self.bss.channel;
+        let rssi = self.bss.rssi;
         let recent_failure_count = self.recent_failure_count();
         let recent_short_connection_count = self.recent_short_connections();
 
