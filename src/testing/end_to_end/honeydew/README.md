@@ -78,7 +78,7 @@ To fully uninstall HoneyDew, delete the virtual environment that was crated
 # Do this step only if you have not pip installed HoneyDew
 >>> import sys
 >>> FUCHSIA_ROOT = os.environ.get("FUCHSIA_DIR")
->>> HONEYDEW_ROOT = f"{FUCHSIA_ROOT}/src/testing/end_to_end"
+>>> HONEYDEW_ROOT = f"{FUCHSIA_ROOT}/src/testing/end_to_end/honeydew"
 >>> sys.path.append(HONEYDEW_ROOT)
 
 # Enable Info logging

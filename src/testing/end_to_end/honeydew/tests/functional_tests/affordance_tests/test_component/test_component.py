@@ -14,7 +14,6 @@ from mobly import test_runner
 from honeydew.interfaces.device_classes import fuchsia_device
 
 ROOT_CM_URL = "fuchsia-boot:///#meta/root.cm"
-SYS_MGR_V1_CMX_NAME = "sysmgr.cmx"
 ROOT_V2_CM_NAME = "root.cm"
 UNKNOWN_COMPONENT_NAME = "unknown.cm"
 
@@ -48,12 +47,8 @@ class ComponentAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         """Test case for component.search()"""
         if self._is_fuchsia_controller_based_device(self.device):
             with asserts.assert_raises(NotImplementedError):
-                self.device.component.search(name=SYS_MGR_V1_CMX_NAME)
+                self.device.component.search(name=ROOT_V2_CM_NAME)
             return
-
-        asserts.assert_true(
-            self.device.component.search(name=SYS_MGR_V1_CMX_NAME),
-            msg=f"{SYS_MGR_V1_CMX_NAME} component expected to be found")
 
         asserts.assert_true(
             self.device.component.search(name=ROOT_V2_CM_NAME),
