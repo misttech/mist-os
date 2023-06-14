@@ -6,22 +6,7 @@ import(
     "//build/bazel/assembly/images_configurations/verify_images_configuration.gni")
 import("//build/product.gni")
 
-if (use_bringup_assembly) {
-  verify_images_configuration("verify_bringup") {
-    testonly = true
-    gn_images_config_target = "//boards/images:default"
-    bazel_images_config_target = ":bringup"
-    bazel_inputs =
-        [ "//build/images/bringup:bringup.bazel_images_config_inputs" ]
-  }
-} else {
-  verify_images_configuration("verify_fuchsia_x64_fxblob") {
-    testonly = true
-    gn_images_config_target = "//boards/images:x64-fxfs"
-    bazel_images_config_target = ":fuchsia_x64_fxblob"
-    bazel_inputs =
-        [ "//build/images/fuchsia:fuchsia.bazel_images_config_inputs" ]
-  }
+if (!use_bringup_assembly) {
   verify_images_configuration("verify_fuchsia_x64") {
     testonly = true
     gn_images_config_target = "//boards/images:x64"
@@ -29,39 +14,43 @@ if (use_bringup_assembly) {
     bazel_inputs =
         [ "//build/images/fuchsia:fuchsia.bazel_images_config_inputs" ]
   }
-}
 
-verify_images_configuration("verify_zedboot_default") {
-  testonly = true
-  gn_images_config_target = "//boards/images:zedboot_default"
-  bazel_images_config_target = ":zedboot_default"
-}
+  verify_images_configuration("verify_fuchsia_x64_fxblob") {
+    testonly = true
+    gn_images_config_target = "//boards/images:x64-fxfs"
+    bazel_images_config_target = ":fuchsia_x64_fxblob"
+    bazel_inputs =
+        [ "//build/images/fuchsia:fuchsia.bazel_images_config_inputs" ]
+  }
 
-verify_images_configuration("verify_zedboot_qemu") {
-  testonly = true
-  gn_images_config_target = "//boards/images:zedboot_qemu"
-  bazel_images_config_target = ":zedboot_qemu"
-}
+  verify_images_configuration("verify_fuchsia_vim3") {
+    testonly = true
+    gn_images_config_target = "//boards/images:vim3"
+    bazel_images_config_target = ":fuchsia_vim3"
+  }
 
-verify_images_configuration("verify_fuchsia_vim3") {
-  testonly = true
-  gn_images_config_target = "//boards/images:vim3"
-  bazel_images_config_target = ":fuchsia_vim3"
+  verify_images_configuration("verify_zedboot_default") {
+    testonly = true
+    gn_images_config_target = "//boards/images:zedboot_default"
+    bazel_images_config_target = ":zedboot_default"
+  }
+
+  verify_images_configuration("verify_zedboot_qemu") {
+    testonly = true
+    gn_images_config_target = "//boards/images:zedboot_qemu"
+    bazel_images_config_target = ":zedboot_qemu"
+  }
 }
 
 group("verifications") {
   testonly = true
-  deps = [
-    ":verify_fuchsia_vim3",
-    ":verify_zedboot_default",
-    ":verify_zedboot_qemu",
-  ]
-  if (use_bringup_assembly) {
-    deps += [ ":verify_bringup" ]
-  } else {
-    deps += [
+  if (!use_bringup_assembly) {
+    deps = [
+      ":verify_fuchsia_vim3",
       ":verify_fuchsia_x64",
       ":verify_fuchsia_x64_fxblob",
+      ":verify_zedboot_default",
+      ":verify_zedboot_qemu",
     ]
   }
 }
