@@ -14,7 +14,11 @@
             "enabled": true
         },
         "diagnostics": {
-            "archivist": "default"
+            "archivist": "default",
+            "additional_serial_log_components": [
+                "/core/session-manager",
+                "/core/session-manager/session:session"
+            ]
         },
         "identity": {
             "password_pinweaver": "required"

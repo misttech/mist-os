@@ -92,7 +92,8 @@ mod tests {
             build_type: &BuildType::Eng,
             ..Default::default()
         };
-        let diagnostics = DiagnosticsConfig { archivist: Some(ArchivistConfig::Default) };
+        let diagnostics =
+            DiagnosticsConfig { archivist: Some(ArchivistConfig::Default), ..Default::default() };
         let mut builder = ConfigurationBuilderImpl::default();
 
         DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder).unwrap();
@@ -143,7 +144,8 @@ mod tests {
             build_type: &BuildType::Eng,
             ..Default::default()
         };
-        let diagnostics = DiagnosticsConfig { archivist: Some(ArchivistConfig::LowMem) };
+        let diagnostics =
+            DiagnosticsConfig { archivist: Some(ArchivistConfig::LowMem), ..Default::default() };
         let mut builder = ConfigurationBuilderImpl::default();
 
         DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder).unwrap();

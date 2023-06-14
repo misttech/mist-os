@@ -12,10 +12,19 @@ product_assembly_configuration("minimal_boot_user") {
   platform = {
     feature_set_level = "minimal"
     build_type = "user"
+
+    # TODO(fxbug.dev/100486): remove. This is being replaced by the equivalent diagnostics
+    # config.
     additional_serial_log_tags = [
       "session-manager",
       "session:session",
     ]
+    diagnostics = {
+      additional_serial_log_components = [
+        "/core/session-manager",
+        "/core/session-manager/session:session",
+      ]
+    }
   }
   product = {
     session_url =

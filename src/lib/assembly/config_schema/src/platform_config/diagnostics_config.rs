@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 pub struct DiagnosticsConfig {
     #[serde(default)]
     pub archivist: Option<ArchivistConfig>,
+    #[serde(default)]
+    pub additional_serial_log_components: Vec<String>,
 }
 
 /// Diagnostics configuration options for the archivist configuration area.
@@ -54,7 +56,10 @@ mod tests {
 
         let mut cursor = std::io::Cursor::new(json5);
         let config: PlatformConfig = util::from_reader(&mut cursor).unwrap();
-        assert!(config.diagnostics.archivist.is_none());
+        assert_eq!(
+            config.diagnostics,
+            DiagnosticsConfig { archivist: None, additional_serial_log_components: Vec::new() }
+        );
     }
 
     #[test]
@@ -69,6 +74,34 @@ mod tests {
 
         let mut cursor = std::io::Cursor::new(json5);
         let config: PlatformConfig = util::from_reader(&mut cursor).unwrap();
-        assert_eq!(config.diagnostics, DiagnosticsConfig { archivist: None });
+        assert_eq!(
+            config.diagnostics,
+            DiagnosticsConfig { archivist: None, additional_serial_log_components: Vec::new() }
+        );
+    }
+
+    #[test]
+    fn test_diagnostics_with_additional_log_tags() {
+        let json5 = r#"
+        {
+          build_type: "eng",
+          feature_set_level: "minimal",
+          diagnostics: {
+            additional_serial_log_components: [
+                "/foo",
+            ]
+          }
+        }
+    "#;
+
+        let mut cursor = std::io::Cursor::new(json5);
+        let config: PlatformConfig = util::from_reader(&mut cursor).unwrap();
+        assert_eq!(
+            config.diagnostics,
+            DiagnosticsConfig {
+                archivist: None,
+                additional_serial_log_components: vec!["/foo".to_string()]
+            }
+        );
     }
 }

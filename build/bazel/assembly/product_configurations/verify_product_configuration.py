@@ -33,8 +33,15 @@ def normalize_platform(config, root_dir):
 
     # When unset, set config_data to empty list for consistency, to avoid noisy
     # diff.
+    # TODO(fxbug.dev/100486): remove. This is being replaced by the equivalent
+    # diagnostics config.
     if "additional_serial_log_tags" not in platform:
         platform["additional_serial_log_tags"] = []
+
+    if "diagnostics" not in platform:
+        platform["diagnostics"] = {}
+    if "additional_serial_log_components" not in platform["diagnostics"]:
+        platform["diagnostics"]["additional_serial_log_components"] = []
 
 
 def normalize_product(
