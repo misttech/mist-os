@@ -11,11 +11,7 @@ use crate::zxio::{
 use bitflags::bitflags;
 use fidl::{encoding::const_assert_eq, endpoints::ServerEnd};
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::{
-    self as zx,
-    sys::{ZX_ERR_INVALID_ARGS, ZX_ERR_NO_MEMORY, ZX_OK},
-    zx_status_t, HandleBased,
-};
+use fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _};
 use std::{
     ffi::CStr,
     mem::{size_of, size_of_val},
@@ -24,7 +20,7 @@ use std::{
 };
 use zerocopy::{AsBytes, FromBytes};
 use zxio::{
-    msghdr, sockaddr, sockaddr_storage, socklen_t, zx_handle_t, zxio_object_type_t,
+    msghdr, sockaddr, sockaddr_storage, socklen_t, zx_handle_t, zx_status_t, zxio_object_type_t,
     zxio_seek_origin_t, zxio_storage_t, ZXIO_SHUTDOWN_OPTIONS_READ, ZXIO_SHUTDOWN_OPTIONS_WRITE,
 };
 
@@ -411,31 +407,30 @@ impl std::fmt::Debug for Zxio {
 // in a more general function pointer (`fn(&str, zx::Channel) -> zx::Status`)
 // rather than having to implement this trait.
 pub trait ServiceConnector {
-    /// Connect `server_end` to the protocol available at `service`.
-    fn connect(service: &str, server_end: zx::Channel) -> zx::Status;
+    /// Returns a channel to the service named by `service_name`.
+    fn connect(service_name: &str) -> Result<&'static zx::Channel, zx::Status>;
 }
 
-/// Connect a handle to a specified service.
+/// Sets `provider_handle` to a handle to the service named by `service_name`.
+///
+/// This function is intended to be passed to zxio_socket().
 ///
 /// SAFETY: Dereferences the raw pointers `service_name` and `provider_handle`.
 unsafe extern "C" fn service_connector<S: ServiceConnector>(
     service_name: *const c_char,
     provider_handle: *mut zx_handle_t,
 ) -> zx_status_t {
-    let (client_end, server_end) = zx::Channel::create();
+    let status: zx::Status = (|| {
+        let service_name = CStr::from_ptr(service_name)
+            .to_str()
+            .map_err(|std::str::Utf8Error { .. }| zx::Status::INVALID_ARGS)?;
 
-    let service = match CStr::from_ptr(service_name).to_str() {
-        Ok(s) => s,
-        Err(_) => return ZX_ERR_INVALID_ARGS,
-    };
-
-    let status = S::connect(service, server_end).into_raw();
-    if status != ZX_OK {
-        return status;
-    }
-
-    *provider_handle = client_end.into_handle().into_raw();
-    ZX_OK
+        S::connect(service_name).map(|channel| {
+            *provider_handle = channel.raw_handle();
+        })
+    })()
+    .into();
+    status.into_raw()
 }
 
 /// Sets `out_storage` as the zxio_storage of `out_context`.
@@ -449,13 +444,17 @@ unsafe extern "C" fn storage_allocator(
     out_context: *mut *mut c_void,
 ) -> zx_status_t {
     let zxio_ptr_ptr = out_context as *mut *mut zxio_storage_t;
-    if let Some(zxio_ptr) = zxio_ptr_ptr.as_mut() {
-        if let Some(zxio) = zxio_ptr.as_mut() {
-            *out_storage = zxio;
-            return ZX_OK;
+    let status: zx::Status = (|| {
+        if let Some(zxio_ptr) = zxio_ptr_ptr.as_mut() {
+            if let Some(zxio) = zxio_ptr.as_mut() {
+                *out_storage = zxio;
+                return Ok(());
+            }
         }
-    }
-    ZX_ERR_NO_MEMORY
+        Err(zx::Status::NO_MEMORY)
+    })()
+    .into();
+    status.into_raw()
 }
 
 impl Zxio {
@@ -1305,11 +1304,10 @@ mod test {
     use super::*;
 
     use anyhow::Error;
-    use fidl::endpoints::Proxy;
+    use fidl::endpoints::Proxy as _;
     use fidl_fuchsia_io as fio;
     use fuchsia_async as fasync;
     use fuchsia_fs::directory;
-    use fuchsia_zircon::{AsHandleRef, HandleBased};
 
     fn open_pkg() -> fio::DirectorySynchronousProxy {
         let pkg_proxy = directory::open_in_namespace(
@@ -1470,7 +1468,7 @@ mod test {
                 &mut out_context_ptr as *mut *mut Zxio as *mut *mut c_void,
             )
         };
-        assert_eq!(out, ZX_OK);
+        assert_eq!(out, zx::sys::ZX_OK);
     }
 
     #[fuchsia::test]
@@ -1487,6 +1485,6 @@ mod test {
                 out_context,
             )
         };
-        assert_eq!(out, ZX_ERR_NO_MEMORY);
+        assert_eq!(out, zx::sys::ZX_ERR_NO_MEMORY);
     }
 }

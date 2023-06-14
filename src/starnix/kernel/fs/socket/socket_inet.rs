@@ -11,13 +11,12 @@ use crate::{
     task::*,
     types::*,
 };
-use fidl::endpoints::ProtocolMarker;
+use fidl::endpoints::DiscoverableProtocolMarker as _;
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
-use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_zircon as zx;
 use static_assertions::const_assert_eq;
-use std::{ffi::CStr, sync::Arc};
+use std::{cell::OnceCell, ffi::CStr, sync::Arc};
 use syncio::{ControlMessage, RecvMessageInfo, ServiceConnector, Zxio};
 
 /// Connects to `fuchsia_posix_socket::Provider` or
@@ -25,23 +24,26 @@ use syncio::{ControlMessage, RecvMessageInfo, ServiceConnector, Zxio};
 struct SocketProviderServiceConnector;
 
 impl ServiceConnector for SocketProviderServiceConnector {
-    fn connect(service: &str, server_end: zx::Channel) -> zx::Status {
-        let result = if service == fposix_socket_raw::ProviderMarker::DEBUG_NAME {
-            connect_channel_to_protocol::<fposix_socket_raw::ProviderMarker>(server_end)
-        } else if service == fposix_socket::ProviderMarker::DEBUG_NAME {
-            connect_channel_to_protocol::<fposix_socket::ProviderMarker>(server_end)
-        } else {
-            return zx::Status::INTERNAL;
-        };
-
-        if let Err(err) = result {
-            if let Some(status) = err.downcast_ref::<zx::Status>() {
-                return *status;
+    fn connect(service_name: &str) -> Result<&'static zx::Channel, zx::Status> {
+        match service_name {
+            fposix_socket::ProviderMarker::PROTOCOL_NAME => {
+                static mut CHANNEL: OnceCell<Result<zx::Channel, zx::Status>> = OnceCell::new();
+                unsafe { &CHANNEL }
             }
-            return zx::Status::INTERNAL;
+            fposix_socket_raw::ProviderMarker::PROTOCOL_NAME => {
+                static mut CHANNEL: OnceCell<Result<zx::Channel, zx::Status>> = OnceCell::new();
+                unsafe { &CHANNEL }
+            }
+            _ => return Err(zx::Status::INTERNAL),
         }
-
-        zx::Status::OK
+        .get_or_init(|| {
+            let (client, server) = zx::Channel::create();
+            let protocol_path = format!("/svc/{service_name}");
+            fdio::service_connect(&protocol_path, server)?;
+            Ok(client)
+        })
+        .as_ref()
+        .map_err(|status| *status)
     }
 }
 
