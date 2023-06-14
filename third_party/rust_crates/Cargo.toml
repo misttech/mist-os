@@ -341,6 +341,7 @@ windows = { path = "empty/windows" }
 windows-sys = { path = "empty/windows-sys" }
 
 ### Forks: vendored crates whose code doesn't match the upstream version
+async-io = { path = "forks/async-io" }
 fatfs = { path = "forks/fatfs" }
 fuse3 = { path = "forks/fuse3" }
 hound = { path = "forks/hound" }

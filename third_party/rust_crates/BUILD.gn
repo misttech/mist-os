@@ -1528,7 +1528,7 @@ rust_library("async-fs-v1_6_0") {
 
 rust_library("async-io-v1_12_0") {
   crate_name = "async_io"
-  crate_root = "//third_party/rust_crates/vendor/async-io-1.12.0/src/lib.rs"
+  crate_root = "//third_party/rust_crates/forks/async-io/src/lib.rs"
   output_name = "async_io-8cea39e881d5ae1e"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
