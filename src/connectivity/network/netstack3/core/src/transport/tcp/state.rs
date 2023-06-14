@@ -1554,9 +1554,20 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                     simultaneous_open: _,
                     buffer_sizes,
                     smss: _,
-                    rcv_wnd_scale,
+                    rcv_wnd_scale: _,
                     snd_wnd_scale: _,
-                }) => (*irs + 1, buffer_sizes.rwnd(), *rcv_wnd_scale, *iss + 1),
+                }) => {
+                    // RFC 7323 Section 2.2:
+                    //  The window field in a segment where the SYN bit is set
+                    //  (i.e., a <SYN> or <SYN,ACK>) MUST NOT be scaled.
+                    let advertised = buffer_sizes.rwnd_unscaled();
+                    (
+                        *irs + 1,
+                        advertised << WindowScale::default(),
+                        WindowScale::default(),
+                        *iss + 1,
+                    )
+                }
                 State::Established(Established { rcv, snd }) => {
                     (rcv.nxt(), rcv.wnd(), rcv.wnd_scale, snd.nxt)
                 }
@@ -5613,5 +5624,70 @@ mod test {
             assert_matches!(active, State::Established(established) => established);
 
         (established.rcv.wnd_scale, established.snd.wnd_scale)
+    }
+
+    #[test_case(
+        u16::MAX as usize,
+        Segment::syn_ack(
+            ISS_2 + 1 + u16::MAX as usize,
+            ISS_1 + 1,
+            UnscaledWindowSize::from(u16::MAX),
+            Options::default(),
+        )
+    )]
+    #[test_case(
+        u16::MAX as usize + 1,
+        Segment::syn_ack(
+            ISS_2 + 1 + u16::MAX as usize,
+            ISS_1 + 1,
+            UnscaledWindowSize::from(u16::MAX),
+            Options::default(),
+        )
+    )]
+    #[test_case(
+        u16::MAX as usize,
+        Segment::data(
+            ISS_2 + 1 + u16::MAX as usize,
+            ISS_1 + 1,
+            UnscaledWindowSize::from(u16::MAX),
+            &TEST_BYTES[..],
+        )
+    )]
+    #[test_case(
+        u16::MAX as usize + 1,
+        Segment::data(
+            ISS_2 + 1 + u16::MAX as usize,
+            ISS_1 + 1,
+            UnscaledWindowSize::from(u16::MAX),
+            &TEST_BYTES[..],
+        )
+    )]
+    fn window_scale_otw_seq(receive_buf_size: usize, otw_seg: impl Into<Segment<&'static [u8]>>) {
+        let buffer_sizes = BufferSizes { send: 0, receive: receive_buf_size };
+        let rcv_wnd_scale = buffer_sizes.rwnd().scale();
+        let mut syn_rcvd: State<_, RingBuffer, RingBuffer, ()> = State::SynRcvd(SynRcvd {
+            iss: ISS_1,
+            irs: ISS_2,
+            timestamp: None,
+            retrans_timer: RetransTimer::new(
+                FakeInstant::default(),
+                Estimator::RTO_INIT,
+                Duration::from_secs(10),
+                DEFAULT_MAX_SYNACK_RETRIES,
+            ),
+            simultaneous_open: None,
+            buffer_sizes: BufferSizes { send: 0, receive: receive_buf_size },
+            smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+            rcv_wnd_scale,
+            snd_wnd_scale: WindowScale::new(1),
+        });
+
+        assert_eq!(
+            syn_rcvd.on_segment_with_default_options::<_, ClientlessBufferProvider>(
+                otw_seg.into(),
+                FakeInstant::default(),
+            ),
+            (Some(Segment::ack(ISS_1 + 1, ISS_2 + 1, buffer_sizes.rwnd_unscaled())), None),
+        )
     }
 }
