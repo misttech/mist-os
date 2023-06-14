@@ -297,10 +297,12 @@ void ZirconComponentManager::OnComponentEvent(fuchsia::component::Event event) {
         debug_agent_->OnComponentStarted(moniker, event.header().component_url());
       }
       if (event.payload().is_debug_started() && event.payload().debug_started().has_runtime_dir()) {
+        auto& runtime_dir = *event.mutable_payload()->debug_started().mutable_runtime_dir();
+        auto& break_on_start = *event.mutable_payload()->debug_started().mutable_break_on_start();
         ReadElfJobId(
-            std::move(*event.mutable_payload()->debug_started().mutable_runtime_dir()), moniker,
-            [weak_this = weak_factory_.GetWeakPtr(), moniker,
-             url = event.header().component_url()](zx_koid_t job_id) {
+            std::move(runtime_dir), moniker,
+            [weak_this = weak_factory_.GetWeakPtr(), moniker, url = event.header().component_url(),
+             break_on_start = std::move(break_on_start)](zx_koid_t job_id) mutable {
               if (weak_this && job_id != ZX_KOID_INVALID) {
                 weak_this->running_component_info_[job_id] = {.moniker = moniker, .url = url};
                 DEBUG_LOG(Process)
@@ -308,6 +310,9 @@ void ZirconComponentManager::OnComponentEvent(fuchsia::component::Event event) {
                     << " moniker=" << weak_this->running_component_info_[job_id].moniker
                     << " url=" << weak_this->running_component_info_[job_id].url;
               }
+              // Explicitly reset break_on_start to indicate the component manager that processes
+              // can be spawned.
+              break_on_start.reset();
             });
       }
       break;
