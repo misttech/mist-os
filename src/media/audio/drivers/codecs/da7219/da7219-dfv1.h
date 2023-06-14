@@ -40,7 +40,6 @@ class Driver : public Base, public ddk::internal::base_protocol {
   std::unique_ptr<Server> server_;
   std::shared_ptr<Core> core_;
   bool is_input_;
-  Logger logger_;
 };
 
 }  // namespace audio::da7219

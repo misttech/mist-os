@@ -26,6 +26,7 @@ DriverBase::DriverBase(std::string_view name, DriverStartArgs start_args,
     ZX_ASSERT_MSG(logger.is_ok(), "%s", logger.status_string());
     return std::move(logger.value());
   }();
+  Logger::SetGlobalInstance(logger_.get());
   std::optional outgoing_request = std::move(start_args_.outgoing_dir());
   ZX_ASSERT(outgoing_request.has_value());
   InitializeAndServe(std::move(incoming), std::move(outgoing_request.value()));
@@ -38,5 +39,7 @@ void DriverBase::InitializeAndServe(
       std::make_shared<OutgoingDirectory>(OutgoingDirectory::Create(driver_dispatcher_->get()));
   ZX_ASSERT(outgoing_->Serve(std::move(outgoing_directory_request)).is_ok());
 }
+
+DriverBase::~DriverBase() { Logger::SetGlobalInstance(nullptr); }
 
 }  // namespace fdf

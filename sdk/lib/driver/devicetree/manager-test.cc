@@ -145,6 +145,8 @@ class ManagerTest : public gtest::DriverTestLoopFixture {
  public:
   ManagerTest() { ConnectLogger(); }
 
+  ~ManagerTest() { fdf::Logger::SetGlobalInstance(nullptr); }
+
   void ConnectLogger() {
     zx::socket client_end, server_end;
     zx_status_t status = zx::socket::create(ZX_SOCKET_DATAGRAM, &client_end, &server_end);
@@ -160,6 +162,7 @@ class ManagerTest : public gtest::DriverTestLoopFixture {
 
     logger_ = std::make_unique<fdf::Logger>("ManagerTest", 0, std::move(client_end),
                                             fidl::WireClient<fuchsia_logger::LogSink>());
+    fdf::Logger::SetGlobalInstance(logger_.get());
   }
 
   // Load the file |name| into a vector and return it.
@@ -208,14 +211,14 @@ class ManagerTest : public gtest::DriverTestLoopFixture {
             .status_value());
   }
 
-  std::unique_ptr<fdf::Logger> logger_;
   FakePlatformBus pbus_;
   FakeCompositeNodeManager mgr_;
   fidl::SyncClient<fuchsia_driver_framework::Node> node_;
+  std::unique_ptr<fdf::Logger> logger_;
 };
 
 TEST_F(ManagerTest, TestFindsNodes) {
-  Manager manager(LoadTestBlob("/pkg/test-data/simple.dtb"), logger_.get());
+  Manager manager(LoadTestBlob("/pkg/test-data/simple.dtb"));
   ASSERT_EQ(ZX_OK, manager.Discover().status_value());
   ASSERT_EQ(3lu, manager.nodes().size());
 
@@ -233,10 +236,10 @@ TEST_F(ManagerTest, TestFindsNodes) {
 }
 
 TEST_F(ManagerTest, TestPropertyCallback) {
-  Manager manager(LoadTestBlob("/pkg/test-data/simple.dtb"), logger_.get());
+  Manager manager(LoadTestBlob("/pkg/test-data/simple.dtb"));
   class TestVisitor : public Visitor {
    public:
-    explicit TestVisitor(fdf::Logger* logger) : Visitor(logger) {}
+    explicit TestVisitor() : Visitor() {}
     zx::result<> Visit(Node& node) override {
       for (auto& [name, _] : node.properties()) {
         if (node.name() == "example-device") {
@@ -258,13 +261,13 @@ TEST_F(ManagerTest, TestPropertyCallback) {
 
   ASSERT_EQ(ZX_OK, manager.Discover().status_value());
 
-  TestVisitor visitor(logger_.get());
+  TestVisitor visitor;
   ASSERT_EQ(ZX_OK, manager.Walk(visitor).status_value());
   EXPECT_EQ(0lu, visitor.expected.size());
 }
 
 TEST_F(ManagerTest, TestPublishesSimpleNode) {
-  Manager manager(LoadTestBlob("/pkg/test-data/simple.dtb"), logger_.get());
+  Manager manager(LoadTestBlob("/pkg/test-data/simple.dtb"));
   ASSERT_EQ(ZX_OK, manager.Discover().status_value());
 
   manager.DefaultVisit();

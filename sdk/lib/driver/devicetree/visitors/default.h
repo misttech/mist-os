@@ -19,17 +19,17 @@ namespace fdf_devicetree {
 template <typename... Visitors>
 class MultiVisitor : public Visitor {
  public:
-  explicit MultiVisitor(fdf::Logger* logger) : Visitor(logger) { Init<0, Visitors...>(); }
+  explicit MultiVisitor() : Visitor() { Init<0, Visitors...>(); }
   ~MultiVisitor() override = default;
 
   template <int I, typename T, typename... Other>
   constexpr void Init() {
-    visitors_[I] = std::unique_ptr<Visitor>(new T(logger_));
+    visitors_[I] = std::unique_ptr<Visitor>(new T());
     if constexpr (sizeof...(Other) > 1) {
       Init<I + 1, Other...>();
     } else if constexpr (sizeof...(Other) == 1) {
       // We use make_unique here so that it deals with the parameter unpacking.
-      visitors_[I + 1] = std::unique_ptr<Visitor>(std::make_unique<Other...>(logger_).release());
+      visitors_[I + 1] = std::unique_ptr<Visitor>(std::make_unique<Other...>().release());
     }
   }
 

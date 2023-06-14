@@ -23,8 +23,8 @@ namespace audio::da7219 {
 // an input and an output servers.
 class Core {
  public:
-  explicit Core(Logger* logger, fidl::ClientEnd<fuchsia_hardware_i2c::Device> i2c,
-                zx::interrupt irq, async_dispatcher_t* dispatcher);
+  explicit Core(fidl::ClientEnd<fuchsia_hardware_i2c::Device> i2c, zx::interrupt irq,
+                async_dispatcher_t* dispatcher);
   ~Core() = default;
 
   using PlugCallback = fit::function<void(bool)>;
@@ -41,7 +41,6 @@ class Core {
                  const zx_packet_interrupt_t* interrupt);
   void PlugDetected(bool plugged, bool with_mic);
 
-  Logger* logger_;
   fidl::ClientEnd<fuchsia_hardware_i2c::Device> i2c_;
   zx::interrupt irq_;
   async::IrqMethod<Core, &Core::HandleIrq> irq_handler_{this};
@@ -53,7 +52,7 @@ class Core {
 class Server : public fidl::WireServer<fuchsia_hardware_audio::Codec>,
                public fidl::WireServer<fuchsia_hardware_audio_signalprocessing::SignalProcessing> {
  public:
-  explicit Server(Logger* logger, std::shared_ptr<Core> core, bool is_input);
+  explicit Server(std::shared_ptr<Core> core, bool is_input);
   async_dispatcher_t* dispatcher() { return core_->dispatcher(); }
 
  private:
@@ -89,7 +88,6 @@ class Server : public fidl::WireServer<fuchsia_hardware_audio::Codec>,
                        SetElementStateCompleter::Sync& completer) override;
   void SetTopology(SetTopologyRequestView request, SetTopologyCompleter::Sync& completer) override;
 
-  Logger* logger_;
   std::shared_ptr<Core> core_;
   bool is_input_;
   std::optional<fidl::ServerBinding<fuchsia_hardware_audio_signalprocessing::SignalProcessing>>

@@ -20,9 +20,8 @@ using namespace fuchsia_driver_framework;
 
 namespace fdf_devicetree {
 
-Node::Node(const std::string_view name, devicetree::Properties properties, uint32_t id,
-           fdf::Logger *logger)
-    : name_(name), id_(id), logger_(logger) {
+Node::Node(const std::string_view name, devicetree::Properties properties, uint32_t id)
+    : name_(name), id_(id) {
   pbus_node_.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_DEVICETREE;
   pbus_node_.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
   pbus_node_.instance_id() = id;

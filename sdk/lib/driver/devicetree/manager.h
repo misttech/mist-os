@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <lib/devicetree/devicetree.h>
-#include <lib/driver/logging/cpp/logger.h>
+#include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 
@@ -22,13 +22,12 @@ namespace fdf_devicetree {
 
 class Manager {
  public:
-  static zx::result<Manager> CreateFromNamespace(fdf::Namespace& ns, fdf::Logger* logger);
+  static zx::result<Manager> CreateFromNamespace(fdf::Namespace& ns);
 
   // Create a new device tree manager using the given FDT blob.
-  explicit Manager(std::vector<uint8_t> fdt_blob, fdf::Logger* logger)
+  explicit Manager(std::vector<uint8_t> fdt_blob)
       : fdt_blob_(std::move(fdt_blob)),
-        tree_(devicetree::ByteView{fdt_blob_.data(), fdt_blob_.size()}),
-        logger_(logger) {}
+        tree_(devicetree::ByteView{fdt_blob_.data(), fdt_blob_.size()}) {}
 
   // Do the initial walk of the tree.
   zx::result<> Discover();
@@ -56,8 +55,6 @@ class Manager {
  private:
   std::vector<uint8_t> fdt_blob_;
   devicetree::Devicetree tree_;
-
-  fdf::Logger* logger_;
 
   // List of nodes, in the order that they were seen in the tree.
   std::vector<std::unique_ptr<Node>> nodes_publish_order_;

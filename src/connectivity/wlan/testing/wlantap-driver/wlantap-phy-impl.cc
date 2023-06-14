@@ -18,9 +18,8 @@ WlanPhyImplDevice::WlanPhyImplDevice(
     std::shared_ptr<wlan_tap::WlantapPhyConfig> phy_config,
     fidl::ClientEnd<fuchsia_driver_framework::NodeController> phy_controller)
     : driver_context_(std::move(context)),
-      logger_(driver_context_.logger()),
       phy_config_(std::move(phy_config)),
-      wlantap_phy_(std::make_unique<WlantapPhy>(logger_, std::move(user_channel), phy_config_,
+      wlantap_phy_(std::make_unique<WlantapPhy>(std::move(user_channel), phy_config_,
                                                 std::move(phy_controller))) {}
 
 void WlanPhyImplDevice::GetSupportedMacRoles(fdf::Arena& arena,
@@ -141,7 +140,7 @@ zx_status_t WlanPhyImplDevice::CreateWlanSoftmac(wlan_common::WlanMacRole role,
     return endpoints.status_value();
   }
 
-  auto wlantap_mac = std::make_unique<WlantapMac>(logger_, wlantap_phy_.get(), role, phy_config_,
+  auto wlantap_mac = std::make_unique<WlantapMac>(wlantap_phy_.get(), role, phy_config_,
                                                   std::move(mlme_channel));
 
   zx_status_t status = ServeWlanSoftmac(name, std::move(wlantap_mac));

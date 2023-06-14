@@ -16,10 +16,9 @@ constexpr size_t kWlanSoftmacQueryResponseBufferSize = 5120;
 
 namespace wlan {
 
-WlantapMac::WlantapMac(fdf::Logger* logger, Listener* listener, wlan_common::WlanMacRole role,
+WlantapMac::WlantapMac(Listener* listener, wlan_common::WlanMacRole role,
                        std::shared_ptr<wlan_tap::WlantapPhyConfig> config, zx::channel sme_channel)
-    : logger_(logger),
-      listener_(listener),
+    : listener_(listener),
       role_(role),
       phy_config_(std::move(config)),
       sme_channel_(std::move(sme_channel)) {}

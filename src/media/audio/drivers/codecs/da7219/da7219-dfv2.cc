@@ -40,8 +40,7 @@ zx::result<> Driver::Start() {
 
   // There is a core class that implements the core logic and interaction with the hardware, and a
   // Server class that allows the creation of multiple instances (one for input and one for output).
-  core_ = std::make_shared<Core>(logger_.get(), std::move(i2c.value()), std::move(irq.value()),
-                                 dispatcher());
+  core_ = std::make_shared<Core>(std::move(i2c.value()), std::move(irq.value()), dispatcher());
   if (zx_status_t status = core_->Initialize(); status != ZX_OK) {
     DA7219_LOG(ERROR, "Could not initialize: %s", zx_status_get_string(status));
     return zx::error(status);
@@ -74,9 +73,9 @@ zx::result<> Driver::Serve(std::string_view name, bool is_input) {
   // from a client, we allow multiple bindings of ServerConnector but share the instance.
   // ServerConnector limits the actual usage to one client at the time.
   if (is_input) {
-    server_input_ = std::make_shared<ServerConnector>(logger_.get(), core_, true);
+    server_input_ = std::make_shared<ServerConnector>(core_, true);
   } else {
-    server_output_ = std::make_shared<ServerConnector>(logger_.get(), core_, false);
+    server_output_ = std::make_shared<ServerConnector>(core_, false);
   }
   ServerConnector* connector = is_input ? server_input_.get() : server_output_.get();
 

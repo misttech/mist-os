@@ -4,16 +4,8 @@
 
 #include <sdk/lib/driver/compat/cpp/logging.h>
 
-std::atomic<fdf::Logger*> g_logger = nullptr;
-
-void driver_initialize_logger(fdf::Logger* logger) {
-  ZX_DEBUG_ASSERT(g_logger == nullptr || logger == nullptr);
-  g_logger = logger;
-}
-
 bool driver_log_severity_enabled_internal(FuchsiaLogSeverity severity) {
-  ZX_DEBUG_ASSERT(g_logger != nullptr);
-  return g_logger.load()->GetSeverity() <= severity;
+  return fdf::Logger::GlobalInstance()->GetSeverity() <= severity;
 }
 
 void driver_logf_internal(FuchsiaLogSeverity severity, const char* tag, const char* file, int line,
@@ -26,6 +18,5 @@ void driver_logf_internal(FuchsiaLogSeverity severity, const char* tag, const ch
 
 void driver_logvf_internal(FuchsiaLogSeverity severity, const char* tag, const char* file, int line,
                            const char* msg, va_list args) {
-  ZX_DEBUG_ASSERT(g_logger != nullptr);
-  g_logger.load()->logvf(severity, tag, file, line, msg, args);
+  fdf::Logger::GlobalInstance()->logvf(severity, tag, file, line, msg, args);
 }

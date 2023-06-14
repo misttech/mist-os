@@ -11,11 +11,7 @@ namespace audio::da7219 {
 
 // Logger/logger_ are only needed to match DFv2 libraries and share the driver server
 // implementation.
-#define DA7219_LOG            \
-  static_cast<void>(logger_); \
-  zxlogf
-class Logger {};
-
+#define DA7219_LOG zxlogf
 }  // namespace audio::da7219
 
 #endif  // SRC_MEDIA_AUDIO_DRIVERS_CODECS_DA7219_DA7219_LOGGING_DFV1_H_

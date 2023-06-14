@@ -5,7 +5,7 @@
 #ifndef LIB_DRIVER_DEVICETREE_VISITOR_H_
 #define LIB_DRIVER_DEVICETREE_VISITOR_H_
 
-#include <lib/driver/logging/cpp/logger.h>
+#include <lib/zx/result.h>
 
 namespace fdf_devicetree {
 class Node;
@@ -14,14 +14,9 @@ class Node;
 // See |Manager::Walk()| for more information.
 class Visitor {
  public:
-  explicit Visitor(fdf::Logger* logger) : logger_(logger) {}
+  explicit Visitor() = default;
   virtual ~Visitor() = default;
   virtual zx::result<> Visit(Node& node) = 0;
-
- protected:
-  // logger_ is here so visitors can use FDF_LOG/FDF_SLOG macros.
-  // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
-  fdf::Logger* logger_;
 };
 
 }  // namespace fdf_devicetree

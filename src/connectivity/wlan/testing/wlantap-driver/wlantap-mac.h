@@ -37,7 +37,7 @@ class WlantapMac : public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmac> {
     virtual void WlantapMacSetKey(const wlan_softmac::WlanKeyConfiguration& key_config) = 0;
   };
 
-  WlantapMac(fdf::Logger* logger, Listener* listener, wlan_common::WlanMacRole,
+  WlantapMac(Listener* listener, wlan_common::WlanMacRole,
              std::shared_ptr<wlan_tap::WlantapPhyConfig> config, zx::channel sme_channel);
 
   // WlanSoftmac protocol implementation.
@@ -77,7 +77,6 @@ class WlantapMac : public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmac> {
                            UpdateWmmParametersCompleter::Sync& completer) override;
 
  private:
-  fdf::Logger* logger_;
   Listener* listener_;
   wlan_common::WlanMacRole role_;
 

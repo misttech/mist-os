@@ -14,7 +14,8 @@
 
 #define FDF_LOGL(severity, logger, msg...) \
   (logger).logf((FUCHSIA_LOG_##severity), nullptr, __FILE__, __LINE__, msg)
-#define FDF_LOG(severity, msg...) FDF_LOGL(severity, *logger_, msg)
+
+#define FDF_LOG(severity, msg...) FDF_LOGL(severity, *fdf::Logger::GlobalInstance(), msg)
 
 namespace fdf {
 
@@ -31,6 +32,9 @@ class Logger {
   static zx::result<std::unique_ptr<Logger>> Create(
       const Namespace& ns, async_dispatcher_t* dispatcher, std::string_view name,
       FuchsiaLogSeverity min_severity = FUCHSIA_LOG_INFO, bool wait_for_initial_interest = true);
+
+  static Logger* GlobalInstance();
+  static void SetGlobalInstance(Logger*);
 
   Logger(std::string_view name, FuchsiaLogSeverity min_severity, zx::socket socket,
          fidl::WireClient<fuchsia_logger::LogSink> log_sink)

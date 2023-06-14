@@ -18,11 +18,6 @@
 // loaded into the driver host multiple times.
 __BEGIN_CDECLS
 
-// Initialize the global logger. This should be called before any other APIs defined in this file
-// are invoked. Typical usage should be:
-//   driver_initialize_logger(&logger());
-void driver_initialize_logger(fdf::Logger* logger);
-
 // Do not use this function directly, use zxlog_level_enabled() instead.
 bool driver_log_severity_enabled_internal(FuchsiaLogSeverity flag);
 

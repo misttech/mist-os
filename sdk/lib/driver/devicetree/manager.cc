@@ -21,28 +21,27 @@ namespace fdf_devicetree {
 
 constexpr const char kPhandleProp[] = "phandle";
 
-zx::result<Manager> Manager::CreateFromNamespace(fdf::Namespace& ns, fdf::Logger* logger) {
+zx::result<Manager> Manager::CreateFromNamespace(fdf::Namespace& ns) {
   zx::result client_end = ns.Connect<fuchsia_boot::Items>();
   if (client_end.is_error()) {
-    FDF_LOGL(ERROR, *logger, "Failed to connect to fuchsia.boot.Items: %s",
-             client_end.status_string());
+    FDF_LOG(ERROR, "Failed to connect to fuchsia.boot.Items: %s", client_end.status_string());
     return client_end.take_error();
   }
 
   fidl::WireSyncClient client(std::move(client_end.value()));
   fidl::WireResult result = client->Get2(ZBI_TYPE_DEVICETREE, {});
   if (!result.ok()) {
-    FDF_LOGL(ERROR, *logger, "Failed to send get2 request: %s", result.FormatDescription().data());
+    FDF_LOG(ERROR, "Failed to send get2 request: %s", result.FormatDescription().data());
     return zx::error(result.status());
   }
   if (result->is_error()) {
-    FDF_LOGL(ERROR, *logger, "Failed to get2: %s", zx_status_get_string(result->error_value()));
+    FDF_LOG(ERROR, "Failed to get2: %s", zx_status_get_string(result->error_value()));
     return zx::error(result->error_value());
   }
 
   fidl::VectorView items = result->value()->retrieved_items;
   if (items.count() != 1) {
-    FDF_LOGL(ERROR, *logger, "Found wrong number of devicetrees: wanted 1, got %zu", items.count());
+    FDF_LOG(ERROR, "Found wrong number of devicetrees: wanted 1, got %zu", items.count());
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
@@ -52,12 +51,12 @@ zx::result<Manager> Manager::CreateFromNamespace(fdf::Namespace& ns, fdf::Logger
 
   zx_status_t status = dt.payload.read(data.data(), 0, dt.length);
   if (status != ZX_OK) {
-    FDF_LOGL(ERROR, *logger, "Failed to read %u bytes from the devicetree: %s", dt.length,
-             zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to read %u bytes from the devicetree: %s", dt.length,
+            zx_status_get_string(status));
     return zx::error(status);
   }
 
-  return zx::ok(Manager(std::move(data), logger));
+  return zx::ok(Manager(std::move(data)));
 }
 
 zx::result<> Manager::Discover() {
@@ -67,7 +66,7 @@ zx::result<> Manager::Discover() {
 
         // Create a node.
         const devicetree::Properties& properties = decoder.properties();
-        auto node = std::make_unique<Node>(path.back(), properties, node_id_++, logger_);
+        auto node = std::make_unique<Node>(path.back(), properties, node_id_++);
         Node* ptr = node.get();
         nodes_publish_order_.emplace_back(std::move(node));
         FDF_LOG(DEBUG, "Node[%d] - %s added for publishing", node_id_, path.back().data());
@@ -98,7 +97,7 @@ zx::result<> Manager::Walk(Visitor& visitor) {
 }
 
 void Manager::DefaultVisit() {
-  DefaultVisitor visitor(logger_);
+  DefaultVisitor visitor;
   [[maybe_unused]] auto unused = Walk(visitor);
 }
 

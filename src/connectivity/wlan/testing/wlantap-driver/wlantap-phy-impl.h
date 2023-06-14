@@ -48,8 +48,6 @@ class WlanPhyImplDevice : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyIm
 
   WlantapDriverContext driver_context_;
 
-  fdf::Logger* logger_{nullptr};
-
   std::shared_ptr<wlan_tap::WlantapPhyConfig> phy_config_{};
 
   std::string name_{"wlanphyimpl"};

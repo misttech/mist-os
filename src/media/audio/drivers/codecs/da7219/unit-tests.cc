@@ -42,7 +42,7 @@ class Da7219Test : public zxtest::Test {
     zx::interrupt irq2;
     ASSERT_OK(irq_.duplicate(ZX_RIGHT_SAME_RIGHTS, &irq2));
 
-    core_ = std::make_shared<Core>(nullptr, std::move(i2c_endpoints->client), std::move(irq2),
+    core_ = std::make_shared<Core>(std::move(i2c_endpoints->client), std::move(irq2),
                                    loop_driver_.dispatcher());
     ASSERT_OK(core_->Initialize());
 

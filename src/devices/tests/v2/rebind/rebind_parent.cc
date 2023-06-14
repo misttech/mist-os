@@ -23,8 +23,8 @@ const std::string kChildNodeName = "added-child";
 class RebindParentServer : public fidl::Server<fuchsia_rebind_test::RebindParent> {
  public:
   RebindParentServer(async_dispatcher_t* dispatcher,
-                     fidl::ClientEnd<fuchsia_driver_framework::Node> node, fdf::Logger* logger)
-      : node_(std::move(node)), logger_(logger) {}
+                     fidl::ClientEnd<fuchsia_driver_framework::Node> node)
+      : node_(std::move(node)) {}
 
  private:
   void RemoveChild(RemoveChildCompleter::Sync& completer) override {
@@ -73,7 +73,6 @@ class RebindParentServer : public fidl::Server<fuchsia_rebind_test::RebindParent
 
   fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
   std::optional<fidl::WireSyncClient<fuchsia_driver_framework::NodeController>> node_controller_;
-  fdf::Logger* logger_;
 };
 
 class RebindParent : public fdf::DriverBase {
@@ -114,7 +113,7 @@ class RebindParent : public fdf::DriverBase {
       return zx::error(result.status());
     }
     controller_.Bind(std::move(controller_endpoints->client));
-    server_.emplace(dispatcher(), std::move(node_endpoints->client), &logger());
+    server_.emplace(dispatcher(), std::move(node_endpoints->client));
 
     return zx::ok();
   }

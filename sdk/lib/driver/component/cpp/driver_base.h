@@ -79,7 +79,7 @@ class DriverBase {
   DriverBase& operator=(const DriverBase&) = delete;
 
   // The destructor is called right after the |Stop| method.
-  virtual ~DriverBase() = default;
+  virtual ~DriverBase();
 
   // This method will be called by the factory to start the driver. This is when
   // the driver should setup the outgoing directory through `outgoing()->Add...` calls.

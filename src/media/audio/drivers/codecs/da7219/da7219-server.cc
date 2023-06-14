@@ -12,9 +12,9 @@ namespace audio::da7219 {
 
 // Core methods.
 
-Core::Core(Logger* logger, fidl::ClientEnd<fuchsia_hardware_i2c::Device> i2c, zx::interrupt irq,
+Core::Core(fidl::ClientEnd<fuchsia_hardware_i2c::Device> i2c, zx::interrupt irq,
            async_dispatcher_t* dispatcher)
-    : logger_(logger), i2c_(std::move(i2c)), irq_(std::move(irq)), dispatcher_(dispatcher) {
+    : i2c_(std::move(i2c)), irq_(std::move(irq)), dispatcher_(dispatcher) {
   irq_handler_.set_object(irq_.get());
   irq_handler_.Begin(dispatcher_);
 }
@@ -288,8 +288,8 @@ void Core::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_sta
 
 // Server methods.
 
-Server::Server(Logger* logger, std::shared_ptr<Core> core, bool is_input)
-    : logger_(logger), core_(std::move(core)), is_input_(is_input) {
+Server::Server(std::shared_ptr<Core> core, bool is_input)
+    : core_(std::move(core)), is_input_(is_input) {
   core_->AddPlugCallback(is_input_, [this](bool plugged) {
     // Update plug state if we haven't set it yet, or if changed.
     if (!plugged_time_.get() || plugged_ != plugged) {

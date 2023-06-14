@@ -11,6 +11,10 @@ namespace flog = fuchsia_syslog;
 
 namespace fdf {
 
+namespace {
+std::atomic<Logger*> g_instance = nullptr;
+}
+
 zx_koid_t GetKoid(zx_handle_t handle) {
   zx_info_handle_basic_t info;
   zx_status_t status =
@@ -77,6 +81,15 @@ zx::result<std::unique_ptr<Logger>> Logger::Create(const Namespace& ns,
       fit::bind_member(logger.get(), &Logger::OnInterestChange));
 
   return zx::ok(std::move(logger));
+}
+
+Logger* Logger::GlobalInstance() {
+  ZX_DEBUG_ASSERT(g_instance != nullptr);
+  return g_instance.load();
+}
+
+void Logger::SetGlobalInstance(Logger* logger) {
+  g_instance = logger;
 }
 
 Logger::~Logger() = default;

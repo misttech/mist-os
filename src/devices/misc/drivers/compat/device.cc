@@ -410,14 +410,14 @@ zx_status_t Device::Add(device_add_args_t* zx_args, zx_device_t** out) {
 zx_status_t Device::ExportAfterInit() {
   if (zx_status_t status = device_server_.Serve(dispatcher_, &driver()->outgoing());
       status != ZX_OK) {
-    FDF_LOG(INFO, "Device %s failed to add to outgoing directory: %s", topological_path_.c_str(),
-            zx_status_get_string(status));
+    FDF_LOGL(INFO, *logger_, "Device %s failed to add to outgoing directory: %s",
+             topological_path_.c_str(), zx_status_get_string(status));
     return status;
   }
 
   if (zx_status_t status = CreateNode(); status != ZX_OK) {
-    FDF_LOG(ERROR, "Device %s: failed to create node: %s", topological_path_.c_str(),
-            zx_status_get_string(status));
+    FDF_LOGL(ERROR, *logger_, "Device %s: failed to create node: %s", topological_path_.c_str(),
+             zx_status_get_string(status));
     return status;
   }
 
@@ -505,11 +505,11 @@ zx_status_t Device::CreateNode() {
 
   if (!parent_.value()->node_.is_valid()) {
     if (parent_.value()->device_flags_ & DEVICE_ADD_NON_BINDABLE) {
-      FDF_LOG(ERROR, "Cannot add device, as parent '%s' does not have a valid node",
-              (*parent_)->topological_path_.data());
+      FDF_LOGL(ERROR, *logger_, "Cannot add device, as parent '%s' does not have a valid node",
+               (*parent_)->topological_path_.data());
     } else {
-      FDF_LOG(ERROR, "Cannot add device, as parent '%s' is not marked NON_BINDABLE.",
-              (*parent_)->topological_path_.data());
+      FDF_LOGL(ERROR, *logger_, "Cannot add device, as parent '%s' is not marked NON_BINDABLE.",
+               (*parent_)->topological_path_.data());
     }
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -517,8 +517,8 @@ zx_status_t Device::CreateNode() {
   // Set up devfs information.
   {
     if (!devfs_connector_.has_value()) {
-      FDF_LOG(ERROR, "Device %s failed to add to devfs: no devfs_connector",
-              topological_path_.c_str());
+      FDF_LOGL(ERROR, *logger_, "Device %s failed to add to devfs: no devfs_connector",
+               topological_path_.c_str());
       return ZX_ERR_INTERNAL;
     }
 
@@ -528,8 +528,8 @@ zx_status_t Device::CreateNode() {
 
     zx::result connector = devfs_connector_.value().Bind(dispatcher());
     if (connector.is_error()) {
-      FDF_LOG(ERROR, "Device %s failed to create devfs connector: %s", topological_path_.c_str(),
-              connector.status_string());
+      FDF_LOGL(ERROR, *logger_, "Device %s failed to create devfs connector: %s",
+               topological_path_.c_str(), connector.status_string());
       return connector.error_value();
     }
     auto devfs_args =
@@ -543,7 +543,8 @@ zx_status_t Device::CreateNode() {
       zx_status_t status =
           inspect_vmo_file_.value()->vmo().duplicate(ZX_RIGHT_SAME_RIGHTS, &inspect);
       if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to duplicate inspect vmo: %s", zx_status_get_string(status));
+        FDF_LOGL(ERROR, *logger_, "Failed to duplicate inspect vmo: %s",
+                 zx_status_get_string(status));
       } else {
         devfs_args.inspect(std::move(inspect));
       }
@@ -576,18 +577,20 @@ zx_status_t Device::CreateNode() {
             if (auto error = std::get_if<zx_status_t>(&status); error) {
               if (*error == ZX_ERR_PEER_CLOSED) {
                 // This is a warning because it can happen during shutdown.
-                FDF_LOG(WARNING, "%s: Node channel closed while adding device", Name());
+                FDF_LOGL(WARNING, *logger_, "%s: Node channel closed while adding device", Name());
               } else {
-                FDF_LOG(ERROR, "Failed to add device: %s: status: %s", Name(),
-                        zx_status_get_string(*error));
+                FDF_LOGL(ERROR, *logger_, "Failed to add device: %s: status: %s", Name(),
+                         zx_status_get_string(*error));
               }
             } else if (auto error = std::get_if<fdf::NodeError>(&status); error) {
               if (*error == fdf::NodeError::kNodeRemoved) {
                 // This is a warning because it can happen if the parent driver is unbound while we
                 // are still setting up.
-                FDF_LOG(WARNING, "Failed to add device '%s' while parent was removed", Name());
+                FDF_LOGL(WARNING, *logger_, "Failed to add device '%s' while parent was removed",
+                         Name());
               } else {
-                FDF_LOG(ERROR, "Failed to add device: NodeError: '%s': %u", Name(), *error);
+                FDF_LOGL(ERROR, *logger_, "Failed to add device: NodeError: '%s': %u", Name(),
+                         *error);
               }
             }
           })
@@ -656,7 +659,8 @@ fpromise::promise<void> Device::Remove() {
   // to the protocol, because that means we are already in the process
   // of shutting down.
   if (!result.ok() && !result.is_canceled()) {
-    FDF_LOG(ERROR, "Failed to remove device '%s': %s", Name(), result.FormatDescription().data());
+    FDF_LOGL(ERROR, *logger_, "Failed to remove device '%s': %s", Name(),
+             result.FormatDescription().data());
   }
   return finished_bridge.consumer.promise();
 }
@@ -743,7 +747,7 @@ zx_status_t Device::GetProtocol(uint32_t proto_id, void* out) const {
 
 zx_status_t Device::GetFragmentProtocol(const char* fragment, uint32_t proto_id, void* out) {
   if (driver() == nullptr) {
-    FDF_LOG(ERROR, "Driver is null");
+    FDF_LOGL(ERROR, *logger_, "Driver is null");
     return ZX_ERR_BAD_STATE;
   }
 
@@ -800,8 +804,8 @@ void Device::InitReply(zx_status_t status) {
             // exported.
             status = ExportAfterInit();
             if (status != ZX_OK) {
-              FDF_LOG(ERROR, "Device %s failed to create node: %s", topological_path_.c_str(),
-                      zx_status_get_string(status));
+              FDF_LOGL(ERROR, *logger_, "Device %s failed to create node: %s",
+                       topological_path_.c_str(), zx_status_get_string(status));
             }
           }
 
@@ -863,8 +867,9 @@ zx_status_t Device::ConnectFragmentFidl(const char* fragment_name, const char* s
       }
     }
     if (!fragment_exists) {
-      FDF_LOG(ERROR, "Tried to connect to fragment '%s' but it's not in the fragment list",
-              fragment_name);
+      FDF_LOGL(ERROR, *logger_,
+               "Tried to connect to fragment '%s' but it's not in the fragment list",
+               fragment_name);
       return ZX_ERR_NOT_FOUND;
     }
   }
@@ -875,7 +880,7 @@ zx_status_t Device::ConnectFragmentFidl(const char* fragment_name, const char* s
   auto result = component::internal::ConnectAtRaw(driver_->driver_namespace().svc_dir(),
                                                   std::move(request), protocol_path.c_str());
   if (result.is_error()) {
-    FDF_LOG(ERROR, "Error connecting: %s", result.status_string());
+    FDF_LOGL(ERROR, *logger_, "Error connecting: %s", result.status_string());
     return result.status_value();
   }
 
@@ -886,26 +891,27 @@ zx_status_t Device::AddComposite(const char* name, const composite_device_desc_t
   auto creator =
       driver_->driver_namespace().Connect<fuchsia_device_composite::DeprecatedCompositeCreator>();
   if (creator.status_value() != ZX_OK) {
-    FDF_LOG(ERROR, "Error connecting: %s", creator.status_string());
+    FDF_LOGL(ERROR, *logger_, "Error connecting: %s", creator.status_string());
     return creator.status_value();
   }
 
   fidl::Arena allocator;
   auto composite = CreateComposite(allocator, comp_desc);
   if (composite.is_error()) {
-    FDF_LOG(ERROR, "Error creating composite: %s", composite.status_string());
+    FDF_LOGL(ERROR, *logger_, "Error creating composite: %s", composite.status_string());
     return composite.error_value();
   }
 
   // TODO(fxb/111891): Support metadata for AddComposite().
   if (comp_desc->metadata_count > 0) {
-    FDF_LOG(WARNING, "AddComposite() currently doesn't support metadata. See fxb/111891.");
+    FDF_LOGL(WARNING, *logger_,
+             "AddComposite() currently doesn't support metadata. See fxb/111891.");
   }
 
   auto result = fidl::WireCall(*creator)->AddCompositeDevice(fidl::StringView::FromExternal(name),
                                                              std::move(composite.value()));
   if (result.status() != ZX_OK) {
-    FDF_LOG(ERROR, "Error calling connect fidl: %s", result.status_string());
+    FDF_LOGL(ERROR, *logger_, "Error calling connect fidl: %s", result.status_string());
     return result.status();
   }
 
@@ -928,7 +934,7 @@ zx_status_t Device::AddCompositeNodeSpec(const char* name, const composite_node_
   auto composite_node_manager =
       driver_->driver_namespace().Connect<fuchsia_driver_framework::CompositeNodeManager>();
   if (composite_node_manager.is_error()) {
-    FDF_LOG(ERROR, "Error connecting: %s", composite_node_manager.status_string());
+    FDF_LOGL(ERROR, *logger_, "Error connecting: %s", composite_node_manager.status_string());
     return composite_node_manager.status_value();
   }
 
@@ -944,7 +950,8 @@ zx_status_t Device::AddCompositeNodeSpec(const char* name, const composite_node_
 
   // TODO(fxb/111891): Support metadata for AddCompositeNodeSpec().
   if (spec->metadata_count > 0) {
-    FDF_LOG(WARNING, "AddCompositeNodeSpec() currently doesn't support metadata. See fxb/111891.");
+    FDF_LOGL(WARNING, *logger_,
+             "AddCompositeNodeSpec() currently doesn't support metadata. See fxb/111891.");
   }
 
   auto fidl_spec = fdf::wire::CompositeNodeSpec::Builder(allocator)
@@ -954,7 +961,7 @@ zx_status_t Device::AddCompositeNodeSpec(const char* name, const composite_node_
 
   auto result = fidl::WireCall(*composite_node_manager)->AddSpec(std::move(fidl_spec));
   if (result.status() != ZX_OK) {
-    FDF_LOG(ERROR, "Error calling connect fidl: %s", result.status_string());
+    FDF_LOGL(ERROR, *logger_, "Error calling connect fidl: %s", result.status_string());
     return result.status();
   }
 
@@ -980,7 +987,7 @@ zx_status_t Device::ServeInspectVmo(zx::vmo inspect_vmo) {
   uint64_t size;
   zx_status_t status = inspect_vmo.get_size(&size);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to vmo size: %s", zx_status_get_string(status));
+    FDF_LOGL(ERROR, *logger_, "Failed to vmo size: %s", zx_status_get_string(status));
     return status;
   }
   inspect_vmo_file_.emplace(fbl::MakeRefCounted<fs::VmoFile>(std::move(inspect_vmo), size));
@@ -990,14 +997,14 @@ zx_status_t Device::ServeInspectVmo(zx::vmo inspect_vmo) {
   status =
       driver()->diagnostics_dir().AddEntry(inspect_filename.c_str(), inspect_vmo_file_.value());
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to add inspect vmo: %s", zx_status_get_string(status));
+    FDF_LOGL(ERROR, *logger_, "Failed to add inspect vmo: %s", zx_status_get_string(status));
     return status;
   }
   return ZX_OK;
 }
 
 void Device::LogError(const char* error) {
-  FDF_LOG(ERROR, "%s: %s", topological_path_.c_str(), error);
+  FDF_LOGL(ERROR, *logger_, "%s: %s", topological_path_.c_str(), error);
 }
 bool Device::IsUnbound() { return pending_removal_; }
 

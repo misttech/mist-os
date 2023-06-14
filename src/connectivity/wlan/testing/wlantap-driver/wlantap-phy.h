@@ -23,7 +23,7 @@ namespace wlan {
 class WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>,
                    public WlantapMac::Listener {
  public:
-  WlantapPhy(fdf::Logger* logger, zx::channel user_channel,
+  WlantapPhy(zx::channel user_channel,
              std::shared_ptr<wlan_tap::WlantapPhyConfig> phy_config,
              fidl::ClientEnd<fuchsia_driver_framework::NodeController> phy_controller);
 
@@ -51,7 +51,6 @@ class WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>,
   std::string name_;
   fidl::ServerBindingRef<fuchsia_wlan_tap::WlantapPhy> user_binding_;
   size_t report_tx_status_count_ = 0;
-  fdf::Logger* logger_;
   fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmacIfc> wlan_softmac_ifc_client_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> phy_controller_;
 };

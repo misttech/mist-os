@@ -22,7 +22,7 @@ void Driver::Connect(ConnectRequestView request, ConnectCompleter::Sync& complet
     completer.Close(ZX_ERR_NO_RESOURCES);  // Only allow one connection.
     return;
   }
-  server_ = std::make_unique<Server>(nullptr, core_, is_input_);
+  server_ = std::make_unique<Server>(core_, is_input_);
   auto on_unbound = [this](fidl::WireServer<fuchsia_hardware_audio::Codec>*, fidl::UnbindInfo info,
                            fidl::ServerEnd<fuchsia_hardware_audio::Codec> server_end) {
     if (info.is_peer_closed()) {
@@ -74,7 +74,7 @@ zx_status_t Driver::Bind(void* ctx, zx_device_t* parent) {
   // via multiple DdkAdd invocations.
   // logger is null since it is only used with DFv2.
   async_dispatcher_t* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
-  auto core = std::make_shared<Core>(nullptr, std::move(i2c_endpoints->client),
+  auto core = std::make_shared<Core>(std::move(i2c_endpoints->client),
                                      std::move(result.value().value()->irq), dispatcher);
   status = core->Initialize();
   if (status != ZX_OK) {

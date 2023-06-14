@@ -23,16 +23,15 @@ namespace audio::da7219 {
 // allows binding the server directly via BindServer.
 class ServerConnector : public fidl::WireServer<fuchsia_hardware_audio::CodecConnector> {
  public:
-  explicit ServerConnector(Logger* logger, std::shared_ptr<Core> core, bool is_input)
-      : logger_(logger),
-        core_(core),
+  explicit ServerConnector(std::shared_ptr<Core> core, bool is_input)
+      : core_(core),
         is_input_(is_input),
         devfs_connector_(fit::bind_member<&ServerConnector::BindConnector>(this)) {}
 
   // Bind the trampoline server.
   void BindConnector(fidl::ServerEnd<fuchsia_hardware_audio::CodecConnector> server) {
-    auto on_unbound = [this](ServerConnector*, fidl::UnbindInfo info,
-                             fidl::ServerEnd<fuchsia_hardware_audio::CodecConnector> server_end) {
+    auto on_unbound = [](ServerConnector*, fidl::UnbindInfo info,
+                         fidl::ServerEnd<fuchsia_hardware_audio::CodecConnector> server_end) {
       if (info.is_peer_closed()) {
         DA7219_LOG(DEBUG, "Client disconnected");
       } else if (!info.is_user_initiated() && info.status() != ZX_ERR_CANCELED) {
@@ -97,7 +96,7 @@ class ServerConnector : public fidl::WireServer<fuchsia_hardware_audio::CodecCon
       }
       server_.reset();  // Allow re-connecting after unbind.
     };
-    server_ = std::make_unique<Server>(logger_, core_, is_input_);
+    server_ = std::make_unique<Server>(core_, is_input_);
     fidl::BindServer(core_->dispatcher(), std::move(request), server_.get(), std::move(on_unbound));
   }
 
@@ -111,7 +110,6 @@ class ServerConnector : public fidl::WireServer<fuchsia_hardware_audio::CodecCon
     BindServer(std::move(request->codec_protocol));
   }
 
-  Logger* logger_;
   std::shared_ptr<Core> core_;
   bool is_input_;
   std::unique_ptr<Server> server_;

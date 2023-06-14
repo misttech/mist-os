@@ -60,7 +60,7 @@ wlan_tap::TxArgs ToTxArgs(const wlan_softmac::WlanTxPacket pkt) {
 
 }  // namespace
 
-WlantapPhy::WlantapPhy(fdf::Logger* logger, zx::channel user_channel,
+WlantapPhy::WlantapPhy(zx::channel user_channel,
                        std::shared_ptr<wlan_tap::WlantapPhyConfig> phy_config,
                        fidl::ClientEnd<fuchsia_driver_framework::NodeController> phy_controller)
     : phy_config_(std::move(phy_config)),
@@ -68,7 +68,6 @@ WlantapPhy::WlantapPhy(fdf::Logger* logger, zx::channel user_channel,
       user_binding_(fidl::BindServer(
           fdf::Dispatcher::GetCurrent()->async_dispatcher(),
           fidl::ServerEnd<fuchsia_wlan_tap::WlantapPhy>(std::move(user_channel)), this)),
-      logger_(logger),
       phy_controller_(std::move(phy_controller)) {}
 
 zx_status_t WlantapPhy::SetCountry(wlan_tap::SetCountryArgs args) {
@@ -116,8 +115,8 @@ void WlantapPhy::Rx(RxRequestView request, RxCompleter::Sync& completer) {
   wlan_softmac::WlanRxPacket rx_packet = {.mac_frame = request->data, .info = converted_info};
   auto arena = fdf::Arena::Create(0, 0);
   wlan_softmac_ifc_client_.buffer(*arena)->Recv(rx_packet).ThenExactlyOnce(
-      [completer = completer.ToAsync(),
-       this](fdf::WireUnownedResult<fuchsia_wlan_softmac::WlanSoftmacIfc::Recv>& result) {
+      [completer = completer.ToAsync()](
+          fdf::WireUnownedResult<fuchsia_wlan_softmac::WlanSoftmacIfc::Recv>& result) {
         FDF_LOG(INFO, "Recv completed");
       });
   FDF_LOG(DEBUG, "%s: Rx done", name_.c_str());
@@ -173,8 +172,8 @@ void WlantapPhy::ScanComplete(ScanCompleteRequestView request,
   wlan_softmac_ifc_client_.buffer(*arena)
       ->NotifyScanComplete(scan_complete_req)
       .ThenExactlyOnce(
-          [this](fdf::WireUnownedResult<fuchsia_wlan_softmac::WlanSoftmacIfc::NotifyScanComplete>&
-                     result) {
+          [](fdf::WireUnownedResult<fuchsia_wlan_softmac::WlanSoftmacIfc::NotifyScanComplete>&
+                 result) {
             if (!result.ok()) {
               FDF_LOG(ERROR, "Failed to send scan complete notification up. Status: %s",
                       zx_status_get_string(result.status()));

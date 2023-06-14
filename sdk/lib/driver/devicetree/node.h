@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <lib/devicetree/devicetree.h>
-#include <lib/driver/logging/cpp/logger.h>
 
 #include <string_view>
 #include <utility>
@@ -18,8 +17,7 @@ namespace fdf_devicetree {
 // Node represents the nodes in the device tree along with it's properties.
 class Node {
  public:
-  explicit Node(std::string_view name, devicetree::Properties properties, uint32_t id,
-                fdf::Logger* logger);
+  explicit Node(std::string_view name, devicetree::Properties properties, uint32_t id);
 
   // Add |prop| as a bind property of the device, when it is eventually published.
   void AddBindProperty(fuchsia_driver_framework::NodeProperty prop);
@@ -51,8 +49,6 @@ class Node {
   // This is a unique ID we use to match our device group with the correct
   // platform bus node. It is generated at runtime and not stable across boots.
   uint32_t id_;
-
-  fdf::Logger* logger_;
 };
 
 }  // namespace fdf_devicetree
