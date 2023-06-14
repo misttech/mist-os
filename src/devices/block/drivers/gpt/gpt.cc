@@ -19,17 +19,21 @@
 #include <sys/param.h>
 #include <threads.h>
 #include <zircon/assert.h>
+#include <zircon/compiler.h>
 #include <zircon/syscalls.h>
 
 #include <algorithm>
 #include <memory>
+#include <mutex>
 
 #include <bind/fuchsia/block/cpp/bind.h>
 #include <bind/fuchsia/gpt/cpp/bind.h>
 #include <fbl/alloc_checker.h>
+#include <safemath/checked_math.h>
 
 #include "lib/ddk/driver.h"
 #include "src/devices/block/lib/common/include/common.h"
+#include "src/lib/storage/block_client/cpp/block_device.h"
 #include "zircon/errors.h"
 #include "zircon/status.h"
 
@@ -79,15 +83,6 @@ bool ignore_device(const fidl::VectorView<fuchsia_hardware_gpt_metadata::wire::P
   }
   return false;
 }
-
-class PlaceholderDevice;
-using PlaceholderDeviceType = ddk::Device<PlaceholderDevice>;
-
-class PlaceholderDevice : public PlaceholderDeviceType {
- public:
-  explicit PlaceholderDevice(zx_device_t* parent) : PlaceholderDeviceType(parent) {}
-  void DdkRelease() { delete this; }
-};
 
 }  // namespace
 
@@ -204,44 +199,205 @@ zx_status_t PartitionDevice::Add(uint32_t partition_number, bool ignore_device) 
   return status;
 }
 
-void gpt_read_sync_complete(void* cookie, zx_status_t status, block_op_t* bop) {
-  // Pass 32bit status back to caller via 32bit command field
-  // Saves from needing custom structs, etc.
-  bop->command.flags = status;
-  sync_completion_signal(static_cast<sync_completion_t*>(cookie));
+// A thin wrapper around BlockDevice, implemented via block_impl_protocol_t.
+// Allows compatibility with GptDevice.
+class BlockClient : public block_client::BlockDevice {
+ public:
+  explicit BlockClient(const block_impl_protocol_t& protocol) {
+    protocol_ = protocol;
+    block_info_t info;
+    protocol_.ops->query(protocol_.ctx, &info, &block_op_size_);
+    ZX_ASSERT(block_op_size_ > 0);
+  }
+
+  // BlockDevice interface
+  zx::result<std::string> GetDevicePath() const override { return zx::error(ZX_ERR_NOT_SUPPORTED); }
+
+  fidl::UnownedClientEnd<fuchsia_device::Controller> Controller() const override {
+    ZX_ASSERT(false);
+  }
+
+  zx_status_t VolumeGetInfo(
+      fuchsia_hardware_block_volume::wire::VolumeManagerInfo* out_manager_info,
+      fuchsia_hardware_block_volume::wire::VolumeInfo* out_volume_info) const override {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  zx_status_t VolumeQuerySlices(const uint64_t* slices, size_t slices_count,
+                                fuchsia_hardware_block_volume::wire::VsliceRange* out_ranges,
+                                size_t* out_ranges_count) const override {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  zx_status_t VolumeExtend(uint64_t offset, uint64_t length) override {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  zx_status_t VolumeShrink(uint64_t offset, uint64_t length) override {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  zx_status_t FifoTransaction(block_fifo_request_t* requests, size_t count) override {
+    ZX_ASSERT_MSG(count == 1, "Only single-length txns supported");
+    auto buf = std::make_unique<uint8_t[]>(block_op_size_);
+    auto bop = reinterpret_cast<block_op_t*>(buf.get());
+    {
+      std::lock_guard guard(lock_);
+      const auto& it = vmos_.find(requests->vmoid);
+      if (it == vmos_.end()) {
+        return ZX_ERR_INVALID_ARGS;
+      }
+
+      bop->command.opcode = requests->command.opcode;
+      bop->rw.vmo = it->second;
+      bop->rw.length = requests->length;
+      bop->rw.offset_dev = requests->dev_offset;
+      bop->rw.offset_vmo = requests->vmo_offset;
+    }
+
+    struct Context {
+      sync_completion_t completion;
+      zx_status_t status;
+    } context;
+    block_impl_queue(
+        &protocol_, bop,
+        [](void* cookie, zx_status_t status, block_op_t* bop) {
+          Context* context = static_cast<Context*>(cookie);
+          context->status = status;
+          sync_completion_signal(&context->completion);
+        },
+        &context);
+    sync_completion_wait(&context.completion, ZX_TIME_INFINITE);
+    if (context.status != ZX_OK) {
+      zxlogf(ERROR, "gpt: error while interacting with GPT: %s",
+             zx_status_get_string(context.status));
+      return context.status;
+    }
+    return ZX_OK;
+  }
+
+  zx_status_t BlockGetInfo(fuchsia_hardware_block::wire::BlockInfo* out_info) const override {
+    block_info_t info;
+    uint64_t block_op_size;
+    protocol_.ops->query(protocol_.ctx, &info, &block_op_size);
+    out_info->block_size = info.block_size;
+    out_info->block_count = info.block_count;
+    out_info->max_transfer_size = info.max_transfer_size;
+    auto flags = fuchsia_hardware_block::Flag::TryFrom(info.flags);
+    if (!flags.has_value()) {
+      zxlogf(ERROR, "Bad flags from underlying block device: %u", info.flags);
+      return ZX_ERR_IO;
+    }
+    out_info->flags = *flags;
+    return ZX_OK;
+  }
+
+  zx_status_t BlockAttachVmo(const zx::vmo& vmo, storage::Vmoid* out_vmoid) final {
+    std::lock_guard guard(lock_);
+    vmoid_t vmoid = next_vmoid_;
+    next_vmoid_ += 1;
+    if (next_vmoid_ == VMOID_INVALID) {
+      // Skip VMOID_INVALID, which occurs on wrap.
+      ++next_vmoid_;
+    }
+    if (auto it = vmos_.emplace(vmoid, vmo.get()); !it.second) {
+      zxlogf(ERROR, "Reused vmoid %u", vmoid);
+      return ZX_ERR_NO_RESOURCES;
+    }
+    *out_vmoid = storage::Vmoid(vmoid);
+    return ZX_OK;
+  }
+
+  zx_status_t BlockDetachVmo(storage::Vmoid vmoid) final {
+    std::lock_guard guard(lock_);
+    if (auto erased = vmos_.erase(vmoid.TakeId()); erased != 1) {
+      return ZX_ERR_BAD_HANDLE;
+    }
+    return ZX_OK;
+  }
+
+ private:
+  block_impl_protocol_t protocol_;
+  size_t block_op_size_;
+  std::mutex lock_;
+  std::map<vmoid_t, zx_handle_t> vmos_ __TA_GUARDED(lock_);
+  vmoid_t next_vmoid_ __TA_GUARDED(lock_) = 1;
+};
+
+void PartitionManager::DdkRelease() { delete this; }
+
+zx_status_t PartitionManager::Load() {
+  block_info_t block_info;
+  size_t block_op_size;
+  block_protocol_.ops->query(block_protocol_.ctx, &block_info, &block_op_size);
+
+  uint32_t num_partitions = 0;
+  for (uint32_t partition = 0; partition < gpt_->EntryCount(); ++partition) {
+    zx::result p = gpt_->GetPartition(partition);
+    if (!p.is_ok()) {
+      continue;
+    }
+    if (zx_status_t status = AddPartition(block_info, block_op_size, partition); status != ZX_OK) {
+      if (status == ZX_ERR_NEXT) {
+        continue;
+      }
+      return status;
+    }
+    ++num_partitions;
+  }
+  zxlogf(INFO, "gpt: Loaded %u partitions", num_partitions);
+
+  return ZX_OK;
 }
 
-zx_status_t ReadBlocks(block_impl_protocol_t* block_protocol, size_t block_op_size,
-                       const block_info_t& block_info, uint32_t block_count, uint64_t block_offset,
-                       uint8_t* out_buffer) {
-  zx_status_t status;
-  sync_completion_t completion;
-  std::unique_ptr<uint8_t[]> bop_buffer(new uint8_t[block_op_size]);
-  block_op_t* bop = reinterpret_cast<block_op_t*>(bop_buffer.get());
-  zx::vmo vmo;
-  size_t vmo_size = static_cast<size_t>(block_count) * block_info.block_size;
-  if ((status = zx::vmo::create(vmo_size, 0, &vmo)) != ZX_OK) {
-    zxlogf(ERROR, "gpt: VMO create failed(%d)", status);
+zx_status_t PartitionManager::AddPartition(block_info_t block_info, size_t block_op_size,
+                                           uint32_t partition_index) {
+  zx::result p = gpt_->GetPartition(partition_index);
+  if (p.is_error()) {
+    return p.status_value();
+  }
+  gpt_partition_t* entry = p.value();
+
+  auto result = ValidateEntry(entry);
+  ZX_DEBUG_ASSERT(result.is_ok());
+  ZX_DEBUG_ASSERT(result.value() == true);
+
+  auto device = std::make_unique<PartitionDevice>(parent(), block_protocol_);
+
+  char partition_guid[GPT_GUID_STRLEN] = {};
+  uint8_to_guid_string(partition_guid, entry->guid);
+
+  char partition_name[kMaxUtf8NameLen] = {};
+  if (GetPartitionName(*entry, partition_name, sizeof(partition_name)).is_error()) {
+    zxlogf(ERROR, "gpt: bad partition name, ignoring entry");
+    return ZX_ERR_NEXT;
+  }
+  bool ignore = false;
+  if (metadata_ && (*metadata_)->has_partition_info()) {
+    apply_guid_map((*metadata_)->partition_info(), partition_name, entry->type);
+    ignore = ignore_device((*metadata_)->partition_info(), partition_name);
+  }
+
+  char type_guid[GPT_GUID_STRLEN] = {};
+  uint8_to_guid_string(type_guid, entry->type);
+  zxlogf(TRACE,
+         "gpt: partition=%u type=%s guid=%s name=%s first=0x%" PRIx64 " last=0x%" PRIx64 "\n",
+         partition_index, type_guid, partition_guid, partition_name, entry->first, entry->last);
+
+  block_info.block_count = entry->last - entry->first + 1;
+  device->SetInfo(entry, &block_info, block_op_size);
+
+  // It would be nicer if we made these devices children of the PartitionManager (i.e. "gpt"
+  // device), instead, they are siblings.  Fixing this will require updating a bunch of hard-coded
+  // topological paths.
+  if (zx_status_t status = device->Add(partition_index, ignore); status != ZX_OK) {
     return status;
   }
-
-  bop->command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
-  bop->rw.vmo = vmo.get();
-  bop->rw.length = block_count;
-  bop->rw.offset_dev = block_offset;
-  bop->rw.offset_vmo = 0;
-
-  block_protocol->ops->queue(block_protocol->ctx, bop, gpt_read_sync_complete, &completion);
-  sync_completion_wait(&completion, ZX_TIME_INFINITE);
-  if (bop->command.flags != ZX_OK) {
-    zxlogf(ERROR, "gpt: error %d reading GPT", bop->command.flags);
-    return static_cast<zx_status_t>(bop->command.flags);
-  }
-
-  return vmo.read(out_buffer, 0, vmo_size);
+  [[maybe_unused]] auto ptr = device.release();
+  return ZX_OK;
 }
 
-zx_status_t Bind(void* ctx, zx_device_t* parent) {
+zx_status_t PartitionManager::Bind(void* ctx, zx_device_t* parent) {
   auto metadata = ddk::GetEncodedMetadata<fuchsia_hardware_gpt_metadata::wire::GptInfo>(
       parent, DEVICE_METADATA_GPT_INFO);
   if (!metadata.is_ok() && metadata.status_value() != ZX_ERR_NOT_FOUND) {
@@ -283,11 +439,6 @@ zx_status_t Bind(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_SPACE;
   }
 
-  uint32_t gpt_block_count = static_cast<uint32_t>(result.value());
-  size_t gpt_buffer_size = static_cast<size_t>(gpt_block_count) * block_info.block_size;
-  std::unique_ptr<uint8_t[]> buffer(new uint8_t[gpt_buffer_size]);
-  std::unique_ptr<GptDevice> gpt;
-
   // sanity check the default txn size with the block size
   if ((kMaxPartitionTableSize % block_info.block_size) ||
       (kMaxPartitionTableSize < block_info.block_size)) {
@@ -296,89 +447,130 @@ zx_status_t Bind(void* ctx, zx_device_t* parent) {
     return ZX_ERR_BAD_STATE;
   }
 
-  zx_status_t status =
-      ReadBlocks(&block_protocol, block_op_size, block_info, gpt_block_count, 1, buffer.get());
+  auto client = std::make_unique<BlockClient>(block_protocol);
+  std::unique_ptr<GptDevice> gpt;
+  zx_status_t status = GptDevice::CreateNoController(std::move(client), block_info.block_size,
+                                                     block_info.block_count, &gpt);
   if (status != ZX_OK) {
-    return status;
-  }
-
-  if ((status = GptDevice::Load(buffer.get(), gpt_buffer_size, block_info.block_size,
-                                block_info.block_count, &gpt)) != ZX_OK) {
     zxlogf(ERROR, "gpt: failed to load gpt- %s", HeaderStatusToCString(status));
     return status;
   }
 
   zxlogf(TRACE, "gpt: found gpt header");
 
-  bool has_partition = false;
-  unsigned int partitions;
-  for (partitions = 0; partitions < gpt->EntryCount(); partitions++) {
-    zx::result<gpt_partition_t*> p = gpt->GetPartition(partitions);
-    if (!p.is_ok()) {
-      continue;
-    }
-    gpt_partition_t* entry = p.value();
-    has_partition = true;
-
-    auto result = ValidateEntry(entry);
-    ZX_DEBUG_ASSERT(result.is_ok());
-    ZX_DEBUG_ASSERT(result.value() == true);
-
-    fbl::AllocChecker ac;
-    std::unique_ptr<PartitionDevice> device(new (&ac) PartitionDevice(parent, &block_protocol));
-    if (!ac.check()) {
-      zxlogf(ERROR, "gpt: out of memory");
-      return ZX_ERR_NO_MEMORY;
-    }
-
-    char partition_guid[GPT_GUID_STRLEN] = {};
-    uint8_to_guid_string(partition_guid, entry->guid);
-
-    char partition_name[kMaxUtf8NameLen] = {};
-    if (GetPartitionName(*entry, partition_name, sizeof(partition_name)).is_error()) {
-      zxlogf(ERROR, "gpt: bad partition name, ignoring entry");
-      continue;
-    }
-    bool ignore = false;
-    if (metadata.is_ok() && metadata->has_partition_info()) {
-      apply_guid_map(metadata->partition_info(), partition_name, entry->type);
-      ignore = ignore_device(metadata->partition_info(), partition_name);
-    }
-
-    char type_guid[GPT_GUID_STRLEN] = {};
-    uint8_to_guid_string(type_guid, entry->type);
-    zxlogf(TRACE,
-           "gpt: partition=%u type=%s guid=%s name=%s first=0x%" PRIx64 " last=0x%" PRIx64 "\n",
-           partitions, type_guid, partition_guid, partition_name, entry->first, entry->last);
-
-    block_info.block_count = entry->last - entry->first + 1;
-    device->SetInfo(entry, &block_info, block_op_size);
-
-    if ((status = device->Add(partitions, ignore)) != ZX_OK) {
+  std::optional<ddk::DecodedMetadata<fuchsia_hardware_gpt_metadata::wire::GptInfo>> metadata_opt;
+  if (metadata.is_ok()) {
+    metadata_opt = std::move(*metadata);
+  }
+  auto manager = std::make_unique<PartitionManager>(std::move(gpt), std::move(metadata_opt),
+                                                    std::move(block_protocol), parent);
+  if (status = manager->DdkAdd(ddk::DeviceAddArgs("gpt").set_flags(DEVICE_ADD_NON_BINDABLE));
+      status != ZX_OK) {
+    zxlogf(ERROR, "gpt: failed to DdkAdd: %s", zx_status_get_string(status));
+    return status;
+  }
+  {
+    std::lock_guard guard(manager->lock_);
+    if (status = manager->Load(); status != ZX_OK) {
+      zxlogf(ERROR, "gpt: failed to load partition tables: %s", zx_status_get_string(status));
       return status;
     }
-    device.release();
   }
-
-  if (!has_partition) {
-    auto placeholder = std::make_unique<PlaceholderDevice>(parent);
-    status = placeholder->DdkAdd("placeholder", DEVICE_ADD_NON_BINDABLE);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "gpt: failed to add placeholder %s", zx_status_get_string(status));
-      return status;
-    }
-    // Placeholder is managed by ddk.
-    [[maybe_unused]] auto p = placeholder.release();
-    return ZX_OK;
-  }
-
+  // The PartitionManager object is owned by the DDK, now that it has been
+  // added. It will be deleted when the device is released.
+  [[maybe_unused]] auto ptr = manager.release();
   return ZX_OK;
+}
+
+void PartitionManager::GetInfoLocked(fuchsia_hardware_block_volume::wire::VolumeManagerInfo* info) {
+  info->slice_count = gpt_->TotalBlockCount();
+  info->slice_size = gpt_->BlockSize();
+  info->assigned_slice_count = 0;
+  info->maximum_slice_count = 0;
+  info->max_virtual_slice = 0;
+}
+
+zx::result<uint32_t> PartitionManager::AllocatePartitionLocked(
+    uint64_t slice_count, const fuchsia_hardware_block_partition::wire::Guid& type,
+    const fuchsia_hardware_block_partition::wire::Guid& instance, fidl::StringView name) {
+  uint64_t offset;
+  zx_status_t status = gpt_->FindFreeRange(slice_count, &offset);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  std::string name_str(name.cbegin(), name.cend());
+  zx::result partition_index = gpt_->AddPartition(name_str.c_str(), type.value.data(),
+                                                  instance.value.data(), offset, slice_count, 0);
+  if (partition_index.is_error()) {
+    zxlogf(ERROR, "Failed to add GPT partition: %s", partition_index.status_string());
+    return partition_index.take_error();
+  }
+
+  if (status = gpt_->Sync(); status != ZX_OK) {
+    zxlogf(ERROR, "Failed to sync GPT: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+  return zx::ok(*partition_index);
+}
+
+void PartitionManager::AllocatePartition(AllocatePartitionRequestView request,
+                                         AllocatePartitionCompleter::Sync& completer) {
+  zxlogf(INFO, "AllocatePartition %lu blocks", request->slice_count);
+  zx_status_t status;
+  {
+    std::lock_guard guard(lock_);
+    zx::result<uint32_t> partition_index = AllocatePartitionLocked(
+        request->slice_count, request->type, request->instance, request->name);
+    status = partition_index.status_value();
+    if (partition_index.is_ok()) {
+      block_info_t block_info;
+      size_t block_op_size;
+      block_protocol_.ops->query(block_protocol_.ctx, &block_info, &block_op_size);
+      if (status = AddPartition(block_info, block_op_size, *partition_index); status != ZX_OK) {
+        if (status == ZX_ERR_NEXT) {
+          status = ZX_ERR_BAD_STATE;
+        }
+        zxlogf(ERROR, "Failed to add partition: %s", zx_status_get_string(status));
+      } else {
+        zxlogf(INFO, "Added partition, id %u", *partition_index);
+      }
+    } else {
+      zxlogf(ERROR, "Failed to allocate partition: %s", zx_status_get_string(status));
+    }
+  }
+  completer.Reply(status);
+}
+
+void PartitionManager::GetInfo(GetInfoCompleter::Sync& completer) {
+  fidl::Arena allocator;
+  fidl::ObjectView<fuchsia_hardware_block_volume::wire::VolumeManagerInfo> info(allocator);
+  {
+    std::lock_guard guard(lock_);
+    GetInfoLocked(info.get());
+  }
+  completer.Reply(ZX_OK, info);
+}
+
+void PartitionManager::Activate(ActivateRequestView request, ActivateCompleter::Sync& completer) {
+  completer.Reply(ZX_ERR_NOT_SUPPORTED);
+}
+void PartitionManager::GetPartitionLimit(GetPartitionLimitRequestView request,
+                                         GetPartitionLimitCompleter::Sync& completer) {
+  completer.Reply(ZX_ERR_NOT_SUPPORTED, 0);
+}
+void PartitionManager::SetPartitionLimit(SetPartitionLimitRequestView request,
+                                         SetPartitionLimitCompleter::Sync& completer) {
+  completer.Reply(ZX_ERR_NOT_SUPPORTED);
+}
+void PartitionManager::SetPartitionName(SetPartitionNameRequestView request,
+                                        SetPartitionNameCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
 constexpr zx_driver_ops_t gpt_driver_ops = []() {
   zx_driver_ops_t ops = {};
   ops.version = DRIVER_OPS_VERSION;
-  ops.bind = Bind;
+  ops.bind = PartitionManager::Bind;
   return ops;
 }();
 

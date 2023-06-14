@@ -26,9 +26,9 @@ zx_library("gpt") {
       "gpt.cc",
       "guid.cc",
     ]
+    public_deps += [ "//src/lib/storage/block_client/cpp" ]
     deps = [
       "//sdk/lib/fit",
-      "//src/lib/storage/block_client/cpp",
       "//src/lib/utf_conversion",
       "//zircon/system/ulib/fbl",
       "//zircon/system/ulib/mbr",

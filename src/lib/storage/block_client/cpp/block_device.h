@@ -31,6 +31,9 @@ class BlockDevice : public storage::VmoidRegistry {
   // Queries the device path using the fuchsia.device.Controller interface.
   virtual zx::result<std::string> GetDevicePath() const = 0;
 
+  // Accesses the Controller proxy for the device.
+  virtual fidl::UnownedClientEnd<fuchsia_device::Controller> Controller() const = 0;
+
   // fuchsia.device.block interface:
   virtual zx_status_t BlockGetInfo(fuchsia_hardware_block::wire::BlockInfo* out_info) const = 0;
 

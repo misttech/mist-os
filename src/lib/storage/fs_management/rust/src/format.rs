@@ -7,6 +7,7 @@ pub mod constants;
 use {
     anyhow::{anyhow, ensure, Context as _, Error},
     fidl_fuchsia_hardware_block::BlockProxy,
+    fidl_fuchsia_hardware_block_partition::PartitionProxy,
     fuchsia_zircon::{self as zx, HandleBased as _},
 };
 
@@ -78,8 +79,60 @@ pub fn round_up(val: u64, divisor: u64) -> Option<u64> {
     ((val.checked_add(divisor.checked_sub(1)?)?).checked_div(divisor)?).checked_mul(divisor)
 }
 
-pub async fn detect_disk_format(block_proxy: &BlockProxy) -> DiskFormat {
-    match detect_disk_format_res(&block_proxy).await {
+/// Wrap the functions that [`detect_disk_format`] needs to use from Block in a trait, so we can
+/// substitute something else (e.g. a PartitionProxy).
+pub trait DetectableDevice: Send + Sync {
+    fn get_info(
+        &self,
+    ) -> fidl::client::QueryResponseFut<fidl_fuchsia_hardware_block::BlockGetInfoResult>;
+
+    fn read_blocks(
+        &self,
+        vmo: fidl::Vmo,
+        length: u64,
+        dev_offset: u64,
+        vmo_offset: u64,
+    ) -> fidl::client::QueryResponseFut<fidl_fuchsia_hardware_block::BlockReadBlocksResult>;
+}
+
+impl DetectableDevice for BlockProxy {
+    fn get_info(
+        &self,
+    ) -> fidl::client::QueryResponseFut<fidl_fuchsia_hardware_block::BlockGetInfoResult> {
+        BlockProxy::get_info(self)
+    }
+
+    fn read_blocks(
+        &self,
+        vmo: fidl::Vmo,
+        length: u64,
+        dev_offset: u64,
+        vmo_offset: u64,
+    ) -> fidl::client::QueryResponseFut<fidl_fuchsia_hardware_block::BlockReadBlocksResult> {
+        BlockProxy::read_blocks(self, vmo, length, dev_offset, vmo_offset)
+    }
+}
+
+impl DetectableDevice for PartitionProxy {
+    fn get_info(
+        &self,
+    ) -> fidl::client::QueryResponseFut<fidl_fuchsia_hardware_block::BlockGetInfoResult> {
+        PartitionProxy::get_info(self)
+    }
+
+    fn read_blocks(
+        &self,
+        vmo: fidl::Vmo,
+        length: u64,
+        dev_offset: u64,
+        vmo_offset: u64,
+    ) -> fidl::client::QueryResponseFut<fidl_fuchsia_hardware_block::BlockReadBlocksResult> {
+        PartitionProxy::read_blocks(self, vmo, length, dev_offset, vmo_offset)
+    }
+}
+
+pub async fn detect_disk_format(block_proxy: &dyn DetectableDevice) -> DiskFormat {
+    match detect_disk_format_res(block_proxy).await {
         Ok(format) => format,
         Err(e) => {
             tracing::error!("detect_disk_format failed: {}", e);
@@ -88,7 +141,7 @@ pub async fn detect_disk_format(block_proxy: &BlockProxy) -> DiskFormat {
     }
 }
 
-async fn detect_disk_format_res(block_proxy: &BlockProxy) -> Result<DiskFormat, Error> {
+async fn detect_disk_format_res(block_proxy: &dyn DetectableDevice) -> Result<DiskFormat, Error> {
     let block_info = block_proxy
         .get_info()
         .await

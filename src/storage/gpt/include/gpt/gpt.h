@@ -14,6 +14,10 @@
 
 #include <gpt/c/gpt.h>
 
+#ifdef __Fuchsia__
+#include "src/lib/storage/block_client/cpp/block_device.h"
+#endif
+
 namespace gpt {
 
 // GPT magic number.
@@ -124,15 +128,16 @@ zx::result<> GetPartitionName(const gpt_entry_t& entry, char* name, size_t capac
 
 class GptDevice {
  public:
-  static zx_status_t Create(fidl::ClientEnd<fuchsia_hardware_block::Block> device,
+#ifdef __Fuchsia__
+  static zx_status_t Create(std::unique_ptr<block_client::BlockDevice> device,
                             fidl::ClientEnd<fuchsia_device::Controller> controller,
                             uint32_t blocksize, uint64_t blocks,
                             std::unique_ptr<GptDevice>* out_dev);
-
   // TODO(fxbug.dev/127870): Remove this API to remove controller multiplexing.
-  static zx_status_t CreateNoController(fidl::ClientEnd<fuchsia_hardware_block::Block> device,
+  static zx_status_t CreateNoController(std::unique_ptr<block_client::BlockDevice> device,
                                         uint32_t blocksize, uint64_t blocks,
                                         std::unique_ptr<GptDevice>* out_dev);
+#endif
 
   // Loads gpt header and gpt entries array from |buffer| of length |size|
   // belonging to "block device" with |blocks| number of blocks and each
@@ -147,6 +152,10 @@ class GptDevice {
   // Returns the range of usable blocks within the GPT, from [block_start, block_end] (inclusive)
   zx_status_t Range(uint64_t* block_start, uint64_t* block_end) const;
 
+  // Finds a contiguous series of |blocks| which are unallocated, returning the offset of the range
+  // in |out_offset|.  Returns ZX_ERR_NO_SPACE if no free range that large exists.
+  zx_status_t FindFreeRange(uint64_t blocks, uint64_t* out_offset) const;
+
   // Writes changes to partition table to the device. If the device does not contain valid
   // GPT, a gpt header gets created. Sync doesn't nudge block device driver to rescan the
   // partitions. So it is the caller's responsibility to rescan partitions for the changes
@@ -158,9 +167,10 @@ class GptDevice {
   zx_status_t Finalize();
 
   // Adds a partition to in-memory instance of GptDevice. The changes stay visible
-  // only to this instace. Needs a Sync to write the changes to the device.
-  zx_status_t AddPartition(const char* name, const uint8_t* type, const uint8_t* guid,
-                           uint64_t offset, uint64_t blocks, uint64_t flags);
+  // only to this instance. Needs a Sync to write the changes to the device.
+  // Returns the partition's index.
+  zx::result<uint32_t> AddPartition(const char* name, const uint8_t* type, const uint8_t* guid,
+                                    uint64_t offset, uint64_t blocks, uint64_t flags);
 
   // Writes zeroed blocks at an arbitrary offset (in blocks) within the device.
   //
@@ -239,18 +249,22 @@ class GptDevice {
   // Return total number of blocks in the device
   uint64_t TotalBlockCount() const { return blocks_; }
 
-  const fidl::ClientEnd<fuchsia_hardware_block::Block>& device() const;
+#ifdef __Fuchsia__
+  block_client::BlockDevice& device();
+#endif
 
  private:
   GptDevice() { valid_ = false; }
 
   zx_status_t FinalizeAndSync(bool persist);
 
-  // read the partition table from the device.
-  static zx_status_t Init(fidl::ClientEnd<fuchsia_hardware_block::Block> device,
+#ifdef __Fuchsia__
+  // Reads the partition table from the device, or reformats the device if no valid GPT is found.
+  static zx_status_t Init(std::unique_ptr<block_client::BlockDevice> device,
                           fidl::ClientEnd<fuchsia_device::Controller> controller,
                           uint32_t blocksize, uint64_t block_count,
                           std::unique_ptr<GptDevice>* out_dev);
+#endif
 
   zx_status_t LoadEntries(const uint8_t* buffer, uint64_t buffer_size, uint64_t block_count);
 
@@ -266,8 +280,7 @@ class GptDevice {
   gpt_partition_t* partitions_[kPartitionCount] = {};
 
 #ifdef __Fuchsia__
-  fidl::ClientEnd<fuchsia_hardware_block::Block> device_;
-  fidl::ClientEnd<fuchsia_device::Controller> controller_;
+  std::unique_ptr<block_client::BlockDevice> device_;
 #endif
 
   // block size in bytes

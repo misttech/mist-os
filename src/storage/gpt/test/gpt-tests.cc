@@ -19,7 +19,10 @@
 #include <ramdevice-client/ramdisk.h>
 #include <zxtest/zxtest.h>
 
+#include "src/lib/storage/block_client/cpp/block_device.h"
+#include "src/lib/storage/block_client/cpp/reader.h"
 #include "src/lib/storage/block_client/cpp/remote_block_device.h"
+#include "src/lib/storage/block_client/cpp/writer.h"
 #include "src/storage/gpt/gpt.h"
 
 extern bool gUseRamDisk;
@@ -71,8 +74,8 @@ void UpdateHeaderCrcs(gpt_header_t* header, uint8_t* entries_array, size_t size)
   header->crc32 = CalculateCrc(*header);
 }
 
-void destroy_gpt(fidl::UnownedClientEnd<fuchsia_hardware_block::Block> device, uint64_t block_size,
-                 uint64_t offset, uint64_t block_count) {
+void destroy_gpt(block_client::BlockDevice& device, uint64_t block_size, uint64_t offset,
+                 uint64_t block_count) {
   char zero[block_size];
   memset(zero, 0, sizeof(zero));
 
@@ -82,13 +85,10 @@ void destroy_gpt(fidl::UnownedClientEnd<fuchsia_hardware_block::Block> device, u
   uint64_t first = offset;
   uint64_t last = offset + block_count - 1;
 
+  block_client::Writer writer(device);
   for (uint64_t i = first; i <= last; i++) {
-    ASSERT_OK(block_client::SingleWriteBytes(device, zero, sizeof(zero), block_size * i),
-              "Failed to pwrite");
+    ASSERT_OK(writer.Write(block_size * i, block_size, zero), "Failed to write");
   }
-  // fsync is not supported in rpc-server.cpp
-  // TODO(fxbug.dev/33099) to fix this
-  // ASSERT_EQ(fsync(fd), 0, "Failed to fsync");
 }
 
 // This class keeps track of what we expect partitions to be on the
@@ -356,12 +356,14 @@ class LibGptTest {
 
   // Remove all partition from GPT and keep device in GPT initialized state.
   void Reset() {
-    zx::result device = component::Connect<fuchsia_hardware_block::Block>(disk_path_);
+    zx::result device = component::Connect<fuchsia_hardware_block_volume::Volume>(disk_path_);
     ASSERT_OK(device);
     std::string controller_path = std::string(disk_path_).append("/device_controller");
     zx::result controller = component::Connect<fuchsia_device::Controller>(controller_path);
     ASSERT_OK(controller);
-    ASSERT_OK(GptDevice::Create(std::move(device.value()), std::move(controller.value()),
+    zx::result remote_device = block_client::RemoteBlockDevice::Create(std::move(*device));
+    ASSERT_OK(remote_device);
+    ASSERT_OK(GptDevice::Create(std::move(remote_device.value()), std::move(controller.value()),
                                 GetBlockSize(), GetBlockCount(), &gpt_));
   }
 
@@ -398,7 +400,8 @@ class LibGptTest {
 
     // Read the block containing the MBR.
     char buff[blk_size_];
-    if (block_client::SingleReadBytes(gpt_->device(), buff, blk_size_, 0) != ZX_OK) {
+    block_client::Reader reader(gpt_->device());
+    if (reader.Read(0, blk_size_, buff) != ZX_OK) {
       return ZX_ERR_IO;
     }
 
@@ -438,7 +441,7 @@ class LibGptTest {
   // Adds a partition
   zx_status_t AddPartition(const char* name, const uint8_t* type, const uint8_t* guid,
                            uint64_t offset, uint64_t blocks, uint64_t flags) {
-    return gpt_->AddPartition(name, type, guid, offset, blocks, flags);
+    return gpt_->AddPartition(name, type, guid, offset, blocks, flags).status_value();
   }
 
   // removes a partition.
@@ -483,7 +486,7 @@ class LibGptTest {
   // Initialize a physical media.
   void InitDisk(const char* disk_path) {
     strlcpy(disk_path_, disk_path, sizeof(disk_path_));
-    zx::result device = component::Connect<fuchsia_hardware_block::Block>(disk_path_);
+    zx::result device = component::Connect<fuchsia_hardware_block_volume::Volume>(disk_path_);
     ASSERT_OK(device);
     const fidl::WireResult result = fidl::WireCall(device.value())->GetInfo();
     ASSERT_OK(result.status());
@@ -498,7 +501,9 @@ class LibGptTest {
     std::string controller_path = std::string(disk_path_).append("/device_controller");
     zx::result controller = component::Connect<fuchsia_device::Controller>(controller_path);
 
-    ASSERT_OK(GptDevice::Create(std::move(device.value()), std::move(controller.value()),
+    zx::result remote_device = block_client::RemoteBlockDevice::Create(std::move(*device));
+    ASSERT_OK(remote_device);
+    ASSERT_OK(GptDevice::Create(std::move(remote_device.value()), std::move(controller.value()),
                                 GetBlockSize(), GetBlockCount(), &gpt_));
   }
 
@@ -1804,6 +1809,69 @@ TEST(GetPartitionNameTest, LongName) {
   ASSERT_OK(gpt::GetPartitionName(partition_entry, partition_name.data(), partition_name.size())
                 .status_value());
   ASSERT_EQ(expected_result, partition_name);
+}
+
+TEST(GptDeviceLoadEntries, FindFreeRange) {
+  gpt_header_t header = InitializePrimaryHeader(kBlockSize, kBlockCount).value();
+  size_t len = MinimumBytesPerCopy(kBlockSize).value();
+  std::unique_ptr<uint8_t[]> buffer(new uint8_t[len]);
+  uint8_t* blocks = buffer.get();
+  memset(blocks, 0, len);
+
+  // Add three entries covering [START..n], [n + 402..END], [n + 100..n + 101], where `n` is
+  // arbitrary.  This should leave room for allocations up to 300 blocks long.
+  gpt_entry_t* entry1 = reinterpret_cast<gpt_entry_t*>(&blocks[kBlockSize]);
+  entry1->guid[0] = 1;
+  entry1->type[0] = 1;
+  entry1->first = header.first;
+  entry1->last = kBlockCount / 4;
+  EXPECT_TRUE(entry1->first <= entry1->last);
+
+  gpt_entry_t* entry2 = entry1 + 1;
+  entry2->guid[0] = 2;
+  entry2->type[0] = 2;
+  entry2->first = entry1->last + 402;
+  entry2->last = header.last;
+  EXPECT_TRUE(entry2->first <= entry2->last);
+
+  gpt_entry_t* entry3 = entry2 + 1;
+  entry3->guid[0] = 3;
+  entry3->type[0] = 3;
+  entry3->first = entry1->last + 100;
+  entry3->last = entry3->first + 1;
+  EXPECT_TRUE(entry2->first <= entry2->last);
+
+  UpdateHeaderCrcs(&header, &blocks[kBlockSize], len - kBlockSize);
+  memcpy(blocks, &header, sizeof(header));
+  std::unique_ptr<GptDevice> gpt;
+  ASSERT_OK(GptDevice::Load(blocks, len, kBlockSize, kBlockCount, &gpt));
+  uint64_t offset;
+  ASSERT_OK(gpt->FindFreeRange(10, &offset));
+  ASSERT_OK(gpt->FindFreeRange(100, &offset));
+  ASSERT_OK(gpt->FindFreeRange(300, &offset));
+  ASSERT_STATUS(ZX_ERR_NO_SPACE, gpt->FindFreeRange(301, &offset), "Found offset %lu", offset);
+}
+
+TEST(GptDeviceLoadEntries, FindFreeRangeEmptyGpt) {
+  gpt_header_t header = InitializePrimaryHeader(kBlockSize, kBlockCount).value();
+  size_t len = MinimumBytesPerCopy(kBlockSize).value();
+  std::unique_ptr<uint8_t[]> buffer(new uint8_t[len]);
+  uint8_t* blocks = buffer.get();
+  memset(blocks, 0, len);
+
+  UpdateHeaderCrcs(&header, &blocks[kBlockSize], len - kBlockSize);
+  memcpy(blocks, &header, sizeof(header));
+  std::unique_ptr<GptDevice> gpt;
+  ASSERT_OK(GptDevice::Load(blocks, len, kBlockSize, kBlockCount, &gpt));
+  uint64_t start = 0;
+  uint64_t end = std::numeric_limits<uint64_t>::max();
+  ASSERT_OK(gpt->Range(&start, &end));
+
+  uint64_t offset;
+  ASSERT_OK(gpt->FindFreeRange(10, &offset));
+  ASSERT_OK(gpt->FindFreeRange(end - start + 1, &offset));
+  ASSERT_STATUS(ZX_ERR_NO_SPACE, gpt->FindFreeRange(end - start + 2, &offset), "Found offset %lu",
+                offset);
 }
 
 }  // namespace gpt

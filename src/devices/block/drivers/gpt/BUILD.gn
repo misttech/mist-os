@@ -32,7 +32,9 @@ fuchsia_driver("gpt-driver") {
   deps = [
     ":gpt_bind",
     "//sdk/banjo/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.gpt.metadata:fuchsia.hardware.gpt.metadata_cpp_wire",
     "//sdk/lib/fit",
     "//sdk/lib/syslog/cpp:backend",
@@ -41,10 +43,13 @@ fuchsia_driver("gpt-driver") {
     "//src/devices/block/lib/common",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
+    "//src/lib/fidl/cpp",
+    "//src/lib/storage/block_client/cpp",
     "//src/storage/gpt",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync",
     "//zircon/third_party/ulib/cksum",
+    "//zircon/third_party/ulib/safemath",
   ]
 }
 
@@ -74,12 +79,14 @@ test("gpt-device-test-bin") {
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//src/storage/gpt",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
     "//zircon/third_party/ulib/cksum",
+    "//zircon/third_party/ulib/safemath",
   ]
 }
 

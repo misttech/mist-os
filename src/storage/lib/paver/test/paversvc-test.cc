@@ -2074,11 +2074,14 @@ class PaverServiceGptDeviceTest : public PaverServiceTest {
 
     zx::result new_connection = GetNewConnectionsMultiplexed(gpt_dev->block_interface());
     ASSERT_OK(new_connection);
+    fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume(
+        std::move(new_connection->device));
+    zx::result remote_device = block_client::RemoteBlockDevice::Create(std::move(volume));
+    ASSERT_OK(remote_device);
     std::unique_ptr<gpt::GptDevice> gpt;
-    ASSERT_OK(gpt::GptDevice::Create(
-        fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(new_connection->device)),
-        std::move(new_connection->controller), gpt_dev->block_size(), gpt_dev->block_count(),
-        &gpt));
+    ASSERT_OK(gpt::GptDevice::Create(std::move(*remote_device),
+                                     std::move(new_connection->controller), gpt_dev->block_size(),
+                                     gpt_dev->block_count(), &gpt));
     ASSERT_OK(gpt->Sync());
 
     for (const auto& part : init_partitions) {

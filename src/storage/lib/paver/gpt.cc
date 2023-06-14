@@ -15,6 +15,7 @@
 #include <fbl/unique_fd.h>
 #include <gpt/c/gpt.h>
 
+#include "src/lib/storage/block_client/cpp/remote_block_device.h"
 #include "src/storage/lib/paver/pave-logging.h"
 #include "src/storage/lib/paver/utils.h"
 
@@ -199,7 +200,7 @@ zx::result<std::unique_ptr<GptDevicePartitioner>> GptDevicePartitioner::Initiali
     return pauser.take_error();
   }
   fdio_cpp::FdioCaller caller(std::move(gpt_device));
-  zx::result device = caller.clone_as<block::Block>();
+  zx::result device = caller.clone_as<fuchsia_hardware_block_volume::Volume>();
   if (device.is_error()) {
     ERROR("Warning: Could not acquire GPT block info: %s\n", device.status_string())
     return device.take_error();
@@ -217,9 +218,13 @@ zx::result<std::unique_ptr<GptDevicePartitioner>> GptDevicePartitioner::Initiali
   }
   const fuchsia_hardware_block::wire::BlockInfo& info = response.value()->info;
 
+  zx::result remote_device = block_client::RemoteBlockDevice::Create(std::move(*device));
+  if (!remote_device.is_ok()) {
+    return remote_device.take_error();
+  }
   std::unique_ptr<GptDevice> gpt;
-  if (GptDevice::CreateNoController(std::move(device.value()), info.block_size, info.block_count,
-                                    &gpt) != ZX_OK) {
+  if (GptDevice::CreateNoController(std::move(remote_device.value()), info.block_size,
+                                    info.block_count, &gpt) != ZX_OK) {
     ERROR("Failed to get GPT info\n");
     return zx::error(ZX_ERR_BAD_STATE);
   }
@@ -268,7 +273,7 @@ zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::Init
   std::unique_ptr<GptDevicePartitioner> gpt_partitioner;
   for (auto& [_, gpt_device] : gpt_devices) {
     fdio_cpp::FdioCaller caller(std::move(gpt_device));
-    zx::result device = caller.clone_as<block::Block>();
+    zx::result device = caller.clone_as<fuchsia_hardware_block_volume::Volume>();
     if (device.is_error()) {
       ERROR("Warning: Could not acquire GPT block info: %s\n", device.status_string());
       return device.take_error();
@@ -290,9 +295,13 @@ zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::Init
       continue;
     }
 
+    zx::result remote_device = block_client::RemoteBlockDevice::Create(std::move(*device));
+    if (!remote_device.is_ok()) {
+      return remote_device.take_error();
+    }
     std::unique_ptr<GptDevice> gpt;
-    if (GptDevice::CreateNoController(std::move(device.value()), info.block_size, info.block_count,
-                                      &gpt) != ZX_OK) {
+    if (GptDevice::CreateNoController(std::move(remote_device.value()), info.block_size,
+                                      info.block_count, &gpt) != ZX_OK) {
       ERROR("Failed to get GPT info\n");
       return zx::error(ZX_ERR_BAD_STATE);
     }
@@ -408,7 +417,8 @@ zx::result<Uuid> GptDevicePartitioner::CreateGptPartition(const char* name, cons
                                                           uint64_t offset, uint64_t blocks) const {
   Uuid guid = Uuid::Generate();
 
-  if (zx_status_t status = gpt_->AddPartition(name, type.bytes(), guid.bytes(), offset, blocks, 0);
+  if (zx_status_t status =
+          gpt_->AddPartition(name, type.bytes(), guid.bytes(), offset, blocks, 0).status_value();
       status != ZX_OK) {
     ERROR("Failed to add partition\n");
     return zx::error(status);
@@ -421,10 +431,7 @@ zx::result<Uuid> GptDevicePartitioner::CreateGptPartition(const char* name, cons
     ERROR("Failed to clear first block of new partition\n");
     return status.take_error();
   }
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-  if (auto status = RebindGptDriver(svc_root_, fidl::UnownedClientEnd<fuchsia_device::Controller>(
-                                                   gpt_->device().channel().borrow()));
-      status.is_error()) {
+  if (auto status = RebindGptDriver(svc_root_, gpt_->device().Controller()); status.is_error()) {
     ERROR("Failed to rebind GPT\n");
     return status.take_error();
   }
@@ -525,9 +532,7 @@ zx::result<> GptDevicePartitioner::WipePartitions(FilterCallback filter) const {
     LOG("Immediate reboot strongly recommended\n");
   }
 
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-  static_cast<void>(RebindGptDriver(svc_root_, fidl::UnownedClientEnd<fuchsia_device::Controller>(
-                                                   gpt_->device().channel().borrow())));
+  static_cast<void>(RebindGptDriver(svc_root_, gpt_->device().Controller()));
   return zx::ok();
 }
 

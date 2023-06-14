@@ -63,6 +63,11 @@ class BlockDevice {
         ramdisk_get_block_interface(client_));
   }
 
+  fidl::UnownedClientEnd<fuchsia_hardware_block_volume::Volume> volume_interface() const {
+    return fidl::UnownedClientEnd<fuchsia_hardware_block_volume::Volume>(
+        ramdisk_get_block_interface(client_));
+  }
+
   fidl::UnownedClientEnd<fuchsia_device::Controller> block_controller_interface() const {
     return fidl::UnownedClientEnd<fuchsia_device::Controller>(
         ramdisk_get_block_controller_interface(client_));

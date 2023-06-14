@@ -21,6 +21,10 @@ class PassThroughReadOnlyBlockDevice : public BlockDevice {
     return device_.FifoTransaction(requests, count);
   }
 
+  fidl::UnownedClientEnd<fuchsia_device::Controller> Controller() const override {
+    ZX_ASSERT(false);
+  }
+
   zx::result<std::string> GetDevicePath() const override { return device_.GetDevicePath(); }
 
   zx_status_t BlockGetInfo(fuchsia_hardware_block::wire::BlockInfo* out_info) const override {

@@ -22,6 +22,8 @@
 #include <gpt/gpt.h>
 #include <gpt/guid.h>
 
+#include "src/lib/storage/block_client/cpp/remote_block_device.h"
+
 using gpt::GptDevice;
 using gpt::GuidProperties;
 using gpt::KnownGuid;
@@ -114,7 +116,7 @@ char* FlagsToCString(char* dst, size_t dst_len, const uint8_t* guid, uint64_t fl
 }
 
 std::unique_ptr<GptDevice> Init(const char* dev) {
-  zx::result block = component::Connect<fuchsia_hardware_block::Block>(dev);
+  zx::result block = component::Connect<fuchsia_hardware_block_volume::Volume>(dev);
   if (block.is_error()) {
     fprintf(stderr, "gpt: error opening %s: %s\n", dev, block.status_string());
     return nullptr;
@@ -144,9 +146,14 @@ std::unique_ptr<GptDevice> Init(const char* dev) {
     return nullptr;
   }
 
+  auto device = block_client::RemoteBlockDevice::Create(std::move(block.value()));
+  if (device.is_error()) {
+    fprintf(stderr, "Failed to create block client: %s\n", device.status_string());
+    return nullptr;
+  }
   std::unique_ptr<GptDevice> gpt;
   if (zx_status_t status =
-          GptDevice::Create(std::move(block.value()), std::move(controller.value()),
+          GptDevice::Create(std::move(device.value()), std::move(controller.value()),
                             info.block_size, info.block_count, &gpt);
       status != ZX_OK) {
     fprintf(stderr, "gpt: error initializing GPT from %s: %s\n", dev, zx_status_get_string(status));
@@ -262,10 +269,8 @@ zx_status_t Commit(GptDevice* gpt, const char* dev) {
     return status;
   }
 
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-  const fidl::WireResult result = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_device::Controller>(
-                                                     gpt->device().channel().borrow()))
-                                      ->Rebind({});
+  fidl::UnownedClientEnd<fuchsia_device::Controller> controller = gpt->device().Controller();
+  const fidl::WireResult result = fidl::WireCall(controller)->Rebind({});
   if (!result.ok()) {
     fprintf(stderr, "gpt: gpt updated but device %s could not be rebound: %s. Please reboot.\n",
             dev, result.FormatDescription().c_str());
@@ -313,7 +318,7 @@ zx_status_t AddPartition(const char* dev, uint64_t start, uint64_t end, const ch
 
   uint8_t type[GPT_GUID_LEN];
   memset(type, 0xff, GPT_GUID_LEN);
-  zx_status_t rc = gpt->AddPartition(name, type, guid, start, end - start + 1, 0);
+  zx_status_t rc = gpt->AddPartition(name, type, guid, start, end - start + 1, 0).status_value();
   if (rc != ZX_OK) {
     fprintf(stderr, "Add partition failed: %s\n", zx_status_get_string(rc));
     return rc;
@@ -719,7 +724,7 @@ zx_status_t Repartition(int argc, char** argv, std::optional<PartitionScheme> sc
 
       printf("%s: %" PRIu64 " bytes, %" PRIu64 " blocks, %" PRIu64 "-%" PRIu64 "\n", name,
              byte_size, nblocks, start, end);
-      ZX_ASSERT(gpt->AddPartition(name, type, guid, start, end - start, 0) == ZX_OK);
+      ZX_ASSERT(gpt->AddPartition(name, type, guid, start, end - start, 0).status_value() == ZX_OK);
 
       start = end + 1;
     }

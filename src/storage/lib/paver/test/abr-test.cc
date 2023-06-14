@@ -14,12 +14,14 @@
 #include <lib/fdio/directory.h>
 #include <zircon/hw/gpt.h>
 
+#include <algorithm>
 #include <iostream>
 
 #include <mock-boot-arguments/server.h>
 #include <zxtest/zxtest.h>
 
 #include "gpt/cros.h"
+#include "src/lib/storage/block_client/cpp/remote_block_device.h"
 #include "src/lib/uuid/uuid.h"
 #include "src/storage/lib/paver/abr-client.h"
 #include "src/storage/lib/paver/astro.h"
@@ -133,12 +135,16 @@ class ChromebookX64AbrTests : public zxtest::Test {
     zx::result new_connection = GetNewConnections(disk_->block_controller_interface());
     ASSERT_OK(new_connection);
 
+    fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume(
+        std::move(new_connection->device));
+    zx::result remote_device = block_client::RemoteBlockDevice::Create(std::move(volume));
+    ASSERT_OK(remote_device);
+
     std::unique_ptr<gpt::GptDevice> gpt;
-    ASSERT_OK(gpt::GptDevice::Create(
-        fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(new_connection->device)),
-        std::move(new_connection->controller),
-        /*blocksize=*/disk_->block_size(),
-        /*blocks=*/disk_->block_count(), &gpt));
+    ASSERT_OK(gpt::GptDevice::Create(std::move(*remote_device),
+                                     std::move(new_connection->controller),
+                                     /*blocksize=*/disk_->block_size(),
+                                     /*blocks=*/disk_->block_count(), &gpt));
     ASSERT_OK(gpt->Sync());
     // 2 (GPT header and MBR header) blocks + number of blocks in entry array.
     uint64_t cur_start = 2 + gpt->EntryArrayBlockCount();
@@ -260,12 +266,14 @@ TEST_F(ChromebookX64AbrTests, AbrAlwaysMarksRSuccessful) {
   zx::result new_connection = GetNewConnections(disk_->block_controller_interface());
   ASSERT_OK(new_connection);
 
+  fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume(std::move(new_connection->device));
+  zx::result remote_device = block_client::RemoteBlockDevice::Create(std::move(volume));
+  ASSERT_OK(remote_device);
+
   std::unique_ptr<gpt::GptDevice> gpt;
-  ASSERT_OK(gpt::GptDevice::Create(
-      fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(new_connection->device)),
-      std::move(new_connection->controller),
-      /*blocksize=*/disk_->block_size(),
-      /*blocks=*/disk_->block_count(), &gpt));
+  ASSERT_OK(gpt::GptDevice::Create(std::move(*remote_device), std::move(new_connection->controller),
+                                   /*blocksize=*/disk_->block_size(),
+                                   /*blocks=*/disk_->block_count(), &gpt));
   gpt_partition_t* part = GetPartitionByName(gpt, GPT_ZIRCON_R_NAME);
   ASSERT_NE(part, nullptr);
   ASSERT_TRUE(gpt_cros_attr_get_successful(part->flags));
@@ -294,11 +302,14 @@ class CurrentSlotUuidTest : public zxtest::Test {
   void CreateDiskWithPartition(const char* partition) {
     zx::result new_connection = GetNewConnections(disk_->block_controller_interface());
     ASSERT_OK(new_connection);
-    ASSERT_OK(gpt::GptDevice::Create(
-        fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(new_connection->device)),
-        std::move(new_connection->controller),
-        /*blocksize=*/disk_->block_size(),
-        /*blocks=*/disk_->block_count(), &gpt_));
+    fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume(
+        std::move(new_connection->device));
+    zx::result remote_device = block_client::RemoteBlockDevice::Create(std::move(volume));
+    ASSERT_OK(remote_device);
+    ASSERT_OK(gpt::GptDevice::Create(std::move(*remote_device),
+                                     std::move(new_connection->controller),
+                                     /*blocksize=*/disk_->block_size(),
+                                     /*blocks=*/disk_->block_count(), &gpt_));
     ASSERT_OK(gpt_->Sync());
     ASSERT_OK(gpt_->AddPartition(partition, kZirconType, kTestUuid,
                                  2 + gpt_->EntryArrayBlockCount(), 10, 0));

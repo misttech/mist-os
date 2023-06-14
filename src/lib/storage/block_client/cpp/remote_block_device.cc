@@ -33,6 +33,11 @@ zx::result<std::string> RemoteBlockDevice::GetDevicePath() const {
   return zx::ok(response->path.get());
 }
 
+fidl::UnownedClientEnd<fuchsia_device::Controller> RemoteBlockDevice::Controller() const {
+  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
+  return fidl::UnownedClientEnd<fuchsia_device::Controller>(device_.borrow().channel());
+}
+
 zx_status_t RemoteBlockDevice::BlockGetInfo(
     fuchsia_hardware_block::wire::BlockInfo* out_info) const {
   const fidl::WireResult result = fidl::WireCall(device_)->GetInfo();

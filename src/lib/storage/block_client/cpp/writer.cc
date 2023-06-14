@@ -43,7 +43,7 @@ zx_status_t Writer::Write(uint64_t offset, const size_t count, void* buf) {
         .vmoid = vmoid_.get(),
         .length = safemath::checked_cast<uint32_t>(amount / block_size_),
         .vmo_offset = 0,
-        .dev_offset = safemath::checked_cast<uint32_t>(offset / block_size_),
+        .dev_offset = offset / block_size_,
     };
     if (zx_status_t status = device_.FifoTransaction(&request, 1); status != ZX_OK)
       return status;

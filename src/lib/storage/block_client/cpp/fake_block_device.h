@@ -17,6 +17,7 @@
 #include <fbl/mutex.h>
 #include <range/range.h>
 
+#include "lib/fidl/cpp/wire/internal/transport_channel.h"
 #include "src/lib/storage/block_client/cpp/block_device.h"
 #include "src/storage/lib/storage-metrics/block-metrics.h"
 
@@ -88,6 +89,10 @@ class FakeBlockDevice : public BlockDevice {
   // BlockDevice interface
 
   zx::result<std::string> GetDevicePath() const override { return zx::error(ZX_ERR_NOT_SUPPORTED); }
+
+  fidl::UnownedClientEnd<fuchsia_device::Controller> Controller() const override {
+    ZX_ASSERT(false);
+  }
 
   zx_status_t VolumeGetInfo(
       fuchsia_hardware_block_volume::wire::VolumeManagerInfo* out_manager_info,

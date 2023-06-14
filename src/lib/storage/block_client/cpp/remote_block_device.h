@@ -37,6 +37,7 @@ class RemoteBlockDevice final : public BlockDevice {
 
   zx_status_t FifoTransaction(block_fifo_request_t* requests, size_t count) final;
   zx::result<std::string> GetDevicePath() const final;
+  fidl::UnownedClientEnd<fuchsia_device::Controller> Controller() const final;
   zx_status_t BlockGetInfo(fuchsia_hardware_block::wire::BlockInfo* out_info) const final;
   zx_status_t BlockAttachVmo(const zx::vmo& vmo, storage::Vmoid* out_vmoid) final;
   zx_status_t VolumeGetInfo(

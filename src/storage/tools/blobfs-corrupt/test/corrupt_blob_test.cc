@@ -33,6 +33,9 @@ class ProxyBlockDevice : public BlockDevice {
   zx_status_t FifoTransaction(block_fifo_request_t* requests, size_t count) override {
     return inner_->FifoTransaction(requests, count);
   }
+  fidl::UnownedClientEnd<fuchsia_device::Controller> Controller() const override {
+    ZX_ASSERT(false);
+  }
   zx::result<std::string> GetDevicePath() const override { return inner_->GetDevicePath(); }
   zx_status_t BlockGetInfo(fuchsia_hardware_block::wire::BlockInfo* out_info) const override {
     return inner_->BlockGetInfo(out_info);

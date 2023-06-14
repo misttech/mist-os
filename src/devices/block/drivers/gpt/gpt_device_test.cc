@@ -7,6 +7,7 @@
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <fuchsia/hardware/block/partition/cpp/banjo.h>
 #include <inttypes.h>
+#include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -14,6 +15,8 @@
 #include <lib/zx/vmo.h>
 #include <zircon/errors.h>
 #include <zircon/hw/gpt.h>
+
+#include <iterator>
 
 #include <ddktl/device.h>
 #include <fbl/alloc_checker.h>
@@ -35,7 +38,11 @@ constexpr std::string_view kPartition1Name = "Linux filesystem\xf0\x90\x80\x80";
 
 class FakeBlockDevice : public ddk::BlockProtocol<FakeBlockDevice> {
  public:
-  FakeBlockDevice() : proto_({&block_protocol_ops_, this}) {
+  FakeBlockDevice()
+      : header_(new uint8_t[sizeof(test_partition_table)]),
+        header_len_(sizeof(test_partition_table)),
+        proto_({&block_protocol_ops_, this}) {
+    std::copy(std::begin(test_partition_table), std::end(test_partition_table), header_.get());
     info_.block_count = kBlockCnt;
     info_.block_size = kBlockSz;
     info_.max_transfer_size = fuchsia_hardware_block::wire::kMaxTransferUnbounded;
@@ -55,6 +62,8 @@ class FakeBlockDevice : public ddk::BlockProtocol<FakeBlockDevice> {
  private:
   zx_status_t BlockQueueOp(block_op_t* op);
 
+  std::unique_ptr<uint8_t[]> header_;
+  size_t header_len_;
   block_protocol_t proto_{};
   block_info_t info_{};
 };
@@ -72,9 +81,6 @@ zx_status_t FakeBlockDevice::BlockQueueOp(block_op_t* op) {
     if ((op->rw.offset_dev + op->rw.length) > (bsize * info_.block_count)) {
       return ZX_ERR_OUT_OF_RANGE;
     }
-    if (opcode == BLOCK_OPCODE_WRITE) {
-      return ZX_OK;
-    }
   } else if (opcode == BLOCK_OPCODE_TRIM) {
     if ((op->trim.offset_dev + op->trim.length) > (bsize * info_.block_count)) {
       return ZX_ERR_OUT_OF_RANGE;
@@ -86,37 +92,52 @@ zx_status_t FakeBlockDevice::BlockQueueOp(block_op_t* op) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  size_t part_size = sizeof(test_partition_table);
-  size_t read_off = op->rw.offset_dev * bsize;
-  size_t read_len = op->rw.length * bsize;
+  size_t rw_off = op->rw.offset_dev * bsize;
+  size_t rw_len = op->rw.length * bsize;
 
-  if (read_len == 0) {
+  if (rw_len == 0) {
     return ZX_OK;
   }
 
   uint64_t vmo_addr = op->rw.offset_vmo * bsize;
 
-  // Read initial part from header if in range.
-  if (read_off < part_size) {
-    size_t part_read_len = part_size - read_off;
-    if (part_read_len > read_len) {
-      part_read_len = read_len;
+  // Read or write initial part from header if in range.
+  if (rw_off < header_len_) {
+    size_t part_rw_len = header_len_ - rw_off;
+    if (part_rw_len > rw_len) {
+      part_rw_len = rw_len;
     }
-    zx_vmo_write(op->rw.vmo, test_partition_table + read_off, vmo_addr, part_read_len);
+    if (opcode == BLOCK_OPCODE_READ) {
+      if (zx_status_t status =
+              zx_vmo_write(op->rw.vmo, header_.get() + rw_off, vmo_addr, part_rw_len);
+          status != ZX_OK) {
+        return status;
+      }
+    } else {
+      if (zx_status_t status =
+              zx_vmo_read(op->rw.vmo, header_.get() + rw_off, vmo_addr, part_rw_len);
+          status != ZX_OK) {
+        return status;
+      }
+    }
 
-    read_len -= part_read_len;
-    read_off += part_read_len;
-    vmo_addr += part_read_len;
+    rw_len -= part_rw_len;
+    rw_off += part_rw_len;
+    vmo_addr += part_rw_len;
 
-    if (read_len == 0) {
+    if (rw_len == 0) {
       return ZX_OK;
     }
+  }
+
+  if (opcode == BLOCK_OPCODE_WRITE) {
+    return ZX_OK;
   }
 
   std::unique_ptr<uint8_t[]> zbuf(new uint8_t[bsize]);
   memset(zbuf.get(), 0, bsize);
   // Zero-fill remaining.
-  for (; read_len > 0; read_len -= bsize) {
+  for (; rw_len > 0; rw_len -= bsize) {
     zx_vmo_write(op->rw.vmo, zbuf.get(), vmo_addr, bsize);
     vmo_addr += bsize;
   }
@@ -127,19 +148,46 @@ class GptDeviceTest : public zxtest::Test {
  public:
   GptDeviceTest() = default;
 
-  DISALLOW_COPY_ASSIGN_AND_MOVE(GptDeviceTest);
-
   void SetInfo(const block_info_t* info) { fake_block_device_.SetInfo(info); }
 
-  void Init() {
+  void SetUp() override {
     fake_parent_->AddProtocol(ZX_PROTOCOL_BLOCK, fake_block_device_.proto()->ops,
                               fake_block_device_.proto()->ctx);
   }
+
+  zx_status_t Bind() {
+    zx_status_t status = PartitionManager::Bind(nullptr, fake_parent_.get());
+    if (status == ZX_OK) {
+      loop_.StartThread();
+      auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::VolumeManager>();
+      EXPECT_OK(endpoints.status_value());
+      fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), GetPartitionManager());
+      volume_manager_fidl_.Bind(std::move(endpoints->client));
+    }
+    return status;
+  }
+
+  zx_status_t Rebind() {
+    volume_manager_fidl_.TakeClientEnd();
+    loop_.RunUntilIdle();
+    fake_parent_ = MockDevice::FakeRootParent();
+    fake_parent_->AddProtocol(ZX_PROTOCOL_BLOCK, fake_block_device_.proto()->ops,
+                              fake_block_device_.proto()->ctx);
+    return Bind();
+  }
+
+  void TearDown() override { loop_.Shutdown(); }
+
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
 
+  fidl::WireSyncClient<fuchsia_hardware_block_volume::VolumeManager>& volume_manager_fidl() {
+    return volume_manager_fidl_;
+  }
+
   PartitionDevice* GetDev(size_t device_number) {
-    ZX_ASSERT(fake_parent_->child_count() > device_number);
-    auto iter = std::next(fake_parent_->children().begin(), device_number);
+    // Skip the first device which is the partition manager.
+    ZX_ASSERT(fake_parent_->child_count() > device_number + 1);
+    auto iter = std::next(fake_parent_->children().begin(), device_number + 1);
     return (*iter)->GetDeviceContext<PartitionDevice>();
   }
 
@@ -158,22 +206,26 @@ class GptDeviceTest : public zxtest::Test {
   }
 
  private:
+  PartitionManager* GetPartitionManager() {
+    ZX_ASSERT(fake_parent_->child_count() > 1);
+    return fake_parent_->children().front()->GetDeviceContext<PartitionManager>();
+  }
+
+  fidl::WireSyncClient<fuchsia_hardware_block_volume::VolumeManager> volume_manager_fidl_;
   FakeBlockDevice fake_block_device_;
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
 
 TEST_F(GptDeviceTest, DeviceTooSmall) {
-  Init();
-
   const block_info_t info = {20, 512, fuchsia_hardware_block::wire::kMaxTransferUnbounded, 0};
   SetInfo(&info);
 
-  ASSERT_EQ(ZX_ERR_NO_SPACE, Bind(nullptr, fake_parent_.get()));
+  ASSERT_STATUS(ZX_ERR_NO_SPACE, PartitionManager::Bind(nullptr, fake_parent_.get()));
 }
 
 TEST_F(GptDeviceTest, ValidatePartitionGuid) {
-  Init();
-  ASSERT_OK(Bind(nullptr, fake_parent_.get()));
-  ASSERT_EQ(fake_parent_->child_count(), 2);
+  ASSERT_OK(Bind());
+  ASSERT_EQ(fake_parent_->child_count(), 3);
 
   char name[MAX_PARTITION_NAME_LENGTH];
   guid_t guid;
@@ -210,13 +262,13 @@ TEST_F(GptDeviceTest, ValidatePartitionGuid) {
 }
 
 TEST_F(GptDeviceTest, ValidatePartitionBindProps) {
-  Init();
-  ASSERT_OK(Bind(nullptr, fake_parent_.get()));
-  ASSERT_EQ(fake_parent_->child_count(), 2);
+  ASSERT_OK(Bind());
+  ASSERT_EQ(fake_parent_->child_count(), 3);
 
   char name[MAX_PARTITION_NAME_LENGTH];
 
-  auto iter = fake_parent_->children().begin();
+  // Skip the first device which is the partition manager.
+  auto iter = ++fake_parent_->children().begin();
 
   {
     PartitionDevice* dev = (*iter)->GetDeviceContext<PartitionDevice>();
@@ -264,8 +316,6 @@ TEST_F(GptDeviceTest, ValidatePartitionBindProps) {
 }
 
 TEST_F(GptDeviceTest, ValidatePartitionBindPropIgnoreDevice) {
-  Init();
-
   const fuchsia_hardware_gpt_metadata::GptInfo metadata = {{
       .partition_info = {{
           {{
@@ -281,10 +331,11 @@ TEST_F(GptDeviceTest, ValidatePartitionBindPropIgnoreDevice) {
   fake_parent_->SetMetadata(DEVICE_METADATA_GPT_INFO, encoded.value().data(),
                             encoded.value().size());
 
-  ASSERT_OK(Bind(nullptr, fake_parent_.get()));
-  ASSERT_EQ(fake_parent_->child_count(), 2);
+  ASSERT_OK(Bind());
+  ASSERT_EQ(fake_parent_->child_count(), 3);
 
-  auto iter = fake_parent_->children().begin();
+  // Skip the first child, which is the partition manager
+  auto iter = ++fake_parent_->children().begin();
 
   {
     cpp20::span<const zx_device_str_prop_t> props = (*iter)->GetStringProperties();
@@ -308,8 +359,6 @@ TEST_F(GptDeviceTest, ValidatePartitionBindPropIgnoreDevice) {
 }
 
 TEST_F(GptDeviceTest, ValidatePartitionGuidWithMap) {
-  Init();
-
   const fuchsia_hardware_gpt_metadata::GptInfo metadata = {{
       .partition_info = {{
           {{
@@ -327,8 +376,8 @@ TEST_F(GptDeviceTest, ValidatePartitionGuidWithMap) {
   fake_parent_->SetMetadata(DEVICE_METADATA_GPT_INFO, encoded.value().data(),
                             encoded.value().size());
 
-  ASSERT_OK(Bind(nullptr, fake_parent_.get()));
-  ASSERT_EQ(fake_parent_->child_count(), 2);
+  ASSERT_OK(Bind());
+  ASSERT_EQ(fake_parent_->child_count(), 3);
 
   char name[MAX_PARTITION_NAME_LENGTH];
   guid_t guid;
@@ -367,8 +416,6 @@ TEST_F(GptDeviceTest, ValidatePartitionGuidWithMap) {
 }
 
 TEST_F(GptDeviceTest, CorruptMetadataMap) {
-  Init();
-
   const fuchsia_hardware_gpt_metadata::GptInfo metadata = {{
       .partition_info = {{
           {{
@@ -387,12 +434,10 @@ TEST_F(GptDeviceTest, CorruptMetadataMap) {
   // loading the driver (rather than continuing with a corrupt GUID map).
   fake_parent_->SetMetadata(DEVICE_METADATA_GPT_INFO, encoded.value().data(),
                             encoded.value().size() - 1);
-  ASSERT_EQ(ZX_ERR_INTERNAL, Bind(nullptr, fake_parent_.get()));
+  ASSERT_STATUS(ZX_ERR_INTERNAL, Bind());
 }
 
 TEST_F(GptDeviceTest, BlockOpsPropagate) {
-  Init();
-
   const fuchsia_hardware_gpt_metadata::GptInfo metadata = {{
       .partition_info = {{
           {{
@@ -410,8 +455,8 @@ TEST_F(GptDeviceTest, BlockOpsPropagate) {
   fake_parent_->SetMetadata(DEVICE_METADATA_GPT_INFO, encoded.value().data(),
                             encoded.value().size());
 
-  ASSERT_OK(Bind(nullptr, fake_parent_.get()));
-  ASSERT_EQ(fake_parent_->child_count(), 2);
+  ASSERT_OK(Bind());
+  ASSERT_EQ(fake_parent_->child_count(), 3);
 
   PartitionDevice* dev0 = GetDev(0);
   PartitionDevice* dev1 = GetDev(1);
@@ -478,8 +523,6 @@ TEST_F(GptDeviceTest, BlockOpsPropagate) {
 }
 
 TEST_F(GptDeviceTest, BlockOpsOutOfBounds) {
-  Init();
-
   const fuchsia_hardware_gpt_metadata::GptInfo metadata = {{
       .partition_info = {{
           {{
@@ -497,8 +540,8 @@ TEST_F(GptDeviceTest, BlockOpsOutOfBounds) {
   fake_parent_->SetMetadata(DEVICE_METADATA_GPT_INFO, encoded.value().data(),
                             encoded.value().size());
 
-  ASSERT_OK(Bind(nullptr, fake_parent_.get()));
-  ASSERT_EQ(fake_parent_->child_count(), 2);
+  ASSERT_OK(Bind());
+  ASSERT_EQ(fake_parent_->child_count(), 3);
 
   PartitionDevice* dev0 = GetDev(0);
   PartitionDevice* dev1 = GetDev(1);
@@ -544,6 +587,54 @@ TEST_F(GptDeviceTest, BlockOpsOutOfBounds) {
   sync_completion_reset(&result.completion);
 
   EXPECT_NOT_OK(result.status);
+}
+
+TEST_F(GptDeviceTest, GetInfo) {
+  ASSERT_OK(Bind());
+  fidl::WireResult result = volume_manager_fidl()->GetInfo();
+  ASSERT_OK(result);
+  ASSERT_OK(result.value().status);
+  ASSERT_EQ(result.value().info->slice_count, kBlockCnt);
+  ASSERT_EQ(result.value().info->slice_size, kBlockSz);
+}
+
+TEST_F(GptDeviceTest, AddPartition) {
+  ASSERT_OK(Bind());
+  fuchsia_hardware_block_partition::wire::Guid type = GUID_LINUX_FILESYSTEM;
+  fuchsia_hardware_block_partition::wire::Guid instance;
+  instance.value[0] = 0xff;
+  fidl::WireResult result = volume_manager_fidl()->AllocatePartition(1, type, instance, "new", 0);
+  ASSERT_OK(result);
+  ASSERT_OK(result.value().status);
+
+  // Ensure the changes persist.
+  ASSERT_OK(Rebind());
+  PartitionDevice* dev = GetDev(2);
+  ASSERT_NOT_NULL(dev);
+
+  char name[MAX_PARTITION_NAME_LENGTH];
+  guid_t guid;
+
+  ASSERT_OK(dev->BlockPartitionGetName(name, sizeof(name)));
+  ASSERT_STREQ("new", name);
+
+  ASSERT_OK(dev->BlockPartitionGetGuid(GUIDTYPE_TYPE, &guid));
+  {
+    uint8_t expected_guid[GPT_GUID_LEN] = GUID_LINUX_FILESYSTEM;
+    EXPECT_BYTES_EQ(reinterpret_cast<uint8_t*>(&guid), expected_guid, GPT_GUID_LEN);
+  }
+  ASSERT_OK(dev->BlockPartitionGetGuid(GUIDTYPE_INSTANCE, &guid));
+  { EXPECT_BYTES_EQ(reinterpret_cast<uint8_t*>(&guid), &instance.value, GPT_GUID_LEN); }
+}
+
+TEST_F(GptDeviceTest, AddPartitionWithInvalidGuid) {
+  ASSERT_OK(Bind());
+  fuchsia_hardware_block_partition::wire::Guid type = {0};
+  fuchsia_hardware_block_partition::wire::Guid instance;
+  instance.value[0] = 0xff;
+  fidl::WireResult result = volume_manager_fidl()->AllocatePartition(1, type, instance, "new", 0);
+  ASSERT_OK(result);
+  ASSERT_STATUS(ZX_ERR_INVALID_ARGS, result.value().status);
 }
 
 }  // namespace
