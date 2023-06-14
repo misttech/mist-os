@@ -15,7 +15,9 @@ _type_moniker_map = {
 #   test_type (optional)
 #     Maps to the moniker to run the test component in.
 #     Type: string
-#     TODO(https://fxbug.dev/127535: Document various types)
+#     Refer to
+#     https://fuchsia.dev/fuchsia-src/development/testing/components/test_runner_framework?hl=en#non-hermetic_tests
+#     for valid types
 template("fuchsia_test_component") {
   fuchsia_component(target_name) {
     forward_variables_from(invoker,
