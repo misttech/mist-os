@@ -214,7 +214,7 @@ assembly_input_bundle("core_realm") {
     "//src/devices/sysmem/bin/sysmem_connector:pkg",
 
     # Developer.
-    "//src/developer/forensics:pkg-real",
+    "//src/developer/forensics:pkg",
   ]
 
   compiled_packages = [

@@ -54,11 +54,7 @@ group("workstation_configs") {
 ###############################################################################
 # PACKAGES
 ###############################################################################
-# TODO(fxbug.dev/122864) Remove transitional labels
-group("pkg") {
-}
-
-fuchsia_package("pkg-real") {
+fuchsia_package("pkg") {
   package_name = "forensics"
 
   deps = [
@@ -89,13 +85,6 @@ fuchsia_component("feedback") {
     ":feedback_exe",
     ":system_log_recorder_exe",
   ]
-}
-
-###############################################################################
-# CORE SHARDS
-###############################################################################
-# TODO(fxbug.dev/122864) Remove transitional labels
-group("core_shard") {
 }
 
 ###############################################################################

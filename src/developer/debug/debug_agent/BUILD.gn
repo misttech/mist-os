@@ -199,10 +199,6 @@ fuchsia_package("debug_agent") {
   }
 }
 
-# TODO(fxbug.dev/122864) Remove transitional labels
-group("core_shard") {
-}
-
 # Common functionality used by tests.
 source_set("test_lib") {
   testonly = true
