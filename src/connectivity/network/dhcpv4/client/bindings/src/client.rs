@@ -18,7 +18,7 @@ use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use futures::{channel::mpsc, pin_mut, select, FutureExt as _, TryStreamExt as _};
 use net_types::{
-    ip::{Ipv4, PrefixLength},
+    ip::{Ipv4, Ipv4Addr, PrefixLength},
     SpecifiedAddr, Witness as _,
 };
 use rand::SeedableRng as _;
@@ -378,75 +378,13 @@ impl Client {
     ) -> Result<ClientWatchConfigurationResponse, Error> {
         let clock = Clock;
         loop {
-            let Self { core, rng, config, stop_receiver, current_lease, interface_id } = self;
+            let step =
+                self.watch_configuration_step(packet_socket_provider, udp_socket_provider).await;
 
-            // Notice that we are `select`ing between the following two futures,
-            // and when one of them completes we throw away progress on the
-            // other one:
-            // 1) Watching for a previously-acquired address to be removed
-            // 2) Running the current state machine state
-            //
-            // If (1) completes, throwing away progress on (2) is okay because
-            // we always need to either transition back to the Init state or
-            // exit the client when an address is removed -- in both cases we're
-            // fine with throwing away whatever state-execution progress we'd
-            // previously made.
-            //
-            // If (2) completes, throwing away progress on (1) is okay because
-            // we'll be in one of two scenarios:
-            // a) We've transitioned to another state that maintains the same
-            //    lease (e.g. going from Bound to Renewing for the same
-            //    address). In this case, we won't modify the `current_lease`
-            //    field, and we'll observe that the AddressStateProvider has
-            //    been closed on the next iteration of this loop.
-            // b) We've transitioned to a state that entails removing the lease
-            //    (e.g. failing to Rebind and having to go back to Init), at
-            //    which point `current_lease` will be cleared for the next
-            //    iteration.
-            let select_result = {
-                let core_step_fut = core
-                    .run(
-                        config,
-                        packet_socket_provider,
-                        udp_socket_provider,
-                        rng,
-                        &clock,
-                        stop_receiver,
-                    )
-                    .fuse();
-                let address_removed_fut = async {
-                    match current_lease {
-                        Some(current_lease) => {
-                            match current_lease.watch_for_address_removal().await {
-                                Ok(reason) => (Some(reason), current_lease.ip_address),
-                                Err(e) => {
-                                    tracing::error!(
-                                        "observed error {:?} while watching for removal \
-                                         of address {} on interface {}; \
-                                         removing address",
-                                        e,
-                                        *current_lease.ip_address,
-                                        interface_id
-                                    );
-                                    (None, current_lease.ip_address)
-                                }
-                            }
-                        }
-                        None => futures::future::pending().await,
-                    }
-                }
-                .fuse();
-
-                pin_mut!(core_step_fut, address_removed_fut);
-
-                select! {
-                    reason = address_removed_fut => futures::future::Either::Left(reason),
-                    core_step = core_step_fut => futures::future::Either::Right(core_step),
-                }
-            };
-
-            match select_result {
-                futures::future::Either::Left((reason, ip_address)) => {
+            let Self { core, rng: _, config, stop_receiver: _, current_lease, interface_id: _ } =
+                self;
+            match step {
+                WatchConfigurationStep::CurrentLeaseAddressRemoved((reason, ip_address)) => {
                     // TODO(https://fxbug.dev/126747): Explicitly remove this
                     // address and observe the OnAddressRemoved event to ensure
                     // we don't race with netstack-side teardown if we end up
@@ -492,14 +430,12 @@ impl Client {
                         }
                     }
                 }
-                futures::future::Either::Right(core_step) => {
-                    match core_step {
-                        Err(e) => return Err(Error::from_core(e)),
-                        Ok(step) => match step {
-                            dhcp_client_core::client::Step::NextState(transition) => {
-                                let (next_core, effect) = core.apply(transition);
-                                *core = next_core;
-                                match effect {
+                WatchConfigurationStep::CoreStep(core_step) => {
+                    match core_step? {
+                        dhcp_client_core::client::Step::NextState(transition) => {
+                            let (next_core, effect) = core.apply(transition);
+                            *core = next_core;
+                            match effect {
                                 Some(dhcp_client_core::client::TransitionEffect::DropLease) => {
                                     // TODO(https://fxbug.dev/126747):
                                     // Explicitly remove this address and
@@ -509,30 +445,107 @@ impl Client {
                                     // address later.
                                     assert!(current_lease.take().is_some());
                                 }
-                                Some(dhcp_client_core::client::TransitionEffect::HandleNewLease(
-                                    newly_acquired_lease,
-                                )) => {
+                                Some(
+                                    dhcp_client_core::client::TransitionEffect::HandleNewLease(
+                                        newly_acquired_lease,
+                                    ),
+                                ) => {
                                     return self.handle_newly_acquired_lease(newly_acquired_lease);
                                 }
-                                Some(dhcp_client_core::client::TransitionEffect::HandleRenewedLease(
-                                    lease_renewal
-                                )) => {
+                                Some(
+                                    dhcp_client_core::client::TransitionEffect::HandleRenewedLease(
+                                        lease_renewal,
+                                    ),
+                                ) => {
                                     return self.handle_lease_renewal(lease_renewal).await;
                                 }
                                 None => (),
-                                }
                             }
-                            dhcp_client_core::client::Step::Exit(reason) => match reason {
-                                dhcp_client_core::client::ExitReason::GracefulShutdown => {
-                                    return Err(Error::Exit(ClientExitReason::GracefulShutdown))
-                                }
-                            },
+                        }
+                        dhcp_client_core::client::Step::Exit(reason) => match reason {
+                            dhcp_client_core::client::ExitReason::GracefulShutdown => {
+                                return Err(Error::Exit(ClientExitReason::GracefulShutdown))
+                            }
                         },
                     }
                 }
             };
         }
     }
+
+    async fn watch_configuration_step(
+        &mut self,
+        packet_socket_provider: &crate::packetsocket::PacketSocketProviderImpl,
+        udp_socket_provider: &impl dhcp_client_core::deps::UdpSocketProvider,
+    ) -> WatchConfigurationStep {
+        let Self { core, rng, config, stop_receiver, current_lease, interface_id } = self;
+        let clock = Clock;
+
+        // Notice that we are `select`ing between the following two futures,
+        // and when one of them completes we throw away progress on the
+        // other one:
+        // 1) Watching for a previously-acquired address to be removed
+        // 2) Running the current state machine state
+        //
+        // If (1) completes, throwing away progress on (2) is okay because
+        // we always need to either transition back to the Init state or
+        // exit the client when an address is removed -- in both cases we're
+        // fine with throwing away whatever state-execution progress we'd
+        // previously made.
+        //
+        // If (2) completes, throwing away progress on (1) is okay because
+        // we'll be in one of two scenarios:
+        // a) We've transitioned to another state that maintains the same
+        //    lease (e.g. going from Bound to Renewing for the same
+        //    address). In this case, we won't modify the `current_lease`
+        //    field, and we'll observe that the AddressStateProvider has
+        //    been closed on the next iteration of this loop.
+        // b) We've transitioned to a state that entails removing the lease
+        //    (e.g. failing to Rebind and having to go back to Init), at
+        //    which point `current_lease` will be cleared for the next
+        //    iteration.
+        let core_step_fut = core
+            .run(config, packet_socket_provider, udp_socket_provider, rng, &clock, stop_receiver)
+            .fuse();
+        let address_removed_fut = async {
+            match current_lease {
+                Some(current_lease) => match current_lease.watch_for_address_removal().await {
+                    Ok(reason) => (Some(reason), current_lease.ip_address),
+                    Err(e) => {
+                        tracing::error!(
+                            "observed error {:?} while watching for removal \
+                                         of address {} on interface {}; \
+                                         removing address",
+                            e,
+                            *current_lease.ip_address,
+                            interface_id
+                        );
+                        (None, current_lease.ip_address)
+                    }
+                },
+                None => futures::future::pending().await,
+            }
+        }
+        .fuse();
+
+        pin_mut!(core_step_fut, address_removed_fut);
+
+        select! {
+            address_removed = address_removed_fut => {
+                WatchConfigurationStep::CurrentLeaseAddressRemoved(address_removed)
+            },
+            core_step = core_step_fut => {
+                WatchConfigurationStep::CoreStep(core_step.map_err(Error::from_core))
+            },
+        }
+    }
+}
+
+enum WatchConfigurationStep {
+    CurrentLeaseAddressRemoved(
+        (Option<fnet_interfaces_admin::AddressRemovalReason>, SpecifiedAddr<Ipv4Addr>),
+    ),
+    CoreStep(Result<dhcp_client_core::client::Step<fasync::Time>, Error>),
 }
 
 fn into_fidl_list(list: Vec<std::net::Ipv4Addr>) -> Vec<fidl_fuchsia_net::Ipv4Address> {
