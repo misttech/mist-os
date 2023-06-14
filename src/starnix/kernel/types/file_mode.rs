@@ -73,7 +73,7 @@ impl FileMode {
     }
 
     pub fn with_type(&self, file_type: FileMode) -> FileMode {
-        FileMode((self.bits() & 0o777) | (file_type.bits() & uapi::S_IFMT))
+        FileMode((self.bits() & Self::PERMISSIONS.bits()) | (file_type.bits() & uapi::S_IFMT))
     }
 
     pub fn is_lnk(&self) -> bool {

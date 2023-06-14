@@ -976,7 +976,6 @@ impl FsNode {
         self.update_info(|info| {
             let creds = current_task.creds();
             if !creds.has_capability(CAP_FOWNER) {
-                let creds = current_task.creds();
                 if info.uid != creds.euid {
                     return error!(EPERM);
                 }

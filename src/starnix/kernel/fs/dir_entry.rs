@@ -358,6 +358,22 @@ impl DirEntry {
         if mode.is_dir() {
             self.node.mkdir(current_task, name, mode, owner)
         } else {
+            // https://man7.org/linux/man-pages/man7/inode.7.html says:
+            //
+            //   For an executable file, the set-group-ID bit causes the
+            //   effective group ID of a process that executes the file to change
+            //   as described in execve(2).
+            //
+            // We need to check whether the current task has permission to create such a file.
+            // See a similar check in `FsNode::chmod`.
+            let creds = current_task.creds();
+            if !creds.has_capability(CAP_FOWNER)
+                && owner.gid != creds.egid
+                && !creds.is_in_group(owner.gid)
+            {
+                mode &= !FileMode::ISGID;
+            }
+
             let node = self.node.mknod(current_task, name, mode, dev, owner)?;
             if mode.is_sock() {
                 node.set_socket(Socket::new(
@@ -427,8 +443,11 @@ impl DirEntry {
         must_be_directory: bool,
     ) -> Result<(), Errno> {
         assert!(!DirEntry::is_reserved_name(name));
-        let mut self_children = self.lock_children();
 
+        // The user must be able to search the directory (requires the EXEC permission)
+        self.node.check_access(current_task, Access::EXEC)?;
+
+        let mut self_children = self.lock_children();
         let child = self_children.component_lookup(current_task, name)?;
         let child_children = child.children.read();
 
