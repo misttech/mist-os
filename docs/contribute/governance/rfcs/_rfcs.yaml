@@ -2879,3 +2879,16 @@
   reviewers: ['aaronwood@google.com', 'abarth@google.com', 'amathes@google.com', 'ddorwin@google.com', 'dworsham@google.com', 'fmeawad@google.com', 'hjfreyer@google.com', 'jasoncampbell@google.com', 'neelsa@google.com', 'nicoh@google.com']
   submitted: '2022-04-06'
   reviewed: '2022-06-13'
+
+- name: 'RFC-0221'
+  title: 'Python for out-of-tree system testing'
+  short_description: 'Approve Python for out-of-tree system testing.'
+  authors: ['chok']
+  file: '0221_python_for_out-of-tree_system_testing.md'
+  area: ['Languages and Libraries', 'Testing']
+  issue: ['']
+  gerrit_change_id: ['848319']
+  status: 'Accepted'
+  reviewers: ['abarth@google.com', 'cpu@google.com', 'jamesr@google.com', 'keir@google.com', 'rlb@google.com']
+  submitted: '2023-04-27'
+  reviewed: '2023-06-13'
