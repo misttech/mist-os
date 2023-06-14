@@ -62,7 +62,6 @@ group("dart_allowlist") {
     "//sdk/dart/fuchsia_inspect:*",
     "//sdk/dart/fuchsia_inspect/test/integration:*",
     "//sdk/dart/fuchsia_inspect/test/validator_puppet:*",
-    "//sdk/dart/fuchsia_internationalization_flutter:*",
     "//sdk/dart/fuchsia_logger:*",
     "//sdk/dart/fuchsia_logger/test/integration:*",
     "//sdk/dart/fuchsia_scenic:*",

@@ -110,10 +110,7 @@ group("tests") {
   # TODO(fxb/41505): Temporarily disable flutter_tester tests on mac hosts.
   _flutter_tester_tests = []
   if (host_os != "mac") {
-    _flutter_tester_tests += [
-      "//sdk/dart/fuchsia_internationalization_flutter:tests($host_toolchain)",
-      "//sdk/dart/fuchsia_scenic_flutter:fuchsia_scenic_flutter_unittests($host_toolchain)",
-    ]
+    _flutter_tester_tests += [ "//sdk/dart/fuchsia_scenic_flutter:fuchsia_scenic_flutter_unittests($host_toolchain)" ]
   }
 
   public_deps = [
@@ -172,7 +169,6 @@ action("dart_sdk_docs") {
     rebase_path("//sdk/dart/fuchsia"),
     rebase_path("//sdk/dart/fuchsia_component_test"),
     rebase_path("//sdk/dart/fuchsia_inspect"),
-    rebase_path("//sdk/dart/fuchsia_internationalization_flutter"),
     rebase_path("//sdk/dart/fuchsia_logger"),
     rebase_path("//sdk/dart/fuchsia_scenic"),
     rebase_path("//sdk/dart/fuchsia_scenic_flutter"),
