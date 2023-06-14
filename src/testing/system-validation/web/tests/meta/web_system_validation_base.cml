@@ -43,8 +43,6 @@
                 "fuchsia.feedback.ComponentDataRegister",
                 "fuchsia.feedback.CrashReportingProductRegister",
                 "fuchsia.logger.LogSink",
-                "fuchsia.sys.Environment",
-                "fuchsia.sys.Loader",
             ],
             from: "parent",
             to: "#context_provider",

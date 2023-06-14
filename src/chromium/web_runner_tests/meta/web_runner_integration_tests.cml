@@ -126,16 +126,6 @@
         },
         {
             protocol: [
-                // TODO(crbug.com/1280703): Remove "fuchsia.sys.*" after
-                // successful transition to CFv2.
-                "fuchsia.sys.Environment",
-                "fuchsia.sys.Loader",
-            ],
-            from: "parent",
-            to: "#realm_builder",
-        },
-        {
-            protocol: [
                 "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.tracing.provider.Registry",

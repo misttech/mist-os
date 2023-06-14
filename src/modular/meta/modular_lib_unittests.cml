@@ -13,24 +13,8 @@
     },
     use: [
         {
-            protocol: [
-                "fuchsia.sys.Environment",
-                "fuchsia.sys.Launcher",
-            ],
-        },
-        {
             storage: "tmp",
             path: "/tmp",
         },
     ],
-    facets: {
-        "fuchsia.test": {
-            "deprecated-allowed-packages": [
-                "basemgr",
-                "environment_delegating_runner",
-                "modular_test_harness",
-                "sessionmgr",
-            ],
-        },
-    },
 }

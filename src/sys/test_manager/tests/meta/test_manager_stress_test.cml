@@ -19,14 +19,4 @@
             from: "#test_manager",
         },
     ],
-    offer: [
-        {
-            protocol: [
-                "fuchsia.sys.Environment",
-                "fuchsia.sys.Loader",
-            ],
-            from: "parent",
-            to: "#test_manager",
-        },
-    ],
 }

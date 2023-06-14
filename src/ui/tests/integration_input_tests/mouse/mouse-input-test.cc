@@ -300,7 +300,6 @@ class ChromiumInputTest : public MouseInputBase {
         {.capabilities =
              {
                  Protocol{fuchsia::process::Launcher::Name_},
-                 Protocol{fuchsia::sys::Environment::Name_},
                  Protocol{fuchsia::vulkan::loader::Loader::Name_},
              },
          .source = ParentRef(),
@@ -341,11 +340,6 @@ class ChromiumInputTest : public MouseInputBase {
         {.capabilities = {Protocol{fuchsia::web::ContextProvider::Name_}},
          .source = ChildRef{kWebContextProvider},
          .targets = {target}},
-        // TODO(crbug.com/1280703): Remove "fuchsia.sys.Environment" after
-        // successful transition to CFv2.
-        {.capabilities = {Protocol{fuchsia::sys::Environment::Name_}},
-         .source = ParentRef(),
-         .targets = {target, ChildRef{kWebContextProvider}}},
         {.capabilities = {Protocol{fuchsia::metrics::MetricEventLoggerFactory::Name_}},
          .source = ChildRef{kMockCobalt},
          .targets = {ChildRef{kMemoryPressureProvider}}},

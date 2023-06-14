@@ -19,9 +19,6 @@
     // [2]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/session/bin/session_manager/meta/session_manager.cml
     //
     // TODO(fxbug.dev/103234): Remove this shard
-
-    // Protocols used from a child are routed to the v1 sys realm.
-    use: [],
     offer: [
         {
             // These protocols are not available in smart products
@@ -50,17 +47,6 @@
             protocol: [ "fuchsia.bluetooth.sys.Bootstrap" ],
             from: "#bluetooth-core",
             to: "#session-manager",
-        },
-        {
-            // Routed from v1 components.
-            protocol: [
-                "fuchsia.sys.Environment",
-                "fuchsia.sys.Launcher",
-                "fuchsia.sys.Loader",
-            ],
-            from: "self",
-            to: "#session-manager",
-            dependency: "weak_for_migration",
         },
     ],
 }

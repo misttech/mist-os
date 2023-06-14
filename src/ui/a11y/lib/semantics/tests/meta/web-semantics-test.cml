@@ -22,7 +22,6 @@
                 "fuchsia.kernel.Stats",
                 "fuchsia.process.Launcher",
                 "fuchsia.scheduler.ProfileProvider",
-                "fuchsia.sys.Environment",
                 "fuchsia.sysmem.Allocator",
 
                 // Explicitly offer as there is no `vulkan/offer.shard.cml`.

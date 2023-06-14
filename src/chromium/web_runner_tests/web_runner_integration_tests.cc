@@ -101,18 +101,16 @@ class ChromiumAppTest : public gtest::RealLoopFixture,
                            "fuchsia-pkg://fuchsia.com/web_engine#meta/context_provider.cm");
 
     // Capabilities that must be given to ContextProvider.
-    realm_builder.AddRoute(Route{
-        // TODO(crbug.com/1280703): Remove "fuchsia.sys.Environment" after
-        // successful transition to CFv2. Alphabetize the rest.
-        .capabilities = {Protocol{"fuchsia.sys.Environment"}, Protocol{"fuchsia.logger.LogSink"},
-                         Protocol{"fuchsia.feedback.ComponentDataRegister"},
-                         Protocol{"fuchsia.feedback.CrashReportingProductRegister"},
-                         Directory{
-                             .name = "root-ssl-certificates",
-                             .rights = fuchsia::io::R_STAR_DIR,
-                         }},
-        .source = ParentRef(),
-        .targets = {ChildRef{"context_provider"}}});
+    realm_builder.AddRoute(
+        Route{.capabilities = {Protocol{"fuchsia.logger.LogSink"},
+                               Protocol{"fuchsia.feedback.ComponentDataRegister"},
+                               Protocol{"fuchsia.feedback.CrashReportingProductRegister"},
+                               Directory{
+                                   .name = "root-ssl-certificates",
+                                   .rights = fuchsia::io::R_STAR_DIR,
+                               }},
+              .source = ParentRef(),
+              .targets = {ChildRef{"context_provider"}}});
 
     // Expose the ContextProvider capabilities to the test.
     realm_builder.AddRoute(Route{.capabilities = {Protocol{"fuchsia.web.ContextProvider"}},

@@ -23,19 +23,6 @@
             from: "#feedback",
             to: "#context_provider",
         },
-
-        // TODO(crbug.com/1280703): Remove the offers in this next block once
-        // context_provider.cm is launching web_instance.cm rather than
-        // web_instance.cmx in the "release" prebuilt.
-        {
-            protocol: [
-                "fuchsia.sys.Environment",
-                "fuchsia.sys.Loader",
-            ],
-            from: "self",
-            to: "#context_provider",
-            dependency: "weak_for_migration",
-        },
         {
             directory: "config-data",
             from: "parent",

@@ -24,17 +24,6 @@
             to: "#sandbox",
         },
         {
-            protocol: [
-                "fuchsia.sys.Environment",
-                "fuchsia.sys.Loader",
-            ],
-            from: "parent",
-            to: "#sandbox",
-
-            // Used to support cmx children, if/when appmgr is present.
-            availability: "optional",
-        },
-        {
             storage: [
                 "cache",
                 "data",

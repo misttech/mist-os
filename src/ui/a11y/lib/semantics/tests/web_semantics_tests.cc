@@ -218,11 +218,6 @@ class WebSemanticsTest : public SemanticsIntegrationTestV2 {
     realm()->AddRoute({.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
                        .source = ChildRef{kWebView},
                        .targets = {ParentRef()}});
-    // TODO(crbug.com/1280703): Remove "fuchsia.sys.Environment" after
-    // successful transition to CFv2.
-    realm()->AddRoute({.capabilities = {Protocol{fuchsia::sys::Environment::Name_}},
-                       .source = ParentRef(),
-                       .targets = {ChildRef{kWebContextProvider}, ChildRef{kWebView}}});
 
     FX_LOGS(INFO) << "Override html config";
     // Override "html" config value for web client.

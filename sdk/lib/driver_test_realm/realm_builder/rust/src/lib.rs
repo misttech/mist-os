@@ -39,7 +39,6 @@ impl DriverTestRealmBuilder for RealmBuilder {
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
                 .capability(Capability::protocol_by_name("fuchsia.process.Launcher"))
-                .capability(Capability::protocol_by_name("fuchsia.sys.Launcher"))
                 .from(Ref::parent())
                 .to(&driver_realm),
         )

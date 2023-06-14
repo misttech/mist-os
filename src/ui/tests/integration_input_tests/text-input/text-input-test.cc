@@ -197,12 +197,9 @@ class ChromiumInputBase : public gtest::RealLoopFixture {
          // Protocol{fuchsia::net::interfaces::State::Name_},
          // TODO(fxbug.dev/123550): Do the feedback protocols need to be here? Is
          // including launch_context_provider.shard.cml sufficient?
-         // TODO(crbug.com/1280703): Remove "fuchsia.sys.Environment" after
-         // successful transition to CFv2.
          Protocol{fuchsia::kernel::Stats::Name_}, Protocol{fuchsia::process::Launcher::Name_},
          Protocol{fuchsia::feedback::ComponentDataRegister::Name_},
          Protocol{fuchsia::feedback::CrashReportingProductRegister::Name_},
-         Protocol{fuchsia::sys::Environment::Name_},
          Directory{
              .name = "root-ssl-certificates",
              .type = fuchsia::component::decl::DependencyType::STRONG,
@@ -484,11 +481,6 @@ class ChromiumInputTest : public ChromiumInputBase {
         {.capabilities = {Protocol{fuchsia::accessibility::semantics::SemanticsManager::Name_}},
          .source = ParentRef(),
          .targets = {target}},
-        // TODO(crbug.com/1280703): Remove "fuchsia.sys.Environment" after
-        // successful transition to CFv2.
-        {.capabilities = {Protocol{fuchsia::sys::Environment::Name_}},
-         .source = ParentRef(),
-         .targets = {target, ChildRef{kWebContextProvider}}},
         {.capabilities = {Protocol{fuchsia::metrics::MetricEventLoggerFactory::Name_}},
          .source = ChildRef{kMockCobalt},
          .targets = {ChildRef{kMemoryPressureProvider}}},

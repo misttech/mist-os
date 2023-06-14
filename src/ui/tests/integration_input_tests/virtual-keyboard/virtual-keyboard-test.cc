@@ -114,7 +114,7 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest() {
     config.use_scene_owner = true;
     config.ui_to_client_services = protocols_required;
     config.passthrough_capabilities = {
-        {Protocol{fuchsia::process::Launcher::Name_}, Protocol{fuchsia::sys::Environment::Name_},
+        {Protocol{fuchsia::process::Launcher::Name_},
          Directory{
              .name = "root-ssl-certificates",
              .type = fuchsia::component::decl::DependencyType::STRONG,
@@ -132,7 +132,7 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest() {
     config.ui_to_client_services.push_back(fuchsia::ui::composition::Flatland::Name_);
     config.ui_to_client_services.push_back(fuchsia::ui::composition::Allocator::Name_);
     config.passthrough_capabilities = {
-        {Protocol{fuchsia::process::Launcher::Name_}, Protocol{fuchsia::sys::Environment::Name_},
+        {Protocol{fuchsia::process::Launcher::Name_},
          Directory{
              .name = "root-ssl-certificates",
              .type = fuchsia::component::decl::DependencyType::STRONG,
@@ -476,16 +476,6 @@ class WebEngineTest : public VirtualKeyboardBase {
         {.capabilities = {Protocol{fuchsia::buildinfo::Provider::Name_}},
          .source = ChildRef{kBuildInfoProvider},
          .targets = {target}},
-        // TODO(crbug.com/1280703): Remove "fuchsia.sys.Environment" after
-        // successful transition to CFv2.
-        {
-            .capabilities =
-                {
-                    Protocol{fuchsia::sys::Environment::Name_},
-                },
-            .source = ParentRef(),
-            .targets = {ChildRef{kWebContextProvider}},
-        },
         {.capabilities = {Directory{
              .name = "root-ssl-certificates",
              .type = fuchsia::component::decl::DependencyType::STRONG,

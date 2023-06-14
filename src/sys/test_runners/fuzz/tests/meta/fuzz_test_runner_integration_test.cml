@@ -37,14 +37,6 @@
             ],
         },
         {
-            protocol: [
-                "fuchsia.sys.Environment",
-                "fuchsia.sys.Loader",
-            ],
-            from: "parent",
-            to: "#test_manager",
-        },
-        {
             protocol: "fuchsia.component.Realm",
             from: "framework",
             to: "#test_manager",

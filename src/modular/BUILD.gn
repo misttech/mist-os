@@ -34,7 +34,6 @@ group("tests") {
 }
 
 fuchsia_unittest_package("modular_lib_tests") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   deps = [ "//src/modular/lib:modular_lib_unittests" ]
   manifest = "meta/modular_lib_unittests.cml"
   test_specs = {

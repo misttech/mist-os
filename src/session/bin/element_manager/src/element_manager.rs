@@ -554,7 +554,7 @@ mod tests {
         fuchsia_zircon as zx,
         futures::{channel::mpsc::channel, prelude::*},
         maplit::hashmap,
-        session_testing::{spawn_directory_server, spawn_noop_directory_server},
+        session_testing::spawn_directory_server,
     };
 
     fn example_collection_config() -> CollectionConfig {
@@ -680,36 +680,6 @@ mod tests {
         let _ = element.connect_to_named_protocol_with_channel("myProtocol", server_channel);
         let open_paths = directory_open_receiver.take(2).collect::<Vec<_>>().await;
         assert_eq!(vec![fcomponent::BinderMarker::DEBUG_NAME, "myProtocol"], open_paths);
-    }
-
-    /// Tests that adding a .cm element does not use fuchsia.sys.Launcher.
-    #[fuchsia::test]
-    async fn launch_element_success_not_use_launcher() {
-        let component_url = "fuchsia-pkg://fuchsia.com/simple_element#meta/simple_element.cm";
-        let child_name = "child";
-
-        let realm = spawn_stream_handler(move |realm_request| async move {
-            match realm_request {
-                fcomponent::RealmRequest::CreateChild { collection, decl, args: _, responder } => {
-                    assert_eq!(decl.url.unwrap(), component_url);
-                    assert_eq!(decl.name.unwrap(), child_name);
-                    assert_eq!(&collection.name, "elements");
-
-                    let _ = responder.send(Ok(()));
-                }
-                fcomponent::RealmRequest::OpenExposedDir { child, exposed_dir, responder } => {
-                    assert_eq!(child.collection, Some("elements".to_string()));
-                    spawn_noop_directory_server(exposed_dir);
-                    let _ = responder.send(Ok(()));
-                }
-                _ => panic!("Realm handler received an unexpected request"),
-            }
-        })
-        .unwrap();
-
-        let element_manager = ElementManager::new(realm, None, example_collection_config(), false);
-
-        assert!(element_manager.launch_element(component_url, child_name).await.is_ok());
     }
 
     /// Tests that launching an element which is not successfully created in the realm returns an

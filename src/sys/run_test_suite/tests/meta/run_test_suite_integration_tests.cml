@@ -41,11 +41,6 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.sys.Loader" ],
-            from: "parent",
-            to: "#test_manager",
-        },
-        {
             event_stream: [
                 "capability_requested",
                 "directory_ready",

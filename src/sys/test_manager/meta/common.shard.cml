@@ -286,19 +286,6 @@
                 "#g3_dart_jit_product_runner",
             ],
         },
-        {
-            protocol: [
-                "fuchsia.sys.Environment",
-                "fuchsia.sys.Loader",
-            ],
-            from: "parent",
-            to: [
-                "#dart_aot_runner",
-                "#dart_jit_runner",
-                "#g3_dart_jit_product_runner",
-            ],
-            availability: "optional",
-        },
 
         // These capabilities are offered for use by certain non-hermetic tests.
         {

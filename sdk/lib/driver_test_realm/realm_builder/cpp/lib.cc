@@ -29,11 +29,6 @@ void Setup(component_testing::RealmBuilder& realm_builder) {
       .targets = {ChildRef{"driver_test_realm"}},
   });
   realm_builder.AddRoute(Route{
-      .capabilities = {Protocol{"fuchsia.sys.Launcher"}},
-      .source = {ParentRef()},
-      .targets = {ChildRef{"driver_test_realm"}},
-  });
-  realm_builder.AddRoute(Route{
       .capabilities = {Protocol{"fuchsia.driver.development.DriverDevelopment"}},
       .source = {ChildRef{"driver_test_realm"}},
       .targets = {ParentRef()},
