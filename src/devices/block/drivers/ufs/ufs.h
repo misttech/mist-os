@@ -137,6 +137,8 @@ class Ufs : public UfsDeviceType {
   DeviceDescriptor &GetDeviceDescriptor() { return device_descriptor_; }
   GeometryDescriptor &GetGeometryDescriptor() { return geometry_descriptor_; }
 
+  void DumpRegisters();
+
  private:
   friend class UfsTest;
   // TODO(fxbug.dev/124835): Irq threads and scsi threads will be refactored.

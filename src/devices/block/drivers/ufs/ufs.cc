@@ -45,7 +45,7 @@ zx::result<> Ufs::Notify(NotifyEvent event, uint64_t data) {
 }
 
 zx_status_t Ufs::WaitWithTimeout(fit::function<zx_status_t()> wait_for, uint32_t timeout_us,
-                                 const fbl::String &timeout_message) {
+                                 const fbl::String& timeout_message) {
   uint32_t time_left = timeout_us;
   while (true) {
     if (wait_for()) {
@@ -60,7 +60,7 @@ zx_status_t Ufs::WaitWithTimeout(fit::function<zx_status_t()> wait_for, uint32_t
   }
 }
 
-void Ufs::HandleBlockOp(IoCommand *io_cmd) {
+void Ufs::HandleBlockOp(IoCommand* io_cmd) {
   zx::pmt pmt;
   std::unique_ptr<ScsiCommandUpiu> upiu;
   std::array<zx_paddr_t, 2> data_paddrs = {0};
@@ -275,10 +275,10 @@ int Ufs::ScsiLoop() {
 
 zx::result<> Ufs::QueueScsiCommand(std::unique_ptr<ScsiCommandUpiu> upiu, uint8_t lun,
                                    const std::array<zx_paddr_t, 2> buffer_phys,
-                                   sync_completion_t *event) {
+                                   sync_completion_t* event) {
   auto xfer = std::make_unique<scsi_xfer>();
-  sync_completion_t *local_event = &xfer->local_event;
-  BlockDevice &block_device = block_devices_[lun];
+  sync_completion_t* local_event = &xfer->local_event;
+  BlockDevice& block_device = block_devices_[lun];
 
   xfer->lun = lun;
   xfer->op = upiu->GetOpcode();
@@ -331,7 +331,7 @@ zx_status_t Ufs::Init() {
   }
 
   if (int thrd_status = thrd_create_with_name(
-          &scsi_thread_, [](void *ctx) { return static_cast<Ufs *>(ctx)->ScsiLoop(); }, this,
+          &scsi_thread_, [](void* ctx) { return static_cast<Ufs*>(ctx)->ScsiLoop(); }, this,
           "ufs-scsi-thread");
       thrd_status) {
     zx_status_t status = thrd_status_to_zx_status(thrd_status);
@@ -366,6 +366,9 @@ zx_status_t Ufs::Init() {
   }
   logical_unit_count_ = lun_count;
   zxlogf(INFO, "Bind Success");
+
+  DumpRegisters();
+
   return ZX_OK;
 }
 
@@ -386,7 +389,7 @@ zx::result<> Ufs::InitController() {
   }
 
   if (int thrd_status = thrd_create_with_name(
-          &irq_thread_, [](void *ctx) { return static_cast<Ufs *>(ctx)->IrqLoop(); }, this,
+          &irq_thread_, [](void* ctx) { return static_cast<Ufs*>(ctx)->IrqLoop(); }, this,
           "ufs-irq-thread");
       thrd_status) {
     zx_status_t status = thrd_status_to_zx_status(thrd_status);
@@ -656,7 +659,7 @@ zx::result<> Ufs::ScanLogicalUnits() {
     zxlogf(ERROR, "Failed to map IO buffer: %s", zx_status_get_string(status));
     return zx::error(status);
   }
-  auto *sense_data = reinterpret_cast<ScsiSenseData *>(mapper.start());
+  auto* sense_data = reinterpret_cast<ScsiSenseData*>(mapper.start());
   std::array<zx_paddr_t, 2> sense_data_paddr = {0};
   if (zx_status_t status =
           bti_.pin(ZX_BTI_PERM_WRITE, *unowned_vmo, 0, kPageSize, sense_data_paddr.data(), 1, &pmt);
@@ -683,7 +686,7 @@ zx::result<> Ufs::ScanLogicalUnits() {
       continue;
     }
 
-    BlockDevice &block_device = block_devices_[i];
+    BlockDevice& block_device = block_devices_[i];
     block_device.is_present = true;
     block_device.lun = i;
 
@@ -739,6 +742,54 @@ zx::result<> Ufs::ScanLogicalUnits() {
   return zx::ok();
 }
 
+void Ufs::DumpRegisters() {
+  CapabilityReg::Get().ReadFrom(&mmio_).Print(
+      [](const char* arg) { zxlogf(DEBUG, "CapabilityReg::%s", arg); });
+  VersionReg::Get().ReadFrom(&mmio_).Print(
+      [](const char* arg) { zxlogf(DEBUG, "VersionReg::%s", arg); });
+
+  InterruptStatusReg::Get().ReadFrom(&mmio_).Print(
+      [](const char* arg) { zxlogf(DEBUG, "InterruptStatusReg::%s", arg); });
+  InterruptEnableReg::Get().ReadFrom(&mmio_).Print(
+      [](const char* arg) { zxlogf(DEBUG, "InterruptEnableReg::%s", arg); });
+
+  HostControllerStatusReg::Get().ReadFrom(&mmio_).Print(
+      [](const char* arg) { zxlogf(DEBUG, "HostControllerStatusReg::%s", arg); });
+  HostControllerEnableReg::Get().ReadFrom(&mmio_).Print(
+      [](const char* arg) { zxlogf(DEBUG, "HostControllerEnableReg::%s", arg); });
+
+  UtrListBaseAddressReg::Get().ReadFrom(&mmio_).Print(
+      [](const char* arg) { zxlogf(DEBUG, "UtrListBaseAddressReg::%s", arg); });
+  UtrListBaseAddressUpperReg::Get().ReadFrom(&mmio_).Print(
+      [](const char* arg) { zxlogf(DEBUG, "UtrListBaseAddressUpperReg::%s", arg); });
+  UtrListDoorBellReg::Get().ReadFrom(&mmio_).Print(
+      [](const char* arg) { zxlogf(DEBUG, "UtrListDoorBellReg::%s", arg); });
+  UtrListClearReg::Get().ReadFrom(&mmio_).Print(
+      [](const char* arg) { zxlogf(DEBUG, "UtrListClearReg::%s", arg); });
+  UtrListRunStopReg::Get().ReadFrom(&mmio_).Print(
+      [](const char* arg) { zxlogf(DEBUG, "UtrListRunStopReg::%s", arg); });
+  UtrListCompletionNotificationReg::Get().ReadFrom(&mmio_).Print(
+      [](const char* arg) { zxlogf(DEBUG, "UtrListCompletionNotificationReg::%s", arg); });
+
+  UtmrListBaseAddressReg::Get().ReadFrom(&mmio_).Print(
+      [](const char* arg) { zxlogf(DEBUG, "UtmrListBaseAddressReg::%s", arg); });
+  UtmrListBaseAddressUpperReg::Get().ReadFrom(&mmio_).Print(
+      [](const char* arg) { zxlogf(DEBUG, "UtmrListBaseAddressUpperReg::%s", arg); });
+  UtmrListDoorBellReg::Get().ReadFrom(&mmio_).Print(
+      [](const char* arg) { zxlogf(DEBUG, "UtmrListDoorBellReg::%s", arg); });
+  UtmrListRunStopReg::Get().ReadFrom(&mmio_).Print(
+      [](const char* arg) { zxlogf(DEBUG, "UtmrListRunStopReg::%s", arg); });
+
+  UicCommandReg::Get().ReadFrom(&mmio_).Print(
+      [](const char* arg) { zxlogf(DEBUG, "UicCommandReg::%s", arg); });
+  UicCommandArgument1Reg::Get().ReadFrom(&mmio_).Print(
+      [](const char* arg) { zxlogf(DEBUG, "UicCommandArgument1Reg::%s", arg); });
+  UicCommandArgument2Reg::Get().ReadFrom(&mmio_).Print(
+      [](const char* arg) { zxlogf(DEBUG, "UicCommandArgument2Reg::%s", arg); });
+  UicCommandArgument3Reg::Get().ReadFrom(&mmio_).Print(
+      [](const char* arg) { zxlogf(DEBUG, "UicCommandArgument3Reg::%s", arg); });
+}
+
 zx_status_t Ufs::EnableHostController() {
   HostControllerEnableReg::Get().FromValue(0).set_host_controller_enable(true).WriteTo(&mmio_);
 
@@ -770,7 +821,7 @@ zx_status_t Ufs::AddDevice() {
   return ZX_OK;
 }
 
-zx_status_t Ufs::Bind(void *ctx, zx_device_t *parent) {
+zx_status_t Ufs::Bind(void* ctx, zx_device_t* parent) {
   ddk::Pci pci(parent, "pci");
   if (!pci.is_valid()) {
     zxlogf(ERROR, "Failed to find PCI fragment");
@@ -832,6 +883,7 @@ void Ufs::DdkInit(ddk::InitTxn txn) {
   zx_status_t status = Init();
   if (status != ZX_OK) {
     zxlogf(ERROR, "Driver initialization failed: %s", zx_status_get_string(status));
+    DumpRegisters();
   }
   txn.Reply(status);
 }

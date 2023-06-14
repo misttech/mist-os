@@ -55,7 +55,7 @@ enum RegisterMap {
 
 // UFSHCI Specification Version 3.0, section 5.2.1
 // "Offset 00h: CAP – Controller Capabilities".
-class CapabilityReg : public hwreg::RegisterBase<CapabilityReg, uint32_t> {
+class CapabilityReg : public hwreg::RegisterBase<CapabilityReg, uint32_t, hwreg::EnablePrinter> {
  public:
   DEF_BIT(28, crtpto_support);
   DEF_BIT(26, uic_dme_test_mode_command_suppoort);
@@ -71,7 +71,7 @@ class CapabilityReg : public hwreg::RegisterBase<CapabilityReg, uint32_t> {
 
 // UFSHCI Specification Version 3.0, section 5.2.2
 // "Offset 08h: VER – UFS Version".
-class VersionReg : public hwreg::RegisterBase<VersionReg, uint32_t> {
+class VersionReg : public hwreg::RegisterBase<VersionReg, uint32_t, hwreg::EnablePrinter> {
  public:
   DEF_FIELD(15, 8, major_version_number);
   DEF_FIELD(7, 4, minor_version_number);
@@ -82,7 +82,8 @@ class VersionReg : public hwreg::RegisterBase<VersionReg, uint32_t> {
 
 // UFSHCI Specification Version 3.0, section 5.3.1
 // "Offset 20h: IS – Interrupt Status".
-class InterruptStatusReg : public hwreg::RegisterBase<InterruptStatusReg, uint32_t> {
+class InterruptStatusReg
+    : public hwreg::RegisterBase<InterruptStatusReg, uint32_t, hwreg::EnablePrinter> {
  public:
   DEF_BIT(18, crypto_engine_fatal_error_status);
   DEF_BIT(17, system_bus_fatal_error_status);
@@ -106,7 +107,8 @@ class InterruptStatusReg : public hwreg::RegisterBase<InterruptStatusReg, uint32
 
 // UFSHCI Specification Version 3.0, section 5.3.2
 // "Offset 24h: IE – Interrupt Enable".
-class InterruptEnableReg : public hwreg::RegisterBase<InterruptEnableReg, uint32_t> {
+class InterruptEnableReg
+    : public hwreg::RegisterBase<InterruptEnableReg, uint32_t, hwreg::EnablePrinter> {
  public:
   DEF_BIT(18, crypto_engine_fatal_error_enable);
   DEF_BIT(17, system_bus_fatal_error_enable);
@@ -130,7 +132,8 @@ class InterruptEnableReg : public hwreg::RegisterBase<InterruptEnableReg, uint32
 
 // UFSHCI Specification Version 3.0, section 5.3.3
 // "Offset 30h: HCS – Host Controller Status".
-class HostControllerStatusReg : public hwreg::RegisterBase<HostControllerStatusReg, uint32_t> {
+class HostControllerStatusReg
+    : public hwreg::RegisterBase<HostControllerStatusReg, uint32_t, hwreg::EnablePrinter> {
  public:
   enum ErrorCode {
     kRejectUpiuHasInvalidTaskTagOrLun = 0,
@@ -160,7 +163,8 @@ class HostControllerStatusReg : public hwreg::RegisterBase<HostControllerStatusR
 
 // UFSHCI Specification Version 3.0, section 5.3.4
 // "Offset 34h: HCE – Host Controller Enable".
-class HostControllerEnableReg : public hwreg::RegisterBase<HostControllerEnableReg, uint32_t> {
+class HostControllerEnableReg
+    : public hwreg::RegisterBase<HostControllerEnableReg, uint32_t, hwreg::EnablePrinter> {
  public:
   DEF_BIT(1, crypto_general_enable);
   DEF_BIT(0, host_controller_enable);
@@ -170,7 +174,8 @@ class HostControllerEnableReg : public hwreg::RegisterBase<HostControllerEnableR
 
 // UFSHCI Specification Version 3.0, section 5.4.1
 // "Offset 50h: UTRLBA – UTP Transfer Request List Base Address".
-class UtrListBaseAddressReg : public hwreg::RegisterBase<UtrListBaseAddressReg, uint32_t> {
+class UtrListBaseAddressReg
+    : public hwreg::RegisterBase<UtrListBaseAddressReg, uint32_t, hwreg::EnablePrinter> {
  public:
   DEF_FIELD(31, 0, address);
 
@@ -180,7 +185,7 @@ class UtrListBaseAddressReg : public hwreg::RegisterBase<UtrListBaseAddressReg, 
 // UFSHCI Specification Version 3.0, section 5.4.2
 // "Offset 54h: UTRLBAU – UTP Transfer Request List Base Address Upper 32-bits".
 class UtrListBaseAddressUpperReg
-    : public hwreg::RegisterBase<UtrListBaseAddressUpperReg, uint32_t> {
+    : public hwreg::RegisterBase<UtrListBaseAddressUpperReg, uint32_t, hwreg::EnablePrinter> {
  public:
   DEF_FIELD(31, 0, address_upper);
 
@@ -191,7 +196,8 @@ class UtrListBaseAddressUpperReg
 
 // UFSHCI Specification Version 3.0, section 5.4.3
 // "Offset 58h: UTRLDBR – UTP Transfer Request List Door Bell Register".
-class UtrListDoorBellReg : public hwreg::RegisterBase<UtrListDoorBellReg, uint32_t> {
+class UtrListDoorBellReg
+    : public hwreg::RegisterBase<UtrListDoorBellReg, uint32_t, hwreg::EnablePrinter> {
  public:
   DEF_FIELD(31, 0, door_bell);
 
@@ -200,7 +206,8 @@ class UtrListDoorBellReg : public hwreg::RegisterBase<UtrListDoorBellReg, uint32
 
 // UFSHCI Specification Version 3.0, section 5.4.4
 // "Offset 5Ch: UTRLCLR – UTP Transfer Request List Clear Register".
-class UtrListClearReg : public hwreg::RegisterBase<UtrListClearReg, uint32_t> {
+class UtrListClearReg
+    : public hwreg::RegisterBase<UtrListClearReg, uint32_t, hwreg::EnablePrinter> {
  public:
   DEF_FIELD(31, 0, clear);
 
@@ -209,7 +216,8 @@ class UtrListClearReg : public hwreg::RegisterBase<UtrListClearReg, uint32_t> {
 
 // UFSHCI Specification Version 3.0, section 5.4.5
 // "Offset 60h: UTRLRSR – UTP Transfer Request List Run Stop Register".
-class UtrListRunStopReg : public hwreg::RegisterBase<UtrListRunStopReg, uint32_t> {
+class UtrListRunStopReg
+    : public hwreg::RegisterBase<UtrListRunStopReg, uint32_t, hwreg::EnablePrinter> {
  public:
   DEF_BIT(0, value);
 
@@ -219,7 +227,7 @@ class UtrListRunStopReg : public hwreg::RegisterBase<UtrListRunStopReg, uint32_t
 // UFSHCI Specification Version 3.0, section 5.4.6
 // "Offset 64h: UTRLCNR – UTP Transfer Request List Completion Notification Register".
 class UtrListCompletionNotificationReg
-    : public hwreg::RegisterBase<UtrListCompletionNotificationReg, uint32_t> {
+    : public hwreg::RegisterBase<UtrListCompletionNotificationReg, uint32_t, hwreg::EnablePrinter> {
  public:
   DEF_FIELD(31, 0, notification);
 
@@ -230,7 +238,8 @@ class UtrListCompletionNotificationReg
 
 // UFSHCI Specification Version 3.0, section 5.5.1
 // "Offset 70h: UTMRLBA – UTP Task Management Request List Base Address".
-class UtmrListBaseAddressReg : public hwreg::RegisterBase<UtmrListBaseAddressReg, uint32_t> {
+class UtmrListBaseAddressReg
+    : public hwreg::RegisterBase<UtmrListBaseAddressReg, uint32_t, hwreg::EnablePrinter> {
  public:
   DEF_FIELD(31, 0, address);
 
@@ -240,7 +249,7 @@ class UtmrListBaseAddressReg : public hwreg::RegisterBase<UtmrListBaseAddressReg
 // UFSHCI Specification Version 3.0, section 5.5.2
 // "Offset 74h: UTMRLBAU – UTP Task Management Request List Base Address Upper 32-bits".
 class UtmrListBaseAddressUpperReg
-    : public hwreg::RegisterBase<UtmrListBaseAddressUpperReg, uint32_t> {
+    : public hwreg::RegisterBase<UtmrListBaseAddressUpperReg, uint32_t, hwreg::EnablePrinter> {
  public:
   DEF_FIELD(31, 0, address_upper);
 
@@ -251,7 +260,8 @@ class UtmrListBaseAddressUpperReg
 
 // UFSHCI Specification Version 3.0, section 5.5.3
 // "Offset 78h: UTMRLDBR – UTP Task Management Request List Door Bell Register".
-class UtmrListDoorBellReg : public hwreg::RegisterBase<UtmrListDoorBellReg, uint32_t> {
+class UtmrListDoorBellReg
+    : public hwreg::RegisterBase<UtmrListDoorBellReg, uint32_t, hwreg::EnablePrinter> {
  public:
   DEF_FIELD(7, 0, door_bell);
 
@@ -260,7 +270,8 @@ class UtmrListDoorBellReg : public hwreg::RegisterBase<UtmrListDoorBellReg, uint
 
 // UFSHCI Specification Version 3.0, section 5.5.5
 // "Offset 80h: UTMRLRSR – UTP Task Management Request List Run Stop Register".
-class UtmrListRunStopReg : public hwreg::RegisterBase<UtmrListRunStopReg, uint32_t> {
+class UtmrListRunStopReg
+    : public hwreg::RegisterBase<UtmrListRunStopReg, uint32_t, hwreg::EnablePrinter> {
  public:
   DEF_BIT(0, value);
 
@@ -269,7 +280,7 @@ class UtmrListRunStopReg : public hwreg::RegisterBase<UtmrListRunStopReg, uint32
 
 // UFSHCI Specification Version 3.0, section 5.6.1
 // "Offset 90h: UICCMD – UIC Command".
-class UicCommandReg : public hwreg::RegisterBase<UicCommandReg, uint32_t> {
+class UicCommandReg : public hwreg::RegisterBase<UicCommandReg, uint32_t, hwreg::EnablePrinter> {
  public:
   DEF_ENUM_FIELD(UicCommandOpcode, 7, 0, command_opcode);
 
@@ -278,7 +289,8 @@ class UicCommandReg : public hwreg::RegisterBase<UicCommandReg, uint32_t> {
 
 // UFSHCI Specification Version 3.0, section 5.6.2
 // "Offset 94h: UICCMDARG1 – UIC Command Argument 1".
-class UicCommandArgument1Reg : public hwreg::RegisterBase<UicCommandArgument1Reg, uint32_t> {
+class UicCommandArgument1Reg
+    : public hwreg::RegisterBase<UicCommandArgument1Reg, uint32_t, hwreg::EnablePrinter> {
  public:
   DEF_FIELD(31, 16, mib_attribute);
   DEF_FIELD(15, 0, gen_selector_index);
@@ -290,7 +302,8 @@ class UicCommandArgument1Reg : public hwreg::RegisterBase<UicCommandArgument1Reg
 
 // UFSHCI Specification Version 3.0, section 5.6.3
 // "Offset 98h: UICCMDARG2 – UIC Command Argument 2".
-class UicCommandArgument2Reg : public hwreg::RegisterBase<UicCommandArgument2Reg, uint32_t> {
+class UicCommandArgument2Reg
+    : public hwreg::RegisterBase<UicCommandArgument2Reg, uint32_t, hwreg::EnablePrinter> {
  public:
   enum GenericErrorCode {
     kSuccess = 0,
@@ -309,7 +322,8 @@ class UicCommandArgument2Reg : public hwreg::RegisterBase<UicCommandArgument2Reg
 
 // UFSHCI Specification Version 3.0, section 5.6.4
 // "Offset 9Ch: UICCMDARG3 – UIC Command Argument 3".
-class UicCommandArgument3Reg : public hwreg::RegisterBase<UicCommandArgument3Reg, uint32_t> {
+class UicCommandArgument3Reg
+    : public hwreg::RegisterBase<UicCommandArgument3Reg, uint32_t, hwreg::EnablePrinter> {
  public:
   DEF_FIELD(31, 0, value);
 
