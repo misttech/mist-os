@@ -13,7 +13,7 @@ use std::collections::HashMap;
 /// returns it as a map. If `data` contains duplicate keys, then the last value
 /// wins. For example:
 ///
-/// data = "key0=value0,key1,key2=value2,key0=value3" -> map{"key0":"value3","key1":""],"key2":"value2"}
+/// data = "key0=value0,key1,key2=value2,key0=value3" -> map{"key0":"value3","key1":"","key2":"value2"}
 ///
 /// generic_parse_mount_options is not appropriate if values may contain commas.
 pub fn generic_parse_mount_options(data: &FsStr) -> HashMap<&FsStr, &FsStr> {
