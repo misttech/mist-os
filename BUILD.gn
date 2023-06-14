@@ -1508,6 +1508,10 @@ group("developer_base_packages") {
   ]
 
   public_deps = base_package_labels
+
+  # the buildbot host tests should only be added via `--with-host`, to the
+  # `host_labels` GN arg.
+  assert_no_deps = [ "//bundles/buildbot/host/*" ]
 }
 
 # Cache packages added by the developer, using `fx set --with <foo>` or
@@ -1520,6 +1524,10 @@ group("developer_cache_packages") {
     "//build/images/*",
   ]
   public_deps = cache_package_labels
+
+  # the buildbot host tests should only be added via `--with-host`, to the
+  # `host_labels` GN arg.
+  assert_no_deps = [ "//bundles/buildbot/host/*" ]
 }
 
 # Universe packages added by the developer, using `fx set` or `fx args`
@@ -1531,6 +1539,10 @@ group("developer_universe_packages") {
     "//build/images/*",
   ]
   public_deps = universe_package_labels
+
+  # the buildbot host tests should only be added via `--with-host`, to the
+  # `host_labels` GN arg.
+  assert_no_deps = [ "//bundles/buildbot/host/*" ]
 }
 
 ##
@@ -1579,7 +1591,7 @@ group("host") {
     "//build/input/board:host($host_toolchain)",
     "//build/input/product:host($host_toolchain)",
 
-    # Tools added by the developer
+    # Tools & tests added by the developer
     ":developer_host_tools",
   ]
 
