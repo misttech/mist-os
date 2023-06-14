@@ -38,7 +38,6 @@ test("fan-controller-test-bin") {
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zxtest",
   ]
-  defines = [ "FAN_CONTROLLER_TEST" ]
 }
 
 fuchsia_unittest_package("fan-controller-test") {
