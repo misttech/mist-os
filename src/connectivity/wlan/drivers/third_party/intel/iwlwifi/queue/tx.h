@@ -116,9 +116,9 @@ void iwl_txq_free_tso_page(struct iwl_trans *trans, struct sk_buff *skb);
 
 void iwl_txq_log_scd_error(struct iwl_trans *trans, struct iwl_txq *txq);
 
-int iwl_txq_gen2_set_tb(struct iwl_trans *trans,
+zx_status_t iwl_txq_gen2_set_tb(struct iwl_trans *trans,
 			struct iwl_tfh_tfd *tfd, dma_addr_t addr,
-			u16 len);
+			u16 len, int* idx);
 
 void iwl_txq_gen2_tfd_unmap(struct iwl_trans *trans,
 			    struct iwl_cmd_meta *meta,
@@ -126,9 +126,9 @@ void iwl_txq_gen2_tfd_unmap(struct iwl_trans *trans,
 
 int iwl_txq_dyn_alloc(struct iwl_trans *trans, u32 flags,
 		      u32 sta_mask, u8 tid,
-		      int size, unsigned int timeout);
+		      int size, zx_duration_t timeout, size_t* out_qid);
 
-int iwl_txq_gen2_tx(struct iwl_trans *trans, struct sk_buff *skb,
+zx_status_t iwl_txq_gen2_tx(struct iwl_trans *trans, struct ieee80211_mac_packet* pkt,
 		    struct iwl_device_tx_cmd *dev_cmd, int txq_id);
 
 void iwl_txq_dyn_free(struct iwl_trans *trans, int queue);
@@ -184,8 +184,7 @@ void iwl_txq_gen1_inval_byte_cnt_tbl(struct iwl_trans *trans,
 void iwl_txq_gen1_update_byte_cnt_tbl(struct iwl_trans *trans,
 				      struct iwl_txq *txq, u16 byte_cnt,
 				      int num_tbs);
-void iwl_txq_reclaim(struct iwl_trans *trans, int txq_id, int ssn,
-		     struct sk_buff_head *skbs);
+void iwl_txq_reclaim(struct iwl_trans *trans, int txq_id, int ssn);
 void iwl_txq_set_q_ptrs(struct iwl_trans *trans, int txq_id, int ptr);
 void iwl_trans_txq_freeze_timer(struct iwl_trans *trans, unsigned long txqs,
 				bool freeze);

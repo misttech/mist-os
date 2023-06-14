@@ -12,10 +12,12 @@ source_set("pcie") {
     "trans-gen2.c",
     "trans.c",
     "tx.c",
+    "tx-gen2.c",
   ]
   public = [ "entry.h" ]
   deps = [
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:core",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/queue:queue",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw",
     "//src/devices/pci/lib/device-protocol-pci",
     "//src/lib/ddk",

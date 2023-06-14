@@ -762,7 +762,7 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
       mock_tx_;
 
   static zx_status_t tx_wrapper(struct iwl_trans* trans, struct ieee80211_mac_packet* pkt,
-                                const struct iwl_device_cmd* dev_cmd, int txq_id) {
+                                struct iwl_device_tx_cmd* dev_cmd, int txq_id) {
     iwl_stats_inc(IWL_STATS_CNT_DATA_TO_FW);  // to simulate the iwl_trans_pcie_tx() behavior.
     auto test = GET_TEST(MacInterfaceTest, trans);
     return test->mock_tx_.Call(pkt->header_size + pkt->headroom_used_size + pkt->body_size,

@@ -394,6 +394,8 @@ enum iwl_pcie_imr_status {
  * @fh_mask: current unmasked fh causes
  * @hw_mask: current unmasked hw causes
  * @in_rescan: true if we have triggered a device rescan
+ * @supported_dma_mask: DMA mask to validate the actual address against,
+ *	will be DMA_BIT_MASK(11) or DMA_BIT_MASK(12) depending on the device
  */
 struct iwl_trans_pcie {
   struct iwl_rxq* rxq;
@@ -427,15 +429,15 @@ struct iwl_trans_pcie {
   mtx_t mutex;
   uint32_t inta_mask;
   uint32_t scd_base_addr;
-  struct iwl_dma_ptr scd_bc_tbls;
+  struct iwl_dma_ptr scd_bc_tbls;  // TODO(fxbug.dev/119415): remove me after uprev
   struct iwl_dma_ptr kw;
 
   struct iwl_dram_data pnvm_dram;
   struct iwl_dram_data reduce_power_dram;
 
   struct iwl_txq* txq_memory;
+  // TODO(fxbug.dev/119415): remove below queue fields since iwl_trans->txqs has them.
   struct iwl_txq* txq[IWL_MAX_TVQM_QUEUES];
-  // TODO(fxbug.dev/119415): remove these queue fields since iwl_trans->txqs has them.
   unsigned long queue_used[BITS_TO_LONGS(IWL_MAX_TVQM_QUEUES)];
   unsigned long queue_stopped[BITS_TO_LONGS(IWL_MAX_TVQM_QUEUES)];
 
@@ -468,7 +470,9 @@ struct iwl_trans_pcie {
   enum iwl_amsdu_size rx_buf_size;
   bool scd_set_active;
   bool pcie_dbg_dumped_once;
-  uint32_t rx_page_order;
+	u32 rx_page_order;
+	u32 rx_buf_bytes;
+	u32 supported_dma_mask;
 
   /*protect hw register */
   mtx_t reg_lock;
@@ -584,7 +588,7 @@ bool iwl_trans_pcie_txq_enable(struct iwl_trans* trans, int queue, uint16_t ssn,
 void iwl_trans_pcie_txq_disable(struct iwl_trans* trans, int queue, bool configure_scd);
 void iwl_trans_pcie_txq_set_shared_mode(struct iwl_trans* trans, uint32_t txq_id, bool shared_mode);
 zx_status_t iwl_trans_pcie_tx(struct iwl_trans* trans, struct ieee80211_mac_packet* pkt,
-                              const struct iwl_device_cmd* dev_cmd, int txq_id);
+                              struct iwl_device_tx_cmd* dev_cmd, int txq_id);
 void iwl_pcie_txq_check_wrptrs(struct iwl_trans* trans);
 zx_status_t iwl_trans_pcie_send_hcmd(struct iwl_trans* trans, struct iwl_host_cmd* cmd);
 zx_status_t iwl_pcie_cmdq_reclaim(struct iwl_trans* trans, int txq_id, uint32_t idx);
@@ -729,6 +733,35 @@ static inline void iwl_enable_fw_load_int(struct iwl_trans* trans) {
     iwl_write32(trans, CSR_MSIX_HW_INT_MASK_AD, trans_pcie->hw_init_mask);
     iwl_enable_fh_int_msk_msix(trans, MSIX_FH_INT_CAUSES_D2S_CH0_NUM);
   }
+}
+
+static inline void iwl_enable_fw_load_int_ctx_info(struct iwl_trans *trans)
+{
+	struct iwl_trans_pcie *trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
+
+	IWL_DEBUG_ISR(trans, "Enabling ALIVE interrupt only\n");
+
+	if (!trans_pcie->msix_enabled) {
+		/*
+		 * When we'll receive the ALIVE interrupt, the ISR will call
+		 * iwl_enable_fw_load_int_ctx_info again to set the ALIVE
+		 * interrupt (which is not really needed anymore) but also the
+		 * RX interrupt which will allow us to receive the ALIVE
+		 * notification (which is Rx) and continue the flow.
+		 */
+		trans_pcie->inta_mask =  CSR_INT_BIT_ALIVE | CSR_INT_BIT_FH_RX;
+		iwl_write32(trans, CSR_INT_MASK, trans_pcie->inta_mask);
+	} else {
+#if 0  // NEEDS_PORTING
+		iwl_enable_hw_int_msk_msix(trans,
+					   MSIX_HW_INT_CAUSES_REG_ALIVE);
+		/*
+		 * Leave all the FH causes enabled to get the ALIVE
+		 * notification.
+		 */
+		iwl_enable_fh_int_msk_msix(trans, trans_pcie->fh_init_mask);
+#endif  // NEEDS_PORTING
+	}
 }
 
 static inline uint16_t iwl_pcie_get_cmd_index(const struct iwl_txq* q, uint32_t index) {
@@ -892,28 +925,22 @@ void iwl_pcie_alloc_fw_monitor(struct iwl_trans* trans, uint8_t max_power);
 zx_status_t iwl_pcie_txq_build_tfd(struct iwl_trans* trans, struct iwl_txq* txq, zx_paddr_t addr,
                                    uint16_t len, bool reset, uint32_t* num_tbs);
 
-#if 0   // NEEDS_PORTING
 /* transport gen 2 exported functions */
-int iwl_trans_pcie_gen2_start_fw(struct iwl_trans* trans, const struct fw_img* fw,
-                                 bool run_in_rfkill);
-void iwl_trans_pcie_gen2_fw_alive(struct iwl_trans* trans, uint32_t scd_addr);
-void iwl_pcie_gen2_txq_free_memory(struct iwl_trans* trans, struct iwl_txq* txq);
-int iwl_trans_pcie_dyn_txq_alloc_dma(struct iwl_trans* trans, struct iwl_txq** intxq, int size,
-                                     unsigned int timeout);
-int iwl_trans_pcie_txq_alloc_response(struct iwl_trans* trans, struct iwl_txq* txq,
-                                      struct iwl_host_cmd* hcmd);
-int iwl_trans_pcie_dyn_txq_alloc(struct iwl_trans* trans, __le16 flags, uint8_t sta_id, uint8_t tid,
-                                 int cmd_id, int size, unsigned int timeout);
-void iwl_trans_pcie_dyn_txq_free(struct iwl_trans* trans, int queue);
-int iwl_trans_pcie_gen2_tx(struct iwl_trans* trans, struct sk_buff* skb,
-                           struct iwl_device_cmd* dev_cmd, int txq_id);
-int iwl_trans_pcie_gen2_send_hcmd(struct iwl_trans* trans, struct iwl_host_cmd* cmd);
-void iwl_trans_pcie_gen2_stop_device(struct iwl_trans* trans, bool low_power);
-void _iwl_trans_pcie_gen2_stop_device(struct iwl_trans* trans, bool low_power);
-void iwl_pcie_gen2_txq_unmap(struct iwl_trans* trans, int txq_id);
-void iwl_pcie_gen2_tx_free(struct iwl_trans* trans);
-void iwl_pcie_gen2_tx_stop(struct iwl_trans* trans);
-#endif  // NEEDS_PORTING
+int iwl_trans_pcie_gen2_start_fw(struct iwl_trans *trans,
+				 const struct fw_img *fw, bool run_in_rfkill);
+void iwl_trans_pcie_gen2_fw_alive(struct iwl_trans *trans, u32 scd_addr);
+int iwl_trans_pcie_gen2_send_hcmd(struct iwl_trans *trans,
+				  struct iwl_host_cmd *cmd);
+void iwl_trans_pcie_gen2_stop_device(struct iwl_trans *trans);
+void _iwl_trans_pcie_gen2_stop_device(struct iwl_trans *trans);
+void iwl_pcie_d3_complete_suspend(struct iwl_trans *trans,
+				  bool test, bool reset);
+int iwl_pcie_gen2_enqueue_hcmd(struct iwl_trans *trans,
+			       struct iwl_host_cmd *cmd);
+void iwl_trans_pcie_copy_imr_fh(struct iwl_trans *trans,
+				u32 dst_addr, u64 src_addr, u32 byte_cnt);
+int iwl_trans_pcie_copy_imr(struct iwl_trans *trans,
+			    u32 dst_addr, u64 src_addr, u32 byte_cnt);
 
 __END_CDECLS
 

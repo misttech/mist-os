@@ -1,6 +1,5 @@
-# Copyright 2021 The Fuchsia Authors. All rights reserved.
-# Use of this source code is governed by a BSD-style license that can be
-# found in the LICENSE file.
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
 visibility = [ "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/*" ]
 
@@ -8,7 +7,15 @@ source_set("queue") {
   sources = [
     "tx.c",
   ]
+  public = [ "tx.h" ]
   deps = [
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:core",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw",
   ]
+  public_deps = [
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform",
+    "//zircon/system/public",
+  ]
+  friend =
+      [ "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/test:*" ]
 }

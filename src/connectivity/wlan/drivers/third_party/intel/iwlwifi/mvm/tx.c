@@ -519,28 +519,37 @@ static zx_status_t iwl_mvm_set_tx_cmd_crypto(struct iwl_mvm* mvm, struct ieee802
 /*
  * Allocates and sets the Tx cmd the driver data pointers in the skb
  *
- * An 'struct iwl_device_cmd' instance is passed in 'dev_cmd' as input. It also stores the output of
- * this function.
+ * This function returns an allocated 'struct iwl_device_tx_cmd' in 'out_dev_cmd'. It is caller's
+ * responsibility to release the memory.
  *
- * Note that the 'struct iwl_device_cmd' includes two parts: the header and the payload. The header
- * size is fixed, while the *actual* payload is variable, which depends on the command type and in
- * this case it is sizeof(stuct iwl_tx_cmd). Also, worth to note that the 'struct iwl_device_cmd'
- * already contains the maximum payload size.
+ * Note that the 'struct iwl_device_tx_cmd' includes two parts: the header and the payload. The
+ * header size is fixed, while the *actual* payload is variable, which depends on the command type
+ * and in this case it is sizeof(stuct iwl_tx_cmd). Also, worth to note that the
+ * 'struct iwl_device_tx_cmd' already contains the maximum payload size.
+ *
+ * It is caller's responsibility to release the allocated memory returned in `out_dev_cmd`. Call
+ * iwl_trans_free_tx_cmd() to free it.
  *
  */
 static zx_status_t iwl_mvm_set_tx_params(struct iwl_mvm* mvm, struct ieee80211_mac_packet* pkt,
-                                         struct ieee80211_tx_info* info,
-                                         const struct iwl_mvm_sta* mvmsta,
-                                         struct iwl_device_cmd* dev_cmd) {
+		      struct ieee80211_tx_info *info, int hdrlen,
+		      struct ieee80211_sta *sta, u8 sta_id,
+		      struct iwl_device_tx_cmd** out_dev_cmd) {
   zx_status_t ret = ZX_OK;
-  uint8_t sta_id = mvmsta->sta_id;
+  struct iwl_device_tx_cmd *dev_cmd;
   struct iwl_tx_cmd* tx_cmd;
 
   /* Make sure we zero enough of dev_cmd */
   BUILD_BUG_ON(sizeof(struct iwl_tx_cmd_gen2) > sizeof(*tx_cmd));
   BUILD_BUG_ON(sizeof(struct iwl_tx_cmd_gen3) > sizeof(*tx_cmd));
 
-  memset(dev_cmd, 0, sizeof(dev_cmd->hdr) + sizeof(*tx_cmd));
+  if (!out_dev_cmd) return ZX_ERR_INVALID_ARGS;
+
+  dev_cmd = iwl_trans_alloc_tx_cmd(mvm->trans);
+
+  if (unlikely(!dev_cmd))
+    return ZX_ERR_NO_MEMORY;
+
   dev_cmd->hdr.cmd = TX_CMD;
 
 #if 0   // NEEDS_PORTING
@@ -624,6 +633,8 @@ static zx_status_t iwl_mvm_set_tx_params(struct iwl_mvm* mvm, struct ieee80211_m
 
   /* Copy MAC header from pkt into command buffer */
   memcpy(tx_cmd->hdr, pkt->common_header, pkt->header_size);
+
+  *out_dev_cmd = dev_cmd;
 
   return ZX_OK;
 }
@@ -1071,10 +1082,23 @@ static zx_status_t iwl_mvm_tx_mpdu(struct iwl_mvm* mvm, struct ieee80211_mac_pac
   uint8_t tid = IWL_MAX_TID_COUNT;  // TODO(51120): support QoS
   uint16_t txq_id = mvmsta->tid_data[tid].txq_id;
 
-  struct iwl_device_cmd dev_cmd;
-  if ((ret = iwl_mvm_set_tx_params(mvm, pkt, info, mvmsta, &dev_cmd)) != ZX_OK) {
+  struct iwl_device_tx_cmd* dev_cmd;
+  struct ieee80211_sta sta = {
+    .drv_priv = mvmsta,
+  };
+  int hdrlen;
+
+  mvmsta = iwl_mvm_sta_from_mac80211(&sta);
+  hdrlen = ieee80211_get_header_len(pkt->common_header);
+
+  if ((ret = iwl_mvm_set_tx_params(mvm, pkt, info, hdrlen, &sta, mvmsta->sta_id, &dev_cmd)) !=
+      ZX_OK) {
     IWL_ERR(mvm, "failed to set Tx parameters: %s\n", zx_status_get_string(ret));
     return ret;
+  }
+  if (!dev_cmd) {
+    ret = ZX_ERR_NO_MEMORY;
+    goto drop;
   }
 
   mtx_lock(&mvmsta->lock);
@@ -1083,7 +1107,11 @@ static zx_status_t iwl_mvm_tx_mpdu(struct iwl_mvm* mvm, struct ieee80211_mac_pac
   IWL_DEBUG_TX(mvm, "iwl_mvm_tx_mpdu() TX to [std_id:%d|tid:%d] txq_id:%d - seq:0x%x\n",
                mvmsta->sta_id, tid, txq_id, seq_number >> 4);
 
-  ret = iwl_trans_tx(mvm->trans, pkt, &dev_cmd, txq_id);
+  ret = iwl_trans_tx(mvm->trans, pkt, dev_cmd, txq_id);
+
+  // The above iwl_trans_tx() copied the whole `dev_cmd` content so that we can free it here.
+  iwl_trans_free_tx_cmd(mvm->trans, dev_cmd);
+
   mtx_unlock(&mvmsta->lock);
   if ((ret != ZX_OK)) {
     IWL_ERR(mvm, "failed to Tx packet: %s\n", zx_status_get_string(ret));
@@ -1187,10 +1215,10 @@ static zx_status_t iwl_mvm_tx_mpdu(struct iwl_mvm* mvm, struct ieee80211_mac_pac
 drop_unlock_sta:
     iwl_trans_free_tx_cmd(mvm->trans, dev_cmd);
     spin_unlock(&mvmsta->lock);
-drop:
-	IWL_DEBUG_TX(mvm, "TX to [%d|%d] dropped\n", mvmsta->sta_id, tid);
-    return -1;
 #endif  // NEEDS_PORTING
+drop:
+  IWL_DEBUG_TX(mvm, "TX to [%d|%d] dropped\n", mvmsta->sta_id, tid);
+  return ret;
 }
 
 zx_status_t iwl_mvm_tx_skb(struct iwl_mvm* mvm, struct ieee80211_mac_packet* pkt,

@@ -2,11 +2,15 @@
 /*
  * Copyright (C) 2020-2022 Intel Corporation
  */
+#include <lib/sync/completion.h>
+#include <zircon/status.h>
+
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-debug.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-io.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/api/commands.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/api/tx.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/api/datapath.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/irq.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/queue/tx.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-fh.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-scd.h"
@@ -26,8 +30,8 @@ static void iwl_pcie_gen2_update_byte_tbl(struct iwl_trans *trans,
 	if (WARN(idx >= txq->n_window, "%d >= %d\n", idx, txq->n_window))
 		return;
 
-	filled_tfd_size = offsetof(struct iwl_tfh_tfd, tbs) +
-			  num_tbs * sizeof(struct iwl_tfh_tb);
+	filled_tfd_size = (u8)(offsetof(struct iwl_tfh_tfd, tbs) +
+			  num_tbs * sizeof(struct iwl_tfh_tb));
 	/*
 	 * filled_tfd_size contains the number of filled bytes in the TFD.
 	 * Dividing it by 64 will give the number of chunks to fetch
@@ -63,7 +67,7 @@ static void iwl_pcie_gen2_update_byte_tbl(struct iwl_trans *trans,
  */
 void iwl_txq_inc_wr_ptr(struct iwl_trans *trans, struct iwl_txq *txq)
 {
-	lockdep_assert_held(&txq->lock);
+	iwl_assert_lock_held(&txq->lock);
 
 	IWL_DEBUG_TX(trans, "Q:%d WR: 0x%x\n", txq->id, txq->write_ptr);
 
@@ -80,6 +84,10 @@ static u8 iwl_txq_gen2_get_num_tbs(struct iwl_trans *trans,
 	return le16_to_cpu(tfd->num_tbs) & 0x1f;
 }
 
+//
+// Since DMA addresses are manipulated by iobufs, we don't do DMA unmap here. Instead,
+// we update the TFD entry only (zero-ing num_tbs).
+//
 void iwl_txq_gen2_tfd_unmap(struct iwl_trans *trans, struct iwl_cmd_meta *meta,
 			    struct iwl_tfh_tfd *tfd)
 {
@@ -95,6 +103,7 @@ void iwl_txq_gen2_tfd_unmap(struct iwl_trans *trans, struct iwl_cmd_meta *meta,
 
 	/* first TB is never freed - it's the bidirectional DMA data */
 	for (i = 1; i < num_tbs; i++) {
+#if 0  // NEEDS_PORTING
 		if (meta->tbs & BIT(i))
 			dma_unmap_page(trans->dev,
 				       le64_to_cpu(tfd->tbs[i].addr),
@@ -105,6 +114,7 @@ void iwl_txq_gen2_tfd_unmap(struct iwl_trans *trans, struct iwl_cmd_meta *meta,
 					 le64_to_cpu(tfd->tbs[i].addr),
 					 le16_to_cpu(tfd->tbs[i].tb_len),
 					 DMA_TO_DEVICE);
+#endif  // NEEDS_PORTING
 	}
 
 	tfd->num_tbs = 0;
@@ -116,9 +126,8 @@ void iwl_txq_gen2_free_tfd(struct iwl_trans *trans, struct iwl_txq *txq)
 	 * idx is bounded by n_window
 	 */
 	int idx = iwl_txq_get_cmd_index(txq, txq->read_ptr);
-	struct sk_buff *skb;
 
-	lockdep_assert_held(&txq->lock);
+	iwl_assert_lock_held(&txq->lock);
 
 	if (!txq->entries)
 		return;
@@ -126,7 +135,8 @@ void iwl_txq_gen2_free_tfd(struct iwl_trans *trans, struct iwl_txq *txq)
 	iwl_txq_gen2_tfd_unmap(trans, &txq->entries[idx].meta,
 			       iwl_txq_get_tfd(trans, txq, idx));
 
-	skb = txq->entries[idx].skb;
+#if 0  // NEEDS_PORTING
+	struct sk_buff *skb = txq->entries[idx].skb;
 
 	/* Can be called from irqs-disabled context
 	 * If skb is not NULL, it means that the whole queue is being
@@ -136,10 +146,11 @@ void iwl_txq_gen2_free_tfd(struct iwl_trans *trans, struct iwl_txq *txq)
 		iwl_op_mode_free_skb(trans->op_mode, skb);
 		txq->entries[idx].skb = NULL;
 	}
+#endif  // NEEDS_PORTING
 }
 
-int iwl_txq_gen2_set_tb(struct iwl_trans *trans, struct iwl_tfh_tfd *tfd,
-			dma_addr_t addr, u16 len)
+zx_status_t iwl_txq_gen2_set_tb(struct iwl_trans *trans, struct iwl_tfh_tfd *tfd,
+			dma_addr_t addr, u16 len, int* out_idx)
 {
 	int idx = iwl_txq_gen2_get_num_tbs(trans, tfd);
 	struct iwl_tfh_tb *tb;
@@ -151,29 +162,41 @@ int iwl_txq_gen2_set_tb(struct iwl_trans *trans, struct iwl_tfh_tfd *tfd,
 	 * there's no more space, and so when we know there is enough we
 	 * don't always check ...
 	 */
-	WARN(iwl_txq_crosses_4g_boundary(addr, len),
+	if (iwl_txq_crosses_4g_boundary(addr, len)) {
+    IWL_WARN(trans,
 	     "possible DMA problem with iova:0x%llx, len:%d\n",
 	     (unsigned long long)addr, len);
+  }
 
 	if (WARN_ON(idx >= IWL_TFH_NUM_TBS))
-		return -EINVAL;
+		return ZX_ERR_INVALID_ARGS;
 	tb = &tfd->tbs[idx];
 
 	/* Each TFD can point to a maximum max_tbs Tx buffers */
 	if (le16_to_cpu(tfd->num_tbs) >= trans->txqs.tfd.max_tbs) {
 		IWL_ERR(trans, "Error can not send more than %d chunks\n",
 			trans->txqs.tfd.max_tbs);
-		return -EINVAL;
+		return ZX_ERR_INVALID_ARGS;
 	}
 
+	// Since x86 supports unaligned access, just ignore the warning.
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
 	put_unaligned_le64(addr, &tb->addr);
+	#pragma GCC diagnostic pop
+
 	tb->tb_len = cpu_to_le16(len);
 
 	tfd->num_tbs = cpu_to_le16(idx + 1);
 
-	return idx;
+	if (out_idx) {
+		*out_idx = idx;
+	}
+
+	return ZX_OK;
 }
 
+#if 0  // NEEDS_PORTING
 static struct page *get_workaround_page(struct iwl_trans *trans,
 					struct sk_buff *skb)
 {
@@ -192,6 +215,7 @@ static struct page *get_workaround_page(struct iwl_trans *trans,
 
 	return ret;
 }
+#endif  // NEEDS_PORTING
 
 /*
  * Add a TB and if needed apply the FH HW bug workaround;
@@ -199,32 +223,37 @@ static struct page *get_workaround_page(struct iwl_trans *trans,
  * need to dma_unmap_page() and set the meta->tbs bit in
  * this case.
  */
-static int iwl_txq_gen2_set_tb_with_wa(struct iwl_trans *trans,
-				       struct sk_buff *skb,
+static zx_status_t iwl_txq_gen2_set_tb_with_wa(struct iwl_trans *trans,
+				       struct ieee80211_mac_packet* pkt,
 				       struct iwl_tfh_tfd *tfd,
-				       dma_addr_t phys, void *virt,
+				       dma_addr_t phys, const void *virt,
 				       u16 len, struct iwl_cmd_meta *meta)
 {
+  zx_status_t ret;
+
+#if 0  // NEEDS_PORTING
 	dma_addr_t oldphys = phys;
 	struct page *page;
-	int ret;
 
 	if (unlikely(dma_mapping_error(trans->dev, phys)))
 		return -ENOMEM;
+#endif  // NEEDS_PORTING
 
 	if (likely(!iwl_txq_crosses_4g_boundary(phys, len))) {
-		ret = iwl_txq_gen2_set_tb(trans, tfd, phys, len);
+		int idx;
+		ret = iwl_txq_gen2_set_tb(trans, tfd, phys, len, &idx);
 
-		if (ret < 0)
+		if (ret != ZX_OK)
 			goto unmap;
 
 		if (meta)
-			meta->tbs |= BIT(ret);
+			meta->tbs |= BIT(idx);
 
-		ret = 0;
+		ret = ZX_OK;
 		goto trace;
 	}
 
+#if 0  // NEEDS_PORTING
 	/*
 	 * Work around a hardware bug. If (as expressed in the
 	 * condition above) the TB ends on a 32-bit boundary,
@@ -261,15 +290,20 @@ static int iwl_txq_gen2_set_tb_with_wa(struct iwl_trans *trans,
 	IWL_WARN(trans,
 		 "TB bug workaround: copied %d bytes from 0x%llx to 0x%llx\n",
 		 len, (unsigned long long)oldphys, (unsigned long long)phys);
+#endif  // NEEDS_PORTING
 
-	ret = 0;
+	ret = ZX_OK;
 unmap:
+#if 0  // NEEDS_PORTING
 	if (meta)
 		dma_unmap_page(trans->dev, oldphys, len, DMA_TO_DEVICE);
 	else
 		dma_unmap_single(trans->dev, oldphys, len, DMA_TO_DEVICE);
+#endif  // NEEDS_PORTING
 trace:
+#if 0  // NEEDS_PORTING
 	trace_iwlwifi_dev_tx_tb(trans->dev, skb, virt, phys, len);
+#endif  // NEEDS_PORTING
 
 	return ret;
 }
@@ -320,7 +354,8 @@ out:
 }
 #endif
 
-static int iwl_txq_gen2_build_amsdu(struct iwl_trans *trans,
+__maybe_unused
+static zx_status_t iwl_txq_gen2_build_amsdu(struct iwl_trans *trans,
 				    struct sk_buff *skb,
 				    struct iwl_tfh_tfd *tfd, int start_len,
 				    u8 hdr_len,
@@ -444,18 +479,19 @@ static int iwl_txq_gen2_build_amsdu(struct iwl_trans *trans,
 
 out_err:
 #endif
-	return -EINVAL;
+	return ZX_ERR_NOT_SUPPORTED;
 }
 
 static struct
 iwl_tfh_tfd *iwl_txq_gen2_build_tx_amsdu(struct iwl_trans *trans,
 					 struct iwl_txq *txq,
 					 struct iwl_device_tx_cmd *dev_cmd,
-					 struct sk_buff *skb,
+				   struct ieee80211_mac_packet* pkt,
 					 struct iwl_cmd_meta *out_meta,
 					 int hdr_len,
 					 int tx_cmd_len)
 {
+#if 0  // NEEDS_PORTING
 	int idx = iwl_txq_get_cmd_index(txq, txq->write_ptr);
 	struct iwl_tfh_tfd *tfd = iwl_txq_get_tfd(trans, txq, idx);
 	dma_addr_t tb_phys;
@@ -503,14 +539,17 @@ iwl_tfh_tfd *iwl_txq_gen2_build_tx_amsdu(struct iwl_trans *trans,
 
 out_err:
 	iwl_txq_gen2_tfd_unmap(trans, out_meta, tfd);
+#endif  // NEEDS_PORTING
 	return NULL;
 }
 
-static int iwl_txq_gen2_tx_add_frags(struct iwl_trans *trans,
+__maybe_unused
+static zx_status_t iwl_txq_gen2_tx_add_frags(struct iwl_trans *trans,
 				     struct sk_buff *skb,
 				     struct iwl_tfh_tfd *tfd,
 				     struct iwl_cmd_meta *out_meta)
 {
+#if 0  // NEEDS_PORTING
 	int i;
 
 	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
@@ -532,13 +571,16 @@ static int iwl_txq_gen2_tx_add_frags(struct iwl_trans *trans,
 	}
 
 	return 0;
+#else  // NEEDS_PORTING
+	return ZX_ERR_NOT_SUPPORTED;
+#endif  // NEEDS_PORTING
 }
 
 static struct
 iwl_tfh_tfd *iwl_txq_gen2_build_tx(struct iwl_trans *trans,
 				   struct iwl_txq *txq,
 				   struct iwl_device_tx_cmd *dev_cmd,
-				   struct sk_buff *skb,
+				   struct ieee80211_mac_packet* pkt,
 				   struct iwl_cmd_meta *out_meta,
 				   int hdr_len,
 				   int tx_cmd_len,
@@ -548,20 +590,19 @@ iwl_tfh_tfd *iwl_txq_gen2_build_tx(struct iwl_trans *trans,
 	struct iwl_tfh_tfd *tfd = iwl_txq_get_tfd(trans, txq, idx);
 	dma_addr_t tb_phys;
 	int len, tb1_len, tb2_len;
-	void *tb1_addr;
-	struct sk_buff *frag;
 
 	tb_phys = iwl_txq_get_first_tb_dma(txq, idx);
 
 	/* The first TB points to bi-directional DMA data */
-	memcpy(&txq->first_tb_bufs[idx], dev_cmd, IWL_FIRST_TB_SIZE);
+	struct iwl_pcie_first_tb_buf* tb_bufs = iwl_iobuf_virtual(txq->first_tb_bufs);
+	memcpy(&tb_bufs[idx], dev_cmd, IWL_FIRST_TB_SIZE);
 
 	/*
 	 * No need for _with_wa, the first TB allocation is aligned up
 	 * to a 64-byte boundary and thus can't be at the end or cross
 	 * a page boundary (much less a 2^32 boundary).
 	 */
-	iwl_txq_gen2_set_tb(trans, tfd, tb_phys, IWL_FIRST_TB_SIZE);
+	iwl_txq_gen2_set_tb(trans, tfd, tb_phys, IWL_FIRST_TB_SIZE, NULL);
 
 	/*
 	 * The second TB (tb1) points to the remainder of the TX command
@@ -578,20 +619,30 @@ iwl_tfh_tfd *iwl_txq_gen2_build_tx(struct iwl_trans *trans,
 		tb1_len = len;
 
 	/* map the data for TB1 */
-	tb1_addr = ((u8 *)&dev_cmd->hdr) + IWL_FIRST_TB_SIZE;
-	tb_phys = dma_map_single(trans->dev, tb1_addr, tb1_len, DMA_TO_DEVICE);
-	if (unlikely(dma_mapping_error(trans->dev, tb_phys)))
-		goto out_err;
+	zx_paddr_t phys_addr = iwl_iobuf_physical(txq->entries[idx].cmd);
+	tb_phys = phys_addr + IWL_FIRST_TB_SIZE;
 	/*
 	 * No need for _with_wa(), we ensure (via alignment) that the data
 	 * here can never cross or end at a page boundary.
 	 */
-	iwl_txq_gen2_set_tb(trans, tfd, tb_phys, tb1_len);
+	iwl_txq_gen2_set_tb(trans, tfd, tb_phys, (u16)tb1_len, NULL);
+#if 0  // NEEDS_PORTING
 	trace_iwlwifi_dev_tx(trans->dev, skb, tfd, sizeof(*tfd), &dev_cmd->hdr,
 			     IWL_FIRST_TB_SIZE + tb1_len, hdr_len);
+#endif
 
 	/* set up TFD's third entry to point to remainder of skb's head */
-	tb2_len = skb_headlen(skb) - hdr_len;
+	tb2_len = (int)(pkt->headroom_used_size + pkt->body_size - hdr_len);
+#if 1  // NEEDS_PORTING
+	if (tb2_len > 0) {
+		zx_status_t ret = iwl_txq_gen2_set_tb_with_wa(trans, pkt, tfd, tb_phys,
+						  pkt->body + hdr_len, (u16)tb2_len,
+						  NULL);
+		if (ret != ZX_OK) {
+			goto out_err;
+    }
+  }
+#else  // NEEDS_PORTING
 
 	if (tb2_len > 0) {
 		int ret;
@@ -621,6 +672,7 @@ iwl_tfh_tfd *iwl_txq_gen2_build_tx(struct iwl_trans *trans,
 		if (iwl_txq_gen2_tx_add_frags(trans, frag, tfd, out_meta))
 			goto out_err;
 	}
+#endif  // NEEDS_PORTING
 
 	return tfd;
 
@@ -633,10 +685,10 @@ static
 struct iwl_tfh_tfd *iwl_txq_gen2_build_tfd(struct iwl_trans *trans,
 					   struct iwl_txq *txq,
 					   struct iwl_device_tx_cmd *dev_cmd,
-					   struct sk_buff *skb,
+					   struct ieee80211_mac_packet* pkt,
 					   struct iwl_cmd_meta *out_meta)
 {
-	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
+	const struct ieee80211_frame_header *fh = pkt->common_header;
 	int idx = iwl_txq_get_cmd_index(txq, txq->write_ptr);
 	struct iwl_tfh_tfd *tfd = iwl_txq_get_tfd(trans, txq, idx);
 	int len, hdr_len;
@@ -652,21 +704,19 @@ struct iwl_tfh_tfd *iwl_txq_gen2_build_tfd(struct iwl_trans *trans,
 	else
 		len = sizeof(struct iwl_tx_cmd_gen3);
 
-	amsdu = ieee80211_is_data_qos(hdr->frame_control) &&
-			(*ieee80211_get_qos_ctl(hdr) &
-			 IEEE80211_QOS_CTL_A_MSDU_PRESENT);
+	amsdu = ieee80211_is_data_qos(fh) && (ieee80211_is_data_qos(fh));
 
-	hdr_len = ieee80211_hdrlen(hdr->frame_control);
+	hdr_len = (int)ieee80211_hdrlen(fh);
 
 	/*
 	 * Only build A-MSDUs here if doing so by GSO, otherwise it may be
 	 * an A-MSDU for other reasons, e.g. NAN or an A-MSDU having been
 	 * built in the higher layers already.
 	 */
-	if (amsdu && skb_shinfo(skb)->gso_size)
-		return iwl_txq_gen2_build_tx_amsdu(trans, txq, dev_cmd, skb,
+	if (amsdu /* NEEDS_PORTING && skb_shinfo(skb)->gso_size */)
+		return iwl_txq_gen2_build_tx_amsdu(trans, txq, dev_cmd, pkt,
 						    out_meta, hdr_len, len);
-	return iwl_txq_gen2_build_tx(trans, txq, dev_cmd, skb, out_meta,
+	return iwl_txq_gen2_build_tx(trans, txq, dev_cmd, pkt, out_meta,
 				      hdr_len, len, !amsdu);
 }
 
@@ -681,7 +731,7 @@ int iwl_txq_space(struct iwl_trans *trans, const struct iwl_txq *q)
 	 * If q->n_window is smaller than max_tfd_queue_size, there is no need
 	 * to reserve any queue entries for this purpose.
 	 */
-	if (q->n_window < trans->trans_cfg->base_params->max_tfd_queue_size)
+	if (q->n_window < (int)(trans->trans_cfg->base_params->max_tfd_queue_size))
 		max = q->n_window;
 	else
 		max = trans->trans_cfg->base_params->max_tfd_queue_size - 1;
@@ -699,7 +749,8 @@ int iwl_txq_space(struct iwl_trans *trans, const struct iwl_txq *q)
 	return max - used;
 }
 
-int iwl_txq_gen2_tx(struct iwl_trans *trans, struct sk_buff *skb,
+zx_status_t iwl_txq_gen2_tx(struct iwl_trans *trans,
+        struct ieee80211_mac_packet* pkt,
 		    struct iwl_device_tx_cmd *dev_cmd, int txq_id)
 {
 	struct iwl_cmd_meta *out_meta;
@@ -708,43 +759,59 @@ int iwl_txq_gen2_tx(struct iwl_trans *trans, struct sk_buff *skb,
 	int idx;
 	void *tfd;
 
-	if (WARN_ONCE(txq_id >= IWL_MAX_TVQM_QUEUES,
-		      "queue %d out of range", txq_id))
-		return -EINVAL;
+	if (txq_id >= IWL_MAX_TVQM_QUEUES) {
+		IWL_WARN(trans, "queue %d out of range\n", txq_id);
+		return ZX_ERR_INVALID_ARGS;
+  }
 
-	if (WARN_ONCE(!test_bit(txq_id, trans->txqs.queue_used),
-		      "TX on unused queue %d\n", txq_id))
-		return -EINVAL;
+	if (!test_bit(txq_id, trans->txqs.queue_used)) {
+		IWL_WARN(trans, "TX on unused queue %d\n", txq_id);
+		return ZX_ERR_INVALID_ARGS;
+  }
 
+#if 0  // NEEDS_PORTING
 	if (skb_is_nonlinear(skb) &&
 	    skb_shinfo(skb)->nr_frags > IWL_TRANS_MAX_FRAGS(trans) &&
 	    __skb_linearize(skb))
 		return -ENOMEM;
+#endif  // NEEDS_PORTING
 
-	spin_lock(&txq->lock);
+	mtx_lock(&txq->lock);
 
 	if (iwl_txq_space(trans, txq) < txq->high_mark) {
 		iwl_txq_stop(trans, txq);
 
 		/* don't put the packet on the ring, if there is no room */
-		if (unlikely(iwl_txq_space(trans, txq) < 3)) {
-			struct iwl_device_tx_cmd **dev_cmd_ptr;
-
-			dev_cmd_ptr = (void *)((u8 *)skb->cb +
-					       trans->txqs.dev_cmd_offs);
-
-			*dev_cmd_ptr = dev_cmd;
-			__skb_queue_tail(&txq->overflow_q, skb);
-			spin_unlock(&txq->lock);
-			return 0;
+    size_t available_space = iwl_txq_space(trans, txq);
+		if (available_space < TX_RESERVED_SPACE) {
+			mtx_unlock(&txq->lock);
+			IWL_WARN(trans, "dropped packet due to small available space: %zu\n",
+			         available_space);
+			return ZX_OK;
 		}
 	}
 
 	idx = iwl_txq_get_cmd_index(txq, txq->write_ptr);
 
 	/* Set up driver data for this TFD */
+#if 0  // NEEDS_PORTING
 	txq->entries[idx].skb = skb;
 	txq->entries[idx].cmd = dev_cmd;
+#endif  // NEEDS_PORTING
+
+	// First copy 'dev_cmd' to 'out_cmd'. This is easier to copy the whole cmd to tb0 and tb1
+	// respectively.
+	ZX_ASSERT(!txq->entries[idx].cmd);
+	zx_status_t status = iwl_iobuf_allocate_contiguous(trans->dev,
+	                                                   sizeof(struct iwl_device_tx_cmd),
+	                                                   &txq->entries[idx].cmd);
+	if (status != ZX_OK) {
+		IWL_ERR(trans, "pcie TX io_buffer_init() failed: %s\n", zx_status_get_string(status));
+		mtx_unlock(&txq->lock);
+		return status;
+	}
+	struct iwl_device_tx_cmd* out_cmd = iwl_iobuf_virtual(txq->entries[idx].cmd);
+	*out_cmd = *dev_cmd;  // Copy into the TXQ memory shared with the firmware.
 
 	dev_cmd->hdr.sequence =
 		cpu_to_le16((u16)(QUEUE_TO_SEQ(txq_id) |
@@ -754,10 +821,10 @@ int iwl_txq_gen2_tx(struct iwl_trans *trans, struct sk_buff *skb,
 	out_meta = &txq->entries[idx].meta;
 	out_meta->flags = 0;
 
-	tfd = iwl_txq_gen2_build_tfd(trans, txq, dev_cmd, skb, out_meta);
+	tfd = iwl_txq_gen2_build_tfd(trans, txq, dev_cmd, pkt, out_meta);
 	if (!tfd) {
-		spin_unlock(&txq->lock);
-		return -1;
+		mtx_unlock(&txq->lock);
+		return ZX_ERR_INTERNAL;
 	}
 
 	if (trans->trans_cfg->device_family >= IWL_DEVICE_FAMILY_AX210) {
@@ -777,8 +844,10 @@ int iwl_txq_gen2_tx(struct iwl_trans *trans, struct sk_buff *skb,
 				      iwl_txq_gen2_get_num_tbs(trans, tfd));
 
 	/* start timer if queue currently empty */
-	if (txq->read_ptr == txq->write_ptr && txq->wd_timeout)
-		mod_timer(&txq->stuck_timer, jiffies + txq->wd_timeout);
+	if (txq->read_ptr == txq->write_ptr && txq->wd_timeout) {
+		iwl_irq_timer_stop(txq->stuck_timer);
+		iwl_irq_timer_start(txq->stuck_timer, txq->wd_timeout);
+  }
 
 	/* Tell device the write index *just past* this latest filled TFD */
 	txq->write_ptr = iwl_txq_inc_wrap(trans, txq->write_ptr);
@@ -787,8 +856,8 @@ int iwl_txq_gen2_tx(struct iwl_trans *trans, struct sk_buff *skb,
 	 * At this point the frame is "transmitted" successfully
 	 * and we will get a TX status notification eventually.
 	 */
-	spin_unlock(&txq->lock);
-	return 0;
+	mtx_unlock(&txq->lock);
+	return ZX_OK;
 }
 
 /*************** HOST COMMAND QUEUE FUNCTIONS   *****/
@@ -800,29 +869,33 @@ void iwl_txq_gen2_unmap(struct iwl_trans *trans, int txq_id)
 {
 	struct iwl_txq *txq = trans->txqs.txq[txq_id];
 
-	spin_lock_bh(&txq->lock);
+	mtx_lock(&txq->lock);
 	while (txq->write_ptr != txq->read_ptr) {
 		IWL_DEBUG_TX_REPLY(trans, "Q %d Free %d\n",
 				   txq_id, txq->read_ptr);
 
 		if (txq_id != trans->txqs.cmd.q_id) {
+#if 0  // NEEDS_PORTING
 			int idx = iwl_txq_get_cmd_index(txq, txq->read_ptr);
 			struct sk_buff *skb = txq->entries[idx].skb;
 
 			if (!WARN_ON_ONCE(!skb))
 				iwl_txq_free_tso_page(trans, skb);
+#endif
 		}
 		iwl_txq_gen2_free_tfd(trans, txq);
 		txq->read_ptr = iwl_txq_inc_wrap(trans, txq->read_ptr);
 	}
 
+#if 0  // NEEDS_PORTING
 	while (!skb_queue_empty(&txq->overflow_q)) {
 		struct sk_buff *skb = __skb_dequeue(&txq->overflow_q);
 
 		iwl_op_mode_free_skb(trans->op_mode, skb);
 	}
+#endif  // NEEDS_PORTING
 
-	spin_unlock_bh(&txq->lock);
+	mtx_unlock(&txq->lock);
 
 	/* just in case - this queue may have been stopped */
 	iwl_wake_queue(trans, txq);
@@ -831,23 +904,21 @@ void iwl_txq_gen2_unmap(struct iwl_trans *trans, int txq_id)
 static void iwl_txq_gen2_free_memory(struct iwl_trans *trans,
 				     struct iwl_txq *txq)
 {
-	struct device *dev = trans->dev;
-
 	/* De-alloc circular buffer of TFDs */
 	if (txq->tfds) {
-		dma_free_coherent(dev,
-				  trans->txqs.tfd.size * txq->n_window,
-				  txq->tfds, txq->dma_addr);
-		dma_free_coherent(dev,
-				  sizeof(*txq->first_tb_bufs) * txq->n_window,
-				  txq->first_tb_bufs, txq->first_tb_dma);
+	  iwl_iobuf_release(txq->tfds);
+	}
+	if (txq->first_tb_bufs) {
+		iwl_iobuf_release(txq->first_tb_bufs);
 	}
 
-	kfree(txq->entries);
+	free(txq->entries);
+#if 0  // NEEDS_PORTING
 	if (txq->bc_tbl.addr)
 		dma_pool_free(trans->txqs.bc_pool,
 			      txq->bc_tbl.addr, txq->bc_tbl.dma);
-	kfree(txq);
+#endif
+	free(txq);
 }
 
 /*
@@ -861,26 +932,31 @@ static void iwl_txq_gen2_free_memory(struct iwl_trans *trans,
 static void iwl_txq_gen2_free(struct iwl_trans *trans, int txq_id)
 {
 	struct iwl_txq *txq;
-	int i;
 
-	if (WARN_ONCE(txq_id >= IWL_MAX_TVQM_QUEUES,
-		      "queue %d out of range", txq_id))
+	if (txq_id >= IWL_MAX_TVQM_QUEUES) {
+		IWL_WARN(trans, "queue %d out of range\n", txq_id);
 		return;
+	}
 
 	txq = trans->txqs.txq[txq_id];
 
-	if (WARN_ON(!txq))
+	if (!txq) {
+		IWL_WARN(trans, "txq is NULL\n");
 		return;
+	}
 
 	iwl_txq_gen2_unmap(trans, txq_id);
 
+#if 0  // NEEDS_PORTING
 	/* De-alloc array of command/tx buffers */
 	if (txq_id == trans->txqs.cmd.q_id)
-		for (i = 0; i < txq->n_window; i++) {
+		for (int i = 0; i < txq->n_window; i++) {
 			kfree_sensitive(txq->entries[i].cmd);
 			kfree_sensitive(txq->entries[i].free_buf);
 		}
-	del_timer_sync(&txq->stuck_timer);
+#endif  // NEEDS_PORTING
+
+	iwl_irq_timer_release_sync(txq->stuck_timer);
 
 	iwl_txq_gen2_free_memory(trans, txq);
 
@@ -892,14 +968,16 @@ static void iwl_txq_gen2_free(struct iwl_trans *trans, int txq_id)
 /*
  * iwl_queue_init - Initialize queue's high/low-water and read/write indexes
  */
-static int iwl_queue_init(struct iwl_txq *q, int slots_num)
+static zx_status_t iwl_queue_init(struct iwl_txq *q, int slots_num)
 {
 	q->n_window = slots_num;
 
 	/* slots_num must be power-of-two size, otherwise
 	 * iwl_txq_get_cmd_index is broken. */
-	if (WARN_ON(!is_power_of_2(slots_num)))
-		return -EINVAL;
+	if (!is_power_of_2(slots_num)) {
+		IWL_WARN(q, "The slots num must be the power of 2, %d instead.\n", slots_num);
+		return ZX_ERR_INVALID_ARGS;
+	}
 
 	q->low_mark = q->n_window / 4;
 	if (q->low_mark < 4)
@@ -912,13 +990,13 @@ static int iwl_queue_init(struct iwl_txq *q, int slots_num)
 	q->write_ptr = 0;
 	q->read_ptr = 0;
 
-	return 0;
+	return ZX_OK;
 }
 
-int iwl_txq_init(struct iwl_trans *trans, struct iwl_txq *txq, int slots_num,
+zx_status_t iwl_txq_init(struct iwl_trans *trans, struct iwl_txq *txq, int slots_num,
 		 bool cmd_queue)
 {
-	int ret;
+	zx_status_t ret;
 	u32 tfd_queue_max_size =
 		trans->trans_cfg->base_params->max_tfd_queue_size;
 
@@ -926,29 +1004,33 @@ int iwl_txq_init(struct iwl_trans *trans, struct iwl_txq *txq, int slots_num,
 
 	/* max_tfd_queue_size must be power-of-two size, otherwise
 	 * iwl_txq_inc_wrap and iwl_txq_dec_wrap are broken. */
-	if (WARN_ONCE(tfd_queue_max_size & (tfd_queue_max_size - 1),
-		      "Max tfd queue size must be a power of two, but is %d",
-		      tfd_queue_max_size))
-		return -EINVAL;
+	if (tfd_queue_max_size & (tfd_queue_max_size - 1)) {
+		IWL_WARN(trans, "Max tfd queue size must be a power of two, but is %u\n",
+		         tfd_queue_max_size);
+		return ZX_ERR_INVALID_ARGS;
+	}
 
 	/* Initialize queue's high/low-water marks, and head/tail indexes */
 	ret = iwl_queue_init(txq, slots_num);
-	if (ret)
+	if (ret != ZX_OK)
 		return ret;
 
-	spin_lock_init(&txq->lock);
+	mtx_init(&txq->lock, mtx_plain);
 
+#if 0  // NEEDS_PORTING
 	if (cmd_queue) {
 		static struct lock_class_key iwl_txq_cmd_queue_lock_class;
 
-		lockdep_set_class(&txq->lock, &iwl_txq_cmd_queue_lock_class);
+		iwl_assert_lock_held(&txq->lock, &iwl_txq_cmd_queue_lock_class);
 	}
 
 	__skb_queue_head_init(&txq->overflow_q);
+#endif
 
-	return 0;
+	return ZX_OK;
 }
 
+#if 0  // NEEDS_PORTING
 void iwl_txq_free_tso_page(struct iwl_trans *trans, struct sk_buff *skb)
 {
 	struct page **page_ptr;
@@ -966,6 +1048,7 @@ void iwl_txq_free_tso_page(struct iwl_trans *trans, struct sk_buff *skb)
 		__free_page(tmp);
 	}
 }
+#endif  // NEEDS_PORTING
 
 void iwl_txq_log_scd_error(struct iwl_trans *trans, struct iwl_txq *txq)
 {
@@ -997,25 +1080,27 @@ void iwl_txq_log_scd_error(struct iwl_trans *trans, struct iwl_txq *txq)
 			iwl_read_direct32(trans, FH_TX_TRB_REG(fifo)));
 }
 
-static void iwl_txq_stuck_timer(struct timer_list *t)
+static void iwl_txq_stuck_timer(void* data)
 {
-	struct iwl_txq *txq = from_timer(txq, t, stuck_timer);
+	struct iwl_txq* txq = data;
 	struct iwl_trans *trans = txq->trans;
 
-	spin_lock(&txq->lock);
+	mtx_lock(&txq->lock);
 	/* check if triggered erroneously */
 	if (txq->read_ptr == txq->write_ptr) {
-		spin_unlock(&txq->lock);
+		mtx_unlock(&txq->lock);
 		return;
 	}
-	spin_unlock(&txq->lock);
+	mtx_unlock(&txq->lock);
 
 	iwl_txq_log_scd_error(trans, txq);
 
+#if 0  // NEEDS_PORTING
 	iwl_force_nmi(trans);
+#endif
 }
 
-int iwl_txq_alloc(struct iwl_trans *trans, struct iwl_txq *txq, int slots_num,
+zx_status_t iwl_txq_alloc(struct iwl_trans *trans, struct iwl_txq *txq, int slots_num,
 		  bool cmd_queue)
 {
 	size_t tfd_sz = trans->txqs.tfd.size *
@@ -1023,121 +1108,129 @@ int iwl_txq_alloc(struct iwl_trans *trans, struct iwl_txq *txq, int slots_num,
 	size_t tb0_buf_sz;
 	int i;
 
-	if (WARN_ON(txq->entries || txq->tfds))
-		return -EINVAL;
+	if (txq->entries || txq->tfds)
+		return ZX_ERR_INVALID_ARGS;
 
 	if (trans->trans_cfg->use_tfh)
 		tfd_sz = trans->txqs.tfd.size * slots_num;
 
-	timer_setup(&txq->stuck_timer, iwl_txq_stuck_timer, 0);
+	iwl_irq_timer_create(trans->dev, iwl_txq_stuck_timer, &txq, &txq->stuck_timer);
 	txq->trans = trans;
 
 	txq->n_window = slots_num;
 
-	txq->entries = kcalloc(slots_num,
-			       sizeof(struct iwl_pcie_txq_entry),
-			       GFP_KERNEL);
+	txq->entries = calloc(slots_num, sizeof(struct iwl_pcie_txq_entry));
 
 	if (!txq->entries)
 		goto error;
 
 	if (cmd_queue)
 		for (i = 0; i < slots_num; i++) {
-			txq->entries[i].cmd =
-				kmalloc(sizeof(struct iwl_device_cmd),
-					GFP_KERNEL);
-			if (!txq->entries[i].cmd)
+			zx_status_t status = iwl_iobuf_allocate_contiguous(
+			    trans->dev, sizeof(struct iwl_device_tx_cmd), &txq->entries[i].cmd);
+			if (status != ZX_OK) {
 				goto error;
+			}
 		}
 
 	/* Circular buffer of transmit frame descriptors (TFDs),
 	 * shared with device */
-	txq->tfds = dma_alloc_coherent(trans->dev, tfd_sz,
-				       &txq->dma_addr, GFP_KERNEL);
-	if (!txq->tfds)
+	zx_status_t status = iwl_iobuf_allocate_contiguous(trans->dev, tfd_sz, &txq->tfds);
+	if (status != ZX_OK) {
 		goto error;
+	}
+	txq->dma_addr = iwl_iobuf_physical(txq->tfds);
 
-	BUILD_BUG_ON(sizeof(*txq->first_tb_bufs) != IWL_FIRST_TB_SIZE_ALIGN);
+	BUILD_BUG_ON(sizeof(struct iwl_pcie_first_tb_buf) != IWL_FIRST_TB_SIZE_ALIGN);
 
-	tb0_buf_sz = sizeof(*txq->first_tb_bufs) * slots_num;
+	tb0_buf_sz = sizeof(struct iwl_pcie_first_tb_buf) * slots_num;
 
-	txq->first_tb_bufs = dma_alloc_coherent(trans->dev, tb0_buf_sz,
-						&txq->first_tb_dma,
-						GFP_KERNEL);
-	if (!txq->first_tb_bufs)
+	status =
+	    iwl_iobuf_allocate_contiguous(trans->dev, tb0_buf_sz, &txq->first_tb_bufs);
+	if (status != ZX_OK) {
 		goto err_free_tfds;
+	}
+	txq->first_tb_dma = iwl_iobuf_physical(txq->first_tb_bufs);
 
-	return 0;
+	return ZX_OK;
+
 err_free_tfds:
-	dma_free_coherent(trans->dev, tfd_sz, txq->tfds, txq->dma_addr);
+	iwl_iobuf_release(txq->tfds);
 	txq->tfds = NULL;
 error:
-	if (txq->entries && cmd_queue)
-		for (i = 0; i < slots_num; i++)
-			kfree(txq->entries[i].cmd);
-	kfree(txq->entries);
+	if (txq->entries && cmd_queue) {
+		for (int i = 0; i < slots_num; i++) {
+			iwl_iobuf_release(txq->entries[i].cmd);
+			txq->entries[i].cmd = NULL;
+		}
+	}
+	free(txq->entries);
 	txq->entries = NULL;
 
-	return -ENOMEM;
+	return ZX_ERR_NO_MEMORY;
 }
 
-static struct iwl_txq *
-iwl_txq_dyn_alloc_dma(struct iwl_trans *trans, int size, unsigned int timeout)
+static zx_status_t
+iwl_txq_dyn_alloc_dma(struct iwl_trans *trans, int size, zx_duration_t timeout,
+    struct iwl_txq **out_txq)
 {
 	size_t bc_tbl_size, bc_tbl_entries;
 	struct iwl_txq *txq;
-	int ret;
+	zx_status_t ret;
 
 	WARN_ON(!trans->txqs.bc_tbl_size);
 
 	bc_tbl_size = trans->txqs.bc_tbl_size;
 	bc_tbl_entries = bc_tbl_size / sizeof(u16);
 
-	if (WARN_ON(size > bc_tbl_entries))
-		return ERR_PTR(-EINVAL);
+	if (size > (int)bc_tbl_entries)
+		return ZX_ERR_INVALID_ARGS;
 
-	txq = kzalloc(sizeof(*txq), GFP_KERNEL);
+	txq = calloc(1, sizeof(*txq));
 	if (!txq)
-		return ERR_PTR(-ENOMEM);
+		return ZX_ERR_NO_MEMORY;
 
+#if 0  // NEEDS_PORTING
 	txq->bc_tbl.addr = dma_pool_alloc(trans->txqs.bc_pool, GFP_KERNEL,
 					  &txq->bc_tbl.dma);
 	if (!txq->bc_tbl.addr) {
 		IWL_ERR(trans, "Scheduler BC Table allocation failed\n");
 		kfree(txq);
-		return ERR_PTR(-ENOMEM);
+		return ZX_ERR_NO_MEMORY;
 	}
+#endif
 
 	ret = iwl_txq_alloc(trans, txq, size, false);
-	if (ret) {
+	if (ret != ZX_OK) {
 		IWL_ERR(trans, "Tx queue alloc failed\n");
 		goto error;
 	}
 	ret = iwl_txq_init(trans, txq, size, false);
-	if (ret) {
+	if (ret != ZX_OK) {
 		IWL_ERR(trans, "Tx queue init failed\n");
 		goto error;
 	}
 
-	txq->wd_timeout = msecs_to_jiffies(timeout);
+	txq->wd_timeout = timeout;
 
-	return txq;
+	*out_txq = txq;
+	return ZX_OK;
 
 error:
 	iwl_txq_gen2_free_memory(trans, txq);
-	return ERR_PTR(ret);
+	return ret;
 }
 
-static int iwl_txq_alloc_response(struct iwl_trans *trans, struct iwl_txq *txq,
-				  struct iwl_host_cmd *hcmd)
+static zx_status_t iwl_txq_alloc_response(struct iwl_trans *trans, struct iwl_txq *txq,
+				  struct iwl_host_cmd *hcmd, size_t* out_qid)
 {
 	struct iwl_tx_queue_cfg_rsp *rsp;
-	int ret, qid;
+	zx_status_t ret;
+	size_t qid;
 	u32 wr_ptr;
 
-	if (WARN_ON(iwl_rx_packet_payload_len(hcmd->resp_pkt) !=
-		    sizeof(*rsp))) {
-		ret = -EINVAL;
+	if (iwl_rx_packet_payload_len(hcmd->resp_pkt) != sizeof(*rsp)) {
+		ret = ZX_ERR_INVALID_ARGS;
 		goto error_free_resp;
 	}
 
@@ -1146,24 +1239,24 @@ static int iwl_txq_alloc_response(struct iwl_trans *trans, struct iwl_txq *txq,
 	wr_ptr = le16_to_cpu(rsp->write_pointer);
 
 	if (qid >= ARRAY_SIZE(trans->txqs.txq)) {
-		WARN_ONCE(1, "queue index %d unsupported", qid);
-		ret = -EIO;
+		IWL_WARN(trans, "queue index %zu unsupported\n", qid);
+		ret = ZX_ERR_IO;
 		goto error_free_resp;
 	}
 
 	if (test_and_set_bit(qid, trans->txqs.queue_used)) {
-		WARN_ONCE(1, "queue %d already used", qid);
-		ret = -EIO;
+		IWL_WARN(trans, "queue %zu already used\n", qid);
+		ret = ZX_ERR_IO;
 		goto error_free_resp;
 	}
 
-	if (WARN_ONCE(trans->txqs.txq[qid],
-		      "queue %d already allocated\n", qid)) {
-		ret = -EIO;
+	if (trans->txqs.txq[qid]) {
+		IWL_WARN(trans, "queue %zu already allocated\n", qid);
+		ret = ZX_ERR_IO;
 		goto error_free_resp;
 	}
 
-	txq->id = qid;
+	txq->id = (uint32_t)qid;
 	trans->txqs.txq[qid] = txq;
 	wr_ptr &= (trans->trans_cfg->base_params->max_tfd_queue_size - 1);
 
@@ -1171,10 +1264,11 @@ static int iwl_txq_alloc_response(struct iwl_trans *trans, struct iwl_txq *txq,
 	txq->read_ptr = wr_ptr;
 	txq->write_ptr = wr_ptr;
 
-	IWL_DEBUG_TX_QUEUES(trans, "Activate queue %d\n", qid);
+	IWL_DEBUG_TX_QUEUES(trans, "Activate queue %zu\n", qid);
 
 	iwl_free_resp(hcmd);
-	return qid;
+	*out_qid = qid;
+	return ZX_OK;
 
 error_free_resp:
 	iwl_free_resp(hcmd);
@@ -1182,8 +1276,8 @@ error_free_resp:
 	return ret;
 }
 
-int iwl_txq_dyn_alloc(struct iwl_trans *trans, u32 flags, u32 sta_mask,
-		      u8 tid, int size, unsigned int timeout)
+zx_status_t iwl_txq_dyn_alloc(struct iwl_trans *trans, u32 flags, u32 sta_mask,
+		      u8 tid, int size, zx_duration_t timeout, size_t* out_qid)
 {
 	struct iwl_txq *txq;
 	union {
@@ -1193,15 +1287,15 @@ int iwl_txq_dyn_alloc(struct iwl_trans *trans, u32 flags, u32 sta_mask,
 	struct iwl_host_cmd hcmd = {
 		.flags = CMD_WANT_SKB,
 	};
-	int ret;
+	zx_status_t ret;
 
 	if (trans->trans_cfg->device_family == IWL_DEVICE_FAMILY_BZ &&
 	    trans->hw_rev_step == SILICON_A_STEP)
 		size = 4096;
 
-	txq = iwl_txq_dyn_alloc_dma(trans, size, timeout);
-	if (IS_ERR(txq))
-		return PTR_ERR(txq);
+	ret = iwl_txq_dyn_alloc_dma(trans, size, timeout, &txq);
+	if (ret != ZX_OK)
+		return ret;
 
 	if (trans->txqs.queue_alloc_cmd_ver == 0) {
 		memset(&cmd.old, 0, sizeof(cmd.old));
@@ -1212,10 +1306,10 @@ int iwl_txq_dyn_alloc(struct iwl_trans *trans, u32 flags, u32 sta_mask,
 		cmd.old.tid = tid;
 
 		if (hweight32(sta_mask) != 1) {
-			ret = -EINVAL;
+			ret = ZX_ERR_INVALID_ARGS;
 			goto error;
 		}
-		cmd.old.sta_id = ffs(sta_mask) - 1;
+		cmd.old.sta_id = (uint8_t)(ffs(sta_mask) - 1);
 
 		hcmd.id = SCD_QUEUE_CFG;
 		hcmd.len[0] = sizeof(cmd.old);
@@ -1234,15 +1328,15 @@ int iwl_txq_dyn_alloc(struct iwl_trans *trans, u32 flags, u32 sta_mask,
 		hcmd.len[0] = sizeof(cmd.new);
 		hcmd.data[0] = &cmd.new;
 	} else {
-		ret = -EOPNOTSUPP;
+		ret = ZX_ERR_NOT_SUPPORTED;
 		goto error;
 	}
 
 	ret = iwl_trans_send_cmd(trans, &hcmd);
-	if (ret)
+	if (ret != ZX_OK)
 		goto error;
 
-	return iwl_txq_alloc_response(trans, txq, &hcmd);
+	return iwl_txq_alloc_response(trans, txq, &hcmd, out_qid);
 
 error:
 	iwl_txq_gen2_free_memory(trans, txq);
@@ -1251,9 +1345,10 @@ error:
 
 void iwl_txq_dyn_free(struct iwl_trans *trans, int queue)
 {
-	if (WARN(queue >= IWL_MAX_TVQM_QUEUES,
-		 "queue %d out of range", queue))
+	if (queue >= IWL_MAX_TVQM_QUEUES) {
+		IWL_WARN(trans, "queue %d out of range\n", queue);
 		return;
+	}
 
 	/*
 	 * Upon HW Rfkill - we stop the device, and then stop the queues
@@ -1262,8 +1357,9 @@ void iwl_txq_dyn_free(struct iwl_trans *trans, int queue)
 	 * stop_device.
 	 */
 	if (!test_and_clear_bit(queue, trans->txqs.queue_used)) {
-		WARN_ONCE(test_bit(STATUS_DEVICE_ENABLED, &trans->status),
-			  "queue %d not used", queue);
+		if (test_bit(STATUS_DEVICE_ENABLED, &trans->status)) {
+			IWL_WARN(trans, "queue %d not used\n", queue);
+		}
 		return;
 	}
 
@@ -1274,7 +1370,7 @@ void iwl_txq_dyn_free(struct iwl_trans *trans, int queue)
 
 void iwl_txq_gen2_tx_free(struct iwl_trans *trans)
 {
-	int i;
+	size_t i;
 
 	memset(trans->txqs.queue_used, 0, sizeof(trans->txqs.queue_used));
 
@@ -1283,21 +1379,21 @@ void iwl_txq_gen2_tx_free(struct iwl_trans *trans)
 		if (!trans->txqs.txq[i])
 			continue;
 
-		iwl_txq_gen2_free(trans, i);
+		iwl_txq_gen2_free(trans, (int)i);
 	}
 }
 
-int iwl_txq_gen2_init(struct iwl_trans *trans, int txq_id, int queue_size)
+zx_status_t iwl_txq_gen2_init(struct iwl_trans *trans, int txq_id, int queue_size)
 {
 	struct iwl_txq *queue;
 	int ret;
 
 	/* alloc and init the tx queue */
 	if (!trans->txqs.txq[txq_id]) {
-		queue = kzalloc(sizeof(*queue), GFP_KERNEL);
+		queue = calloc(1, sizeof(*queue));
 		if (!queue) {
 			IWL_ERR(trans, "Not enough memory for tx queue\n");
-			return -ENOMEM;
+			return ZX_ERR_NO_MEMORY;
 		}
 		trans->txqs.txq[txq_id] = queue;
 		ret = iwl_txq_alloc(trans, queue, queue_size, true);
@@ -1318,50 +1414,22 @@ int iwl_txq_gen2_init(struct iwl_trans *trans, int txq_id, int queue_size)
 	trans->txqs.txq[txq_id]->id = txq_id;
 	set_bit(txq_id, trans->txqs.queue_used);
 
-	return 0;
+	return ZX_OK;
 
 error:
 	iwl_txq_gen2_tx_free(trans);
 	return ret;
 }
 
-static inline dma_addr_t iwl_txq_gen1_tfd_tb_get_addr(struct iwl_trans *trans,
-						      void *_tfd, u8 idx)
-{
-	struct iwl_tfd *tfd;
-	struct iwl_tfd_tb *tb;
-	dma_addr_t addr;
-	dma_addr_t hi_len;
-
-	if (trans->trans_cfg->use_tfh) {
-		struct iwl_tfh_tfd *tfh_tfd = _tfd;
-		struct iwl_tfh_tb *tfh_tb = &tfh_tfd->tbs[idx];
-
-		return (dma_addr_t)(le64_to_cpu(tfh_tb->addr));
-	}
-
-	tfd = _tfd;
-	tb = &tfd->tbs[idx];
-	addr = get_unaligned_le32(&tb->lo);
-
-	if (sizeof(dma_addr_t) <= sizeof(u32))
-		return addr;
-
-	hi_len = le16_to_cpu(tb->hi_n_len) & 0xF;
-
-	/*
-	 * shift by 16 twice to avoid warnings on 32-bit
-	 * (where this code never runs anyway due to the
-	 * if statement above)
-	 */
-	return addr | ((hi_len << 16) << 16);
-}
-
+//
+// Since DMA addresses are manipulated by iobufs, we don't do DMA unmap here. Instead,
+// we update the TFD entry only (zero-ing num_tbs).
+//
 void iwl_txq_gen1_tfd_unmap(struct iwl_trans *trans,
 			    struct iwl_cmd_meta *meta,
 			    struct iwl_txq *txq, int index)
 {
-	int i, num_tbs;
+	int num_tbs;
 	void *tfd = iwl_txq_get_tfd(trans, txq, index);
 
 	/* Sanity check on number of chunks */
@@ -1374,23 +1442,6 @@ void iwl_txq_gen1_tfd_unmap(struct iwl_trans *trans,
 	}
 
 	/* first TB is never freed - it's the bidirectional DMA data */
-
-	for (i = 1; i < num_tbs; i++) {
-		if (meta->tbs & BIT(i))
-			dma_unmap_page(trans->dev,
-				       iwl_txq_gen1_tfd_tb_get_addr(trans,
-								    tfd, i),
-				       iwl_txq_gen1_tfd_tb_get_len(trans,
-								   tfd, i),
-				       DMA_TO_DEVICE);
-		else
-			dma_unmap_single(trans->dev,
-					 iwl_txq_gen1_tfd_tb_get_addr(trans,
-								      tfd, i),
-					 iwl_txq_gen1_tfd_tb_get_len(trans,
-								     tfd, i),
-					 DMA_TO_DEVICE);
-	}
 
 	meta->tbs = 0;
 
@@ -1421,7 +1472,7 @@ void iwl_txq_gen1_update_byte_cnt_tbl(struct iwl_trans *trans,
 	u8 sec_ctl = 0;
 	u16 len = byte_cnt + IWL_TX_CRC_SIZE + IWL_TX_DELIMITER_SIZE;
 	__le16 bc_ent;
-	struct iwl_device_tx_cmd *dev_cmd = txq->entries[txq->write_ptr].cmd;
+	struct iwl_device_tx_cmd *dev_cmd = iwl_iobuf_virtual(txq->entries[txq->write_ptr].cmd);
 	struct iwl_tx_cmd *tx_cmd = (void *)dev_cmd->payload;
 	u8 sta_id = tx_cmd->sta_id;
 
@@ -1431,7 +1482,7 @@ void iwl_txq_gen1_update_byte_cnt_tbl(struct iwl_trans *trans,
 
 	switch (sec_ctl & TX_CMD_SEC_MSK) {
 	case TX_CMD_SEC_CCM:
-		len += IEEE80211_CCMP_MIC_LEN;
+		len += fuchsia_wlan_ieee80211_CCMP_128_MIC_LEN;
 		break;
 	case TX_CMD_SEC_TKIP:
 		len += IEEE80211_TKIP_ICV_LEN;
@@ -1463,7 +1514,7 @@ void iwl_txq_gen1_inval_byte_cnt_tbl(struct iwl_trans *trans,
 	int read_ptr = txq->read_ptr;
 	u8 sta_id = 0;
 	__le16 bc_ent;
-	struct iwl_device_tx_cmd *dev_cmd = txq->entries[read_ptr].cmd;
+	struct iwl_device_tx_cmd *dev_cmd = iwl_iobuf_virtual(txq->entries[read_ptr].cmd);
 	struct iwl_tx_cmd *tx_cmd = (void *)dev_cmd->payload;
 
 	WARN_ON(read_ptr >= TFD_QUEUE_SIZE_MAX);
@@ -1496,9 +1547,8 @@ void iwl_txq_free_tfd(struct iwl_trans *trans, struct iwl_txq *txq)
 	 */
 	int rd_ptr = txq->read_ptr;
 	int idx = iwl_txq_get_cmd_index(txq, rd_ptr);
-	struct sk_buff *skb;
 
-	lockdep_assert_held(&txq->lock);
+	iwl_assert_lock_held(&txq->lock);
 
 	if (!txq->entries)
 		return;
@@ -1508,22 +1558,27 @@ void iwl_txq_free_tfd(struct iwl_trans *trans, struct iwl_txq *txq)
 	 */
 	iwl_txq_gen1_tfd_unmap(trans, &txq->entries[idx].meta, txq, rd_ptr);
 
-	/* free SKB */
-	skb = txq->entries[idx].skb;
+	/* free iobufs */
+	struct iwl_iobuf* cmd = txq->entries[idx].cmd;
+	struct iwl_iobuf* dup_io_buf = txq->entries[idx].dup_io_buf;
 
 	/* Can be called from irqs-disabled context
-	 * If skb is not NULL, it means that the whole queue is being
+	 * If iobuf is not NULL, it means that the whole queue is being
 	 * freed and that the queue is not empty - free the skb
 	 */
-	if (skb) {
-		iwl_op_mode_free_skb(trans->op_mode, skb);
-		txq->entries[idx].skb = NULL;
+	if (cmd) {
+		iwl_iobuf_release(cmd);
+		txq->entries[idx].cmd = NULL;
+	}
+	if (dup_io_buf) {
+		iwl_iobuf_release(dup_io_buf);
+		txq->entries[idx].dup_io_buf = NULL;
 	}
 }
 
 void iwl_txq_progress(struct iwl_txq *txq)
 {
-	lockdep_assert_held(&txq->lock);
+	iwl_assert_lock_held(&txq->lock);
 
 	if (!txq->wd_timeout)
 		return;
@@ -1539,16 +1594,19 @@ void iwl_txq_progress(struct iwl_txq *txq)
 	 * if empty delete timer, otherwise move timer forward
 	 * since we're making progress on this queue
 	 */
-	if (txq->read_ptr == txq->write_ptr)
-		del_timer(&txq->stuck_timer);
-	else
-		mod_timer(&txq->stuck_timer, jiffies + txq->wd_timeout);
+	if (txq->read_ptr == txq->write_ptr) {
+		iwl_irq_timer_stop(txq->stuck_timer);
+	}
+	else {
+		iwl_irq_timer_stop(txq->stuck_timer);
+		iwl_irq_timer_start(txq->stuck_timer, txq->wd_timeout);
+	}
 }
 
 /* Frees buffers until index _not_ inclusive */
-void iwl_txq_reclaim(struct iwl_trans *trans, int txq_id, int ssn,
-		     struct sk_buff_head *skbs)
+void iwl_txq_reclaim(struct iwl_trans *trans, int txq_id, int ssn)
 {
+#if 0  // NEEDS_PORTING
 	struct iwl_txq *txq = trans->txqs.txq[txq_id];
 	int tfd_num = iwl_txq_get_cmd_index(txq, ssn);
 	int read_ptr = iwl_txq_get_cmd_index(txq, txq->read_ptr);
@@ -1664,6 +1722,9 @@ void iwl_txq_reclaim(struct iwl_trans *trans, int txq_id, int ssn,
 
 out:
 	spin_unlock_bh(&txq->lock);
+#else  // NEEDS_PORTING
+	IWL_ERR(trans, "ZX_ERR_NOT_SUPPORTED\n");
+#endif  // NEEDS_PORTING
 }
 
 /* Set wr_ptr of specific device and txq  */
@@ -1671,17 +1732,18 @@ void iwl_txq_set_q_ptrs(struct iwl_trans *trans, int txq_id, int ptr)
 {
 	struct iwl_txq *txq = trans->txqs.txq[txq_id];
 
-	spin_lock_bh(&txq->lock);
+	mtx_lock(&txq->lock);
 
 	txq->write_ptr = ptr;
 	txq->read_ptr = txq->write_ptr;
 
-	spin_unlock_bh(&txq->lock);
+	mtx_unlock(&txq->lock);
 }
 
 void iwl_trans_txq_freeze_timer(struct iwl_trans *trans, unsigned long txqs,
 				bool freeze)
 {
+#if 0  // NEEDS_PORTING
 	int queue;
 
 	for_each_set_bit(queue, &txqs, BITS_PER_LONG) {
@@ -1729,11 +1791,14 @@ void iwl_trans_txq_freeze_timer(struct iwl_trans *trans, unsigned long txqs,
 next_queue:
 		spin_unlock_bh(&txq->lock);
 	}
+#else  // NEEDS_PORTING
+	IWL_ERR(trans, "This function is not supported yet.");
+#endif  // NEEDS_PORTING
 }
 
-#define HOST_COMPLETE_TIMEOUT	(2 * HZ)
+#define HOST_COMPLETE_TIMEOUT ZX_SEC(2)
 
-static int iwl_trans_txq_send_hcmd_sync(struct iwl_trans *trans,
+static zx_status_t iwl_trans_txq_send_hcmd_sync(struct iwl_trans *trans,
 					struct iwl_host_cmd *cmd)
 {
 	const char *cmd_str = iwl_get_cmd_string(trans, cmd->id);
@@ -1746,9 +1811,11 @@ static int iwl_trans_txq_send_hcmd_sync(struct iwl_trans *trans,
 	if (WARN(test_and_set_bit(STATUS_SYNC_HCMD_ACTIVE,
 				  &trans->status),
 		 "Command %s: a command is already active!\n", cmd_str))
-		return -EIO;
+		return ZX_ERR_IO;
 
 	IWL_DEBUG_INFO(trans, "Setting HCMD_ACTIVE for command %s\n", cmd_str);
+
+	sync_completion_reset(&trans->wait_command_queue);
 
 	cmd_idx = trans->ops->send_cmd(trans, cmd);
 	if (cmd_idx < 0) {
@@ -1759,11 +1826,8 @@ static int iwl_trans_txq_send_hcmd_sync(struct iwl_trans *trans,
 		return ret;
 	}
 
-	ret = wait_event_timeout(trans->wait_command_queue,
-				 !test_bit(STATUS_SYNC_HCMD_ACTIVE,
-					   &trans->status),
-				 HOST_COMPLETE_TIMEOUT);
-	if (!ret) {
+	ret = sync_completion_wait(&trans->wait_command_queue, HOST_COMPLETE_TIMEOUT);
+	if (ret != ZX_OK) {
 		IWL_ERR(trans, "Error sending %s: time out after %dms.\n",
 			cmd_str, jiffies_to_msecs(HOST_COMPLETE_TIMEOUT));
 
@@ -1773,7 +1837,7 @@ static int iwl_trans_txq_send_hcmd_sync(struct iwl_trans *trans,
 		clear_bit(STATUS_SYNC_HCMD_ACTIVE, &trans->status);
 		IWL_DEBUG_INFO(trans, "Clearing HCMD_ACTIVE for command %s\n",
 			       cmd_str);
-		ret = -ETIMEDOUT;
+		ret = ZX_ERR_TIMED_OUT;
 
 		iwl_trans_sync_nmi(trans);
 		goto cancel;
@@ -1783,26 +1847,28 @@ static int iwl_trans_txq_send_hcmd_sync(struct iwl_trans *trans,
 		if (!test_and_clear_bit(STATUS_SUPPRESS_CMD_ERROR_ONCE,
 					&trans->status)) {
 			IWL_ERR(trans, "FW error in SYNC CMD %s\n", cmd_str);
+#if 0  // NEEDS_PORTING
 			dump_stack();
+#endif  // NEEDS_PORTING
 		}
-		ret = -EIO;
+		ret = ZX_ERR_IO;
 		goto cancel;
 	}
 
 	if (!(cmd->flags & CMD_SEND_IN_RFKILL) &&
 	    test_bit(STATUS_RFKILL_OPMODE, &trans->status)) {
 		IWL_DEBUG_RF_KILL(trans, "RFKILL in SYNC CMD... no rsp\n");
-		ret = -ERFKILL;
+		ret = ZX_ERR_BAD_STATE;
 		goto cancel;
 	}
 
 	if ((cmd->flags & CMD_WANT_SKB) && !cmd->resp_pkt) {
 		IWL_ERR(trans, "Error: Response NULL in '%s'\n", cmd_str);
-		ret = -EIO;
+		ret = ZX_ERR_IO;
 		goto cancel;
 	}
 
-	return 0;
+	return ZX_OK;
 
 cancel:
 	if (cmd->flags & CMD_WANT_SKB) {
@@ -1823,43 +1889,42 @@ cancel:
 	return ret;
 }
 
-int iwl_trans_txq_send_hcmd(struct iwl_trans *trans,
+zx_status_t iwl_trans_txq_send_hcmd(struct iwl_trans *trans,
 			    struct iwl_host_cmd *cmd)
 {
 	/* Make sure the NIC is still alive in the bus */
 	if (test_bit(STATUS_TRANS_DEAD, &trans->status))
-		return -ENODEV;
+		return ZX_ERR_INTERNAL;
 
 	if (!(cmd->flags & CMD_SEND_IN_RFKILL) &&
 	    test_bit(STATUS_RFKILL_OPMODE, &trans->status)) {
 		IWL_DEBUG_RF_KILL(trans, "Dropping CMD 0x%x: RF KILL\n",
 				  cmd->id);
-		return -ERFKILL;
+		return ZX_ERR_BAD_STATE;
 	}
 
 	if (unlikely(trans->system_pm_mode == IWL_PLAT_PM_MODE_D3 &&
 		     !(cmd->flags & CMD_SEND_IN_D3))) {
-		IWL_DEBUG_WOWLAN(trans, "Dropping CMD 0x%x: D3\n", cmd->id);
-		return -EHOSTDOWN;
+		IWL_DEBUG_POWER(trans, "Dropping CMD 0x%x: D3\n", cmd->id);
+		return ZX_ERR_BAD_STATE;
 	}
 
 	if (cmd->flags & CMD_ASYNC) {
-		int ret;
+		zx_status_t ret;
 
 		/* An asynchronous command can not expect an SKB to be set. */
 		if (WARN_ON(cmd->flags & CMD_WANT_SKB))
-			return -EINVAL;
+			return ZX_ERR_INVALID_ARGS;
 
 		ret = trans->ops->send_cmd(trans, cmd);
-		if (ret < 0) {
+		if (ret != ZX_OK) {
 			IWL_ERR(trans,
 				"Error sending %s: enqueue_hcmd failed: %d\n",
 				iwl_get_cmd_string(trans, cmd->id), ret);
 			return ret;
 		}
-		return 0;
+		return ZX_OK;
 	}
 
 	return iwl_trans_txq_send_hcmd_sync(trans, cmd);
 }
-

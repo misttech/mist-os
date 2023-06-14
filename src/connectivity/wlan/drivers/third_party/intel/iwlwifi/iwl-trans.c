@@ -38,8 +38,11 @@
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-drv.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-fh.h"
 
-struct iwl_trans* iwl_trans_alloc(unsigned int priv_size, struct device* dev,
-                                  struct iwl_trans_ops* ops, const struct iwl_cfg_trans_params *cfg_trans) {
+struct iwl_trans *iwl_trans_alloc(unsigned int priv_size,
+				  struct device *dev,
+				  struct iwl_trans_ops *ops,
+				  const struct iwl_cfg_trans_params *cfg_trans)
+{
   struct iwl_trans* trans;
 
   trans = calloc(1, sizeof(*trans) + priv_size);

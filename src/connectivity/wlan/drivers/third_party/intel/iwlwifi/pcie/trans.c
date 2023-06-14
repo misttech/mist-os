@@ -57,6 +57,7 @@
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/pcie/internal.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/pci-fidl.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/time.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/queue/tx.h"
 #ifdef CPTCFG_IWLWIFI_DEVICE_TESTMODE
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-dnt-cfg.h"
 #endif
@@ -1216,7 +1217,7 @@ static void iwl_pcie_init_msix(struct iwl_trans_pcie* trans_pcie) {
   trans_pcie->hw_mask = trans_pcie->hw_init_mask;
 }
 
-static void _iwl_trans_pcie_stop_device(struct iwl_trans* trans, bool low_power) {
+static void _iwl_trans_pcie_stop_device(struct iwl_trans* trans) {
   struct iwl_trans_pcie* trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
 
   iwl_assert_lock_held(&trans_pcie->mutex);
@@ -1299,10 +1300,10 @@ static void _iwl_trans_pcie_stop_device(struct iwl_trans* trans, bool low_power)
   iwl_pcie_prepare_card_hw(trans);
 }
 
-#if 0   // NEEDS_PORTING
 // TODO(43123): implement this function
 void iwl_pcie_synchronize_irqs(struct iwl_trans* trans) {
-	struct iwl_trans_pcie *trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
+#if 0   // NEEDS_PORTING
+	struct iwl_trans_pcie* trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
 
 	if (trans_pcie->msix_enabled) {
 		int i;
@@ -1312,8 +1313,8 @@ void iwl_pcie_synchronize_irqs(struct iwl_trans* trans) {
 	} else {
 		synchronize_irq(trans_pcie->pci_dev->irq);
 	}
-}
 #endif  // NEEDS_PORTING
+}
 
 static zx_status_t iwl_trans_pcie_start_fw(struct iwl_trans* trans, const struct fw_img* fw,
                                            bool run_in_rfkill) {
@@ -1436,14 +1437,14 @@ void iwl_trans_pcie_handle_stop_rfkill(struct iwl_trans* trans, bool was_in_rfki
   }
 }
 
-static void iwl_trans_pcie_stop_device(struct iwl_trans* trans, bool low_power) {
+static void iwl_trans_pcie_stop_device(struct iwl_trans* trans) {
   struct iwl_trans_pcie* trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
   bool was_in_rfkill;
 
   mtx_lock(&trans_pcie->mutex);
   trans_pcie->opmode_down = true;
   was_in_rfkill = test_bit(STATUS_RFKILL_OPMODE, &trans->status);
-  _iwl_trans_pcie_stop_device(trans, low_power);
+  _iwl_trans_pcie_stop_device(trans);
   iwl_trans_pcie_handle_stop_rfkill(trans, was_in_rfkill);
   mtx_unlock(&trans_pcie->mutex);
 }
@@ -1454,17 +1455,12 @@ void iwl_trans_pcie_rf_kill(struct iwl_trans* trans, bool state) {
   iwl_assert_lock_held(&trans_pcie->mutex);
 
   IWL_WARN(trans, "reporting RF_KILL (radio %s)\n", state ? "disabled" : "enabled");
-  if (iwl_op_mode_hw_rf_kill(trans->op_mode, state)) {
-#if 0   // NEEDS_PORTING
-        if (trans->cfg->gen2) {
-            _iwl_trans_pcie_gen2_stop_device(trans, true);
-        } else {
-#endif  // NEEDS_PORTING
-    _iwl_trans_pcie_stop_device(trans, true);
-#if 0   // NEEDS_PORTING
-        }
-#endif  // NEEDS_PORTING
-  }
+	if (iwl_op_mode_hw_rf_kill(trans->op_mode, state)) {
+		if (trans->trans_cfg->gen2)
+			_iwl_trans_pcie_gen2_stop_device(trans);
+		else
+			_iwl_trans_pcie_stop_device(trans);
+	}
 }
 
 static void iwl_trans_pcie_d3_suspend(struct iwl_trans* trans, bool test, bool reset) {
@@ -1929,7 +1925,13 @@ static void iwl_trans_pcie_configure(struct iwl_trans* trans,
            trans_pcie->n_no_reclaim_cmds * sizeof(uint8_t));
 
   trans_pcie->rx_buf_size = trans_cfg->rx_buf_size;
-  trans_pcie->rx_page_order = iwl_trans_get_rb_size_order(trans_pcie->rx_buf_size);
+	trans_pcie->rx_page_order =
+		iwl_trans_get_rb_size_order(trans_pcie->rx_buf_size);
+	trans_pcie->rx_buf_bytes =
+		iwl_trans_get_rb_size(trans_pcie->rx_buf_size);
+	trans_pcie->supported_dma_mask = DMA_BIT_MASK(12);
+	if (trans->trans_cfg->device_family >= IWL_DEVICE_FAMILY_AX210)
+		trans_pcie->supported_dma_mask = DMA_BIT_MASK(11);
 
 	trans->txqs.bc_table_dword = trans_cfg->bc_table_dword;
   trans_pcie->scd_set_active = trans_cfg->scd_set_active;
@@ -2331,8 +2333,6 @@ static void iwl_trans_pcie_block_txq_ptrs(struct iwl_trans* trans, bool block) {
 }
 
 #define IWL_FLUSH_WAIT_MS 2000
-
-void iwl_txq_log_scd_error(struct iwl_trans *trans, struct iwl_txq *txq) {}
 
 #if 0   // NEEDS_PORTING
 static int iwl_trans_pcie_rxq_dma_data(struct iwl_trans *trans, int queue,
@@ -3423,46 +3423,46 @@ static struct iwl_trans_ops trans_ops_pcie = {
 #endif
 };
 
+static struct iwl_trans_ops trans_ops_pcie_gen2 = {
+	IWL_TRANS_COMMON_OPS,
+	.start_hw = iwl_trans_pcie_start_hw,
+	.fw_alive = iwl_trans_pcie_gen2_fw_alive,
+	.start_fw = iwl_trans_pcie_gen2_start_fw,
+	.stop_device = iwl_trans_pcie_gen2_stop_device,
+
+	.send_cmd = iwl_pcie_gen2_enqueue_hcmd,
+
+	.tx = iwl_txq_gen2_tx,
+	.reclaim = iwl_txq_reclaim,
+
 #if 0  // NEEDS_PORTING
-static const struct iwl_trans_ops trans_ops_pcie_gen2 = {
-    IWL_TRANS_COMMON_OPS,
-    .start_hw = iwl_trans_pcie_start_hw,
-    .fw_alive = iwl_trans_pcie_gen2_fw_alive,
-    .start_fw = iwl_trans_pcie_gen2_start_fw,
-    .stop_device = iwl_trans_pcie_gen2_stop_device,
+	.set_q_ptrs = iwl_txq_set_q_ptrs,
 
-    .send_cmd = iwl_trans_pcie_gen2_send_hcmd,
-
-    .tx = iwl_trans_pcie_gen2_tx,
-    .reclaim = iwl_trans_pcie_reclaim,
-
-    .txq_alloc = iwl_trans_pcie_dyn_txq_alloc,
-    .txq_free = iwl_trans_pcie_dyn_txq_free,
-    .wait_txq_empty = iwl_trans_pcie_wait_txq_empty,
-    .rxq_dma_data = iwl_trans_pcie_rxq_dma_data,
-#ifdef CPTCFG_IWLWIFI_DEBUGFS
-    .debugfs_cleanup = iwl_trans_pcie_debugfs_cleanup,
+	.txq_alloc = iwl_txq_dyn_alloc,
+	.txq_free = iwl_txq_dyn_free,
+	.wait_txq_empty = iwl_trans_pcie_wait_txq_empty,
+	.rxq_dma_data = iwl_trans_pcie_rxq_dma_data,
+	.set_pnvm = iwl_trans_pcie_ctx_info_gen3_set_pnvm,
+	.set_reduce_power = iwl_trans_pcie_ctx_info_gen3_set_reduce_power,
+#endif  // NEEDS_PORTING
+#ifdef CONFIG_IWLWIFI_DEBUGFS
+	.debugfs_cleanup = iwl_trans_pcie_debugfs_cleanup,
 #endif
 };
-#endif  // NEEDS_PORTING
 
 struct iwl_trans* iwl_trans_pcie_alloc(struct iwl_pci_dev* pdev,
                                        const struct iwl_pci_device_id* ent,
                                        const struct iwl_cfg_trans_params *cfg_trans) {
   struct iwl_trans_pcie* trans_pcie;
   struct iwl_trans* trans;
-  zx_status_t status;
+	zx_status_t status;
+	struct iwl_trans_ops *ops = &trans_ops_pcie_gen2;
 
-#if 0   // NEEDS_PORTING
-  if (cfg->gen2) {
-    trans = iwl_trans_alloc(sizeof(struct iwl_trans_pcie), &pdev->dev, cfg, &trans_ops_pcie_gen2);
-  } else {
-#endif  // NEEDS_PORTING
-  trans = iwl_trans_alloc(sizeof(struct iwl_trans_pcie), &pdev->dev, &trans_ops_pcie, cfg_trans);
-#if 0   // NEEDS_PORTING
-  }
-#endif  // NEEDS_PORTING
+	if (!cfg_trans->gen2)
+		ops = &trans_ops_pcie;
 
+	trans = iwl_trans_alloc(sizeof(struct iwl_trans_pcie), &pdev->dev, ops,
+				cfg_trans);
   if (!trans) {
     return NULL;
   }

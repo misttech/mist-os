@@ -124,7 +124,7 @@ static zx_status_t iwl_sim_trans_start_fw(struct iwl_trans* trans, const struct 
 
 static void iwl_sim_trans_fw_alive(struct iwl_trans* trans, uint32_t scd_addr) {}
 
-static void iwl_sim_trans_stop_device(struct iwl_trans* trans, bool low_power) {}
+static void iwl_sim_trans_stop_device(struct iwl_trans* trans) {}
 
 static zx_status_t iwl_sim_trans_send_cmd(struct iwl_trans* trans, struct iwl_host_cmd* cmd) {
   bool notify_wait;
@@ -140,7 +140,7 @@ static zx_status_t iwl_sim_trans_send_cmd(struct iwl_trans* trans, struct iwl_ho
 }
 
 static zx_status_t iwl_sim_trans_tx(struct iwl_trans* trans, ieee80211_mac_packet* pkt,
-                                    const struct iwl_device_cmd* dev_cmd, int queue) {
+                                    struct iwl_device_tx_cmd* dev_cmd, int queue) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 

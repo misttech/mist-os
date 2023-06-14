@@ -224,7 +224,10 @@ static bool iwl_alive_fn(struct iwl_notif_wait_data* notif_wait, struct iwl_rx_p
 
 __UNUSED static bool iwl_wait_init_complete(struct iwl_notif_wait_data* notif_wait,
                                             struct iwl_rx_packet* pkt, void* data) {
-  WARN_ON(pkt->hdr.cmd != INIT_COMPLETE_NOTIF);
+  if (pkt->hdr.cmd != INIT_COMPLETE_NOTIF) {
+    IWL_WARN(notif_wait, "received notification is not INIT_COMPLETE_NOTIF. Actual: %d\n",
+             pkt->hdr.cmd);
+  }
 
   return true;
 }
@@ -330,52 +333,59 @@ static zx_status_t iwl_mvm_load_ucode_wait_alive(struct iwl_mvm* mvm,
   return ZX_OK;
 }
 
-#if 0   // NEEDS_PORTING
-static int iwl_run_unified_mvm_ucode(struct iwl_mvm* mvm, bool read_nvm) {
-    struct iwl_notification_wait init_wait;
-    struct iwl_nvm_access_complete_cmd nvm_complete = {};
-    struct iwl_init_extended_cfg_cmd init_cfg = {
-        .init_flags = cpu_to_le32(BIT(IWL_INIT_NVM)),
-    };
-    static const uint16_t init_complete[] = {
-        INIT_COMPLETE_NOTIF,
-    };
-    int ret;
+static int iwl_run_unified_mvm_ucode(struct iwl_mvm *mvm)
+{
+	struct iwl_notification_wait init_wait;
+	struct iwl_nvm_access_complete_cmd nvm_complete = {};
+	struct iwl_init_extended_cfg_cmd init_cfg = {
+		.init_flags = cpu_to_le32(BIT(IWL_INIT_NVM)),
+	};
+	static const u16 init_complete[] = {
+		INIT_COMPLETE_NOTIF,
+	};
+	int ret;
 
-	if (mvm->trans->trans_cfg->tx_with_siso_diversity)
+	if (mvm->trans->cfg->tx_with_siso_diversity)
 		init_cfg.init_flags |= cpu_to_le32(BIT(IWL_INIT_PHY));
 
-    iwl_assert_lock_held(&mvm->mutex);
+	iwl_assert_lock_held(&mvm->mutex);
 
 	mvm->rfkill_safe_init_done = false;
 
-    iwl_init_notification_wait(&mvm->notif_wait, &init_wait, init_complete,
-                               ARRAY_SIZE(init_complete), iwl_wait_init_complete, NULL);
+	iwl_init_notification_wait(&mvm->notif_wait,
+				   &init_wait,
+				   init_complete,
+				   ARRAY_SIZE(init_complete),
+				   iwl_wait_init_complete,
+				   NULL);
 
 	iwl_dbg_tlv_time_point(&mvm->fwrt, IWL_FW_INI_TIME_POINT_EARLY, NULL);
 
-    /* Will also start the device */
-    ret = iwl_mvm_load_ucode_wait_alive(mvm, IWL_UCODE_REGULAR);
-    if (ret) {
-        IWL_ERR(mvm, "Failed to start RT ucode: %d\n", ret);
-        iwl_fw_assert_error_dump(&mvm->fwrt);
-        goto error;
-    }
+	/* Will also start the device */
+	ret = iwl_mvm_load_ucode_wait_alive(mvm, IWL_UCODE_REGULAR);
+	if (ret != ZX_OK) {
+		IWL_ERR(mvm, "Failed to start RT ucode: %d\n", ret);
+		goto error;
+	}
 	iwl_dbg_tlv_time_point(&mvm->fwrt, IWL_FW_INI_TIME_POINT_AFTER_ALIVE,
-			       NULL);
+	    NULL);
 
-    /* Send init config command to mark that we are sending NVM access
-     * commands
-     */
-    ret = iwl_mvm_send_cmd_pdu(mvm, WIDE_ID(SYSTEM_GROUP, INIT_EXTENDED_CFG_CMD), 0,
-                               sizeof(init_cfg), &init_cfg);
-    if (ret) {
-        IWL_ERR(mvm, "Failed to run init config command: %d\n", ret);
-        goto error;
-    }
+	/* Send init config command to mark that we are sending NVM access
+	 * commands
+	 */
+	ret = iwl_mvm_send_cmd_pdu(mvm, WIDE_ID(SYSTEM_GROUP,
+						INIT_EXTENDED_CFG_CMD),
+				   CMD_SEND_IN_RFKILL,
+				   sizeof(init_cfg), &init_cfg);
+	if (ret != ZX_OK) {
+		IWL_ERR(mvm, "Failed to run init config command: %d\n",
+			ret);
+		goto error;
+	}
 
-    /* Load NVM to NIC if needed */
-    if (mvm->nvm_file_name) {
+#if 0  // NEEDS_PORTING
+	/* Load NVM to NIC if needed */
+	if (mvm->nvm_file_name) {
 		ret = iwl_read_external_nvm(mvm->trans, mvm->nvm_file_name,
 					    mvm->nvm_sections);
 		if (ret)
@@ -383,47 +393,54 @@ static int iwl_run_unified_mvm_ucode(struct iwl_mvm* mvm, bool read_nvm) {
 		ret = iwl_mvm_load_nvm_to_nic(mvm);
 		if (ret)
 			goto error;
-    }
+	}
+#endif  // NEEDS_PORTING
 
-    if (IWL_MVM_PARSE_NVM && read_nvm && !mvm->nvm_data) {
-        ret = iwl_nvm_init(mvm);
-        if (ret) {
-            IWL_ERR(mvm, "Failed to read NVM: %d\n", ret);
-            goto error;
-        }
-    }
+	if (IWL_MVM_PARSE_NVM && !mvm->nvm_data) {
+		ret = iwl_nvm_init(mvm);
+		if (ret != ZX_OK) {
+			IWL_ERR(mvm, "Failed to read NVM: %s\n", zx_status_get_string(ret));
+			goto error;
+		}
+	}
 
-    ret = iwl_mvm_send_cmd_pdu(mvm, WIDE_ID(REGULATORY_AND_NVM_GROUP, NVM_ACCESS_COMPLETE), CMD_SEND_IN_RFKILL,
-                               sizeof(nvm_complete), &nvm_complete);
-    if (ret) {
-        IWL_ERR(mvm, "Failed to run complete NVM access: %d\n", ret);
-        goto error;
-    }
+	ret = iwl_mvm_send_cmd_pdu(mvm, WIDE_ID(REGULATORY_AND_NVM_GROUP,
+						NVM_ACCESS_COMPLETE),
+				   CMD_SEND_IN_RFKILL,
+				   sizeof(nvm_complete), &nvm_complete);
+	if (ret != ZX_OK) {
+		IWL_ERR(mvm, "Failed to run complete NVM access: %s\n",
+			zx_status_get_string(ret));
+		goto error;
+	}
 
-    /* We wait for the INIT complete notification */
-    ret = iwl_wait_notification(&mvm->notif_wait, &init_wait, MVM_UCODE_ALIVE_TIMEOUT);
-    if (ret) { return ret; }
+	/* We wait for the INIT complete notification */
+	ret = iwl_wait_notification(&mvm->notif_wait, &init_wait,
+				    MVM_UCODE_ALIVE_TIMEOUT);
+	if (ret != ZX_OK) {
+		IWL_INFO(mvm, "Failed to wait for init config notification: %s\n",
+		         zx_status_get_string(ret));
+		return ret;
+	}
 
-    /* Read the NVM only at driver load time, no need to do this twice */
-    if (!IWL_MVM_PARSE_NVM && read_nvm && !mvm->nvm_data) {
-        mvm->nvm_data = iwl_get_nvm(mvm->trans, mvm->fw);
-        if (IS_ERR(mvm->nvm_data)) {
-            ret = PTR_ERR(mvm->nvm_data);
-            mvm->nvm_data = NULL;
-            IWL_ERR(mvm, "Failed to read NVM: %d\n", ret);
-            return ret;
-        }
-    }
+	/* Read the NVM only at driver load time, no need to do this twice */
+	if (!IWL_MVM_PARSE_NVM && !mvm->nvm_data) {
+		ret = iwl_get_nvm(mvm->trans, mvm->fw, &mvm->nvm_data);
+		if (ret != ZX_OK) {
+			mvm->nvm_data = NULL;
+			IWL_ERR(mvm, "Failed to read NVM: %s\n", zx_status_get_string(ret));
+			return ret;
+		}
+	}
 
 	mvm->rfkill_safe_init_done = true;
 
-    return 0;
+	return ZX_OK;
 
 error:
-    iwl_remove_notification(&mvm->notif_wait, &init_wait);
-    return ret;
+	iwl_remove_notification(&mvm->notif_wait, &init_wait);
+	return ret;
 }
-#endif  // NEEDS_PORTING
 
 static zx_status_t iwl_send_phy_cfg_cmd(struct iwl_mvm* mvm) {
   struct iwl_phy_cfg_cmd phy_cfg_cmd = {};
@@ -509,12 +526,9 @@ zx_status_t iwl_run_init_mvm_ucode(struct iwl_mvm* mvm, bool read_nvm) {
   static const uint16_t init_complete[] = {INIT_COMPLETE_NOTIF, CALIB_RES_NOTIF_PHY_DB};
   int ret = ZX_OK;
 
-#if 0   // NEEDS_PORTING
-  // The chip we use (7265D) doesn't have unified ucode.
   if (iwl_mvm_has_unified_ucode(mvm)) {
-    return iwl_run_unified_mvm_ucode(mvm, true);
+    return iwl_run_unified_mvm_ucode(mvm);
   }
-#endif  // NEEDS_PORTING
 
   iwl_assert_lock_held(&mvm->mutex);
 
@@ -1246,12 +1260,9 @@ static int iwl_mvm_sar_init(struct iwl_mvm *mvm)
 static zx_status_t iwl_mvm_load_rt_fw(struct iwl_mvm* mvm) {
   zx_status_t ret;
 
-#if 0   // NEEDS_PORTING
-  // The chip we use (7265D) doesn't have unified ucode.
   if (iwl_mvm_has_unified_ucode(mvm)) {
-    return iwl_run_unified_mvm_ucode(mvm, false);
+    return iwl_run_unified_mvm_ucode(mvm);
   }
-#endif  // NEEDS_PORTING
 
   ret = iwl_run_init_mvm_ucode(mvm, false);
   if (ret != ZX_OK) {

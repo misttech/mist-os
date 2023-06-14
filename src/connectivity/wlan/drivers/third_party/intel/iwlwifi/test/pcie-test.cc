@@ -48,7 +48,6 @@ extern "C" {
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/memory.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/pcie-device.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/stats.h"
-#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/queue/tx.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/test/wlan-pkt-builder.h"
 #include "src/devices/pci/testing/pci_protocol_fake.h"
 
@@ -56,6 +55,12 @@ namespace {
 
 constexpr int kTestDeviceId = 0x095a;
 constexpr int kTestSubsysDeviceId = 0x9e10;
+
+// This const is actually defined in queue/tx.h. However, including the header file would
+// introduce unnecessary complexity. So we just define it here.
+// TODO(fxbug.dev/119415): come back to review this after uprev.
+#define TX_RESERVED_SPACE 3
+
 
 class MockDdkTesterPci : public zxtest::Test, public loop_fixture::RealLoop {};
 
@@ -675,7 +680,7 @@ class TxTest : public PcieTest {
   int txq_id_;
   struct iwl_txq* txq_;
   std::shared_ptr<wlan::testing::WlanPktBuilder::WlanPkt> wlan_pkt_;
-  iwl_device_cmd dev_cmd_;
+  iwl_device_cmd dev_cmd_;  // We use fixed-length object in class.
 };
 
 TEST_F(TxTest, Init) {
@@ -1073,7 +1078,7 @@ TEST_F(TxTest, TxDataCornerCaseUnusedQueue) {
   ASSERT_OK(iwl_pcie_tx_init(trans_));
 
   ieee80211_mac_packet pkt = {};
-  iwl_device_cmd dev_cmd = {};
+  iwl_device_tx_cmd dev_cmd = {};
   // unused queue
   ASSERT_EQ(ZX_ERR_INVALID_ARGS,
             iwl_trans_pcie_tx(trans_, &pkt, &dev_cmd, /* txq_id */ IWL_MVM_DQA_MIN_DATA_QUEUE));
@@ -1087,7 +1092,8 @@ TEST_F(TxTest, TxNormal) {
   ASSERT_EQ(0, txq_->read_ptr);
   ASSERT_EQ(0, txq_->write_ptr);
   // Tx a packet and see the write pointer advanced.
-  ASSERT_EQ(ZX_OK, iwl_trans_pcie_tx(trans_, wlan_pkt_->mac_pkt(), &dev_cmd_, txq_id_));
+  auto dev_cmd = (struct iwl_device_tx_cmd*)&dev_cmd_;
+  ASSERT_EQ(ZX_OK, iwl_trans_pcie_tx(trans_, wlan_pkt_->mac_pkt(), dev_cmd, txq_id_));
   ASSERT_EQ(0, txq_->read_ptr);
   ASSERT_EQ(1, txq_->write_ptr);
   ASSERT_EQ(TFD_QUEUE_SIZE_MAX - 1 - /* this packet */ 1, iwl_queue_space(trans_, txq_));
@@ -1110,7 +1116,8 @@ TEST_F(TxTest, TxSoManyPackets) {
   op_mode_queue_full_.ExpectCall(txq_id_);
   // Fill up all space.
   for (int i = 0; i < TFD_QUEUE_SIZE_MAX * 2; i++) {
-    ASSERT_EQ(ZX_OK, iwl_trans_pcie_tx(trans_, wlan_pkt_->mac_pkt(), &dev_cmd_, txq_id_));
+    auto dev_cmd = (struct iwl_device_tx_cmd*)&dev_cmd_;
+    ASSERT_EQ(ZX_OK, iwl_trans_pcie_tx(trans_, wlan_pkt_->mac_pkt(), dev_cmd, txq_id_));
   }
   op_mode_queue_full_.VerifyAndClear();
 

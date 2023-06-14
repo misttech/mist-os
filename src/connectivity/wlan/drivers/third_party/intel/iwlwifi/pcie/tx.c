@@ -142,6 +142,8 @@ zx_status_t iwl_pcie_alloc_dma_ptr(struct iwl_trans* trans, struct iwl_dma_ptr* 
   struct iwl_trans_pcie* trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
   zx_status_t status = iwl_iobuf_allocate_contiguous(&trans_pcie->pci_dev->dev, size, &ptr->io_buf);
   if (status != ZX_OK) {
+    IWL_ERR(trans, "Cannot allocate %zu bytes for DMA (%p): %s\n", size, &trans_pcie->pci_dev->dev,
+            zx_status_get_string(status));
     return status;
   }
 
@@ -823,6 +825,7 @@ void iwl_pcie_tx_free(struct iwl_trans* trans) {
   iwl_pcie_free_dma_ptr(trans, &trans_pcie->kw);
 
   iwl_pcie_free_dma_ptr(trans, &trans_pcie->scd_bc_tbls);
+  iwl_pcie_free_dma_ptr(trans, &trans->txqs.scd_bc_tbls);
 }
 
 /*
@@ -831,8 +834,9 @@ void iwl_pcie_tx_free(struct iwl_trans* trans) {
  */
 static zx_status_t iwl_pcie_tx_alloc(struct iwl_trans* trans) {
   zx_status_t ret;
+  int txq_id, slots_num;
   struct iwl_trans_pcie* trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
-  uint16_t bc_tbls_size = trans->trans_cfg->base_params->num_of_queues;
+  u16 bc_tbls_size = trans->trans_cfg->base_params->num_of_queues;
 
   if (WARN_ON(trans->trans_cfg->device_family >= IWL_DEVICE_FAMILY_AX210))
     return ZX_ERR_INVALID_ARGS;
@@ -847,6 +851,7 @@ static zx_status_t iwl_pcie_tx_alloc(struct iwl_trans* trans) {
   }
 
   ret = iwl_pcie_alloc_dma_ptr(trans, &trans_pcie->scd_bc_tbls, bc_tbls_size);
+  ret = iwl_pcie_alloc_dma_ptr(trans, &trans->txqs.scd_bc_tbls, bc_tbls_size);
   if (ret != ZX_OK) {
     IWL_ERR(trans, "Scheduler BC Table allocation failed\n");
     goto error;
@@ -867,17 +872,24 @@ static zx_status_t iwl_pcie_tx_alloc(struct iwl_trans* trans) {
   }
 
   /* Alloc and init all Tx queues, including the command queue (#4/#9) */
-  for (int txq_id = 0; txq_id < trans->trans_cfg->base_params->num_of_queues; txq_id++) {
-    bool cmd_queue = (txq_id == trans_pcie->cmd_queue);
+  for (txq_id = 0; txq_id < trans->trans_cfg->base_params->num_of_queues; txq_id++) {
+    bool cmd_queue = (txq_id == trans->txqs.cmd.q_id);
 
-    int slots_num = cmd_queue ? TFD_CMD_SLOTS : TFD_TX_CMD_SLOTS;
-    trans_pcie->txq[txq_id] = &trans_pcie->txq_memory[txq_id];
-    ret = iwl_pcie_txq_alloc(trans, trans_pcie->txq[txq_id], slots_num, cmd_queue);
+		if (cmd_queue)
+			slots_num = max_t(u32, IWL_CMD_QUEUE_SIZE,
+					  trans->cfg->min_txq_size);
+		else
+			slots_num = max_t(u32, IWL_DEFAULT_QUEUE_SIZE,
+					  trans->cfg->min_ba_txq_size);
+    trans_pcie->txq[txq_id] = &trans_pcie->txq_memory[txq_id];  // TODO(fxbug.dev/119415): remove me
+    trans->txqs.txq[txq_id] = &trans_pcie->txq_memory[txq_id];
+    ret = iwl_pcie_txq_alloc(trans, trans->txqs.txq[txq_id], slots_num, cmd_queue);
     if (ret != ZX_OK) {
       IWL_ERR(trans, "Tx %d queue alloc failed\n", txq_id);
       goto error;
     }
     trans_pcie->txq[txq_id]->id = txq_id;
+    trans->txqs.txq[txq_id]->id = txq_id;
   }
 
   return ZX_OK;
@@ -890,11 +902,12 @@ error:
 zx_status_t iwl_pcie_tx_init(struct iwl_trans* trans) {
   struct iwl_trans_pcie* trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
   int ret;
+	int txq_id, slots_num;
   bool alloc = false;
 
   if (!trans_pcie->txq_memory) {
     ret = iwl_pcie_tx_alloc(trans);
-    if (ret) {
+    if (ret != ZX_OK) {
       goto error;
     }
     alloc = true;
@@ -911,11 +924,17 @@ zx_status_t iwl_pcie_tx_init(struct iwl_trans* trans) {
   mtx_unlock(&trans_pcie->irq_lock);
 
   /* Alloc and init all Tx queues, including the command queue (#4/#9) */
-  for (int txq_id = 0; txq_id < trans->trans_cfg->base_params->num_of_queues; txq_id++) {
-    bool cmd_queue = (txq_id == trans_pcie->cmd_queue);
+  for (txq_id = 0; txq_id < trans->trans_cfg->base_params->num_of_queues; txq_id++) {
+    bool cmd_queue = (txq_id == trans->txqs.cmd.q_id);
 
-    int slots_num = cmd_queue ? TFD_CMD_SLOTS : TFD_TX_CMD_SLOTS;
-    ret = iwl_pcie_txq_init(trans, trans_pcie->txq[txq_id], slots_num, cmd_queue);
+		if (cmd_queue)
+			slots_num = max_t(u32, IWL_CMD_QUEUE_SIZE,
+					  trans->cfg->min_txq_size);
+		else
+			slots_num = max_t(u32, IWL_DEFAULT_QUEUE_SIZE,
+					  trans->cfg->min_ba_txq_size);
+		ret = iwl_txq_init(trans, trans->txqs.txq[txq_id], slots_num,
+				   cmd_queue);
     if (ret != ZX_OK) {
       IWL_ERR(trans, "Tx %d queue init failed\n", txq_id);
       goto error;
@@ -928,7 +947,7 @@ zx_status_t iwl_pcie_tx_init(struct iwl_trans* trans) {
      * Circular buffer (TFD queue in DRAM) physical base address
      */
     iwl_write_direct32(trans, FH_MEM_CBBC_QUEUE(trans, txq_id),
-                       trans_pcie->txq[txq_id]->dma_addr >> 8);
+                       trans->txqs.txq[txq_id]->dma_addr >> 8);
   }
 
   iwl_set_bits_prph(trans, SCD_GP_CTRL, SCD_GP_CTRL_AUTO_ACTIVE_MODE);
@@ -2222,8 +2241,10 @@ static int iwl_fill_data_tbs_amsdu(struct iwl_trans* trans, struct sk_buff* skb,
 // copy the payload because the firmware will transmit the packet in asynchronous manner.
 //
 zx_status_t iwl_trans_pcie_tx(struct iwl_trans* trans, struct ieee80211_mac_packet* pkt,
-                              const struct iwl_device_cmd* dev_cmd, int txq_id) {
+                              struct iwl_device_tx_cmd* dev_tx_cmd, int txq_id) {
   zx_status_t ret = ZX_OK;
+  // TODO(fxbug.dev/119415): Use `iwl_device_tx_cmd` instad of `iwl_device_cmd`.
+  struct iwl_device_cmd* dev_cmd = (struct iwl_device_cmd*)dev_tx_cmd;
   ZX_DEBUG_ASSERT(trans);
   ZX_DEBUG_ASSERT(pkt);
   ZX_DEBUG_ASSERT(dev_cmd);

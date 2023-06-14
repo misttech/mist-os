@@ -50,6 +50,7 @@ typedef struct cssid cssid_t;
 #define fuchsia_wlan_ieee80211_CCMP_PN_LEN UINT32_C(6)
 // IEEE Std 802.11-2016 12.5.3.2
 #define fuchsia_wlan_ieee80211_CCMP_HDR_LEN UINT32_C(8)
+#define fuchsia_wlan_ieee80211_CCMP_128_MIC_LEN UINT32_C(8)
 
 // Declarations
 struct ht_capabilities {

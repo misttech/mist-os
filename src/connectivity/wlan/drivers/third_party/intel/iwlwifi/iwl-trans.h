@@ -150,11 +150,15 @@ static inline uint32_t iwl_rx_packet_payload_len(const struct iwl_rx_packet* pkt
  *  (i.e. mark it as non-idle).
  * @CMD_WANT_ASYNC_CALLBACK: the op_mode's async callback function must be
  *  called after this command completes. Valid only with CMD_ASYNC.
+ * @CMD_SEND_IN_D3: Allow the command to be sent in D3 mode, relevant to
+ *	SUSPEND and RESUME commands. We are in D3 mode when we set
+ *	trans->system_pm_mode to IWL_PLAT_PM_MODE_D3.
  */
 enum CMD_MODE {
   CMD_ASYNC = BIT(0),
   CMD_WANT_SKB = BIT(1),
   CMD_SEND_IN_RFKILL = BIT(2),
+  CMD_SEND_IN_D3 = BIT(4),
   CMD_HIGH_PRIO = BIT(3),
   CMD_SEND_IN_IDLE = BIT(4),
   CMD_MAKE_TRANS_IDLE = BIT(5),
@@ -344,8 +348,8 @@ enum iwl_trans_status {
   STATUS_FW_ERROR,
   STATUS_TRANS_GOING_IDLE,
   STATUS_TRANS_IDLE,
-  STATUS_TA_ACTIVE,
   STATUS_TRANS_DEAD,
+  STATUS_SUPPRESS_CMD_ERROR_ONCE,
 };
 
 static inline size_t iwl_trans_get_rb_size_order(enum iwl_amsdu_size rb_size) {
@@ -363,6 +367,24 @@ static inline size_t iwl_trans_get_rb_size_order(enum iwl_amsdu_size rb_size) {
       WARN_ON(1);
       return 0;
   }
+}
+
+static inline size_t
+iwl_trans_get_rb_size(enum iwl_amsdu_size rb_size)
+{
+	switch (rb_size) {
+	case IWL_AMSDU_2K:
+		return 2 * 1024;
+	case IWL_AMSDU_4K:
+		return 4 * 1024;
+	case IWL_AMSDU_8K:
+		return 8 * 1024;
+	case IWL_AMSDU_12K:
+		return 16 * 1024;
+	default:
+		WARN_ON(1);
+		return 0;
+	}
 }
 
 struct iwl_hcmd_names {
@@ -552,7 +574,7 @@ struct iwl_trans_ops {
 #endif
   zx_status_t (*start_fw)(struct iwl_trans* trans, const struct fw_img* fw, bool run_in_rfkill);
   void (*fw_alive)(struct iwl_trans* trans, uint32_t scd_addr);
-  void (*stop_device)(struct iwl_trans* trans, bool low_power);
+  void (*stop_device)(struct iwl_trans* trans);
 
   void (*d3_suspend)(struct iwl_trans* trans, bool test, bool reset);
   zx_status_t (*d3_resume)(struct iwl_trans* trans, enum iwl_d3_status* status, bool test,
@@ -561,7 +583,7 @@ struct iwl_trans_ops {
   zx_status_t (*send_cmd)(struct iwl_trans* trans, struct iwl_host_cmd* cmd);
 
   zx_status_t (*tx)(struct iwl_trans* trans, struct ieee80211_mac_packet* pkt,
-                    const struct iwl_device_cmd* dev_cmd, int queue);
+                    struct iwl_device_tx_cmd* dev_cmd, int queue);
   void (*reclaim)(struct iwl_trans* trans, int queue, int ssn);
 
   bool (*txq_enable)(struct iwl_trans* trans, int queue, uint16_t ssn,
@@ -601,17 +623,28 @@ struct iwl_trans_ops {
 
   struct iwl_trans_dump_data* (*dump_data)(struct iwl_trans* trans, uint32_t dump_mask);
   void (*debugfs_cleanup)(struct iwl_trans* trans);
+	void (*sync_nmi)(struct iwl_trans *trans);
+	int (*set_pnvm)(struct iwl_trans *trans, const void *data, u32 len);
+	int (*set_reduce_power)(struct iwl_trans *trans,
+				const void *data, u32 len);
+	void (*interrupts)(struct iwl_trans *trans, bool enable);
+	int (*imr_dma_data)(struct iwl_trans *trans,
+			    u32 dst_addr, u64 src_addr,
+			    u32 byte_cnt);
+
 };
 
 /**
  * enum iwl_trans_state - state of the transport layer
  *
- * @IWL_TRANS_NO_FW: no fw has sent an alive response
- * @IWL_TRANS_FW_ALIVE: a fw has sent an alive response
+ * @IWL_TRANS_NO_FW: firmware wasn't started yet, or crashed
+ * @IWL_TRANS_FW_STARTED: FW was started, but not alive yet
+ * @IWL_TRANS_FW_ALIVE: FW has sent an alive response
  */
 enum iwl_trans_state {
-  IWL_TRANS_NO_FW = 0,
-  IWL_TRANS_FW_ALIVE = 1,
+	IWL_TRANS_NO_FW,
+	IWL_TRANS_FW_STARTED,
+	IWL_TRANS_FW_ALIVE,
 };
 
 /**
@@ -777,11 +810,12 @@ struct iwl_txq {
 	unsigned long frozen_expiry_remainder;
 	struct iwl_irq_timer* stuck_timer;
 	struct iwl_trans_pcie* trans_pcie;
+	struct iwl_trans *trans;
 	bool need_update;
 	bool frozen;
 	bool ampdu;
 	int block;
-	unsigned long wd_timeout;
+	zx_duration_t wd_timeout;
 	struct sk_buff_head overflow_q;
 	struct iwl_dma_ptr bc_tbl;
 
@@ -878,9 +912,9 @@ struct iwl_trans_txqs {
  * @iwl_trans_txqs: transport tx queues data.
  */
 struct iwl_trans {
-  struct iwl_trans_ops* ops;
+  struct iwl_trans_ops* ops;  // removed 'const' for unit test.
   struct iwl_op_mode* op_mode;
-	const struct iwl_cfg_trans_params *trans_cfg;
+  const struct iwl_cfg_trans_params *trans_cfg;
   const struct iwl_cfg* cfg;
   struct iwl_drv* drv;
   struct iwl_tm_gnl_dev* tmdev;
@@ -1005,7 +1039,7 @@ static inline int iwl_trans_start_fw_dbg(struct iwl_trans* trans, const struct f
 #endif
 
 static inline void _iwl_trans_stop_device(struct iwl_trans* trans, bool low_power) {
-  trans->ops->stop_device(trans, low_power);
+  trans->ops->stop_device(trans);
 
   trans->state = IWL_TRANS_NO_FW;
 }
@@ -1051,16 +1085,25 @@ static inline struct iwl_trans_dump_data* iwl_trans_dump_data(struct iwl_trans* 
   return trans->ops->dump_data(trans, dump_mask);
 }
 
+static inline struct iwl_device_tx_cmd *
+iwl_trans_alloc_tx_cmd(struct iwl_trans *trans)
+{
+	// Allocate a maximum-length packet (`struct iwl_device_cmd`), but return it in the
+	// variable-length form of header (`struct iwl_device_tx_cmd`).
+	return (struct iwl_device_tx_cmd *)calloc(1, sizeof(struct iwl_device_cmd));
+}
+
 // This function returns couple error codes. The ZX_ERR_BAD_STATE is the most special one.
 // It is called ERFKILL originally. We remap it to ZX_ERR_BAD_STATE in Fuchsia.
 zx_status_t iwl_trans_send_cmd(struct iwl_trans* trans, struct iwl_host_cmd* cmd);
 
-static inline void iwl_trans_free_tx_cmd(struct iwl_trans* trans, struct iwl_device_cmd* dev_cmd) {
+static inline void iwl_trans_free_tx_cmd(struct iwl_trans* trans,
+    struct iwl_device_tx_cmd* dev_cmd) {
   free(dev_cmd);
 }
 
 static inline zx_status_t iwl_trans_tx(struct iwl_trans* trans, struct ieee80211_mac_packet* pkt,
-                                       struct iwl_device_cmd* dev_cmd, int queue) {
+                                       struct iwl_device_tx_cmd* dev_cmd, int queue) {
   if (unlikely(test_bit(STATUS_FW_ERROR, &trans->status))) {
     IWL_ERR(trans, "%s() trans->status inidicates FW_ERROR\n", __func__);
     return ZX_ERR_INTERNAL;
@@ -1306,27 +1349,40 @@ static inline void iwl_trans_release_nic_access(struct iwl_trans* trans, unsigne
   trans->ops->release_nic_access(trans, flags);
 }
 
-static inline void iwl_trans_fw_error(struct iwl_trans* trans, bool sync) {
-  if (WARN_ON_ONCE(!trans->op_mode)) {
-    return;
-  }
+static inline void iwl_trans_fw_error(struct iwl_trans *trans, bool sync)
+{
+	if (WARN_ON_ONCE(!trans->op_mode))
+		return;
 
-  /* prevent double restarts due to the same erroneous FW */
-  if (!test_and_set_bit(STATUS_FW_ERROR, &trans->status)) {
-    iwl_op_mode_nic_error(trans->op_mode, sync);
-  }
+	/* prevent double restarts due to the same erroneous FW */
+	if (!test_and_set_bit(STATUS_FW_ERROR, &trans->status)) {
+		iwl_op_mode_nic_error(trans->op_mode, sync);
+		trans->state = IWL_TRANS_NO_FW;
+	}
 }
 
-static inline bool iwl_trans_fw_running(struct iwl_trans* trans) {
+static inline bool iwl_trans_fw_running(struct iwl_trans *trans)
+{
   return trans->state == IWL_TRANS_FW_ALIVE;
 }
+
+static inline void iwl_trans_sync_nmi(struct iwl_trans *trans)
+{
+	if (trans->ops->sync_nmi)
+		trans->ops->sync_nmi(trans);
+}
+
+void iwl_trans_sync_nmi_with_addr(struct iwl_trans *trans, u32 inta_addr,
+				  u32 sw_err_bit);
 
 /*****************************************************
  * transport helper functions
  *****************************************************/
-struct iwl_trans* iwl_trans_alloc(unsigned int priv_size, struct device* dev,
-                                  struct iwl_trans_ops* ops, const struct iwl_cfg_trans_params *cfg_trans);
-zx_status_t iwl_trans_init(struct iwl_trans *trans);
+struct iwl_trans *iwl_trans_alloc(unsigned int priv_size,
+			  struct device *dev,
+			  struct iwl_trans_ops *ops,
+			  const struct iwl_cfg_trans_params *cfg_trans);
+int iwl_trans_init(struct iwl_trans *trans);
 void iwl_trans_free(struct iwl_trans* trans);
 void iwl_trans_ref(struct iwl_trans* trans);
 void iwl_trans_unref(struct iwl_trans* trans);

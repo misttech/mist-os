@@ -1739,7 +1739,7 @@ class TxqTest : public MvmTest, public MockTrans {
       mock_tx_;
 
   static zx_status_t tx_wrapper(struct iwl_trans* trans, struct ieee80211_mac_packet* pkt,
-                                const struct iwl_device_cmd* dev_cmd, int txq_id) {
+                                struct iwl_device_tx_cmd* dev_cmd, int txq_id) {
     auto test = GET_TEST(TxqTest, trans);
     return test->mock_tx_.Call(pkt->header_size + pkt->headroom_used_size + pkt->body_size,
                                WIDE_ID(dev_cmd->hdr.group_id, dev_cmd->hdr.cmd), txq_id);
