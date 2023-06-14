@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use diagnostics_data::{LogsData, Severity};
-use futures_util::{
-    stream::{unfold, BoxStream},
-    AsyncReadExt, Stream, StreamExt,
-};
-use serde::{Deserialize, Serialize};
+use std::pin::Pin;
+
+use async_stream::stream;
+use diagnostics_data::LogsData;
+use futures_util::{AsyncReadExt, Stream, StreamExt};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use thiserror::Error;
 
 /// Read buffer size. Sufficiently large to store a large number
@@ -15,122 +15,72 @@ use thiserror::Error;
 /// to make when reading messages.
 const READ_BUFFER_SIZE: usize = 1000 * 1000 * 2;
 
-enum JsonReadState {
-    /// Initial decode state
-    Init,
-    /// Reading a message (offset, buffer length)
-    ReadingMessage((usize, usize)),
-    /// Partial read (middle of message)
-    PartialRead(Vec<u8>),
-}
+/// Amount to increase the read buffer size by after
+/// each read attempt.
+const READ_BUFFER_INCREMENT: usize = 1000 * 256;
 
-impl JsonReadState {
-    fn new() -> Self {
-        JsonReadState::Init
-    }
-    fn take(&mut self) -> Self {
-        std::mem::replace(self, JsonReadState::Init)
-    }
-}
-
-// JSON decoder state
-struct State {
-    socket: fuchsia_async::Socket,
-    buffer: Vec<u8>,
-    json: JsonReadState,
-}
-
-impl State {
-    /// Reads from the socket, returns None if the value is zero
-    async fn read(&mut self) -> Option<usize> {
-        self.socket
-            .read(&mut self.buffer)
-            .await
-            .ok()
-            .map(|value| if value == 0 { None } else { Some(value) })
-            .flatten()
-    }
-}
-
-// Reads LogsData from a socket.
-// This can't be in a lambda as we need to explicitly specify lifetime bounds.
-async fn read_socket_impl(mut value: State) -> Option<(OneOrMany<LogsData>, State)> {
-    loop {
-        match value.json.take() {
-            JsonReadState::Init => {
-                // read from socket and create iterator from slice
-                let ret = value.read().await?;
-                let des = serde_json::Deserializer::from_slice(&value.buffer[..ret]);
-                let mut msg = des.into_iter::<OneOrMany<LogsData>>();
-                let maybe_log = msg.next();
-                if let Some(Ok(log)) = maybe_log {
-                    value.json = JsonReadState::ReadingMessage((msg.byte_offset(), ret));
-                    return Some((log, value));
-                } else {
-                    value.json = JsonReadState::PartialRead(value.buffer[..ret].to_vec());
-                }
+fn stream_raw_json<T, const BUFFER_SIZE: usize, const INC: usize>(
+    mut socket: fuchsia_async::Socket,
+) -> impl Stream<Item = OneOrMany<T>>
+where
+    T: DeserializeOwned,
+{
+    stream! {
+        let mut buffer = vec![];
+        buffer.resize(BUFFER_SIZE, 0);
+        let mut write_offset = 0;
+        let mut read_offset = 0;
+        let mut available = 0;
+        loop {
+            // Read data from socket
+            debug_assert!(write_offset <= buffer.len());
+            if write_offset == buffer.len() {
+                buffer.resize(buffer.len() + INC, 0);
             }
-            JsonReadState::ReadingMessage((offset, buffer_len)) => {
-                let des = serde_json::Deserializer::from_slice(&value.buffer[offset..buffer_len]);
-                let mut msg = des.into_iter::<OneOrMany<LogsData>>();
-                match msg.next() {
-                    Some(Ok(log)) => {
-                        return Some((log, value));
-                    }
-                    _ => {
-                        // End of message
-                        if msg.byte_offset() + offset != buffer_len {
-                            // partial read state
-                            let mut partial_read = vec![];
-                            partial_read
-                                .extend_from_slice(&value.buffer[offset + msg.byte_offset()..]);
-                            value.json = JsonReadState::PartialRead(partial_read);
-                        }
-                    }
-                }
+            let socket_bytes_read = socket.read(&mut buffer[write_offset..]).await.unwrap();
+            if socket_bytes_read == 0 {
+                break;
             }
-            JsonReadState::PartialRead(mut partial) => {
-                // read from socket
-                let ret = value.read().await?;
-                partial.extend_from_slice(&value.buffer[..ret]);
-                let des = serde_json::Deserializer::from_slice(&partial);
-                let mut msg = des.into_iter::<OneOrMany<LogsData>>();
-                match msg.next() {
-                    Some(Ok(log)) => {
-                        value.json =
-                            JsonReadState::PartialRead(partial[msg.byte_offset()..].to_vec());
-                        return Some((log, value));
-                    }
-                    _ => {
-                        // End of message
-                        if msg.byte_offset() != partial.len() {
-                            // partial read state
-                            let mut partial_read = vec![];
-                            partial_read.extend_from_slice(&partial[msg.byte_offset()..]);
-                            value.json = JsonReadState::PartialRead(partial_read);
-                        }
-                    }
-                }
+            write_offset += socket_bytes_read;
+            available += socket_bytes_read;
+            let mut des = serde_json::Deserializer::from_slice(&buffer[read_offset..available])
+                .into_iter();
+            let mut read_nothing = true;
+            while let Some(Ok(item)) = des.next() {
+                read_nothing = false;
+                yield item;
+            }
+            // Don't update the read offset if we haven't successfully
+            // read anything.
+            if read_nothing {
+                continue;
+            }
+            let byte_offset = des.byte_offset();
+            if byte_offset+read_offset == available {
+                available = 0;
+                write_offset = 0;
+                read_offset = 0;
+                buffer.resize(READ_BUFFER_SIZE, 0);
+            } else {
+                read_offset += byte_offset;
             }
         }
     }
 }
 
-/// Streams raw JSON from a socket as an async stream
-fn stream_raw_json(stream: fuchsia_async::Socket) -> impl Stream<Item = OneOrMany<LogsData>> {
-    let mut buffer = vec![];
-    buffer.resize(READ_BUFFER_SIZE, 0);
-    unfold(State { socket: stream, buffer, json: JsonReadState::new() }, read_socket_impl)
-}
-
 /// Streams JSON logs from a socket
-fn stream_json(socket: fuchsia_async::Socket) -> impl Stream<Item = LogsData> {
-    stream_raw_json(socket).map(|value| futures_util::stream::iter(value)).flatten()
+fn stream_json<T>(socket: fuchsia_async::Socket) -> impl Stream<Item = T>
+where
+    T: DeserializeOwned,
+{
+    stream_raw_json::<T, READ_BUFFER_SIZE, READ_BUFFER_INCREMENT>(socket)
+        .map(|value| futures_util::stream::iter(value))
+        .flatten()
 }
 
 /// Stream of JSON logs from the target device.
 pub struct LogsDataStream {
-    inner: BoxStream<'static, LogsData>,
+    inner: Pin<Box<dyn Stream<Item = LogsData>>>,
 }
 
 impl LogsDataStream {
@@ -208,7 +158,8 @@ pub enum JsonDeserializeError {
 mod test {
     use super::*;
     use assert_matches::assert_matches;
-    use diagnostics_data::{BuilderArgs, LogsDataBuilder, Timestamp};
+    use diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity, Timestamp};
+    use futures_util::AsyncWriteExt;
 
     #[fuchsia::test]
     fn test_one_or_many() {
@@ -268,6 +219,73 @@ mod test {
         let serialized_bytes = serialized_log.as_bytes();
         local.write(serialized_bytes).unwrap();
         assert_eq!(&decoder.next().await.unwrap(), &test_log);
+    }
+
+    #[fuchsia::test]
+    async fn test_json_decoder_large_message() {
+        const MSG_COUNT: usize = 100;
+        let (local, remote) = fuchsia_zircon::Socket::create_stream();
+        let socket = fuchsia_async::Socket::from_socket(remote).unwrap();
+        let mut decoder = Box::pin(
+            stream_raw_json::<LogsData, 100, 10>(socket)
+                .map(|value| futures_util::stream::iter(value))
+                .flatten(),
+        );
+        let test_logs = (0..MSG_COUNT)
+            .map(|value| {
+                LogsDataBuilder::new(BuilderArgs {
+                    component_url: None,
+                    moniker: "ffx".to_string(),
+                    severity: Severity::Info,
+                    timestamp_nanos: Timestamp::from(BOOT_TS as i64),
+                })
+                .set_message(format!("Hello world! {}", value))
+                .add_tag("Some tag")
+                .build()
+            })
+            .collect::<Vec<_>>();
+        let mut local = fuchsia_async::Socket::from_socket(local).unwrap();
+        let test_logs_clone = test_logs.clone();
+        let _write_task = fuchsia_async::Task::local(async move {
+            for log in test_logs {
+                let serialized_log = serde_json::to_string(&log).unwrap();
+                let serialized_bytes = serialized_log.as_bytes();
+                local.write_all(serialized_bytes).await.unwrap();
+            }
+        });
+        for i in 0..MSG_COUNT {
+            assert_eq!(&decoder.next().await.unwrap(), &test_logs_clone[i]);
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_json_decoder_large_single_message() {
+        // At least 10MB of characters in a single message
+        const CHAR_COUNT: usize = 1000 * 1000;
+        let (local, remote) = fuchsia_zircon::Socket::create_stream();
+        let socket = fuchsia_async::Socket::from_socket(remote).unwrap();
+        let mut decoder = Box::pin(
+            stream_raw_json::<LogsData, 256000, 20000>(socket)
+                .map(|value| futures_util::stream::iter(value))
+                .flatten(),
+        );
+        let test_log = LogsDataBuilder::new(BuilderArgs {
+            component_url: None,
+            moniker: "ffx".to_string(),
+            severity: Severity::Info,
+            timestamp_nanos: Timestamp::from(BOOT_TS as i64),
+        })
+        .set_message(format!("Hello world! {}", "h".repeat(CHAR_COUNT)))
+        .add_tag("Some tag")
+        .build();
+        let mut local = fuchsia_async::Socket::from_socket(local).unwrap();
+        let test_log_clone = test_log.clone();
+        let _write_task = fuchsia_async::Task::local(async move {
+            let serialized_log = serde_json::to_string(&test_log).unwrap();
+            let serialized_bytes = serialized_log.as_bytes();
+            local.write_all(serialized_bytes).await.unwrap();
+        });
+        assert_eq!(&decoder.next().await.unwrap(), &test_log_clone);
     }
 
     #[fuchsia::test]
