@@ -26,6 +26,7 @@ TEST(DisplayIdTest, EqualityIsReflexive) {
   EXPECT_EQ(kOne, kOne);
   EXPECT_EQ(kAnotherOne, kAnotherOne);
   EXPECT_EQ(kTwo, kTwo);
+  EXPECT_EQ(kInvalidDisplayId, kInvalidDisplayId);
 }
 
 TEST(DisplayIdTest, EqualityIsSymmetric) {
@@ -38,42 +39,53 @@ TEST(DisplayIdTest, EqualityForDifferentValues) {
   EXPECT_NE(kAnotherOne, kTwo);
   EXPECT_NE(kTwo, kOne);
   EXPECT_NE(kTwo, kAnotherOne);
+
+  EXPECT_NE(kOne, kInvalidDisplayId);
+  EXPECT_NE(kTwo, kInvalidDisplayId);
+  EXPECT_NE(kInvalidDisplayId, kOne);
+  EXPECT_NE(kInvalidDisplayId, kTwo);
 }
 
 TEST(DisplayIdTest, ToFidlDisplayId) {
   EXPECT_EQ(1u, ToFidlDisplayId(kOne));
   EXPECT_EQ(2u, ToFidlDisplayId(kTwo));
   EXPECT_EQ(kLargeIdValue, ToFidlDisplayId(kLargeId));
+  EXPECT_EQ(fuchsia_hardware_display::wire::kInvalidDispId, ToFidlDisplayId(kInvalidDisplayId));
 }
 
 TEST(DisplayIdTest, ToBanjoDisplayId) {
   EXPECT_EQ(1u, ToBanjoDisplayId(kOne));
   EXPECT_EQ(2u, ToBanjoDisplayId(kTwo));
   EXPECT_EQ(kLargeIdValue, ToBanjoDisplayId(kLargeId));
+  EXPECT_EQ(INVALID_DISPLAY_ID, ToBanjoDisplayId(kInvalidDisplayId));
 }
 
 TEST(DisplayIdTest, ToDisplayIdWithFidlValue) {
   EXPECT_EQ(kOne, ToDisplayId(1));
   EXPECT_EQ(kTwo, ToDisplayId(2));
   EXPECT_EQ(kLargeId, ToDisplayId(kLargeIdValue));
+  EXPECT_EQ(kInvalidDisplayId, ToDisplayId(fuchsia_hardware_display::wire::kInvalidDispId));
 }
 
 TEST(DisplayIdTest, ToDisplayIdWithBanjoValue) {
   EXPECT_EQ(kOne, ToDisplayId(1));
   EXPECT_EQ(kTwo, ToDisplayId(2));
   EXPECT_EQ(kLargeId, ToDisplayId(kLargeIdValue));
+  EXPECT_EQ(kInvalidDisplayId, ToDisplayId(INVALID_DISPLAY_ID));
 }
 
 TEST(DisplayIdTest, FidlConversionRoundtrip) {
   EXPECT_EQ(kOne, ToDisplayId(ToFidlDisplayId(kOne)));
   EXPECT_EQ(kTwo, ToDisplayId(ToFidlDisplayId(kTwo)));
   EXPECT_EQ(kLargeId, ToDisplayId(ToFidlDisplayId(kLargeId)));
+  EXPECT_EQ(kInvalidDisplayId, ToDisplayId(ToFidlDisplayId(kInvalidDisplayId)));
 }
 
 TEST(DisplayIdTest, BanjoConversionRoundtrip) {
   EXPECT_EQ(kOne, ToDisplayId(ToBanjoDisplayId(kOne)));
   EXPECT_EQ(kTwo, ToDisplayId(ToBanjoDisplayId(kTwo)));
   EXPECT_EQ(kLargeId, ToDisplayId(ToBanjoDisplayId(kLargeId)));
+  EXPECT_EQ(kInvalidDisplayId, ToDisplayId(ToBanjoDisplayId(kInvalidDisplayId)));
 }
 
 }  // namespace
