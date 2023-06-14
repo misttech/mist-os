@@ -581,6 +581,32 @@ impl Zxio {
         zx::ok(status)
     }
 
+    /// Opens a limited node connection (similar to O_PATH).
+    pub fn open_node(
+        &self,
+        path: &str,
+        node_flags: fio::NodeProtocolFlags,
+        attributes: Option<&mut zxio_node_attributes_t>,
+    ) -> Result<Self, zx::Status> {
+        let zxio = Zxio::default();
+        let status = unsafe {
+            zxio::zxio_open2(
+                self.as_ptr(),
+                path.as_ptr() as *const c_char,
+                path.len(),
+                &zxio::zxio_open_options {
+                    node_flags: node_flags.bits(),
+                    mode: fio::OpenMode::OpenExisting as u32,
+                    ..Default::default()
+                },
+                attributes.map(|a| a as *mut _).unwrap_or(std::ptr::null_mut()),
+                zxio.as_storage_ptr(),
+            )
+        };
+        zx::ok(status)?;
+        Ok(zxio)
+    }
+
     pub fn read(&self, data: &mut [u8]) -> Result<usize, zx::Status> {
         let flags = zxio::zxio_flags_t::default();
         let mut actual = 0usize;

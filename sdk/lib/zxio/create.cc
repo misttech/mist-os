@@ -515,6 +515,13 @@ zx_status_t zxio_create_with_representation(fidl::ClientEnd<fio::Node> node,
   switch (representation.Which()) {
 #if __Fuchsia_API_level__ >= FUCHSIA_HEAD
     case fio::wire::Representation::Tag::kConnector: {
+      fio::wire::ConnectorInfo& connector = representation.connector();
+      if (attr) {
+        if (!connector.has_attributes())
+          return ZX_ERR_INVALID_ARGS;
+        if (zx_status_t status = fill_in_attributes(connector.attributes(), *attr); status != ZX_OK)
+          return status;
+      }
       return zxio_node_init(storage, std::move(node));
     }
     case fio::wire::Representation::Tag::kDirectory: {

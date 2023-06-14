@@ -202,7 +202,11 @@ closed protocol Node2 {
         /// [`Node2`].
         ///
         /// See [`NodeProtocolKinds.CONNECTOR`].
-        1: connector @generated_name("ConnectorInfo") table {};
+        1: connector @generated_name("ConnectorInfo") table {
+            /// Requested attributes for the object. This is only populated if requested.
+            @available(added=HEAD)
+            1: attributes NodeAttributes2;
+        };
 
         /// Auxiliary data for the directory representation of a node. The
         /// selection of this variant in [`Representation`] implies that the

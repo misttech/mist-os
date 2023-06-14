@@ -8,4 +8,5 @@ mod describe;
 mod directory;
 mod file;
 mod get_connection_info;
+mod node;
 mod remote;

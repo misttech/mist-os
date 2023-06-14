@@ -170,9 +170,19 @@ impl ProtocolsExt for fio::ConnectionProtocols {
         Ok(SymlinkOptions)
     }
 
-    fn to_node_options(&self, _entry_info: &EntryInfo) -> Result<NodeOptions, zx::Status> {
-        // TODO(fxbug.dev/77623): Implement this
-        Err(zx::Status::NOT_SUPPORTED)
+    fn to_node_options(&self, entry_info: &EntryInfo) -> Result<NodeOptions, zx::Status> {
+        let must_be_directory = match self {
+            fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols { node: Some(flags), .. }),
+                ..
+            }) => flags.contains(fio::NodeProtocolFlags::MUST_BE_DIRECTORY),
+            _ => false,
+        };
+        if must_be_directory && entry_info.type_() != fio::DirentType::Directory {
+            Err(zx::Status::NOT_DIR)
+        } else {
+            Ok(NodeOptions { rights: self.rights().unwrap() & fio::Operations::GET_ATTRIBUTES })
+        }
     }
 
     fn get_representation(&self) -> bool {
@@ -236,12 +246,7 @@ impl ProtocolsExt for fio::ConnectionProtocols {
         matches!(
             self,
             fio::ConnectionProtocols::Node(fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols {
-                    directory: None,
-                    file: None,
-                    symlink: None,
-                    ..
-                }),
+                protocols: Some(fio::NodeProtocols { node: Some(_), .. }),
                 ..
             })
         )
@@ -434,7 +439,7 @@ impl ProtocolsExt for fio::OpenFlags {
         {
             Err(zx::Status::NOT_DIR)
         } else {
-            Ok(NodeOptions)
+            Ok(NodeOptions { rights: fio::Operations::GET_ATTRIBUTES })
         }
     }
 

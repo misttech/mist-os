@@ -429,15 +429,20 @@ typedef zx_status_t (*zxio_watch_directory_cb)(zxio_watch_directory_event_t even
 
 // See fuchsia.io for detailed semantics.
 typedef struct zxio_open_options {
-  // Which protocols to accept.
+  // Which protocols to accept. If no protocols are specified, a limited node protocol will
+  // be used; see fuchsia.io's node protocol.
   zxio_node_protocols_t protocols;
 
   // Directory options
   // If zero, then this will translate to the field not being present in fuchsia.io.
   uint64_t optional_rights;
 
-  // File options
+  // File flags  See fuchsia.io's FileProtocolFlags.
   uint64_t file_flags;
+
+  // Node flags (only applicable if no protocols are specified above).  See fuchsia.io's
+  // NodeProtocolFlags.
+  uint64_t node_flags;
 
   // Specifies behaviour with respect to existence. See fuchia.io's OpenMode, and use constants
   // defined above.

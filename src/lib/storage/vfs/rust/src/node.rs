@@ -27,7 +27,9 @@ use {
 /// POSIX emulation layer access attributes for all services created with service().
 pub const POSIX_READ_WRITE_PROTECTION_ATTRIBUTES: u32 = S_IRUSR | S_IWUSR;
 
-pub struct NodeOptions;
+pub struct NodeOptions {
+    pub rights: fio::Operations,
+}
 
 /// All nodes must implement this trait.
 #[async_trait]
@@ -40,8 +42,7 @@ pub trait Node: DirectoryEntry {
         Err(zx::Status::NOT_SUPPORTED)
     }
 
-    /// Get this directory's attributes.
-    /// The "mode" field will be filled in by the connection.
+    /// Get this node's attributes.
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status>;
 
     /// Called when the node is closed.
@@ -58,7 +59,7 @@ pub struct Connection<N: Node> {
     node: OpenNode<N>,
 
     // Node options.
-    _options: NodeOptions,
+    options: NodeOptions,
 }
 
 /// Return type for [`handle_request()`] functions.
@@ -82,7 +83,7 @@ impl<N: Node> Connection<N> {
         let options = protocols.to_node_options(&node.entry_info())?;
         let object_request = object_request.take();
         Ok(async move {
-            let connection = Connection { scope: scope.clone(), node, _options: options };
+            let connection = Connection { scope: scope.clone(), node, options };
             if let Ok(requests) = object_request.into_request_stream(&connection).await {
                 connection.handle_requests(requests).await
             }
@@ -136,7 +137,13 @@ impl<N: Node> Connection<N> {
             fio::NodeRequest::Sync { responder } => {
                 responder.send(Err(ZX_ERR_NOT_SUPPORTED))?;
             }
-            fio::NodeRequest::GetAttr { responder } => match self.node.get_attrs().await {
+            fio::NodeRequest::GetAttr { responder } => match {
+                if !self.options.rights.contains(fio::Operations::GET_ATTRIBUTES) {
+                    Err(zx::Status::BAD_HANDLE)
+                } else {
+                    self.node.get_attrs().await
+                }
+            } {
                 Ok(attr) => responder.send(ZX_OK, &attr)?,
                 Err(status) => {
                     responder.send(
@@ -212,10 +219,16 @@ impl<N: Node> Representation for Connection<N> {
 
     async fn get_representation(
         &self,
-        _requested_attributes: fio::NodeAttributesQuery,
+        requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::Representation, zx::Status> {
-        // TODO(fxbug.dev/77623): Add support for _requested_attributes.
-        Ok(fio::Representation::Connector(fio::ConnectorInfo::default()))
+        Ok(fio::Representation::Connector(fio::ConnectorInfo {
+            attributes: if requested_attributes.is_empty() {
+                None
+            } else {
+                Some(self.node.get_attributes(requested_attributes).await?)
+            },
+            ..Default::default()
+        }))
     }
 
     async fn node_info(&self) -> Result<fio::NodeInfoDeprecated, zx::Status> {

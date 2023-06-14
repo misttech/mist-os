@@ -1017,5 +1017,50 @@ async fn open2_dir_optional_rights() {
     );
 }
 
+#[fuchsia::test]
+async fn open2_request_attributes_rights_failure() {
+    let harness = TestHarness::new().await;
+
+    if !harness.config.supports_open2.unwrap_or_default() {
+        return;
+    }
+
+    let test_dir = harness.get_directory(
+        root_directory(vec![]),
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+    );
+
+    // Open with no rights.
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    test_dir
+        .open2(
+            ".",
+            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+                rights: Some(fio::Operations::empty()),
+                ..Default::default()
+            }),
+            server.into_channel(),
+        )
+        .unwrap();
+
+    // Now open again and request attributes. It should fail.
+    let (proxy2, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    proxy
+        .open2(
+            ".",
+            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+                attributes: Some(fio::NodeAttributesQuery::PROTOCOLS),
+                ..Default::default()
+            }),
+            server.into_channel(),
+        )
+        .unwrap();
+
+    assert_matches!(
+        proxy2.take_event_stream().try_next().await,
+        Err(fidl::Error::ClientChannelClosed { status: zx::Status::ACCESS_DENIED, .. })
+    );
+}
+
 // TODO(fxbug.dev/123390): Add open2 symlink tests.
 // TODO(fxbug.dev/77623): Add open2 connect tests.

@@ -607,6 +607,7 @@ pub struct zxio_open_options {
     pub protocols: zxio_node_protocols_t,
     pub optional_rights: u64,
     pub file_flags: u64,
+    pub node_flags: u64,
     pub mode: u32,
     pub __bindgen_padding_0: [u8; 4usize],
     pub rights: u64,

@@ -931,6 +931,7 @@ zx_status_t Remote<Protocol>::Open2(const char* path, size_t path_len,
   fio::wire::ConnectorFlags connector_flags;
   fio::Operations optional_rights;
   fidl::WireTableFrame<fio::wire::DirectoryProtocolOptions> directory_options_frame;
+  fio::wire::NodeProtocolFlags node_flags;
   fio::wire::DirectoryProtocolOptions directory_options;
   fio::wire::FileProtocolFlags file_flags;
   fio::wire::SymlinkProtocolFlags symlink_flags;
@@ -963,28 +964,35 @@ zx_status_t Remote<Protocol>::Open2(const char* path, size_t path_len,
         fidl::ObjectView<fidl::WireTableFrame<fio::wire::NodeProtocols>>::FromExternal(
             &node_protocols_frame));
 
-    if (options->protocols & ZXIO_NODE_PROTOCOL_DIRECTORY) {
-      auto directory_options_builder = fio::wire::DirectoryProtocolOptions::ExternalBuilder(
-          fidl::ObjectView<fidl::WireTableFrame<fio::wire::DirectoryProtocolOptions>>::FromExternal(
-              &directory_options_frame));
-      if (options->optional_rights != 0) {
-        optional_rights = fio::Operations(options->optional_rights);
-        directory_options_builder.optional_rights(
-            fidl::ObjectView<fio::wire::Operations>::FromExternal(&optional_rights));
-      }
-      directory_options = directory_options_builder.Build();
+    if (options->protocols == ZXIO_NODE_PROTOCOL_NONE) {
+      node_flags = fio::NodeProtocolFlags(options->node_flags);
+      node_protocols_builder.node(
+          fidl::ObjectView<fio::wire::NodeProtocolFlags>::FromExternal(&node_flags));
+    } else {
+      if (options->protocols & ZXIO_NODE_PROTOCOL_DIRECTORY) {
+        auto directory_options_builder = fio::wire::DirectoryProtocolOptions::ExternalBuilder(
+            fidl::ObjectView<fidl::WireTableFrame<fio::wire::DirectoryProtocolOptions>>::
+                FromExternal(&directory_options_frame));
+        if (options->optional_rights != 0) {
+          optional_rights = fio::Operations(options->optional_rights);
+          directory_options_builder.optional_rights(
+              fidl::ObjectView<fio::wire::Operations>::FromExternal(&optional_rights));
+        }
+        directory_options = directory_options_builder.Build();
 
-      node_protocols_builder.directory(
-          fidl::ObjectView<fio::wire::DirectoryProtocolOptions>::FromExternal(&directory_options));
-    }
-    if (options->protocols & ZXIO_NODE_PROTOCOL_FILE) {
-      file_flags = fio::FileProtocolFlags(options->file_flags);
-      node_protocols_builder.file(
-          fidl::ObjectView<fio::wire::FileProtocolFlags>::FromExternal(&file_flags));
-    }
-    if (options->protocols & ZXIO_NODE_PROTOCOL_SYMLINK) {
-      node_protocols_builder.symlink(
-          fidl::ObjectView<fio::wire::SymlinkProtocolFlags>::FromExternal(&symlink_flags));
+        node_protocols_builder.directory(
+            fidl::ObjectView<fio::wire::DirectoryProtocolOptions>::FromExternal(
+                &directory_options));
+      }
+      if (options->protocols & ZXIO_NODE_PROTOCOL_FILE) {
+        file_flags = fio::FileProtocolFlags(options->file_flags);
+        node_protocols_builder.file(
+            fidl::ObjectView<fio::wire::FileProtocolFlags>::FromExternal(&file_flags));
+      }
+      if (options->protocols & ZXIO_NODE_PROTOCOL_SYMLINK) {
+        node_protocols_builder.symlink(
+            fidl::ObjectView<fio::wire::SymlinkProtocolFlags>::FromExternal(&symlink_flags));
+      }
     }
     node_protocols = node_protocols_builder.Build();
     node_options_builder.protocols(

@@ -152,7 +152,7 @@ impl FxDirectory {
                     if last_segment {
                         match object_descriptor {
                             ObjectDescriptor::Directory => {
-                                if !protocols.is_dir_allowed() {
+                                if !protocols.is_node() && !protocols.is_dir_allowed() {
                                     if protocols.is_file_allowed() {
                                         bail!(FxfsError::NotFile)
                                     } else {
@@ -161,7 +161,7 @@ impl FxDirectory {
                                 }
                             }
                             ObjectDescriptor::File => {
-                                if !protocols.is_file_allowed() {
+                                if !protocols.is_node() && !protocols.is_file_allowed() {
                                     if protocols.is_dir_allowed() {
                                         bail!(FxfsError::NotDir)
                                     } else {
@@ -170,7 +170,7 @@ impl FxDirectory {
                                 }
                             }
                             ObjectDescriptor::Symlink => {
-                                if !protocols.is_symlink_allowed() {
+                                if !protocols.is_node() && !protocols.is_symlink_allowed() {
                                     bail!(FxfsError::WrongType)
                                 }
                             }

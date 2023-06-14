@@ -53,6 +53,10 @@ impl ObjectRequest {
         self.what_to_send
     }
 
+    pub(crate) fn attributes(&self) -> fio::NodeAttributesQuery {
+        self.attributes
+    }
+
     /// Returns the request stream after sending requested information.
     pub async fn into_request_stream<T: Representation>(
         self,

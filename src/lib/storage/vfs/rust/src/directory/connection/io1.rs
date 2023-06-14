@@ -254,11 +254,17 @@ where
             } => {
                 fuchsia_trace::duration!("storage", "Directory::Open2");
                 // Fill in rights from the parent connection if it's absent.
-                if let fio::ConnectionProtocols::Node(fio::NodeOptions { rights, .. }) =
-                    &mut protocols
+                if let fio::ConnectionProtocols::Node(fio::NodeOptions {
+                    rights, protocols, ..
+                }) = &mut protocols
                 {
                     if rights.is_none() {
-                        *rights = Some(self.options.rights);
+                        if matches!(protocols, Some(fio::NodeProtocols { node: Some(_), .. })) {
+                            // Only inherit the GET_ATTRIBUTES right for node connections.
+                            *rights = Some(self.options.rights & fio::Operations::GET_ATTRIBUTES);
+                        } else {
+                            *rights = Some(self.options.rights);
+                        }
                     }
                 }
                 // If optional_rights is set, remove any rights that are not present on the current
@@ -419,6 +425,13 @@ where
             }
         }
 
+        // If requesting attributes, check permission.
+        if !object_request.attributes().is_empty()
+            && !self.options.rights.contains(fio::Operations::GET_ATTRIBUTES)
+        {
+            return Err(zx::Status::ACCESS_DENIED);
+        }
+
         // If creating an object, it's not legal to specify more than one protocol.
         if protocols.open_mode() != fio::OpenMode::OpenExisting
             && ((protocols.is_file_allowed() && protocols.is_dir_allowed())
@@ -434,7 +447,7 @@ where
         }
 
         if path.is_dot() {
-            if !protocols.is_dir_allowed() {
+            if !protocols.is_node() && !protocols.is_dir_allowed() {
                 return Err(zx::Status::INVALID_ARGS);
             }
             if protocols.open_mode() == fio::OpenMode::AlwaysCreate {
