@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use {
-    crate::{MetaPackage, PackageManifest},
+    crate::PackageManifest,
     anyhow::{Context as _, Result},
     camino::Utf8PathBuf,
     fuchsia_merkle::Hash,
     fuchsia_url::RelativePackageUrl,
     serde::{de::Deserializer, Deserialize, Serialize},
-    std::{fs, io},
+    std::io,
 };
 
 /// Helper type for reading the build-time information based on the subpackage
@@ -28,15 +28,6 @@ impl SubpackagesBuildManifest {
     pub fn to_subpackages(&self) -> Result<Vec<(RelativePackageUrl, Hash, Utf8PathBuf)>> {
         let mut entries = Vec::with_capacity(self.0.entries.len());
         for entry in &self.0.entries {
-            let url = match &entry.kind {
-                SubpackagesBuildManifestEntryKind::Url(url) => url.clone(),
-                SubpackagesBuildManifestEntryKind::MetaPackageFile(path) => {
-                    let f = fs::File::open(path).with_context(|| format!("opening {path}"))?;
-                    let meta_package = MetaPackage::deserialize(io::BufReader::new(f))?;
-                    meta_package.name().clone().into()
-                }
-            };
-
             // Read the merkle from the package manifest.
             let manifest = PackageManifest::try_load_from(&entry.package_manifest_file)
                 .with_context(|| format!("reading {}", &entry.package_manifest_file))?;
@@ -45,6 +36,15 @@ impl SubpackagesBuildManifest {
                 .iter()
                 .find(|b| b.path == "meta/")
                 .with_context(|| format!("finding meta/in {}", &entry.package_manifest_file))?;
+
+            // Read the name from the package manifest, but override with the name if provided.
+            let url = match &entry.kind {
+                SubpackagesBuildManifestEntryKind::Url(url) => url.clone(),
+                SubpackagesBuildManifestEntryKind::Empty
+                | SubpackagesBuildManifestEntryKind::MetaPackageFile(_) => {
+                    manifest.name().clone().into()
+                }
+            };
 
             entries.push((url, meta_far_blob.merkle, entry.package_manifest_file.clone()));
         }
@@ -81,7 +81,7 @@ impl<'de> Deserialize<'de> for SubpackagesBuildManifestV0 {
         #[derive(Deserialize)]
         struct Helper {
             #[serde(flatten)]
-            helper_kind: HelperKind,
+            helper_kind: Option<HelperKind>,
             package_manifest_file: Utf8PathBuf,
         }
 
@@ -97,12 +97,12 @@ impl<'de> Deserialize<'de> for SubpackagesBuildManifestV0 {
         let mut entries = vec![];
         for Helper { helper_kind, package_manifest_file } in manifest_entries {
             let kind = match helper_kind {
-                HelperKind::Name { name } => SubpackagesBuildManifestEntryKind::Url(name),
-                HelperKind::File { meta_package_file } => {
+                Some(HelperKind::Name { name }) => SubpackagesBuildManifestEntryKind::Url(name),
+                Some(HelperKind::File { meta_package_file }) => {
                     SubpackagesBuildManifestEntryKind::MetaPackageFile(meta_package_file)
                 }
+                None => SubpackagesBuildManifestEntryKind::Empty,
             };
-
             entries.push(SubpackagesBuildManifestEntry { kind, package_manifest_file });
         }
 
@@ -138,6 +138,7 @@ impl Serialize for SubpackagesBuildManifestEntry {
             package_manifest_file: &self.package_manifest_file,
         };
         match &self.kind {
+            SubpackagesBuildManifestEntryKind::Empty => {}
             SubpackagesBuildManifestEntryKind::Url(url) => helper.name = Some(url),
             SubpackagesBuildManifestEntryKind::MetaPackageFile(path) => {
                 helper.meta_package_file = Some(path)
@@ -159,6 +160,7 @@ impl SubpackagesBuildManifestEntry {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SubpackagesBuildManifestEntryKind {
+    Empty,
     Url(RelativePackageUrl),
     MetaPackageFile(Utf8PathBuf),
 }
@@ -167,7 +169,7 @@ pub enum SubpackagesBuildManifestEntryKind {
 mod tests {
     use {
         super::*,
-        crate::PackageBuilder,
+        crate::{MetaPackage, PackageBuilder},
         assert_matches::assert_matches,
         camino::Utf8Path,
         fuchsia_url::PackageName,
@@ -212,6 +214,9 @@ mod tests {
             File::create(&subpackages_build_manifest_path).unwrap(),
             &json!([
                 {
+                    "package_manifest_file": pkg1_package_manifest_file.to_string(),
+                },
+                {
                     "name": pkg1_name.to_string(),
                     "package_manifest_file": pkg1_package_manifest_file.to_string(),
                 },
@@ -232,6 +237,10 @@ mod tests {
             manifest.0.entries,
             vec![
                 SubpackagesBuildManifestEntry {
+                    kind: SubpackagesBuildManifestEntryKind::Empty,
+                    package_manifest_file: pkg1_package_manifest_file.clone(),
+                },
+                SubpackagesBuildManifestEntry {
                     kind: SubpackagesBuildManifestEntryKind::Url(pkg1_url.clone()),
                     package_manifest_file: pkg1_package_manifest_file.clone(),
                 },
@@ -248,6 +257,7 @@ mod tests {
         assert_eq!(
             manifest.to_subpackages().unwrap(),
             vec![
+                (pkg1_url.clone(), pkg1_hash, pkg1_package_manifest_file.clone()),
                 (pkg1_url, pkg1_hash, pkg1_package_manifest_file),
                 (pkg2_url, pkg2_hash, pkg2_package_manifest_file),
             ]
@@ -353,6 +363,10 @@ mod tests {
     fn test_serialize() {
         let entries = vec![
             SubpackagesBuildManifestEntry::new(
+                SubpackagesBuildManifestEntryKind::Empty,
+                "package-manifest-path-0".into(),
+            ),
+            SubpackagesBuildManifestEntry::new(
                 SubpackagesBuildManifestEntryKind::Url("subpackage-name".parse().unwrap()),
                 "package-manifest-path-0".into(),
             ),
@@ -371,6 +385,9 @@ mod tests {
             actual_json,
             json!([
                 {
+                    "package_manifest_file": "package-manifest-path-0"
+                },
+                {
                     "name": "subpackage-name",
                     "package_manifest_file": "package-manifest-path-0"
                 },
@@ -385,6 +402,10 @@ mod tests {
     #[test]
     fn test_serialize_deserialize() {
         let entries = vec![
+            SubpackagesBuildManifestEntry::new(
+                SubpackagesBuildManifestEntryKind::Empty,
+                "package-manifest-path-0".into(),
+            ),
             SubpackagesBuildManifestEntry::new(
                 SubpackagesBuildManifestEntryKind::Url("subpackage-name".parse().unwrap()),
                 "package-manifest-path-0".into(),

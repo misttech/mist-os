@@ -161,19 +161,6 @@ template("generate_meta_subpackages") {
   subpackage_targets = []
   subpackage_inputs = []
   foreach(subpackage, invoker.subpackages) {
-    if (defined(subpackage.name)) {
-      name = subpackage.name
-    } else {
-      subpackage_target =
-          get_label_info(subpackage.package, "label_no_toolchain")
-      meta_package_target = subpackage_target + "_meta_package"
-      meta_package_target_gen_dir =
-          get_label_info(meta_package_target, "target_gen_dir")
-      meta_package_target_name = get_label_info(meta_package_target, "name")
-      package_output =
-          meta_package_target_gen_dir + "/" + meta_package_target_name + ".txt"
-    }
-
     package_manifest_file =
         get_label_info(subpackage.package, "target_out_dir") + "/" +
         get_label_info(subpackage.package, "name") + "/package_manifest.json"
@@ -183,10 +170,7 @@ template("generate_meta_subpackages") {
     rebased_subpackages += [
       {
         if (defined(subpackage.name)) {
-          name = name
-        } else {
-          # to get the subpackage package name
-          meta_package_file = rebase_path(package_output, root_build_dir)
+          name = subpackage.name
         }
 
         # the package_manifest.json of the subpackage

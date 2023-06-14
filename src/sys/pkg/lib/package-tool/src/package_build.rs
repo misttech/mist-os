@@ -100,6 +100,7 @@ pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
             for entry in subpackages_build_manifest.entries() {
                 let SubpackagesBuildManifestEntry { kind, package_manifest_file } = entry;
                 match kind {
+                    SubpackagesBuildManifestEntryKind::Empty => {}
                     SubpackagesBuildManifestEntryKind::Url(_) => {}
                     SubpackagesBuildManifestEntryKind::MetaPackageFile(package_manifest_file) => {
                         deps.insert(package_manifest_file.as_str());
@@ -572,7 +573,7 @@ mod test {
         let subpackages_build_manifest_path = root.join("subpackages");
         let subpackages_build_manifest_file =
             File::create(&subpackages_build_manifest_path).unwrap();
-        let subpackage_url = "subpackage".parse::<RelativePackageUrl>().unwrap();
+        let subpackage_url = "mock-subpackage".parse::<RelativePackageUrl>().unwrap();
         let subpackage_hash = fuchsia_merkle::Hash::from([0; fuchsia_merkle::HASH_SIZE]);
 
         let subpackage_package_manifest_file = root.join("subpackage_package_manifest.json");
@@ -610,7 +611,6 @@ mod test {
             subpackages_build_manifest_file,
             &serde_json::json!([
                 {
-                    "name": "subpackage",
                     "package_manifest_file": subpackage_package_manifest_file.to_string(),
                 }
             ]),
