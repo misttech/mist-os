@@ -6,12 +6,7 @@ use anyhow::{anyhow, Error};
 use bitflags::bitflags;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use once_cell::sync::Lazy;
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    convert::TryInto,
-    ops::Range,
-    sync::Arc,
-};
+use std::{collections::HashMap, convert::TryInto, ops::Range, sync::Arc};
 use zerocopy::{AsBytes, FromBytes};
 
 use crate::{
@@ -246,10 +241,55 @@ pub struct MemoryManagerState {
     pub vdso_base: UserAddress,
 }
 
+fn map_in_vmar(
+    vmar: &zx::Vmar,
+    vmar_info: &zx::VmarInfo,
+    addr: DesiredAddress,
+    vmo: &zx::Vmo,
+    vmo_offset: u64,
+    length: usize,
+    prot_flags: ProtectionFlags,
+    options: MappingOptions,
+) -> Result<UserAddress, Errno> {
+    let base_addr = UserAddress::from_ptr(vmar_info.base);
+    let (vmar_offset, vmar_extra_flags) = match addr {
+        DesiredAddress::Any if options.contains(MappingOptions::LOWER_32BIT) => {
+            // MAP_32BIT specifies that the memory allocated will
+            // be within the first 2 GB of the process address space.
+            (0x80000000 - base_addr.ptr(), zx::VmarFlags::OFFSET_IS_UPPER_LIMIT)
+        }
+        DesiredAddress::Any => (0, zx::VmarFlags::empty()),
+        DesiredAddress::Hint(addr) | DesiredAddress::Fixed(addr) => {
+            (addr - base_addr, zx::VmarFlags::SPECIFIC)
+        }
+        DesiredAddress::FixedOverwrite(addr) => {
+            let specific_overwrite = unsafe {
+                zx::VmarFlags::from_bits_unchecked(zx::VmarFlagsExtended::SPECIFIC_OVERWRITE.bits())
+            };
+            (addr - base_addr, specific_overwrite)
+        }
+    };
+
+    let vmar_flags = prot_flags.to_vmar_flags() | zx::VmarFlags::ALLOW_FAULTS | vmar_extra_flags;
+
+    let mut map_result = vmar.map(vmar_offset, vmo, vmo_offset, length, vmar_flags);
+
+    // Retry mapping if the target address was a Hint.
+    if map_result.is_err() {
+        if let DesiredAddress::Hint(_) = addr {
+            let vmar_flags = vmar_flags - zx::VmarFlags::SPECIFIC;
+            map_result = vmar.map(0, vmo, vmo_offset, length, vmar_flags);
+        }
+    }
+
+    let mapped_addr = map_result.map_err(MemoryManager::get_errno_for_map_err)?;
+    Ok(UserAddress::from_ptr(mapped_addr))
+}
+
 impl MemoryManagerState {
     // Map the memory without updating `self.mappings`.
     fn map_internal(
-        &mut self,
+        &self,
         addr: DesiredAddress,
         vmo: &zx::Vmo,
         vmo_offset: u64,
@@ -257,42 +297,16 @@ impl MemoryManagerState {
         prot_flags: ProtectionFlags,
         options: MappingOptions,
     ) -> Result<UserAddress, Errno> {
-        let base_addr = UserAddress::from_ptr(self.user_vmar_info.base);
-        let (vmar_offset, vmar_extra_flags) = match addr {
-            DesiredAddress::Any if options.contains(MappingOptions::LOWER_32BIT) => {
-                // MAP_32BIT specifies that the memory allocated will
-                // be within the first 2 GB of the process address space.
-                (0x80000000 - base_addr.ptr(), zx::VmarFlags::OFFSET_IS_UPPER_LIMIT)
-            }
-            DesiredAddress::Any => (0, zx::VmarFlags::empty()),
-            DesiredAddress::Hint(addr) | DesiredAddress::Fixed(addr) => {
-                (addr - base_addr, zx::VmarFlags::SPECIFIC)
-            }
-            DesiredAddress::FixedOverwrite(addr) => {
-                let specific_overwrite = unsafe {
-                    zx::VmarFlags::from_bits_unchecked(
-                        zx::VmarFlagsExtended::SPECIFIC_OVERWRITE.bits(),
-                    )
-                };
-                (addr - base_addr, specific_overwrite)
-            }
-        };
-
-        let vmar_flags =
-            prot_flags.to_vmar_flags() | zx::VmarFlags::ALLOW_FAULTS | vmar_extra_flags;
-
-        let mut map_result = self.user_vmar.map(vmar_offset, vmo, vmo_offset, length, vmar_flags);
-
-        // Retry mapping if the target address was a Hint.
-        if map_result.is_err() {
-            if let DesiredAddress::Hint(_) = addr {
-                let vmar_flags = vmar_flags - zx::VmarFlags::SPECIFIC;
-                map_result = self.user_vmar.map(0, vmo, vmo_offset, length, vmar_flags);
-            }
-        }
-
-        let mapped_addr = map_result.map_err(MemoryManager::get_errno_for_map_err)?;
-        Ok(UserAddress::from_ptr(mapped_addr))
+        map_in_vmar(
+            &self.user_vmar,
+            &self.user_vmar_info,
+            addr,
+            vmo,
+            vmo_offset,
+            length,
+            prot_flags,
+            options,
+        )
     }
 
     fn map(
@@ -1372,15 +1386,14 @@ impl MemoryManager {
     pub fn snapshot_to(&self, target: &MemoryManager) -> Result<(), Errno> {
         // TODO(fxbug.dev/123742): When SNAPSHOT (or equivalent) is supported on pager-backed VMOs
         // we can remove the hack below (which also won't be performant). For now, as a workaround,
-        // we use SNAPSHOT_AT_LEAST_ON_WRITE and then eagerly copy the mapped regions. These
-        // mappings should generally be small.
+        // we use SNAPSHOT_AT_LEAST_ON_WRITE on both the child and the parent.
 
         struct VmoInfo {
             vmo: Arc<zx::Vmo>,
             size: u64,
 
-            // Indicates whether or not the contents of the VMO need to be eagerly copied.
-            needs_copy: bool,
+            // Indicates whether or not the VMO needs to be replaced on the parent as well.
+            needs_snapshot_on_parent: bool,
         }
 
         // Clones the `vmo` and returns the `VmoInfo` with the clone.
@@ -1388,7 +1401,11 @@ impl MemoryManager {
             let vmo_info = vmo.info().map_err(impossible_error)?;
             let pager_backed = vmo_info.flags.contains(zx::VmoInfoFlags::PAGER_BACKED);
             Ok(if pager_backed && !rights.contains(zx::Rights::WRITE) {
-                VmoInfo { vmo: vmo.clone(), size: vmo_info.size_bytes, needs_copy: false }
+                VmoInfo {
+                    vmo: vmo.clone(),
+                    size: vmo_info.size_bytes,
+                    needs_snapshot_on_parent: false,
+                }
             } else {
                 let mut cloned_vmo = vmo
                     .create_child(
@@ -1409,40 +1426,68 @@ impl MemoryManager {
                 VmoInfo {
                     vmo: Arc::new(cloned_vmo),
                     size: vmo_info.size_bytes,
-                    needs_copy: pager_backed,
+                    needs_snapshot_on_parent: pager_backed,
                 }
             })
         }
 
-        let state = self.state.read();
+        fn snapshot_vmo(
+            vmo: &Arc<zx::Vmo>,
+            size: u64,
+            rights: zx::Rights,
+        ) -> Result<Arc<zx::Vmo>, Errno> {
+            let mut cloned_vmo = vmo
+                .create_child(
+                    zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE
+                        | zx::VmoChildOptions::RESIZABLE,
+                    0,
+                    size,
+                )
+                .map_err(MemoryManager::get_errno_for_map_err)?;
+
+            if rights.contains(zx::Rights::EXECUTE) {
+                cloned_vmo =
+                    cloned_vmo.replace_as_executable(&VMEX_RESOURCE).map_err(impossible_error)?;
+            }
+            Ok(Arc::new(cloned_vmo))
+        }
+
+        let state: &mut MemoryManagerState = &mut self.state.write();
         let mut target_state = target.state.write();
-        let mut vmos = HashMap::<zx::Koid, VmoInfo>::new();
+        let mut child_vmos = HashMap::<zx::Koid, VmoInfo>::new();
+        let mut replaced_vmos = HashMap::<zx::Koid, Arc<zx::Vmo>>::new();
 
-        for (range, mapping) in state.mappings.iter() {
-            let basic_info = mapping.vmo.basic_info().map_err(impossible_error)?;
-
+        for (range, mapping) in state.mappings.iter_mut() {
             let vmo_offset = mapping.vmo_offset + (range.start - mapping.base) as u64;
             let length = range.end - range.start;
 
             let target_vmo = if mapping.options.contains(MappingOptions::SHARED) {
                 &mapping.vmo
             } else {
-                let VmoInfo { vmo, size: vmo_size, needs_copy } = match vmos.entry(basic_info.koid)
-                {
-                    Entry::Occupied(o) => o.into_mut(),
-                    Entry::Vacant(v) => v.insert(clone_vmo(&mapping.vmo, basic_info.rights)?),
-                };
-                if *needs_copy && vmo_offset < *vmo_size {
-                    // The mapping may extend past the bounds of the VMO.
-                    let length_to_copy = std::cmp::min(*vmo_size - vmo_offset, length as u64);
-                    vmo.write(
-                        &mapping
-                            .vmo
-                            .read_to_vec(vmo_offset, length_to_copy)
-                            .map_err(impossible_error)?,
+                let basic_info = mapping.vmo.basic_info().map_err(impossible_error)?;
+
+                let VmoInfo { vmo, size: vmo_size, needs_snapshot_on_parent } = child_vmos
+                    .entry(basic_info.koid)
+                    .or_insert(clone_vmo(&mapping.vmo, basic_info.rights)?);
+
+                if *needs_snapshot_on_parent {
+                    let vmo = replaced_vmos.entry(basic_info.koid).or_insert(snapshot_vmo(
+                        &mapping.vmo,
+                        *vmo_size,
+                        basic_info.rights,
+                    )?);
+                    map_in_vmar(
+                        &state.user_vmar,
+                        &state.user_vmar_info,
+                        DesiredAddress::FixedOverwrite(range.start),
+                        vmo,
                         vmo_offset,
-                    )
-                    .map_err(impossible_error)?;
+                        length,
+                        mapping.prot_flags,
+                        mapping.options,
+                    )?;
+
+                    mapping.vmo = vmo.clone();
                 }
                 vmo
             };
@@ -2765,6 +2810,9 @@ mod tests {
             vmo.create_child(zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE, 0, VMO_SIZE).unwrap(),
         );
 
+        // Write something to the source VMO.
+        vmo.write(b"foo", 0).expect("write failed");
+
         let prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
         let addr = mm
             .map(
@@ -2778,28 +2826,26 @@ mod tests {
             )
             .expect("map failed");
 
-        // Write something to the source VMO.
-        vmo.write(b"foo", 0).expect("write failed");
-
         let target = create_task(&kernel, "another-task");
         mm.snapshot_to(&target.mm).expect("snapshot_to failed");
 
-        // Find the mapping in the target.
-        let (target_vmo, offset) =
-            target.mm.get_mapping_vmo(addr, prot_flags).expect("get_mapping_vmo failed");
-        assert_eq!(offset, 0);
-
         // Make sure it has what we wrote.
-        assert_eq!(&target_vmo.read_to_vec(0, 3).expect("read_to_vec failed"), b"foo");
+        let mut buf = vec![0u8; 3];
+        target.mm.read_memory(addr, &mut buf).expect("read_memory failed");
+        assert_eq!(buf, b"foo");
 
         // Write something to both source and target and make sure they are forked.
-        vmo.write(b"bar", 0).expect("write failed");
-        assert_eq!(&target_vmo.read_to_vec(0, 3).expect("read_to_vec failed"), b"foo");
+        mm.write_memory(addr, b"bar").expect("write_memory failed");
 
-        target_vmo.write(b"baz", 0).expect("write failed");
-        assert_eq!(&vmo.read_to_vec(0, 3).expect("read_to_vec failed"), b"bar");
+        target.mm.read_memory(addr, &mut buf).expect("read_memory failed");
+        assert_eq!(buf, b"foo");
 
-        assert_eq!(&target_vmo.read_to_vec(0, 3).expect("read_to_vec failed"), b"baz");
+        target.mm.write_memory(addr, b"baz").expect("write_memory failed");
+        mm.read_memory(addr, &mut buf).expect("read_memory failed");
+        assert_eq!(buf, b"bar");
+
+        target.mm.read_memory(addr, &mut buf).expect("read_memory failed");
+        assert_eq!(buf, b"baz");
 
         port.queue(&zx::Packet::from_user_packet(0, 0, zx::UserPacket::from_u8_array([0; 32])))
             .unwrap();

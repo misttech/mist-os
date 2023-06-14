@@ -9,11 +9,13 @@
 #include <sys/mman.h>
 #include <sys/syscall.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #include <cerrno>
 #include <cstdint>
+#include <thread>
 
 #include <gtest/gtest.h>
 #include <linux/sched.h>
@@ -22,6 +24,17 @@
 #include "src/starnix/tests/syscalls/test_helper.h"
 
 namespace {
+
+#define MAX_PAGE_ALIGNMENT (1 << 21)
+
+// Unless the split between the data and bss sections happens to be page-aligned, initial part
+// of the bss section will be in the same page as the last part of the data section.
+// By aligning g_global_variable_bss to a value bigger than the page size, we prevent it from
+// ending up in this shared page
+alignas(MAX_PAGE_ALIGNMENT) volatile int g_global_variable_bss = 0;
+
+volatile size_t g_global_variable_data = 15;
+volatile size_t g_fork_doesnt_drop_writes = 0;
 
 // As of this writing, our sysroot's syscall.h lacks the SYS_clone3 definition.
 #ifndef SYS_clone3
@@ -257,16 +270,6 @@ TEST(Task, BrkShrinkAfterFork) {
   ASSERT_NE(SBRK_ERROR, sbrk(-brk_increment));
 }
 
-#define MAX_PAGE_ALIGNMENT (1 << 21)
-
-volatile int g_global_variable_data = 15;
-
-// Unless the split between the data and bss sections happens to be page-aligned, initial part
-// of the bss section will be in the same page as the last part of the data section.
-// By aligning g_global_variable_bss to a value bigger than the page size, we prevent it from
-// ending up in this shared page
-alignas(MAX_PAGE_ALIGNMENT) volatile int g_global_variable_bss = 0;
-
 TEST(Task, ChildCantModifyParent) {
   ASSERT_GT(MAX_PAGE_ALIGNMENT, getpagesize());
 
@@ -278,7 +281,7 @@ TEST(Task, ChildCantModifyParent) {
   volatile int* heap_variable = new volatile int();
   *heap_variable = 1000;
 
-  ASSERT_EQ(g_global_variable_data, 1);
+  ASSERT_EQ(g_global_variable_data, 1u);
   ASSERT_EQ(g_global_variable_bss, 10);
   ASSERT_EQ(local_variable, 100);
   ASSERT_EQ(*heap_variable, 1000);
@@ -291,11 +294,57 @@ TEST(Task, ChildCantModifyParent) {
   });
   ASSERT_TRUE(helper.WaitForChildren());
 
-  EXPECT_EQ(g_global_variable_data, 1);
+  EXPECT_EQ(g_global_variable_data, 1u);
   EXPECT_EQ(g_global_variable_bss, 10);
   EXPECT_EQ(local_variable, 100);
   EXPECT_EQ(*heap_variable, 1000);
   delete heap_variable;
+}
+
+TEST(Task, ForkDoesntDropWrites) {
+  // This tests creates a thread that keeps reading
+  // and writing to a pager-backed memory region (the data section of this
+  // binary).
+  //
+  // This is to test that during fork, writes to pager-backed vmos are not
+  // dropped if we have concurrent processes writing to memory while the kernel
+  // changes those mappings.
+  std::atomic<bool> stop = false;
+  std::atomic<bool> success = false;
+  std::vector<pid_t> pids;
+
+  std::thread writer([&stop, &success, &data = g_fork_doesnt_drop_writes]() {
+    data = 0;
+    size_t i = 0;
+    success = false;
+    while (!stop) {
+      i++;
+      data += 1;
+      if (data != i) {
+        return;
+      }
+    }
+    success = true;
+  });
+
+  for (size_t i = 0; i < 1000; i++) {
+    pid_t pid = fork();
+    if (pid == 0) {
+      _exit(0);
+    }
+    pids.push_back(pid);
+  }
+
+  stop = true;
+  writer.join();
+  EXPECT_TRUE(success.load());
+
+  for (auto pid : pids) {
+    int status;
+    EXPECT_EQ(waitpid(pid, &status, 0), pid);
+    EXPECT_TRUE(WIFEXITED(status));
+    EXPECT_EQ(WEXITSTATUS(status), 0);
+  }
 }
 
 TEST(Task, ParentCantModifyChild) {
@@ -309,7 +358,7 @@ TEST(Task, ParentCantModifyChild) {
   volatile int* heap_variable = new volatile int();
   *heap_variable = 1000;
 
-  ASSERT_EQ(g_global_variable_data, 1);
+  ASSERT_EQ(g_global_variable_data, 1u);
   ASSERT_EQ(g_global_variable_bss, 10);
   ASSERT_EQ(local_variable, 100);
   ASSERT_EQ(*heap_variable, 1000);
@@ -320,7 +369,7 @@ TEST(Task, ParentCantModifyChild) {
   pid_t child_pid = helper.RunInForkedProcess([&] {
     signal_helper.waitForSignal(SIGUSR1);
 
-    EXPECT_EQ(g_global_variable_data, 1);
+    EXPECT_EQ(g_global_variable_data, 1u);
     EXPECT_EQ(g_global_variable_bss, 10);
     EXPECT_EQ(local_variable, 100);
     EXPECT_EQ(*heap_variable, 1000);

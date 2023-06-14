@@ -263,6 +263,11 @@ where
         self.map.iter().map(|(k, value)| (&k.range, value))
     }
 
+    /// Iterate over the ranges in the map, mut.
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&Range<K>, &mut V)> {
+        self.map.iter_mut().map(|(k, value)| (&k.range, value))
+    }
+
     /// Iterate over the ranges in the map, starting at the first range starting after or at the given point.
     pub fn iter_starting_at(&self, point: &K) -> impl Iterator<Item = (&Range<K>, &V)> {
         self.map.range(RangeStart::from_point(point)..).map(|(k, value)| (&k.range, value))
