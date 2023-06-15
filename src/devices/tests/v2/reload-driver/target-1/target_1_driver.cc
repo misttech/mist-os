@@ -37,4 +37,4 @@ class TargetOneDriver : public fdf::DriverBase {
 
 }  // namespace
 
-FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<TargetOneDriver>);
+FUCHSIA_DRIVER_EXPORT(TargetOneDriver);

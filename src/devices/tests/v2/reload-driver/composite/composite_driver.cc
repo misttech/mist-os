@@ -37,4 +37,4 @@ class CompositeDriver : public fdf::DriverBase {
 
 }  // namespace
 
-FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<CompositeDriver>);
+FUCHSIA_DRIVER_EXPORT(CompositeDriver);

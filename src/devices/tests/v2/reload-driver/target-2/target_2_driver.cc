@@ -37,4 +37,4 @@ class TargetTwoDriver : public fdf::DriverBase {
 
 }  // namespace
 
-FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<TargetTwoDriver>);
+FUCHSIA_DRIVER_EXPORT(TargetTwoDriver);

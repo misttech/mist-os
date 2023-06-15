@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/runtime/testing/cpp/dispatcher.h>
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime_env.h>
@@ -39,7 +40,7 @@ class FakeTestDriver : public MagmaTestDriverBase {
 };
 
 // Export the |FakeTestDriver| for the |fdf_testing::DriverUnderTest<FakeTestDriver>| to use.
-FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<FakeTestDriver>);
+FUCHSIA_DRIVER_EXPORT(FakeTestDriver);
 
 class FakeDriver : public MagmaProductionDriverBase {
  public:

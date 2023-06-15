@@ -70,4 +70,4 @@ class WlantapDriver : public fdf::DriverBase {
 };
 
 }  // namespace wlan
-FUCHSIA_DRIVER_LIFECYCLE_CPP_V2(fdf::Lifecycle<wlan::WlantapDriver>);
+FUCHSIA_DRIVER_EXPORT(wlan::WlantapDriver);

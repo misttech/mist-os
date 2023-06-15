@@ -131,4 +131,4 @@ class RebindParent : public fdf::DriverBase {
 
 }  // namespace rebind_parent
 
-FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<rebind_parent::RebindParent>);
+FUCHSIA_DRIVER_EXPORT(rebind_parent::RebindParent);

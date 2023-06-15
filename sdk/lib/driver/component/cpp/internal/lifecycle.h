@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_COMPONENT_CPP_LIFECYCLE_H_
-#define LIB_DRIVER_COMPONENT_CPP_LIFECYCLE_H_
+#ifndef LIB_DRIVER_COMPONENT_CPP_INTERNAL_LIFECYCLE_H_
+#define LIB_DRIVER_COMPONENT_CPP_INTERNAL_LIFECYCLE_H_
 
-#include <lib/driver/component/cpp/basic_factory.h>
+#include <lib/driver/component/cpp/internal/basic_factory.h>
 #include <lib/driver/component/cpp/internal/start_args.h>
 
-namespace fdf {
+namespace fdf_internal {
 
 // |Lifecycle| implements static |Start| and |Stop| methods which will be used by the framework.
 //
@@ -42,14 +42,15 @@ namespace fdf {
 // ```
 template <typename Driver, typename Factory = BasicFactory<Driver>>
 class Lifecycle {
-  static_assert(std::is_base_of_v<DriverBase, Driver>, "Driver has to inherit from DriverBase");
+  static_assert(std::is_base_of_v<fdf::DriverBase, Driver>,
+                "Driver has to inherit from DriverBase");
 
   DECLARE_HAS_MEMBER_FN(has_create_driver, CreateDriver);
   static_assert(has_create_driver_v<Factory>,
                 "Factory must implement a public static CreateDriver function.");
   static_assert(
       std::is_same_v<decltype(&Factory::CreateDriver),
-                     void (*)(DriverStartArgs, fdf::UnownedSynchronizedDispatcher,
+                     void (*)(fdf::DriverStartArgs, fdf::UnownedSynchronizedDispatcher,
                               fdf::StartCompleter)>,
       "CreateDriver must be a public static function with signature "
       "'void (fdf::DriverStartArgs start_args, "
@@ -67,21 +68,21 @@ class Lifecycle {
     ZX_ASSERT_MSG(start_args.is_ok(), "Failed to decode start_args: %s",
                   start_args.error_value().FormatDescription().c_str());
 
-    StartCompleter completer(complete, complete_cookie);
+    fdf::StartCompleter completer(complete, complete_cookie);
     Factory::CreateDriver(std::move(*start_args), fdf::UnownedSynchronizedDispatcher(dispatcher),
                           std::move(completer));
   }
 
   static void PrepareStop(void* driver, PrepareStopCompleteCallback* complete,
                           void* complete_cookie) {
-    PrepareStopCompleter completer(complete, complete_cookie);
-    static_cast<DriverBase*>(driver)->PrepareStop(std::move(completer));
+    fdf::PrepareStopCompleter completer(complete, complete_cookie);
+    static_cast<fdf::DriverBase*>(driver)->PrepareStop(std::move(completer));
   }
 
   static zx_status_t Stop(void* driver) {
     // Make a unique_ptr take ownership of the driver. Once it goes out of scope at the end of this
     // function, the driver is deleted automatically.
-    auto driver_ptr = std::unique_ptr<DriverBase>(static_cast<DriverBase*>(driver));
+    auto driver_ptr = std::unique_ptr<fdf::DriverBase>(static_cast<fdf::DriverBase*>(driver));
     driver_ptr->Stop();
     return ZX_OK;
   }
@@ -95,6 +96,6 @@ class Lifecycle {
   FUCHSIA_DRIVER_LIFECYCLE_V3(.start = lifecycle::Start, .prepare_stop = lifecycle::PrepareStop, \
                               .stop = lifecycle::Stop)
 
-}  // namespace fdf
+}  // namespace fdf_internal
 
-#endif  // LIB_DRIVER_COMPONENT_CPP_LIFECYCLE_H_
+#endif  // LIB_DRIVER_COMPONENT_CPP_INTERNAL_LIFECYCLE_H_

@@ -144,4 +144,4 @@ class ParentDriverTransportDriver : public fdf::DriverBase {
 
 }  // namespace driver_transport
 
-FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<driver_transport::ParentDriverTransportDriver>);
+FUCHSIA_DRIVER_EXPORT(driver_transport::ParentDriverTransportDriver);

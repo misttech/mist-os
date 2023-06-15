@@ -10,7 +10,6 @@
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
-#include <lib/driver/component/cpp/lifecycle.h>
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/fit/thread_safety.h>
 #include <lib/inspect/component/cpp/service.h>

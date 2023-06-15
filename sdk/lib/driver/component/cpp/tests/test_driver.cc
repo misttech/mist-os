@@ -151,4 +151,4 @@ void TestDriver::CreateChildNodeAsync() {
       });
 }
 
-FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<TestDriver>);
+FUCHSIA_DRIVER_EXPORT(TestDriver);

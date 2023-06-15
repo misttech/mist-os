@@ -72,4 +72,4 @@ class RebindChild : public fdf::DriverBase {
 
 }  // namespace rebind_child
 
-FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<rebind_child::RebindChild>);
+FUCHSIA_DRIVER_EXPORT(rebind_child::RebindChild);

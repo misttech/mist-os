@@ -52,4 +52,4 @@ class RightParentDriver : public fdf::DriverBase {
 
 }  // namespace
 
-FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<RightParentDriver>);
+FUCHSIA_DRIVER_EXPORT(RightParentDriver);

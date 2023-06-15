@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
-#include <lib/driver/component/cpp/lifecycle.h>
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/fit/thread_safety.h>
 
@@ -69,5 +68,4 @@ class MaliDriver : public MagmaDriverBaseType {
   std::unique_ptr<ParentDeviceDFv2> parent_device_;
 };
 
-using lifecycle = fdf::Lifecycle<MaliDriver>;
-FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(lifecycle);
+FUCHSIA_DRIVER_EXPORT(MaliDriver);

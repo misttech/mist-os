@@ -17,14 +17,15 @@ sdk_source_set("cpp") {
   include_base = "//sdk"
 
   sources = [
-    "basic_factory.h",
     "composite_node_spec.h",
     "driver_base.cc",
     "driver_base.h",
     "driver_cpp.h",
+    "driver_export.h",
+    "internal/basic_factory.h",
+    "internal/lifecycle.h",
     "internal/start_args.h",
     "internal/symbols.h",
-    "lifecycle.h",
     "node_add_args.cc",
     "node_add_args.h",
     "prepare_stop_completer.cc",

@@ -114,7 +114,7 @@ file to compile the bind rules:
 
 Once a driver is bound, the framework loads the component binary and constructs
 an instance of the driver class registered using the
-`FUCHSIA_DRIVER_LIFECYCLE_CPP_V2()` macro. The driver overrides the `Start()`
+`FUCHSIA_DRIVER_EXPORT()` macro. The driver overrides the `Start()`
 method to perform any initialization tasks.
 
 Create `qemu_edu/drivers/qemu_edu.h` and `qemu_edu/drivers/qemu_edu.cc` and add

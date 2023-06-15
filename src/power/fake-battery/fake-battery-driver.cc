@@ -103,6 +103,6 @@ class Driver : public fdf::DriverBase {
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
 };
 
-FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<fake_battery::Driver>);
+FUCHSIA_DRIVER_EXPORT(fake_battery::Driver);
 
 }  // namespace fake_battery

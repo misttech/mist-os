@@ -99,4 +99,4 @@ zx::result<> Driver::Serve(std::string_view name, bool is_input) {
 
 }  // namespace audio::da7219
 
-FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<audio::da7219::Driver>);
+FUCHSIA_DRIVER_EXPORT(audio::da7219::Driver);

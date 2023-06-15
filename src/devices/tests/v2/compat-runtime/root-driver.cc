@@ -139,4 +139,4 @@ class RootDriver : public fdf::DriverBase, public fdf::Server<ft::Root> {
 
 }  // namespace
 
-FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<RootDriver>);
+FUCHSIA_DRIVER_EXPORT(RootDriver);

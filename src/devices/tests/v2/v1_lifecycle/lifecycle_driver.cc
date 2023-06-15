@@ -137,4 +137,4 @@ class LifecycleDriver : public fdf::DriverBase, public fidl::WireServer<ft::Devi
 
 }  // namespace
 
-FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<LifecycleDriver>);
+FUCHSIA_DRIVER_EXPORT(LifecycleDriver);

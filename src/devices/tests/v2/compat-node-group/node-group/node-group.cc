@@ -34,4 +34,4 @@ class NodeGroupDriver : public fdf::DriverBase {
 
 }  // namespace
 
-FUCHSIA_DRIVER_LIFECYCLE_CPP_V2(fdf::Lifecycle<NodeGroupDriver>);
+FUCHSIA_DRIVER_EXPORT(NodeGroupDriver);

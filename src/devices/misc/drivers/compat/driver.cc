@@ -10,6 +10,7 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/binding_priv.h>
 #include <lib/driver/compat/cpp/connect.h>
+#include <lib/driver/component/cpp/internal/lifecycle.h>
 #include <lib/driver/component/cpp/internal/start_args.h>
 #include <lib/driver/component/cpp/internal/symbols.h>
 #include <lib/driver/promise/cpp/promise.h>
@@ -799,5 +800,5 @@ zx_status_t Driver::GetFragmentProtocol(const char* fragment, uint32_t proto_id,
 
 }  // namespace compat
 
-using record = fdf::Lifecycle<compat::Driver, compat::DriverFactory>;
+using record = fdf_internal::Lifecycle<compat::Driver, compat::DriverFactory>;
 FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(record);

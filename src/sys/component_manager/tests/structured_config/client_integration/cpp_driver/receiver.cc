@@ -94,4 +94,4 @@ class ReceiverDriver : public fdf::DriverBase, public fidl::WireServer<scr::Conf
 
 }  // namespace
 
-FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<ReceiverDriver>);
+FUCHSIA_DRIVER_EXPORT(ReceiverDriver);
