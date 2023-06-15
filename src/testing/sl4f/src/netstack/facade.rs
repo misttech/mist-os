@@ -126,7 +126,6 @@ impl From<(fidl_fuchsia_net_interfaces_ext::Properties, Option<fidl_fuchsia_net:
 #[derive(Debug, Default)]
 pub struct NetstackFacade {
     interfaces_state: OnceCell<fidl_fuchsia_net_interfaces::StateProxy>,
-    debug_interfaces: OnceCell<fidl_fuchsia_net_debug::InterfacesProxy>,
     root_interfaces: OnceCell<fidl_fuchsia_net_root::InterfacesProxy>,
 }
 
@@ -145,7 +144,7 @@ impl NetstackFacade {
     async fn get_interfaces_state(
         &self,
     ) -> Result<&fidl_fuchsia_net_interfaces::StateProxy, Error> {
-        let Self { interfaces_state, debug_interfaces: _, root_interfaces: _ } = self;
+        let Self { interfaces_state, root_interfaces: _ } = self;
         if let Some(state_proxy) = interfaces_state.get() {
             Ok(state_proxy)
         } else {
@@ -157,23 +156,8 @@ impl NetstackFacade {
         }
     }
 
-    async fn get_debug_interfaces(
-        &self,
-    ) -> Result<&fidl_fuchsia_net_debug::InterfacesProxy, Error> {
-        let Self { interfaces_state: _, debug_interfaces, root_interfaces: _ } = self;
-        if let Some(interfaces_proxy) = debug_interfaces.get() {
-            Ok(interfaces_proxy)
-        } else {
-            let interfaces_proxy =
-                get_netstack_proxy::<fidl_fuchsia_net_debug::InterfacesMarker>().await?;
-            debug_interfaces.set(interfaces_proxy).unwrap();
-            let interfaces_proxy = debug_interfaces.get().unwrap();
-            Ok(interfaces_proxy)
-        }
-    }
-
     async fn get_root_interfaces(&self) -> Result<&fidl_fuchsia_net_root::InterfacesProxy, Error> {
-        let Self { interfaces_state: _, debug_interfaces: _, root_interfaces } = self;
+        let Self { interfaces_state: _, root_interfaces } = self;
         if let Some(interfaces_proxy) = root_interfaces.get() {
             Ok(interfaces_proxy)
         } else {
@@ -189,11 +173,11 @@ impl NetstackFacade {
         &self,
         id: u64,
     ) -> Result<fidl_fuchsia_net_interfaces_ext::admin::Control, Error> {
-        let debug_interfaces = self.get_root_interfaces().await?;
+        let root_interfaces = self.get_root_interfaces().await?;
         let (control, server_end) =
             fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
                 .context("create admin control endpoints")?;
-        let () = debug_interfaces.get_admin(id, server_end).context("send get admin request")?;
+        let () = root_interfaces.get_admin(id, server_end).context("send get admin request")?;
         Ok(control)
     }
 
@@ -229,7 +213,7 @@ impl NetstackFacade {
 
     pub async fn list_interfaces(&self) -> Result<Vec<Properties>, Error> {
         let interfaces_state = self.get_interfaces_state().await?;
-        let debug_interfaces = self.get_debug_interfaces().await?;
+        let root_interfaces = self.get_root_interfaces().await?;
         // Only `OnlyAssigned` is implemented; additional work is required to
         // support unassigned addresses.
         let stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
@@ -243,13 +227,13 @@ impl NetstackFacade {
         .await?;
         let response = response.into_values().map(
             |fidl_fuchsia_net_interfaces_ext::PropertiesAndState { properties, state: () }| async {
-                match debug_interfaces.get_mac(properties.id.get()).await? {
+                match root_interfaces.get_mac(properties.id.get()).await? {
                     Ok(mac) => {
                         let mac = mac.map(|boxed_mac| *boxed_mac);
                         let view: Properties = (properties, mac).into();
                         Ok::<_, Error>(Some(view))
                     }
-                    Err(fidl_fuchsia_net_debug::InterfacesGetMacError::NotFound) => {
+                    Err(fidl_fuchsia_net_root::InterfacesGetMacError::NotFound) => {
                         // Interface with given id not found; this occurs when state
                         // is reported for an interface that has since been removed.
                         Ok::<_, Error>(None)

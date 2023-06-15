@@ -15,7 +15,6 @@ import (
 	"syscall/zx"
 	"syscall/zx/fidl"
 
-	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
 	"go.fuchsia.dev/fuchsia/src/lib/component"
 	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
 
@@ -29,18 +28,6 @@ var _ debug.InterfacesWithCtx = (*debugInterfacesImpl)(nil)
 
 type debugInterfacesImpl struct {
 	ns *Netstack
-}
-
-func (ci *debugInterfacesImpl) GetMac(_ fidl.Context, nicid uint64) (debug.InterfacesGetMacResult, error) {
-	if nicInfo, ok := ci.ns.stack.NICInfo()[tcpip.NICID(nicid)]; ok {
-		var response debug.InterfacesGetMacResponse
-		if linkAddress := nicInfo.LinkAddress; len(linkAddress) != 0 {
-			mac := fidlconv.ToNetMacAddress(linkAddress)
-			response.Mac = &mac
-		}
-		return debug.InterfacesGetMacResultWithResponse(response), nil
-	}
-	return debug.InterfacesGetMacResultWithErr(debug.InterfacesGetMacErrorNotFound), nil
 }
 
 func (ci *debugInterfacesImpl) GetPort(_ fidl.Context, nicid uint64, request network.PortWithCtxInterfaceRequest) error {

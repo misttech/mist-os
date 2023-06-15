@@ -6,9 +6,9 @@
 
 use fdio::{SpawnAction, SpawnOptions};
 use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_debug as fnet_debug;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
+use fidl_fuchsia_net_root as fnet_root;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_packet as fposix_socket_packet;
@@ -348,10 +348,10 @@ async fn bridged_packet_test(name: &str) {
             .await
             .expect("error adding neighbor entry");
 
-        let debug = realm
-            .connect_to_protocol::<fnet_debug::InterfacesMarker>()
-            .expect("failed to connect to debug interfaces protocol");
-        let mac = debug
+        let root = realm
+            .connect_to_protocol::<fnet_root::InterfacesMarker>()
+            .expect("failed to connect to root interfaces protocol");
+        let mac = root
             .get_mac(bridge_id)
             .await
             .expect("error calling get_mac")

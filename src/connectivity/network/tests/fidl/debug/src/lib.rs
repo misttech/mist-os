@@ -101,9 +101,9 @@ async fn get_admin_netemul_endpoint<N: Netstack>(name: &str) {
 // https://doc.rust-lang.org/beta/unstable-book/language-features/box-patterns.html.
 async fn get_mac(
     id: u64,
-    debug_interfaces: &fnet_debug::InterfacesProxy,
-) -> Result<Option<fnet::MacAddress>, fnet_debug::InterfacesGetMacError> {
-    let mac = debug_interfaces.get_mac(id).await.expect("get mac");
+    root_interfaces: &fnet_root::InterfacesProxy,
+) -> Result<Option<fnet::MacAddress>, fnet_root::InterfacesGetMacError> {
+    let mac = root_interfaces.get_mac(id).await.expect("get mac");
     mac.map(|option| option.map(|box_| *box_))
 }
 
@@ -111,14 +111,14 @@ async fn get_mac(
 async fn get_mac_not_found<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
-    let debug_interfaces =
-        realm.connect_to_protocol::<fnet_debug::InterfacesMarker>().expect("connect to protocol");
+    let root_interfaces =
+        realm.connect_to_protocol::<fnet_root::InterfacesMarker>().expect("connect to protocol");
 
     let loopback_id = get_loopback_id(&realm).await;
     // Unknown device ID produces an error.
     assert_matches!(
-        get_mac(loopback_id + 1, &debug_interfaces).await,
-        Err(fnet_debug::InterfacesGetMacError::NotFound)
+        get_mac(loopback_id + 1, &root_interfaces).await,
+        Err(fnet_root::InterfacesGetMacError::NotFound)
     );
 }
 
@@ -126,13 +126,13 @@ async fn get_mac_not_found<N: Netstack>(name: &str) {
 async fn get_mac_loopback<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
-    let debug_interfaces =
-        realm.connect_to_protocol::<fnet_debug::InterfacesMarker>().expect("connect to protocol");
+    let root_interfaces =
+        realm.connect_to_protocol::<fnet_root::InterfacesMarker>().expect("connect to protocol");
 
     let loopback_id = get_loopback_id(&realm).await;
     // Loopback has the all-zero MAC address.
     assert_matches!(
-        get_mac(loopback_id, &debug_interfaces).await,
+        get_mac(loopback_id, &root_interfaces).await,
         Ok(Some(fnet::MacAddress { octets: [0, 0, 0, 0, 0, 0] }))
     );
 }
@@ -169,8 +169,8 @@ async fn add_pure_ip_interface(
 async fn get_mac_pure_ip() {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<Netstack2, _>("get_mac").expect("create realm");
-    let debug_interfaces =
-        realm.connect_to_protocol::<fnet_debug::InterfacesMarker>().expect("connect to protocol");
+    let root_interfaces =
+        realm.connect_to_protocol::<fnet_root::InterfacesMarker>().expect("connect to protocol");
 
     const PORT_ID: u8 = 7; // Arbitrary nonzero to avoid masking default value assumptions.
     const INTERFACE_NAME: &str = "ihazmac";
@@ -182,15 +182,15 @@ async fn get_mac_pure_ip() {
         add_pure_ip_interface(&network_port, &admin_device_control, INTERFACE_NAME).await;
     let virtual_id = admin_control.get_id().await.expect("get id");
     // Pure IP interfaces do not have MAC addresses.
-    assert_matches!(get_mac(virtual_id, &debug_interfaces).await, Ok(None));
+    assert_matches!(get_mac(virtual_id, &root_interfaces).await, Ok(None));
 }
 
 #[netstack_test]
 async fn get_mac_netemul_endpoint<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
-    let debug_interfaces =
-        realm.connect_to_protocol::<fnet_debug::InterfacesMarker>().expect("connect to protocol");
+    let root_interfaces =
+        realm.connect_to_protocol::<fnet_root::InterfacesMarker>().expect("connect to protocol");
 
     const DEFAULT_MAC: fnet::MacAddress = fidl_mac!("00:03:00:00:00:00");
     let device = sandbox
@@ -205,7 +205,7 @@ async fn get_mac_netemul_endpoint<N: Netstack>(name: &str) {
         .add_to_stack(&realm, netemul::InterfaceConfig::default())
         .await
         .expect("add to stack");
-    assert_matches!(get_mac(id.into(), &debug_interfaces).await, Ok(Some(DEFAULT_MAC)));
+    assert_matches!(get_mac(id.into(), &root_interfaces).await, Ok(Some(DEFAULT_MAC)));
 }
 
 #[netstack_test]

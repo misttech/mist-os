@@ -21,6 +21,7 @@ import (
 
 	"gvisor.dev/gvisor/pkg/tcpip"
 )
+import "go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
 
 var _ root.InterfacesWithCtx = (*rootInterfacesImpl)(nil)
 
@@ -43,4 +44,16 @@ func (ci *rootInterfacesImpl) GetAdmin(_ fidl.Context, nicid uint64, request adm
 		ifs.addAdminConnection(request, false /* strong */)
 		return nil
 	}
+}
+
+func (ci *rootInterfacesImpl) GetMac(_ fidl.Context, nicid uint64) (root.InterfacesGetMacResult, error) {
+	if nicInfo, ok := ci.ns.stack.NICInfo()[tcpip.NICID(nicid)]; ok {
+		var response root.InterfacesGetMacResponse
+		if linkAddress := nicInfo.LinkAddress; len(linkAddress) != 0 {
+			mac := fidlconv.ToNetMacAddress(linkAddress)
+			response.Mac = &mac
+		}
+		return root.InterfacesGetMacResultWithResponse(response), nil
+	}
+	return root.InterfacesGetMacResultWithErr(root.InterfacesGetMacErrorNotFound), nil
 }

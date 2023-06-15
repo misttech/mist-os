@@ -7,11 +7,11 @@
 use std::{borrow::Cow, convert::TryFrom as _};
 
 use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_debug as fnet_debug;
 use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_filter as fnetfilter;
 use fidl_fuchsia_net_interfaces_admin as finterfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
+use fidl_fuchsia_net_root as fnet_root;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use futures::FutureExt as _;
@@ -316,10 +316,10 @@ pub async fn setup_masquerade_nat_network<'a>(
     }
 
     async fn get_mac(realm: &netemul::TestRealm<'_>, id: u64) -> fidl_fuchsia_net::MacAddress {
-        let debug = realm
-            .connect_to_protocol::<fnet_debug::InterfacesMarker>()
-            .expect("failed to connect to debug protocol");
-        *debug
+        let root = realm
+            .connect_to_protocol::<fnet_root::InterfacesMarker>()
+            .expect("failed to connect to root protocol");
+        *root
             .get_mac(id)
             .await
             .expect("error calling get_mac")

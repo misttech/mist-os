@@ -13,19 +13,6 @@ using fuchsia.hardware.network;
 /// load-bearing code.
 @discoverable
 closed protocol Interfaces {
-    /// Return an interface's MAC address.
-    ///
-    /// + request `id` identifies the interface whose MAC is requested.
-    /// - response `mac` is the interface's MAC address, if it has one.
-    strict GetMac(struct {
-        id fuchsia.net.InterfaceId;
-    }) -> (struct {
-        mac box<fuchsia.net.MacAddress>;
-    }) error strict enum {
-        /// `id` does not identify an interface.
-        NOT_FOUND = 1;
-    };
-
     /// Provides access to the port backing an interface.
     ///
     /// `port` is closed with `ZX_ERR_NOT_FOUND` if an interface referenced by

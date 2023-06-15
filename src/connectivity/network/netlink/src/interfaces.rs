@@ -2192,6 +2192,7 @@ mod tests {
                                     }
                                     control.shutdown();
                                 }
+                                req => panic!("unexpected request {:?}", req),
                             })
                         })
                         .await
@@ -2239,6 +2240,7 @@ mod tests {
                                 pretty_assertions::assert_eq!(id, ETH_INTERFACE_ID);
                                 control.into_stream().unwrap()
                             }
+                            req => panic!("unexpected request {:?}", req),
                         })
                     })
                     .flatten()

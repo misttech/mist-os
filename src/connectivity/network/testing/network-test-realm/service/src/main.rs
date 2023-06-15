@@ -288,7 +288,7 @@ async fn find_interface_id_and_status(
         fntr::Error::Internal
     })?;
 
-    let debug_interfaces_proxy = connector.connect_to_protocol::<fnet_debug::InterfacesMarker>()?;
+    let root_interfaces_proxy = connector.connect_to_protocol::<fnet_root::InterfacesMarker>()?;
 
     let interfaces_stream = futures::stream::iter(interfaces.into_values());
 
@@ -297,16 +297,16 @@ async fn find_interface_id_and_status(
              properties: fnet_interfaces_ext::Properties { id, online, .. },
              state: _,
          }| {
-            let debug_interfaces_proxy = &debug_interfaces_proxy;
+            let root_interfaces_proxy = &root_interfaces_proxy;
             async move {
-                match debug_interfaces_proxy.get_mac(id.get()).await {
+                match root_interfaces_proxy.get_mac(id.get()).await {
                     Err(e) => {
                         let _: fidl::Error = e;
                         warn!("get_mac failure: {:?}", e);
                         None
                     }
                     Ok(result) => match result {
-                        Err(fnet_debug::InterfacesGetMacError::NotFound) => {
+                        Err(fnet_root::InterfacesGetMacError::NotFound) => {
                             warn!("get_mac interface not found for ID: {}", id);
                             None
                         }

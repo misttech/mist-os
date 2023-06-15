@@ -269,8 +269,8 @@ async fn do_if<C: NetCliDepsConnector>(
 ) -> Result<(), Error> {
     match cmd {
         opts::IfEnum::List(opts::IfList { name_pattern }) => {
-            let debug_interfaces =
-                connect_with_context::<fdebug::InterfacesMarker, _>(connector).await?;
+            let root_interfaces =
+                connect_with_context::<froot::InterfacesMarker, _>(connector).await?;
             let interface_state =
                 connect_with_context::<finterfaces::StateMarker, _>(connector).await?;
             let stream = finterfaces_ext::event_stream_from_state(
@@ -287,7 +287,7 @@ async fn do_if<C: NetCliDepsConnector>(
             }
             let response = response.into_values().map(
                 |finterfaces_ext::PropertiesAndState { properties, state: () }| async {
-                    let mac = debug_interfaces
+                    let mac = root_interfaces
                         .get_mac(properties.id.get())
                         .await
                         .context("call get_mac")?;
@@ -298,7 +298,7 @@ async fn do_if<C: NetCliDepsConnector>(
             let mut response: Vec<_> = response
                 .into_iter()
                 .filter_map(|(properties, mac)| match mac {
-                    Err(fdebug::InterfacesGetMacError::NotFound) => None,
+                    Err(froot::InterfacesGetMacError::NotFound) => None,
                     Ok(mac) => {
                         let mac = mac.map(|box_| *box_);
                         Some((properties, mac).into())
@@ -315,8 +315,8 @@ async fn do_if<C: NetCliDepsConnector>(
         }
         opts::IfEnum::Get(opts::IfGet { interface }) => {
             let id = interface.find_nicid(connector).await?;
-            let debug_interfaces =
-                connect_with_context::<fdebug::InterfacesMarker, _>(connector).await?;
+            let root_interfaces =
+                connect_with_context::<froot::InterfacesMarker, _>(connector).await?;
             let interface_state =
                 connect_with_context::<finterfaces::StateMarker, _>(connector).await?;
             let stream = finterfaces_ext::event_stream_from_state(
@@ -337,9 +337,9 @@ async fn do_if<C: NetCliDepsConnector>(
                     state: _,
                 }) => {
                     let finterfaces_ext::Properties { id, .. } = &properties;
-                    let mac = debug_interfaces.get_mac(id.get()).await.context("call get_mac")?;
+                    let mac = root_interfaces.get_mac(id.get()).await.context("call get_mac")?;
                     match mac {
-                        Err(fdebug::InterfacesGetMacError::NotFound) => {
+                        Err(froot::InterfacesGetMacError::NotFound) => {
                             return Err(user_facing_error(format!(
                                 "interface with id={} not found",
                                 id
@@ -2277,8 +2277,8 @@ mac             -
     #[test_case(false, wanted_net_if_list_tabular() ; "in tabular format")]
     #[fasync::run_singlethreaded(test)]
     async fn if_list(json: bool, wanted_output: String) {
-        let (debug_interfaces, debug_interfaces_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdebug::InterfacesMarker>().unwrap();
+        let (root_interfaces, root_interfaces_stream) =
+            fidl::endpoints::create_proxy_and_stream::<froot::InterfacesMarker>().unwrap();
         let (interfaces_state, interfaces_state_stream) =
             fidl::endpoints::create_proxy_and_stream::<finterfaces::StateMarker>().unwrap();
 
@@ -2291,7 +2291,7 @@ mac             -
 
         let do_if_fut = async {
             let connector = TestConnector {
-                debug_interfaces: Some(debug_interfaces),
+                root_interfaces: Some(root_interfaces),
                 interfaces_state: Some(interfaces_state),
                 ..Default::default()
             };
@@ -2385,8 +2385,8 @@ mac             -
                 futures::future::ready(())
             }
         });
-        let debug_fut = debug_interfaces_stream
-            .map(|res| res.expect("debug interfaces stream error"))
+        let root_fut = root_interfaces_stream
+            .map(|res| res.expect("root interfaces stream error"))
             .for_each_concurrent(None, |req| {
                 let (id, responder) = req.into_get_mac().expect("get_mac request");
                 let () = responder
@@ -2394,12 +2394,12 @@ mac             -
                         mac_addresses
                             .get(&id.try_into().unwrap())
                             .map(Option::as_ref)
-                            .ok_or(fdebug::InterfacesGetMacError::NotFound),
+                            .ok_or(froot::InterfacesGetMacError::NotFound),
                     )
                     .expect("send get_mac response");
                 futures::future::ready(())
             });
-        let ((), (), ()) = futures::future::join3(do_if_fut, watcher_fut, debug_fut).await;
+        let ((), (), ()) = futures::future::join3(do_if_fut, watcher_fut, root_fut).await;
 
         let got_output = output.test_output().unwrap();
 

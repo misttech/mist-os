@@ -13,11 +13,7 @@ use fuchsia_zircon as zx;
 use futures::{SinkExt as _, StreamExt as _, TryStreamExt as _};
 use tracing::{debug, error, warn};
 
-use crate::bindings::{
-    devices::{BindingId, LOOPBACK_MAC},
-    util::IntoFidl,
-    DeviceIdExt as _, DeviceSpecificInfo, Netstack,
-};
+use crate::bindings::{devices::BindingId, DeviceIdExt as _, DeviceSpecificInfo, Netstack};
 
 // Serve a stream of fuchsia.net.debug.Interfaces API requests for a single
 // channel (e.g. a single client connection).
@@ -28,12 +24,6 @@ pub(crate) async fn serve_interfaces(
     debug!(protocol = fnet_debug::InterfacesMarker::DEBUG_NAME, "serving");
     rs.try_for_each(|req| async {
         match req {
-            fnet_debug::InterfacesRequest::GetMac { id, responder } => {
-                responder_send!(
-                    responder,
-                    handle_get_mac(&ns, id).as_ref().map(Option::as_deref).map_err(|e| *e)
-                );
-            }
             fnet_debug::InterfacesRequest::GetPort { id, port, control_handle: _ } => {
                 handle_get_port(&ns, id, port);
             }
@@ -41,21 +31,6 @@ pub(crate) async fn serve_interfaces(
         Ok(())
     })
     .await
-}
-
-fn handle_get_mac(ns: &Netstack, interface_id: u64) -> fnet_debug::InterfacesGetMacResult {
-    debug!(interface_id, "handling fuchsia.net.debug.Interfaces::GetMac");
-    let ctx = ns.ctx.clone();
-    BindingId::new(interface_id)
-        .and_then(|id| ctx.non_sync_ctx.devices.get_core_id(id))
-        .ok_or(fnet_debug::InterfacesGetMacError::NotFound)
-        .map(|core_id| {
-            let mac = match core_id.external_state() {
-                DeviceSpecificInfo::Loopback(_) => LOOPBACK_MAC,
-                DeviceSpecificInfo::Netdevice(info) => info.mac.into(),
-            };
-            Some(Box::new(mac.into_fidl()))
-        })
 }
 
 fn handle_get_port(

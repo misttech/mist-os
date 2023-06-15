@@ -12,7 +12,12 @@ use fuchsia_zircon as zx;
 use futures::TryStreamExt as _;
 use tracing::{debug, error};
 
-use crate::bindings::{devices::BindingId, interfaces_admin, DeviceIdExt as _, Netstack};
+use crate::bindings::{
+    devices::{BindingId, DeviceSpecificInfo, LOOPBACK_MAC},
+    interfaces_admin,
+    util::IntoFidl as _,
+    DeviceIdExt as _, Netstack,
+};
 
 // Serve a stream of fuchsia.net.root.Interfaces API requests for a single
 // channel (e.g. a single client connection).
@@ -25,6 +30,12 @@ pub(crate) async fn serve_interfaces(
         match req {
             fnet_root::InterfacesRequest::GetAdmin { id, control, control_handle: _ } => {
                 handle_get_admin(&ns, id, control).await;
+            }
+            fnet_root::InterfacesRequest::GetMac { id, responder } => {
+                responder_send!(
+                    responder,
+                    handle_get_mac(&ns, id).as_ref().map(Option::as_deref).map_err(|e| *e)
+                );
             }
         }
         Ok(())
@@ -59,4 +70,19 @@ async fn handle_get_admin(
             owned_control_handle.into_control_handle().shutdown_with_epitaph(zx::Status::NOT_FOUND)
         }
     }
+}
+
+fn handle_get_mac(ns: &Netstack, interface_id: u64) -> fnet_root::InterfacesGetMacResult {
+    debug!(interface_id, "handling fuchsia.net.root.Interfaces::GetMac");
+    let ctx = ns.ctx.clone();
+    BindingId::new(interface_id)
+        .and_then(|id| ctx.non_sync_ctx.devices.get_core_id(id))
+        .ok_or(fnet_root::InterfacesGetMacError::NotFound)
+        .map(|core_id| {
+            let mac = match core_id.external_state() {
+                DeviceSpecificInfo::Loopback(_) => LOOPBACK_MAC,
+                DeviceSpecificInfo::Netdevice(info) => info.mac.into(),
+            };
+            Some(Box::new(mac.into_fidl()))
+        })
 }
