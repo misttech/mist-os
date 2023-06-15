@@ -99,11 +99,8 @@ async fn embedding_stop_api_works_for_batch_iterator() {
 }
 
 async fn initialize_topology() -> RealmInstance {
-    let (builder, test_realm) = test_topology::create(test_topology::Options {
-        archivist_url: constants::ARCHIVIST_FOR_V1_URL,
-    })
-    .await
-    .unwrap();
+    let (builder, test_realm) =
+        test_topology::create(test_topology::Options::default()).await.unwrap();
     test_topology::add_collection(&test_realm, "coll").await.unwrap();
     test_topology::expose_test_realm_protocol(&builder, &test_realm).await;
     builder.build().await.expect("create instance")

@@ -2,14 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::events::{
-    error::EventError,
-    types::{ComponentIdentifier, Moniker, UniqueKey, ValidatedSourceIdentity},
-};
+use crate::events::types::{ComponentIdentifier, Moniker, UniqueKey};
 use diagnostics_message::MonikerWithUrl;
-use fidl_fuchsia_sys_internal::SourceIdentity;
 use flyweights::FlyStr;
-use std::convert::TryFrom;
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct ComponentIdentity {
@@ -60,20 +55,6 @@ impl ComponentIdentity {
             key.push(instance_id.into())
         }
         key.into()
-    }
-}
-
-impl TryFrom<SourceIdentity> for ComponentIdentity {
-    type Error = EventError;
-    fn try_from(component: SourceIdentity) -> Result<Self, Self::Error> {
-        let component: ValidatedSourceIdentity = ValidatedSourceIdentity::try_from(component)?;
-        let mut moniker = component.realm_path;
-        moniker.push(component.component_name);
-        let id = ComponentIdentifier::Legacy {
-            moniker: moniker.into(),
-            instance_id: component.instance_id.into_boxed_str(),
-        };
-        Ok(Self::from_identifier_and_url(id, component.component_url))
     }
 }
 

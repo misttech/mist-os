@@ -8,7 +8,7 @@ use crate::{
     error::Error,
     events::{
         router::{ConsumerConfig, EventRouter, ProducerConfig, RouterOptions},
-        sources::{ComponentEventProvider, EventSource, LogConnector},
+        sources::EventSource,
         types::*,
     },
     inspect::{repository::InspectRepository, servers::*},
@@ -24,12 +24,8 @@ use archivist_config::Config;
 use fidl_fuchsia_diagnostics::ArchiveAccessorRequestStream;
 use fidl_fuchsia_diagnostics_host as fhost;
 use fidl_fuchsia_process_lifecycle::LifecycleRequestStream;
-use fidl_fuchsia_sys_internal as fsys_internal;
 use fuchsia_async as fasync;
-use fuchsia_component::{
-    client::connect_to_protocol,
-    server::{ServiceFs, ServiceObj},
-};
+use fuchsia_component::server::{ServiceFs, ServiceObj};
 use fuchsia_inspect::{component, health::Reporter};
 use fuchsia_zircon as zx;
 use futures::{
@@ -216,26 +212,6 @@ impl Archivist {
         config: &Config,
     ) -> Vec<fasync::Task<()>> {
         let mut incoming_external_event_producers = vec![];
-        if config.enable_component_event_provider {
-            match connect_to_protocol::<fsys_internal::ComponentEventProviderMarker>() {
-                Err(err) => {
-                    warn!(?err, "Failed to connect to fuchsia.sys.internal.ComponentEventProvider");
-                }
-                Ok(proxy) => {
-                    let mut component_event_provider = ComponentEventProvider::new(proxy);
-                    event_router.add_producer(ProducerConfig {
-                        producer: &mut component_event_provider,
-                        events: vec![EventType::DiagnosticsReady],
-                    });
-                    incoming_external_event_producers.push(fasync::Task::spawn(async move {
-                        component_event_provider.spawn().await.unwrap_or_else(|err| {
-                            warn!(?err, "Failed to run component event provider loop");
-                        });
-                    }));
-                }
-            };
-        }
-
         if config.enable_event_source {
             match EventSource::new("/events/log_sink_requested_event_stream").await {
                 Err(err) => warn!(?err, "Failed to create event source for log sink requests"),
@@ -279,26 +255,6 @@ impl Archivist {
                     incoming_external_event_producers.push(fasync::Task::spawn(async move {
                         // This should never exit.
                         let _ = event_source.spawn().await;
-                    }));
-                }
-            }
-        }
-
-        if config.enable_log_connector {
-            match connect_to_protocol::<fsys_internal::LogConnectorMarker>() {
-                Err(err) => {
-                    warn!(?err, "Failed to connect to fuchsia.sys.internal.LogConnector");
-                }
-                Ok(proxy) => {
-                    let mut connector = LogConnector::new(proxy);
-                    event_router.add_producer(ProducerConfig {
-                        producer: &mut connector,
-                        events: vec![EventType::LogSinkRequested],
-                    });
-                    incoming_external_event_producers.push(fasync::Task::spawn(async move {
-                        connector.spawn().await.unwrap_or_else(|err| {
-                            warn!(?err, "Failed to run event source producer loop");
-                        });
                     }));
                 }
             }
@@ -452,10 +408,8 @@ mod tests {
 
     async fn init_archivist(fs: &mut ServiceFs<ServiceObj<'static, ()>>) -> Archivist {
         let config = Config {
-            enable_component_event_provider: false,
             enable_klog: false,
             enable_event_source: false,
-            enable_log_connector: false,
             log_to_debuglog: false,
             maximum_concurrent_snapshots_per_reader: 4,
             logs_max_cached_original_bytes: LEGACY_DEFAULT_MAXIMUM_CACHED_LOGS_BYTES,

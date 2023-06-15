@@ -18,7 +18,6 @@ rustc_test("integration_tests_bin") {
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
-    "//sdk/fidl/fuchsia.sys.internal:fuchsia.sys.internal_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//src/diagnostics/archivist:lib",
     "//src/lib/diagnostics/data/rust",
@@ -59,7 +58,6 @@ rustc_test("integration_tests_bin") {
     "src/logs/attribution.rs",
     "src/logs/basic.rs",
     "src/logs/budget.rs",
-    "src/logs/connector.rs",
     "src/logs/crash.rs",
     "src/logs/interest.rs",
     "src/logs/lifecycle.rs",
@@ -82,17 +80,6 @@ rustc_test("integration_tests_bin") {
     "test_data/unified_reader_single_value_golden.json",
     "test_data/pipeline_reader_single_value_golden.json",
   ]
-}
-
-fuchsia_component_manifest("for-v1-manifest") {
-  manifest = "meta/archivist_for_integration_for_v1.cml"
-  component_name = "archivist_for_v1"
-}
-
-fuchsia_component("archivist-for-integration-for-v1") {
-  cm_label = ":for-v1-manifest"
-  testonly = true
-  deps = [ "//src/diagnostics/archivist:bin" ]
 }
 
 fuchsia_component_manifest("with-klog-manifest") {
@@ -193,11 +180,6 @@ fuchsia_structured_config_values("archivist-with-klog-config") {
   values = with_klog_config
 }
 
-fuchsia_structured_config_values("archivist-for-v1-config") {
-  cm_label = ":for-v1-manifest"
-  values = for_v1_config
-}
-
 fuchsia_structured_config_values("archivist-with-feedback-filtering-config") {
   cm_label = ":with-feedback-filtering-manifest"
   values = with_feedback_filtering
@@ -248,8 +230,6 @@ fuchsia_test_package("archivist-integration-tests") {
   deps = [
     ":archivist-for-integration",
     ":archivist-for-integration-config",
-    ":archivist-for-integration-for-v1",
-    ":archivist-for-v1-config",
     ":archivist-with-feedback-filtering",
     ":archivist-with-feedback-filtering-config",
     ":archivist-with-feedback-filtering-disabled",

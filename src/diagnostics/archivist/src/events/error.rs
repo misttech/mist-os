@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::events::types::{Event, SourceIdentityValidationError};
+use crate::events::types::Event;
 use fidl_fuchsia_component as fcomponent;
 use futures::channel::mpsc;
 use thiserror::Error;
@@ -20,9 +20,6 @@ pub enum EventError {
 
     #[error("missing diagnostics directory in DirectoryReady payload")]
     MissingDiagnosticsDir,
-
-    #[error(transparent)]
-    SourceIdentityValidationFailed(#[from] SourceIdentityValidationError),
 
     #[error("missing `{0}`")]
     MissingField(&'static str),

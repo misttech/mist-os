@@ -38,8 +38,3 @@ with_feedback_filtering_disabled = {
   forward_variables_from(archivist_for_integration_config, "*")
   pipelines_path = "/pkg/data/config/pipelines/feedback_filtering_disabled"
 }
-
-for_v1_config = {
-  forward_variables_from(archivist_for_integration_config, "*")
-  enable_log_connector = true
-}

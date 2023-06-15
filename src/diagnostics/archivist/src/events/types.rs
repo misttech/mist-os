@@ -12,7 +12,6 @@ use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_inspect as finspect;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_logger as flogger;
-use fidl_fuchsia_sys_internal::SourceIdentity;
 use fidl_table_validation::ValidFidlTable;
 use flyweights::FlyStr;
 use fuchsia_zircon as zx;
@@ -265,15 +264,6 @@ impl ComponentIdentifier {
 
         Ok(ComponentIdentifier::Moniker(segments))
     }
-}
-
-#[derive(Debug, Clone, ValidFidlTable, PartialEq)]
-#[fidl_table_src(SourceIdentity)]
-pub struct ValidatedSourceIdentity {
-    pub realm_path: Vec<String>,
-    pub component_url: String,
-    pub component_name: String,
-    pub instance_id: String,
 }
 
 #[derive(Debug, ValidFidlTable)]

@@ -5,17 +5,11 @@
 // LINT.IfChange
 {
     config: {
-        // Ingest events coming from CFv1.
-        enable_component_event_provider: { type: "bool" },
-
         // Drain klog.
         enable_klog: { type: "bool" },
 
         // Ingest events coming from CFv2.
         enable_event_source: { type: "bool" },
-
-        // Ingest attributed log connections coming from CFv1.
-        enable_log_connector: { type: "bool" },
 
         // Send archivist logs to klog.
         log_to_debuglog: { type: "bool" },

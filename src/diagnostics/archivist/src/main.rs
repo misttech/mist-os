@@ -47,9 +47,7 @@ async fn async_main(config: Config) -> Result<(), Error> {
         .root()
         .record_child("config", |config_node| config.record_inspect(config_node));
 
-    let router_options = RouterOptions {
-        validate: config.enable_event_source || config.enable_component_event_provider,
-    };
+    let router_options = RouterOptions { validate: config.enable_event_source };
     let mut archivist = Archivist::new(config).await;
     archivist.set_lifecycle_request_stream(component_lifecycle::take_lifecycle_request_stream());
     debug!("Archivist initialized from configuration.");

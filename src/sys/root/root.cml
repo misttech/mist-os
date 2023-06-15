@@ -226,11 +226,7 @@
             availability: "same_as_target",
         },
         {
-            protocol: [
-                "fuchsia.memorypressure.Provider",
-                "fuchsia.sys.internal.ComponentEventProvider",
-                "fuchsia.sys.internal.LogConnector",
-            ],
+            protocol: [ "fuchsia.memorypressure.Provider" ],
             from: "#core",
             to: "#bootstrap",
             dependency: "weak",

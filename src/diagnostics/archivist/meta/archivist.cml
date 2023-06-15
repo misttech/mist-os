@@ -36,13 +36,6 @@
             availability: "optional",
         },
         {
-            protocol: [
-                "fuchsia.sys.internal.ComponentEventProvider",
-                "fuchsia.sys.internal.LogConnector",
-            ],
-            availability: "optional",
-        },
-        {
             directory: "config-data",
             rights: [ "r*" ],
             path: "/config/data",

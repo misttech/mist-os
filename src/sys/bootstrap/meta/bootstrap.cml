@@ -1052,18 +1052,6 @@
             availability: "same_as_target",
         },
 
-        // Optional services from appmgr
-        {
-            protocol: [
-                "fuchsia.sys.internal.ComponentEventProvider",
-                "fuchsia.sys.internal.LogConnector",
-            ],
-            from: "parent",
-            to: "#archivist",
-            dependency: "weak_for_migration",
-            availability: "optional",
-        },
-
         // Configuration
         {
             directory: "boot",

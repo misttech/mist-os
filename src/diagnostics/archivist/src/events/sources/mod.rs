@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub use crate::events::sources::{event_source::*, legacy::*, log_connector::*};
+pub use crate::events::sources::event_source::*;
 
 mod event_source;
-mod legacy;
-mod log_connector;
