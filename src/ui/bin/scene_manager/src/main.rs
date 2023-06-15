@@ -289,8 +289,7 @@ async fn inner_main() -> Result<(), Error> {
     let inspect_node = inspector.root().create_child("input_pipeline");
 
     // Start input pipeline.
-    let Config { idle_threshold_minutes, supported_input_devices } =
-        Config::take_from_startup_handle();
+    let Config { supported_input_devices } = Config::take_from_startup_handle();
     let has_light_sensor_configuration = light_sensor_configuration.is_some();
     if let Ok(input_pipeline) = input_pipeline::handle_input(
         use_flatland,
@@ -320,8 +319,9 @@ async fn inner_main() -> Result<(), Error> {
     };
 
     // Create Activity Manager.
+    const DEFAULT_IDLE_THRESHOLD_MINUTES: i64 = 15;
     let activity_manager =
-        ActivityManager::new(zx::Duration::from_minutes(idle_threshold_minutes as i64));
+        ActivityManager::new(zx::Duration::from_minutes(DEFAULT_IDLE_THRESHOLD_MINUTES));
 
     // Create and register a ColorTransformManager.
     let color_converter = connect_to_protocol::<color::ConverterMarker>()?;

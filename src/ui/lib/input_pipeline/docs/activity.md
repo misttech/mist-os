@@ -83,42 +83,6 @@ while let Some(Ok(state)) = watch_activity_state_stream.next().await {
 }
 ```
 
-## Configuring the idle transition threshold with product assembly
-
-The activity service uses structured configuration by declaring a `config`
-value in a component manifest, such as in
-`//src/ui/bin/scene_manager/meta/scene_manager.cml`:
-
-```
-config: {
-    idle_threshold_minutes: { type: "int64" },
-},
-```
-
-This value can also be set in product assembly via the following
-configuration schema:
-
-```
-product_assembly_configuration("my_product") {
-  platform = {
-    input = {
-      idle_threshold_minutes = 15
-    }
-  }
-}
-```
-
-It can also be set to a default value such as for testing:
-
-```
-fuchsia_structured_config_values("test_config") {
-  cm_label = ":manifest"
-  values = {
-    idle_threshold_minutes = 2
-  }
-}
-```
-
 ## Integration with Scene Manager
 
 As there are no current use cases for the activity service, integration of the ActivityManager via the Scene Manager component has been removed. This means that `fuchsia.input.interaction.observation.Aggregator` and `fuchsia.input.interaction.Notifier` are not actively being served on any product configurations. If you have a use case for this library, please contact OWNERS.

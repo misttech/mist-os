@@ -80,7 +80,6 @@
         },
     ],
     config: {
-        idle_threshold_minutes: { type: "uint64" },
         supported_input_devices: {
             type: "vector",
             element: {

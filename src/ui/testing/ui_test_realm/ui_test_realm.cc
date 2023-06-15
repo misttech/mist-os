@@ -365,11 +365,6 @@ void UITestRealm::ConfigureSceneOwner() {
   realm_builder_.RouteReadOnlyDirectory("sensor-config", std::move(targets),
                                         std::move(input_config_directory_contents));
 
-  // Configure Activity Service in Scene Manager.
-  realm_builder_.InitMutableConfigFromPackage(kSceneManagerName);
-  realm_builder_.SetConfigValue(kSceneManagerName, "idle_threshold_minutes",
-                                ConfigValue::Uint64(config_.idle_threshold_minutes));
-
   // Configure scene provider, which will only be present in the test realm if
   // the client specifies a scene owner. Note: scene-provider has more config
   // fields than we set here, load the defaults.

@@ -12,16 +12,8 @@ impl DefineSubsystemConfiguration<PlatformInputConfig> for InputSubsystemConfig 
         input_config: &PlatformInputConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        // Configure the input interaction activity service.
-        const DEFAULT_IDLE_THRESHOLD_MINUTES: u64 = 15;
         let mut scene_manager_config =
             builder.package("scene_manager").component("meta/scene_manager.cm")?;
-
-        // Configure the idle threshold
-        scene_manager_config.field(
-            "idle_threshold_minutes",
-            input_config.idle_threshold_minutes.unwrap_or(DEFAULT_IDLE_THRESHOLD_MINUTES),
-        )?;
 
         // Configure the supported input devices. Default to an empty list.
         scene_manager_config.field(

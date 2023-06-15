@@ -12,14 +12,17 @@ product.
 ## Structured configuration
 
 This component can be configured during product assembly via the following
-configuration schema to define a specific idleness threshold for
-[activity recency detection](../../lib/input_pipeline/docs/activity.md):
+configuration schema to define a set of supported input devices, which is in turn
+used to determine which input handlers to assemble in the input pipeline instance:
 
 ```
 product_assembly_configuration("my_product") {
   platform = {
     input = {
-      idle_threshold_minutes = 15
+      supported_input_devices = [
+        "button",
+        "touchscreen",
+      ]
     }
   }
 }
@@ -31,7 +34,13 @@ The `component-for-test` target also sets a default value for testing:
 fuchsia_structured_config_values("test_config") {
   cm_label = ":manifest"
   values = {
-    idle_threshold_minutes = 2
+    supported_input_devices = [
+      "button",
+      "keyboard",
+      "lightsensor",
+      "mouse",
+      "touchscreen",
+    ]
   }
 }
 ```

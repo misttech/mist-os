@@ -27,3 +27,55 @@ making progress. Such programs can
 The library provides a [client shard](../meta/client.shard.cml) to ensure
 proper routing is available. This shard can be included in the integrating
 component's manifest file.
+
+## Structured Configuration
+
+The input pipeline uses structured configuration by declaring a `config`
+value in the integrating component's manifest, such as in
+`//src/ui/bin/scene_manager/meta/scene_manager.cml`:
+
+```
+config: {
+    supported_input_devices: {
+        type: "vector",
+        element: {
+            type: "string",
+            max_size: 12,
+        },
+        max_count: 6,
+    },
+},
+```
+
+This value can also be set in product assembly via the following
+configuration schema:
+
+```
+product_assembly_configuration("my_product") {
+  platform = {
+    input = {
+      supported_input_devices = [
+        "button",
+        "touchscreen",
+      ]
+    }
+  }
+}
+```
+
+It can also be set to a default value such as for testing:
+
+```
+fuchsia_structured_config_values("test_config") {
+  cm_label = ":manifest"
+  values = {
+    supported_input_devices = [
+      "button",
+      "keyboard",
+      "lightsensor",
+      "mouse",
+      "touchscreen",
+    ]
+  }
+}
+```

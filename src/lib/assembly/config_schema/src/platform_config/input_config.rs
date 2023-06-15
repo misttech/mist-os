@@ -9,11 +9,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformInputConfig {
-    /// The idle threshold is how much time has passed since the last user
-    /// input activity for the system to become idle.
-    #[serde(default)]
-    pub idle_threshold_minutes: Option<u64>,
-
     /// The relevant input device bindings from which to install appropriate
     /// input handlers. Default to an empty set.
     #[serde(default)]
