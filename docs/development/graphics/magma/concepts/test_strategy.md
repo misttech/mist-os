@@ -9,8 +9,8 @@ Four major interfaces
 
 * [Vulkan](https://www.khronos.org/vulkan)
 * [magma](/sdk/lib/magma_client/include/lib/magma/magma.h)
-* [magma system](/src/graphics/lib/magma/src/magma_util/platform/platform_connection.h)
-* [msd](/src/graphics/lib/magma/include/msd/msd.h)
+* [magma FIDL](/sdk/fidl/fuchsia.gpu.magma/magma.fidl)
+* [msd](/src/graphics/lib/magma/include/msd/msd_cc.h)
 
 Four major components
 

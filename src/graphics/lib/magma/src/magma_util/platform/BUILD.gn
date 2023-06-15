@@ -202,31 +202,6 @@ source_set("connection_client") {
   }
 }
 
-source_set("connection_header") {
-  public_configs = [ ":platform_include_config" ]
-
-  sources = [ "platform_connection.h" ]
-
-  public_deps = [
-    ":buffer",
-    ":event",
-    ":object",
-    ":semaphore",
-    ":thread",
-    "$magma_build_root/src/magma_util:macros",
-    "//src/graphics/lib/magma/include:magma",
-    "//src/graphics/lib/magma/include:msd",
-  ]
-}
-
-source_set("connection") {
-  public_deps = [ ":connection_header" ]
-
-  if (is_fuchsia) {
-    deps = [ "zircon:connection" ]
-  }
-}
-
 source_set("device_client_header") {
   public_configs = [ ":platform_include_config" ]
 

@@ -21,7 +21,6 @@
 #include "magma_util/short_macros.h"
 #include "magma_util/thread.h"
 #include "mali_register_io.h"
-#include "msd.h"
 #include "msd_cc.h"
 #include "msd_defs.h"
 #include "parent_device.h"

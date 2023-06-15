@@ -357,7 +357,7 @@ the system driver using the Zircon DDK.
 [allowlist]: /src/graphics/lib/magma/gnbuild/imported_symbols.allowlist
 [magma_pdev_entry]: /src/graphics/lib/magma/src/magma_util/platform/zircon/driver_entry.gni
 [vmo]: /docs/reference/kernel_objects/vm_object.md
-[msdheader]: /src/graphics/lib/magma/include/msd/msd.h
+[msdheader]: /src/graphics/lib/magma/include/msd/msd_cc.h
 [magmaheader]: /sdk/lib/magma_client/include/lib/magma/magma.h
 [l0]: /docs/development/graphics/magma/concepts/contributing.md#l0
 [l1]: /docs/development/graphics/magma/concepts/contributing.md#l1

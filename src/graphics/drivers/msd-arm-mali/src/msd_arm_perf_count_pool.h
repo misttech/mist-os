@@ -12,7 +12,7 @@
 #include <vector>
 
 #include "magma_util/short_macros.h"
-#include "msd.h"
+#include "msd_defs.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_buffer.h"
 #include "src/graphics/drivers/msd-arm-mali/src/performance_counters.h"
 

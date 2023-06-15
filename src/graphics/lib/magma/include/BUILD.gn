@@ -26,8 +26,6 @@ source_set("msd_defs") {
 }
 
 source_set("msd") {
-  sources = [ "msd/msd.h" ]
-
   public_deps = [
     ":magma_common",
     ":msd_defs",

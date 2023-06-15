@@ -91,7 +91,6 @@ source_set("magma_platform_tests") {
   testonly = true
   sources = [
     "test_platform_buffer.cc",
-    "test_platform_connection.cc",
     "test_platform_event.cc",
     "test_platform_handle.cc",
     "test_platform_logger.cc",
@@ -104,7 +103,6 @@ source_set("magma_platform_tests") {
   ]
   deps = [
     "$magma_build_root/src/magma_util:short_macros",
-    "$magma_build_root/src/magma_util/platform:connection",
     "$magma_build_root/src/magma_util/platform:connection_client",
     "$magma_build_root/src/magma_util/platform:event",
     "$magma_build_root/src/magma_util/platform:handle",
@@ -122,9 +120,6 @@ source_set("magma_platform_tests") {
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/zx",
   ]
-  if (is_fuchsia) {
-    deps += [ "$magma_build_root/src/magma_util/platform/zircon:connection" ]
-  }
 }
 
 source_set("platform_bus_mapper_cases") {
