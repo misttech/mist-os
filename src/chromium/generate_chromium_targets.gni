@@ -266,7 +266,7 @@ if (is_host) {
       }
     }
   }
-} else if (target_cpu == "riscv64") {
+} else if (current_cpu == "riscv64") {
   # The real generate_test_targets() definition below fails at `gn gen` time
   # because prebuilt_test_manifest() uses read_file() to parse a manifest
   # file that does not exist for riscv64 yet.
