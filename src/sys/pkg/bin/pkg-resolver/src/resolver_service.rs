@@ -6,7 +6,7 @@ use {
     crate::{
         cache::{
             BasePackageIndex, BlobFetcher, CacheError::*, MerkleForError, MerkleForError::*,
-            ToResolveError as _, ToResolveStatus as _,
+            ToResolveError, ToResolveStatus as _,
         },
         eager_package_manager::EagerPackageManager,
         repository_manager::RepositoryManager,
@@ -223,7 +223,7 @@ impl QueuedResolver {
         // Base pin.
         let package_inspect = self.inspect.resolve(&pkg_url);
         if let Some(blob) = self.base_package_index.is_unpinned_base_package(&pkg_url) {
-            let dir = self.cache.open(blob).await.map_err(|e| {
+            let dir = self.cache.get_already_cached(blob).await.map_err(|e| {
                 let error = e.to_resolve_error();
                 error!("failed to open base package url {:?}: {:#}", pkg_url, anyhow!(e));
                 error
@@ -309,7 +309,7 @@ impl QueuedResolver {
         tuf_error: &GetPackageError,
         pkg_url: &AbsolutePackageUrl,
         rewritten_url: &AbsolutePackageUrl,
-    ) -> Result<Option<(BlobId, PackageDirectory)>, fidl_fuchsia_pkg_ext::cache::OpenError> {
+    ) -> Result<Option<(BlobId, PackageDirectory)>, pkg::cache::GetAlreadyCachedError> {
         match tuf_error {
             Cache(MerkleFor(TargetNotFound(_))) => {
                 // If we can get metadata but the repo doesn't know about the package,
@@ -322,7 +322,9 @@ impl QueuedResolver {
                     &self.system_cache_list,
                     &self.inspect,
                 ) {
-                    Some(hash) => self.cache.open(hash).await.map(|pkg| Some((hash, pkg))),
+                    Some(hash) => {
+                        self.cache.get_already_cached(hash).await.map(|pkg| Some((hash, pkg)))
+                    }
                     None => Ok(None),
                 }
             }
@@ -339,7 +341,9 @@ impl QueuedResolver {
                 // cache packages manifest obtained from pkg-cache.
                 // The manifest pkg URLs are for fuchsia.com, so do not use the rewritten URL.
                 match hash_from_cache_packages_manifest(pkg_url, &self.system_cache_list) {
-                    Some(hash) => self.cache.open(hash).await.map(|pkg| Some((hash, pkg))),
+                    Some(hash) => {
+                        self.cache.get_already_cached(hash).await.map(|pkg| Some((hash, pkg)))
+                    }
                     None => Ok(None),
                 }
             }

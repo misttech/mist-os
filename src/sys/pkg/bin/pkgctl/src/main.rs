@@ -16,13 +16,7 @@ use {
     crate::v1repoconf::{validate_host, SourceConfig},
     anyhow::{bail, format_err, Context as _},
     fidl_fuchsia_net_http::{self as http},
-    fidl_fuchsia_pkg::{
-        self as fpkg, PackageCacheMarker, PackageResolverMarker, PackageUrl,
-        RepositoryManagerMarker, RepositoryManagerProxy,
-    },
-    fidl_fuchsia_pkg_ext::{
-        BlobId, RepositoryConfig, RepositoryConfigBuilder, RepositoryStorageType,
-    },
+    fidl_fuchsia_pkg as fpkg, fidl_fuchsia_pkg_ext as pkg,
     fidl_fuchsia_pkg_rewrite::EngineMarker,
     fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule as RewriteRule, RuleConfig},
     fidl_fuchsia_space::ManagerMarker as SpaceManagerMarker,
@@ -53,7 +47,7 @@ pub fn main() -> Result<(), anyhow::Error> {
 async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
     match command {
         Command::Resolve(ResolveCommand { pkg_url, verbose }) => {
-            let resolver = connect_to_protocol::<PackageResolverMarker>()
+            let resolver = connect_to_protocol::<fpkg::PackageResolverMarker>()
                 .context("Failed to connect to resolver service")?;
             println!("resolving {pkg_url}");
 
@@ -77,19 +71,23 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
             Ok(0)
         }
         Command::GetHash(GetHashCommand { pkg_url }) => {
-            let resolver = connect_to_protocol::<fidl_fuchsia_pkg::PackageResolverMarker>()
+            let resolver = connect_to_protocol::<fpkg::PackageResolverMarker>()
                 .context("Failed to connect to resolver service")?;
-            let blob_id = resolver.get_hash(&PackageUrl { url: pkg_url }).await?.map_err(|i| {
-                format_err!("Failed to get package hash with error: {}", zx::Status::from_raw(i))
-            })?;
-            println!("{}", BlobId::from(blob_id));
+            let blob_id =
+                resolver.get_hash(&fpkg::PackageUrl { url: pkg_url }).await?.map_err(|i| {
+                    format_err!(
+                        "Failed to get package hash with error: {}",
+                        zx::Status::from_raw(i)
+                    )
+                })?;
+            println!("{}", pkg::BlobId::from(blob_id));
             Ok(0)
         }
         Command::PkgStatus(PkgStatusCommand { pkg_url }) => {
-            let resolver = connect_to_protocol::<fidl_fuchsia_pkg::PackageResolverMarker>()
+            let resolver = connect_to_protocol::<fpkg::PackageResolverMarker>()
                 .context("Failed to connect to resolver service")?;
-            let blob_id = match resolver.get_hash(&PackageUrl { url: pkg_url }).await? {
-                Ok(blob_id) => blob_id,
+            let blob_id = match resolver.get_hash(&fpkg::PackageUrl { url: pkg_url }).await? {
+                Ok(blob_id) => pkg::BlobId::from(blob_id),
                 Err(status) => match zx::Status::from_raw(status) {
                     zx::Status::NOT_FOUND => {
                         println!("Package in registered TUF repo: no");
@@ -103,39 +101,37 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
                     }
                 },
             };
-            println!("Package in registered TUF repo: yes (merkle={})", BlobId::from(blob_id));
+            println!("Package in registered TUF repo: yes (merkle={blob_id})");
 
-            let cache = connect_to_protocol::<PackageCacheMarker>()
-                .context("Failed to connect to cache service")?;
-            let (_, dir_server_end) = fidl::endpoints::create_proxy()?;
-            let res = cache.open(&blob_id, dir_server_end).await?;
-            match res.map_err(zx::Status::from_raw) {
+            let cache = pkg::cache::Client::from_proxy(
+                connect_to_protocol::<fpkg::PackageCacheMarker>()
+                    .context("Failed to connect to cache service")?,
+            );
+
+            match cache.get_already_cached(blob_id).await {
                 Ok(_) => {}
-                Err(zx::Status::NOT_FOUND) => {
+                Err(e) if e.was_not_cached() => {
                     println!("Package on disk: no");
                     return Ok(2);
                 }
-                Err(other_failure_status) => {
-                    bail!("Cannot determine pkg status. Failed fuchsia.pkg.PackageCache.Open with unexpected status: {:?}",
-                      other_failure_status
-                          );
+                Err(e) => {
+                    bail!(
+                        "Cannot determine pkg status. Failed fuchsia.pkg.PackageCache.Get: {:?}",
+                        e
+                    );
                 }
-            };
+            }
             println!("Package on disk: yes");
             Ok(0)
         }
         Command::Open(OpenCommand { meta_far_blob_id }) => {
-            let cache = connect_to_protocol::<PackageCacheMarker>()
-                .context("Failed to connect to cache service")?;
+            let cache = pkg::cache::Client::from_proxy(
+                connect_to_protocol::<fpkg::PackageCacheMarker>()
+                    .context("Failed to connect to cache service")?,
+            );
             println!("opening {meta_far_blob_id}");
 
-            let (dir, dir_server_end) = fidl::endpoints::create_proxy()?;
-
-            let () = cache
-                .open(&meta_far_blob_id.into(), dir_server_end)
-                .await?
-                .map_err(zx::Status::from_raw)?;
-
+            let dir = cache.get_already_cached(meta_far_blob_id).await?.into_proxy();
             let entries = fuchsia_fs::directory::readdir_recursive(&dir, /*timeout=*/ None)
                 .try_collect::<Vec<_>>()
                 .await?;
@@ -147,7 +143,7 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
             Ok(0)
         }
         Command::Repo(RepoCommand { verbose, subcommand }) => {
-            let repo_manager = connect_to_protocol::<RepositoryManagerMarker>()
+            let repo_manager = connect_to_protocol::<fpkg::RepositoryManagerMarker>()
                 .context("Failed to connect to resolver service")?;
 
             match subcommand {
@@ -189,28 +185,30 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
                                     }
                                     if persist {
                                         repo.set_repo_storage_type(
-                                            RepositoryStorageType::Persistent,
+                                            pkg::RepositoryStorageType::Persistent,
                                         );
                                     }
 
                                     repo_manager.add(&repo.into()).await?
                                 }
                                 RepoConfigFormat::Version2 => {
-                                    let mut repo: RepositoryConfig = serde_json::from_reader(
+                                    let mut repo: pkg::RepositoryConfig = serde_json::from_reader(
                                         io::BufReader::new(File::open(file)?),
                                     )?;
                                     // If a name is specified via the command line, override the
                                     // automatically derived name.
                                     if let Some(n) = name {
-                                        repo = RepositoryConfigBuilder::from(repo)
+                                        repo = pkg::RepositoryConfigBuilder::from(repo)
                                             .repo_url(RepositoryUrl::parse_host(n)?)
                                             .build();
                                     }
                                     // The storage type can be overridden to persistent via the
                                     // command line.
                                     if persist {
-                                        repo = RepositoryConfigBuilder::from(repo)
-                                            .repo_storage_type(RepositoryStorageType::Persistent)
+                                        repo = pkg::RepositoryConfigBuilder::from(repo)
+                                            .repo_storage_type(
+                                                pkg::RepositoryStorageType::Persistent,
+                                            )
                                             .build();
                                     }
 
@@ -238,26 +236,29 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
                                     }
                                     if persist {
                                         repo.set_repo_storage_type(
-                                            RepositoryStorageType::Persistent,
+                                            pkg::RepositoryStorageType::Persistent,
                                         );
                                     }
 
                                     repo_manager.add(&repo.into()).await?
                                 }
                                 RepoConfigFormat::Version2 => {
-                                    let mut repo: RepositoryConfig = serde_json::from_slice(&res)?;
+                                    let mut repo: pkg::RepositoryConfig =
+                                        serde_json::from_slice(&res)?;
                                     // If a name is specified via the command line, override the
                                     // automatically derived name.
                                     if let Some(n) = name {
-                                        repo = RepositoryConfigBuilder::from(repo)
+                                        repo = pkg::RepositoryConfigBuilder::from(repo)
                                             .repo_url(RepositoryUrl::parse_host(n)?)
                                             .build();
                                     }
                                     // The storage type can be overridden to persistent via the
                                     // command line.
                                     if persist {
-                                        repo = RepositoryConfigBuilder::from(repo)
-                                            .repo_storage_type(RepositoryStorageType::Persistent)
+                                        repo = pkg::RepositoryConfigBuilder::from(repo)
+                                            .repo_storage_type(
+                                                pkg::RepositoryStorageType::Persistent,
+                                            )
                                             .build();
                                     }
 
@@ -387,8 +388,8 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
 }
 
 async fn fetch_repos(
-    repo_manager: RepositoryManagerProxy,
-) -> Result<Vec<RepositoryConfig>, anyhow::Error> {
+    repo_manager: fpkg::RepositoryManagerProxy,
+) -> Result<Vec<pkg::RepositoryConfig>, anyhow::Error> {
     let (iter, server_end) = fidl::endpoints::create_proxy()?;
     repo_manager.list(server_end)?;
     let mut repos = vec![];
@@ -403,7 +404,7 @@ async fn fetch_repos(
 
     repos
         .into_iter()
-        .map(|repo| RepositoryConfig::try_from(repo).map_err(anyhow::Error::from))
+        .map(|repo| pkg::RepositoryConfig::try_from(repo).map_err(anyhow::Error::from))
         .collect()
 }
 

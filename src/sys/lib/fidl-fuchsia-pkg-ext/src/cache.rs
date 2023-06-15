@@ -35,21 +35,6 @@ impl Client {
         &self.proxy
     }
 
-    /// Opens the package specified by `meta_far_blob` if it exists.
-    pub async fn open(&self, meta_far_blob: BlobId) -> Result<PackageDirectory, OpenError> {
-        let (pkg_dir, pkg_dir_server_end) = PackageDirectory::create_request()?;
-
-        let () =
-            self.proxy.open(&meta_far_blob.into(), pkg_dir_server_end).await?.map_err(|s| {
-                match Status::from_raw(s) {
-                    Status::NOT_FOUND => OpenError::NotFound,
-                    s => OpenError::UnexpectedResponse(s),
-                }
-            })?;
-
-        Ok(pkg_dir)
-    }
-
     /// Opens the package specified by `meta_far_blob` with the intent to fetch any missing blobs
     /// using the returned [`Get`] type if needed.
     pub fn get(&self, meta_far_blob: BlobInfo) -> Result<Get, fidl::Error> {
@@ -74,8 +59,6 @@ impl Client {
 
     /// Uses PackageCache.Get to obtain the package directory of a package that is already cached
     /// (all blobs are already in blobfs).
-    /// Like `self.open` except it works for packages that are neither in base nor active in the
-    /// dynamic index.
     /// Errors if the package is not already cached.
     pub async fn get_already_cached(
         &self,
@@ -125,6 +108,17 @@ pub enum GetAlreadyCachedError {
 
     #[error("finishing get")]
     FinishGet(#[source] GetError),
+}
+
+impl GetAlreadyCachedError {
+    /// Returns true if the get failed because the package was not cached.
+    pub fn was_not_cached(&self) -> bool {
+        use GetAlreadyCachedError::*;
+        match self {
+            Get(..) | OpenMetaBlob(..) | GetMissingBlobs(..) | FinishGet(..) => false,
+            MissingMetaFar | MissingContentBlobs(..) => true,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -683,8 +677,8 @@ mod tests {
     use fidl::endpoints::{ClientEnd, ControlHandle as _, RequestStream as _};
     use fidl_fuchsia_pkg::{
         BlobInfoIteratorRequest, NeededBlobsRequest, NeededBlobsRequestStream,
-        PackageCacheGetResponder, PackageCacheMarker, PackageCacheOpenResponder,
-        PackageCacheRequest, PackageCacheRequestStream,
+        PackageCacheGetResponder, PackageCacheMarker, PackageCacheRequest,
+        PackageCacheRequestStream,
     };
 
     struct MockPackageCache {
@@ -696,18 +690,6 @@ mod tests {
             let (proxy, stream) =
                 fidl::endpoints::create_proxy_and_stream::<PackageCacheMarker>().unwrap();
             (Client::from_proxy(proxy), Self { stream })
-        }
-
-        async fn expect_open(&mut self, blob_id: BlobId) -> PendingOpen {
-            match self.stream.next().await {
-                Some(Ok(PackageCacheRequest::Open { meta_far_blob_id, dir, responder })) => {
-                    assert_eq!(BlobId::from(meta_far_blob_id), blob_id);
-                    let dir = dir.into_stream().unwrap();
-
-                    PendingOpen { dir, responder }
-                }
-                r => panic!("Unexpected request: {:?}", r),
-            }
         }
 
         async fn expect_get(&mut self, blob_info: BlobInfo) -> PendingGet {
@@ -730,21 +712,6 @@ mod tests {
 
         async fn expect_closed(mut self) {
             assert_matches!(self.stream.next().await, None);
-        }
-    }
-
-    struct PendingOpen {
-        dir: fio::DirectoryRequestStream,
-        responder: PackageCacheOpenResponder,
-    }
-
-    impl PendingOpen {
-        fn succeed(self) -> PackageDirProvider {
-            self.responder.send(Ok(())).unwrap();
-            PackageDirProvider { stream: self.dir }
-        }
-        fn fail_not_found(self) {
-            self.responder.send(Err(Status::NOT_FOUND.into_raw())).unwrap();
         }
     }
 
@@ -922,43 +889,6 @@ mod tests {
 
         drop(stream);
         assert_matches!(client.proxy().sync().await, Err(_));
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn open_present_package() {
-        let (client, mut server) = MockPackageCache::new();
-
-        let ((), ()) = future::join(
-            async {
-                server.expect_open(blob_id(0)).await.succeed().close_pkg_dir();
-                server.expect_closed().await;
-            },
-            async move {
-                let pkg_dir = client.open(blob_id(0)).await.unwrap();
-
-                assert_matches!(
-                    pkg_dir.into_proxy().take_event_stream().next().await,
-                    Some(Err(fidl::Error::ClientChannelClosed { status: Status::NOT_EMPTY, .. }))
-                );
-            },
-        )
-        .await;
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn open_missing_package() {
-        let (client, mut server) = MockPackageCache::new();
-
-        let ((), ()) = future::join(
-            async {
-                server.expect_open(blob_id(1)).await.fail_not_found();
-                server.expect_closed().await;
-            },
-            async move {
-                assert_matches!(client.open(blob_id(1)).await, Err(OpenError::NotFound));
-            },
-        )
-        .await;
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

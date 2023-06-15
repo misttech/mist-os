@@ -9,8 +9,8 @@ use {
     cobalt_client::traits::AsEventCodes,
     cobalt_sw_delivery_registry as metrics,
     fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload},
+    fidl_fuchsia_pkg_ext as fpkg_ext,
     fuchsia_pkg_testing::SystemImageBuilder,
-    fuchsia_zircon as zx,
 };
 
 async fn assert_count_events(
@@ -47,16 +47,16 @@ async fn assert_count_events(
 async fn pkg_cache_open_failure() {
     let env = TestEnv::builder().build().await;
 
-    assert_eq!(
-        env.open_package("0000000000000000000000000000000000000000000000000000000000000000")
+    assert_matches!(
+        env.get_already_cached("0000000000000000000000000000000000000000000000000000000000000000")
             .await
             .map(|_| ()),
-        Err(zx::Status::NOT_FOUND)
+        Err(fpkg_ext::cache::GetAlreadyCachedError::MissingMetaFar)
     );
     assert_count_events(
         &env,
         metrics::PKG_CACHE_OPEN_MIGRATED_METRIC_ID,
-        vec![metrics::PkgCacheOpenMigratedMetricDimensionResult::NotFound],
+        vec![metrics::PkgCacheOpenMigratedMetricDimensionResult::Io],
     )
     .await;
 }
@@ -64,16 +64,14 @@ async fn pkg_cache_open_failure() {
 #[fuchsia::test]
 async fn pkg_cache_open_success() {
     let system_image_package = SystemImageBuilder::new().build().await;
-
     let env =
         TestEnv::builder().blobfs_from_system_image(&system_image_package).await.build().await;
 
-    assert_eq!(
-        env.open_package(&system_image_package.meta_far_merkle_root().clone().to_string())
-            .await
-            .map(|_| ()),
-        Ok(())
-    );
+    let _ = env
+        .get_already_cached(&system_image_package.meta_far_merkle_root().clone().to_string())
+        .await
+        .unwrap();
+
     assert_count_events(
         &env,
         metrics::PKG_CACHE_OPEN_MIGRATED_METRIC_ID,

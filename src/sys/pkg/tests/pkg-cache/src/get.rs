@@ -30,9 +30,9 @@ async fn get_multiple_packages_with_no_content_blobs() {
 
     // Assert the packages are not present before the get
     for pkg in &packages {
-        assert_eq!(
-            env.open_package(&pkg.meta_far_merkle_root().to_string()).await.map(|_| ()),
-            Err(Status::NOT_FOUND)
+        assert_matches!(
+            env.get_already_cached(&pkg.meta_far_merkle_root().to_string()).await,
+            Err(e) if e.was_not_cached()
         );
     }
 
@@ -356,20 +356,12 @@ async fn get_package_already_present_on_fs_with_pre_closed_needed_blobs() {
     let () = env.stop().await;
 }
 
-// Does a PackageCache.Get of `superpackage`, then verifies that all the transitive subpackages:
-//   1. are not available via PackageCache.Open
-//   2. are available via PackageCache.Get without needing to write any more blobs
+// Does a PackageCache.Get of `superpackage`, then verifies that all the transitive subpackages are
+// available via PackageCache.Get without needing to write any more blobs
 async fn verify_superpackage_get(superpackage: &Package, subpackages: &[Package]) {
     let env = TestEnv::builder().build().await;
     let _: fio::DirectoryProxy =
         get_and_verify_package(&env.proxies.package_cache, superpackage).await;
-
-    for subpackage in subpackages {
-        assert_eq!(
-            env.open_package(&subpackage.meta_far_merkle_root().to_string()).await.unwrap_err(),
-            Status::NOT_FOUND
-        );
-    }
 
     for subpackage in subpackages {
         let _: fio::DirectoryProxy =

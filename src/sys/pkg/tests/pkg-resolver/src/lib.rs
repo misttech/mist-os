@@ -32,7 +32,7 @@ use {
     fuchsia_merkle::{Hash, MerkleTree},
     fuchsia_pkg_testing::{serve::ServedRepository, Package, PackageBuilder, Repository},
     fuchsia_url::{PinnedAbsolutePackageUrl, RepositoryUrl},
-    fuchsia_zircon::{self as zx, Status},
+    fuchsia_zircon as zx,
     futures::prelude::*,
     mock_boot_arguments::MockBootArgumentsService,
     mock_metrics::MockMetricEventLoggerFactory,
@@ -986,27 +986,24 @@ impl<B: Blobfs> TestEnv<B> {
     pub fn get_hash(
         &self,
         url: impl Into<String>,
-    ) -> impl Future<Output = Result<pkg::BlobId, Status>> {
+    ) -> impl Future<Output = Result<pkg::BlobId, zx::Status>> {
         let fut = self.proxies.resolver.get_hash(&fpkg::PackageUrl { url: url.into() });
-        async move { fut.await.unwrap().map(|blob_id| blob_id.into()).map_err(Status::from_raw) }
+        async move { fut.await.unwrap().map(|blob_id| blob_id.into()).map_err(zx::Status::from_raw) }
     }
 
-    pub async fn open_cached_package(
+    pub async fn get_already_cached(
         &self,
         hash: pkg::BlobId,
-    ) -> Result<fio::DirectoryProxy, zx::Status> {
-        let cache_service = self
-            .realm_instance
-            .root
-            .connect_to_protocol_at_exposed_dir::<PackageCacheMarker>()
-            .unwrap();
-        let (proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
-        let () = cache_service
-            .open(&hash.into(), server_end)
-            .await
-            .unwrap()
-            .map_err(zx::Status::from_raw)?;
-        Ok(proxy)
+    ) -> Result<fio::DirectoryProxy, pkg::cache::GetAlreadyCachedError> {
+        pkg::cache::Client::from_proxy(
+            self.realm_instance
+                .root
+                .connect_to_protocol_at_exposed_dir::<PackageCacheMarker>()
+                .unwrap(),
+        )
+        .get_already_cached(hash)
+        .await
+        .map(|pd| pd.into_proxy())
     }
 
     pub async fn pkg_resolver_inspect_hierarchy(&self) -> DiagnosticsHierarchy {

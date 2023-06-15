@@ -37,7 +37,6 @@ mod cobalt;
 mod executability_enforcement;
 mod get;
 mod inspect;
-mod open;
 mod pkgfs;
 mod retained_packages;
 mod space;
@@ -678,29 +677,26 @@ impl<B: Blobfs> TestEnv<B> {
         get_inspect_hierarchy(&nested_environment_label, "pkg_cache").await
     }
 
-    pub async fn open_package(&self, merkle: &str) -> Result<fio::DirectoryProxy, zx::Status> {
-        let (package, server_end) = fidl::endpoints::create_proxy().unwrap();
-        let status_fut = self
-            .proxies
-            .package_cache
-            .open(&merkle.parse::<fpkg_ext::BlobId>().unwrap().into(), server_end);
-
-        let () = status_fut.await.unwrap().map_err(zx::Status::from_raw)?;
-        Ok(package)
+    pub async fn get_already_cached(
+        &self,
+        merkle: &str,
+    ) -> Result<fio::DirectoryProxy, fpkg_ext::cache::GetAlreadyCachedError> {
+        fpkg_ext::cache::Client::from_proxy(self.proxies.package_cache.clone())
+            .get_already_cached(merkle.parse().unwrap())
+            .await
+            .map(|pd| pd.into_proxy())
     }
 
     async fn block_until_started(&self) {
-        let (_, server_end) = fidl::endpoints::create_endpoints();
-        // The fidl call should succeed, but the result of open doesn't matter.
+        // Wait until the server is responding to FIDL requests, the result is irrelevant.
+        let (_, needed_blobs) = fidl::endpoints::create_endpoints();
         let _ = self
             .proxies
             .package_cache
-            .open(
-                &"0000000000000000000000000000000000000000000000000000000000000000"
-                    .parse::<fpkg_ext::BlobId>()
-                    .unwrap()
-                    .into(),
-                server_end,
+            .get(
+                &fpkg::BlobInfo { blob_id: fpkg::BlobId { merkle_root: [0; 32] }, length: 0 },
+                needed_blobs,
+                None,
             )
             .await
             .unwrap();

@@ -7,7 +7,7 @@
 #![cfg(test)]
 use {
     anyhow::Error,
-    fidl::endpoints::ServerEnd,
+    fidl::endpoints::{ControlHandle as _, ServerEnd},
     fidl_fuchsia_io as fio,
     fidl_fuchsia_pkg::{
         self as fpkg, PackageCacheRequest, PackageCacheRequestStream, PackageResolverRequest,
@@ -27,6 +27,7 @@ use {
     fuchsia_component::server::ServiceFs,
     fuchsia_hyper_test_support::{handler::StaticResponse, TestServer},
     fuchsia_url::RepositoryUrl,
+    fuchsia_zircon as zx,
     fuchsia_zircon::Status,
     futures::prelude::*,
     http::Uri,
@@ -415,17 +416,27 @@ impl MockPackageResolverService {
 
 #[derive(PartialEq, Debug, Eq)]
 enum CapturedPackageCacheRequest {
-    Open { meta_far_blob_id: fidl_fuchsia_pkg::BlobId },
+    Get { meta_far_blob_id: fpkg::BlobInfo },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum GetBehavior {
+    AlreadyCached,
+    NotCached,
+    ImmediateClose,
 }
 
 struct MockPackageCacheService {
     captured_args: Mutex<Vec<CapturedPackageCacheRequest>>,
-    open_response: Mutex<Option<Result<(), Status>>>,
+    get_behavior: Mutex<GetBehavior>,
 }
 
 impl MockPackageCacheService {
     fn new() -> Self {
-        Self { captured_args: Mutex::new(vec![]), open_response: Mutex::new(Some(Ok(()))) }
+        Self {
+            captured_args: Mutex::new(vec![]),
+            get_behavior: Mutex::new(GetBehavior::ImmediateClose),
+        }
     }
     async fn run_service(
         self: Arc<Self>,
@@ -433,27 +444,50 @@ impl MockPackageCacheService {
     ) -> Result<(), Error> {
         while let Some(req) = stream.try_next().await? {
             match req {
-                PackageCacheRequest::Open { meta_far_blob_id, responder, .. } => {
+                PackageCacheRequest::Get { meta_far_blob, needed_blobs, dir, responder } => {
                     self.captured_args
                         .lock()
-                        .push(CapturedPackageCacheRequest::Open { meta_far_blob_id });
-                    responder
-                        .send(self.open_response.lock().unwrap().map_err(|s| s.into_raw()))
-                        .expect("send ok");
-                }
-                PackageCacheRequest::Get { .. } => {
-                    panic!("should only support Open requests, received Get")
+                        .push(CapturedPackageCacheRequest::Get { meta_far_blob_id: meta_far_blob });
+                    let () = self.handle_get(meta_far_blob, needed_blobs, dir, responder).await;
                 }
                 PackageCacheRequest::BasePackageIndex { .. } => {
-                    panic!("should only support Open requests, received BasePackageIndex")
+                    panic!("should only support Get requests, received BasePackageIndex")
                 }
                 PackageCacheRequest::CachePackageIndex { .. } => {
-                    panic!("should only support Open requests, received CachePackageIndex")
+                    panic!("should only support Get requests, received CachePackageIndex")
                 }
-                PackageCacheRequest::Sync { .. } => panic!("should only support Open requests"),
+                PackageCacheRequest::Sync { .. } => {
+                    panic!("should only support Get requests, received Sync")
+                }
             }
         }
         Ok(())
+    }
+    async fn handle_get(
+        &self,
+        _meta_far: fpkg::BlobInfo,
+        needed_blobs: ServerEnd<fpkg::NeededBlobsMarker>,
+        _dir: Option<ServerEnd<fio::DirectoryMarker>>,
+        get_responder: fpkg::PackageCacheGetResponder,
+    ) {
+        let behavior = *self.get_behavior.lock();
+        match behavior {
+            GetBehavior::AlreadyCached => {
+                let (_, control) = needed_blobs.into_stream_and_control_handle().unwrap();
+                let () = control.shutdown_with_epitaph(zx::Status::OK);
+                let () = get_responder.send(Ok(())).unwrap();
+            }
+            GetBehavior::NotCached => {
+                let mut stream = needed_blobs.into_stream().unwrap();
+                let req = stream.next().await.unwrap().unwrap();
+                let fpkg::NeededBlobsRequest::OpenMetaBlob{responder, .. } = req
+                     else {
+                        panic!("unexpected NeededBlobsRequest: {req:?}");
+                    };
+                let () = responder.send(Ok(Some(fidl::endpoints::create_endpoints().0))).unwrap();
+            }
+            GetBehavior::ImmediateClose => {}
+        }
     }
 }
 
@@ -488,7 +522,13 @@ impl MockSpaceManagerService {
 }
 
 fn assert_no_errors(output: &ProcessOutput) {
-    assert!(output.is_ok(), "status: {:?}\nstdout: {}", output.return_code(), output.stdout_str());
+    assert!(
+        output.is_ok(),
+        "status: {:?}\nstdout: {}\nstderr: {}",
+        output.return_code(),
+        output.stdout_str(),
+        output.stderr_str()
+    );
 }
 
 fn assert_stdout(output: &ProcessOutput, expected: &str) {
@@ -497,7 +537,7 @@ fn assert_stdout(output: &ProcessOutput, expected: &str) {
 }
 
 fn assert_stdout_disregard_errors(output: &ProcessOutput, expected: &str) {
-    assert_eq!(output.stdout_str(), expected);
+    assert_eq!(output.stdout_str(), expected, "{:?}", output.stderr_str());
 }
 
 fn assert_stderr(output: &ProcessOutput, expected: &str) {
@@ -837,6 +877,7 @@ async fn test_pkg_status_success() {
             .into();
     let env = TestEnv::new();
     env.package_resolver.get_hash_response.lock().replace(Ok(hash));
+    *env.package_cache.get_behavior.lock() = GetBehavior::AlreadyCached;
 
     let output = env.run_pkgctl(vec!["pkg-status", "the-url"]).await;
 
@@ -845,7 +886,9 @@ async fn test_pkg_status_success() {
       Package on disk: yes\n");
     env.assert_only_package_resolver_and_package_cache_called_with(
         vec![CapturedPackageResolverRequest::GetHash { package_url: "the-url".into() }],
-        vec![CapturedPackageCacheRequest::Open { meta_far_blob_id: hash }],
+        vec![CapturedPackageCacheRequest::Get {
+            meta_far_blob_id: fpkg::BlobInfo { blob_id: hash, length: 0 },
+        }],
     );
 }
 
@@ -858,7 +901,7 @@ async fn test_pkg_status_fail_pkg_in_tuf_repo_but_not_on_disk() {
             .into();
     let env = TestEnv::new();
     env.package_resolver.get_hash_response.lock().replace(Ok(hash));
-    env.package_cache.open_response.lock().replace(Err(Status::NOT_FOUND));
+    *env.package_cache.get_behavior.lock() = GetBehavior::NotCached;
 
     let output = env.run_pkgctl(vec!["pkg-status", "the-url"]).await;
 
@@ -868,7 +911,9 @@ async fn test_pkg_status_fail_pkg_in_tuf_repo_but_not_on_disk() {
     assert_eq!(output.return_code(), 2);
     env.assert_only_package_resolver_and_package_cache_called_with(
         vec![CapturedPackageResolverRequest::GetHash { package_url: "the-url".into() }],
-        vec![CapturedPackageCacheRequest::Open { meta_far_blob_id: hash }],
+        vec![CapturedPackageCacheRequest::Get {
+            meta_far_blob_id: fpkg::BlobInfo { blob_id: hash, length: 0 },
+        }],
     );
 }
 

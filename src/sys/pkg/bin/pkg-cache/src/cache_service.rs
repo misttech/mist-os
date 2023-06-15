@@ -99,33 +99,6 @@ pub(crate) async fn serve(
                     drop(node);
                     responder.send(response.map_err(|status| status.into_raw()))?;
                 }
-                PackageCacheRequest::Open { meta_far_blob_id, dir, responder } => {
-                    let meta_far: Hash = BlobId::from(meta_far_blob_id).into();
-                    let trace_id = ftrace::Id::random();
-                    let guard = ftrace::async_enter!(
-                        trace_id,
-                        "app",
-                        "cache_open",
-                        "meta_far_blob_id" => meta_far.to_string().as_str()
-                    );
-                    let response = open(
-                        package_index.as_ref(),
-                        base_packages.as_ref(),
-                        executability_restrictions,
-                        non_static_allow_list.as_ref(),
-                        scope.clone(),
-                        &blobfs,
-                        meta_far,
-                        dir,
-                        cobalt_sender,
-                    )
-                    .await;
-                    guard.end(&[ftrace::ArgValue::of(
-                        "status",
-                        Status::from(response).to_string().as_str(),
-                    )]);
-                    responder.send(response.map_err(|status| status.into_raw()))?;
-                }
                 PackageCacheRequest::BasePackageIndex { iterator, control_handle: _ } => {
                     let stream = iterator.into_stream()?;
                     serve_base_package_index(BASE_PACKAGE_HOST, Arc::clone(&base_packages), stream)
@@ -288,61 +261,6 @@ async fn get(
             dir.into_channel().into(),
         );
     }
-
-    cobalt_sender.send(
-        MetricEvent::builder(metrics::PKG_CACHE_OPEN_MIGRATED_METRIC_ID)
-            .with_event_codes(metrics::PkgCacheOpenMigratedMetricDimensionResult::Success)
-            .as_occurrence(1),
-    );
-    Ok(())
-}
-
-#[allow(clippy::too_many_arguments)]
-/// Open a package directory.
-async fn open(
-    package_index: &async_lock::RwLock<PackageIndex>,
-    base_packages: &BasePackages,
-    executability_restrictions: system_image::ExecutabilityRestrictions,
-    non_static_allow_list: &system_image::NonStaticAllowList,
-    scope: package_directory::ExecutionScope,
-    blobfs: &blobfs::Client,
-    meta_far: Hash,
-    dir_request: ServerEnd<fio::DirectoryMarker>,
-    mut cobalt_sender: ProtocolSender<MetricEvent>,
-) -> Result<(), Status> {
-    let package_status = match get_package_status(base_packages, package_index, &meta_far).await {
-        PackageStatus::Other => {
-            cobalt_sender.send(
-                MetricEvent::builder(metrics::PKG_CACHE_OPEN_MIGRATED_METRIC_ID)
-                    .with_event_codes(metrics::PkgCacheOpenMigratedMetricDimensionResult::NotFound)
-                    .as_occurrence(1),
-            );
-            return Err(Status::NOT_FOUND);
-        }
-        ps @ PackageStatus::Base | ps @ PackageStatus::Active(_) => ps,
-    };
-
-    let () = package_directory::serve(
-        scope,
-        blobfs.clone(),
-        meta_far,
-        make_pkgdir_flags(executability_status(
-            executability_restrictions,
-            &package_status,
-            non_static_allow_list,
-        )),
-        dir_request,
-    )
-    .map_err(|e| {
-        error!("open: error serving package {}: {:#}", meta_far, anyhow!(e));
-        cobalt_sender.send(
-            MetricEvent::builder(metrics::PKG_CACHE_OPEN_MIGRATED_METRIC_ID)
-                .with_event_codes(metrics::PkgCacheOpenMigratedMetricDimensionResult::Io)
-                .as_occurrence(1),
-        );
-        Status::INTERNAL
-    })
-    .await?;
 
     cobalt_sender.send(
         MetricEvent::builder(metrics::PKG_CACHE_OPEN_MIGRATED_METRIC_ID)

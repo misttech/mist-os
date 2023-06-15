@@ -53,11 +53,9 @@ async fn test_base_package_found() {
     assert!(repo_pkg.verify_contents(&package_dir).await.is_err());
 
     // Make sure that repo_pkg is not cached locally.
-    assert_eq!(
-        env.open_cached_package(repo_pkg.meta_far_merkle_root().clone().into())
-            .await
-            .expect_err("repo_pkg should not be cached"),
-        Status::NOT_FOUND
+    assert_matches!(
+        env.get_already_cached(repo_pkg.meta_far_merkle_root().clone().into()).await,
+        Err(e) if e.was_not_cached()
     );
 
     // Check that get_hash fallback behavior matches resolve.

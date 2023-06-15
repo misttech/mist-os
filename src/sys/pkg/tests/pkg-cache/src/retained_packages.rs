@@ -153,9 +153,9 @@ async fn cached_and_released_packages_are_removed() {
     assert_matches!(env.proxies.space_manager.gc().await, Ok(Ok(())));
 
     for package in packages.iter() {
-        assert_eq!(
-            env.open_package(&package.meta_far_merkle_root().to_string()).await.map(|_| ()),
-            Err(zx::Status::NOT_FOUND)
-        )
+        assert_matches!(
+            env.get_already_cached(&package.meta_far_merkle_root().to_string()).await,
+            Err(e) if e.was_not_cached()
+        );
     }
 }

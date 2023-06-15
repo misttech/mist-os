@@ -4,7 +4,6 @@
 
 use {
     crate::TestEnv,
-    assert_matches::assert_matches,
     fidl_fuchsia_io as fio,
     fuchsia_pkg_testing::{Package, PackageBuilder, SystemImageBuilder},
     fuchsia_zircon::Status,
@@ -70,13 +69,6 @@ async fn verify_package_executability(
     // Verify Get flags
     let dir = crate::verify_package_cached(&env.proxies.package_cache, &pkg).await;
     let () = verify_flags(&dir, expected_flags).await;
-
-    // Verify Open flags
-    let open_res = env.open_package(&pkg.meta_far_merkle_root().to_string()).await;
-    let () = match is_retained {
-        IsRetained::True => assert_matches!(open_res, Err(status) if status == Status::NOT_FOUND),
-        IsRetained::False => verify_flags(&open_res.unwrap(), expected_flags).await,
-    };
 
     let () = env.stop().await;
 }

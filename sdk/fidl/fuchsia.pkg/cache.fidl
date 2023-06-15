@@ -36,18 +36,6 @@ closed protocol PackageCache {
         dir server_end:<fuchsia.io.Directory, optional>;
     }) -> () error zx.Status;
 
-    /// Opens the package, or errors out if it is not present on the local system.
-    ///
-    /// + request `meta_far_blob_id` the blob id for the package's meta.far.
-    /// + request `dir` a request for a directory that will be resolved when the package has been
-    ///   successfully cached.
-    /// * error a zx_status value indicating failure. One of the following:
-    ///     * `ZX_ERR_NOT_FOUND` if the package does not exist.
-    strict Open(resource struct {
-        meta_far_blob_id BlobId;
-        dir server_end:fuchsia.io.Directory;
-    }) -> () error zx.Status;
-
     /// Retrieves a chunk iterator to the base package index.
     ///
     /// + request `iterator` a request for the `PackageIndexIterator` that will return sets of

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{Context as _, Result},
+    anyhow::Result,
     argh::{from_env, FromArgs},
     fidl::endpoints::{create_endpoints, create_proxy, ServerEnd},
     fidl_fuchsia_io as fio,
@@ -94,8 +94,6 @@ struct AccessCheckResult {
     pub pkgfs_versions: Option<ReadableExecutableResult>,
     /// Result of opening via pkgfs-packages API.
     pub pkgfs_packages: Option<ReadableExecutableResult>,
-    /// Result of opening via fuchsia.pkg/PackageCache.Open API.
-    pub pkg_cache_open: Option<ReadableExecutableResult>,
     /// Result of opening via fuchsia.pkg/PackageCache.Get API.
     pub pkg_cache_get: Option<ReadableExecutableResult>,
     /// Result of opening via package resolver API with
@@ -111,8 +109,6 @@ struct AccessCheckSelectors {
     pub pkgfs_versions: bool,
     /// Perform access check against pkgfs-packages API.
     pub pkgfs_packages: bool,
-    /// Perform access check against pkg-cache's fuchsia.pkg/PackageCache.Open API.
-    pub pkg_cache_open: bool,
     /// Perform access check against pkg-cache's fuchsia.pkg/PackageCache.Get API.
     pub pkg_cache_get: bool,
     /// Perform access check against package resolver API with
@@ -129,7 +125,6 @@ impl AccessCheckSelectors {
         Self {
             pkgfs_versions: true,
             pkgfs_packages: true,
-            pkg_cache_open: true,
             pkg_cache_get: true,
             pkg_resolver_with_hash: true,
             pkg_resolver_without_hash: true,
@@ -203,42 +198,6 @@ impl AccessCheckRequest {
             None
         };
 
-        // Open package as executable via pkg-cache's fuchsia.pkg/PackageCache.Open API.
-        let pkg_cache_open_rx_result = if self.selectors.pkg_cache_open {
-            info!(%package_merkle, "Opening package via fuchsia.pkg/PackageCache.Open");
-            let pkg_cache_proxy = connect_to_protocol::<PackageCacheMarker>().unwrap();
-            let (package_directory_proxy, package_directory_server_end) =
-                create_proxy::<fio::DirectoryMarker>().unwrap();
-            // The updated version of the package resolved during OTA is not added to the dynamic
-            // index (because the system-updater adds it to the retained index before resolving it),
-            // so attempting to PackageCache.Open it should fail with NOT_FOUND. We convert
-            // NOT_FOUND into not readable and not executable so we can verify that the OTA
-            // process does not create more executable packages. Non NOT_FOUND errors fail the test
-            // to help catch misconfigurations of the test environment.
-            match pkg_cache_proxy
-                .open(&package_blob_id, package_directory_server_end)
-                .await
-                .unwrap()
-            {
-                Ok(()) => Some((
-                    self.attempt_readable(&package_directory_proxy).await,
-                    self.attempt_executable(&package_directory_proxy).await,
-                )),
-                Err(e) if Status::from_raw(e) == Status::NOT_FOUND => Some((
-                    Status::ok(e).context("PackageCache.Open failed"),
-                    Result::<Box<fidl_fuchsia_mem::Buffer>, _>::Err(Status::from_raw(e))
-                        .context("PackageCache.Open failed"),
-                )),
-                Err(e) => panic!("unexpected PackageCache.Open error {:?}", e),
-            }
-        } else {
-            info!(
-                %package_merkle,
-                "Skipping open package via fuchsia.pkg/PackageCache.Open"
-            );
-            None
-        };
-
         // Open package as executable via pkg-cache's fuchsia.pkg/PackageCache.Get API.
         let pkg_cache_get_rx_result = if self.selectors.pkg_cache_get {
             info!(%package_merkle, "Opening package via fuchsia.pkg/PackageCache.Get");
@@ -304,7 +263,6 @@ impl AccessCheckRequest {
             // ..._rx_result.1 contains Result<Box<Buffer>>.
             pkgfs_versions_rx_result.as_ref().map(|rx| &rx.1),
             pkgfs_packages_rx_result.as_ref().map(|rx| &rx.1),
-            pkg_cache_open_rx_result.as_ref().map(|rx| &rx.1),
             pkg_cache_get_rx_result.as_ref().map(|rx| &rx.1),
             pkg_resolver_with_hash_rx_result.as_ref().map(|rx| &rx.1),
         ]
@@ -318,7 +276,6 @@ impl AccessCheckRequest {
         AccessCheckResult {
             pkgfs_versions: Self::pair_to_result(pkgfs_versions_rx_result),
             pkgfs_packages: Self::pair_to_result(pkgfs_packages_rx_result),
-            pkg_cache_open: Self::pair_to_result(pkg_cache_open_rx_result),
             pkg_cache_get: Self::pair_to_result(pkg_cache_get_rx_result),
             pkg_resolver_with_hash: Self::pair_to_result(pkg_resolver_with_hash_rx_result),
             pkg_resolver_without_hash: Self::pair_to_result(pkg_resolver_without_hash_rx_result),
@@ -545,7 +502,6 @@ async fn access_ota_blob_as_executable() {
             },
             selectors: AccessCheckSelectors {
                 pkgfs_versions: true,
-                pkg_cache_open: true,
                 pkg_cache_get: true,
                 pkg_resolver_with_hash: true,
 
@@ -569,7 +525,6 @@ async fn access_ota_blob_as_executable() {
 
                 // Disable most checks; only interested in package resolution.
                 pkgfs_versions: false,
-                pkg_cache_open: false,
                 pkg_cache_get: false,
                 pkgfs_packages: false,
                 pkg_resolver_without_hash: false,
@@ -587,7 +542,6 @@ async fn access_ota_blob_as_executable() {
     // Pre-update base version access check: Access should always succeed.
     assert!(hello_world_v0_access_check_result.pkgfs_versions.unwrap().is_readable_executable_ok());
     assert!(hello_world_v0_access_check_result.pkgfs_packages.unwrap().is_readable_executable_ok());
-    assert!(hello_world_v0_access_check_result.pkg_cache_open.unwrap().is_readable_executable_ok());
     assert!(hello_world_v0_access_check_result.pkg_cache_get.unwrap().is_readable_executable_ok());
     assert!(hello_world_v0_access_check_result
         .pkg_resolver_with_hash
@@ -623,10 +577,6 @@ async fn access_ota_blob_as_executable() {
         .pkgfs_versions
         .unwrap()
         .is_readable_executable_err());
-    assert!(hello_world_v1_access_check_result
-        .pkg_cache_open
-        .unwrap()
-        .is_readable_executable_err());
     assert!(hello_world_v1_access_check_result.pkg_cache_get.unwrap().is_executable_err());
     assert!(hello_world_v1_access_check_result.pkg_resolver_with_hash.unwrap().is_executable_err());
 
@@ -636,7 +586,6 @@ async fn access_ota_blob_as_executable() {
     // Post-update base version access check: Access should always succeed.
     assert!(hello_world_v0_access_check_result.pkgfs_versions.unwrap().is_readable_executable_ok());
     assert!(hello_world_v0_access_check_result.pkgfs_packages.unwrap().is_readable_executable_ok());
-    assert!(hello_world_v0_access_check_result.pkg_cache_open.unwrap().is_readable_executable_ok());
     assert!(hello_world_v0_access_check_result.pkg_cache_get.unwrap().is_readable_executable_ok());
     assert!(hello_world_v0_access_check_result
         .pkg_resolver_with_hash

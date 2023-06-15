@@ -338,6 +338,16 @@ impl ToResolveError for pkg::cache::WriteBlobError {
     }
 }
 
+impl ToResolveError for pkg::cache::GetAlreadyCachedError {
+    fn to_resolve_error(&self) -> pkg::ResolveError {
+        if self.was_not_cached() {
+            pkg::ResolveError::PackageNotFound
+        } else {
+            pkg::ResolveError::Internal
+        }
+    }
+}
+
 impl ToResolveError for FetchError {
     fn to_resolve_error(&self) -> pkg::ResolveError {
         use FetchError::*;
