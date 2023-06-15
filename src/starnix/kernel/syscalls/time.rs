@@ -85,7 +85,9 @@ pub fn sys_clock_nanosleep(
     // if we sleep for too little time.
     // At some point we'll need to monitor changes to the realtime clock proactively and adjust
     // timers accordingly.
-    if which_clock != CLOCK_MONOTONIC && which_clock != CLOCK_REALTIME {
+    let use_monotonic_clock =
+        which_clock == CLOCK_MONOTONIC || (which_clock == CLOCK_REALTIME && !is_absolute);
+    if !use_monotonic_clock || flags & !TIMER_ABSTIME != 0 {
         not_implemented!("clock_nanosleep, clock {:?}, flags {:?}", which_clock, flags);
         return error!(EINVAL);
     }
@@ -167,10 +169,6 @@ fn clock_nanosleep_monotonic_with_deadline(
                     zx::Duration::from_nanos(0),
                     deadline - now,
                 ));
-                log_trace!(
-                    "computed remaining time as {deadline:?} - {now:?} = {:?}, {remaining:?}",
-                    deadline - now
-                );
                 current_task.mm.write_object(user_remaining, &remaining)?;
             }
             current_task.set_syscall_restart_func(move |current_task| {
@@ -335,8 +333,9 @@ pub fn sys_getitimer(
     which: u32,
     user_curr_value: UserRef<itimerval>,
 ) -> Result<(), Errno> {
-    let remaining = current_task.thread_group.get_itimer(which)?;
-    current_task.mm.write_object(user_curr_value, &remaining)?;
+    let itimers = current_task.thread_group.read().itimers;
+    let timer = itimers.get(which as usize).ok_or_else(|| errno!(EINVAL))?;
+    current_task.mm.write_object(user_curr_value, timer)?;
     Ok(())
 }
 

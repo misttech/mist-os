@@ -35,6 +35,8 @@
 
                 // clock_nanosleep_test
                 "ClockNanosleepProcessTest.SleepFiveSeconds",
+                "Sleepers/WallClockNanosleepTest.InterruptedNanosleep/*",
+                "Sleepers/WallClockNanosleepTest.SleepUntil/0",
 
                 // epoll_test - https://fxbug.dev/79261
                 "EpollTest.CloseFile",
@@ -113,6 +115,7 @@
 
                 // fork_test
                 "ForkTest.Affinity",
+                "ForkTest.Alarm",
                 "CloneTest.NewUserNamespacePermitsAllOtherNamespaces",
                 "CloneTest.NonCanonicalTLS",
 
@@ -223,6 +226,7 @@
                 "IP6TablesTest.InitialInfo",
 
                 // itimer_test
+                "ItimerTest.ItimervalUpdatedBeforeExpiration",
                 "ItimerTest.DeliversSIGPROFToThreadsRoughlyFairlyActive",
 
                 // lseek_test
