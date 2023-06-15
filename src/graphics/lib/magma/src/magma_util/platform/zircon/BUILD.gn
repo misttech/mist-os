@@ -116,8 +116,6 @@ source_set("device") {
   sources = [
     "zircon_platform_device.cc",
     "zircon_platform_device.h",
-    "zircon_platform_pci_device.cc",
-    "zircon_platform_pci_device.h",
   ]
 
   public_deps = [
@@ -135,7 +133,6 @@ source_set("device") {
     "$magma_build_root/src/magma_util:short_macros",
     "..:device_header",
     "//src/devices/lib/driver",
-    "//src/devices/pci/lib/device-protocol-pci",
     "//zircon/system/ulib/zx",
   ]
 }
