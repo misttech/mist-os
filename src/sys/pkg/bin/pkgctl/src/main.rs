@@ -121,7 +121,7 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
                           );
                 }
             };
-            println!("Package on disk: yes (path=/pkgfs/versions/{})", BlobId::from(blob_id));
+            println!("Package on disk: yes");
             Ok(0)
         }
         Command::Open(OpenCommand { meta_far_blob_id }) => {

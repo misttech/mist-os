@@ -842,7 +842,7 @@ async fn test_pkg_status_success() {
 
     assert_stdout(&output,
       "Package in registered TUF repo: yes (merkle=0000000000000000000000000000000000000000000000000000000000000000)\n\
-      Package on disk: yes (path=/pkgfs/versions/0000000000000000000000000000000000000000000000000000000000000000)\n");
+      Package on disk: yes\n");
     env.assert_only_package_resolver_and_package_cache_called_with(
         vec![CapturedPackageResolverRequest::GetHash { package_url: "the-url".into() }],
         vec![CapturedPackageCacheRequest::Open { meta_far_blob_id: hash }],
