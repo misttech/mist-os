@@ -168,7 +168,7 @@ class Runner {
   explicit Runner(Reporter&& reporter);
   Runner(const Runner&) = delete;
   Runner(Runner&&) = delete;
-  ~Runner();
+  virtual ~Runner();
 
   Runner& operator=(const Runner&) = delete;
   Runner& operator=(Runner&&) = delete;

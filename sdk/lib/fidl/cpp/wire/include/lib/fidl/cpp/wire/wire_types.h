@@ -224,6 +224,8 @@ class UnownedEncodedMessage final
 
 class EncodeResult {
  public:
+  EncodeResult() = default;
+  virtual ~EncodeResult() = default;
   virtual ::fidl::OutgoingMessage& message() = 0;
   virtual ::fidl::WireFormatMetadata wire_format_metadata() const = 0;
 };

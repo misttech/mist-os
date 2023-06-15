@@ -89,7 +89,7 @@ class LockedUnbindInfo {
 // binding has been destroyed.
 class AsyncBinding : public std::enable_shared_from_this<AsyncBinding> {
  public:
-  ~AsyncBinding() __TA_EXCLUDES(lock_) = default;
+  virtual ~AsyncBinding() __TA_EXCLUDES(lock_) = default;
 
   void BeginFirstWait() __TA_EXCLUDES(lock_);
 
