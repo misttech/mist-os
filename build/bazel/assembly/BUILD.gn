@@ -8,73 +8,91 @@ import("//build/images/custom_signing.gni")
 import("//build/images/fvm.gni")
 import("//build/product.gni")
 
-if (!use_bringup_assembly) {
-  bazel_product_bundle("minimal.x64") {
-    testonly = true
-    allow_eng_platform_bundle_use = true
-    bazel_product_bundle_target = "//build/bazel/assembly:minimal.x64"
-    bazel_product_image_target =
-        "//build/bazel/assembly:product_image_minimal.x64"
-    bazel_inputs_from_gn = [
-      "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
-      "//build/images/fuchsia:fuchsia.bazel_images_config_inputs",
-    ]
-  }
-}
-
-# Only do drivers lists comparison when both GN and Bazel assembly are done in
-# the same build.
-if (!use_bazel_images_only && bazel_assembly_targets != []) {
-  import("//build/drivers/check_included_drivers.gni")
-
-  check_included_drivers("bazel_drivers_check") {
-    testonly = true
-    deps = bazel_assembly_targets
+if (is_fuchsia) {
+  if (!use_bringup_assembly) {
+    bazel_product_bundle("minimal.x64") {
+      testonly = true
+      allow_eng_platform_bundle_use = true
+      bazel_product_bundle_target = "//build/bazel/assembly:minimal.x64"
+      bazel_product_image_target =
+          "//build/bazel/assembly:product_image_minimal.x64"
+      bazel_inputs_from_gn = [
+        "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
+        "//build/images/fuchsia:fuchsia.bazel_images_config_inputs",
+      ]
+    }
   }
 
-  action("compare_drivers_lists") {
+  # Only do drivers lists comparison when both GN and Bazel assembly are done in
+  # the same build.
+  if (!use_bazel_images_only && bazel_assembly_targets != [] && has_board) {
+    import("//build/drivers/check_included_drivers.gni")
+
+    check_included_drivers("bazel_drivers_check") {
+      testonly = true
+      deps = bazel_assembly_targets
+    }
+
+    action("compare_drivers_lists") {
+      testonly = true
+
+      _gn_drivers_list = get_label_info("//:drivers-check", "target_gen_dir") +
+                         "/drivers-check_metadata_output"
+      _bazel_drivers_list =
+          get_label_info(":bazel_drivers_check", "target_gen_dir") +
+          "/bazel_drivers_check_metadata_output"
+      _output = "${target_out_dir}/diff"
+
+      inputs = [
+        _gn_drivers_list,
+        _bazel_drivers_list,
+      ]
+      outputs = [ _output ]
+
+      script = "//build/bazel/assembly/diff_drivers_lists.py"
+      args = [
+        "--drivers-list1",
+        rebase_path(_gn_drivers_list, root_build_dir),
+        "--drivers-list2",
+        rebase_path(_bazel_drivers_list, root_build_dir),
+        "--output",
+        rebase_path(_output, root_build_dir),
+      ]
+
+      deps = [
+        ":bazel_drivers_check_metadata_check",
+        "//:drivers-check_metadata_check",
+      ]
+    }
+  } else {
+    group("compare_drivers_lists") {
+      testonly = true
+    }
+  }
+
+  group("verifications") {
     testonly = true
-
-    _gn_drivers_list = get_label_info("//:drivers-check", "target_gen_dir") +
-                       "/drivers-check_metadata_output"
-    _bazel_drivers_list =
-        get_label_info(":bazel_drivers_check", "target_gen_dir") +
-        "/bazel_drivers_check_metadata_output"
-    _output = "${target_out_dir}/diff"
-
-    inputs = [
-      _gn_drivers_list,
-      _bazel_drivers_list,
-    ]
-    outputs = [ _output ]
-
-    script = "//build/bazel/assembly/diff_drivers_lists.py"
-    args = [
-      "--drivers-list1",
-      rebase_path(_gn_drivers_list, root_build_dir),
-      "--drivers-list2",
-      rebase_path(_bazel_drivers_list, root_build_dir),
-      "--output",
-      rebase_path(_output, root_build_dir),
-    ]
-
     deps = [
-      ":bazel_drivers_check_metadata_check",
-      "//:drivers-check_metadata_check",
+      "board_configurations:verifications",
+      "images_configurations:verifications",
+      "partitions_configurations:verifications",
+      "product_configurations:verifications",
     ]
-  }
-} else {
-  group("compare_drivers_lists") {
-    testonly = true
   }
 }
 
-group("verifications") {
-  testonly = true
-  deps = [
-    "board_configurations:verifications",
-    "images_configurations:verifications",
-    "partitions_configurations:verifications",
-    "product_configurations:verifications",
-  ]
+if (is_host) {
+  group("host_tests") {
+    testonly = true
+
+    # Verifications tests depends on bazel_actions, which requires default
+    # toolchain.
+    deps = [ ":verifications($default_toolchain)" ]
+
+    if (has_board) {
+      # Driver lists comparison depends on GN assembly, which requires default
+      # toolchain.
+      deps += [ ":compare_drivers_lists($default_toolchain)" ]
+    }
+  }
 }

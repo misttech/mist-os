@@ -1462,7 +1462,6 @@ group("default") {
   if (has_board) {
     deps += [
       "//:drivers-check",
-      "//build/bazel/assembly:compare_drivers_lists",
       "//build/images:default-images",
     ]
   }

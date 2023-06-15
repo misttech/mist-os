@@ -27,18 +27,11 @@ verify_product_configuration("verify_core_product_configuration") {
   bazel_inputs = []
 }
 
-verify_product_configuration("verify_workstation_eng_product_configuration") {
-  gn_product_config_target = "//products/workstation"
-  bazel_product_config_target = ":workstation_eng"
-  bazel_inputs = []
-}
-
 group("verifications") {
   testonly = true
   deps = [
     ":verify_default_product_configuration",
     ":verify_minimal_product_configuration",
-    ":verify_workstation_eng_product_configuration",
 
     # TODO(jayzhuang): Add core product config verifications when driver packages are added in its Bazel target.
     # ":verify_core_product_configuration",

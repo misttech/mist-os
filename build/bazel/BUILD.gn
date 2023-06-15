@@ -203,7 +203,6 @@ bazel_input_resource("build_args_bazel_inputs") {
 group("tests") {
   testonly = true
   deps = [
-    "assembly:verifications",
     "bazel_sdk:tests",
     "scripts:tests",
     "tests",
