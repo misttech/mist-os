@@ -10,7 +10,6 @@ sdk://dart/fuchsia_vfs
 sdk://dart/fuchsia_view
 sdk://dart/zircon
 sdk://docs/metadata_schemas
-sdk://docs/modular_config_schema
 sdk://fidl/fuchsia.auth
 sdk://fidl/fuchsia.component
 sdk://fidl/fuchsia.component.config

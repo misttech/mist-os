@@ -19,7 +19,6 @@
 #include "src/lib/fostr/fidl/fuchsia/settings/formatting.h"
 #include "src/lib/fxl/test/test_settings.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
-#include "src/modular/lib/fidl/clone.h"
 #include "src/performance/trace/tests/component_context.h"
 
 namespace intl {
@@ -34,6 +33,13 @@ using fuchsia::intl::TemperatureUnit;
 using fuchsia::intl::TimeZoneId;
 using fuchsia::settings::HourCycle;
 using sys::testing::ComponentContextProvider;
+
+template <typename T>
+T CloneStruct(const T& value) {
+  T new_value;
+  value.Clone(&new_value);
+  return new_value;
+}
 
 fuchsia::settings::IntlSettings NewSettings(std::vector<std::string> locale_ids,
                                             HourCycle hour_cycle,
@@ -67,7 +73,7 @@ class FakeSettingsService : public fuchsia::settings::testing::Intl_TestBase {
 
   // Test method, used to modify the timezone identifier served by the fake setui service.
   void SetTimeZone(const std::string& iana_tz_id) {
-    fuchsia::settings::IntlSettings new_settings = modular::CloneStruct(intl_settings_);
+    fuchsia::settings::IntlSettings new_settings = CloneStruct(intl_settings_);
     new_settings.mutable_time_zone_id()->id = iana_tz_id;
     SetIntl(new_settings);
   }
@@ -78,7 +84,7 @@ class FakeSettingsService : public fuchsia::settings::testing::Intl_TestBase {
     if (fidl::Equals(intl_settings_, intl_settings)) {
       return;
     }
-    intl_settings_ = modular::CloneStruct(intl_settings);
+    intl_settings_ = CloneStruct(intl_settings);
     state_changed_ = true;
     Notify();
   }
@@ -103,7 +109,7 @@ class FakeSettingsService : public fuchsia::settings::testing::Intl_TestBase {
       return;
     }
     FX_LOGS(INFO) << "telling watcher it's " << intl_settings_;
-    watcher_(modular::CloneStruct(intl_settings_));
+    watcher_(CloneStruct(intl_settings_));
     state_changed_ = false;
     watcher_ = nullptr;
   }

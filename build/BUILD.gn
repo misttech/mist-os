@@ -398,7 +398,6 @@ group("config_data_template_allowlist") {
     "//src/hwinfo:default_product_config",
     "//src/lib/icu/tzdata:*",
     "//src/media/audio/config:chromebook-config",
-    "//src/modular/build:allow_persistent_config_override",
     "//src/security/lib/scrutiny/tests/*",
     "//src/security/policy:appmgr_account_manager_allowlist_eng",
     "//src/security/policy:appmgr_build_info_allowlist_eng",

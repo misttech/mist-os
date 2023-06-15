@@ -400,8 +400,7 @@ that they are not included in the base set, but instead included in
 either "cache" or "universe". In that case, simply restarting the
 software on the target (e.g. by closing it completely, or by invoking
 `killall`) will result in the software being immediately updated when it is
-started again. Specifically for shutting down Modular and all dependant
-components, use `basemgr_launcher shutdown`.
+started again.
 
 Note: some software may not appear to be updating because it is being run
 inside of a "runner" process or some other surrounding environment that is

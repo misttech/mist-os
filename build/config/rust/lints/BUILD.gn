@@ -80,7 +80,6 @@ config("allow_unused_results") {
     "//src/intl/*",
     "//src/lib/*",
     "//src/media/*",
-    "//src/modular/*",
     "//src/performance/*",
     "//src/power/*",
     "//src/recovery/*",

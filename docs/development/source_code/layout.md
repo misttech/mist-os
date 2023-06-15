@@ -327,7 +327,6 @@ populated from CIPD).
     * `graphics/`
     * `identity/`
     * `media/`
-    * `modular/`
     * `storage/`
     * `testing/`
     * `ui/`

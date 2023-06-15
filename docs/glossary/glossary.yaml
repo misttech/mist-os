@@ -1512,15 +1512,6 @@
   related_guides: [""]
   area: ["UI", "HCI"]
 
-- term: "Module"
-  short_description: "A role a <a href=\"/docs/glossary#component\">component</a>
-  can play to contribute UI to a user experience container (story) within a Modular session."
-  full_description: "A <a href=\"/concepts/modular/overview.md\">Modular</a> concept that is being
-  deprecated. Any component that exports a Scenic <code>ViewProvider</code> can be be used as a module."
-  see_also: ["<a href=\"/docs/concepts/modular/module.md\">Module concepts</a>"]
-  related_guides: [""]
-  area: ["Modular"]
-
 - term: "Moniker"
   short_description: "Identifies a specific component instance in the component
   tree using a topological path."

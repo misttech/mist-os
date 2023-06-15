@@ -42,7 +42,6 @@ group("core-tools") {
     "//src/media/bundles:tools",
     "//src/media/codec/bundles:services",
     "//src/media/sessions/bundles:services",
-    "//src/modular/bundles:framework",
 
     # TODO(fxbug.dev/117722): Remove when not required by chromium
     "//src/diagnostics/archivist:archivist-for-embedding",

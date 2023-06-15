@@ -538,8 +538,6 @@ sdk("fuchsia_dart") {
   api = "manifests/fuchsia_dart.manifest"
 
   deps = [
-    "//sdk/docs:modular_config_schema",
-
     # TODO(fxbug.dev/122070): remove, needed to soft transition
     # https://fuchsia-review.googlesource.com/c/fuchsia/+/399537
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_sdk($fidl_toolchain)",

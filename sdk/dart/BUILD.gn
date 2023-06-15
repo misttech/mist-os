@@ -126,8 +126,6 @@ group("tests") {
                   "//sdk/dart/fuchsia_vfs:tests",
                   "//sdk/dart/zircon:tests",
                   "//src/fonts",
-                  "//src/modular/bundles:framework",
-                  "//src/modular/bundles:integration_testing",
                   "//src/ui/examples",
                   "//src/ui/scenic:tests",
                   "//src/ui/tools:scenic",

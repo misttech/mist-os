@@ -39,8 +39,6 @@ group("allow_non_hermetic_packages") {
     "//src/identity/tests/account_manager_integration:*",
     "//src/media/codec/examples:*",
     "//src/media/stream_processors/test:*",
-    "//src/modular:*",
-    "//src/modular/bin/basemgr:*",
     "//src/recovery/integration/ota:*",
     "//src/sys/pkg/tests/isolated-ota:*",
     "//src/sys/run_test_suite/tests:*",
