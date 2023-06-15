@@ -8,6 +8,7 @@ use chrono_english::{parse_date_string, Dialect};
 use diagnostics_data::Severity;
 use fidl_fuchsia_diagnostics::LogInterestSelector;
 use std::{ops::Deref, time::Duration};
+pub mod log_formatter;
 pub mod log_socket_stream;
 
 // Subcommand for ffx log (either watch or dump).
