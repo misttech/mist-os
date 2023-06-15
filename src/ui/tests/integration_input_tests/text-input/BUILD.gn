@@ -24,7 +24,7 @@ group("tests") {
     # The deps below are necessary on minimal product configs.
     # TODO(fxbug.dev/119212): These should be provided by the Product
     # configurations on which these tests run rather than as deps.
-    "//src/chromium:uses_web_engine",
+    "//src/chromium:web_context_provider_for_test",
   ]
 }
 
@@ -98,7 +98,7 @@ fuchsia_test_package("text-input-test") {
     # configurations on which these tests run rather than as deps.
     # TODO(fxbug.dev/119212): Should these be deps of the individual test
     # targets above?
-    "//src/chromium:uses_web_engine",
+    "//src/chromium:web_context_provider_for_test",
     "//src/cobalt/bin/testing/mock_cobalt",
     "//src/connectivity/network/netstack:component",
     "//src/developer/build_info/testing:fake-build-info-component",

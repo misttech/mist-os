@@ -15,7 +15,7 @@ group("tests") {
     # configurations on which these tests run rather than as deps.
     # TODO(fxbug.dev/119212): Should these be deps of the individual test
     # targets above?
-    "//src/chromium:uses_web_engine",
+    "//src/chromium:web_context_provider_for_test",
     "//src/graphics/bin/vulkan_loader",
     "//src/testing/fidl/intl_property_manager",
   ]
@@ -74,7 +74,7 @@ fuchsia_test_package("mouse-input-test") {
 
     # TODO(fxbug.dev/119212): This should be provided by the Product
     # configurations on which these tests run rather than as deps.
-    "//src/chromium:uses_web_engine",
+    "//src/chromium:web_context_provider_for_test",
 
     # Used by some tests.
     "//src/lib/ui/input-synthesis:input-synthesis-component",

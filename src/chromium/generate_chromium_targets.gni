@@ -157,7 +157,7 @@ template("generate_fuchsia_web_targets") {
 
   group("web_engine") {
     # TODO(fxbug.dev/119075): Consider limiting visibility to prevent tests from
-    # depending on it rather than `:uses_web_engine`. Maybe limit it to
+    # depending on it rather than `:web_context_provider_for_test`. Maybe limit it to
     # `//products/*` and `//vendor/*`, though that is imperfect if tests get
     # added to `//vendor/*`.
     visibility += [ "*" ]
@@ -167,10 +167,11 @@ template("generate_fuchsia_web_targets") {
     ]
   }
 
-  # Used by integration tests to indicate they need WebEngine in the Products on
-  # which they run. It has no effect.
-  # TODO(fxbug.dev/119212): Remove once a better solution is available..
-  group("uses_web_engine") {
+  # Used by integration tests to indicate they need WebEngine, specifically the
+  # `context_provider.cm` Component, in the Products on which they run. It has
+  # no effect.
+  # TODO(fxbug.dev/119212): Remove once a better solution is available.
+  group("web_context_provider_for_test") {
     visibility += [ "*" ]
     testonly = true
   }
@@ -330,7 +331,7 @@ if (is_host) {
         # Currently, `web_engine_integration_tests` uses an absolute URL for
         # `web_instance.cm`, so these tests require that `web_engine` in the
         # Product. TODO(crbug.com/1443083): Update based on outcome of the bug.
-        ":uses_web_engine",
+        ":web_context_provider_for_test",
       ]
     }
 

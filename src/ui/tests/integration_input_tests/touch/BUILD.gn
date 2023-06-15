@@ -161,7 +161,7 @@ group("tests") {
     # TODO(fxbug.dev/119212): Should these be deps of the individual test
     # targets above?
     "///src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider",
-    "//src/chromium:uses_web_engine",
+    "//src/chromium:web_context_provider_for_test",
     "//src/cobalt/bin/testing/mock_cobalt",
     "//src/graphics/bin/vulkan_loader",
     "//src/testing/fidl/intl_property_manager",
