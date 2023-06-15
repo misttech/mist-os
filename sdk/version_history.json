@@ -33,10 +33,14 @@
             },
             "11": {
                 "abi_revision": "0x406C7CA7EF077DB4",
-                "status": "supported"
+                "status": "unsupported"
             },
             "12": {
                 "abi_revision": "0x57904F5A17FA3B22",
+                "status": "supported"
+            },
+            "13": {
+                "abi_revision": "0x521FA1E6E1B188D8",
                 "status": "in-development"
             }
         }

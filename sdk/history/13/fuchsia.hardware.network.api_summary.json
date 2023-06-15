@@ -1,0 +1,42 @@
+[
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.hardware.network/DeviceClass.BRIDGE",
+        "value": "4"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.hardware.network/DeviceClass.ETHERNET",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.hardware.network/DeviceClass.PPP",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.hardware.network/DeviceClass.VIRTUAL",
+        "value": "0"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.hardware.network/DeviceClass.WLAN",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.hardware.network/DeviceClass.WLAN_AP",
+        "value": "5"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.hardware.network/DeviceClass",
+        "strictness": "strict",
+        "type": "uint16"
+    },
+    {
+        "kind": "library",
+        "name": "fuchsia.hardware.network"
+    }
+]

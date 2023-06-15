@@ -1,0 +1,272 @@
+[
+    {
+        "kind": "table/member",
+        "name": "fuchsia.net.name/DhcpDnsServerSource.source_interface",
+        "ordinal": "1",
+        "type": "uint64"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.net.name/DhcpDnsServerSource"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.net.name/Dhcpv6DnsServerSource.source_interface",
+        "ordinal": "1",
+        "type": "uint64"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.net.name/Dhcpv6DnsServerSource"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.net.name/DnsServer.address",
+        "ordinal": "1",
+        "type": "fuchsia.net/SocketAddress"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.net.name/DnsServer.source",
+        "ordinal": "2",
+        "type": "fuchsia.net.name/DnsServerSource"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.net.name/DnsServer"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.net.name/DnsServerSource.dhcp",
+        "ordinal": "2",
+        "type": "fuchsia.net.name/DhcpDnsServerSource"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.net.name/DnsServerSource.dhcpv6",
+        "ordinal": "4",
+        "type": "fuchsia.net.name/Dhcpv6DnsServerSource"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.net.name/DnsServerSource.ndp",
+        "ordinal": "3",
+        "type": "fuchsia.net.name/NdpDnsServerSource"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.net.name/DnsServerSource.static_source",
+        "ordinal": "1",
+        "type": "fuchsia.net.name/StaticDnsServerSource"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.net.name/DnsServerSource",
+        "strictness": "strict"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.net.name/DnsServerWatcher.WatchServers",
+        "ordinal": "6289435752595043890",
+        "type": "() -> (vector<fuchsia.net.name/DnsServer> servers)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.net.name/DnsServerWatcher"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.net.name/Lookup.LookupHostname",
+        "ordinal": "1965094522514342692",
+        "type": "(fuchsia.net/IpAddress addr) -> (fuchsia.net.name/Lookup_LookupHostname_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.net.name/Lookup.LookupIp",
+        "ordinal": "6423396061567566288",
+        "type": "(string:255 hostname,fuchsia.net.name/LookupIpOptions options) -> (fuchsia.net.name/Lookup_LookupIp_Result result)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.net.name/Lookup"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.net.name/LookupAdmin.GetDnsServers",
+        "ordinal": "7008449565845288975",
+        "type": "() -> (vector<fuchsia.net/SocketAddress> servers)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.net.name/LookupAdmin.SetDnsServers",
+        "ordinal": "6188713333289893526",
+        "type": "(vector<fuchsia.net/SocketAddress> servers) -> (fuchsia.net.name/LookupAdmin_SetDnsServers_Result result)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.net.name/LookupAdmin"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.name/LookupAdmin_SetDnsServers_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.net.name/LookupAdmin_SetDnsServers_Result.err",
+        "ordinal": "2",
+        "type": "int32"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.net.name/LookupAdmin_SetDnsServers_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.net.name/LookupAdmin_SetDnsServers_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.net.name/LookupAdmin_SetDnsServers_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.net.name/LookupError.INTERNAL_ERROR",
+        "value": "4"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.net.name/LookupError.INVALID_ARGS",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.net.name/LookupError.NOT_FOUND",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.net.name/LookupError.TRANSIENT",
+        "value": "2"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.net.name/LookupError",
+        "strictness": "strict",
+        "type": "uint32"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.net.name/LookupIpOptions.canonical_name_lookup",
+        "ordinal": "4",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.net.name/LookupIpOptions.ipv4_lookup",
+        "ordinal": "1",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.net.name/LookupIpOptions.ipv6_lookup",
+        "ordinal": "2",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.net.name/LookupIpOptions.sort_addresses",
+        "ordinal": "3",
+        "type": "bool"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.net.name/LookupIpOptions"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.net.name/LookupResult.addresses",
+        "ordinal": "1",
+        "type": "vector<fuchsia.net/IpAddress>"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.net.name/LookupResult.canonical_name",
+        "ordinal": "2",
+        "type": "string:255"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.net.name/LookupResult"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.name/Lookup_LookupHostname_Response.hostname",
+        "ordinal": "1",
+        "type": "string:255"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.name/Lookup_LookupHostname_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.net.name/Lookup_LookupHostname_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.net.name/LookupError"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.net.name/Lookup_LookupHostname_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.net.name/Lookup_LookupHostname_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.net.name/Lookup_LookupHostname_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.net.name/Lookup_LookupIp_Response.result",
+        "ordinal": "1",
+        "type": "fuchsia.net.name/LookupResult"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.net.name/Lookup_LookupIp_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.net.name/Lookup_LookupIp_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.net.name/LookupError"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.net.name/Lookup_LookupIp_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.net.name/Lookup_LookupIp_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.net.name/Lookup_LookupIp_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.net.name/NdpDnsServerSource.source_interface",
+        "ordinal": "1",
+        "type": "uint64"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.net.name/NdpDnsServerSource"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.net.name/StaticDnsServerSource"
+    },
+    {
+        "kind": "library",
+        "name": "fuchsia.net.name"
+    }
+]

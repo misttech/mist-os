@@ -14,13 +14,13 @@
     {
         "kind": "const",
         "name": "zx/DEFAULT_CHANNEL_RIGHTS",
-        "type": "zx/rights",
+        "type": "zx/Rights",
         "value": "61454"
     },
     {
         "kind": "const",
         "name": "zx/DEFAULT_EVENT_RIGHTS",
-        "type": "zx/rights",
+        "type": "zx/Rights",
         "value": "53251"
     },
     {
@@ -36,303 +36,303 @@
         "value": "32"
     },
     {
+        "kind": "enum/member",
+        "name": "zx/ObjType.BTI",
+        "value": "24"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.CHANNEL",
+        "value": "4"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.CLOCK",
+        "value": "30"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.EVENT",
+        "value": "5"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.EVENTPAIR",
+        "value": "16"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.EXCEPTION",
+        "value": "29"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.FIFO",
+        "value": "19"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.GUEST",
+        "value": "20"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.INTERRUPT",
+        "value": "9"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.IOMMU",
+        "value": "23"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.JOB",
+        "value": "17"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.LOG",
+        "value": "12"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.MSI",
+        "value": "32"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.NONE",
+        "value": "0"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.PAGER",
+        "value": "28"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.PCI_DEVICE",
+        "value": "11"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.PMT",
+        "value": "26"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.PORT",
+        "value": "6"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.PROCESS",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.PROFILE",
+        "value": "25"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.RESOURCE",
+        "value": "15"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.SOCKET",
+        "value": "14"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.STREAM",
+        "value": "31"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.SUSPEND_TOKEN",
+        "value": "27"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.THREAD",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.TIMER",
+        "value": "22"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.VCPU",
+        "value": "21"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.VMAR",
+        "value": "18"
+    },
+    {
+        "kind": "enum/member",
+        "name": "zx/ObjType.VMO",
+        "value": "3"
+    },
+    {
+        "kind": "enum",
+        "name": "zx/ObjType",
+        "strictness": "strict",
+        "type": "uint32"
+    },
+    {
         "kind": "const",
         "name": "zx/RIGHTS_BASIC",
-        "type": "zx/rights",
+        "type": "zx/Rights",
         "value": "49155"
     },
     {
         "kind": "const",
         "name": "zx/RIGHTS_IO",
-        "type": "zx/rights",
+        "type": "zx/Rights",
         "value": "12"
     },
     {
         "kind": "const",
         "name": "zx/RIGHTS_POLICY",
-        "type": "zx/rights",
+        "type": "zx/Rights",
         "value": "3072"
     },
     {
         "kind": "const",
         "name": "zx/RIGHTS_PROPERTY",
-        "type": "zx/rights",
+        "type": "zx/Rights",
         "value": "192"
     },
     {
-        "kind": "enum/member",
-        "name": "zx/obj_type.BTI",
-        "value": "24"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.CHANNEL",
-        "value": "4"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.CLOCK",
-        "value": "30"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.EVENT",
-        "value": "5"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.EVENTPAIR",
-        "value": "16"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.EXCEPTION",
-        "value": "29"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.FIFO",
-        "value": "19"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.GUEST",
-        "value": "20"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.INTERRUPT",
-        "value": "9"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.IOMMU",
-        "value": "23"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.JOB",
-        "value": "17"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.LOG",
-        "value": "12"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.MSI",
-        "value": "32"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.NONE",
-        "value": "0"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.PAGER",
-        "value": "28"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.PCI_DEVICE",
-        "value": "11"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.PMT",
-        "value": "26"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.PORT",
-        "value": "6"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.PROCESS",
-        "value": "1"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.PROFILE",
-        "value": "25"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.RESOURCE",
-        "value": "15"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.SOCKET",
-        "value": "14"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.STREAM",
-        "value": "31"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.SUSPEND_TOKEN",
-        "value": "27"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.THREAD",
-        "value": "2"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.TIMER",
-        "value": "22"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.VCPU",
-        "value": "21"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.VMAR",
-        "value": "18"
-    },
-    {
-        "kind": "enum/member",
-        "name": "zx/obj_type.VMO",
-        "value": "3"
-    },
-    {
-        "kind": "enum",
-        "name": "zx/obj_type",
-        "strictness": "strict",
-        "type": "uint32"
-    },
-    {
         "kind": "bits/member",
-        "name": "zx/rights.APPLY_PROFILE",
+        "name": "zx/Rights.APPLY_PROFILE",
         "value": "524288"
     },
     {
         "kind": "bits/member",
-        "name": "zx/rights.DESTROY",
+        "name": "zx/Rights.DESTROY",
         "value": "512"
     },
     {
         "kind": "bits/member",
-        "name": "zx/rights.DUPLICATE",
+        "name": "zx/Rights.DUPLICATE",
         "value": "1"
     },
     {
         "kind": "bits/member",
-        "name": "zx/rights.ENUMERATE",
+        "name": "zx/Rights.ENUMERATE",
         "value": "256"
     },
     {
         "kind": "bits/member",
-        "name": "zx/rights.EXECUTE",
+        "name": "zx/Rights.EXECUTE",
         "value": "16"
     },
     {
         "kind": "bits/member",
-        "name": "zx/rights.GET_POLICY",
+        "name": "zx/Rights.GET_POLICY",
         "value": "2048"
     },
     {
         "kind": "bits/member",
-        "name": "zx/rights.GET_PROPERTY",
+        "name": "zx/Rights.GET_PROPERTY",
         "value": "64"
     },
     {
         "kind": "bits/member",
-        "name": "zx/rights.INSPECT",
+        "name": "zx/Rights.INSPECT",
         "value": "32768"
     },
     {
         "kind": "bits/member",
-        "name": "zx/rights.MANAGE_JOB",
+        "name": "zx/Rights.MANAGE_JOB",
         "value": "65536"
     },
     {
         "kind": "bits/member",
-        "name": "zx/rights.MANAGE_PROCESS",
+        "name": "zx/Rights.MANAGE_PROCESS",
         "value": "131072"
     },
     {
         "kind": "bits/member",
-        "name": "zx/rights.MANAGE_SOCKET",
+        "name": "zx/Rights.MANAGE_SOCKET",
         "value": "1048576"
     },
     {
         "kind": "bits/member",
-        "name": "zx/rights.MANAGE_THREAD",
+        "name": "zx/Rights.MANAGE_THREAD",
         "value": "262144"
     },
     {
         "kind": "bits/member",
-        "name": "zx/rights.MAP",
+        "name": "zx/Rights.MAP",
         "value": "32"
     },
     {
         "kind": "bits/member",
-        "name": "zx/rights.OP_CHILDREN",
+        "name": "zx/Rights.OP_CHILDREN",
         "value": "2097152"
     },
     {
         "kind": "bits/member",
-        "name": "zx/rights.READ",
+        "name": "zx/Rights.READ",
         "value": "4"
     },
     {
         "kind": "bits/member",
-        "name": "zx/rights.RESIZE",
+        "name": "zx/Rights.RESIZE",
         "value": "4194304"
     },
     {
         "kind": "bits/member",
-        "name": "zx/rights.SAME_RIGHTS",
+        "name": "zx/Rights.SAME_RIGHTS",
         "value": "2147483648"
     },
     {
         "kind": "bits/member",
-        "name": "zx/rights.SET_POLICY",
+        "name": "zx/Rights.SET_POLICY",
         "value": "1024"
     },
     {
         "kind": "bits/member",
-        "name": "zx/rights.SET_PROPERTY",
+        "name": "zx/Rights.SET_PROPERTY",
         "value": "128"
     },
     {
         "kind": "bits/member",
-        "name": "zx/rights.SIGNAL",
+        "name": "zx/Rights.SIGNAL",
         "value": "4096"
     },
     {
         "kind": "bits/member",
-        "name": "zx/rights.SIGNAL_PEER",
+        "name": "zx/Rights.SIGNAL_PEER",
         "value": "8192"
     },
     {
         "kind": "bits/member",
-        "name": "zx/rights.TRANSFER",
+        "name": "zx/Rights.TRANSFER",
         "value": "2"
     },
     {
         "kind": "bits/member",
-        "name": "zx/rights.WAIT",
+        "name": "zx/Rights.WAIT",
         "value": "16384"
     },
     {
         "kind": "bits/member",
-        "name": "zx/rights.WRITE",
+        "name": "zx/Rights.WRITE",
         "value": "8"
     },
     {
         "kind": "bits",
-        "name": "zx/rights",
+        "name": "zx/Rights",
         "strictness": "strict",
         "type": "uint32"
     },
