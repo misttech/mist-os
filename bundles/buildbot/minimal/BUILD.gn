@@ -1,0 +1,51 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+assert(is_fuchsia, "These can only be defined in the default toolchain")
+
+# WARNING: Known to infrastructure
+group("minimal") {
+  testonly = true
+
+  # The buildbot groups are not allowed to add platform features, only tests
+  # and tools.
+  assert_no_deps = [ "//bundles/platform/*" ]
+
+  deps = [ ":additional_build_targets" ]
+}
+
+# Contains additional targets to be built that are not needed for tests.
+# This allows bots to ensure buildable targets do not regress even if they are
+# not being run by another bot (i.e., during bringup of a new CPU architecture).
+group("additional_build_targets") {
+  testonly = true
+
+  deps = [
+    # TODO(fxbug.dev/128952): Enable after https://fxrev.dev/870816 lands.
+    # "//examples",
+
+    # TODO(fxbug.dev/128952): Enable after fxbug.dev/129033 is fixed or the
+    # Flutter deps are removed on RISC-V.
+    # sdk:tests
+
+    # TODO(fxbug.dev/122609): Enable after removing Go dependencies and fixing
+    # fxbug.dev/129093.
+    # "//src/connectivity/network:tests",
+
+    # TODO(fxbug.dev/128554): Enable once //src/starnix/containers/debian
+    # supports RISC-V.
+    # "//src/developer:tests",
+
+    "//src/fonts:tests",
+    "//src/hwinfo:tests",
+    "//src/intl:tests",
+
+    # TODO(fxbug.dev/129093): Enable once the bug is fixed.
+    # "//src/lib:tests",
+
+    # TODO(fxbug.dev/128952): Enable after disabling battery_manager_go_test
+    # on RISC-V.
+    # "//src/power:tests",
+  ]
+}
