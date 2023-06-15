@@ -69,6 +69,47 @@ zx_status_t GpioDevice::GpioSetDriveStrength(uint64_t ds_ua, uint64_t* out_actua
   return gpio_.SetDriveStrength(pin_, ds_ua, out_actual_ds_ua);
 }
 
+zx_status_t GpioDevice::InitAddDevice() {
+  char name[20];
+  snprintf(name, sizeof(name), "gpio-%u", pin_);
+
+  zx_device_prop_t props[] = {
+      {BIND_GPIO_PIN, 0, pin_},
+  };
+
+  async_dispatcher_t* dispatcher =
+      fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher());
+  outgoing_ = component::OutgoingDirectory(dispatcher);
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.status_value();
+  }
+
+  fuchsia_hardware_gpio::Service::InstanceHandler handler({
+      .device = bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
+  });
+  auto result = outgoing_->AddService<fuchsia_hardware_gpio::Service>(std::move(handler));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service to the outgoing directory");
+    return result.status_value();
+  }
+
+  result = outgoing_->Serve(std::move(endpoints->server));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service to the outgoing directory");
+    return result.status_value();
+  }
+
+  std::array offers = {
+      fuchsia_hardware_gpio::Service::Name,
+  };
+
+  return DdkAdd(
+      ddk::DeviceAddArgs(name).set_props(props).set_fidl_service_offers(offers).set_outgoing_dir(
+          endpoints->client.TakeChannel()));
+}
+
 void GpioDevice::DdkUnbind(ddk::UnbindTxn txn) {
   if (binding_.has_value()) {
     Binding& binding = binding_.value();
@@ -81,27 +122,6 @@ void GpioDevice::DdkUnbind(ddk::UnbindTxn txn) {
 }
 
 void GpioDevice::DdkRelease() { delete this; }
-
-void GpioDevice::OpenSession(OpenSessionRequestView request,
-                             OpenSessionCompleter::Sync& completer) {
-  if (binding_.has_value()) {
-    request->session.Close(ZX_ERR_ALREADY_BOUND);
-    return;
-  }
-  binding_ = Binding{
-      .binding = fidl::BindServer(
-          fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(request->session), this,
-          [](GpioDevice* self, fidl::UnbindInfo, fidl::ServerEnd<fuchsia_hardware_gpio::Gpio>) {
-            self->GpioReleaseInterrupt();
-            std::optional opt = std::exchange(self->binding_, {});
-            ZX_ASSERT(opt.has_value());
-            Binding& binding = opt.value();
-            if (binding.unbind_txn.has_value()) {
-              binding.unbind_txn.value().Reply();
-            }
-          }),
-  };
-}
 
 zx_status_t GpioDevice::Create(void* ctx, zx_device_t* parent) {
   gpio_impl_protocol_t gpio;
@@ -137,15 +157,9 @@ zx_status_t GpioDevice::Create(void* ctx, zx_device_t* parent) {
       return ZX_ERR_NO_MEMORY;
     }
 
-    char name[20];
-    snprintf(name, sizeof(name), "gpio-%u", pin.pin);
-    zx_device_prop_t props[] = {
-        {BIND_GPIO_PIN, 0, pin.pin},
-    };
-
-    status = dev->DdkAdd(ddk::DeviceAddArgs(name).set_props(props));
+    status = dev->InitAddDevice();
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to add device \"%s\": %s", name, zx_status_get_string(status));
+      zxlogf(ERROR, "Failed to add device: %s", zx_status_get_string(status));
       return status;
     }
 

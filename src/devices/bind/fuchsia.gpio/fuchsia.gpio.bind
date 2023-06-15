@@ -9,6 +9,10 @@ extend uint fuchsia.BIND_PROTOCOL {
   IMPL = 21,
 };
 
+extend uint fuchsia.BIND_FIDL_PROTOCOL {
+  SERVICE = 26,
+};
+
 extend uint fuchsia.BIND_INIT_STEP {
   GPIO = 0x4F495047,
 };

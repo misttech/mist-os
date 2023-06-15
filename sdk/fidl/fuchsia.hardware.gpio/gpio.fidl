@@ -100,3 +100,7 @@ closed protocol Device {
         session server_end:Gpio;
     });
 };
+
+service Service {
+    device client_end:Gpio;
+};
