@@ -2,8 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/config/clang/clang.gni")
+import("//build/config/current_target_tuple.gni")
 import("//build/testing/golden_files.gni")
+import("//build/zircon/c_utils.gni")
 
 # Internal template used to preprocess a DTS file.
 #
@@ -17,14 +18,14 @@ import("//build/testing/golden_files.gni")
 #     - Optional: Usual GN meaning.
 #
 template("_preprocessed_dts") {
-  action(target_name) {
+  toolchain_utils_action(target_name) {
     forward_variables_from(invoker,
                            [
                              "sources",
                              "deps",
                            ])
 
-    script = clang_prefix + "/clang"
+    utils = [ "cc" ]
 
     raw_dts_dir = target_name + "_raw_dts"
     source_root_relative = rebase_path(sources[0], "//")
@@ -35,6 +36,8 @@ template("_preprocessed_dts") {
     include_dir = rebase_path("//", root_build_dir)
 
     args = [
+      "--target=$current_target_tuple",
+      "-undef",
       "-MD",
       "-MF",
       rebase_path(depfile, root_build_dir),
