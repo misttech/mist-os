@@ -251,6 +251,9 @@ template("bazel_product_bundle") {
       _full_label = "${_label_dir}:${target_name}($current_toolchain)"
       _system_a_root = rebase_path(target_gen_dir, root_out_dir) +
                        "/${files.product_bundle_out_dir}/system_a"
+      _system_r_root = rebase_path(target_gen_dir, root_out_dir) +
+                       "/${files.product_bundle_out_dir}/system_r"
+      _recovery_name = get_label_info(recovery_label, "name")
 
       # This value can be set (e.g. for testing) with `--args sdk_id=1234` on
       # the `fx set` call.
@@ -316,6 +319,34 @@ template("bazel_product_bundle") {
             # Hack: Infra expects bootserver_pave to be present
             # in the GN graph for this image to be built.
             bootserver_pave = []
+          },
+          {
+            name = "zircon-r"
+            cpu = current_cpu
+            type = "zbi"
+            label = _full_label
+            path = "${_system_r_root}/${_recovery_name}.zbi"
+
+            archive = true
+            bootserver_pave = [ "--zirconr" ]
+            fastboot_flash = []
+            if (zircon_r_partition != "") {
+              fastboot_flash = [ zircon_r_partition ]
+            }
+          },
+          {
+            name = "zircon-r"
+            cpu = current_cpu
+            type = "vbmeta"
+            label = _full_label
+            path = "${_system_r_root}/${_recovery_name}.vbmeta"
+
+            archive = true
+            bootserver_pave = [ "--vbmetar" ]
+            fastboot_flash = []
+            if (vbmeta_r_partition != "") {
+              fastboot_flash = [ vbmeta_r_partition ]
+            }
           },
         ]
 

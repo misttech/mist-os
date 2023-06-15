@@ -141,28 +141,44 @@ files = {
   }
 
   # Recovery output image and vbmeta
-  if (recovery_is_zedboot) {
-    _recovery_outdir = zedboot_assembly_outdir
-    recovery_zbi = "${zedboot_assembly_outdir}/zedboot.${_image_suffix}"
-    recovery_vbmeta = "${zedboot_assembly_outdir}/zedboot.vbmeta"
-  } else if (recovery_is_recovery_eng) {
-    _recovery_outdir = root_out_dir
-    recovery_zbi = "${root_out_dir}/obj/build/images/recovery/recovery-eng/recovery-eng.${_image_suffix}"
-    recovery_vbmeta = "${root_out_dir}/obj/build/images/recovery/recovery-eng/recovery-eng.vbmeta"
-  } else if (recovery_is_recovery_fastboot) {
-    _recovery_outdir = root_out_dir
-    recovery_zbi = "${root_out_dir}/obj/build/images/recovery/recovery-fastboot/recovery-fastboot.${_image_suffix}"
-    recovery_vbmeta = "${root_out_dir}/obj/build/images/recovery/recovery-fastboot/recovery-fastboot.vbmeta"
+  if (use_bazel_images_only) {
+    _recovery_outdir = images_outdir + "/system_r"
+    _recovery_name = get_label_info(recovery_label, "name")
+
+    recovery_zbi = "${_recovery_outdir}/${_recovery_name}.${_image_suffix}"
+    recovery_vbmeta = "${_recovery_outdir}/${_recovery_name}.vbmeta"
   } else {
-    # The standard recovery image and vbmeta locations.
-    _recovery_outdir = root_out_dir
-    recovery_zbi = "${root_out_dir}/recovery.${_image_suffix}"
-    recovery_vbmeta = "${root_out_dir}/recovery.vbmeta"
+    if (recovery_is_zedboot) {
+      _recovery_outdir = zedboot_assembly_outdir
+      recovery_zbi = "${zedboot_assembly_outdir}/zedboot.${_image_suffix}"
+      recovery_vbmeta = "${zedboot_assembly_outdir}/zedboot.vbmeta"
+    } else if (recovery_is_recovery_eng) {
+      _recovery_outdir = root_out_dir
+      recovery_zbi = "${root_out_dir}/obj/build/images/recovery/recovery-eng/recovery-eng.${_image_suffix}"
+      recovery_vbmeta = "${root_out_dir}/obj/build/images/recovery/recovery-eng/recovery-eng.vbmeta"
+    } else if (recovery_is_recovery_fastboot) {
+      _recovery_outdir = root_out_dir
+      recovery_zbi = "${root_out_dir}/obj/build/images/recovery/recovery-fastboot/recovery-fastboot.${_image_suffix}"
+      recovery_vbmeta = "${root_out_dir}/obj/build/images/recovery/recovery-fastboot/recovery-fastboot.vbmeta"
+    } else {
+      # The standard recovery image and vbmeta locations.
+      _recovery_outdir = root_out_dir
+      recovery_zbi = "${root_out_dir}/recovery.${_image_suffix}"
+      recovery_vbmeta = "${root_out_dir}/recovery.vbmeta"
+    }
   }
-  final_recovery_zbi =
-      "${root_out_dir}/" + rebase_path(recovery_zbi, _recovery_outdir)
-  final_recovery_vbmeta =
-      "${root_out_dir}/" + rebase_path(recovery_vbmeta, _recovery_outdir)
+
+  if (use_bazel_images_only) {
+    # Final recovery image and vbmeta are not copied to root in Bazel assembly.
+    final_recovery_zbi = recovery_zbi
+    final_recovery_vbmeta = recovery_vbmeta
+  } else {
+    # Final recovery image and vbmeta (the files at the above paths are copied here).
+    final_recovery_zbi =
+        "${root_out_dir}/" + rebase_path(recovery_zbi, _recovery_outdir)
+    final_recovery_vbmeta =
+        "${root_out_dir}/" + rebase_path(recovery_vbmeta, _recovery_outdir)
+  }
 
   installer_zbi = "${root_out_dir}/obj/build/images/recovery/recovery-installer/recovery-installer.${_image_suffix}"
   installer_vbmeta = "${root_out_dir}/obj/build/images/recovery/recovery-installer/recovery-installer.vbmeta"
