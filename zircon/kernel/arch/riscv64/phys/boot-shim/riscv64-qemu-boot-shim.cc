@@ -39,7 +39,7 @@ using PlatformIdItem = boot_shim::SingleOptionalItem<zbi_platform_id_t, ZBI_TYPE
 using BoardInfoItem = boot_shim::SingleOptionalItem<zbi_board_info_t, ZBI_TYPE_DRV_BOARD_INFO>;
 
 using Shim = boot_shim::BootShim<boot_shim::PoolMemConfigItem,     //
-                                 boot_shim::UartItem,              //
+                                 boot_shim::UartItem<>,            //
                                  boot_shim::TestSerialNumberItem,  //
                                  PlicItem, TimerItem, DtbItem, PlatformIdItem, BoardInfoItem>;
 
@@ -157,7 +157,7 @@ void PhysMain(void* ptr, arch::EarlyTicks boot_ticks) {
   Shim shim(symbolize.name());
   shim.set_build_id(symbolize.build_id());
   shim.set_info("QEMU -kernel argument");
-  shim.Get<boot_shim::UartItem>().Init(GetUartDriver().uart());
+  shim.Get<boot_shim::UartItem<>>().Init(GetUartDriver().uart());
 
   Shim::ByteView zbi = ParseDevicetree(shim, dt);
   ArchSetUp(const_cast<ktl::byte*>(zbi.data()));

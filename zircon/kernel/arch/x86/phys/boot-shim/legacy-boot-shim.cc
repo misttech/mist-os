@@ -44,7 +44,7 @@ void PhysMain(void* ptr, arch::EarlyTicks boot_ticks) {
 
   LegacyBootShim shim(symbolize.name(), gLegacyBoot);
   shim.set_build_id(symbolize.build_id());
-  shim.Get<boot_shim::UartItem>().Init(GetUartDriver().uart());
+  shim.Get<boot_shim::UartItem<>>().Init(GetUartDriver().uart());
 
   // The pool knows all the memory details, so populate the ZBI item that way.
   memalloc::Pool& memory = Allocation::GetPool();

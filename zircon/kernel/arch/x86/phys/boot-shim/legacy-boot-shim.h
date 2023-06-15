@@ -27,7 +27,7 @@ class TrampolineBoot;
 
 using LegacyBootShimBase = boot_shim::BootShim<  //
     boot_shim::PoolMemConfigItem,                //
-    boot_shim::UartItem,                         //
+    boot_shim::UartItem<>,                       //
     boot_shim::AcpiRsdpItem,                     //
     boot_shim::TestSerialNumberItem>;
 
@@ -40,7 +40,7 @@ class LegacyBootShim : public LegacyBootShimBase {
     Log(input_zbi_.storage());
     Check("Error scanning ZBI", Get<SerialNumber>().Init(input_zbi_));
     Get<boot_shim::AcpiRsdpItem>().set_payload(info.acpi_rsdp);
-    Get<boot_shim::UartItem>().Init(info.uart);
+    Get<boot_shim::UartItem<>>().Init(info.uart);
   }
 
   void InitMemConfig(const memalloc::Pool& pool) { Get<boot_shim::PoolMemConfigItem>().Init(pool); }

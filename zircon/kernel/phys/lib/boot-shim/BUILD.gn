@@ -63,7 +63,6 @@ zx_library("boot-shim") {
     "efi.cc",
     "pool-mem-config.cc",
     "test-serial-number.cc",
-    "uart.cc",
   ]
 
   deps = [
@@ -102,6 +101,7 @@ if (!is_kernel) {
   }
 
   test("boot-shim-unittests") {
+    defines = [ "UART_ALL_DRIVERS=1" ]
     sources = [
       "acpi-tests.cc",
       "boot-shim-tests.cc",
