@@ -31,7 +31,8 @@ use netlink_packet_core::{NetlinkMessage, NLM_F_MULTIPART};
 use netlink_packet_route::{
     AddressHeader, AddressMessage, LinkHeader, LinkMessage, RtnlMessage, AF_INET, AF_INET6,
     AF_UNSPEC, ARPHRD_ETHER, ARPHRD_LOOPBACK, ARPHRD_PPP, ARPHRD_VOID, IFA_F_PERMANENT,
-    IFF_LOOPBACK, IFF_RUNNING, IFF_UP, RTNLGRP_IPV4_IFADDR, RTNLGRP_IPV6_IFADDR, RTNLGRP_LINK,
+    IFF_LOOPBACK, IFF_LOWER_UP, IFF_RUNNING, IFF_UP, RTNLGRP_IPV4_IFADDR, RTNLGRP_IPV6_IFADDR,
+    RTNLGRP_LINK,
 };
 use tracing::{debug, error, warn};
 
@@ -859,6 +860,34 @@ fn device_class_to_link_type(device_class: fnet_interfaces::DeviceClass) -> u16 
     }
 }
 
+// Netstack only reports 'online' when the 'admin status' is 'enabled' and the 'link
+// state' is UP. IFF_RUNNING represents only `link state` UP, so it is likely that
+// there will be cases where a flag should be set to IFF_RUNNING but we can not make
+// the determination with the information provided.
+//
+// Per https://www.kernel.org/doc/html/latest/networking/operstates.html#querying-from-userspace,
+//
+//   Both admin and operational state can be queried via the netlink operation
+//   RTM_GETLINK. It is also possible to subscribe to RTNLGRP_LINK to be
+//   notified of updates while the interface is admin up. This is important for
+//   setting from userspace.
+//
+//   These values contain interface state:
+//
+//   ifinfomsg::if_flags & IFF_UP:
+//       Interface is admin up
+//
+//   ifinfomsg::if_flags & IFF_RUNNING:
+//       Interface is in RFC2863 operational state UP or UNKNOWN. This is for
+//       backward compatibility, routing daemons, dhcp clients can use this flag
+//       to determine whether they should use the interface.
+//
+//   ifinfomsg::if_flags & IFF_LOWER_UP:
+//       Driver has signaled netif_carrier_on()
+//
+//   ...
+const ONLINE_IF_FLAGS: u32 = IFF_UP | IFF_RUNNING | IFF_LOWER_UP;
+
 // Implement conversions from `Properties` to `NetlinkLinkMessage`
 // which is fallible iff, the interface has an id greater than u32.
 impl TryFrom<fnet_interfaces_ext::Properties> for NetlinkLinkMessage {
@@ -893,11 +922,7 @@ impl TryFrom<fnet_interfaces_ext::Properties> for NetlinkLinkMessage {
 
         let mut flags = 0;
         if online {
-            // Netstack only reports 'online' when the 'admin status' is 'enabled' and the 'link
-            // state' is UP. IFF_RUNNING represents only `link state` UP, so it is likely that
-            // there will be cases where a flag should be set to IFF_RUNNING but we can not make
-            // the determination with the information provided.
-            flags |= IFF_UP | IFF_RUNNING;
+            flags |= ONLINE_IF_FLAGS;
         };
         if link_header.link_layer_type == ARPHRD_LOOPBACK {
             flags |= IFF_LOOPBACK;
@@ -1567,15 +1592,15 @@ mod tests {
     }
 
     #[test_case(ETHERNET, false, 0)]
-    #[test_case(ETHERNET, true, IFF_UP | IFF_RUNNING)]
+    #[test_case(ETHERNET, true, ONLINE_IF_FLAGS)]
     #[test_case(WLAN, false, 0)]
-    #[test_case(WLAN, true, IFF_UP | IFF_RUNNING)]
+    #[test_case(WLAN, true, ONLINE_IF_FLAGS)]
     #[test_case(WLAN_AP, false, 0)]
-    #[test_case(WLAN_AP, true, IFF_UP | IFF_RUNNING)]
+    #[test_case(WLAN_AP, true, ONLINE_IF_FLAGS)]
     #[test_case(PPP, false, 0)]
-    #[test_case(PPP, true, IFF_UP | IFF_RUNNING)]
+    #[test_case(PPP, true, ONLINE_IF_FLAGS)]
     #[test_case(LOOPBACK, false, IFF_LOOPBACK)]
-    #[test_case(LOOPBACK, true, IFF_UP | IFF_RUNNING | IFF_LOOPBACK)]
+    #[test_case(LOOPBACK, true, ONLINE_IF_FLAGS | IFF_LOOPBACK)]
     fn test_interface_conversion(
         device_class: fnet_interfaces::DeviceClass,
         online: bool,
@@ -1784,7 +1809,7 @@ mod tests {
             create_netlink_link_message(
                 LO_INTERFACE_ID,
                 ARPHRD_LOOPBACK,
-                IFF_UP | IFF_RUNNING | IFF_LOOPBACK,
+                ONLINE_IF_FLAGS | IFF_LOOPBACK,
                 create_nlas(LO_NAME.to_string(), ARPHRD_LOOPBACK, true),
             )
             .into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false),
@@ -2015,7 +2040,7 @@ mod tests {
                         create_netlink_link_message(
                             LO_INTERFACE_ID,
                             ARPHRD_LOOPBACK,
-                            IFF_UP | IFF_RUNNING | IFF_LOOPBACK,
+                            ONLINE_IF_FLAGS | IFF_LOOPBACK,
                             create_nlas(LO_NAME.to_string(), ARPHRD_LOOPBACK, true),
                         )
                         .into_rtnl_new_link(TEST_SEQUENCE_NUMBER, true)
