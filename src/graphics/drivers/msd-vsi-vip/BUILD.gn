@@ -78,32 +78,55 @@ driver_bind_rules("msd_vsi_bind") {
   ]
 }
 
+entry_deps = [
+  "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
+  "//src/devices/bus/lib/device-protocol-pdev",
+  "//src/devices/lib/driver",
+  "//src/graphics/lib/magma/src/magma_util:macros",
+  "//src/graphics/lib/magma/src/magma_util/platform:logger",
+  "//src/graphics/lib/magma/src/magma_util/platform:trace",
+  "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
+  "//src/graphics/lib/magma/src/magma_util/platform/zircon:thread_profile",
+  "//src/graphics/lib/magma/src/sys_driver_cpp",
+  "//src/graphics/lib/magma/src/sys_driver_cpp:device_impl",
+  "//src/lib/ddk",
+  "//src/lib/ddktl",
+  "//zircon/system/ulib/trace",
+  "//zircon/system/ulib/trace-vthread",
+  "//zircon/system/ulib/zx",
+]
+
+source_set("msd_vsi_entry") {
+  sources = [ "src/driver_entry.cc" ]
+  deps = entry_deps + [ ":msd_vsi_bind" ]
+}
+
+source_set("msd_vsi_test_entry") {
+  assert_no_deps = [ "//src/graphics/lib/magma/src/sys_driver" ]
+  testonly = true
+  sources = [
+    "src/driver_entry.cc",
+    "src/driver_test_gtest.cc",
+  ]
+
+  defines = [ "MAGMA_TEST_DRIVER=1" ]
+
+  deps = entry_deps + [
+           ":msd_vsi_test_bind",
+           "src",
+           "tests/unit_tests:hardware_tests",
+           "//src/graphics/lib/magma/tests/helper:platform_device_helper",
+           "//src/graphics/lib/magma/tests/helper:platform_msd_device_helper",
+           "//third_party/googletest:gtest",
+         ]
+}
+
 driver_bind_rules("msd_vsi_test_bind") {
   rules = "msd_vsi_test.bind"
   disable_autobind = true
   deps = [
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.verisilicon.platform",
-  ]
-}
-
-magma_pdev_entry("msd_vsi_entry") {
-  deps = [
-    ":msd_vsi_bind",
-    "//zircon/system/ulib/trace",
-    "//zircon/system/ulib/trace-vthread",
-  ]
-}
-
-magma_pdev_entry("msd_vsi_test_entry") {
-  test_entry = true
-  deps = [
-    ":msd_vsi_test_bind",
-    "tests/unit_tests:hardware_tests",
-    "//src/graphics/lib/magma/tests/unit_tests:magma_platform_device_tests",
-    "//src/graphics/lib/magma/tests/unit_tests:msd_conformance_tests",
-    "//zircon/system/ulib/trace",
-    "//zircon/system/ulib/trace-vthread",
   ]
 }
 

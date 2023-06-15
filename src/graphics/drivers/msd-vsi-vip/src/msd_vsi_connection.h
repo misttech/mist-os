@@ -12,7 +12,7 @@
 #include "address_space.h"
 #include "magma_util/short_macros.h"
 #include "mapped_batch.h"
-#include "msd.h"
+#include "msd_cc.h"
 #include "ringbuffer.h"
 
 class MsdVsiConnection {
@@ -25,8 +25,8 @@ class MsdVsiConnection {
     virtual magma::Status SubmitBatch(std::unique_ptr<MappedBatch> batch, bool do_flush) = 0;
   };
 
-  MsdVsiConnection(Owner* owner, std::shared_ptr<AddressSpace> address_space,
-                   msd_client_id_t client_id)
+  explicit MsdVsiConnection(Owner* owner, std::shared_ptr<AddressSpace> address_space,
+                            msd_client_id_t client_id)
       : owner_(owner), address_space_(std::move(address_space)), client_id_(client_id) {}
 
   magma::Status MapBufferGpu(std::shared_ptr<MsdVsiBuffer> buffer, uint64_t gpu_va,
@@ -42,8 +42,8 @@ class MsdVsiConnection {
 
   bool address_space_dirty() { return address_space_dirty_; }
 
-  void SetNotificationCallback(msd_connection_notification_callback_t callback, void* token) {
-    notifications_.Set(callback, token);
+  void SetNotificationCallback(msd::NotificationHandler* notification_handler) {
+    notifications_.Set(notification_handler);
   }
 
   void SendContextKilled() { notifications_.SendContextKilled(); }
@@ -80,22 +80,18 @@ class MsdVsiConnection {
    public:
     void SendContextKilled() {
       std::lock_guard<std::mutex> lock(mutex_);
-      if (callback_ && token_) {
-        msd_notification_t notification = {};
-        notification.type = MSD_CONNECTION_NOTIFICATION_CONTEXT_KILLED;
-        callback_(token_, &notification);
+      if (notification_handler_) {
+        notification_handler_->ContextKilled();
       }
     }
 
-    void Set(msd_connection_notification_callback_t callback, void* token) {
+    void Set(msd::NotificationHandler* notification_handler) {
       std::lock_guard<std::mutex> lock(mutex_);
-      callback_ = callback;
-      token_ = token;
+      notification_handler_ = notification_handler;
     }
 
    private:
-    FIT_GUARDED(mutex_) msd_connection_notification_callback_t callback_ = nullptr;
-    FIT_GUARDED(mutex_) void* token_ = nullptr;
+    FIT_GUARDED(mutex_) msd::NotificationHandler* notification_handler_{};
     std::mutex mutex_;
   };
 
@@ -106,23 +102,40 @@ class MsdVsiConnection {
   friend class TestMsdVsiConnection_ReleaseBufferWhileMapped_Test;
 };
 
-class MsdVsiAbiConnection : public msd_connection_t {
+class MsdVsiAbiConnection : public msd::Connection {
  public:
-  MsdVsiAbiConnection(std::shared_ptr<MsdVsiConnection> ptr) : ptr_(std::move(ptr)) {
-    magic_ = kMagic;
+  explicit MsdVsiAbiConnection(std::shared_ptr<MsdVsiConnection> ptr)
+      : ptr_(std::move(ptr)), magic_(kMagic) {}
+
+  static MsdVsiAbiConnection* cast(msd::Connection* conn) {
+    DASSERT(conn);
+    auto connection = static_cast<MsdVsiAbiConnection*>(conn);
+    DASSERT(connection->magic_ == kMagic);
+    return connection;
   }
 
-  static MsdVsiAbiConnection* cast(msd_connection_t* connection) {
-    DASSERT(connection);
-    DASSERT(connection->magic_ == kMagic);
-    return static_cast<MsdVsiAbiConnection*>(connection);
+  magma_status_t MapBuffer(msd::Buffer& buffer, uint64_t gpu_va, uint64_t offset, uint64_t length,
+                           uint64_t flags) override;
+
+  void ReleaseBuffer(msd::Buffer& buffer) override;
+
+  magma_status_t UnmapBuffer(msd::Buffer& buffer, uint64_t gpu_va) override;
+
+  magma_status_t BufferRangeOp(msd::Buffer& buffer, uint32_t options, uint64_t start_offset,
+                               uint64_t length) override {
+    return MAGMA_STATUS_INVALID_ARGS;
   }
+
+  void SetNotificationCallback(msd::NotificationHandler* handler) override;
+
+  std::unique_ptr<msd::Context> CreateContext() override;
 
   std::shared_ptr<MsdVsiConnection> ptr() { return ptr_; }
 
  private:
   std::shared_ptr<MsdVsiConnection> ptr_;
   static const uint32_t kMagic = 0x636f6e6e;  // "conn" (Connection)
+  const uint32_t magic_;
 };
 
 #endif  // MSD_VSI_CONNECTION_H

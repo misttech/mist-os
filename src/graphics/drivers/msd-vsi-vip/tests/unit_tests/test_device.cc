@@ -46,11 +46,11 @@ TEST_F(MsdVsiDeviceTest, ChipIdentity) {
   EXPECT_GT(identity.product_id, 0u);
 
   // Now try to get it as a buffer.
-  uint32_t identity_buffer;
-  EXPECT_EQ(MAGMA_STATUS_OK, msd_device_query(device_.get(), kMsdVsiVendorQueryChipIdentity,
-                                              &identity_buffer, nullptr));
+  zx::vmo identity_buffer;
+  EXPECT_EQ(MAGMA_STATUS_OK,
+            device_->Query(kMsdVsiVendorQueryChipIdentity, &identity_buffer, nullptr));
   magma_vsi_vip_chip_identity identity_from_buf;
-  auto buffer = magma::PlatformBuffer::Import(identity_buffer);
+  auto buffer = magma::PlatformBuffer::Import(std::move(identity_buffer));
   EXPECT_TRUE(buffer);
   EXPECT_TRUE(buffer->Read(&identity_from_buf, 0, sizeof(identity_from_buf)));
 
@@ -59,8 +59,7 @@ TEST_F(MsdVsiDeviceTest, ChipIdentity) {
 
 TEST_F(MsdVsiDeviceTest, QueryBadId) {
   uint64_t result;
-  EXPECT_NE(MAGMA_STATUS_OK,
-            msd_device_query(device_.get(), 0xabcd1234 /* id */, nullptr, &result));
+  EXPECT_NE(MAGMA_STATUS_OK, device_->Query(0xabcd1234 /* id */, nullptr, &result));
 }
 
 TEST_F(MsdVsiDeviceTest, ChipOption) {
@@ -68,11 +67,10 @@ TEST_F(MsdVsiDeviceTest, ChipOption) {
   ASSERT_EQ(MAGMA_STATUS_OK, device_->ChipOption(&option));
 
   // Now try to get it as a buffer.
-  uint32_t option_buffer;
-  EXPECT_EQ(MAGMA_STATUS_OK,
-            msd_device_query(device_.get(), kMsdVsiVendorQueryChipOption, &option_buffer, nullptr));
+  zx::vmo option_buffer;
+  EXPECT_EQ(MAGMA_STATUS_OK, device_->Query(kMsdVsiVendorQueryChipOption, &option_buffer, nullptr));
   magma_vsi_vip_chip_option option_from_buf;
-  auto buffer = magma::PlatformBuffer::Import(option_buffer);
+  auto buffer = magma::PlatformBuffer::Import(std::move(option_buffer));
   EXPECT_TRUE(buffer);
   EXPECT_TRUE(buffer->Read(&option_from_buf, 0, sizeof(option_from_buf)));
 
@@ -83,11 +81,10 @@ TEST_F(MsdVsiDeviceTest, QuerySram) {
   if (!device_->HasAxiSram()) {
     GTEST_SKIP();
   }
-  uint32_t sram_buffer;
-  EXPECT_EQ(MAGMA_STATUS_OK,
-            msd_device_query(device_.get(), kMsdVsiVendorQueryExternalSram, &sram_buffer, nullptr));
+  zx::vmo sram_buffer;
+  EXPECT_EQ(MAGMA_STATUS_OK, device_->Query(kMsdVsiVendorQueryExternalSram, &sram_buffer, nullptr));
 
-  auto buffer = magma::PlatformBuffer::Import(sram_buffer);
+  auto buffer = magma::PlatformBuffer::Import(std::move(sram_buffer));
   ASSERT_TRUE(buffer);
 }
 
@@ -215,18 +212,18 @@ TEST_F(MsdVsiDeviceTest, LoadAddressSpace) {
 TEST_F(MsdVsiDeviceTest, Connections) {
   std::vector<std::unique_ptr<MsdVsiConnection>> connections;
   for (uint32_t i = 0; i < PageTableArrays::size(); i++) {
-    auto connection = device_->Open(i);
-    EXPECT_NE(nullptr, connection);
+    auto connection = device_->OpenVsiConnection(i);
+    EXPECT_TRUE(connection);
     EXPECT_EQ(connection->client_id(), i);
     connections.push_back(std::move(connection));
   }
   // Reached the limit
   auto connection = device_->Open(0);
-  EXPECT_EQ(nullptr, connection);
+  EXPECT_FALSE(connection);
   connections.clear();
   // Ok to create more now
   connection = device_->Open(0);
-  EXPECT_NE(nullptr, connection);
+  EXPECT_TRUE(connection);
 }
 
 TEST_F(MsdVsiDeviceTest, RingbufferCanHoldMaxEvents) {

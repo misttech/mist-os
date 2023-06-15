@@ -6,19 +6,19 @@
 #define MSD_VSI_SEMAPHORE_H
 
 #include "magma_util/short_macros.h"
-#include "msd.h"
+#include "msd_cc.h"
 #include "platform_semaphore.h"
 
-class MsdVsiAbiSemaphore : public msd_semaphore_t {
+class MsdVsiAbiSemaphore : public msd::Semaphore {
  public:
-  MsdVsiAbiSemaphore(std::shared_ptr<magma::PlatformSemaphore> ptr) : ptr_(std::move(ptr)) {
-    magic_ = kMagic;
-  }
+  explicit MsdVsiAbiSemaphore(std::shared_ptr<magma::PlatformSemaphore> ptr)
+      : ptr_(std::move(ptr)), magic_(kMagic) {}
 
-  static MsdVsiAbiSemaphore* cast(msd_semaphore_t* semaphore) {
-    DASSERT(semaphore);
+  static MsdVsiAbiSemaphore* cast(msd::Semaphore* sema) {
+    DASSERT(sema);
+    auto semaphore = static_cast<MsdVsiAbiSemaphore*>(sema);
     DASSERT(semaphore->magic_ == kMagic);
-    return static_cast<MsdVsiAbiSemaphore*>(semaphore);
+    return semaphore;
   }
 
   std::shared_ptr<magma::PlatformSemaphore> ptr() { return ptr_; }
@@ -27,6 +27,7 @@ class MsdVsiAbiSemaphore : public msd_semaphore_t {
   std::shared_ptr<magma::PlatformSemaphore> ptr_;
 
   static constexpr uint32_t kMagic = 0x73656d61;  // "sema"
+  const uint32_t magic_;
 };
 
 #endif  // MSD_VSI_SEMAPHORE_H

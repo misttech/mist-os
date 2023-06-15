@@ -6,22 +6,36 @@
 #define MSD_VSI_DRIVER_H
 
 #include "magma_util/short_macros.h"
-#include "msd.h"
+#include "msd_cc.h"
 
-class MsdVsiDriver : public msd_driver_t {
+class MsdVsiDriver : public msd::Driver {
  public:
-  MsdVsiDriver() { magic_ = kMagic; }
+  MsdVsiDriver() : magic_(kMagic) {}
 
   virtual ~MsdVsiDriver() {}
 
-  static MsdVsiDriver* cast(msd_driver_t* drv) {
-    DASSERT(drv);
-    DASSERT(drv->magic_ == kMagic);
-    return static_cast<MsdVsiDriver*>(drv);
+  static MsdVsiDriver* cast(msd::Driver* driv) {
+    DASSERT(driv);
+    auto driver = static_cast<MsdVsiDriver*>(driv);
+    DASSERT(driver->magic_ == kMagic);
+    return driver;
   }
 
+  static std::unique_ptr<MsdVsiDriver> Create();
+  static void Destroy(MsdVsiDriver* drv);
+
+  void Configure(uint32_t flags) override { configure_flags_ = flags; }
+  std::unique_ptr<msd::Device> CreateDevice(msd::DeviceHandle* device_handle) override;
+  std::unique_ptr<msd::Buffer> ImportBuffer(zx::vmo vmo, uint64_t client_id) override;
+  magma_status_t ImportSemaphore(zx::event handle, uint64_t client_id,
+                                 std::unique_ptr<msd::Semaphore>* out) override;
+
+  uint32_t configure_flags() const { return configure_flags_; }
+
  private:
+  uint32_t configure_flags_ = 0;
   static const uint32_t kMagic = 0x64726976;  //"driv"
+  const uint32_t magic_;
 };
 
 #endif  // MSD_VSI_DRIVER_H

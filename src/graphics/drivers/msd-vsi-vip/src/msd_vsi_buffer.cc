@@ -4,10 +4,10 @@
 
 #include "msd_vsi_buffer.h"
 
-std::unique_ptr<MsdVsiBuffer> MsdVsiBuffer::Import(uint32_t handle, uint64_t client_id) {
-  auto platform_buf = magma::PlatformBuffer::Import(handle);
+std::unique_ptr<MsdVsiBuffer> MsdVsiBuffer::Import(zx::vmo handle, uint64_t client_id) {
+  auto platform_buf = magma::PlatformBuffer::Import(std::move(handle));
   if (!platform_buf) {
-    MAGMA_LOG(ERROR, "failed to import buffer handle 0x%x", handle);
+    MAGMA_LOG(ERROR, "failed to import buffer handle");
     return nullptr;
   }
 
@@ -24,17 +24,3 @@ std::unique_ptr<MsdVsiBuffer> MsdVsiBuffer::Create(uint64_t size, const char* na
   }
   return std::make_unique<MsdVsiBuffer>(std::move(platform_buf));
 }
-
-//////////////////////////////////////////////////////////////////////////////
-
-msd_buffer_t* msd_buffer_import(uint32_t handle, uint64_t client_id) {
-  auto buffer = MsdVsiBuffer::Import(handle, client_id);
-  if (!buffer) {
-    MAGMA_LOG(ERROR, "failed to import buffer handle 0x%x", handle);
-    return nullptr;
-  }
-
-  return new MsdVsiAbiBuffer(std::move(buffer));
-}
-
-void msd_buffer_destroy(msd_buffer_t* buf) { delete MsdVsiAbiBuffer::cast(buf); }

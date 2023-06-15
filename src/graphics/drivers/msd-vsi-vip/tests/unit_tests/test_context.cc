@@ -9,8 +9,9 @@
 #include "src/graphics/drivers/msd-vsi-vip/src/command_buffer.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/mapped_batch.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/msd_vsi_context.h"
-#include "sys_driver/magma_system_buffer.h"
-#include "sys_driver/magma_system_semaphore.h"
+#include "src/graphics/drivers/msd-vsi-vip/src/msd_vsi_driver.h"
+#include "src/graphics/lib/magma/src/sys_driver_cpp/magma_system_buffer.h"
+#include "src/graphics/lib/magma/src/sys_driver_cpp/magma_system_semaphore.h"
 
 // Holds the buffers and semaphores associated with a fake test batch.
 class BatchData {
@@ -27,14 +28,17 @@ class BatchData {
   static constexpr uint32_t kNumSignalSemaphores = 3;
 
   BatchData(uint32_t num_resources) {
+    auto driver = std::make_unique<MsdVsiDriver>();
+
     for (unsigned int i = 0; i < num_resources; i++) {
       auto buffer = magma::PlatformBuffer::Create(kResourceSize, "test buffer");
-      resources_.emplace_back(MagmaSystemBuffer::Create(std::move(buffer)));
+      resources_.emplace_back(MagmaSystemBuffer::Create(driver.get(), std::move(buffer)));
     }
 
     for (unsigned int i = 0; i < kNumSignalSemaphores; i++) {
       auto semaphore = magma::PlatformSemaphore::Create();
-      signal_semaphores_.emplace_back(MagmaSystemSemaphore::Create(std::move(semaphore)));
+      signal_semaphores_.emplace_back(
+          MagmaSystemSemaphore::Create(driver.get(), std::move(semaphore)));
     }
   }
 
@@ -49,7 +53,7 @@ class BatchData {
         .flags = 0,
     };
     std::vector<magma_exec_resource> resources;
-    std::vector<msd_buffer_t*> msd_buffers;
+    std::vector<msd::Buffer*> msd_buffers;
     for (auto& buf : resources_) {
       resources.push_back({
           .buffer_id = buf->platform_buffer()->id(),
@@ -58,7 +62,7 @@ class BatchData {
       });
       msd_buffers.push_back(buf->msd_buf());
     }
-    std::vector<msd_semaphore_t*> msd_signal_semaphores;
+    std::vector<msd::Semaphore*> msd_signal_semaphores;
     for (const auto& semaphore : signal_semaphores_) {
       msd_signal_semaphores.emplace_back(semaphore->msd_semaphore());
     }

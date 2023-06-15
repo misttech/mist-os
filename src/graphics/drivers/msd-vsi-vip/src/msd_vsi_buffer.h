@@ -6,12 +6,12 @@
 #define MSD_VSI_BUFFER_H
 
 #include "magma_util/short_macros.h"
-#include "msd.h"
+#include "msd_cc.h"
 #include "platform_buffer.h"
 
 class MsdVsiBuffer {
  public:
-  static std::unique_ptr<MsdVsiBuffer> Import(uint32_t handle, uint64_t client_id);
+  static std::unique_ptr<MsdVsiBuffer> Import(zx::vmo handle, uint64_t client_id);
   static std::unique_ptr<MsdVsiBuffer> Create(uint64_t size, const char* name);
 
   magma::PlatformBuffer* platform_buffer() {
@@ -19,27 +19,30 @@ class MsdVsiBuffer {
     return platform_buf_.get();
   }
 
-  MsdVsiBuffer(std::unique_ptr<magma::PlatformBuffer> platform_buf)
+  explicit MsdVsiBuffer(std::unique_ptr<magma::PlatformBuffer> platform_buf)
       : platform_buf_(std::move(platform_buf)) {}
 
  private:
   std::unique_ptr<magma::PlatformBuffer> platform_buf_;
 };
 
-class MsdVsiAbiBuffer : public msd_buffer_t {
+class MsdVsiAbiBuffer : public msd::Buffer {
  public:
-  MsdVsiAbiBuffer(std::shared_ptr<MsdVsiBuffer> ptr) : ptr_(std::move(ptr)) { magic_ = kMagic; }
+  explicit MsdVsiAbiBuffer(std::shared_ptr<MsdVsiBuffer> ptr)
+      : ptr_(std::move(ptr)), magic_(kMagic) {}
 
-  static MsdVsiAbiBuffer* cast(msd_buffer_t* buf) {
+  static MsdVsiAbiBuffer* cast(msd::Buffer* buf) {
     DASSERT(buf);
-    DASSERT(buf->magic_ == kMagic);
-    return static_cast<MsdVsiAbiBuffer*>(buf);
+    auto buffer = static_cast<MsdVsiAbiBuffer*>(buf);
+    DASSERT(buffer->magic_ == kMagic);
+    return buffer;
   }
   std::shared_ptr<MsdVsiBuffer> ptr() { return ptr_; }
 
  private:
   std::shared_ptr<MsdVsiBuffer> ptr_;
   static const uint32_t kMagic = 0x62756666;  // "buff"
+  const uint32_t magic_;
 };
 
 #endif  // MSD_VSI_BUFFER_H

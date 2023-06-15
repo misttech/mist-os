@@ -202,11 +202,11 @@ class MagmaExecuteMsdVsi : public testing::Test {
     magma_poll_item_t item = {.semaphore = semaphore,
                               .type = MAGMA_POLL_TYPE_SEMAPHORE,
                               .condition = MAGMA_POLL_CONDITION_SIGNALED};
-    ASSERT_EQ(magma_poll(&item, 1, 1000000ul * timeout_ms), MAGMA_STATUS_OK);
-
+    auto status = magma_poll(&item, 1, 1000000ul * timeout_ms);
     auto t = std::chrono::duration_cast<std::chrono::milliseconds>(
                  std::chrono::high_resolution_clock::now() - start)
                  .count();
+    ASSERT_EQ(status, MAGMA_STATUS_OK);
     EXPECT_LT(t, timeout_ms);
 
     magma_connection_release_semaphore(magma_vsi_.GetConnection(), semaphore);
@@ -262,7 +262,7 @@ class MagmaExecuteMsdVsi : public testing::Test {
     // Jump to an unmapped address.
     command_stream->EtnaLink(0x8 /* arbitrary prefetch */, next_gpu_addr_);
 
-    static constexpr uint32_t kTimeoutMs = 1000;
+    static constexpr uint32_t kTimeoutMs = 10000;
     ExecuteCommand(command_stream, kTimeoutMs);
 
     EXPECT_EQ(MAGMA_STATUS_CONTEXT_KILLED, magma_connection_flush(magma_vsi_.GetConnection()));

@@ -8,12 +8,8 @@
 #include "msd_vsi_buffer.h"
 #include "msd_vsi_context.h"
 
-void msd_connection_close(msd_connection_t* connection) {
-  delete MsdVsiAbiConnection::cast(connection);
-}
-
-msd_context_t* msd_connection_create_context(msd_connection_t* abi_connection) {
-  auto connection = MsdVsiAbiConnection::cast(abi_connection)->ptr();
+std::unique_ptr<msd::Context> MsdVsiAbiConnection::CreateContext() {
+  auto connection = ptr();
 
   auto context =
       MsdVsiContext::Create(connection, connection->address_space(), connection->GetRingbuffer());
@@ -21,25 +17,44 @@ msd_context_t* msd_connection_create_context(msd_connection_t* abi_connection) {
     MAGMA_LOG(ERROR, "failed to create new context");
     return nullptr;
   }
-  return new MsdVsiAbiContext(context);
+  return std::make_unique<MsdVsiAbiContext>(MsdVsiAbiContext(context));
 }
 
-magma_status_t msd_connection_map_buffer(msd_connection_t* abi_connection, msd_buffer_t* abi_buffer,
-                                         uint64_t gpu_va, uint64_t offset, uint64_t length,
-                                         uint64_t flags) {
-  if (!magma::is_page_aligned(offset) || !magma::is_page_aligned(length)) {
-    MAGMA_LOG(ERROR, "Offset or length not page aligned");
-    return MAGMA_STATUS_INVALID_ARGS;
-  }
+magma_status_t MsdVsiAbiConnection::MapBuffer(msd::Buffer& buff, uint64_t gpu_va, uint64_t offset,
+                                              uint64_t length, uint64_t flags) {
+  if (!magma::is_page_aligned(offset) || !magma::is_page_aligned(length))
+    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Offset or length not page aligned");
 
   uint64_t page_offset = offset / magma::page_size();
   uint64_t page_count = length / magma::page_size();
 
-  auto connection = MsdVsiAbiConnection::cast(abi_connection)->ptr();
-  auto buffer = MsdVsiAbiBuffer::cast(abi_buffer)->ptr();
+  auto connection = ptr().get();
+  auto buffer = MsdVsiAbiBuffer::cast(&buff)->ptr();
 
   magma::Status status = connection->MapBufferGpu(buffer, gpu_va, page_offset, page_count);
+
   return status.get();
+}
+
+void MsdVsiAbiConnection::ReleaseBuffer(msd::Buffer& buff) {
+  auto connection = ptr().get();
+  auto buffer = MsdVsiAbiBuffer::cast(&buff)->ptr();
+
+  connection->ReleaseBuffer(buffer->platform_buffer());
+}
+
+magma_status_t MsdVsiAbiConnection::UnmapBuffer(msd::Buffer& buff, uint64_t gpu_va) {
+  auto connection = ptr().get();
+  auto buffer = MsdVsiAbiBuffer::cast(&buff)->ptr();
+
+  if (!connection->ReleaseMapping(buffer->platform_buffer(), gpu_va)) {
+    return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Unmap buffer failed");
+  }
+  return MAGMA_STATUS_OK;
+}
+
+void MsdVsiAbiConnection::SetNotificationCallback(msd::NotificationHandler* handler) {
+  ptr()->SetNotificationCallback(handler);
 }
 
 magma::Status MsdVsiConnection::MapBufferGpu(std::shared_ptr<MsdVsiBuffer> buffer, uint64_t gpu_va,
@@ -64,29 +79,6 @@ magma::Status MsdVsiConnection::MapBufferGpu(std::shared_ptr<MsdVsiBuffer> buffe
     return MAGMA_STATUS_INVALID_ARGS;
   }
   return MAGMA_STATUS_OK;
-}
-
-magma_status_t msd_connection_unmap_buffer(msd_connection_t* abi_connection,
-                                           msd_buffer_t* abi_buffer, uint64_t gpu_va) {
-  if (!MsdVsiAbiConnection::cast(abi_connection)
-           ->ptr()
-           ->ReleaseMapping(MsdVsiAbiBuffer::cast(abi_buffer)->ptr()->platform_buffer(), gpu_va)) {
-    MAGMA_LOG(ERROR, "failed to remove mapping");
-    return MAGMA_STATUS_INVALID_ARGS;
-  }
-  return MAGMA_STATUS_OK;
-}
-
-void msd_connection_release_buffer(msd_connection_t* abi_connection, msd_buffer_t* abi_buffer) {
-  MsdVsiAbiConnection::cast(abi_connection)
-      ->ptr()
-      ->ReleaseBuffer(MsdVsiAbiBuffer::cast(abi_buffer)->ptr()->platform_buffer());
-}
-
-void msd_connection_set_notification_callback(struct msd_connection_t* connection,
-                                              msd_connection_notification_callback_t callback,
-                                              void* token) {
-  MsdVsiAbiConnection::cast(connection)->ptr()->SetNotificationCallback(callback, token);
 }
 
 void MsdVsiConnection::QueueReleasedMappings(std::vector<std::shared_ptr<GpuMapping>> mappings) {

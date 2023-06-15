@@ -23,9 +23,9 @@ std::shared_ptr<MsdVsiContext> MsdVsiContext::Create(std::weak_ptr<MsdVsiConnect
 std::unique_ptr<MappedBatch> MsdVsiContext::CreateBatch(std::shared_ptr<MsdVsiContext> context,
                                                         magma_command_buffer* cmd_buf,
                                                         magma_exec_resource* exec_resources,
-                                                        msd_buffer_t** msd_buffers,
-                                                        msd_semaphore_t** msd_wait_semaphores,
-                                                        msd_semaphore_t** msd_signal_semaphores) {
+                                                        msd::Buffer** msd_buffers,
+                                                        msd::Semaphore** msd_wait_semaphores,
+                                                        msd::Semaphore** msd_signal_semaphores) {
   std::vector<CommandBuffer::ExecResource> resources;
   resources.reserve(cmd_buf->resource_count);
   for (uint32_t i = 0; i < cmd_buf->resource_count; i++) {
@@ -70,7 +70,7 @@ std::unique_ptr<MappedBatch> MsdVsiContext::CreateBatch(std::shared_ptr<MsdVsiCo
 magma::Status MsdVsiContext::SubmitBatch(std::unique_ptr<MappedBatch> batch) {
   auto connection = connection_.lock();
   if (!connection) {
-    DMESSAGE("Can't submit without connection");
+    MAGMA_LOG(ERROR, "Can't submit without connection");
     return MAGMA_STATUS_OK;
   }
 
@@ -112,24 +112,15 @@ void MsdVsiContext::Kill() {
   }
 }
 
-void msd_context_destroy(msd_context_t* abi_context) { delete MsdVsiAbiContext::cast(abi_context); }
-
-magma_status_t msd_context_execute_immediate_commands(msd_context_t* ctx, uint64_t commands_size,
-                                                      void* commands, uint64_t semaphore_count,
-                                                      msd_semaphore_t** msd_semaphores) {
-  return MAGMA_STATUS_UNIMPLEMENTED;
-}
-
-magma_status_t msd_context_execute_command_buffer_with_resources(
-    struct msd_context_t* ctx, struct magma_command_buffer* cmd_buf,
-    struct magma_exec_resource* exec_resources, struct msd_buffer_t** buffers,
-    struct msd_semaphore_t** wait_semaphores, struct msd_semaphore_t** signal_semaphores) {
-  auto context = MsdVsiAbiContext::cast(ctx)->ptr();
-
+magma_status_t MsdVsiAbiContext::ExecuteCommandBufferWithResources(
+    magma_command_buffer* cmd_buf, magma_exec_resource* exec_resources, msd::Buffer** buffers,
+    msd::Semaphore** wait_semaphores, msd::Semaphore** signal_semaphores) {
   if (cmd_buf->flags) {
     MAGMA_LOG(ERROR, "Flags not supported");
     return MAGMA_STATUS_INVALID_ARGS;
   }
+
+  auto context = ptr();
 
   std::unique_ptr<MappedBatch> batch = MsdVsiContext::CreateBatch(
       context, cmd_buf, exec_resources, buffers, wait_semaphores, signal_semaphores);

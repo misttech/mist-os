@@ -19,7 +19,7 @@
 #include "magma_vsi_vip_devices.h"
 #include "magma_vsi_vip_types.h"
 #include "mapped_batch.h"
-#include "msd.h"
+#include "msd_cc.h"
 #include "msd_vsi_connection.h"
 #include "msd_vsi_platform_device.h"
 #include "page_table_arrays.h"
@@ -29,7 +29,7 @@
 #include "ringbuffer.h"
 #include "sequencer.h"
 
-class MsdVsiDevice : public msd_device_t,
+class MsdVsiDevice : public msd::Device,
                      public AddressSpace::Owner,
                      public MsdVsiConnection::Owner {
  public:
@@ -40,7 +40,7 @@ class MsdVsiDevice : public msd_device_t,
   // to enable device request processing.
   static std::unique_ptr<MsdVsiDevice> Create(void* device_handle, bool start_device_thread);
 
-  MsdVsiDevice() { magic_ = kMagic; }
+  MsdVsiDevice() : magic_(kMagic) {}
 
   virtual ~MsdVsiDevice();
 
@@ -76,11 +76,18 @@ class MsdVsiDevice : public msd_device_t,
   bool IsIdle();
   bool StopRingbuffer();
 
-  std::unique_ptr<MsdVsiConnection> Open(msd_client_id_t client_id);
+  magma_status_t Query(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) override;
+  magma_status_t GetIcdList(std::vector<msd_icd_info_t>* icd_info_out) override;
+  void DumpStatus(uint32_t dump_flags) override;
+  std::unique_ptr<msd::Connection> Open(msd_client_id_t client_id) override;
+
+  std::unique_ptr<MsdVsiConnection> OpenVsiConnection(msd_client_id_t client_id);
 
   magma_status_t ChipIdentity(magma_vsi_vip_chip_identity* out_identity);
   magma_status_t ChipOption(magma_vsi_vip_chip_option* out_option);
-  magma_status_t QuerySram(uint32_t* handle_out);
+  magma_status_t QuerySram(zx::vmo* out_sram);
+  magma_status_t DataToBuffer(const char* name, void* data, uint64_t size,
+                              zx::vmo* result_buffer_out);
 
   struct DumpState {
     uint64_t last_completed_sequence_number;
@@ -103,12 +110,6 @@ class MsdVsiDevice : public msd_device_t,
   void DumpStatusToLog();
 
   std::vector<MappedBatch*> GetInflightBatches();
-
-  static MsdVsiDevice* cast(msd_device_t* dev) {
-    DASSERT(dev);
-    DASSERT(dev->magic_ == kMagic);
-    return static_cast<MsdVsiDevice*>(dev);
-  }
 
  private:
   // Number of new commands added to the ringbuffer for each submitted batch:
@@ -297,6 +298,7 @@ class MsdVsiDevice : public msd_device_t,
   PageTableArrays* page_table_arrays() { return page_table_arrays_.get(); }
 
   static const uint32_t kMagic = 0x64657669;  //"devi"
+  const uint32_t magic_;
 
   std::unique_ptr<MsdVsiPlatformDevice> platform_device_;
   std::unique_ptr<VsiRegisterIo> register_io_;

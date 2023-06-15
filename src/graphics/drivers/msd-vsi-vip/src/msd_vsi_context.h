@@ -11,7 +11,7 @@
 #include "address_space.h"
 #include "magma_util/short_macros.h"
 #include "mapped_batch.h"
-#include "msd.h"
+#include "msd_cc.h"
 #include "msd_vsi_connection.h"
 #include "ringbuffer.h"
 
@@ -37,9 +37,9 @@ class MsdVsiContext {
   static std::unique_ptr<MappedBatch> CreateBatch(std::shared_ptr<MsdVsiContext> context,
                                                   magma_command_buffer* cmd_buf,
                                                   magma_exec_resource* exec_resources,
-                                                  msd_buffer_t** msd_buffers,
-                                                  msd_semaphore_t** msd_wait_semaphores,
-                                                  msd_semaphore_t** msd_signal_semaphores);
+                                                  msd::Buffer** msd_buffers,
+                                                  msd::Semaphore** msd_wait_semaphores,
+                                                  msd::Semaphore** msd_signal_semaphores);
 
   bool MapRingbuffer(Ringbuffer* ringbuffer);
 
@@ -53,20 +53,30 @@ class MsdVsiContext {
   std::atomic_bool killed_ = false;
 };
 
-class MsdVsiAbiContext : public msd_context_t {
+class MsdVsiAbiContext : public msd::Context {
  public:
-  MsdVsiAbiContext(std::shared_ptr<MsdVsiContext> ptr) : ptr_(std::move(ptr)) { magic_ = kMagic; }
+  explicit MsdVsiAbiContext(std::shared_ptr<MsdVsiContext> ptr)
+      : ptr_(std::move(ptr)), magic_(kMagic) {}
 
-  static MsdVsiAbiContext* cast(msd_context_t* context) {
-    DASSERT(context);
+  static MsdVsiAbiContext* cast(msd::Context* ctxt) {
+    DASSERT(ctxt);
+    auto context = static_cast<MsdVsiAbiContext*>(ctxt);
     DASSERT(context->magic_ == kMagic);
-    return static_cast<MsdVsiAbiContext*>(context);
+    return context;
   }
+
+  magma_status_t ExecuteCommandBufferWithResources(magma_command_buffer* command_buffer,
+                                                   magma_exec_resource* exec_resources,
+                                                   msd::Buffer** buffers,
+                                                   msd::Semaphore** wait_semaphores,
+                                                   msd::Semaphore** signal_semaphores) override;
+
   std::shared_ptr<MsdVsiContext> ptr() { return ptr_; }
 
  private:
-  std::shared_ptr<MsdVsiContext> ptr_;
+  const std::shared_ptr<MsdVsiContext> ptr_;
   static const uint32_t kMagic = 0x63747874;  // "ctxt"
+  const uint32_t magic_;
 };
 
 #endif  // MSD_VSI_CONTEXT_H

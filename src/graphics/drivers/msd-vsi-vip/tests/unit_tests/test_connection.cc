@@ -8,6 +8,7 @@
 #include "src/graphics/drivers/msd-vsi-vip/src/address_space_layout.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/mapped_batch.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/msd_vsi_connection.h"
+#include "src/graphics/lib/magma/tests/helper/msd_stubs.h"
 
 class TestMsdVsiConnection : public ::testing::Test, public MsdVsiConnection::Owner {
  public:
@@ -39,10 +40,16 @@ class TestMsdVsiConnection : public ::testing::Test, public MsdVsiConnection::Ow
     MockBusMapper bus_mapper_;
   };
 
-  static void KillCallbackStatic(void* token, msd_notification_t* notification) {
-    EXPECT_EQ(MSD_CONNECTION_NOTIFICATION_CONTEXT_KILLED, notification->type);
-    reinterpret_cast<TestMsdVsiConnection*>(token)->callback_count_++;
-  }
+  class TestNotificationHandler : public msd::testing::StubNotificationHandler {
+   public:
+    TestNotificationHandler(uint32_t& callback_count) : callback_count_(callback_count) {}
+
+    // msd::NotificationHandler implementation.
+    void ContextKilled() override { callback_count_++; }
+
+   private:
+    uint32_t& callback_count_;
+  };
 
   std::shared_ptr<MsdVsiConnection> connection_;
 
@@ -71,7 +78,8 @@ TEST_F(TestMsdVsiConnection, ReleaseMapping) {
   constexpr uint64_t kGpuAddr1 = 0x10000;
   constexpr uint64_t kGpuAddr2 = 0x20000;
 
-  connection_->SetNotificationCallback(KillCallbackStatic, this);
+  TestNotificationHandler notification(callback_count_);
+  connection_->SetNotificationCallback(&notification);
 
   // Add separate mappings for the buffer's pages.
 
@@ -114,7 +122,8 @@ TEST_F(TestMsdVsiConnection, ReleaseBuffer) {
   constexpr uint64_t kBufferSizeInPages = 1;
   constexpr uint64_t kGpuAddr = 0x10000;
 
-  connection_->SetNotificationCallback(KillCallbackStatic, this);
+  TestNotificationHandler notification(callback_count_);
+  connection_->SetNotificationCallback(&notification);
 
   std::shared_ptr<MsdVsiBuffer> buffer =
       MsdVsiBuffer::Create(kBufferSizeInPages * magma::page_size(), "test");
@@ -138,7 +147,8 @@ TEST_F(TestMsdVsiConnection, ReleaseBufferWhileMapped) {
   constexpr uint64_t kBufferSizeInPages = 1;
   constexpr uint64_t kGpuAddr = 0x10000;
 
-  connection_->SetNotificationCallback(KillCallbackStatic, this);
+  TestNotificationHandler notification(callback_count_);
+  connection_->SetNotificationCallback(&notification);
 
   std::shared_ptr<MsdVsiBuffer> buffer =
       MsdVsiBuffer::Create(kBufferSizeInPages * magma::page_size(), "test");

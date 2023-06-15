@@ -18,7 +18,7 @@
 #include "instructions.h"
 #include "magma_util/short_macros.h"
 #include "magma_vendor_queries.h"
-#include "msd.h"
+#include "msd_cc.h"
 #include "msd_vsi_context.h"
 #include "platform_barriers.h"
 #include "platform_logger.h"
@@ -493,6 +493,7 @@ magma::Status MsdVsiDevice::ProcessInterrupt() {
   if (bus_error) {
     MAGMA_LOG(ERROR, "Interrupt thread received bus error");
   }
+
   // Though events complete in order, we may receive a single interrupt for multiple events
   // simultaneously. We should update the ringbuffer head following the event with the
   // highest sequence number.
@@ -1337,7 +1338,7 @@ magma::Status MsdVsiDevice::ProcessBatch(std::unique_ptr<MappedBatch> batch, boo
   return MAGMA_STATUS_OK;
 }
 
-std::unique_ptr<MsdVsiConnection> MsdVsiDevice::Open(msd_client_id_t client_id) {
+std::unique_ptr<MsdVsiConnection> MsdVsiDevice::OpenVsiConnection(msd_client_id_t client_id) {
   uint32_t page_table_array_slot;
   if (!page_table_slot_allocator_->Alloc(&page_table_array_slot)) {
     MAGMA_LOG(ERROR, "couldn't allocate page table slot");
@@ -1353,6 +1354,16 @@ std::unique_ptr<MsdVsiConnection> MsdVsiDevice::Open(msd_client_id_t client_id) 
   page_table_arrays_->AssignAddressSpace(page_table_array_slot, address_space.get());
 
   return std::make_unique<MsdVsiConnection>(this, std::move(address_space), client_id);
+}
+
+std::unique_ptr<msd::Connection> MsdVsiDevice::Open(msd_client_id_t client_id) {
+  auto connection = OpenVsiConnection(client_id);
+  if (connection) {
+    return std::make_unique<MsdVsiAbiConnection>(std::move(connection));
+  } else {
+    MAGMA_LOG(ERROR, "failed to open vsi connection");
+    return nullptr;
+  }
 }
 
 magma_status_t MsdVsiDevice::ChipIdentity(magma_vsi_vip_chip_identity* out_identity) {
@@ -1400,7 +1411,7 @@ magma_status_t MsdVsiDevice::ChipOption(magma_vsi_vip_chip_option* out_option) {
   return MAGMA_STATUS_OK;
 }
 
-magma_status_t MsdVsiDevice::QuerySram(uint32_t* handle_out) {
+magma_status_t MsdVsiDevice::QuerySram(zx::vmo* out_sram) {
   if (!external_sram_) {
     MAGMA_LOG(ERROR, "Device has no external SRAM");
     return MAGMA_STATUS_INTERNAL_ERROR;
@@ -1432,30 +1443,20 @@ magma_status_t MsdVsiDevice::QuerySram(uint32_t* handle_out) {
 
   external_sram_->UnmapCpu();
 
-  if (!external_sram_->CreateChild(handle_out)) {
+  uint32_t handle;
+  if (!external_sram_->CreateChild(&handle)) {
     MAGMA_LOG(ERROR, "CreateChild failed");
     return MAGMA_STATUS_INTERNAL_ERROR;
   }
 
+  *out_sram = zx::vmo(handle);
+
   return MAGMA_STATUS_OK;
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////
-
-msd_connection_t* msd_device_open(msd_device_t* device, msd_client_id_t client_id) {
-  auto connection = MsdVsiDevice::cast(device)->Open(client_id);
-  if (!connection) {
-    MAGMA_LOG(ERROR, "failed to create connection");
-    return nullptr;
-  }
-  return new MsdVsiAbiConnection(std::move(connection));
-}
-
-void msd_device_destroy(msd_device_t* device) { delete MsdVsiDevice::cast(device); }
-
-static magma_status_t DataToBuffer(const char* name, void* data, uint64_t size,
-                                   uint32_t* buffer_out) {
-  std::unique_ptr<magma::PlatformBuffer> buffer = magma::PlatformBuffer::Create(size, name);
+magma_status_t MsdVsiDevice::DataToBuffer(const char* name, void* data, uint64_t size,
+                                          zx::vmo* result_buffer_out) {
+  auto buffer = magma::PlatformBuffer::Create(size, name);
   if (!buffer) {
     MAGMA_LOG(ERROR, "Failed to allocate buffer");
     return MAGMA_STATUS_INTERNAL_ERROR;
@@ -1464,15 +1465,19 @@ static magma_status_t DataToBuffer(const char* name, void* data, uint64_t size,
     MAGMA_LOG(ERROR, "Failed to write result to buffer");
     return MAGMA_STATUS_INTERNAL_ERROR;
   }
-  if (!buffer->duplicate_handle(buffer_out)) {
+
+  uint32_t result_buffer;
+
+  if (!buffer->duplicate_handle(&result_buffer)) {
     MAGMA_LOG(ERROR, "Failed to duplicate handle");
     return MAGMA_STATUS_INTERNAL_ERROR;
   }
+  *result_buffer_out = zx::vmo(result_buffer);
+
   return MAGMA_STATUS_OK;
 }
 
-magma_status_t msd_device_query(msd_device_t* device, uint64_t id,
-                                magma_handle_t* result_buffer_out, uint64_t* result_out) {
+magma_status_t MsdVsiDevice::Query(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) {
   switch (id) {
     case MAGMA_QUERY_VENDOR_ID:
       *result_out = MAGMA_VENDOR_ID_VSI;
@@ -1483,7 +1488,7 @@ magma_status_t msd_device_query(msd_device_t* device, uint64_t id,
       break;
 
     case MAGMA_QUERY_DEVICE_ID:
-      *result_out = MsdVsiDevice::cast(device)->device_id();
+      *result_out = device_id();
       break;
 
     case MAGMA_QUERY_IS_TOTAL_TIME_SUPPORTED:
@@ -1502,7 +1507,7 @@ magma_status_t msd_device_query(msd_device_t* device, uint64_t id,
 
     case kMsdVsiVendorQueryChipIdentity: {
       magma_vsi_vip_chip_identity chip_id;
-      magma_status_t status = MsdVsiDevice::cast(device)->ChipIdentity(&chip_id);
+      magma_status_t status = ChipIdentity(&chip_id);
       if (status != MAGMA_STATUS_OK)
         return status;
 
@@ -1511,7 +1516,7 @@ magma_status_t msd_device_query(msd_device_t* device, uint64_t id,
 
     case kMsdVsiVendorQueryChipOption: {
       magma_vsi_vip_chip_option chip_opt;
-      magma_status_t status = MsdVsiDevice::cast(device)->ChipOption(&chip_opt);
+      magma_status_t status = ChipOption(&chip_opt);
       if (status != MAGMA_STATUS_OK)
         return status;
 
@@ -1519,38 +1524,29 @@ magma_status_t msd_device_query(msd_device_t* device, uint64_t id,
     }
 
     case kMsdVsiVendorQueryExternalSram:
-      return MsdVsiDevice::cast(device)->QuerySram(result_buffer_out);
+      return QuerySram(result_buffer_out);
 
     default:
       MAGMA_LOG(ERROR, "unhandled id %" PRIu64, id);
       return MAGMA_STATUS_INVALID_ARGS;
   }
 
-  if (result_buffer_out)
-    *result_buffer_out = magma::PlatformHandle::kInvalidHandle;
-
   return MAGMA_STATUS_OK;
 }
 
-void msd_device_dump_status(msd_device_t* device, uint32_t dump_type) {
-  MsdVsiDevice::cast(device)->DumpStatusToLog();
-}
+void MsdVsiDevice::DumpStatus(uint32_t dump_type) { DumpStatusToLog(); }
 
-magma_status_t msd_device_get_icd_list(struct msd_device_t* abi_device, uint64_t count,
-                                       msd_icd_info_t* icd_info_out, uint64_t* actual_count_out) {
+magma_status_t MsdVsiDevice::GetIcdList(std::vector<msd_icd_info_t>* icd_info_out) {
   const char* kSuffixes[] = {"_test", ""};
-  if (icd_info_out && count < std::size(kSuffixes)) {
-    return MAGMA_STATUS_INVALID_ARGS;
-  }
-  *actual_count_out = std::size(kSuffixes);
-  if (icd_info_out) {
-    for (uint32_t i = 0; i < std::size(kSuffixes); i++) {
-      strcpy(icd_info_out[i].component_url,
-             fbl::StringPrintf("fuchsia-pkg://fuchsia.com/libopencl_vsi_vip%s#meta/opencl.cm",
-                               kSuffixes[i])
-                 .c_str());
-      icd_info_out[i].support_flags = ICD_SUPPORT_FLAG_OPENCL;
-    }
+  auto& icd_info = *icd_info_out;
+  icd_info.clear();
+  icd_info.resize(std::size(kSuffixes));
+  for (uint32_t i = 0; i < std::size(kSuffixes); i++) {
+    strcpy(icd_info[i].component_url,
+           fbl::StringPrintf("fuchsia-pkg://fuchsia.com/libopencl_vsi_vip%s#meta/opencl.cm",
+                             kSuffixes[i])
+               .c_str());
+    icd_info[i].support_flags = ICD_SUPPORT_FLAG_OPENCL;
   }
   return MAGMA_STATUS_OK;
 }
