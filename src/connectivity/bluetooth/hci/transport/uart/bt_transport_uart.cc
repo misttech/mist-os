@@ -589,7 +589,12 @@ zx_status_t BtTransportUart::Bind() {
   args.set_props(props);
   args.set_proto_id(ZX_PROTOCOL_BT_TRANSPORT);
   args.forward_metadata(parent(), DEVICE_METADATA_MAC_ADDRESS);
-  return DdkAdd(args);
+  status = DdkAdd(args);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to add bt-transport-uart device: %s\n", zx_status_get_string(status));
+  }
+
+  return status;
 }
 
 static zx_driver_ops_t bt_hci_driver_ops = {

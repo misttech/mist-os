@@ -39,6 +39,7 @@ _common_bootfs_deps = [
   "//src/devices/pwm/drivers/aml-pwm-init",
   "//src/devices/registers/drivers/registers",
   "//src/devices/rtc/drivers/nxp",
+  "//src/devices/serial/drivers/aml-uart",
   "//src/devices/thermal/drivers/aml-thermal",
   "//src/devices/usb/drivers/dwc2",
   "//src/devices/usb/drivers/vim3-usb-phy",
@@ -68,6 +69,8 @@ board_driver_package_labels += [
   "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:brcmfmac-vim3",
   "//src/connectivity/wlan/drivers/wlanphy:wlanphy",
   "//bundles/packages/prod:wlan_fullmac_core_drivers",
+  "//src/connectivity/bluetooth/hci/transport/uart",
+  "//src/connectivity/bluetooth/hci/vendor/broadcom",
 ]
 
 board_package_labels += [

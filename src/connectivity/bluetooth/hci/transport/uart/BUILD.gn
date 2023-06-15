@@ -54,6 +54,10 @@ fuchsia_driver_component("bt-transport-uart") {
   manifest = "meta/bt-transport-uart.cml"
 }
 
+fuchsia_driver_package("uart") {
+  driver_components = [ ":bt-transport-uart" ]
+}
+
 executable("tests_executable") {
   testonly = true
 

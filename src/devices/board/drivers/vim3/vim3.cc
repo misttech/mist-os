@@ -181,6 +181,13 @@ int Vim3::Thread() {
     init_txn_->Reply(ZX_ERR_INTERNAL);
     return status;
   }
+
+  if ((status = BluetoothInit()) != ZX_OK) {
+    zxlogf(ERROR, "BluetoothInit() failed: %d", status);
+    init_txn_->Reply(ZX_ERR_INTERNAL);
+    return status;
+  }
+
   init_txn_->Reply(status);
   return ZX_OK;
 }

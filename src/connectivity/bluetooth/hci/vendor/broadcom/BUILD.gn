@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/bind/bind.gni")
+import("//build/cipd.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
@@ -62,10 +63,21 @@ fuchsia_driver_component("bt-hci-broadcom") {
   manifest = "meta/bt-hci-broadcom.cml"
 }
 
+# This is the firmware for VIM3 board only
 resource("broadcom-firmware") {
-  sources =
-      [ "//prebuilt/connectivity/bluetooth/firmware/broadcom/BCM4345C5.hcd" ]
+  sources = [
+    "//prebuilt/connectivity/bluetooth/firmware/broadcom/vim3/BCM4359C0.hcd",
+  ]
   outputs = [ "lib/firmware/{{source_file_part}}" ]
+}
+
+# This package is only referenced by vim3.gni for now.
+fuchsia_driver_package("broadcom") {
+  driver_components = [ ":bt-hci-broadcom" ]
+
+  if (internal_access) {
+    deps = [ ":broadcom-firmware" ]
+  }
 }
 
 executable("tests_executable") {

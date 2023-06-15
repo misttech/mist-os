@@ -17,6 +17,7 @@
 
 #include <ddktl/device.h>
 #include <fbl/macros.h>
+#include <soc/aml-a311d/a311d-gpio.h>
 #include <soc/aml-a311d/a311d-hw.h>
 
 namespace vim3 {
@@ -72,6 +73,7 @@ class Vim3 : public Vim3Type {
   bool HasLcd();
 
   zx_status_t BacklightInit();
+  zx_status_t BluetoothInit();
   zx_status_t CanvasInit();
   zx_status_t ClkInit();
   zx_status_t CpuInit();

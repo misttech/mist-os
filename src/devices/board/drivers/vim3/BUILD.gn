@@ -5,6 +5,17 @@
 import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
+driver_bind_rules("vim3-bluetooth-bind") {
+  rules = "vim3-bluetooth.bind"
+  header_output = "vim3-bluetooth-bind.h"
+  bind_output = "vim3-bluetooth.bindbc"
+  deps = [
+    "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.hardware.pwm",
+    "//src/devices/bind/fuchsia.platform",
+  ]
+}
+
 driver_bind_rules("vim3-video-bind") {
   rules = "vim3-video.bind"
   header_output = "vim3-video-bind.h"
@@ -99,6 +110,7 @@ fuchsia_driver("vim3-driver") {
   ]
   sources = [
     "vim3-backlight.cc",
+    "vim3-bluetooth.cc",
     "vim3-canvas.cc",
     "vim3-clk.cc",
     "vim3-cpu.cc",
@@ -126,6 +138,7 @@ fuchsia_driver("vim3-driver") {
   ]
   deps = [
     ":vim3-bind",
+    ":vim3-bluetooth-bind_header",
     ":vim3-cpu-bind_header",
     ":vim3-emmc-bind_header",
     ":vim3-pwm-bind_header",
@@ -142,6 +155,7 @@ fuchsia_driver("vim3-driver") {
     "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
     "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
+    "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_cpp_wire",
     "//sdk/lib/driver/component/cpp:cpp",

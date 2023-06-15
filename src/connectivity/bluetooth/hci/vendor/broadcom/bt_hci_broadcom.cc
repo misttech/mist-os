@@ -35,7 +35,9 @@ constexpr zx::duration kFirmwareDownloadDelay = zx::msec(50);
 constexpr zx::duration kBaudRateSwitchDelay = zx::msec(200);
 
 const std::unordered_map<uint16_t, std::string> BtHciBroadcom::kFirmwareMap = {
-    {PDEV_PID_BCM43458, "BCM4345C5.hcd"}};
+    {PDEV_PID_BCM43458, "BCM4345C5.hcd"},
+    {PDEV_PID_BCM4359, "BCM4359C0.hcd"},
+};
 
 BtHciBroadcom::BtHciBroadcom(zx_device_t* parent, async_dispatcher_t* dispatcher)
     : BtHciBroadcomType(parent), dispatcher_(dispatcher) {}
