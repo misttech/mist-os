@@ -702,7 +702,6 @@
                 "NetdeviceTest.InterfaceName",
                 "NetdeviceTest.InterfaceQLEN",
                 "NetdeviceTest.Netmask",
-                "NetdeviceTest.InterfaceMTU",
                 "NetdeviceTest.EthtoolGetTSInfo",
                 "NetdeviceTest.Loopback",
                 "NetdeviceTest.InterfaceFlags",

@@ -303,6 +303,17 @@ impl SocketOps for InetSocket {
                 current_task.mm.write_object(UserRef::new(user_addr), &out_ifreq)?;
                 Ok(SUCCESS)
             }
+            SIOCGIFMTU => {
+                let in_ifreq: ifreq = current_task.mm.read_object(UserRef::new(user_addr))?;
+                let out_ifreq: [u8; std::mem::size_of::<ifreq>()] = struct_with_union_into_bytes!(ifreq {
+                    ifr_ifrn.ifrn_name: unsafe { in_ifreq.ifr_ifrn.ifrn_name },
+                    // TODO(https://fxbug.dev/129165): Return the actual MTU instead
+                    // of this hard-coded value.
+                    ifr_ifru.ifru_mtu: 1280 /* IPv6 MIN MTU */,
+                });
+                current_task.mm.write_object(UserRef::new(user_addr), &out_ifreq)?;
+                Ok(SUCCESS)
+            }
             _ => default_ioctl(request),
         }
     }
