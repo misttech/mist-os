@@ -998,7 +998,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             debug_assert_eq!(discarded, 0);
             Some(seg)
         })?;
-        let seq_max = next_seg + can_send;
+        let seq_max = next_seg + seg.contents.len();
         match *last_seq_ts {
             Some((seq, _ts)) => {
                 if seq_max.after(seq) {
@@ -5689,5 +5689,47 @@ mod test {
             ),
             (Some(Segment::ack(ISS_1 + 1, ISS_2 + 1, buffer_sizes.rwnd_unscaled())), None),
         )
+    }
+
+    #[test]
+    fn poll_send_reserving_buffer() {
+        const RESERVED_BYTES: usize = 3;
+        let mut snd: Send<FakeInstant, _, false> = Send {
+            nxt: ISS_1 + 1,
+            max: ISS_1 + 1,
+            una: ISS_1 + 1,
+            wnd: WindowSize::DEFAULT,
+            wnd_scale: WindowScale::default(),
+            wl1: ISS_1,
+            wl2: ISS_2,
+            buffer: ReservingBuffer {
+                buffer: RingBuffer::with_data(TEST_BYTES.len(), TEST_BYTES),
+                reserved_bytes: RESERVED_BYTES,
+            },
+            last_seq_ts: None,
+            rtt_estimator: Estimator::default(),
+            timer: None,
+            congestion_control: CongestionControl::cubic_with_mss(
+                DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+            ),
+        };
+
+        assert_eq!(
+            snd.poll_send(
+                ISS_2 + 1,
+                WindowSize::DEFAULT,
+                u32::MAX,
+                FakeInstant::default(),
+                &SocketOptions::default(),
+            ),
+            Some(Segment::data(
+                ISS_1 + 1,
+                ISS_2 + 1,
+                WindowSize::DEFAULT >> WindowScale::default(),
+                SendPayload::Contiguous(&TEST_BYTES[..TEST_BYTES.len() - RESERVED_BYTES])
+            ))
+        );
+
+        assert_eq!(snd.nxt, ISS_1 + 1 + (TEST_BYTES.len() - RESERVED_BYTES));
     }
 }
