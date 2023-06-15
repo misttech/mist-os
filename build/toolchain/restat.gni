@@ -16,7 +16,7 @@ restat_wrapper_local_wrapper = "//build/tracer/output_cacher_local_wrapper.sh"
 
 declare_args() {
   # Set to true to make Rust compiles preserve timestamps of unchanged outputs.
-  restat_rust = false
+  restat_rust = true
 
   # Set to true to make C++ compiles preserve timestamps of unchanged outputs.
   restat_cc = false
