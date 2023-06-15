@@ -201,6 +201,13 @@
             source_availability: "unknown",
         },
         {
+            protocol: [ "fuchsia.web.Debug" ],
+            from: "#session-manager",
+            to: "#sl4f",
+            source_availability: "unknown",
+            availability: "same_as_target",
+        },
+        {
             event_stream: "stopped",
             from: "parent",
             as: "stopped_v2",

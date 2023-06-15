@@ -51,6 +51,7 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//sdk/fidl/fuchsia.session:fuchsia.session_rust",
+    "//sdk/fidl/fuchsia.web:fuchsia.web_rust",
     "//src/lib/diagnostics/inspect/contrib/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fdio/rust:fdio",

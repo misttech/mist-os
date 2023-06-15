@@ -11,6 +11,7 @@ use {
         LaunchConfiguration, LaunchError, LauncherRequest, LauncherRequestStream, RestartError,
         RestarterRequest, RestarterRequestStream,
     },
+    fidl_fuchsia_web as fweb,
     fuchsia_component::server::{ServiceFs, ServiceObjLocal},
     fuchsia_inspect_contrib::nodes::BoundedListNode,
     fuchsia_zircon as zx,
@@ -38,6 +39,7 @@ pub enum IncomingRequest {
     GraphicalPresenter(felement::GraphicalPresenterRequestStream),
     Launcher(LauncherRequestStream),
     Restarter(RestarterRequestStream),
+    WebDebug(fweb::DebugRequestStream),
 }
 
 struct Diagnostics {
@@ -205,6 +207,14 @@ impl SessionManager {
                 )
                 .await?;
             }
+            IncomingRequest::WebDebug(request_stream) => {
+                // Connect to `fuchsia.web.Debug` served by the session.
+                self.forward_request_to_session(
+                    request_stream,
+                    SessionManager::handle_web_debug_request_stream,
+                )
+                .await?;
+            }
             IncomingRequest::Launcher(request_stream) => {
                 self.handle_launcher_request_stream(request_stream)
                     .await
@@ -327,6 +337,31 @@ impl SessionManager {
         Ok(())
     }
 
+    /// Serves a specified [`DebugRequestStream`].
+    ///
+    /// # Parameters
+    /// - `request_stream`: the DebugRequestStream.
+    /// - `debug_proxy`: the DebugProxy that will handle the relayed commands.
+    ///
+    /// # Errors
+    /// When an error is encountered reading from the request stream.
+    pub async fn handle_web_debug_request_stream(
+        mut request_stream: fweb::DebugRequestStream,
+        debug_proxy: fweb::DebugProxy,
+    ) -> Result<(), Error> {
+        while let Some(request) =
+            request_stream.try_next().await.context("Error handling web.Debug request stream")?
+        {
+            match request {
+                fweb::DebugRequest::EnableDevTools { listener, responder } => {
+                    debug_proxy.enable_dev_tools(listener).await?;
+                    let _ = responder.send();
+                }
+            };
+        }
+        Ok(())
+    }
+
     /// Handles calls to Launcher.Launch().
     ///
     /// # Parameters
@@ -397,12 +432,13 @@ impl SessionManager {
 mod tests {
     use {
         super::SessionManager,
-        fidl::endpoints::{create_proxy_and_stream, spawn_stream_handler},
+        fidl::endpoints::{create_proxy_and_stream, create_request_stream, spawn_stream_handler},
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_element as felement,
         fidl_fuchsia_session::{
             LaunchConfiguration, LauncherMarker, LauncherProxy, RestartError, RestarterMarker,
             RestarterProxy,
         },
+        fidl_fuchsia_web as fweb,
         fuchsia_inspect::{self, assert_data_tree, testing::AnyProperty},
         futures::prelude::*,
         session_testing::spawn_noop_directory_server,
@@ -612,5 +648,45 @@ mod tests {
         let _ = future::join3(propose_and_drop_fut, local_server_fut, downstream_server_fut).await;
 
         assert_eq!(num_elements_proposed, 1);
+    }
+
+    #[fuchsia::test]
+    async fn handle_web_debug_request_stream_propagates_request_to_downstream_service() {
+        let (local_proxy, local_request_stream) = create_proxy_and_stream::<fweb::DebugMarker>()
+            .expect("Failed to create local web.Debug proxy and stream");
+
+        let (downstream_proxy, mut downstream_request_stream) =
+            create_proxy_and_stream::<fweb::DebugMarker>()
+                .expect("Failed to create downstream web.Debug proxy and stream");
+
+        let mut listeners = Vec::new();
+
+        let local_server_fut =
+            SessionManager::handle_web_debug_request_stream(local_request_stream, downstream_proxy);
+
+        let downstream_server_fut = async {
+            while let Some(request) = downstream_request_stream.try_next().await.unwrap() {
+                match request {
+                    fweb::DebugRequest::EnableDevTools { listener, responder, .. } => {
+                        listeners.push(listener);
+                        let _ = responder.send();
+                    }
+                }
+            }
+        };
+
+        let (listener, _listener_request_stream) =
+            create_request_stream::<fweb::DevToolsListenerMarker>()
+                .expect("Failed to create web.DevToolsListener proxy and stream");
+
+        let enable_and_drop_fut = async {
+            local_proxy.enable_dev_tools(listener).await.expect("Failed to call EnableDevTools");
+
+            std::mem::drop(local_proxy); // Drop proxy to terminate `server_fut`.
+        };
+
+        let _ = future::join3(enable_and_drop_fut, local_server_fut, downstream_server_fut).await;
+
+        assert_eq!(listeners.len(), 1);
     }
 }
