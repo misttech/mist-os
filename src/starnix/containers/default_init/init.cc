@@ -47,8 +47,16 @@ intptr_t _syscall4(intptr_t syscall_number, intptr_t arg1, intptr_t arg2, intptr
                    : "0"(x0), "r"(x1), "r"(x2), "r"(x3), "r"(number)
                    : "memory");
 #elif defined(__riscv) && __riscv_xlen == 64
-  // TODO(fxbug.dev/128554): implement riscv64 support.
-  ret = 0;
+  register intptr_t a0 asm("a0") = arg1;
+  register intptr_t a1 asm("a1") = arg2;
+  register intptr_t a2 asm("a2") = arg3;
+  register intptr_t a3 asm("a3") = arg4;
+  register intptr_t number asm("a7") = syscall_number;
+
+  __asm__ volatile("ecall"
+                   : "=r"(ret)
+                   : "r"(a0), "r"(a1), "r"(a2), "r"(a3), "r"(number)
+                   : "memory");
 #endif
   return handle_error(ret);
 }
