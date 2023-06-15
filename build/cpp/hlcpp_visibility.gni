@@ -68,7 +68,6 @@ hlcpp_visibility = [
   "//sdk/lib/inspect/service/cpp/tests:*",
   "//sdk/lib/media/audio/cpp:*",
   "//sdk/lib/media/cpp:*",
-  "//sdk/lib/modular/cpp:*",
   "//sdk/lib/sys/component/cpp/testing:*",
   "//sdk/lib/sys/component/cpp/tests:*",
   "//sdk/lib/sys/cpp/*",

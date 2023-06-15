@@ -68,7 +68,6 @@ executable("virtual_camera_bin") {
   deps = [
     ":stream_storage",
     ":virtual_camera_agent",
-    "//sdk/lib/modular/cpp",
     "//sdk/lib/sys/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

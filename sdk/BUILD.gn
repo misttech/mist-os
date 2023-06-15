@@ -330,7 +330,6 @@ sdk_molecule("core_lib") {
     "//sdk/lib/inspect/service/cpp:cpp_sdk",
     "//sdk/lib/magma_client:magma_client_sdk",
     "//sdk/lib/media/cpp:cpp_sdk",
-    "//sdk/lib/modular/cpp:cpp_sdk",
     "//sdk/lib/stdcompat:stdcompat_sdk",
     "//sdk/lib/svc:svc_sdk",
     "//sdk/lib/sys/component:realm_builder_shard_sdk",

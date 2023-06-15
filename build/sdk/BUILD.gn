@@ -53,7 +53,6 @@ _sdk_versioned_source_sets_list = [
   "//sdk/lib/inspect/service/cpp",
   "//sdk/lib/media/cpp",
   "//sdk/lib/media/cpp:no_converters",
-  "//sdk/lib/modular/cpp",
   "//sdk/lib/stdcompat",
   "//sdk/lib/sys/cpp",
   "//sdk/lib/sys/inspect/cpp",
