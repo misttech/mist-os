@@ -1,6 +1,6 @@
 {
   "pkg/fit-promise/include/lib/fpromise/barrier.h": "165eaf8820b9055c94adc5199c9a496d",
-  "pkg/fit-promise/include/lib/fpromise/bridge.h": "fa8515f6cd6d90d726979675c33b0612",
+  "pkg/fit-promise/include/lib/fpromise/bridge.h": "5261dd8f50f207091d4d3cf3cc079c01",
   "pkg/fit-promise/include/lib/fpromise/bridge_internal.h": "7f17672771d4eaebe75c5e4d9a3e216a",
   "pkg/fit-promise/include/lib/fpromise/promise.h": "0a5b184d842ff4d8cf3110372e8a0dfa",
   "pkg/fit-promise/include/lib/fpromise/promise_internal.h": "ebb8a10a0da343651d1903a2c99954c3",

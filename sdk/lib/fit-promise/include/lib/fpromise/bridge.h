@@ -219,13 +219,13 @@ class completer final {
   // Reports that the task has completed successfully.
   // This method takes no arguments if |value_type| is void, otherwise it
   // takes one argument which must be assignable to |value_type|.
-  template <typename VV = value_type, typename = std::enable_if_t<std::is_void<VV>::value>>
+  template <typename VV = value_type, typename = std::enable_if_t<std::is_void_v<VV>>>
   void complete_ok() {
     assert(completion_ref_);
     bridge_state* state = completion_ref_.get();
     state->complete_or_abandon(std::move(completion_ref_), ::fpromise::ok());
   }
-  template <typename VV = value_type, typename = std::enable_if_t<!std::is_void<VV>::value>>
+  template <typename VV = value_type, typename = std::enable_if_t<!std::is_void_v<VV>>>
   void complete_ok(VV value) {
     assert(completion_ref_);
     bridge_state* state = completion_ref_.get();
@@ -236,13 +236,13 @@ class completer final {
   // Reports that the task has completed with an error.
   // This method takes no arguments if |error_type| is void, otherwise it
   // takes one argument which must be assignable to |error_type|.
-  template <typename EE = error_type, typename = std::enable_if_t<std::is_void<EE>::value>>
+  template <typename EE = error_type, typename = std::enable_if_t<std::is_void_v<EE>>>
   void complete_error() {
     assert(completion_ref_);
     bridge_state* state = completion_ref_.get();
     state->complete_or_abandon(std::move(completion_ref_), ::fpromise::error());
   }
-  template <typename EE = error_type, typename = std::enable_if_t<!std::is_void<EE>::value>>
+  template <typename EE = error_type, typename = std::enable_if_t<!std::is_void_v<EE>>>
   void complete_error(EE error) {
     assert(completion_ref_);
     bridge_state* state = completion_ref_.get();
