@@ -35,7 +35,6 @@ group("dart_allowlist") {
     "//build/dart/kernel/tests:*",
     "//build/dart/sdk/detect_api_changes:*",
     "//build/flutter/internal/build_test_bootstrap:*",
-    "//examples/components/realm_builder:*",
     "//examples/components/routing/fidl:*",
     "//examples/diagnostics/inspect/codelab/dart:*",
     "//examples/diagnostics/inspect/codelab/dart/client:*",
