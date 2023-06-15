@@ -4060,7 +4060,7 @@ Contains the major version number of the ICU library, for dependencies that
 need different configuration based on the library version. Currently this
 is only useful in Fuchsia.
 
-**Current value (from the default):** `"72"`
+**Current value (from the default):** `"73"`
 
 From //third_party/icu/default/version.gni:13
 
@@ -7384,7 +7384,7 @@ From //build/toolchain/restat.gni:22
 
 Set to true to make Rust compiles preserve timestamps of unchanged outputs.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //build/toolchain/restat.gni:19
 
