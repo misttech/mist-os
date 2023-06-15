@@ -5,6 +5,7 @@
 mod abstract_socket_namespace;
 mod interruptible_lock;
 mod iptables;
+mod itimer;
 mod kernel;
 mod kernel_threads;
 mod pid_table;

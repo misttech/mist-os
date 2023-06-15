@@ -31,6 +31,25 @@ pub fn sys_access(
     sys_faccessat(current_task, FdNumber::AT_FDCWD, user_path, mode)
 }
 
+pub fn sys_alarm(current_task: &CurrentTask, duration: u32) -> Result<u32, Errno> {
+    let duration = zx::Duration::from_seconds(duration.into());
+    let new_value = timeval_from_duration(duration);
+    let old_value = current_task.thread_group.set_itimer(
+        ITIMER_REAL,
+        itimerval { it_value: new_value, it_interval: Default::default() },
+    )?;
+
+    let remaining = duration_from_timeval(old_value.it_value)?;
+
+    let old_value_seconds = remaining.into_seconds();
+    if old_value_seconds == 0 && remaining != zx::Duration::default() {
+        // We can't return a zero value if the alarm was scheduled even if it had
+        // less than one second remaining. Return 1 instead.
+        return Ok(1);
+    }
+    old_value_seconds.try_into().map_err(|_| errno!(EDOM))
+}
+
 pub fn sys_arch_prctl(
     current_task: &mut CurrentTask,
     code: u32,

@@ -58,6 +58,7 @@ pub fn dispatch_syscall(
         current_task; syscall.decl.number; args;
         accept4[4],
         accept[3],
+        #[cfg(target_arch = "x86_64")] alarm[1],
         #[cfg(target_arch = "x86_64")] access[2],
         #[cfg(target_arch = "x86_64")] arch_prctl[2],
         bind[3],

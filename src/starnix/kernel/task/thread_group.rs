@@ -18,11 +18,12 @@ use crate::{
     device::terminal::*,
     drop_notifier::DropNotifier,
     lock::RwLock,
-    logging::log_error,
+    logging::{log_error, not_implemented},
     mutable_state::*,
     selinux::SeLinuxThreadGroupState,
     signals::{syscalls::WaitingOptions, *},
-    task::*,
+    task::{itimer::Itimer, *},
+    time::utc,
     types::*,
 };
 
@@ -71,8 +72,8 @@ pub struct ThreadGroupMutableState {
     /// The timers for this thread group (from timer_create(), etc.).
     pub timers: Arc<TimerTable>,
 
-    /// The itimers for this thread group.
-    pub itimers: [itimerval; 3],
+    // Object for ITIMER_REAL.
+    itimer_real: Arc<Itimer>,
 
     pub did_exec: bool,
 
@@ -252,7 +253,7 @@ impl ThreadGroup {
                 is_child_subreaper: false,
                 process_group: Arc::clone(&process_group),
                 timers: TimerTable::new(),
-                itimers: Default::default(),
+                itimer_real: Arc::new(Itimer::default()),
                 did_exec: false,
                 stopped: false,
                 stopped_waiters: WaitQueue::default(),
@@ -497,11 +498,51 @@ impl ThreadGroup {
     }
 
     pub fn set_itimer(self: &Arc<Self>, which: u32, value: itimerval) -> Result<itimerval, Errno> {
-        let mut state = self.write();
-        let timer = state.itimers.get_mut(which as usize).ok_or_else(|| errno!(EINVAL))?;
-        let old_value = *timer;
-        *timer = value;
-        Ok(old_value)
+        if which == ITIMER_PROF || which == ITIMER_VIRTUAL {
+            // We don't support setting these timers.
+            // The gvisor test suite clears ITIMER_PROF as part of its test setup logic, so we support
+            // clearing these values.
+            if value.it_value.tv_sec == 0 && value.it_value.tv_usec == 0 {
+                return Ok(itimerval::default());
+            }
+            not_implemented!("Unsupported itimer type: {which}");
+            return Err(errno!(ENOTSUP));
+        }
+
+        if which != ITIMER_REAL {
+            return Err(errno!(EINVAL));
+        }
+        let state = self.write();
+        let prev_remaining = state.itimer_real.time_remaining();
+        if value.it_value.tv_sec != 0 || value.it_value.tv_usec != 0 {
+            state.itimer_real.arm(
+                Arc::downgrade(self),
+                &self.kernel.kthreads.ehandle,
+                utc::utc_now() + duration_from_timeval(value.it_value)?,
+                duration_from_timeval(value.it_interval)?,
+            );
+        } else {
+            state.itimer_real.disarm();
+        }
+        Ok(itimerval {
+            it_value: timeval_from_duration(prev_remaining.remainder),
+            it_interval: timeval_from_duration(prev_remaining.interval),
+        })
+    }
+
+    pub fn get_itimer(self: &Arc<Self>, which: u32) -> Result<itimerval, Errno> {
+        if which == ITIMER_PROF || which == ITIMER_VIRTUAL {
+            // We don't support setting these timers, so we can accurately report that these are not set.
+            return Ok(itimerval::default());
+        }
+        if which != ITIMER_REAL {
+            return Err(errno!(EINVAL));
+        }
+        let remaining = self.read().itimer_real.time_remaining();
+        Ok(itimerval {
+            it_value: timeval_from_duration(remaining.remainder),
+            it_interval: timeval_from_duration(remaining.interval),
+        })
     }
 
     /// Set the stop status of the process.
