@@ -71,10 +71,10 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
 
         archivist_config
             .field("bind_services", bind_services.into_iter().collect::<Vec<_>>())?
-            .field("enable_component_event_provider", true)?
+            .field("enable_component_event_provider", false)?
             .field("enable_event_source", true)?
             .field("enable_klog", true)?
-            .field("enable_log_connector", true)?
+            .field("enable_log_connector", false)?
             .field("log_to_debuglog", true)?
             .field("logs_max_cached_original_bytes", logs_max_cached_original_bytes)?
             .field(
@@ -134,11 +134,11 @@ mod tests {
         );
         assert_eq!(
             archivist_fields.get("enable_component_event_provider"),
-            Some(&Value::Bool(true))
+            Some(&Value::Bool(false))
         );
         assert_eq!(archivist_fields.get("enable_event_source"), Some(&Value::Bool(true)));
         assert_eq!(archivist_fields.get("enable_klog"), Some(&Value::Bool(true)));
-        assert_eq!(archivist_fields.get("enable_log_connector"), Some(&Value::Bool(true)));
+        assert_eq!(archivist_fields.get("enable_log_connector"), Some(&Value::Bool(false)));
         assert_eq!(archivist_fields.get("log_to_debuglog"), Some(&Value::Bool(true)));
         assert_eq!(
             archivist_fields.get("logs_max_cached_original_bytes"),

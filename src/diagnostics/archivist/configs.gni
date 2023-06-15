@@ -14,10 +14,10 @@ default_config = {
     "fuchsia.component.PersistenceBinder",
     "fuchsia.component.SamplerBinder",
   ]
-  enable_component_event_provider = true
+  enable_component_event_provider = false
   enable_event_source = true
   enable_klog = true
-  enable_log_connector = true
+  enable_log_connector = false
   log_to_debuglog = true
   logs_max_cached_original_bytes = archivist_max_cached_logs_bytes
   maximum_concurrent_snapshots_per_reader = 4
