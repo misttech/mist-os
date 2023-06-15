@@ -532,14 +532,22 @@ fn shared_ioctl(
             Ok(SUCCESS)
         }
 
+        TIOCSETD => {
+            not_implemented!(
+                "{}: setting line discipline not implemented",
+                if is_main { "ptmx" } else { "pts" }
+            );
+            error!(EINVAL)
+        }
+
         TCGETA | TCSETA | TCSETAW | TCSETAF | TCSBRK | TCXONC | TCFLSH | TIOCEXCL | TIOCNXCL
         | TIOCOUTQ | TIOCSTI | TIOCMGET | TIOCMBIS | TIOCMBIC | TIOCMSET | TIOCGSOFTCAR
         | TIOCSSOFTCAR | TIOCLINUX | TIOCCONS | TIOCGSERIAL | TIOCSSERIAL | TIOCPKT | FIONBIO
-        | TIOCSETD | TIOCGETD | TCSBRKP | TIOCSBRK | TIOCCBRK | TIOCGSID | TIOCGRS485
-        | TIOCSRS485 | TCGETX | TCSETX | TCSETXF | TCSETXW | TIOCVHANGUP | FIONCLEX | FIOCLEX
-        | FIOASYNC | TIOCSERCONFIG | TIOCSERGWILD | TIOCSERSWILD | TIOCGLCKTRMIOS
-        | TIOCSLCKTRMIOS | TIOCSERGSTRUCT | TIOCSERGETLSR | TIOCSERGETMULTI | TIOCSERSETMULTI
-        | TIOCMIWAIT | TIOCGICOUNT | FIOQSIZE => {
+        | TIOCGETD | TCSBRKP | TIOCSBRK | TIOCCBRK | TIOCGSID | TIOCGRS485 | TIOCSRS485
+        | TCGETX | TCSETX | TCSETXF | TCSETXW | TIOCVHANGUP | FIONCLEX | FIOCLEX | FIOASYNC
+        | TIOCSERCONFIG | TIOCSERGWILD | TIOCSERSWILD | TIOCGLCKTRMIOS | TIOCSLCKTRMIOS
+        | TIOCSERGSTRUCT | TIOCSERGETLSR | TIOCSERGETMULTI | TIOCSERSETMULTI | TIOCMIWAIT
+        | TIOCGICOUNT | FIOQSIZE => {
             not_implemented!(
                 "{}: ioctl request 0x{:08x} not implemented",
                 if is_main { "ptmx" } else { "pts" },
