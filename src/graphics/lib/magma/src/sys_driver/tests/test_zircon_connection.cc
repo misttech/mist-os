@@ -16,7 +16,7 @@
 #include "platform_handle.h"
 #include "platform_port.h"
 #include "platform_semaphore.h"
-#include "src/graphics/lib/magma/src/sys_driver_cpp/zircon_connection.h"
+#include "src/graphics/lib/magma/src/sys_driver/zircon_connection.h"
 
 #if defined(__Fuchsia__)
 #include "zircon/zircon_platform_connection_client.h"  // nogncheck

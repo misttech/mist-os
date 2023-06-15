@@ -1,8 +1,8 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-#ifndef SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_CPP_PERFORMANCE_COUNTERS_SERVER_H_
-#define SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_CPP_PERFORMANCE_COUNTERS_SERVER_H_
+#ifndef SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_PERFORMANCE_COUNTERS_SERVER_H_
+#define SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_PERFORMANCE_COUNTERS_SERVER_H_
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
@@ -34,4 +34,4 @@ class PerformanceCountersServer
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> node_controller_;
 };
 
-#endif  // SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_CPP_PERFORMANCE_COUNTERS_SERVER_H_
+#endif  // SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_PERFORMANCE_COUNTERS_SERVER_H_

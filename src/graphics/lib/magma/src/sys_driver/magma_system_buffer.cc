@@ -7,11 +7,11 @@
 #include "magma_util/macros.h"
 
 MagmaSystemBuffer::MagmaSystemBuffer(std::unique_ptr<magma::PlatformBuffer> platform_buf,
-                                     msd_buffer_unique_ptr_t msd_buf)
+                                     std::unique_ptr<msd::Buffer> msd_buf)
     : platform_buf_(std::move(platform_buf)), msd_buf_(std::move(msd_buf)) {}
 
 std::unique_ptr<MagmaSystemBuffer> MagmaSystemBuffer::Create(
-    std::unique_ptr<magma::PlatformBuffer> platform_buffer) {
+    msd::Driver* driver, std::unique_ptr<magma::PlatformBuffer> platform_buffer) {
   if (!platform_buffer)
     return MAGMA_DRETP(nullptr, "Failed to create PlatformBuffer");
 
@@ -19,8 +19,7 @@ std::unique_ptr<MagmaSystemBuffer> MagmaSystemBuffer::Create(
   if (!platform_buffer->duplicate_handle(&duplicate_handle))
     return MAGMA_DRETP(nullptr, "failed to get duplicate_handle");
 
-  msd_buffer_unique_ptr_t msd_buf =
-      MsdBufferUniquePtr(msd_buffer_import(duplicate_handle, platform_buffer->id()));
+  auto msd_buf = driver->ImportBuffer(zx::vmo(duplicate_handle), platform_buffer->id());
   if (!msd_buf)
     return MAGMA_DRETP(nullptr,
                        "Failed to import newly allocated buffer into the MSD Implementation");

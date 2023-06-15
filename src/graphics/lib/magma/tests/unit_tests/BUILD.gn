@@ -19,7 +19,6 @@ executable("unit_tests") {
 
   deps = [
     ":magma_platform_tests",
-    ":magma_system_tests",
     ":magma_util_tests",
     "$magma_build_root/tests/helper:logger_init_helper",
     "//src/lib/fxl/test:gtest_main",
@@ -31,34 +30,6 @@ executable("unit_tests") {
     deps += [ ":magma_ddk_tests" ]
   } else {
     deps += [ "//src/devices/testing/no_ddk" ]
-  }
-}
-
-source_set("magma_system_tests") {
-  testonly = true
-
-  sources = [
-    "test_magma_driver.cc",
-    "test_magma_system_buffer.cc",
-    "test_magma_system_connection.cc",
-    "test_magma_system_context.cc",
-    "test_magma_system_device.cc",
-  ]
-
-  assert_no_deps = [ "//src/graphics/lib/magma/src/sys_driver_cpp" ]
-  deps = [
-    "$magma_build_root/src/magma_util:macros",
-    "$magma_build_root/src/magma_util/platform:event",
-    "$magma_build_root/src/sys_driver",
-    "$magma_build_root/tests/helper:command_buffer_helper",
-    "$magma_build_root/tests/helper:platform_device_helper",
-    "$magma_build_root/tests/mock:msd",
-    "//sdk/lib/fit",
-    "//third_party/googletest:gtest",
-  ]
-
-  if (is_fuchsia) {
-    deps += [ "$magma_build_root/src/magma_util/platform/zircon:buffer" ]
   }
 }
 
@@ -200,30 +171,6 @@ source_set("magma_platform_pci_device_tests") {
 }
 
 # Requires hardware
-source_set("msd_conformance_tests") {
-  testonly = true
-
-  sources = [
-    "test_magma_system_multithread.cc",
-    "test_msd_buffer.cc",
-    "test_msd_context.cc",
-    "test_msd_device.cc",
-    "test_msd_driver.cc",
-    "test_msd_semaphore.cc",
-  ]
-
-  deps = [
-    "$magma_build_root/include:msd",
-    "$magma_build_root/src/magma_util:short_macros",
-    "$magma_build_root/src/magma_util/platform:buffer",
-    "$magma_build_root/src/magma_util/platform:semaphore",
-    "$magma_build_root/src/sys_driver",
-    "$magma_build_root/tests/helper:platform_msd_device_helper",
-    "//src/graphics/drivers/msd-intel-gen/include",
-    "//third_party/googletest:gtest",
-  ]
-}
-
 source_set("msd_conformance_tests_cc") {
   testonly = true
 
@@ -243,7 +190,7 @@ source_set("msd_conformance_tests_cc") {
     "$magma_build_root/src/magma_util:short_macros",
     "$magma_build_root/src/magma_util/platform:buffer",
     "$magma_build_root/src/magma_util/platform:semaphore",
-    "$magma_build_root/src/sys_driver_cpp",
+    "$magma_build_root/src/sys_driver",
     "$magma_build_root/tests/helper:msd_stubs",
     "$magma_build_root/tests/helper:platform_msd_device_helper",
     "//src/graphics/drivers/msd-intel-gen/include",

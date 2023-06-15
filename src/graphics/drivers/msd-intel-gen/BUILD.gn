@@ -16,10 +16,7 @@ fuchsia_driver("msd_intel-driver") {
     "src",
   ]
 
-  assert_no_deps = [
-    "//src/graphics/lib/magma/src/sys_driver",
-    "//zircon/system/ulib/trace-engine:trace-engine-static",
-  ]
+  assert_no_deps = [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
 }
 
 fuchsia_driver_component("msd_intel") {
@@ -41,10 +38,7 @@ fuchsia_driver("msd_intel_test-driver") {
     "src",
   ]
 
-  assert_no_deps = [
-    "//src/graphics/lib/magma/src/sys_driver",
-    "//zircon/system/ulib/trace-engine:trace-engine-static",
-  ]
+  assert_no_deps = [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
 }
 
 fuchsia_driver_component("msd_intel_test") {
@@ -80,8 +74,8 @@ source_set("msd_intel_entry") {
     "//src/graphics/lib/magma/src/magma_util/platform:trace",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:performance_counter_device",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
-    "//src/graphics/lib/magma/src/sys_driver_cpp",
-    "//src/graphics/lib/magma/src/sys_driver_cpp:device_impl",
+    "//src/graphics/lib/magma/src/sys_driver",
+    "//src/graphics/lib/magma/src/sys_driver:device_impl",
     "//src/lib/ddk",
     "//src/zircon/lib/zircon",
     "//zircon/system/ulib/trace",
@@ -105,8 +99,8 @@ source_set("msd_intel_test_entry") {
     "//src/graphics/lib/magma/src/magma_util:macros",
     "//src/graphics/lib/magma/src/magma_util/platform:trace",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
-    "//src/graphics/lib/magma/src/sys_driver_cpp",
-    "//src/graphics/lib/magma/src/sys_driver_cpp:device_impl",
+    "//src/graphics/lib/magma/src/sys_driver",
+    "//src/graphics/lib/magma/src/sys_driver:device_impl",
     "//src/lib/ddk",
     "//src/zircon/lib/zircon",
     "//zircon/system/ulib/trace",

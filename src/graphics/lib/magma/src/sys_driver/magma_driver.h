@@ -10,38 +10,32 @@
 #include "magma_system_device.h"
 #include "magma_util/dlog.h"
 #include "magma_util/macros.h"
-#include "msd.h"
-
-using msd_driver_unique_ptr_t = std::unique_ptr<msd_driver_t, fit::function<void(msd_driver_t*)>>;
-
-static inline msd_driver_unique_ptr_t MsdDriverUniquePtr(msd_driver_t* driver) {
-  return msd_driver_unique_ptr_t(driver, &msd_driver_destroy);
-}
+#include "msd_cc.h"
 
 class MagmaDriver {
  public:
-  explicit MagmaDriver(msd_driver_unique_ptr_t msd_drv) : msd_drv_(std::move(msd_drv)) {}
+  explicit MagmaDriver(std::unique_ptr<msd::Driver> msd_drv) : msd_drv_(std::move(msd_drv)) {}
 
-  std::unique_ptr<MagmaSystemDevice> CreateDevice(void* device_handle) {
-    msd_device_t* msd_dev = msd_driver_create_device(msd_drv_.get(), device_handle);
+  std::unique_ptr<MagmaSystemDevice> CreateDevice(msd::DeviceHandle* device_handle) {
+    std::unique_ptr<msd::Device> msd_dev = msd_drv_->CreateDevice(device_handle);
     if (!msd_dev)
       return MAGMA_DRETP(nullptr, "msd_create_device failed");
 
-    return MagmaSystemDevice::Create(MsdDeviceUniquePtr(msd_dev));
+    return MagmaSystemDevice::Create(msd_drv_.get(), std::move(msd_dev));
   }
 
   static std::unique_ptr<MagmaDriver> Create() {
-    msd_driver_t* msd_drv = msd_driver_create();
+    std::unique_ptr<msd::Driver> msd_drv = msd::Driver::Create();
     if (!msd_drv)
       return MAGMA_DRETP(nullptr, "msd_create returned null");
 
-    return std::make_unique<MagmaDriver>(MsdDriverUniquePtr(msd_drv));
+    return std::make_unique<MagmaDriver>(std::move(msd_drv));
   }
 
-  uint32_t DuplicateInspectVmo() { return msd_driver_duplicate_inspect_handle(msd_drv_.get()); }
+  std::optional<inspect::Inspector> DuplicateInspector() { return msd_drv_->DuplicateInspector(); }
 
  private:
-  msd_driver_unique_ptr_t msd_drv_;
+  std::unique_ptr<msd::Driver> msd_drv_;
 };
 
 #endif  // MAGMA_DRIVER_H

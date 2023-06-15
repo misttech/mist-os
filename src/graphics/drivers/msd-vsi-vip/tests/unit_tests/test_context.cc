@@ -10,8 +10,8 @@
 #include "src/graphics/drivers/msd-vsi-vip/src/mapped_batch.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/msd_vsi_context.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/msd_vsi_driver.h"
-#include "src/graphics/lib/magma/src/sys_driver_cpp/magma_system_buffer.h"
-#include "src/graphics/lib/magma/src/sys_driver_cpp/magma_system_semaphore.h"
+#include "src/graphics/lib/magma/src/sys_driver/magma_system_buffer.h"
+#include "src/graphics/lib/magma/src/sys_driver/magma_system_semaphore.h"
 
 // Holds the buffers and semaphores associated with a fake test batch.
 class BatchData {

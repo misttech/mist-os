@@ -10,9 +10,9 @@
 #include "helper/platform_msd_device_helper.h"
 #include "msd/msd_cc.h"
 #include "platform_semaphore.h"
-#include "sys_driver_cpp/magma_driver.h"
-#include "sys_driver_cpp/magma_system_connection.h"
-#include "sys_driver_cpp/magma_system_context.h"
+#include "sys_driver/magma_driver.h"
+#include "sys_driver/magma_system_connection.h"
+#include "sys_driver/magma_system_context.h"
 
 // a class to create and own the command buffer were trying to execute
 class CommandBufferHelper final : public msd::NotificationHandler {

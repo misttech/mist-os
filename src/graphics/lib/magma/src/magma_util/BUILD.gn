@@ -157,7 +157,7 @@ source_set("short_macros") {
     "//src/graphics/lib/magma/src/libmagma:*",
     "//src/graphics/lib/magma/src/libmagma_virt:*",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:*",
-    "//src/graphics/lib/magma/src/sys_driver_cpp/tests:*",
+    "//src/graphics/lib/magma/src/sys_driver/tests:*",
     "//src/graphics/lib/magma/tests/mock:*",
     "//src/graphics/lib/magma/tests/unit_tests:*",
     "//third_party/imgtec-pvr-rgx-km/*",

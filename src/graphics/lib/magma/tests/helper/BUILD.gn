@@ -34,23 +34,13 @@ source_set("platform_msd_device_helper") {
   sources = [ "platform_msd_device_helper.h" ]
 }
 
-source_set("command_buffer_helper") {
-  public_configs = [ "$magma_build_root:magma_tests_include_config" ]
-
-  public_deps = [ "$magma_build_root/src/magma_util/platform:device" ]
-
-  sources = [ "command_buffer_helper.h" ]
-
-  deps = [ "$magma_build_root/src/sys_driver" ]
-}
-
 source_set("command_buffer_helper_cpp") {
   public_configs = [ "$magma_build_root:magma_tests_include_config" ]
 
   public_deps = [
     ":platform_msd_device_helper",
     "$magma_build_root/src/magma_util/platform:device",
-    "$magma_build_root/src/sys_driver_cpp",
+    "$magma_build_root/src/sys_driver",
     "//src/graphics/lib/magma/src/magma_util/platform:semaphore",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

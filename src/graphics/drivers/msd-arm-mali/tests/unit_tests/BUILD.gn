@@ -88,7 +88,7 @@ group("test_deps") {
     "//src/graphics/lib/magma/src/magma_util:registers",
     "//src/graphics/lib/magma/src/magma_util/platform:port",
     "//src/graphics/lib/magma/src/magma_util/platform:semaphore",
-    "//src/graphics/lib/magma/src/sys_driver_cpp",
+    "//src/graphics/lib/magma/src/sys_driver",
     "//src/graphics/lib/magma/tests/helper:platform_msd_device_helper",
     "//src/graphics/lib/magma/tests/mock:mmio",
     "//third_party/googletest:gtest",

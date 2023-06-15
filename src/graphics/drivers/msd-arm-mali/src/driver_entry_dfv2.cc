@@ -16,8 +16,8 @@
 #include "platform_bus_mapper.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_logger_dfv2.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
-#include "src/graphics/lib/magma/src/sys_driver_cpp/magma_driver_base.h"
-#include "sys_driver_cpp/magma_driver.h"
+#include "src/graphics/lib/magma/src/sys_driver/magma_driver_base.h"
+#include "sys_driver/magma_driver.h"
 
 #if MAGMA_TEST_DRIVER
 using MagmaDriverBaseType = MagmaTestDriverBase;

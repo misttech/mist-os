@@ -11,13 +11,6 @@
 #include "magma_system_buffer.h"
 #include "magma_system_semaphore.h"
 #include "magma_util/status.h"
-#include "msd.h"
-
-using msd_context_unique_ptr_t = std::unique_ptr<msd_context_t, decltype(&msd_context_destroy)>;
-
-static inline msd_context_unique_ptr_t MsdContextUniquePtr(msd_context_t* context) {
-  return msd_context_unique_ptr_t(context, &msd_context_destroy);
-}
 
 class MagmaSystemCommandBuffer;
 
@@ -29,7 +22,7 @@ class MagmaSystemContext {
     virtual std::shared_ptr<MagmaSystemSemaphore> LookupSemaphoreForContext(uint64_t id) = 0;
   };
 
-  MagmaSystemContext(Owner* owner, msd_context_unique_ptr_t msd_ctx)
+  MagmaSystemContext(Owner* owner, std::unique_ptr<msd::Context> msd_ctx)
       : owner_(owner), msd_ctx_(std::move(msd_ctx)) {}
 
   magma::Status ExecuteCommandBufferWithResources(
@@ -39,11 +32,11 @@ class MagmaSystemContext {
                                          uint64_t semaphore_count, uint64_t* semaphore_ids);
 
  private:
-  msd_context_t* msd_ctx() { return msd_ctx_.get(); }
+  msd::Context* msd_ctx() { return msd_ctx_.get(); }
 
   Owner* owner_;
 
-  msd_context_unique_ptr_t msd_ctx_;
+  std::unique_ptr<msd::Context> msd_ctx_;
 
   friend class CommandBufferHelper;
 };

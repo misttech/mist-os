@@ -17,14 +17,13 @@ source_set("magma_system_tests") {
     "test_notification_handler.cc",
     "test_zircon_connection.cc",
   ]
-  assert_no_deps = [ "//src/graphics/lib/magma/src/sys_driver" ]
 
   deps = [
     "$magma_build_root/src/magma_util:macros",
     "$magma_build_root/src/magma_util:short_macros",
     "$magma_build_root/src/magma_util/platform:connection_client",
     "$magma_build_root/src/magma_util/platform:event",
-    "$magma_build_root/src/sys_driver_cpp",
+    "$magma_build_root/src/sys_driver",
     "$magma_build_root/tests/helper:command_buffer_helper_cpp",
     "$magma_build_root/tests/helper:logger_init_helper",
     "$magma_build_root/tests/helper:platform_device_helper",
@@ -45,7 +44,7 @@ executable("magma_system_dfv2_test_executable") {
   sources = [ "test_magma_driver_base.cc" ]
 
   deps = [
-    "$magma_build_root/src/sys_driver_cpp:magma_driver_base",
+    "$magma_build_root/src/sys_driver:magma_driver_base",
     "$magma_build_root/tests/mock:msd_cpp",
     "//sdk/lib/driver/testing/cpp",
     "//src/lib/fxl/test:gtest_main",
@@ -53,9 +52,9 @@ executable("magma_system_dfv2_test_executable") {
   ]
 }
 
-executable("magma_sys_driver_cpp_test_executable") {
+executable("magma_sys_driver_test_executable") {
   testonly = true
-  output_name = "magma_sys_driver_cpp_test"
+  output_name = "magma_sys_driver_test"
   deps = [
     ":magma_system_tests",
     "//src/lib/fxl/test:gtest_main",
@@ -63,8 +62,8 @@ executable("magma_sys_driver_cpp_test_executable") {
   ]
 }
 
-fuchsia_unittest_package("magma_sys_driver_cpp_test") {
-  deps = [ ":magma_sys_driver_cpp_test_executable" ]
+fuchsia_unittest_package("magma_sys_driver_test") {
+  deps = [ ":magma_sys_driver_test_executable" ]
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
@@ -84,7 +83,7 @@ fuchsia_unittest_package("magma_system_dfv2_test") {
 group("tests") {
   testonly = true
   deps = [
-    ":magma_sys_driver_cpp_test",
+    ":magma_sys_driver_test",
     ":magma_system_dfv2_test",
   ]
 }

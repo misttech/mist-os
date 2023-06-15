@@ -5,10 +5,13 @@
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
 source_set("sys_driver") {
+  assert_no_deps = [ "//src/devices/bin/driver_host:driver" ]
   public_deps = [
+    ":connection",
     "$magma_build_root/include:magma",
-    "$magma_build_root/include:msd",
+    "$magma_build_root/include:msd_cc",
     "$magma_build_root/src/magma_util:macros",
+    "$magma_build_root/src/magma_util:status",
     "$magma_build_root/src/magma_util/platform:buffer",
     "//sdk/lib/fit",
   ]
@@ -25,17 +28,41 @@ source_set("sys_driver") {
     "magma_system_device.h",
     "magma_system_semaphore.cc",
     "magma_system_semaphore.h",
-    "stub_entry_points.cc",
   ]
 
   deps = [
-    "$magma_build_root/src/magma_util/platform:connection",
-    "$magma_build_root/src/magma_util/platform:device",
-    "$magma_build_root/src/magma_util/platform:object",
     "$magma_build_root/src/magma_util/platform:semaphore",
-    "$magma_build_root/src/magma_util/platform:thread",
     "$magma_build_root/src/magma_util/platform:trace",
   ]
+}
+
+source_set("connection") {
+  configs += [
+    "//src/graphics/lib/magma/src/magma_util/platform:platform_include_config",
+  ]
+
+  sources = [
+    "zircon_connection.cc",
+    "zircon_connection.h",
+  ]
+
+  public_deps = [
+    "$magma_build_root/include:msd",
+    "$magma_build_root/include:msd_cc",
+    "$magma_build_root/src/magma_util:macros",
+    "$magma_build_root/src/magma_util:status",
+    "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
+    "//sdk/lib/stdcompat",
+    "//src/graphics/lib/magma/src/magma_util/platform:trace",
+    "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/zx",
+  ]
+
+  deps = [ "//zircon/system/ulib/async:async-cpp" ]
+
+  # Fidl bindings should not introduce a dep on libasync-default.so
+  assert_no_deps = [ "//zircon/system/ulib/async-default" ]
 }
 
 source_set("device_impl") {
@@ -44,13 +71,39 @@ source_set("device_impl") {
   public_deps = [
     ":sys_driver",
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
-    "//sdk/lib/fit",
     "//src/devices/lib/driver",
     "//src/graphics/lib/magma/src/magma_util:macros",
+    "//src/graphics/lib/magma/src/magma_util/platform:thread",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:dependency_injection_device",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:performance_counter_device",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
+    "//src/graphics/lib/magma/src/magma_util/platform/zircon:thread_profile",
     "//src/lib/ddk",
     "//src/lib/ddktl",
+  ]
+}
+
+source_set("magma_driver_base") {
+  sources = [
+    "dependency_injection_server.cc",
+    "dependency_injection_server.h",
+    "magma_driver_base.h",
+    "performance_counters_server.cc",
+    "performance_counters_server.h",
+  ]
+
+  public_deps = [
+    ":sys_driver",
+    "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
+    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp_wire",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/devfs/cpp",
+    "//sdk/lib/inspect/component/cpp:inspect_component_cpp",
+    "//src/graphics/lib/magma/src/magma_util:macros",
+    "//src/graphics/lib/magma/src/magma_util/platform:logger",
+    "//src/graphics/lib/magma/src/magma_util/platform/zircon:logger_for_dfv2",
+    "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
+    "//zircon/system/ulib/zx",
   ]
 }

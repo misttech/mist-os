@@ -29,8 +29,8 @@
 #include "msd_intel_pci_device.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/magma_performance_counter_device.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
-#include "src/graphics/lib/magma/src/sys_driver_cpp/magma_device_impl.h"
-#include "sys_driver_cpp/magma_driver.h"
+#include "src/graphics/lib/magma/src/sys_driver/magma_device_impl.h"
+#include "sys_driver/magma_driver.h"
 
 #if MAGMA_TEST_DRIVER
 zx_status_t magma_indriver_test(magma::PlatformPciDevice* platform_device);

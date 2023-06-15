@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "mock/mock_msd.h"
+#include "mock/mock_msd_cc.h"
 #include "sys_driver/magma_system_connection.h"
 #include "sys_driver/magma_system_device.h"
 
@@ -12,9 +12,9 @@ class MsdMockBufferManager_Create : public MsdMockBufferManager {
  public:
   MsdMockBufferManager_Create() : has_created_buffer_(false), has_destroyed_buffer_(false) {}
 
-  MsdMockBuffer* CreateBuffer(uint32_t handle, uint64_t client_id) {
+  std::unique_ptr<MsdMockBuffer> CreateBuffer(zx::vmo handle, uint64_t client_id) {
     has_created_buffer_ = true;
-    return MsdMockBufferManager::CreateBuffer(handle, client_id);
+    return MsdMockBufferManager::CreateBuffer(std::move(handle), client_id);
   }
 
   void DestroyBuffer(MsdMockBuffer* buf) {
@@ -36,14 +36,15 @@ TEST(MagmaSystemBuffer, Create) {
 
   auto bufmgr = static_cast<MsdMockBufferManager_Create*>(scoped_bufmgr.get());
 
-  auto msd_drv = msd_driver_create();
-  auto msd_dev = msd_driver_create_device(msd_drv, nullptr);
-  auto dev =
-      std::shared_ptr<MagmaSystemDevice>(MagmaSystemDevice::Create(MsdDeviceUniquePtr(msd_dev)));
-  auto msd_connection = msd_device_open(msd_dev, 0);
+  auto msd_drv = std::make_unique<MsdMockDriver>();
+  auto msd_dev = msd_drv->CreateDevice(nullptr);
+  auto msd_dev_ptr = msd_dev.get();
+  auto dev = std::shared_ptr<MagmaSystemDevice>(
+      MagmaSystemDevice::Create(msd_drv.get(), std::move(msd_dev)));
+  auto msd_connection = msd_dev_ptr->Open(0);
   ASSERT_NE(msd_connection, nullptr);
   auto connection = std::unique_ptr<MagmaSystemConnection>(
-      new MagmaSystemConnection(dev, MsdConnectionUniquePtr(msd_connection)));
+      new MagmaSystemConnection(dev, std::move(msd_connection)));
   ASSERT_NE(connection, nullptr);
 
   EXPECT_FALSE(bufmgr->has_created_buffer());
@@ -52,10 +53,10 @@ TEST(MagmaSystemBuffer, Create) {
   {
     auto buf = magma::PlatformBuffer::Create(256, "test");
 
-    uint32_t duplicate_handle;
+    zx::handle duplicate_handle;
     ASSERT_TRUE(buf->duplicate_handle(&duplicate_handle));
 
-    EXPECT_TRUE(connection->ImportBuffer(duplicate_handle, buf->id()));
+    EXPECT_TRUE(connection->ImportBuffer(std::move(duplicate_handle), buf->id()));
     EXPECT_TRUE(bufmgr->has_created_buffer());
     EXPECT_FALSE(bufmgr->has_destroyed_buffer());
 
@@ -64,5 +65,5 @@ TEST(MagmaSystemBuffer, Create) {
   EXPECT_TRUE(bufmgr->has_created_buffer());
   EXPECT_TRUE(bufmgr->has_destroyed_buffer());
 
-  msd_driver_destroy(msd_drv);
+  msd_drv.reset();
 }

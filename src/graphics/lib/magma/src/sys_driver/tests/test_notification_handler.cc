@@ -10,8 +10,8 @@
 #include <gtest/gtest.h>
 
 #include "mock/mock_msd_cc.h"
-#include "sys_driver_cpp/magma_system_connection.h"
-#include "sys_driver_cpp/magma_system_device.h"
+#include "sys_driver/magma_system_connection.h"
+#include "sys_driver/magma_system_device.h"
 
 namespace {
 

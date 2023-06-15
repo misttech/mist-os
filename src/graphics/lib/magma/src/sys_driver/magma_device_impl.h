@@ -11,6 +11,7 @@
 
 #include <ddktl/device.h>
 
+#include "platform_thread.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/magma_dependency_injection_device.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/magma_performance_counter_device.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
@@ -141,10 +142,9 @@ class MagmaDeviceImpl : public ddk::Messageable<DeviceType>::Mixin<D>,
     if (!CheckSystemDevice(_completer))
       return;
 
-    auto connection = MagmaSystemDevice::Open(
-        magma_system_device_, request->client_id,
-        magma::PlatformHandle::Create(request->primary_channel.channel().release()),
-        magma::PlatformHandle::Create(request->notification_channel.channel().release()));
+    auto connection = MagmaSystemDevice::Open(magma_system_device_, request->client_id,
+                                              std::move(request->primary_channel),
+                                              std::move(request->notification_channel));
 
     if (!connection) {
       DLOG("MagmaSystemDevice::Open failed");
@@ -153,7 +153,10 @@ class MagmaDeviceImpl : public ddk::Messageable<DeviceType>::Mixin<D>,
     }
 
     ZX_DEBUG_ASSERT(zx_device_);
-    magma_system_device_->StartConnectionThread(std::move(connection), zx_device_);
+    magma_system_device_->StartConnectionThread(
+        std::move(connection), [zx_device_ = zx_device_](const char* name) {
+          magma::PlatformThreadHelper::SetRole(zx_device_, name);
+        });
   }
 
   void DumpState(fws::DumpStateRequestView request,

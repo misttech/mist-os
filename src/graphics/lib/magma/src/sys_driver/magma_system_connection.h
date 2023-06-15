@@ -10,32 +10,28 @@
 #include <unordered_map>
 #include <vector>
 
+#include "fidl/fuchsia.gpu.magma/cpp/wire_types.h"
 #include "magma_system_buffer.h"
 #include "magma_system_context.h"
 #include "magma_util/macros.h"
-#include "magma_util/platform/platform_connection.h"
-#include "msd.h"
-
-using msd_connection_unique_ptr_t =
-    std::unique_ptr<msd_connection_t, decltype(&msd_connection_close)>;
-
-static inline msd_connection_unique_ptr_t MsdConnectionUniquePtr(msd_connection_t* conn) {
-  return msd_connection_unique_ptr_t(conn, &msd_connection_close);
-}
+#include "msd_cc.h"
+#include "zircon_connection.h"
 
 class MagmaSystemDevice;
 
 class MagmaSystemConnection : private MagmaSystemContext::Owner,
-                              public magma::PlatformConnection::Delegate {
+                              public magma::ZirconConnection::Delegate,
+                              msd::NotificationHandler {
  public:
   MagmaSystemConnection(std::weak_ptr<MagmaSystemDevice> device,
-                        msd_connection_unique_ptr_t msd_connection_t);
+                        std::unique_ptr<msd::Connection> msd_connection_t);
 
   ~MagmaSystemConnection() override;
 
-  magma::Status ImportObject(uint32_t handle, magma::PlatformObject::Type object_type,
+  magma::Status ImportObject(zx::handle handle, fuchsia_gpu_magma::wire::ObjectType object_type,
                              uint64_t client_id) override;
-  magma::Status ReleaseObject(uint64_t object_id, magma::PlatformObject::Type object_type) override;
+  magma::Status ReleaseObject(uint64_t object_id,
+                              fuchsia_gpu_magma::wire::ObjectType object_type) override;
   magma::Status CreateContext(uint32_t context_id) override;
   magma::Status DestroyContext(uint32_t context_id) override;
   magma::Status ExecuteCommandBufferWithResources(
@@ -50,10 +46,8 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
                                          void* commands, uint64_t semaphore_count,
                                          uint64_t* semaphore_ids) override;
   MagmaSystemContext* LookupContext(uint32_t context_id);
-  void SetNotificationCallback(msd_connection_notification_callback_t callback,
-                               void* token) override;
-  magma::Status EnablePerformanceCounterAccess(
-      std::unique_ptr<magma::PlatformHandle> access_token) override;
+  void SetNotificationCallback(msd::NotificationHandler*) override;
+  magma::Status EnablePerformanceCounterAccess(zx::handle access_token) override;
   bool IsPerformanceCounterAccessAllowed() override { return can_access_performance_counters_; }
   magma::Status EnablePerformanceCounters(const uint64_t* counters,
                                           uint64_t counter_count) override;
@@ -68,9 +62,15 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
   magma::Status DumpPerformanceCounters(uint64_t pool_id, uint32_t trigger_id) override;
   magma::Status ClearPerformanceCounters(const uint64_t* counters, uint64_t counter_count) override;
 
+  // msd::NotificationHandler implementation.
+  void NotificationChannelSend(cpp20::span<uint8_t> data) override;
+  void ContextKilled() override;
+  void PerformanceCounterReadCompleted(const msd::PerfCounterResult& result) override;
+  async_dispatcher_t* GetAsyncDispatcher() override;
+
   // Create a buffer from the handle and add it to the map,
   // on success |id_out| contains the id to be used to query the map
-  magma::Status ImportBuffer(uint32_t handle, uint64_t id);
+  magma::Status ImportBuffer(zx::handle handle, uint64_t id);
   // This removes the reference to the shared_ptr in the map
   // other instances remain valid until deleted
   // Returns false if no buffer with the given |id| exists in the map
@@ -85,7 +85,7 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
 
   uint32_t GetDeviceId();
 
-  msd_connection_t* msd_connection() { return msd_connection_.get(); }
+  msd::Connection* msd_connection() { return msd_connection_.get(); }
 
   void set_can_access_performance_counters(bool can_access) {
     can_access_performance_counters_ = can_access;
@@ -98,7 +98,7 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
     std::shared_ptr<MagmaSystemBuffer> buffer;
   };
   struct PoolReference {
-    msd_perf_count_pool* msd_pool;
+    std::unique_ptr<msd::PerfCountPool> msd_pool;
     std::unique_ptr<magma::PlatformPerfCountPool> platform_pool;
   };
 
@@ -113,18 +113,15 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
   // The returned value is valid until ReleasePerformanceCounterBufferPool is called on it.
   // Otherwise it will always be valid within the lifetime of a call into MagmaSystemConnection on
   // the connection thread.
-  msd_perf_count_pool* LookupPerfCountPool(uint64_t id);
-
-  static void NotificationCallback(void* token, struct msd_notification_t* notification);
+  msd::PerfCountPool* LookupPerfCountPool(uint64_t id);
 
   std::weak_ptr<MagmaSystemDevice> device_;
-  msd_connection_unique_ptr_t msd_connection_;
+  std::unique_ptr<msd::Connection> msd_connection_;
   std::unordered_map<uint32_t, std::unique_ptr<MagmaSystemContext>> context_map_;
   std::unordered_map<uint64_t, BufferReference> buffer_map_;
   std::unordered_map<uint64_t, std::shared_ptr<MagmaSystemSemaphore>> semaphore_map_;
 
-  msd_connection_notification_callback_t platform_callback_{};
-  void* platform_token_{};
+  msd::NotificationHandler* notification_handler_ = nullptr;
 
   // |pool_map_mutex_| should not be held while calling into the driver. It must be held for
   // modifications to pool_map_ and accesses to pool_map_ from a thread that's not the connection

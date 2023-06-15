@@ -21,7 +21,7 @@ magma::Status MagmaSystemContext::ExecuteCommandBufferWithResources(
   system_resources.reserve(cmd_buf->resource_count);
 
   // the resources to be sent to the MSD driver
-  auto msd_resources = std::vector<msd_buffer_t*>();
+  auto msd_resources = std::vector<msd::Buffer*>();
   msd_resources.reserve(cmd_buf->resource_count);
 
   // validate batch buffer index
@@ -57,8 +57,8 @@ magma::Status MagmaSystemContext::ExecuteCommandBufferWithResources(
   }
 
   // used to keep semaphores in scope until msd_context_execute_command_buffer returns
-  std::vector<msd_semaphore_t*> msd_wait_semaphores(cmd_buf->wait_semaphore_count);
-  std::vector<msd_semaphore_t*> msd_signal_semaphores(cmd_buf->signal_semaphore_count);
+  std::vector<msd::Semaphore*> msd_wait_semaphores(cmd_buf->wait_semaphore_count);
+  std::vector<msd::Semaphore*> msd_signal_semaphores(cmd_buf->signal_semaphore_count);
 
   // validate semaphores
   for (uint32_t i = 0; i < cmd_buf->wait_semaphore_count; i++) {
@@ -78,8 +78,8 @@ magma::Status MagmaSystemContext::ExecuteCommandBufferWithResources(
   }
 
   // submit command buffer to driver
-  magma_status_t result = msd_context_execute_command_buffer_with_resources(
-      msd_ctx(), cmd_buf.get(), resources.data(), msd_resources.data(), msd_wait_semaphores.data(),
+  magma_status_t result = msd_ctx()->ExecuteCommandBufferWithResources(
+      cmd_buf.get(), resources.data(), msd_resources.data(), msd_wait_semaphores.data(),
       msd_signal_semaphores.data());
 
   return MAGMA_DRET_MSG(
@@ -90,7 +90,7 @@ magma::Status MagmaSystemContext::ExecuteImmediateCommands(uint64_t commands_siz
                                                            uint64_t semaphore_count,
                                                            uint64_t* semaphore_ids) {
   TRACE_DURATION("magma", "MagmaSystemContext::ExecuteImmediateCommands");
-  std::vector<msd_semaphore_t*> msd_semaphores(semaphore_count);
+  std::vector<msd::Semaphore*> msd_semaphores(semaphore_count);
   for (uint32_t i = 0; i < semaphore_count; i++) {
     auto semaphore = owner_->LookupSemaphoreForContext(semaphore_ids[i]);
     if (!semaphore)
@@ -102,8 +102,8 @@ magma::Status MagmaSystemContext::ExecuteImmediateCommands(uint64_t commands_siz
     // src/ui/scenic/lib/flatland/renderer/vk_renderer.cc, so it uses the koid.
     TRACE_FLOW_END("gfx", "semaphore", semaphore->platform_semaphore()->global_id());
   }
-  magma_status_t result = msd_context_execute_immediate_commands(
-      msd_ctx(), commands_size, commands, semaphore_count, msd_semaphores.data());
+  magma_status_t result = msd_ctx()->ExecuteImmediateCommands(
+      cpp20::span(reinterpret_cast<uint8_t*>(commands), commands_size), msd_semaphores);
 
   return MAGMA_DRET_MSG(
       result, "ExecuteImmediateCommands: msd_context_execute_immediate_commands failed: %d",

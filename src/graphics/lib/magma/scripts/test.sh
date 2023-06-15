@@ -12,7 +12,7 @@ case "$1" in
 intel)
   fx-command-run test --no-build --simple --exact -o \
     magma_nonhardware_tests \
-    magma_sys_driver_cpp_test \
+    magma_sys_driver_test \
     msd_intel_gen_nonhardware_tests \
     mesa_unit_tests \
     magma-conformance-tests \
@@ -25,7 +25,7 @@ intel)
 mali)
   fx-command-run test --no-build --simple -o \
     magma_nonhardware_tests \
-    magma_sys_driver_cpp_test \
+    magma_sys_driver_test \
     msd_arm_mali_nonhardware_tests \
     magma-conformance-tests-arm \
     vkreadback_test \
@@ -38,7 +38,7 @@ mali)
 vsi)
   fx-command-run test --simple -o \
     magma_nonhardware_tests \
-    magma_sys_driver_cpp_test \
+    magma_sys_driver_test \
     msd-vsi-vip-nonhardware-tests \
     magma-conformance-tests-vsi \
     msd-vsi-vip-integration-tests \

@@ -13,7 +13,7 @@
 #include <gtest/gtest.h>
 
 #include "src/graphics/lib/magma/tests/mock/mock_msd_cc.h"
-#include "sys_driver_cpp/magma_driver_base.h"
+#include "sys_driver/magma_driver_base.h"
 
 namespace {
 class FakeTestDriver : public MagmaTestDriverBase {

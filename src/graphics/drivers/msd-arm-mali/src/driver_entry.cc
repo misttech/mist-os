@@ -28,9 +28,9 @@
 #include "platform_bus_mapper.h"
 #include "platform_logger.h"
 #include "src/graphics/drivers/msd-arm-mali/src/parent_device.h"
-#include "src/graphics/lib/magma/src/sys_driver_cpp/magma_device_impl.h"
-#include "sys_driver_cpp/magma_driver.h"
-#include "sys_driver_cpp/magma_system_device.h"
+#include "src/graphics/lib/magma/src/sys_driver/magma_device_impl.h"
+#include "sys_driver/magma_driver.h"
+#include "sys_driver/magma_system_device.h"
 
 #if MAGMA_TEST_DRIVER
 zx_status_t magma_indriver_test(ParentDevice* device);

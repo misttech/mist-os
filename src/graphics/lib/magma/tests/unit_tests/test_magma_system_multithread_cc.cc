@@ -10,10 +10,10 @@
 #include <gtest/gtest.h>
 
 #include "helper/platform_msd_device_helper.h"
-#include "sys_driver_cpp/magma_driver.h"
-#include "sys_driver_cpp/magma_system_connection.h"
-#include "sys_driver_cpp/magma_system_context.h"
-#include "sys_driver_cpp/magma_system_device.h"
+#include "sys_driver/magma_driver.h"
+#include "sys_driver/magma_system_connection.h"
+#include "sys_driver/magma_system_context.h"
+#include "sys_driver/magma_system_device.h"
 
 namespace {
 inline uint64_t page_size() { return sysconf(_SC_PAGESIZE); }

@@ -22,7 +22,7 @@ executable("nonhardware_tests") {
     "//src/graphics/drivers/msd-vsi-vip/src",
     "//src/graphics/lib/magma/src/magma_util:mapped_batch",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:thread_profile",
-    "//src/graphics/lib/magma/src/sys_driver_cpp",
+    "//src/graphics/lib/magma/src/sys_driver",
     "//src/graphics/lib/magma/tests/helper:logger_init_helper",
     "//src/graphics/lib/magma/tests/helper:msd_stubs",
     "//src/graphics/lib/magma/tests/mock:bus_mapper",

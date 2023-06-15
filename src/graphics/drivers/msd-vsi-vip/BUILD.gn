@@ -87,8 +87,8 @@ entry_deps = [
   "//src/graphics/lib/magma/src/magma_util/platform:trace",
   "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
   "//src/graphics/lib/magma/src/magma_util/platform/zircon:thread_profile",
-  "//src/graphics/lib/magma/src/sys_driver_cpp",
-  "//src/graphics/lib/magma/src/sys_driver_cpp:device_impl",
+  "//src/graphics/lib/magma/src/sys_driver",
+  "//src/graphics/lib/magma/src/sys_driver:device_impl",
   "//src/lib/ddk",
   "//src/lib/ddktl",
   "//zircon/system/ulib/trace",
@@ -102,7 +102,6 @@ source_set("msd_vsi_entry") {
 }
 
 source_set("msd_vsi_test_entry") {
-  assert_no_deps = [ "//src/graphics/lib/magma/src/sys_driver" ]
   testonly = true
   sources = [
     "src/driver_entry.cc",

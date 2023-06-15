@@ -1,8 +1,8 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-#ifndef SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_CPP_MAGMA_DRIVER_BASE_H_
-#define SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_CPP_MAGMA_DRIVER_BASE_H_
+#ifndef SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_MAGMA_DRIVER_BASE_H_
+#define SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_MAGMA_DRIVER_BASE_H_
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.gpu.magma/cpp/fidl.h>
@@ -22,7 +22,7 @@
 #include "performance_counters_server.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_logger_dfv2.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
-#include "sys_driver_cpp/magma_driver.h"
+#include "sys_driver/magma_driver.h"
 
 template <typename FidlDeviceType>
 class MagmaDriverBase : public fdf::DriverBase,
@@ -351,4 +351,4 @@ class MagmaTestDriverBase : public MagmaDriverBase<fuchsia_gpu_magma::TestDevice
 
 using MagmaProductionDriverBase = MagmaDriverBase<fuchsia_gpu_magma::CombinedDevice>;
 
-#endif  // SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_CPP_MAGMA_DRIVER_BASE_H_
+#endif  // SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_MAGMA_DRIVER_BASE_H_

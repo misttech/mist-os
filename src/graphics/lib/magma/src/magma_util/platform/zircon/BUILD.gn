@@ -85,35 +85,6 @@ source_set("dependency_injection_device") {
   ]
 }
 
-entry_deps = [
-  ":bus_mapper",
-  ":status",
-  ":thread_profile",
-  "$magma_build_root/src/magma_util:short_macros",
-  "..:logger",
-  "..:trace",
-  "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
-  "//src/devices/bus/lib/device-protocol-pdev",
-  "//src/devices/lib/driver",
-  "//src/graphics/lib/magma/src/magma_util:macros",
-  "//src/graphics/lib/magma/src/sys_driver",
-  "//src/graphics/lib/magma/src/sys_driver:device_impl",
-  "//src/lib/ddk",
-  "//src/lib/ddktl",
-  "//zircon/system/ulib/zx",
-]
-
-source_set("entry") {
-  sources = [ "zircon_entry.cc" ]
-  deps = entry_deps
-}
-
-source_set("entry_test") {
-  sources = [ "zircon_entry.cc" ]
-  defines = [ "MAGMA_TEST_DRIVER=1" ]
-  deps = entry_deps
-}
-
 source_set("interrupt") {
   sources = [ "zircon_platform_interrupt.h" ]
 

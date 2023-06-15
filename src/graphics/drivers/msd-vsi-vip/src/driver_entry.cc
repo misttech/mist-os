@@ -24,9 +24,9 @@
 #include "magma_util/short_macros.h"
 #include "platform_handle.h"
 #include "platform_logger.h"
-#include "src/graphics/lib/magma/src/sys_driver_cpp/magma_device_impl.h"
-#include "sys_driver_cpp/magma_driver.h"
-#include "sys_driver_cpp/magma_system_device.h"
+#include "src/graphics/lib/magma/src/sys_driver/magma_device_impl.h"
+#include "sys_driver/magma_driver.h"
+#include "sys_driver/magma_system_device.h"
 
 #if MAGMA_TEST_DRIVER
 zx_status_t magma_indriver_test(zx_device_t* device);
@@ -116,7 +116,7 @@ static zx_status_t driver_bind(void* context, zx_device_t* parent) {
   return ZX_OK;
 }
 
-} // namespace
+}  // namespace
 
 zx_driver_ops_t msd_driver_ops = []() constexpr {
   zx_driver_ops_t ops = {};

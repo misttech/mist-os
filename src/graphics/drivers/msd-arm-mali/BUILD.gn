@@ -47,10 +47,7 @@ fuchsia_driver_component("msd_arm_rebind") {
 fuchsia_driver("msd_arm_test-driver") {
   testonly = true
   output_name = "libmsd_arm_test"
-  assert_no_deps = [
-    "//src/graphics/lib/magma/src/sys_driver",
-    "//zircon/system/ulib/trace-engine:trace-engine-static",
-  ]
+  assert_no_deps = [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
 
   deps = [
     ":msd_arm_test_entry",
@@ -104,7 +101,7 @@ dfv2_entry_deps = [
   "//src/graphics/lib/magma/src/magma_util/platform:trace",
   "//src/graphics/lib/magma/src/magma_util/platform/zircon:logger_for_dfv2",
   "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
-  "//src/graphics/lib/magma/src/sys_driver_cpp",
+  "//src/graphics/lib/magma/src/sys_driver",
   "//zircon/system/ulib/trace",
   "//zircon/system/ulib/trace-vthread",
   "//zircon/system/ulib/zx",
@@ -114,7 +111,7 @@ source_set("msd_arm_entry_dfv2") {
   sources = [ "src/driver_entry_dfv2.cc" ]
   deps = dfv2_entry_deps + [
            ":msd_arm_bind",
-           "//src/graphics/lib/magma/src/sys_driver_cpp:magma_driver_base",
+           "//src/graphics/lib/magma/src/sys_driver:magma_driver_base",
          ]
 }
 
@@ -126,7 +123,6 @@ fuchsia_driver("msd_arm-dfv2-driver") {
   ]
   assert_no_deps = [
     "//src/devices/bin/driver_host:driver",
-    "//src/graphics/lib/magma/src/sys_driver",
     "//zircon/system/ulib/trace-engine:trace-engine-static",
   ]
 }
@@ -151,8 +147,8 @@ entry_deps = [
   "//src/graphics/lib/magma/src/magma_util/platform:trace",
   "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
   "//src/graphics/lib/magma/src/magma_util/platform/zircon:thread_profile",
-  "//src/graphics/lib/magma/src/sys_driver_cpp",
-  "//src/graphics/lib/magma/src/sys_driver_cpp:device_impl",
+  "//src/graphics/lib/magma/src/sys_driver",
+  "//src/graphics/lib/magma/src/sys_driver:device_impl",
   "//src/lib/ddk",
   "//src/lib/ddktl",
   "//zircon/system/ulib/trace",
@@ -166,7 +162,6 @@ source_set("msd_arm_entry") {
 }
 
 source_set("msd_arm_test_entry") {
-  assert_no_deps = [ "//src/graphics/lib/magma/src/sys_driver" ]
   testonly = true
   sources = [
     "src/driver_entry.cc",
