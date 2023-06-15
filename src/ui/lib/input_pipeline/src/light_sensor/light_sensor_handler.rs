@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::input_device::{Handled, InputDeviceDescriptor, InputDeviceEvent, InputEvent};
-use crate::input_handler::InputHandler;
+use crate::input_handler::{InputHandler, InputHandlerStatus};
 use crate::light_sensor::calibrator::{Calibrate, Calibrator};
 use crate::light_sensor::led_watcher::{CancelableTask, LedWatcher, LedWatcherHandle};
 use crate::light_sensor::types::{AdjustmentSetting, Calibration, Rgbc, SensorConfiguration};
@@ -18,6 +18,7 @@ use fidl_fuchsia_lightsensor::{
 };
 use fidl_fuchsia_settings::LightProxy;
 use fidl_fuchsia_ui_brightness::ControlProxy as BrightnessControlProxy;
+use fuchsia_inspect;
 use fuchsia_zircon as zx;
 use futures::channel::oneshot;
 use futures::TryStreamExt;
@@ -251,6 +252,8 @@ pub struct LightSensorHandler<T> {
     si_scaling_factors: Rgbc<f32>,
     vendor_id: u32,
     product_id: u32,
+    /// The inventory of this handler's Inspect status.
+    _inspect_status: Rc<InputHandlerStatus>,
 }
 
 enum ActiveSettingState {
@@ -264,6 +267,7 @@ pub async fn make_light_sensor_handler_and_spawn_led_watcher(
     brightness_proxy: BrightnessControlProxy,
     calibration: Option<Calibration>,
     configuration: SensorConfiguration,
+    input_handlers_node: &fuchsia_inspect::Node,
 ) -> Result<(Rc<CalibratedLightSensorHandler>, Option<CancelableTask>), Error> {
     let (calibrator, watcher_task) = if let Some(calibration) = calibration {
         let light_groups =
@@ -282,11 +286,15 @@ pub async fn make_light_sensor_handler_and_spawn_led_watcher(
     } else {
         (None, None)
     };
-    Ok((LightSensorHandler::new(calibrator, configuration), watcher_task))
+    Ok((LightSensorHandler::new(calibrator, configuration, input_handlers_node), watcher_task))
 }
 
 impl<T> LightSensorHandler<T> {
-    pub fn new(calibrator: impl Into<Option<T>>, configuration: SensorConfiguration) -> Rc<Self> {
+    pub fn new(
+        calibrator: impl Into<Option<T>>,
+        configuration: SensorConfiguration,
+        input_handlers_node: &fuchsia_inspect::Node,
+    ) -> Rc<Self> {
         let calibrator = calibrator.into();
         // We cannot provide a default value for the light sensor yet until we have a reading from
         // the driver. For now, just store a None that we will update once we have an initial
@@ -294,6 +302,11 @@ impl<T> LightSensorHandler<T> {
         let hanging_get = Rc::new(RefCell::new(None));
         let active_setting =
             Rc::new(RefCell::new(ActiveSettingState::Uninitialized(configuration.settings)));
+        let inspect_status = Rc::new(InputHandlerStatus::new(
+            input_handlers_node,
+            "light_sensor_handler",
+            /* generates_events */ false,
+        ));
         Rc::new(Self {
             hanging_get,
             subscriber_queue: Rc::new(RefCell::new(vec![])),
@@ -303,6 +316,7 @@ impl<T> LightSensorHandler<T> {
             si_scaling_factors: configuration.si_scaling_factors,
             vendor_id: configuration.vendor_id,
             product_id: configuration.product_id,
+            _inspect_status: inspect_status,
         })
     }
 

@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use {
-    crate::input_handler::UnhandledInputHandler,
+    crate::input_handler::{InputHandlerStatus, UnhandledInputHandler},
     crate::{consumer_controls_binding, input_device},
     anyhow::{Context, Error},
     async_trait::async_trait,
     fidl::endpoints::Proxy,
     fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_ui_input as fidl_ui_input,
-    fidl_fuchsia_ui_policy as fidl_ui_policy, fuchsia_async as fasync,
+    fidl_fuchsia_ui_policy as fidl_ui_policy, fuchsia_async as fasync, fuchsia_inspect,
     fuchsia_zircon::AsHandleRef,
     futures::{channel::mpsc, StreamExt, TryStreamExt},
     std::cell::RefCell,
@@ -22,6 +22,9 @@ use {
 pub struct MediaButtonsHandler {
     /// The mutable fields of this handler.
     inner: RefCell<MediaButtonsHandlerInner>,
+
+    /// The inventory of this handler's Inspect status.
+    _inspect_status: InputHandlerStatus,
 }
 
 #[derive(Debug)]
@@ -68,13 +71,16 @@ impl UnhandledInputHandler for MediaButtonsHandler {
 
 impl MediaButtonsHandler {
     /// Creates a new [`MediaButtonsHandler`] that sends media button events to listeners.
-    pub fn new() -> Rc<Self> {
+    pub fn new(input_handlers_node: &fuchsia_inspect::Node) -> Rc<Self> {
+        let inspect_status =
+            InputHandlerStatus::new(input_handlers_node, "media_buttons_handler", false);
         let media_buttons_handler = Self {
             inner: RefCell::new(MediaButtonsHandlerInner {
                 listeners: HashMap::new(),
                 last_event: None,
                 send_event_task_tracker: LocalTaskTracker::new(),
             }),
+            _inspect_status: inspect_status,
         };
         Rc::new(media_buttons_handler)
     }
@@ -248,7 +254,7 @@ mod tests {
         anyhow::Error,
         assert_matches::assert_matches,
         fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_input_report as fidl_input_report, fuchsia_async as fasync,
+        fidl_fuchsia_input_report as fidl_input_report, fuchsia_async as fasync, fuchsia_inspect,
         fuchsia_zircon as zx,
         futures::{channel::oneshot, StreamExt},
         pretty_assertions::assert_eq,
@@ -306,12 +312,20 @@ mod tests {
     /// registration.
     #[fasync::run_singlethreaded(test)]
     async fn register_media_buttons_listener() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let inspect_status = InputHandlerStatus::new(
+            &test_node,
+            "media_buttons_handler",
+            /* generates_events */ false,
+        );
         let media_buttons_handler = Rc::new(MediaButtonsHandler {
             inner: RefCell::new(MediaButtonsHandlerInner {
                 listeners: HashMap::new(),
                 last_event: Some(create_ui_input_media_buttons_event(Some(1), None, None, None)),
                 send_event_task_tracker: LocalTaskTracker::new(),
             }),
+            _inspect_status: inspect_status,
         });
         let device_listener_proxy =
             spawn_device_listener_registry_server(media_buttons_handler.clone());
@@ -347,7 +361,9 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn listener_receives_all_buttons() {
         let event_time = zx::Time::get_monotonic();
-        let media_buttons_handler = MediaButtonsHandler::new();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let media_buttons_handler = MediaButtonsHandler::new(&test_node);
         let device_listener_proxy =
             spawn_device_listener_registry_server(media_buttons_handler.clone());
 
@@ -387,7 +403,9 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn multiple_listeners_receive_event() {
         let event_time = zx::Time::get_monotonic();
-        let media_buttons_handler = MediaButtonsHandler::new();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let media_buttons_handler = MediaButtonsHandler::new(&test_node);
         let device_listener_proxy =
             spawn_device_listener_registry_server(media_buttons_handler.clone());
 
@@ -432,7 +450,9 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let event_time = zx::Time::get_monotonic();
-        let media_buttons_handler = MediaButtonsHandler::new();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let media_buttons_handler = MediaButtonsHandler::new(&test_node);
         let media_buttons_handler_clone = media_buttons_handler.clone();
 
         let mut task = fasync::Task::local(async move {
@@ -517,7 +537,9 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn stuck_reader_wont_block_input_pipeline() {
         let event_time = zx::Time::get_monotonic();
-        let media_buttons_handler = MediaButtonsHandler::new();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let media_buttons_handler = MediaButtonsHandler::new(&test_node);
         let device_listener_proxy =
             spawn_device_listener_registry_server(media_buttons_handler.clone());
 
@@ -688,5 +710,27 @@ mod tests {
         assert!(sender_1.is_canceled());
 
         Ok(())
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn media_buttons_handler_initialized_with_inspect_node() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        let _handler = MediaButtonsHandler::new(&fake_handlers_node);
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                media_buttons_handler: {
+                    events_received_count: 0u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
     }
 }

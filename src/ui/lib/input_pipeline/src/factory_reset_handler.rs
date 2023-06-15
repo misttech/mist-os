@@ -5,7 +5,7 @@
 use {
     crate::consumer_controls_binding::ConsumerControlsEvent,
     crate::input_device,
-    crate::input_handler::UnhandledInputHandler,
+    crate::input_handler::{InputHandlerStatus, UnhandledInputHandler},
     anyhow::{anyhow, format_err, Context as _, Error},
     async_trait::async_trait,
     async_utils::hanging_get::server::HangingGet,
@@ -20,7 +20,7 @@ use {
         FactoryResetCountdownWatchResponder,
     },
     fuchsia_async::{Duration, Task, Time, TimeoutExt, Timer},
-    fuchsia_component,
+    fuchsia_component, fuchsia_inspect,
     fuchsia_zircon::Channel,
     futures::StreamExt,
     std::{
@@ -98,6 +98,9 @@ type ResetCountdownHangingGet =
 pub struct FactoryResetHandler {
     factory_reset_state: RefCell<FactoryResetState>,
     countdown_hanging_get: RefCell<ResetCountdownHangingGet>,
+
+    /// The inventory of this handler's Inspect status.
+    _inspect_status: InputHandlerStatus,
 }
 
 /// Uses the `ConsumerControlsEvent` to determine whether the device should
@@ -114,7 +117,7 @@ fn is_reset_requested(event: &ConsumerControlsEvent) -> bool {
 impl FactoryResetHandler {
     /// Creates a new [`FactoryResetHandler`] that listens for the reset button
     /// and handles timing down and, ultimately, factory resetting the device.
-    pub fn new() -> Rc<Self> {
+    pub fn new(input_handlers_node: &fuchsia_inspect::Node) -> Rc<Self> {
         let initial_state = if Path::new(FACTORY_RESET_DISALLOWED_PATH).exists() {
             FactoryResetState::Disallowed
         } else {
@@ -122,10 +125,16 @@ impl FactoryResetHandler {
         };
 
         let countdown_hanging_get = FactoryResetHandler::init_hanging_get(initial_state);
+        let inspect_status = InputHandlerStatus::new(
+            input_handlers_node,
+            "factory_reset_handler",
+            /* generates_events */ false,
+        );
 
         Rc::new(Self {
             factory_reset_state: RefCell::new(initial_state),
             countdown_hanging_get: RefCell::new(countdown_hanging_get),
+            _inspect_status: inspect_status,
         })
     }
 
@@ -407,7 +416,7 @@ mod tests {
         fidl_fuchsia_recovery_policy::{DeviceMarker, DeviceProxy},
         fidl_fuchsia_recovery_ui::{FactoryResetCountdownMarker, FactoryResetCountdownProxy},
         fuchsia_async::TestExecutor,
-        fuchsia_zircon as zx,
+        fuchsia_inspect, fuchsia_zircon as zx,
         pin_utils::pin_mut,
         pretty_assertions::assert_eq,
         std::task::Poll,
@@ -537,7 +546,9 @@ mod tests {
 
     #[fuchsia::test]
     async fn factory_reset_countdown_listener_gets_initial_state() {
-        let reset_handler = FactoryResetHandler::new();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let reset_handler = FactoryResetHandler::new(&test_node);
         let countdown_proxy = create_factory_reset_countdown_proxy(reset_handler.clone());
         let reset_state = countdown_proxy.watch().await.expect("Failed to get countdown state");
         assert!(reset_state.scheduled_reset_time.is_none());
@@ -547,7 +558,9 @@ mod tests {
     #[fuchsia::test]
     fn factory_reset_countdown_listener_is_notified_on_state_change() -> Result<(), Error> {
         let mut executor = TestExecutor::new_with_fake_time();
-        let reset_handler = FactoryResetHandler::new();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let reset_handler = FactoryResetHandler::new(&test_node);
         let countdown_proxy = create_factory_reset_countdown_proxy(reset_handler.clone());
 
         // The initial state should be no scheduled reset time and the
@@ -597,7 +610,9 @@ mod tests {
 
     #[fuchsia::test]
     async fn recovery_policy_requests_update_reset_handler_state() {
-        let reset_handler = FactoryResetHandler::new();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let reset_handler = FactoryResetHandler::new(&test_node);
         let countdown_proxy = create_factory_reset_countdown_proxy(reset_handler.clone());
 
         // Initial state should be FactoryResetState::Idle with no scheduled reset
@@ -636,7 +651,9 @@ mod tests {
         let mut executor = TestExecutor::new();
 
         let reset_event = create_reset_consumer_controls_event();
-        let reset_handler = FactoryResetHandler::new();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let reset_handler = FactoryResetHandler::new(&test_node);
         let countdown_proxy = create_factory_reset_countdown_proxy(reset_handler.clone());
 
         // Initial state should be FactoryResetState::Idle with no scheduled reset
@@ -663,7 +680,9 @@ mod tests {
 
     #[fuchsia::test]
     async fn handle_allowed_event_wont_change_state_without_reset() {
-        let reset_handler = FactoryResetHandler::new();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let reset_handler = FactoryResetHandler::new(&test_node);
         let countdown_proxy = create_factory_reset_countdown_proxy(reset_handler.clone());
 
         // Initial state should be FactoryResetState::Idle with no scheduled reset
@@ -680,7 +699,9 @@ mod tests {
 
     #[fuchsia::test]
     async fn handle_disallowed_event_wont_change_state() {
-        let reset_handler = FactoryResetHandler::new();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let reset_handler = FactoryResetHandler::new(&test_node);
         *reset_handler.factory_reset_state.borrow_mut() = FactoryResetState::Disallowed;
 
         // Calling handle_disallowed_event shouldn't change the state no matter
@@ -696,7 +717,9 @@ mod tests {
 
     #[fuchsia::test]
     async fn handle_button_countdown_event_changes_state_when_reset_no_longer_requested() {
-        let reset_handler = FactoryResetHandler::new();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let reset_handler = FactoryResetHandler::new(&test_node);
 
         let deadline = Time::after(BUTTON_TIMEOUT);
         *reset_handler.factory_reset_state.borrow_mut() =
@@ -711,7 +734,9 @@ mod tests {
 
     #[fuchsia::test]
     async fn handle_reset_countdown_event_changes_state_when_reset_no_longer_requested() {
-        let reset_handler = FactoryResetHandler::new();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let reset_handler = FactoryResetHandler::new(&test_node);
 
         *reset_handler.factory_reset_state.borrow_mut() =
             FactoryResetState::ResetCountdown { deadline: Time::now() };
@@ -725,7 +750,9 @@ mod tests {
 
     #[fuchsia::test]
     async fn factory_reset_disallowed_during_button_countdown() {
-        let reset_handler = FactoryResetHandler::new();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let reset_handler = FactoryResetHandler::new(&test_node);
         let countdown_proxy = create_factory_reset_countdown_proxy(reset_handler.clone());
 
         // Initial state should be FactoryResetState::Idle with no scheduled reset
@@ -757,7 +784,9 @@ mod tests {
 
     #[fuchsia::test]
     async fn factory_reset_disallowed_during_reset_countdown() {
-        let reset_handler = FactoryResetHandler::new();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let reset_handler = FactoryResetHandler::new(&test_node);
         let countdown_proxy = create_factory_reset_countdown_proxy(reset_handler.clone());
 
         // Initial state should be FactoryResetState::Idle with no scheduled reset
@@ -797,7 +826,9 @@ mod tests {
 
     #[fuchsia::test]
     async fn factory_reset_cancelled_during_button_countdown() {
-        let reset_handler = FactoryResetHandler::new();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let reset_handler = FactoryResetHandler::new(&test_node);
         let countdown_proxy = create_factory_reset_countdown_proxy(reset_handler.clone());
 
         // Initial state should be FactoryResetState::Idle with no scheduled reset
@@ -829,7 +860,9 @@ mod tests {
 
     #[fuchsia::test]
     async fn factory_reset_cancelled_during_reset_countdown() {
-        let reset_handler = FactoryResetHandler::new();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let reset_handler = FactoryResetHandler::new(&test_node);
         let countdown_proxy = create_factory_reset_countdown_proxy(reset_handler.clone());
 
         // Initial state should be FactoryResetState::Idle with no scheduled reset
@@ -865,5 +898,27 @@ mod tests {
         let reset_state = countdown_proxy.watch().await.expect("Failed to get countdown state");
         assert!(reset_state.scheduled_reset_time.is_none());
         assert_eq!(reset_handler.factory_reset_state(), FactoryResetState::Idle);
+    }
+
+    #[fuchsia::test]
+    fn factory_reset_handler_initialized_with_inspect_node() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        let _handler = FactoryResetHandler::new(&fake_handlers_node);
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                factory_reset_handler: {
+                    events_received_count: 0u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
     }
 }

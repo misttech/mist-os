@@ -7,6 +7,7 @@ use {
     async_trait::async_trait,
     fuchsia_inspect::{self, health::Reporter},
     std::any::Any,
+    std::fmt::{Debug, Formatter},
     std::rc::Rc,
 };
 
@@ -114,19 +115,34 @@ where
 
 pub struct InputHandlerStatus {
     /// A node that contains the state below.
-    _inspect_node: fuchsia_inspect::Node,
+    inspect_node: fuchsia_inspect::Node,
 
     /// The number of unhandled events received by the handler.
-    _events_received_count: fuchsia_inspect::UintProperty,
+    events_received_count: fuchsia_inspect::UintProperty,
 
     /// The number of reports handled by the handler.
-    _events_handled_count: fuchsia_inspect::UintProperty,
+    events_handled_count: fuchsia_inspect::UintProperty,
 
     /// The event time the last received InputEvent was received.
-    _last_received_timestamp_ns: fuchsia_inspect::UintProperty,
+    last_received_timestamp_ns: fuchsia_inspect::UintProperty,
 
     // This node records the health status of the `InputHandler`.
     _health_node: fuchsia_inspect::health::Node,
+}
+
+impl PartialEq for InputHandlerStatus {
+    fn eq(&self, other: &Self) -> bool {
+        self.inspect_node == other.inspect_node
+            && self.events_received_count == other.events_received_count
+            && self.events_handled_count == other.events_handled_count
+            && self.last_received_timestamp_ns == other.last_received_timestamp_ns
+    }
+}
+
+impl Debug for InputHandlerStatus {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.inspect_node.fmt(f)
+    }
 }
 
 impl InputHandlerStatus {
@@ -138,10 +154,10 @@ impl InputHandlerStatus {
         let mut health_node = fuchsia_inspect::health::Node::new(&handler_node);
         health_node.set_starting_up();
         Self {
-            _inspect_node: handler_node,
-            _events_received_count: events_received_count,
-            _events_handled_count: events_handled_count,
-            _last_received_timestamp_ns: last_received_timestamp_ns,
+            inspect_node: handler_node,
+            events_received_count: events_received_count,
+            events_handled_count: events_handled_count,
+            last_received_timestamp_ns: last_received_timestamp_ns,
             _health_node: health_node,
         }
     }

@@ -380,7 +380,9 @@ fn light_sensor_handler_calculate_lux() {
         settings: vec![],
     };
 
-    let handler = LightSensorHandler::new((), sensor_configuration);
+    let inspector = fuchsia_inspect::Inspector::default();
+    let test_node = inspector.root().create_child("test_node");
+    let handler = LightSensorHandler::new((), sensor_configuration, &test_node);
     let lux = handler.calculate_lux(Rgbc { red: 11.0, green: 13.0, blue: 17.0, clear: 19.0 });
     assert_eq!(lux, 2.0 * 11.0 + 3.0 * 13.0 + 5.0 * 17.0 + 7.0 * 19.0);
 }
@@ -396,7 +398,10 @@ async fn light_sensor_handler_no_calibrator_returns_uncalibrated() {
     };
 
     let (device_proxy, called, task) = get_mock_device_proxy();
-    let handler = LightSensorHandler::<DoublingCalibrator>::new(None, sensor_configuration);
+    let inspector = fuchsia_inspect::Inspector::default();
+    let test_node = inspector.root().create_child("test_node");
+    let handler =
+        LightSensorHandler::<DoublingCalibrator>::new(None, sensor_configuration, &test_node);
     // The first reading is always saturated as it initializing the device settings.
     let reading = handler
         .get_calibrated_data(Rgbc { red: 1, green: 2, blue: 3, clear: 14747 }, device_proxy.clone())
@@ -492,7 +497,9 @@ async fn light_sensor_handler_get_calibrated_data() {
     };
 
     let (device_proxy, called, task) = get_mock_device_proxy();
-    let handler = LightSensorHandler::new(DoublingCalibrator, sensor_configuration);
+    let inspector = fuchsia_inspect::Inspector::default();
+    let test_node = inspector.root().create_child("test_node");
+    let handler = LightSensorHandler::new(DoublingCalibrator, sensor_configuration, &test_node);
     // The first reading is always saturated as it initializing the device settings.
     let reading = handler
         .get_calibrated_data(Rgbc { red: 1, green: 2, blue: 3, clear: 14747 }, device_proxy.clone())
@@ -641,7 +648,9 @@ async fn light_sensor_handler_get_calibrated_data_should_proxy_error() {
 
     let (device_proxy, _, task) =
         get_mock_device_proxy_with_response(None, Err(zx::sys::ZX_ERR_CONNECTION_RESET));
-    let handler = LightSensorHandler::new(DoublingCalibrator, sensor_configuration);
+    let inspector = fuchsia_inspect::Inspector::default();
+    let test_node = inspector.root().create_child("test_node");
+    let handler = LightSensorHandler::new(DoublingCalibrator, sensor_configuration, &test_node);
     let reading = handler
         .get_calibrated_data(Rgbc { red: 1, green: 2, blue: 3, clear: 4 }, device_proxy)
         .await;
@@ -660,7 +669,9 @@ async fn light_sensor_handler_input_event_handler() {
     };
 
     let (device_proxy, _, task) = get_mock_device_proxy();
-    let handler = LightSensorHandler::new(DoublingCalibrator, sensor_configuration);
+    let inspector = fuchsia_inspect::Inspector::default();
+    let test_node = inspector.root().create_child("test_node");
+    let handler = LightSensorHandler::new(DoublingCalibrator, sensor_configuration, &test_node);
 
     let (sensor_proxy, stream): (SensorProxy, SensorRequestStream) =
         create_proxy_and_stream::<SensorMarker>().expect("should get proxy and streamns");
@@ -734,7 +745,9 @@ async fn light_sensor_handler_subscriber_queue() {
     };
 
     let (device_proxy, _, task) = get_mock_device_proxy();
-    let handler = LightSensorHandler::new(DoublingCalibrator, sensor_configuration);
+    let inspector = fuchsia_inspect::Inspector::default();
+    let test_node = inspector.root().create_child("test_node");
+    let handler = LightSensorHandler::new(DoublingCalibrator, sensor_configuration, &test_node);
 
     let (sensor_proxy, stream): (SensorProxy, SensorRequestStream) =
         create_proxy_and_stream::<SensorMarker>().expect("should get proxy and streamns");
@@ -791,4 +804,34 @@ async fn light_sensor_handler_subscriber_queue() {
     drop(events);
     request_task.await;
     task.await;
+}
+
+#[fuchsia::test]
+fn light_sensor_handler_initialized_with_inspect_node() {
+    let sensor_configuration = SensorConfiguration {
+        vendor_id: VENDOR_ID,
+        product_id: PRODUCT_ID,
+        rgbc_to_lux_coefficients: Rgbc { red: 2.0, green: 3.0, blue: 5.0, clear: 7.0 },
+        si_scaling_factors: Rgbc { red: 1.0, green: 1.0, blue: 1.0, clear: 1.0 },
+        settings: vec![],
+    };
+    let inspector = fuchsia_inspect::Inspector::default();
+    let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+    let _handler =
+        LightSensorHandler::new(DoublingCalibrator, sensor_configuration, &fake_handlers_node);
+    fuchsia_inspect::assert_data_tree!(inspector, root: {
+        input_handlers_node: {
+            light_sensor_handler: {
+                events_received_count: 0u64,
+                events_handled_count: 0u64,
+                last_received_timestamp_ns: 0u64,
+                "fuchsia.inspect.Health": {
+                    status: "STARTING_UP",
+                    // Timestamp value is unpredictable and not relevant in this context,
+                    // so we only assert that the property is present.
+                    start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                },
+            }
+        }
+    });
 }

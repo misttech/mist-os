@@ -99,9 +99,10 @@ pub async fn handle_input(
     supported_input_devices: Vec<String>,
     light_sensor_configuration: Option<LightSensorConfiguration>,
 ) -> Result<InputPipeline, Error> {
-    let factory_reset_handler = FactoryResetHandler::new();
-    let media_buttons_handler = MediaButtonsHandler::new();
-    let wayland_input_handler = WaylandHandler::new();
+    let input_handlers_node = node.create_child("input_handlers");
+    let factory_reset_handler = FactoryResetHandler::new(&input_handlers_node);
+    let media_buttons_handler = MediaButtonsHandler::new(&input_handlers_node);
+    let wayland_input_handler = WaylandHandler::new(&input_handlers_node);
 
     let supported_input_devices =
         input_device::InputDeviceType::list_from_structured_config_list(&supported_input_devices);
@@ -131,6 +132,7 @@ pub async fn handle_input(
                 brightness_proxy,
                 calibration,
                 light_sensor_configuration.sensor,
+                &input_handlers_node,
             )
             .await
             .context("unable to create light sensor handler")?;
@@ -162,6 +164,7 @@ pub async fn handle_input(
             HashSet::from_iter(supported_input_devices.iter()),
             focus_chain_publisher,
             wayland_input_handler.clone(),
+            input_handlers_node,
         )
         .await,
         node,
@@ -325,14 +328,14 @@ async fn register_mouse_related_input_handlers(
     assembly: InputPipelineAssembly,
     use_flatland: bool,
     scene_manager: Arc<Mutex<dyn SceneManager>>,
-    node: &inspect::Node,
+    input_pipeline_node: &inspect::Node,
 ) -> InputPipelineAssembly {
     let (sender, mut receiver) = futures::channel::mpsc::channel(0);
 
     // Add the touchpad gestures handler after the click-drag handler,
     // since the gestures handler creates mouse events but already
     // disambiguates between click and drag gestures.
-    let mut assembly = add_touchpad_gestures_handler(assembly, node);
+    let mut assembly = add_touchpad_gestures_handler(assembly, input_pipeline_node);
 
     // Add handler to scale pointer motion based on speed of sensor
     // motion. This allows touchpads and mice to be easily used for
@@ -392,6 +395,7 @@ async fn build_input_pipeline_assembly(
     supported_input_devices: HashSet<&input_device::InputDeviceType>,
     focus_chain_publisher: FocusChainProviderPublisher,
     wayland_input_handler: Rc<WaylandHandler>,
+    input_handlers_node: inspect::Node,
 ) -> InputPipelineAssembly {
     let mut assembly = InputPipelineAssembly::new();
     {
@@ -455,6 +459,10 @@ async fn build_input_pipeline_assembly(
         &supported_input_devices,
         /* displays_recent_events = */ false,
     );
+
+    // Record input_handlers_node to it's parent node so that it does not get dropped
+    // from the Inspect tree when we exit this scope.
+    node.record(input_handlers_node);
 
     assembly
 }
@@ -665,7 +673,7 @@ pub async fn handle_input_device_registry_request_streams(
     input_device_types: Vec<input_device::InputDeviceType>,
     input_event_sender: futures::channel::mpsc::UnboundedSender<input_device::InputEvent>,
     input_device_bindings: InputDeviceBindingHashMap,
-    injected_devices_node: fuchsia_inspect::Node,
+    injected_devices_node: inspect::Node,
 ) {
     // Use a high value device id to avoid conflicting device ids.
     let mut device_id = u32::MAX;
