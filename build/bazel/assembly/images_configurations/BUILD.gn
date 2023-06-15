@@ -11,16 +11,18 @@ if (!use_bringup_assembly) {
     testonly = true
     gn_images_config_target = "//boards/images:x64"
     bazel_images_config_target = ":fuchsia_x64"
-    bazel_inputs =
-        [ "//build/images/fuchsia:fuchsia.bazel_images_config_inputs" ]
   }
 
   verify_images_configuration("verify_fuchsia_x64_fxblob") {
     testonly = true
     gn_images_config_target = "//boards/images:x64-fxfs"
     bazel_images_config_target = ":fuchsia_x64_fxblob"
-    bazel_inputs =
-        [ "//build/images/fuchsia:fuchsia.bazel_images_config_inputs" ]
+  }
+
+  verify_images_configuration("verify_fuchsia_qemu-x64") {
+    testonly = true
+    gn_images_config_target = "//boards/images:qemu-x64"
+    bazel_images_config_target = ":fuchsia_qemu-x64"
   }
 
   verify_images_configuration("verify_fuchsia_vim3") {
@@ -46,6 +48,7 @@ group("verifications") {
   testonly = true
   if (!use_bringup_assembly) {
     deps = [
+      ":verify_fuchsia_qemu-x64",
       ":verify_fuchsia_vim3",
       ":verify_fuchsia_x64",
       ":verify_fuchsia_x64_fxblob",

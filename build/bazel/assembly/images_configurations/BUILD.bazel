@@ -59,6 +59,18 @@ fuchsia_images_configuration(
 )
 
 fuchsia_images_configuration(
+    name = "fuchsia_qemu-x64",
+    fvm_slice_size = "8388608",
+    images = [
+        ":fuchsia_zbi",
+        # FVM outputs.
+        ":standard_fvm_qemu-x64",
+        ":sparse_fvm_qemu-x64",
+        ":blob_sparse_fvm_qemu-x64",
+    ],
+)
+
+fuchsia_images_configuration(
     name = "fuchsia_vim3",
     fvm_slice_size = "8388608",
     images = [
@@ -86,6 +98,36 @@ fuchsia_vbmeta(
     name = "fuchsia_vbmeta_vim3",
     key = "//src/firmware/avb_keys:vim3/vim3-dev-key/vim3_devkey_atx_psk.pem",
     key_metadata = "//src/firmware/avb_keys:vim3/vim3-dev-key/vim3_dev_atx_metadata.bin",
+)
+
+fuchsia_fvm_standard(
+    name = "standard_fvm_qemu-x64",
+    filesystems = [
+        ":empty_data",
+        ":blobfs_qemu-x64",
+        ":internal_reserved",
+    ],
+    fvm_standard_name = "fvm",
+)
+
+fuchsia_fvm_sparse(
+    name = "sparse_fvm_qemu-x64",
+    filesystems = [
+        ":empty_data",
+        ":blobfs_qemu-x64",
+        ":internal_reserved",
+    ],
+    fvm_sparse_name = "fvm.sparse",
+)
+
+fuchsia_fvm_sparse(
+    name = "blob_sparse_fvm_qemu-x64",
+    filesystems = [
+        ":empty_data",
+        ":blobfs_qemu-x64",
+        ":internal_reserved",
+    ],
+    fvm_sparse_name = "fvm.blob.sparse",
 )
 
 fuchsia_fvm_standard(
@@ -157,6 +199,10 @@ fuchsia_fvm_standard(
 fuchsia_filesystem_blobfs(
     name = "blobfs",
     maximum_contents_size = "5216665600",  # 4975 MiB. Leaves 50 MiB for the update package.
+)
+
+fuchsia_filesystem_blobfs(
+    name = "blobfs_qemu-x64",
 )
 
 fuchsia_filesystem_empty_data(
