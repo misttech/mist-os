@@ -9,8 +9,12 @@ use {
         client::{bss_selection, types},
         config_management::{PastConnectionData, SavedNetworksManagerApi},
         mode_management::{Defect, IfaceFailure},
-        telemetry::{DisconnectInfo, TelemetryEvent, TelemetrySender},
+        telemetry::{
+            DisconnectInfo, TelemetryEvent, TelemetrySender, TimestampedConnectionScore,
+            AVERAGE_SCORE_DELTA_MINIMUM_DURATION,
+        },
         util::{
+            historical_list::HistoricalList,
             listener::{
                 ClientListenerMessageSender, ClientNetworkState, ClientStateUpdate,
                 Message::NotifyListeners,
@@ -49,6 +53,8 @@ const MIN_RSSI_CHANGE_TO_ROAM_SCAN: i8 = 5;
 
 const MAX_CONNECTION_ATTEMPTS: u8 = 4; // arbitrarily chosen until we have some data
 const CONNECT_TIMEOUT: zx::Duration = zx::Duration::from_seconds(30);
+const NUM_PAST_SCORES: usize = 35; // number of past periodic connection scores to store
+
 type State = state_machine::State<ExitReason>;
 type ReqStream = stream::Fuse<mpsc::Receiver<ManualRequest>>;
 
@@ -481,6 +487,7 @@ async fn connecting_state<'a>(
                 multiple_bss_candidates: options.connect_selection.target.network_has_multiple_bss,
                 connection_attempt_time: start_time,
                 time_to_connect: fasync::Time::now() - start_time,
+                past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
             };
             return Ok(connected_state(common_options, connected_options).into_state());
         }
@@ -523,6 +530,8 @@ struct ConnectedOptions {
     pub connection_attempt_time: fasync::Time,
     /// Duration from connection attempt to success, historical data for network scoring.
     pub time_to_connect: zx::Duration,
+    /// Rolling log of connection scores
+    pub past_connection_scores: HistoricalList<TimestampedConnectionScore>,
 }
 
 /// The CONNECTED state monitors the SME status. It handles the SME status response:
@@ -562,9 +571,14 @@ async fn connected_state(
         options.ap_state.tracked.channel,
         past_connections,
     );
+    let (initial_score, _) = bss_selection::evaluate_current_bss(&bss_quality_data);
 
     // Keep track of the connection's average signal strength for future scoring.
     let mut avg_rssi = SignalStrengthAverage::new();
+
+    // Timer to log post-connection scores metrics.
+    let timer = fasync::Timer::new(AVERAGE_SCORE_DELTA_MINIMUM_DURATION.after_now()).fuse();
+    fasync::pin_mut!(timer);
 
     loop {
         select! {
@@ -580,6 +594,7 @@ async fn connected_state(
                                 disconnect_source: fidl_info.disconnect_source,
                                 previous_connect_reason: options.currently_fulfilled_connection.reason,
                                 ap_state: (*options.ap_state).clone(),
+                                connection_scores: options.past_connection_scores.clone()
                             };
                             common_options.telemetry_sender.send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
 
@@ -634,7 +649,8 @@ async fn connected_state(
 
                             // Evaluate current BSS, and determine if roaming future should be
                             // triggered.
-                            let (_bss_score, roam_reasons) = bss_selection::evaluate_current_bss(bss_quality_data.clone());
+                            let (bss_score, roam_reasons) = bss_selection::evaluate_current_bss(&bss_quality_data);
+                            options.past_connection_scores.add(TimestampedConnectionScore::new(bss_score, fasync::Time::now()));
                             if !roam_reasons.is_empty() {
                                 let now = fasync::Time::now();
                                 if now < time_prev_roam_scan + MIN_TIME_BETWEEN_ROAM_SCANS {
@@ -695,19 +711,20 @@ async fn connected_state(
                             reason,
                             bss_quality_data.signal_data
                         ).await;
-                        let ap_state = options.ap_state;
+                        let ConnectedOptions {ap_state, past_connection_scores, currently_fulfilled_connection, ..} = options;
+                        let options = DisconnectingOptions {
+                            disconnect_responder: Some(responder),
+                            previous_network: Some((currently_fulfilled_connection.target.network.clone(), types::DisconnectStatus::ConnectionStopped)),
+                            next_network: None,
+                            reason,
+                        };
                         let info = DisconnectInfo {
                             connected_duration: now - connect_start_time,
                             is_sme_reconnecting: false,
-                            disconnect_source: fidl_sme::DisconnectSource::User(types::convert_to_sme_disconnect_reason(reason)),
-                            previous_connect_reason: options.currently_fulfilled_connection.reason,
+                            disconnect_source: fidl_sme::DisconnectSource::User(types::convert_to_sme_disconnect_reason(options.reason)),
                             ap_state: *ap_state,
-                        };
-                        let options = DisconnectingOptions {
-                            disconnect_responder: Some(responder),
-                            previous_network: Some((options.currently_fulfilled_connection.target.network, types::DisconnectStatus::ConnectionStopped)),
-                            next_network: None,
-                            reason,
+                            previous_connect_reason: currently_fulfilled_connection.reason,
+                            connection_scores: past_connection_scores
                         };
                         common_options.telemetry_sender.send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
                         return Ok(disconnecting_state(common_options, options).into_state());
@@ -735,27 +752,34 @@ async fn connected_state(
                                 connect_selection: new_connect_selection.clone(),
                                 attempt_counter: 0,
                             };
-                            let ap_state = options.ap_state;
-                            let info = DisconnectInfo {
-                                connected_duration: now - connect_start_time,
-                                is_sme_reconnecting: false,
-                                disconnect_source: fidl_sme::DisconnectSource::User(types::convert_to_sme_disconnect_reason(disconnect_reason)),
-                                previous_connect_reason: options.currently_fulfilled_connection.reason,
-                                ap_state: *ap_state,
-                            };
+                            let ConnectedOptions { ap_state, past_connection_scores, currently_fulfilled_connection, ..} = options;
                             let options = DisconnectingOptions {
                                 disconnect_responder: None,
-                                previous_network: Some((options.currently_fulfilled_connection.target.network, types::DisconnectStatus::ConnectionStopped)),
+                                previous_network: Some((currently_fulfilled_connection.target.network, types::DisconnectStatus::ConnectionStopped)),
                                 next_network: Some(next_connecting_options),
                                 reason: disconnect_reason,
                             };
                             info!("Connection to new network requested, disconnecting from current network");
+                            let info = DisconnectInfo {
+                                connected_duration: now - connect_start_time,
+                                is_sme_reconnecting: false,
+                                disconnect_source: fidl_sme::DisconnectSource::User(types::convert_to_sme_disconnect_reason(options.reason)),
+                                ap_state: *ap_state,
+                                previous_connect_reason: currently_fulfilled_connection.reason,
+                                connection_scores: past_connection_scores
+                            };
                             common_options.telemetry_sender.send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
                             return Ok(disconnecting_state(common_options, options).into_state())
                         }
                     }
                     None => return handle_none_request(),
                 };
+            },
+            () = timer => {
+                // Log the score deltas since connection.
+                common_options.telemetry_sender.send(
+                    TelemetryEvent::PostConnectionScores { connect_time: connect_start_time, score_at_connect: initial_score, scores: options.past_connection_scores.clone() }
+                );
             }
         }
     }
@@ -1845,6 +1869,7 @@ mod tests {
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time,
             time_to_connect,
+            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
@@ -1905,6 +1930,7 @@ mod tests {
                     disconnect_source: fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::FidlStopClientConnectionsRequest),
                     previous_connect_reason: connect_selection.reason,
                     ap_state: ap_state.clone(),
+                    connection_scores: HistoricalList::new(NUM_PAST_SCORES),
                 });
             });
         });
@@ -1970,6 +1996,7 @@ mod tests {
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time,
             time_to_connect,
+            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
         };
 
         // Start the state machine in the connected state.
@@ -2024,6 +2051,7 @@ mod tests {
                     disconnect_source: fidl_disconnect_info.disconnect_source,
                     previous_connect_reason: connect_selection.reason,
                     ap_state: ap_state.clone(),
+                    connection_scores: HistoricalList::new(NUM_PAST_SCORES),
                 });
             });
         });
@@ -2054,6 +2082,7 @@ mod tests {
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
+            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
@@ -2216,6 +2245,7 @@ mod tests {
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
+            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
@@ -2267,6 +2297,7 @@ mod tests {
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time,
             time_to_connect,
+            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
@@ -2340,6 +2371,7 @@ mod tests {
                     disconnect_source: fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::ProactiveNetworkSwitch),
                     previous_connect_reason: first_connect_selection.reason,
                     ap_state: first_ap_state.clone(),
+                    connection_scores: HistoricalList::new(NUM_PAST_SCORES),
                 });
             });
         });
@@ -2436,6 +2468,7 @@ mod tests {
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
+            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
@@ -2489,6 +2522,7 @@ mod tests {
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
+            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
@@ -2545,6 +2579,7 @@ mod tests {
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
+            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
         };
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
@@ -2651,6 +2686,7 @@ mod tests {
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
+            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
         };
         let initial_state = connected_state(test_values.common_options, options);
 
@@ -2785,6 +2821,7 @@ mod tests {
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
+            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
         };
         let initial_state = connected_state(test_values.common_options, options);
 
@@ -2869,6 +2906,7 @@ mod tests {
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
+            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
         };
         let initial_state = connected_state(test_values.common_options, options);
         let connect_txn_handle = connect_txn_stream.control_handle();
@@ -2950,6 +2988,7 @@ mod tests {
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
+            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
         };
         let initial_state = connected_state(test_values.common_options, options);
 

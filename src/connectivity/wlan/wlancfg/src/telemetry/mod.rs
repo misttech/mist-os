@@ -11,7 +11,10 @@ use {
     crate::{
         client,
         telemetry::{inspect_time_series::TimeSeriesStats, windowed_stats::WindowedStats},
-        util::pseudo_energy::PseudoDecibel,
+        util::{
+            historical_list::{HistoricalList, Timestamped},
+            pseudo_energy::PseudoDecibel,
+        },
     },
     anyhow::{format_err, Context, Error},
     fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload},
@@ -60,6 +63,25 @@ const GET_IFACE_STATS_TIMEOUT: zx::Duration = zx::Duration::from_seconds(5);
 const USER_RESTART_TIME_THRESHOLD: zx::Duration = zx::Duration::from_seconds(5);
 // Short duration connection for metrics purposes.
 const METRICS_SHORT_CONNECT_DURATION: zx::Duration = zx::Duration::from_seconds(90);
+// Minimum connection duration for logging average connection score deltas.
+pub const AVERAGE_SCORE_DELTA_MINIMUM_DURATION: zx::Duration = zx::Duration::from_seconds(30);
+
+#[derive(Clone, Debug, PartialEq)]
+// Connection score and the time at which it was calculated.
+pub struct TimestampedConnectionScore {
+    score: u8,
+    time: fasync::Time,
+}
+impl TimestampedConnectionScore {
+    pub fn new(score: u8, time: fasync::Time) -> Self {
+        Self { score, time }
+    }
+}
+impl Timestamped for TimestampedConnectionScore {
+    fn time(&self) -> fasync::Time {
+        self.time
+    }
+}
 
 #[derive(Clone)]
 #[cfg_attr(test, derive(Debug))]
@@ -110,6 +132,7 @@ pub struct DisconnectInfo {
     pub disconnect_source: fidl_sme::DisconnectSource,
     pub previous_connect_reason: client::types::ConnectReason,
     pub ap_state: client::types::ApState,
+    pub connection_scores: HistoricalList<TimestampedConnectionScore>,
 }
 
 pub trait DisconnectSourceExt {
@@ -235,6 +258,13 @@ pub enum TelemetryEvent {
     /// Notify telemetry that there was a decision to look for networks to roam to after evaluating
     /// the existing connection.
     RoamingScan,
+    /// Notify telemetry event loop that connection duration has reached threshold to log
+    /// post-connect score deltas.
+    PostConnectionScores {
+        connect_time: fasync::Time,
+        score_at_connect: u8,
+        scores: HistoricalList<TimestampedConnectionScore>,
+    },
     /// Notify telemetry of an API request to start client connections.
     StartClientConnectionsRequest,
     /// Notify telemetry of an API request to stop client connections.
@@ -1084,6 +1114,12 @@ impl Telemetry {
                 self.stats_logger
                     .log_stat(StatOp::AddDisconnectCount(info.disconnect_source))
                     .await;
+                self.stats_logger
+                    .log_pre_disconnect_score_deltas(
+                        info.connected_duration,
+                        info.connection_scores.clone(),
+                    )
+                    .await;
 
                 let duration = now - self.last_checked_connection_state;
                 match &self.connection_state {
@@ -1251,6 +1287,11 @@ impl Telemetry {
             } => {
                 self.stats_logger
                     .log_bss_selection_metrics(reason, scored_candidates, selected_candidate)
+                    .await
+            }
+            TelemetryEvent::PostConnectionScores { connect_time, score_at_connect, scores } => {
+                self.stats_logger
+                    .log_post_connection_score_deltas(connect_time, score_at_connect, scores)
                     .await;
             }
         }
@@ -2901,6 +2942,142 @@ impl StatsLogger {
         )
     }
 
+    /// Helper function used to log post-connect and pre-disconnect average score delta metrics. The
+    /// calculated score delta is the difference between the average of `scores` and the provided
+    /// baseline score.
+    async fn log_average_delta_metric(
+        &mut self,
+        metric_id: u32,
+        scores: Vec<TimestampedConnectionScore>,
+        baseline_score: u8,
+        time_dimension: u32,
+    ) {
+        if scores.is_empty() {
+            warn!("Scores list for time dimension {:?} is empty.", time_dimension);
+            return;
+        }
+        let score_dimension = {
+            // This dimension is the same for post-connect and pre-disconnect, representing the
+            // first and last recorded score, respectively.
+            use metrics::AverageScoreDeltaAfterConnectionByInitialScoreMetricDimensionInitialScore::*;
+            match baseline_score {
+                u8::MIN..=20 => _0To20,
+                21..=40 => _21To40,
+                41..=60 => _41To60,
+                61..=80 => _61To80,
+                81..=u8::MAX => _81To100,
+            }
+        };
+        let baseline_score = baseline_score as u32;
+        // Using saturating arithmetic to ensure overflow panics are impossible. In practice,
+        // integers for this metric should not be remotely near overflowing.
+        let avg = baseline_score.saturating_add(
+            scores.iter().fold(0u32, |sum, TimestampedConnectionScore { score, .. }| {
+                sum.saturating_add(*score as u32)
+            }),
+        ) / (scores.len() + 1) as u32;
+        let delta = (avg as i64).saturating_sub(baseline_score as i64);
+        log_cobalt_1dot1!(
+            &self.cobalt_1dot1_proxy,
+            log_integer,
+            metric_id,
+            delta,
+            &[score_dimension as u32, time_dimension],
+        );
+    }
+
+    async fn log_post_connection_score_deltas(
+        &mut self,
+        connect_time: fasync::Time,
+        score_at_connect: u8,
+        scores: HistoricalList<TimestampedConnectionScore>,
+    ) {
+        // The following time ranges are 100ms longer than the corresponding duration dimensions.
+        // Scores should be logged every 1 second, but the extra time provides a buffer reports are
+        // not perfectly periodic.
+        use metrics::AverageScoreDeltaAfterConnectionByInitialScoreMetricDimensionTimeSinceConnect as DurationDimension;
+
+        self.log_average_delta_metric(
+            metrics::AVERAGE_SCORE_DELTA_AFTER_CONNECTION_BY_INITIAL_SCORE_METRIC_ID,
+            scores.get_between(connect_time, connect_time + zx::Duration::from_millis(1100)),
+            score_at_connect,
+            DurationDimension::OneSecond as u32,
+        )
+        .await;
+
+        self.log_average_delta_metric(
+            metrics::AVERAGE_SCORE_DELTA_AFTER_CONNECTION_BY_INITIAL_SCORE_METRIC_ID,
+            scores.get_between(connect_time, connect_time + zx::Duration::from_millis(5100)),
+            score_at_connect,
+            DurationDimension::FiveSeconds as u32,
+        )
+        .await;
+
+        self.log_average_delta_metric(
+            metrics::AVERAGE_SCORE_DELTA_AFTER_CONNECTION_BY_INITIAL_SCORE_METRIC_ID,
+            scores.get_between(connect_time, connect_time + zx::Duration::from_millis(10100)),
+            score_at_connect,
+            DurationDimension::TenSeconds as u32,
+        )
+        .await;
+
+        self.log_average_delta_metric(
+            metrics::AVERAGE_SCORE_DELTA_AFTER_CONNECTION_BY_INITIAL_SCORE_METRIC_ID,
+            scores.get_between(connect_time, connect_time + zx::Duration::from_millis(30100)),
+            score_at_connect,
+            DurationDimension::ThirtySeconds as u32,
+        )
+        .await;
+    }
+
+    async fn log_pre_disconnect_score_deltas(
+        &mut self,
+        connect_duration: zx::Duration,
+        mut scores: HistoricalList<TimestampedConnectionScore>,
+    ) {
+        // The following time ranges are 100ms longer than the corresponding duration dimensions.
+        // Scores should be logged every 1 second, but the extra time provides a buffer reports are
+        // not perfectly periodic.
+        use metrics::AverageScoreDeltaBeforeDisconnectByFinalScoreMetricDimensionTimeUntilDisconnect as DurationDimension;
+        if connect_duration >= AVERAGE_SCORE_DELTA_MINIMUM_DURATION {
+            // Get the last recorded score before the disconnect occurs.
+            if let Some(TimestampedConnectionScore { score: final_score, time: final_score_time }) =
+                scores.0.pop_back()
+            {
+                self.log_average_delta_metric(
+                    metrics::AVERAGE_SCORE_DELTA_BEFORE_DISCONNECT_BY_FINAL_SCORE_METRIC_ID,
+                    scores.get_recent(final_score_time - zx::Duration::from_millis(1100)),
+                    final_score,
+                    DurationDimension::OneSecond as u32,
+                )
+                .await;
+                self.log_average_delta_metric(
+                    metrics::AVERAGE_SCORE_DELTA_BEFORE_DISCONNECT_BY_FINAL_SCORE_METRIC_ID,
+                    scores.get_recent(final_score_time - zx::Duration::from_millis(5100)),
+                    final_score,
+                    DurationDimension::FiveSeconds as u32,
+                )
+                .await;
+                self.log_average_delta_metric(
+                    metrics::AVERAGE_SCORE_DELTA_BEFORE_DISCONNECT_BY_FINAL_SCORE_METRIC_ID,
+                    scores.get_recent(final_score_time - zx::Duration::from_millis(10100)),
+                    final_score,
+                    DurationDimension::TenSeconds as u32,
+                )
+                .await;
+                self.log_average_delta_metric(
+                    metrics::AVERAGE_SCORE_DELTA_BEFORE_DISCONNECT_BY_FINAL_SCORE_METRIC_ID,
+                    scores.get_recent(final_score_time - zx::Duration::from_millis(30100)),
+                    final_score,
+                    DurationDimension::ThirtySeconds as u32,
+                )
+                .await;
+            } else {
+                warn!("Past scores list is unexpectedly empty");
+            }
+        }
+    }
+
     async fn log_network_selection_metrics(
         &mut self,
         connection_state: &mut ConnectionState,
@@ -3071,6 +3248,7 @@ impl StatsLogger {
         );
     }
 }
+
 fn append_device_connected_channel_cobalt_metrics(
     metric_events: &mut Vec<MetricEvent>,
     primary_channel: u8,
@@ -3320,7 +3498,7 @@ mod tests {
         fidl_fuchsia_wlan_stats,
         fuchsia_inspect::{testing::NonZeroUintProperty, Inspector},
         futures::{pin_mut, task::Poll, TryStreamExt},
-        std::{cmp::min, pin::Pin},
+        std::{cmp::min, collections::VecDeque, pin::Pin},
         test_case::test_case,
         wlan_common::{
             assert_variant,
@@ -6831,6 +7009,174 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn test_log_post_connection_score_deltas() {
+        let (mut test_helper, mut test_fut) = setup_test();
+        let connect_time = fasync::Time::from_nanos(1_000_000_000);
+        let scores_deque: VecDeque<TimestampedConnectionScore> = VecDeque::from_iter([
+            // One second after connection
+            TimestampedConnectionScore::new(90, connect_time + zx::Duration::from_millis(500)),
+            TimestampedConnectionScore::new(85, connect_time + zx::Duration::from_seconds(1)),
+            // Five seconds after connection
+            TimestampedConnectionScore::new(60, connect_time + zx::Duration::from_seconds(2)),
+            TimestampedConnectionScore::new(55, connect_time + zx::Duration::from_seconds(3)),
+            TimestampedConnectionScore::new(50, connect_time + zx::Duration::from_seconds(5)),
+            // Ten seconds after connection
+            TimestampedConnectionScore::new(50, connect_time + zx::Duration::from_seconds(6)),
+            TimestampedConnectionScore::new(45, connect_time + zx::Duration::from_seconds(8)),
+            TimestampedConnectionScore::new(40, connect_time + zx::Duration::from_seconds(9)),
+            TimestampedConnectionScore::new(35, connect_time + zx::Duration::from_seconds(10)),
+            // Thirty seconds after connection
+            TimestampedConnectionScore::new(30, connect_time + zx::Duration::from_seconds(11)),
+            TimestampedConnectionScore::new(20, connect_time + zx::Duration::from_seconds(20)),
+            TimestampedConnectionScore::new(10, connect_time + zx::Duration::from_seconds(30)),
+            // More than thirty seconds after connection
+            TimestampedConnectionScore::new(100, connect_time + zx::Duration::from_seconds(31)),
+        ]);
+        let scores = HistoricalList { 0: scores_deque };
+        let score_at_connect: u8 = 80;
+
+        test_helper.telemetry_sender.send(TelemetryEvent::PostConnectionScores {
+            connect_time: connect_time,
+            score_at_connect,
+            scores,
+        });
+        test_helper.drain_cobalt_events(&mut test_fut);
+        let logged_metrics = test_helper.get_logged_metrics(
+            metrics::AVERAGE_SCORE_DELTA_AFTER_CONNECTION_BY_INITIAL_SCORE_METRIC_ID,
+        );
+
+        use metrics::AverageScoreDeltaAfterConnectionByInitialScoreMetricDimensionInitialScore::*;
+        use metrics::AverageScoreDeltaAfterConnectionByInitialScoreMetricDimensionTimeSinceConnect as DurationDimension;
+
+        // Logged metrics for one, five, ten, and thirty seconds.
+        assert_eq!(logged_metrics.len(), 4);
+
+        // Verify one second average delta
+        assert_eq!(
+            logged_metrics[0].event_codes,
+            vec![_61To80 as u32, DurationDimension::OneSecond as u32]
+        );
+        assert_eq!(logged_metrics[0].payload, MetricEventPayload::IntegerValue(5));
+
+        // Verify five second average delta
+        assert_eq!(
+            logged_metrics[1].event_codes,
+            vec![_61To80 as u32, DurationDimension::FiveSeconds as u32]
+        );
+        assert_eq!(logged_metrics[1].payload, MetricEventPayload::IntegerValue(-10));
+
+        // Verify ten second average delta
+        assert_eq!(
+            logged_metrics[2].event_codes,
+            vec![_61To80 as u32, DurationDimension::TenSeconds as u32]
+        );
+        assert_eq!(logged_metrics[2].payload, MetricEventPayload::IntegerValue(-21));
+
+        // Verify thirty second average delta
+        assert_eq!(
+            logged_metrics[3].event_codes,
+            vec![_61To80 as u32, DurationDimension::ThirtySeconds as u32]
+        );
+        assert_eq!(logged_metrics[3].payload, MetricEventPayload::IntegerValue(-30));
+    }
+
+    #[fuchsia::test]
+    fn test_log_pre_disconnect_score_deltas() {
+        let (mut test_helper, mut test_fut) = setup_test();
+        let final_score_time = fasync::Time::from_nanos(31_000_000_000);
+        let scores_deque: VecDeque<TimestampedConnectionScore> = VecDeque::from_iter([
+            // More than thirty seconds before last recorded score
+            TimestampedConnectionScore::new(100, final_score_time - zx::Duration::from_seconds(31)),
+            // Thirty seconds before last recorded score
+            TimestampedConnectionScore::new(10, final_score_time - zx::Duration::from_seconds(30)),
+            TimestampedConnectionScore::new(20, final_score_time - zx::Duration::from_seconds(20)),
+            TimestampedConnectionScore::new(30, final_score_time - zx::Duration::from_seconds(11)),
+            // Ten seconds before last recorded score
+            TimestampedConnectionScore::new(35, final_score_time - zx::Duration::from_seconds(10)),
+            TimestampedConnectionScore::new(40, final_score_time - zx::Duration::from_seconds(9)),
+            TimestampedConnectionScore::new(45, final_score_time - zx::Duration::from_seconds(8)),
+            TimestampedConnectionScore::new(50, final_score_time - zx::Duration::from_seconds(6)),
+            // Five seconds before last recorded score
+            TimestampedConnectionScore::new(50, final_score_time - zx::Duration::from_seconds(5)),
+            TimestampedConnectionScore::new(55, final_score_time - zx::Duration::from_seconds(3)),
+            TimestampedConnectionScore::new(60, final_score_time - zx::Duration::from_seconds(2)),
+            // One second before last recorded score
+            TimestampedConnectionScore::new(85, final_score_time - zx::Duration::from_seconds(1)),
+            TimestampedConnectionScore::new(90, final_score_time - zx::Duration::from_millis(500)),
+            // Last recorded score
+            TimestampedConnectionScore::new(80, final_score_time),
+        ]);
+        let scores = HistoricalList { 0: scores_deque };
+
+        // Record a disconnect for a connection meeting the minimum required duration.
+        let disconnect_info = DisconnectInfo {
+            connected_duration: AVERAGE_SCORE_DELTA_MINIMUM_DURATION,
+            connection_scores: scores,
+            ..fake_disconnect_info()
+        };
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: false,
+            info: disconnect_info,
+        });
+        test_helper.drain_cobalt_events(&mut test_fut);
+        let logged_metrics = test_helper.get_logged_metrics(
+            metrics::AVERAGE_SCORE_DELTA_BEFORE_DISCONNECT_BY_FINAL_SCORE_METRIC_ID,
+        );
+
+        use metrics::AverageScoreDeltaBeforeDisconnectByFinalScoreMetricDimensionFinalScore::*;
+        use metrics::AverageScoreDeltaBeforeDisconnectByFinalScoreMetricDimensionTimeUntilDisconnect as DurationDimension;
+
+        // Logged metrics for one, five, ten, and thirty seconds.
+        assert_eq!(logged_metrics.len(), 4);
+
+        // Verify one second average delta
+        assert_eq!(
+            logged_metrics[0].event_codes,
+            vec![_61To80 as u32, DurationDimension::OneSecond as u32]
+        );
+        assert_eq!(logged_metrics[0].payload, MetricEventPayload::IntegerValue(5));
+
+        // Verify five second average delta
+        assert_eq!(
+            logged_metrics[1].event_codes,
+            vec![_61To80 as u32, DurationDimension::FiveSeconds as u32]
+        );
+        assert_eq!(logged_metrics[1].payload, MetricEventPayload::IntegerValue(-10));
+
+        // Verify ten second average delta
+        assert_eq!(
+            logged_metrics[2].event_codes,
+            vec![_61To80 as u32, DurationDimension::TenSeconds as u32]
+        );
+        assert_eq!(logged_metrics[2].payload, MetricEventPayload::IntegerValue(-21));
+
+        // Verify thirty second average delta
+        assert_eq!(
+            logged_metrics[3].event_codes,
+            vec![_61To80 as u32, DurationDimension::ThirtySeconds as u32]
+        );
+        assert_eq!(logged_metrics[3].payload, MetricEventPayload::IntegerValue(-30));
+
+        // Record a disconnect shorter than the minimum required duration
+        let disconnect_info = DisconnectInfo {
+            connected_duration: AVERAGE_SCORE_DELTA_MINIMUM_DURATION
+                - zx::Duration::from_seconds(1),
+            ..fake_disconnect_info()
+        };
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: false,
+            info: disconnect_info,
+        });
+        test_helper.drain_cobalt_events(&mut test_fut);
+
+        // No additional metrics should be logged.
+        let logged_metrics = test_helper.get_logged_metrics(
+            metrics::AVERAGE_SCORE_DELTA_BEFORE_DISCONNECT_BY_FINAL_SCORE_METRIC_ID,
+        );
+        assert_eq!(logged_metrics.len(), 4);
+    }
+
+    #[fuchsia::test]
     fn test_log_network_selection_metrics() {
         let (mut test_helper, mut test_fut) = setup_test();
 
@@ -7524,6 +7870,7 @@ mod tests {
             disconnect_source: fidl_disconnect_info.disconnect_source,
             previous_connect_reason: client::types::ConnectReason::IdleInterfaceAutoconnect,
             ap_state: random_bss_description!(Wpa2).into(),
+            connection_scores: HistoricalList::new(8),
         }
     }
 

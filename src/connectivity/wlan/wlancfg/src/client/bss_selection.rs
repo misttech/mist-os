@@ -89,7 +89,7 @@ pub enum RoamReason {
 }
 
 /// Returns scoring information for a particular BSS
-pub fn evaluate_current_bss(bss: BssQualityData) -> (u8, Vec<RoamReason>) {
+pub fn evaluate_current_bss(bss: &BssQualityData) -> (u8, Vec<RoamReason>) {
     let signal_score = score_signal_data(bss.signal_data);
     let mut roam_reasons: Vec<RoamReason> = vec![];
 
@@ -300,7 +300,7 @@ mod test {
             channel::Channel::new(11, channel::Cbw::Cbw20),
             PastConnectionList::default(),
         );
-        let (_, roam_reasons) = evaluate_current_bss(weak_signal_bss);
+        let (_, roam_reasons) = evaluate_current_bss(&weak_signal_bss);
         assert!(roam_reasons.iter().any(|&r| r == RoamReason::SuboptimalSignal));
 
         // Moderate RSSI, low SNR
@@ -309,7 +309,7 @@ mod test {
             channel::Channel::new(11, channel::Cbw::Cbw20),
             PastConnectionList::default(),
         );
-        let (_, roam_reasons) = evaluate_current_bss(low_snr_bss);
+        let (_, roam_reasons) = evaluate_current_bss(&low_snr_bss);
         assert!(roam_reasons.iter().any(|&r| r == RoamReason::SuboptimalSignal));
     }
 }
