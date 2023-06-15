@@ -349,7 +349,8 @@ template("syscall_test_suite") {
     not_needed([ "ns2_fastudp_label" ])
   }
 
-  test_deps = []
+  ns2_test_deps = []
+  ns3_test_deps = []
   foreach(stack, stacks) {
     combined_label = "${stack.label}_${suite_label}"
 
@@ -402,12 +403,20 @@ template("syscall_test_suite") {
         }
       }
     }
-    test_deps += [ ":${test_package_label}" ]
+    if (stack.label == ns3_label) {
+      ns3_test_deps += [ ":${test_package_label}" ]
+    } else {
+      ns2_test_deps += [ ":${test_package_label}" ]
+    }
   }
 
-  group(suite_label) {
+  group("${suite_label}_ns3") {
     testonly = true
-    public_deps = test_deps
+    public_deps = ns3_test_deps
+  }
+  group("${suite_label}_ns2") {
+    testonly = true
+    public_deps = ns2_test_deps
   }
 }
 
@@ -472,24 +481,49 @@ syscall_test_suite(tcp_test_label) {
   }
 }
 
+suite_labels = [
+  generic_test_label,
+  loopback_isolated_tcp_fin_wait_test_label,
+  loopback_isolated_tcp_linger_timeout_test_label,
+  loopback_isolated_test_label,
+  loopback_tcp_accept_backlog_listen_v4_mapped_test_label,
+  loopback_tcp_accept_backlog_listen_v4_test_label,
+  loopback_tcp_accept_backlog_listen_v6_test_label,
+  loopback_tcp_accept_test_label,
+  loopback_tcp_backlog_test_label,
+  loopback_test_label,
+  raw_packet_test_label,
+  tcp_blocking_test_label,
+  tcp_test_label,
+  udp_raw_test_label,
+  udp_test_label,
+  udp_unbound_test_label,
+]
+
+ns2_labels = []
+foreach(label, suite_labels) {
+  ns2_labels += [ ":${label}_ns2" ]
+}
+
+group("ns2-tests") {
+  testonly = true
+  public_deps = ns2_labels
+}
+
+ns3_labels = []
+foreach(label, suite_labels) {
+  ns3_labels += [ ":${label}_ns3" ]
+}
+
+group("ns3-tests") {
+  testonly = true
+  public_deps = ns3_labels
+}
+
 group("tests") {
   testonly = true
   public_deps = [
-    ":${generic_test_label}",
-    ":${loopback_isolated_tcp_fin_wait_test_label}",
-    ":${loopback_isolated_tcp_linger_timeout_test_label}",
-    ":${loopback_isolated_test_label}",
-    ":${loopback_tcp_accept_backlog_listen_v4_mapped_test_label}",
-    ":${loopback_tcp_accept_backlog_listen_v4_test_label}",
-    ":${loopback_tcp_accept_backlog_listen_v6_test_label}",
-    ":${loopback_tcp_accept_test_label}",
-    ":${loopback_tcp_backlog_test_label}",
-    ":${loopback_test_label}",
-    ":${raw_packet_test_label}",
-    ":${tcp_blocking_test_label}",
-    ":${tcp_test_label}",
-    ":${udp_raw_test_label}",
-    ":${udp_test_label}",
-    ":${udp_unbound_test_label}",
+    ":ns2-tests",
+    ":ns3-tests",
   ]
 }
