@@ -823,26 +823,6 @@
                     },
                 },
 
-                // TODO(https://fxbug.dev/115635): Find a way to remove this exception
-                {
-                    using_node: "/core",
-                    capability: "fuchsia.ui.policy.Presenter",
-                    error: {
-                        error: {
-                            analyzer_model_error: {
-                                routing_error: {
-                                    offer_from_child_expose_not_found: {
-                                        child_moniker: "ui",
-                                        moniker: "/core",
-                                        capability_id: "fuchsia.ui.policy.Presenter",
-                                    },
-                                },
-                            },
-                        },
-                        message: "`/core` tried to offer `fuchsia.ui.policy.Presenter` from its child `#ui`, but `#ui` does not expose `fuchsia.ui.policy.Presenter`.",
-                    },
-                },
-
                 // TODO(https://fxbug.dev/115635): Find a way to remove this exception.
                 {
                     using_node: "/bootstrap",
@@ -1007,20 +987,6 @@
                 {
                     using_node: "/core/test_manager",
                     capability: "fuchsia.ui.input3.Keyboard",
-                    error: {
-                        error: {
-                            analyzer_model_error: {
-                                routing_error: {
-                                    availability_routing_error: "offer_from_void_to_required_target",
-                                },
-                            },
-                        },
-                        message: "Offer uses void source, but target requires the capability",
-                    },
-                },
-                {
-                    using_node: "/core/test_manager",
-                    capability: "fuchsia.ui.policy.Presenter",
                     error: {
                         error: {
                             analyzer_model_error: {
@@ -1260,24 +1226,6 @@
                             },
                         },
                         message: "Offer uses void source, but target requires the capability",
-                    },
-                },
-                {
-                    using_node: "/core/test_manager",
-                    capability: "fuchsia.ui.policy.Presenter",
-                    error: {
-                        error: {
-                            analyzer_model_error: {
-                                routing_error: {
-                                    offer_from_child_expose_not_found: {
-                                        child_moniker: "ui",
-                                        moniker: "/core",
-                                        capability_id: "fuchsia.ui.policy.Presenter",
-                                    },
-                                },
-                            },
-                        },
-                        message: "`/core` tried to offer `fuchsia.ui.policy.Presenter` from its child `#ui`, but `#ui` does not expose `fuchsia.ui.policy.Presenter`.",
                     },
                 },
                 {

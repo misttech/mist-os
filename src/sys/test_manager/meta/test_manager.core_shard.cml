@@ -195,7 +195,6 @@
                 "fuchsia.accessibility.semantics.SemanticsManager",
                 "fuchsia.input.virtualkeyboard.ControllerCreator",
                 "fuchsia.ui.input3.Keyboard",
-                "fuchsia.ui.policy.Presenter",
             ],
             from: "#ui",
             to: "#test_manager",

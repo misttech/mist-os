@@ -317,12 +317,8 @@
             availability: "same_as_target",
         },
         {
-            // Routed to session-manager via ui.core_shard.cml
-            // Varies per-product.
-            protocol: [
-                "fuchsia.session.scene.Manager",
-                "fuchsia.ui.policy.Presenter",
-            ],
+            // Routed to session-manager via ui.core_shard.cml.
+            protocol: [ "fuchsia.session.scene.Manager" ],
             from: "parent",
             to: "#session",
             availability: "same_as_target",

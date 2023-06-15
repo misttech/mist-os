@@ -30,12 +30,6 @@
             from: "#ui",
             to: "#session-manager",
         },
-        {
-            protocol: [ "fuchsia.ui.policy.Presenter" ],
-            from: "void",
-            to: "#session-manager",
-            availability: "optional",
-        },
 
         // Routes from optional shards.
         // All of these routes should be marked `source_availability: "unknown"`
