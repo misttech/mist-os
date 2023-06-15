@@ -7,7 +7,6 @@ use {
     dyn_clone::{clone_trait_object, DynClone},
     fuchsia_zircon as zx,
     futures::future::BoxFuture,
-    std::convert::Infallible,
 };
 
 /// The capability trait, implemented by all capabilities.
@@ -25,11 +24,12 @@ impl std::fmt::Debug for AnyCapability {
     }
 }
 
-impl TryFrom<zx::Handle> for AnyCapability {
-    type Error = Infallible;
-
-    fn try_from(value: zx::Handle) -> Result<Self, Self::Error> {
-        Ok(Box::new(Handle::from(value)))
+impl<T> From<T> for AnyCapability
+where
+    T: zx::HandleBased,
+{
+    fn from(value: T) -> Self {
+        Box::new(Handle::from(value.into_handle()))
     }
 }
 
