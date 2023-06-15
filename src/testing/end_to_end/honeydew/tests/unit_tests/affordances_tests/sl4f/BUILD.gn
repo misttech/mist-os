@@ -5,8 +5,8 @@
 import("//build/python/python_host_test.gni")
 
 if (is_host) {
-  python_host_test("bluetooth_sl4f_test") {
-    main_source = "bluetooth_test.py"
+  python_host_test("bluetooth_gap_sl4f_test") {
+    main_source = "bluetooth_gap_test.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
       "//third_party/parameterized",
@@ -39,7 +39,7 @@ if (is_host) {
 group("tests") {
   testonly = true
   public_deps = [
-    ":bluetooth_sl4f_test($host_toolchain)",
+    ":bluetooth_gap_sl4f_test($host_toolchain)",
     ":component_sl4f_test($host_toolchain)",
     ":tracing_sl4f_test($host_toolchain)",
   ]

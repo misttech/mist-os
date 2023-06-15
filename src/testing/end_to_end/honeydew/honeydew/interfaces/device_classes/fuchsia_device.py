@@ -8,7 +8,7 @@ import abc
 from typing import Optional
 
 from honeydew import custom_types
-from honeydew.interfaces.affordances import bluetooth
+from honeydew.interfaces.affordances.bluetooth import bluetooth_gap
 from honeydew.interfaces.affordances import component
 from honeydew.interfaces.affordances import tracing
 from honeydew.interfaces.auxiliary_devices import \
@@ -91,11 +91,11 @@ class FuchsiaDevice(abc.ABC):
     # List all the affordances in alphabetical order
     @properties.Affordance
     @abc.abstractmethod
-    def bluetooth(self) -> bluetooth.Bluetooth:
-        """Returns a bluetooth affordance object.
+    def bluetooth_gap(self) -> bluetooth_gap.BluetoothGap:
+        """Returns a BluetoothGap affordance object.
 
         Returns:
-            bluetooth.Bluetooth object
+            bluetooth_gap.BluetoothGap object
         """
 
     @properties.Affordance

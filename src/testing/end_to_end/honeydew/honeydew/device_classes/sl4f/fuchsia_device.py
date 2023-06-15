@@ -14,10 +14,10 @@ from typing import Any, Dict, Optional
 
 from honeydew import custom_types
 from honeydew import errors
-from honeydew.affordances.sl4f import bluetooth as bluetooth_sl4f
+from honeydew.affordances.sl4f.bluetooth import bluetooth_gap as bluetooth_gap_sl4f
 from honeydew.affordances.sl4f import component as component_sl4f
 from honeydew.affordances.sl4f import tracing as tracing_sl4f
-from honeydew.interfaces.affordances import bluetooth as bluetooth_interface
+from honeydew.interfaces.affordances.bluetooth import bluetooth_gap as bluetooth_gap_interface
 from honeydew.interfaces.affordances import component as component_interface
 from honeydew.interfaces.affordances import tracing as tracing_interface
 from honeydew.interfaces.auxiliary_devices import \
@@ -52,7 +52,7 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 class FuchsiaDevice(fuchsia_device.FuchsiaDevice,
-                    affordances_capable.BluetoothCapableDevice,
+                    affordances_capable.BluetoothGapCapableDevice,
                     affordances_capable.ComponentCapableDevice,
                     affordances_capable.TracingCapableDevice,
                     transports_capable.FFXCapableDevice,
@@ -222,13 +222,13 @@ class FuchsiaDevice(fuchsia_device.FuchsiaDevice,
     # List all the affordances in alphabetical order
     # TODO(fxbug.dev/123944): Remove this after fxbug.dev/123944 is fixed
     @properties.Affordance
-    def bluetooth(self) -> bluetooth_interface.Bluetooth:
-        """Returns a bluetooth affordance object.
+    def bluetooth_gap(self) -> bluetooth_gap_interface.BluetoothGap:
+        """Returns a BluetoothGap affordance object.
 
         Returns:
-            bluetooth.Bluetooth object
+            bluetooth_gap.BluetoothGap object
         """
-        return bluetooth_sl4f.Bluetooth(
+        return bluetooth_gap_sl4f.BluetoothGap(
             device_name=self.device_name, sl4f=self.sl4f)
 
     @properties.Affordance
@@ -417,7 +417,7 @@ class FuchsiaDevice(fuchsia_device.FuchsiaDevice,
 
         # If applicable, initialize bluetooth stack
         if "qemu" not in self.device_type:
-            self.bluetooth.sys_init()
+            self.bluetooth_gap.sys_init()
 
     def _wait_for_offline(self, timeout: float = _TIMEOUTS["OFFLINE"]) -> None:
         """Wait for Fuchsia device to go offline.

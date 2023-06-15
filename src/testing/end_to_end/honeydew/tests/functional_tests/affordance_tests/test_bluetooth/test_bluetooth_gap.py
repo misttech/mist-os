@@ -15,8 +15,8 @@ from honeydew.interfaces.device_classes import fuchsia_device
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class BluetoothAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
-    """Bluetooth affordance tests"""
+class BluetoothGapAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
+    """BluetoothGap affordance tests"""
 
     def setup_class(self) -> None:
         """setup_class is called once before running tests.
@@ -32,10 +32,10 @@ class BluetoothAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
 
         if self._is_fuchsia_controller_based_device(self.device):
             with asserts.assert_raises(NotImplementedError):
-                self.device.bluetooth.request_discovery(True)
+                self.device.bluetooth_gap.request_discovery(True)
             return
 
-        self.device.bluetooth.request_discovery(True)
+        self.device.bluetooth_gap.request_discovery(True)
 
 
 if __name__ == "__main__":

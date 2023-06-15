@@ -6,23 +6,23 @@
 
 import abc
 
-from honeydew.interfaces.affordances import bluetooth
+from honeydew.interfaces.affordances.bluetooth import bluetooth_gap
 from honeydew.interfaces.affordances import component
 from honeydew.interfaces.affordances import tracing
 from honeydew.utils import properties
 
 
-class BluetoothCapableDevice(abc.ABC):
+class BluetoothGapCapableDevice(abc.ABC):
     """Abstract base class to be implemented by a device which supports the
     Bluetooth affordance."""
 
     @properties.Affordance
     @abc.abstractmethod
-    def bluetooth(self) -> bluetooth.Bluetooth:
-        """Returns a bluetooth affordance object.
+    def bluetooth_gap(self) -> bluetooth_gap.BluetoothGap:
+        """Returns a BluetoothGap affordance object.
 
         Returns:
-            bluetooth.Bluetooth object
+            bluetooth_gap.BluetoothGap object
         """
 
 

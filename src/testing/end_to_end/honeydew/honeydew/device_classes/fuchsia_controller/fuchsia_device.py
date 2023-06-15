@@ -8,10 +8,10 @@ from typing import Optional
 
 from honeydew import custom_types
 from honeydew import errors
-from honeydew.affordances.fuchsia_controller import bluetooth as bluetooth_fc
+from honeydew.affordances.fuchsia_controller.bluetooth import bluetooth_gap as bluetooth_gap_fc
 from honeydew.affordances.fuchsia_controller import component as component_fc
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
-from honeydew.interfaces.affordances import bluetooth
+from honeydew.interfaces.affordances.bluetooth import bluetooth_gap as bluetooth_gap_interface
 from honeydew.interfaces.affordances import component
 from honeydew.interfaces.affordances import tracing
 from honeydew.interfaces.auxiliary_devices import \
@@ -25,7 +25,7 @@ from honeydew.utils import properties
 
 
 class FuchsiaDevice(fuchsia_device.FuchsiaDevice,
-                    affordances_capable.BluetoothCapableDevice,
+                    affordances_capable.BluetoothGapCapableDevice,
                     affordances_capable.ComponentCapableDevice,
                     affordances_capable.TracingCapableDevice,
                     transports_capable.FFXCapableDevice,
@@ -160,13 +160,13 @@ class FuchsiaDevice(fuchsia_device.FuchsiaDevice,
 
     # List all the affordances in alphabetical order
     @properties.Affordance
-    def bluetooth(self) -> bluetooth.Bluetooth:
-        """Returns a bluetooth affordance object.
+    def bluetooth_gap(self) -> bluetooth_gap_interface.BluetoothGap:
+        """Returns a BluetoothGap affordance object.
 
         Returns:
-            bluetooth.Bluetooth object
+            bluetooth_gap.BluetoothGap object
         """
-        return bluetooth_fc.Bluetooth()
+        return bluetooth_gap_fc.BluetoothGap()
 
     @properties.Affordance
     def component(self) -> component.Component:

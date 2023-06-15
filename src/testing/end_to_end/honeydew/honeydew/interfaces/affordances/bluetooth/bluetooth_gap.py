@@ -7,8 +7,8 @@
 import abc
 
 
-class Bluetooth(abc.ABC):
-    """Abstract base class for Bluetooth affordance."""
+class BluetoothGap(abc.ABC):
+    """Abstract base class for BluetoothGap affordance."""
 
     # List all the public methods in alphabetical order
     @abc.abstractmethod

@@ -6,7 +6,7 @@
 
 from typing import Dict
 
-from honeydew.interfaces.affordances import bluetooth
+from honeydew.interfaces.affordances.bluetooth import bluetooth_gap
 from honeydew.transports import sl4f as sl4f_transport
 
 _SL4F_METHODS: Dict[str, str] = {
@@ -15,8 +15,8 @@ _SL4F_METHODS: Dict[str, str] = {
 }
 
 
-class Bluetooth(bluetooth.Bluetooth):
-    """Bluetooth affordance implementation using SL4F.
+class BluetoothGap(bluetooth_gap.BluetoothGap):
+    """BluetoothGap affordance implementation using SL4F.
 
     Args:
         device_name: Device name returned by `ffx target list`.

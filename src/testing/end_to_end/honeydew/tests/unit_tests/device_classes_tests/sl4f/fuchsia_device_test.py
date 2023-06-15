@@ -132,10 +132,10 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
             self.fd_obj, fuchsia_device_interface.FuchsiaDevice)
 
     # List all the tests related to affordances in alphabetical order
-    def test_fuchsia_device_is_bluetooth_capable(self) -> None:
-        """Test case to make sure fuchsia device is bluetooth capable"""
+    def test_fuchsia_device_is_bluetooth_gap_capable(self) -> None:
+        """Test case to make sure fuchsia device is BluetoothGap capable"""
         self.assertIsInstance(
-            self.fd_obj, affordances_capable.BluetoothCapableDevice)
+            self.fd_obj, affordances_capable.BluetoothGapCapableDevice)
 
     def test_fuchsia_device_is_component_capable(self) -> None:
         """Test case to make sure fuchsia device is component capable"""
@@ -394,7 +394,7 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
     # persistent properties
 
     @mock.patch.object(
-        fuchsia_device.bluetooth_sl4f.Bluetooth, "sys_init", autospec=True)
+        fuchsia_device.bluetooth_gap_sl4f.BluetoothGap, "sys_init", autospec=True)
     @mock.patch.object(
         fuchsia_device.FuchsiaDevice,
         "device_type",

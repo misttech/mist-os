@@ -4,11 +4,11 @@
 # found in the LICENSE file.
 """Bluetooth affordance implementation using Fuchsia-Controller."""
 
-from honeydew.interfaces.affordances import bluetooth
+from honeydew.interfaces.affordances.bluetooth import bluetooth_gap
 
 
-class Bluetooth(bluetooth.Bluetooth):
-    """Bluetooth affordance implementation using Fuchsia-Controller."""
+class BluetoothGap(bluetooth_gap.BluetoothGap):
+    """BluetoothGap affordance implementation using Fuchsia-Controller."""
 
     # List all the public methods in alphabetical order
     def sys_init(self) -> None:

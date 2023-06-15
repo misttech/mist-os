@@ -8,10 +8,9 @@ from typing import Any, Dict
 import unittest
 from unittest import mock
 
-from parameterized import parameterized
-
-from honeydew.affordances.sl4f import bluetooth as sl4f_bluetooth
+from honeydew.affordances.sl4f.bluetooth import bluetooth_gap as sl4f_bluetooth_gap
 from honeydew.transports import sl4f as sl4f_transport
+from parameterized import parameterized
 
 
 def _custom_test_name_func(testcase_func, _, param) -> str:
@@ -25,14 +24,14 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
 
 
 # pylint: disable=protected-access
-class BluetoothSL4FTests(unittest.TestCase):
-    """Unit tests for honeydew.affordances.sl4f.bluetooth.py."""
+class BluetoothGapSL4FTests(unittest.TestCase):
+    """Unit tests for honeydew.affordances.sl4f.bluetooth.bluetooth_gap.py."""
 
     def setUp(self) -> None:
         super().setUp()
 
         self.sl4f_obj = mock.MagicMock(spec=sl4f_transport.SL4F)
-        self.bluetooth_obj = sl4f_bluetooth.Bluetooth(
+        self.bluetooth_obj = sl4f_bluetooth_gap.BluetoothGap(
             device_name="fuchsia-emulator", sl4f=self.sl4f_obj)
 
         self.sl4f_obj.run.assert_called()

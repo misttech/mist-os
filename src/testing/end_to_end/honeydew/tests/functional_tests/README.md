@@ -108,7 +108,7 @@ $ fx set core.x64 \
     --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
     --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
-$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_bluetooth:bluetooth_test --e2e --output
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_bluetooth:bluetooth_gap_test --e2e --output
 ```
 
 ### Component tests

@@ -13,7 +13,7 @@ if (is_host) {
 
   group("nuc_tests") {
     testonly = true
-    public_deps = [ "test_bluetooth:bluetooth_test($host_toolchain)" ]
+    public_deps = [ "test_bluetooth:bluetooth_gap_test($host_toolchain)" ]
   }
 
   group("tests") {
