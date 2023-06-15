@@ -377,13 +377,6 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
             let dump_on_exit = current_task.read().dump_on_exit;
             if dump_on_exit {
                 log_trace!("requesting backtrace");
-                // Disable exception processing on the exception handling thread since we're about
-                // to generate a SW breakpoint exception and we want the system to handle it. This
-                // is a temporary workaround. Once Zircon gains the ability to return exceptions
-                // generated from restricted mode through zx_restricted_enter's restricted_return
-                // call we can just generate an exception here in normal mode and it will not be
-                // confused with exceptions from restricted mode.
-                current_task.ignore_exceptions.store(true, std::sync::atomic::Ordering::Release);
                 // (Re)-generate CFI directives so that stack unwinders will trace into the Linux state.
                 generate_cfi_directives!(state);
                 backtrace_request::backtrace_request_current_thread();

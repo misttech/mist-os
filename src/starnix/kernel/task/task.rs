@@ -399,10 +399,6 @@ pub struct Task {
     /// when created with the CLONE_VFORK flag.
     vfork_event: Option<zx::Event>,
 
-    /// Whether the restricted mode executor should ignore exceptions associated with this Task's thread
-    // TODO(https://fxbug.dev/124427): Remove this mechanism once exceptions are handled inline.
-    pub ignore_exceptions: std::sync::atomic::AtomicBool,
-
     /// Variable that can tell you whether there are currently seccomp
     /// filters without holding a lock
     pub seccomp_filter_state: SeccompState,
@@ -477,7 +473,6 @@ impl Task {
                 seccomp_filters,
                 robust_list_head: UserAddress::NULL,
             }),
-            ignore_exceptions: std::sync::atomic::AtomicBool::new(false),
             seccomp_filter_state,
         };
         #[cfg(any(test, debug_assertions))]
