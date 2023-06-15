@@ -326,7 +326,11 @@ if (is_host) {
       }
       deps = [
         ":chromium_test_base_deps",
-        ":web_engine",
+
+        # Currently, `web_engine_integration_tests` uses an absolute URL for
+        # `web_instance.cm`, so these tests require that `web_engine` in the
+        # Product. TODO(crbug.com/1443083): Update based on outcome of the bug.
+        ":uses_web_engine",
       ]
     }
 
