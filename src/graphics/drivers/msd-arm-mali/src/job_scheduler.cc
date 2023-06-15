@@ -260,8 +260,6 @@ void JobScheduler::TryToSchedule() {
 }
 
 void JobScheduler::CancelAtomsForConnection(std::shared_ptr<MsdArmConnection> connection) {
-  msd_client_id_t connection_id = connection ? connection->client_id() : 0u;
-  MAGMA_LOG(INFO, "Canceling all atoms while tearing down connection %ld", connection_id);
   const char* atom_type = nullptr;
   auto removal_function = [connection, &atom_type](auto it) {
     auto locked = it->connection().lock();
