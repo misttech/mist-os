@@ -135,7 +135,7 @@ pub async fn detect_disk_format(block_proxy: &dyn DetectableDevice) -> DiskForma
     match detect_disk_format_res(block_proxy).await {
         Ok(format) => format,
         Err(e) => {
-            tracing::error!("detect_disk_format failed: {}", e);
+            tracing::error!("detect_disk_format failed: {:?}", e);
             return DiskFormat::Unknown;
         }
     }

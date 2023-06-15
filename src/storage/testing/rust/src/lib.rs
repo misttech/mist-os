@@ -7,6 +7,7 @@ use {
     fidl_fuchsia_device::ControllerProxy,
     fidl_fuchsia_hardware_block_partition::{PartitionMarker, PartitionProxy},
     fidl_fuchsia_io as fio,
+    fs_management::format::{detect_disk_format, DiskFormat},
     fuchsia_component::client::connect_to_protocol_at_path,
     fuchsia_fs::directory::{WatchEvent, Watcher},
     fuchsia_zircon as zx,
@@ -18,6 +19,10 @@ pub mod fvm;
 pub mod zxcrypt;
 
 pub type Guid = [u8; 16];
+
+pub fn into_guid(guid: Guid) -> fidl_fuchsia_hardware_block_partition::Guid {
+    fidl_fuchsia_hardware_block_partition::Guid { value: guid }
+}
 
 pub fn create_random_guid() -> Guid {
     *uuid::Uuid::new_v4().as_bytes()
@@ -48,6 +53,11 @@ async fn partition_name_matches(name: &str, partition: &PartitionProxy) -> Resul
     Ok(partition_name == name)
 }
 
+async fn block_contents_match(format: DiskFormat, block: &PartitionProxy) -> Result<bool> {
+    let content_format = detect_disk_format(block).await;
+    Ok(format == content_format)
+}
+
 /// A constraint for the block device being waited for in `wait_for_block_device`.
 pub enum BlockDeviceMatcher<'a> {
     /// Only matches block devices that have this type Guid.
@@ -58,6 +68,9 @@ pub enum BlockDeviceMatcher<'a> {
 
     /// Only matches block devices that have this name.
     Name(&'a str),
+
+    /// Only matches block devices whose contents match the given format.
+    ContentsMatch(DiskFormat),
 }
 
 impl BlockDeviceMatcher<'_> {
@@ -66,6 +79,7 @@ impl BlockDeviceMatcher<'_> {
             Self::TypeGuid(guid) => partition_type_guid_matches(guid, partition).await,
             Self::InstanceGuid(guid) => partition_instance_guid_matches(guid, partition).await,
             Self::Name(name) => partition_name_matches(name, partition).await,
+            Self::ContentsMatch(format) => block_contents_match(*format, partition).await,
         }
     }
 }
@@ -82,6 +96,9 @@ pub async fn wait_for_block_device(matchers: &[BlockDeviceMatcher<'_>]) -> Resul
         if msg.event != WatchEvent::ADD_FILE && msg.event != WatchEvent::EXISTING {
             continue;
         }
+        if msg.filename.to_str() == Some(".") {
+            continue;
+        }
         let path = Path::new(DEV_CLASS_BLOCK).join(msg.filename);
         let partition = connect_to_protocol_at_path::<PartitionMarker>(path.to_str().unwrap())?;
         let mut matches = true;
@@ -96,6 +113,33 @@ pub async fn wait_for_block_device(matchers: &[BlockDeviceMatcher<'_>]) -> Resul
         }
     }
     Err(anyhow!("Failed to wait for block device"))
+}
+
+/// Looks for a block device already in `/dev/class/block` that meets all of the requirements of
+/// `matchers`. Returns the path to the matched block device.
+pub async fn find_block_device(matchers: &[BlockDeviceMatcher<'_>]) -> Result<PathBuf> {
+    const DEV_CLASS_BLOCK: &str = "/dev/class/block";
+    assert!(!matchers.is_empty());
+    let block_dev_dir =
+        fuchsia_fs::directory::open_in_namespace(DEV_CLASS_BLOCK, fio::OpenFlags::RIGHT_READABLE)?;
+    let entries = fuchsia_fs::directory::readdir(&block_dev_dir)
+        .await
+        .context("Failed to readdir /dev/class/block")?;
+    for entry in entries {
+        let path = Path::new(DEV_CLASS_BLOCK).join(entry.name);
+        let partition = connect_to_protocol_at_path::<PartitionMarker>(path.to_str().unwrap())?;
+        let mut matches = true;
+        for matcher in matchers {
+            if !matcher.matches(&partition).await.unwrap_or(false) {
+                matches = false;
+                break;
+            }
+        }
+        if matches {
+            return Ok(path);
+        }
+    }
+    Err(anyhow!("Failed to find matching block device"))
 }
 
 #[cfg(test)]
@@ -145,5 +189,21 @@ mod tests {
         ])
         .await
         .expect("Failed to find block device");
+
+        find_block_device(&[
+            BlockDeviceMatcher::TypeGuid(&TYPE_GUID),
+            BlockDeviceMatcher::InstanceGuid(&INSTANCE_GUID),
+            BlockDeviceMatcher::Name(VOLUME_NAME),
+        ])
+        .await
+        .expect("Failed to find block device");
+
+        find_block_device(&[
+            BlockDeviceMatcher::TypeGuid(&TYPE_GUID),
+            BlockDeviceMatcher::InstanceGuid(&INSTANCE_GUID),
+            BlockDeviceMatcher::Name("something else"),
+        ])
+        .await
+        .expect_err("Unexpected match for block device");
     }
 }

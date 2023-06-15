@@ -169,9 +169,14 @@ async fn main() {
     let filter = filter.build().unwrap();
 
     let fvm_volume_factory = FvmVolumeFactory::new().await;
+    if fvm_volume_factory.is_none() {
+        tracing::warn!("Not running any tests -- neither FVM nor GPT could be found.");
+        tracing::warn!("To run these test locally on an emulator, see the README.md.");
+        return;
+    }
     let benchmark_suite =
         if args.blob_benchmarks { build_blob_benchmark_set() } else { build_benchmark_set() };
-    let results = benchmark_suite.run(&fvm_volume_factory, &filter).await;
+    let results = benchmark_suite.run(fvm_volume_factory.as_ref().unwrap(), &filter).await;
 
     results.write_table(std::io::stdout());
     if args.output_csv {

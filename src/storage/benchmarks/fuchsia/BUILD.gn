@@ -46,10 +46,13 @@ rustc_binary("fuchsia-storage-benchmarks") {
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:rand_xorshift",
     "//third_party/rust_crates:regex",
+    "//third_party/rust_crates:tracing",
   ]
   test_deps = [
+    "//src/lib/fuchsia-runtime",
     "//src/lib/test_util",
     "//src/sys/test_runners:tmp_storage",
+    "//third_party/rust_crates:gpt",
   ]
   with_unit_tests = true
 }
