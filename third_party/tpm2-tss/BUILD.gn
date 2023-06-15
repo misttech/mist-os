@@ -45,14 +45,12 @@ static_library("tss2-mu") {
   configs += [
     "//build/config:Wno-conversion",
     "//build/config:Wno-extra-semi",
+    "//build/config:Wno-missing-prototypes",
   ]
 
   public_configs = [ ":common_public_configs" ]
 
-  cflags_c = [
-    "-Wno-implicit-function-declaration",
-    "-Wno-error=missing-prototypes",
-  ]
+  cflags_c = [ "-Wno-implicit-function-declaration" ]
 
   if (is_kernel) {
     public_deps = [

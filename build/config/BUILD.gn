@@ -964,7 +964,10 @@ config("Wno-defaulted-function-deleted") {
 
 config("Wno-missing-prototypes") {
   cflags_c = [ "-Wno-missing-prototypes" ]
-  visibility = [ "//zircon/third_party/ulib/lz4" ]
+  visibility = [
+    "//third_party/tpm2-tss:tss2-mu",
+    "//zircon/third_party/ulib/lz4",
+  ]
 }
 
 config("Wno-missing-declarations") {
