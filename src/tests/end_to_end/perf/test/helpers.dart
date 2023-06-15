@@ -168,6 +168,7 @@ class PerfTestHelper {
   Future<File> runTestComponentReturningResultsFile(
       {required String packageName,
       required String componentName,
+      String? realm,
       required String commandArgs,
       required String resultsFileSuffix}) async {
     // Make a name for the output directory that is very likely to be
@@ -179,8 +180,12 @@ class PerfTestHelper {
     expect(result.exitCode, equals(0));
 
     try {
-      final String command = 'run-test-suite'
-          ' fuchsia-pkg://fuchsia.com/$packageName#meta/$componentName'
+      String command = 'run-test-suite'
+          ' fuchsia-pkg://fuchsia.com/$packageName#meta/$componentName';
+      if (realm != null) {
+        command += ' --realm $realm';
+      }
+      command +=
           ' --deprecated-output-directory $targetOutputDir -- $commandArgs';
       final result = await sl4fDriver.ssh.run(command);
       expect(result.exitCode, equals(0));
@@ -208,10 +213,14 @@ class PerfTestHelper {
   Future<void> runTestComponentWithNoResults(
       {required String packageName,
       required String componentName,
+      String? realm,
       required String commandArgs}) async {
-    final String command = 'run-test-suite'
-        ' fuchsia-pkg://fuchsia.com/$packageName#meta/$componentName'
-        ' -- $commandArgs';
+    String command = 'run-test-suite'
+        ' fuchsia-pkg://fuchsia.com/$packageName#meta/$componentName';
+    if (realm != null) {
+      command += ' --realm $realm';
+    }
+    command += ' -- $commandArgs';
     final result = await sl4fDriver.ssh.run(command);
     expect(result.exitCode, equals(0));
   }
@@ -223,6 +232,7 @@ class PerfTestHelper {
 Future<void> runTestComponent(
     {required String packageName,
     required String componentName,
+    String? realm,
     required String commandArgs,
     required String expectedMetricNamesFile,
     int processRuns = 1}) async {
@@ -234,6 +244,7 @@ Future<void> runTestComponent(
     localResultsFiles.add(await helper.runTestComponentReturningResultsFile(
         packageName: packageName,
         componentName: componentName,
+        realm: realm,
         commandArgs: commandArgs,
         resultsFileSuffix: '_process$process'));
   }
