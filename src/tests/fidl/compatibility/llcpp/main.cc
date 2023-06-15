@@ -16,6 +16,7 @@
 #include <lib/fidl/cpp/interface_request.h>
 #include <lib/fidl/cpp/wire/string_view.h>
 #include <lib/sys/cpp/component_context.h>
+#include <lib/vfs/cpp/service.h>
 #include <zircon/status.h>
 
 #include <cstdlib>

@@ -7,18 +7,24 @@
 
 #include <lib/fidl/cpp/interface_request.h>
 #include <lib/fidl/cpp/service_handler_base.h>
-#include <lib/vfs/cpp/pseudo_dir.h>
-#include <lib/vfs/cpp/service.h>
+
+namespace vfs {
+class Service;
+class PseudoDir;
+}  // namespace vfs
 
 namespace sys {
 
 // A handler for an instance of a service.
 class ServiceHandler : public fidl::ServiceHandlerBase {
  public:
+  ServiceHandler() noexcept;
+  ServiceHandler(ServiceHandler&&);
+
+  ~ServiceHandler() override;
+
   // Add a |member| to the instance, which will is handled by |handler|.
-  zx_status_t AddMember(std::string member, MemberHandler handler) const override {
-    return dir_->AddEntry(std::move(member), std::make_unique<vfs::Service>(std::move(handler)));
-  }
+  zx_status_t AddMember(std::string member, MemberHandler handler) const override;
 
   // Take the underlying pseudo-directory from the service handler.
   //
@@ -26,7 +32,7 @@ class ServiceHandler : public fidl::ServiceHandlerBase {
   std::unique_ptr<vfs::PseudoDir> TakeDirectory() { return std::move(dir_); }
 
  private:
-  std::unique_ptr<vfs::PseudoDir> dir_ = std::make_unique<vfs::PseudoDir>();
+  std::unique_ptr<vfs::PseudoDir> dir_;
 };
 
 }  // namespace sys

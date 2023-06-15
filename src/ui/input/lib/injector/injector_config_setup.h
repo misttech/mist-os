@@ -7,6 +7,7 @@
 
 #include <fuchsia/ui/pointerinjector/configuration/cpp/fidl.h>
 #include <fuchsia/ui/views/cpp/fidl.h>
+#include <lib/fidl/cpp/binding.h>
 #include <lib/sys/cpp/component_context.h>
 
 namespace input {

@@ -5,12 +5,14 @@
 #ifndef LIB_SYS_CPP_TESTING_SERVICE_DIRECTORY_PROVIDER_H_
 #define LIB_SYS_CPP_TESTING_SERVICE_DIRECTORY_PROVIDER_H_
 
-#include <lib/vfs/cpp/pseudo_dir.h>
-#include <lib/vfs/cpp/service.h>
+#include <lib/sys/cpp/service_directory.h>
 
 #include <memory>
 
-#include "lib/sys/cpp/service_directory.h"
+namespace vfs {
+class Service;
+class PseudoDir;
+}  // namespace vfs
 
 namespace sys {
 namespace testing {
@@ -57,8 +59,12 @@ class ServiceDirectoryProvider {
   // ```
   template <typename Interface>
   zx_status_t AddService(fidl::InterfaceRequestHandler<Interface> handler,
-                         const std::string& name = Interface::Name_) const {
-    return AddService(std::make_unique<vfs::Service>(std::move(handler)), name);
+                         std::string name = Interface::Name_) const {
+    return AddService(
+        [handler = std::move(handler)](zx::channel channel, async_dispatcher_t* dispatcher) {
+          handler(fidl::InterfaceRequest<Interface>(std::move(channel)));
+        },
+        std::move(name));
   }
 
   // Injects a service which can be accessed by calling Connect on
@@ -72,11 +78,15 @@ class ServiceDirectoryProvider {
   //
   // ZX_ERR_ALREADY_EXISTS: This already contains an entry for
   // this service.
-  zx_status_t AddService(std::unique_ptr<vfs::Service> service, const std::string& name) const;
+  zx_status_t AddService(std::unique_ptr<vfs::Service> service, std::string name) const;
 
   std::shared_ptr<ServiceDirectory>& service_directory() { return service_directory_; }
 
  private:
+  using Connector = fit::function<void(zx::channel channel, async_dispatcher_t* dispatcher)>;
+
+  zx_status_t AddService(Connector connector, std::string service_name) const;
+
   std::shared_ptr<ServiceDirectory> service_directory_;
   std::unique_ptr<vfs::PseudoDir> svc_dir_;
 };

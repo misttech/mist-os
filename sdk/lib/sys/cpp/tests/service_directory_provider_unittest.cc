@@ -2,8 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/async/dispatcher.h>
 #include <lib/fdio/directory.h>
+#include <lib/fidl/cpp/interface_request.h>
 #include <lib/sys/cpp/testing/service_directory_provider.h>
+#include <lib/vfs/cpp/service.h>
 #include <zircon/types.h>
 
 #include <memory>
@@ -11,9 +14,6 @@
 #include <gtest/gtest.h>
 
 #include "echo_server.h"
-#include "lib/async/dispatcher.h"
-#include "lib/fidl/cpp/interface_request.h"
-#include "lib/vfs/cpp/service.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 
 namespace {

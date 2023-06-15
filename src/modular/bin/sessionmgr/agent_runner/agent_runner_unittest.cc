@@ -9,6 +9,7 @@
 #include <fuchsia/testing/modular/cpp/fidl.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/sys/cpp/testing/fake_launcher.h>
+#include <lib/vfs/cpp/service.h>
 #include <lib/zx/object.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>

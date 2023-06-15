@@ -9,11 +9,14 @@
 #include <lib/fit/function.h>
 #include <lib/sys/service/cpp/service.h>
 #include <lib/sys/service/cpp/service_handler.h>
-#include <lib/vfs/cpp/pseudo_dir.h>
-#include <lib/vfs/cpp/service.h>
 
 #include <memory>
 #include <utility>
+
+namespace vfs {
+class Service;
+class PseudoDir;
+}  // namespace vfs
 
 namespace sys {
 
@@ -121,8 +124,11 @@ class OutgoingDirectory final {
   template <typename Interface>
   zx_status_t AddPublicService(fidl::InterfaceRequestHandler<Interface> handler,
                                std::string service_name = Interface::Name_) const {
-    return AddPublicService(std::make_unique<vfs::Service>(std::move(handler)),
-                            std::move(service_name));
+    return AddPublicService(
+        [handler = std::move(handler)](zx::channel channel, async_dispatcher_t* dispatcher) {
+          handler(fidl::InterfaceRequest<Interface>(std::move(channel)));
+        },
+        std::move(service_name));
   }
 
   // Adds the specified service to the set of public services.
@@ -151,7 +157,7 @@ class OutgoingDirectory final {
   // ```
   template <typename Interface>
   zx_status_t RemovePublicService(const std::string& name = Interface::Name_) const {
-    return svc_->RemoveEntry(name);
+    return RemovePublicService(name);
   }
 
   // Adds an instance of a service.
@@ -224,6 +230,11 @@ class OutgoingDirectory final {
   vfs::PseudoDir* GetOrCreateDirectory(const std::string& name);
 
  private:
+  using Connector = fit::function<void(zx::channel channel, async_dispatcher_t* dispatcher)>;
+
+  zx_status_t AddPublicService(Connector connector, std::string service_name) const;
+  zx_status_t RemovePublicService(const std::string& name) const;
+
   // The root of the outgoing directory itself.
   std::unique_ptr<vfs::PseudoDir> root_;
 

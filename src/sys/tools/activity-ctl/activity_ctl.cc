@@ -11,6 +11,7 @@
 #include <lib/async/default.h>
 #include <lib/async/dispatcher.h>
 #include <lib/cmdline/args_parser.h>
+#include <lib/fidl/cpp/binding.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/clock.h>

@@ -16,6 +16,7 @@ executable("bin") {
   deps = [
     "//sdk/lib/fdio",
     "//sdk/lib/sys/cpp",
+    "//sdk/lib/vfs/cpp",
     "//src/tests/fidl/compatibility/fidl:fidl_service_cpp_wire_testing",
     "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/async-loop",

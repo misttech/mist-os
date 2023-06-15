@@ -35,11 +35,13 @@ sdk_source_set("cpp") {
     "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp",
-    "//sdk/lib/vfs/cpp",
     "//zircon/system/ulib/zx",
   ]
 
-  deps = [ "//sdk/lib/fdio" ]
+  deps = [
+    "//sdk/lib/fdio",
+    "//sdk/lib/vfs/cpp",
+  ]
 
   public_configs = [ "//sdk/config" ]
 }

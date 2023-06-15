@@ -5,6 +5,7 @@
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/inspect/service/cpp/service.h>
 #include <lib/sys/inspect/cpp/component.h>
+#include <lib/vfs/cpp/pseudo_dir.h>
 #include <lib/vfs/cpp/service.h>
 #include <lib/vfs/cpp/vmo_file.h>
 

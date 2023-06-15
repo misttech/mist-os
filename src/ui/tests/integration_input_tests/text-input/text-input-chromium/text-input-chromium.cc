@@ -9,9 +9,11 @@
 #include <fuchsia/sys/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
 #include <fuchsia/ui/test/input/cpp/fidl.h>
+#include <fuchsia/ui/views/cpp/fidl.h>
 #include <fuchsia/web/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/fidl/cpp/binding.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/sys/cpp/service_directory.h>
 #include <lib/syslog/cpp/macros.h>
@@ -23,7 +25,6 @@
 
 #include <string>
 
-#include "fuchsia/ui/views/cpp/fidl.h"
 #include "src/lib/fsl/vmo/vector.h"
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/lib/json_parser/json_parser.h"

@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 #include <lib/sys/cpp/outgoing_directory.h>
+#include <lib/vfs/cpp/pseudo_dir.h>
+#include <lib/vfs/cpp/service.h>
 #include <zircon/process.h>
 #include <zircon/processargs.h>
 
@@ -97,6 +99,16 @@ vfs::PseudoDir* OutgoingDirectory::GetOrCreateDirectory(const std::string& name)
 zx_status_t OutgoingDirectory::AddPublicService(std::unique_ptr<vfs::Service> service,
                                                 std::string service_name) const {
   return svc_->AddEntry(std::move(service_name), std::move(service));
+}
+
+zx_status_t OutgoingDirectory::AddPublicService(Connector connector,
+                                                std::string service_name) const {
+  return AddPublicService(std::make_unique<vfs::Service>(std::move(connector)),
+                          std::move(service_name));
+}
+
+zx_status_t OutgoingDirectory::RemovePublicService(const std::string& name) const {
+  return svc_->RemoveEntry(name);
 }
 
 zx_status_t OutgoingDirectory::AddNamedService(ServiceHandler handler, std::string service,

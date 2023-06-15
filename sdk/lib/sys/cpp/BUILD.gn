@@ -28,11 +28,13 @@ sdk_source_set("cpp") {
     "//sdk/fidl/fuchsia.sys:fuchsia.sys_hlcpp",
     "//sdk/lib/fit",
     "//sdk/lib/sys/service/cpp",
-    "//sdk/lib/vfs/cpp",
     "//zircon/system/ulib/zx",
   ]
 
-  deps = [ "//sdk/lib/fdio" ]
+  deps = [
+    "//sdk/lib/fdio",
+    "//sdk/lib/vfs/cpp",
+  ]
 
   public_configs = [ "//sdk/config" ]
 }

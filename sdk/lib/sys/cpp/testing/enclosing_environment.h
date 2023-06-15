@@ -13,12 +13,15 @@
 #include <lib/fit/function.h>
 #include <lib/sys/cpp/service_directory.h>
 #include <lib/sys/cpp/testing/launcher_impl.h>
-#include <lib/vfs/cpp/pseudo_dir.h>
-#include <lib/vfs/cpp/service.h>
 
 #include <memory>
 #include <string>
 #include <unordered_map>
+
+namespace vfs {
+class Service;
+class PseudoDir;
+}  // namespace vfs
 
 namespace sys {
 namespace testing {
@@ -60,6 +63,8 @@ class EnvironmentServices {
   EnvironmentServices& operator=(const EnvironmentServices&) = delete;
   EnvironmentServices(EnvironmentServices&&) = delete;
 
+  ~EnvironmentServices();
+
   // Creates services with some of parent's service.
   static std::unique_ptr<EnvironmentServices> Create(const fuchsia::sys::EnvironmentPtr& parent_env,
                                                      async_dispatcher_t* dispatcher = nullptr);
@@ -81,22 +86,20 @@ class EnvironmentServices {
   //
   template <typename Interface>
   zx_status_t AddService(fidl::InterfaceRequestHandler<Interface> handler,
-                         const std::string& service_name = Interface::Name_) {
-    svc_names_.push_back(service_name);
-    return svc_.AddEntry(
-        service_name,
-        std::make_unique<vfs::Service>(
-            [handler = std::move(handler)](zx::channel channel, async_dispatcher_t* dispatcher) {
-              handler(fidl::InterfaceRequest<Interface>(std::move(channel)));
-            }));
+                         std::string service_name = Interface::Name_) {
+    return AddService(
+        [handler = std::move(handler)](zx::channel channel, async_dispatcher_t* dispatcher) {
+          handler(fidl::InterfaceRequest<Interface>(std::move(channel)));
+        },
+        std::move(service_name));
   }
 
   // Adds the specified service to the set of services.
   zx_status_t AddSharedService(const std::shared_ptr<vfs::Service>& service,
-                               const std::string& service_name);
+                               std::string service_name);
 
   // Adds the specified service to the set of services.
-  zx_status_t AddService(std::unique_ptr<vfs::Service> service, const std::string& service_name);
+  zx_status_t AddService(std::unique_ptr<vfs::Service> service, std::string service_name);
 
   // Adds the specified service to the set of services.
   //
@@ -106,7 +109,7 @@ class EnvironmentServices {
   // Note: Only url and arguments fields of provided launch_info are used, if
   // you need to use other fields, use the Handler signature.
   zx_status_t AddServiceWithLaunchInfo(fuchsia::sys::LaunchInfo launch_info,
-                                       const std::string& service_name);
+                                       std::string service_name);
 
   // Adds the specified service to the set of services.
   //
@@ -118,14 +121,14 @@ class EnvironmentServices {
   // info.
   zx_status_t AddServiceWithLaunchInfo(std::string singleton_id,
                                        fit::function<fuchsia::sys::LaunchInfo()> handler,
-                                       const std::string& service_name);
+                                       std::string service_name);
 
   // Allows child components to access parent service with name
   // |service_name|.
   //
   // This will only work if parent environment actually provides said service
   // and the service is in the test component's service whitelist.
-  zx_status_t AllowParentService(const std::string& service_name);
+  zx_status_t AllowParentService(std::string service_name);
 
   // Serve service directory using |flags| and returns a new |InterfaceHandle|;
   // Will cause exception if serving fails.
@@ -153,13 +156,17 @@ class EnvironmentServices {
   }
 
  private:
+  using Connector = fit::function<void(zx::channel channel, async_dispatcher_t* dispatcher)>;
+
+  zx_status_t AddService(Connector connector, std::string service_name);
+
   friend class EnclosingEnvironment;
   EnvironmentServices(const fuchsia::sys::EnvironmentPtr& parent_env,
                       ParentOverrides parent_overrides, async_dispatcher_t* dispatcher = nullptr);
 
   void set_enclosing_env(EnclosingEnvironment* e) { enclosing_env_ = e; }
 
-  vfs::PseudoDir svc_;
+  std::unique_ptr<vfs::PseudoDir> svc_;
   std::vector<std::string> svc_names_;
   std::shared_ptr<sys::ServiceDirectory> parent_svc_;
   // Pointer to containing environment. Not owned.
@@ -190,7 +197,7 @@ class EnclosingEnvironment {
   // |services| are the services the environment will provide. See
   // |EnvironmentServices| for details.
   static std::unique_ptr<EnclosingEnvironment> Create(
-      const std::string& label, const fuchsia::sys::EnvironmentPtr& parent_env,
+      std::string label, const fuchsia::sys::EnvironmentPtr& parent_env,
       std::unique_ptr<EnvironmentServices> services,
       const fuchsia::sys::EnvironmentOptions& options = {});
 
@@ -230,17 +237,17 @@ class EnclosingEnvironment {
   fuchsia::sys::ComponentControllerPtr CreateComponentFromUrl(std::string component_url);
 
   // Creates a nested enclosing environment on top of underlying environment.
-  std::unique_ptr<EnclosingEnvironment> CreateNestedEnclosingEnvironment(const std::string& label);
+  std::unique_ptr<EnclosingEnvironment> CreateNestedEnclosingEnvironment(std::string label);
 
   // Creates a nested enclosing environment on top of underlying environment
   // with custom loader service.
   std::unique_ptr<EnclosingEnvironment> CreateNestedEnclosingEnvironmentWithLoader(
-      const std::string& label, std::shared_ptr<vfs::Service> loader_service);
+      std::string label, std::shared_ptr<vfs::Service> loader_service);
 
   std::shared_ptr<sys::ServiceDirectory> service_directory() { return service_provider_; }
 
   // Connects to service provided by this environment.
-  void ConnectToService(std::string service_name, zx::channel channel) {
+  void ConnectToService(const std::string& service_name, zx::channel channel) {
     service_provider_->Connect(service_name, std::move(channel));
   }
 

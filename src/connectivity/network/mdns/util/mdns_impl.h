@@ -6,6 +6,7 @@
 #define SRC_CONNECTIVITY_NETWORK_MDNS_UTIL_MDNS_IMPL_H_
 
 #include <fuchsia/net/mdns/cpp/fidl.h>
+#include <lib/fidl/cpp/binding.h>
 #include <lib/fit/function.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/zx/channel.h>

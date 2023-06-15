@@ -82,6 +82,7 @@ source_set("sessionmgr_lib") {
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/inspect/cpp",
     "//sdk/lib/ui/scenic/cpp",
+    "//sdk/lib/vfs/cpp",
     "//src/lib/fsl",
     "//src/lib/uuid",
     "//src/modular/bin/basemgr/cobalt",

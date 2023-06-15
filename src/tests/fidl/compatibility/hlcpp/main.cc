@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/test/compatibility/cpp/fidl.h>
+#include <fidl/test/imported/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fidl/cpp/binding_set.h>
@@ -15,7 +16,6 @@
 #include <cstdlib>
 #include <string>
 
-#include "fidl/test/imported/cpp/fidl.h"
 #include "src/tests/fidl/compatibility/hlcpp_client_app.h"
 
 namespace fidl {

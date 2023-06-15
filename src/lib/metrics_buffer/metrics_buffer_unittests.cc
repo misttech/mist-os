@@ -10,6 +10,7 @@
 #include <lib/async/cpp/task.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/sys/cpp/outgoing_directory.h>
+#include <lib/vfs/cpp/pseudo_dir.h>
 #include <lib/zx/time.h>
 #include <zircon/types.h>
 

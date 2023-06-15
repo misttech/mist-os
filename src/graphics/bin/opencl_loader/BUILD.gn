@@ -38,12 +38,14 @@ source_set("app") {
     "//src/lib/json_parser",
     "//src/lib/storage/vfs/cpp",
   ]
+
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
     "//sdk/fidl/fuchsia.opencl.loader:fuchsia.opencl.loader_hlcpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/sys/cpp",
+    "//sdk/lib/vfs/cpp",
     "//src/lib/fsl",
     "//src/lib/fxl",
     "//zircon/system/ulib/async-default",
@@ -52,6 +54,7 @@ source_set("app") {
     "//zircon/system/ulib/fbl",
   ]
 }
+
 executable("bin") {
   output_name = "opencl_loader"
 

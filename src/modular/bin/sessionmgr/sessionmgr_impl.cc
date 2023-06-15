@@ -16,6 +16,7 @@
 #include <lib/ui/scenic/cpp/view_ref_pair.h>
 #include <lib/ui/scenic/cpp/view_token_pair.h>
 #include <lib/vfs/cpp/pseudo_dir.h>
+#include <lib/vfs/cpp/service.h>
 #include <lib/zx/eventpair.h>
 #include <zircon/status.h>
 

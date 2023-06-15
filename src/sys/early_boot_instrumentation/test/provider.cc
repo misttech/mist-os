@@ -12,6 +12,7 @@
 #include <lib/stdcompat/source_location.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/vfs/cpp/pseudo_dir.h>
 #include <lib/vfs/cpp/service.h>
 #include <lib/vfs/cpp/vmo_file.h>
 #include <string.h>

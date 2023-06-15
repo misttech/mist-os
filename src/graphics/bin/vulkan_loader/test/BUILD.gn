@@ -38,6 +38,7 @@ executable("unittest_bin") {
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
+    "//sdk/lib/vfs/cpp",
     "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/storage/vfs/cpp",

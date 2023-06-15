@@ -46,6 +46,7 @@ executable("metrics_buffer_unittests") {
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_cpp_wire",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_hlcpp",
     "//sdk/lib/fdio:fdio",
+    "//sdk/lib/vfs/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
   ]

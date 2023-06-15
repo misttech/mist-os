@@ -13,7 +13,9 @@
 #include <lib/fidl/cpp/synchronous_interface_ptr.h>
 #include <lib/inspect/cpp/reader.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/vfs/cpp/pseudo_dir.h>
 #include <lib/vfs/cpp/remote_dir.h>
+#include <lib/vfs/cpp/service.h>
 #include <zircon/status.h>
 
 #include <utility>

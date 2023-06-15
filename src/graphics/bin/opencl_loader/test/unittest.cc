@@ -14,6 +14,8 @@
 #include <lib/fidl/cpp/interface_handle.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
+#include <lib/vfs/cpp/pseudo_dir.h>
+#include <lib/vfs/cpp/service.h>
 #include <lib/zx/vmo.h>
 
 #include <fbl/unique_fd.h>

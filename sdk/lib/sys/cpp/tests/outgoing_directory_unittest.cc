@@ -5,6 +5,8 @@
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/message_buffer.h>
 #include <lib/sys/cpp/outgoing_directory.h>
+#include <lib/vfs/cpp/pseudo_dir.h>
+#include <lib/vfs/cpp/service.h>
 #include <lib/zx/channel.h>
 
 #include <gtest/gtest.h>

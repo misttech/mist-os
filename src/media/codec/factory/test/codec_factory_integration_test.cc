@@ -10,6 +10,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/fit/defer.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
+#include <lib/vfs/cpp/pseudo_dir.h>
 #include <lib/vfs/cpp/remote_dir.h>
 
 #include <gtest/gtest.h>

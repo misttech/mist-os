@@ -16,6 +16,7 @@ executable("bin") {
     "//sdk/lib/fdio",
     "//sdk/lib/stdcompat",
     "//sdk/lib/sys/cpp",
+    "//sdk/lib/vfs/cpp",
     "//src/tests/fidl/compatibility/fidl:fidl_service_cpp",
     "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/async-loop",

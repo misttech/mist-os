@@ -5,6 +5,7 @@
 #include "src/cobalt/bin/app/user_consent_watcher.h"
 
 #include <fuchsia/settings/cpp/fidl.h>
+#include <lib/fidl/cpp/binding.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/testing/cpp/inspect.h>
 

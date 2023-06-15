@@ -8,6 +8,7 @@
 
 #include <fuchsia/bluetooth/gatt/cpp/fidl.h>
 #include <fuchsia/bluetooth/le/cpp/fidl.h>
+#include <lib/fidl/cpp/binding.h>
 #include <lib/sys/cpp/component_context.h>
 
 namespace nl {

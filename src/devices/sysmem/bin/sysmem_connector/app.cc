@@ -5,11 +5,11 @@
 #include "app.h"
 
 #include <fuchsia/metrics/cpp/fidl.h>
+#include <lib/async/dispatcher.h>
+#include <lib/sysmem-connector/sysmem-connector.h>
+#include <lib/vfs/cpp/pseudo_dir.h>
 
 #include <sdk/lib/syslog/cpp/macros.h>
-
-#include "lib/async/dispatcher.h"
-#include "lib/sysmem-connector/sysmem-connector.h"
 
 const char* kSysmemClassPath = "/dev/class/sysmem";
 

@@ -7,6 +7,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fdio/directory.h>
+#include <lib/vfs/cpp/pseudo_dir.h>
 #include <lib/vfs/cpp/remote_dir.h>
 
 #include "src/graphics/bin/opencl_loader/icd_component.h"

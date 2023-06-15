@@ -98,6 +98,8 @@ source_set("lib") {
     "//zircon/system/ulib/zx",
   ]
 
+  deps = [ "//sdk/lib/vfs/cpp" ]
+
   configs += [ "//build/config:all_source" ]
 
   # TODO(fxbug.dev/58162): delete the below and fix compiler warnings

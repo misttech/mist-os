@@ -5,6 +5,8 @@
 #include <lib/inspect/service/cpp/service.h>
 #include <lib/media/codec_impl/codec_diagnostics.h>
 #include <lib/media/codec_impl/log.h>
+#include <lib/vfs/cpp/pseudo_dir.h>
+#include <lib/vfs/cpp/service.h>
 
 ComponentCodecDiagnostics::ComponentCodecDiagnostics(CodecDiagnostics& driver_diagnostics,
                                                      inspect::Node root)

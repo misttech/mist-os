@@ -7,11 +7,13 @@
 
 #include <lib/async/dispatcher.h>
 #include <lib/sys/cpp/testing/fake_launcher.h>
-#include <lib/vfs/cpp/pseudo_dir.h>
-#include <lib/vfs/cpp/service.h>
 
 #include <memory>
 #include <utility>
+
+namespace vfs {
+class PseudoDir;
+}  // namespace vfs
 
 namespace sys {
 namespace testing {
@@ -34,9 +36,12 @@ class FakeComponent {
   //   AddPublicService(foobar_bindings_.GetHandler(this));
   template <typename Interface>
   zx_status_t AddPublicService(fidl::InterfaceRequestHandler<Interface> handler,
-                               const std::string& service_name = Interface::Name_) {
-    return directory_.AddEntry(service_name.c_str(),
-                               std::make_unique<vfs::Service>(std::move(handler)));
+                               std::string service_name = Interface::Name_) {
+    return AddPublicService(
+        [handler = std::move(handler)](zx::channel channel, async_dispatcher_t* dispatcher) {
+          handler(fidl::InterfaceRequest<Interface>(std::move(channel)));
+        },
+        std::move(service_name));
   }
 
   // Registers this component with a FakeLauncher.
@@ -44,7 +49,11 @@ class FakeComponent {
                 async_dispatcher_t* dispatcher = nullptr);
 
  private:
-  vfs::PseudoDir directory_;
+  using Connector = fit::function<void(zx::channel channel, async_dispatcher_t* dispatcher)>;
+
+  zx_status_t AddPublicService(Connector connector, std::string service_name);
+
+  std::unique_ptr<vfs::PseudoDir> directory_;
   std::vector<fidl::InterfaceRequest<fuchsia::sys::ComponentController>> ctrls_;
 };
 

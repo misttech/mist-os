@@ -16,16 +16,16 @@
 #include <lib/fidl/cpp/vector.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/vfs/cpp/pseudo_dir.h>
 #include <zircon/assert.h>
 #include <zircon/status.h>
 
 #include <algorithm>
 #include <random>
 
-#include <src/lib/fsl/io/device_watcher.h>
-
 #include "codec_factory_impl.h"
 #include "codec_isolate.h"
+#include "src/lib/fsl/io/device_watcher.h"
 #include "src/lib/fxl/strings/concatenate.h"
 
 namespace {

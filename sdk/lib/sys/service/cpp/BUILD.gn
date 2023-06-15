@@ -16,6 +16,7 @@ sdk_source_set("cpp") {
     "service.h",
     "service_aggregate.cc",
     "service_aggregate.h",
+    "service_handler.cc",
     "service_handler.h",
     "service_watcher.cc",
     "service_watcher.h",
@@ -25,10 +26,11 @@ sdk_source_set("cpp") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl/cpp",
-    "//sdk/lib/vfs/cpp",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/zx",
   ]
+
+  deps = [ "//sdk/lib/vfs/cpp" ]
 
   public_configs = [ "//sdk/config" ]
 

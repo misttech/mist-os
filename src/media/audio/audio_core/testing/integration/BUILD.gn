@@ -56,6 +56,7 @@ source_set("hermetic_audio_test") {
     "//sdk/fidl/fuchsia.media.tuning:fuchsia.media.tuning_hlcpp",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
     "//sdk/lib/driver_test_realm/realm_builder/cpp",
+    "//sdk/lib/vfs/cpp",
     "//src/cobalt/bin/testing/mock_cobalt:component_v2",
     "//src/devices/bus/drivers/platform",
     "//src/lib/fxl",

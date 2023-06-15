@@ -11,9 +11,11 @@
 #include <lib/sys/cpp/service_directory.h>
 #include <lib/sys/cpp/testing/enclosing_environment.h>
 #include <lib/vfs/cpp/pseudo_dir.h>
+#include <lib/vfs/cpp/service.h>
 #include <zircon/assert.h>
 
 #include <memory>
+#include <utility>
 
 namespace sys {
 namespace testing {
@@ -29,7 +31,7 @@ EnvironmentServices::ParentOverrides::ParentOverrides() = default;
 EnvironmentServices::EnvironmentServices(const fuchsia::sys::EnvironmentPtr& parent_env,
                                          ParentOverrides parent_overrides,
                                          async_dispatcher_t* dispatcher)
-    : dispatcher_(dispatcher) {
+    : svc_(std::make_unique<vfs::PseudoDir>()), dispatcher_(dispatcher) {
 #if __Fuchsia_API_level__ < 10
   zx::channel
 #else
@@ -52,6 +54,8 @@ EnvironmentServices::EnvironmentServices(const fuchsia::sys::EnvironmentPtr& par
   }
 }
 
+EnvironmentServices::~EnvironmentServices() = default;
+
 // static
 std::unique_ptr<EnvironmentServices> EnvironmentServices::Create(
     const fuchsia::sys::EnvironmentPtr& parent_env, async_dispatcher_t* dispatcher) {
@@ -68,19 +72,23 @@ std::unique_ptr<EnvironmentServices> EnvironmentServices::CreateWithParentOverri
 }
 
 zx_status_t EnvironmentServices::AddSharedService(const std::shared_ptr<vfs::Service>& service,
-                                                  const std::string& service_name) {
+                                                  std::string service_name) {
   svc_names_.push_back(service_name);
-  return svc_.AddSharedEntry(service_name, service);
+  return svc_->AddSharedEntry(std::move(service_name), service);
 }
 
 zx_status_t EnvironmentServices::AddService(std::unique_ptr<vfs::Service> service,
-                                            const std::string& service_name) {
+                                            std::string service_name) {
   svc_names_.push_back(service_name);
-  return svc_.AddEntry(service_name, std::move(service));
+  return svc_->AddEntry(std::move(service_name), std::move(service));
+}
+
+zx_status_t EnvironmentServices::AddService(Connector connector, std::string service_name) {
+  return AddService(std::make_unique<vfs::Service>(std::move(connector)), std::move(service_name));
 }
 
 zx_status_t EnvironmentServices::AddServiceWithLaunchInfo(fuchsia::sys::LaunchInfo launch_info,
-                                                          const std::string& service_name) {
+                                                          std::string service_name) {
   return AddServiceWithLaunchInfo(
       launch_info.url,
       [launch_info = std::move(launch_info)]() {
@@ -90,16 +98,18 @@ zx_status_t EnvironmentServices::AddServiceWithLaunchInfo(fuchsia::sys::LaunchIn
         fidl::Clone(launch_info.arguments, &dup_launch_info.arguments);
         return dup_launch_info;
       },
-      service_name);
+      std::move(service_name));
 }
 
 zx_status_t EnvironmentServices::AddServiceWithLaunchInfo(
     std::string singleton_id, fit::function<fuchsia::sys::LaunchInfo()> handler,
-    const std::string& service_name) {
-  auto child = std::make_unique<vfs::Service>(
-      [this, service_name, handler = std::move(handler), singleton_id = std::move(singleton_id),
-       controller = fuchsia::sys::ComponentControllerPtr()](
-          zx::channel client_handle, async_dispatcher_t* /*unused*/) mutable {
+    std::string service_name) {
+  return AddService(
+      std::make_unique<vfs::Service>([this, service_name, handler = std::move(handler),
+                                      singleton_id = std::move(singleton_id),
+                                      controller = fuchsia::sys::ComponentControllerPtr()](
+                                         zx::channel client_handle,
+                                         async_dispatcher_t* /*unused*/) mutable {
         auto it = singleton_services_.find(singleton_id);
         if (it == singleton_services_.end()) {
           fuchsia::sys::LaunchInfo launch_info = handler();
@@ -124,18 +134,16 @@ zx_status_t EnvironmentServices::AddServiceWithLaunchInfo(
         }
 
         it->second->Connect(service_name, std::move(client_handle));
-      });
-  svc_names_.push_back(service_name);
-  return svc_.AddEntry(service_name, std::move(child));
+      }),
+      std::move(service_name));
 }
 
-zx_status_t EnvironmentServices::AllowParentService(const std::string& service_name) {
-  svc_names_.push_back(service_name);
-  return svc_.AddEntry(
-      service_name, std::make_unique<vfs::Service>(
-                        [this, service_name](zx::channel channel, async_dispatcher_t* /*unused*/) {
-                          parent_svc_->Connect(service_name, std::move(channel));
-                        }));
+zx_status_t EnvironmentServices::AllowParentService(std::string service_name) {
+  return AddService(
+      [this, service_name](zx::channel channel, async_dispatcher_t* /*unused*/) {
+        parent_svc_->Connect(service_name, std::move(channel));
+      },
+      std::move(service_name));
 }
 
 fidl::InterfaceHandle<fuchsia::io::Directory> EnvironmentServices::ServeServiceDir(
@@ -152,7 +160,7 @@ zx_status_t EnvironmentServices::ServeServiceDir(
 
 zx_status_t EnvironmentServices::ServeServiceDir(zx::channel request,
                                                  fuchsia::io::OpenFlags flags) {
-  return svc_.Serve(flags, std::move(request), dispatcher_);
+  return svc_->Serve(flags, std::move(request), dispatcher_);
 }
 
 EnclosingEnvironment::EnclosingEnvironment(std::string label,
@@ -194,10 +202,10 @@ EnclosingEnvironment::EnclosingEnvironment(std::string label,
 
 // static
 std::unique_ptr<EnclosingEnvironment> EnclosingEnvironment::Create(
-    const std::string& label, const fuchsia::sys::EnvironmentPtr& parent_env,
+    std::string label, const fuchsia::sys::EnvironmentPtr& parent_env,
     std::unique_ptr<EnvironmentServices> services,
     const fuchsia::sys::EnvironmentOptions& options) {
-  auto* env = new EnclosingEnvironment(label, parent_env, std::move(services), options);
+  auto* env = new EnclosingEnvironment(std::move(label), parent_env, std::move(services), options);
   return std::unique_ptr<EnclosingEnvironment>(env);
 }
 
@@ -219,10 +227,10 @@ void EnclosingEnvironment::Kill(fit::function<void()> callback) {
 }
 
 std::unique_ptr<EnclosingEnvironment> EnclosingEnvironment::CreateNestedEnclosingEnvironment(
-    const std::string& label) {
+    std::string label) {
   fuchsia::sys::EnvironmentPtr env;
   service_provider_->Connect(env.NewRequest());
-  return Create(label, env, EnvironmentServices::Create(env));
+  return Create(std::move(label), env, EnvironmentServices::Create(env));
 }
 
 void EnclosingEnvironment::CreateComponent(
@@ -241,7 +249,7 @@ fuchsia::sys::ComponentControllerPtr EnclosingEnvironment::CreateComponent(
 fuchsia::sys::ComponentControllerPtr EnclosingEnvironment::CreateComponentFromUrl(
     std::string component_url) {
   fuchsia::sys::LaunchInfo launch_info;
-  launch_info.url = component_url;
+  launch_info.url = std::move(component_url);
 
   return CreateComponent(std::move(launch_info));
 }

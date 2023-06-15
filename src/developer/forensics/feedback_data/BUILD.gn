@@ -49,6 +49,7 @@ source_set("data_provider") {
     ":screenshot",
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_hlcpp",
     "//sdk/lib/syslog/cpp",
+    "//sdk/lib/vfs/cpp",
     "//src/developer/forensics/feedback/attachments",
     "//src/developer/forensics/utils:archive",
     "//src/lib/fostr/fidl/fuchsia.images",
