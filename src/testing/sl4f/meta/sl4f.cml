@@ -143,6 +143,10 @@
             availability: "optional",
         },
         {
+            protocol: "fuchsia.web.Debug-context_provider",
+            availability: "optional",
+        },
+        {
             protocol: "fuchsia.component.Realm",
             from: "framework",
         },

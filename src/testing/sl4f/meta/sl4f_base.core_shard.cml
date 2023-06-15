@@ -116,6 +116,7 @@
         {
             protocol: "fuchsia.web.Debug",
             from: "#context_provider",
+            as: "fuchsia.web.Debug-context_provider",
             to: "#sl4f",
             source_availability: "unknown",
         },

@@ -97,31 +97,53 @@ impl WebdriverFacadeInternal {
     /// receiving end.  Assumes Webdriver is already running.
     async fn get_port_event_receiver() -> Result<mpsc::UnboundedReceiver<PortUpdateMessage>, Error>
     {
-        let debug_proxy =
-            fuchsia_component::client::connect_to_protocol::<fidl_fuchsia_web::DebugMarker>()?;
-        let (dev_tools_client, dev_tools_stream) =
-            create_request_stream::<DevToolsListenerMarker>()?;
         let (port_update_sender, port_update_receiver) = mpsc::unbounded();
 
-        Self::spawn_dev_tools_listener(dev_tools_stream, port_update_sender);
-        debug_proxy.enable_dev_tools(dev_tools_client).await?;
+        let debug = Self::spawn_dev_tools_listener_at_path(
+            "/svc/fuchsia.web.Debug",
+            port_update_sender.clone(),
+        );
+        let debug_context_provider = Self::spawn_dev_tools_listener_at_path(
+            "/svc/fuchsia.web.Debug-context_provider",
+            port_update_sender,
+        );
+
+        // Wait for initializing the two providers to complete, and continue so long as one or other is functional.
+        let debug_result = debug.await;
+        let debug_context_provider_result = debug_context_provider.await;
+        debug_result.or(debug_context_provider_result)?;
+
         Ok(port_update_receiver)
     }
 
     /// Spawn an instance of `DevToolsListener` that forwards port open/close
-    /// events from the debug request channel to the mpsc channel.
-    fn spawn_dev_tools_listener(
-        dev_tools_request_stream: DevToolsListenerRequestStream,
+    /// events from the debug request channel at `protocol_path` to the supplied
+    /// mpsc channel.
+    async fn spawn_dev_tools_listener_at_path(
+        protocol_path: &str,
         port_update_sender: mpsc::UnboundedSender<PortUpdateMessage>,
-    ) {
+    ) -> Result<(), Error> {
+        // Connect to the specified protocol path.
+        let debug_proxy = fuchsia_component::client::connect_to_protocol_at_path::<
+            fidl_fuchsia_web::DebugMarker,
+        >(protocol_path)?;
+
+        // Create a DevToolsListener and channel, and enable DevTools.
+        let (dev_tools_client, dev_tools_stream) =
+            create_request_stream::<DevToolsListenerMarker>()?;
+        debug_proxy.enable_dev_tools(dev_tools_client).await?;
+
+        // Spawn a task to process the DevToolsListener updates asynchronously.
         fasync::Task::spawn(async move {
             let dev_tools_listener = DevToolsListener::new(port_update_sender);
             dev_tools_listener
-                .handle_requests_from_stream(dev_tools_request_stream)
+                .handle_requests_from_stream(dev_tools_stream)
                 .await
                 .unwrap_or_else(|_| print!("Error handling DevToolsListener channel!"));
         })
         .detach();
+
+        Ok(())
     }
 }
 
