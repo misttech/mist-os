@@ -10,39 +10,21 @@ use crate::types::uapi;
 use fuchsia_zircon as zx;
 use static_assertions::const_assert_eq;
 
-/// Represents the location at which an error was generated.
-///
-/// This is useful if the anyhow error associated with the `Errno` can't print backtraces.
-pub struct ErrnoSource {
-    pub file: String,
-    pub line: u32,
-}
-
-impl Debug for ErrnoSource {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}:{:?}", self.file, self.line)
-    }
-}
-
 pub struct Errno {
     pub code: ErrnoCode,
     anyhow: Option<anyhow::Error>,
 }
 
 impl Errno {
-    pub fn new(
-        code: ErrnoCode,
-        name: &'static str,
-        context: Option<String>,
-        source: ErrnoSource,
-    ) -> Errno {
+    #[track_caller]
+    pub fn new(code: ErrnoCode, name: &'static str, context: Option<String>) -> Errno {
         Errno {
             code,
             anyhow: Some(anyhow::format_err!(
-                "{:?} {} ({}), context: {}",
-                source,
+                "{} ({}), source: {}, context: {}",
                 name,
                 code,
+                std::panic::Location::caller(),
                 context.as_ref().unwrap_or(&"None".to_string())
             )),
         }
@@ -336,19 +318,13 @@ pub const ENOTSUP: ErrnoCode = EOPNOTSUPP;
 /// Use `error!` instead if you want the `Errno` to be wrapped in an `Err`.
 macro_rules! errno {
     ($err:ident) => {
-        crate::types::errno::Errno::new(
-            crate::types::errno::$err,
-            stringify!($err),
-            None,
-            crate::types::errno::ErrnoSource { file: file!().to_string(), line: line!() },
-        )
+        crate::types::errno::Errno::new(crate::types::errno::$err, stringify!($err), None)
     };
     ($err:ident, $context:expr) => {
         crate::types::errno::Errno::new(
             crate::types::errno::$err,
             stringify!($err),
             Some($context.to_string()),
-            crate::types::errno::ErrnoSource { file: file!().to_string(), line: line!() },
         )
     };
 }
@@ -366,12 +342,7 @@ macro_rules! error {
 macro_rules! errno_from_code {
     ($err:expr) => {{
         let errno = crate::types::errno::ErrnoCode::from_error_code($err);
-        Errno::new(
-            errno,
-            stringify!($err),
-            None,
-            crate::types::errno::ErrnoSource { file: file!().to_string(), line: line!() },
-        )
+        Errno::new(errno, stringify!($err), None)
     }};
 }
 
