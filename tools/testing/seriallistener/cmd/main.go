@@ -16,12 +16,15 @@ import (
 	"math"
 	"net"
 	"os"
+	"path/filepath"
 	"time"
 
 	"go.fuchsia.dev/fuchsia/tools/botanist/constants"
 	"go.fuchsia.dev/fuchsia/tools/lib/color"
 	"go.fuchsia.dev/fuchsia/tools/lib/iomisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
+	"go.fuchsia.dev/fuchsia/tools/lib/osmisc"
+	testrunnerconstants "go.fuchsia.dev/fuchsia/tools/testing/testrunner/constants"
 )
 
 var (
@@ -113,7 +116,22 @@ func main() {
 	ctx := logger.WithLogger(context.Background(), log)
 
 	// Emulator serial is already wired up to stdout
+	// TODO(fxbug.dev/116559): Temporarily write serial output
+	// to a file for debugging purposes.
 	stdout := io.Discard
+	if outDir := os.Getenv(testrunnerconstants.TestOutDirEnvKey); outDir != "" {
+		if serialOutput, err := osmisc.CreateFile(filepath.Join(outDir, "serial_output")); err != nil {
+			logger.Errorf(ctx, "%s", err)
+		} else {
+			stdout = serialOutput
+			// Have the logger write to the file as well to get a
+			// better sense of how much is read from the socket before
+			// the socket io or ticker timeouts are reached.
+			log := logger.NewLogger(logger.DebugLevel, color.NewColor(color.ColorAuto),
+				io.MultiWriter(os.Stdout, serialOutput), io.MultiWriter(os.Stderr, serialOutput), "seriallistener ")
+			ctx = logger.WithLogger(ctx, log)
+		}
+	}
 	deviceType := os.Getenv(constants.DeviceTypeEnvKey)
 	if deviceType != "QEMU" && deviceType != "AEMU" {
 		stdout = os.Stdout

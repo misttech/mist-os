@@ -5,7 +5,6 @@
 package targets
 
 import (
-	"bytes"
 	"context"
 	"debug/pe"
 	"encoding/hex"
@@ -527,22 +526,19 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 		cmd = exec.Command(invocation[0], invocation[1:]...)
 	}
 
-	// TODO(fxbug.dev/43188): We temporarily capture the tail of all stdout and
-	// stderr to search for a particular error signature.
-	var outputSink bytes.Buffer
 	cmd.Dir = workdir
 	stdout, stderr, flush := botanist.NewStdioWriters(ctx)
 	if t.ptm != nil {
 		cmd.Stdin = t.ptm
-		cmd.Stdout = io.MultiWriter(t.ptm, &outputSink, stdout)
-		cmd.Stderr = io.MultiWriter(t.ptm, &outputSink, stderr)
+		cmd.Stdout = io.MultiWriter(t.ptm, stdout)
+		cmd.Stderr = io.MultiWriter(t.ptm, stderr)
 		cmd.SysProcAttr = &syscall.SysProcAttr{
 			Setctty: true,
 			Setsid:  true,
 		}
 	} else {
-		cmd.Stdout = io.MultiWriter(&outputSink, stdout)
-		cmd.Stderr = io.MultiWriter(&outputSink, stderr)
+		cmd.Stdout = stdout
+		cmd.Stderr = stderr
 		cmd.SysProcAttr = &syscall.SysProcAttr{
 			// Set a process group ID so we can kill the entire group, meaning
 			// the process and any of its children.
