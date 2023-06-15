@@ -326,8 +326,15 @@ impl Component {
         fs.object_manager().track_statistics(&metrics::detail(), "object_manager");
         fs.root_store().track_statistics(&metrics::object_stores(), "__root");
 
+        let info = fs.get_info();
+        info!(
+            device_size = info.total_bytes,
+            used = info.used_bytes,
+            free = info.total_bytes - info.used_bytes,
+            "Mounted"
+        );
+
         *state = State::Running(RunningState { fs, volumes, _inspect_tree: inspect_tree });
-        info!("Mounted");
         Ok(())
     }
 

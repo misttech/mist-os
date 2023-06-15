@@ -23,6 +23,8 @@ use {
     fuchsia_merkle::{MerkleTree, MerkleTreeBuilder},
     fuchsia_zircon::{self as zx, HandleBased as _, Status},
     fxfs::{
+        errors::FxfsError,
+        log::*,
         object_handle::{
             GetProperties, ObjectHandle, ObjectProperties, ReadObjectHandle, WriteObjectHandle,
         },
@@ -236,7 +238,7 @@ impl File for FxUnsealedBlob {
         true
     }
 
-    async fn open_file(&self, _optionss: &FileOptions) -> Result<(), Status> {
+    async fn open_file(&self, _options: &FileOptions) -> Result<(), Status> {
         Ok(())
     }
 
@@ -252,13 +254,20 @@ impl File for FxUnsealedBlob {
         // TODO(fxbug.dev/122125): This needs some locks.
         // TODO(fxbug.dev/122125): What if truncate has already been called.
         let mut transaction = self.handle.new_transaction().await.map_err(map_to_status)?;
-        self.handle
+        if let Err(e) = self
+            .handle
             .preallocate_range(
                 &mut transaction,
                 0..round_up(length, self.handle.block_size()).unwrap(),
             )
             .await
-            .map_err(map_to_status)?;
+        {
+            if FxfsError::NoSpace.matches(&e) {
+                let info = self.handle.store().filesystem().get_info();
+                warn!(length, space = info.total_bytes - info.used_bytes, "No space for blob");
+            }
+            return Err(map_to_status(e));
+        }
         self.handle.grow(&mut transaction, 0, length).await.map_err(map_to_status)?;
         transaction.commit().await.map_err(map_to_status)?;
         Ok(())
