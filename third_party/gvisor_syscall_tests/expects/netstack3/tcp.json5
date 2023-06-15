@@ -34,7 +34,6 @@
             matchers: [
                 // Otherwise, expect failure.
                 "AllInetTests/TcpSocketTest.ShutdownWriteInTimeWait/*",
-                "AllInetTests/TcpSocketTest.ClosedWriteBlockingSocket/*",
                 "AllInetTests/TcpSocketTest.MsgTrunc/*",
                 "AllInetTests/TcpSocketTest.MsgTruncWithCtrunc/*",
                 "AllInetTests/TcpSocketTest.MsgTruncWithCtruncOnly/*",
