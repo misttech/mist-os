@@ -474,7 +474,6 @@
                 "memcontrol04",
                 "memctl_test01",
                 "memfd_create01",
-                "memfd_create02",
                 "memfd_create03",
                 "memfd_create04",
                 "migrate_pages01",

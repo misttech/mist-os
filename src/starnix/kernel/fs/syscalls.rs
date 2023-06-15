@@ -16,12 +16,6 @@ use crate::{
 };
 use fuchsia_zircon as zx;
 
-/// A memfd file descriptor cannot have a name longer than 250 bytes, including
-/// the null terminator.
-///
-/// See Errors section of https://man7.org/linux/man-pages/man2/memfd_create.2.html
-const MEMFD_NAME_MAX_LEN: usize = 250;
-
 // Constants from bionic/libc/include/sys/stat.h
 const UTIME_NOW: i64 = 0x3fffffff;
 const UTIME_OMIT: i64 = 0x3ffffffe;
@@ -1182,17 +1176,42 @@ pub fn sys_dup3(
     Ok(newfd)
 }
 
+/// A memfd file descriptor cannot have a name longer than 250 bytes, including
+/// the null terminator.
+///
+/// See Errors section of https://man7.org/linux/man-pages/man2/memfd_create.2.html
+const MEMFD_NAME_MAX_LEN: usize = 250;
+
 pub fn sys_memfd_create(
     current_task: &CurrentTask,
     user_name: UserCString,
     flags: u32,
 ) -> Result<FdNumber, Errno> {
+    const HUGE_SHIFTED_MASK: u32 = MFD_HUGE_MASK << MFD_HUGE_SHIFT;
+
+    if flags & !(MFD_CLOEXEC | MFD_ALLOW_SEALING | MFD_HUGETLB | HUGE_SHIFTED_MASK) != 0 {
+        return error!(EINVAL);
+    }
+
+    let _huge_page_size = if flags & MFD_HUGETLB != 0 {
+        Some(flags & HUGE_SHIFTED_MASK)
+    } else {
+        if flags & HUGE_SHIFTED_MASK != 0 {
+            return error!(EINVAL);
+        }
+        None
+    };
+
     if flags & !(MFD_CLOEXEC | MFD_ALLOW_SEALING) != 0 {
         not_implemented!("memfd_create: flags: {}", flags);
     }
 
     let mut name = [0u8; MEMFD_NAME_MAX_LEN];
-    let name = current_task.mm.read_c_string(user_name, &mut name)?.to_owned();
+    let name = current_task
+        .mm
+        .read_c_string(user_name, &mut name)
+        .map_err(|e| if e == ENAMETOOLONG { errno!(EINVAL) } else { e })?
+        .to_owned();
 
     let seals = if flags & MFD_ALLOW_SEALING != 0 {
         SealFlags::empty()
