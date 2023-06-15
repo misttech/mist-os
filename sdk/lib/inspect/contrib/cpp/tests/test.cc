@@ -109,6 +109,14 @@ class ArchiveReaderTest : public gtest::RealLoopFixture {
     return "realm_builder\\:" + realm_->component().GetChildName() + "/test_app_2:root";
   }
 
+  std::string cm1_moniker() {
+    return "realm_builder\\:" + realm_->component().GetChildName() + "/test_app";
+  }
+
+  std::string cm2_moniker() {
+    return "realm_builder\\:" + realm_->component().GetChildName() + "/test_app_2";
+  }
+
  private:
   std::unique_ptr<RealmRoot> realm_;
   async::Executor executor_;
@@ -117,9 +125,6 @@ class ArchiveReaderTest : public gtest::RealLoopFixture {
 
 using ResultType = fpromise::result<std::vector<inspect::contrib::InspectData>, std::string>;
 
-constexpr char cm1[] = "test_app";
-constexpr char cm2[] = "test_app_2";
-
 TEST_F(ArchiveReaderTest, ReadHierarchy) {
   std::cerr << "RUNNING TEST" << std::endl;
   inspect::contrib::ArchiveReader reader(svc()->Connect<fuchsia::diagnostics::ArchiveAccessor>(),
@@ -127,7 +132,7 @@ TEST_F(ArchiveReaderTest, ReadHierarchy) {
 
   ResultType result;
   executor().schedule_task(
-      reader.SnapshotInspectUntilPresent({"test_app", "test_app_2"}).then([&](ResultType& r) {
+      reader.SnapshotInspectUntilPresent({cm1_moniker(), cm2_moniker()}).then([&](ResultType& r) {
         result = std::move(r);
       }));
   RunLoopUntil([&] { return !!result; });
@@ -135,11 +140,10 @@ TEST_F(ArchiveReaderTest, ReadHierarchy) {
   ASSERT_TRUE(result.is_ok()) << "Error: " << result.error();
 
   auto value = result.take_value();
-  std::sort(value.begin(), value.end(),
-            [](auto& a, auto& b) { return a.component_name() < b.component_name(); });
+  std::sort(value.begin(), value.end(), [](auto& a, auto& b) { return a.moniker() < b.moniker(); });
 
-  EXPECT_EQ(cm1, value[0].component_name());
-  EXPECT_EQ(cm2, value[1].component_name());
+  EXPECT_EQ(cm1_moniker(), value[0].moniker());
+  EXPECT_EQ(cm2_moniker(), value[1].moniker());
 
   EXPECT_STREQ("v1", value[0].content()["root"]["version"].GetString());
   EXPECT_STREQ("v1", value[1].content()["root"]["version"].GetString());
@@ -154,7 +158,7 @@ TEST_F(ArchiveReaderTest, ReadHierarchyWithAlternativeDispatcher) {
 
   ResultType result;
   local_executor.schedule_task(
-      reader.SnapshotInspectUntilPresent({"test_app", "test_app_2"}).then([&](ResultType& r) {
+      reader.SnapshotInspectUntilPresent({cm1_moniker(), cm2_moniker()}).then([&](ResultType& r) {
         result = std::move(r);
       }));
 
@@ -169,11 +173,10 @@ TEST_F(ArchiveReaderTest, ReadHierarchyWithAlternativeDispatcher) {
   ASSERT_TRUE(result.is_ok()) << "Error: " << result.error();
 
   auto value = result.take_value();
-  std::sort(value.begin(), value.end(),
-            [](auto& a, auto& b) { return a.component_name() < b.component_name(); });
+  std::sort(value.begin(), value.end(), [](auto& a, auto& b) { return a.moniker() < b.moniker(); });
 
-  EXPECT_EQ(cm1, value[0].component_name());
-  EXPECT_EQ(cm2, value[1].component_name());
+  EXPECT_EQ(cm1_moniker(), value[0].moniker());
+  EXPECT_EQ(cm2_moniker(), value[1].moniker());
 
   EXPECT_STREQ("v1", value[0].content()["root"]["version"].GetString());
   EXPECT_STREQ("v1", value[1].content()["root"]["version"].GetString());
@@ -185,7 +188,7 @@ TEST_F(ArchiveReaderTest, Sort) {
 
   ResultType result;
   executor().schedule_task(
-      reader.SnapshotInspectUntilPresent({"test_app", "test_app_2"}).then([&](ResultType& r) {
+      reader.SnapshotInspectUntilPresent({cm1_moniker(), cm2_moniker()}).then([&](ResultType& r) {
         result = std::move(r);
       }));
   RunLoopUntil([&] { return !!result; });
@@ -195,8 +198,7 @@ TEST_F(ArchiveReaderTest, Sort) {
   auto value = result.take_value();
   ASSERT_EQ(2lu, value.size());
 
-  std::sort(value.begin(), value.end(),
-            [](auto& a, auto& b) { return a.component_name() < b.component_name(); });
+  std::sort(value.begin(), value.end(), [](auto& a, auto& b) { return a.moniker() < b.moniker(); });
   value[0].Sort();
   value[1].Sort();
 

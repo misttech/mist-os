@@ -23,18 +23,17 @@ constexpr char kChildUrl[] = "#meta/config_example.cm";
 
 class IntegrationTest : public gtest::RealLoopFixture {
  protected:
-  InspectData GetInspect(const std::string& name) {
+  InspectData GetInspect(const std::string& name, const std::string& moniker) {
     fuchsia::diagnostics::ArchiveAccessorPtr archive;
     auto svc = sys::ServiceDirectory::CreateFromNamespace();
     svc->Connect(archive.NewRequest());
 
     std::stringstream selector;
     selector << "*/" << name << ":root";
-
     inspect::contrib::ArchiveReader reader(std::move(archive), {selector.str()});
     fpromise::result<std::vector<InspectData>, std::string> result;
     async::Executor executor(dispatcher());
-    executor.schedule_task(reader.SnapshotInspectUntilPresent({name}).then(
+    executor.schedule_task(reader.SnapshotInspectUntilPresent({moniker}).then(
         [&](fpromise::result<std::vector<InspectData>, std::string>& rest) {
           result = std::move(rest);
         }));
@@ -59,8 +58,9 @@ TEST_F(IntegrationTest, ConfigCpp) {
       .source = component_testing::ParentRef(),
       .targets = {component_testing::ChildRef{child_name}}});
   auto realm = realm_builder.Build();
+  auto moniker = "realm_builder\\:" + realm.component().GetChildName() + "/" + child_name;
 
-  auto data = GetInspect(child_name);
+  auto data = GetInspect(child_name, moniker);
 
   // Verify that the published values match the static package definition in ../../cpp/BUILD.gn.
   EXPECT_EQ(rapidjson::Value("World"), data.GetByPath({"root", "config", "greeting"}));
@@ -87,8 +87,9 @@ TEST_F(IntegrationTest, ConfigCppReplaceSome) {
       .source = component_testing::ParentRef(),
       .targets = {component_testing::ChildRef{child_name}}});
   auto realm = realm_builder.Build();
+  auto moniker = "realm_builder\\:" + realm.component().GetChildName() + "/" + child_name;
 
-  auto data = GetInspect(child_name);
+  auto data = GetInspect(child_name, moniker);
 
   EXPECT_EQ(rapidjson::Value("Fuchsia"), data.GetByPath({"root", "config", "greeting"}));
   EXPECT_EQ(rapidjson::Value(100), data.GetByPath({"root", "config", "delay_ms"}));
@@ -112,8 +113,9 @@ TEST_F(IntegrationTest, ConfigCppReplaceAllPackaged) {
       .source = component_testing::ParentRef(),
       .targets = {component_testing::ChildRef{child_name}}});
   auto realm = realm_builder.Build();
+  auto moniker = "realm_builder\\:" + realm.component().GetChildName() + "/" + child_name;
 
-  auto data = GetInspect(child_name);
+  auto data = GetInspect(child_name, moniker);
 
   EXPECT_EQ(rapidjson::Value("Fuchsia"), data.GetByPath({"root", "config", "greeting"}));
   EXPECT_EQ(rapidjson::Value(200), data.GetByPath({"root", "config", "delay_ms"}));
@@ -140,8 +142,9 @@ TEST_F(IntegrationTest, ConfigCppSetAllWhenEmpty) {
       .source = component_testing::ParentRef(),
       .targets = {component_testing::ChildRef{child_name}}});
   auto realm = realm_builder.Build();
+  auto moniker = "realm_builder\\:" + realm.component().GetChildName() + "/" + child_name;
 
-  auto data = GetInspect(child_name);
+  auto data = GetInspect(child_name, moniker);
 
   EXPECT_EQ(rapidjson::Value("Fuchsia"), data.GetByPath({"root", "config", "greeting"}));
   EXPECT_EQ(rapidjson::Value(200), data.GetByPath({"root", "config", "delay_ms"}));

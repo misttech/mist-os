@@ -251,15 +251,6 @@ InspectData::InspectData(rapidjson::Document document) : document_(std::move(doc
   if (document_.HasMember(kPathName) && document_[kPathName].IsString()) {
     std::string val = document_[kPathName].GetString();
     moniker_ = document_[kPathName].GetString();
-
-    size_t idx = val.find_last_of("/");
-
-    // TODO(fxb/77979) Remove name_
-    if (idx != std::string::npos) {
-      name_ = val.substr(idx + 1);
-    } else {
-      name_ = std::move(val);
-    }
   }
   if (document_.HasMember(kVersionName) && document_[kVersionName].IsNumber()) {
     version_ = document_[kVersionName].GetInt64();
@@ -303,8 +294,6 @@ InspectData::InspectData(rapidjson::Document document) : document_(std::move(doc
     }
   }
 }
-
-const std::string& InspectData::component_name() const { return name_; }
 
 const rapidjson::Value& InspectData::content() const {
   static rapidjson::Value default_ret;
@@ -400,21 +389,20 @@ fpromise::promise<std::vector<InspectData>, std::string> ArchiveReader::GetInspe
 }
 
 fpromise::promise<std::vector<InspectData>, std::string> ArchiveReader::SnapshotInspectUntilPresent(
-    std::vector<std::string> component_names) {
+    std::vector<std::string> monikers) {
   fpromise::bridge<std::vector<InspectData>, std::string> bridge;
 
-  InnerSnapshotInspectUntilPresent(std::move(bridge.completer), std::move(component_names));
+  InnerSnapshotInspectUntilPresent(std::move(bridge.completer), std::move(monikers));
 
   return bridge.consumer.promise_or(fpromise::error("Failed to create bridge promise"));
 }
 
 void ArchiveReader::InnerSnapshotInspectUntilPresent(
     fpromise::completer<std::vector<InspectData>, std::string> completer,
-    std::vector<std::string> component_names) {
+    std::vector<std::string> monikers) {
   executor_.schedule_task(
       GetInspectSnapshot()
-          .then([this, component_names = std::move(component_names),
-                 completer = std::move(completer)](
+          .then([this, monikers = std::move(monikers), completer = std::move(completer)](
                     fpromise::result<std::vector<InspectData>, std::string>& result) mutable {
             if (result.is_error()) {
               completer.complete_error(result.take_error());
@@ -422,9 +410,13 @@ void ArchiveReader::InnerSnapshotInspectUntilPresent(
             }
 
             auto value = result.take_value();
-            std::set<std::string> remaining(component_names.begin(), component_names.end());
+            std::set<std::string> remaining(monikers.begin(), monikers.end());
             for (const auto& val : value) {
-              remaining.erase(val.component_name());
+              remaining.erase(val.moniker());
+              // TODO(fxb/77979) This is a workaround to make tests pass during
+              // the migration. Remove after migration
+              auto name = val.moniker().substr(val.moniker().find_last_of("/") + 1);
+              remaining.erase(name);
             }
 
             if (remaining.empty()) {
@@ -435,14 +427,13 @@ void ArchiveReader::InnerSnapshotInspectUntilPresent(
                   executor_.dispatcher(),
                   [completer = std::move(timeout.completer)]() mutable { completer.complete_ok(); },
                   zx::msec(kDelayMs));
-              executor_.schedule_task(timeout.consumer.promise_or(fpromise::error())
-                                          .then([this, completer = std::move(completer),
-                                                 component_names = std::move(component_names)](
-                                                    fpromise::result<>& res) mutable {
-                                            InnerSnapshotInspectUntilPresent(
-                                                std::move(completer), std::move(component_names));
-                                          })
-                                          .wrap_with(scope_));
+              executor_.schedule_task(
+                  timeout.consumer.promise_or(fpromise::error())
+                      .then([this, completer = std::move(completer),
+                             monikers = std::move(monikers)](fpromise::result<>& res) mutable {
+                        InnerSnapshotInspectUntilPresent(std::move(completer), std::move(monikers));
+                      })
+                      .wrap_with(scope_));
             }
           })
           .wrap_with(scope_));

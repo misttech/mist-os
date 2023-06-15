@@ -302,16 +302,16 @@ TEST_F(AccessorTest, StreamDiagnosticsInspect) {
 
   auto _binder = realm.component().ConnectSync<fuchsia::component::Binder>();
 
-  auto selector = "realm_builder\\:" + realm.component().GetChildName() + "/inspect-publisher:root";
+  auto moniker = "realm_builder\\:" + realm.component().GetChildName() + "/inspect-publisher";
+  auto selector = moniker + ":root";
   inspect::contrib::ArchiveReader reader(std::move(accessor), {selector});
 
   fpromise::result<std::vector<inspect::contrib::InspectData>, std::string> actual_result;
   fpromise::single_threaded_executor executor;
 
-  executor.schedule_task(
-      reader.SnapshotInspectUntilPresent({"inspect-publisher"})
-          .then([&](fpromise::result<std::vector<inspect::contrib::InspectData>, std::string>&
-                        result) mutable { actual_result = std::move(result); }));
+  executor.schedule_task(reader.SnapshotInspectUntilPresent({moniker}).then(
+      [&](fpromise::result<std::vector<inspect::contrib::InspectData>, std::string>&
+              result) mutable { actual_result = std::move(result); }));
 
   executor.run();
 

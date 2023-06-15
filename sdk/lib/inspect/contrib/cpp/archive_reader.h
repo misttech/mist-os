@@ -46,10 +46,6 @@ class InspectData {
   InspectData& operator=(const InspectData&) = delete;
   InspectData& operator=(InspectData&&) = default;
 
-  // TODO(https://fxbug.dev/77979): Switch all uses to moniker() and remove component_name()
-  // Return the name of the component that created this data.
-  const std::string& component_name() const;
-
   // Return the moniker of the component that created this data.
   const std::string& moniker() const { return moniker_; }
 
@@ -87,9 +83,6 @@ class InspectData {
  private:
   // The document wrapped by this container.
   rapidjson::Document document_;
-
-  // The parsed name of the component.
-  std::string name_;
 
   // Moniker of the component that generated the payload.
   std::string moniker_;

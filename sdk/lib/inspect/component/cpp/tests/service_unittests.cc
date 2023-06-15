@@ -453,7 +453,7 @@ TEST_F(InspectServiceTest, ReadFromComponentInspector) {
   uint64_t app_index;
   bool found = false;
   for (uint64_t i = 0; i < data.size(); i++) {
-    if (data.at(i).component_name() == "inspect_writer_app") {
+    if (data.at(i).moniker() == "inspect_writer_app") {
       app_index = i;
       found = true;
       break;

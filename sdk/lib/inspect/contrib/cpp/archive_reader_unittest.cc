@@ -22,7 +22,7 @@ TEST(InspectDataTest, ComponentNameExtraction) {
     doc.Parse(R"({"moniker": "root/hub/my_component.cmx"})");
     inspect::contrib::EmplaceInspect(std::move(doc), &data);
     InspectData &datum = data[0];
-    EXPECT_EQ("my_component.cmx", datum.component_name());
+    EXPECT_EQ("root/hub/my_component.cmx", datum.moniker());
   }
   {
     std::vector<inspect::contrib::InspectData> data;
@@ -30,7 +30,7 @@ TEST(InspectDataTest, ComponentNameExtraction) {
     doc.Parse(R"({"moniker": "abcd"})");
     inspect::contrib::EmplaceInspect(std::move(doc), &data);
     InspectData &datum = data[0];
-    EXPECT_EQ("abcd", datum.component_name());
+    EXPECT_EQ("abcd", datum.moniker());
   }
   {
     // Can't find path, empty return.
@@ -39,7 +39,7 @@ TEST(InspectDataTest, ComponentNameExtraction) {
     doc.Parse(R"({"not_moniker": "abcd"})");
     inspect::contrib::EmplaceInspect(std::move(doc), &data);
     InspectData &datum = data[0];
-    EXPECT_EQ("", datum.component_name());
+    EXPECT_EQ("", datum.moniker());
   }
 }
 
