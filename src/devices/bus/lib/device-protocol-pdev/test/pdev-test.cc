@@ -10,11 +10,14 @@
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fake-resource/resource.h>
+#include <lib/mmio/mmio-buffer.h>
+#include <zircon/errors.h>
+#include <zircon/syscalls/object.h>
+#include <zircon/types.h>
 
 #include <zxtest/zxtest.h>
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
-#include "zircon/errors.h"
 
 constexpr uint32_t kVid = 1;
 constexpr uint32_t kPid = 1;
@@ -128,15 +131,20 @@ TEST(PDevFidlTest, GetMmioBuffer) {
   constexpr uint32_t kMmioId = 5;
   constexpr zx_off_t kMmioOffset = 10;
   constexpr size_t kMmioSize = 11;
+  MMIO_PTR void* mmio_vaddr;
+  zx_koid_t vmo_koid;
+  zx_info_handle_basic info;
   std::map<uint32_t, fake_pdev::Mmio> mmios;
   {
-    fdf::MmioBuffer mmio{mmio_buffer_t{
-        .vaddr = (MMIO_PTR void*)kMmioId,
-        .offset = kMmioOffset,
-        .size = kMmioSize,
-        .vmo = ZX_HANDLE_INVALID,
-    }};
-    mmios[kMmioId] = std::move(mmio);
+    std::optional<fdf::MmioBuffer> mmio;
+    zx::vmo vmo;
+    ASSERT_OK(zx::vmo::create(kMmioSize, 0, &vmo));
+    ASSERT_OK(vmo.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
+    ASSERT_OK(fdf::MmioBuffer::Create(kMmioOffset, kMmioSize, std::move(vmo),
+                                      ZX_CACHE_POLICY_UNCACHED, &mmio));
+    vmo_koid = info.koid;
+    mmio_vaddr = mmio->get();
+    mmios[kMmioId] = std::move(*mmio);
   }
 
   FakePDevFidlWithThread infra;
@@ -155,8 +163,10 @@ TEST(PDevFidlTest, GetMmioBuffer) {
   auto* mmio_buffer = reinterpret_cast<fdf::MmioBuffer*>(mmio.offset);
   ASSERT_EQ(kMmioOffset, mmio_buffer->get_offset());
   ASSERT_EQ(kMmioSize, mmio_buffer->get_size());
-  ASSERT_EQ(kMmioId, reinterpret_cast<uintptr_t>(mmio_buffer->get()));
-  ASSERT_EQ(ZX_HANDLE_INVALID, mmio_buffer->get_vmo());
+  ASSERT_EQ(mmio_vaddr, mmio_buffer->get());
+  ASSERT_OK(mmio_buffer->get_vmo()->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr,
+                                             nullptr));
+  ASSERT_EQ(vmo_koid, info.koid);
 
   ASSERT_EQ(ZX_ERR_NOT_FOUND, pdev.GetMmio(4, &mmio));
 }
