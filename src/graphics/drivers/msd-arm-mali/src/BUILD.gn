@@ -107,6 +107,8 @@ source_set("src") {
     "//sdk/fidl/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_cpp_driver",
     "//src/graphics/lib/magma/include:msd_cc",
     "//src/graphics/lib/magma/src/magma_util:short_macros",
+    "//src/graphics/lib/magma/src/magma_util/platform:interrupt_header",
+    "//src/graphics/lib/magma/src/magma_util/platform:mmio_header",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/inspect",
@@ -138,7 +140,6 @@ source_set("parent_device_dfv2") {
   ]
 
   deps = [
-    "//src/graphics/lib/magma/src/magma_util/platform:mmio_header",
     "//src/graphics/lib/magma/src/magma_util/platform:thread",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:interrupt",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:mmio",
@@ -149,5 +150,7 @@ source_set("parent_device_dfv2") {
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/incoming/cpp",
+    "//src/graphics/lib/magma/src/magma_util/platform:interrupt_header",
+    "//src/graphics/lib/magma/src/magma_util/platform:mmio_header",
   ]
 }
