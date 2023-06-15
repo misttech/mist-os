@@ -8,7 +8,7 @@ use {
         buffer_allocator::{BufferAllocator, MemBufferSource},
         Device,
     },
-    anyhow::{anyhow, ensure, Error},
+    anyhow::{ensure, Error},
     async_trait::async_trait,
     // Provides read_exact_at and write_all_at.
     // TODO(jfsulliv): Do we need to support non-UNIX systems?
@@ -35,28 +35,17 @@ impl FileBackedDevice {
     pub fn new(file: std::fs::File, block_size: u32) -> Self {
         let size = file.metadata().unwrap().len();
         assert!(block_size > 0 && size > 0);
-        Self::new_inner(file, block_size, size / block_size as u64)
+        Self::new_with_block_count(file, block_size, size / block_size as u64)
     }
 
-    /// Creates a new FileBackedDevice over |file| using an explicit size.  The underlying file will
-    /// be truncated to the target size.
-    pub fn new_with_block_count(
-        file: std::fs::File,
-        block_size: u32,
-        block_count: u64,
-    ) -> Result<Self, Error> {
+    /// Creates a new FileBackedDevice over |file| using an explicit size.  The underlying file is
+    /// *not* truncated to the target size, so the file size will be exactly as large as the
+    /// filesystem ends up using within the file.  With a sequential allocator, this makes the file
+    /// as big as it needs to be and no more.
+    pub fn new_with_block_count(file: std::fs::File, block_size: u32, block_count: u64) -> Self {
         // TODO(jfsulliv): If file is S_ISBLK, we should use its block size. Rust does not appear to
         // expose this information in a portable way, so we may need to dip into non-portable code
         // to do so.
-        file.set_len(
-            block_count
-                .checked_mul(block_size.into())
-                .ok_or(anyhow!("Multiplication overflow; image size is too big"))?,
-        )?;
-        Ok(Self::new_inner(file, block_size, block_count))
-    }
-
-    fn new_inner(file: std::fs::File, block_size: u32, block_count: u64) -> Self {
         let allocator = BufferAllocator::new(
             block_size as usize,
             Box::new(MemBufferSource::new(TRANSFER_HEAP_SIZE)),

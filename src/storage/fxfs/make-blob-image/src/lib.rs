@@ -8,6 +8,7 @@ use {
     fuchsia_merkle::{Hash, MerkleTreeBuilder, HASH_SIZE},
     futures::{try_join, SinkExt as _, StreamExt as _, TryStreamExt as _},
     fxfs::{
+        errors::FxfsError,
         filesystem::{Filesystem, FxFilesystem},
         object_handle::{GetProperties, WriteBytes},
         object_store::{
@@ -46,12 +47,15 @@ type BlobsJsonOutput = Vec<BlobsJsonOutputEntry>;
 /// Generates an Fxfs image containing a blob volume with the blobs specified in `manifest_path`.
 /// Creates the block image at `output_image_path` and writes a blobs.json file to
 /// `json_output_path`.
-/// The image will be `size` bytes; if the contents exceed this size, an error is returned.
+/// If `target_size` bytes is set, the image will be set to exactly this size (and an error is
+/// returned if the contents exceed that size).  If unset (or 0), the image will be truncated to
+/// twice the size of its contents, which is a heuristic that gives us roughly enough space for
+/// normal usage of the image.
 pub async fn make_blob_image(
     output_image_path: &str,
     manifest_path: &str,
     json_output_path: &str,
-    size: u64,
+    target_size: Option<u64>,
 ) -> Result<(), Error> {
     let output_image = std::fs::OpenOptions::new()
         .read(true)
@@ -61,20 +65,50 @@ pub async fn make_blob_image(
         .open(output_image_path)?;
     let blobs = parse_manifest(manifest_path).context("Failed to parse manifest")?;
 
+    let size = target_size.unwrap_or_default();
+
     const BLOCK_SIZE: u32 = 4096;
-    if size < BLOCK_SIZE as u64 {
+    if size > 0 && size < BLOCK_SIZE as u64 {
         return Err(anyhow!("Size {} is too small", size));
     }
-    let block_count = size / BLOCK_SIZE as u64;
+    let block_count = if size != 0 {
+        // Truncate the image to the target size now.
+        output_image.set_len(size).context("Failed to resize image")?;
+        size / BLOCK_SIZE as u64
+    } else {
+        // Arbitrarily use 4GiB for the initial block device size, but don't truncate the file yet,
+        // so it becomes exactly as large as needed to contain the contents.  We'll truncate it down
+        // to 2x contents later.
+        // 4G just needs to be large enough to fit pretty much any image.
+        const FOUR_GIGS: u64 = 4 * 1024 * 1024 * 1024;
+        FOUR_GIGS / BLOCK_SIZE as u64
+    };
+
     let device = DeviceHolder::new(FileBackedDevice::new_with_block_count(
         output_image,
         BLOCK_SIZE,
         block_count,
-    )?);
+    ));
     let filesystem =
         FxFilesystem::new_empty(device).await.context("Failed to format filesystem")?;
-    let blobs_json = install_blobs(filesystem.clone(), "blob", blobs).await?;
+    let blobs_json = install_blobs(filesystem.clone(), "blob", blobs).await.map_err(|e| {
+        if target_size.is_some() && FxfsError::NoSpace.matches(&e) {
+            e.context(format!(
+                "Configured image size {} is too small to fit the base system image.",
+                size
+            ))
+        } else {
+            e
+        }
+    })?;
     filesystem.close().await?;
+
+    if size == 0 {
+        let output_image =
+            std::fs::OpenOptions::new().read(true).write(true).open(output_image_path)?;
+        let actual_size = output_image.metadata()?.len();
+        output_image.set_len(actual_size * 2).context("Failed to resize image")?;
+    }
 
     let mut json_output = BufWriter::new(
         std::fs::File::create(json_output_path).context("Failed to create JSON output file")?,

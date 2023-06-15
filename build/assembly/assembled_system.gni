@@ -223,8 +223,10 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #     documentation of the `--length` parameter of the `fvm` binary host tool
 #     for details.
 #
-#   assembly_fxfs_image_size_bytes (optional; default: 536870912)
-#     [int] The size of image to generate.  The system contents must fit within this.
+#   assembly_fxfs_image_size_bytes (optional)
+#     [int] The size of image to generate.  The system contents must fit within this.  If unset, the
+#     image size is unfixed: the generated image will be set to an arbitrary size greater than or
+#     equal to the required size to fit the base system.
 #
 # Board: ZBI arguments
 #

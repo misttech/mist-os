@@ -412,16 +412,14 @@ pub struct NandFvm {
     pub pages_per_block: u64,
 }
 
-fn default_fxfs_size_bytes() -> u64 {
-    512 * 1024 * 1024
-}
-
 /// The parameters describing how to create an Fxfs image.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Fxfs {
-    /// The number of additional bytes to reserve as free space in the image.
-    #[serde(default = "default_fxfs_size_bytes")]
-    pub size_bytes: u64,
+    /// The size of Fxfs image to generate.  The base system's contents must not exceed this size.
+    /// If unset, there's no limit, and the image will be an arbitrary size greater than or equal to
+    /// the space needed for the base system's contents.
+    #[serde(default)]
+    pub size_bytes: Option<u64>,
 }
 
 impl ImagesConfig {

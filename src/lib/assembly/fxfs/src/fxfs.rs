@@ -24,18 +24,18 @@ use {
 ///
 pub struct FxfsBuilder {
     manifest: BlobManifest,
-    size_bytes: u64,
+    size_bytes: Option<u64>,
 }
 
 impl FxfsBuilder {
     /// Construct a new FxfsBuilder.
     pub fn new() -> Self {
-        FxfsBuilder { manifest: BlobManifest::default(), size_bytes: 0 }
+        FxfsBuilder { manifest: BlobManifest::default(), size_bytes: None }
     }
 
     /// Sets the target image size.
     pub fn set_size(&mut self, size_bytes: u64) {
-        self.size_bytes += size_bytes
+        self.size_bytes = Some(size_bytes)
     }
 
     /// Add a package to fxfs by inserting every blob mentioned in the `package_manifest` on the
