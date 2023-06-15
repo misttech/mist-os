@@ -361,6 +361,17 @@
                 "in6_02",
                 "init_module01",
                 "init_module02",
+                "inotify01",
+                "inotify02",
+                "inotify03",
+                "inotify04",
+                "inotify05",
+                "inotify06",
+                "inotify07",
+                "inotify08",
+                "inotify10",
+                "inotify11",
+                "inotify12",
                 "input01",
                 "input02",
                 "input04",
@@ -1284,9 +1295,6 @@
                 "io_pgetevents01",
                 "select03",
                 "setrlimit02",
-
-                // inotify is not implemented yet. Skip, so they don't spam the output.
-                "inotify*",
 
                 // These tests hang
                 "fallocate05",
