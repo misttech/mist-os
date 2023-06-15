@@ -39,21 +39,14 @@ test("device-enumeration") {
     "aemu.h",
     "boards/aemu_x64.cc",
     "boards/astro.cc",
-    "boards/atlas.cc",
-    "boards/av400.cc",
-    "boards/clover.cc",
-    "boards/eve.cc",
     "boards/gce_arm64.cc",
     "boards/nelson.cc",
-    "boards/nocturne.cc",
     "boards/nuc.cc",
-    "boards/pinecrest.cc",
     "boards/qemu_arm64.cc",
     "boards/qemu_riscv64.cc",
     "boards/qemu_x64.cc",
     "boards/sherlock.cc",
     "boards/vim3.cc",
-    "boards/visalia.cc",
     "bootfs_main.cc",
   ]
   deps = [
@@ -85,33 +78,17 @@ _boards = [
     astro_env,
   ],
   [
-    "atlas",
-    atlas_env,
-  ],
-
-  # ["av400", ],
-  # ["clover", ],
-  # ["eve", ],
-  [
     "gce_arm64",
     gce_env,
-  ],
-  [
-    "luis",
-    luis_env,
   ],
   [
     "nelson",
     nelson_env,
   ],
-
-  # ["nocturne", ],
   [
     "nuc",
     nuc_env,
   ],
-
-  # ["pinecrest", ],
   [
     "qemu_arm64",
     {
@@ -147,8 +124,6 @@ _boards = [
     "vim3",
     vim3_env,
   ],
-
-  # ["visalia", ],
 ]
 
 foreach(board_info, _boards) {

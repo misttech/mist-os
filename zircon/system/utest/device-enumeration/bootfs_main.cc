@@ -42,40 +42,22 @@ fbl::String GetTestFilter() {
     return "*Astro*";
   } else if (board_name == "sherlock") {
     return "*Sherlock*";
-  } else if (board_name == "msm8x53-som") {
-    return "*Msm8x53Som*";
-  } else if (board_name == "visalia") {
-    return "*Visalia*";
-  } else if (board_name == "pinecrest") {
-    return "*Pinecrest*";
-  } else if (board_name == "Nocturne") {
-    return "*Nocturne*";
   } else if (board_name == "nelson") {
     return "*Nelson*";
-  } else if (board_name == "luis") {
-    return "*Luis*";
-  } else if (board_name == "Eve") {
-    return "*Eve*";
   } else if (board_name == "NUC7i5DNB") {
     return "*Nuc*";
-  } else if (board_name == "Atlas") {
-    return "*Atlas*";
   } else if (board_name == "Standard PC (Q35 + ICH9, 2009)") {
     // QEMU and AEMU with emulated Q35 boards have this board name.
     if (device_enumeration::IsAemuBoard()) {
       return "*AemuX64*";
     }
     return "*QemuX64*";
-  } else if (board_name == "av400") {
-    return "*Av400*";
   } else if (board_name == "Google Compute Engine") {
 #ifdef __aarch64__
     return "*GceArm64*";
 #endif
   } else if (board_name == "arm64" || board_name == "x64") {
     return "*GenericShouldFail*";
-  } else if (board_name == "clover") {
-    return "*Clover*";
   }
 
   return "Unknown";
