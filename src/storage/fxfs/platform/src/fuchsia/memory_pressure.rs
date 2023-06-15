@@ -146,7 +146,7 @@ impl Inner {
             Ok(v) => watcher_request_to_on_level_changed(v),
             Err(e) => {
                 error!(
-                    error = e.as_value(),
+                    error = ?e,
                     "FIDL error occurred from memory pressure watcher. Terminating memory pressure \
                     monitoring."
                 );
@@ -158,7 +158,7 @@ impl Inner {
 
         if let Err(e) = responder.send() {
             error!(
-                error = e.as_value(),
+                error = ?e,
                 "FIDL error while responding to memory pressure event. Terminating memory pressure \
                 monitoring."
             );

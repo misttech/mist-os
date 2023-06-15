@@ -374,7 +374,7 @@ impl MutableDirectory for FxDirectory {
                 // If purging fails , we should still return success, since the file will appear
                 // unlinked at this point anyways.  The file should be cleaned up on a later mount.
                 if let Err(e) = self.volume().maybe_purge_file(id).await {
-                    warn!(error = e.as_value(), "Failed to purge file");
+                    warn!(error = ?e, "Failed to purge file");
                 }
             }
             ReplacedChild::Directory(id) => {
@@ -842,7 +842,7 @@ impl vfs::directory::entry_container::Directory for FxDirectory {
                 let mut iter = match self.directory.iter_from(&mut merger, "").await {
                     Ok(iter) => iter,
                     Err(e) => {
-                        error!(error = e.as_value(), "Failed to iterate directory for watch",);
+                        error!(error = ?e, "Failed to iterate directory for watch",);
                         // TODO(fxbug.dev/96086): This really should close the watcher connection
                         // with an epitaph so that the watcher knows.
                         return;
@@ -854,7 +854,7 @@ impl vfs::directory::entry_container::Directory for FxDirectory {
                 while let Some((name, _, _)) = iter.get() {
                     controller.send_event(&mut SingleNameEventProducer::existing(name));
                     if let Err(e) = iter.advance().await {
-                        error!(error = e.as_value(), "Failed to iterate directory for watch",);
+                        error!(error = ?e, "Failed to iterate directory for watch",);
                         return;
                     }
                 }

@@ -233,7 +233,7 @@ impl Component {
             let me = self.clone();
             self.scope.spawn(async move {
                 if let Err(e) = me.handle_lifecycle_requests(channel).await {
-                    warn!(error = e.as_value(), "handle_lifecycle_requests");
+                    warn!(error = ?e, "handle_lifecycle_requests");
                 }
             });
         }
@@ -304,7 +304,7 @@ impl Component {
             Ok(v) => Some(v),
             Err(e) => {
                 warn!(
-                    error = e.as_value(),
+                    error = ?e,
                     "Failed to connect to memory pressure monitor. Running \
                 without pressure awareness."
                 );
@@ -437,17 +437,17 @@ impl Component {
                                 .await
                                 .map_err(map_to_raw_status),
                         )
-                        .unwrap_or_else(|e| {
-                            warn!(error = e.as_value(), "Failed to send volume creation response")
-                        });
+                        .unwrap_or_else(
+                            |e| warn!(error = ?e, "Failed to send volume creation response"),
+                        );
                 }
                 VolumesRequest::Remove { name, responder } => {
                     info!(name = name.as_str(), "Remove volume");
                     responder
                         .send(volumes.remove_volume(&name).await.map_err(map_to_raw_status))
-                        .unwrap_or_else(|e| {
-                            warn!(error = e.as_value(), "Failed to send volume removal response")
-                        });
+                        .unwrap_or_else(
+                            |e| warn!(error = ?e, "Failed to send volume removal response"),
+                        );
                 }
             }
         }

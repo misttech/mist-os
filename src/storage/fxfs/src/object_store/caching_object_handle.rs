@@ -427,7 +427,7 @@ impl<S: HandleOwner> WriteObjectHandle for CachingObjectHandle<S> {
         // Try and resize immediately, but since we successfully resized the cache, don't propagate
         // errors here.
         if let Err(e) = self.flush_metadata().await {
-            warn!(error = e.as_value(), "Failed to flush after resize");
+            warn!(error = ?e, "Failed to flush after resize");
         }
         Ok(())
     }

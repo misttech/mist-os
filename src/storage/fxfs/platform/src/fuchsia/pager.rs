@@ -93,7 +93,7 @@ impl Inner {
                             watch_for_zero_children(port, file.as_ref()).unwrap();
                         }
                     }
-                    Err(e) => error!(error = e.as_value(), "Vmo::info failed"),
+                    Err(e) => error!(error = ?e, "Vmo::info failed"),
                 }
             }
         }
@@ -264,7 +264,7 @@ impl PortThread {
                         _ => unreachable!(), // We don't expect any other kinds of packets
                     }
                 }
-                Err(e) => error!(error = e.as_value(), "Port::wait failed"),
+                Err(e) => error!(error = ?e, "Port::wait failed"),
             }
         }
     }
@@ -431,7 +431,7 @@ impl Pager {
         transfer_offset: u64,
     ) {
         if let Err(e) = self.pager.supply_pages(vmo, range, transfer_vmo, transfer_offset) {
-            error!(error = e.as_value(), "supply_pages failed");
+            error!(error = ?e, "supply_pages failed");
         }
     }
 
@@ -454,7 +454,7 @@ impl Pager {
             _ => zx::Status::BAD_STATE,
         };
         if let Err(e) = self.pager.op_range(zx::PagerOp::Fail(pager_status), vmo, range) {
-            error!(error = e.as_value(), "op_range failed");
+            error!(error = ?e, "op_range failed");
         }
     }
 
@@ -462,7 +462,7 @@ impl Pager {
     /// page request. See `ZX_PAGER_OP_DIRTY` for more information.
     pub fn dirty_pages(&self, vmo: &zx::Vmo, range: Range<u64>) {
         if let Err(e) = self.pager.op_range(zx::PagerOp::Dirty, vmo, range) {
-            error!(error = e.as_value(), "dirty_pages failed");
+            error!(error = ?e, "dirty_pages failed");
         }
     }
 
@@ -475,7 +475,7 @@ impl Pager {
         options: zx::PagerWritebackBeginOptions,
     ) {
         if let Err(e) = self.pager.op_range(zx::PagerOp::WritebackBegin(options), vmo, range) {
-            error!(error = e.as_value(), "writeback_begin failed");
+            error!(error = ?e, "writeback_begin failed");
         }
     }
 
@@ -483,7 +483,7 @@ impl Pager {
     /// `ZX_PAGER_OP_WRITEBACK_END` for more information.
     pub fn writeback_end(&self, vmo: &zx::Vmo, range: Range<u64>) {
         if let Err(e) = self.pager.op_range(zx::PagerOp::WritebackEnd, vmo, range) {
-            error!(error = e.as_value(), "writeback_end failed");
+            error!(error = ?e, "writeback_end failed");
         }
     }
 

@@ -113,7 +113,6 @@ fxfs_sources = [
 
 if (is_fuchsia) {
   fxfs_deps += [
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/trace/rust:trace",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:scopeguard",

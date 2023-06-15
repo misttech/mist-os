@@ -535,7 +535,7 @@ impl FxFilesystem {
         let sync_status =
             self.journal.sync(SyncOptions { flush_device: true, ..Default::default() }).await;
         if let Err(e) = &sync_status {
-            error!(error = e.as_value(), "Failed to sync filesystem; data may be lost");
+            error!(error = ?e, "Failed to sync filesystem; data may be lost");
         }
         self.journal.terminate();
         let flush_task = self.flush_task.lock().unwrap().take();

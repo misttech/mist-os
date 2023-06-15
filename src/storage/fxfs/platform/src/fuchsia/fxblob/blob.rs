@@ -428,7 +428,7 @@ impl PagerBackedVmo for FxBlob {
                     ?range,
                     merkle_root = %self.merkle_tree.root(),
                     ?self.uncompressed_size,
-                    error = e.as_value(),
+                    error = ?e,
                     "Failed to load range"
                 );
                 // TODO(fxbug.dev/122125): Should we fuse further reads shut?  This would match
@@ -466,7 +466,7 @@ impl PagerBackedVmo for FxBlob {
                     // considered transient.
                     error!(
                             range = ?range_chunk,
-                            error = e.as_value(),
+                            error = ?e,
                             "Failed to transfer range");
                     self.handle.owner().pager().report_failure(
                         self.vmo(),

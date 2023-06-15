@@ -160,7 +160,7 @@ impl FxVolume {
             if let Err(e) = self.store.lock().await {
                 // The store will be left in a safe state and there won't be data-loss unless
                 // there's an issue flushing the journal later.
-                warn!(error = e.as_value(), "Locking store error");
+                warn!(error = ?e, "Locking store error");
             }
         }
         let sync_status = self
@@ -169,7 +169,7 @@ impl FxVolume {
             .sync(SyncOptions { flush_device: true, ..Default::default() })
             .await;
         if let Err(e) = sync_status {
-            error!(error = e.as_value(), "Failed to sync filesystem; data may be lost");
+            error!(error = ?e, "Failed to sync filesystem; data may be lost");
         }
     }
 
@@ -346,7 +346,7 @@ impl FxVolume {
                 warn!(
                     store_id = self.store.store_object_id(),
                     oid = file.object_id(),
-                    error = e.as_value(),
+                    error = ?e,
                     "Failed to flush",
                 )
             }

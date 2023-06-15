@@ -476,7 +476,7 @@ impl PagerBackedVmo for FxFile {
                 error!(
                     ?range,
                     oid = self.handle.uncached_handle().object_id(),
-                    error = e.as_value(),
+                    error = ?e,
                     "Failed to page-in range"
                 );
                 self.handle.pager().report_failure(self.vmo(), range.clone(), zx::Status::IO);
@@ -501,7 +501,7 @@ impl PagerBackedVmo for FxFile {
                     // considered transient.
                     error!(
                             range = ?range_chunk,
-                            error = e.as_value(),
+                            error = ?e,
                             "Failed to transfer range");
                     self.handle.pager().report_failure(self.vmo(), range_chunk, zx::Status::IO);
                 }
