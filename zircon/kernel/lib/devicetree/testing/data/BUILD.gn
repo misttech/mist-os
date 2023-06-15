@@ -18,6 +18,7 @@ dtbs_all = [
   "qemu-arm-gic2.dtb",
   "qemu-arm-gic3.dtb",
   "qemu-riscv.dtb",
+  "sifive-hifive-unmatched.dtb",
   "vision-five-2.dtb",
   "synthetic/complex_no_properties.dtb",
   "synthetic/complex_with_alias.dtb",
