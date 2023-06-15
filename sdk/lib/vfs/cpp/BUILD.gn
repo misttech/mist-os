@@ -55,6 +55,68 @@ sdk_source_set("cpp") {
   ]
 
   public_configs = [ "//sdk/config" ]
+
+  #  ________  _________  ________  ________
+  # |\   ____\|\___   ___\\   __  \|\   __  \
+  # \ \  \___|\|___ \  \_\ \  \|\  \ \  \|\  \
+  #  \ \_____  \   \ \  \ \ \  \\\  \ \   ____\
+  #   \|____|\  \   \ \  \ \ \  \\\  \ \  \___|
+  #     ____\_\  \   \ \__\ \ \_______\ \__\
+  #    |\_________\   \|__|  \|_______|\|__|
+  #    \|_________|
+  #
+  # New code should use //src/lib/storage/vfs/cpp instead. https://fxbug.dev/103032 tracks removal
+  # of this library.
+  #
+  # To remove items from the allowlist, please send a change to one of the OWNERS of
+  # this file to remove an element from the visibility list below.
+  #
+  # Please allowlist entire directories rather than individual targets as it
+  # requires less allowlist churn over time.
+  #
+  # To regenerate:
+  #   scripts/gn/trim_visibility.py --target=//sdk/lib/vfs/cpp
+  visibility = [
+    ":*",
+    "//build/sdk:*",
+    "//sdk/ctf/tests/pkg/svc:*",
+    "//sdk/lib/sys/cpp:*",
+    "//sdk/lib/sys/cpp/testing:*",
+    "//sdk/lib/sys/cpp/tests:*",
+    "//sdk/lib/sys/inspect/cpp:*",
+    "//sdk/lib/sys/service/cpp:*",
+    "//sdk/lib/vfs/cpp/testing:*",
+    "//src/developer/build_info:*",
+    "//src/developer/forensics/feedback_data:*",
+    "//src/devices/bin/driver_host2:*",
+    "//src/devices/bin/driver_manager/v2:*",
+    "//src/devices/sysmem/bin/sysmem_connector:*",
+    "//src/diagnostics/validator/inspect/lib/cpp:*",
+    "//src/graphics/bin/opencl_loader:*",
+    "//src/graphics/bin/opencl_loader/test:*",
+    "//src/graphics/bin/vulkan_loader:*",
+    "//src/graphics/bin/vulkan_loader/test:*",
+    "//src/lib/metrics_buffer:*",
+    "//src/lib/vulkan/gapii-pkg:*",
+    "//src/lib/vulkan/vulkan-validation-pkg:*",
+    "//src/media/audio/audio_core/testing/integration:*",
+    "//src/media/codec/factory:*",
+    "//src/media/lib/codec_impl:*",
+    "//src/modular/bin/sessionmgr:*",
+    "//src/modular/lib/pseudo_dir:*",
+    "//src/storage/conformance/conformance_harness/sdkcpp:*",
+    "//src/sys/appmgr:*",
+    "//src/sys/early_boot_instrumentation:*",
+    "//src/sys/early_boot_instrumentation/test:*",
+    "//src/sys/sysmgr:*",
+    "//src/tests/fidl/compatibility/cpp:*",
+    "//src/tests/fidl/compatibility/llcpp:*",
+    "//src/ui/a11y/bin/a11y_manager/tests/util:*",
+    "//src/ui/a11y/lib/configuration/tests:*",
+    "//src/ui/lib/escher:*",
+    "//third_party/tcpdump:*",
+    "//vendor/google/*",
+  ]
 }
 
 test("vfs_cpp_unittests") {
