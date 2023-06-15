@@ -10,11 +10,13 @@ _clang_utils = {
   dir = clang_tool_dir
   prefix = "llvm-"
   cc = "clang"
+  cc_extra_args = [ "--target=$current_target_tuple" ]
 }
 _gcc_utils = {
   dir = gcc_tool_dir
   prefix = "$clang_cpu-elf-"
   cc = "${prefix}gcc"
+  cc_extra_args = []
 }
 
 # Like action() but using utility binaries from the C/C++ toolchain.
@@ -22,22 +24,23 @@ _gcc_utils = {
 #
 # Parameters
 #
-#   utils
-#     Required: Utilities to use, e.g. "nm", "objcopy", "objdump".
-#     Type: list(string)
+#   * utils
+#     - Required: Utilities to use, e.g. "nm", "objcopy", "objdump", "cc".
+#     Note if "cc" is listed then it must be the only utility in the list.
+#     - Type: list(string)
 #
-#   script
-#     Optional:  Same as for action().  The script receives an implicit
+#   * script
+#     - Optional: Same as for action().  The script receives an implicit
 #     argument for each element in $utils giving the command to run.
 #     If omitted, then $utils must have only one element and that command
 #     itself will be run with $args just as given.  This can be true instead
 #     of a string for automatic response file handling; see notes below.
-#     Type: file or true (see below)
+#     - Type: file or true (see below)
 #
-#   args
-#     Required: Same as for action().  If there is a $script,
+#   * args
+#     - Required: Same as for action().  If there is a $script,
 #     the implicit $utils arguments precede $args.
-#     Type: list(string)
+#     - Type: list(string)
 #
 #   depfile, deps, inputs, outputs, sources, testonly, visibility
 #      See action().
@@ -68,6 +71,7 @@ template("toolchain_utils_action") {
   utils_dirs = []
   utils_inputs = []
   utils_paths = []
+  util_extra_args = []
   foreach(util, invoker.utils) {
     # Clear from any previous iteration.
     use_utils = {
@@ -84,6 +88,10 @@ template("toolchain_utils_action") {
 
     if (util == "cc") {
       util = use_utils.cc
+      assert(
+          utils_paths == [],
+          "\"cc\" must be used alone in toolchain_utils_action() `utils` list")
+      util_extra_args = use_utils.cc_extra_args
     } else {
       util = use_utils.prefix + util
     }
@@ -123,13 +131,13 @@ template("toolchain_utils_action") {
         script = script
         args = []
       }
-      args += utils_paths + invoker.args
+      args += utils_paths + util_extra_args + invoker.args
     } else {
       script = rebase_path(utils_paths[0], "", root_build_dir)
       assert(
           utils_paths == [ utils_paths[0] ],
           "toolchain_utils_action(\"$target_name\") without `script` must have exactly one element in `utils`")
-      args = invoker.args
+      args = util_extra_args + invoker.args
     }
 
     # The utilities might access other parts of their own installation.
