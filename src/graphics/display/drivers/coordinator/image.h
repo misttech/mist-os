@@ -67,8 +67,6 @@ class Image : public fbl::RefCounted<Image>,
 
   Image(Controller* controller, const image_t& info, zx::vmo vmo, inspect::Node* parent_node,
         uint32_t client_id);
-  Image(Controller* controller, const image_t& info, inspect::Node* parent_node,
-        uint32_t client_id);
   ~Image();
 
   image_t& info() { return info_; }
@@ -189,9 +187,6 @@ class Image : public fbl::RefCounted<Image>,
   // the next vsync. This is distinct from presenting_ due to multiplexing the display between
   // multiple clients.
   bool retiring_ __TA_GUARDED(mtx()) = false;
-
-  // flag used to distinguish between an image used for display vs capture
-  const bool capture_image_ = false;
 
   const zx::vmo vmo_;
 

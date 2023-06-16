@@ -41,6 +41,7 @@
 #include <fbl/ring_buffer.h>
 #include <fbl/vector.h>
 
+#include "src/graphics/display/drivers/coordinator/capture-image.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
@@ -288,7 +289,7 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   uint64_t next_image_id_ = 1;         // Only INVALID_ID == 0 is invalid
   uint64_t next_capture_image_id = 1;  // Only INVALID_ID == 0 is invalid
   Image::Map images_;
-  Image::Map capture_images_;
+  CaptureImage::Map capture_images_;
   DisplayConfig::Map configs_;
   bool pending_config_valid_ = false;
   bool is_owner_ = false;

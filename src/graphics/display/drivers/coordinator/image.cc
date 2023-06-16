@@ -18,36 +18,21 @@
 
 namespace display {
 
-Image::Image(Controller* controller, const image_t& info, zx::vmo handle,
-             inspect::Node* parent_node, uint32_t client_id)
-    : info_(info),
-      controller_(controller),
-      client_id_(client_id),
-      capture_image_(false),
-      vmo_(std::move(handle)) {
-  InitializeInspect(parent_node);
-}
-Image::Image(Controller* controller, const image_t& info, inspect::Node* parent_node,
+Image::Image(Controller* controller, const image_t& info, zx::vmo vmo, inspect::Node* parent_node,
              uint32_t client_id)
-    : info_(info), controller_(controller), client_id_(client_id), capture_image_(true) {
+    : info_(info), controller_(controller), client_id_(client_id), vmo_(std::move(vmo)) {
   InitializeInspect(parent_node);
 }
-
 Image::~Image() {
-  if (!capture_image_) {
-    ZX_ASSERT(!std::atomic_load(&in_use_));
-    ZX_ASSERT(!InDoublyLinkedList());
-    controller_->ReleaseImage(this);
-  } else {
-    controller_->ReleaseCaptureImage(info_.handle);
-  }
+  ZX_ASSERT(!std::atomic_load(&in_use_));
+  ZX_ASSERT(!InDoublyLinkedList());
+  controller_->ReleaseImage(this);
 }
 
 void Image::InitializeInspect(inspect::Node* parent_node) {
   if (!parent_node)
     return;
   node_ = parent_node->CreateChild(fbl::StringPrintf("image-%p", this).c_str());
-  node_.CreateBool("capture_image", capture_image_, &properties_);
   node_.CreateUint("width", info_.width, &properties_);
   node_.CreateUint("height", info_.height, &properties_);
   node_.CreateUint("type", info_.type, &properties_);
