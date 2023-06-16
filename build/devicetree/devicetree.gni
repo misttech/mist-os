@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/config/current_target_tuple.gni")
 import("//build/testing/golden_files.gni")
 import("//build/zircon/c_utils.gni")
 
@@ -36,7 +35,6 @@ template("_preprocessed_dts") {
     include_dir = rebase_path("//", root_build_dir)
 
     args = [
-      "--target=$current_target_tuple",
       "-undef",
       "-MD",
       "-MF",
