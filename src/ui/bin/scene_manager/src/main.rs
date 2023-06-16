@@ -5,8 +5,7 @@
 use {
     crate::color_transform_manager::ColorTransformManager,
     ::input_pipeline::{
-        activity::ActivityManager, input_device::InputDeviceType,
-        light_sensor::Configuration as LightSensorConfiguration,
+        input_device::InputDeviceType, light_sensor::Configuration as LightSensorConfiguration,
     },
     anyhow::{Context, Error},
     fidl::prelude::*,
@@ -19,8 +18,6 @@ use {
         GraphicalPresenterRequest, GraphicalPresenterRequestStream, PresentViewError, ViewSpec,
     },
     fidl_fuchsia_input_injection::InputDeviceRegistryRequestStream,
-    fidl_fuchsia_input_interaction::NotifierRequestStream,
-    fidl_fuchsia_input_interaction_observation::AggregatorRequestStream,
     fidl_fuchsia_input_wayland::KeymapRequestStream,
     fidl_fuchsia_lightsensor::SensorRequestStream as LightSensorRequestStream,
     fidl_fuchsia_recovery_policy::DeviceRequestStream as FactoryResetDeviceRequestStream,
@@ -78,8 +75,6 @@ enum ExposedServices {
     InputDeviceRegistry(InputDeviceRegistryRequestStream),
     LightSensor(LightSensorRequestStream),
     SceneManager(SceneManagerRequestStream),
-    UserInteractionObservation(AggregatorRequestStream),
-    UserInteraction(NotifierRequestStream),
     Wayland(KeymapRequestStream),
 }
 
@@ -136,8 +131,6 @@ async fn inner_main() -> Result<(), Error> {
         .add_fidl_service(ExposedServices::InputConfigFeatures)
         .add_fidl_service(ExposedServices::InputDeviceRegistry)
         .add_fidl_service(ExposedServices::SceneManager)
-        .add_fidl_service(ExposedServices::UserInteractionObservation)
-        .add_fidl_service(ExposedServices::UserInteraction)
         .add_fidl_service(ExposedServices::Wayland);
 
     let light_sensor_configuration: Option<LightSensorConfiguration> =
@@ -318,11 +311,6 @@ async fn inner_main() -> Result<(), Error> {
         fasync::Task::local(input_pipeline.handle_input_events()).detach();
     };
 
-    // Create Activity Manager.
-    const DEFAULT_IDLE_THRESHOLD_MINUTES: i64 = 15;
-    let activity_manager =
-        ActivityManager::new(zx::Duration::from_minutes(DEFAULT_IDLE_THRESHOLD_MINUTES));
-
     // Create and register a ColorTransformManager.
     let color_converter = connect_to_protocol::<color::ConverterMarker>()?;
     let color_transform_manager =
@@ -454,38 +442,6 @@ async fn inner_main() -> Result<(), Error> {
                         warn!("failed to forward fuchsia.recovery.policy.Device: {:?}", e)
                     }
                 }
-            }
-            ExposedServices::UserInteractionObservation(stream) => {
-                let activity_manager = activity_manager.clone();
-                fasync::Task::local(async move {
-                match activity_manager
-                    .handle_interaction_aggregator_request_stream(stream)
-                    .await
-                {
-                    Ok(()) => (),
-                    Err(e) => {
-                        warn!(
-                      "failure while serving fuchsia.input.interaction.observation.Aggregator: {:?}",
-                      e
-                  );
-                    }}
-                }).detach();
-            }
-            ExposedServices::UserInteraction(stream) => {
-                let activity_manager = activity_manager.clone();
-                fasync::Task::local(async move {
-                    match activity_manager.handle_interaction_notifier_request_stream(stream).await
-                    {
-                        Ok(()) => (),
-                        Err(e) => {
-                            warn!(
-                                "failure while serving fuchsia.input.interaction.Notifier: {:?}",
-                                e
-                            );
-                        }
-                    }
-                })
-                .detach();
             }
             ExposedServices::Wayland(stream) => {
                 let keymap_sender_clone = keymap_sender.clone();

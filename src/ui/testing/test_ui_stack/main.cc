@@ -4,7 +4,6 @@
 
 #include <fuchsia/accessibility/semantics/cpp/fidl.h>
 #include <fuchsia/element/cpp/fidl.h>
-#include <fuchsia/input/interaction/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/display/singleton/cpp/fidl.h>
 #include <fuchsia/ui/focus/cpp/fidl.h>
@@ -67,8 +66,6 @@ int run_test_ui_stack(int argc, const char** argv) {
       context.get(), realm_exposed_services.get());
   AddPublicService<fuchsia::element::GraphicalPresenter>(context.get(),
                                                          realm_exposed_services.get());
-  AddPublicService<fuchsia::input::interaction::Notifier>(context.get(),
-                                                          realm_exposed_services.get());
   AddPublicService<fuchsia::ui::composition::Allocator>(context.get(),
                                                         realm_exposed_services.get());
   AddPublicService<fuchsia::ui::composition::Flatland>(context.get(), realm_exposed_services.get());

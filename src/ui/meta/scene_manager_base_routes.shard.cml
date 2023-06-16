@@ -71,7 +71,6 @@
         {
             protocol: [
                 "fuchsia.input.injection.InputDeviceRegistry", // test-only
-                "fuchsia.input.interaction.Notifier",
 
                 // Dynamic keymap changes for Wayland bridge.
                 "fuchsia.input.wayland.Keymap",
