@@ -40,7 +40,6 @@ zx_library("fidl-async-cpp") {
     "//src/devices/gpio/drivers/gpio:*",
     "//src/devices/ram/bin/ram-info:*",
     "//src/devices/registers/drivers/registers:*",
-    "//src/firmware/lib/fastboot:lib",
     "//src/graphics/display/drivers/aml-hdmi:*",
     "//src/graphics/display/drivers/amlogic-display:*",
     "//src/graphics/display/drivers/intel-i915:*",

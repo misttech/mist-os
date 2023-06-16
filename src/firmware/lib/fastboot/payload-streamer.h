@@ -9,7 +9,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fzl/vmo-mapper.h>
 
 namespace fastboot {
@@ -22,7 +21,7 @@ class PayloadStreamer : public fidl::WireServer<fuchsia_paver::PayloadStream> {
   PayloadStreamer(fidl::ServerEnd<fuchsia_paver::PayloadStream> server_end, const void* data,
                   size_t size)
       : data_(static_cast<const uint8_t*>(data)), size_(size) {
-    fidl::BindSingleInFlightOnly(async_get_default_dispatcher(), std::move(server_end), this);
+    fidl::BindServer(async_get_default_dispatcher(), std::move(server_end), this);
   }
 
   ~PayloadStreamer() override = default;

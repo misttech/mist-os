@@ -36,9 +36,6 @@ source_set("lib") {
     "//src/developer/sshd-host:sshd_constants",
     "//src/storage/lib/paver:gpt",
     "//third_party/android/platform/system:sparse_format",
-
-    # payload-streamer.h has #include <lib/fidl-async/cpp/bind.h>.
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zx",
   ]
