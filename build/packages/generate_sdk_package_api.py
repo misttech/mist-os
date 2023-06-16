@@ -11,7 +11,6 @@ import collections
 import difflib
 import json
 import os
-import platform
 import sys
 
 
@@ -69,10 +68,10 @@ def main():
                 file=sys.stderr)
             return 1
 
-        if path not in args.expected_files_exact:
+        if path in args.expected_files_internal:
             # Add as an 'internal' file.
             generated_package_api['content']['files'][path] = {"internal": True}
-        else:
+        if path in args.expected_files_exact:
             # Add as an 'exact' file.
             generated_package_api['content']['files'][path] = {"hash": merkle}
 
@@ -85,8 +84,7 @@ def main():
                 file=sys.stderr)
             return 1
 
-    generated_package_api_str = json.dumps(
-        generated_package_api, indent=2)
+    generated_package_api_str = json.dumps(generated_package_api, indent=2)
 
     with open(args.output, 'w') as output_file:
         output_file.write(generated_package_api_str)
@@ -96,7 +94,8 @@ def main():
         passed_golden = False
         if not os.path.isfile(args.reference):
             print(
-                f"Golden file specified, but no file found at {args.reference}.", file=sys.stderr)
+                f"Golden file specified, but no file found at {args.reference}.",
+                file=sys.stderr)
         else:
             with open(args.reference, 'r') as manifest_file:
                 golden = json.load(manifest_file)
@@ -105,11 +104,13 @@ def main():
 
             if not generated_package_api_str == golden_str:
                 print(
-                    "Golden and generated api file do not match.", file=sys.stderr)
+                    "Golden and generated api file do not match.",
+                    file=sys.stderr)
                 print(
                     "\n".join(
-                        difflib.unified_diff(golden_str.splitlines(),
-                                            generated_package_api_str.splitlines())),
+                        difflib.unified_diff(
+                            golden_str.splitlines(),
+                            generated_package_api_str.splitlines())),
                     file=sys.stderr)
             else:
                 passed_golden = True

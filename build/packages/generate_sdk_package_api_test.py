@@ -47,10 +47,16 @@ class ConvertTest(unittest.TestCase):
                                 "merkle": "222",
                                 "size": 1
                             },
+                            {
+                                "source_path": "my/qux",
+                                "path": "bin/qux",
+                                "merkle": "333",
+                                "size": 1
+                            },
                         ],
                 },
-                expected_files_exact=["bin/bar"],
-                expected_files_internal=[],
+                expected_files_exact=["meta/", "bin/bar"],
+                expected_files_internal=["my/baz"],
                 reference={
                     "version": "1",
                     "content":
@@ -58,7 +64,7 @@ class ConvertTest(unittest.TestCase):
                             "files":
                                 {
                                     "meta/": {
-                                        "internal": True,
+                                        "hash": "000",
                                     },
                                     "bin/bar": {
                                         "hash": "111",
@@ -93,13 +99,13 @@ class ConvertTest(unittest.TestCase):
                             {
                                 "source_path": "my/bar",
                                 "path": "bin/bar",
-                                "merkle": "222",
+                                "merkle": "111",
                                 "size": 1
                             },
                         ],
                 },
                 expected_files_exact=["bin/bar"],
-                expected_files_internal=[],
+                expected_files_internal=["meta/"],
                 reference={
                     "version": "1",
                     "content":
@@ -110,7 +116,7 @@ class ConvertTest(unittest.TestCase):
                                         "internal": True
                                     },
                                     "bin/bar": {
-                                        "hash": "111",
+                                        "hash": "INCORRECT_HASH",
                                     },
                                 }
                         }

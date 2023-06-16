@@ -57,8 +57,7 @@
 #     do not participate in that package's API definition. Their content
 #     does not matter for API verification, but these paths must appear in
 #     the golden //sdk/package/${package_name}.api file, and in the same order.
-#     Any paths missing from this list will be included in the generated API definition,
-#     while any paths specified in this list that are not found in the specified
+#     Any paths specified in this list that are not found in the specified
 #     manifest will cause an error during API definition generation.
 #     Type: list of relative package paths
 #
@@ -107,7 +106,7 @@ template("sdk_fuchsia_package") {
                     "/" + get_label_info(invoker.package_label, "name")
 
   package_manifest_file = "${package_out_dir}/package_manifest.json"
-  computed_api_file = "${root_out_dir}/sdk/packages/${package_name}.api"
+  computed_api_file = "${package_out_dir}/sdk/packages/${package_name}.api"
   golden_api_file = "//sdk/packages/${package_name}.api"
 
   action(target_name) {
