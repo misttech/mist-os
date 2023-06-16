@@ -88,14 +88,14 @@ group("vkext_linux_x64") {
   public_deps = [ ":vkext_linux(//build/toolchain:linux_x64)" ]
 }
 
-fuchsia_component("vkext_unprotected_cmp") {
-  testonly = true
+fuchsia_test_component("vkext_unprotected_cmp") {
   component_name = "vkext_unprotected"
   deps = [
     ":vkext_unprotected_bin",
     "//src/lib/vulkan/validation_layers",
   ]
   manifest = "meta/vkext_unprotected.cml"
+  test_type = "vulkan"
 }
 
 fuchsia_test_package("vkext-unprotected-package") {
@@ -118,7 +118,7 @@ foreach(env, magma_libvulkan_hardware_envs) {
   }
 }
 
-fuchsia_component("vkext_protected_cmp") {
+fuchsia_test_component("vkext_protected_cmp") {
   testonly = true
   component_name = "vkext_protected"
   deps = [
@@ -126,6 +126,7 @@ fuchsia_component("vkext_protected_cmp") {
     "//src/lib/vulkan/validation_layers",
   ]
   manifest = "meta/vkext_protected.cml"
+  test_type = "vulkan"
 }
 
 fuchsia_test_package("vkext-protected-package") {

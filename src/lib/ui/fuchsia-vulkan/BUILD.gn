@@ -31,6 +31,7 @@ fuchsia_unittest_package("fuchsia_vulkan_tests") {
   test_specs = {
     environments = vulkan_envs
   }
+  test_type = "vulkan"
 }
 
 group("tests") {

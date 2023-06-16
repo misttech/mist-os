@@ -79,4 +79,5 @@ fuchsia_unittest_package("image-pipe-swapchain-hermetic-tests") {
       max_severity = "ERROR"
     }
   }
+  test_type = "vulkan"
 }

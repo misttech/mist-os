@@ -20,7 +20,7 @@ executable("vkpriority_bin") {
   ]
 }
 
-fuchsia_component("vkpriority_cmp") {
+fuchsia_test_component("vkpriority_cmp") {
   testonly = true
   component_name = "vkpriority"
   deps = [
@@ -29,6 +29,7 @@ fuchsia_component("vkpriority_cmp") {
   ]
 
   manifest = "meta/vkpriority.cml"
+  test_type = "vulkan"
 }
 
 fuchsia_test_package("vkpriority-pkg") {

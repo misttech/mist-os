@@ -102,4 +102,5 @@ fuchsia_unittest_package(
       max_severity = "ERROR"
     }
   }
+  test_type = "vulkan"
 }

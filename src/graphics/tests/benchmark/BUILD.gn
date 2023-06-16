@@ -80,11 +80,11 @@ if (magma_openvx_package != "") {
   }
 }
 
-fuchsia_component("vkcopy_cmp") {
-  testonly = true
+fuchsia_test_component("vkcopy_cmp") {
   component_name = "vkcopy"
   deps = [ ":vkcopy_bin" ]
   manifest = "meta/vkcopy.cml"
+  test_type = "vulkan"
 }
 
 fuchsia_test_package("vkcopy-pkg") {

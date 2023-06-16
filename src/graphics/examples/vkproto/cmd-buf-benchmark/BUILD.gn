@@ -20,7 +20,7 @@ packaged_shared_library("libvulkan") {
   library = "//third_party/Vulkan-Loader:libvulkan"
 }
 
-fuchsia_component("cmd-buf-benchmark-component") {
+fuchsia_test_component("cmd-buf-benchmark-component") {
   testonly = true
   component_name = "cmd-buf-benchmark"
   manifest = "meta/cmd-buf-benchmark.cml"
@@ -31,6 +31,7 @@ fuchsia_component("cmd-buf-benchmark-component") {
     "//src/lib/vulkan/swapchain:image_pipe_swapchain_fb_layer",
     "//src/lib/vulkan/validation_layers",
   ]
+  test_type = "vulkan"
 }
 
 config("vulkan_sdk_linux_config") {

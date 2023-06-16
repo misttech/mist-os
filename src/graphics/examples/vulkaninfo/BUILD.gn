@@ -5,7 +5,7 @@
 import("//build/components.gni")
 import("//src/lib/vulkan/vulkan.gni")
 
-fuchsia_component("vulkaninfo-cmp") {
+fuchsia_test_component("vulkaninfo-cmp") {
   manifest = "meta/vulkaninfo.cml"
   component_name = "vulkaninfo"
 
@@ -14,6 +14,7 @@ fuchsia_component("vulkaninfo-cmp") {
     "//src/lib/vulkan/swapchain:image_pipe_swapchain_fb_layer",
     "//src/lib/vulkan/validation_layers",
   ]
+  test_type = "vulkan"
 }
 
 fuchsia_test_package("vulkaninfo") {

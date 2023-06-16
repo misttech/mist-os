@@ -39,8 +39,7 @@ executable("icd_conformance_bin") {
   deps = [ ":src" ]
 }
 
-fuchsia_component("icd_conformance_cmp") {
-  testonly = true
+fuchsia_test_component("icd_conformance_cmp") {
   component_name = "icd_conformance"
   deps = [
     ":icd_conformance_bin",
@@ -48,6 +47,7 @@ fuchsia_component("icd_conformance_cmp") {
   ]
 
   manifest = "meta/icd_conformance.cml"
+  test_type = "vulkan"
 }
 
 fuchsia_test_package("icd-conformance") {

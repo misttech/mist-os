@@ -24,8 +24,7 @@ resource("override_from_path") {
   outputs = [ "data/test-xdg2/vulkan/implicit_layer.d/VkLayer_override.json" ]
 }
 
-fuchsia_component("vkvalidation_cmp") {
-  testonly = true
+fuchsia_test_component("vkvalidation_cmp") {
   component_name = "vkvalidation"
   deps = [
     ":override",
@@ -33,6 +32,7 @@ fuchsia_component("vkvalidation_cmp") {
     "//src/lib/vulkan/validation_layers",
   ]
   manifest = "meta/vkvalidation.cml"
+  test_type = "vulkan"
 }
 
 fuchsia_test_package("vkvalidation-pkg") {
@@ -43,9 +43,8 @@ fuchsia_test_package("vkvalidation-pkg") {
   }
 }
 
-fuchsia_component("vkvalidation_external_cmp") {
+fuchsia_test_component("vkvalidation_external_cmp") {
   restricted_features = [ "allow_non_hermetic_packages" ]
-  testonly = true
   component_name = "vkvalidation-external"
 
   # Package must not include validation layers
@@ -56,6 +55,7 @@ fuchsia_component("vkvalidation_external_cmp") {
     "//src/lib/vulkan/vulkan-validation-pkg:validation-client",
   ]
   manifest = "meta/vkvalidation-external.cml"
+  test_type = "vulkan"
 }
 
 fuchsia_test_package("vkvalidation-external-pkg") {

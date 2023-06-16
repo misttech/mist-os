@@ -52,6 +52,7 @@ fuchsia_test_component("vkreadback_test_component") {
   ]
 
   manifest = "meta/vkreadback.cml"
+  test_type = "vulkan"
 }
 
 fuchsia_test_package("vkreadback_test_package") {

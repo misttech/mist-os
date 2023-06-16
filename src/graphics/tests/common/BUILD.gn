@@ -36,8 +36,7 @@ executable("vkcontext_bin") {
   ]
 }
 
-fuchsia_component("vkcontext_cmp") {
-  testonly = true
+fuchsia_test_component("vkcontext_cmp") {
   component_name = "vkcontext"
   deps = [
     ":vkcontext_bin",
@@ -45,6 +44,7 @@ fuchsia_component("vkcontext_cmp") {
   ]
 
   manifest = "meta/vkcontext.cml"
+  test_type = "vulkan"
 }
 
 fuchsia_test_package("vkcontext-pkg") {
