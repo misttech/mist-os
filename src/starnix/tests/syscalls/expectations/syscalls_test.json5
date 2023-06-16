@@ -29,6 +29,9 @@
             matchers: [
                 // TODO(https://fxbug.dev/121778)
                 "MMapProcTest.AdjacentFileMappings",
+
+                // TODO(https://fxbug.dev/128842)
+                "VdsoTest.VdsoCanBeMadvised",
             ],
         },
     ],
