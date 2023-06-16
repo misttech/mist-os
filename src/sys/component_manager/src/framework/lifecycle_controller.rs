@@ -125,8 +125,14 @@ impl LifecycleController {
     ) -> Result<(), fsys::CreateError> {
         let parent_moniker = join_monikers(scope_moniker, &parent_moniker)
             .map_err(|_| fsys::CreateError::BadMoniker)?;
-        let parent_component =
-            self.model.find(&parent_moniker).await.ok_or(fsys::CreateError::InstanceNotFound)?;
+        let parent_component = self.model.look_up(&parent_moniker).await.map_err(|e| match e {
+            ModelError::CollectionNotFound { name: _ } => fsys::CreateError::CollectionNotFound,
+            ModelError::PathIsNotUtf8 { path: _ }
+            | ModelError::UnexpectedComponentManagerMoniker
+            | ModelError::ComponentInstanceError { err: _ } => fsys::CreateError::InstanceNotFound,
+            ModelError::MonikerError { err: _ } => fsys::CreateError::BadMoniker,
+            _ => fsys::CreateError::Internal,
+        })?;
 
         cm_fidl_validator::validate_dynamic_child(&child_decl)
             .map_err(|error| {
