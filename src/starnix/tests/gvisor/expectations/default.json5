@@ -410,13 +410,6 @@
                 "PingSocket.PayloadTooLarge",
                 "PingSocket.ReceiveIPPacketInfo",
                 "PingSocket.ReceiveIPv6PktInfo",
-                "PingSockets/Fixture.Bind/ICMP_socket_V6Any",
-                "PingSockets/Fixture.Bind/ICMP_socket_V6Loopback",
-                "PingSockets/Fixture.Bind/ICMP_socket_V6Multicast",
-                "PingSockets/Fixture.Bind/ICMP_socket_V6MulticastInterfaceLocalAllNodes",
-                "PingSockets/Fixture.Bind/ICMP_socket_V6MulticastLinkLocalAllNodes",
-                "PingSockets/Fixture.Bind/ICMP_socket_V6MulticastLinkLocalAllRouters",
-                "PingSockets/Fixture.Bind/ICMP_socket_IPv6UnknownUnicast",
 
                 // pivot_root_test
                 "PivotRootTest.WithoutCapability",

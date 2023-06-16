@@ -123,7 +123,13 @@ pub fn sys_bind(
     let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
     let address = parse_socket_address(current_task, user_socket_address, address_length)?;
     if !address.valid_for_domain(socket.domain) {
-        return error!(EINVAL);
+        return match socket.domain {
+            SocketDomain::Unix
+            | SocketDomain::Vsock
+            | SocketDomain::Inet6
+            | SocketDomain::Netlink => error!(EINVAL),
+            SocketDomain::Inet => error!(EAFNOSUPPORT),
+        };
     }
     match address {
         SocketAddress::Unspecified => return error!(EINVAL),
