@@ -25,18 +25,6 @@ driver_bind_rules("astro-bind") {
   ]
 }
 
-driver_bind_rules("astro-bluetooth-bind") {
-  rules = "bind/astro-bluetooth.bind"
-  header_output = "astro-bluetooth-bind.h"
-  bind_output = "astro-bluetooth.bindbc"
-  tests = "bind-tests/astro-bluetooth-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.hardware.pwm",
-    "//src/devices/bind/fuchsia.platform",
-  ]
-}
-
 driver_bind_rules("astro-buttons-bind") {
   rules = "bind/astro-buttons.bind"
   header_output = "astro-buttons-bind.h"
@@ -240,7 +228,6 @@ fuchsia_driver("astro-driver") {
     ":astro-aml-sdio-bind_header",
     ":astro-aml-usb-phy-v2-bind_header",
     ":astro-bind",
-    ":astro-bluetooth-bind_header",
     ":astro-buttons-bind_header",
     ":astro-cpu-bind_header",
     ":astro-dwc2-phy-bind_header",
@@ -330,7 +317,6 @@ group("tests") {
     ":astro-aml-sdio-bind_test",
     ":astro-aml-usb-phy-v2-bind_test",
     ":astro-bind_test",
-    ":astro-bluetooth-bind_test",
     ":astro-buttons-bind_test",
     ":astro-cpu-bind_test",
     ":astro-dwc2-phy-bind_test",
