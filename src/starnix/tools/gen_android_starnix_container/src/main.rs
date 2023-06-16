@@ -69,6 +69,7 @@ fn generate(cmd: Command) -> Result<()> {
     let system_files = ext4_extract(cmd.system.as_str(), system_outdir.as_str())
         .context("Extracting system files")?;
     for (dst, src) in &system_files {
+        let dst = format!("data/system/{}", dst);
         builder
             .add_file_as_blob(dst, &src)
             .with_context(|| format!("Adding blob from file: {}", &src))?;
@@ -153,9 +154,9 @@ mod tests {
             blob_filenames,
             vec![
                 "meta/".to_string(),
-                "13".to_string(),
+                "data/system/13".to_string(),
+                "data/system/metadata.v1".to_string(),
                 "data/test".to_string(),
-                "metadata.v1".to_string(),
             ]
         );
         assert_eq!(subpackage_names, vec!["test-hal".to_string(),]);
