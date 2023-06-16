@@ -9,7 +9,7 @@
 
 use anyhow::{Context, Error};
 use archivist_config::Config;
-use archivist_lib::{archivist::Archivist, component_lifecycle, events::router::RouterOptions};
+use archivist_lib::{archivist::Archivist, component_lifecycle};
 use diagnostics_log::PublishOptions;
 use fuchsia_async as fasync;
 use fuchsia_component::server::{MissingStartupHandle, ServiceFs};
@@ -47,7 +47,6 @@ async fn async_main(config: Config) -> Result<(), Error> {
         .root()
         .record_child("config", |config_node| config.record_inspect(config_node));
 
-    let router_options = RouterOptions { validate: config.enable_event_source };
     let mut archivist = Archivist::new(config).await;
     archivist.set_lifecycle_request_stream(component_lifecycle::take_lifecycle_request_stream());
     debug!("Archivist initialized from configuration.");
@@ -58,7 +57,7 @@ async fn async_main(config: Config) -> Result<(), Error> {
 
     let mut fs = ServiceFs::new();
     fs.serve_connection(fidl::endpoints::ServerEnd::new(zx::Channel::from(startup_handle)))?;
-    archivist.run(fs, router_options).await?;
+    archivist.run(fs).await?;
 
     Ok(())
 }

@@ -22,20 +22,6 @@ use tracing::{debug, error};
 
 const RECENT_EVENT_LIMIT: usize = 200;
 
-#[derive(Debug)]
-pub struct RouterOptions {
-    /// Whether or not to validate that the event routing is complete: for each consumer of an
-    /// event there exists at least one producer. And for each producer, there exists at least one
-    /// consumer.
-    pub validate: bool,
-}
-
-impl Default for RouterOptions {
-    fn default() -> Self {
-        Self { validate: true }
-    }
-}
-
 /// Core archivist internal event router that supports multiple event producers and multiple event
 /// consumers.
 pub struct EventRouter {
@@ -101,13 +87,8 @@ impl EventRouter {
     /// Afterwards, listens to events emitted by producers. When an event arrives it sends it to
     /// all consumers of the event. Since all events are singletons, the first consumer that was
     /// registered will get the singleton data and the rest won't.
-    pub fn start(
-        mut self,
-        opts: RouterOptions,
-    ) -> Result<(TerminateHandle, impl Future<Output = ()>), RouterError> {
-        if opts.validate {
-            self.validate_routing()?;
-        }
+    pub fn start(mut self) -> Result<(TerminateHandle, impl Future<Output = ()>), RouterError> {
+        self.validate_routing()?;
 
         let (terminate_handle, mut stream) = EventStream::new(self.receiver);
         let mut consumers = self.consumers;
@@ -517,7 +498,7 @@ mod tests {
         // An explicit match is needed here since unwrap_err requires Debug implemented for both T
         // and E in Result<T, E> and T is a pair which second element is `impl Future` which
         // doesn't implement Debug.
-        match router.start(RouterOptions::default()) {
+        match router.start() {
             Err(err) => {
                 assert_matches!(err, RouterError::MissingProducer(EventType::LogSinkRequested));
             }
@@ -536,7 +517,7 @@ mod tests {
             events: vec![EventType::LogSinkRequested],
         });
 
-        match router.start(RouterOptions::default()) {
+        match router.start() {
             Err(err) => {
                 assert_matches!(
                     err,
@@ -567,7 +548,7 @@ mod tests {
             events: vec![EventType::LogSinkRequested],
         });
 
-        let (_terminate_handle, fut) = router.start(RouterOptions::default()).unwrap();
+        let (_terminate_handle, fut) = router.start().unwrap();
         let _router_task = fasync::Task::spawn(fut);
 
         // Emit an event
@@ -630,7 +611,7 @@ mod tests {
         drop(first_consumer);
         drop(third_consumer);
 
-        let (_terminate_handle, fut) = router.start(RouterOptions::default()).unwrap();
+        let (_terminate_handle, fut) = router.start().unwrap();
         let _router_task = fasync::Task::spawn(fut);
 
         // Emit an event
@@ -704,7 +685,7 @@ mod tests {
         producer3.emit(EventType::InspectSinkRequested, IDENTITY.clone()).await;
 
         // Consume the events.
-        let (_terminate_handle, fut) = router.start(RouterOptions::default()).unwrap();
+        let (_terminate_handle, fut) = router.start().unwrap();
         let _router_task = fasync::Task::spawn(fut);
         receiver.take(2).collect::<Vec<_>>().await;
 
@@ -769,7 +750,7 @@ mod tests {
         producer2.emit(EventType::DiagnosticsReady, identity("./d")).await;
 
         // We should see the events in order of emission.
-        let (_terminate_handle, fut) = router.start(RouterOptions::default()).unwrap();
+        let (_terminate_handle, fut) = router.start().unwrap();
         let _router_task = fasync::Task::spawn(fut);
         let events = receiver.take(4).collect::<Vec<_>>().await;
 
@@ -806,7 +787,7 @@ mod tests {
 
         producer.emit(EventType::DiagnosticsReady, IDENTITY.clone()).await;
 
-        let (terminate_handle, fut) = router.start(RouterOptions::default()).unwrap();
+        let (terminate_handle, fut) = router.start().unwrap();
         let _router_task = fasync::Task::spawn(fut);
         let on_drained = terminate_handle.terminate();
         let drain_finished = fasync::Task::spawn(on_drained);

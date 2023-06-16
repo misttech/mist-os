@@ -8,9 +8,6 @@
         // Drain klog.
         enable_klog: { type: "bool" },
 
-        // Ingest events coming from CFv2.
-        enable_event_source: { type: "bool" },
-
         // Send archivist logs to klog.
         log_to_debuglog: { type: "bool" },
 

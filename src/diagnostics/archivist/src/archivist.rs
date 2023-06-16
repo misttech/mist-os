@@ -7,7 +7,7 @@ use crate::{
     component_lifecycle,
     error::Error,
     events::{
-        router::{ConsumerConfig, EventRouter, ProducerConfig, RouterOptions},
+        router::{ConsumerConfig, EventRouter, ProducerConfig},
         sources::EventSource,
         types::*,
     },
@@ -91,7 +91,7 @@ impl Archivist {
         let mut event_router =
             EventRouter::new(component::inspector().root().create_child("events"));
         let incoming_external_event_producers =
-            Self::initialize_external_event_sources(&mut event_router, &config).await;
+            Self::initialize_external_event_sources(&mut event_router).await;
 
         let logs_repo = LogsRepository::new(
             config.logs_max_cached_original_bytes,
@@ -209,54 +209,51 @@ impl Archivist {
 
     pub async fn initialize_external_event_sources(
         event_router: &mut EventRouter,
-        config: &Config,
     ) -> Vec<fasync::Task<()>> {
         let mut incoming_external_event_producers = vec![];
-        if config.enable_event_source {
-            match EventSource::new("/events/log_sink_requested_event_stream").await {
-                Err(err) => warn!(?err, "Failed to create event source for log sink requests"),
-                Ok(mut event_source) => {
-                    event_router.add_producer(ProducerConfig {
-                        producer: &mut event_source,
-                        events: vec![EventType::LogSinkRequested],
-                    });
-                    incoming_external_event_producers.push(fasync::Task::spawn(async move {
-                        // This should never exit.
-                        let _ = event_source.spawn().await;
-                    }));
-                }
+        match EventSource::new("/events/log_sink_requested_event_stream").await {
+            Err(err) => warn!(?err, "Failed to create event source for log sink requests"),
+            Ok(mut event_source) => {
+                event_router.add_producer(ProducerConfig {
+                    producer: &mut event_source,
+                    events: vec![EventType::LogSinkRequested],
+                });
+                incoming_external_event_producers.push(fasync::Task::spawn(async move {
+                    // This should never exit.
+                    let _ = event_source.spawn().await;
+                }));
             }
+        }
 
-            match EventSource::new("/events/inspect_sink_requested_event_stream").await {
-                Err(err) => {
-                    warn!(?err, "Failed to create event source for InspectSink requests")
-                }
-                Ok(mut event_source) => {
-                    event_router.add_producer(ProducerConfig {
-                        producer: &mut event_source,
-                        events: vec![EventType::InspectSinkRequested],
-                    });
-                    incoming_external_event_producers.push(fasync::Task::spawn(async move {
-                        // This should never exit.
-                        let _ = event_source.spawn().await;
-                    }));
-                }
+        match EventSource::new("/events/inspect_sink_requested_event_stream").await {
+            Err(err) => {
+                warn!(?err, "Failed to create event source for InspectSink requests")
             }
+            Ok(mut event_source) => {
+                event_router.add_producer(ProducerConfig {
+                    producer: &mut event_source,
+                    events: vec![EventType::InspectSinkRequested],
+                });
+                incoming_external_event_producers.push(fasync::Task::spawn(async move {
+                    // This should never exit.
+                    let _ = event_source.spawn().await;
+                }));
+            }
+        }
 
-            match EventSource::new("/events/diagnostics_ready_event_stream").await {
-                Err(err) => {
-                    warn!(?err, "Failed to create event source for diagnostics ready requests")
-                }
-                Ok(mut event_source) => {
-                    event_router.add_producer(ProducerConfig {
-                        producer: &mut event_source,
-                        events: vec![EventType::DiagnosticsReady],
-                    });
-                    incoming_external_event_producers.push(fasync::Task::spawn(async move {
-                        // This should never exit.
-                        let _ = event_source.spawn().await;
-                    }));
-                }
+        match EventSource::new("/events/diagnostics_ready_event_stream").await {
+            Err(err) => {
+                warn!(?err, "Failed to create event source for diagnostics ready requests")
+            }
+            Ok(mut event_source) => {
+                event_router.add_producer(ProducerConfig {
+                    producer: &mut event_source,
+                    events: vec![EventType::DiagnosticsReady],
+                });
+                incoming_external_event_producers.push(fasync::Task::spawn(async move {
+                    // This should never exit.
+                    let _ = event_source.spawn().await;
+                }));
             }
         }
 
@@ -271,11 +268,7 @@ impl Archivist {
     /// Run archivist to completion.
     /// # Arguments:
     /// * `outgoing_channel`- channel to serve outgoing directory on.
-    pub async fn run(
-        mut self,
-        mut fs: ServiceFs<ServiceObj<'static, ()>>,
-        router_opts: RouterOptions,
-    ) -> Result<(), Error> {
+    pub async fn run(mut self, mut fs: ServiceFs<ServiceObj<'static, ()>>) -> Result<(), Error> {
         debug!("Running Archivist.");
 
         // Start servicing all outgoing services.
@@ -285,7 +278,7 @@ impl Archivist {
         // Start ingesting events.
         let (terminate_handle, drain_events_fut) = self
             .event_router
-            .start(router_opts)
+            .start()
             // panic: can only panic if we didn't register event producers and consumers correctly.
             .expect("Failed to start event router");
         let _event_routing_task = fasync::Task::spawn(async move {
@@ -409,7 +402,6 @@ mod tests {
     async fn init_archivist(fs: &mut ServiceFs<ServiceObj<'static, ()>>) -> Archivist {
         let config = Config {
             enable_klog: false,
-            enable_event_source: false,
             log_to_debuglog: false,
             maximum_concurrent_snapshots_per_reader: 4,
             logs_max_cached_original_bytes: LEGACY_DEFAULT_MAXIMUM_CACHED_LOGS_BYTES,
@@ -508,7 +500,7 @@ mod tests {
         archivist.set_lifecycle_request_stream(request_stream);
         let (signal_send, signal_recv) = oneshot::channel();
         fasync::Task::spawn(async move {
-            archivist.run(fs, RouterOptions::default()).await.expect("Cannot run archivist");
+            archivist.run(fs).await.expect("Cannot run archivist");
             signal_send.send(()).unwrap();
         })
         .detach();
@@ -522,7 +514,7 @@ mod tests {
         fs.serve_connection(server_end).unwrap();
         let archivist = init_archivist(&mut fs).await;
         fasync::Task::spawn(async move {
-            archivist.run(fs, RouterOptions::default()).await.expect("Cannot run archivist");
+            archivist.run(fs).await.expect("Cannot run archivist");
         })
         .detach();
         directory
