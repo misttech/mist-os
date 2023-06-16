@@ -58,6 +58,7 @@ pub mod include_log {
             .get_sdk()
             .await?;
         let isolate = new_isolate("log-run-normal").await?;
+        isolate.start_daemon().await?;
         // Test with proactive logging enabled
         run_logging_e2e_test(&sdk, &isolate, &target, true).await?;
         // Test without proactive logging enabled.
