@@ -82,7 +82,7 @@ pub fn sys_clone3(
 fn read_c_string_vector(
     mm: &MemoryManager,
     user_vector: UserRef<UserCString>,
-    buf: &mut [u8],
+    elem_limit: usize,
     vec_limit: usize,
 ) -> Result<(Vec<CString>, usize), Errno> {
     let mut user_current = user_vector;
@@ -93,7 +93,7 @@ fn read_c_string_vector(
         if user_string.is_null() {
             break;
         }
-        let string = mm.read_c_string(user_string, buf).map_err(|e| {
+        let string = mm.read_c_string_vec(user_string, elem_limit).map_err(|e| {
             if e == errno!(ENAMETOOLONG) {
                 errno!(E2BIG)
             } else {
@@ -142,20 +142,24 @@ pub fn sys_execveat(
 
     // The limit per argument or environment variable is 32 pages.
     // See the Limits sections in https://man7.org/linux/man-pages/man2/execve.2.html
-    let mut buf = vec![0u8; page_limit_size];
     let (argv, argv_size) = if user_argv.is_null() {
         (Vec::new(), 0)
     } else {
-        read_c_string_vector(&current_task.mm, user_argv, &mut buf, argv_env_limit)?
+        read_c_string_vector(&current_task.mm, user_argv, page_limit_size, argv_env_limit)?
     };
 
     let (environ, _) = if user_environ.is_null() {
         (Vec::new(), 0)
     } else {
-        read_c_string_vector(&current_task.mm, user_environ, &mut buf, argv_env_limit - argv_size)?
+        read_c_string_vector(
+            &current_task.mm,
+            user_environ,
+            page_limit_size,
+            argv_env_limit - argv_size,
+        )?
     };
 
-    let path = current_task.mm.read_c_string(user_path, &mut buf)?;
+    let path = &current_task.mm.read_c_string_vec(user_path, page_limit_size)?;
 
     log_trace!(
         "execveat({}, {}, argv={:?}, environ={:?}, flags={})",
@@ -1566,15 +1570,14 @@ mod tests {
         mm.write_object((argv_addr + mem::size_of::<UserCString>()).into(), &null_usercstr)
             .expect("failed to write UserCString");
         let argv_userref = UserRef::new(argv_addr);
-        let mut buf = vec![0u8; 100];
 
         // The arguments size limit should include the null terminator.
-        assert!(read_c_string_vector(mm, argv_userref, &mut buf, arg.len()).is_ok());
+        assert!(read_c_string_vector(mm, argv_userref, 100, arg.len()).is_ok());
         assert_eq!(
             read_c_string_vector(
                 mm,
                 argv_userref,
-                &mut buf,
+                100,
                 std::str::from_utf8(arg).unwrap().trim_matches('\0').len()
             ),
             error!(E2BIG)

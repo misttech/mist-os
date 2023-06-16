@@ -1177,6 +1177,35 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         Ok(data)
     }
 
+    fn read_c_string_vec(&self, string: UserCString, max_size: usize) -> Result<Vec<u8>, Errno> {
+        let min_chunk_size = std::cmp::min(*PAGE_SIZE as usize, max_size);
+
+        let mut buf = vec![0; min_chunk_size];
+        let mut index = 0;
+        loop {
+            let read = self.read_memory_partial(string.addr(), &mut buf[index..])?;
+
+            if let Some(nul_index) = memchr::memchr(b'\0', &buf[index..index + read]) {
+                buf.resize(index + nul_index, 0u8);
+                if buf.len() > max_size {
+                    return error!(ENAMETOOLONG);
+                }
+
+                return Ok(buf);
+            }
+            index += read;
+
+            if index != buf.len() || index >= max_size {
+                // There's no more for us to read.
+                return error!(ENAMETOOLONG);
+            }
+
+            // Trigger a capacity increase.
+            buf.reserve(min_chunk_size);
+            buf.resize(std::cmp::min(buf.capacity(), max_size), 0);
+        }
+    }
+
     fn read_c_string<'a>(
         &self,
         string: UserCString,
@@ -2369,6 +2398,44 @@ mod tests {
         // However, accessing zero bytes in unmapped memory is not an error.
         mm.write_memory(unmapped_addr, &[]).expect("failed to write no data");
         mm.read_memory(unmapped_addr, &mut []).expect("failed to read no data");
+    }
+
+    #[::fuchsia::test]
+    async fn test_read_c_string_vec() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let mm = &current_task.mm;
+
+        let page_size = *PAGE_SIZE;
+        let max_size = 2 * page_size as usize;
+        let addr = mm.base_addr + 10 * page_size;
+
+        // Map a page at a fixed address and write an unterminated string at the end of it.
+        assert_eq!(map_memory(&current_task, addr, page_size), addr);
+        let test_str = b"foo!";
+        let test_addr = addr + page_size - test_str.len();
+        mm.write_memory(test_addr, test_str).expect("failed to write test string");
+
+        // Expect error if the string is not terminated.
+        assert_eq!(
+            mm.read_c_string_vec(UserCString::new(test_addr), max_size),
+            error!(ENAMETOOLONG)
+        );
+
+        // Expect success if the string is terminated.
+        mm.write_memory(addr + (page_size - 1), b"\0").expect("failed to write nul");
+        assert_eq!(mm.read_c_string_vec(UserCString::new(test_addr), max_size).unwrap(), b"foo");
+
+        // Expect success if the string spans over two mappings.
+        assert_eq!(map_memory(&current_task, addr + page_size, page_size), addr + page_size);
+        assert_eq!(mm.get_mapping_count(), 2);
+        mm.write_memory(addr + (page_size - 1), b"bar\0").expect("failed to write extra chars");
+        assert_eq!(mm.read_c_string_vec(UserCString::new(test_addr), max_size).unwrap(), b"foobar");
+
+        // Expect error if the string exceeds max limit
+        assert_eq!(mm.read_c_string_vec(UserCString::new(test_addr), 2), error!(ENAMETOOLONG));
+
+        // Expect error if the address is invalid.
+        assert_eq!(mm.read_c_string_vec(UserCString::default(), max_size), error!(EFAULT));
     }
 
     #[::fuchsia::test]
