@@ -26,6 +26,7 @@ rustc_library("netstack_testing_common") {
     "//sdk/fidl/fuchsia.net.reachability:fuchsia.net.reachability_rust",
     "//sdk/fidl/fuchsia.net.root:fuchsia.net.root_rust",
     "//sdk/fidl/fuchsia.net.routes:fuchsia.net.routes_rust",
+    "//sdk/fidl/fuchsia.net.routes.admin:fuchsia.net.routes.admin_rust",
     "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_rust",
     "//sdk/fidl/fuchsia.net.tun:fuchsia.net.tun_rust",
     "//sdk/fidl/fuchsia.net.virtualization:fuchsia.net.virtualization_rust",

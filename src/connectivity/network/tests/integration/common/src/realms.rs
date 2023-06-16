@@ -22,6 +22,7 @@ use fidl_fuchsia_net_neighbor as fnet_neighbor;
 use fidl_fuchsia_net_reachability as fnet_reachability;
 use fidl_fuchsia_net_root as fnet_root;
 use fidl_fuchsia_net_routes as fnet_routes;
+use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_test_realm as fntr;
 use fidl_fuchsia_net_virtualization as fnet_virtualization;
@@ -94,6 +95,8 @@ impl NetstackVersion {
                 fnet_multicast_admin::Ipv6RoutingTableControllerMarker::PROTOCOL_NAME,
                 fnet_neighbor::ControllerMarker::PROTOCOL_NAME,
                 fnet_neighbor::ViewMarker::PROTOCOL_NAME,
+                fnet_routes_admin::SetProviderV4Marker::PROTOCOL_NAME,
+                fnet_routes_admin::SetProviderV6Marker::PROTOCOL_NAME,
                 fnet_stack::LogMarker::PROTOCOL_NAME,
             ),
             NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => &common_services_and!(),

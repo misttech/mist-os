@@ -1,0 +1,23 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "expect_failure",
+            matchers: [
+                // TODO(https://fxbug.dev/129218): Implement fuchsia.net.routes.admin in Netstack2.
+                "add_route_ns2",
+
+                // TODO(https://fxbug.dev/129219): Implement fuchsia.net.routes.admin in Netstack3.
+                "add_route_ns3",
+            ],
+        },
+    ],
+}

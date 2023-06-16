@@ -22,7 +22,10 @@ tests = [
   "routes",
 ]
 
-tests_with_expectations = [ "interfaces-admin" ]
+tests_with_expectations = [
+  "interfaces-admin",
+  "routes-admin",
+]
 
 foreach(test, tests) {
   name = "netstack-${test}-fidl-test"
