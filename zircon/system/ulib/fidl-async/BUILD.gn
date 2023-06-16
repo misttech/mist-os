@@ -61,7 +61,6 @@ zx_library("fidl-async-cpp") {
     "//src/ui/light/drivers/aml-light:*",
     "//zircon/system/ulib/c/test:*",
     "//zircon/system/ulib/mock-boot-arguments:*",
-    "//zircon/system/ulib/usb-peripheral-utils:*",
   ]
 }
 

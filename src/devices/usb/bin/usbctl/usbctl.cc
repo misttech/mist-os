@@ -176,7 +176,7 @@ zx_status_t device_clear_functions(const fidl::WireSyncClient<peripheral::Device
   }
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  usb_peripheral_utils::EventWatcher watcher(&loop, std::move(server_end), 0);
+  usb_peripheral_utils::EventWatcher watcher(loop, std::move(server_end), 0);
   loop.Run();
   if (!watcher.all_functions_cleared()) {
     return ZX_ERR_BAD_STATE;

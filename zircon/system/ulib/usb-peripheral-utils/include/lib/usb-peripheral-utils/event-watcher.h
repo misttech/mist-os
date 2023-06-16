@@ -7,13 +7,12 @@
 
 #include <fidl/fuchsia.hardware.usb.peripheral/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <zircon/types.h>
 
 namespace usb_peripheral_utils {
 
 class __EXPORT EventWatcher : public fidl::WireServer<fuchsia_hardware_usb_peripheral::Events> {
  public:
-  EventWatcher(async::Loop* loop, fidl::ServerEnd<fuchsia_hardware_usb_peripheral::Events> svc,
+  EventWatcher(async::Loop& loop, fidl::ServerEnd<fuchsia_hardware_usb_peripheral::Events> svc,
                size_t functions);
 
   void FunctionRegistered(FunctionRegisteredCompleter::Sync& completer) override;
@@ -23,7 +22,7 @@ class __EXPORT EventWatcher : public fidl::WireServer<fuchsia_hardware_usb_perip
   bool all_functions_cleared() const { return all_functions_cleared_; }
 
  private:
-  async::Loop* loop_;
+  async::Loop& loop_;
   const size_t functions_;
   size_t functions_registered_ = 0;
 
