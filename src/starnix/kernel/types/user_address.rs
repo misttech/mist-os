@@ -197,6 +197,12 @@ impl<T> From<UserAddress> for UserRef<T> {
     }
 }
 
+impl<T> From<UserRef<T>> for UserAddress {
+    fn from(user: UserRef<T>) -> UserAddress {
+        user.addr
+    }
+}
+
 impl<T> TryFrom<UserBuffer> for UserRef<T> {
     type Error = Errno;
 
