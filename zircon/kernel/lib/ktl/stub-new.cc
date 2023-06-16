@@ -19,3 +19,7 @@ const nothrow_t nothrow;
 }  // namespace std
 
 void* operator new(std::size_t, const std::nothrow_t&) noexcept { return nullptr; }
+
+void* operator new(std::size_t, std::align_val_t, const std::nothrow_t&) noexcept {
+  return nullptr;
+}
