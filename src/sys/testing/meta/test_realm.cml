@@ -5,6 +5,8 @@
 // This realm installs various testing collections.
 {
     include: [
+        "//src/lib/vulkan/vulkan_test_realm.shard.cml",
+
         // Optional: Include optional runners.
         "//src/sys/testing/meta/fuzz-test-runner.shard.cml",
         "//src/sys/testing/meta/inspect-test-runner.shard.cml",

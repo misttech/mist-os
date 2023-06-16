@@ -630,6 +630,7 @@ Possible values of `test_type`:
 | ----- | ----------- |
 | `system` | [Legacy non hermetic realm][system-test-realm] with access to some system capabilities. |
 | `test_arch` | [Test Architecture Tests] |
+| `vulkan` | [Vulkan tests] |
 
 [Learn][create-test-realm] how to create your own test realm.
 
@@ -685,7 +686,6 @@ Possible values of `fuchsia.test.type`:
 | `starnix` | Starnix test realm |
 | `system-validation` | system validation apps test realm |
 | `vfs-compliance` | VFS compliance test realm |
-| `vulkan` | Vulkan test realm |
 
 ## Restricted logs
 
@@ -850,3 +850,4 @@ offer: [
 [subpackages]: /docs/concepts/components/v2/subpackaging.md
 [test-manager-as-a-service]: /docs/contribute/governance/rfcs/0202_test_manager_as_a_service.md
 [create-test-realm]: /docs/development/testing/components/create_test_realm.md
+[Vulkan tests]: /src/lib/vulkan/vulkan_test_realm.shard.cml

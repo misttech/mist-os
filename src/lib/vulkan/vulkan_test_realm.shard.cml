@@ -42,9 +42,11 @@
             scope: "#vulkan-tests",
         },
         {
-            storage: "data",
+            storage: "fxfs_tests_data",
             from: "self",
+            as: "data",
             to: [ "#vulkan-tests" ],
+            rights: [ "rw*" ],
         },
         {
             storage: "tmp",

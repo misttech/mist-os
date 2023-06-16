@@ -43,17 +43,31 @@ if there are security concerns about the use of deadline threads in the Vulkan I
 specified, the Vulkan ICD will use default thread priorities for internal threads, which may cause
 suboptimal performance.  Not included in `vulkan/client.shard.cml`, so it must be `use`d manually.
 
-Test components can receive these capabilities by being placed into a
-[non-hermetic realm](/docs/development/testing/components/test_component.md#legacy_non-hermetic_tests):
+Test components can receive these capabilities by being executed in a
+[non-hermetic realm](/docs/development/testing/components/test_runner_framework.md#non-hermetic_tests):
 
-- For `vulkan-test` include the `//src/lib/vulkan/vulkan-test.shard.cml` shard
-- For `system-test` include the `//src/sys/test_manager/system-test.shard.cml` shard
+```gn
+# BUILD.gn
+
+fuchsia_test_component("my_test_component") {
+  component_name = "my_test"
+  manifest = "meta/my_test.cml"
+  deps = [ ":my_test_bin" ]
+
+  # This runs the test in "vulkan-tests" non-hermetic realm.
+  test_type = "{{ '<var label="test_type">vulkan</var>' }}"
+}
+```
+
+- For `vulkan-test` mark your test_type as `vulkan`
+- For `system-test` mark your test_type as `system`
 
 Test components can use the [vulkan_envs][vulkan_envs]
 [environment][environment] to ensure they're run on all buildbots with Vulkan
 support.
 
 ## Buildtime dependencies
+
 ### In-tree builds
 
 In-tree code should depend on `//src/lib/vulkan` to be able to include the vulkan headers and link against `libvulkan.so`.

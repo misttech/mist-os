@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    "include": [
+    include: [
+        "//src/sys/test_runners/gtest/default.shard.cml",
         "syslog/client.shard.cml",
         "vulkan/client.shard.cml",
-        "//src/lib/vulkan/vulkan-test.shard.cml",
-        "//src/sys/test_runners/gtest/default.shard.cml"
     ],
-    "program": {
-        "binary": "bin/flatland_buffers_unittests"
+    program: {
+        binary: "bin/flatland_buffers_unittests",
     },
 }

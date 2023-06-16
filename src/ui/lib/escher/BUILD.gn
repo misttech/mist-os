@@ -22,21 +22,25 @@ config("test_for_glsl_spirv_mismatch_config") {
 fuchsia_test_component("escher_unittests") {
   manifest = "meta/escher_unittests.cml"
   deps = [ "test:escher_unittests" ]
+  test_type = "vulkan"
 }
 
 fuchsia_test_component("escher_unittests_expected_failure") {
   manifest = "meta/escher_unittests_expected_failure.cml"
   deps = [ "test:escher_unittests_expected_failure" ]
+  test_type = "vulkan"
 }
 
 fuchsia_test_component("escher_renderer_tests") {
   manifest = "meta/escher_renderer_tests.cml"
   deps = [ "test:escher_renderer_tests" ]
+  test_type = "vulkan"
 }
 
 fuchsia_test_component("escher_examples_test") {
   manifest = "meta/escher_examples_test.cml"
   deps = [ "//src/ui/examples/escher/test:escher_examples_test" ]
+  test_type = "vulkan"
 }
 
 fuchsia_test_package("escher_tests") {
