@@ -95,6 +95,10 @@ inferior("cpp_functions") {
   cflags = [ "-fno-inline-functions" ]
 }
 
+inferior("pretty_types") {
+  sources = [ "pretty_types.cc" ]
+}
+
 inferior("rust_functions") {
   type = "rustc_binary"
   edition = "2021"
@@ -134,6 +138,7 @@ fuchsia_package("zxdb_e2e_inferiors") {
     ":cpp_functions",
     ":inlined_crasher",
     ":loop",
+    ":pretty_types",
     ":rust_functions",
     ":simplified_templates",
     ":step_plt",

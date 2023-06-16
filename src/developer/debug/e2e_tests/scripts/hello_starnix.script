@@ -6,15 +6,15 @@
 [zxdb] attach hello_starnix
 Waiting for process matching "hello_starnix".
 
-[zxdb] b hello_starnix.cc:8
-Created Breakpoint 1 @ hello_starnix.cc:8
+[zxdb] b hello_starnix.cc:9
+Created Breakpoint 1 @ hello_starnix.cc:9
 
 [zxdb] run-test fuchsia-pkg://fuchsia.com/zxdb_e2e_inferiors#meta/hello_starnix.cm
 Attached Process 1 state=Running koid=?? name=hello_starnix component=starnix_kernel.cm
-🛑 on bp 1 main() • hello_starnix.cc:8
+🛑 on bp 1 main() • hello_starnix.cc:9
 
-# [zxdb] next
-# TODO(fxbug.dev/127391): This should step over the puts call.
+[zxdb] next
+🛑 main() • hello_starnix.cc:10
 
 [zxdb] b execute_syscall
 Created Breakpoint 2 @ execute_syscall
@@ -25,7 +25,7 @@ Created Breakpoint 2 @ execute_syscall
 # Zxdb can unwind into restricted stack.
 [zxdb] f
 ▶ 0 ??execute_syscall??
-  ?? main() • hello_starnix.cc:8
+  ?? main() • hello_starnix.cc:10
 
 [zxdb] bp rm
 Removed Breakpoint 2 @ execute_syscall

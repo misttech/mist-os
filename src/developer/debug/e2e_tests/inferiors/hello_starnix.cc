@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 #include <stdio.h>
+#include <stdlib.h>
 
 int main() {
   puts("Hello, Starnix!");
-  return 0;
+  exit(0);
 }
