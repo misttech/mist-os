@@ -37,6 +37,9 @@ rustc_library("wlan-common") {
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:zerocopy",
   ]
+  if (is_fuchsia) {
+    deps += [ "//src/lib/fidl/rust/fidl" ]
+  }
 
   sources = [
     "src/appendable.rs",

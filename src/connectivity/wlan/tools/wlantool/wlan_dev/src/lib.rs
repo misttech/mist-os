@@ -336,6 +336,14 @@ async fn do_iface(cmd: opts::IfaceCmd, monitor_proxy: DeviceMonitor) -> Result<(
     Ok(())
 }
 
+fn read_scan_result_vmo(_vmo: fidl::Vmo) -> Result<Vec<fidl_sme::ScanResult>, Error> {
+    #[cfg(target_os = "fuchsia")]
+    return wlan_common::scan::read_vmo(_vmo)
+        .map_err(|e| format_err!("failed to read VMO: {:?}", e));
+    #[cfg(not(target_os = "fuchsia"))]
+    return Err(format_err!("cannot read scan result VMO on host"));
+}
+
 async fn do_client_connect(
     cmd: opts::ClientConnectCmd,
     monitor_proxy: DeviceMonitorProxy,
@@ -346,11 +354,12 @@ async fn do_client_connect(
     ) -> Result<fidl_internal::BssDescription, Error> {
         let mut bss_description = None;
         match scan_result {
-            Ok(mut scan_result_list) => {
+            Ok(vmo) => {
+                let scan_result_list = read_scan_result_vmo(vmo)?;
                 if bss_description.is_none() {
                     // Write the first matching `BssDescription`. Any additional information is
                     // ignored.
-                    if let Some(bss_info) = scan_result_list.drain(0..).find(|scan_result| {
+                    if let Some(bss_info) = scan_result_list.into_iter().find(|scan_result| {
                         // TODO(fxbug.dev/83708): Until the error produced by
                         // `ScanResult::try_from` includes some details about the scan result
                         // which failed conversion, `scan_result` must be cloned for debug
@@ -641,7 +650,14 @@ impl FromStr for MacAddr {
 
 fn print_scan_result(scan_result: fidl_sme::ClientSmeScanResult) {
     match scan_result {
-        Ok(scan_result_list) => {
+        Ok(vmo) => {
+            let scan_result_list = match read_scan_result_vmo(vmo) {
+                Ok(list) => list,
+                Err(e) => {
+                    eprintln!("Failed to read VMO: {:?}", e);
+                    return;
+                }
+            };
             print_scan_header();
             scan_result_list
                 .into_iter()

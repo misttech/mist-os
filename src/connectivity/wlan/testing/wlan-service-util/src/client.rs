@@ -310,11 +310,12 @@ pub async fn disconnect_all(wlan_svc: &WlanService) -> Result<(), Error> {
 pub async fn passive_scan(
     iface_sme_proxy: &fidl_sme::ClientSmeProxy,
 ) -> Result<Vec<fidl_sme::ScanResult>, Error> {
-    iface_sme_proxy
+    let vmo = iface_sme_proxy
         .scan(&fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest {}))
         .await
         .context("error sending scan request")?
-        .map_err(|scan_error_code| format_err!("Scan error: {:?}", scan_error_code))
+        .map_err(|scan_error_code| format_err!("Scan error: {:?}", scan_error_code))?;
+    wlan_common::scan::read_vmo(vmo)
 }
 
 #[cfg(test)]
@@ -343,6 +344,7 @@ mod tests {
             assert_variant,
             channel::{Cbw, Channel},
             fake_fidl_bss_description,
+            scan::write_vmo,
         },
     };
 
@@ -1240,7 +1242,8 @@ mod tests {
     ) {
         match poll_client_sme_request(exec, server) {
             Poll::Ready(fidl_sme::ClientSmeRequest::Scan { responder, .. }) => {
-                responder.send(Ok(scan_results)).expect("failed to send scan results")
+                let vmo = write_vmo(scan_results.to_vec()).expect("failed to write VMO");
+                responder.send(Ok(vmo)).expect("failed to send scan results")
             }
             Poll::Pending => panic!("expected a request to be available"),
             _ => panic!("expected a scan request"),

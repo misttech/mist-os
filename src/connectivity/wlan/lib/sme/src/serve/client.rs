@@ -20,7 +20,7 @@ use futures::{prelude::*, select};
 use pin_utils::pin_mut;
 use std::sync::{Arc, Mutex};
 use tracing::error;
-use wlan_common::hasher::WlanHasher;
+use wlan_common::{hasher::WlanHasher, scan::write_vmo};
 
 pub type Endpoint = ServerEnd<fidl_sme::ClientSmeMarker>;
 type Sme = client_sme::ClientSme;
@@ -138,10 +138,10 @@ async fn scan(
     };
 
     match receive_result {
-        Ok(scan_results) => responder.send(Ok(&scan_results
-            .into_iter()
-            .map(fidl_sme::ScanResult::from)
-            .collect::<Vec<_>>())),
+        Ok(scan_results) => {
+            let results = scan_results.into_iter().map(Into::into).collect::<Vec<_>>();
+            responder.send(Ok(write_vmo(results)?))
+        }
         Err(mlme_scan_result_code) => {
             let scan_error_code = match mlme_scan_result_code {
                 fidl_mlme::ScanResultCode::Success | fidl_mlme::ScanResultCode::InvalidArgs => {
@@ -258,7 +258,7 @@ mod tests {
         pin_utils::pin_mut,
         rand::{prelude::ThreadRng, Rng},
         test_case::test_case,
-        wlan_common::{assert_variant, random_bss_description},
+        wlan_common::{assert_variant, random_bss_description, scan::read_vmo},
         wlan_rsn::auth,
     };
 
@@ -406,13 +406,14 @@ mod tests {
                         Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan {
                             req: _, responder,
                         }))) => {
-                            responder.send(Ok(&scan_result_list)).expect("failed to send scan results");
+                            let vmo = write_vmo(scan_result_list.clone()).expect("failed to write VMO");
+                            responder.send(Ok(vmo)).expect("failed to send scan results");
                         }
         );
 
         // Verify scan results
-        assert_variant!(exec.run_until_stalled(&mut result_fut), Poll::Ready(Ok(received_scan_result_list)) => {
-            assert_eq!(scan_result_list, received_scan_result_list);
+        assert_variant!(exec.run_until_stalled(&mut result_fut), Poll::Ready(Ok(vmo)) => {
+            assert_eq!(scan_result_list, read_vmo(vmo).expect("failed to read VMO"));
         })
     }
 

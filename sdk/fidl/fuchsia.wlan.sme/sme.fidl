@@ -98,6 +98,10 @@ type ScanResult = struct {
     bss_description fuchsia.wlan.internal.BssDescription;
 };
 
+type ScanResultVector = struct {
+    results vector<ScanResult>;
+};
+
 type ScanErrorCode = strict enum {
     NOT_SUPPORTED = 1;
     INTERNAL_ERROR = 2;
@@ -207,14 +211,11 @@ type ClientStatusResponse = strict union {
 };
 
 closed protocol ClientSme {
-    // TODO(fxbug.dev/100478): Remove this denylist when support
-    // for other languages is complete.
-    @bindings_denylist("cpp, dart, go, hlcpp, llcpp")
-    @experimental_overflowing(response=true)
     strict Scan(resource struct {
         req ScanRequest;
-    }) -> (struct {
-        scan_results vector<ScanResult>;
+    }) -> (resource struct {
+        // The VMO encodes ScanResultVector with RFC-0120 FIDL persistence.
+        scan_results zx.Handle:VMO;
     }) error ScanErrorCode;
     strict Connect(resource struct {
         req ConnectRequest;

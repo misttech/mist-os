@@ -43,7 +43,7 @@ use {
     },
     test_case::test_case,
     tracing::{debug, info, trace},
-    wlan_common::{assert_variant, random_fidl_bss_description},
+    wlan_common::{assert_variant, random_fidl_bss_description, scan::write_vmo},
 };
 
 pub const TEST_CLIENT_IFACE_ID: u16 = 42;
@@ -675,7 +675,7 @@ fn save_and_connect(
     });
     let mutual_security_protocols = security_protocols_from_protection(scanned_security);
     assert!(!mutual_security_protocols.is_empty(), "no mutual security protocols");
-    let mock_scan_results = &[fidl_sme::ScanResult {
+    let mock_scan_results = vec![fidl_sme::ScanResult {
         compatibility: Some(Box::new(fidl_sme::Compatibility { mutual_security_protocols })),
         timestamp_nanos: zx::Time::get_monotonic().into_nanos(),
         bss_description: random_fidl_bss_description!(
@@ -698,7 +698,8 @@ fn save_and_connect(
             req, responder
         })) => {
             assert_eq!(req, expected_scan_request);
-            responder.send(Ok(mock_scan_results)).expect("failed to send scan data");
+            let vmo = write_vmo(mock_scan_results).expect("failed to write VMO");
+            responder.send(Ok(vmo)).expect("failed to send scan data");
         }
     );
 
@@ -974,7 +975,7 @@ fn test_save_and_fail_to_connect(
             fidl_sme::ActiveScanRequest { ssids: vec![TEST_SSID.clone().into()], channels: vec![] };
         let mutual_security_protocols = security_protocols_from_protection(scanned_security);
         assert!(!mutual_security_protocols.is_empty(), "no mutual security protocols");
-        let mock_scan_results = &[fidl_sme::ScanResult {
+        let mock_scan_results = vec![fidl_sme::ScanResult {
             compatibility: Some(Box::new(fidl_sme::Compatibility { mutual_security_protocols })),
             timestamp_nanos: zx::Time::get_monotonic().into_nanos(),
             bss_description: random_fidl_bss_description!(
@@ -1006,7 +1007,8 @@ fn test_save_and_fail_to_connect(
                         // Context: https://fxbug.dev/115137
                     },
                 }
-                responder.send(Ok(mock_scan_results)).expect("failed to send scan data");
+                let vmo = write_vmo(mock_scan_results).expect("failed to write VMO");
+                responder.send(Ok(vmo)).expect("failed to send scan data");
             }
         );
     }
@@ -1139,7 +1141,7 @@ fn test_connect_to_new_network() {
         channels: vec![],
     });
     let mutual_security_protocols = security_protocols_from_protection(Scanned::Wpa2Personal);
-    let mock_scan_results = &[
+    let mock_scan_results = vec![
         fidl_sme::ScanResult {
             compatibility: Some(Box::new(fidl_sme::Compatibility {
                 mutual_security_protocols: mutual_security_protocols.clone(),
@@ -1178,7 +1180,8 @@ fn test_connect_to_new_network() {
             req, responder
         })) => {
             assert_eq!(req, expected_scan_request);
-            responder.send(Ok(mock_scan_results)).expect("failed to send scan data");
+            let vmo = write_vmo(mock_scan_results).expect("failed to write VMO");
+            responder.send(Ok(vmo)).expect("failed to send scan data");
         }
     );
 
@@ -1330,7 +1333,7 @@ fn test_autoconnect_to_saved_network() {
     let expected_scan_request = fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest);
     let mutual_security_protocols = security_protocols_from_protection(Scanned::Wpa2Personal);
     assert!(!mutual_security_protocols.is_empty(), "no mutual security protocols");
-    let mock_scan_results = &[fidl_sme::ScanResult {
+    let mock_scan_results = vec![fidl_sme::ScanResult {
         compatibility: Some(Box::new(fidl_sme::Compatibility { mutual_security_protocols })),
         timestamp_nanos: zx::Time::get_monotonic().into_nanos(),
         bss_description: random_fidl_bss_description!(
@@ -1353,7 +1356,8 @@ fn test_autoconnect_to_saved_network() {
             req, responder
         })) => {
             assert_eq!(req, expected_scan_request);
-            responder.send( Ok(mock_scan_results)).expect("failed to send scan data");
+            let vmo = write_vmo(mock_scan_results.clone()).expect("failed to write VMO");
+            responder.send(Ok(vmo)).expect("failed to send scan data");
         }
     );
 
@@ -1378,7 +1382,8 @@ fn test_autoconnect_to_saved_network() {
                 assert_eq!(ssids.pop().unwrap(), TEST_SSID.to_vec());
                 channels
             });
-            responder.send(Ok(mock_scan_results)).expect("failed to send scan data");
+            let vmo = write_vmo(mock_scan_results.clone()).expect("failed to write VMO");
+            responder.send(Ok(vmo)).expect("failed to send scan data");
             channels
         }
     );
@@ -1406,7 +1411,8 @@ fn test_autoconnect_to_saved_network() {
                     req, responder
                 })) => {
                     assert_eq!(req, expected_scan_request);
-                    responder.send(Ok(mock_scan_results)).expect("failed to send scan data");
+                    let vmo = write_vmo(mock_scan_results).expect("failed to write VMO");
+                    responder.send(Ok(vmo)).expect("failed to send scan data");
                 }
             );
         }
@@ -1582,7 +1588,7 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
         // Generate mock scan results
         let mutual_security_protocols = security_protocols_from_protection(Scanned::Wpa2Personal);
         assert!(!mutual_security_protocols.is_empty(), "no mutual security protocols");
-        let mock_scan_results = &[fidl_sme::ScanResult {
+        let mock_scan_results = vec![fidl_sme::ScanResult {
             compatibility: Some(Box::new(fidl_sme::Compatibility { mutual_security_protocols })),
             timestamp_nanos: zx::Time::get_monotonic().into_nanos(),
             bss_description: random_fidl_bss_description!(
@@ -1625,8 +1631,9 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
                         fidl_sme::ScanRequest::Passive(_) => {
                             // This is not the active scan we're looking for, continue
                             debug!("Got a passive scan, continuing");
+                            let vmo = write_vmo(vec![]).expect("failed to write VMO");
                             responder
-                                .send(Ok(&[]))
+                                .send(Ok(vmo))
                                 .expect("failed to send scan data");
                             continue;
                         }
@@ -1634,8 +1641,9 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
                             assert_eq!(active_req.ssids.len(), 1);
                             assert_eq!(active_req.ssids[0], TEST_SSID.to_vec());
                             assert_eq!(active_req.channels.len(), 0);
+                            let vmo = write_vmo(mock_scan_results).expect("failed to write VMO");
                             responder
-                                .send(Ok(mock_scan_results))
+                                .send(Ok(vmo))
                                 .expect("failed to send scan data");
                             break;
                         }

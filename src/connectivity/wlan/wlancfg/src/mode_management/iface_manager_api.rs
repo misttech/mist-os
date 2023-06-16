@@ -221,7 +221,7 @@ impl SmeForScan {
 
     pub fn scan(
         &self,
-        req: &mut fidl_sme::ScanRequest,
+        req: &fidl_sme::ScanRequest,
     ) -> <fidl_sme::ClientSmeProxy as fidl_sme::ClientSmeProxyInterface>::ScanResponseFut {
         self.proxy.scan(req)
     }
@@ -1371,7 +1371,7 @@ mod tests {
         });
 
         // Issue the scan request.
-        let scan_result_fut = sme.scan(&mut scan_request.clone());
+        let scan_result_fut = sme.scan(&scan_request);
         pin_mut!(scan_result_fut);
         assert_variant!(exec.run_until_stalled(&mut scan_result_fut), Poll::Pending);
 

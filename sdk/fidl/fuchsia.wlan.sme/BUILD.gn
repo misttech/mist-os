@@ -10,8 +10,6 @@ fidl("fuchsia.wlan.sme") {
 
   sources = [ "sme.fidl" ]
 
-  experimental_flags = [ "allow_overflowing" ]
-
   public_deps = [
     "//sdk/fidl/fuchsia.wlan.common",
     "//sdk/fidl/fuchsia.wlan.common.security",

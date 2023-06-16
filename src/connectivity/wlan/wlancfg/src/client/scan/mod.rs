@@ -188,46 +188,50 @@ pub trait ScanResultUpdate: Sync + Send {
 /// Requests a new SME scan and returns the results.
 async fn sme_scan(
     sme_proxy: &SmeForScan,
-    scan_request: fidl_sme::ScanRequest,
+    scan_request: &fidl_sme::ScanRequest,
     telemetry_sender: TelemetrySender,
 ) -> Result<Vec<wlan_common::scan::ScanResult>, types::ScanError> {
     debug!("Sending scan request to SME");
-    let scan_result = sme_proxy.scan(&mut scan_request.clone()).await.map_err(|error| {
+    let scan_result = sme_proxy.scan(scan_request).await.map_err(|error| {
         error!("Failed to send scan to SME: {:?}", error);
         types::ScanError::GeneralError
     })?;
     debug!("Finished getting scan results from SME");
-    scan_result
-        .map(|scan_result_list| {
-            scan_result_list
-                .iter()
+    match scan_result {
+        Ok(vmo) => {
+            let scan_result_list = wlan_common::scan::read_vmo(vmo).map_err(|error| {
+                error!("Failed to read scan results from VMO: {:?}", error);
+                types::ScanError::GeneralError
+            })?;
+            Ok(scan_result_list
+                .into_iter()
                 .filter_map(|scan_result| {
-                    wlan_common::scan::ScanResult::try_from(scan_result.clone())
-                        .map(|scan_result| Some(scan_result))
-                        .unwrap_or_else(|e| {
+                    wlan_common::scan::ScanResult::try_from(scan_result).map(Some).unwrap_or_else(
+                        |e| {
                             // TODO(fxbug.dev/83708): Report details about which
                             // scan result failed to convert if possible.
                             error!("ScanResult conversion failed: {:?}", e);
                             None
-                        })
+                        },
+                    )
                 })
-                .collect::<Vec<_>>()
-        })
-        .map_err(|scan_error_code| {
+                .collect::<Vec<_>>())
+        }
+        Err(scan_error_code) => {
             log_metric_for_scan_error(&scan_error_code, telemetry_sender);
-
             match scan_error_code {
                 fidl_sme::ScanErrorCode::ShouldWait
                 | fidl_sme::ScanErrorCode::CanceledByDriverOrFirmware => {
                     info!("Scan cancelled by SME, retry indicated: {:?}", scan_error_code);
-                    types::ScanError::Cancelled
+                    Err(types::ScanError::Cancelled)
                 }
                 _ => {
                     error!("Scan error from SME: {:?}", scan_error_code);
-                    types::ScanError::GeneralError
+                    Err(types::ScanError::GeneralError)
                 }
             }
-        })
+        }
+    }
 }
 
 /// Handles incoming scan requests by creating a new SME scan request. Will retry scan once if SME
@@ -250,7 +254,7 @@ async fn perform_scan(
             }
         };
         // TODO(fxbug.dev/111468) Log metrics when this times out so we are aware of the issue.
-        let scan_results = sme_scan(&sme_proxy, scan_request.clone(), telemetry_sender.clone())
+        let scan_results = sme_scan(&sme_proxy, &scan_request, telemetry_sender.clone())
             .on_timeout(SCAN_TIMEOUT, || {
                 error!("Timed out waiting on scan response from SME");
                 Err(fidl_policy::ScanErrorCode::GeneralError)
@@ -475,7 +479,8 @@ mod tests {
         std::{convert::TryInto, sync::Arc},
         test_case::test_case,
         wlan_common::{
-            assert_variant, random_fidl_bss_description, scan::Compatibility,
+            assert_variant, random_fidl_bss_description,
+            scan::{write_vmo, Compatibility},
             security::SecurityDescriptor,
         },
     };
@@ -760,7 +765,7 @@ mod tests {
 
         // Issue request to scan.
         let scan_request = fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest {});
-        let scan_fut = sme_scan(&sme_proxy, scan_request.clone(), telemetry_sender);
+        let scan_fut = sme_scan(&sme_proxy, &scan_request, telemetry_sender);
         pin_mut!(scan_fut);
 
         // Request scan data from SME
@@ -776,7 +781,8 @@ mod tests {
                 req, responder,
             }))) => {
                 assert_eq!(req, scan_request);
-                responder.send(Ok(&input_aps)).expect("failed to send scan data");
+                let vmo = write_vmo(input_aps.clone()).expect("failed to write VMO");
+                responder.send(Ok(vmo)).expect("failed to send scan data");
             }
         );
 
@@ -810,7 +816,7 @@ mod tests {
             ],
             channels: vec![1, 20],
         });
-        let scan_fut = sme_scan(&sme_proxy, scan_request.clone(), telemetry_sender);
+        let scan_fut = sme_scan(&sme_proxy, &scan_request, telemetry_sender);
         pin_mut!(scan_fut);
 
         // Request scan data from SME
@@ -826,7 +832,8 @@ mod tests {
                 req, responder,
             }))) => {
                 assert_eq!(req, scan_request);
-                responder.send(Ok(&input_aps)).expect("failed to send scan data");
+                let vmo = write_vmo(input_aps.clone()).expect("failed to write VMO");
+                responder.send(Ok(vmo)).expect("failed to send scan data");
             }
         );
 
@@ -854,7 +861,7 @@ mod tests {
 
         // Issue request to scan.
         let scan_request = fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest {});
-        let scan_fut = sme_scan(&sme_proxy, scan_request, telemetry_sender);
+        let scan_fut = sme_scan(&sme_proxy, &scan_request, telemetry_sender);
         pin_mut!(scan_fut);
 
         // Request scan data from SME
@@ -908,7 +915,8 @@ mod tests {
                 req, responder,
             }))) => {
                 assert_eq!(req, sme_scan.clone());
-                responder.send(Ok(&input_aps)).expect("failed to send scan data");
+                let vmo = write_vmo(input_aps).expect("failed to write VMO");
+                responder.send(Ok(vmo)).expect("failed to send scan data");
             }
         );
 
@@ -950,7 +958,8 @@ mod tests {
                 req, responder,
             }))) => {
                 assert_eq!(req, sme_scan.clone());
-                responder.send(Ok(&[])).expect("failed to send scan data");
+                let vmo = write_vmo(vec![]).expect("failed to write VMO");
+                responder.send(Ok(vmo)).expect("failed to send scan data");
             }
         );
 
@@ -1009,7 +1018,8 @@ mod tests {
                 req, responder,
             }))) => {
                 assert_eq!(req, sme_scan_request);
-                responder.send(Ok(&input_aps)).expect("failed to send scan data");
+                let vmo = write_vmo(input_aps).expect("failed to write VMO");
+                responder.send(Ok(vmo)).expect("failed to send scan data");
             }
         );
 
@@ -1250,7 +1260,8 @@ mod tests {
                     req, responder,
                 }))) => {
                     assert_eq!(req, sme_scan.clone());
-                    responder.send(Ok(&input_aps)).expect("failed to send scan data");
+                    let vmo = write_vmo(input_aps).expect("failed to write VMO");
+                    responder.send(Ok(vmo)).expect("failed to send scan data");
                 }
             );
 
@@ -1589,8 +1600,9 @@ mod tests {
         assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req: _, responder }))) => {
-                let results = &[generate_random_sme_scan_result(), generate_random_sme_scan_result()];
-                responder.send(Ok(results)).expect("failed to send scan error");
+                let results = vec![generate_random_sme_scan_result(), generate_random_sme_scan_result()];
+                let vmo = write_vmo(results).expect("failed to write VMO");
+                responder.send(Ok(vmo)).expect("failed to send scan error");
             }
         );
         assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
@@ -1642,8 +1654,9 @@ mod tests {
         assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req: _, responder }))) => {
-                let results = &[generate_random_sme_scan_result(), generate_random_sme_scan_result()];
-                responder.send(Ok(results)).expect("failed to send scan error");
+                let results = vec![generate_random_sme_scan_result(), generate_random_sme_scan_result()];
+                let vmo = write_vmo(results).expect("failed to write VMO");
+                responder.send(Ok(vmo)).expect("failed to send scan error");
             }
         );
         assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);
@@ -1665,8 +1678,9 @@ mod tests {
         assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req: _, responder }))) => {
-                let results = &[generate_random_sme_scan_result(), generate_random_sme_scan_result()];
-                responder.send(Ok(results)).expect("failed to send scan error");
+                let results = vec![generate_random_sme_scan_result(), generate_random_sme_scan_result()];
+                let vmo = write_vmo(results).expect("failed to write VMO");
+                responder.send(Ok(vmo)).expect("failed to send scan error");
             }
         );
         assert_variant!(exec.run_until_stalled(&mut scanning_loop), Poll::Pending);

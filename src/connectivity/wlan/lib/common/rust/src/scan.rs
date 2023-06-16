@@ -13,7 +13,7 @@ use {
 };
 
 #[cfg(target_os = "fuchsia")]
-use fuchsia_zircon as zx;
+use {anyhow::Context as _, fuchsia_zircon as zx};
 
 /// Compatibility of a BSS with respect to a scanning interface.
 ///
@@ -150,4 +150,24 @@ impl TryFrom<fidl_sme::ScanResult> for ScanResult {
             bss_description: bss_description.try_into()?,
         })
     }
+}
+
+/// Creates a VMO containing FIDL-encoded scan results.
+#[cfg(target_os = "fuchsia")]
+pub fn write_vmo(results: Vec<fidl_sme::ScanResult>) -> Result<fidl::Vmo, anyhow::Error> {
+    let bytes =
+        fidl::persist(&fidl_sme::ScanResultVector { results }).context("encoding scan results")?;
+    let vmo = fidl::Vmo::create(bytes.len() as u64).context("creating VMO for scan results")?;
+    vmo.write(&bytes, 0).context("writing scan results to VMO")?;
+    Ok(vmo)
+}
+
+/// Reads FIDL-encoded scan results from a VMO.
+#[cfg(target_os = "fuchsia")]
+pub fn read_vmo(vmo: fidl::Vmo) -> Result<Vec<fidl_sme::ScanResult>, anyhow::Error> {
+    let size = vmo.get_content_size().context("getting VMO content size")?;
+    let bytes = vmo.read_to_vec(0, size).context("reading VMO of scan results")?;
+    let scan_result_vector =
+        fidl::unpersist::<fidl_sme::ScanResultVector>(&bytes).context("decoding scan results")?;
+    Ok(scan_result_vector.results)
 }
