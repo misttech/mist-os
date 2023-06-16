@@ -113,6 +113,7 @@ class Encode(common.FuchsiaControllerTest):
                 "tab":
                     {
                         "dub": 2.0,
+                        "integer": None,
                         "str": "foobar",
                         "union_field": {
                             "union_int": 5,

@@ -108,10 +108,13 @@ class PythonDictVisitor : public fidl_codec::Visitor {
   void VisitTableValue(const fidl_codec::TableValue* node,
                        const fidl_codec::Type* for_type) override {
     auto res = py::Object(PyDict_New());
+
     for (const auto& member : node->table_definition().members()) {
       if ((member != nullptr) && !member->reserved()) {
         auto it = node->members().find(member.get());
         if (it == node->members().end()) {
+          Py_IncRef(Py_None);
+          PyDict_SetItemString(res.get(), member->name().c_str(), Py_None);
           continue;
         }
         if (it->second == nullptr || it->second->IsNull()) {
