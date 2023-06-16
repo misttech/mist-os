@@ -10,7 +10,7 @@ use futures::StreamExt as _;
 use netstack3_core::SyncCtx;
 use tracing::error;
 
-use crate::bindings::{socket::SocketWorkerProperties, util, BindingsNonSyncCtxImpl, Ctx};
+use crate::bindings::{socket::SocketWorkerProperties, BindingsNonSyncCtxImpl, Ctx};
 
 pub(crate) struct SocketWorker<Data> {
     ctx: Ctx,
@@ -127,11 +127,7 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
                     continue;
                 }
                 Some(Err(e)) => {
-                    log_error!(
-                        util::fidl_err_log_level(&e),
-                        "got error while polling for requests: {}",
-                        e
-                    );
+                    tracing::error!("got error while polling for requests: {}", e);
                     // Continuing implicitly drops the request stream that
                     // produced the error, which would otherwise be re-enqueued
                     // below.

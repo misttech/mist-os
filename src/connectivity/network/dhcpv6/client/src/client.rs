@@ -661,9 +661,6 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
                     Ok(request) => {
                         request.map(|request| self.handle_client_request(request)).transpose()
                     }
-                    Err(e) if e.is_closed() => {
-                        Ok(None)
-                    }
                     Err(e) => {
                         Err(ClientError::Fidl(e))
                     }

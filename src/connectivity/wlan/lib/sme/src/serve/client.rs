@@ -132,14 +132,12 @@ async fn scan(
         Ok(receive_result) => receive_result,
         Err(e) => {
             error!("Scan receiver error: {:?}", e);
-            return filter_out_peer_closed(
-                responder.send(Err(fidl_sme::ScanErrorCode::InternalError)),
-            )
-            .map_err(anyhow::Error::from);
+            responder.send(Err(fidl_sme::ScanErrorCode::InternalError))?;
+            return Ok(());
         }
     };
 
-    let send_result = match receive_result {
+    match receive_result {
         Ok(scan_results) => responder.send(Ok(&scan_results
             .into_iter()
             .map(fidl_sme::ScanResult::from)
@@ -161,8 +159,8 @@ async fn scan(
             };
             responder.send(Err(scan_error_code))
         }
-    };
-    filter_out_peer_closed(send_result).map_err(anyhow::Error::from)
+    }?;
+    Ok(())
 }
 
 async fn connect(
@@ -186,7 +184,7 @@ async fn serve_connect_txn_stream(
     if let Some(handle) = handle {
         loop {
             match connect_txn_stream.next().fuse().await {
-                Some(event) => filter_out_peer_closed(match event {
+                Some(event) => match event {
                     ConnectTransactionEvent::OnConnectResult { result, is_reconnect } => {
                         let connect_result = convert_connect_result(&result, is_reconnect);
                         handle.send_on_connect_result(&connect_result)
@@ -200,20 +198,13 @@ async fn serve_connect_txn_stream(
                     ConnectTransactionEvent::OnChannelSwitched { info } => {
                         handle.send_on_channel_switched(&info)
                     }
-                })?,
+                }?,
                 // SME has dropped the ConnectTransaction endpoint, likely due to a disconnect.
                 None => return Ok(()),
             }
         }
     }
     Ok(())
-}
-
-pub fn filter_out_peer_closed(r: Result<(), fidl::Error>) -> Result<(), fidl::Error> {
-    match r {
-        Err(ref e) if e.is_closed() => Ok(()),
-        other => other,
-    }
 }
 
 fn disconnect(

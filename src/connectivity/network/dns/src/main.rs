@@ -1174,13 +1174,9 @@ async fn main() -> Result<(), Error> {
                 .await
                 .unwrap_or_else(|e| warn!("run_lookup finished with error: {}", e)),
             IncomingRequest::LookupAdmin(stream) => {
-                run_lookup_admin(&resolver, &config_state, stream).await.unwrap_or_else(|e| {
-                    if e.is_closed() {
-                        warn!("run_lookup_admin finished with error: {}", e)
-                    } else {
-                        error!("run_lookup_admin finished with error: {}", e)
-                    }
-                })
+                run_lookup_admin(&resolver, &config_state, stream)
+                    .await
+                    .unwrap_or_else(|e| error!("run_lookup_admin finished with error: {}", e))
             }
         }
     });

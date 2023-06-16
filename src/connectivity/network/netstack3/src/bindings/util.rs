@@ -1059,18 +1059,6 @@ impl<I: Ip> TryIntoFidlWithContext<fnet_routes_ext::InstalledRoute<I>>
     }
 }
 
-/// Returns `Warn` when `e` is closed; otherwise returns `Error`.
-///
-/// A closed [`fidl::Error`] indicates that the client closed the channel, and
-/// the Netstack should not generate errors based on client behavior.
-pub(crate) fn fidl_err_log_level(e: &fidl::Error) -> tracing::Level {
-    if e.is_closed() {
-        tracing::Level::WARN
-    } else {
-        tracing::Level::ERROR
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -1079,7 +1067,6 @@ mod tests {
     use fidl_fuchsia_net as fidl_net;
     use fidl_fuchsia_net_ext::IntoExt;
     use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-    use fuchsia_zircon_status as zx_status;
     use net_declare::{net_ip_v4, net_ip_v6};
     use net_types::ip::{Ipv4Addr, Ipv6Addr};
     use test_case::test_case;
@@ -1413,17 +1400,5 @@ mod tests {
         let value_core: Option<u8> = value.into_core();
         assert_eq!(value_core, Some(46));
         assert_eq!(value_core.into_fidl(), value);
-    }
-
-    #[test]
-    fn fidl_err_into_warn_and_error() {
-        assert_eq!(
-            fidl_err_log_level(&fidl::Error::ClientChannelClosed {
-                status: zx_status::Status::PEER_CLOSED,
-                protocol_name: "PLACEHOLDER_PROTOCOL"
-            }),
-            tracing::Level::WARN
-        );
-        assert_eq!(fidl_err_log_level(&fidl::Error::UnexpectedSyncResponse), tracing::Level::ERROR);
     }
 }

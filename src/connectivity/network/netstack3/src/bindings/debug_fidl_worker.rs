@@ -159,13 +159,7 @@ impl DiagnosticsHandler {
             })
         })
         .await
-        .unwrap_or_else(|e: fidl::Error| {
-            if e.is_closed() {
-                warn!(err = ?e, "error operating diagnostics stream");
-            } else {
-                error!(err = ?e, "error operating diagnostics stream");
-            }
-        });
+        .unwrap_or_else(|e: fidl::Error| error!(err = ?e, "error operating diagnostics stream"));
     }
 }
 

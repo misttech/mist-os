@@ -227,7 +227,6 @@ impl Watcher {
         if let Some(responder) = responder.take() {
             match responder.send(&event) {
                 Ok(()) => (),
-                Err(e) if e.is_closed() => (),
                 Err(e) => tracing::error!("error sending event {:?} to watcher: {:?}", event, e),
             }
             return;

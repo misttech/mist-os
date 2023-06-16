@@ -158,14 +158,7 @@ impl DeviceIdServer {
 
         let client_request = match token.into_stream() {
             Err(e) => {
-                // If the `token` is already closed, then the FIDL client no longer wants to
-                // advertise. This is OK. However, return error so that this can be logged by the
-                // server as the FIDL client request was not handled.
-                if e.is_closed() {
-                    let _ = responder.send(Ok(()));
-                } else {
-                    let _ = responder.send(Err(zx::Status::CANCELED.into_raw()));
-                }
+                let _ = responder.send(Err(zx::Status::CANCELED.into_raw()));
                 return Err(e.into());
             }
             Ok(s) => s,

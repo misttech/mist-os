@@ -18,7 +18,7 @@ use fuchsia_component::{
     server::{ServiceFs, ServiceFsDir},
 };
 use futures_util::{StreamExt as _, TryStreamExt as _};
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 #[fuchsia_async::run_singlethreaded]
 async fn main() {
@@ -49,13 +49,7 @@ async fn handle_request(request: fnetemul::ConfigurableNetstackRequest) -> Resul
                     Err(e.into())
                 }
             };
-            match responder.send(result) {
-                Err(e) if e.is_closed() => {
-                    warn!("channel was closed before response was sent");
-                    Ok(())
-                }
-                other => other,
-            }
+            responder.send(result)
         }
     }
 }

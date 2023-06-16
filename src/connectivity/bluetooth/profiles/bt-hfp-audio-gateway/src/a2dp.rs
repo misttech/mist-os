@@ -116,7 +116,6 @@ mod tests {
     ) {
         match exec.run_until_stalled(&mut requests.next()) {
             Poll::Ready(None) => {}
-            Poll::Ready(Some(Err(e))) if e.is_closed() => {}
             x => panic!("Expected suspender to be closed, but it wasn't: {:?}", x),
         }
     }

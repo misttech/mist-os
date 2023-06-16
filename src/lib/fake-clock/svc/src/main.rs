@@ -527,28 +527,18 @@ async fn main() -> Result<(), Error> {
         .add_fidl_service(move |rs: FakeClockControlRequestStream| {
             let cl = Arc::clone(&mock_clock);
             fasync::Task::local(async move {
-                match handle_control_events(cl, rs).await {
-                    Ok(()) => (),
-                    Err(e) if e.is_closed() => {
-                        debug!("Got channel closed while serving fake clock control: {:?}", e)
-                    }
-                    Err(e) => {
-                        error!("Got unexpected error while serving fake clock control: {:?}", e)
-                    }
-                }
+                handle_control_events(cl, rs).await.unwrap_or_else(|e| {
+                    error!("Got unexpected error while serving fake clock control: {:?}", e)
+                });
             })
             .detach()
         })
         .add_fidl_service(move |rs: FakeClockRequestStream| {
             let cl = Arc::clone(&m1);
             fasync::Task::local(async move {
-                match handle_events(cl, rs).await {
-                    Ok(()) => (),
-                    Err(e) if e.is_closed() => {
-                        debug!("Got channel closed while serving fake clock : {:?}", e)
-                    }
-                    Err(e) => error!("Got unexpected error while serving fake clock: {:?}", e),
-                }
+                handle_events(cl, rs).await.unwrap_or_else(|e| {
+                    error!("Got unexpected error while serving fake clock: {:?}", e)
+                });
             })
             .detach()
         });

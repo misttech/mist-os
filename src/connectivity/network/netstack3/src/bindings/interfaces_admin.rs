@@ -59,7 +59,7 @@ use netstack3_core::{
 };
 
 use crate::bindings::{
-    devices, netdevice_worker, util, util::IntoCore as _, util::TryIntoCore as _, BindingId, Ctx,
+    devices, netdevice_worker, util::IntoCore as _, util::TryIntoCore as _, BindingId, Ctx,
     DeviceIdExt as _, Netstack, StackTime,
 };
 
@@ -426,13 +426,10 @@ async fn run_link_state_watcher<
         .await;
     match result {
         Ok(()) => tracing::debug!("state stream closed for interface {}", id),
-        Err(e) => {
-            let level = match &e {
-                netdevice_client::Error::Fidl(e) if e.is_closed() => tracing::Level::DEBUG,
-                _ => tracing::Level::ERROR,
-            };
-            log_error!(level, "error operating port state stream {:?} for interface {}", e, id);
+        Err(netdevice_client::Error::Fidl(e)) if e.is_closed() => {
+            tracing::warn!("error operating port state stream {:?} for interface {}", e, id)
         }
+        Err(e) => tracing::error!("error operating port state stream {:?} for interface {}", e, id),
     }
 }
 
@@ -482,8 +479,7 @@ pub(crate) async fn run_interface_control(
                     let ReqStreamState { ctx, id, owns_interface, control_handle: _ } = &mut state;
                     match request {
                         Err(e) => {
-                            log_error!(
-                                util::fidl_err_log_level(&e),
+                            tracing::error!(
                                 "error operating {} stream for interface {}: {:?}",
                                 fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
                                 id,
@@ -503,8 +499,7 @@ pub(crate) async fn run_interface_control(
                             .await
                             {
                                 Err(e) => {
-                                    log_error!(
-                                        util::fidl_err_log_level(&e),
+                                    tracing::error!(
                                         "failed to handle request for interface {}: {:?}",
                                         id,
                                         e
@@ -591,12 +586,7 @@ pub(crate) async fn run_interface_control(
         Some(move || {
             control_handles.into_iter().for_each(|control_handle| {
                 control_handle.send_on_interface_removed(remove_reason).unwrap_or_else(|e| {
-                    log_error!(
-                        util::fidl_err_log_level(&e),
-                        "failed to send terminal event: {:?} for interface {}",
-                        e,
-                        id
-                    )
+                    tracing::error!("failed to send terminal event: {:?} for interface {}", e, id)
                 });
             });
         })
@@ -1334,41 +1324,36 @@ async fn address_state_provider_main_loop(
                     }
                     break None;
                 }
-                Ok(Some(request)) => {
-                    let e = match dispatch_address_state_provider_request(
-                        ctx.clone(),
-                        request,
-                        address,
-                        id,
-                        &mut detached,
-                        &mut watch_state,
-                    ) {
-                        Ok(Some(UserRemove)) => {
-                            break Some(AddressStateProviderCancellationReason::UserRemoved)
-                        }
-                        Ok(None) => continue,
-                        Err(e) => e,
-                    };
-                    let (log_level, should_terminate) = match &e {
-                        AddressStateProviderError::PreviousPendingWatchRequest => {
-                            (tracing::Level::WARN, true)
-                        }
-                        AddressStateProviderError::Fidl(e) => (util::fidl_err_log_level(e), false),
-                    };
-                    log_error!(
-                        log_level,
+                Ok(Some(request)) => match dispatch_address_state_provider_request(
+                    ctx.clone(),
+                    request,
+                    address,
+                    id,
+                    &mut detached,
+                    &mut watch_state,
+                ) {
+                    Ok(Some(UserRemove)) => {
+                        break Some(AddressStateProviderCancellationReason::UserRemoved)
+                    }
+                    Ok(None) => {}
+                    Err(err @ AddressStateProviderError::PreviousPendingWatchRequest) => {
+                        tracing::warn!(
+                            "failed to handle request for address {:?} on interface {}: {}",
+                            address,
+                            id,
+                            err
+                        );
+                        break None;
+                    }
+                    Err(err @ AddressStateProviderError::Fidl(_)) => tracing::error!(
                         "failed to handle request for address {:?} on interface {}: {}",
                         address,
                         id,
-                        e
-                    );
-                    if should_terminate {
-                        break None;
-                    }
-                }
+                        err
+                    ),
+                },
                 Err(e) => {
-                    log_error!(
-                        util::fidl_err_log_level(&e),
+                    tracing::error!(
                         "error operating {} stream for address {:?} on interface {}: {:?}",
                         fnet_interfaces_admin::AddressStateProviderMarker::DEBUG_NAME,
                         address,
@@ -1380,8 +1365,7 @@ async fn address_state_provider_main_loop(
             },
             AddressStateProviderEvent::AssignmentStateChange(state) => {
                 watch_state.on_new_assignment_state(state).unwrap_or_else(|e|{
-                        log_error!(
-                            util::fidl_err_log_level(&e),
+                        tracing::error!(
                             "failed to respond to pending watch request for address {:?} on interface {}: {:?}",
                             address,
                             id,
@@ -1582,9 +1566,7 @@ fn send_address_removal_event(
     reason: fnet_interfaces_admin::AddressRemovalReason,
 ) {
     control_handle.send_on_address_removed(reason).unwrap_or_else(|e| {
-        let log_level = if e.is_closed() { tracing::Level::DEBUG } else { tracing::Level::ERROR };
-        log_error!(
-            log_level,
+        tracing::error!(
             "failed to send address removal reason for addr {:?} on interface {}: {:?}",
             addr,
             id,

@@ -222,19 +222,6 @@ async fn create_realm_instance(
                                     fio::OpenFlags::CLONE_SAME_RIGHTS,
                                     mock_handles.outgoing_dir.into_channel().into(),
                                 )
-                                .or_else(|e| {
-                                    // A mock child source is served from
-                                    // outside of our component and returning an
-                                    // error here causes an error log. A racy
-                                    // component teardown can cause this, so log
-                                    // any closed errors as warnings.
-                                    if e.is_closed() {
-                                        warn!("failed to serve mock connection request: {:?}", e);
-                                        Ok(())
-                                    } else {
-                                        Err(e)
-                                    }
-                                })
                                 .context("cloning directory for mock handles"),
                             )
                             // The lifetime of the mock child component is tied
@@ -501,22 +488,6 @@ struct ManagedRealm {
     devfs: Arc<SimpleMutableDir>,
 }
 
-fn with_responder_ignoring_peer_closed<R, F>(r: R, f: F) -> Result<(), fidl::Error>
-where
-    R: fidl::endpoints::Responder,
-    F: FnOnce(R) -> Result<(), fidl::Error>,
-{
-    match f(r) {
-        Ok(()) => Ok(()),
-        // If the client closed the channel, log a warning and do not propagate the error.
-        Err(e) if e.is_closed() => {
-            warn!("client closed managed realm channel with request(s) in flight: {:?}", e);
-            Ok(())
-        }
-        Err(e) => Err(e),
-    }
-}
-
 // This represents a device in devfs. It can serve both the device's FIDL protocol as well
 // as fuchsia.device/Controller protocol.
 // As a DirectoryEntry, the DevfsDevice acts as both a directory, and a protocol (similar to how
@@ -536,30 +507,16 @@ impl vfs::directory::entry::DirectoryEntry for DevfsDevice {
     ) {
         // If we are opening the device directly we get the device protocol.
         if path.is_dot() || path.is_empty() {
-            let () =
-                self.device.serve_device(server_end.into_channel().into()).unwrap_or_else(|e| {
-                    // PEER_CLOSED errors are expected
-                    // to happen during test teardown.
-                    if e.is_closed() {
-                        warn!("failed to serve device on path {}: {}", self.path, e);
-                    } else {
-                        error!("failed to serve device on path {}: {}", self.path, e);
-                    }
-                });
+            let () = self
+                .device
+                .serve_device(server_end.into_channel().into())
+                .unwrap_or_else(|e| error!("failed to serve device on path {}: {}", self.path, e));
             return;
         }
         // If we are opening "device_controller" then we get fuchsia.device/Controller.
         if path.as_ref() == "device_controller" {
             let () = self.device.serve_controller(server_end.into_channel().into()).unwrap_or_else(
-                |e| {
-                    // PEER_CLOSED errors are expected
-                    // to happen during test teardown.
-                    if e.is_closed() {
-                        warn!("failed to serve controller on path {}: {}", self.path, e);
-                    } else {
-                        error!("failed to serve controller on path {}: {}", self.path, e);
-                    }
-                },
+                |e| error!("failed to serve controller on path {}: {}", self.path, e),
             );
             return;
         }
@@ -579,8 +536,7 @@ impl ManagedRealm {
             match request {
                 ManagedRealmRequest::GetMoniker { responder } => {
                     let moniker = format!("{}:{}", REALM_COLLECTION_NAME, realm.root.child_name());
-                    with_responder_ignoring_peer_closed(responder, |r| r.send(&moniker))
-                        .context("responding to GetMoniker request")?;
+                    responder.send(&moniker).context("responding to GetMoniker request")?;
                 }
                 ManagedRealmRequest::ConnectToProtocol {
                     protocol_name,
@@ -659,10 +615,9 @@ impl ManagedRealm {
                         response
                     })()
                     .await;
-                    with_responder_ignoring_peer_closed(responder, |r| {
-                        r.send(response.map_err(zx::Status::into_raw))
-                    })
-                    .context("responding to AddDevice request")?;
+                    responder
+                        .send(response.map_err(zx::Status::into_raw))
+                        .context("responding to AddDevice request")?;
                 }
                 ManagedRealmRequest::RemoveDevice { path, responder } => {
                     let devfs = devfs.clone();
@@ -709,10 +664,9 @@ impl ManagedRealm {
                         response
                     })()
                     .await;
-                    with_responder_ignoring_peer_closed(responder, |r| {
-                        r.send(response.map_err(zx::Status::into_raw))
-                    })
-                    .context("responding to RemoveDevice request")?;
+                    responder
+                        .send(response.map_err(zx::Status::into_raw))
+                        .context("responding to RemoveDevice request")?;
                 }
                 ManagedRealmRequest::StartChildComponent { child_name, responder } => {
                     let response = async {
@@ -751,10 +705,9 @@ impl ManagedRealm {
                         Ok(())
                     }
                     .await;
-                    with_responder_ignoring_peer_closed(responder, |r| {
-                        r.send(response.map_err(zx::Status::into_raw))
-                    })
-                    .context("responding to StartChildComponent request")?;
+                    responder
+                        .send(response.map_err(zx::Status::into_raw))
+                        .context("responding to StartChildComponent request")?;
                 }
                 ManagedRealmRequest::StopChildComponent { child_name, responder } => {
                     let response = async {
@@ -790,10 +743,9 @@ impl ManagedRealm {
                         Ok(())
                     }
                     .await;
-                    with_responder_ignoring_peer_closed(responder, |r| {
-                        r.send(response.map_err(zx::Status::into_raw))
-                    })
-                    .context("responding to StopChildComponent request")?;
+                    responder
+                        .send(response.map_err(zx::Status::into_raw))
+                        .context("responding to StopChildComponent request")?;
                 }
                 ManagedRealmRequest::Shutdown { control_handle } => {
                     let () = realm.destroy().await.context("destroy realm")?;

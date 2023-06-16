@@ -33,13 +33,9 @@ pub(crate) async fn serve(stream: fnet_filter::FilterRequestStream) -> Result<()
                         "fuchsia.net.filter.Filter is not implemented \
                            (https://fxbug.dev/106604); ignoring GetRules"
                     );
-                    responder.send(&[], 0).unwrap_or_else(|e| {
-                        log_error!(
-                            crate::bindings::util::fidl_err_log_level(&e),
-                            "Responder send error: {:?}",
-                            e
-                        )
-                    })
+                    responder
+                        .send(&[], 0)
+                        .unwrap_or_else(|e| error!("Responder send error: {:?}", e))
                 }
                 FilterRequest::UpdateRules { rules, generation, responder } => {
                     error!(
