@@ -38,7 +38,7 @@ using PassthroughDeviceType =
 
 class AddressSpaceDevice : public DeviceType {
  public:
-  static zx_status_t Create(void* ctx, zx_device_t* parent);
+  static zx_status_t Create(void* ctx, zx_device_t* device);
 
   explicit AddressSpaceDevice(zx_device_t* parent, async_dispatcher_t* dispatcher);
   ~AddressSpaceDevice();
@@ -116,7 +116,7 @@ class AddressSpaceChildDriver
   // by this device (including host-visible memory, user-space ring buffers)
   // will not be accessed anymore after the ICD is destroyed, so it's safe
   // to unpin the memory.
-  ~AddressSpaceChildDriver();
+  ~AddressSpaceChildDriver() override;
 
   // |fidl::WireServer<fuchsia_hardware_goldfish::AddressSpaceChildDriver>|
   void AllocateBlock(AllocateBlockRequestView request,

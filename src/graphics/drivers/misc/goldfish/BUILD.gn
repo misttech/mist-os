@@ -48,7 +48,7 @@ fuchsia_driver("goldfish_driver-driver") {
     "pipe_device.h",
   ]
 
-  deps = common_deps + [ "//zircon/system/ulib/fidl-async:fidl-async-cpp" ]
+  deps = common_deps
 
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
 
@@ -82,14 +82,12 @@ test("goldfish-pipe-device-test") {
            "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp_mock",
            "//sdk/fidl/fuchsia.hardware.goldfish.pipe:fuchsia.hardware.goldfish.pipe_cpp_wire",
            "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
-           "//sdk/lib/async_patterns/testing/cpp",
            "//sdk/lib/component/outgoing/cpp",
            "//src/devices/lib/acpi/mock:mock-acpi",
            "//src/devices/testing/fake-bti",
            "//src/devices/testing/mock-ddk",
            "//zircon/system/ulib/async-default",
            "//zircon/system/ulib/async-loop:async-loop-cpp",
-           "//zircon/system/ulib/fidl-async:fidl-async-cpp",
            "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
            "//zircon/system/ulib/mock-function",
            "//zircon/system/ulib/sync",
@@ -115,8 +113,7 @@ group("tests") {
   testonly = true
   deps = [ ":goldfish-bind_test" ]
 
-  # TODO(fxbug.dev/123012): Re-enable the test once the flake is fixed.
-  # if (target_cpu == "x64") {
-  #   deps += [ ":goldfish-pipe-device-test-package" ]
-  # }
+  if (target_cpu == "x64") {
+    deps += [ ":goldfish-pipe-device-test-package" ]
+  }
 }

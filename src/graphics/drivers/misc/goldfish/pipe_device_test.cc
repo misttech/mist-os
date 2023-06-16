@@ -117,7 +117,7 @@ class VmoMapping {
 
 class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::Sysmem> {
  public:
-  FakeSysmem() {}
+  FakeSysmem() = default;
 
   void ConnectServer(ConnectServerRequestView request,
                      ConnectServerCompleter::Sync& completer) override {
@@ -159,8 +159,6 @@ struct IncomingNamespace {
   FakeSysmem fake_sysmem;
   component::OutgoingDirectory outgoing;
 };
-
-}  // namespace
 
 // Test suite creating fake PipeDevice on a mock ACPI bus.
 class PipeDeviceTest : public zxtest::Test {
@@ -422,7 +420,8 @@ TEST_F(PipeDeviceTest, GetBti) {
   ASSERT_FALSE(memcmp(&goldfish_bti_info, &acpi_bti_info, sizeof(zx_info_bti_t)));
 }
 
-TEST_F(PipeDeviceTest, ConnectToSysmem) {
+// TODO(fxbug.dev/123012): Re-enable the test once the flake is fixed.
+TEST_F(PipeDeviceTest, DISABLED_ConnectToSysmem) {
   ASSERT_OK(dut_child_->Bind(kDefaultPipeDeviceProps, kDefaultPipeDeviceName));
   dut_child_.release();
 
@@ -510,5 +509,7 @@ TEST_F(PipeDeviceTest, ChildDevice) {
 
   ASSERT_NE(id1, id2);
 }
+
+}  // namespace
 
 }  // namespace goldfish

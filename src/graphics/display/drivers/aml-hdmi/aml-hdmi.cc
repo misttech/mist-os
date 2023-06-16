@@ -7,7 +7,6 @@
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fidl/epitaph.h>
 #include <zircon/assert.h>
 #include <zircon/status.h>

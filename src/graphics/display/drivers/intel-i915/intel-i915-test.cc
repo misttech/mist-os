@@ -15,7 +15,6 @@
 #include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/driver.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/mmio-ptr/fake.h>
 #include <lib/zbi-format/graphics.h>
 #include <lib/zircon-internal/align.h>

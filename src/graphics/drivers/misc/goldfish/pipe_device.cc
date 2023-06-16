@@ -13,7 +13,6 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/fdf/cpp/dispatcher.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fidl/cpp/wire/internal/transport.h>
 #include <lib/zx/channel.h>
@@ -331,7 +330,7 @@ zx_status_t PipeDevice::RegisterSysmemHeap(uint64_t heap, zx::channel connection
 }
 
 int PipeDevice::IrqHandler() {
-  while (1) {
+  while (true) {
     zx_status_t status = irq_.wait(nullptr);
     if (status != ZX_OK) {
       zxlogf(ERROR, "%s: irq.wait() got %d", kTag, status);

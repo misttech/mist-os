@@ -10,7 +10,6 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <zircon/syscalls/object.h>
 

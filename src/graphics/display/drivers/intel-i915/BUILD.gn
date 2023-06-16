@@ -146,7 +146,6 @@ test("intel-i915-test") {
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
     "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
   ]
 }

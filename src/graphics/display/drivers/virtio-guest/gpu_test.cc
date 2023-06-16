@@ -11,7 +11,6 @@
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/fake-bti/bti.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <zircon/compiler.h>
 
 #include "fidl/fuchsia.hardware.sysmem/cpp/markers.h"
@@ -208,7 +207,7 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
         fidl::CreateEndpoints<fuchsia_hardware_sysmem::Sysmem>();
     ASSERT_OK(sysmem_endpoints.status_value());
     auto& [sysmem_client, sysmem_server] = sysmem_endpoints.value();
-    fidl::BindSingleInFlightOnly(dispatcher(), std::move(sysmem_server), fake_sysmem_.get());
+    fidl::BindServer(dispatcher(), std::move(sysmem_server), fake_sysmem_.get());
 
     ASSERT_OK(device_->SetAndInitSysmemForTesting(fidl::WireSyncClient(std::move(sysmem_client))));
 

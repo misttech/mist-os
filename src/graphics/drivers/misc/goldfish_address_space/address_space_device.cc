@@ -13,7 +13,6 @@
 #include <lib/device-protocol/pci.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/dispatcher.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fit/defer.h>
 #include <limits.h>

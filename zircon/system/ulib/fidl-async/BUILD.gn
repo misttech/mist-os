@@ -33,12 +33,6 @@ zx_library("fidl-async-cpp") {
   visibility = [
     ":fidl-async-cpp_cc_stub",
     "test:fidl-async-test",
-    "//src/graphics/display/drivers/aml-hdmi:*",
-    "//src/graphics/display/drivers/amlogic-display:*",
-    "//src/graphics/display/drivers/intel-i915:*",
-    "//src/graphics/display/drivers/virtio-guest:*",
-    "//src/graphics/drivers/misc/goldfish:*",
-    "//src/graphics/drivers/misc/goldfish_address_space:*",
   ]
 }
 
