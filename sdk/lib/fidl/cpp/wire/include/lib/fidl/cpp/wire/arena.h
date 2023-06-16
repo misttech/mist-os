@@ -219,9 +219,11 @@ class ArenaBase : public AnyArena {
   friend ::fidl_testing::ArenaChecker;
 };
 
+constexpr size_t kDefaultArenaInitialCapacity = 512;
+
 // Class which supports arena allocation of data for the views (ObjectView,
 // StringView, VectorView). See |AnyArena| for general FIDL arena behavior.
-template <size_t initial_capacity = 512>
+template <size_t initial_capacity = kDefaultArenaInitialCapacity>
 class Arena : public ArenaBase {
  public:
   // Can't move because destructor pointers can point within |initial_buffer_|.
@@ -241,6 +243,9 @@ class Arena : public ArenaBase {
 
   friend ::fidl_testing::ArenaChecker;
 };
+
+template <size_t initial_capacity = kDefaultArenaInitialCapacity>
+Arena() -> Arena<initial_capacity>;
 
 }  // namespace fidl
 

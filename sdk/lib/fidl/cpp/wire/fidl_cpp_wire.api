@@ -1,5 +1,5 @@
 {
-  "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/arena.h": "29199e5268fc1d012d66d7640dc8bef8",
+  "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/arena.h": "a450d4835650001933d1b23040af6460",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/array.h": "e59d3b74207ce05d9f1bf5eb442cfc38",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/async_binding.h": "81e5d725792976c61194b9ad304eb623",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/async_transaction.h": "7f71296357846e14eb9acfd3b96d9f7e",
