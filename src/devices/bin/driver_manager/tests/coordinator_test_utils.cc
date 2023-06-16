@@ -20,7 +20,12 @@ CoordinatorConfig DefaultConfig(async_dispatcher_t* bootargs_dispatcher,
 
   if (boot_args != nullptr && client != nullptr) {
     *boot_args = mock_boot_arguments::Server{{{"key1", "new-value"}, {"key2", "value2"}}};
-    boot_args->CreateClient(bootargs_dispatcher, client);
+    zx::result result = boot_args->CreateClient(bootargs_dispatcher);
+    if (result.is_ok()) {
+      *client = std::move(result.value());
+    } else {
+      printf("Failed to create mock boot arguments client: %s\n", result.status_string());
+    }
   }
   config.delay_fallback_until_base_drivers_indexed = false;
   config.boot_args = client;

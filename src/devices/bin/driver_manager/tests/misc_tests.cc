@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <dirent.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.device.manager/cpp/wire_test_base.h>
 #include <fidl/fuchsia.driver.test.logger/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -17,6 +16,7 @@
 #include <threads.h>
 #include <zircon/fidl.h>
 
+#include <utility>
 #include <vector>
 
 #include <fbl/algorithm.h>
@@ -32,25 +32,27 @@
 constexpr char kDriverPath[] = "driver/mock-device.so";
 constexpr char kDriverUrl[] = "#meta/mock-device.cm";
 
-static CoordinatorConfig NullConfig() { return DefaultConfig(nullptr, nullptr, nullptr); }
-
 namespace {
+
+CoordinatorConfig NullConfig() { return DefaultConfig(nullptr, nullptr, nullptr); }
 
 zx_status_t load_driver(fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args,
                         DriverLoadCallback func) {
-  int fd;
-  if ((fd = open("/pkg", O_RDONLY, O_DIRECTORY)) < 0) {
-    return ZX_ERR_INTERNAL;
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.error_value();
   }
-
-  fidl::ClientEnd<fuchsia_io::Directory> client_end;
-  if (zx_status_t status = fdio_fd_transfer(fd, client_end.channel().reset_and_get_address());
+  auto& [client, server] = endpoints.value();
+  if (zx_status_t status = fdio_open("/pkg",
+                                     static_cast<uint32_t>(fuchsia_io::OpenFlags::kRightReadable |
+                                                           fuchsia_io::OpenFlags::kRightExecutable |
+                                                           fuchsia_io::OpenFlags::kDirectory),
+                                     server.TakeChannel().release());
       status != ZX_OK) {
-    return ZX_ERR_INTERNAL;
+    return status;
   }
 
-  zx::result vmo_result = load_driver_vmo(
-      fidl::WireSyncClient<fuchsia_io::Directory>{std::move(client_end)}, kDriverPath);
+  zx::result vmo_result = load_driver_vmo(fidl::WireSyncClient{std::move(client)}, kDriverPath);
   if (vmo_result.is_error()) {
     return vmo_result.status_value();
   }
@@ -63,7 +65,7 @@ class FidlTransaction : public fidl::Transaction {
  public:
   FidlTransaction(FidlTransaction&&) = default;
   explicit FidlTransaction(zx_txid_t transaction_id, zx::unowned_channel channel)
-      : txid_(transaction_id), channel_(channel) {}
+      : txid_(transaction_id), channel_(std::move(channel)) {}
 
   std::unique_ptr<fidl::Transaction> TakeOwnership() override {
     return std::make_unique<FidlTransaction>(std::move(*this));
@@ -95,8 +97,8 @@ class FidlTransaction : public fidl::Transaction {
 
 class FakeDevice : public fidl::testing::WireTestBase<fuchsia_device_manager::DeviceController> {
  public:
-  FakeDevice(fidl::ServerEnd<fuchsia_driver_test_logger::Logger> test_output,
-             const fidl::StringView expected_driver = {})
+  explicit FakeDevice(fidl::ServerEnd<fuchsia_driver_test_logger::Logger> test_output,
+                      const fidl::StringView expected_driver = {})
       : test_output_(std::move(test_output)), expected_driver_(expected_driver) {}
 
   void BindDriver(BindDriverRequestView request, BindDriverCompleter::Sync& completer) override {
@@ -108,7 +110,7 @@ class FakeDevice : public fidl::testing::WireTestBase<fuchsia_device_manager::De
     }
   }
 
-  bool bind_called() { return bind_called_; }
+  bool bind_called() const { return bind_called_; }
 
  private:
   void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
@@ -148,8 +150,6 @@ void CheckBindDriverReceived(
   ASSERT_TRUE(fake.bind_called());
 }
 
-}  // namespace
-
 TEST(MiscTestCase, InitCoreDevices) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   InspectManager inspect_manager(loop.dispatcher());
@@ -171,15 +171,15 @@ TEST(MiscTestCase, LoadDisabledDriver) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   ASSERT_OK(loop.StartThread("mock-boot-args"));
   mock_boot_arguments::Server boot_args{{{"driver.mock_device.disable", "true"}}};
-  fidl::WireSyncClient<fuchsia_boot::Arguments> client;
-  boot_args.CreateClient(loop.dispatcher(), &client);
+  zx::result client = boot_args.CreateClient(loop.dispatcher());
+  ASSERT_OK(client);
 
   bool found_driver = false;
   auto callback = [&found_driver](Driver* drv, const char* version) {
     delete drv;
     found_driver = true;
   };
-  ASSERT_OK(load_driver(&client, callback));
+  ASSERT_OK(load_driver(&client.value(), callback));
   ASSERT_FALSE(found_driver);
 }
 
@@ -525,5 +525,7 @@ TEST(MiscTestCase, AddCompositeNodeSpec) {
   coordinator_endpoints->client.reset();
   loop.RunUntilIdle();
 }
+
+}  // namespace
 
 int main(int argc, char** argv) { return RUN_ALL_TESTS(argc, argv); }

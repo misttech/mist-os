@@ -10,6 +10,8 @@
 #include <mock-boot-arguments/server.h>
 #include <zxtest/zxtest.h>
 
+namespace {
+
 TEST(SystemInstanceTest, CheckBootArgParsing) {
   std::map<std::string, std::string> arguments;
   arguments["kernel.shell"] = "false";
@@ -23,10 +25,10 @@ TEST(SystemInstanceTest, CheckBootArgParsing) {
   mock_boot_arguments::Server boot_server(std::move(arguments));
   loop.StartThread();
 
-  fidl::WireSyncClient<fuchsia_boot::Arguments> boot_args;
-  boot_server.CreateClient(loop.dispatcher(), &boot_args);
+  zx::result boot_args = boot_server.CreateClient(loop.dispatcher());
+  ASSERT_OK(boot_args);
 
-  zx::result args = console_launcher::GetArguments(boot_args.client_end());
+  zx::result args = console_launcher::GetArguments(boot_args.value().client_end());
   ASSERT_OK(args.status_value());
 
   ASSERT_TRUE(args->run_shell);
@@ -46,10 +48,10 @@ TEST(SystemInstanceTest, CheckBootArgDefaultStrings) {
   mock_boot_arguments::Server boot_server(std::move(arguments));
   loop.StartThread();
 
-  fidl::WireSyncClient<fuchsia_boot::Arguments> boot_args;
-  boot_server.CreateClient(loop.dispatcher(), &boot_args);
+  zx::result boot_args = boot_server.CreateClient(loop.dispatcher());
+  ASSERT_OK(boot_args);
 
-  zx::result args = console_launcher::GetArguments(boot_args.client_end());
+  zx::result args = console_launcher::GetArguments(boot_args.value().client_end());
   ASSERT_OK(args.status_value());
 
   ASSERT_FALSE(args->run_shell);
@@ -68,10 +70,10 @@ TEST(VirtconSetup, VirtconDefaults) {
   mock_boot_arguments::Server boot_server(std::move(arguments));
   loop.StartThread();
 
-  fidl::WireSyncClient<fuchsia_boot::Arguments> boot_args;
-  boot_server.CreateClient(loop.dispatcher(), &boot_args);
+  zx::result boot_args = boot_server.CreateClient(loop.dispatcher());
+  ASSERT_OK(boot_args);
 
-  zx::result args = console_launcher::GetArguments(boot_args.client_end());
+  zx::result args = console_launcher::GetArguments(boot_args.value().client_end());
   ASSERT_OK(args.status_value());
 
   ASSERT_FALSE(args->virtual_console_need_debuglog);
@@ -87,10 +89,10 @@ TEST(VirtconSetup, VirtconNeedDebuglog) {
   mock_boot_arguments::Server boot_server(std::move(arguments));
   loop.StartThread();
 
-  fidl::WireSyncClient<fuchsia_boot::Arguments> boot_args;
-  boot_server.CreateClient(loop.dispatcher(), &boot_args);
+  zx::result boot_args = boot_server.CreateClient(loop.dispatcher());
+  ASSERT_OK(boot_args);
 
-  zx::result args = console_launcher::GetArguments(boot_args.client_end());
+  zx::result args = console_launcher::GetArguments(boot_args.value().client_end());
   ASSERT_OK(args.status_value());
 
   ASSERT_TRUE(args->virtual_console_need_debuglog);
@@ -106,11 +108,13 @@ TEST(VirtconSetup, VirtconNetbootWithNetsvcDisabled) {
   mock_boot_arguments::Server boot_server(std::move(arguments));
   loop.StartThread();
 
-  fidl::WireSyncClient<fuchsia_boot::Arguments> boot_args;
-  boot_server.CreateClient(loop.dispatcher(), &boot_args);
+  zx::result boot_args = boot_server.CreateClient(loop.dispatcher());
+  ASSERT_OK(boot_args);
 
-  zx::result args = console_launcher::GetArguments(boot_args.client_end());
+  zx::result args = console_launcher::GetArguments(boot_args.value().client_end());
   ASSERT_OK(args.status_value());
 
   ASSERT_FALSE(args->virtual_console_need_debuglog);
 }
+
+}  // namespace

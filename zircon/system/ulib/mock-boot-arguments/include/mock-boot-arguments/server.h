@@ -17,8 +17,8 @@ class Server final : public fidl::WireServer<fuchsia_boot::Arguments> {
   explicit Server(std::map<std::string, std::string>&& args) : arguments_{args} {}
   explicit Server() = default;
 
-  void CreateClient(async_dispatcher* dispatcher,
-                    fidl::WireSyncClient<fuchsia_boot::Arguments>* argclient);
+  zx::result<fidl::WireSyncClient<fuchsia_boot::Arguments>> CreateClient(
+      async_dispatcher_t* dispatcher);
 
   void GetString(GetStringRequestView request, GetStringCompleter::Sync& completer) override;
   void GetStrings(GetStringsRequestView request, GetStringsCompleter::Sync& completer) override;

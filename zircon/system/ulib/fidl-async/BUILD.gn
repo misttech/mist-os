@@ -47,7 +47,6 @@ zx_library("fidl-async-cpp") {
     "//src/storage/lib/paver/test:*",
     "//src/storage/minfs:*",
     "//src/storage/testing:*",
-    "//zircon/system/ulib/mock-boot-arguments:*",
   ]
 }
 

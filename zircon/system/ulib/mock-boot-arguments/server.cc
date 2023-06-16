@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.boot/cpp/wire.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fidl/cpp/wire/string_view.h>
 #include <lib/fidl/cpp/wire/vector_view.h>
-#include <zircon/status.h>
 
 #include <map>
 #include <vector>
@@ -17,30 +15,17 @@
 
 namespace mock_boot_arguments {
 
-void Server::CreateClient(async_dispatcher* dispatcher,
-                          fidl::WireSyncClient<fuchsia_boot::Arguments>* argclient) {
+zx::result<fidl::WireSyncClient<fuchsia_boot::Arguments>> Server::CreateClient(
+    async_dispatcher_t* dispatcher) {
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_boot::Arguments>();
   if (endpoints.is_error()) {
-    printf(
-        "mock_boot_arguments: failed to create client for mock boot arguments, failed to create "
-        "channel: %s\n",
-        endpoints.status_string());
-    *argclient = {};
-    return;
+    return endpoints.take_error();
   }
   auto& [client, server] = endpoints.value();
 
-  if (zx_status_t status = fidl::BindSingleInFlightOnly(dispatcher, std::move(server), this);
-      status != ZX_OK) {
-    printf(
-        "mock_boot_arguments: failed to create client for mock boot arguments, failed to bind: "
-        "%s\n",
-        zx_status_get_string(status));
-    *argclient = {};
-    return;
-  }
+  fidl::BindServer(dispatcher, std::move(server), this);
 
-  *argclient = fidl::WireSyncClient{std::move(client)};
+  return zx::ok(fidl::WireSyncClient{std::move(client)});
 }
 
 void Server::GetString(GetStringRequestView request, GetStringCompleter::Sync& completer) {

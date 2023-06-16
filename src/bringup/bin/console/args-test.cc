@@ -23,11 +23,11 @@ TEST(ConsoleArgsTestCase, BootArgsPrecedence) {
   async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
   loop.StartThread("mock-boot-args");
 
-  fidl::WireSyncClient<fuchsia_boot::Arguments> args_client;
-  mock_args.CreateClient(loop.dispatcher(), &args_client);
+  zx::result args_client = mock_args.CreateClient(loop.dispatcher());
+  ASSERT_OK(args_client);
 
   Options opts;
-  ASSERT_OK(ParseArgs(std::move(config), args_client, &opts));
+  ASSERT_OK(ParseArgs(std::move(config), args_client.value(), &opts));
 
   const std::vector<std::string> kAllowedExpected{"qux", "foo", "bar"};
   ASSERT_EQ(opts.allowed_log_tags, kAllowedExpected);
