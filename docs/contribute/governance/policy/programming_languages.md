@@ -212,10 +212,13 @@ objects of that class.
 
 #### Decision
 
-*   Python is not supported for end-developers.
+*   Per
+    [RFC-0221](/docs/contribute/governance/rfcs/0221_python_for_out-of-tree_system_testing.md),
+    Python 3 is approved for use by end developers for system testing.
 *   Python 3 is approved for use in the Fuchsia Platform Source Tree for the
     following purposes:
     *   Build
     *   Host tools
+    *   System testing
 *   Python 2.7 is deprecated and existing uses in the Fuchsia Platform Source
     Tree must be migrated to an approved language.
