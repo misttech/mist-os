@@ -6,7 +6,10 @@
 //! RTM_LINK and RTM_ADDR Netlink messages based on events received from
 //! Netstack's interface watcher.
 
-use std::{collections::BTreeMap, num::NonZeroU32};
+use std::{
+    collections::BTreeMap,
+    num::{NonZeroU32, NonZeroU64},
+};
 
 use fidl_fuchsia_hardware_network as fhwnet;
 use fidl_fuchsia_net as fnet;
@@ -29,10 +32,10 @@ use futures::{
 use net_types::ip::{AddrSubnetEither, IpVersion};
 use netlink_packet_core::{NetlinkMessage, NLM_F_MULTIPART};
 use netlink_packet_route::{
-    AddressHeader, AddressMessage, LinkHeader, LinkMessage, RtnlMessage, AF_INET, AF_INET6,
-    AF_UNSPEC, ARPHRD_ETHER, ARPHRD_LOOPBACK, ARPHRD_PPP, ARPHRD_VOID, IFA_F_PERMANENT,
-    IFF_LOOPBACK, IFF_LOWER_UP, IFF_RUNNING, IFF_UP, RTNLGRP_IPV4_IFADDR, RTNLGRP_IPV6_IFADDR,
-    RTNLGRP_LINK,
+    link::nlas::Nla as LinkNla, AddressHeader, AddressMessage, LinkHeader, LinkMessage,
+    RtnlMessage, AF_INET, AF_INET6, AF_UNSPEC, ARPHRD_ETHER, ARPHRD_LOOPBACK, ARPHRD_PPP,
+    ARPHRD_VOID, IFA_F_PERMANENT, IFF_LOOPBACK, IFF_LOWER_UP, IFF_RUNNING, IFF_UP,
+    RTNLGRP_IPV4_IFADDR, RTNLGRP_IPV6_IFADDR, RTNLGRP_LINK,
 };
 use tracing::{debug, error, warn};
 
@@ -244,6 +247,34 @@ struct InterfaceState {
     // `BTreeMap` so that addresses are iterated in deterministic order
     // (useful for tests).
     addresses: BTreeMap<fnet::IpAddress, NetlinkAddressMessage>,
+    link_address: Option<Vec<u8>>,
+}
+
+async fn set_link_address(
+    interfaces_proxy: &fnet_root::InterfacesProxy,
+    id: NonZeroU64,
+    link_address: &mut Option<Vec<u8>>,
+) {
+    match interfaces_proxy
+        .get_mac(id.get())
+        .await
+        .expect("netstack should never close its end of `fuchsia.net.root/Interfaces`")
+    {
+        Ok(None) => {
+            // The request succeeded but the interface has no address.
+            debug!("no MAC address for interface ({id:?})")
+        }
+        Ok(Some(mac)) => {
+            let fnet::MacAddress { octets } = *mac;
+            assert_eq!(link_address.replace(octets.to_vec()), None)
+        }
+        Err(fnet_root::InterfacesGetMacError::NotFound) => {
+            // We only get here if the interface has been removed after we
+            // learned about it through the interfaces watcher. Do nothing as
+            // a removed event should come for this interface shortly.
+            warn!("failed to get MAC address for interface ({id:?}) with not found error")
+        }
+    }
 }
 
 impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
@@ -316,12 +347,17 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
                 }
             };
 
-            for fnet_interfaces_ext::PropertiesAndState { properties, state } in
-                interface_properties.values_mut()
+            for fnet_interfaces_ext::PropertiesAndState {
+                properties,
+                state: InterfaceState { addresses, link_address },
+            } in interface_properties.values_mut()
             {
-                if let Some(addresses) = addresses_optionally_from_interface_properties(properties)
+                set_link_address(&interfaces_proxy, properties.id, link_address).await;
+
+                if let Some(interface_addresses) =
+                    addresses_optionally_from_interface_properties(properties)
                 {
-                    state.addresses = addresses;
+                    *addresses = interface_addresses;
                 }
             }
 
@@ -349,10 +385,11 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
                     };
 
                     match handle_interface_watcher_event(
+                        &interfaces_proxy,
                         &mut interface_properties,
                         &route_clients,
                         event,
-                    ) {
+                    ).await {
                         Ok(()) => {}
                         Err(InterfaceEventHandlerError::ExistingEventReceived(properties)) => {
                             // This error indicates there is an inconsistent interface state shared
@@ -546,10 +583,14 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> EventLoop<S> {
                 GetLinkArgs::Dump => {
                     interface_properties
                         .values()
-                        .map(|fnet_interfaces_ext::PropertiesAndState { properties, state: _ }| {
-                            properties
-                        })
-                        .filter_map(NetlinkLinkMessage::optionally_from)
+                        .filter_map(
+                            |fnet_interfaces_ext::PropertiesAndState {
+                                 properties,
+                                 state: InterfaceState { addresses: _, link_address },
+                             }| {
+                                NetlinkLinkMessage::optionally_from(properties, link_address)
+                            },
+                        )
                         .for_each(|message| {
                             client.send_unicast(message.into_rtnl_new_link(sequence_number, true))
                         });
@@ -676,7 +717,10 @@ fn update_addresses<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
 ///
 /// Returns an `InterfaceEventLoopError` when unexpected events occur, or an
 /// `UpdateError` when updates are not consistent with the current state.
-fn handle_interface_watcher_event<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
+async fn handle_interface_watcher_event<
+    S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
+>(
+    interfaces_proxy: &fnet_root::InterfacesProxy,
     interface_properties: &mut BTreeMap<
         u64,
         fnet_interfaces_ext::PropertiesAndState<InterfaceState>,
@@ -692,9 +736,11 @@ fn handle_interface_watcher_event<S: Sender<<NetlinkRoute as ProtocolFamily>::In
     match update {
         fnet_interfaces_ext::UpdateResult::Added {
             properties,
-            state: InterfaceState { addresses },
+            state: InterfaceState { addresses, link_address },
         } => {
-            if let Some(message) = NetlinkLinkMessage::optionally_from(properties) {
+            set_link_address(interfaces_proxy, properties.id, link_address).await;
+
+            if let Some(message) = NetlinkLinkMessage::optionally_from(properties, link_address) {
                 route_clients.send_message_to_group(
                     message.into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false),
                     ModernGroup(RTNLGRP_LINK),
@@ -734,10 +780,10 @@ fn handle_interface_watcher_event<S: Sender<<NetlinkRoute as ProtocolFamily>::In
                     has_default_ipv4_route: _,
                     has_default_ipv6_route: _,
                 },
-            state: InterfaceState { addresses: interface_addresses },
+            state: InterfaceState { addresses: interface_addresses, link_address },
         } => {
             if online.is_some() {
-                if let Some(message) = NetlinkLinkMessage::optionally_from(current) {
+                if let Some(message) = NetlinkLinkMessage::optionally_from(current, link_address) {
                     route_clients.send_message_to_group(
                         message.into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false),
                         ModernGroup(RTNLGRP_LINK),
@@ -770,14 +816,14 @@ fn handle_interface_watcher_event<S: Sender<<NetlinkRoute as ProtocolFamily>::In
         }
         fnet_interfaces_ext::UpdateResult::Removed(fnet_interfaces_ext::PropertiesAndState {
             properties,
-            state: InterfaceState { mut addresses },
+            state: InterfaceState { mut addresses, link_address },
         }) => {
             update_addresses(&mut addresses, BTreeMap::new(), route_clients);
 
             // Send link messages after the address message for removed links
             // so that netlink clients are aware of the interface throughout the
             // address messages.
-            if let Some(message) = NetlinkLinkMessage::optionally_from(&properties) {
+            if let Some(message) = NetlinkLinkMessage::optionally_from(&properties, &link_address) {
                 route_clients.send_message_to_group(
                     message.into_rtnl_del_link(UNSPECIFIED_SEQUENCE_NUMBER),
                     ModernGroup(RTNLGRP_LINK),
@@ -804,8 +850,11 @@ fn handle_interface_watcher_event<S: Sender<<NetlinkRoute as ProtocolFamily>::In
 pub(crate) struct NetlinkLinkMessage(LinkMessage);
 
 impl NetlinkLinkMessage {
-    fn optionally_from(properties: &fnet_interfaces_ext::Properties) -> Option<Self> {
-        match properties.clone().try_into() {
+    fn optionally_from(
+        properties: &fnet_interfaces_ext::Properties,
+        link_address: &Option<Vec<u8>>,
+    ) -> Option<Self> {
+        match interface_properties_to_link_message(properties, link_address) {
             Ok(o) => Some(o),
             Err(NetlinkLinkMessageConversionError::InvalidInterfaceId(id)) => {
                 warn!(tag = NETLINK_LOG_TAG, "Invalid interface id: {:?}", id);
@@ -890,82 +939,84 @@ const ONLINE_IF_FLAGS: u32 = IFF_UP | IFF_RUNNING | IFF_LOWER_UP;
 
 // Implement conversions from `Properties` to `NetlinkLinkMessage`
 // which is fallible iff, the interface has an id greater than u32.
-impl TryFrom<fnet_interfaces_ext::Properties> for NetlinkLinkMessage {
-    type Error = NetlinkLinkMessageConversionError;
-    fn try_from(
-        fnet_interfaces_ext::Properties {
-            id,
-            name,
-            device_class,
-            online,
-            addresses: _,
-            has_default_ipv4_route: _,
-            has_default_ipv6_route: _,
-        }: fnet_interfaces_ext::Properties,
-    ) -> Result<Self, Self::Error> {
-        let mut link_header = LinkHeader::default();
+fn interface_properties_to_link_message(
+    fnet_interfaces_ext::Properties {
+        id,
+        name,
+        device_class,
+        online,
+        addresses: _,
+        has_default_ipv4_route: _,
+        has_default_ipv6_route: _,
+    }: &fnet_interfaces_ext::Properties,
+    link_address: &Option<Vec<u8>>,
+) -> Result<NetlinkLinkMessage, NetlinkLinkMessageConversionError> {
+    let online = *online;
+    let mut link_header = LinkHeader::default();
 
-        // This constant is in the range of u8-accepted values, so it can be safely casted to a u8.
-        link_header.interface_family = AF_UNSPEC.try_into().expect("should fit into u8");
+    // This constant is in the range of u8-accepted values, so it can be safely casted to a u8.
+    link_header.interface_family = AF_UNSPEC.try_into().expect("should fit into u8");
 
-        // We expect interface ids to safely fit in the range of u32 values.
-        let id: u32 = match id.get().try_into() {
-            Err(std::num::TryFromIntError { .. }) => {
-                return Err(NetlinkLinkMessageConversionError::InvalidInterfaceId(id.into()))
-            }
-            Ok(id) => id,
-        };
-        link_header.index = id;
+    // We expect interface ids to safely fit in the range of u32 values.
+    let id: u32 = match id.get().try_into() {
+        Err(std::num::TryFromIntError { .. }) => {
+            return Err(NetlinkLinkMessageConversionError::InvalidInterfaceId(id.clone().into()))
+        }
+        Ok(id) => id,
+    };
+    link_header.index = id;
 
-        let link_layer_type = device_class_to_link_type(device_class);
-        link_header.link_layer_type = link_layer_type;
+    let link_layer_type = device_class_to_link_type(*device_class);
+    link_header.link_layer_type = link_layer_type;
 
-        let mut flags = 0;
-        if online {
-            flags |= ONLINE_IF_FLAGS;
-        };
-        if link_header.link_layer_type == ARPHRD_LOOPBACK {
-            flags |= IFF_LOOPBACK;
-        };
-        link_header.flags = flags;
+    let mut flags = 0;
+    if online {
+        flags |= ONLINE_IF_FLAGS;
+    };
+    if link_header.link_layer_type == ARPHRD_LOOPBACK {
+        flags |= IFF_LOOPBACK;
+    };
+    link_header.flags = flags;
 
-        // As per netlink_package_route and rtnetlink documentation, this should be set to
-        // `0xffff_ffff` and reserved for future use.
-        link_header.change_mask = u32::MAX;
+    // As per netlink_package_route and rtnetlink documentation, this should be set to
+    // `0xffff_ffff` and reserved for future use.
+    link_header.change_mask = u32::MAX;
 
-        // The NLA order follows the list that attributes are listed on the
-        // rtnetlink man page.
-        // The following fields are used in the options in the NLA, but they do
-        // not have any corresponding values in `fnet_interfaces_ext::Properties`.
-        //
-        // IFLA_ADDRESS
-        // IFLA_BROADCAST
-        // IFLA_MTU
-        // IFLA_LINK
-        // IFLA_QDISC
-        // IFLA_STATS
-        //
-        // There are other NLAs observed via the netlink_packet_route crate, and do
-        // not have corresponding values in `fnet_interfaces_ext::Properties`.
-        // This list is documented within issuetracker.google.com/283137644.
-        let nlas = vec![
-            netlink_packet_route::link::nlas::Nla::IfName(name),
-            netlink_packet_route::link::nlas::Nla::Link(link_layer_type.into()),
-            // Netstack only exposes enough state to determine between `Up` and `Down`
-            // operating state.
-            netlink_packet_route::link::nlas::Nla::OperState(if online {
-                netlink_packet_route::nlas::link::State::Up
-            } else {
-                netlink_packet_route::nlas::link::State::Down
-            }),
-        ];
+    // The NLA order follows the list that attributes are listed on the
+    // rtnetlink man page.
+    // The following fields are used in the options in the NLA, but they do
+    // not have any corresponding values in `fnet_interfaces_ext::Properties`.
+    //
+    // IFLA_BROADCAST
+    // IFLA_MTU
+    // IFLA_LINK
+    // IFLA_QDISC
+    // IFLA_STATS
+    //
+    // There are other NLAs observed via the netlink_packet_route crate, and do
+    // not have corresponding values in `fnet_interfaces_ext::Properties`.
+    // This list is documented within issuetracker.google.com/283137644.
+    let nlas = [
+        LinkNla::IfName(name.clone()),
+        LinkNla::Link(link_layer_type.into()),
+        // Netstack only exposes enough state to determine between `Up` and `Down`
+        // operating state.
+        LinkNla::OperState(if online {
+            netlink_packet_route::nlas::link::State::Up
+        } else {
+            netlink_packet_route::nlas::link::State::Down
+        }),
+    ]
+    .into_iter()
+    // If the interface has a link-address, include it in the NLAs.
+    .chain(link_address.clone().map(LinkNla::Address))
+    .collect();
 
-        let mut link_message = LinkMessage::default();
-        link_message.header = link_header;
-        link_message.nlas = nlas;
+    let mut link_message = LinkMessage::default();
+    link_message.header = link_header;
+    link_message.nlas = nlas;
 
-        return Ok(NetlinkLinkMessage(link_message));
-    }
+    return Ok(NetlinkLinkMessage(link_message));
 }
 
 /// A wrapper type for the netlink_packet_route `AddressMessage` to enable conversions
@@ -1205,7 +1256,7 @@ pub(crate) mod testutil {
         id: u64,
         link_type: u16,
         flags: u32,
-        nlas: Vec<netlink_packet_route::link::nlas::Nla>,
+        nlas: Vec<LinkNla>,
     ) -> NetlinkLinkMessage {
         let mut link_header = LinkHeader::default();
         link_header.index = id.try_into().expect("should fit into u32");
@@ -1224,16 +1275,20 @@ pub(crate) mod testutil {
         name: String,
         link_type: u16,
         online: bool,
-    ) -> Vec<netlink_packet_route::link::nlas::Nla> {
-        vec![
-            netlink_packet_route::link::nlas::Nla::IfName(name),
-            netlink_packet_route::link::nlas::Nla::Link(link_type.into()),
-            netlink_packet_route::link::nlas::Nla::OperState(if online {
+        mac: &Option<fnet::MacAddress>,
+    ) -> Vec<LinkNla> {
+        [
+            LinkNla::IfName(name),
+            LinkNla::Link(link_type.into()),
+            LinkNla::OperState(if online {
                 netlink_packet_route::nlas::link::State::Up
             } else {
                 netlink_packet_route::nlas::link::State::Down
             }),
         ]
+        .into_iter()
+        .chain(mac.map(|fnet::MacAddress { octets }| LinkNla::Address(octets.to_vec())))
+        .collect()
     }
 
     pub(crate) fn create_address_message(
@@ -1295,7 +1350,7 @@ mod tests {
     use pretty_assertions::assert_eq;
     use test_case::test_case;
 
-    use crate::messaging::testutil::{FakeSender, SentMessage};
+    use crate::messaging::testutil::SentMessage;
 
     const TEST_SEQUENCE_NUMBER: u32 = 1234;
 
@@ -1354,68 +1409,6 @@ mod tests {
                 create_address_message(interface_id, TEST_V6_ADDR, interface_name, flags),
             ),
         ])
-    }
-
-    #[fuchsia::test]
-    fn test_handle_interface_watcher_event() {
-        let mut interface_properties =
-            BTreeMap::<u64, fnet_interfaces_ext::PropertiesAndState<InterfaceState>>::new();
-        let route_clients = ClientTable::<NetlinkRoute, FakeSender<_>>::default();
-
-        let mut interface1 =
-            create_interface(ETH_INTERFACE_ID, "test".into(), ETHERNET, true, vec![]);
-        let interface2 = create_interface(LO_INTERFACE_ID, "lo".into(), LOOPBACK, true, vec![]);
-
-        let interface1_add_event = fnet_interfaces::Event::Added(interface1.clone().into());
-        assert_matches!(
-            handle_interface_watcher_event(
-                &mut interface_properties,
-                &route_clients,
-                interface1_add_event
-            ),
-            Ok(())
-        );
-        assert_eq!(interface_properties.get(&ETH_INTERFACE_ID).unwrap().properties, interface1);
-
-        // Sending an updated interface properties with a different field
-        // should update the properties stored under the same interface id.
-        interface1.online = false;
-        let interface1_change_event = fnet_interfaces::Event::Changed(interface1.clone().into());
-        assert_matches!(
-            handle_interface_watcher_event(
-                &mut interface_properties,
-                &route_clients,
-                interface1_change_event
-            ),
-            Ok(())
-        );
-        assert_eq!(interface_properties.get(&ETH_INTERFACE_ID).unwrap().properties, interface1);
-
-        let interface2_add_event = fnet_interfaces::Event::Added(interface2.clone().into());
-        assert_matches!(
-            handle_interface_watcher_event(
-                &mut interface_properties,
-                &route_clients,
-                interface2_add_event
-            ),
-            Ok(())
-        );
-        assert_eq!(interface_properties.get(&ETH_INTERFACE_ID).unwrap().properties, interface1);
-        assert_eq!(interface_properties.get(&LO_INTERFACE_ID).unwrap().properties, interface2);
-
-        // A remove event should result in no longer seeing the LinkMessage in the
-        // interface properties BTreeMap.
-        let interface1_remove_event = fnet_interfaces::Event::Removed(ETH_INTERFACE_ID);
-        assert_matches!(
-            handle_interface_watcher_event(
-                &mut interface_properties,
-                &route_clients,
-                interface1_remove_event
-            ),
-            Ok(())
-        );
-        assert_eq!(interface_properties.get(&ETH_INTERFACE_ID), None);
-        assert_eq!(interface_properties.get(&LO_INTERFACE_ID).unwrap().properties, interface2);
     }
 
     fn get_fake_interface(
@@ -1504,14 +1497,15 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_event_loop_errors_stream_ended() {
-        let Setup { event_loop, watcher_stream, request_sink: _, interfaces_request_stream: _ } =
+        let Setup { event_loop, watcher_stream, request_sink: _, interfaces_request_stream } =
             setup();
         let event_loop_fut = event_loop.run();
         let interfaces = vec![get_fake_interface(1, "lo", LOOPBACK)];
         let watcher_fut =
             respond_to_watcher_with_interfaces(watcher_stream, interfaces, None::<(Option<_>, _)>);
+        let root_interfaces_fut = expect_only_get_mac_root_requests(interfaces_request_stream);
 
-        let (err, ()) = futures::join!(event_loop_fut, watcher_fut);
+        let (err, (), ()) = futures::join!(event_loop_fut, watcher_fut, root_interfaces_fut);
         assert_matches!(
             err,
             EventLoopError::Fidl(InterfacesFidlError::EventStream(
@@ -1543,7 +1537,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_event_loop_errors_duplicate_adds() {
-        let Setup { event_loop, watcher_stream, request_sink: _, interfaces_request_stream: _ } =
+        let Setup { event_loop, watcher_stream, request_sink: _, interfaces_request_stream } =
             setup();
         let event_loop_fut = event_loop.run();
         let interfaces_existing = vec![get_fake_interface(1, "lo", LOOPBACK)];
@@ -1553,8 +1547,9 @@ mod tests {
             interfaces_existing,
             Some((interfaces_new, fnet_interfaces::Event::Added)),
         );
+        let root_interfaces_fut = expect_only_get_mac_root_requests(interfaces_request_stream);
 
-        let (err, ()) = futures::join!(event_loop_fut, watcher_fut);
+        let (err, (), ()) = futures::join!(event_loop_fut, watcher_fut, root_interfaces_fut);
         // The properties that are being added again has interface id 1.
         assert_matches!(err,
             EventLoopError::Netstack(
@@ -1567,7 +1562,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_event_loop_errors_existing_after_add() {
-        let Setup { event_loop, watcher_stream, request_sink: _, interfaces_request_stream: _ } =
+        let Setup { event_loop, watcher_stream, request_sink: _, interfaces_request_stream } =
             setup();
         let event_loop_fut = event_loop.run();
         let interfaces_existing =
@@ -1578,8 +1573,9 @@ mod tests {
             interfaces_existing,
             Some((interfaces_new, fnet_interfaces::Event::Existing)),
         );
+        let root_interfaces_fut = expect_only_get_mac_root_requests(interfaces_request_stream);
 
-        let (err, ()) = futures::join!(event_loop_fut, watcher_fut);
+        let (err, (), ()) = futures::join!(event_loop_fut, watcher_fut, root_interfaces_fut);
         // The second existing properties has interface id 3.
         assert_matches!(
             err,
@@ -1606,16 +1602,16 @@ mod tests {
         online: bool,
         flags: u32,
     ) {
-        let interface_id = 1;
-        let interface_name: String = "test".into();
-
+        let interface_name = LO_NAME.to_string();
         let interface =
-            create_interface(interface_id, interface_name.clone(), device_class, online, vec![]);
-        let actual: NetlinkLinkMessage = interface.try_into().unwrap();
+            create_interface(LO_INTERFACE_ID, interface_name.clone(), device_class, online, vec![]);
+        let actual: NetlinkLinkMessage =
+            interface_properties_to_link_message(&interface, &LO_MAC.map(|a| a.octets.to_vec()))
+                .unwrap();
 
         let link_layer_type = device_class_to_link_type(device_class);
-        let nlas = create_nlas(interface_name, link_layer_type, online);
-        let expected = create_netlink_link_message(interface_id, link_layer_type, flags, nlas);
+        let nlas = create_nlas(interface_name, link_layer_type, online, &LO_MAC);
+        let expected = create_netlink_link_message(LO_INTERFACE_ID, link_layer_type, flags, nlas);
         pretty_assertions::assert_eq!(actual, expected);
     }
 
@@ -1625,8 +1621,7 @@ mod tests {
         let interface =
             create_interface(invalid_interface_id, "test".into(), ETHERNET, true, vec![]);
 
-        let actual_link_message: Result<NetlinkLinkMessage, NetlinkLinkMessageConversionError> =
-            interface.clone().try_into();
+        let actual_link_message = interface_properties_to_link_message(&interface, &None);
         assert_eq!(
             actual_link_message,
             Err(NetlinkLinkMessageConversionError::InvalidInterfaceId(invalid_interface_id))
@@ -1696,7 +1691,7 @@ mod tests {
                 ModernGroup(RTNLGRP_IPV4_IFADDR),
             ],
         );
-        let Setup { event_loop, mut watcher_stream, request_sink: _, interfaces_request_stream: _ } =
+        let Setup { event_loop, mut watcher_stream, request_sink: _, interfaces_request_stream } =
             setup_with_route_clients({
                 let route_clients = ClientTable::default();
                 route_clients.add_client(link_client);
@@ -1708,6 +1703,9 @@ mod tests {
             });
         let event_loop_fut = event_loop.run().fuse();
         futures::pin_mut!(event_loop_fut);
+        let root_interfaces_fut =
+            expect_only_get_mac_root_requests(interfaces_request_stream).fuse();
+        futures::pin_mut!(root_interfaces_fut);
 
         // Existing events should never trigger messages to be sent.
         let watcher_stream_fut = respond_to_watcher(
@@ -1748,6 +1746,9 @@ mod tests {
         );
         futures::select! {
             () = watcher_stream_fut.fuse() => {},
+            () = root_interfaces_fut => {
+                unreachable!("root interfaces request stream should never end")
+            }
             err = event_loop_fut => unreachable!("eventloop should not return: {err:?}"),
         }
         assert_eq!(&link_sink.take_messages()[..], &[]);
@@ -1788,7 +1789,8 @@ mod tests {
                 }),
             ],
         );
-        let ((), err) = futures::future::join(watcher_stream_fut, event_loop_fut).await;
+        let ((), (), err) =
+            futures::future::join3(watcher_stream_fut, root_interfaces_fut, event_loop_fut).await;
         assert_matches!(
             err,
             EventLoopError::Fidl(InterfacesFidlError::EventStream(
@@ -1800,7 +1802,7 @@ mod tests {
                 WLAN_INTERFACE_ID,
                 ARPHRD_ETHER,
                 0,
-                create_nlas(WLAN_NAME.to_string(), ARPHRD_ETHER, false),
+                create_nlas(WLAN_NAME.to_string(), ARPHRD_ETHER, false, &WLAN_MAC),
             )
             .into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false),
             ModernGroup(RTNLGRP_LINK),
@@ -1810,7 +1812,7 @@ mod tests {
                 LO_INTERFACE_ID,
                 ARPHRD_LOOPBACK,
                 ONLINE_IF_FLAGS | IFF_LOOPBACK,
-                create_nlas(LO_NAME.to_string(), ARPHRD_LOOPBACK, true),
+                create_nlas(LO_NAME.to_string(), ARPHRD_LOOPBACK, true, &LO_MAC),
             )
             .into_rtnl_new_link(UNSPECIFIED_SEQUENCE_NUMBER, false),
             ModernGroup(RTNLGRP_LINK),
@@ -1820,7 +1822,7 @@ mod tests {
                 ETH_INTERFACE_ID,
                 ARPHRD_ETHER,
                 0,
-                create_nlas(ETH_NAME.to_string(), ARPHRD_ETHER, false),
+                create_nlas(ETH_NAME.to_string(), ARPHRD_ETHER, false, &ETH_MAC),
             )
             .into_rtnl_del_link(UNSPECIFIED_SEQUENCE_NUMBER),
             ModernGroup(RTNLGRP_LINK),
@@ -1930,11 +1932,34 @@ mod tests {
         assert_eq!(&other_sink.take_messages()[..], &[]);
     }
 
-    async fn expect_no_root_requests(
+    const LO_MAC: Option<fnet::MacAddress> = None;
+    const ETH_MAC: Option<fnet::MacAddress> = Some(fnet::MacAddress { octets: [1, 1, 1, 1, 1, 1] });
+    const PPP_MAC: Option<fnet::MacAddress> = Some(fnet::MacAddress { octets: [2, 2, 2, 2, 2, 2] });
+    const WLAN_MAC: Option<fnet::MacAddress> =
+        Some(fnet::MacAddress { octets: [3, 3, 3, 3, 3, 3] });
+
+    fn handle_get_mac_root_request_or_panic(req: fnet_root::InterfacesRequest) {
+        match req {
+            fnet_root::InterfacesRequest::GetMac { id, responder } => {
+                let link_address = match id {
+                    LO_INTERFACE_ID => LO_MAC,
+                    ETH_INTERFACE_ID => ETH_MAC,
+                    PPP_INTERFACE_ID => PPP_MAC,
+                    WLAN_INTERFACE_ID => WLAN_MAC,
+                    id => panic!("unexpected interface ID {id}"),
+                };
+
+                responder.send(Ok(link_address.as_ref())).unwrap()
+            }
+            req => panic!("unexpected request {:?}", req),
+        }
+    }
+
+    async fn expect_only_get_mac_root_requests(
         interfaces_request_stream: fnet_root::InterfacesRequestStream,
     ) {
         interfaces_request_stream
-            .for_each(|req| async move { panic!("unexpected request {req:?}") })
+            .for_each(|req| async move { handle_get_mac_root_request_or_panic(req.unwrap()) })
             .await
     }
 
@@ -2031,7 +2056,7 @@ mod tests {
         assert_eq!(
             test_request(
                 RequestArgs::Link(LinkRequestArgs::Get(GetLinkArgs::Dump)),
-                expect_no_root_requests,
+                expect_only_get_mac_root_requests,
             )
             .await,
             TestRequestResult {
@@ -2041,7 +2066,7 @@ mod tests {
                             LO_INTERFACE_ID,
                             ARPHRD_LOOPBACK,
                             ONLINE_IF_FLAGS | IFF_LOOPBACK,
-                            create_nlas(LO_NAME.to_string(), ARPHRD_LOOPBACK, true),
+                            create_nlas(LO_NAME.to_string(), ARPHRD_LOOPBACK, true, &LO_MAC),
                         )
                         .into_rtnl_new_link(TEST_SEQUENCE_NUMBER, true)
                     ),
@@ -2050,7 +2075,7 @@ mod tests {
                             ETH_INTERFACE_ID,
                             ARPHRD_ETHER,
                             0,
-                            create_nlas(ETH_NAME.to_string(), ARPHRD_ETHER, false),
+                            create_nlas(ETH_NAME.to_string(), ARPHRD_ETHER, false, &ETH_MAC),
                         )
                         .into_rtnl_new_link(TEST_SEQUENCE_NUMBER, true)
                     ),
@@ -2070,7 +2095,7 @@ mod tests {
                 RequestArgs::Address(AddressRequestArgs::Get(GetAddressArgs::Dump {
                     ip_version_filter
                 })),
-                expect_no_root_requests,
+                expect_only_get_mac_root_requests,
             )
             .await,
             TestRequestResult {
@@ -2192,7 +2217,7 @@ mod tests {
                                     }
                                     control.shutdown();
                                 }
-                                req => panic!("unexpected request {:?}", req),
+                                req => handle_get_mac_root_request_or_panic(req),
                             })
                         })
                         .await
@@ -2230,7 +2255,7 @@ mod tests {
             },
             |interfaces_request_stream| async {
                 interfaces_request_stream
-                    .then(|req| {
+                    .filter_map(|req| {
                         futures::future::ready(match req.unwrap() {
                             fnet_root::InterfacesRequest::GetAdmin {
                                 id,
@@ -2238,9 +2263,12 @@ mod tests {
                                 control_handle: _,
                             } => {
                                 pretty_assertions::assert_eq!(id, ETH_INTERFACE_ID);
-                                control.into_stream().unwrap()
+                                Some(control.into_stream().unwrap())
                             }
-                            req => panic!("unexpected request {:?}", req),
+                            req => {
+                                handle_get_mac_root_request_or_panic(req);
+                                None
+                            }
                         })
                     })
                     .flatten()
