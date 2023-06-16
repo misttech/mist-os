@@ -18,6 +18,11 @@ group("examples") {
     "rust",
     "time",
   ]
+
+  # TODO(fxbug.dev/129093): Remove once the bug is fixed.
+  if (current_cpu == "riscv64") {
+    deps -= [ "fuzzers" ]
+  }
 }
 
 group("tests") {
@@ -34,4 +39,9 @@ group("tests") {
     "rust:tests",
     "testing:tests",
   ]
+
+  # TODO(fxbug.dev/129093): Remove once the bug is fixed.
+  if (current_cpu == "riscv64") {
+    data_deps -= [ "fuzzers:tests" ]
+  }
 }
