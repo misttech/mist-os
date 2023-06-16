@@ -8,6 +8,7 @@
 #include <lib/zbi-format/zbi.h>
 #include <stdio.h>
 
+#include <type_traits>
 #include <utility>
 #include <variant>
 
@@ -76,10 +77,10 @@ using WithAllDrivers = Template<
 using Driver = WithAllDrivers<std::variant>;
 
 // uart::all::KernelDriver is a variant across all the KernelDriver types.
-template <template <typename> class IoProvider, typename Sync>
+template <template <typename> class IoProvider, typename Sync, typename UartDriver = Driver>
 class KernelDriver {
  public:
-  using uart_type = Driver;
+  using uart_type = UartDriver;
 
   // In default-constructed state, it's the null driver.
   KernelDriver() = default;
@@ -114,6 +115,12 @@ class KernelDriver {
   // instantiate that driver and return true.
   bool Match(const acpi_lite::AcpiDebugPortDescriptor& debug_port) { return DoMatch(debug_port); }
 
+  // This is like Match, but instead of matching a ZBI item, it matches a devicetree compatible
+  // list of values.
+  bool Match(std::string_view compatible_device, const void* payload) {
+    return DoMatch(compatible_device, payload);
+  }
+
   // This is like Match, but instead of matching a ZBI item, it matches a
   // string value for the "kernel.serial" boot option.
   bool Parse(std::string_view option) { return DoMatch(option); }
@@ -143,7 +150,7 @@ class KernelDriver {
     uart_type driver;
     Visit([&driver](auto&& active) {
       const auto& uart = active.uart();
-      driver.emplace<std::decay_t<decltype(uart)>>(uart);
+      driver.template emplace<std::decay_t<decltype(uart)>>(uart);
     });
     return driver;
   }
@@ -153,7 +160,16 @@ class KernelDriver {
   using OneDriver = uart::KernelDriver<Uart, IoProvider, Sync>;
   template <class... Uart>
   using Variant = std::variant<OneDriver<Uart>...>;
-  WithAllDrivers<Variant> variant_;
+
+  template <typename T>
+  struct OneDriverVariant;
+
+  template <typename... Args>
+  struct OneDriverVariant<std::variant<Args...>> {
+    using type = Variant<Args...>;
+  };
+
+  typename OneDriverVariant<UartDriver>::type variant_;
 
   template <size_t I, typename... Args>
   bool TryOneMatch(Args&&... args) {

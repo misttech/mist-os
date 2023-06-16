@@ -8,8 +8,10 @@
 
 #include <lib/devicetree/devicetree.h>
 #include <lib/devicetree/matcher.h>
+#include <lib/devicetree/path.h>
 #include <lib/stdcompat/array.h>
 #include <lib/stdcompat/string_view.h>
+#include <lib/uart/all.h>
 #include <lib/zbi-format/driver-config.h>
 #include <stdio.h>
 
@@ -267,6 +269,115 @@ devicetree::ScanState ArmDevicetreeGicItem::OnSubtree(const devicetree::NodePath
   gic_ = nullptr;
   matched_ = true;
   return devicetree::ScanState::kDone;
+}
+
+devicetree::ScanState DevicetreeBootstrapChosenNodeItemBase::HandleBootstrapStdout(
+    const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
+  auto resolved_path = decoder.ResolvePath(stdout_path_);
+  if (resolved_path.is_error()) {
+    if (resolved_path.error_value() == devicetree::PropertyDecoder::PathResolveError::kNoAliases) {
+      return devicetree::ScanState::kNeedsPathResolution;
+    }
+    return devicetree::ScanState::kDone;
+  }
+
+  // for hand off.
+  resolved_stdout_ = *resolved_path;
+
+  switch (devicetree::ComparePath(path, *resolved_path)) {
+    case devicetree::CompareResult::kIsMatch:
+      break;
+    case devicetree::CompareResult::kIsAncestor:
+      return devicetree::ScanState::kActive;
+    default:
+      return devicetree::ScanState::kDoneWithSubtree;
+  }
+
+  auto [compatible, interrupt, reg_property, interrupt_parent] =
+      decoder.FindProperties("compatible", "interrupts", "reg", "interrupt-parent");
+
+  // Without this we cant figure out what driver to use.
+  if (!compatible) {
+    return devicetree::ScanState::kDone;
+  }
+
+  // No MMIO region, we cant do anything.
+  if (!reg_property) {
+    return devicetree::ScanState::kDone;
+  }
+
+  auto reg = reg_property->AsReg(decoder);
+  if (!reg) {
+    return devicetree::ScanState::kDone;
+  }
+
+  auto addr = (*reg)[0].address();
+
+  if (addr) {
+    auto compatible_with = compatible->AsStringList();
+    if (!compatible_with) {
+      return devicetree::ScanState::kDone;
+    }
+
+    zbi_dcfg_simple_t dcfg{
+        .mmio_phys = *addr,
+        .irq = 0,
+    };
+
+    if (!match_(*compatible_with, dcfg)) {
+      return devicetree::ScanState::kDone;
+    }
+  }
+
+  return devicetree::ScanState::kDone;
+}
+
+devicetree::ScanState DevicetreeBootstrapChosenNodeItemBase::OnNode(
+    const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
+  if (found_chosen_) {
+    if (!stdout_path_.empty()) {
+      return HandleBootstrapStdout(path, decoder);
+    }
+    return devicetree::ScanState::kDone;
+  }
+
+  switch (devicetree::ComparePath(path, "/chosen")) {
+    case devicetree::CompareResult::kIsAncestor:
+      return devicetree::ScanState::kActive;
+    case devicetree::CompareResult::kIsMismatch:
+    case devicetree::CompareResult::kIsDescendant:
+      return devicetree::ScanState::kDoneWithSubtree;
+    case devicetree::CompareResult::kIsMatch:
+      found_chosen_ = true;
+      break;
+  };
+
+  // We are on /chosen, pull the cmdline, zbi and uart device path.
+  auto [bootargs, stdout_path, legacy_stdout_path, ramdisk_start, ramdisk_end] =
+      decoder.FindProperties("bootargs", "stdout-path", "linux,stdout-path", "linux,initrd-start",
+                             "linux,initrd-end");
+  if (bootargs) {
+    if (auto cmdline = bootargs->AsString()) {
+      cmdline_ = *cmdline;
+    }
+  }
+
+  if (stdout_path) {
+    stdout_path_ = stdout_path->AsString().value_or("");
+  } else if (legacy_stdout_path) {
+    stdout_path_ = legacy_stdout_path->AsString().value_or("");
+  }
+
+  if (ramdisk_start && ramdisk_end) {
+    auto addr_start = ramdisk_start->AsUint32();
+    auto addr_end = ramdisk_end->AsUint32();
+    if (addr_start && addr_end) {
+      zbi_ = cpp20::span<const std::byte>(reinterpret_cast<const std::byte*>(*addr_start),
+                                          *addr_end - *addr_start);
+    }
+  }
+
+  return devicetree::ScanState::kActive;
 }
 
 }  // namespace boot_shim

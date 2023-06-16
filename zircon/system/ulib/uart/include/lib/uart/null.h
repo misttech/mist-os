@@ -11,6 +11,7 @@
 #include <lib/zbi-format/zbi.h>
 #include <zircon/assert.h>
 
+#include <array>
 #include <string_view>
 
 #include "uart.h"
@@ -20,6 +21,9 @@ namespace null {
 
 struct Driver {
   struct config_type {};
+
+  static constexpr std::array<std::string_view, 0> kDevicetreeBindings = {};
+  static constexpr std::string_view config_name() { return "none"; }
 
   Driver() = default;
 
@@ -46,6 +50,11 @@ struct Driver {
   }
 
   static std::optional<Driver> MaybeCreate(const acpi_lite::AcpiDebugPortDescriptor& debug_port) {
+    return {};
+  }
+
+  // API to match devicetree node compatible list.
+  static std::optional<Driver> MaybeCreate(std::string_view compatible_device, const void*) {
     return {};
   }
 

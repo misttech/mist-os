@@ -4,10 +4,13 @@
 
 #include <lib/uart/all.h>
 #include <lib/uart/mock.h>
+#include <lib/uart/ns8250.h>
 #include <lib/uart/null.h>
 #include <lib/uart/uart.h>
+#include <lib/zbi-format/driver-config.h>
 
 #include <string_view>
+#include <type_traits>
 
 #include <zxtest/zxtest.h>
 
@@ -110,7 +113,7 @@ TEST(UartTests, All) {
   AllDriver driver;
 
   // Match against ZBI items to instantiate.
-  EXPECT_FALSE(driver.Match({}, nullptr));
+  EXPECT_FALSE(driver.Match(zbi_header_t{}, nullptr));
 
   // Use selected driver.
   driver.Visit([](auto&& driver) {
@@ -123,6 +126,41 @@ TEST(UartTests, All) {
   newdriver.Visit([](auto&& driver) {
     EXPECT_EQ(driver.template Write("hello world\n"), 12);
     EXPECT_FALSE(driver.template Read());
+  });
+}
+
+TEST(UartTests, MatchCompatible) {
+  using AllDriver = uart::all::KernelDriver<uart::mock::IoProvider, uart::UnsynchronizedPolicy>;
+
+  AllDriver driver;
+
+  zbi_dcfg_simple_t dcfg = {
+      .mmio_phys = 1,
+      .irq = 2,
+  };
+
+  // Arbitrary range of string views.
+  EXPECT_TRUE(driver.Match("ns16550", &dcfg));
+
+  driver.Visit([](auto&& driver) {
+    using DriverType = std::decay_t<decltype(driver.uart())>;
+    if constexpr (!std::is_same_v<uart::null::Driver, DriverType> &&
+                  !std::is_same_v<uart::internal::DummyDriver, DriverType>) {
+      if constexpr (std::is_same_v<zbi_dcfg_simple_t,
+                                   std::decay_t<decltype(driver.uart().config())>>) {
+        if (driver.uart().extra() == ZBI_KERNEL_DRIVER_I8250_MMIO_UART) {
+          EXPECT_EQ(driver.uart().config_name(), uart::ns8250::MmioDriver::config_name());
+        } else {
+          EXPECT_EQ(driver.uart().config_name(), uart::ns8250::LegacyDw8250Driver::config_name());
+        }
+        EXPECT_EQ(driver.uart().config().mmio_phys, 1);
+        EXPECT_EQ(driver.uart().config().irq, 2);
+      } else {
+        FAIL("Unexpected dcfg_simple_pio_t.");
+      }
+    } else {
+      FAIL("Unexpected uart::null::Driver.");
+    }
   });
 }
 

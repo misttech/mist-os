@@ -20,6 +20,7 @@ dtbs_all = [
   "qemu-riscv.dtb",
   "sifive-hifive-unmatched.dtb",
   "vision-five-2.dtb",
+  "synthetic/chosen.dtb",
   "synthetic/complex_no_properties.dtb",
   "synthetic/complex_with_alias.dtb",
   "synthetic/complex_with_alias_first.dtb",

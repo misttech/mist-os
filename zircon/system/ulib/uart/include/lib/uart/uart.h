@@ -150,6 +150,19 @@ class DriverBase {
     return {};
   }
 
+  // API to match a devicetree bindings.
+  static std::optional<Driver> MaybeCreate(std::string_view compatible_device,
+                                           const void* payload) {
+    // parsing of compatible property for every uart::nnnn::Driver
+    for (std::string_view supported_device : Driver::kDevicetreeBindings) {
+      if (compatible_device == supported_device) {
+        return Driver{*reinterpret_cast<const config_type*>(payload)};
+      }
+    }
+
+    return {};
+  }
+
   // API to match DBG2 Table (ACPI). Currently only 16550 compatible uarts are supported.
   static std::optional<Driver> MaybeCreate(const acpi_lite::AcpiDebugPortDescriptor& debug_port) {
     return {};

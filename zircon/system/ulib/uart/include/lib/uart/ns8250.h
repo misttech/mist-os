@@ -6,7 +6,11 @@
 #define LIB_UART_NS8250_H_
 
 #include <lib/acpi_lite/debug_port.h>
+#include <lib/stdcompat/array.h>
 #include <lib/zbi-format/driver-config.h>
+
+#include <array>
+#include <string_view>
 
 #include <hwreg/bitfields.h>
 
@@ -167,6 +171,15 @@ class DriverImpl
     : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig>, KdrvExtra, KdrvConfig, kPortCount> {
  public:
   using Base = DriverBase<DriverImpl<KdrvExtra, KdrvConfig>, KdrvExtra, KdrvConfig, kPortCount>;
+
+  static constexpr auto kDevicetreeBindings = []() {
+    if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_DW8250_UART) {
+      return cpp20::to_array<std::string_view>(
+          {"ns8250", "ns16450", "ns16550a", "ns16550", "ns16750", "ns16850"});
+    } else {
+      return std::array<std::string_view, 0>{};
+    }
+  }();
 
   static constexpr std::string_view config_name() {
     if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_I8250_PIO_UART) {

@@ -18,6 +18,7 @@
 #include <fbl/macros.h>
 
 #include "boot-shim.h"
+#include "lib/uart/all.h"
 
 namespace boot_shim {
 
@@ -53,6 +54,8 @@ class DevicetreeBootShim : public BootShim<Items...> {
     };
     return Base::template OnSelectItems<IsDevicetreeItem>(match_with);
   }
+
+  const devicetree::Devicetree& devicetree() const { return dt_; }
 
  private:
   DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(HasInit, Init, void (C::*)(const DevicetreeBootShim& shim));

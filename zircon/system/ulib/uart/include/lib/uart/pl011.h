@@ -5,8 +5,12 @@
 #ifndef LIB_UART_PL011_H_
 #define LIB_UART_PL011_H_
 
+#include <lib/stdcompat/array.h>
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/zbi.h>
+
+#include <array>
+#include <string_view>
 
 #include <hwreg/bitfields.h>
 
@@ -135,6 +139,8 @@ struct LineControlRegister : public hwreg::RegisterBase<LineControlRegister, uin
 struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_PL011_UART, zbi_dcfg_simple_t> {
   using Base = DriverBase<Driver, ZBI_KERNEL_DRIVER_PL011_UART, zbi_dcfg_simple_t>;
 
+  static constexpr auto kDevicetreeBindings =
+      cpp20::to_array<std::string_view>({"arm,primecell", "arm,pl011"});
   static constexpr std::string_view config_name() { return "pl011"; }
 
   template <typename... Args>

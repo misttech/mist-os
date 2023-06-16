@@ -8,6 +8,8 @@
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/zbi.h>
 
+#include <array>
+
 #include <hwreg/bitfields.h>
 
 #include "uart.h"
@@ -129,18 +131,11 @@ struct FIFO_DEPTH : public hwreg::RegisterBase<FIFO_DEPTH, uint32_t> {
 struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_MOTMOT_UART, zbi_dcfg_simple_t> {
   using Base = DriverBase<Driver, ZBI_KERNEL_DRIVER_MOTMOT_UART, zbi_dcfg_simple_t>;
 
+  static constexpr std::array<std::string_view, 0> kDevicetreeBindings = {};
   static constexpr std::string_view config_name() { return "motmot"; }
 
   template <typename... Args>
   explicit Driver(Args&&... args) : Base(std::forward<Args>(args)...) {}
-
-  static std::optional<Driver> MaybeCreate(const zbi_header_t& header, const void* payload) {
-    return Base::MaybeCreate(header, payload);
-  }
-
-  static std::optional<Driver> MaybeCreate(std::string_view string) {
-    return Base::MaybeCreate(string);
-  }
 
   template <class IoProvider>
   void Init(IoProvider& io) {

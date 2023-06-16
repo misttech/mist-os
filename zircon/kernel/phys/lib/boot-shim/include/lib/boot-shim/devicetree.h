@@ -10,12 +10,20 @@
 #include <lib/boot-shim/item-base.h>
 #include <lib/devicetree/devicetree.h>
 #include <lib/devicetree/matcher.h>
+#include <lib/fit/function.h>
+#include <lib/fit/result.h>
+#include <lib/memalloc/range.h>
 #include <lib/stdcompat/array.h>
+#include <lib/uart/all.h>
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/zbi.h>
+#include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 
-#include <cstdarg>
+#include <array>
+#include <string>
+#include <string_view>
 
 #include <fbl/type_info.h>
 
@@ -104,11 +112,11 @@ class ArmDevicetreePsciItem
 // Parses either GIC v2 or GIC v3 device node into proper ZBI item.
 //
 // This item will scan the devicetree for either a node compatible with GIC v2 bindings or GIC v3
-// bindings. Upon finding such node it will generate either a |zbi_dcfg_arm_gic_v2_driver_t| for GIC
-// v2 or a |zbi_dcfg_arm_gic_v3_driver_t| for GIC v3.
+// bindings. Upon finding such node it will generate either a |zbi_dcfg_arm_gic_v2_driver_t| for
+// GIC v2 or a |zbi_dcfg_arm_gic_v3_driver_t| for GIC v3.
 //
-// In case of GIC v2, it will determine whether the MSI extension is supported or not by looking at
-// the children of the GIC v2 node.
+// In case of GIC v2, it will determine whether the MSI extension is supported or not by looking
+// at the children of the GIC v2 node.
 //
 // Each interrupt controller contains uses a custom format for their 'reg' property, which defines
 // the different address ranges required for the driver.
@@ -167,6 +175,100 @@ class ArmDevicetreeGicItem
   std::optional<devicetree::RangesProperty> ranges_;
   const devicetree::Node* gic_ = nullptr;
   bool matched_ = false;
+};
+
+// This item does not produce a ZBI Item itself, but becomes a source for other items to produce
+// zbi items themselves.
+//
+// This item parses the 'chosen' node, which is a child of the root node('/chosen'). This node
+// contains information about the commandline, ramdisk and UART.
+//
+// * The commandline is contained as part of the string block of the devicetree.
+//
+// * The ramdisk is represented as a range in memory where the firmware loaded it, usually a ZBI.
+//
+// * The UART on the other hand, is represented as path(which may be aliased). Is the job of this
+//   item to bootstrap the UART, which means determining which driver needs to be used.
+//
+// This item will not decode the interrupt cells, the UART information extracted by this device
+// is incomplete and only useful for non IRQ-driven scenarios.
+//
+// For more details on the chosen node please see:
+//  https://devicetree-specification.readthedocs.io/en/latest/chapter3-devicenodes.html#chosen-node
+class DevicetreeBootstrapChosenNodeItemBase
+    : public DevicetreeItemBase<DevicetreeBootstrapChosenNodeItemBase, 2>,
+      public ItemBase {
+ public:
+  // Matcher API.
+  devicetree::ScanState OnNode(const devicetree::NodePath& path,
+                               const devicetree::PropertyDecoder& decoder);
+
+  // BootShim Item API.
+  constexpr size_t size_bytes() const { return 0; }
+
+  fit::result<ItemBase::DataZbi::Error> AppendItems(ItemBase::DataZbi& zbi) const {
+    return fit::ok();
+  }
+
+  // Accessors
+
+  // Input ZBI from devicetree.
+  constexpr zbitl::ByteView zbi() const { return zbi_; }
+
+  // Command line arguments from devicetree.
+  constexpr std::optional<std::string_view> cmdline() const { return cmdline_; }
+
+  // Resolved path for stdout device(e.g. uart) from the devicetree.
+  constexpr std::optional<devicetree::ResolvedPath> stdout_path() const { return resolved_stdout_; }
+
+ protected:
+  devicetree::ScanState HandleBootstrapStdout(const devicetree::NodePath& path,
+                                              const devicetree::PropertyDecoder& decoder);
+
+  // Path to device node containing the stdout device (uart).
+  bool found_chosen_ = false;
+  std::string_view stdout_path_;
+  std::optional<devicetree::ResolvedPath> resolved_stdout_;
+
+  // Command line provided by the devicetree.
+  std::string_view cmdline_;
+
+  zbitl::ByteView zbi_;
+
+  // Type erased match.
+  fit::inline_function<bool(const devicetree::StringList<>&, const zbi_dcfg_simple_t&)> match_ =
+      nullptr;
+};
+
+template <typename AllUartDrivers = uart::all::Driver>
+class DevicetreeBootstrapChosenNodeItem : public DevicetreeBootstrapChosenNodeItemBase {
+ public:
+  // DevicetreeItem API.
+  template <typename T>
+  void Init(T& shim) {
+    match_ = [this](const auto& compatible_devices, const auto& dcfg) {
+      uart::all::KernelDriver<uart::BasicIoProvider, uart::UnsynchronizedPolicy, AllUartDrivers>
+          driver;
+      // Prefer matching drivers to bindings at the start of the compatible list, this follows the
+      // compatible spec of more specific to more general compatible binding order.
+      // See
+      // https://devicetree-specification.readthedocs.io/en/v0.3/devicetree-basics.html#compatible
+      for (std::string_view compatible_device : compatible_devices) {
+        if (driver.Match(compatible_device, &dcfg)) {
+          uart_ = driver.uart();
+          return true;
+        }
+      }
+      return false;
+    };
+
+    DevicetreeBootstrapChosenNodeItemBase::Init(shim);
+  }
+
+  constexpr std::optional<AllUartDrivers> uart() const { return uart_; }
+
+ private:
+  std::optional<AllUartDrivers> uart_;
 };
 
 }  // namespace boot_shim
