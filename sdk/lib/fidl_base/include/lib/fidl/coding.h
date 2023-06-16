@@ -16,25 +16,6 @@ __BEGIN_CDECLS
 // vectors, or tables) counts as one step in the recursion depth.
 #define FIDL_RECURSION_DEPTH 32
 
-// See
-// https://fuchsia.dev/fuchsia-src/development/languages/fidl/tutorials/tutorial-c#fidl_encode-fidl_encode_msg
-//
-// These methods expect non-transactional messages.
-zx_status_t fidl_encode(const fidl_type_t* type, void* bytes, uint32_t num_bytes,
-                        zx_handle_t* handles, uint32_t max_handles, uint32_t* out_actual_handles,
-                        const char** out_error_msg);
-zx_status_t fidl_encode_etc(const fidl_type_t* type, void* bytes, uint32_t num_bytes,
-                            zx_handle_disposition_t* handle_dispositions,
-                            uint32_t max_handle_dispositions,
-                            uint32_t* out_actual_handle_dispositions, const char** out_error_msg);
-
-// This method assumes that the message being encoded is transactional (ie, that it includes a
-// leading 16-byte header).
-//
-// This method is only intended for use by the deprecated FIDL C bindings.
-zx_status_t fidl_encode_msg(const fidl_type_t* type, fidl_outgoing_msg_byte_t* msg,
-                            uint32_t* out_actual_handles, const char** out_error_msg);
-
 // Perform a fidl_decode_etc as input for HLCPP (leave unknown handles in flexible resource types
 // intact instead of closing them, add offsets to unknown envelopes).
 // IT MAY BREAK AT ANY TIME OR BE REMOVED WITHOUT NOTICE.

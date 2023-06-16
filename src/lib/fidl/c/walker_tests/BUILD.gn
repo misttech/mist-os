@@ -10,11 +10,9 @@ import("//tools/fidl/gidl/gidl.gni")
 source_set("test_sources") {
   testonly = true
   sources = [
-    "encoding_tests.cc",
     "fidl_align_tests.cc",
     "fidl_coded_types.cc",
     "formatting_tests.cc",
-    "on_error_handle_tests.cc",
     "validating_tests.cc",
   ]
   public_deps = [
@@ -91,7 +89,6 @@ if (is_fuchsia) {
 source_set("host_test_sources") {
   testonly = true
   sources = [
-    "encoding_tests.cc",
     "fidl_align_tests.cc",
     "fidl_coded_types.cc",
     "validating_tests.cc",
