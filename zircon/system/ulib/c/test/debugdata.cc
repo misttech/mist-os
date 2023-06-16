@@ -11,7 +11,6 @@
 #include <lib/async/cpp/wait.h>
 #include <lib/fdio/io.h>
 #include <lib/fdio/spawn.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/job.h>
@@ -53,7 +52,8 @@ struct Publisher : public fidl::WireServer<fuchsia_debugdata::Publisher> {
     auto dir = fbl::MakeRefCounted<fs::PseudoDir>();
     auto node = fbl::MakeRefCounted<fs::Service>(
         [dispatcher, this](fidl::ServerEnd<fuchsia_debugdata::Publisher> server_end) {
-          return fidl::BindSingleInFlightOnly(dispatcher, std::move(server_end), this);
+          fidl::BindServer(dispatcher, std::move(server_end), this);
+          return ZX_OK;
         });
 
     dir->AddEntry(fidl::DiscoverableProtocolName<fuchsia_debugdata::Publisher>, node);

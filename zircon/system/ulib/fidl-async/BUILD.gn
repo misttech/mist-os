@@ -59,7 +59,6 @@ zx_library("fidl-async-cpp") {
     "//src/storage/testing:*",
     "//src/ui/input/drivers/hid:*",
     "//src/ui/light/drivers/aml-light:*",
-    "//zircon/system/ulib/c/test:*",
     "//zircon/system/ulib/mock-boot-arguments:*",
   ]
 }
