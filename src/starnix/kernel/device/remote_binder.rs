@@ -20,7 +20,7 @@ use crate::{
         UserCString, UserRef, PATH_MAX,
     },
 };
-use anyhow::Error;
+use anyhow::{Context, Error};
 use derivative::Derivative;
 use fidl::{
     endpoints::{ClientEnd, ControlHandle, RequestStream, ServerEnd},
@@ -30,7 +30,10 @@ use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_starnix_binder as fbinder;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
-use futures::{channel::oneshot, future::FutureExt, pin_mut, select, TryStreamExt};
+use futures::{
+    channel::oneshot, future::FutureExt, pin_mut, select, task::Poll, Future, Stream, StreamExt,
+    TryStreamExt,
+};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     rc::Rc,
@@ -376,6 +379,110 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         Ok(SUCCESS)
     }
 
+    async fn serve_binder_request(
+        &self,
+        remote_binder_connection: Arc<RemoteBinderConnection>,
+        request: fbinder::BinderRequest,
+    ) -> Result<(), Error> {
+        match request {
+            fbinder::BinderRequest::SetVmo { vmo, mapped_address, control_handle } => {
+                // control_handle must be owned by this thread. A weak pointer is sent to the
+                // handler thread. The mutex is used to ensure that the arc cannot be owned by
+                // the handler thread while this thread drops it.
+                let control_handle = Arc::new(control_handle);
+                let mutex = Arc::new(Mutex::new(()));
+                // Use an oneshot channel to asynchronously wait for the operation to be executed.
+                let (tx, rx) = futures::channel::oneshot::channel();
+                self.state.lock().enqueue_taskless_request(TaskRequest::SetVmo(
+                    remote_binder_connection,
+                    vmo,
+                    mapped_address,
+                    Box::new({
+                        let mutex = mutex.clone();
+                        let weak_handle = Arc::downgrade(&control_handle);
+                        move |e| {
+                            if e.is_err() {
+                                let _guard = mutex.lock();
+                                if let Some(control_handle) = weak_handle.upgrade() {
+                                    control_handle.shutdown();
+                                }
+                            }
+                            let _ = tx.send(());
+                        }
+                    }),
+                ));
+                scopeguard::defer! {
+                    let _guard = mutex.lock();
+                    let _control_handle = Arc::into_inner(control_handle);
+                    debug_assert!(_control_handle.is_some());
+                }
+                let _ = rx.await;
+            }
+            fbinder::BinderRequest::Ioctl { tid, request, parameter, responder } => {
+                trace_duration!(trace_category_starnix!(), trace_name_remote_binder_ioctl_send_work!(), "request" => request);
+                trace_flow_begin!(trace_category_starnix!(), trace_name_remote_binder_ioctl!(), tid.into(), "request" => request);
+
+                // responder must be owned by this thread. A weak pointer is sent to the
+                // handler thread. The mutex is used to ensure that the arc cannot be owned by
+                // the handler thread while this thread drops it.
+                // It is sent as a Mutex<Option<Responder>> because the send methods takes
+                // ownership of the responder, so the data must be mutable on the remote thread.
+                let responder = Arc::new(Mutex::new(Some(responder)));
+                let mutex = Arc::new(Mutex::new(()));
+                // Use an oneshot channel to asynchronously wait for the operation to be executed.
+                let (tx, rx) = futures::channel::oneshot::channel();
+                self.state.lock().enqueue_task_request(BoundTaskRequest {
+                    koid: tid,
+                    request: TaskRequest::Ioctl(
+                        remote_binder_connection,
+                        request,
+                        parameter,
+                        tid,
+                        Box::new({
+                            let mutex = mutex.clone();
+                            let weak_responder = Arc::downgrade(&responder);
+                            move |e| {
+                                trace_duration!(
+                                    trace_category_starnix!(),
+                                    trace_name_remote_binder_ioctl_fidl_reply!()
+                                );
+                                trace_flow_end!(
+                                    trace_category_starnix!(),
+                                    trace_name_remote_binder_ioctl!(),
+                                    tid.into()
+                                );
+
+                                let e = e.map_err(|e| {
+                                    fposix::Errno::from_primitive(e.code.error_code() as i32)
+                                        .unwrap_or(fposix::Errno::Einval)
+                                });
+                                let result = {
+                                    let _guard = mutex.lock();
+                                    if let Some(responder) = weak_responder.upgrade() {
+                                        // If the weak pointer is alive, the Option always contains
+                                        // the responder.
+                                        responder.lock().take().unwrap().send(e)
+                                    } else {
+                                        Ok(())
+                                    }
+                                };
+                                let _ = tx.send(());
+                                result
+                            }
+                        }),
+                    ),
+                });
+                scopeguard::defer! {
+                    let _guard = mutex.lock();
+                    let _responder = Arc::into_inner(responder);
+                    debug_assert!(_responder.is_some());
+                }
+                let _ = rx.await;
+            }
+        }
+        Ok(())
+    }
+
     /// Serve the given `binder` handle, by opening `path`.
     async fn open_binder(
         self: Arc<Self>,
@@ -401,7 +508,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         }
 
         // Register a receiver to be notified of exit
-        let (sender, mut receiver) = oneshot::channel::<()>();
+        let (sender, receiver) = oneshot::channel::<()>();
         {
             let mut state = self.state.lock();
             if state.exit.is_some() {
@@ -411,61 +518,25 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         }
 
         // The stream for the Binder protocol
-        let mut stream = fbinder::BinderRequestStream::from_channel(fasync::Channel::from_channel(
+        let stream = fbinder::BinderRequestStream::from_channel(fasync::Channel::from_channel(
             binder.into_channel(),
         )?);
 
-        while let Some(event) = select! {
-            event = stream.try_next() => event,
-            _ = receiver => Ok(None),
-        }? {
-            match event {
-                fbinder::BinderRequest::SetVmo { vmo, mapped_address, control_handle } => {
-                    self.state.lock().enqueue_taskless_request(TaskRequest::SetVmo(
-                        remote_binder_connection.clone(),
-                        vmo,
-                        mapped_address,
-                        Box::new(move |e| {
-                            if e.is_err() {
-                                control_handle.shutdown()
-                            }
-                        }),
-                    ));
-                }
-                fbinder::BinderRequest::Ioctl { tid, request, parameter, responder } => {
-                    trace_duration!(trace_category_starnix!(), trace_name_remote_binder_ioctl_send_work!(), "request" => request);
-                    trace_flow_begin!(trace_category_starnix!(), trace_name_remote_binder_ioctl!(), tid.into(), "request" => request);
-
-                    self.state.lock().enqueue_task_request(BoundTaskRequest {
-                        koid: tid,
-                        request: TaskRequest::Ioctl(
-                            remote_binder_connection.clone(),
-                            request,
-                            parameter,
-                            tid,
-                            Box::new(move |e| {
-                                trace_duration!(
-                                    trace_category_starnix!(),
-                                    trace_name_remote_binder_ioctl_fidl_reply!()
-                                );
-                                trace_flow_end!(
-                                    trace_category_starnix!(),
-                                    trace_name_remote_binder_ioctl!(),
-                                    tid.into()
-                                );
-
-                                let e = e.map_err(|e| {
-                                    fposix::Errno::from_primitive(e.code.error_code() as i32)
-                                        .unwrap_or(fposix::Errno::Einval)
-                                });
-                                responder.send(e)
-                            }),
-                        ),
-                    });
-                }
+        pin_mut!(receiver, stream);
+        // The stream that will cancel once receiver returns a value.
+        let stream = futures::stream::poll_fn(move |context| {
+            if receiver.as_mut().poll(context).is_ready() {
+                return Poll::Ready(None);
             }
-        }
-        Ok(())
+            stream.as_mut().poll_next(context)
+        });
+
+        stream
+            .map(|result| result.context("failed request"))
+            .try_for_each_concurrent(usize::MAX, |event| {
+                self.serve_binder_request(remote_binder_connection.clone(), event)
+            })
+            .await
     }
 
     /// Serve the DevBinder protocol.
