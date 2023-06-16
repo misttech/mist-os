@@ -20,7 +20,6 @@ ffx_plugin("ffx_product_create") {
     "//src/developer/ffx/lib/fastboot:lib",
     "//src/lib/assembly/assembly_manifest",
     "//src/lib/assembly/partitions_config",
-    "//src/lib/assembly/tool",
     "//src/lib/assembly/update_package",
     "//src/lib/assembly/update_packages_manifest",
     "//src/sys/pkg/lib/epoch",

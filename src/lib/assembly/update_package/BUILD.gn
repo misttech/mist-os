@@ -13,9 +13,7 @@ rustc_library("update_package") {
   with_unit_tests = true
   deps = [
     "//src/lib/assembly/assembly_manifest",
-    "//src/lib/assembly/blobfs",
     "//src/lib/assembly/partitions_config",
-    "//src/lib/assembly/tool",
     "//src/lib/assembly/update_packages_manifest",
     "//src/lib/fuchsia-url",
     "//src/lib/utf8_path",

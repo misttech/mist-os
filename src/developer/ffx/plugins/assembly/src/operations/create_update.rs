@@ -6,7 +6,6 @@ use crate::subpackage_blobs_package::construct_subpackage_blobs_package;
 use anyhow::{Context, Result};
 use assembly_manifest::{AssemblyManifest, Image, PackagesMetadata};
 use assembly_partitions_config::PartitionsConfig;
-use assembly_tool::SdkToolProvider;
 use assembly_update_package::{Slot, UpdatePackageBuilder};
 use assembly_update_packages_manifest::UpdatePackagesManifest;
 use epoch::EpochFile;
@@ -17,9 +16,6 @@ use std::collections::BTreeSet;
 use std::fs::File;
 
 pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
-    // Use the sdk to get the host tool paths.
-    let sdk_tools = SdkToolProvider::try_new().context("Getting SDK tools")?;
-
     let mut file = File::open(&args.partitions)
         .with_context(|| format!("Failed to open: {}", args.partitions))?;
     let partitions = PartitionsConfig::from_reader(&mut file)
@@ -41,7 +37,6 @@ pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
     };
 
     let mut builder = UpdatePackageBuilder::new(
-        Box::new(sdk_tools),
         partitions,
         args.board_name,
         args.version_file,

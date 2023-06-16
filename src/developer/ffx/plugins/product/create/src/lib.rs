@@ -8,7 +8,6 @@
 use anyhow::{bail, Context, Result};
 use assembly_manifest::{AssemblyManifest, BlobfsContents, Image, PackagesMetadata};
 use assembly_partitions_config::PartitionsConfig;
-use assembly_tool::{SdkToolProvider, ToolProvider};
 use assembly_update_package::{Slot, UpdatePackageBuilder};
 use assembly_update_packages_manifest::UpdatePackagesManifest;
 use camino::{Utf8Path, Utf8PathBuf};
@@ -40,16 +39,11 @@ pub async fn pb_create(cmd: CreateCommand) -> Result<()> {
         SdkVersion::InTree => in_tree_sdk_version(),
         SdkVersion::Unknown => bail!("Unable to determine SDK version"),
     };
-    let sdk_tools = SdkToolProvider::try_new().context("getting sdk tools")?;
-    pb_create_with_tools(cmd, &sdk_version, Box::new(sdk_tools)).await
+    pb_create_with_sdk_version(cmd, &sdk_version).await
 }
 
-/// Create a product bundle using the provided `tools`.
-pub async fn pb_create_with_tools(
-    cmd: CreateCommand,
-    sdk_version: &str,
-    tools: Box<dyn ToolProvider>,
-) -> Result<()> {
+/// Create a product bundle using the provided sdk.
+pub async fn pb_create_with_sdk_version(cmd: CreateCommand, sdk_version: &str) -> Result<()> {
     // We build an update package if `update_version_file` or `update_epoch` is provided.
     // If we decide to build an update package, we need to ensure that both of them
     // are provided.
@@ -93,7 +87,6 @@ pub async fn pb_create_with_tools(
             let abi_revision = None;
             let gen_dir = TempDir::new().context("creating temporary directory")?;
             let mut builder = UpdatePackageBuilder::new(
-                tools,
                 partitions.clone(),
                 partitions.hardware_revision.clone(),
                 version,
@@ -349,7 +342,6 @@ mod test {
     use anyhow::bail;
     use assembly_manifest::AssemblyManifest;
     use assembly_partitions_config::PartitionsConfig;
-    use assembly_tool::testing::FakeToolProvider;
     use fuchsia_repo::test_utils;
     use sdk_metadata::{VirtualDevice, VirtualDeviceV1};
     use std::io::Write;
@@ -427,8 +419,7 @@ mod test {
         let partitions_file = File::create(&partitions_path).unwrap();
         serde_json::to_writer(&partitions_file, &PartitionsConfig::default()).unwrap();
 
-        let tools = FakeToolProvider::default();
-        pb_create_with_tools(
+        pb_create_with_sdk_version(
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
@@ -446,7 +437,6 @@ mod test {
                 with_deprecated_flash_manifest: false,
             },
             /*sdk_version=*/ "",
-            Box::new(tools),
         )
         .await
         .unwrap();
@@ -482,8 +472,7 @@ mod test {
         let system_path = tempdir.join("system.json");
         AssemblyManifest::default().write(&system_path).unwrap();
 
-        let tools = FakeToolProvider::default();
-        pb_create_with_tools(
+        pb_create_with_sdk_version(
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
@@ -501,7 +490,6 @@ mod test {
                 with_deprecated_flash_manifest: false,
             },
             /*sdk_version=*/ "",
-            Box::new(tools),
         )
         .await
         .unwrap();
@@ -540,8 +528,7 @@ mod test {
         let tuf_keys = tempdir.join("keys");
         test_utils::make_repo_keys_dir(&tuf_keys);
 
-        let tools = FakeToolProvider::default();
-        pb_create_with_tools(
+        pb_create_with_sdk_version(
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
@@ -559,7 +546,6 @@ mod test {
                 with_deprecated_flash_manifest: false,
             },
             /*sdk_version=*/ "",
-            Box::new(tools),
         )
         .await
         .unwrap();
@@ -608,8 +594,7 @@ mod test {
         let tuf_keys = tempdir.join("keys");
         test_utils::make_repo_keys_dir(&tuf_keys);
 
-        let tools = FakeToolProvider::default();
-        pb_create_with_tools(
+        pb_create_with_sdk_version(
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
@@ -627,7 +612,6 @@ mod test {
                 with_deprecated_flash_manifest: false,
             },
             /*sdk_version=*/ "",
-            Box::new(tools),
         )
         .await
         .unwrap();
@@ -681,8 +665,7 @@ mod test {
         vd_file1.write_all(VIRTUAL_DEVICE_VALID.as_bytes())?;
         vd_file2.write_all(VIRTUAL_DEVICE_VALID.as_bytes())?;
 
-        let tools = FakeToolProvider::default();
-        pb_create_with_tools(
+        pb_create_with_sdk_version(
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
@@ -700,7 +683,6 @@ mod test {
                 with_deprecated_flash_manifest: true,
             },
             /*sdk_version=*/ "",
-            Box::new(tools),
         )
         .await
         .unwrap();

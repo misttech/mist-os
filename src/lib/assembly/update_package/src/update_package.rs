@@ -4,10 +4,8 @@
 
 use ::update_package::{ImageMetadata, ImagePackagesManifest};
 use anyhow::{anyhow, Context, Result};
-use assembly_blobfs::BlobFSBuilder;
 use assembly_manifest::{AssemblyManifest, Image};
 use assembly_partitions_config::PartitionsConfig;
-use assembly_tool::ToolProvider;
 use assembly_update_packages_manifest::UpdatePackagesManifest;
 use camino::{Utf8Path, Utf8PathBuf};
 use epoch::EpochFile;
@@ -29,9 +27,6 @@ pub struct UpdatePackage {
 
 /// A builder that constructs update packages.
 pub struct UpdatePackageBuilder {
-    /// The tool provider, used to invoke the blobfs tool from the SDK.
-    tool_provider: Box<dyn ToolProvider>,
-
     /// Root name of the UpdatePackage and its associated images packages.
     /// This is typically only modified for OTA tests so that multiple UpdatePackages can be
     /// published to the same repository.
@@ -160,7 +155,6 @@ impl ImageMapping {
 struct SubpackageBuilder {
     package: PackageBuilder,
     package_name: String,
-    manifest_path: Utf8PathBuf,
     far_path: Utf8PathBuf,
     gendir: Utf8PathBuf,
 }
@@ -168,20 +162,12 @@ struct SubpackageBuilder {
 impl SubpackageBuilder {
     /// Build and publish an update package or one of its subpackages. Returns a merkle-pinned
     /// fuchsia-pkg:// URL for the package with the hostname set to "fuchsia.com".
-    fn build(
-        self,
-        blobfs_builder: &mut BlobFSBuilder,
-    ) -> Result<(PinnedAbsolutePackageUrl, PackageManifest)> {
-        let SubpackageBuilder { package: builder, package_name, manifest_path, far_path, gendir } =
-            self;
+    fn build(self) -> Result<(PinnedAbsolutePackageUrl, PackageManifest)> {
+        let SubpackageBuilder { package: builder, package_name, far_path, gendir } = self;
 
         let manifest = builder
             .build(&gendir, &far_path)
             .with_context(|| format!("Failed to build the {package_name} package"))?;
-
-        blobfs_builder.add_package(&manifest_path).with_context(|| {
-            format!("Adding the {package_name} package to update packages blobfs")
-        })?;
 
         let url = PinnedAbsolutePackageUrl::new(
             RepositoryUrl::parse_host("fuchsia.com".to_string())
@@ -198,7 +184,6 @@ impl SubpackageBuilder {
 impl UpdatePackageBuilder {
     /// Construct a new UpdatePackageBuilder with the minimal requirements for an UpdatePackage.
     pub fn new(
-        tool_provider: Box<dyn ToolProvider>,
         partitions: PartitionsConfig,
         board_name: impl AsRef<str>,
         version_file: impl AsRef<Path>,
@@ -207,7 +192,6 @@ impl UpdatePackageBuilder {
         outdir: impl AsRef<Utf8Path>,
     ) -> Self {
         Self {
-            tool_provider,
             name: "update".into(),
             partitions,
             board_name: board_name.as_ref().into(),
@@ -290,7 +274,7 @@ impl UpdatePackageBuilder {
         let far_path = self.outdir.join(format!("{package_name}.far"));
         let gendir = self.gendir.join(&package_name);
 
-        Ok(SubpackageBuilder { package: builder, package_name, manifest_path, far_path, gendir })
+        Ok(SubpackageBuilder { package: builder, package_name, far_path, gendir })
     }
 
     /// Build the update package and associated update images packages.
@@ -300,8 +284,6 @@ impl UpdatePackageBuilder {
         // Keep track of all the packages that were built, so that they can be returned.
         let mut package_manifests = vec![];
 
-        let blobfs_tool = self.tool_provider.get_tool("blobfs")?;
-        let mut blobfs_builder = BlobFSBuilder::new(blobfs_tool, "compact");
         let mut assembly_manifest = ImagePackagesManifest::builder();
 
         // Generate the update_images_fuchsia package.
@@ -316,14 +298,14 @@ impl UpdatePackageBuilder {
                 builder.package.add_file_as_blob(&vbmeta.destination, vbmeta.source.to_string())?;
             }
 
-            let (url, manifest) = builder.build(&mut blobfs_builder)?;
+            let (url, manifest) = builder.build()?;
             package_manifests.push(manifest);
             assembly_manifest.fuchsia_package(
                 zbi.metadata(url.clone())?,
                 vbmeta.map(|vbmeta| vbmeta.metadata(url)).transpose()?,
             );
         } else {
-            let (_, manifest) = builder.build(&mut blobfs_builder)?;
+            let (_, manifest) = builder.build()?;
             package_manifests.push(manifest);
         }
 
@@ -339,7 +321,7 @@ impl UpdatePackageBuilder {
                 builder.package.add_file_as_blob(&vbmeta.destination, vbmeta.source.to_string())?;
             }
 
-            let (url, manifest) = builder.build(&mut blobfs_builder)?;
+            let (url, manifest) = builder.build()?;
             package_manifests.push(manifest);
 
             assembly_manifest.recovery_package(
@@ -347,7 +329,7 @@ impl UpdatePackageBuilder {
                 vbmeta.map(|vbmeta| vbmeta.metadata(url)).transpose()?,
             );
         } else {
-            let (_, manifest) = builder.build(&mut blobfs_builder)?;
+            let (_, manifest) = builder.build()?;
             package_manifests.push(manifest);
         }
 
@@ -364,7 +346,7 @@ impl UpdatePackageBuilder {
                 builder.package.add_file_as_blob(destination, bootloader.image.to_string())?;
             }
 
-            let (url, manifest) = builder.build(&mut blobfs_builder)?;
+            let (url, manifest) = builder.build()?;
             package_manifests.push(manifest);
 
             for bootloader in &self.partitions.bootloader_partitions {
@@ -381,7 +363,7 @@ impl UpdatePackageBuilder {
 
             assembly_manifest.firmware_package(firmware);
         } else {
-            let (_, manifest) = builder.build(&mut blobfs_builder)?;
+            let (_, manifest) = builder.build()?;
             package_manifests.push(manifest);
         }
 
@@ -426,18 +408,9 @@ impl UpdatePackageBuilder {
             };
             builder.package.add_file_as_blob(destination, bootloader.image.to_string())?;
         }
-        let (_, manifest) = builder.build(&mut blobfs_builder)?;
+        let (_, manifest) = builder.build()?;
         let merkle = manifest.hash();
         package_manifests.push(manifest);
-
-        // Generate a blobfs with the generated update package and update images packages inside
-        // it. This is useful for packaging up the blobs to use in adversarial tests. We do not
-        // care which blobfs layout we use, or whether it is compressed, because blobfs is mostly
-        // just being used as a content-addressed container.
-        let update_blob_path = self.gendir.join("update.blob.blk");
-        blobfs_builder
-            .build(self.gendir, update_blob_path)
-            .context("Building blobfs for update package")?;
 
         Ok(UpdatePackage { merkle, package_manifests })
     }
@@ -449,13 +422,10 @@ mod tests {
     use assembly_manifest::Image;
     use assembly_partitions_config::Slot as PartitionSlot;
     use assembly_partitions_config::{BootloaderPartition, Partition, PartitionsConfig};
-    use assembly_tool::testing::FakeToolProvider;
-    use assembly_tool::{ToolCommandLog, ToolProvider};
     use assembly_update_packages_manifest::UpdatePackagesManifest;
     use fuchsia_archive::Utf8Reader;
     use fuchsia_hash::{Hash, HASH_SIZE};
     use fuchsia_pkg::{PackageManifest, PackagePath};
-    use serde_json::json;
     use std::fs::File;
     use std::io::{BufReader, Write};
     use std::str::FromStr;
@@ -465,7 +435,6 @@ mod tests {
     fn build() {
         let tmp = tempdir().unwrap();
         let outdir = Utf8Path::from_path(tmp.path()).unwrap();
-        let tools = FakeToolProvider::default();
 
         let fake_bootloader_tmp = NamedTempFile::new().unwrap();
         let fake_bootloader = Utf8Path::from_path(fake_bootloader_tmp.path()).unwrap();
@@ -485,7 +454,6 @@ mod tests {
         let mut fake_version = NamedTempFile::new().unwrap();
         writeln!(fake_version, "1.2.3.4").unwrap();
         let mut builder = UpdatePackageBuilder::new(
-            Box::new(tools.clone()),
             partitions_config,
             "board",
             fake_version.path().to_path_buf(),
@@ -503,28 +471,6 @@ mod tests {
         }));
 
         builder.build().unwrap();
-
-        // Ensure the blobfs tool was invoked correctly.
-        let blob_blk_path = outdir.join("update.blob.blk");
-        let blobs_json_path = outdir.join("blobs.json");
-        let blob_manifest_path = outdir.join("blob.manifest");
-        let expected_commands: ToolCommandLog = serde_json::from_value(json!({
-            "commands": [
-                {
-                    "tool": "./host_x64/blobfs",
-                    "args": [
-                        "--json-output",
-                        blobs_json_path,
-                        blob_blk_path,
-                        "create",
-                        "--manifest",
-                        blob_manifest_path,
-                    ]
-                }
-            ]
-        }))
-        .unwrap();
-        assert_eq!(&expected_commands, tools.log());
 
         let file = File::open(outdir.join("images.json.orig")).unwrap();
         let reader = BufReader::new(file);
@@ -638,7 +584,6 @@ mod tests {
     fn build_full() {
         let tmp = tempdir().unwrap();
         let outdir = Utf8Path::from_path(tmp.path()).unwrap();
-        let tools = FakeToolProvider::default();
 
         let fake_bootloader_tmp = NamedTempFile::new().unwrap();
         let fake_bootloader = Utf8Path::from_path(fake_bootloader_tmp.path()).unwrap();
@@ -658,7 +603,6 @@ mod tests {
         let mut fake_version = NamedTempFile::new().unwrap();
         writeln!(fake_version, "1.2.3.4").unwrap();
         let mut builder = UpdatePackageBuilder::new(
-            Box::new(tools.clone()),
             partitions_config,
             "board",
             fake_version.path().to_path_buf(),
@@ -696,28 +640,6 @@ mod tests {
             "51d6f1a674d4e7c80ac60d44aebe1a60c2d046a16b263d39bae57592f8ac0ad0".parse().unwrap()
         );
         assert_eq!(update_package.package_manifests.len(), 4);
-
-        // Ensure the blobfs tool was invoked correctly.
-        let blob_blk_path = outdir.join("update.blob.blk");
-        let blobs_json_path = outdir.join("blobs.json");
-        let blob_manifest_path = outdir.join("blob.manifest");
-        let expected_commands: ToolCommandLog = serde_json::from_value(json!({
-            "commands": [
-                {
-                    "tool": "./host_x64/blobfs",
-                    "args": [
-                        "--json-output",
-                        blobs_json_path,
-                        blob_blk_path,
-                        "create",
-                        "--manifest",
-                        blob_manifest_path,
-                    ]
-                }
-            ]
-        }))
-        .unwrap();
-        assert_eq!(&expected_commands, tools.log());
 
         let file = File::open(outdir.join("images.json.orig")).unwrap();
         let reader = BufReader::new(file);
@@ -852,14 +774,12 @@ mod tests {
     fn build_emits_empty_image_packages() {
         let tmp = tempdir().unwrap();
         let outdir = Utf8Path::from_path(tmp.path()).unwrap();
-        let tools = FakeToolProvider::default();
 
         let partitions_config = PartitionsConfig::default();
         let epoch = EpochFile::Version1 { epoch: 0 };
         let mut fake_version = NamedTempFile::new().unwrap();
         writeln!(fake_version, "1.2.3.4").unwrap();
         let builder = UpdatePackageBuilder::new(
-            Box::new(tools.clone()),
             partitions_config,
             "board",
             fake_version.path().to_path_buf(),
@@ -892,12 +812,10 @@ mod tests {
     fn name() {
         let tmp = tempdir().unwrap();
         let outdir = Utf8Path::from_path(tmp.path()).unwrap();
-        let tools = FakeToolProvider::default();
 
         let mut fake_version = NamedTempFile::new().unwrap();
         writeln!(fake_version, "1.2.3.4").unwrap();
         let mut builder = UpdatePackageBuilder::new(
-            Box::new(tools.clone()),
             PartitionsConfig::default(),
             "board",
             fake_version.path().to_path_buf(),
@@ -918,12 +836,10 @@ mod tests {
     fn packages() {
         let tmp = tempdir().unwrap();
         let outdir = Utf8Path::from_path(tmp.path()).unwrap();
-        let tools = FakeToolProvider::default();
 
         let mut fake_version = NamedTempFile::new().unwrap();
         writeln!(fake_version, "1.2.3.4").unwrap();
         let mut builder = UpdatePackageBuilder::new(
-            Box::new(tools.clone()),
             PartitionsConfig::default(),
             "board",
             fake_version.path().to_path_buf(),

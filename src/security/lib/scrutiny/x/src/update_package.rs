@@ -98,7 +98,6 @@ pub mod test {
     use assembly_partitions_config::Partition;
     use assembly_partitions_config::PartitionsConfig;
     use assembly_partitions_config::Slot as PartitionSlot;
-    use assembly_tool::testing::FakeToolProvider;
     use assembly_update_package::Slot;
     use assembly_update_package::UpdatePackageBuilder;
     use camino::Utf8Path;
@@ -118,7 +117,6 @@ pub mod test {
         let temporary_directory = tempfile::tempdir().expect("temporary directory");
         let output_directory_path =
             Utf8Path::from_path(temporary_directory.path()).expect("output directory path");
-        let tools = FakeToolProvider::default();
 
         let fake_bootloader_temporary_file =
             tempfile::NamedTempFile::new().expect("named temporary file");
@@ -140,7 +138,6 @@ pub mod test {
         let mut fake_version = NamedTempFile::new().expect("create fake version file");
         writeln!(fake_version, "1.2.3.4").expect("write fake version file");
         let mut builder = UpdatePackageBuilder::new(
-            Box::new(tools.clone()),
             partitions_config,
             "board",
             fake_version.path().to_path_buf(),

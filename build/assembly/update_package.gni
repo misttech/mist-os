@@ -57,9 +57,6 @@ template("update_package") {
     epoch = "$gendir/epoch.json"
     images = "$gendir/images.json.orig"
     packages = "$gendir/packages.json"
-    update_blob = "$gendir/update.blob.blk"
-    blob_manifest = "$gendir/blob.manifest"
-    blobs_json = "$gendir/blobs.json"
   }
 
   python_action(labels.hermetic_inputs) {
@@ -171,9 +168,6 @@ template("update_package") {
       files.epoch,
       files.images,
       files.packages,
-      files.update_blob,
-      files.blob_manifest,
-      files.blobs_json,
     ]
 
     inputs = [
