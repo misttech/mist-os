@@ -182,27 +182,9 @@ macro_rules! instant {
 pub fn instant(category: &'static CStr, name: &'static CStr, scope: Scope, args: &[Arg<'_>]) {
     assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
-    // trace_context_write_xxx functions require that:
-    // - category and name are static null-terminated strings (`&'static CStr).
-    // - the refs must be valid for the given call
-    unsafe {
-        let mut category_ref = mem::MaybeUninit::<sys::trace_string_ref_t>::uninit();
-        let context =
-            sys::trace_acquire_context_for_category(category.as_ptr(), category_ref.as_mut_ptr());
-        if context != ptr::null() {
-            let helper = EventHelper::new(context, name);
-            sys::trace_context_write_instant_event_record(
-                context,
-                helper.ticks,
-                &helper.thread_ref,
-                category_ref.as_ptr(),
-                &helper.name_ref,
-                scope.into_raw(),
-                args.as_ptr() as *const sys::trace_arg_t,
-                args.len(),
-            );
-            sys::trace_release_context(context);
-        }
+    if let Some(context) = TraceCategoryContext::acquire(category) {
+        let name_ref = context.register_string_literal(name);
+        context.write_instant(name_ref, scope, args);
     }
 }
 
@@ -279,25 +261,9 @@ pub fn counter(category: &'static CStr, name: &'static CStr, counter_id: u64, ar
     assert!(args.len() >= 1, "trace counter args must include at least one numeric argument");
     assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
-    // See unsafety justification in `instant`
-    unsafe {
-        let mut category_ref = mem::MaybeUninit::<sys::trace_string_ref_t>::uninit();
-        let context =
-            sys::trace_acquire_context_for_category(category.as_ptr(), category_ref.as_mut_ptr());
-        if context != ptr::null() {
-            let helper = EventHelper::new(context, name);
-            sys::trace_context_write_counter_event_record(
-                context,
-                helper.ticks,
-                &helper.thread_ref,
-                category_ref.as_ptr(),
-                &helper.name_ref,
-                counter_id,
-                args.as_ptr() as *const sys::trace_arg_t,
-                args.len(),
-            );
-            sys::trace_release_context(context);
-        }
+    if let Some(context) = TraceCategoryContext::acquire(category) {
+        let name_ref = context.register_string_literal(name);
+        context.write_counter(name_ref, counter_id, args);
     }
 }
 
@@ -322,28 +288,9 @@ impl<'a> DurationScope<'a> {
 
 impl<'a> Drop for DurationScope<'a> {
     fn drop(&mut self) {
-        // See unsafety justification in `instant`
-        unsafe {
-            let DurationScope { category, name, args, start_time } = self;
-            let mut category_ref = mem::MaybeUninit::<sys::trace_string_ref_t>::uninit();
-            let context = sys::trace_acquire_context_for_category(
-                category.as_ptr(),
-                category_ref.as_mut_ptr(),
-            );
-            if context != ptr::null() {
-                let helper = EventHelper::new(context, name);
-                sys::trace_context_write_duration_event_record(
-                    context,
-                    *start_time,
-                    helper.ticks,
-                    &helper.thread_ref,
-                    category_ref.as_ptr(),
-                    &helper.name_ref,
-                    args.as_ptr() as *const sys::trace_arg_t,
-                    args.len(),
-                );
-                sys::trace_release_context(context);
-            }
+        if let Some(context) = TraceCategoryContext::acquire(self.category) {
+            let name_ref = context.register_string_literal(self.name);
+            context.write_duration(name_ref, self.start_time, self.args);
         }
     }
 }
@@ -443,62 +390,42 @@ macro_rules! duration_end {
     }
 }
 
-macro_rules! duration_event {
-    ($( #[$docs:meta] )* $name:ident, $sys_method:path $(,)*) => {
-        $( #[$docs] )*
-        pub fn $name(category: &'static CStr, name: &'static CStr, args: &[Arg<'_>]) {
-            assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
-            // See justification in `instant`
-            unsafe {
-                let mut category_ref = mem::MaybeUninit::<sys::trace_string_ref_t>::uninit();
-                let context = sys::trace_acquire_context_for_category(
-                    category.as_ptr(), category_ref.as_mut_ptr()
-                );
-                if context != ptr::null() {
-                    let helper = EventHelper::new(context, name);
-                    $sys_method(
-                        context,
-                        helper.ticks,
-                        &helper.thread_ref,
-                        category_ref.as_ptr(),
-                        &helper.name_ref,
-                        args.as_ptr() as *const sys::trace_arg_t,
-                        args.len(),
-                    );
-                    sys::trace_release_context(context);
-                }
-            }
-        }
-    };
-}
-duration_event!(
-    /// Writes a duration begin event only.
-    /// This event must be matched by a duration end event with the same category and name.
-    ///
-    /// Durations describe work which is happening synchronously on one thread.
-    /// They can be nested to represent a control flow stack.
-    ///
-    /// 0 to 15 arguments can be associated with the event, each of which is used
-    /// to annotate the duration with additional information.  The arguments provided
-    /// to matching duration begin and duration end events are combined together in
-    /// the trace; it is not necessary to repeat them.
-    duration_begin,
-    sys::trace_context_write_duration_begin_event_record,
-);
+/// Writes a duration begin event only.
+/// This event must be matched by a duration end event with the same category and name.
+///
+/// Durations describe work which is happening synchronously on one thread.
+/// They can be nested to represent a control flow stack.
+///
+/// 0 to 15 arguments can be associated with the event, each of which is used
+/// to annotate the duration with additional information.  The arguments provided
+/// to matching duration begin and duration end events are combined together in
+/// the trace; it is not necessary to repeat them.
+pub fn duration_begin(category: &'static CStr, name: &'static CStr, args: &[Arg<'_>]) {
+    assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
-duration_event!(
-    /// Writes a duration end event only.
-    ///
-    /// Durations describe work which is happening synchronously on one thread.
-    /// They can be nested to represent a control flow stack.
-    ///
-    /// 0 to 15 arguments can be associated with the event, each of which is used
-    /// to annotate the duration with additional information.  The arguments provided
-    /// to matching duration begin and duration end events are combined together in
-    /// the trace; it is not necessary to repeat them.
-    duration_end,
-    sys::trace_context_write_duration_end_event_record,
-);
+    if let Some(context) = TraceCategoryContext::acquire(category) {
+        let name_ref = context.register_string_literal(name);
+        context.write_duration_begin(name_ref, args);
+    }
+}
+
+/// Writes a duration end event only.
+///
+/// Durations describe work which is happening synchronously on one thread.
+/// They can be nested to represent a control flow stack.
+///
+/// 0 to 15 arguments can be associated with the event, each of which is used
+/// to annotate the duration with additional information.  The arguments provided
+/// to matching duration begin and duration end events are combined together in
+/// the trace; it is not necessary to repeat them.
+pub fn duration_end(category: &'static CStr, name: &'static CStr, args: &[Arg<'_>]) {
+    assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
+
+    if let Some(context) = TraceCategoryContext::acquire(category) {
+        let name_ref = context.register_string_literal(name);
+        context.write_duration_end(name_ref, args);
+    }
+}
 
 /// AsyncScope maintains state around the context of async events generated via the
 /// async_enter! macro.
@@ -623,83 +550,65 @@ macro_rules! async_instant {
     }
 }
 
-macro_rules! async_proto {
-    ($( #[$docs:meta] )* $name:ident, $sys_method:path $(,)*) => {
-        $( #[$docs] )*
-        pub fn $name(id: Id, category: &'static CStr, name: &'static CStr, args: &[Arg<'_>]) {
-            assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
-            // See justification in `instant`
-            unsafe {
-                let mut category_ref = mem::MaybeUninit::<sys::trace_string_ref_t>::uninit();
-                let context = sys::trace_acquire_context_for_category(
-                    category.as_ptr(), category_ref.as_mut_ptr()
-                );
-                if context != ptr::null() {
-                    let helper = EventHelper::new(context, name);
-                    $sys_method(
-                        context,
-                        helper.ticks,
-                        &helper.thread_ref,
-                        category_ref.as_ptr(),
-                        &helper.name_ref,
-                        id.into(),
-                        args.as_ptr() as *const sys::trace_arg_t,
-                        args.len(),
-                    );
-                    sys::trace_release_context(context);
-                }
-            }
-        }
-    };
+/// Writes an async begin event. This event must be matched by an async end event with the same
+/// id, category, and name. This function is intended to be called through use of the
+/// `async_enter!` macro.
+///
+/// Async events describe concurrent work that may or may not migrate threads, or be otherwise
+/// interleaved with other work on the same thread. They can be nested to represent a control
+/// flow stack.
+///
+/// 0 to 15 arguments can be associated with the event, each of which is used to annotate the
+/// async event with additional information. Arguments provided in matching async begin and end
+/// events are combined together in the trace; it is not necessary to repeat them.
+pub fn async_begin(id: Id, category: &'static CStr, name: &'static CStr, args: &[Arg<'_>]) {
+    assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
+
+    if let Some(context) = TraceCategoryContext::acquire(category) {
+        let name_ref = context.register_string_literal(name);
+        context.write_async_begin(id, name_ref, args);
+    }
 }
 
-async_proto!(
-    /// Writes an async begin event. This event must be matched by an async end event with the same
-    /// id, category, and name. This function is intended to be called through use of the
-    /// `async_enter!` macro.
-    ///
-    /// Async events describe concurrent work that may or may not migrate threads, or be otherwise
-    /// interleaved with other work on the same thread. They can be nested to represent a control
-    /// flow stack.
-    ///
-    /// 0 to 15 arguments can be associated with the event, each of which is used to annotate the
-    /// async event with additional information. Arguments provided in matching async begin and end
-    /// events are combined together in the trace; it is not necessary to repeat them.
-    async_begin,
-    sys::trace_context_write_async_begin_event_record,
-);
+/// Writes an async end event. This event must be associated with a prior async begin event
+/// with the same id, category, and name. This function is intended to be called implicitly
+/// when the `AsyncScope` object created through use of the `async_enter!` macro is dropped.
+///
+/// Async events describe concurrent work that may or may not migrate threads, or be otherwise
+/// interleaved with other work on the same thread. They can be nested to represent a control
+/// flow stack.
+///
+/// 0 to 15 arguments can be associated with the event, each of which is used to annotate the
+/// async event with additional information. Arguments provided in matching async begin and end
+/// events are combined together in the trace; it is not necessary to repeat them.
+pub fn async_end(id: Id, category: &'static CStr, name: &'static CStr, args: &[Arg<'_>]) {
+    assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
-async_proto!(
-    /// Writes an async instant event with the specified id.
-    ///
-    /// Asynchronous events describe work that is happening asynchronously and that
-    /// may span multiple threads.  Asynchronous events do not nest.  The id serves
-    /// to correlate the progress of distinct asynchronous operations that share
-    /// the same category and name within the same process.
-    ///
-    /// 0 to 15 arguments can be associated with the event, each of which is used
-    /// to annotate the asynchronous operation with additional information.  The
-    /// arguments provided to matching async begin, async instant, and async end
-    /// events are combined together in the trace; it is not necessary to repeat them.
-    async_instant,
-    sys::trace_context_write_async_instant_event_record,
-);
+    if let Some(context) = TraceCategoryContext::acquire(category) {
+        let name_ref = context.register_string_literal(name);
+        context.write_async_end(id, name_ref, args);
+    }
+}
 
-async_proto!(
-    /// Writes an async end event. This event must be associated with a prior async begin event
-    /// with the same id, category, and name. This function is intended to be called implicitly
-    /// when the `AsyncScope` object created through use of the `async_enter!` macro is dropped.
-    ///
-    /// Async events describe concurrent work that may or may not migrate threads, or be otherwise
-    /// interleaved with other work on the same thread. They can be nested to represent a control
-    /// flow stack.
-    ///
-    /// 0 to 15 arguments can be associated with the event, each of which is used to annotate the
-    /// async event with additional information. Arguments provided in matching async begin and end
-    /// events are combined together in the trace; it is not necessary to repeat them.
-    async_end,
-    sys::trace_context_write_async_end_event_record,
-);
+/// Writes an async instant event with the specified id.
+///
+/// Asynchronous events describe work that is happening asynchronously and that
+/// may span multiple threads.  Asynchronous events do not nest.  The id serves
+/// to correlate the progress of distinct asynchronous operations that share
+/// the same category and name within the same process.
+///
+/// 0 to 15 arguments can be associated with the event, each of which is used
+/// to annotate the asynchronous operation with additional information.  The
+/// arguments provided to matching async begin, async instant, and async end
+/// events are combined together in the trace; it is not necessary to repeat them.
+pub fn async_instant(id: Id, category: &'static CStr, name: &'static CStr, args: &[Arg<'_>]) {
+    assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
+
+    if let Some(context) = TraceCategoryContext::acquire(category) {
+        let name_ref = context.register_string_literal(name);
+        context.write_async_instant(id, name_ref, args);
+    }
+}
 
 #[macro_export]
 macro_rules! blob {
@@ -708,28 +617,9 @@ macro_rules! blob {
     }
 }
 pub fn blob_fn(category: &'static CStr, name: &'static CStr, bytes: &[u8], args: &[Arg<'_>]) {
-    // trace_context_write_xxx functions require that:
-    // - category and name are static null-terminated strings (&'static CStr).
-    // - the refs must be valid for the given call
-    unsafe {
-        let mut category_ref = mem::MaybeUninit::<sys::trace_string_ref_t>::uninit();
-        let context =
-            sys::trace_acquire_context_for_category(category.as_ptr(), category_ref.as_mut_ptr());
-        if context != ptr::null() {
-            let helper = EventHelper::new(context, name);
-            sys::trace_context_write_blob_event_record(
-                context,
-                helper.ticks,
-                &helper.thread_ref,
-                category_ref.as_ptr(),
-                &helper.name_ref,
-                bytes.as_ptr() as *const core::ffi::c_void,
-                bytes.len(),
-                args.as_ptr() as *const sys::trace_arg_t,
-                args.len(),
-            );
-            sys::trace_release_context(context);
-        }
+    if let Some(context) = TraceCategoryContext::acquire(category) {
+        let name_ref = context.register_string_literal(name);
+        context.write_blob(name_ref, bytes, args);
     }
 }
 
@@ -802,121 +692,80 @@ macro_rules! flow_end {
     }
 }
 
-macro_rules! flow_event {
-    ($( #[$docs:meta] )* $name:ident, $sys_method:path$(,)*) => {
-        $( #[$docs] )*
-        pub fn $name(category: &'static CStr, name: &'static CStr, flow_id: Id, args: &[Arg<'_>]) {
-            assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
-            // See justification in `instant`
-            unsafe {
-                let mut category_ref = mem::MaybeUninit::<sys::trace_string_ref_t>::uninit();
-                let context = sys::trace_acquire_context_for_category(
-                    category.as_ptr(), category_ref.as_mut_ptr()
-                );
-                if context != ptr::null() {
-                    let helper = EventHelper::new(context, name);
-                    $sys_method(
-                        context,
-                        helper.ticks,
-                        &helper.thread_ref,
-                        category_ref.as_ptr(),
-                        &helper.name_ref,
-                        flow_id.into(),
-                        args.as_ptr() as *const sys::trace_arg_t,
-                        args.len(),
-                    );
-                    sys::trace_release_context(context);
-                }
-            }
-        }
-    };
+/// Writes a flow begin event with the specified id.
+/// This event may be followed by flow steps events and must be matched by
+/// a flow end event with the same category, name, and id.
+///
+/// Flow events describe control flow handoffs between threads or across processes.
+/// They are typically represented as arrows in a visualizer.  Flow arrows are
+/// from the end of the duration event which encloses the beginning of the flow
+/// to the beginning of the duration event which encloses the next step or the
+/// end of the flow.  The id serves to correlate flows which share the same
+/// category and name across processes.
+///
+/// This event must be enclosed in a duration event which represents where
+/// the flow handoff occurs.
+///
+/// 0 to 15 arguments can be associated with the event, each of which is used
+/// to annotate the flow with additional information.  The arguments provided
+/// to matching flow begin, flow step, and flow end events are combined together
+/// in the trace; it is not necessary to repeat them.
+pub fn flow_begin(category: &'static CStr, name: &'static CStr, flow_id: Id, args: &[Arg<'_>]) {
+    assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
+
+    if let Some(context) = TraceCategoryContext::acquire(category) {
+        let name_ref = context.register_string_literal(name);
+        context.write_flow_begin(name_ref, flow_id, args);
+    }
 }
 
-flow_event!(
-    /// Writes a flow begin event with the specified id.
-    /// This event may be followed by flow steps events and must be matched by
-    /// a flow end event with the same category, name, and id.
-    ///
-    /// Flow events describe control flow handoffs between threads or across processes.
-    /// They are typically represented as arrows in a visualizer.  Flow arrows are
-    /// from the end of the duration event which encloses the beginning of the flow
-    /// to the beginning of the duration event which encloses the next step or the
-    /// end of the flow.  The id serves to correlate flows which share the same
-    /// category and name across processes.
-    ///
-    /// This event must be enclosed in a duration event which represents where
-    /// the flow handoff occurs.
-    ///
-    /// 0 to 15 arguments can be associated with the event, each of which is used
-    /// to annotate the flow with additional information.  The arguments provided
-    /// to matching flow begin, flow step, and flow end events are combined together
-    /// in the trace; it is not necessary to repeat them.
-    flow_begin,
-    sys::trace_context_write_flow_begin_event_record,
-);
+/// Writes a flow end event with the specified id.
+///
+/// Flow events describe control flow handoffs between threads or across processes.
+/// They are typically represented as arrows in a visualizer.  Flow arrows are
+/// from the end of the duration event which encloses the beginning of the flow
+/// to the beginning of the duration event which encloses the next step or the
+/// end of the flow.  The id serves to correlate flows which share the same
+/// category and name across processes.
+///
+/// This event must be enclosed in a duration event which represents where
+/// the flow handoff occurs.
+///
+/// 0 to 15 arguments can be associated with the event, each of which is used
+/// to annotate the flow with additional information.  The arguments provided
+/// to matching flow begin, flow step, and flow end events are combined together
+/// in the trace; it is not necessary to repeat them.
+pub fn flow_end(category: &'static CStr, name: &'static CStr, flow_id: Id, args: &[Arg<'_>]) {
+    assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
-flow_event!(
-    /// Writes a flow step event with the specified id.
-    ///
-    /// Flow events describe control flow handoffs between threads or across processes.
-    /// They are typically represented as arrows in a visualizer.  Flow arrows are
-    /// from the end of the duration event which encloses the beginning of the flow
-    /// to the beginning of the duration event which encloses the next step or the
-    /// end of the flow.  The id serves to correlate flows which share the same
-    /// category and name across processes.
-    ///
-    /// This event must be enclosed in a duration event which represents where
-    /// the flow handoff occurs.
-    ///
-    /// 0 to 15 arguments can be associated with the event, each of which is used
-    /// to annotate the flow with additional information.  The arguments provided
-    /// to matching flow begin, flow step, and flow end events are combined together
-    /// in the trace; it is not necessary to repeat them.
-    flow_step,
-    sys::trace_context_write_flow_step_event_record,
-);
-
-flow_event!(
-    /// Writes a flow end event with the specified id.
-    ///
-    /// Flow events describe control flow handoffs between threads or across processes.
-    /// They are typically represented as arrows in a visualizer.  Flow arrows are
-    /// from the end of the duration event which encloses the beginning of the flow
-    /// to the beginning of the duration event which encloses the next step or the
-    /// end of the flow.  The id serves to correlate flows which share the same
-    /// category and name across processes.
-    ///
-    /// This event must be enclosed in a duration event which represents where
-    /// the flow handoff occurs.
-    ///
-    /// 0 to 15 arguments can be associated with the event, each of which is used
-    /// to annotate the flow with additional information.  The arguments provided
-    /// to matching flow begin, flow step, and flow end events are combined together
-    /// in the trace; it is not necessary to repeat them.
-    flow_end,
-    sys::trace_context_write_flow_end_event_record,
-);
-
-struct EventHelper {
-    ticks: sys::trace_ticks_t,
-    thread_ref: sys::trace_thread_ref_t,
-    name_ref: sys::trace_string_ref_t,
+    if let Some(context) = TraceCategoryContext::acquire(category) {
+        let name_ref = context.register_string_literal(name);
+        context.write_flow_end(name_ref, flow_id, args);
+    }
 }
 
-impl EventHelper {
-    // Requires valid ptr to `trace_context_t`
-    unsafe fn new(context: *const sys::trace_context_t, name: &'static CStr) -> Self {
-        let ticks = zx::ticks_get();
+/// Writes a flow step event with the specified id.
+///
+/// Flow events describe control flow handoffs between threads or across processes.
+/// They are typically represented as arrows in a visualizer.  Flow arrows are
+/// from the end of the duration event which encloses the beginning of the flow
+/// to the beginning of the duration event which encloses the next step or the
+/// end of the flow.  The id serves to correlate flows which share the same
+/// category and name across processes.
+///
+/// This event must be enclosed in a duration event which represents where
+/// the flow handoff occurs.
+///
+/// 0 to 15 arguments can be associated with the event, each of which is used
+/// to annotate the flow with additional information.  The arguments provided
+/// to matching flow begin, flow step, and flow end events are combined together
+/// in the trace; it is not necessary to repeat them.
+pub fn flow_step(category: &'static CStr, name: &'static CStr, flow_id: Id, args: &[Arg<'_>]) {
+    assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
-        let mut thread_ref = mem::MaybeUninit::<sys::trace_thread_ref_t>::uninit();
-        sys::trace_context_register_current_thread(context, thread_ref.as_mut_ptr());
-        let thread_ref = thread_ref.assume_init();
-
-        let mut name_ref = mem::MaybeUninit::<sys::trace_string_ref_t>::uninit();
-        sys::trace_context_register_string_literal(context, name.as_ptr(), name_ref.as_mut_ptr());
-        let name_ref = name_ref.assume_init();
-
-        EventHelper { ticks, thread_ref, name_ref }
+    if let Some(context) = TraceCategoryContext::acquire(category) {
+        let name_ref = context.register_string_literal(name);
+        context.write_flow_step(name_ref, flow_id, args);
     }
 }
 
@@ -959,6 +808,290 @@ fn trace_make_inline_string_ref(string: &str) -> sys::trace_string_ref_t {
     sys::trace_string_ref_t {
         encoded_value: sys::TRACE_ENCODED_STRING_REF_INLINE_FLAG | len,
         inline_string: string.as_ptr() as *const libc::c_char,
+    }
+}
+
+/// RAII wrapper for a trace context for a specific category.
+pub struct TraceCategoryContext {
+    raw: *const sys::trace_context_t,
+    category_ref: sys::trace_string_ref_t,
+}
+
+impl TraceCategoryContext {
+    pub fn acquire(category: &'static CStr) -> Option<TraceCategoryContext> {
+        unsafe {
+            let mut category_ref = mem::MaybeUninit::<sys::trace_string_ref_t>::uninit();
+            let raw = sys::trace_acquire_context_for_category(
+                category.as_ptr(),
+                category_ref.as_mut_ptr(),
+            );
+            if raw != ptr::null() {
+                Some(TraceCategoryContext { raw, category_ref: category_ref.assume_init() })
+            } else {
+                None
+            }
+        }
+    }
+
+    fn register_string_literal(&self, name: &'static CStr) -> sys::trace_string_ref_t {
+        unsafe {
+            let mut name_ref = mem::MaybeUninit::<sys::trace_string_ref_t>::uninit();
+            sys::trace_context_register_string_literal(
+                self.raw,
+                name.as_ptr(),
+                name_ref.as_mut_ptr(),
+            );
+            name_ref.assume_init()
+        }
+    }
+
+    fn register_current_thread(&self) -> sys::trace_thread_ref_t {
+        unsafe {
+            let mut thread_ref = mem::MaybeUninit::<sys::trace_thread_ref_t>::uninit();
+            sys::trace_context_register_current_thread(self.raw, thread_ref.as_mut_ptr());
+            thread_ref.assume_init()
+        }
+    }
+
+    fn write_instant(&self, name_ref: sys::trace_string_ref_t, scope: Scope, args: &[Arg<'_>]) {
+        let ticks = zx::ticks_get();
+        let thread_ref = self.register_current_thread();
+        unsafe {
+            sys::trace_context_write_instant_event_record(
+                self.raw,
+                ticks,
+                &thread_ref,
+                &self.category_ref,
+                &name_ref,
+                scope.into_raw(),
+                args.as_ptr() as *const sys::trace_arg_t,
+                args.len(),
+            );
+        }
+    }
+
+    pub fn write_instant_with_inline_name(&self, name: &str, scope: Scope, args: &[Arg<'_>]) {
+        let name_ref = trace_make_inline_string_ref(name);
+        self.write_instant(name_ref, scope, args)
+    }
+
+    fn write_counter(&self, name_ref: sys::trace_string_ref_t, counter_id: u64, args: &[Arg<'_>]) {
+        let ticks = zx::ticks_get();
+        let thread_ref = self.register_current_thread();
+        unsafe {
+            sys::trace_context_write_counter_event_record(
+                self.raw,
+                ticks,
+                &thread_ref,
+                &self.category_ref,
+                &name_ref,
+                counter_id,
+                args.as_ptr() as *const sys::trace_arg_t,
+                args.len(),
+            );
+        }
+    }
+
+    fn write_duration(
+        &self,
+        name_ref: sys::trace_string_ref_t,
+        start_time: sys::trace_ticks_t,
+        args: &[Arg<'_>],
+    ) {
+        let ticks = zx::ticks_get();
+        let thread_ref = self.register_current_thread();
+        unsafe {
+            sys::trace_context_write_duration_event_record(
+                self.raw,
+                start_time,
+                ticks,
+                &thread_ref,
+                &self.category_ref,
+                &name_ref,
+                args.as_ptr() as *const sys::trace_arg_t,
+                args.len(),
+            );
+        }
+    }
+
+    pub fn write_duration_with_inline_name(
+        &self,
+        name: &str,
+        start_time: sys::trace_ticks_t,
+        args: &[Arg<'_>],
+    ) {
+        let name_ref = trace_make_inline_string_ref(name);
+        self.write_duration(name_ref, start_time, args);
+    }
+
+    fn write_duration_begin(&self, name_ref: sys::trace_string_ref_t, args: &[Arg<'_>]) {
+        let ticks = zx::ticks_get();
+        let thread_ref = self.register_current_thread();
+        unsafe {
+            sys::trace_context_write_duration_begin_event_record(
+                self.raw,
+                ticks,
+                &thread_ref,
+                &self.category_ref,
+                &name_ref,
+                args.as_ptr() as *const sys::trace_arg_t,
+                args.len(),
+            );
+        }
+    }
+
+    pub fn write_duration_begin_with_inline_name(&self, name: &str, args: &[Arg<'_>]) {
+        let name_ref = trace_make_inline_string_ref(name);
+        self.write_duration_begin(name_ref, args);
+    }
+
+    fn write_duration_end(&self, name_ref: sys::trace_string_ref_t, args: &[Arg<'_>]) {
+        let ticks = zx::ticks_get();
+        let thread_ref = self.register_current_thread();
+        unsafe {
+            sys::trace_context_write_duration_end_event_record(
+                self.raw,
+                ticks,
+                &thread_ref,
+                &self.category_ref,
+                &name_ref,
+                args.as_ptr() as *const sys::trace_arg_t,
+                args.len(),
+            );
+        }
+    }
+
+    pub fn write_duration_end_with_inline_name(&self, name: &str, args: &[Arg<'_>]) {
+        let name_ref = trace_make_inline_string_ref(name);
+        self.write_duration_end(name_ref, args);
+    }
+
+    fn write_async_begin(&self, id: Id, name_ref: sys::trace_string_ref_t, args: &[Arg<'_>]) {
+        let ticks = zx::ticks_get();
+        let thread_ref = self.register_current_thread();
+        unsafe {
+            sys::trace_context_write_async_begin_event_record(
+                self.raw,
+                ticks,
+                &thread_ref,
+                &self.category_ref,
+                &name_ref,
+                id.into(),
+                args.as_ptr() as *const sys::trace_arg_t,
+                args.len(),
+            );
+        }
+    }
+
+    fn write_async_end(&self, id: Id, name_ref: sys::trace_string_ref_t, args: &[Arg<'_>]) {
+        let ticks = zx::ticks_get();
+        let thread_ref = self.register_current_thread();
+        unsafe {
+            sys::trace_context_write_async_end_event_record(
+                self.raw,
+                ticks,
+                &thread_ref,
+                &self.category_ref,
+                &name_ref,
+                id.into(),
+                args.as_ptr() as *const sys::trace_arg_t,
+                args.len(),
+            );
+        }
+    }
+
+    fn write_async_instant(&self, id: Id, name_ref: sys::trace_string_ref_t, args: &[Arg<'_>]) {
+        let ticks = zx::ticks_get();
+        let thread_ref = self.register_current_thread();
+        unsafe {
+            sys::trace_context_write_async_instant_event_record(
+                self.raw,
+                ticks,
+                &thread_ref,
+                &self.category_ref,
+                &name_ref,
+                id.into(),
+                args.as_ptr() as *const sys::trace_arg_t,
+                args.len(),
+            );
+        }
+    }
+
+    fn write_blob(&self, name_ref: sys::trace_string_ref_t, bytes: &[u8], args: &[Arg<'_>]) {
+        let ticks = zx::ticks_get();
+        let thread_ref = self.register_current_thread();
+        unsafe {
+            sys::trace_context_write_blob_event_record(
+                self.raw,
+                ticks,
+                &thread_ref,
+                &self.category_ref,
+                &name_ref,
+                bytes.as_ptr() as *const core::ffi::c_void,
+                bytes.len(),
+                args.as_ptr() as *const sys::trace_arg_t,
+                args.len(),
+            );
+        }
+    }
+
+    fn write_flow_begin(&self, name_ref: sys::trace_string_ref_t, flow_id: Id, args: &[Arg<'_>]) {
+        let ticks = zx::ticks_get();
+        let thread_ref = self.register_current_thread();
+        unsafe {
+            sys::trace_context_write_flow_begin_event_record(
+                self.raw,
+                ticks,
+                &thread_ref,
+                &self.category_ref,
+                &name_ref,
+                flow_id.into(),
+                args.as_ptr() as *const sys::trace_arg_t,
+                args.len(),
+            );
+        }
+    }
+
+    fn write_flow_end(&self, name_ref: sys::trace_string_ref_t, flow_id: Id, args: &[Arg<'_>]) {
+        let ticks = zx::ticks_get();
+        let thread_ref = self.register_current_thread();
+        unsafe {
+            sys::trace_context_write_flow_end_event_record(
+                self.raw,
+                ticks,
+                &thread_ref,
+                &self.category_ref,
+                &name_ref,
+                flow_id.into(),
+                args.as_ptr() as *const sys::trace_arg_t,
+                args.len(),
+            );
+        }
+    }
+
+    fn write_flow_step(&self, name_ref: sys::trace_string_ref_t, flow_id: Id, args: &[Arg<'_>]) {
+        let ticks = zx::ticks_get();
+        let thread_ref = self.register_current_thread();
+        unsafe {
+            sys::trace_context_write_flow_step_event_record(
+                self.raw,
+                ticks,
+                &thread_ref,
+                &self.category_ref,
+                &name_ref,
+                flow_id.into(),
+                args.as_ptr() as *const sys::trace_arg_t,
+                args.len(),
+            );
+        }
+    }
+}
+
+impl std::ops::Drop for TraceCategoryContext {
+    fn drop(&mut self) {
+        unsafe {
+            sys::trace_release_context(self.raw);
+        }
     }
 }
 

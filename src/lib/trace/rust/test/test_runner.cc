@@ -45,10 +45,10 @@ TEST(TEST_SUITE, test_counter) {
 
   ASSERT_RECORDS(
       "String(index: 1, \"+enabled\")\n"
-      "String(index: 2, \"process\")\n"
+      "String(index: 2, \"name\")\n"
+      "String(index: 3, \"process\")\n"
       "KernelObject(koid: <>, type: thread, name: \"initial-thread\", {process: koid(<>)})\n"
       "Thread(index: 1, <>)\n"
-      "String(index: 3, \"name\")\n"
       "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", Counter(id: 42), {arg: "
       "int32(10)})\n");
 }
@@ -62,10 +62,10 @@ TEST(TEST_SUITE, test_instant) {
 
   ASSERT_RECORDS(
       "String(index: 1, \"+enabled\")\n"
-      "String(index: 2, \"process\")\n"
+      "String(index: 2, \"name\")\n"
+      "String(index: 3, \"process\")\n"
       "KernelObject(koid: <>, type: thread, name: \"initial-thread\", {process: koid(<>)})\n"
       "Thread(index: 1, <>)\n"
-      "String(index: 3, \"name\")\n"
       "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", Instant(scope: process), "
       "{arg: int32(10)})\n");
 }
@@ -79,10 +79,10 @@ TEST(TEST_SUITE, test_duration) {
 
   ASSERT_RECORDS(
       "String(index: 1, \"+enabled\")\n"
-      "String(index: 2, \"process\")\n"
+      "String(index: 2, \"name\")\n"
+      "String(index: 3, \"process\")\n"
       "KernelObject(koid: <>, type: thread, name: \"initial-thread\", {process: koid(<>)})\n"
       "Thread(index: 1, <>)\n"
-      "String(index: 3, \"name\")\n"
       "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", DurationComplete(end_ts: <>), "
       "{x: int32(5), y: int32(10)})\n");
 }
@@ -96,10 +96,10 @@ TEST(TEST_SUITE, test_scoped_duration) {
 
   ASSERT_RECORDS(
       "String(index: 1, \"+enabled\")\n"
-      "String(index: 2, \"process\")\n"
+      "String(index: 2, \"name\")\n"
+      "String(index: 3, \"process\")\n"
       "KernelObject(koid: <>, type: thread, name: \"initial-thread\", {process: koid(<>)})\n"
       "Thread(index: 1, <>)\n"
-      "String(index: 3, \"name\")\n"
       "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", Instant(scope: process), "
       "{arg: int32(10)})\n"
       "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", DurationComplete(end_ts: <>), "
@@ -115,10 +115,10 @@ TEST(TEST_SUITE, test_duration_granular) {
 
   ASSERT_RECORDS(
       "String(index: 1, \"+enabled\")\n"
-      "String(index: 2, \"process\")\n"
+      "String(index: 2, \"name\")\n"
+      "String(index: 3, \"process\")\n"
       "KernelObject(koid: <>, type: thread, name: \"initial-thread\", {process: koid(<>)})\n"
       "Thread(index: 1, <>)\n"
-      "String(index: 3, \"name\")\n"
       "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", DurationBegin, {x: "
       "int32(5)})\n"
       "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", Instant(scope: process), "
@@ -136,10 +136,10 @@ TEST(TEST_SUITE, test_blob) {
 
   ASSERT_RECORDS(
       "String(index: 1, \"+enabled\")\n"
-      "String(index: 2, \"process\")\n"
+      "String(index: 2, \"name\")\n"
+      "String(index: 3, \"process\")\n"
       "KernelObject(koid: <>, type: thread, name: \"initial-thread\", {process: koid(<>)})\n"
       "Thread(index: 1, <>)\n"
-      "String(index: 3, \"name\")\n"
       "LargeRecord(Blob(format: blob_event, category: \"+enabled\", name: \"name\", ts: <>, pt: "
       "<>, {x: int32(5)}, size: 13, preview: <62 6c 6f 62 20 63 6f 6e 74 65 6e 74 73>))\n");
 }
@@ -153,10 +153,10 @@ TEST(TEST_SUITE, test_flow) {
 
   ASSERT_RECORDS(
       "String(index: 1, \"+enabled\")\n"
-      "String(index: 2, \"process\")\n"
+      "String(index: 2, \"name\")\n"
+      "String(index: 3, \"process\")\n"
       "KernelObject(koid: <>, type: thread, name: \"initial-thread\", {process: koid(<>)})\n"
       "Thread(index: 1, <>)\n"
-      "String(index: 3, \"name\")\n"
       "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", FlowBegin(id: 123), {x: "
       "int32(5)})\n"
       "String(index: 4, \"step\")\n"
@@ -175,10 +175,10 @@ TEST(TEST_SUITE, test_arglimit) {
 
   ASSERT_RECORDS(
       "String(index: 1, \"+enabled\")\n"
-      "String(index: 2, \"process\")\n"
+      "String(index: 2, \"name\")\n"
+      "String(index: 3, \"process\")\n"
       "KernelObject(koid: <>, type: thread, name: \"initial-thread\", {process: koid(<>)})\n"
       "Thread(index: 1, <>)\n"
-      "String(index: 3, \"name\")\n"
       "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", DurationComplete(end_ts: <>), "
       "{1: int32(1), 2: int32(2), 3: int32(3), 4: int32(4), 5: int32(5), 6: int32(6), 7: int32(7), "
       "8: int32(8), 9: int32(9), 10: int32(10), 11: int32(11), 12: int32(12), 13: int32(13), 14: "
@@ -194,10 +194,10 @@ TEST(TEST_SUITE, test_async_event) {
 
   ASSERT_RECORDS(
       "String(index: 1, \"+enabled\")\n"
-      "String(index: 2, \"process\")\n"
+      "String(index: 2, \"name\")\n"
+      "String(index: 3, \"process\")\n"
       "KernelObject(koid: <>, type: thread, name: \"initial-thread\", {process: koid(<>)})\n"
       "Thread(index: 1, <>)\n"
-      "String(index: 3, \"name\")\n"
       "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", AsyncBegin(id: 1), {x: "
       "int32(5), y: int32(10)})\n"
       "Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", Instant(scope: process)"
