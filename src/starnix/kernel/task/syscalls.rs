@@ -159,7 +159,7 @@ pub fn sys_execveat(
         )?
     };
 
-    let path = &current_task.mm.read_c_string_vec(user_path, page_limit_size)?;
+    let path = &current_task.mm.read_c_string_vec(user_path, PATH_MAX as usize)?;
 
     log_trace!(
         "execveat({}, {}, argv={:?}, environ={:?}, flags={})",

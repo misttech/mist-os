@@ -4,6 +4,7 @@
 
 #include "src/starnix/tests/syscalls/task_test.h"
 
+#include <limits.h>
 #include <sched.h>
 #include <strings.h>
 #include <sys/mman.h>
@@ -434,5 +435,29 @@ TEST(Task, ExecveArgvEnvExceedLimit) {
     EXPECT_NE(execve("/proc/self/exe", argv, envp), 0);
     EXPECT_EQ(errno, E2BIG);
   });
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+
+TEST(Task, ExecvePathnameTooLong) {
+  ForkHelper helper;
+  helper.RunInForkedProcess([] {
+    constexpr size_t path_size = PATH_MAX + 1;
+    // We use '/' here because ////// (...) is a valid path:
+    // More than two leading / should be considered as one,
+    // So this path resolves to "/".
+    //
+    // Each path component is limited to NAME_MAX, so if we
+    // use a different character we would need to add a delimiter
+    // every NAME_MAX characters.
+    std::vector<char> pathname(path_size, '/');
+    pathname[path_size - 1] = '\0';
+
+    char* argv[] = {NULL};
+    char* envp[] = {NULL};
+
+    EXPECT_NE(execve(pathname.data(), argv, envp), 0);
+    EXPECT_EQ(errno, ENAMETOOLONG);
+  });
+
   ASSERT_TRUE(helper.WaitForChildren());
 }
