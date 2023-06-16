@@ -36,6 +36,12 @@ impl DefineSubsystemConfiguration<FontsConfig> for FontsSubsystem {
                     .with_context(|| {
                         format!("while setting component {}", FONT_SERVER_COMPONENT_LOCAL_URL)
                     })?;
+                component
+                    .field(
+                        "verbose_logging",
+                        matches!(context.build_type, BuildType::Eng | BuildType::UserDebug),
+                    )
+                    .context("while setting verbose_logging")?;
                 let font_manifest = if font_collection_name.is_empty() {
                     // Empty means default behavior (use config-data).
                     String::from("")
