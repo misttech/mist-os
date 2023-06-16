@@ -190,9 +190,6 @@ impl SettingProxy {
             .map_err(Error::new)?;
         let service_signature = receptor.get_signature();
 
-        // TODO(fxbug.dev/67536): Remove receptors below as their logic is
-        // migrated to the MessageHub defined above.
-
         let event_publisher = event::Publisher::create(
             &delegate,
             MessengerType::Addressable(service::Address::EventSource(
