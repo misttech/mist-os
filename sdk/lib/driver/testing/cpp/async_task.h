@@ -21,7 +21,7 @@ namespace fdf_testing {
 // AsyncTask therefore provides a way to await the result of the task while running unmanaged
 // driver dispatchers (if there are any) on the calling thread to ensure the task can complete.
 template <typename ResultType>
-class LIB_FIT_NODISCARD AsyncTask {
+class [[nodiscard]] AsyncTask {
  public:
   explicit AsyncTask(std::shared_future<ResultType> future) : future_(std::move(future)) {}
 

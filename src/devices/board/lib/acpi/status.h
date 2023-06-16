@@ -85,7 +85,7 @@ class status;
 
 // Specialization of status for returning a single value.
 template <typename T>
-class LIB_FIT_NODISCARD status<T> : public ::fit::result<ACPI_STATUS, T> {
+class [[nodiscard]] status<T> : public ::fit::result<ACPI_STATUS, T> {
   using base = ::fit::result<ACPI_STATUS, T>;
 
  public:
@@ -112,7 +112,7 @@ class LIB_FIT_NODISCARD status<T> : public ::fit::result<ACPI_STATUS, T> {
 
 // Specialization of status for empty value type.
 template <>
-class LIB_FIT_NODISCARD status<> : public ::fit::result<ACPI_STATUS> {
+class [[nodiscard]] status<> : public ::fit::result<ACPI_STATUS> {
   using base = ::fit::result<ACPI_STATUS>;
 
  public:
