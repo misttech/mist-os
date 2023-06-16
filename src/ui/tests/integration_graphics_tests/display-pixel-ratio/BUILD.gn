@@ -22,6 +22,7 @@ executable("display-pixel-ratio-test-bin") {
 fuchsia_test_component("display-pixel-ratio-test-component") {
   manifest = "meta/display-pixel-ratio-test.cml"
   deps = [ ":display-pixel-ratio-test-bin" ]
+  test_type = "vulkan"
 }
 
 fuchsia_test_package("display-pixel-ratio-test") {

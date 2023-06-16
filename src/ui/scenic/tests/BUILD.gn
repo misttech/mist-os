@@ -124,6 +124,7 @@ fuchsia_test_component("gfx_focus_integration_test") {
   component_name = "gfx_focus_integration_test"
   manifest = "meta/gfx_focus_integration_test.cml"
   deps = [ ":gfx_focus_integration_test_bin" ]
+  test_type = "vulkan"
 }
 
 executable("gfx_touch_integration_test_bin") {
@@ -144,6 +145,7 @@ fuchsia_test_component("gfx_touch_integration_test") {
   component_name = "gfx_touch_integration_test"
   manifest = "meta/gfx_touch_integration_test.cml"
   deps = [ ":gfx_touch_integration_test_bin" ]
+  test_type = "vulkan"
 }
 
 executable("gfx_mouse_integration_test_bin") {
@@ -160,6 +162,7 @@ fuchsia_test_component("gfx_mouse_integration_test") {
   component_name = "gfx_mouse_integration_test"
   manifest = "meta/gfx_mouse_integration_test.cml"
   deps = [ ":gfx_mouse_integration_test_bin" ]
+  test_type = "vulkan"
 }
 
 executable("gfx_view_ref_installed_integration_test_bin") {
@@ -176,6 +179,7 @@ fuchsia_test_component("gfx_view_ref_installed_integration_test") {
   component_name = "gfx_view_ref_installed_integration_test"
   manifest = "meta/gfx_view_ref_installed_integration_test.cml"
   deps = [ ":gfx_view_ref_installed_integration_test_bin" ]
+  test_type = "vulkan"
 }
 
 executable("gfx_viewstate_apptest_bin") {
@@ -193,6 +197,7 @@ fuchsia_test_component("gfx_viewstate_apptest") {
   component_name = "gfx_viewstate_apptest"
   manifest = "meta/gfx_viewstate_app_test.cml"
   deps = [ ":gfx_viewstate_apptest_bin" ]
+  test_type = "vulkan"
 }
 
 executable("scenic_pixeltest_bin") {
@@ -214,6 +219,7 @@ fuchsia_test_component("scenic_pixeltest") {
   component_name = "scenic_pixeltest"
   manifest = "meta/scenic_pixeltest.cml"
   deps = [ ":scenic_pixeltest_bin" ]
+  test_type = "vulkan"
 }
 
 executable("flatland_touch_integration_test_bin") {
@@ -235,6 +241,7 @@ fuchsia_test_component("flatland_touch_integration_test") {
   component_name = "flatland_touch_integration_test"
   manifest = "meta/flatland_touch_integration_test.cml"
   deps = [ ":flatland_touch_integration_test_bin" ]
+  test_type = "vulkan"
 }
 
 executable("flatland_focus_integration_test_bin") {
@@ -251,6 +258,7 @@ fuchsia_test_component("flatland_focus_integration_test") {
   component_name = "flatland_focus_integration_test"
   manifest = "meta/flatland_focus_integration_test.cml"
   deps = [ ":flatland_focus_integration_test_bin" ]
+  test_type = "vulkan"
 }
 
 executable("flatland_view_ref_installed_integration_test_bin") {
@@ -266,6 +274,7 @@ fuchsia_test_component("flatland_view_ref_installed_integration_test") {
   component_name = "flatland_view_ref_installed_integration_test"
   manifest = "meta/flatland_view_ref_installed_integration_test.cml"
   deps = [ ":flatland_view_ref_installed_integration_test_bin" ]
+  test_type = "vulkan"
 }
 
 executable("flatland_view_integration_test_bin") {
@@ -282,6 +291,7 @@ fuchsia_test_component("flatland_view_integration_test") {
   component_name = "flatland_view_integration_test"
   manifest = "meta/flatland_view_integration_test.cml"
   deps = [ ":flatland_view_integration_test_bin" ]
+  test_type = "vulkan"
 }
 
 executable("observer_registry_integration_test_bin") {
@@ -301,6 +311,7 @@ fuchsia_test_component("observer_registry_integration_test") {
   component_name = "observer_registry_integration_test"
   manifest = "meta/observer_registry_integration_test.cml"
   deps = [ ":observer_registry_integration_test_bin" ]
+  test_type = "vulkan"
 }
 
 executable("scoped_observer_registry_integration_test_bin") {
@@ -321,6 +332,7 @@ fuchsia_test_component("scoped_observer_registry_integration_test") {
   component_name = "scoped_observer_registry_integration_test"
   manifest = "meta/scoped_observer_registry_integration_test.cml"
   deps = [ ":scoped_observer_registry_integration_test_bin" ]
+  test_type = "vulkan"
 }
 
 executable("protected_memory_integration_test_bin") {
@@ -340,6 +352,7 @@ fuchsia_test_component("protected_memory_integration_test") {
   component_name = "protected_memory_integration_test"
   manifest = "meta/protected_memory_integration_test.cml"
   deps = [ ":protected_memory_integration_test_bin" ]
+  test_type = "vulkan"
 }
 
 executable("screen_capture_integration_test_bin") {
@@ -360,6 +373,7 @@ fuchsia_test_component("screen_capture_integration_test") {
   component_name = "screen_capture_integration_test"
   manifest = "meta/screen_capture_integration_test.cml"
   deps = [ ":screen_capture_integration_test_bin" ]
+  test_type = "vulkan"
 }
 
 executable("screen_capture2_integration_test_bin") {
@@ -384,6 +398,7 @@ fuchsia_test_component("screen_capture2_integration_test") {
   component_name = "screen_capture2_integration_test"
   manifest = "meta/screen_capture2_integration_test.cml"
   deps = [ ":screen_capture2_integration_test_bin" ]
+  test_type = "vulkan"
 }
 
 executable("singleton_display_integration_test_bin") {
@@ -403,6 +418,7 @@ fuchsia_test_component("singleton_display_integration_test") {
   component_name = "singleton_display_integration_test"
   manifest = "meta/singleton_display_integration_test.cml"
   deps = [ ":singleton_display_integration_test_bin" ]
+  test_type = "vulkan"
 }
 
 executable("flatland_mouse_integration_test_bin") {
@@ -422,6 +438,7 @@ fuchsia_test_component("flatland_mouse_integration_test") {
   component_name = "flatland_mouse_integration_test"
   manifest = "meta/flatland_mouse_integration_test.cml"
   deps = [ ":flatland_mouse_integration_test_bin" ]
+  test_type = "vulkan"
 }
 
 executable("flatland_pixeltest_bin") {
@@ -448,6 +465,7 @@ fuchsia_test_component("flatland_pixeltest") {
   component_name = "flatland_pixeltest"
   manifest = "meta/flatland_pixeltest.cml"
   deps = [ ":flatland_pixeltest_bin" ]
+  test_type = "vulkan"
 }
 
 fuchsia_test_package("gfx_integration_tests") {

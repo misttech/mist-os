@@ -27,6 +27,7 @@ executable("presentation_test_bin") {
 fuchsia_test_component("presentation-test-component") {
   manifest = "meta/presentation_test.cml"
   deps = [ ":presentation_test_bin" ]
+  test_type = "vulkan"
 }
 
 fuchsia_test_package("presentation-test") {

@@ -59,6 +59,7 @@ fuchsia_test_component("magnification-pixeltest-component") {
   component_name = "magnification-pixeltest-component"
   manifest = "meta/magnification_pixel_test.cml"
   deps = [ ":magnification_pixeltest_bin" ]
+  test_type = "vulkan"
 }
 
 fuchsia_test_package("magnification-pixeltest") {
