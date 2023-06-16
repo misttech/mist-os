@@ -4,7 +4,6 @@
 
 #ifdef __linux__
 
-#include <dlfcn.h>
 #include <elf.h>
 #include <link.h>
 #include <stddef.h>
