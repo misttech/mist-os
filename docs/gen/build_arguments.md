@@ -7567,7 +7567,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"dPuK81TMCNKPKvF3kQtHZ06EajzWNB2C7IeuF1TAa2YC"`
+**Current value (from the default):** `"sEPJOTRQJTIygsr5E35R0ZTwE3p4hlWsI6ANfThySDoC"`
 
 From //build/rust/config.gni:32
 
@@ -8385,16 +8385,6 @@ From //products/common/bringup.gni:6
 **Overridden from the default:** `false`
 
 From //build/product.gni:11
-
-### use_cast_runner_canary
-
-Whether to use the most recent (canary) version of the CastRunner prebuilt.
-Otherwise, the qualified "release" version is used.
-Set [`use_chromium_canary`](#use_chromium_canary) to the same value.
-
-**Current value (from the default):** `false`
-
-From //src/cast/generate_cast_targets.gni:19
 
 ### use_ccache
 
