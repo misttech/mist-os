@@ -31,7 +31,9 @@
             protocol: [
                 "fuchsia.accessibility.semantics.SemanticsManager",
 
-                // "fuchsia.buildinfo.Provider" is faked.
+                // TODO(fxbug.dev/121700): Once tests in Chromium "release" use
+                // `chromium-system-tests`, comment out as faked.
+                "fuchsia.buildinfo.Provider",
                 "fuchsia.device.NameProvider",
                 "fuchsia.feedback.ComponentDataRegister",
                 "fuchsia.feedback.CrashReportingProductRegister",
@@ -41,7 +43,9 @@
                 "fuchsia.hwinfo.Product",
                 "fuchsia.input.virtualkeyboard.ControllerCreator",
 
-                // "fuchsia.intl.PropertyProvider" is faked.
+                // TODO(fxbug.dev/121700): Once tests in Chromium "release" use
+                // `chromium-system-tests`, comment out as faked.
+                "fuchsia.intl.PropertyProvider",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.media.Audio",
                 "fuchsia.media.AudioDeviceEnumerator",
@@ -113,6 +117,15 @@
             from: "parent",
             to: "#chromium-tests",
             scope: "#chromium-tests",
+        },
+
+        // TODO(fxbug.dev/91934, fxbug.dev/121700): Once tests in Chromium
+        // "release" use `chromium-system-tests` when necessary and
+        // `fake-build-info` otherwise, remove this.
+        {
+            directory: "build-info",
+            from: "parent",
+            to: "#chromium-tests",
         },
         {
             directory: [
