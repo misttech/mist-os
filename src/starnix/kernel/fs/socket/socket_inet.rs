@@ -11,9 +11,11 @@ use crate::{
     task::*,
     types::*,
 };
+
 use fidl::endpoints::DiscoverableProtocolMarker as _;
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
+use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_zircon as zx;
 use static_assertions::const_assert_eq;
 use std::{cell::OnceCell, ffi::CStr, sync::Arc};
@@ -285,20 +287,31 @@ impl SocketOps for InetSocket {
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        // TODO(fxbug.dev/128604): Remove hardcoded constant
-        const DEFAULT_IFACE_NAME: &[u8; 16usize] = b"sta-iface-name\0\0";
         let user_addr = UserAddress::from(arg);
+        // TODO(https://fxbug.dev/129059): Share this implementation with `fdio`
+        // by moving things to `zxio`.
         match request {
             SIOCGIFINDEX => {
                 let in_ifreq: ifreq = current_task.mm.read_object(UserRef::new(user_addr))?;
-                let iface_name = unsafe { CStr::from_ptr(in_ifreq.ifr_ifrn.ifrn_name.as_ptr()) };
-                if iface_name.to_bytes()[..] != DEFAULT_IFACE_NAME[..] {
-                    return error!(EINVAL);
-                }
+                let iface_name = unsafe { CStr::from_ptr(in_ifreq.ifr_ifrn.ifrn_name.as_ptr()) }
+                    .to_str()
+                    .map_err(|std::str::Utf8Error { .. }| errno!(EINVAL))?;
+                let (provider, server_end) = zx::Channel::create();
+                connect_channel_to_protocol::<fposix_socket::ProviderMarker>(server_end)
+                    .expect("should always have access to `fuchsia.posix.socket/Provider`");
+                let provider = fposix_socket::ProviderSynchronousProxy::new(provider);
+                let index = provider
+                    .interface_name_to_index(iface_name, zx::Time::INFINITE)
+                    .expect("netstack should never close its end of the channel");
+                let index: u64 = index.map_err(|zx_err| {
+                    let zx_err = zx::Status::from_raw(zx_err);
+                    from_status_like_fdio!(zx_err)
+                })?;
+                // TODO(https://fxbug.dev/129172): Avoid this panic opportunity.
+                let index = i32::try_from(index).expect("interface ID should fit in an i32");
                 let out_ifreq: [u8; std::mem::size_of::<ifreq>()] = struct_with_union_into_bytes!(ifreq {
                     ifr_ifrn.ifrn_name: unsafe { in_ifreq.ifr_ifrn.ifrn_name },
-                    // TODO(fxbug.dev/128604): Don't hardcode iface index
-                    ifr_ifru.ifru_ivalue: 1,
+                    ifr_ifru.ifru_ivalue: index,
                 });
                 current_task.mm.write_object(UserRef::new(user_addr), &out_ifreq)?;
                 Ok(SUCCESS)
