@@ -75,9 +75,15 @@ group("sanitizer") {
   testonly = true
   deps = [
     ":hwasan-ctor-order-bootfs-test",
-    ":lsan-bootfs-test",
     ":sanitizer-utils-bootfs-test",
   ]
+
+  # TODO(fxbug.dev/128990): RiscV64 has a failure when attempting to mmap
+  # space for the internal lsan allocator, causing all tests to fail. Disable
+  # to keep the builder green until fixed.
+  if (target_cpu != "riscv64") {
+    deps += [ ":lsan-bootfs-test" ]
+  }
 }
 
 test("sanitizer-utils-test") {
