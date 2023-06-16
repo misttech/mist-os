@@ -253,10 +253,12 @@ fn setup_pointer_injector_config_request_stream(
 async fn add_touchscreen_handler(
     scene_manager: Arc<Mutex<dyn SceneManager>>,
     mut assembly: InputPipelineAssembly,
+    input_handlers_node: &inspect::Node,
 ) -> InputPipelineAssembly {
     let setup_proxy = setup_pointer_injector_config_request_stream(scene_manager.clone());
     let size = scene_manager.lock().await.get_pointerinjection_display_size();
-    let touch_handler = TouchInjectorHandler::new_with_config_proxy(setup_proxy, size).await;
+    let touch_handler =
+        TouchInjectorHandler::new_with_config_proxy(setup_proxy, size, input_handlers_node).await;
     match touch_handler {
         Ok(touch_handler) => {
             fasync::Task::local(touch_handler.clone().watch_viewport()).detach();
@@ -274,11 +276,13 @@ async fn add_mouse_handler(
     scene_manager: Arc<Mutex<dyn SceneManager>>,
     mut assembly: InputPipelineAssembly,
     sender: futures::channel::mpsc::Sender<CursorMessage>,
+    input_handlers_node: &inspect::Node,
 ) -> InputPipelineAssembly {
     let setup_proxy = setup_pointer_injector_config_request_stream(scene_manager.clone());
     let size = scene_manager.lock().await.get_pointerinjection_display_size();
     let mouse_handler =
-        MouseInjectorHandler::new_with_config_proxy(setup_proxy, size, sender).await;
+        MouseInjectorHandler::new_with_config_proxy(setup_proxy, size, sender, input_handlers_node)
+            .await;
     match mouse_handler {
         Ok(mouse_handler) => {
             fasync::Task::local(mouse_handler.clone().watch_viewport()).detach();
@@ -330,13 +334,15 @@ async fn register_mouse_related_input_handlers(
     use_flatland: bool,
     scene_manager: Arc<Mutex<dyn SceneManager>>,
     input_pipeline_node: &inspect::Node,
+    input_handlers_node: &inspect::Node,
 ) -> InputPipelineAssembly {
     let (sender, mut receiver) = futures::channel::mpsc::channel(0);
 
     // Add the touchpad gestures handler after the click-drag handler,
     // since the gestures handler creates mouse events but already
     // disambiguates between click and drag gestures.
-    let mut assembly = add_touchpad_gestures_handler(assembly, input_pipeline_node);
+    let mut assembly =
+        add_touchpad_gestures_handler(assembly, input_pipeline_node, input_handlers_node);
 
     // Add handler to scale pointer motion based on speed of sensor
     // motion. This allows touchpads and mice to be easily used for
@@ -346,7 +352,7 @@ async fn register_mouse_related_input_handlers(
     // This handler must come before the PointerMotionDisplayScaleHandler.
     // Otherwise the display scale will be applied quadratically in some
     // cases.
-    assembly = add_pointer_sensor_scale_handler(assembly);
+    assembly = add_pointer_sensor_scale_handler(assembly, input_handlers_node);
 
     // Add handler to scale pointer motion on high-DPI displays.
     //
@@ -358,10 +364,11 @@ async fn register_mouse_related_input_handlers(
     //   mouse events should be scaled.
     let pointer_scale =
         scene_manager.lock().await.get_display_metrics().physical_pixel_ratio().max(1.0);
-    assembly = add_pointer_display_scale_handler(assembly, pointer_scale);
+    assembly = add_pointer_display_scale_handler(assembly, pointer_scale, input_handlers_node);
 
     if use_flatland {
-        assembly = add_mouse_handler(scene_manager.clone(), assembly, sender).await;
+        assembly =
+            add_mouse_handler(scene_manager.clone(), assembly, sender, input_handlers_node).await;
     } else {
         // We don't have mouse support for GFX. But that's okay,
         // because the devices still using GFX don't support mice
@@ -442,13 +449,16 @@ async fn build_input_pipeline_assembly(
                 use_flatland,
                 scene_manager.clone(),
                 node,
+                &input_handlers_node,
             )
             .await;
         }
 
         if supported_input_devices.contains(&input_device::InputDeviceType::Touch) {
             info!("Registering touchscreen-related input handlers.");
-            assembly = add_touchscreen_handler(scene_manager.clone(), assembly).await;
+            assembly =
+                add_touchscreen_handler(scene_manager.clone(), assembly, &input_handlers_node)
+                    .await;
         }
     }
 
@@ -569,9 +579,11 @@ async fn add_ime(
 fn add_pointer_display_scale_handler(
     assembly: InputPipelineAssembly,
     scale_factor: f32,
+    input_handlers_node: &inspect::Node,
 ) -> InputPipelineAssembly {
     match input_pipeline::pointer_display_scale_handler::PointerDisplayScaleHandler::new(
         scale_factor,
+        input_handlers_node,
     ) {
         Ok(handler) => assembly.add_handler(handler),
         Err(e) => {
@@ -581,16 +593,26 @@ fn add_pointer_display_scale_handler(
     }
 }
 
-fn add_pointer_sensor_scale_handler(assembly: InputPipelineAssembly) -> InputPipelineAssembly {
-    assembly
-        .add_handler(input_pipeline::pointer_sensor_scale_handler::PointerSensorScaleHandler::new())
+fn add_pointer_sensor_scale_handler(
+    assembly: InputPipelineAssembly,
+    input_handlers_node: &inspect::Node,
+) -> InputPipelineAssembly {
+    assembly.add_handler(
+        input_pipeline::pointer_sensor_scale_handler::PointerSensorScaleHandler::new(
+            input_handlers_node,
+        ),
+    )
 }
 
 fn add_touchpad_gestures_handler(
     assembly: InputPipelineAssembly,
     inspect_node: &inspect::Node,
+    input_handlers_node: &inspect::Node,
 ) -> InputPipelineAssembly {
-    assembly.add_handler(input_pipeline::make_touchpad_gestures_handler(inspect_node))
+    assembly.add_handler(input_pipeline::make_touchpad_gestures_handler(
+        inspect_node,
+        input_handlers_node,
+    ))
 }
 
 pub async fn handle_input_config_request_streams(

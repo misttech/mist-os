@@ -6,12 +6,17 @@ use {
     super::{
         args, motion, one_finger_button, primary_tap, scroll, secondary_button, secondary_tap,
     },
-    crate::{input_device, input_handler::InputHandler, mouse_binding, touch_binding, utils::Size},
+    crate::{
+        input_device,
+        input_handler::{InputHandler, InputHandlerStatus},
+        mouse_binding, touch_binding,
+        utils::Size,
+    },
     anyhow::{format_err, Context, Error},
     async_trait::async_trait,
     core::cell::RefCell,
     fidl_fuchsia_input_report as fidl_input_report,
-    fuchsia_inspect::{ArrayProperty, Node as InspectNode},
+    fuchsia_inspect::{self, ArrayProperty, Node as InspectNode},
     fuchsia_inspect_contrib::nodes::BoundedListNode,
     fuchsia_zircon as zx,
     std::any::Any,
@@ -62,6 +67,7 @@ impl ContenderFactory for GestureArenaInitialContenders {
 
 pub fn make_input_handler(
     inspect_node: &InspectNode,
+    input_handlers_node: &InspectNode,
 ) -> std::rc::Rc<dyn crate::input_handler::InputHandler> {
     // TODO(https://fxbug.dev/105092): Remove log message.
     tracing::info!("touchpad: created input handler");
@@ -69,6 +75,7 @@ pub fn make_input_handler(
         Box::new(GestureArenaInitialContenders {}),
         inspect_node,
         MAX_TOUCHPAD_EVENT_LOG_ENTRIES,
+        input_handlers_node,
     ))
 }
 
@@ -341,6 +348,8 @@ pub(super) struct GestureArena {
     contender_factory: Box<dyn ContenderFactory>,
     mutable_state: RefCell<MutableState>,
     inspect_log: RefCell<BoundedListNode>,
+    /// The inventory of this handler's Inspect status.
+    _inspect_status: InputHandlerStatus,
 }
 
 impl GestureArena {
@@ -350,14 +359,21 @@ impl GestureArena {
         inspector: &fuchsia_inspect::Inspector,
         max_inspect_log_entries: usize,
     ) -> GestureArena {
-        Self::new_internal(contender_factory, inspector.root(), max_inspect_log_entries)
+        let test_node = inspector.root().create_child("test_node");
+        Self::new_internal(contender_factory, inspector.root(), max_inspect_log_entries, &test_node)
     }
 
     fn new_internal(
         contender_factory: Box<dyn ContenderFactory>,
         inspect_node: &InspectNode,
         max_inspect_log_entries: usize,
+        input_handlers_node: &InspectNode,
     ) -> GestureArena {
+        let inspect_status = InputHandlerStatus::new(
+            input_handlers_node,
+            "gesture_arena",
+            /* generates_events */ true,
+        );
         GestureArena {
             contender_factory,
             mutable_state: RefCell::new(MutableState::Idle),
@@ -365,6 +381,7 @@ impl GestureArena {
                 inspect_node.create_child("gestures_event_log"),
                 max_inspect_log_entries,
             )),
+            _inspect_status: inspect_status,
         }
     }
 
@@ -1716,7 +1733,10 @@ mod tests {
                     StubMatchedContender, StubWinner, TOUCH_CONTACT_INDEX_FINGER,
                 },
             },
-            crate::{input_device, touch_binding, utils::Size, Position},
+            crate::{
+                input_device, input_handler::InputHandlerStatus, touch_binding, utils::Size,
+                Position,
+            },
             assert_matches::assert_matches,
             fuchsia_zircon as zx,
             maplit::hashset,
@@ -1735,6 +1755,7 @@ mod tests {
                     fuchsia_inspect::Inspector::default().root().create_child("some_key"),
                     1,
                 )),
+                _inspect_status: InputHandlerStatus::default(),
             })
         }
 
@@ -1750,6 +1771,7 @@ mod tests {
                     fuchsia_inspect::Inspector::default().root().create_child("some_key"),
                     1,
                 )),
+                _inspect_status: InputHandlerStatus::default(),
             });
             arena.handle_input_event(make_unhandled_touchpad_event()).await;
             assert!(contender_factory.was_called());
@@ -1760,7 +1782,6 @@ mod tests {
         #[fuchsia::test(allow_stalls = false)]
         async fn does_not_invoke_contender_factory_on_mouse_event(state: MutableState) {
             let contender_factory = Box::new(ContenderFactoryCalled::new());
-
             let arena = Rc::new(GestureArena {
                 contender_factory: contender_factory.clone(),
                 mutable_state: RefCell::new(state),
@@ -1768,6 +1789,7 @@ mod tests {
                     fuchsia_inspect::Inspector::default().root().create_child("some_key"),
                     1,
                 )),
+                _inspect_status: InputHandlerStatus::default(),
             });
             arena.handle_input_event(make_unhandled_mouse_event()).await;
             assert!(!contender_factory.was_called());
@@ -1786,6 +1808,7 @@ mod tests {
                     fuchsia_inspect::Inspector::default().root().create_child("some_key"),
                     1,
                 )),
+                _inspect_status: InputHandlerStatus::default(),
             });
             arena.handle_input_event(make_unhandled_keyboard_event()).await;
             assert!(!contender_factory.was_called());
@@ -2132,7 +2155,10 @@ mod tests {
                     StubContender, StubMatchedContender, StubWinner, TOUCH_CONTACT_INDEX_FINGER,
                 },
             },
-            crate::{input_device, mouse_binding, touch_binding, Position},
+            crate::{
+                input_device, input_handler::InputHandlerStatus, mouse_binding, touch_binding,
+                Position,
+            },
             assert_matches::assert_matches,
             fuchsia_zircon as zx,
             maplit::hashset,
@@ -2185,6 +2211,7 @@ mod tests {
                     fuchsia_inspect::Inspector::default().root().create_child("some_key"),
                     1,
                 )),
+                _inspect_status: InputHandlerStatus::default(),
             })
         }
 
@@ -2705,7 +2732,10 @@ mod tests {
                     TOUCH_CONTACT_INDEX_FINGER,
                 },
             },
-            crate::{input_device, mouse_binding, touch_binding, Position},
+            crate::{
+                input_device, input_handler::InputHandlerStatus, mouse_binding, touch_binding,
+                Position,
+            },
             assert_matches::assert_matches,
             fuchsia_zircon as zx,
             maplit::hashset,
@@ -2750,6 +2780,7 @@ mod tests {
                     fuchsia_inspect::Inspector::default().root().create_child("some_key"),
                     1,
                 )),
+                _inspect_status: InputHandlerStatus::default(),
             })
         }
 
@@ -3527,6 +3558,34 @@ mod tests {
             fn make_contenders(&self) -> Vec<Box<dyn crate::gestures::gesture_arena::Contender>> {
                 vec![]
             }
+        }
+
+        #[fuchsia::test]
+        fn gesture_arena_initialized_with_inspect_node() {
+            let inspector = fuchsia_inspect::Inspector::default();
+            let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+            let _handler = GestureArena::new_internal(
+                Box::new(EmptyContenderFactory {}),
+                &inspector.root(),
+                2,
+                &fake_handlers_node,
+            );
+            fuchsia_inspect::assert_data_tree!(inspector, root: {
+                gestures_event_log: {},
+                input_handlers_node: {
+                    gesture_arena: {
+                        events_received_count: 0u64,
+                        events_handled_count: 0u64,
+                        last_received_timestamp_ns: 0u64,
+                        "fuchsia.inspect.Health": {
+                            status: "STARTING_UP",
+                            // Timestamp value is unpredictable and not relevant in this context,
+                            // so we only assert that the property is present.
+                            start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                        },
+                    }
+                }
+            });
         }
 
         #[fuchsia::test]

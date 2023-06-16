@@ -12,7 +12,10 @@ use {
 pub(super) async fn run_gesture_arena_test(
     inputs: Vec<input_device::InputEvent>,
 ) -> Vec<Vec<input_device::InputEvent>> {
-    let handler = gesture_arena::make_input_handler(fuchsia_inspect::Inspector::default().root());
+    let inspector = fuchsia_inspect::Inspector::default();
+    let test_node = inspector.root().create_child("test_node");
+    let handler =
+        gesture_arena::make_input_handler(fuchsia_inspect::Inspector::default().root(), &test_node);
 
     let mut output: Vec<Vec<input_device::InputEvent>> = vec![];
 

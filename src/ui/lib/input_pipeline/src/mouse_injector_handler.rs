@@ -6,7 +6,7 @@
 
 use {
     crate::input_device,
-    crate::input_handler::InputHandler,
+    crate::input_handler::{InputHandler, InputHandlerStatus},
     crate::mouse_binding,
     crate::utils::{CursorMessage, Position, Size},
     anyhow::{anyhow, Context, Error, Result},
@@ -17,7 +17,7 @@ use {
     fidl_fuchsia_ui_pointerinjector as pointerinjector,
     fidl_fuchsia_ui_pointerinjector_configuration as pointerinjector_config,
     fuchsia_component::client::connect_to_protocol,
-    fuchsia_zircon as zx,
+    fuchsia_inspect, fuchsia_zircon as zx,
     futures::{channel::mpsc::Sender, stream::StreamExt, SinkExt},
     std::iter::FromIterator,
     std::{
@@ -60,6 +60,9 @@ pub struct MouseInjectorHandler {
 
     /// The FIDL proxy used to get configuration details for pointer injection.
     configuration_proxy: pointerinjector_config::SetupProxy,
+
+    /// The inventory of this handler's Inspect status.
+    _inspect_status: InputHandlerStatus,
 }
 
 struct MutableState {
@@ -140,6 +143,7 @@ impl MouseInjectorHandler {
     pub async fn new(
         display_size: Size,
         cursor_message_sender: Sender<CursorMessage>,
+        input_handlers_node: &fuchsia_inspect::Node,
     ) -> Result<Rc<Self>, Error> {
         let configuration_proxy = connect_to_protocol::<pointerinjector_config::SetupMarker>()?;
         let injector_registry_proxy = connect_to_protocol::<pointerinjector::RegistryMarker>()?;
@@ -149,6 +153,7 @@ impl MouseInjectorHandler {
             injector_registry_proxy,
             display_size,
             cursor_message_sender,
+            input_handlers_node,
         )
         .await
     }
@@ -172,6 +177,7 @@ impl MouseInjectorHandler {
         configuration_proxy: pointerinjector_config::SetupProxy,
         display_size: Size,
         cursor_message_sender: Sender<CursorMessage>,
+        input_handlers_node: &fuchsia_inspect::Node,
     ) -> Result<Rc<Self>, Error> {
         let injector_registry_proxy = connect_to_protocol::<pointerinjector::RegistryMarker>()?;
         Self::new_handler(
@@ -179,6 +185,7 @@ impl MouseInjectorHandler {
             injector_registry_proxy,
             display_size,
             cursor_message_sender,
+            input_handlers_node,
         )
         .await
     }
@@ -211,9 +218,15 @@ impl MouseInjectorHandler {
         injector_registry_proxy: pointerinjector::RegistryProxy,
         display_size: Size,
         cursor_message_sender: Sender<CursorMessage>,
+        input_handlers_node: &fuchsia_inspect::Node,
     ) -> Result<Rc<Self>, Error> {
         // Get the context and target views to inject into.
         let (context_view_ref, target_view_ref) = configuration_proxy.get_view_refs().await?;
+        let inspect_status = InputHandlerStatus::new(
+            input_handlers_node,
+            "mouse_injector_handler",
+            /* generates_events */ false,
+        );
         let handler = Rc::new(Self {
             mutable_state: RefCell::new(MutableState {
                 viewport: None,
@@ -230,6 +243,7 @@ impl MouseInjectorHandler {
             max_position: Position { x: display_size.width, y: display_size.height },
             injector_registry_proxy,
             configuration_proxy,
+            _inspect_status: inspect_status,
         });
 
         Ok(handler)
@@ -538,7 +552,7 @@ mod tests {
         assert_matches::assert_matches,
         fidl_fuchsia_input_report as fidl_input_report,
         fidl_fuchsia_ui_pointerinjector as pointerinjector, fuchsia_async as fasync,
-        fuchsia_zircon as zx,
+        fuchsia_inspect, fuchsia_zircon as zx,
         futures::{channel::mpsc, StreamExt},
         pretty_assertions::assert_eq,
         std::collections::HashSet,
@@ -701,12 +715,16 @@ mod tests {
                 .expect("Failed to create pointerinjector Registry proxy and stream.");
         let (sender, _) = futures::channel::mpsc::channel::<CursorMessage>(0);
 
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+
         // Create mouse handler.
         let mouse_handler_fut = MouseInjectorHandler::new_handler(
             configuration_proxy,
             injector_registry_proxy,
             Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
+            &test_node,
         );
         let config_request_stream_fut =
             handle_configuration_request_stream(&mut configuration_request_stream);
@@ -878,11 +896,14 @@ mod tests {
 
         // Create MouseInjectorHandler.
         let (sender, mut receiver) = futures::channel::mpsc::channel::<CursorMessage>(1);
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
         let mouse_handler_fut = MouseInjectorHandler::new_handler(
             configuration_proxy,
             injector_registry_proxy,
             Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
+            &test_node,
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
@@ -975,11 +996,14 @@ mod tests {
 
         // Create MouseInjectorHandler.
         let (sender, mut receiver) = futures::channel::mpsc::channel::<CursorMessage>(1);
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
         let mouse_handler_fut = MouseInjectorHandler::new_handler(
             configuration_proxy,
             injector_registry_proxy,
             Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
+            &test_node,
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
@@ -1112,11 +1136,14 @@ mod tests {
 
         // Create MouseInjectorHandler.
         let (sender, mut receiver) = futures::channel::mpsc::channel::<CursorMessage>(1);
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
         let mouse_handler_fut = MouseInjectorHandler::new_handler(
             configuration_proxy,
             injector_registry_proxy,
             Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
+            &test_node,
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
@@ -1211,11 +1238,14 @@ mod tests {
         // Note: The size of the CursorMessage channel's buffer is 2 to allow for one cursor
         // update for every input event being sent.
         let (sender, mut receiver) = futures::channel::mpsc::channel::<CursorMessage>(2);
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
         let mouse_handler_fut = MouseInjectorHandler::new_handler(
             configuration_proxy,
             injector_registry_proxy,
             Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
+            &test_node,
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
@@ -1345,11 +1375,14 @@ mod tests {
         // Note: The size of the CursorMessage channel's buffer is 4 to allow for one cursor
         // update for every input event being sent.
         let (sender, mut receiver) = futures::channel::mpsc::channel::<CursorMessage>(4);
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
         let mouse_handler_fut = MouseInjectorHandler::new_handler(
             configuration_proxy,
             injector_registry_proxy,
             Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
+            &test_node,
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
@@ -1548,11 +1581,14 @@ mod tests {
         // Note: The size of the CursorMessage channel's buffer is 3 to allow for one cursor
         // update for every input event being sent.
         let (sender, mut receiver) = futures::channel::mpsc::channel::<CursorMessage>(3);
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
         let mouse_handler_fut = MouseInjectorHandler::new_handler(
             configuration_proxy,
             injector_registry_proxy,
             Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
+            &test_node,
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
@@ -1729,11 +1765,14 @@ mod tests {
 
         // Create MouseInjectorHandler.
         let (sender, mut receiver) = futures::channel::mpsc::channel::<CursorMessage>(1);
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
         let mouse_handler_fut = MouseInjectorHandler::new_handler(
             configuration_proxy,
             injector_registry_proxy,
             Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
+            &test_node,
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
@@ -1938,11 +1977,14 @@ mod tests {
 
         // Create MouseInjectorHandler.
         let (sender, _) = futures::channel::mpsc::channel::<CursorMessage>(1);
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
         let mouse_handler_fut = MouseInjectorHandler::new_handler(
             configuration_proxy,
             injector_registry_proxy,
             Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
+            &test_node,
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
@@ -2002,11 +2044,14 @@ mod tests {
 
         // Create MouseInjectorHandler.
         let (sender, _) = futures::channel::mpsc::channel::<CursorMessage>(1);
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
         let mouse_handler_fut = MouseInjectorHandler::new_handler(
             configuration_proxy,
             injector_registry_proxy,
             Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
             sender,
+            &test_node,
         );
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
@@ -2160,5 +2205,41 @@ mod tests {
                 event_time4,
             )])
         );
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mouse_injector_handler_initialized_with_inspect_node() {
+        let (configuration_proxy, mut configuration_request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>()
+                .expect("Failed to create pointerinjector Setup proxy and stream.");
+        let config_request_stream_fut =
+            handle_configuration_request_stream(&mut configuration_request_stream);
+        let (sender, _) = futures::channel::mpsc::channel::<CursorMessage>(1);
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        let mouse_handler_fut = MouseInjectorHandler::new_with_config_proxy(
+            configuration_proxy,
+            Size { width: DISPLAY_WIDTH_IN_PHYSICAL_PX, height: DISPLAY_HEIGHT_IN_PHYSICAL_PX },
+            sender,
+            &fake_handlers_node,
+        );
+        let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
+        let _handler = mouse_handler_res.expect("Failed to create mouse handler");
+
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                mouse_injector_handler: {
+                    events_received_count: 0u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
     }
 }

@@ -5,7 +5,7 @@
 #![warn(clippy::await_holding_refcell_ref)]
 use {
     crate::input_device,
-    crate::input_handler::UnhandledInputHandler,
+    crate::input_handler::{InputHandlerStatus, UnhandledInputHandler},
     crate::touch_binding,
     crate::utils::{Position, Size},
     anyhow::{Context, Error, Result},
@@ -15,7 +15,7 @@ use {
     fidl_fuchsia_ui_pointerinjector as pointerinjector,
     fidl_fuchsia_ui_pointerinjector_configuration as pointerinjector_config,
     fuchsia_component::client::connect_to_protocol,
-    fuchsia_zircon as zx,
+    fuchsia_inspect, fuchsia_zircon as zx,
     futures::stream::StreamExt,
     std::{cell::RefCell, collections::HashMap, option::Option, rc::Rc},
 };
@@ -45,6 +45,9 @@ pub struct TouchInjectorHandler {
 
     /// The FIDL proxy used to get configuration details for pointer injection.
     configuration_proxy: pointerinjector_config::SetupProxy,
+
+    /// The inventory of this handler's Inspect status.
+    _inspect_status: InputHandlerStatus,
 }
 
 #[derive(Debug)]
@@ -107,11 +110,20 @@ impl TouchInjectorHandler {
     ///
     /// # Errors
     /// If unable to connect to pointerinjector protocols.
-    pub async fn new(display_size: Size) -> Result<Rc<Self>, Error> {
+    pub async fn new(
+        display_size: Size,
+        input_handlers_node: &fuchsia_inspect::Node,
+    ) -> Result<Rc<Self>, Error> {
         let configuration_proxy = connect_to_protocol::<pointerinjector_config::SetupMarker>()?;
         let injector_registry_proxy = connect_to_protocol::<pointerinjector::RegistryMarker>()?;
 
-        Self::new_handler(configuration_proxy, injector_registry_proxy, display_size).await
+        Self::new_handler(
+            configuration_proxy,
+            injector_registry_proxy,
+            display_size,
+            input_handlers_node,
+        )
+        .await
     }
 
     /// Creates a new touch handler that holds touch pointer injectors.
@@ -131,9 +143,16 @@ impl TouchInjectorHandler {
     pub async fn new_with_config_proxy(
         configuration_proxy: pointerinjector_config::SetupProxy,
         display_size: Size,
+        input_handlers_node: &fuchsia_inspect::Node,
     ) -> Result<Rc<Self>, Error> {
         let injector_registry_proxy = connect_to_protocol::<pointerinjector::RegistryMarker>()?;
-        Self::new_handler(configuration_proxy, injector_registry_proxy, display_size).await
+        Self::new_handler(
+            configuration_proxy,
+            injector_registry_proxy,
+            display_size,
+            input_handlers_node,
+        )
+        .await
     }
 
     /// Creates a new touch handler that holds touch pointer injectors.
@@ -155,10 +174,16 @@ impl TouchInjectorHandler {
         configuration_proxy: pointerinjector_config::SetupProxy,
         injector_registry_proxy: pointerinjector::RegistryProxy,
         display_size: Size,
+        input_handlers_node: &fuchsia_inspect::Node,
     ) -> Result<Rc<Self>, Error> {
         // Get the context and target views to inject into.
         let (context_view_ref, target_view_ref) = configuration_proxy.get_view_refs().await?;
 
+        let inspect_status = InputHandlerStatus::new(
+            input_handlers_node,
+            "touch_injector_handler",
+            /* generates_events */ false,
+        );
         let handler = Rc::new(Self {
             mutable_state: RefCell::new(MutableState { viewport: None, injectors: HashMap::new() }),
             context_view_ref,
@@ -166,6 +191,7 @@ impl TouchInjectorHandler {
             display_size,
             injector_registry_proxy,
             configuration_proxy,
+            _inspect_status: inspect_status,
         });
 
         Ok(handler)
@@ -412,7 +438,7 @@ mod tests {
         },
         assert_matches::assert_matches,
         fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_ui_input as fidl_ui_input,
-        fuchsia_async as fasync, fuchsia_zircon as zx,
+        fuchsia_async as fasync, fuchsia_inspect, fuchsia_zircon as zx,
         futures::StreamExt,
         maplit::hashmap,
         pretty_assertions::assert_eq,
@@ -530,10 +556,13 @@ mod tests {
         let (injector_registry_proxy, _injector_registry_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>()
                 .expect("Failed to create pointerinjector Registry proxy and stream.");
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
         let touch_handler_fut = TouchInjectorHandler::new_handler(
             configuration_proxy,
             injector_registry_proxy,
             Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
+            &test_node,
         );
         let config_request_stream_fut =
             handle_configuration_request_stream(&mut configuration_request_stream);
@@ -638,11 +667,15 @@ mod tests {
         let config_request_stream_fut =
             handle_configuration_request_stream(&mut configuration_request_stream);
 
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+
         // Create TouchInjectorHandler.
         let touch_handler_fut = TouchInjectorHandler::new_handler(
             configuration_proxy,
             injector_registry_proxy,
             Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
+            &test_node,
         );
         let (touch_handler_res, _) = exec.run_singlethreaded(futures::future::join(
             touch_handler_fut,
@@ -688,10 +721,13 @@ mod tests {
         let (injector_registry_proxy, _injector_registry_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>()
                 .expect("Failed to create pointerinjector Registry proxy and stream.");
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
         let touch_handler_fut = TouchInjectorHandler::new_handler(
             configuration_proxy,
             injector_registry_proxy,
             Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
+            &test_node,
         );
         let config_request_stream_fut =
             handle_configuration_request_stream(&mut configuration_request_stream);
@@ -788,10 +824,13 @@ mod tests {
         let (injector_registry_proxy, mut injector_registry_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<pointerinjector::RegistryMarker>()
                 .expect("Failed to create pointerinjector Registry proxy and stream.");
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
         let touch_handler_fut = TouchInjectorHandler::new_handler(
             configuration_proxy,
             injector_registry_proxy,
             Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
+            &test_node,
         );
         let config_request_stream_fut =
             handle_configuration_request_stream(&mut configuration_request_stream);
@@ -863,5 +902,38 @@ mod tests {
         // Injector should not receive anything because the handler does not support touchpad yet.
         let mut ir_fut = injector_registry_request_stream.next();
         assert_matches!(exec.run_until_stalled(&mut ir_fut), futures::task::Poll::Pending);
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn touch_injector_handler_initialized_with_inspect_node() {
+        let (configuration_proxy, mut configuration_request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<pointerinjector_config::SetupMarker>()
+                .expect("Failed to create pointerinjector Setup proxy and stream.");
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        let touch_handler_fut = TouchInjectorHandler::new_with_config_proxy(
+            configuration_proxy,
+            Size { width: DISPLAY_WIDTH, height: DISPLAY_HEIGHT },
+            &fake_handlers_node,
+        );
+        let config_request_stream_fut =
+            handle_configuration_request_stream(&mut configuration_request_stream);
+        let (touch_handler_res, _) = futures::join!(touch_handler_fut, config_request_stream_fut,);
+        let _handler = touch_handler_res.expect("Failed to create touch handler.");
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                touch_injector_handler: {
+                    events_received_count: 0u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
     }
 }

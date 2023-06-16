@@ -4,14 +4,22 @@
 
 //!
 use {
-    crate::{input_device, input_handler::UnhandledInputHandler, mouse_binding, utils::Position},
+    crate::{
+        input_device,
+        input_handler::{InputHandlerStatus, UnhandledInputHandler},
+        mouse_binding,
+        utils::Position,
+    },
     async_trait::async_trait,
-    fuchsia_zircon as zx,
+    fuchsia_inspect, fuchsia_zircon as zx,
     std::{cell::RefCell, convert::From, num::FpCategory, option::Option, rc::Rc},
 };
 
 pub struct PointerSensorScaleHandler {
     mutable_state: RefCell<MutableState>,
+
+    /// The inventory of this handler's Inspect status.
+    _inspect_status: InputHandlerStatus,
 }
 
 struct MutableState {
@@ -200,12 +208,18 @@ impl PointerSensorScaleHandler {
     /// Creates a new [`PointerSensorScaleHandler`].
     ///
     /// Returns `Rc<Self>`.
-    pub fn new() -> Rc<Self> {
+    pub fn new(input_handlers_node: &fuchsia_inspect::Node) -> Rc<Self> {
+        let inspect_status = InputHandlerStatus::new(
+            input_handlers_node,
+            "pointer_sensor_scale_handler",
+            /* generates_events */ false,
+        );
         Rc::new(Self {
             mutable_state: RefCell::new(MutableState {
                 last_move_timestamp: None,
                 last_scroll_timestamp: None,
             }),
+            _inspect_status: inspect_status,
         })
     }
 
@@ -403,7 +417,7 @@ mod tests {
     use {
         super::*,
         assert_matches::assert_matches,
-        fuchsia_zircon as zx,
+        fuchsia_inspect, fuchsia_zircon as zx,
         maplit::hashset,
         std::cell::Cell,
         test_util::{assert_gt, assert_lt, assert_near},
@@ -456,6 +470,28 @@ mod tests {
         }
     }
 
+    #[fuchsia::test]
+    fn pointer_sensor_scale_handler_initialized_with_inspect_node() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        let _handler = PointerSensorScaleHandler::new(&fake_handlers_node);
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                pointer_sensor_scale_handler: {
+                    events_received_count: 0u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
+    }
+
     // While its generally preferred to write tests against the public API of
     // a module, these tests
     // 1. Can't be written against the public API (since that API doesn't
@@ -506,7 +542,9 @@ mod tests {
         }
 
         async fn get_scaled_motion_mm(movement_mm: Position, duration: zx::Duration) -> Position {
-            let handler = PointerSensorScaleHandler::new();
+            let inspector = fuchsia_inspect::Inspector::default();
+            let test_node = inspector.root().create_child("test_node");
+            let handler = PointerSensorScaleHandler::new(&test_node);
 
             // Send a don't-care value through to seed the last timestamp.
             let input_event = input_device::UnhandledInputEvent {
@@ -726,7 +764,9 @@ mod tests {
         } => (None, Some(PIXELS_PER_TICK)); "h")]
         #[fuchsia::test(allow_stalls = false)]
         async fn scaled(event: mouse_binding::MouseEvent) -> (Option<f32>, Option<f32>) {
-            let handler = PointerSensorScaleHandler::new();
+            let inspector = fuchsia_inspect::Inspector::default();
+            let test_node = inspector.root().create_child("test_node");
+            let handler = PointerSensorScaleHandler::new(&test_node);
             let unhandled_event = make_unhandled_input_event(event);
 
             let events = handler.clone().handle_unhandled_input_event(unhandled_event).await;
@@ -771,7 +811,9 @@ mod tests {
             wheel_delta_h_mm: Option<f32>,
             duration: zx::Duration,
         ) -> (Option<mouse_binding::WheelDelta>, Option<mouse_binding::WheelDelta>) {
-            let handler = PointerSensorScaleHandler::new();
+            let inspector = fuchsia_inspect::Inspector::default();
+            let test_node = inspector.root().create_child("test_node");
+            let handler = PointerSensorScaleHandler::new(&test_node);
 
             // Send a don't-care value through to seed the last timestamp.
             let input_event = input_device::UnhandledInputEvent {
@@ -1074,7 +1116,9 @@ mod tests {
         }; "wheel event")]
         #[fuchsia::test(allow_stalls = false)]
         async fn does_not_consume_event(event: mouse_binding::MouseEvent) {
-            let handler = PointerSensorScaleHandler::new();
+            let inspector = fuchsia_inspect::Inspector::default();
+            let test_node = inspector.root().create_child("test_node");
+            let handler = PointerSensorScaleHandler::new(&test_node);
             let input_event = make_unhandled_input_event(event);
             assert_matches!(
                 handler.clone().handle_unhandled_input_event(input_event).await.as_slice(),
@@ -1111,7 +1155,9 @@ mod tests {
         }; "wheel event")]
         #[fuchsia::test(allow_stalls = false)]
         async fn preserves_event_time(event: mouse_binding::MouseEvent) {
-            let handler = PointerSensorScaleHandler::new();
+            let inspector = fuchsia_inspect::Inspector::default();
+            let test_node = inspector.root().create_child("test_node");
+            let handler = PointerSensorScaleHandler::new(&test_node);
             let mut input_event = make_unhandled_input_event(event);
             const EVENT_TIME: zx::Time = zx::Time::from_nanos(42);
             input_event.event_time = EVENT_TIME;
@@ -1167,7 +1213,9 @@ mod tests {
         async fn preserves_is_precision_scroll(
             event: mouse_binding::MouseEvent,
         ) -> input_device::InputEvent {
-            let handler = PointerSensorScaleHandler::new();
+            let inspector = fuchsia_inspect::Inspector::default();
+            let test_node = inspector.root().create_child("test_node");
+            let handler = PointerSensorScaleHandler::new(&test_node);
             let input_event = make_unhandled_input_event(event);
 
             handler.clone().handle_unhandled_input_event(input_event).await[0].clone()

@@ -3,9 +3,15 @@
 // found in the LICENSE file.
 
 use {
-    crate::{input_device, input_handler::UnhandledInputHandler, mouse_binding, utils::Position},
+    crate::{
+        input_device,
+        input_handler::{InputHandlerStatus, UnhandledInputHandler},
+        mouse_binding,
+        utils::Position,
+    },
     anyhow::{format_err, Error},
     async_trait::async_trait,
+    fuchsia_inspect,
     std::{convert::From, rc::Rc},
 };
 
@@ -15,6 +21,9 @@ pub struct PointerDisplayScaleHandler {
     /// The amount by which motion will be scaled up. E.g., a `scale_factor`
     /// of 2 means that all motion will be multiplied by 2.
     scale_factor: f32,
+
+    /// The inventory of this handler's Inspect status.
+    _inspect_status: InputHandlerStatus,
 }
 
 #[async_trait(?Send)]
@@ -112,9 +121,17 @@ impl PointerDisplayScaleHandler {
     /// Returns
     /// * `Ok(Rc<Self>)` if `scale_factor` is finite and >= 1.0, and
     /// * `Err(Error)` otherwise.
-    pub fn new(scale_factor: f32) -> Result<Rc<Self>, Error> {
+    pub fn new(
+        scale_factor: f32,
+        input_handlers_node: &fuchsia_inspect::Node,
+    ) -> Result<Rc<Self>, Error> {
         tracing::debug!("scale_factor={}", scale_factor);
         use std::num::FpCategory;
+        let inspect_status = InputHandlerStatus::new(
+            input_handlers_node,
+            "pointer_display_scale_handler",
+            /* generates_events */ false,
+        );
         match scale_factor.classify() {
             FpCategory::Nan | FpCategory::Infinite | FpCategory::Zero | FpCategory::Subnormal => {
                 Err(format_err!(
@@ -128,7 +145,7 @@ impl PointerDisplayScaleHandler {
                 } else if scale_factor < 1.0 {
                     Err(format_err!("Down-scaling motion is not supported"))
                 } else {
-                    Ok(Rc::new(Self { scale_factor }))
+                    Ok(Rc::new(Self { scale_factor, _inspect_status: inspect_status }))
                 }
             }
         }
@@ -167,7 +184,7 @@ mod tests {
     use {
         super::*,
         assert_matches::assert_matches,
-        fuchsia_zircon as zx,
+        fuchsia_inspect, fuchsia_zircon as zx,
         maplit::hashset,
         std::{cell::Cell, collections::HashSet},
         test_case::test_case,
@@ -213,12 +230,17 @@ mod tests {
     #[test_case(              1.0 => matches Ok(_);  "yields handler for unit scale")]
     #[test_case(              1.5 => matches Ok(_);  "yields handler for upscale")]
     fn new(scale_factor: f32) -> Result<Rc<PointerDisplayScaleHandler>, Error> {
-        PointerDisplayScaleHandler::new(scale_factor)
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        PointerDisplayScaleHandler::new(scale_factor, &test_node)
     }
 
     #[fuchsia::test(allow_stalls = false)]
     async fn applies_scale_mm() {
-        let handler = PointerDisplayScaleHandler::new(2.0).expect("failed to make handler");
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let handler =
+            PointerDisplayScaleHandler::new(2.0, &test_node).expect("failed to make handler");
         let input_event = make_unhandled_input_event(mouse_binding::MouseEvent {
             location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                 millimeters: Position { x: 1.5, y: 4.5 },
@@ -275,7 +297,10 @@ mod tests {
         }; "wheel event")]
     #[fuchsia::test(allow_stalls = false)]
     async fn does_not_consume(event: mouse_binding::MouseEvent) {
-        let handler = PointerDisplayScaleHandler::new(2.0).expect("failed to make handler");
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let handler =
+            PointerDisplayScaleHandler::new(2.0, &test_node).expect("failed to make handler");
         let input_event = make_unhandled_input_event(event);
         assert_matches!(
             handler.clone().handle_unhandled_input_event(input_event).await.as_slice(),
@@ -288,7 +313,10 @@ mod tests {
     #[test_case(hashset! {1, 2, 3}; "multiple buttons")]
     #[fuchsia::test(allow_stalls = false)]
     async fn preserves_buttons_move_event(input_buttons: HashSet<u8>) {
-        let handler = PointerDisplayScaleHandler::new(2.0).expect("failed to make handler");
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let handler =
+            PointerDisplayScaleHandler::new(2.0, &test_node).expect("failed to make handler");
         let input_event = make_unhandled_input_event(mouse_binding::MouseEvent {
             location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                 millimeters: Position { x: 1.5 / COUNTS_PER_MM, y: 4.5 / COUNTS_PER_MM },
@@ -315,7 +343,10 @@ mod tests {
     #[test_case(hashset! {1, 2, 3}; "multiple buttons")]
     #[fuchsia::test(allow_stalls = false)]
     async fn preserves_buttons_wheel_event(input_buttons: HashSet<u8>) {
-        let handler = PointerDisplayScaleHandler::new(2.0).expect("failed to make handler");
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let handler =
+            PointerDisplayScaleHandler::new(2.0, &test_node).expect("failed to make handler");
         let input_event = make_unhandled_input_event(mouse_binding::MouseEvent {
             location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                 millimeters: Position::zero(),
@@ -371,7 +402,10 @@ mod tests {
         }; "wheel event")]
     #[fuchsia::test(allow_stalls = false)]
     async fn preserves_descriptor(event: mouse_binding::MouseEvent) {
-        let handler = PointerDisplayScaleHandler::new(2.0).expect("failed to make handler");
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let handler =
+            PointerDisplayScaleHandler::new(2.0, &test_node).expect("failed to make handler");
         let input_event = make_unhandled_input_event(event);
         assert_matches!(
             handler.clone().handle_unhandled_input_event(input_event).await.as_slice(),
@@ -410,7 +444,10 @@ mod tests {
         }; "wheel event")]
     #[fuchsia::test(allow_stalls = false)]
     async fn preserves_event_time(event: mouse_binding::MouseEvent) {
-        let handler = PointerDisplayScaleHandler::new(2.0).expect("failed to make handler");
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let handler =
+            PointerDisplayScaleHandler::new(2.0, &test_node).expect("failed to make handler");
         let mut input_event = make_unhandled_input_event(event);
         const EVENT_TIME: zx::Time = zx::Time::from_nanos(42);
         input_event.event_time = EVENT_TIME;
@@ -466,7 +503,10 @@ mod tests {
     async fn preserves_is_precision_scroll(
         event: mouse_binding::MouseEvent,
     ) -> input_device::InputEvent {
-        let handler = PointerDisplayScaleHandler::new(2.0).expect("failed to make handler");
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let handler =
+            PointerDisplayScaleHandler::new(2.0, &test_node).expect("failed to make handler");
         let input_event = make_unhandled_input_event(event);
 
         handler.clone().handle_unhandled_input_event(input_event).await[0].clone()
@@ -503,7 +543,10 @@ mod tests {
         wheel_delta_v: Option<mouse_binding::WheelDelta>,
         wheel_delta_h: Option<mouse_binding::WheelDelta>,
     ) -> (Option<f32>, Option<f32>) {
-        let handler = PointerDisplayScaleHandler::new(2.0).expect("failed to make handler");
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let handler =
+            PointerDisplayScaleHandler::new(2.0, &test_node).expect("failed to make handler");
         let input_event = make_unhandled_input_event(mouse_binding::MouseEvent {
             location: mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                 millimeters: Position::zero(),
@@ -546,5 +589,27 @@ mod tests {
         } else {
             unreachable!();
         }
+    }
+
+    #[fuchsia::test]
+    fn pointer_display_scale_handler_initialized_with_inspect_node() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        let _handler = PointerDisplayScaleHandler::new(1.0, &fake_handlers_node);
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                pointer_display_scale_handler: {
+                    events_received_count: 0u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
     }
 }
