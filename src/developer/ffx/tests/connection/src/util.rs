@@ -153,8 +153,6 @@ where
         .await
         .expect("create isolate");
 
-    isolate.start_daemon().await.expect("failed to start daemon");
-
     // Ensure that the address is formatted properly, and include port is if it available.
     // Without this formatting, the connection does not work when using a remote workflow.
     let addr = format!(

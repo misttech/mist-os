@@ -73,8 +73,6 @@ impl IsolatedEmulator {
             .await
             .context("setting ffx log level")?;
 
-        this.ffx_isolate.start_daemon().await?;
-
         info!("starting emulator {}", this.emu_name);
         let emulator_log = this.ffx_isolate.log_dir().join("emulator.log").display().to_string();
         this.ffx(&[

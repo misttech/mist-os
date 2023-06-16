@@ -19,7 +19,6 @@ use futures::{
 #[fuchsia::test]
 async fn test_target_flash_gigaboot(ctx: TestContext) {
     let isolate = ctx.isolate();
-    isolate.start_daemon().await.unwrap();
 
     let emu = Emu::start(&ctx);
 
@@ -53,20 +52,18 @@ async fn test_target_flash_gigaboot(ctx: TestContext) {
     // Retry ffx target show as it may take the device up to 30 seconds to initialize SSH.
     let mut times = 2;
     while times >= 0 {
-        let out = isolate
-            .ffx(&["--target", emu.nodename(), "target", "show"])
-            .await
-            .expect("target show");
+        let out =
+        isolate.ffx(&["--target", emu.nodename(), "target", "show"]).await.expect("target show");
 
         if times > 0 && !out.status.success() {
             times -= 1;
-            continue;
+            continue
         }
 
         assert!(out.status.success(), "status is unexpected: {:?}", out);
         assert!(out.stdout.contains("Product:"), "stdout is unexpected: {:?}", out);
         assert!(out.stderr.lines().count() == 0, "stderr is unexpected: {:?}", out);
-        break;
+        break
     }
 }
 
@@ -74,7 +71,6 @@ async fn test_target_flash_gigaboot(ctx: TestContext) {
 #[fuchsia::test]
 async fn test_target_reboot_to_bootloader_gigaboot(ctx: TestContext) {
     let isolate = ctx.isolate();
-    isolate.start_daemon().await.unwrap();
 
     let emu = Emu::start(&ctx);
 

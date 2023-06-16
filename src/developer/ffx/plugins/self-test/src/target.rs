@@ -6,10 +6,8 @@ use crate::test::*;
 use anyhow::*;
 use std::time::Duration;
 
-pub(crate) async fn test_get_ssh_address_timeout() -> Result<()> {
+pub(crate) async fn test_get_ssh_address_timeout() -> Result<Option<ffx_isolate::Isolate>> {
     let isolate = new_isolate("target-get-ssh-address-timeout").await?;
-    isolate.start_daemon().await?;
-
     let out = isolate.ffx(&["--target", "noexist", "target", "get-ssh-address", "-t", "1"]).await?;
 
     ensure!(out.stdout.lines().count() == 0, "stdout is unexpected: {:?}", out);
@@ -17,13 +15,11 @@ pub(crate) async fn test_get_ssh_address_timeout() -> Result<()> {
     ensure!(out.stderr.contains("noexist"), "stderr is unexpected: {:?}", out);
     ensure!(out.stderr.contains("Timeout"), "stderr is unexpected: {:?}", out);
 
-    Ok(())
+    Ok(Some(isolate))
 }
 
-pub(crate) async fn test_manual_add_get_ssh_address() -> Result<()> {
+pub(crate) async fn test_manual_add_get_ssh_address() -> Result<Option<ffx_isolate::Isolate>> {
     let isolate = new_isolate("target-manual-add-get-ssh-address").await?;
-    isolate.start_daemon().await?;
-
     let _ = isolate.ffx(&["target", "add", "--nowait", "[::1]:8022"]).await?;
 
     let out = isolate.ffx(&["--target", "[::1]:8022", "target", "get-ssh-address"]).await?;
@@ -32,13 +28,12 @@ pub(crate) async fn test_manual_add_get_ssh_address() -> Result<()> {
     ensure!(out.stderr.lines().count() == 0, "stderr is unexpected: {:?}", out);
     // TODO: establish a good way to assert against the whole target address.
 
-    Ok(())
+    Ok(Some(isolate))
 }
 
-pub(crate) async fn test_manual_add_get_ssh_address_late_add() -> Result<()> {
+pub(crate) async fn test_manual_add_get_ssh_address_late_add(
+) -> Result<Option<ffx_isolate::Isolate>> {
     let isolate = new_isolate("target-manual-add-get-ssh-address-late-add").await?;
-    isolate.start_daemon().await?;
-
     let task = isolate.ffx(&["--target", "[::1]:8022", "target", "get-ssh-address", "-t", "10"]);
 
     // The get-ssh-address should pick up targets added after it has started, as well as before.
@@ -52,16 +47,14 @@ pub(crate) async fn test_manual_add_get_ssh_address_late_add() -> Result<()> {
     ensure!(out.stderr.lines().count() == 0, "stderr is unexpected: {:?}", out);
     // TODO: establish a good way to assert against the whole target address.
 
-    Ok(())
+    Ok(Some(isolate))
 }
 
 pub mod include_target {
     use super::*;
 
-    pub(crate) async fn test_list() -> Result<()> {
+    pub(crate) async fn test_list() -> Result<Option<ffx_isolate::Isolate>> {
         let isolate = new_isolate("target-list").await?;
-        isolate.start_daemon().await?;
-
         let mut lines = Vec::<String>::new();
 
         // It takes a few moments to discover devices on the local network over
@@ -82,13 +75,12 @@ pub mod include_target {
         for (got, want) in headerline.split_whitespace().zip(headers) {
             ensure!(got == want, format!("assertion failed:\nLEFT: {:?}\nRIGHT: {:?}", got, want));
         }
-        Ok(())
+        Ok(Some(isolate))
     }
 
-    pub(crate) async fn test_get_ssh_address_includes_port() -> Result<()> {
+    pub(crate) async fn test_get_ssh_address_includes_port() -> Result<Option<ffx_isolate::Isolate>>
+    {
         let isolate = new_isolate("target-get-ssh-address-includes-port").await?;
-        isolate.start_daemon().await?;
-
         let target_nodename = get_target_nodename().await?;
 
         let out = isolate
@@ -99,13 +91,11 @@ pub mod include_target {
         ensure!(out.stderr.lines().count() == 0, "stderr is unexpected: {:?}", out);
         // TODO: establish a good way to assert against the whole target address.
 
-        Ok(())
+        Ok(Some(isolate))
     }
 
-    pub(crate) async fn test_target_show() -> Result<()> {
+    pub(crate) async fn test_target_show() -> Result<Option<ffx_isolate::Isolate>> {
         let isolate = new_isolate("target-show").await?;
-        isolate.start_daemon().await?;
-
         let target_nodename = get_target_nodename().await?;
 
         let out = isolate.ffx(&["--target", &target_nodename, "target", "show"]).await?;
@@ -114,6 +104,6 @@ pub mod include_target {
         ensure!(!out.stdout.is_empty(), "stdout is unexpectedly empty: {:?}", out);
         ensure!(out.stderr.lines().count() == 0, "stderr is unexpected: {:?}", out);
 
-        Ok(())
+        Ok(Some(isolate))
     }
 }

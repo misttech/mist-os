@@ -14,7 +14,6 @@ rustc_library("lib") {
 
   deps = [
     "//src/developer/ffx/config:lib",
-    "//src/developer/ffx/daemon:lib",
     "//src/developer/ffx/lib/sdk:lib",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",

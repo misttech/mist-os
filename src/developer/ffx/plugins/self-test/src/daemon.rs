@@ -6,22 +6,24 @@ use crate::{assert_eq, test::new_isolate};
 use anyhow::*;
 use fuchsia_async::Duration;
 
-pub(crate) async fn test_echo() -> Result<()> {
+pub(crate) async fn test_echo() -> Result<Option<ffx_isolate::Isolate>> {
     let isolate = new_isolate("daemon-echo").await?;
-    isolate.start_daemon().await?;
     let out = isolate.ffx(&["daemon", "echo"]).await?;
 
     let want = "SUCCESS: received \"Ffx\"\n";
     assert_eq!(out.stdout, want);
 
-    Ok(())
+    Ok(Some(isolate))
 }
 
-pub(crate) async fn test_config_flag() -> Result<()> {
+pub(crate) async fn test_config_flag() -> Result<Option<ffx_isolate::Isolate>> {
     let isolate = new_isolate("daemon-config-flag").await?;
-    let mut daemon = isolate.start_daemon().await?;
+    let mut daemon = ffx_daemon::run_daemon(isolate.env_context()).await?;
 
-    assert_eq!(None, daemon.try_wait()?, "Daemon exited quickly after starting");
+    // wait a bit to make sure the daemon has had a chance to start up, then check that it's
+    // still running
+    fuchsia_async::Timer::new(Duration::from_millis(100)).await;
+    assert_eq!(None, daemon.try_wait()?, "Daemon didn't stay up for at least 100ms after starting");
 
     // This should not terminate the daemon just started, as it won't
     // share an overnet socket with it.
@@ -59,38 +61,42 @@ pub(crate) async fn test_config_flag() -> Result<()> {
     // until we wait() for it. So instead we drop the isolate here, then wait.
     drop(isolate);
     fuchsia_async::unblock(move || daemon.wait()).await?;
-    Ok(())
+    Ok(None)
 }
 
-pub(crate) async fn test_stop() -> Result<()> {
+pub(crate) async fn test_stop() -> Result<Option<ffx_isolate::Isolate>> {
     let isolate = new_isolate("daemon-stop").await?;
     let out = isolate.ffx(&["daemon", "stop", "-t", "3000"]).await?;
     let want = "No daemon was running.\n";
     assert_eq!(out.stdout, want);
 
-    let daemon = isolate.start_daemon().await?;
-
-    // Reap the daemon in another thread so the daemon exits.
-    // Otherwise the process will still exist but in a zombie state.
-    let _ = std::thread::spawn(move || { daemon }.wait());
-
+    let _ = isolate.ffx(&["daemon", "echo"]).await?;
     let out = isolate.ffx(&["daemon", "stop", "-t", "3000"]).await?;
     let want = "Stopped daemon.\n";
     assert_eq!(out.stdout, want);
 
-    Ok(())
+    Ok(Some(isolate))
 }
 
-pub(crate) async fn test_no_autostart() -> Result<()> {
+pub(crate) async fn test_no_autostart() -> Result<Option<ffx_isolate::Isolate>> {
     let isolate = new_isolate("daemon-no-autostart").await?;
+    let out = isolate.ffx(&["config", "set", "daemon.autostart", "false"]).await?;
+    assert!(out.status.success());
     let out = isolate.ffx(&["daemon", "echo"]).await?;
     assert!(!out.status.success());
     assert!(out.stderr.contains(
         "FFX Daemon was told not to autostart and no existing Daemon instance was found"
     ));
+    // Build the actual daemon command
+    let mut daemon = ffx_daemon::run_daemon(isolate.env_context()).await?;
 
-    let mut daemon = isolate.start_daemon().await?;
-
+    #[cfg(target_os = "macos")]
+    let daemon_wait_time = 500;
+    #[cfg(not(target_os = "macos"))]
+    let daemon_wait_time = 100;
+    // wait a bit to make sure the daemon has had a chance to start up, then check that it's
+    // still running
+    fuchsia_async::Timer::new(Duration::from_millis(daemon_wait_time)).await;
     assert_eq!(None, daemon.try_wait()?, "Daemon exited quickly after starting");
 
     let out = isolate.ffx(&["daemon", "echo"]).await?;
@@ -104,5 +110,5 @@ pub(crate) async fn test_no_autostart() -> Result<()> {
 
     assert!(echo_succeeded);
 
-    Ok(())
+    Ok(Some(isolate))
 }
