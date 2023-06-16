@@ -2,15 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    cap::{dict::Key, AnyCapability, Dict},
+    cap::{dict::Key, multishot::Sender, AnyCapability, Dict, Handle},
     fuchsia_runtime::{HandleInfo, HandleType},
-    futures::future::{join_all, BoxFuture, FutureExt},
+    futures::channel::mpsc::UnboundedSender,
+    futures::future::{BoxFuture, FutureExt},
+    futures::stream::{FuturesUnordered, StreamExt},
+    namespace::Namespace,
     process_builder::StartupHandle,
     processargs::ProcessArgs,
     std::collections::HashMap,
     std::iter::once,
     thiserror::Error,
 };
+
+mod namespace;
 
 /// How to deliver a particular capability from a dict to an Elf process. Broadly speaking,
 /// one could either deliver a capability using namespace entries, or using numbered handles.
@@ -64,6 +69,10 @@ pub type DeliveryMap = HashMap<Key, DeliveryMapEntry>;
 /// Visits `dict` and installs its capabilities into appropriate locations in the
 /// `processargs`, as determined by a `delivery_map`.
 ///
+/// If the process opens non-existent paths within one of the namespace entries served
+/// by the framework, that path will be sent down `not_found`. Callers should either monitor
+/// the stream, or drop the receiver, to prevent unbounded buffering.
+///
 /// On success, returns a future that services connection requests to those capabilities.
 /// The future will complete if there is no more work possible, such as if all connections
 /// to the items in the dictionary are closed.
@@ -71,25 +80,25 @@ pub fn add_to_processargs(
     dict: Dict,
     processargs: &mut ProcessArgs,
     delivery_map: &DeliveryMap,
+    not_found: UnboundedSender<String>,
 ) -> Result<BoxFuture<'static, ()>, DeliveryError> {
-    let mut handle_futures: Vec<BoxFuture<'static, ()>> = Vec::new();
+    let mut futures: Vec<BoxFuture<'static, ()>> = Vec::new();
+    let mut namespace = Namespace::new(not_found);
 
     // Iterate over the delivery map.
     // Take entries away from dict and install them accordingly.
     let dict = visit_map(delivery_map, dict, &mut |cap: AnyCapability, delivery: &Delivery| {
         match delivery {
-            // TODO: implement namespace serving
-            Delivery::NamespacedObject(_) => todo!(),
+            Delivery::NamespacedObject(path) => {
+                let cap = cap
+                    .downcast::<Sender<Handle>>()
+                    .map_err(|_| DeliveryError::NamespacedObjectNotSender(path.clone()))?;
+                namespace.add_sender(*cap, path).map_err(DeliveryError::NamespaceError)
+            }
+            // TODO: implement namespace entry
             Delivery::NamespaceEntry(_) => todo!(),
             Delivery::Handle(info) => {
-                validate_handle_type(info.handle_type())?;
-
-                let (h, fut) = cap.to_zx_handle();
-                if let Some(fut) = fut {
-                    handle_futures.push(fut);
-                }
-                processargs.add_handles(once(StartupHandle { handle: h, info: *info }));
-
+                processargs.add_handles(once(translate_handle(cap, info, &mut futures)?));
                 Ok(())
             }
         }
@@ -98,7 +107,14 @@ pub fn add_to_processargs(
     // Finally, verify that all dict entries are empty (or empty dictionaries).
     check_empty_dict(&dict)?;
 
-    let fut = Box::pin(join_all(handle_futures).map(|_| ()));
+    let (namespace, namespace_fut) = namespace.serve();
+    processargs.namespace_entries.extend(namespace);
+    futures.push(namespace_fut);
+
+    let mut futures_unordered = FuturesUnordered::new();
+    futures_unordered.extend(futures);
+
+    let fut = async move { while let Some(()) = futures_unordered.next().await {} };
     Ok(fut.boxed())
 }
 
@@ -115,6 +131,29 @@ pub enum DeliveryError {
 
     #[error("handle type `{0:?}` is not allowed to be installed into processargs")]
     UnsupportedHandleType(HandleType),
+
+    #[error("namespace configuration error: `{0}`")]
+    NamespaceError(namespace::NamespaceError),
+
+    #[error(
+        "to install the capability as a namespaced object at `{0}`, it must be a sender capability"
+    )]
+    NamespacedObjectNotSender(cm_types::Path),
+}
+
+fn translate_handle(
+    cap: AnyCapability,
+    info: &HandleInfo,
+    handle_futures: &mut Vec<BoxFuture<'static, ()>>,
+) -> Result<StartupHandle, DeliveryError> {
+    validate_handle_type(info.handle_type())?;
+
+    let (h, fut) = cap.to_zx_handle();
+    if let Some(fut) = fut {
+        handle_futures.push(fut);
+    }
+
+    Ok(StartupHandle { handle: h, info: *info })
 }
 
 fn visit_map(
@@ -163,8 +202,18 @@ fn validate_handle_type(handle_type: HandleType) -> Result<(), DeliveryError> {
 #[cfg(test)]
 mod tests {
     use {
-        super::*, anyhow::Result, assert_matches::assert_matches, fuchsia_zircon as zx,
+        super::*,
+        anyhow::Result,
+        assert_matches::assert_matches,
+        cap::{multishot, Handle},
+        fidl::endpoints::Proxy,
+        fidl_fuchsia_io as fio, fuchsia_async as fasync,
+        fuchsia_fs::directory::DirEntry,
+        fuchsia_zircon as zx,
+        fuchsia_zircon::{AsHandleRef, HandleBased, Peered},
         maplit::hashmap,
+        namespace::ignore_not_found as ignore,
+        std::str::FromStr,
     };
 
     #[fuchsia::test]
@@ -172,7 +221,7 @@ mod tests {
         let mut processargs = ProcessArgs::new();
         let dict = Dict::new();
         let delivery_map = DeliveryMap::new();
-        let fut = add_to_processargs(dict, &mut processargs, &delivery_map)?;
+        let fut = add_to_processargs(dict, &mut processargs, &delivery_map, ignore())?;
 
         assert_eq!(processargs.namespace_entries.len(), 0);
         assert_eq!(processargs.handles.len(), 0);
@@ -194,7 +243,7 @@ mod tests {
                 Delivery::Handle(HandleInfo::new(HandleType::FileDescriptor, 0))
             )
         };
-        let fut = add_to_processargs(dict, &mut processargs, &delivery_map)?;
+        let fut = add_to_processargs(dict, &mut processargs, &delivery_map, ignore())?;
 
         assert_eq!(processargs.namespace_entries.len(), 0);
         assert_eq!(processargs.handles.len(), 1);
@@ -235,7 +284,7 @@ mod tests {
                 )
             })
         };
-        let fut = add_to_processargs(dict, &mut processargs, &delivery_map)?;
+        let fut = add_to_processargs(dict, &mut processargs, &delivery_map, ignore())?;
 
         assert_eq!(processargs.namespace_entries.len(), 0);
         assert_eq!(processargs.handles.len(), 1);
@@ -268,7 +317,7 @@ mod tests {
         };
 
         assert_matches!(
-            add_to_processargs(dict, &mut processargs, &delivery_map).err().unwrap(),
+            add_to_processargs(dict, &mut processargs, &delivery_map, ignore()).err().unwrap(),
             DeliveryError::NotADict(name)
             if &name == "handles"
         );
@@ -284,7 +333,7 @@ mod tests {
         let delivery_map = DeliveryMap::new();
 
         assert_matches!(
-            add_to_processargs(dict, &mut processargs, &delivery_map).err().unwrap(),
+            add_to_processargs(dict, &mut processargs, &delivery_map, ignore()).err().unwrap(),
             DeliveryError::UnusedCapability(name)
             if &name == "stdin"
         );
@@ -304,7 +353,7 @@ mod tests {
         };
 
         assert_matches!(
-            add_to_processargs(dict, &mut processargs, &delivery_map).err().unwrap(),
+            add_to_processargs(dict, &mut processargs, &delivery_map, ignore()).err().unwrap(),
             DeliveryError::UnsupportedHandleType(handle_type)
             if handle_type == HandleType::DirectoryRequest
         );
@@ -321,9 +370,96 @@ mod tests {
         };
 
         assert_matches!(
-            add_to_processargs(dict, &mut processargs, &delivery_map).err().unwrap(),
+            add_to_processargs(dict, &mut processargs, &delivery_map, ignore()).err().unwrap(),
             DeliveryError::NotInDict(name)
             if &name == "stdin"
         );
+    }
+
+    /// Two protocol capabilities in `/svc`. One of them has a receiver waiting for incoming
+    /// requests. The other is disconnected from the receiver, which should close all incoming
+    /// connections to that protocol.
+    #[fuchsia::test]
+    async fn test_namespace_end_to_end() -> Result<()> {
+        let (sender, receiver) = multishot::<Handle>();
+        let peer_closed_sender = multishot::<Handle>().0;
+
+        let mut processargs = ProcessArgs::new();
+        let mut dict = Dict::new();
+        dict.entries.insert("normal".to_string(), Box::new(sender));
+        dict.entries.insert("closed".to_string(), Box::new(peer_closed_sender));
+        let delivery_map = hashmap! {
+            "normal".to_string() => DeliveryMapEntry::Delivery(
+                Delivery::NamespacedObject(cm_types::Path::from_str("/svc/fuchsia.Normal").unwrap())
+            ),
+            "closed".to_string() => DeliveryMapEntry::Delivery(
+                Delivery::NamespacedObject(cm_types::Path::from_str("/svc/fuchsia.Closed").unwrap())
+            )
+        };
+        let fut = add_to_processargs(dict, &mut processargs, &delivery_map, ignore())?;
+        let fut = fasync::Task::spawn(fut);
+
+        assert_eq!(processargs.handles.len(), 0);
+        assert_eq!(processargs.namespace_entries.len(), 1);
+        let entry = processargs.namespace_entries.pop().unwrap();
+        assert_eq!(entry.path.to_str().unwrap(), "/svc");
+
+        // Check that there are the expected two protocols inside the svc directory.
+        let dir = entry.directory.into_proxy().unwrap();
+        let mut entries = fuchsia_fs::directory::readdir(&dir).await.unwrap();
+        let mut expectation = vec![
+            DirEntry { name: "fuchsia.Normal".to_string(), kind: fio::DirentType::Service },
+            DirEntry { name: "fuchsia.Closed".to_string(), kind: fio::DirentType::Service },
+        ];
+        entries.sort();
+        expectation.sort();
+        assert_eq!(entries, expectation);
+
+        let dir = dir.into_channel().unwrap().into_zx_channel();
+
+        // Connect to the protocol using namespace functionality.
+        let (client_end, server_end) = zx::Channel::create();
+        fdio::service_connect_at(&dir, "fuchsia.Normal", server_end).unwrap();
+
+        // Make sure the server_end is received, and test connectivity.
+        let server_end: zx::Channel = receiver.0.recv().await.unwrap().into_handle().into();
+        client_end.signal_peer(zx::Signals::empty(), zx::Signals::USER_0).unwrap();
+        server_end.wait_handle(zx::Signals::USER_0, zx::Time::INFINITE_PAST).unwrap();
+
+        // Connect to the closed protocol. Because the receiver is discarded, anything we send
+        // should get peer-closed.
+        let (client_end, server_end) = zx::Channel::create();
+        fdio::service_connect_at(&dir, "fuchsia.Closed", server_end).unwrap();
+        fasync::Channel::from_channel(client_end).unwrap().on_closed().await.unwrap();
+
+        drop(dir);
+        drop(processargs);
+        fut.await;
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn dropping_future_stops_everything() -> Result<()> {
+        let (sender, _receiver) = multishot::<Handle>();
+
+        let mut processargs = ProcessArgs::new();
+        let mut dict = Dict::new();
+        dict.entries.insert("a".to_string(), Box::new(sender));
+        let delivery_map = hashmap! {
+            "a".to_string() => DeliveryMapEntry::Delivery(
+                Delivery::NamespacedObject(cm_types::Path::from_str("/svc/a").unwrap())
+            ),
+        };
+        let fut = add_to_processargs(dict, &mut processargs, &delivery_map, ignore())?;
+        drop(fut);
+
+        assert_eq!(processargs.namespace_entries.len(), 1);
+        let dir = processargs.namespace_entries.pop().unwrap().directory.into_proxy().unwrap();
+        let dir = dir.into_channel().unwrap().into_zx_channel();
+
+        let (client_end, server_end) = zx::Channel::create();
+        fdio::service_connect_at(&dir, "a", server_end).unwrap();
+        fasync::Channel::from_channel(client_end).unwrap().on_closed().await.unwrap();
+        Ok(())
     }
 }
