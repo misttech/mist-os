@@ -569,18 +569,17 @@ zx_status_t bind_simple_pci_display(zx_device_t* dev, const char* name, uint32_t
 
   fidl::WireSyncClient sysmem{std::move(*client)};
 
-  mmio_buffer_t mmio;
+  std::optional<fdf::MmioBuffer> framebuffer_mmio;
   // map framebuffer window
-  zx_status_t status = pci.MapMmio(bar, ZX_CACHE_POLICY_WRITE_COMBINING, &mmio);
+  zx_status_t status = pci.MapMmio(bar, ZX_CACHE_POLICY_WRITE_COMBINING, &framebuffer_mmio);
   if (status != ZX_OK) {
     printf("%s: failed to map pci bar %d: %d\n", name, bar, status);
     return status;
   }
-  fdf::MmioBuffer framebuffer_mmio(mmio);
 
   fbl::AllocChecker ac;
   std::unique_ptr<SimpleDisplay> display(new (&ac) SimpleDisplay(
-      dev, std::move(sysmem), std::move(framebuffer_mmio), width, height, stride, format));
+      dev, std::move(sysmem), std::move(*framebuffer_mmio), width, height, stride, format));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }

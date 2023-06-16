@@ -84,7 +84,7 @@ static zx_status_t bochs_vbe_bind(void* ctx, zx_device_t* dev) {
     return ZX_ERR_INTERNAL;
   }
 
-  mmio_buffer_t mmio;
+  std::optional<fdf::MmioBuffer> mmio;
   // map register window
   zx_status_t status = pci.MapMmio(2u, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio);
   if (status != ZX_OK) {
@@ -92,9 +92,7 @@ static zx_status_t bochs_vbe_bind(void* ctx, zx_device_t* dev) {
     return status;
   }
 
-  set_hw_mode(mmio.vaddr, kDisplayWidth, kDisplayHeight, kBitsPerPixel);
-
-  mmio_buffer_release(&mmio);
+  set_hw_mode(mmio->get(), kDisplayWidth, kDisplayHeight, kBitsPerPixel);
 
   return bind_simple_pci_display(dev, "bochs_vbe", 0u, kDisplayWidth, kDisplayHeight,
                                  /*stride=*/kDisplayWidth, kDisplayFormat);
