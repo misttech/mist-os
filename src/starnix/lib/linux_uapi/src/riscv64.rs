@@ -11489,6 +11489,14 @@ pub const _REMOTE_BINDER_START: __u32 = 2148028929;
 pub const REMOTE_BINDER_START: __u32 = 2148028929;
 pub const _REMOTE_BINDER_WAIT: __u32 = 1073828354;
 pub const REMOTE_BINDER_WAIT: __u32 = 1073828354;
+pub const _FS_IOC_FSGETXATTR: __u32 = 2149341215;
+pub const FS_IOC_FSGETXATTR: __u32 = 2149341215;
+pub const _FS_IOC_FSSETXATTR: __u32 = 1075599392;
+pub const FS_IOC_FSSETXATTR: __u32 = 1075599392;
+pub const _FS_IOC_GETFLAGS: __u32 = 2148034049;
+pub const FS_IOC_GETFLAGS: __u32 = 2148034049;
+pub const _FS_IOC_SETFLAGS: __u32 = 1074292226;
+pub const FS_IOC_SETFLAGS: __u32 = 1074292226;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct xt_match {

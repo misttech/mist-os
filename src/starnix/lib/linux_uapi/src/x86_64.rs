@@ -3292,7 +3292,6 @@ pub const XT_STANDARD_TARGET: &'static std::ffi::CStr =
 pub const XT_ERROR_TARGET: &'static std::ffi::CStr =
     unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"ERROR\0") };
 pub const XT_INV_PROTO: u32 = 64;
-pub type wchar_t = crate::types::c_int;
 pub const IPT_FUNCTION_MAXNAMELEN: u32 = 30;
 pub const IPT_TABLE_MAXNAMELEN: u32 = 32;
 pub const IPT_CONTINUE: u32 = 4294967295;
@@ -3987,21 +3986,6 @@ pub const IPT_SO_GET_REVISION_MATCH: u32 = 66;
 pub const IPT_SO_GET_REVISION_TARGET: u32 = 67;
 pub const IPT_SO_GET_MAX: u32 = 67;
 pub const IPT_ICMP_INV: u32 = 1;
-pub const NCC: u32 = 8;
-pub const TIOCM_LE: u32 = 1;
-pub const TIOCM_DTR: u32 = 2;
-pub const TIOCM_RTS: u32 = 4;
-pub const TIOCM_ST: u32 = 8;
-pub const TIOCM_SR: u32 = 16;
-pub const TIOCM_CTS: u32 = 32;
-pub const TIOCM_CAR: u32 = 64;
-pub const TIOCM_RNG: u32 = 128;
-pub const TIOCM_DSR: u32 = 256;
-pub const TIOCM_CD: u32 = 64;
-pub const TIOCM_RI: u32 = 128;
-pub const TIOCM_OUT1: u32 = 8192;
-pub const TIOCM_OUT2: u32 = 16384;
-pub const TIOCM_LOOP: u32 = 32768;
 pub const TFD_TIMER_ABSTIME: u32 = 1;
 pub const TFD_TIMER_CANCEL_ON_SET: u32 = 2;
 pub const TFD_CLOEXEC: u32 = 524288;
@@ -4135,6 +4119,21 @@ pub const NF_IP6_FORWARD: u32 = 2;
 pub const NF_IP6_LOCAL_OUT: u32 = 3;
 pub const NF_IP6_POST_ROUTING: u32 = 4;
 pub const NF_IP6_NUMHOOKS: u32 = 5;
+pub const NCC: u32 = 8;
+pub const TIOCM_LE: u32 = 1;
+pub const TIOCM_DTR: u32 = 2;
+pub const TIOCM_RTS: u32 = 4;
+pub const TIOCM_ST: u32 = 8;
+pub const TIOCM_SR: u32 = 16;
+pub const TIOCM_CTS: u32 = 32;
+pub const TIOCM_CAR: u32 = 64;
+pub const TIOCM_RNG: u32 = 128;
+pub const TIOCM_DSR: u32 = 256;
+pub const TIOCM_CD: u32 = 64;
+pub const TIOCM_RI: u32 = 128;
+pub const TIOCM_OUT1: u32 = 8192;
+pub const TIOCM_OUT2: u32 = 16384;
+pub const TIOCM_LOOP: u32 = 32768;
 pub const __X32_SYSCALL_BIT: u32 = 1073741824;
 pub const __NR_read: u32 = 0;
 pub const __NR_write: u32 = 1;
@@ -4498,6 +4497,7 @@ pub const __NR_memfd_secret: u32 = 447;
 pub const __NR_process_mrelease: u32 = 448;
 pub const __NR_futex_waitv: u32 = 449;
 pub const __NR_set_mempolicy_home_node: u32 = 450;
+pub type wchar_t = crate::types::c_int;
 #[repr(C)]
 #[repr(align(16))]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
@@ -11738,6 +11738,14 @@ pub const _REMOTE_BINDER_START: __u32 = 2148028929;
 pub const REMOTE_BINDER_START: __u32 = 2148028929;
 pub const _REMOTE_BINDER_WAIT: __u32 = 1073828354;
 pub const REMOTE_BINDER_WAIT: __u32 = 1073828354;
+pub const _FS_IOC_FSGETXATTR: __u32 = 2149341215;
+pub const FS_IOC_FSGETXATTR: __u32 = 2149341215;
+pub const _FS_IOC_FSSETXATTR: __u32 = 1075599392;
+pub const FS_IOC_FSSETXATTR: __u32 = 1075599392;
+pub const _FS_IOC_GETFLAGS: __u32 = 2148034049;
+pub const FS_IOC_GETFLAGS: __u32 = 2148034049;
+pub const _FS_IOC_SETFLAGS: __u32 = 1074292226;
+pub const FS_IOC_SETFLAGS: __u32 = 1074292226;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct xt_match {

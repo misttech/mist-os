@@ -16,7 +16,7 @@ use crate::{
     logging::{impossible_error, not_implemented},
     mm::{
         vmo::round_up_to_system_page_size, DesiredAddress, MappedVmo, MappingName, MappingOptions,
-        ProtectionFlags,
+        MemoryAccessorExt, ProtectionFlags,
     },
     syscalls::*,
     task::*,
@@ -1065,7 +1065,39 @@ impl FileObject {
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        self.ops().ioctl(self, current_task, request, arg)
+        match request {
+            FIONBIO => {
+                self.update_file_flags(OpenFlags::NONBLOCK, OpenFlags::NONBLOCK);
+                Ok(SUCCESS)
+            }
+
+            FS_IOC_FSGETXATTR => {
+                not_implemented!("FS_IOC_FSGETXATTR");
+                let arg = UserAddress::from(arg).into();
+                current_task.mm.write_object(arg, &fsxattr::default())?;
+                Ok(SUCCESS)
+            }
+            FS_IOC_FSSETXATTR => {
+                not_implemented!("FS_IOC_FSSETXATTR");
+                let arg = UserAddress::from(arg).into();
+                let _: fsxattr = current_task.mm.read_object(arg)?;
+                Ok(SUCCESS)
+            }
+            FS_IOC_GETFLAGS => {
+                not_implemented!("FS_IOC_GETFLAGS");
+                let arg = UserAddress::from(arg).into();
+                current_task.mm.write_object(arg, &u32::default())?;
+                Ok(SUCCESS)
+            }
+            FS_IOC_SETFLAGS => {
+                not_implemented!("FS_IOC_SETFLAGS");
+                let arg = UserAddress::from(arg).into();
+                let _: u32 = current_task.mm.read_object(arg)?;
+                Ok(SUCCESS)
+            }
+
+            _ => self.ops().ioctl(self, current_task, request, arg),
+        }
     }
 
     pub fn fcntl(

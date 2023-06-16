@@ -1113,13 +1113,7 @@ pub fn sys_ioctl(
     arg: SyscallArg,
 ) -> Result<SyscallResult, Errno> {
     let file = current_task.files.get(fd)?;
-    match request {
-        FIONBIO => {
-            file.update_file_flags(OpenFlags::NONBLOCK, OpenFlags::NONBLOCK);
-            Ok(SUCCESS)
-        }
-        _ => file.ioctl(current_task, request, arg),
-    }
+    file.ioctl(current_task, request, arg)
 }
 
 pub fn sys_symlinkat(
@@ -1369,10 +1363,11 @@ fn do_mount_create(
 
     // HACK! Shadow's Android's FUSE proxy with a proxy implemented in starnix. Delete once FUSE is
     // working well enough.
-    if current_task.kernel().features.contains("sdcard_hack")
-        && fs_type == b"fuse"
-        && target.path_escaping_chroot() == b"/mnt/user/0/emulated"
-    {
+    if current_task.kernel().features.contains("sdcard_hack") && fs_type == b"fuse" {
+        if target.path_escaping_chroot() != b"/mnt/user/0/emulated" {
+            log_error!("unexpected FUSE mount target {:?}", target.path_escaping_chroot());
+            return error!(EINVAL);
+        }
         if let WhatToMount::Fs(ref mut fs) = fs {
             *fs = super::sdcard_hack::SdcardHackFs::new_fs(
                 current_task,
