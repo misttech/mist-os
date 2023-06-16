@@ -5,7 +5,7 @@
 use {
     crate::helpers::*,
     crate::results_parser::*,
-    anyhow::Error,
+    anyhow::{Context, Error},
     fidl::endpoints::create_proxy,
     fidl_fuchsia_component_runner as frunner,
     fidl_fuchsia_test::{self as ftest, Result_ as TestResult, Status},
@@ -135,14 +135,22 @@ pub async fn run_gtest_cases(
         .finished(&TestResult { status: Some(Status::Passed), ..Default::default() })?;
 
     // Parse test results.
-    let mut read_content = read_file(&output_dir, &output_file_name)
+    let test_results = read_file(&output_dir, &output_file_name)
         .await
-        .expect("Failed to read test result file.")
-        .to_string();
-    read_content = read_content.trim().to_string();
-    let test_list = parse_results(test_type, &read_content)?;
+        .with_context(|| format!("Failed to read {}", output_file_name))
+        .and_then(|x| {
+            parse_results(test_type, x.trim())
+                .with_context(|| format!("Failed to parse {}", output_file_name))
+        });
 
-    for suite in &test_list.testsuites {
+    // If tests crashes then we would fail to read or parse the output file. We
+    // still want to report these cases as failed before returning the error;
+    let (test_list, result) = match test_results {
+        Ok(results) => (results.testsuites, Ok(())),
+        Err(e) => (vec![], Err(e)),
+    };
+
+    for suite in &test_list {
         for test in &suite.testsuite {
             let name = format!("{}.{}", suite.name, test.name);
             let status = match &test.status {
@@ -171,7 +179,7 @@ pub async fn run_gtest_cases(
             .finished(&TestResult { status: Some(Status::Failed), ..Default::default() })?;
     }
 
-    Ok(())
+    result
 }
 
 fn format_arg(test_type: TestType, test_arg: &str) -> String {
