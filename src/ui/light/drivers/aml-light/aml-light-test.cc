@@ -10,7 +10,6 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/fidl-async/cpp/bind.h>
 
 #include <cmath>
 #include <list>
@@ -48,15 +47,13 @@ class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_
   void ExpectEnable() { expect_enable_ = true; }
 
   void ExpectSetConfig(fuchsia_hardware_pwm::wire::PwmConfig config) {
-    std::unique_ptr<uint8_t[]> mode_config =
-        std::make_unique<uint8_t[]>(config.mode_config.count());
-    memcpy(mode_config.get(), config.mode_config.data(), config.mode_config.count());
+    std::unique_ptr<uint8_t[]>& mode_config =
+        mode_config_buffers_.emplace_back(std::make_unique<uint8_t[]>(config.mode_config.count()));
+    std::copy_n(config.mode_config.data(), config.mode_config.count(), mode_config.get());
 
-    auto copy = config;
-    copy.mode_config =
+    config.mode_config =
         fidl::VectorView<uint8_t>::FromExternal(mode_config.get(), config.mode_config.count());
-    expect_configs_.push_back(std::move(copy));
-    mode_config_buffers_.push_back(std::move(mode_config));
+    expect_configs_.push_back(config);
   }
 
   void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
@@ -85,29 +82,25 @@ class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_
 
 class FakeAmlLight : public AmlLight {
  public:
-  static std::unique_ptr<FakeAmlLight> Create(
+  static zx::result<std::unique_ptr<FakeAmlLight>> Create(
       const gpio_protocol_t* gpio,
       std::optional<fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>> pwm,
       zx_duration_t pwm_period = 170'625) {
     fbl::AllocChecker ac;
-    auto device = fbl::make_unique_checked<FakeAmlLight>(&ac);
+    std::unique_ptr device = fbl::make_unique_checked<FakeAmlLight>(&ac);
     if (!ac.check()) {
-      zxlogf(ERROR, "%s: device object alloc failed", __func__);
-      return nullptr;
+      return zx::error(ZX_ERR_NO_MEMORY);
     }
-    device->lights_.emplace_back("test", ddk::GpioProtocolClient(gpio),
-                                 pwm.has_value() ? std::move(pwm) : std::nullopt,
-                                 zx::duration(pwm_period));
-    EXPECT_OK(device->lights_.back().Init(true));
-    return device;
+    LightDevice& light = device->lights_.emplace_back(
+        "test", ddk::GpioProtocolClient(gpio), pwm.has_value() ? std::move(pwm) : std::nullopt,
+        zx::duration(pwm_period));
+    if (zx_status_t status = light.Init(true); status != ZX_OK) {
+      return zx::error(status);
+    }
+    return zx::ok(std::move(device));
   }
 
   explicit FakeAmlLight() : AmlLight(nullptr) {}
-
-  zx_status_t Connect(async_dispatcher_t* dispatcher,
-                      fidl::ServerEnd<fuchsia_hardware_light::Light> request) {
-    return fidl::BindSingleInFlightOnly(dispatcher, std::move(request), this);
-  }
 };
 
 namespace {
@@ -122,7 +115,7 @@ class AmlLightTest : public zxtest::Test {
     zx::result server = fidl::CreateEndpoints(&client_);
     ASSERT_OK(server);
     ASSERT_OK(loop_->StartThread("aml-light-test-loop"));
-    ASSERT_OK(light_->Connect(loop_->dispatcher(), std::move(server.value())));
+    fidl::BindServer(loop_->dispatcher(), std::move(server.value()), light_.get());
   }
 
   void TearDown() override {
@@ -161,8 +154,9 @@ TEST_F(AmlLightTest, GetInfoTest1) {
 
   auto gpio = gpio_.GetProto();
   auto pwm_client = pwm_.SyncCall(&MockPwmServer::BindServer);
-  light_ = FakeAmlLight::Create(gpio, std::move(pwm_client));
-  ASSERT_NOT_NULL(light_);
+  zx::result light = FakeAmlLight::Create(gpio, std::move(pwm_client));
+  ASSERT_OK(light);
+  light_ = std::move(light.value());
   Init();
 
   fidl::WireSyncClient<fuchsia_hardware_light::Light> client(std::move(client_));
@@ -177,8 +171,9 @@ TEST_F(AmlLightTest, GetInfoTest2) {
   gpio_.ExpectWrite(ZX_OK, true);
 
   auto gpio = gpio_.GetProto();
-  light_ = FakeAmlLight::Create(gpio, std::nullopt);
-  ASSERT_NOT_NULL(light_);
+  zx::result light = FakeAmlLight::Create(gpio, std::nullopt);
+  ASSERT_OK(light);
+  light_ = std::move(light.value());
   Init();
 
   fidl::WireSyncClient<fuchsia_hardware_light::Light> client(std::move(client_));
@@ -193,8 +188,9 @@ TEST_F(AmlLightTest, SetValueTest1) {
   gpio_.ExpectWrite(ZX_OK, true);
 
   auto gpio = gpio_.GetProto();
-  light_ = FakeAmlLight::Create(gpio, std::nullopt);
-  ASSERT_NOT_NULL(light_);
+  zx::result light = FakeAmlLight::Create(gpio, std::nullopt);
+  ASSERT_OK(light);
+  light_ = std::move(light.value());
   Init();
 
   fidl::WireSyncClient<fuchsia_hardware_light::Light> client(std::move(client_));
@@ -253,8 +249,9 @@ TEST_F(AmlLightTest, SetValueTest2) {
 
   auto gpio = gpio_.GetProto();
   auto pwm_client = pwm_.SyncCall(&MockPwmServer::BindServer);
-  light_ = FakeAmlLight::Create(gpio, std::move(pwm_client));
-  ASSERT_NOT_NULL(light_);
+  zx::result light = FakeAmlLight::Create(gpio, std::move(pwm_client));
+  ASSERT_OK(light);
+  light_ = std::move(light.value());
   Init();
 
   fidl::WireSyncClient<fuchsia_hardware_light::Light> client(std::move(client_));
@@ -315,8 +312,9 @@ TEST_F(AmlLightTest, SetInvalidValueTest) {
 
   auto gpio = gpio_.GetProto();
   auto pwm_client = pwm_.SyncCall(&MockPwmServer::BindServer);
-  light_ = FakeAmlLight::Create(gpio, std::move(pwm_client));
-  ASSERT_NOT_NULL(light_);
+  zx::result light = FakeAmlLight::Create(gpio, std::move(pwm_client));
+  ASSERT_OK(light);
+  light_ = std::move(light.value());
   Init();
 
   fidl::WireSyncClient<fuchsia_hardware_light::Light> client(std::move(client_));
@@ -366,8 +364,9 @@ TEST_F(AmlLightTest, SetValueTestNelson) {
 
   auto gpio = gpio_.GetProto();
   auto pwm_client = pwm_.SyncCall(&MockPwmServer::BindServer);
-  light_ = FakeAmlLight::Create(gpio, std::move(pwm_client), 500'000);
-  ASSERT_NOT_NULL(light_);
+  zx::result light = FakeAmlLight::Create(gpio, std::move(pwm_client), 500'000);
+  ASSERT_OK(light);
+  light_ = std::move(light.value());
   Init();
 
   fidl::WireSyncClient<fuchsia_hardware_light::Light> client(std::move(client_));
