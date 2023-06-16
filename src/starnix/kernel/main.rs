@@ -135,6 +135,13 @@ async fn main() -> Result<(), Error> {
     }
     inspect_runtime::serve(fuchsia_inspect::component::inspector(), &mut fs)?;
 
+    // Wait for the UTC clock to start up before we start accepting requests since so many Linux
+    // APIs need a running UTC clock to function.
+    // See https://fxbug.dev/126111 for more discussion.
+    // TODO(https://fxbug.dev/93344): Once it's practical to do so we should report a STARTING_UP
+    // state in inspect's health node until we are ready to start accepting requests.
+    time::utc::wait_for_utc_clock_to_start().await;
+
     fs.take_and_serve_directory_handle()?;
     fs.for_each_concurrent(None, |request: KernelServices| async {
         match request {
