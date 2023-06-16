@@ -48,7 +48,6 @@ zx_library("fidl-async-cpp") {
     "//src/graphics/drivers/misc/goldfish:*",
     "//src/graphics/drivers/misc/goldfish_address_space:*",
     "//src/lib/fidl/llcpp/tests/integration:*",
-    "//src/power/shutdown-shim:*",
     "//src/storage/bin/disk-pave:*",
     "//src/storage/blobfs:*",
     "//src/storage/f2fs:*",

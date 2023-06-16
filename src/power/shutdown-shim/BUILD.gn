@@ -20,7 +20,6 @@ executable("shutdown-shim") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
   ]
 }
 

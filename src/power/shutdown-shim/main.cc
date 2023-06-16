@@ -10,7 +10,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fit/function.h>
 #include <zircon/errors.h>
 #include <zircon/process.h>
@@ -467,24 +466,18 @@ void SystemStateTransitionServer::GetMexecZbis(GetMexecZbisCompleter::Sync& comp
 
 zx_status_t StateControlAdminServer::ExportServices(fbl::RefPtr<fs::PseudoDir>& svc_dir,
                                                     async_dispatcher* dispatcher) {
-  zx_status_t status = svc_dir->AddEntry(
-      fidl::DiscoverableProtocolName<statecontrol_fidl::Admin>,
-      fbl::MakeRefCounted<fs::Service>(
-          // `fuchsia.hardware.power.statecontrol.Admin| must run on a separate thread from
-          // `fuchsia.device.manager.SystemStateTransition` as the latter has to serve requests
-          // while the former makes blocking calls. Notice the different dispatcher specified here
-          // vs below.
-          [dispatcher = loop_.dispatcher(),
-           this](fidl::ServerEnd<statecontrol_fidl::Admin> server_end) mutable {
-            zx_status_t status =
-                fidl::BindSingleInFlightOnly(dispatcher, std::move(server_end), this);
-            if (status != ZX_OK) {
-              fprintf(stderr, "[shutdown-shim] failed to bind statecontrol.Admin service: %s\n",
-                      zx_status_get_string(status));
-              return status;
-            }
-            return ZX_OK;
-          }));
+  zx_status_t status =
+      svc_dir->AddEntry(fidl::DiscoverableProtocolName<statecontrol_fidl::Admin>,
+                        fbl::MakeRefCounted<fs::Service>(
+                            // `fuchsia.hardware.power.statecontrol.Admin| must run on a separate
+                            // thread from `fuchsia.device.manager.SystemStateTransition` as the
+                            // latter has to serve requests while the former makes blocking calls.
+                            // Notice the different dispatcher specified here vs below.
+                            [dispatcher = loop_.dispatcher(),
+                             this](fidl::ServerEnd<statecontrol_fidl::Admin> server_end) mutable {
+                              fidl::BindServer(dispatcher, std::move(server_end), this);
+                              return ZX_OK;
+                            }));
   if (status != ZX_OK) {
     return status;
   }
@@ -494,13 +487,7 @@ zx_status_t StateControlAdminServer::ExportServices(fbl::RefPtr<fs::PseudoDir>& 
           // See above comment about how this must run on a separate thread from the other service.
           [dispatcher, this](
               fidl::ServerEnd<fuchsia_device_manager::SystemStateTransition> server_end) mutable {
-            zx_status_t status = fidl::BindSingleInFlightOnly(dispatcher, std::move(server_end),
-                                                              &system_state_transition_server_);
-            if (status != ZX_OK) {
-              fprintf(stderr, "[shutdown-shim] failed to bind SystemStateTransition service: %s\n",
-                      zx_status_get_string(status));
-              return status;
-            }
+            fidl::BindServer(dispatcher, std::move(server_end), &system_state_transition_server_);
             return ZX_OK;
           }));
 }
