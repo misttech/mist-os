@@ -11,13 +11,15 @@ use {
         errors::map_to_status,
         fxblob::{
             blob::FxBlob,
-            writer::{BlobWriterProtocol as _, FxUnsealedBlob},
+            delivery_blob::FxDeliveryBlob,
+            writer::{BlobWriterProtocol, FxUnsealedBlob},
         },
         node::{FxNode, GetResult, OpenedNode},
         volume::{FxVolume, RootDir},
     },
     anyhow::{bail, ensure, Error},
     async_trait::async_trait,
+    delivery_blob::DELIVERY_PATH_PREFIX,
     fidl::endpoints::{create_proxy, ClientEnd, Proxy as _, ServerEnd},
     fidl_fuchsia_fxfs::{
         BlobWriterMarker, BlobWriterRequest, CreateBlobError, WriteBlobRequest,
@@ -77,6 +79,7 @@ impl RootDir for BlobDirectory {
         self as Arc<dyn FxNode>
     }
 
+    /// TODO(fxbug.dev/127530): Support delivery blobs ([`FxDeliveryBlob`]) using this protocol.
     async fn handle_blob_requests(
         self: Arc<Self>,
         mut requests: WriteBlobRequestStream,
@@ -146,6 +149,12 @@ impl BlobDirectory {
         let store = self.store();
         let fs = store.filesystem();
         let name = path.next().unwrap();
+        let (name, is_delivery_blob) =
+            name.strip_prefix(DELIVERY_PATH_PREFIX).map_or((name, false), |name| (name, true));
+        if is_delivery_blob && !self.directory.store().filesystem().options().allow_delivery_blobs {
+            bail!(FxfsError::NotSupported);
+        }
+        let hash = Hash::from_str(name).map_err(|_| FxfsError::InvalidArgs)?;
 
         // TODO(fxbug.dev/122125): Create the transaction here if we might need to create the object
         // so that we have a lock in place.
@@ -174,23 +183,28 @@ impl BlobDirectory {
                 std::mem::drop(guard);
 
                 ensure!(flags.contains(fio::OpenFlags::CREATE), FxfsError::NotFound);
+                ensure!(flags.contains(fio::OpenFlags::RIGHT_WRITABLE), FxfsError::AccessDenied);
 
                 let mut transaction = fs.clone().new_transaction(&keys, Options::default()).await?;
 
-                let volume = self.volume();
+                let handle = ObjectStore::create_object(
+                    self.volume(),
+                    &mut transaction,
+                    HandleOptions::default(),
+                    store.crypt().as_deref(),
+                    None,
+                )
+                .await?;
 
-                let node = OpenedNode::new(FxUnsealedBlob::new(
-                    self.clone(),
-                    Hash::from_str(name).map_err(|_| FxfsError::InvalidArgs)?,
-                    ObjectStore::create_object(
-                        volume,
-                        &mut transaction,
-                        HandleOptions::default(),
-                        store.crypt().as_deref(),
-                        None,
+                let node = if is_delivery_blob {
+                    OpenedNode::new(
+                        FxDeliveryBlob::new(self.clone(), hash, handle) as Arc<dyn FxNode>
                     )
-                    .await?,
-                ) as Arc<dyn FxNode>);
+                } else {
+                    OpenedNode::new(
+                        FxUnsealedBlob::new(self.clone(), hash, handle) as Arc<dyn FxNode>
+                    )
+                };
 
                 // Add the object to the graveyard so that it's cleaned up if we crash.
                 store.add_to_graveyard(&mut transaction, node.object_id());
@@ -425,6 +439,14 @@ impl DirectoryEntry for BlobDirectory {
                     FxBlob::create_connection_async(node, scope, flags, object_request)
                 } else if node.is::<FxUnsealedBlob>() {
                     let node = node.downcast::<FxUnsealedBlob>().unwrap_or_else(|_| unreachable!());
+                    object_request.create_connection(
+                        scope,
+                        node.take(),
+                        flags,
+                        FidlIoConnection::create,
+                    )
+                } else if node.is::<FxDeliveryBlob>() {
+                    let node = node.downcast::<FxDeliveryBlob>().unwrap_or_else(|_| unreachable!());
                     object_request.create_connection(
                         scope,
                         node.take(),

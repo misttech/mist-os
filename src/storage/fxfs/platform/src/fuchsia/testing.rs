@@ -69,6 +69,7 @@ impl TestFixture {
         let (filesystem, volume, volumes_directory) = if options.format {
             let filesystem = FxFilesystemBuilder::new()
                 .background_task_spawner(spawn_on_pager_executor)
+                .allow_delivery_blobs(true)
                 .format(true)
                 .open(device)
                 .await

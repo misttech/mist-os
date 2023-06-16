@@ -30,7 +30,7 @@ mod compression;
 mod format;
 
 /// Prefix used for writing delivery blobs. Should be prepended to the Merkle root of the blob.
-const DELIVERY_PATH_PREFIX: &'static str = "v1-";
+pub const DELIVERY_PATH_PREFIX: &'static str = "v1-";
 
 /// Generate a delivery blob of the specified `delivery_type` for `data` using default parameters.
 pub fn generate(delivery_type: DeliveryBlobType, data: &[u8]) -> Vec<u8> {
@@ -130,7 +130,7 @@ pub struct Type1Blob {
 }
 
 impl Type1Blob {
-    const HEADER: DeliveryBlobHeader = DeliveryBlobHeader {
+    pub const HEADER: DeliveryBlobHeader = DeliveryBlobHeader {
         delivery_type: DeliveryBlobType::Type1,
         header_length: std::mem::size_of::<SerializedType1Blob>(),
     };

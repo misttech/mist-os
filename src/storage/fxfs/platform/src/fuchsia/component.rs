@@ -286,10 +286,8 @@ impl Component {
         assert!(client.block_size() <= zx::system_get_page_size());
         assert!((zx::system_get_page_size() as u64) == MIN_BLOCK_SIZE);
 
-        // TODO(https://fxbug.dev/122125): fxblob delivery blob support.
-        assert!(!options.allow_delivery_blobs);
-
         let fs = FxFilesystemBuilder::new()
+            .allow_delivery_blobs(options.allow_delivery_blobs)
             .fsck_after_every_transaction(options.fsck_after_every_transaction)
             .read_only(options.read_only)
             .background_task_spawner(spawn_on_pager_executor)

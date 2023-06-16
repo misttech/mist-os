@@ -52,13 +52,17 @@ use {
 };
 
 lazy_static! {
-    static ref RING_BUFFER_SIZE: u64 = 64 * (zx::system_get_page_size() as u64);
+    pub static ref RING_BUFFER_SIZE: u64 = 64 * (zx::system_get_page_size() as u64);
 }
 
-/// Interface for the fuchsia.storage.fxfs.BlobWriter protocol.
+/// Interface for the fuchsia.storage.fxfs.BlobWriter protocol that uses a ring buffer to transfer
+/// data using a VMO.
 #[async_trait]
 pub trait BlobWriterProtocol {
+    /// Get the VMO to write to for this blob, and prepare the blob to accept `size` bytes.
     async fn get_vmo(&self, size: u64) -> Result<zx::Vmo, Error>;
+
+    /// Signal that `bytes_written` bytes can be read out of the VMO provided by `get_vmo`.
     async fn bytes_ready(&self, bytes_written: u64) -> Result<(), Error>;
 }
 
@@ -308,13 +312,13 @@ impl File for FxUnsealedBlob {
 #[async_trait]
 impl FileIo for FxUnsealedBlob {
     async fn read_at(&self, offset: u64, buffer: &mut [u8]) -> Result<u64, Status> {
+        // TODO(fxbug.dev/122125): We should disallow reading from a blob before it's verified.
         let mut buf = self.handle.allocate_buffer(buffer.len());
         let read = self.handle.read(offset, buf.as_mut()).await.map_err(map_to_status)?;
         buffer[..read].copy_from_slice(&buf.as_slice()[..read]);
         Ok(read as u64)
     }
 
-    // TODO(fxbug.dev/122125): Support receiving blobs in the Delivery Format (RFC-0207).
     async fn write_at(&self, offset: u64, content: &[u8]) -> Result<u64, Status> {
         {
             let mut inner = self.inner.lock().unwrap();
