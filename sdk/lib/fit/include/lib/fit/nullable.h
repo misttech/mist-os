@@ -39,8 +39,8 @@ constexpr inline bool is_null(T&&) {
 // with nullptr.
 template <typename T>
 struct is_nullable
-    : public std::integral_constant<bool, std::is_constructible<T, decltype(nullptr)>::value &&
-                                              std::is_assignable<T&, decltype(nullptr)>::value &&
+    : public std::integral_constant<bool, std::is_constructible_v<T, decltype(nullptr)> &&
+                                              std::is_assignable_v<T&, decltype(nullptr)> &&
                                               is_comparable_with_null<T>::value> {};
 template <>
 struct is_nullable<void> : public std::false_type {};
@@ -60,8 +60,8 @@ struct is_nullable<void> : public std::false_type {};
 // TODO(fxbug.dev/4681): fit::nullable does not precisely mirror
 // cpp17::optional. This should be corrected to avoid surprises when switching
 // between the types.
-template <typename T, bool = (is_nullable<T>::value && std::is_constructible<T, T&&>::value &&
-                              std::is_assignable<T&, T&&>::value)>
+template <typename T, bool = (is_nullable<T>::value && std::is_constructible_v<T, T&&> &&
+                              std::is_assignable_v<T&, T&&>)>
 class nullable final {
  public:
   using value_type = T;
@@ -129,30 +129,26 @@ class nullable<T, true> final {
   constexpr T& value() & {
     if (has_value()) {
       return value_;
-    } else {
-      __builtin_abort();
     }
+    __builtin_abort();
   }
   constexpr const T& value() const& {
     if (has_value()) {
       return value_;
-    } else {
-      __builtin_abort();
     }
+    __builtin_abort();
   }
   constexpr T&& value() && {
     if (has_value()) {
       return std::move(value_);
-    } else {
-      __builtin_abort();
     }
+    __builtin_abort();
   }
   constexpr const T&& value() const&& {
     if (has_value()) {
       return std::move(value_);
-    } else {
-      __builtin_abort();
     }
+    __builtin_abort();
   }
 
   template <typename U = T>
