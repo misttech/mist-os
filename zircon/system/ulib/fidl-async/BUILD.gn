@@ -33,13 +33,6 @@ zx_library("fidl-async-cpp") {
   visibility = [
     ":fidl-async-cpp_cc_stub",
     "test:fidl-async-test",
-    "//src/devices/bin/driver_manager:*",
-    "//src/devices/block/bin/sdio:*",
-    "//src/devices/board/lib/acpi:*",
-    "//src/devices/gpio/bin/gpioutil:*",
-    "//src/devices/gpio/drivers/gpio:*",
-    "//src/devices/ram/bin/ram-info:*",
-    "//src/devices/registers/drivers/registers:*",
     "//src/graphics/display/drivers/aml-hdmi:*",
     "//src/graphics/display/drivers/amlogic-display:*",
     "//src/graphics/display/drivers/intel-i915:*",

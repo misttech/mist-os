@@ -10,7 +10,6 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fit/defer.h>
 #include <lib/fpromise/promise.h>
 #include <zircon/errors.h>
@@ -109,7 +108,7 @@ zx_status_t Device::ReportCurrentResources() {
 
   // call _CRS to fill in resources
   ACPI_STATUS acpi_status = AcpiWalkResources(
-      acpi_handle_, (char*)"_CRS",
+      acpi_handle_, const_cast<char*>("_CRS"),
       [](ACPI_RESOURCE* res, void* ctx) __TA_REQUIRES(reinterpret_cast<Device*>(ctx)->lock_) {
         return reinterpret_cast<Device*>(ctx)->AddResource(res);
       },
@@ -300,25 +299,11 @@ void Device::GetBti(GetBtiRequestView request, GetBtiCompleter::Sync& completer)
     completer.ReplyError(path.zx_status_value());
     return;
   }
-  auto iommu_handle = manager_->iommu_manager()->IommuForAcpiDevice(path->data());
+  auto iommu_handle = manager_->iommu_manager()->IommuForAcpiDevice(path.value());
   zx::bti bti;
   zx::bti::create(*iommu_handle, 0, bti_id_, &bti);
 
   completer.ReplySuccess(std::move(bti));
-}
-
-void Device::AcpiConnectServer(zx::channel server) {
-  zx_status_t status = ZX_OK;
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to start FIDL thread: %s", zx_status_get_string(status));
-    return;
-  }
-
-  status = fidl::BindSingleInFlightOnly(
-      dispatcher_, fidl::ServerEnd<fuchsia_hardware_acpi::Device>(std::move(server)), this);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to bind channel: %s", zx_status_get_string(status));
-  }
 }
 
 zx::result<zx::channel> Device::PrepareOutgoing() {
@@ -855,7 +840,7 @@ void Device::InstallNotifyHandler(InstallNotifyHandlerRequestView request,
     completer.ReplyError(fuchsia_hardware_acpi::wire::Status::kAlreadyExists);
     return;
   }
-  notify_handler_type_ = uint32_t(request->mode);
+  notify_handler_type_ = static_cast<uint32_t>(request->mode);
 
   if (!request->handler.is_valid()) {
     completer.ReplyError(fuchsia_hardware_acpi::wire::Status::kBadParameter);

@@ -7,7 +7,6 @@
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/device-protocol/pdev-fidl.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fidl/epitaph.h>
 
 namespace registers {
@@ -126,11 +125,9 @@ zx_status_t Register<T>::WriteRegister(uint64_t offset, T mask, T value) {
 
 template <typename T>
 zx_status_t RegistersDevice<T>::Init(zx_device_t* parent, Metadata metadata) {
-  zx_status_t status = ZX_OK;
-
   ddk::PDevFidl pdev(parent);
   pdev_device_info_t device_info = {};
-  if ((status = pdev.GetDeviceInfo(&device_info)) != ZX_OK) {
+  if (zx_status_t status = pdev.GetDeviceInfo(&device_info); status != ZX_OK) {
     zxlogf(ERROR, "%s: Could not get device info", __func__);
     return status;
   }
@@ -143,7 +140,7 @@ zx_status_t RegistersDevice<T>::Init(zx_device_t* parent, Metadata metadata) {
   std::map<uint32_t, std::vector<T>> overlap;
   for (uint32_t i = 0; i < device_info.mmio_count; i++) {
     std::optional<fdf::MmioBuffer> tmp_mmio;
-    if ((status = pdev.MapMmio(i, &tmp_mmio)) != ZX_OK) {
+    if (zx_status_t status = pdev.MapMmio(i, &tmp_mmio); status != ZX_OK) {
       zxlogf(ERROR, "%s: Could not get mmio regions", __func__);
       return status;
     }
@@ -257,15 +254,15 @@ zx_status_t RegistersDevice<T>::Create(zx_device_t* parent, Metadata metadata) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  zx_status_t status = ZX_OK;
-  if ((status = device->DdkAdd("registers-device", DEVICE_ADD_NON_BINDABLE)) != ZX_OK) {
+  if (zx_status_t status = device->DdkAdd("registers-device", DEVICE_ADD_NON_BINDABLE);
+      status != ZX_OK) {
     zxlogf(ERROR, "%s: DdkAdd failed", __func__);
     return status;
   }
 
   auto* device_ptr = device.release();
 
-  if ((status = device_ptr->Init(parent, metadata)) != ZX_OK) {
+  if (zx_status_t status = device_ptr->Init(parent, metadata); status != ZX_OK) {
     device_ptr->DdkAsyncRemove();
     zxlogf(ERROR, "%s: Init failed", __func__);
     return status;

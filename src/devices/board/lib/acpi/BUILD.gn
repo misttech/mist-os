@@ -56,7 +56,6 @@ shared_fuchsia_deps = [
   "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_cpp_wire",
   "//src/devices/lib/acpi",
   "//src/devices/pci/lib/pci",
-  "//zircon/system/ulib/fidl-async:fidl-async-cpp",
   "//zircon/system/ulib/sync:sync-cpp",
   "//zircon/system/ulib/zircon-internal",
 ]

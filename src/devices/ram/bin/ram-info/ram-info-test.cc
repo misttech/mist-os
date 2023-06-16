@@ -6,13 +6,15 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fidl-async/cpp/bind.h>
 
 #include <zxtest/zxtest.h>
 
 namespace ram_metrics = fuchsia_hardware_ram_metrics;
 
 namespace ram_info {
+
+namespace {
+
 // fake register value used in test.
 constexpr uint32_t TEST_REGISTER_VALUE = 42;
 
@@ -80,7 +82,7 @@ class RamInfoTest : public zxtest::Test {
   void SetUp() override {
     zx::result server = fidl::CreateEndpoints<fuchsia_hardware_ram_metrics::Device>(&client_);
     ASSERT_OK(server.status_value());
-    ASSERT_OK(fidl::BindSingleInFlightOnly(loop_.dispatcher(), std::move(*server), &fake_device_));
+    fidl::BindServer(loop_.dispatcher(), std::move(server.value()), &fake_device_);
     loop_.StartThread("ram-info-test-loop");
   }
 
@@ -127,7 +129,7 @@ TEST_F(RamInfoTest, DefaultPrinter) {
   ram_metrics::wire::BandwidthMeasurementConfig config = {};
   config.cycles_to_measure = kCyclesToMeasure;
 
-  EXPECT_OK(MeasureBandwith(&printer, std::move(client_), config));
+  EXPECT_OK(MeasureBandwith(&printer, client_, config));
   fclose(output_file);
 
   constexpr char kExpectedOutput[] =
@@ -156,7 +158,7 @@ TEST_F(RamInfoTest, CsvPrinter) {
   ram_metrics::wire::BandwidthMeasurementConfig config = {};
   config.cycles_to_measure = kCyclesToMeasure;
 
-  EXPECT_OK(MeasureBandwith(&printer, std::move(client_), config));
+  EXPECT_OK(MeasureBandwith(&printer, client_, config));
   fclose(output_file);
 
   constexpr char kExpectedOutput[] =
@@ -218,7 +220,7 @@ TEST_F(RamInfoTest, CyclesToMeasure) {
   ram_metrics::wire::BandwidthMeasurementConfig config = {};
   config.cycles_to_measure = kCyclesToMeasure;
 
-  EXPECT_OK(MeasureBandwith(&printer, std::move(client_), config));
+  EXPECT_OK(MeasureBandwith(&printer, client_, config));
   fclose(output_file);
 
   constexpr char kExpectedOutput[] =
@@ -236,5 +238,7 @@ TEST_F(RamInfoTest, GetDdrWindowingResults) {
   // function does is print the resulting value.
   EXPECT_OK(GetDdrWindowingResults(client_));
 }
+
+}  // namespace
 
 }  // namespace ram_info

@@ -126,8 +126,6 @@ class Device : public DeviceType,
   ACPI_HANDLE acpi_handle() const { return acpi_handle_; }
   zx_device_t** mutable_zxdev() { return &zxdev_; }
 
-  void AcpiConnectServer(zx::channel server);
-
   // Wrapper around |DdkAdd| which handles setting up FIDL outgoing directory.
   zx::result<> AddDevice(const char* name, cpp20::span<zx_device_prop_t> props,
                          cpp20::span<zx_device_str_prop_t> str_props, uint32_t flags);

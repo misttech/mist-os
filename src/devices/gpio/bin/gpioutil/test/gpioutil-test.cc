@@ -6,7 +6,6 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/mock-function/mock-function.h>
 
 #include <zxtest/zxtest.h>
@@ -18,11 +17,6 @@ using fuchsia_hardware_gpio::Gpio;
 class FakeGpio : public fidl::WireServer<Gpio> {
  public:
   explicit FakeGpio(uint32_t pin = 0, std::string_view name = "NO_NAME") : pin_(pin), name_(name) {}
-
-  zx_status_t Connect(async_dispatcher_t* dispatcher,
-                      fidl::ServerEnd<fuchsia_hardware_gpio::Gpio> server) {
-    return fidl::BindSingleInFlightOnly(dispatcher, std::move(server), this);
-  }
 
   void GetPin(GetPinCompleter::Sync& completer) override {
     mock_get_pin_.Call();
@@ -117,11 +111,11 @@ class GpioUtilTest : public zxtest::Test {
     loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigAttachToCurrentThread);
     gpio_ = std::make_unique<FakeGpio>();
 
-    auto server = fidl::CreateEndpoints(&client_);
+    zx::result server = fidl::CreateEndpoints(&client_);
     ASSERT_OK(server.status_value());
+    fidl::BindServer(loop_->dispatcher(), std::move(server.value()), gpio_.get());
 
     ASSERT_OK(loop_->StartThread("gpioutil-test-loop"));
-    ASSERT_OK(gpio_->Connect(loop_->dispatcher(), std::move(server.value())));
   }
 
   void TearDown() override {

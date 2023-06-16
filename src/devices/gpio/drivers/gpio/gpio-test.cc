@@ -9,7 +9,6 @@
 #include <lib/async-loop/default.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
-#include <lib/fidl-async/cpp/bind.h>
 
 #include <ddk/metadata/gpio.h>
 #include <fbl/alloc_checker.h>
@@ -18,6 +17,8 @@
 
 namespace gpio {
 
+namespace {
+
 class GpioDeviceWrapper {
  public:
   zx::result<fidl::ClientEnd<fuchsia_hardware_gpio::Gpio>> Connect(async_dispatcher_t* dispatcher) {
@@ -25,12 +26,7 @@ class GpioDeviceWrapper {
     if (endpoints.is_error()) {
       return endpoints.take_error();
     }
-    zx_status_t status =
-        fidl::BindSingleInFlightOnly<fidl::WireServer<fuchsia_hardware_gpio::Gpio>>(
-            dispatcher, std::move(endpoints->server), &device_);
-    if (status != ZX_OK) {
-      return zx::error(status);
-    }
+    fidl::BindServer(dispatcher, std::move(endpoints->server), &device_);
     return zx::ok(std::move(endpoints->client));
   }
 
@@ -371,5 +367,7 @@ TEST_F(GpioTest, InitErrorHandling) {
 
   EXPECT_NO_FAILURES(gpio.VerifyAndClear());
 }
+
+}  // namespace
 
 }  // namespace gpio

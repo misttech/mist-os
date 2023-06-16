@@ -70,7 +70,6 @@ test("gpio-test-bin") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",

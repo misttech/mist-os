@@ -6,7 +6,6 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fidl-async/cpp/bind.h>
 
 #include <vector>
 
@@ -14,14 +13,15 @@
 
 namespace sdio {
 
+namespace {
+
 class SdioTest : public zxtest::Test, public fidl::WireServer<fuchsia_hardware_sdio::Device> {
  public:
   SdioTest() : loop_(&kAsyncLoopConfigAttachToCurrentThread) {
     zx::result endpoints = fidl::CreateEndpoints<Device>();
     ASSERT_OK(endpoints.status_value());
     client_ = std::move(endpoints->client);
-    ASSERT_OK(fidl::BindSingleInFlightOnly<fidl::WireServer<Device>>(
-        loop_.dispatcher(), std::move(endpoints->server), this));
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), this);
     loop_.StartThread("sdio-test-loop");
   }
 
@@ -55,7 +55,7 @@ class SdioTest : public zxtest::Test, public fidl::WireServer<fuchsia_hardware_s
   }
 
   void DoRwTxn(DoRwTxnRequestView request, DoRwTxnCompleter::Sync& completer) override {
-    txns_.push_back(wire::SdioRwTxn{
+    txns_.emplace_back(wire::SdioRwTxn{
         .addr = request->txn.addr,
         .data_size = request->txn.data_size,
         .incr = request->txn.incr,
@@ -96,11 +96,11 @@ class SdioTest : public zxtest::Test, public fidl::WireServer<fuchsia_hardware_s
 
  protected:
   void set_byte(uint8_t byte) { byte_ = byte; }
-  uint8_t get_byte() { return byte_; }
-  uint32_t get_address() { return address_; }
+  uint8_t get_byte() const { return byte_; }
+  uint32_t get_address() const { return address_; }
   const std::vector<wire::SdioRwTxn>& get_txns() { return txns_; }
 
-  void ExpectTxnsEqual(const wire::SdioRwTxn& lhs, const wire::SdioRwTxn& rhs) {
+  static void ExpectTxnsEqual(const wire::SdioRwTxn& lhs, const wire::SdioRwTxn& rhs) {
     EXPECT_EQ(lhs.addr, rhs.addr);
     EXPECT_EQ(lhs.data_size, rhs.data_size);
     EXPECT_EQ(lhs.incr, rhs.incr);
@@ -293,5 +293,7 @@ TEST_F(SdioTest, GetTxnStats) {
   EXPECT_STREQ(GetTxnStats(zx::usec(2), 0).c_str(), "2.000 us (0.000 B/s)");
   EXPECT_STREQ(GetTxnStats(zx::nsec(0), 100).c_str(), "0 ns");
 }
+
+}  // namespace
 
 }  // namespace sdio
