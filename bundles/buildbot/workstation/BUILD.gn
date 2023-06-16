@@ -31,11 +31,6 @@ group("workstation") {
 
     # FIDL example tests
     "//examples/fidl:tests",
-
-    # Web-related system integration tests require WebEngine, which must be
-    # provided by the Product. See fxbug.dev/119212. Workstation does not
-    # currently include WebEngine, so provide it to the buildbot.
-    "//src/chromium:web_engine",
   ]
 }
 

@@ -4,6 +4,9 @@
 
 import("generate_chromium_targets.gni")
 
+# Set the default visibility after importing the targets above so that those
+# targets must set visibility from scratch and to ensure that no unscoped
+# visibility leaks into this file.
 visibility = [ ":*" ]
 
 # This target is provided per
