@@ -128,7 +128,8 @@ impl SessionManager {
             .add_fidl_service(IncomingRequest::Manager)
             .add_fidl_service(IncomingRequest::GraphicalPresenter)
             .add_fidl_service(IncomingRequest::Launcher)
-            .add_fidl_service(IncomingRequest::Restarter);
+            .add_fidl_service(IncomingRequest::Restarter)
+            .add_fidl_service(IncomingRequest::WebDebug);
         fs.take_and_serve_directory_handle()?;
 
         fs.for_each_concurrent(MAX_CONCURRENT_CONNECTIONS, |request| {
