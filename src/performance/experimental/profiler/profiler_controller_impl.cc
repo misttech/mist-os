@@ -6,7 +6,7 @@
 
 #include <lib/syslog/cpp/macros.h>
 
-#include <inspector/inspector.h>
+#include <src/lib/fsl/socket/strings.h>
 #include <src/lib/unwinder/cfi_unwinder.h>
 #include <src/lib/unwinder/fp_unwinder.h>
 #include <src/lib/unwinder/fuchsia.h>
@@ -224,62 +224,63 @@ void ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
     return;
   }
 
-  FILE* f = tmpfile();
-  if (f == nullptr) {
-    FX_LOGS(ERROR) << "failed to open file: " << errno;
-    fclose(f);
-    Reset();
-    completer.Close(ZX_ERR_BAD_PATH);
+  // Start by writing out symbolization information to the sockets
+  zx::result<profiler::SymbolizationContext> modules = sampler_->GetContexts();
+  if (modules.is_error()) {
+    completer.Close(modules.status_value());
+  }
+
+  std::stringstream modules_ss;
+  modules_ss << "{{{reset}}}\n";
+  for (const auto& [pid, modules] : modules->process_contexts) {
+    const size_t kPageSize = zx_system_get_page_size();
+    for (const profiler::Module& mod : modules) {
+      modules_ss << "{{{module:0x" << std::hex << mod.module_id << std::dec << ":"
+                 << mod.module_name << ":elf:" << mod.build_id << "}}}\n";
+      for (const profiler::Segment& segment : mod.loads) {
+        uintptr_t start = segment.p_vaddr & -kPageSize;
+        uintptr_t end = (segment.p_vaddr + segment.p_memsz + kPageSize - 1) & -kPageSize;
+        modules_ss << "{{{mmap:0x" << std::hex << mod.vaddr + start << ":0x" << end - start
+                   << ":load:" << mod.module_id << ":";
+
+        if (segment.p_flags & PF_R) {
+          modules_ss << 'r';
+        }
+        if (segment.p_flags & PF_W) {
+          modules_ss << 'w';
+        }
+        if (segment.p_flags & PF_X) {
+          modules_ss << 'x';
+        }
+        modules_ss << ":0x" << start << "}}}\n";
+      }
+    }
+  }
+  if (!fsl::BlockingCopyFromString(modules_ss.str(), socket_)) {
+    completer.Close(ZX_ERR_IO);
     return;
   }
-  sampler_->PrintMarkupContext(f);
+
+  // Then write out each sample
   for (const Sample& sample : sampler_->GetSamples()) {
+    std::stringstream ss;
+    ss << sample.pid << "\n" << sample.tid << "\n";
     int n = 0;
-    fprintf(f, "%lu\n%lu\n", sample.pid, sample.tid);
     for (const auto& frame : sample.stack) {
       const char* address_type = "ra";
       if (n == 0) {
         address_type = "pc";
       }
-      fprintf(f, "{{{bt:%u:%#" PRIxPTR ":%s}}}\n", n++, frame, address_type);
-    }
-  }
-  fflush(f);
-  if (fseek(f, 0, SEEK_SET)) {
-    FX_LOGS(ERROR) << "Failed to rewind tmp file: " << errno;
-    Reset();
-    completer.Close(ZX_ERR_BAD_PATH);
-    return;
-  }
-
-  size_t total = 0;
-  for (;;) {
-    uint8_t buffer[1024];
-    size_t count = fread(buffer, sizeof(buffer[0]), sizeof(buffer) / sizeof(buffer[0]), f);
-    if (count <= 0) {
-      break;
-    }
-    size_t remaining = count;
-    while (remaining > 0) {
-      size_t written;
-      zx_status_t res = socket_.write(0, buffer, remaining, &written);
-      total += written;
-      remaining -= written;
-      if (res == ZX_ERR_SHOULD_WAIT) {
-        zx_signals_t observed;
-        socket_.wait_one(ZX_SOCKET_WRITABLE, zx::time::infinite(), &observed);
-        if (!(observed & ZX_SOCKET_WRITABLE)) {
-          break;
-        }
-      } else if (res != ZX_OK) {
-        break;
+      ss << "{{{bt:" << n++ << ":0x" << std::hex << frame << std::dec << ":" << address_type
+         << "}}}\n";
+      if (!fsl::BlockingCopyFromString(ss.str(), socket_)) {
+        completer.Close(ZX_ERR_IO);
+        return;
       }
     }
   }
 
   socket_.reset();
-  fclose(f);
-  FX_LOGS(INFO) << "Wrote " << total << " bytes to socket";
 
   std::vector<zx::ticks> inspecting_durations = sampler_->SamplingDurations();
   fuchsia_cpu_profiler::SessionStopResponse stats;

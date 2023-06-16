@@ -24,11 +24,6 @@
     ],
     offer: [
         {
-            storage: "tmp",
-            from: "parent",
-            to: "#profiler",
-        },
-        {
             protocol: [
                 "fuchsia.kernel.RootJob",
                 "fuchsia.logger.Log",

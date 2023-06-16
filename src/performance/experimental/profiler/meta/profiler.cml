@@ -19,10 +19,6 @@
                 "fuchsia.logger.Log",
             ],
         },
-        {
-            storage: "tmp",
-            path: "/tmp",
-        },
     ],
     expose: [
         {

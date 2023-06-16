@@ -9,6 +9,7 @@ source_set("lib") {
   sources = [
     "process_watcher.cc",
     "sampler.cc",
+    "symbolization_context.cc",
     "taskfinder.cc",
   ]
 
@@ -22,7 +23,6 @@ source_set("lib") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/elf-search",
-    "//zircon/system/ulib/inspector",
     "//zircon/system/ulib/task-utils",
   ]
 }
@@ -42,6 +42,7 @@ executable("bin") {
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/syslog/cpp",
+    "//src/lib/fsl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]

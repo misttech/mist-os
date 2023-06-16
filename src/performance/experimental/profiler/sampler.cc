@@ -143,3 +143,16 @@ void Sampler::CollectSamples() {
   async::PostDelayedTask(
       dispatcher_, [this]() mutable { CollectSamples(); }, zx::msec(10));
 }
+
+zx::result<profiler::SymbolizationContext> Sampler::GetContexts() {
+  std::map<zx_koid_t, std::vector<profiler::Module>> contexts;
+  for (const SamplingInfo& target : targets_) {
+    zx::result<std::vector<profiler::Module>> modules =
+        profiler::GetProcessModules(target.process.borrow());
+    if (modules.is_error()) {
+      return modules.take_error();
+    }
+    contexts[target.pid] = *modules;
+  }
+  return zx::ok(profiler::SymbolizationContext{contexts});
+}

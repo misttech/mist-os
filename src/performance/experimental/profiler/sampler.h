@@ -17,13 +17,13 @@
 #include <mutex>
 #include <vector>
 
-#include <inspector/inspector.h>
 #include <src/lib/unwinder/cfi_unwinder.h>
 #include <src/lib/unwinder/fp_unwinder.h>
 #include <src/lib/unwinder/fuchsia.h>
 #include <src/lib/unwinder/unwind.h>
 
 #include "process_watcher.h"
+#include "symbolization_context.h"
 
 struct SamplingInfo {
   SamplingInfo(zx::process process, zx_koid_t pid,
@@ -58,11 +58,8 @@ class Sampler {
   zx::result<> Start();
   zx::result<> Stop();
 
-  void PrintMarkupContext(FILE* f) {
-    for (const SamplingInfo& target : targets_) {
-      inspector_print_markup_context(f, target.process.get());
-    }
-  }
+  // Return the information needed to symbolize the samples
+  zx::result<profiler::SymbolizationContext> GetContexts();
 
   std::vector<Sample> GetSamples() { return samples_; }
   std::vector<zx::ticks> SamplingDurations() { return inspecting_durations_; }
