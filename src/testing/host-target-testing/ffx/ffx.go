@@ -144,7 +144,7 @@ func (f *FFXTool) Flash(ctx context.Context, target, FlashManifest string, args 
 	}
 	finalArgs = append(finalArgs, []string{"target", "flash"}...)
 	finalArgs = append(finalArgs, args...)
-	finalArgs = append(finalArgs, FlashManifest)
+	finalArgs = append(finalArgs, []string{"--manifest", FlashManifest}...)
 	return f.runFFXCmd(ctx, finalArgs...)
 }
 
