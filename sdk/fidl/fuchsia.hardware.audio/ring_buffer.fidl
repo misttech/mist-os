@@ -8,49 +8,44 @@ using zx;
 /// Delay information as returned by the driver.
 @available(added=HEAD)
 type DelayInfo = table {
-    /// The driver's best estimate of the delay internal to the hardware it abstracts for
-    /// the chosen format.
+    /// The driver's best estimate (for the chosen format) of the delay internal to the hardware it
+    /// abstracts.
     ///
-    /// "Internal" refers to the hardware on the side of any hardware interconnect (DAI)
-    /// that provides the ring buffer, for instance an SoC audio subsystem, whereas "external"
-    /// refers to hardware on the other side of any hardware interconnect (DAI), for
-    /// instance hardware codecs.
+    /// "Internal" refers to the hardware between the hardware interconnect (DAI) and the ring
+    /// buffer (e.g. an SoC audio subsystem), whereas "external" refers to hardware on the far side
+    /// of any hardware interconnect (DAI) (e.g. hardware codecs).
     ///
     /// For a given frame during playback, this is any delay after the driver/HW copies it
     /// out of the ring-buffer, before it exits any hardware interconnect.
-    /// For a given frame during recording, this is any delay before the driver/HW copies
-    /// it into the ring-buffer, after it enters the hardware interconnect.
+    /// For a given frame during recording, this is any delay after it enters the hardware
+    /// interconnect, before the driver/HW copies it into the ring-buffer.
     ///
-    /// `internal_delay` must be taken into account by the client when determining either
-    /// the minimum lead time requirement (for playback) or the minimum capture delay (for
-    /// capture).
+    /// `internal_delay` must be taken into account by the client when determining the requirements
+    /// for minimum lead time (during playback) and minimum capture delay (during capture).
     ///
     /// This delay must not include the inherent delay added by the temporary buffering needed
-    /// to copy data in and out of the ring buffer, specified via `RingBufferProperties`
+    /// to copy data in and out of the ring buffer, which is contained in `RingBufferProperties`
     /// `driver_transfer_bytes`.
     ///
     /// Required.
     1: internal_delay zx.Duration;
 
-    /// The driver's best estimate of the delay external to the hardware it abstracts for
-    /// the chosen format.
+    /// The driver's best estimate (for the chosen format) of the delay external to the hardware it
+    /// abstracts.
     ///
-    /// "Internal" refers to the hardware on the side of any hardware interconnect (DAI)
-    /// that provides the ring buffer, for instance an SoC audio subsystem, whereas "external"
-    /// refers to hardware on the other side of any hardware interconnect (DAI), for
-    /// instance hardware codecs.
+    /// "External" refers to hardware on the far side of any hardware interconnect (DAI) (e.g.
+    /// hardware codecs), whereas "internal" refers to hardware between the hardware interconnect
+    /// (DAI) and the ring buffer (e.g. an SoC audio subsystem).
     ///
-    /// If not included `external_delay` is unknown. If unknown, the client may treat
-    /// `external_delay` as it chooses, e.g. may autodetect it, consider it zero, consider
-    /// it a large number, etc.
+    /// `external_delay` must be taken into account by the client when determining the requirements
+    /// for minimum lead time (during playback) and minimum capture delay (during capture).
     ///
-    /// `external_delay` must be taken into account by the client when determining either
-    /// the minimum lead time requirement (for playback) or the minimum capture delay (for
-    /// capture).
+    /// If not included, `external_delay` is unknown. If unknown, a client may treat it however it
+    /// chooses (consider it zero or some large number, autodetect it, etc).
     ///
-    /// This delay must not include the inherent delay added by the temporary buffering needed
-    /// to copy data in and out of the ring buffer, specified via `RingBufferProperties`
-    /// `driver_transfer_bytes`.
+    /// Like `internal_delay`, this delay must not include the inherent delay added by the temporary
+    /// buffering needed to copy data in and out of the ring buffer, which is contained in
+    /// `RingBufferProperties` field `driver_transfer_bytes`.
     ///
     /// Optional.
     2: external_delay zx.Duration;
@@ -58,20 +53,20 @@ type DelayInfo = table {
 
 /// Properties of the ring buffer. These values don't change once the ring buffer is created.
 type RingBufferProperties = table {
-    /// The driver's best estimate of the external delay present in the presentation pipeline for
-    /// the chosen format. When precisely synchronizing presentation across multiple entities
-    /// (e.g. devices), the external delay should be taken into account.
+    /// The driver's best estimate (for the chosen format) of the delay external to the hardware it
+    /// abstracts. External delay must be taken into account when precisely synchronizing
+    /// presentation across multiple entities (e.g. devices).
     /// If not included `external_delay` is unknown.
     //
     // # Deprecation
     //
     // Not needed anymore since the functionality is available via `WatchDelayInfo` below.
-    // Should match `DelayInfo` `external_delay` until it's removed.
+    // Should match `DelayInfo` `external_delay` until it is removed.
     @available(deprecated=9)
     1: external_delay zx.Duration;
 
-    /// Size (in bytes) representing a temporary buffer used by the driver in order to consume or
-    /// generate the ring buffer contents. Required.
+    /// Size (in bytes) of the temporary buffer used by the driver when consuming or generating ring
+    /// buffer contents. Required.
     /// The ring buffer contents must be produced and consumed at the rate specified with the
     /// `CreateRingBuffer` command, however some amount of buffering is required when the data is
     /// written into and read from the ring buffer. For playback the data is consumed by the driver
@@ -107,87 +102,103 @@ type RingBufferProperties = table {
     2: fifo_depth uint32;
 
     /// When set to true, indicates that the ring buffer runs in a different cache coherency domain,
-    /// hence clients need to make sure that their data has been flushed all the way to main memory
-    /// (in the case of playback) or that their view of the ring buffer will need to be invalidated
-    /// before read (in the case of capture).
+    /// and thus clients must ensure that their data writes are flushed all the way to main memory
+    /// (during playback), or that their view of the ring buffer must be invalidated before any
+    /// reads (during capture). This is because there may be hardware external to the CPUs that
+    /// reads/writes main memory, bypassing the CPUs.
     ///
-    /// When set to false, indicates that the ring buffer runs in the same cache coherency domain,
-    /// hence the driver does not require flushing/invalidation, as in there is no hardware external
-    /// to the CPUs reading/writing from/to main memory bypassing the CPUs.
-    /// Note that in this case the driver and client still need to make sure they synchronize their
-    /// access to the data, for instance inserting the appropriate acquire fences before reading
-    /// and release fences after writing.
+    /// When set to false, indicates that the ring buffer runs in the same cache coherency domain as
+    /// the CPUs, hence the driver is not required to flush/invalidate the ring buffer.
+    /// Note that in this case, the driver and client still must synchronize their data access, for
+    /// instance by inserting the appropriate acquire fences before reading and releasing fences
+    /// after writing.
     ///
     /// Required.
     3: needs_cache_flush_or_invalidate bool;
 
-    /// The driver's best estimate of the amount of time it takes the hardware to actually start
-    /// playback/capture, after a channel is activated by `SetActiveChannels`.
-    /// Restated: the driver estimates that after `SetActiveChannels` enables a channel, its data
-    /// will resume flowing at approximately `set_time` + `turn_on_delay`.
-    /// It may take some time for the hardware to get into fully operational mode, for example due
-    /// a power state change or communication delays within the driver's multiple hardware entities
-    /// as in a Bluetooth driver. This delay must be taken into account if not getting the initial
-    /// audio samples played or captured is not acceptable.
-    /// If not included `turn_on_delay` is unknown.
+    /// The driver's best estimate of the time needed for the hardware to emit (during playback) or
+    /// accept (during capture) frames, after a channel is activated by `SetActiveChannels`.
+    /// The driver estimates that after `SetActiveChannels(channel)->(set_time)` enables a channel,
+    /// its data will resume flowing at approximately `set_time` + `turn_on_delay`.
+    /// Hardware can take time to become fully operational (e.g. due to a power state change, or
+    /// communication delays between a Bluetooth driver's multiple hardware entities). The client
+    /// must take this delay into account, if it is unacceptable to drop the actual audio frames
+    /// and instead play/capture silence during this interval.
+    /// If not included, `turn_on_delay` is unknown.
     ///
     /// Optional.
     4: turn_on_delay zx.Duration;
 
-    /// Size (in bytes) representing a temporary buffer used by the driver/HW in order to transfer
-    /// (consume or produce) the ring buffer contents.
+    /// Size (in bytes) of the temporary buffer used by the driver/HW when consuming or generating
+    /// the ring buffer contents.
     ///
     /// The ring buffer contents must be produced and consumed at the rate specified with the
-    /// `CreateRingBuffer` command; however, some amount of buffering is required when the data is
-    /// written into and read from the ring buffer. For playback, the data is consumed by the driver
-    /// by reading ahead up to `driver_transfer_bytes`. For capture, the data is produced by the
-    /// driver holding up to `driver_transfer_bytes` at a time before committing it to the ring
-    /// buffer.
+    /// `CreateRingBuffer` command, using data transfers between a temporary buffer and the ring
+    /// buffer. For playback, audio frames are consumed by the driver in transfers as large as
+    /// `driver_transfer_bytes`. For capture, audio frames are produced by the driver in transfers
+    /// as large as `driver_transfer_bytes`. In both cases, this many frames must accumulate before
+    /// they are read from or committed to the ring buffer.
     ///
-    /// Let's define ‘begin pointer’ and 'end pointer' as position pointers in the ring buffer,
-    /// represented as 'B' and 'E' in the figures below, that bound the portion of the ring buffer
-    /// that are unsafe for reading or writing by the client at a given point in time.
+    /// These data transfers mean that there is always a section of the ring buffer that is unsafe
+    /// for the client to be writing/reading. This unsafe buffer region is defined on one side by
+    /// the current position 'P', and on the other side by the 'safe pointer' location 'S'. Once the
+    /// ring buffer starts, these two pointers begin moving, and the region between these pointers
+    /// must not be read or written by the client at that time. The diagrams below note these
+    /// pointers as 'P' and 'S'.
+    ///
+    /// During playback, client must write data BEFORE hardware transfers occur. During capture,
+    /// client can read captured data only AFTER hardware transfers occur. For this reason, during
+    /// playback 'S' is always ahead of 'P', whereas during capture 'S' is always behind 'P'.
+    ///
     ///
     /// ## Playback
     ///
-    /// For playback, it is safe for a client to write only to the part of the ring buffer that is
-    /// not simultaneously being read by the driver/HW. Before the ring buffer is started, clients
-    /// of output devices may write initial data starting at the very beginning of the ring buffer
-    /// at least `driver_transfer_bytes` of audio since they must always stay at least that far
-    /// ahead of where the driver/HW is reading. Note that if the client does not write to the
-    /// beginning of the ring buffer, then it is relying on the zeroed-out contents of the VMO as
-    /// the initial audio to be read by the driver/HW.
-    /// It is therefore not safe for the client to copy additional data to the ring buffer between
-    /// 'B' and 'E', the part already in use which may or may not already be consumed. The client
-    /// may safely write to any other portion of the ring buffer from 'E' to '0/B'.
+    /// Before they start the ring buffer, clients may safely write any ring buffer location. It is
+    /// recommended that they write at least `driver_transfer_bytes` of initial audio (since they
+    /// must always stay at least that far ahead of where the driver/HW is reading). Otherwise the
+    /// client relies on the zeroed-out contents of the VMO to be the initial audio read by the
+    /// driver/HW.
+    /// Once the ring buffer is started, it is not safe for the client to write data to the ring
+    /// buffer between 'P' and 'S', because this represents data already in use (potentially already
+    /// consumed). The client may safely write the rest of the ring buffer (between 'S' and '0/P').
     ///
     /// ```
     ///                                       Ring Buffer
     ///  +-------------------------+-------------------------------------------------------------+
-    ///  |<---      unsafe     --->|<---                  safe (empty)                       --->|
+    ///  |<---      unsafe     --->|<---     safe (empty unless prewritten by the client)    --->|
     ///  |<`driver_transfer_bytes`>|                                                             |
     ///  +-------------------------+-------------------------------------------------------------+
-    /// 0/B                        E                                                             0
+    ///  0=P                       S                                                             0
     /// ```
     ///
-    /// As time passes, the driver/HW reads the data in chunks of unknown size (up to the amount of
-    /// `driver_transfer_bytes`) at the rate specified in `CreateRingBuffer`, and the begin/end
-    /// pointers move to the right of '0' at the same rate. As a result, the area to which it is
-    /// unsafe for the client to write moves gradually forward through the ring buffer, but
-    /// maintains a constant size equal to `driver_transfer_bytes`. For instance after some time we
-    /// now have:
+    /// As time passes, the driver/HW reads the data in chunks of `driver_transfer_bytes` or less,
+    /// at the rate specified in `CreateRingBuffer`. The Position/Safe pointers move to the right at
+    /// the same rate, but do so smoothly. As a result, the "unsafe for client writes" area moves
+    /// gradually through the ring buffer, while maintaining a constant size equal to
+    /// `driver_transfer_bytes`. Thus, after some period we now have:
     ///
     /// ```
     ///                                       Ring Buffer
     ///  +------------+-------------------------+------------------------------------------------+
-    ///  [<-- safe -->|<---      unsafe     --->|<--               safe (empty)               -->|
+    ///  |<-- safe -->|<---      unsafe     --->|<--      safe (empty unless prewritten)      -->|
     ///  |            |<`driver_transfer_bytes`>|                                                |
     ///  +------------+-------------------------+------------------------------------------------+
-    ///  0            B                         E                                                0
+    ///  0            P                         S                                                0
     /// ```
     ///
-    /// In steady state, i.e. once the process has wrapped around the ring buffer, any area outside
-    /// of the pointers 'B' and 'E' is safe to write:
+    /// Later, 'S' wraps around the ring buffer before 'P' does. Note that the region from 0 to 'S',
+    /// plus the region from 'P' to the end of the ring buffer, adds up to `driver_transfer_bytes`:
+    ///
+    /// ```
+    ///                                       Ring Buffer
+    ///  +---------------+------------------------------------------------------------+----------+
+    ///  |<--- unsafe -->|<---                        safe                        --->|<-unsafe->|
+    ///  |<`driver_transf|                                                            |er_bytes`>|
+    ///  +---------------+------------------------------------------------------------+----------+
+    ///  0               S                                                            P          0
+    /// ```
+    ///
+    /// In steady state, any area outside of the pointers 'P' and 'S' is safe to write:
     ///
     /// ```
     ///                                       Ring Buffer
@@ -195,30 +206,30 @@ type RingBufferProperties = table {
     ///  [<--           safe           -->|<---      unsafe     --->|<--         safe         -->|
     ///  |                                |<`driver_transfer_bytes`>|                            |
     ///  +--------------------------------+-------------------------+----------------------------+
-    ///  0                                B                         E                            0
+    ///  0                                P                         S                            0
     /// ```
     ///
     ///
     /// ## Recording
     ///
-    /// For recording, it is safe for a client to read only the part of the ring buffer that is not
-    /// simultaneously being written by the driver/HW. At the moment when the ring buffer is started
-    /// by the client, the driver has not written any amount of data to the ring buffer, so there
-    /// is nothing for the client to read:
+    /// While recording, it is only safe for the client to read that part of the ring buffer that is
+    /// not simultaneously being written by the driver/HW. Before capture begins, it may read the
+    /// entire ring buffer, but the driver has not yet written anything for the client to read. This
+    /// is the ring buffer at the moment that the client starts the ring buffer:
     ///
     /// ```
     ///                                       Ring Buffer
     ///  +---------------------------------------------------------------------------------------+
     ///  [<---                                   empty                                        -->|
     ///  +---------------------------------------------------------------------------------------+
-    ///0/B/E                                                                                     0
+    /// 0=S=P                                                                                    0
     /// ```
     ///
-    /// The driver/HW begins writing to the ring buffer starting at '0'. As time passes, the
-    /// driver/HW writes data in chunks of unknown size (up to `driver_transfer_bytes`) at the rate
-    /// specified in `CreateRingBuffer`. Until an amount of data equal to `driver_transfer_bytes`
-    /// has been written into the ring buffer by the driver/HW, it is not safe for the client to
-    /// read any data:
+    /// Once capture begins, the driver/HW acquires frames, eventually making its first data
+    /// transfer to the ring buffer starting at '0'. These transfers are of unknown size but may be
+    /// as large as `driver_transfer_bytes`; they occur at the rate specified in `CreateRingBuffer`.
+    /// Before the driver/HW writes at least `driver_transfer_bytes` into the ring buffer, the
+    /// client cannot yet safely read any of the newly captured frames:
     ///
     /// ```
     ///                                       Ring Buffer
@@ -226,26 +237,40 @@ type RingBufferProperties = table {
     ///  [<--- unsafe --->|<--                               empty                            -->|
     ///  |<`driver_transfer_bytes`>|                                                             |
     ///  +----------------+----------------------------------------------------------------------+
-    /// 0/B               E                                                                      0
+    /// 0=S               P                                                                      0
     /// ```
     ///
-    /// Once `driver_transfer_bytes` of data have been copied into the ring buffer by the driver/HW,
-    /// it is safe for the client to read the data from '0' to 'B'. It is unsafe to read the data
-    /// from ‘B’ to ‘E’, the area in which the driver/HW is simultaneously writing. This unsafe
-    /// area moves gradually forward through the ring buffer, but maintains a constant size equal
-    /// to `driver_transfer_bytes`. For instance after some time we now have:
+    /// Once the driver/HW has written at least `driver_transfer_bytes` of data into the ring
+    /// buffer, 'S' begins to smoothly move forward at the same rate as 'P' (as determined by the
+    /// ring buffer's rate and sample format). The client can safely read frames in the region
+    /// between '0' and 'S'. It is unsafe for the client to read data between 'S' and 'P', because
+    /// this is where the driver/HW is simultaneously writing. This region gradually  progresses
+    /// across the ring buffer, maintaining a constant size of `driver_transfer_bytes`.
+    /// After some time we have:
     ///
     /// ```
     ///                                       Ring Buffer
-    ///  +------------+-------------------------+------------------------------------------------+
-    ///  [<-- safe -->|<---      unsafe     --->|<--                  empty                   -->|
-    ///  |            |<`driver_transfer_bytes`>|                                                |
-    ///  +------------+-------------------------+------------------------------------------------+
-    ///  0            B                         E                                                0
+    ///  +----------------------+-------------------------+--------------------------------------+
+    ///  [<--      safe      -->|<---      unsafe     --->|<--             empty              -->|
+    ///  |                      |<`driver_transfer_bytes`>|                                      |
+    ///  +----------------------+-------------------------+--------------------------------------+
+    ///  0                      S                         P                                      0
+    /// ```
+    ///
+    /// Later, 'P' wraps around the ring buffer before 'S' does. Note that the region from 0 to 'P',
+    /// plus the region from 'S' to the end of the ring buffer, adds up to `driver_transfer_bytes`:
+    ///
+    /// ```
+    ///                                       Ring Buffer
+    ///  +-----------+------------------------------------------------------------+--------------+
+    ///  |<--unsafe->|<---                        safe                        --->|<---unsafe--->|
+    ///  |<`driver_tr|                                                            |ansfer_bytes`>|
+    ///  +-----------+------------------------------------------------------------+--------------+
+    ///  0           P                                                            S              0
     /// ```
     ///
     /// In steady state, i.e. once the process has wrapped around the ring buffer, any area outside
-    /// of the pointers 'B' and 'E' is safe to read:
+    /// of pointers 'S' and 'P' is safe to read:
     ///
     /// ```
     ///                                       Ring Buffer
@@ -253,35 +278,35 @@ type RingBufferProperties = table {
     ///  [<--           safe           -->|<---      unsafe     --->|<--         safe         -->|
     ///  |                                |<`driver_transfer_bytes`>|                            |
     ///  +--------------------------------+-------------------------+----------------------------+
-    ///  0                                B                         E                            0
+    ///  0                                S                         P                            0
     /// ```
+    ///
     ///
     /// ## Hardware versus software
     ///
     /// The ring buffer data may be directly consumed/generated by hardware, i.e.
     /// `driver_transfer_bytes` can be mapped directly to the size of a hardware FIFO block, since a
     /// hardware FIFO block determines the upper limit amount of data read ahead or held back.
-    /// Note that if the FIFO buffer is used in a "ping pong" manner (such that only half the FIFO
-    /// buffer size is copied at a time), and this is true not only on steady state but also the
-    /// very first time the driver copies data to or from the ring buffer, then
-    /// `driver_transfer_bytes` may be set to half the FIFO buffer size. If the hardware at any time
-    /// copies data to/from the ring buffer in an amount equal to the entire FIFO buffer size (for
-    /// instance the first copy from the ring buffer to fill an initially empty hardware FIFO), then
-    /// `driver_transfer_bytes` must be set to the entire size of the FIFO buffer.
+    /// Note that if the FIFO buffer is not used in the traditional "high water" way (such as a
+    /// "ping pong" design where only half the FIFO size is used at any time -- even during the very
+    /// first transfers at `Start` time), then `driver_transfer_bytes` may be set to a smaller value
+    /// but must be at least equal to the largest amount of data ever stored in the FIFO buffer.
+    /// Even if the transfer size never exceeds half the size of the FIFO, if the full size of the
+    /// FIFO is used (for instance, upon `Start` when filling an initially empty hardware FIFO),
+    /// then `driver_transfer_bytes` must be set to the entire size of the FIFO buffer.
     ///
     /// The ring buffer data may instead be consumed/generated by audio driver software that is
     /// conceptually situated between the ring buffer and the audio hardware. In this case, for
-    /// playback, the `driver_transfer_bytes` read ahead amount is set large enough such that the
-    /// driver guarantees no undetected underruns, this assuming the client is generating the data
-    /// as determined by the `CreateRingBuffer` and `Start` commands. For capture, the
-    /// `driver_transfer_bytes` held back amount is set large enough such that the driver guarantees
-    /// no undetected underruns when generating the data as determined by the `CreateRingBuffer` and
-    /// `Start` commands.
+    /// playback, the `driver_transfer_bytes` read ahead amount must be large enough such that the
+    /// driver guarantees no undetected underruns, based on the client requirement to generate data
+    /// based on the `CreateRingBuffer` rate and the `start_time` from `Start`. For capture,
+    /// `driver_transfer_bytes` must be large enough for the driver to guarantee no underruns when
+    /// generating the data as determined by the `CreateRingBuffer` and `Start` commands.
     ///
     ///
-    /// This size must not include the impact of any delays caused by hardware or software
-    /// processing abstracted by the driver; those are communicated by the `internal_delay` and
-    /// `external_delay` fields in `DelayInfo` and are entirely orthogonal to this value.
+    /// `driver_transfer_bytes` must not include the impact of delays caused by hardware or software
+    /// processing abstracted by the driver. Those delays are communicated by `internal_delay` and
+    /// `external_delay` fields in `DelayInfo`; they are orthogonal to this value.
     ///
     /// Required.
     @available(added=HEAD)
