@@ -8,7 +8,6 @@ use std::sync::Arc;
 use crate::{
     arch::vdso::{get_sigreturn_offset, set_vdso_constants, HAS_VDSO},
     types::{errno, from_status_like_fdio, Errno},
-    vmex_resource::VMEX_RESOURCE,
 };
 
 #[derive(Default)]
@@ -49,14 +48,11 @@ pub fn load_vdso_from_file() -> Result<Option<Arc<zx::Vmo>>, Errno> {
     const VDSO_FILENAME: &str = "libvdso.so";
     const VDSO_LOCATION: &str = "/pkg/data";
 
-    let dir_proxy = sync_open_in_namespace(
-        VDSO_LOCATION,
-        fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_EXECUTABLE,
-    )?;
+    let dir_proxy = sync_open_in_namespace(VDSO_LOCATION, fuchsia_fs::OpenFlags::RIGHT_READABLE)?;
     let vdso_vmo = syncio::directory_open_vmo(
         &dir_proxy,
         VDSO_FILENAME,
-        fidl_fuchsia_io::VmoFlags::READ | fidl_fuchsia_io::VmoFlags::EXECUTE,
+        fidl_fuchsia_io::VmoFlags::READ,
         zx::Time::INFINITE,
     )
     .map_err(|status| from_status_like_fdio!(status))?;
@@ -66,9 +62,6 @@ pub fn load_vdso_from_file() -> Result<Option<Arc<zx::Vmo>>, Errno> {
         .create_child(zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE, 0, vdso_size)
         .map_err(|status| from_status_like_fdio!(status))?;
     set_vdso_constants(&vdso_clone)?;
-    let vdso_executable = vdso_clone
-        .replace_as_executable(&VMEX_RESOURCE)
-        .map_err(|status| from_status_like_fdio!(status))?;
 
-    Ok(Some(Arc::new(vdso_executable)))
+    Ok(Some(Arc::new(vdso_clone)))
 }

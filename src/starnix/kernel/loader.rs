@@ -9,7 +9,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::{fs::FileHandle, logging::*, mm::*, task::*, types::*};
+use crate::{fs::FileHandle, logging::*, mm::*, task::*, types::*, vmex_resource::VMEX_RESOURCE};
 
 #[derive(Debug)]
 struct StackResult {
@@ -405,9 +405,19 @@ pub fn load_executable(
     let vdso_base = if let Some(vdso_vmo) = &current_task.kernel().vdso.vmo {
         let vmo_size = vdso_vmo.get_size().map_err(|_| errno!(EINVAL))?;
         let prot_flags = ProtectionFlags::READ | ProtectionFlags::EXEC;
+
+        // Create a private mapping of each
+        let vdso_clone = vdso_vmo
+            .create_child(zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE, 0, vmo_size)
+            .map_err(|status| from_status_like_fdio!(status))?;
+
+        let vdso_executable = vdso_clone
+            .replace_as_executable(&VMEX_RESOURCE)
+            .map_err(|status| from_status_like_fdio!(status))?;
+
         let map_result = current_task.mm.map(
             DesiredAddress::Any,
-            Arc::clone(vdso_vmo),
+            Arc::new(vdso_executable),
             0,
             vmo_size as usize,
             prot_flags,

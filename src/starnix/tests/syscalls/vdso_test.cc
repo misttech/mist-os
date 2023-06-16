@@ -300,7 +300,44 @@ TEST_F(VdsoProcTest, VdsoModificationsDontAffectOtherPrograms) {
     SetEIPadFirstByte(vdso_base_, 0x3F);
     // From this point on, we can't use any vdso call.
     execve(argv[0], const_cast<char**>(&argv[0]), NULL);
+    _exit(1);
   });
 
   EXPECT_TRUE(helper.WaitForChildren());
+}
+
+TEST_F(VdsoProcTest, VdsoModificationsBeforeForkingDontAffectOtherPrograms) {
+  // Due to eager vmo copies in starnix fork, modifying the vdso before and
+  // after fork has different effects. This test checks that if we modify the
+  // vdso before forking, and execve into another binary, that binary will *not*
+  // see our vdso modifications.
+  const char* argv[] = {"/proc/self/exe", "--gtest_filter=" ELF_HEADER_TEST_NAME, NULL};
+  ASSERT_EQ(mprotect(vdso_base_, vdso_size_, PROT_READ | PROT_WRITE | PROT_EXEC), 0);
+  ASSERT_TRUE(IsEIPadFirstByteZero(vdso_base_));
+
+  // Don't print anything on the child.
+  ASSERT_EQ(fcntl(fileno(stdout), F_SETFD, FD_CLOEXEC), 0);
+  ASSERT_EQ(fcntl(fileno(stderr), F_SETFD, FD_CLOEXEC), 0);
+  ASSERT_EQ(fcntl(fileno(stdin), F_SETFD, FD_CLOEXEC), 0);
+
+  // We are going to modify the vdso. Try not to use complex code.
+  SetEIPadFirstByte(vdso_base_, 0x3F);
+
+  // From this point on, we can't use any vdso call.
+  pid_t child_pid = fork();
+
+  if (child_pid == 0) {
+    execve(argv[0], const_cast<char**>(&argv[0]), NULL);
+    _exit(1);
+  } else {
+    int status;
+    pid_t waited = waitpid(child_pid, &status, 0);
+
+    // restore the vdso.
+    SetEIPadFirstByte(vdso_base_, 0x00);
+
+    EXPECT_EQ(waited, child_pid);
+    EXPECT_TRUE(WIFEXITED(status));
+    EXPECT_EQ(WEXITSTATUS(status), 0);
+  }
 }
