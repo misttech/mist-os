@@ -481,6 +481,9 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         // to ensure that the same device is not opened multiple times because of concurrency.
         let binder_tasks = Rc::new(Mutex::new(HashMap::<zx::Koid, fasync::Task<()>>::new()));
         while let Some(event) = stream.try_next().await? {
+            // The tasks must be freed when this method returns, binder_tasks should always have a
+            // single owner, and the RC is only used temporarily to let tasks clean themselves.
+            debug_assert_eq!(Rc::strong_count(&binder_tasks), 1);
             match event {
                 fbinder::DevBinderRequest::Open { payload, control_handle } => {
                     // Extract the path, process_accessor and binder_server from the `payload`, and
