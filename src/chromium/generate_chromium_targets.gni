@@ -335,6 +335,7 @@ if (is_host) {
       ]
     }
 
+    # TODO(fxrev.dev/769058): Remove once fxbug.dev/117321 is fixed.
     prebuilt_test_manifest("chromium_cast_runner_tests") {
       manifest_name = "cast_runner_tests_manifest.json"
       environments = [ nuc_env ]
@@ -342,15 +343,6 @@ if (is_host) {
         max_severity = "ERROR"
       }
       deps = [ ":chromium_test_base_deps" ]
-      if (!use_chromium_canary) {
-        deps += [
-          # Although the test package includes cast_runner, the
-          # CastRunnerCfv1ShimIntegrationTest tests rely on being able to launch
-          # cast_runner by its Component URL.
-          # TODO(crbug.com/1065707): Remove once CFv1 support & tests are removed.
-          "//src/cast:cast_runner_pkg",
-        ]
-      }
     }
 
     icu_tzdata_config_data("tzdata_for_base_unittests") {
