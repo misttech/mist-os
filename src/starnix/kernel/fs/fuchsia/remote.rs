@@ -4,11 +4,12 @@
 
 use fidl::AsHandleRef;
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::{self as zx, HandleBased};
+use fuchsia_zircon as zx;
 use std::sync::Arc;
 use syncio::{
-    zxio, zxio::zxio_get_posix_mode, zxio_node_attributes_t, DirentIterator, Zxio, ZxioDirent,
-    ZxioSignals,
+    zxio,
+    zxio::{zxio_get_posix_mode, ZXIO_NODE_PROTOCOL_SYMLINK},
+    zxio_node_attr_has_t, zxio_node_attributes_t, DirentIterator, Zxio, ZxioDirent, ZxioSignals,
 };
 
 use crate::{
@@ -25,7 +26,16 @@ use crate::{
     vmex_resource::VMEX_RESOURCE,
 };
 
-pub struct RemoteFs;
+// Returns true if this remote filesystem supports open2. This only works if the specified node is
+// from the remote filesystem.
+fn supports_open2(node: &FsNode) -> bool {
+    node.fs().downcast_ops::<RemoteFs>().unwrap().supports_open2
+}
+
+pub struct RemoteFs {
+    supports_open2: bool,
+}
+
 impl FileSystemOps for RemoteFs {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
         const REMOTE_FS_MAGIC: u32 = u32::from_be_bytes(*b"f.io");
@@ -47,14 +57,48 @@ impl RemoteFs {
         source: &str,
         rights: fio::OpenFlags,
     ) -> Result<FileSystemHandle, Errno> {
-        let remote_node = RemoteNode::new(root.into_handle(), rights)?;
-        let attrs = remote_node.zxio.attr_get().map_err(|_| errno!(EIO))?;
+        // See if open2 works.  We assume that if open2 works on the root, it will work for all
+        // descendent nodes in this filesystem.  At the time of writing, this is true for Fxfs.
+        let (client_end, server_end) = zx::Channel::create();
+        let root_proxy = fio::DirectorySynchronousProxy::new(root);
+        root_proxy
+            .open2(
+                ".",
+                &fio::ConnectionProtocols::Node(fio::NodeOptions {
+                    flags: Some(fio::NodeFlags::GET_REPRESENTATION),
+                    attributes: Some(fio::NodeAttributesQuery::ID),
+                    ..Default::default()
+                }),
+                server_end,
+            )
+            .map_err(|_| errno!(EIO))?;
+        let mut attrs = zxio_node_attributes_t {
+            has: zxio_node_attr_has_t { id: true, ..Default::default() },
+            ..Default::default()
+        };
+        let (remote_node, node_id, supports_open2) =
+            match Zxio::create_with_on_representation(client_end.into(), Some(&mut attrs)) {
+                Err(zx::Status::NOT_SUPPORTED) => {
+                    // Fall back to open.
+                    let remote_node = RemoteNode {
+                        zxio: Arc::new(
+                            Zxio::create(root_proxy.into_channel().into())
+                                .map_err(|status| from_status_like_fdio!(status))?,
+                        ),
+                        rights,
+                    };
+                    let attrs = remote_node.zxio.attr_get().map_err(|_| errno!(EIO))?;
+                    (remote_node, attrs.id, false)
+                }
+                Err(status) => return Err(from_status_like_fdio!(status)),
+                Ok(zxio) => (RemoteNode { zxio: Arc::new(zxio), rights }, attrs.id, true),
+            };
         let mut root_node = FsNode::new_root(remote_node);
-        root_node.node_id = attrs.id;
+        root_node.node_id = node_id;
         let fs = FileSystem::new(
             kernel,
             CacheMode::Cached,
-            RemoteFs,
+            RemoteFs { supports_open2 },
             FileSystemOptions {
                 source: source.as_bytes().to_vec(),
                 flags: if rights.contains(fio::OpenFlags::RIGHT_WRITABLE) {
@@ -81,13 +125,6 @@ struct RemoteNode {
     /// The fuchsia.io rights for the dir handle. Subdirs will be opened with
     /// the same rights.
     rights: fio::OpenFlags,
-}
-
-impl RemoteNode {
-    fn new(handle: zx::Handle, rights: fio::OpenFlags) -> Result<RemoteNode, Errno> {
-        let zxio = Arc::new(Zxio::create(handle).map_err(|status| from_status_like_fdio!(status))?);
-        Ok(RemoteNode { zxio, rights })
-    }
 }
 
 /// Create a file handle from a zx::Handle.
@@ -230,7 +267,7 @@ impl FsNodeOps for RemoteNode {
         node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,
-        mode: FileMode,
+        mut mode: FileMode,
         _dev: DeviceType,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
@@ -240,22 +277,55 @@ impl FsNodeOps for RemoteNode {
             return error!(EINVAL, name);
         }
 
-        let open_flags = fio::OpenFlags::CREATE
-            | fio::OpenFlags::RIGHT_WRITABLE
-            | fio::OpenFlags::RIGHT_READABLE;
-        let zxio = Arc::new(
-            self.zxio
-                .open(open_flags, name)
-                .map_err(|status| from_status_like_fdio!(status, name))?,
-        );
+        let zxio;
+        let node_id;
+        if supports_open2(node) {
+            let mut attrs = zxio_node_attributes_t {
+                has: zxio_node_attr_has_t { id: true, ..Default::default() },
+                ..Default::default()
+            };
+            zxio = Arc::new(
+                self.zxio
+                    .open2(
+                        name,
+                        syncio::OpenOptions {
+                            node_protocols: Some(fio::NodeProtocols {
+                                file: Some(fio::FileProtocolFlags::default()),
+                                ..Default::default()
+                            }),
+                            mode: fio::OpenMode::AlwaysCreate,
+                            create_attr: Some(zxio_node_attributes_t {
+                                mode: mode.bits(),
+                                has: zxio_node_attr_has_t { mode: true, ..Default::default() },
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        },
+                        Some(&mut attrs),
+                    )
+                    .map_err(|status| from_status_like_fdio!(status, name))?,
+            );
+            node_id = attrs.id;
+        } else {
+            let open_flags = fio::OpenFlags::CREATE
+                | fio::OpenFlags::CREATE_IF_ABSENT
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::RIGHT_READABLE;
+            zxio = Arc::new(
+                self.zxio
+                    .open(open_flags, name)
+                    .map_err(|status| from_status_like_fdio!(status, name))?,
+            );
+            // Unfortunately, remote filesystems that don't support open2 require another
+            // round-trip.
+            let attrs = zxio.attr_get().map_err(|status| from_status_like_fdio!(status, name))?;
+            mode = get_mode(&attrs)?;
+            node_id = attrs.id;
+        }
 
-        // TODO: It's unfortunate to have another round-trip. We should be able
-        // to set the mode based on the information we get during open.
-        let attrs = zxio.attr_get().map_err(|status| from_status_like_fdio!(status, name))?;
         let ops = Box::new(RemoteNode { zxio, rights: self.rights });
-        let mode = get_mode(&attrs)?;
         let child =
-            node.fs().create_node_with_id(ops, attrs.id, FsNodeInfo::new(attrs.id, mode, owner));
+            node.fs().create_node_with_id(ops, node_id, FsNodeInfo::new(node_id, mode, owner));
         Ok(child)
     }
 
@@ -294,19 +364,59 @@ impl FsNodeOps for RemoteNode {
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let name = get_name_str(name)?;
-        let zxio = Arc::new(self.zxio.open(self.rights, name).map_err(|status| match status {
-            // TODO: When the file is not found `PEER_CLOSED` is returned. In this case the peer
-            // closed should be translated into ENOENT, so that the file may be created. This
-            // logic creates a race when creating files in remote filesystems, between us and
-            // any other client creating a file between here and `mknod`.
-            zx::Status::PEER_CLOSED => errno!(ENOENT, name),
-            status => from_status_like_fdio!(status, name),
-        })?);
+        let zxio;
+        let mode;
+        let node_id;
+        if supports_open2(node) {
+            let mut attrs = zxio_node_attributes_t {
+                has: zxio_node_attr_has_t {
+                    protocols: true,
+                    mode: true,
+                    id: true,
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            zxio = Arc::new(
+                self.zxio
+                    .open2(
+                        name,
+                        syncio::OpenOptions {
+                            node_protocols: Some(fio::NodeProtocols {
+                                directory: Some(Default::default()),
+                                file: Some(Default::default()),
+                                symlink: Some(Default::default()),
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        },
+                        Some(&mut attrs),
+                    )
+                    .map_err(|status| from_status_like_fdio!(status, name))?,
+            );
+            if attrs.protocols & ZXIO_NODE_PROTOCOL_SYMLINK != 0 {
+                // We don't set the mode for symbolic links, so we synthesize it instead.
+                mode = FileMode::IFLNK | FileMode::ALLOW_ALL;
+            } else {
+                mode = FileMode::from_bits(attrs.mode);
+            }
+            node_id = attrs.id;
+        } else {
+            zxio = Arc::new(self.zxio.open(self.rights, name).map_err(|status| match status {
+                // TODO: When the file is not found `PEER_CLOSED` is returned. In this case the peer
+                // closed should be translated into ENOENT, so that the file may be created. This
+                // logic creates a race when creating files in remote filesystems, between us and
+                // any other client creating a file between here and `mknod`.
+                zx::Status::PEER_CLOSED => errno!(ENOENT, name),
+                status => from_status_like_fdio!(status, name),
+            })?);
 
-        // TODO: It's unfortunate to have another round-trip. We should be able
-        // to set the mode based on the information we get during open.
-        let attrs = zxio.attr_get().map_err(|status| from_status_like_fdio!(status))?;
-        let mode = get_mode(&attrs)?;
+            // Unfortunately, remote filesystems that don't support open2 require another
+            // round-trip.
+            let attrs = zxio.attr_get().map_err(|status| from_status_like_fdio!(status))?;
+            mode = get_mode(&attrs)?;
+            node_id = attrs.id;
+        }
 
         let ops = if mode.is_lnk() {
             Box::new(RemoteSymlink { zxio }) as Box<dyn FsNodeOps>
@@ -315,8 +425,8 @@ impl FsNodeOps for RemoteNode {
         };
         let child = node.fs().create_node_with_id(
             ops,
-            attrs.id,
-            FsNodeInfo::new(attrs.id, mode, FsCred::root()),
+            node_id,
+            FsNodeInfo::new(node_id, mode, FsCred::root()),
         );
         Ok(child)
     }
@@ -794,7 +904,8 @@ mod test {
     use fidl_fuchsia_io as fio;
     use fuchsia_async as fasync;
     use fuchsia_fs::{directory, file};
-    use fxfs_testing::TestFixture;
+    use fuchsia_zircon::HandleBased;
+    use fxfs_testing::{TestFixture, TestFixtureOptions};
 
     #[::fuchsia::test]
     async fn test_tree() -> Result<(), anyhow::Error> {
@@ -948,6 +1059,59 @@ mod test {
                 SymlinkTarget::Node(_) => panic!("readlink returned SymlinkTarget::Node"),
             }
         }
+
+        fixture.close().await;
+    }
+
+    #[::fuchsia::test]
+    async fn test_mode_persists() {
+        let fixture = TestFixture::new().await;
+
+        let (server, client) = zx::Channel::create();
+        fixture
+            .root()
+            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
+            .expect("clone failed");
+
+        const MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits() | 0o467);
+
+        let (kernel, current_task) = create_kernel_and_task();
+        fasync::unblock(move || {
+            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+            let fs = RemoteFs::new_fs(&kernel, client, "/", rights).expect("new_fs failed");
+            let ns = Namespace::new(fs);
+            current_task.fs().set_umask(FileMode::from_bits(0));
+            ns.root()
+                .create_node(&current_task, b"file", MODE, DeviceType::NONE)
+                .expect("create_node failed");
+        })
+        .await;
+
+        let fixture = TestFixture::open(
+            fixture.close().await,
+            TestFixtureOptions { encrypted: true, as_blob: false, format: false },
+        )
+        .await;
+
+        let (server, client) = zx::Channel::create();
+        fixture
+            .root()
+            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
+            .expect("clone failed");
+
+        let (kernel, current_task) = create_kernel_and_task();
+        fasync::unblock(move || {
+            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+            let fs = RemoteFs::new_fs(&kernel, client, "/", rights).expect("new_fs failed");
+            let ns = Namespace::new(fs);
+            let mut context = LookupContext::new(SymlinkMode::NoFollow);
+            let child = ns
+                .root()
+                .lookup_child(&current_task, &mut context, b"file")
+                .expect("lookup_child failed");
+            assert_eq!(child.entry.node.info().mode, MODE);
+        })
+        .await;
 
         fixture.close().await;
     }

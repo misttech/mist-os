@@ -13,6 +13,7 @@ Symbols:
   - { Name: zxio_create_symlink, Type: Func }
   - { Name: zxio_create_with_info, Type: Func }
   - { Name: zxio_create_with_on_open, Type: Func }
+  - { Name: zxio_create_with_on_representation, Type: Func }
   - { Name: zxio_dirent_iterator_destroy, Type: Func }
   - { Name: zxio_dirent_iterator_init, Type: Func }
   - { Name: zxio_dirent_iterator_next, Type: Func }

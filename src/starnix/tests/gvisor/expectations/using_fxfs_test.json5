@@ -12,14 +12,6 @@
         {
             type: "expect_failure",
             matchers: [
-                // access_test
-                "AccessTest.UsrReadOnly",
-                "AccessTest.UsrReadExec",
-                "AccessTest.UsrReadWriteExec",
-
-                // chown_test
-                "ChownKinds/ChownParamTest.ChownFileSucceedsAsRoot/*",
-
                 // exec_test
                 "ExecTest.SymlinkLimitRefreshedForInterpreter",
 
@@ -61,17 +53,9 @@
 
                 // mknod_test
                 "MknodTest.MknodAtFIFO",
-                "MknodTest.RegularFilePermissions",
                 "MknodTest.Socket",
 
-                // open_create_test
-                "CreateTest.CreateWithReadFlagNotAllowedByMode",
-                "CreateTest.CreateWithWriteFlagNotAllowedByMode",
-                "CreateTest.HonorsUmask",
-
                 // open_test
-                "OpenTest.CanTruncateWithStrangePermissions",
-                "OpenTest.OpenWithOpath",
                 "OpenTest.Truncate",
 
                 // read_test

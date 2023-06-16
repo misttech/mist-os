@@ -11,6 +11,7 @@
                 zxio_create_symlink;
 		zxio_create_with_info;
 		zxio_create_with_on_open;
+		zxio_create_with_on_representation;
 		zxio_dirent_iterator_destroy;
 		zxio_dirent_iterator_init;
 		zxio_dirent_iterator_next;

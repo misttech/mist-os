@@ -43,7 +43,7 @@ impl FileMode {
     pub const PERMISSIONS: FileMode = FileMode(0o7777);
     pub const EMPTY: FileMode = FileMode(0);
 
-    pub fn from_bits(mask: u32) -> FileMode {
+    pub const fn from_bits(mask: u32) -> FileMode {
         FileMode(mask)
     }
 
@@ -56,51 +56,51 @@ impl FileMode {
         Ok(Self::from_bits(mask))
     }
 
-    pub fn bits(&self) -> u32 {
+    pub const fn bits(&self) -> u32 {
         self.0
     }
 
-    pub fn contains(&self, other: FileMode) -> bool {
-        *self & other == other
+    pub const fn contains(&self, other: FileMode) -> bool {
+        self.0 & other.0 == other.bits()
     }
 
-    pub fn intersects(&self, other: FileMode) -> bool {
-        *self & other != FileMode::EMPTY
+    pub const fn intersects(&self, other: FileMode) -> bool {
+        self.0 & other.0 != 0
     }
 
     pub fn fmt(&self) -> FileMode {
         FileMode(self.bits() & uapi::S_IFMT)
     }
 
-    pub fn with_type(&self, file_type: FileMode) -> FileMode {
+    pub const fn with_type(&self, file_type: FileMode) -> FileMode {
         FileMode((self.bits() & Self::PERMISSIONS.bits()) | (file_type.bits() & uapi::S_IFMT))
     }
 
-    pub fn is_lnk(&self) -> bool {
+    pub const fn is_lnk(&self) -> bool {
         (self.bits() & uapi::S_IFMT) == uapi::S_IFLNK
     }
 
-    pub fn is_reg(&self) -> bool {
+    pub const fn is_reg(&self) -> bool {
         (self.bits() & uapi::S_IFMT) == uapi::S_IFREG
     }
 
-    pub fn is_dir(&self) -> bool {
+    pub const fn is_dir(&self) -> bool {
         (self.bits() & uapi::S_IFMT) == uapi::S_IFDIR
     }
 
-    pub fn is_chr(&self) -> bool {
+    pub const fn is_chr(&self) -> bool {
         (self.bits() & uapi::S_IFMT) == uapi::S_IFCHR
     }
 
-    pub fn is_blk(&self) -> bool {
+    pub const fn is_blk(&self) -> bool {
         (self.bits() & uapi::S_IFMT) == uapi::S_IFBLK
     }
 
-    pub fn is_fifo(&self) -> bool {
+    pub const fn is_fifo(&self) -> bool {
         (self.bits() & uapi::S_IFMT) == uapi::S_IFIFO
     }
 
-    pub fn is_sock(&self) -> bool {
+    pub const fn is_sock(&self) -> bool {
         (self.bits() & uapi::S_IFMT) == uapi::S_IFSOCK
     }
 }

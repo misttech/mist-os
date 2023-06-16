@@ -60,7 +60,8 @@ ZXIO_EXPORT zx_status_t zxio_create(zx_handle_t handle, zxio_storage_t* storage)
 // Always consumes |handle|. |handle| must refer to a channel object.
 ZXIO_EXPORT zx_status_t zxio_create_with_on_open(zx_handle_t handle, zxio_storage_t* storage);
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+// EXPERIMENTAL: This is not widely supported.
+//
 // Like zxio_create for channel objects expecting an incoming
 // fuchsia.io.Node/OnRepresentation event.
 //
@@ -74,7 +75,6 @@ ZXIO_EXPORT zx_status_t zxio_create_with_on_open(zx_handle_t handle, zxio_storag
 ZXIO_EXPORT zx_status_t zxio_create_with_on_representation(zx_handle_t handle,
                                                            zxio_node_attributes_t* inout_attr,
                                                            zxio_storage_t* storage);
-#endif
 
 // Like zxio_create but the caller provides information about the handle.
 ZXIO_EXPORT zx_status_t zxio_create_with_info(zx_handle_t handle,

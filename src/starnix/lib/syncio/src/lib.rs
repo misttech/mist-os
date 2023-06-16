@@ -327,7 +327,7 @@ pub struct OpenOptions {
     /// Behaviour with respect ot existence. See fuchsia.io for precise semantics.
     pub mode: fio::OpenMode,
 
-    /// See fuchsia.io for semantics. If empty, then it is regarded as absent i.e.  rights will be
+    /// See fuchsia.io for semantics. If empty, then it is regarded as absent i.e. rights will be
     /// inherited.
     pub rights: fio::Operations,
 
@@ -500,6 +500,14 @@ impl Zxio {
         Ok(zxio)
     }
 
+    pub fn create_with_on_open(handle: zx::Handle) -> Result<Zxio, zx::Status> {
+        let zxio = Zxio::default();
+        let status =
+            unsafe { zxio::zxio_create_with_on_open(handle.into_raw(), zxio.as_storage_ptr()) };
+        zx::ok(status)?;
+        Ok(zxio)
+    }
+
     pub fn release(self) -> Result<zx::Handle, zx::Status> {
         let mut handle = 0;
         let status = unsafe { zxio::zxio_release(self.as_ptr(), &mut handle) };
@@ -572,12 +580,20 @@ impl Zxio {
         Ok(zxio)
     }
 
-    pub fn unlink(&self, name: &str, flags: fio::UnlinkFlags) -> Result<(), zx::Status> {
-        let flags_bits = flags.bits().try_into().map_err(|_| zx::Status::INVALID_ARGS)?;
+    pub fn create_with_on_representation(
+        handle: zx::Handle,
+        attributes: Option<&mut zxio_node_attributes_t>,
+    ) -> Result<Zxio, zx::Status> {
+        let zxio = Zxio::default();
         let status = unsafe {
-            zxio::zxio_unlink(self.as_ptr(), name.as_ptr() as *const c_char, name.len(), flags_bits)
+            zxio::zxio_create_with_on_representation(
+                handle.into_raw(),
+                attributes.map(|a| a as *mut _).unwrap_or(std::ptr::null_mut()),
+                zxio.as_storage_ptr(),
+            )
         };
-        zx::ok(status)
+        zx::ok(status)?;
+        Ok(zxio)
     }
 
     /// Opens a limited node connection (similar to O_PATH).
@@ -604,6 +620,14 @@ impl Zxio {
         };
         zx::ok(status)?;
         Ok(zxio)
+    }
+
+    pub fn unlink(&self, name: &str, flags: fio::UnlinkFlags) -> Result<(), zx::Status> {
+        let flags_bits = flags.bits().try_into().map_err(|_| zx::Status::INVALID_ARGS)?;
+        let status = unsafe {
+            zxio::zxio_unlink(self.as_ptr(), name.as_ptr() as *const c_char, name.len(), flags_bits)
+        };
+        zx::ok(status)
     }
 
     pub fn read(&self, data: &mut [u8]) -> Result<usize, zx::Status> {
