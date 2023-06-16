@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/mmio/mmio-buffer.h>
+#include <lib/mmio/mmio-pinned-buffer.h>
 
 #include "magma_util/dlog.h"
 #include "magma_util/short_macros.h"
@@ -12,15 +13,15 @@ namespace magma {
 
 class ZirconPlatformMmio : public PlatformMmio {
  public:
-  ZirconPlatformMmio(mmio_buffer_t mmio);
+  explicit ZirconPlatformMmio(fdf::MmioBuffer mmio);
 
   ~ZirconPlatformMmio();
-  bool Pin(zx_handle_t bti);
+  bool Pin(const zx::bti& bti);
   uint64_t physical_address() override;
 
  private:
-  mmio_buffer_t mmio_;
-  mmio_pinned_buffer_t pinned_mmio_ = {};
+  fdf::MmioBuffer mmio_;
+  std::optional<fdf::MmioPinnedBuffer> pinned_mmio_;
 };
 
 }  // namespace magma

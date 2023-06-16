@@ -83,7 +83,7 @@ std::unique_ptr<magma::PlatformMmio> ParentDeviceDFv2::CpuMapMmio(
   }
 
   std::unique_ptr<magma::ZirconPlatformMmio> mmio(
-      new magma::ZirconPlatformMmio(mmio_buffer.value().release()));
+      new magma::ZirconPlatformMmio(std::move(mmio_buffer.value())));
   return mmio;
 }
 

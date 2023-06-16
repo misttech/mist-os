@@ -56,14 +56,14 @@ std::unique_ptr<PlatformMmio> ZirconPlatformDevice::CpuMapMmio(
   DLOG("map_mmio index %d cache_policy %d returned: 0x%x", index, static_cast<int>(cache_policy),
        mmio_buffer->get_vmo()->get());
 
-  std::unique_ptr<ZirconPlatformMmio> mmio(new ZirconPlatformMmio(mmio_buffer.value().release()));
+  std::unique_ptr<ZirconPlatformMmio> mmio(new ZirconPlatformMmio(std::move(mmio_buffer.value())));
 
   zx::bti bti;
   status = pdev_.GetBti(0, &bti);
   if (status != ZX_OK)
     return DRETP(nullptr, "failed to get bus transaction initiator for pinning mmio: %d", status);
 
-  if (!mmio->Pin(bti.get()))
+  if (!mmio->Pin(bti))
     return DRETP(nullptr, "Failed to pin mmio");
 
   return mmio;

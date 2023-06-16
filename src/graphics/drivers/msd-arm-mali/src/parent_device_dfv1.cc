@@ -44,14 +44,14 @@ std::unique_ptr<magma::PlatformMmio> ParentDeviceDFv1::CpuMapMmio(
        mmio_buffer.value().get_vmo()->get());
 
   std::unique_ptr<magma::ZirconPlatformMmio> mmio(
-      new magma::ZirconPlatformMmio(mmio_buffer.value().release()));
+      new magma::ZirconPlatformMmio(std::move(mmio_buffer.value())));
 
   zx::bti bti_handle;
   status = pdev_.GetBti(0, &bti_handle);
   if (status != ZX_OK)
     return DRETP(nullptr, "failed to get bus transaction initiator for pinning mmio: %d", status);
 
-  if (!mmio->Pin(bti_handle.get()))
+  if (!mmio->Pin(bti_handle))
     return DRETP(nullptr, "Failed to pin mmio");
 
   return mmio;

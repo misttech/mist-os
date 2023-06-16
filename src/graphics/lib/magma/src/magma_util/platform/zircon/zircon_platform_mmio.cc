@@ -20,24 +20,23 @@ static_assert(ZX_CACHE_POLICY_WRITE_COMBINING ==
                   static_cast<int>(PlatformMmio::CACHE_POLICY_WRITE_COMBINING),
               "enum mismatch");
 
-ZirconPlatformMmio::ZirconPlatformMmio(mmio_buffer_t mmio)
+ZirconPlatformMmio::ZirconPlatformMmio(fdf::MmioBuffer mmio)
     // TODO(fxbug.dev/56253): Add MMIO_PTR to cast.
-    : PlatformMmio((void*)mmio.vaddr, mmio.size), mmio_(mmio) {}
+    : PlatformMmio((void*)mmio.get(), mmio.get_size()), mmio_(std::move(mmio)) {}
 
-bool ZirconPlatformMmio::Pin(zx_handle_t bti) {
-  zx_status_t status = mmio_buffer_pin(&mmio_, bti, &pinned_mmio_);
+bool ZirconPlatformMmio::Pin(const zx::bti& bti) {
+  zx_status_t status = mmio_.Pin(bti, &pinned_mmio_);
   if (status != ZX_OK) {
     return DRETF(false, "Failed to pin mmio: %d\n", status);
   }
   return true;
 }
 
-uint64_t ZirconPlatformMmio::physical_address() { return pinned_mmio_.paddr; }
-
-ZirconPlatformMmio::~ZirconPlatformMmio() {
-  DLOG("ZirconPlatformMmio dtor");
-  mmio_buffer_unpin(&pinned_mmio_);
-  mmio_buffer_release(&mmio_);
+uint64_t ZirconPlatformMmio::physical_address() {
+  MAGMA_DASSERT(pinned_mmio_);
+  return pinned_mmio_->get_paddr();
 }
+
+ZirconPlatformMmio::~ZirconPlatformMmio() { DLOG("ZirconPlatformMmio dtor"); }
 
 }  // namespace magma
