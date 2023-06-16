@@ -69,6 +69,7 @@
                 "fuchsia.paver.Paver",
                 "fuchsia.power.battery.BatteryManager",
                 "fuchsia.update.installer.Installer",
+                "fuchsia.wlan.wlanix.Wlanix",
             ],
             from: "parent",
             to: "#elements",

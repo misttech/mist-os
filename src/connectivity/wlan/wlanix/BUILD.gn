@@ -1,0 +1,48 @@
+# Copyright 2019 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/fidl/fidl.gni")
+import("//build/rust/rustc_binary.gni")
+import("//src/sys/core/build/core_shard.gni")
+
+fidl("fuchsia.wlan.wlanix") {
+  sdk_category = "internal"
+
+  sources = [ "wlanix.fidl" ]
+
+  public_deps = [ "//zircon/vdso/zx" ]
+}
+
+rustc_binary("wlanix_bin") {
+  output_name = "wlanix"
+  edition = "2018"
+  with_unit_tests = true
+
+  deps = [
+    ":fuchsia.wlan.wlanix_rust",
+    "//src/lib/diagnostics/log/rust",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:tracing",
+  ]
+
+  sources = [ "src/main.rs" ]
+}
+
+fuchsia_component("component") {
+  manifest = "meta/wlanix.cml"
+  component_name = "wlanix"
+  deps = [ ":wlanix_bin" ]
+}
+
+fuchsia_package("wlanix") {
+  deps = [ ":component" ]
+}
+
+core_shard("wlanix-core-shard") {
+  shard_file = "meta/wlanix.core_shard.cml"
+}

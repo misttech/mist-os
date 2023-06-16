@@ -43,5 +43,11 @@
             from: "parent",
             to: "#starnix_runner",
         },
+        {
+            protocol: [ "fuchsia.wlan.wlanix.Wlanix" ],
+            from: "#wlanix",
+            to: "#starnix_runner",
+            source_availability: "unknown",
+        },
     ],
 }

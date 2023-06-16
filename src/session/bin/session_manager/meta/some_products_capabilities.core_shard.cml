@@ -276,5 +276,11 @@
             to: "#session-manager",
             source_availability: "unknown",
         },
+        {
+            protocol: "fuchsia.wlan.wlanix.Wlanix",
+            from: "#wlanix",
+            to: "#session-manager",
+            source_availability: "unknown",
+        },
     ],
 }

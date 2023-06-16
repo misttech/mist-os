@@ -1,0 +1,33 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.wlan.wlanix;
+
+using zx;
+
+/// Protocol used to proxy Wlanix requests from Starnix into Fuchsia.
+@discoverable
+open protocol Wlanix {
+    flexible GetWifi(resource struct {
+        wifi server_end:Wifi;
+    }) -> () error zx.Status;
+};
+
+open protocol Wifi {
+    flexible GetChip(resource struct {
+        chip_id uint32;
+        chip server_end:WifiChip;
+    }) -> () error zx.Status;
+};
+
+open protocol WifiChip {
+    flexible CreateStaIface(resource struct {
+        iface server_end:WifiStaIface;
+    }) -> () error zx.Status;
+};
+
+open protocol WifiStaIface {
+    flexible GetName() -> (struct {
+        iface_name string:16;
+    });
+};
