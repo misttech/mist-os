@@ -19,11 +19,13 @@
 //! revisit this decision if we grow more stages that need autorepeat.
 
 use crate::input_device::{self, Handled, InputDeviceDescriptor, InputDeviceEvent, InputEvent};
+use crate::input_handler::InputHandlerStatus;
 use crate::keyboard_binding::KeyboardEvent;
 use anyhow::{anyhow, Context, Result};
 use fidl_fuchsia_settings as fsettings;
 use fidl_fuchsia_ui_input3::{self as finput3, KeyEventType, KeyMeaning};
 use fuchsia_async::{Task, Time, Timer};
+use fuchsia_inspect;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::Duration;
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
@@ -197,22 +199,33 @@ pub struct Autorepeater {
 
     // The task that feeds input events into the processing loop.
     _event_feeder: Task<()>,
+
+    /// The inventory of this handler's Inspect status.
+    _inspect_status: InputHandlerStatus,
 }
 
 impl Autorepeater {
     /// Creates a new [Autorepeater].  The `source` is a receiver end through which
     /// the input pipeline events are sent.  You must submit [Autorepeater::run]
     /// to an executor to start the event processing.
-    pub fn new(source: UnboundedReceiver<InputEvent>) -> Rc<Self> {
-        Self::new_with_settings(source, Default::default())
+    pub fn new(
+        source: UnboundedReceiver<InputEvent>,
+        input_handlers_node: &fuchsia_inspect::Node,
+    ) -> Rc<Self> {
+        Self::new_with_settings(source, Default::default(), input_handlers_node)
     }
 
     fn new_with_settings(
         mut source: UnboundedReceiver<InputEvent>,
         settings: Settings,
+        input_handlers_node: &fuchsia_inspect::Node,
     ) -> Rc<Self> {
         let (event_sink, event_source) = mpsc::unbounded();
-
+        let inspect_status = InputHandlerStatus::new(
+            input_handlers_node,
+            "autorepeater",
+            /* generates_events */ true,
+        );
         // We need a task to feed input events into the channel read by `run()`.
         // The task will run until there is at least one sender. When there
         // are no more senders, `source.next().await` will return None, and
@@ -256,6 +269,7 @@ impl Autorepeater {
             state: RefCell::new(Default::default()),
             settings,
             _event_feeder: event_feeder,
+            _inspect_status: inspect_status,
         })
     }
 
@@ -418,6 +432,7 @@ mod tests {
     use crate::testing_utilities;
     use fidl_fuchsia_input::Key;
     use fuchsia_async::TestExecutor;
+    use fuchsia_inspect;
     use fuchsia_zircon as zx;
     use futures::Future;
     use pin_utils::pin_mut;
@@ -586,6 +601,9 @@ mod tests {
         // `receiver` is where the autorepeater will read these events from.
         let (input, receiver) = mpsc::unbounded();
 
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+
         // The autorepeat handler takes a receiver end of one channel to get
         // the input from, and the send end of another channel to place the
         // output into. Since we must formally start the handling process in
@@ -595,7 +613,7 @@ mod tests {
         // This API ensures that the handler is fully configured when started,
         // all the while leaving the user with an option of when and how exactly
         // to start the handler, including not immediately upon creation.
-        let handler = Autorepeater::new_with_settings(receiver, default_settings());
+        let handler = Autorepeater::new_with_settings(receiver, default_settings(), &test_node);
 
         // `sender` is where the autorepeat handler will send processed input
         // events into.  `output` is where we will read the results of the
@@ -669,7 +687,9 @@ mod tests {
     fn basic_sync_and_cancel_only() {
         let mut executor = TestExecutor::new_with_fake_time();
         let (input, receiver) = mpsc::unbounded();
-        let handler = Autorepeater::new_with_settings(receiver, default_settings());
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let handler = Autorepeater::new_with_settings(receiver, default_settings(), &test_node);
         let (sender, output) = mpsc::unbounded();
         let handler_task = Task::local(async move { handler.run(sender).await });
 
@@ -723,7 +743,9 @@ mod tests {
     fn handled_events_are_forwarded() {
         let mut executor = TestExecutor::new_with_fake_time();
         let (input, receiver) = mpsc::unbounded();
-        let handler = Autorepeater::new_with_settings(receiver, default_settings());
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let handler = Autorepeater::new_with_settings(receiver, default_settings(), &test_node);
         let (sender, output) = mpsc::unbounded();
         let handler_task = Task::local(async move { handler.run(sender).await });
 
@@ -782,7 +804,9 @@ mod tests {
         let mut executor = TestExecutor::new_with_fake_time();
 
         let (input, receiver) = mpsc::unbounded();
-        let handler = Autorepeater::new_with_settings(receiver, default_settings());
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let handler = Autorepeater::new_with_settings(receiver, default_settings(), &test_node);
         let (sender, output) = mpsc::unbounded();
         let handler_task = Task::local(async move { handler.run(sender).await });
 
@@ -858,7 +882,9 @@ mod tests {
         let mut executor = TestExecutor::new_with_fake_time();
 
         let (input, receiver) = mpsc::unbounded();
-        let handler = Autorepeater::new_with_settings(receiver, default_settings());
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let handler = Autorepeater::new_with_settings(receiver, default_settings(), &test_node);
         let (sender, output) = mpsc::unbounded();
         let handler_task = Task::local(async move { handler.run(sender).await });
 
@@ -938,7 +964,9 @@ mod tests {
         let mut executor = TestExecutor::new_with_fake_time();
 
         let (input, receiver) = mpsc::unbounded();
-        let handler = Autorepeater::new_with_settings(receiver, default_settings());
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let handler = Autorepeater::new_with_settings(receiver, default_settings(), &test_node);
         let (sender, output) = mpsc::unbounded();
         let handler_task = Task::local(async move { handler.run(sender).await });
 
@@ -1064,7 +1092,9 @@ mod tests {
         let mut executor = TestExecutor::new_with_fake_time();
 
         let (input, receiver) = mpsc::unbounded();
-        let handler = Autorepeater::new_with_settings(receiver, default_settings());
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let handler = Autorepeater::new_with_settings(receiver, default_settings(), &test_node);
         let (sender, output) = mpsc::unbounded();
         let handler_task = Task::local(async move { handler.run(sender).await });
 
@@ -1182,7 +1212,9 @@ mod tests {
         let mut executor = TestExecutor::new_with_fake_time();
 
         let (input, receiver) = mpsc::unbounded();
-        let handler = Autorepeater::new_with_settings(receiver, default_settings());
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let handler = Autorepeater::new_with_settings(receiver, default_settings(), &test_node);
         let (sender, output) = mpsc::unbounded();
         let handler_task = Task::local(async move { handler.run(sender).await });
 
@@ -1244,7 +1276,9 @@ mod tests {
         let mut executor = TestExecutor::new_with_fake_time();
 
         let (input, receiver) = mpsc::unbounded();
-        let handler = Autorepeater::new_with_settings(receiver, default_settings());
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let handler = Autorepeater::new_with_settings(receiver, default_settings(), &test_node);
         let (sender, output) = mpsc::unbounded();
         let handler_task = Task::local(async move { handler.run(sender).await });
 
@@ -1349,7 +1383,9 @@ mod tests {
         let mut executor = TestExecutor::new_with_fake_time();
 
         let (input, receiver) = mpsc::unbounded();
-        let handler = Autorepeater::new_with_settings(receiver, default_settings());
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let handler = Autorepeater::new_with_settings(receiver, default_settings(), &test_node);
         let (sender, output) = mpsc::unbounded();
         let handler_task = Task::local(async move { handler.run(sender).await });
 
@@ -1461,5 +1497,30 @@ mod tests {
         };
         pin_mut!(joined_fut);
         run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
+    }
+
+    #[test]
+    fn autorepeater_initialized_with_inspect_node() {
+        let _executor = TestExecutor::new_with_fake_time();
+
+        let (_, receiver) = mpsc::unbounded();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        let _autorepeater = Autorepeater::new(receiver, &fake_handlers_node);
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                autorepeater: {
+                    events_received_count: 0u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
     }
 }

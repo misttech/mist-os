@@ -121,10 +121,11 @@ impl InputPipelineAssembly {
     pub fn add_display_ownership(
         self,
         display_ownership_event: zx::Event,
+        input_handlers_node: &fuchsia_inspect::Node,
     ) -> InputPipelineAssembly {
         let (sender, autorepeat_receiver, mut tasks) = self.into_components();
         let (autorepeat_sender, receiver) = mpsc::unbounded();
-        let h = DisplayOwnership::new(display_ownership_event);
+        let h = DisplayOwnership::new(display_ownership_event, input_handlers_node);
         tasks.push(fasync::Task::local(async move {
             h.handle_input_events(autorepeat_receiver, autorepeat_sender)
                 .await
@@ -136,10 +137,10 @@ impl InputPipelineAssembly {
     /// Adds the autorepeater into the input pipeline assembly.  The autorepeater
     /// is installed after any handlers that have been already added to the
     /// assembly.
-    pub fn add_autorepeater(self) -> Self {
+    pub fn add_autorepeater(self, input_handlers_node: &fuchsia_inspect::Node) -> Self {
         let (sender, autorepeat_receiver, mut tasks) = self.into_components();
         let (autorepeat_sender, receiver) = mpsc::unbounded();
-        let a = Autorepeater::new(autorepeat_receiver);
+        let a = Autorepeater::new(autorepeat_receiver, input_handlers_node);
         tasks.push(fasync::Task::local(async move {
             a.run(autorepeat_sender)
                 .await

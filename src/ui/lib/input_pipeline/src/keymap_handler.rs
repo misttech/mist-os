@@ -7,9 +7,10 @@
 //! See [KeymapHandler] for details.
 
 use crate::input_device;
-use crate::input_handler::UnhandledInputHandler;
+use crate::input_handler::{InputHandlerStatus, UnhandledInputHandler};
 use crate::keyboard_binding;
 use async_trait::async_trait;
+use fuchsia_inspect;
 use fuchsia_zircon as zx;
 use keymaps;
 use std::cell::RefCell;
@@ -27,6 +28,9 @@ pub struct KeymapHandler {
 
     /// Tracks the lock state (NumLock, CapsLock).
     lock_state: RefCell<keymaps::LockStateKeys>,
+
+    /// The inventory of this handler's Inspect status.
+    _inspect_status: InputHandlerStatus,
 }
 
 /// This trait implementation allows the [KeymapHandler] to be hooked up into the input
@@ -57,8 +61,17 @@ impl UnhandledInputHandler for KeymapHandler {
 
 impl KeymapHandler {
     /// Creates a new instance of the keymap handler.
-    pub fn new() -> Rc<Self> {
-        Rc::new(Default::default())
+    pub fn new(input_handlers_node: &fuchsia_inspect::Node) -> Rc<Self> {
+        let inspect_status = InputHandlerStatus::new(
+            input_handlers_node,
+            "keymap_handler",
+            /* generates_events */ false,
+        );
+        Rc::new(Self {
+            modifier_state: Default::default(),
+            lock_state: Default::default(),
+            _inspect_status: inspect_status,
+        })
     }
 
     /// Attaches a key meaning to each passing keyboard event.
@@ -105,6 +118,7 @@ mod tests {
     use fidl_fuchsia_input as finput;
     use fidl_fuchsia_ui_input3 as finput3;
     use fuchsia_async as fasync;
+    use fuchsia_inspect;
     use fuchsia_zircon as zx;
     use pretty_assertions::assert_eq;
     use std::convert::TryFrom as _;
@@ -231,9 +245,11 @@ mod tests {
                 ],
             },
         ];
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
         for test in &tests {
             let mut actual: Vec<Option<finput3::KeyMeaning>> = vec![];
-            let handler = KeymapHandler::new();
+            let handler = KeymapHandler::new(&test_node);
             for event in &test.events {
                 let mut result = handler
                     .clone()
@@ -246,5 +262,27 @@ mod tests {
             }
             assert_eq!(test.expected, actual);
         }
+    }
+
+    #[fuchsia::test]
+    fn keymap_handler_initialized_with_inspect_node() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        let _handler = KeymapHandler::new(&fake_handlers_node);
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                keymap_handler: {
+                    events_received_count: 0u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
     }
 }

@@ -38,11 +38,12 @@
 use crate::input_device::{
     Handled, InputDeviceDescriptor, InputDeviceEvent, InputEvent, UnhandledInputEvent,
 };
-use crate::input_handler::UnhandledInputHandler;
+use crate::input_handler::{InputHandlerStatus, UnhandledInputHandler};
 use crate::keyboard_binding::KeyboardEvent;
 use async_trait::async_trait;
 use core::fmt;
 use fidl_fuchsia_ui_input3::{KeyEventType, KeyMeaning};
+use fuchsia_inspect;
 use fuchsia_zircon as zx;
 use rust_icu_sys as usys;
 use rust_icu_unorm2 as unorm;
@@ -293,6 +294,9 @@ pub struct DeadKeysHandler {
     /// This handler requires ICU data to be live. This is ensured by holding
     /// a reference to an ICU data loader.
     _data: icu_data::Loader,
+
+    /// The inventory of this handler's Inspect status.
+    _inspect_status: InputHandlerStatus,
 }
 
 /// This trait implementation allows the [Handler] to be hooked up into the input
@@ -309,13 +313,22 @@ impl UnhandledInputHandler for DeadKeysHandler {
 
 impl DeadKeysHandler {
     /// Creates a new instance of the dead keys handler.
-    pub fn new(icu_data: icu_data::Loader) -> Rc<Self> {
+    pub fn new(
+        icu_data: icu_data::Loader,
+        input_handlers_node: &fuchsia_inspect::Node,
+    ) -> Rc<Self> {
+        let inspect_status = InputHandlerStatus::new(
+            input_handlers_node,
+            "dead_keys_handler",
+            /* generates_events */ false,
+        );
         let handler = DeadKeysHandler {
             state: RefCell::new(State::S0000),
             // The NFC normalizer performs the needed composition and is not
             // lossy.
             normalizer: unorm::UNormalizer::new_nfc().unwrap(),
             _data: icu_data,
+            _inspect_status: inspect_status,
         };
         Rc::new(handler)
     }
@@ -751,6 +764,7 @@ mod tests {
     use crate::testing_utilities;
     use fidl_fuchsia_input::Key;
     use fidl_fuchsia_ui_input3::{KeyEventType, KeyMeaning};
+    use fuchsia_inspect;
     use fuchsia_zircon as zx;
     use pretty_assertions::assert_eq;
     use std::convert::TryFrom as _;
@@ -1217,9 +1231,10 @@ mod tests {
                 ],
             },
         ];
-
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
         let loader = icu_data::Loader::new().unwrap();
-        let handler = super::DeadKeysHandler::new(loader);
+        let handler = super::DeadKeysHandler::new(loader, &test_node);
         for test in tests {
             let actuals: Vec<InputEvent> = test
                 .inputs
@@ -1234,5 +1249,28 @@ mod tests {
                 test.name
             );
         }
+    }
+
+    #[test]
+    fn dead_keys_handler_initialized_with_inspect_node() {
+        let loader = icu_data::Loader::new().unwrap();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        let _handler = DeadKeysHandler::new(loader, &fake_handlers_node);
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                dead_keys_handler: {
+                    events_received_count: 0u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
     }
 }

@@ -4,12 +4,13 @@
 
 use crate::autorepeater;
 use crate::input_device;
-use crate::input_handler::UnhandledInputHandler;
+use crate::input_handler::{InputHandlerStatus, UnhandledInputHandler};
 use anyhow::{Context, Error, Result};
 use async_trait::async_trait;
 use fidl_fuchsia_input as finput;
 use fidl_fuchsia_settings as fsettings;
 use fuchsia_async as fasync;
+use fuchsia_inspect;
 use futures::{TryFutureExt, TryStreamExt};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -28,6 +29,9 @@ pub struct TextSettingsHandler {
 
     /// Stores the currently active autorepeat settings.
     autorepeat_settings: RefCell<Option<autorepeater::Settings>>,
+
+    /// The inventory of this handler's Inspect status.
+    _inspect_status: InputHandlerStatus,
 }
 
 #[async_trait(?Send)]
@@ -73,10 +77,17 @@ impl TextSettingsHandler {
     pub fn new(
         initial_keymap: Option<finput::KeymapId>,
         initial_autorepeat: Option<autorepeater::Settings>,
+        input_handlers_node: &fuchsia_inspect::Node,
     ) -> Rc<Self> {
+        let inspect_status = InputHandlerStatus::new(
+            input_handlers_node,
+            "text_settings_handler",
+            /* generates_events */ false,
+        );
         Rc::new(Self {
             keymap_id: RefCell::new(initial_keymap),
             autorepeat_settings: RefCell::new(initial_autorepeat),
+            _inspect_status: inspect_status,
         })
     }
 
@@ -163,6 +174,7 @@ mod tests {
     use fidl_fuchsia_input;
     use fidl_fuchsia_ui_input3;
     use fuchsia_async as fasync;
+    use fuchsia_inspect;
     use fuchsia_zircon as zx;
     use pretty_assertions::assert_eq;
     use std::convert::TryFrom as _;
@@ -230,8 +242,10 @@ mod tests {
                 expected: Some("US_COLEMAK".to_owned()),
             },
         ];
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
         for test in tests {
-            let handler = TextSettingsHandler::new(test.keymap_id.clone(), None);
+            let handler = TextSettingsHandler::new(test.keymap_id.clone(), None, &test_node);
             let expected = key_event(test.expected.clone());
             let result = handler.handle_unhandled_input_event(unhandled_key_event()).await;
             assert_eq!(vec![expected], result, "for: {:?}", &test);
@@ -257,7 +271,9 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn config_call_processing() {
-        let handler = TextSettingsHandler::new(None, None);
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let handler = TextSettingsHandler::new(None, None, &test_node);
 
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fsettings::KeyboardMarker>().unwrap();
@@ -298,5 +314,27 @@ mod tests {
             let now = fuchsia_async::Time::now();
             assert!(now < deadline, "the settings did not get applied, was: {:?}", &result);
         }
+    }
+
+    #[fuchsia::test]
+    fn text_settings_handler_initialized_with_inspect_node() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        let _handler = TextSettingsHandler::new(None, None, &fake_handlers_node);
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                text_settings_handler: {
+                    events_received_count: 0u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
     }
 }

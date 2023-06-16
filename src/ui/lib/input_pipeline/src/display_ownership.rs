@@ -3,11 +3,13 @@
 // found in the LICENSE file.
 
 use crate::input_device::{self, InputEvent};
+use crate::input_handler::InputHandlerStatus;
 use crate::keyboard_binding::{KeyboardDeviceDescriptor, KeyboardEvent};
 use anyhow::{Context, Result};
 use fidl_fuchsia_ui_input3::KeyEventType;
 use fidl_fuchsia_ui_scenic as fscenic;
 use fuchsia_async::{OnSignals, Task};
+use fuchsia_inspect;
 use fuchsia_zircon::{AsHandleRef, Duration, Signals, Status, Time};
 use futures::{
     channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
@@ -95,6 +97,9 @@ pub struct DisplayOwnership {
     /// it alive to ensure that it keeps running.
     _display_ownership_task: Task<()>,
 
+    /// The inventory of this handler's Inspect status.
+    _inspect_status: InputHandlerStatus,
+
     /// The event processing loop will do an `unbounded_send(())` on this
     /// channel once at the end of each loop pass, in test configurations only.
     /// The test fixture uses this channel to execute test fixture in
@@ -111,8 +116,11 @@ impl DisplayOwnership {
     /// Scenic using `fuchsia.ui.scenic.Scenic/GetDisplayOwnershipEvent`.  There
     /// isn't really a way for this code to know here whether this is true or
     /// not, so implementor beware.
-    pub fn new(display_ownership_event: impl AsHandleRef + 'static) -> Rc<Self> {
-        DisplayOwnership::new_internal(display_ownership_event, None)
+    pub fn new(
+        display_ownership_event: impl AsHandleRef + 'static,
+        input_handlers_node: &fuchsia_inspect::Node,
+    ) -> Rc<Self> {
+        DisplayOwnership::new_internal(display_ownership_event, None, input_handlers_node)
     }
 
     #[cfg(test)]
@@ -120,12 +128,19 @@ impl DisplayOwnership {
         display_ownership_event: impl AsHandleRef + 'static,
         loop_done: UnboundedSender<()>,
     ) -> Rc<Self> {
-        DisplayOwnership::new_internal(display_ownership_event, Some(loop_done))
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        DisplayOwnership::new_internal(
+            display_ownership_event,
+            Some(loop_done),
+            &fake_handlers_node,
+        )
     }
 
     fn new_internal(
         display_ownership_event: impl AsHandleRef + 'static,
         _loop_done: Option<UnboundedSender<()>>,
+        input_handlers_node: &fuchsia_inspect::Node,
     ) -> Rc<Self> {
         let initial_state = display_ownership_event
             // scenic guarantees that ANY_DISPLAY_EVENT is asserted. If it is
@@ -156,11 +171,17 @@ impl DisplayOwnership {
             tracing::warn!("display loop exiting and will no longer monitor display changes - this is not expected");
         });
         tracing::info!("Display ownership handler installed");
+        let inspect_status = InputHandlerStatus::new(
+            input_handlers_node,
+            "display_ownership",
+            /* generates_events */ false,
+        );
         Rc::new(Self {
             ownership,
             key_state: RefCell::new(KeyState::new()),
             display_ownership_change_receiver: RefCell::new(ownership_receiver),
             _display_ownership_task: display_ownership_task,
+            _inspect_status: inspect_status,
             #[cfg(test)]
             loop_done: RefCell::new(_loop_done),
         })
@@ -508,5 +529,35 @@ mod tests {
                 new_keyboard_input_event(Key::C, KeyEventType::Released),
             ]
         );
+    }
+
+    #[fuchsia::test]
+    async fn display_ownership_initialized_with_inspect_node() {
+        let (test_event, handler_event) = EventPair::create();
+        let (loop_done_sender, _) = mpsc::unbounded::<()>();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        // Signal needs to be initialized first so DisplayOwnership::new doesn't panic with a TIMEOUT error
+        let _ = DisplayWrangler::new(test_event);
+        let _handler = DisplayOwnership::new_internal(
+            handler_event,
+            Some(loop_done_sender),
+            &fake_handlers_node,
+        );
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                display_ownership: {
+                    events_received_count: 0u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
     }
 }

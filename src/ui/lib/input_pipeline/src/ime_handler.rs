@@ -4,13 +4,13 @@
 
 use {
     crate::input_device,
-    crate::input_handler::UnhandledInputHandler,
+    crate::input_handler::{InputHandlerStatus, UnhandledInputHandler},
     crate::keyboard_binding,
     anyhow::Error,
     async_trait::async_trait,
     fidl_fuchsia_ui_input3::{self as fidl_ui_input3, LockState, Modifiers},
     fuchsia_component::client::connect_to_protocol,
-    fuchsia_zircon as zx,
+    fuchsia_inspect, fuchsia_zircon as zx,
     keymaps::{self, LockStateChecker, ModifierChecker},
     std::rc::Rc,
 };
@@ -57,6 +57,9 @@ impl ModifierChecker for FrozenModifierState {
 pub struct ImeHandler {
     /// The FIDL proxy (client-side stub) to the service for key event injection.
     key_event_injector: fidl_ui_input3::KeyEventInjectorProxy,
+
+    /// The inventory of this handler's Inspect status.
+    _inspect_status: InputHandlerStatus,
 }
 
 #[async_trait(?Send)]
@@ -85,10 +88,10 @@ impl UnhandledInputHandler for ImeHandler {
 #[allow(dead_code)]
 impl ImeHandler {
     /// Creates a new [`ImeHandler`] by connecting out to the key event injector.
-    pub async fn new() -> Result<Rc<Self>, Error> {
+    pub async fn new(input_handlers_node: &fuchsia_inspect::Node) -> Result<Rc<Self>, Error> {
         let key_event_injector = connect_to_protocol::<fidl_ui_input3::KeyEventInjectorMarker>()?;
 
-        Self::new_handler(key_event_injector).await
+        Self::new_handler(key_event_injector, input_handlers_node).await
     }
 
     /// Creates a new [`ImeHandler`].
@@ -98,8 +101,14 @@ impl ImeHandler {
     /// injector FIDL service.
     async fn new_handler(
         key_event_injector: fidl_ui_input3::KeyEventInjectorProxy,
+        input_handlers_node: &fuchsia_inspect::Node,
     ) -> Result<Rc<Self>, Error> {
-        let handler = ImeHandler { key_event_injector };
+        let inspect_status = InputHandlerStatus::new(
+            input_handlers_node,
+            "ime_handler",
+            /* generates_events */ false,
+        );
+        let handler = ImeHandler { key_event_injector, _inspect_status: inspect_status };
 
         Ok(Rc::new(handler))
     }
@@ -175,7 +184,7 @@ mod tests {
         crate::testing_utilities,
         assert_matches::assert_matches,
         fidl_fuchsia_input as fidl_input, fidl_fuchsia_ui_input3 as fidl_ui_input3,
-        fuchsia_async as fasync, fuchsia_zircon as zx,
+        fuchsia_async as fasync, fuchsia_inspect, fuchsia_zircon as zx,
         futures::StreamExt,
         std::convert::TryFrom as _,
         test_case::test_case,
@@ -295,8 +304,10 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn pressed_key() {
         let (proxy, request_stream) = connect_to_key_event_injector();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
         let ime_handler =
-            ImeHandler::new_handler(proxy).await.expect("Failed to create ImeHandler.");
+            ImeHandler::new_handler(proxy, &test_node).await.expect("Failed to create ImeHandler.");
 
         let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
             keyboard_binding::KeyboardDeviceDescriptor {
@@ -331,8 +342,10 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn released_key() {
         let (proxy, request_stream) = connect_to_key_event_injector();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
         let ime_handler =
-            ImeHandler::new_handler(proxy).await.expect("Failed to create ImeHandler.");
+            ImeHandler::new_handler(proxy, &test_node).await.expect("Failed to create ImeHandler.");
 
         let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
             keyboard_binding::KeyboardDeviceDescriptor {
@@ -366,8 +379,10 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn pressed_and_released_key() {
         let (proxy, request_stream) = connect_to_key_event_injector();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
         let ime_handler =
-            ImeHandler::new_handler(proxy).await.expect("Failed to create ImeHandler.");
+            ImeHandler::new_handler(proxy, &test_node).await.expect("Failed to create ImeHandler.");
 
         let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
             keyboard_binding::KeyboardDeviceDescriptor {
@@ -455,8 +470,10 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn repeated_modifier_key() {
         let (proxy, request_stream) = connect_to_key_event_injector();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
         let ime_handler =
-            ImeHandler::new_handler(proxy).await.expect("Failed to create ImeHandler.");
+            ImeHandler::new_handler(proxy, &test_node).await.expect("Failed to create ImeHandler.");
 
         let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
             keyboard_binding::KeyboardDeviceDescriptor {
@@ -537,8 +554,10 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn nonprintable_key_meanings_set_correctly() {
         let (proxy, request_stream) = connect_to_key_event_injector();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
         let ime_handler =
-            ImeHandler::new_handler(proxy).await.expect("Failed to create ImeHandler.");
+            ImeHandler::new_handler(proxy, &test_node).await.expect("Failed to create ImeHandler.");
 
         let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
             keyboard_binding::KeyboardDeviceDescriptor {
@@ -616,8 +635,10 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn tab() {
         let (proxy, request_stream) = connect_to_key_event_injector();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
         let ime_handler =
-            ImeHandler::new_handler(proxy).await.expect("Failed to create ImeHandler.");
+            ImeHandler::new_handler(proxy, &test_node).await.expect("Failed to create ImeHandler.");
 
         let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
             keyboard_binding::KeyboardDeviceDescriptor {
@@ -656,8 +677,10 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn shift_shift_a() {
         let (proxy, request_stream) = connect_to_key_event_injector();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
         let ime_handler =
-            ImeHandler::new_handler(proxy).await.expect("Failed to create ImeHandler.");
+            ImeHandler::new_handler(proxy, &test_node).await.expect("Failed to create ImeHandler.");
 
         let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
             keyboard_binding::KeyboardDeviceDescriptor {
@@ -731,8 +754,10 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn ctrl_tab() {
         let (proxy, request_stream) = connect_to_key_event_injector();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
         let ime_handler =
-            ImeHandler::new_handler(proxy).await.expect("Failed to create ImeHandler.");
+            ImeHandler::new_handler(proxy, &test_node).await.expect("Failed to create ImeHandler.");
 
         let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
             keyboard_binding::KeyboardDeviceDescriptor {
@@ -783,6 +808,31 @@ mod tests {
 
         handle_events(ime_handler, input_events);
         assert_ime_receives_events(expected_events, request_stream).await;
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn ime_handler_initialized_with_inspect_node() {
+        let (proxy, _) = connect_to_key_event_injector();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        let _handler = ImeHandler::new_handler(proxy, &fake_handlers_node)
+            .await
+            .expect("Failed to create ImeHandler.");
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                ime_handler: {
+                    events_received_count: 0u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
     }
 
     #[test_case(

@@ -145,6 +145,13 @@ impl Debug for InputHandlerStatus {
     }
 }
 
+impl Default for InputHandlerStatus {
+    fn default() -> Self {
+        let inspector = fuchsia_inspect::Inspector::default();
+        Self::new(&inspector.root(), "default", false)
+    }
+}
+
 impl InputHandlerStatus {
     pub fn new(node: &fuchsia_inspect::Node, name: &str, _generates_events: bool) -> Self {
         let handler_node = node.create_child(name);

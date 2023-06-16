@@ -299,23 +299,24 @@ async fn register_keyboard_related_input_handlers(
     wayland_input_handler: Rc<WaylandHandler>,
     icu_data_loader: icu_data::Loader,
     focus_chain_publisher: FocusChainProviderPublisher,
+    input_handlers_node: &inspect::Node,
 ) -> InputPipelineAssembly {
     // Add as early as possible, but not before inspect handlers.
-    let mut assembly = add_chromebook_keyboard_handler(assembly);
+    let mut assembly = add_chromebook_keyboard_handler(assembly, input_handlers_node);
 
     // Display ownership deals with keyboard events.
-    assembly = assembly.add_display_ownership(display_ownership_event);
-    assembly = add_modifier_handler(assembly);
+    assembly = assembly.add_display_ownership(display_ownership_event, input_handlers_node);
+    assembly = add_modifier_handler(assembly, input_handlers_node);
 
     // Add the text settings handler early in the pipeline to use the
     // keymap settings in the remainder of the pipeline.
-    assembly = add_text_settings_handler(assembly);
-    assembly = add_keymap_handler(assembly);
+    assembly = add_text_settings_handler(assembly, input_handlers_node);
+    assembly = add_keymap_handler(assembly, input_handlers_node);
     assembly = add_wayland_handler(assembly, wayland_input_handler);
-    assembly = add_key_meaning_modifier_handler(assembly);
-    assembly = assembly.add_autorepeater();
-    assembly = add_dead_keys_handler(assembly, icu_data_loader);
-    assembly = add_ime(assembly).await;
+    assembly = add_key_meaning_modifier_handler(assembly, input_handlers_node);
+    assembly = assembly.add_autorepeater(input_handlers_node);
+    assembly = add_dead_keys_handler(assembly, icu_data_loader, input_handlers_node);
+    assembly = add_ime(assembly, input_handlers_node).await;
 
     // Forward focus to Text Manager.
     // This requires `fuchsia.ui.focus.FocusChainListenerRegistry`
@@ -415,6 +416,7 @@ async fn build_input_pipeline_assembly(
                 wayland_input_handler,
                 icu_data_loader,
                 focus_chain_publisher,
+                &input_handlers_node,
             )
             .await;
         }
@@ -467,20 +469,35 @@ async fn build_input_pipeline_assembly(
     assembly
 }
 
-fn add_chromebook_keyboard_handler(assembly: InputPipelineAssembly) -> InputPipelineAssembly {
-    assembly
-        .add_handler(input_pipeline::chromebook_keyboard_handler::ChromebookKeyboardHandler::new())
+fn add_chromebook_keyboard_handler(
+    assembly: InputPipelineAssembly,
+    input_handlers_node: &inspect::Node,
+) -> InputPipelineAssembly {
+    assembly.add_handler(
+        input_pipeline::chromebook_keyboard_handler::ChromebookKeyboardHandler::new(
+            input_handlers_node,
+        ),
+    )
 }
 
 /// Hooks up the modifier keys handler.
-fn add_modifier_handler(assembly: InputPipelineAssembly) -> InputPipelineAssembly {
-    assembly.add_handler(input_pipeline::modifier_handler::ModifierHandler::new())
+fn add_modifier_handler(
+    assembly: InputPipelineAssembly,
+    input_handlers_node: &inspect::Node,
+) -> InputPipelineAssembly {
+    assembly
+        .add_handler(input_pipeline::modifier_handler::ModifierHandler::new(input_handlers_node))
 }
 
 /// Hooks up the modifier keys handler based on key meanings.  This must come
 /// after the keymap handler.
-fn add_key_meaning_modifier_handler(assembly: InputPipelineAssembly) -> InputPipelineAssembly {
-    assembly.add_handler(input_pipeline::modifier_handler::ModifierMeaningHandler::new())
+fn add_key_meaning_modifier_handler(
+    assembly: InputPipelineAssembly,
+    input_handlers_node: &inspect::Node,
+) -> InputPipelineAssembly {
+    assembly.add_handler(input_pipeline::modifier_handler::ModifierMeaningHandler::new(
+        input_handlers_node,
+    ))
 }
 
 /// Hooks up the inspect handler.
@@ -498,10 +515,13 @@ fn add_inspect_handler(
 }
 
 /// Hooks up the text settings handler.
-fn add_text_settings_handler(assembly: InputPipelineAssembly) -> InputPipelineAssembly {
+fn add_text_settings_handler(
+    assembly: InputPipelineAssembly,
+    input_handlers_node: &fuchsia_inspect::Node,
+) -> InputPipelineAssembly {
     let proxy = connect_to_protocol::<fsettings::KeyboardMarker>()
         .expect("needs a connection to fuchsia.settings.Keyboard");
-    let text_handler = TextSettingsHandler::new(None, None);
+    let text_handler = TextSettingsHandler::new(None, None, input_handlers_node);
     text_handler.clone().serve(proxy);
     assembly.add_handler(text_handler)
 }
@@ -509,8 +529,11 @@ fn add_text_settings_handler(assembly: InputPipelineAssembly) -> InputPipelineAs
 /// Hooks up the keymapper.  The keymapper requires the text settings handler to
 /// be added as well to support keymapping.  Otherwise, it defaults to applying
 /// the US QWERTY keymap.
-fn add_keymap_handler(assembly: InputPipelineAssembly) -> InputPipelineAssembly {
-    assembly.add_handler(keymap_handler::KeymapHandler::new())
+fn add_keymap_handler(
+    assembly: InputPipelineAssembly,
+    input_handlers_node: &inspect::Node,
+) -> InputPipelineAssembly {
+    assembly.add_handler(keymap_handler::KeymapHandler::new(input_handlers_node))
 }
 
 /// Hooks up the wayland input handler.  It relies on the keymap handler (above)
@@ -528,12 +551,16 @@ fn add_wayland_handler(
 fn add_dead_keys_handler(
     assembly: InputPipelineAssembly,
     loader: icu_data::Loader,
+    input_handlers_node: &inspect::Node,
 ) -> InputPipelineAssembly {
-    assembly.add_handler(dead_keys_handler::DeadKeysHandler::new(loader))
+    assembly.add_handler(dead_keys_handler::DeadKeysHandler::new(loader, input_handlers_node))
 }
 
-async fn add_ime(mut assembly: InputPipelineAssembly) -> InputPipelineAssembly {
-    if let Ok(ime_handler) = ImeHandler::new().await {
+async fn add_ime(
+    mut assembly: InputPipelineAssembly,
+    input_handlers_node: &inspect::Node,
+) -> InputPipelineAssembly {
+    if let Ok(ime_handler) = ImeHandler::new(input_handlers_node).await {
         assembly = assembly.add_handler(ime_handler);
     }
     assembly

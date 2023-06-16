@@ -3,9 +3,10 @@
 // found in the LICENSE file.
 
 use crate::input_device::{Handled, InputDeviceEvent, InputEvent, UnhandledInputEvent};
-use crate::input_handler::UnhandledInputHandler;
+use crate::input_handler::{InputHandlerStatus, UnhandledInputHandler};
 use async_trait::async_trait;
 use fidl_fuchsia_ui_input3::{KeyMeaning, Modifiers, NonPrintableKey};
+use fuchsia_inspect;
 use keymaps::{LockStateKeys, ModifierState};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -26,6 +27,9 @@ pub struct ModifierHandler {
 
     /// The tracked lock state.
     lock_state: RefCell<LockStateKeys>,
+
+    /// The inventory of this handler's Inspect status.
+    _inspect_status: InputHandlerStatus,
 }
 
 #[async_trait(?Send)]
@@ -63,10 +67,16 @@ impl UnhandledInputHandler for ModifierHandler {
 
 impl ModifierHandler {
     /// Creates a new [ModifierHandler].
-    pub fn new() -> Rc<Self> {
+    pub fn new(input_handlers_node: &fuchsia_inspect::Node) -> Rc<Self> {
+        let inspect_status = InputHandlerStatus::new(
+            input_handlers_node,
+            "modifier_handler",
+            /* generates_events */ false,
+        );
         Rc::new(Self {
             modifier_state: RefCell::new(ModifierState::new()),
             lock_state: RefCell::new(LockStateKeys::new()),
+            _inspect_status: inspect_status,
         })
     }
 }
@@ -77,12 +87,23 @@ impl ModifierHandler {
 pub struct ModifierMeaningHandler {
     /// The tracked state of the modifiers.
     modifier_state: RefCell<ModifierState>,
+
+    /// The inventory of this handler's Inspect status.
+    _inspect_status: InputHandlerStatus,
 }
 
 impl ModifierMeaningHandler {
     /// Creates a new [ModifierMeaningHandler].
-    pub fn new() -> Rc<Self> {
-        Rc::new(Self { modifier_state: RefCell::new(ModifierState::new()) })
+    pub fn new(input_handlers_node: &fuchsia_inspect::Node) -> Rc<Self> {
+        let inspect_status = InputHandlerStatus::new(
+            input_handlers_node,
+            "modifier_meaning_handler",
+            /* generates_events */ false,
+        );
+        Rc::new(Self {
+            modifier_state: RefCell::new(ModifierState::new()),
+            _inspect_status: inspect_status,
+        })
     }
 }
 
@@ -134,6 +155,7 @@ mod tests {
     use fidl_fuchsia_input::Key;
     use fidl_fuchsia_ui_input3::{KeyEventType, LockState, Modifiers};
     use fuchsia_async as fasync;
+    use fuchsia_inspect;
     use fuchsia_zircon as zx;
     use pretty_assertions::assert_eq;
 
@@ -148,7 +170,9 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_decoration() {
-        let handler = ModifierHandler::new();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let handler = ModifierHandler::new(&test_node);
         let input_event =
             get_unhandled_input_event(KeyboardEvent::new(Key::CapsLock, KeyEventType::Pressed));
         let result = handler.handle_unhandled_input_event(input_event.clone()).await;
@@ -165,7 +189,9 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_key_meaning_decoration() {
-        let handler = ModifierMeaningHandler::new();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let handler = ModifierMeaningHandler::new(&test_node);
         {
             let input_event = get_unhandled_input_event(
                 KeyboardEvent::new(Key::RightAlt, KeyEventType::Pressed)
@@ -219,7 +245,9 @@ mod tests {
             get_unhandled_input_event(KeyboardEvent::new(Key::CapsLock, KeyEventType::Released)),
         ];
 
-        let handler = ModifierHandler::new();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let handler = ModifierHandler::new(&test_node);
         let clone_handler = move || handler.clone();
         let result = futures::future::join_all(
             input_events
@@ -274,7 +302,9 @@ mod tests {
             get_unhandled_input_event(KeyboardEvent::new(Key::A, KeyEventType::Released)),
         ];
 
-        let handler = ModifierHandler::new();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+        let handler = ModifierHandler::new(&test_node);
         let clone_handler = move || handler.clone();
         let result = futures::future::join_all(
             input_events
@@ -311,5 +341,39 @@ mod tests {
         .map(InputEvent::from)
         .collect::<Vec<_>>();
         assert_eq!(expected, result);
+    }
+
+    #[fuchsia::test]
+    fn modifier_handlers_initialized_with_inspect_node() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let fake_handlers_node = inspector.root().create_child("input_handlers_node");
+        let _modifier_handler = ModifierHandler::new(&fake_handlers_node);
+        let _modifier_meaning_handler = ModifierMeaningHandler::new(&fake_handlers_node);
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_handlers_node: {
+                modifier_handler: {
+                    events_received_count: 0u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                },
+                modifier_meaning_handler: {
+                    events_received_count: 0u64,
+                    events_handled_count: 0u64,
+                    last_received_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: fuchsia_inspect::AnyProperty
+                    },
+                }
+            }
+        });
     }
 }
