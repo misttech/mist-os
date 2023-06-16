@@ -5,6 +5,7 @@
 #include "src/devices/tests/v2/reload-driver/driver_helpers.h"
 
 #include <fidl/fuchsia.reloaddriver.test/cpp/fidl.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
 #include <bind/fuchsia/reloaddriverbind/test/cpp/bind.h>
 

@@ -4,6 +4,9 @@
 
 #include "fake-battery-driver.h"
 
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/logging/cpp/structured_logger.h>
+
 using fuchsia_hardware_powersource::wire::BatteryInfo;
 using fuchsia_hardware_powersource::wire::BatteryUnit;
 using fuchsia_hardware_powersource::wire::PowerType;

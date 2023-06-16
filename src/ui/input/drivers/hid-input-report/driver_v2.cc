@@ -8,9 +8,11 @@
 #include <lib/ddk/debug.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/compat/cpp/symbols.h>
-#include <lib/driver/component/cpp/driver_cpp.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/internal/symbols.h>
 #include <lib/driver/devfs/cpp/connector.h>
+#include <lib/driver/logging/cpp/structured_logger.h>
 #include <lib/inspect/component/cpp/component.h>
 #include <zircon/errors.h>
 

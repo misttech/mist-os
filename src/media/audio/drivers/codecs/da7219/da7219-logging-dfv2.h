@@ -5,7 +5,7 @@
 #ifndef SRC_MEDIA_AUDIO_DRIVERS_CODECS_DA7219_DA7219_LOGGING_DFV2_H_
 #define SRC_MEDIA_AUDIO_DRIVERS_CODECS_DA7219_DA7219_LOGGING_DFV2_H_
 
-#include <lib/driver/component/cpp/driver_cpp.h>
+#include <lib/driver/component/cpp/driver_base.h>
 
 namespace audio::da7219 {
 

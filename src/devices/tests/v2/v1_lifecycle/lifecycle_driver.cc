@@ -11,9 +11,11 @@
 #include <fidl/fuchsia.lifecycle.test/cpp/wire.h>
 #include <fuchsia/lifecycle/test/cpp/banjo.h>
 #include <lib/driver/compat/cpp/symbols.h>
-#include <lib/driver/component/cpp/driver_cpp.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/internal/symbols.h>
 #include <lib/driver/devfs/cpp/connector.h>
+#include <lib/driver/logging/cpp/structured_logger.h>
 
 namespace fdf {
 using namespace fuchsia_driver_framework;

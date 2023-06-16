@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 #include <fidl/test.structuredconfig.receiver.shim/cpp/wire.h>
-#include <lib/driver/component/cpp/driver_cpp.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/driver_export.h>
 #include <lib/inspect/component/cpp/component.h>
 
 #include "src/sys/component_manager/tests/structured_config/client_integration/cpp_driver/receiver_config.h"

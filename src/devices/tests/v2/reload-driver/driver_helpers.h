@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_TESTS_V2_RELOAD_DRIVER_DRIVER_HELPERS_H_
 #define SRC_DEVICES_TESTS_V2_RELOAD_DRIVER_DRIVER_HELPERS_H_
 
-#include <lib/driver/component/cpp/driver_cpp.h>
+#include <lib/driver/component/cpp/driver_base.h>
 
 namespace reload_test_driver_helpers {
 

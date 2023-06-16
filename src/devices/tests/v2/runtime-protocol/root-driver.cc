@@ -7,7 +7,9 @@
 #include <fidl/fuchsia.runtime.test/cpp/driver/fidl.h>
 #include <fidl/fuchsia.runtime.test/cpp/fidl.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/driver/component/cpp/driver_cpp.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/fdf/cpp/channel.h>
 #include <lib/fdf/cpp/protocol.h>
 #include <lib/fdf/dispatcher.h>

@@ -6,7 +6,7 @@
 
 #include <lib/async-loop/loop.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/driver/component/cpp/driver_cpp.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime_env.h>
 #include <lib/driver/testing/cpp/test_environment.h>

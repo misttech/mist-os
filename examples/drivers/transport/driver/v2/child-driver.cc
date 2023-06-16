@@ -5,8 +5,10 @@
 #include <fidl/fuchsia.examples.gizmo/cpp/driver/wire.h>
 #include <fidl/fuchsia.gizmo.protocol/cpp/wire.h>
 #include <lib/driver/compat/cpp/compat.h>
-#include <lib/driver/component/cpp/driver_cpp.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/devfs/cpp/connector.h>
+#include <lib/driver/logging/cpp/structured_logger.h>
 
 namespace driver_transport {
 

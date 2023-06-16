@@ -20,7 +20,6 @@ sdk_source_set("cpp") {
     "composite_node_spec.h",
     "driver_base.cc",
     "driver_base.h",
-    "driver_cpp.h",
     "driver_export.h",
     "internal/basic_factory.h",
     "internal/lifecycle.h",

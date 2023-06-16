@@ -7,7 +7,7 @@
 
 #include <fidl/fuchsia.driver.component.test/cpp/driver/wire.h>
 #include <fidl/fuchsia.driver.component.test/cpp/wire.h>
-#include <lib/driver/component/cpp/driver_cpp.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
 
 class TestDriver : public fdf::DriverBase,

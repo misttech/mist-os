@@ -5,7 +5,9 @@
 #include <fidl/fuchsia.nodegroup.test/cpp/wire.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
-#include <lib/driver/component/cpp/driver_cpp.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
 #include <bind/fuchsia/nodegroupbind/test/cpp/bind.h>
 

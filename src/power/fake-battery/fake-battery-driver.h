@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.hardware.powersource/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.powersource/cpp/wire.h>
 #include <fidl/fuchsia.power.battery/cpp/wire.h>
-#include <lib/driver/component/cpp/driver_cpp.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/devfs/cpp/connector.h>
 

@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/tests/test_driver.h>
+#include <lib/driver/logging/cpp/structured_logger.h>
 
 void TestDriver::Start(fdf::StartCompleter completer) {
   node_client_.Bind(std::move(node()), dispatcher());

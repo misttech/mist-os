@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 #include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
 #include <bind/fuchsia/reloaddriverbind/test/cpp/bind.h>
 

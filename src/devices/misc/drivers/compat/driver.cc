@@ -13,6 +13,7 @@
 #include <lib/driver/component/cpp/internal/lifecycle.h>
 #include <lib/driver/component/cpp/internal/start_args.h>
 #include <lib/driver/component/cpp/internal/symbols.h>
+#include <lib/driver/logging/cpp/structured_logger.h>
 #include <lib/driver/promise/cpp/promise.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fit/defer.h>

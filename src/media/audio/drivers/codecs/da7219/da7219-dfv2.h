@@ -7,8 +7,9 @@
 
 #include <fidl/fuchsia.hardware.audio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
-#include <lib/driver/component/cpp/driver_cpp.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
+#include <lib/driver/logging/cpp/structured_logger.h>
 
 #include <algorithm>
 #include <memory>

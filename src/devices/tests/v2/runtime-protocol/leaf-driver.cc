@@ -6,7 +6,8 @@
 #include <fidl/fuchsia.runtime.test/cpp/driver/fidl.h>
 #include <fidl/fuchsia.runtime.test/cpp/fidl.h>
 #include <lib/async/cpp/executor.h>
-#include <lib/driver/component/cpp/driver_cpp.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/fdf/cpp/arena.h>
