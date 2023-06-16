@@ -131,6 +131,11 @@ template("sdk_source_set") {
       deps += [ "//build/sdk:sdk_versioned_source_sets_allowlist" ]
     }
 
+    # TODO(fxbug.dev/129182): All SDK libraries should compile with `sdk_extra_warnings`.
+    if (invoker.category == "partner" || invoker.category == "public") {
+      configs += [ "//build/config:sdk_extra_warnings" ]
+    }
+
     metadata = {
       if (defined(invoker.metadata)) {
         forward_variables_from(invoker.metadata, "*")

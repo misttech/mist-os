@@ -30,8 +30,10 @@ a [standard convention][build-id].
 
 The following flags are guaranteed to not generate any warning:
 - `-Wall`
+- `-Wctad-maybe-unsupported`
 - `-Wextra-semi`
 - `-Wnewline-eof`
+- `-Wnon-virtual-dtor`
 - `-Wshadow`
 
 The following flags may generate warnings:

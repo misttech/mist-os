@@ -549,6 +549,8 @@ template("fuchsia_structured_config_cpp_elf_lib") {
       "//zircon/system/ulib/inspect",
     ]
 
+    configs += [ "//build/config:sdk_extra_warnings" ]
+
     # prevent manifest from getting into package this way
     metadata = {
       distribution_entries_barrier = []
@@ -738,6 +740,8 @@ template("fuchsia_structured_config_cpp_driver_lib") {
       "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp_wire",
       "//zircon/system/ulib/inspect",
     ]
+
+    configs += [ "//build/config:sdk_extra_warnings" ]
 
     # prevent manifest from getting into package this way
     metadata = {

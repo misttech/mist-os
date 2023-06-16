@@ -600,6 +600,24 @@ config("default_warnings") {
   }
 }
 
+# Code that goes into the SDK or otherwise contributes to the SDK surface area
+# in source form will be compiled in many different environments. As such, we
+# should compile it with stricter warnings in fuchsia.git.
+config("sdk_extra_warnings") {
+  cflags_cc = [
+    "-Wnon-virtual-dtor",
+    "-Wctad-maybe-unsupported",
+  ]
+  # TODO(fxbug.dev/120888): Add -Wshadow
+}
+
+# Same as `sdk_extra_warnings`, but intended to be added to the configuration of
+# test targets that exercise SDK headers, to verify that the public headers of
+# SDK libraries build under a stricter set of warnings.
+config("test_exercising_sdk_headers") {
+  configs = [ ":sdk_extra_warnings" ]
+}
+
 # TODO(fxbug.dev/58161): clean up instances of this outside of third party code.
 config("Wno-unused-function") {
   cflags = [ "-Wno-unused-function" ]

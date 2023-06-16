@@ -193,14 +193,13 @@ template("_fidl_cpp_library_impl") {
       }
     }
 
-    # chromium uses this library, and enables the following flags, so these tests should work with
-    # these flags enabled.
+    # The generated bindings code is part of the SDK surface. Our customers compile
+    # the generated code with potentially stricter warnings, so we need to ensure
+    # that the code works in their diverse environments.
     #
-    # TODO(fxbug.dev/120888): Remove this when a central definition of SDK warnings exists.
-    cflags_cc = [
-      "-Wctad-maybe-unsupported",
-      "-Wshadow",
-    ]
+    # TODO(fxbug.dev/120888): Remove -Wshadow when all SDK code builds with that flag.
+    cflags_cc = [ "-Wshadow" ]
+    configs += [ "//build/config:sdk_extra_warnings" ]
 
     if (defined(invoker.additional_configs)) {
       configs += invoker.additional_configs

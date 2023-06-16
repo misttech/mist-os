@@ -37,21 +37,16 @@ test("fit-promise-tests") {
     "//sdk/lib/fit-promise",
     "//zircon/system/ulib/zxtest",
   ]
-  configs += [ ":sdk" ]
+  configs += [ ":Wshadow" ]
+  configs += [ "//build/config:test_exercising_sdk_headers" ]
   if (is_fuchsia) {
     deps += [ "//sdk/lib/fdio" ]
   }
 }
 
-# chromium uses this library, and enables the following flags, so these tests should work with these
-# flags enabled.
-#
-# TODO(fxbug.dev/120888): Remove this when a central definition of SDK warnings exists.
-config("sdk") {
-  cflags_cc = [
-    "-Wctad-maybe-unsupported",
-    "-Wshadow",
-  ]
+# TODO(fxbug.dev/120888): Remove -Wshadow when all SDK code builds with that flag.
+config("Wshadow") {
+  cflags_cc = [ "-Wshadow" ]
 }
 
 fuchsia_unittest_package("fit-promise-test-pkg") {
