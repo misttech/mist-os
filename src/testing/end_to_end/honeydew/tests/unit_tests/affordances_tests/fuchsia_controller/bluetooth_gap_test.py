@@ -6,11 +6,13 @@
 
 import unittest
 
-from honeydew.affordances.fuchsia_controller.bluetooth import bluetooth_gap as fc_bluetooth_gap
+from honeydew.affordances.fuchsia_controller.bluetooth import \
+    bluetooth_gap as fc_bluetooth_gap
 
 
 class BluetoothFCTests(unittest.TestCase):
-    """Unit tests for honeydew.affordances.fuchsia_controller.bluetooth_gap.py."""
+    """Unit tests for
+    honeydew.affordances.fuchsia_controller.bluetooth_gap.py."""
 
     def setUp(self) -> None:
         super().setUp()

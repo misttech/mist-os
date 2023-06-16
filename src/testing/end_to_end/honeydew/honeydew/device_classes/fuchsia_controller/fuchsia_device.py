@@ -8,12 +8,14 @@ from typing import Optional
 
 from honeydew import custom_types
 from honeydew import errors
-from honeydew.affordances.fuchsia_controller.bluetooth import bluetooth_gap as bluetooth_gap_fc
 from honeydew.affordances.fuchsia_controller import component as component_fc
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
-from honeydew.interfaces.affordances.bluetooth import bluetooth_gap as bluetooth_gap_interface
+from honeydew.affordances.fuchsia_controller.bluetooth import \
+    bluetooth_gap as bluetooth_gap_fc
 from honeydew.interfaces.affordances import component
 from honeydew.interfaces.affordances import tracing
+from honeydew.interfaces.affordances.bluetooth import \
+    bluetooth_gap as bluetooth_gap_interface
 from honeydew.interfaces.auxiliary_devices import \
     power_switch as power_switch_interface
 from honeydew.interfaces.device_classes import affordances_capable

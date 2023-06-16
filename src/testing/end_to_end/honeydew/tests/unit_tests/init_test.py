@@ -407,7 +407,9 @@ class InitTests(unittest.TestCase):
             self, mock_get_device_class) -> None:
         """Test case for honeydew.get_all_affordances() for a SL4F based
         device."""
-        expected_affordances: List[str] = ["bluetooth_gap", "component", "tracing"]
+        expected_affordances: List[str] = [
+            "bluetooth_gap", "component", "tracing"
+        ]
 
         self.assertEqual(
             honeydew.get_all_affordances(
@@ -425,7 +427,9 @@ class InitTests(unittest.TestCase):
             self, mock_get_device_class) -> None:
         """Test case for honeydew.get_all_affordances() for a Fuchsia-Controller
         based device."""
-        expected_affordances: List[str] = ["bluetooth_gap", "component", "tracing"]
+        expected_affordances: List[str] = [
+            "bluetooth_gap", "component", "tracing"
+        ]
 
         self.assertEqual(
             honeydew.get_all_affordances(

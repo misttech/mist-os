@@ -14,12 +14,14 @@ from typing import Any, Dict, Optional
 
 from honeydew import custom_types
 from honeydew import errors
-from honeydew.affordances.sl4f.bluetooth import bluetooth_gap as bluetooth_gap_sl4f
 from honeydew.affordances.sl4f import component as component_sl4f
 from honeydew.affordances.sl4f import tracing as tracing_sl4f
-from honeydew.interfaces.affordances.bluetooth import bluetooth_gap as bluetooth_gap_interface
+from honeydew.affordances.sl4f.bluetooth import \
+    bluetooth_gap as bluetooth_gap_sl4f
 from honeydew.interfaces.affordances import component as component_interface
 from honeydew.interfaces.affordances import tracing as tracing_interface
+from honeydew.interfaces.affordances.bluetooth import \
+    bluetooth_gap as bluetooth_gap_interface
 from honeydew.interfaces.auxiliary_devices import \
     power_switch as power_switch_interface
 from honeydew.interfaces.device_classes import affordances_capable

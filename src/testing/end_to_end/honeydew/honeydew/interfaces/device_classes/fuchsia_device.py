@@ -8,9 +8,9 @@ import abc
 from typing import Optional
 
 from honeydew import custom_types
-from honeydew.interfaces.affordances.bluetooth import bluetooth_gap
 from honeydew.interfaces.affordances import component
 from honeydew.interfaces.affordances import tracing
+from honeydew.interfaces.affordances.bluetooth import bluetooth_gap
 from honeydew.interfaces.auxiliary_devices import \
     power_switch as power_switch_interface
 from honeydew.utils import properties

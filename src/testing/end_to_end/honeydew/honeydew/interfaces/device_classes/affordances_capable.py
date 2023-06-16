@@ -6,9 +6,9 @@
 
 import abc
 
-from honeydew.interfaces.affordances.bluetooth import bluetooth_gap
 from honeydew.interfaces.affordances import component
 from honeydew.interfaces.affordances import tracing
+from honeydew.interfaces.affordances.bluetooth import bluetooth_gap
 from honeydew.utils import properties
 
 

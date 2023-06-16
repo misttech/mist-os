@@ -394,7 +394,9 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
     # persistent properties
 
     @mock.patch.object(
-        fuchsia_device.bluetooth_gap_sl4f.BluetoothGap, "sys_init", autospec=True)
+        fuchsia_device.bluetooth_gap_sl4f.BluetoothGap,
+        "sys_init",
+        autospec=True)
     @mock.patch.object(
         fuchsia_device.FuchsiaDevice,
         "device_type",

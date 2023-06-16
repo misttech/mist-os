@@ -8,9 +8,11 @@ from typing import Any, Dict
 import unittest
 from unittest import mock
 
-from honeydew.affordances.sl4f.bluetooth import bluetooth_gap as sl4f_bluetooth_gap
-from honeydew.transports import sl4f as sl4f_transport
 from parameterized import parameterized
+
+from honeydew.affordances.sl4f.bluetooth import \
+    bluetooth_gap as sl4f_bluetooth_gap
+from honeydew.transports import sl4f as sl4f_transport
 
 
 def _custom_test_name_func(testcase_func, _, param) -> str:
@@ -25,7 +27,9 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
 
 # pylint: disable=protected-access
 class BluetoothGapSL4FTests(unittest.TestCase):
-    """Unit tests for honeydew.affordances.sl4f.bluetooth.bluetooth_gap.py."""
+    """Unit tests for
+    honeydew.affordances.sl4f.bluetooth.bluetooth_gap.py.
+    """
 
     def setUp(self) -> None:
         super().setUp()
