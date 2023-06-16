@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.paver/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fidl-async/cpp/bind.h>
 
 #include <zxtest/zxtest.h>
 
@@ -24,7 +23,7 @@ class FakePayloadStream : public fidl::WireServer<fuchsia_paver::PayloadStream> 
   FakePayloadStream() : loop_(&kAsyncLoopConfigAttachToCurrentThread) {
     zx::result server = fidl::CreateEndpoints(&client_);
     ASSERT_OK(server.status_value());
-    fidl::BindSingleInFlightOnly(loop_.dispatcher(), std::move(server.value()), this);
+    fidl::BindServer(loop_.dispatcher(), std::move(server.value()), this);
     loop_.StartThread("payload-stream-test-loop");
   }
 

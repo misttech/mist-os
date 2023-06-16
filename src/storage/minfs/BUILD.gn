@@ -155,7 +155,6 @@ static_library("minfs") {
       "//zircon/system/ulib/async-loop",
       "//zircon/system/ulib/async-loop:async-loop-default",
       "//zircon/system/ulib/fdio-caller",
-      "//zircon/system/ulib/fidl-async:fidl-async-cpp",
       "//zircon/system/ulib/fzl",
       "//zircon/system/ulib/inspect",
       "//zircon/system/ulib/sync",

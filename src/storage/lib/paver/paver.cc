@@ -8,7 +8,6 @@
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fidl/epitaph.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/stdcompat/span.h>
@@ -122,15 +121,13 @@ zx::result<std::unique_ptr<PartitionClient>> GetFvmPartition(const DevicePartiti
 
     LOG("Could not find FVM Partition on device. Attemping to add new partition\n");
 
-    if (auto status = partitioner.AddPartition(spec); status.is_error()) {
+    auto status = partitioner.AddPartition(spec);
+    if (status.is_error()) {
       ERROR("Failure creating FVM partition: %s\n", status.status_string());
-      return status.take_error();
-    } else {
-      return status.take_value();
     }
-  } else {
-    LOG("FVM Partition already exists\n");
+    return status;
   }
+  LOG("FVM Partition already exists\n");
   return status.take_value();
 }
 
@@ -709,7 +706,7 @@ void DataSink::Bind(async_dispatcher_t* dispatcher, fbl::unique_fd devfs_root,
     return;
   }
   auto data_sink = std::make_unique<DataSink>(std::move(devfs_root), std::move(partitioner));
-  fidl::BindSingleInFlightOnly(dispatcher, std::move(server), std::move(data_sink));
+  fidl::BindServer(dispatcher, std::move(server), std::move(data_sink));
 }
 
 void DynamicDataSink::Bind(async_dispatcher_t* dispatcher, fbl::unique_fd devfs_root,
@@ -726,7 +723,7 @@ void DynamicDataSink::Bind(async_dispatcher_t* dispatcher, fbl::unique_fd devfs_
     return;
   }
   auto data_sink = std::make_unique<DynamicDataSink>(std::move(devfs_root), std::move(partitioner));
-  fidl::BindSingleInFlightOnly(dispatcher, std::move(server), std::move(data_sink));
+  fidl::BindServer(dispatcher, std::move(server), std::move(data_sink));
 }
 
 void DynamicDataSink::InitializePartitionTables(
@@ -787,7 +784,7 @@ void BootManager::Bind(async_dispatcher_t* dispatcher, fbl::unique_fd devfs_root
 
   auto boot_manager = std::make_unique<BootManager>(std::move(abr_client), std::move(devfs_root),
                                                     std::move(svc_root));
-  fidl::BindSingleInFlightOnly(dispatcher, std::move(server), std::move(boot_manager));
+  fidl::BindServer(dispatcher, std::move(server), std::move(boot_manager));
 }
 
 void BootManager::QueryCurrentConfiguration(QueryCurrentConfigurationCompleter::Sync& completer) {

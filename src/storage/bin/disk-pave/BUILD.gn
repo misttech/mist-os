@@ -36,7 +36,6 @@ executable("install-disk-image") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zx",
   ]
@@ -64,7 +63,6 @@ test("install-disk-image-test") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",

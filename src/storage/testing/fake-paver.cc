@@ -4,21 +4,19 @@
 
 #include "fake-paver.h"
 
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fzl/vmo-mapper.h>
 
 namespace paver_test {
 
-zx_status_t FakePaver::Connect(async_dispatcher_t* dispatcher,
-                               fidl::ServerEnd<fuchsia_paver::Paver> request) {
+void FakePaver::Connect(async_dispatcher_t* dispatcher,
+                        fidl::ServerEnd<fuchsia_paver::Paver> request) {
   dispatcher_ = dispatcher;
-  return fidl::BindSingleInFlightOnly<fidl::WireServer<fuchsia_paver::Paver>>(
-      dispatcher, std::move(request), this);
+  fidl::BindServer(dispatcher, std::move(request), this);
 }
 
 void FakePaver::FindDataSink(FindDataSinkRequestView request,
                              FindDataSinkCompleter::Sync& _completer) {
-  fidl::BindSingleInFlightOnly<fidl::WireServer<fuchsia_paver::DynamicDataSink>>(
+  fidl::BindServer(
       dispatcher_,
       fidl::ServerEnd<fuchsia_paver::DynamicDataSink>(request->data_sink.TakeChannel()), this);
 }
@@ -38,8 +36,7 @@ void FakePaver::UseBlockDevice(UseBlockDeviceRequestView request,
       return;
     }
   }
-  fidl::BindSingleInFlightOnly<fidl::WireServer<fuchsia_paver::DynamicDataSink>>(
-      dispatcher_, std::move(request->data_sink), this);
+  fidl::BindServer(dispatcher_, std::move(request->data_sink), this);
 }
 
 void FakePaver::FindBootManager(FindBootManagerRequestView request,
@@ -47,8 +44,7 @@ void FakePaver::FindBootManager(FindBootManagerRequestView request,
   fbl::AutoLock al(&lock_);
   AppendCommand(Command::kInitializeAbr);
   if (abr_supported_) {
-    fidl::BindSingleInFlightOnly<fidl::WireServer<fuchsia_paver::BootManager>>(
-        dispatcher_, std::move(request->boot_manager), this);
+    fidl::BindServer(dispatcher_, std::move(request->boot_manager), this);
   }
 }
 
@@ -288,7 +284,7 @@ void FakePaver::WaitForWritten(size_t size) {
   sync_completion_reset(&done_signal_);
 }
 
-const std::vector<Command> FakePaver::GetCommandTrace() {
+std::vector<Command> FakePaver::GetCommandTrace() {
   fbl::AutoLock al(&lock_);
   return command_trace_;
 }
@@ -328,7 +324,7 @@ void FakePaver::set_expected_device(std::string expected) {
   expected_block_device_ = std::move(expected);
 }
 
-const AbrData FakePaver::abr_data() {
+AbrData FakePaver::abr_data() {
   fbl::AutoLock al(&lock_);
   return abr_data_;
 }

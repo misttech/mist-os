@@ -1,10 +1,13 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 #ifndef SRC_STORAGE_LIB_PAVER_TEST_TEST_UTILS_H_
 #define SRC_STORAGE_LIB_PAVER_TEST_TEST_UTILS_H_
+
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/fdio/directory.h>
 #include <lib/fzl/vmo-mapper.h>
 
 #include <memory>
@@ -16,8 +19,6 @@
 #include <ramdevice-client/ramnand.h>
 #include <zxtest/zxtest.h>
 
-#include "lib/fdio/directory.h"
-#include "lib/fidl-async/cpp/bind.h"
 #include "src/lib/storage/vfs/cpp/pseudo_dir.h"
 #include "src/lib/storage/vfs/cpp/service.h"
 #include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
@@ -176,8 +177,8 @@ class FakeSvc {
     root_dir_->AddEntry(
         fidl::DiscoverableProtocolName<fuchsia_boot::Arguments>,
         fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<fuchsia_boot::Arguments> request) {
-          return fidl::BindSingleInFlightOnly<fidl::WireServer<fuchsia_boot::Arguments>>(
-              dispatcher_, std::move(request), &fake_boot_args_);
+          fidl::BindServer(dispatcher_, std::move(request), &fake_boot_args_);
+          return ZX_OK;
         }));
 
     auto svc_remote = fidl::CreateEndpoints(&svc_local_);

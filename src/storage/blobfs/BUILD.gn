@@ -190,7 +190,6 @@ static_library("blobfs") {
       "//zircon/system/ulib/async-loop",
       "//zircon/system/ulib/async-loop:async-loop-default",
       "//zircon/system/ulib/backtrace-request",
-      "//zircon/system/ulib/fidl-async:fidl-async-cpp",
       "//zircon/system/ulib/fzl",
       "//zircon/system/ulib/sync",
       "//zircon/system/ulib/trace",

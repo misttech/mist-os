@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.paver/cpp/wire.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/paver/provider.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
@@ -25,11 +24,12 @@ namespace {
 
 zx_status_t Connect(void* ctx, async_dispatcher_t* dispatcher, const char* service_name,
                     zx_handle_t request) {
-  if (!strcmp(service_name, fidl::DiscoverableProtocolName<fuchsia_paver::Paver>)) {
+  if (std::string_view{service_name} == fidl::DiscoverableProtocolName<fuchsia_paver::Paver>) {
     auto* paver = reinterpret_cast<paver::Paver*>(ctx);
     paver->set_dispatcher(dispatcher);
-    return fidl::BindSingleInFlightOnly(
-        dispatcher, fidl::ServerEnd<fuchsia_paver::Paver>(zx::channel(request)), paver);
+    fidl::BindServer(dispatcher, fidl::ServerEnd<fuchsia_paver::Paver>(zx::channel(request)),
+                     paver);
+    return ZX_OK;
   }
 
   zx_handle_close(request);

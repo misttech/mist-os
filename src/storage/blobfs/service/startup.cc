@@ -4,7 +4,6 @@
 
 #include "src/storage/blobfs/service/startup.h"
 
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include "src/lib/storage/block_client/cpp/remote_block_device.h"
@@ -84,7 +83,8 @@ MountOptions MergeComponentConfigIntoMountOptions(const ComponentOptions& config
 StartupService::StartupService(async_dispatcher_t* dispatcher, const ComponentOptions& config,
                                ConfigureCallback cb)
     : fs::Service([dispatcher, this](fidl::ServerEnd<fuchsia_fs_startup::Startup> server_end) {
-        return fidl::BindSingleInFlightOnly(dispatcher, std::move(server_end), this);
+        fidl::BindServer(dispatcher, std::move(server_end), this);
+        return ZX_OK;
       }),
       component_config_(config),
       configure_(std::move(cb)) {}

@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.update.verify/cpp/wire.h>
 #include <lib/async/dispatcher.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
 
@@ -24,7 +23,8 @@ namespace blobfs {
 HealthCheckService::HealthCheckService(async_dispatcher_t* dispatcher, Blobfs& blobfs)
     : fs::Service(
           [dispatcher, this](fidl::ServerEnd<fuchsia_update_verify::BlobfsVerifier> server_end) {
-            return fidl::BindSingleInFlightOnly(dispatcher, std::move(server_end), this);
+            fidl::BindServer(dispatcher, std::move(server_end), this);
+            return ZX_OK;
           }),
       blobfs_(blobfs) {}
 

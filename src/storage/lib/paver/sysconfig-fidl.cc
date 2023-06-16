@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 #include "sysconfig-fidl.h"
 
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fidl/epitaph.h>
 
 #include <fbl/string.h>
@@ -34,7 +33,7 @@ void Sysconfig::Bind(async_dispatcher_t* dispatcher, fbl::unique_fd devfs_root,
   }
 
   auto sysconfig = std::make_unique<Sysconfig>(std::move(res.value()));
-  fidl::BindSingleInFlightOnly(dispatcher, std::move(server), std::move(sysconfig));
+  fidl::BindServer(dispatcher, std::move(server), std::move(sysconfig));
 }
 
 void Sysconfig::Read(ReadCompleter::Sync& completer) {

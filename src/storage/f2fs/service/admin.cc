@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/fidl-async/cpp/bind.h>
-
 #include "src/storage/f2fs/f2fs.h"
 
 namespace f2fs {
 
 AdminService::AdminService(async_dispatcher_t* dispatcher, ShutdownRequester shutdown)
     : fs::Service([dispatcher, this](fidl::ServerEnd<fuchsia_fs::Admin> server_end) {
-        return fidl::BindSingleInFlightOnly(dispatcher, std::move(server_end), this);
+        fidl::BindServer(dispatcher, std::move(server_end), this);
+        return ZX_OK;
       }),
       shutdown_(std::move(shutdown)) {}
 

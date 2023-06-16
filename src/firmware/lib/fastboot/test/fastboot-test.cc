@@ -21,6 +21,7 @@
 #include <lib/fastboot/fastboot.h>
 #include <lib/fastboot/test/test-transport.h>
 
+#include <future>
 #include <unordered_map>
 #include <vector>
 
@@ -30,9 +31,9 @@
 
 #include "sparse_format.h"
 #include "src/lib/fxl/strings/string_printf.h"
+#include "src/lib/storage/vfs/cpp/managed_vfs.h"
 #include "src/lib/storage/vfs/cpp/pseudo_dir.h"
 #include "src/lib/storage/vfs/cpp/service.h"
-#include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
 #include "src/storage/testing/fake-paver.h"
 
 namespace fastboot {
@@ -50,7 +51,7 @@ TEST(FastbootTest, NoPacket) {
   Fastboot fastboot(0x40000);
   TestTransport transport;
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
   Packets expected_packets = {};
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
 }
@@ -61,7 +62,7 @@ TEST(FastbootTest, GetVarMaxDownloadSize) {
   TestTransport transport;
   transport.AddInPacket(command, strlen(command));
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
   Packets expected_packets = {"OKAY0x00040000"};
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
 }
@@ -72,7 +73,7 @@ TEST(FastbootTest, GetVarUnknownVariable) {
   TestTransport transport;
   transport.AddInPacket(command, strlen(command));
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), 1ULL);
   ASSERT_EQ(sent_packets[0].compare(0, 4, "FAIL"), 0);
@@ -84,7 +85,7 @@ TEST(FastbootTest, GetVarNotEnoughArgument) {
   TestTransport transport;
   transport.AddInPacket(command, strlen(command));
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), 1ULL);
   ASSERT_EQ(sent_packets[0].compare(0, 4, "FAIL"), 0);
@@ -96,7 +97,7 @@ TEST(FastbootTest, UnknownCommand) {
   TestTransport transport;
   transport.AddInPacket(command, strlen(command));
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), 1ULL);
   ASSERT_EQ(sent_packets[0].compare(0, 4, "FAIL"), 0);
@@ -112,7 +113,7 @@ TEST(FastbootResponseTest, FailNewLineMessageNotSplit) {
   std::string_view message(kNewLineMessage);
   TestTransport transport;
   auto res = fastboot.SendResponse(Fastboot::ResponseType::kFail, message, &transport, zx::ok());
-  ASSERT_TRUE(res.is_ok());
+  ASSERT_OK(res);
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), 1ULL);
   ASSERT_EQ(sent_packets[0], std::string("FAIL") + kNewLineMessage);
@@ -123,7 +124,7 @@ TEST(FastbootResponseTest, OkayNewLineMessageNotSplit) {
   std::string_view message(kNewLineMessage);
   TestTransport transport;
   auto res = fastboot.SendResponse(Fastboot::ResponseType::kOkay, message, &transport, zx::ok());
-  ASSERT_TRUE(res.is_ok());
+  ASSERT_OK(res);
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), 1ULL);
   ASSERT_EQ(sent_packets[0], std::string("OKAY") + kNewLineMessage);
@@ -134,7 +135,7 @@ TEST(FastbootResponseTest, InfoNewLineMessageSplitAtNewLine) {
   std::string_view message(kNewLineMessage);
   TestTransport transport;
   auto res = fastboot.SendResponse(Fastboot::ResponseType::kInfo, message, &transport, zx::ok());
-  ASSERT_TRUE(res.is_ok());
+  ASSERT_OK(res);
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), kNewLineMessageSplits);
   ASSERT_EQ(sent_packets[0], std::string("INFO") + "test line 1");
@@ -157,7 +158,7 @@ TEST(FastbootResponseTest, FailLongMessageNotSplit) {
   std::string_view message(kLongMessage);
   TestTransport transport;
   auto res = fastboot.SendResponse(Fastboot::ResponseType::kFail, message, &transport, zx::ok());
-  ASSERT_TRUE(res.is_ok());
+  ASSERT_OK(res);
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), 1ULL);
   ASSERT_EQ(sent_packets[0], (std::string("FAIL") + kLongMessage).substr(0, kMaxCommandPacketSize));
@@ -168,7 +169,7 @@ TEST(FastbootResponseTest, OkayLongMessageNotSplit) {
   std::string_view message(kLongMessage);
   TestTransport transport;
   auto res = fastboot.SendResponse(Fastboot::ResponseType::kOkay, message, &transport, zx::ok());
-  ASSERT_TRUE(res.is_ok());
+  ASSERT_OK(res);
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), 1ULL);
   ASSERT_EQ(sent_packets[0], (std::string("OKAY") + kLongMessage).substr(0, kMaxCommandPacketSize));
@@ -179,7 +180,7 @@ TEST(FastbootResponseTest, InfoLongMessageSplitAtNewLine) {
   std::string_view message(kLongMessage);
   TestTransport transport;
   auto res = fastboot.SendResponse(Fastboot::ResponseType::kInfo, message, &transport, zx::ok());
-  ASSERT_TRUE(res.is_ok());
+  ASSERT_OK(res);
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), kLongMessageSplits);
   std::string res_message;
@@ -233,10 +234,9 @@ TEST(FastbootResponseTest, InfoLongMessageErrorAddedTruncated) {
 TEST(FastbootResponseTest, BadType) {
   Fastboot fastboot(0x40000);
   const int expected_error = ZX_ERR_INVALID_ARGS;
-  std::string_view message("");
   Fastboot::ResponseType bad_type = static_cast<Fastboot::ResponseType>(123);
   TestTransport transport;
-  auto res = fastboot.SendResponse(bad_type, message, &transport, zx::ok());
+  auto res = fastboot.SendResponse(bad_type, {}, &transport, zx::ok());
   ASSERT_TRUE(res.is_error());
   EXPECT_EQ(res.error_value(), expected_error);
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
@@ -248,14 +248,14 @@ TEST(FastbootResponseTest, BadType) {
 class FastbootDownloadTest : public zxtest::Test {
  public:
   // Exercises the protocol to download the given data to the Fastboot instance.
-  void DownloadData(Fastboot& fastboot, const std::vector<uint8_t>& download_content) {
+  static void DownloadData(Fastboot& fastboot, const std::vector<uint8_t>& download_content) {
     std::string size_hex_str = fxl::StringPrintf("%08zx", download_content.size());
 
     std::string command = "download:" + size_hex_str;
     TestTransport transport;
     transport.AddInPacket(command);
     zx::result<> ret = fastboot.ProcessPacket(&transport);
-    ASSERT_TRUE(ret.is_ok());
+    ASSERT_OK(ret);
     std::vector<std::string> expected_packets = {
         "DATA" + size_hex_str,
     };
@@ -268,7 +268,7 @@ class FastbootDownloadTest : public zxtest::Test {
                                     download_content.begin() + download_content.size() / 2);
     transport.AddInPacket(first_half);
     ret = fastboot.ProcessPacket(&transport);
-    ASSERT_TRUE(ret.is_ok());
+    ASSERT_OK(ret);
     // There should be no new response packet.
     ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
     ASSERT_BYTES_EQ(fastboot.download_vmo_mapper_.start(), first_half.data(), first_half.size());
@@ -278,7 +278,7 @@ class FastbootDownloadTest : public zxtest::Test {
                                      download_content.end());
     transport.AddInPacket(second_half);
     ret = fastboot.ProcessPacket(&transport);
-    ASSERT_TRUE(ret.is_ok());
+    ASSERT_OK(ret);
     expected_packets.push_back("OKAY");
     ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
     ASSERT_BYTES_EQ(fastboot.download_vmo_mapper_.start(), download_content.data(),
@@ -286,7 +286,7 @@ class FastbootDownloadTest : public zxtest::Test {
   }
 
   // Overload for string data; does not include any trailing null.
-  void DownloadData(Fastboot& fastboot, std::string_view content) {
+  static void DownloadData(Fastboot& fastboot, std::string_view content) {
     std::vector<uint8_t> byte_content(content.size());
     memcpy(byte_content.data(), content.data(), content.size());
     DownloadData(fastboot, byte_content);
@@ -338,19 +338,19 @@ TEST(FastbootTest, DownloadFailsOnUnexpectedAmountOfData) {
   TestTransport transport;
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
 
   // Transmit the first half.
   std::vector<uint8_t> first_half(download_content.begin(),
                                   download_content.begin() + download_content.size() / 2);
   transport.AddInPacket(first_half);
   ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
 
   // The second transmit sends the entire download, which will exceed expected size.
   transport.AddInPacket(download_content);
   ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
   // Check that the last packet is a FAIL response
   ASSERT_EQ(transport.GetOutPackets().size(), 2ULL);
   ASSERT_EQ(transport.GetOutPackets().back().compare(0, 4, "FAIL"), 0);
@@ -366,7 +366,7 @@ TEST(FastbootTest, DownloadFailsOnZeroSizeDownload) {
   TestTransport transport;
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), 1ULL);
   ASSERT_EQ(sent_packets[0].compare(0, 4, "FAIL"), 0);
@@ -382,7 +382,7 @@ TEST(FastbootTest, DownloadFailsOnNotEnoughArgument) {
   TestTransport transport;
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), 1ULL);
   ASSERT_EQ(sent_packets[0].compare(0, 4, "FAIL"), 0);
@@ -443,7 +443,8 @@ class FastbootFlashTest : public FastbootDownloadTest {
     root_dir->AddEntry(
         fidl::DiscoverableProtocolName<fuchsia_paver::Paver>,
         fbl::MakeRefCounted<fs::Service>([this](fidl::ServerEnd<fuchsia_paver::Paver> request) {
-          return fake_paver_.Connect(loop_.dispatcher(), std::move(request));
+          fake_paver_.Connect(loop_.dispatcher(), std::move(request));
+          return ZX_OK;
         }));
     zx::result server_end = fidl::CreateEndpoints(&svc_local_);
     ASSERT_OK(server_end.status_value());
@@ -455,7 +456,12 @@ class FastbootFlashTest : public FastbootDownloadTest {
 
   paver_test::FakePaver& paver() { return fake_paver_; }
 
-  ~FastbootFlashTest() { loop_.Shutdown(); }
+  ~FastbootFlashTest() override {
+    std::promise<zx_status_t> promise;
+    vfs_.Shutdown([&promise](zx_status_t status) { promise.set_value(status); });
+    ASSERT_OK(promise.get_future().get());
+    loop_.Shutdown();
+  }
 
   void TestFlashBootloader(Fastboot& fastboot, fuchsia_paver::wire::Configuration config,
                            const std::string& type_suffix) {
@@ -476,7 +482,7 @@ class FastbootFlashTest : public FastbootDownloadTest {
 
     transport.AddInPacket(command);
     zx::result<> ret = fastboot.ProcessPacket(&transport);
-    ASSERT_TRUE(ret.is_ok());
+    ASSERT_OK(ret);
 
     std::vector<std::string> expected_packets = {"OKAY"};
     ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
@@ -498,7 +504,7 @@ class FastbootFlashTest : public FastbootDownloadTest {
     ASSERT_EQ(fake_paver_.last_firmware_type(), type);
   }
 
-  void TestFlashAsset(const std::string partition, fuchsia_paver::wire::Configuration config,
+  void TestFlashAsset(const std::string& partition, fuchsia_paver::wire::Configuration config,
                       fuchsia_paver::wire::Asset asset) {
     Fastboot fastboot(0x40000, std::move(svc_chan()));
     std::vector<uint8_t> download_content(256, 1);
@@ -510,7 +516,7 @@ class FastbootFlashTest : public FastbootDownloadTest {
     TestTransport transport;
     transport.AddInPacket(command);
     zx::result<> ret = fastboot.ProcessPacket(&transport);
-    ASSERT_TRUE(ret.is_ok());
+    ASSERT_OK(ret);
 
     std::vector<std::string> expected_packets = {"OKAY"};
     ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
@@ -518,7 +524,7 @@ class FastbootFlashTest : public FastbootDownloadTest {
     ASSERT_EQ(fake_paver.last_asset(), asset);
   }
 
-  void TestSetActive(const std::string slot) {
+  void TestSetActive(const std::string& slot) {
     Fastboot fastboot(0x40000, std::move(svc_chan()));
     paver().set_abr_supported(true);
 
@@ -526,14 +532,14 @@ class FastbootFlashTest : public FastbootDownloadTest {
     const std::string command = "set_active:" + slot;
     transport.AddInPacket(command);
     zx::result<> ret = fastboot.ProcessPacket(&transport);
-    ASSERT_TRUE(ret.is_ok());
+    ASSERT_OK(ret);
 
     std::vector<std::string> expected_packets = {"OKAY"};
     ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
   }
 
   async::Loop loop_;
-  fs::SynchronousVfs vfs_;
+  fs::ManagedVfs vfs_;
   TestPaver fake_paver_;
   fidl::ClientEnd<fuchsia_io::Directory> svc_local_;
 };
@@ -548,7 +554,7 @@ TEST_F(FastbootFlashTest, FlashFailsOnNotEnoughArguments) {
   TestTransport transport;
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
 
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), 1ULL);
@@ -565,7 +571,7 @@ TEST_F(FastbootFlashTest, FlashFailsOnUnsupportedPartition) {
   TestTransport transport;
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
 
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), 1ULL);
@@ -586,7 +592,7 @@ TEST_F(FastbootFlashTest, FlashBootloaderNoAbrNoFirmwareType) {
 
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
 
   std::vector<std::string> expected_packets = {"OKAY"};
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
@@ -609,7 +615,7 @@ TEST_F(FastbootFlashTest, FlashBootloaderNoAbrWithFirmwareType) {
 
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
 
   std::vector<std::string> expected_packets = {"OKAY"};
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
@@ -686,7 +692,7 @@ TEST_F(FastbootFlashTest, FlashBooloaderUnsupportedFirmwareType) {
   TestTransport transport;
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
 
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), 1ULL);
@@ -706,7 +712,7 @@ TEST_F(FastbootFlashTest, FlashFuchsiaEsp) {
   TestTransport transport;
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
   std::vector<std::string> expected_packets = {"OKAY"};
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
 
@@ -791,7 +797,7 @@ TEST_F(FastbootFlashTest, SetActiveInvalidSlot) {
   TestTransport transport;
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
 
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), 1ULL);
@@ -811,7 +817,7 @@ TEST_F(FastbootFlashTest, FlashFVM) {
   TestTransport transport;
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
   std::vector<std::string> expected_packets = {"OKAY"};
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
   ASSERT_EQ(fake_paver.GetCommandTrace(),
@@ -824,7 +830,7 @@ TEST_F(FastbootFlashTest, GetVarVersion) {
   TestTransport transport;
   transport.AddInPacket(command, strlen(command));
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
   std::vector<std::string> expected_packets = {"OKAY0.4"};
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
 }
@@ -836,7 +842,7 @@ TEST_F(FastbootFlashTest, GetVarSlotCount) {
   TestTransport transport;
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
   std::vector<std::string> expected_packets = {"OKAY2"};
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
 }
@@ -848,7 +854,7 @@ TEST_F(FastbootFlashTest, GetVarSlotCountAbrNotSupported) {
   TestTransport transport;
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
   std::vector<std::string> expected_packets = {"OKAY1"};
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
 }
@@ -859,7 +865,7 @@ TEST_F(FastbootFlashTest, GetVarIsUserspace) {
   TestTransport transport;
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
   std::vector<std::string> expected_packets = {"OKAYyes"};
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
 }
@@ -883,7 +889,7 @@ class FastbootFakeGptDevices : public Fastboot {
   bool FindGptDevices(paver::GptDevicePartitioner::GptDevices& gpt_devices) override {
     for (auto& ele : block_topology_paths_) {
       // fd doesn't matter, test won't be using it. We just give a valid one.
-      gpt_devices.push_back(std::make_pair(ele, fbl::unique_fd(open("/svc", O_RDONLY))));
+      gpt_devices.emplace_back(ele, fbl::unique_fd(open("/svc", O_RDONLY)));
     }
 
     return true;
@@ -899,7 +905,7 @@ TEST_F(FastbootFlashTest, OemInitPartitionTables) {
   TestTransport transport;
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
 
   std::vector<std::string> expected_packets = {"OKAY"};
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
@@ -942,7 +948,7 @@ TEST_F(FastbootFlashTest, OemWipePartitionTables) {
   TestTransport transport;
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
 
   std::vector<std::string> expected_packets = {"OKAY"};
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
@@ -1129,7 +1135,7 @@ TEST_F(FastbootRebootTest, Reboot) {
   TestTransport transport;
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
 
   std::vector<std::string> expected_packets = {"OKAY"};
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
@@ -1142,7 +1148,7 @@ TEST_F(FastbootRebootTest, Continue) {
   TestTransport transport;
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
 
   // One info message plus one OKAY message
   ASSERT_EQ(transport.GetOutPackets().size(), 2ULL);
@@ -1156,7 +1162,7 @@ TEST_F(FastbootRebootTest, RebootBootloader) {
   TestTransport transport;
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
 
   // Two info messages plus one OKAY message
   ASSERT_EQ(transport.GetOutPackets().size(), 3ULL);
@@ -1171,7 +1177,7 @@ TEST_F(FastbootFlashTest, UnknownOemCommand) {
   TestTransport transport;
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), 1ULL);
   ASSERT_EQ(sent_packets[0].compare(0, 4, "FAIL"), 0);
@@ -1305,7 +1311,7 @@ TEST_F(FastbootFshostTest, OemAddStagedBootloaderFile) {
 
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
   std::vector<std::string> expected_packets = {"OKAY"};
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
 
@@ -1321,7 +1327,7 @@ TEST_F(FastbootFlashTest, OemAddStagedBootloaderFileInvalidNumberOfArguments) {
   TestTransport transport;
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), 1ULL);
   ASSERT_EQ(sent_packets[0].compare(0, 4, "FAIL"), 0);
@@ -1333,7 +1339,7 @@ TEST_F(FastbootFlashTest, OemAddStagedBootloaderFileUnsupportedFile) {
   TestTransport transport;
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), 1ULL);
   ASSERT_EQ(sent_packets[0].compare(0, 4, "FAIL"), 0);
@@ -1350,7 +1356,7 @@ TEST_F(FastbootFlashTest, FlashRawFVM) {
   TestTransport transport;
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
 
   std::vector<std::string> expected_packets = {"OKAY"};
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
@@ -1391,7 +1397,7 @@ TEST_F(FastbootFlashTest, AndroidSparseImageNotSupported) {
   TestTransport transport;
   transport.AddInPacket(command);
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
 
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), 1ULL);
@@ -1522,7 +1528,7 @@ TEST_F(FastbootBuildInfoTest, GetVarHwRevision) {
   TestTransport transport;
   transport.AddInPacket(command, strlen(command));
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
   Packets expected_packets = {"OKAY" + std::string(kTestBoardConfig)};
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
 }
@@ -1533,7 +1539,7 @@ TEST_F(FastbootBuildInfoTest, GetVarProduct) {
   TestTransport transport;
   transport.AddInPacket(command, strlen(command));
   zx::result<> ret = fastboot.ProcessPacket(&transport);
-  ASSERT_TRUE(ret.is_ok());
+  ASSERT_OK(ret);
   Packets expected_packets = {"OKAY" + std::string(kTestBoardConfig)};
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
 }

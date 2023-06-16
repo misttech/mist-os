@@ -74,8 +74,7 @@ class FakePaver : public fidl::WireServer<fuchsia_paver::Paver>,
                   public fidl::WireServer<fuchsia_paver::BootManager>,
                   public fidl::WireServer<fuchsia_paver::DynamicDataSink> {
  public:
-  zx_status_t Connect(async_dispatcher_t* dispatcher,
-                      fidl::ServerEnd<fuchsia_paver::Paver> request);
+  void Connect(async_dispatcher_t* dispatcher, fidl::ServerEnd<fuchsia_paver::Paver> request);
 
   void FindDataSink(FindDataSinkRequestView request,
                     FindDataSinkCompleter::Sync& _completer) override;
@@ -141,7 +140,7 @@ class FakePaver : public fidl::WireServer<fuchsia_paver::Paver>,
 
   void WaitForWritten(size_t size);
 
-  const std::vector<Command> GetCommandTrace();
+  std::vector<Command> GetCommandTrace();
 
   std::string last_firmware_type() const;
   fuchsia_paver::wire::Configuration last_firmware_config() const;
@@ -155,7 +154,7 @@ class FakePaver : public fidl::WireServer<fuchsia_paver::Paver>,
   void set_wait_for_start_signal(bool wait) { wait_for_start_signal_ = wait; }
   void set_expected_device(std::string expected);
 
-  const AbrData abr_data();
+  AbrData abr_data();
 
   std::atomic<async_dispatcher_t*>& dispatcher() { return dispatcher_; }
 

@@ -4,7 +4,6 @@
 
 #include "src/storage/f2fs/service/startup.h"
 
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include "src/storage/f2fs/bcache.h"
@@ -15,7 +14,8 @@ namespace f2fs {
 
 StartupService::StartupService(async_dispatcher_t* dispatcher, ConfigureCallback cb)
     : fs::Service([dispatcher, this](fidl::ServerEnd<fuchsia_fs_startup::Startup> server_end) {
-        return fidl::BindSingleInFlightOnly(dispatcher, std::move(server_end), this);
+        fidl::BindServer(dispatcher, std::move(server_end), this);
+        return ZX_OK;
       }),
       configure_(std::move(cb)) {}
 

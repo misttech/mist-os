@@ -4,7 +4,6 @@
 
 #include "src/storage/minfs/service/startup.h"
 
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include "src/lib/storage/block_client/cpp/remote_block_device.h"
@@ -52,7 +51,8 @@ MountOptions ParseFormatOptions(const fuchsia_fs_startup::wire::FormatOptions& f
 
 StartupService::StartupService(async_dispatcher_t* dispatcher, ConfigureCallback cb)
     : fs::Service([dispatcher, this](fidl::ServerEnd<fuchsia_fs_startup::Startup> server_end) {
-        return fidl::BindSingleInFlightOnly(dispatcher, std::move(server_end), this);
+        fidl::BindServer(dispatcher, std::move(server_end), this);
+        return ZX_OK;
       }),
       configure_(std::move(cb)) {}
 

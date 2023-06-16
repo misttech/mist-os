@@ -4,14 +4,14 @@
 
 #include "src/storage/minfs/service/admin.h"
 
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/syslog/cpp/macros.h>
 
 namespace minfs {
 
 AdminService::AdminService(async_dispatcher_t* dispatcher, ShutdownRequester shutdown)
     : fs::Service([dispatcher, this](fidl::ServerEnd<fuchsia_fs::Admin> server_end) {
-        return fidl::BindSingleInFlightOnly(dispatcher, std::move(server_end), this);
+        fidl::BindServer(dispatcher, std::move(server_end), this);
+        return ZX_OK;
       }),
       shutdown_(std::move(shutdown)) {}
 

@@ -48,7 +48,6 @@ source_set("paver-core") {
     "//src/security/lib/zxcrypt:zxcrypt-client",
     "//src/storage/gpt",
     "//zircon/system/ulib/fdio-caller",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
     "//zircon/third_party/ulib/cksum",
     "//zircon/third_party/ulib/safemath",
   ]
@@ -241,7 +240,6 @@ zx_library("paver") {
     ":vim3",
     ":x64",
     "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp_wire",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
   ]
   public_deps = [ "//zircon/system/ulib/svc" ]
 }

@@ -69,7 +69,7 @@ class FakeSvc {
       component::OutgoingDirectory outgoing{dispatcher};
       ASSERT_OK(outgoing.AddUnmanagedProtocol<fuchsia_paver::Paver>(
           [&fake_paver, dispatcher](fidl::ServerEnd<fuchsia_paver::Paver> server_end) mutable {
-            ASSERT_OK(fake_paver.Connect(dispatcher, std::move(server_end)));
+            fake_paver.Connect(dispatcher, std::move(server_end));
           }));
       ASSERT_OK(outgoing.AddUnmanagedProtocol<fuchsia_fshost::Admin>(
           [&fake_fshost, dispatcher](fidl::ServerEnd<fuchsia_fshost::Admin> server_end) {

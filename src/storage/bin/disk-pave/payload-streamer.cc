@@ -5,14 +5,13 @@
 #include "payload-streamer.h"
 
 #include <lib/async/default.h>
-#include <lib/fidl-async/cpp/bind.h>
 
 namespace disk_pave {
 
 PayloadStreamer::PayloadStreamer(fidl::ServerEnd<fuchsia_paver::PayloadStream> server_end,
                                  fbl::unique_fd payload)
     : payload_(std::move(payload)) {
-  fidl::BindSingleInFlightOnly(async_get_default_dispatcher(), std::move(server_end), this);
+  fidl::BindServer(async_get_default_dispatcher(), std::move(server_end), this);
 }
 
 PayloadStreamer::~PayloadStreamer() {
