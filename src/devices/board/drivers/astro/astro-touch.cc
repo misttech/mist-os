@@ -15,7 +15,7 @@
 
 #include <bind/fuchsia/amlogic/platform/s905d2/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
-#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <soc/aml-s905d2/s905d2-gpio.h>
@@ -63,24 +63,28 @@ const device_bind_prop_t kGoodixI2cProperties[] = {
 };
 
 const ddk::BindRule kInterruptRules[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+    ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                            bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
     ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                             bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_4),
 };
 
 const device_bind_prop_t kInterruptProperties[] = {
-    ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
-    ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_INTERRUPT)};
+    ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+    ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+                      bind_fuchsia_hardware_gpio::FUNCTION_TOUCH_INTERRUPT)};
 
 const ddk::BindRule kResetRules[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+    ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                            bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
     ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                             bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_9),
 };
 
 const device_bind_prop_t kResetProperties[] = {
-    ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
-    ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_RESET),
+    ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+    ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+                      bind_fuchsia_hardware_gpio::FUNCTION_TOUCH_RESET),
 };
 
 zx_status_t Astro::TouchInit() {

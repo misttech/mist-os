@@ -83,11 +83,11 @@ TEST_F(CompositeNodeSpecTest, CreateAcceptBindRules) {
   ASSERT_TRUE(bool_val_bind_rule.get().values[0].data.bool_value);
 
   auto enum_val_bind_rule =
-      ddk::MakeAcceptBindRule("enum_based_val", "fuchsia.gpio.BIND_PROTOCOL.DEVICE");
+      ddk::MakeAcceptBindRule("enum_based_val", "fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE");
   ASSERT_STREQ("enum_based_val", enum_val_bind_rule.get().key.data.str_key);
   ASSERT_EQ(DEVICE_BIND_RULE_CONDITION_ACCEPT, enum_val_bind_rule.get().condition);
   ASSERT_EQ(1, enum_val_bind_rule.get().values_count);
-  ASSERT_STREQ("fuchsia.gpio.BIND_PROTOCOL.DEVICE",
+  ASSERT_STREQ("fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE",
                enum_val_bind_rule.get().values[0].data.enum_value);
 }
 
@@ -147,11 +147,11 @@ TEST_F(CompositeNodeSpecTest, CreateRejectBindRules) {
   ASSERT_TRUE(bool_val_bind_rule.get().values[0].data.bool_value);
 
   auto enum_val_bind_rule =
-      ddk::MakeRejectBindRule("enum_based_val", "fuchsia.gpio.BIND_PROTOCOL.DEVICE");
+      ddk::MakeRejectBindRule("enum_based_val", "fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE");
   ASSERT_STREQ("enum_based_val", enum_val_bind_rule.get().key.data.str_key);
   ASSERT_EQ(DEVICE_BIND_RULE_CONDITION_REJECT, enum_val_bind_rule.get().condition);
   ASSERT_EQ(1, enum_val_bind_rule.get().values_count);
-  ASSERT_STREQ("fuchsia.gpio.BIND_PROTOCOL.DEVICE",
+  ASSERT_STREQ("fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE",
                enum_val_bind_rule.get().values[0].data.enum_value);
 }
 
@@ -212,16 +212,16 @@ TEST_F(CompositeNodeSpecTest, CreateAcceptBindRuleList) {
   ASSERT_STREQ("thrush", str_val_bind_rule.get().values[0].data.str_value);
   ASSERT_STREQ("robin", str_val_bind_rule.get().values[1].data.str_value);
 
-  const char* enum_val_bind_rule_values[] = {"fuchsia.gpio.BIND_PROTOCOL.DEVICE",
-                                             "fuchsia.gpio.BIND_PROTOCOL.IMPL"};
+  const char* enum_val_bind_rule_values[] = {"fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE",
+                                             "fuchsia.hardware.gpio.BIND_PROTOCOL.IMPL"};
   auto enum_val_bind_rule =
       ddk::MakeAcceptBindRuleList("enum_based_val", enum_val_bind_rule_values);
   ASSERT_STREQ("enum_based_val", enum_val_bind_rule.get().key.data.str_key);
   ASSERT_EQ(DEVICE_BIND_RULE_CONDITION_ACCEPT, enum_val_bind_rule.get().condition);
   ASSERT_EQ(2, enum_val_bind_rule.get().values_count);
-  ASSERT_STREQ("fuchsia.gpio.BIND_PROTOCOL.DEVICE",
+  ASSERT_STREQ("fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE",
                enum_val_bind_rule.get().values[0].data.enum_value);
-  ASSERT_STREQ("fuchsia.gpio.BIND_PROTOCOL.IMPL",
+  ASSERT_STREQ("fuchsia.hardware.gpio.BIND_PROTOCOL.IMPL",
                enum_val_bind_rule.get().values[1].data.enum_value);
 }
 
@@ -284,16 +284,16 @@ TEST_F(CompositeNodeSpecTest, CreateRejectBindRuleList) {
   ASSERT_STREQ("thrush", str_val_bind_rule.get().values[0].data.str_value);
   ASSERT_STREQ("robin", str_val_bind_rule.get().values[1].data.str_value);
 
-  const char* enum_val_bind_rule_values[] = {"fuchsia.gpio.BIND_PROTOCOL.DEVICE",
-                                             "fuchsia.gpio.BIND_PROTOCOL.IMPL"};
+  const char* enum_val_bind_rule_values[] = {"fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE",
+                                             "fuchsia.hardware.gpio.BIND_PROTOCOL.IMPL"};
   auto enum_val_bind_rule =
       ddk::MakeRejectBindRuleList("enum_based_val", enum_val_bind_rule_values);
   ASSERT_STREQ("enum_based_val", enum_val_bind_rule.get().key.data.str_key);
   ASSERT_EQ(DEVICE_BIND_RULE_CONDITION_REJECT, enum_val_bind_rule.get().condition);
   ASSERT_EQ(2, enum_val_bind_rule.get().values_count);
-  ASSERT_STREQ("fuchsia.gpio.BIND_PROTOCOL.DEVICE",
+  ASSERT_STREQ("fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE",
                enum_val_bind_rule.get().values[0].data.enum_value);
-  ASSERT_STREQ("fuchsia.gpio.BIND_PROTOCOL.IMPL",
+  ASSERT_STREQ("fuchsia.hardware.gpio.BIND_PROTOCOL.IMPL",
                enum_val_bind_rule.get().values[1].data.enum_value);
 }
 
@@ -346,9 +346,11 @@ TEST_F(CompositeNodeSpecTest, CreateBindProperties) {
   ASSERT_STREQ("bool_key", bool_val_bind_prop.key.data.str_key);
   ASSERT_TRUE(bool_val_bind_prop.value.data.bool_value);
 
-  auto enum_val_bind_prop = ddk::MakeProperty("enum_key", "fuchsia.gpio.BIND_PROTOCOL.DEVICE");
+  auto enum_val_bind_prop =
+      ddk::MakeProperty("enum_key", "fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE");
   ASSERT_STREQ("enum_key", enum_val_bind_prop.key.data.str_key);
-  ASSERT_STREQ("fuchsia.gpio.BIND_PROTOCOL.DEVICE", enum_val_bind_prop.value.data.enum_value);
+  ASSERT_STREQ("fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE",
+               enum_val_bind_prop.value.data.enum_value);
 }
 
 TEST_F(CompositeNodeSpecTest, CreateBindPropertiesWithContants) {

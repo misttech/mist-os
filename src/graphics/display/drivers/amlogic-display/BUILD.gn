@@ -19,8 +19,8 @@ driver_bind_rules("amlogic_display_bind") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.hardware.dsi",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.hardware.hdmi",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.sysmem",

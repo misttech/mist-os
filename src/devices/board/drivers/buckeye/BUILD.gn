@@ -17,8 +17,8 @@ driver_bind_rules("buckeye-emmc-bind") {
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.hardware.clock",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.platform",
   ]
 }
@@ -30,7 +30,7 @@ driver_bind_rules("buckeye-sdio-bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.platform",
   ]
 }
@@ -41,7 +41,7 @@ driver_bind_rules("buckeye-uwb-bind") {
   bind_output = "buckeye-uwb-bind.bc"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.nxp.platform",
     "//src/devices/bind/fuchsia.spi",
   ]
@@ -54,8 +54,8 @@ driver_bind_rules("pwm_init_bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.hardware.clock",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.hardware.pwm",
   ]
 }
@@ -107,7 +107,7 @@ driver_bind_rules("spi_1_bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.platform",
   ]
 }
@@ -118,7 +118,7 @@ driver_bind_rules("spi_0_bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.platform",
   ]
 }
@@ -129,7 +129,7 @@ driver_bind_rules("tdm-i2s-test-codec-bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
     "//src/devices/bind/fuchsia.codec",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.ti.platform",
   ]
 }
@@ -139,7 +139,7 @@ driver_bind_rules("tdm-i2s-bind") {
   header_output = "tdm-i2s-bind.h"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
   ]
 }
 
@@ -194,7 +194,7 @@ driver_bind_rules("buckeye-buttons-bind") {
   header_output = "buckeye-buttons-bind.h"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
   ]
 }
 

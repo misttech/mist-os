@@ -6,7 +6,7 @@ composite spi_1;
 
 using fuchsia.platform;
 using fuchsia.amlogic.platform;
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.amlogic.platform.a5;
 
 primary node "pdev" {
@@ -18,11 +18,11 @@ primary node "pdev" {
 }
 
 node "gpio-cs-0" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.a5.GPIOT_PIN_ID.PIN_10;  // GPIO_SPICC1_SS0
 }
 
 // Guarantee that spi pin has been set before load spi driver.
 node "gpio-init-step" {
-  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+  fuchsia.BIND_INIT_STEP == fuchsia.hardware.gpio.BIND_INIT_STEP.GPIO;
 }

@@ -5,7 +5,7 @@
 composite sr1xx;
 
 using fuchsia.amlogic.platform.a5;
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.nxp.platform;
 using fuchsia.spi;
 
@@ -16,17 +16,17 @@ primary node "spi" {
 }
 
 node "gpio-int" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.a5.GPIOD_PIN_ID.PIN_14; // UWB_SOC_INT
 }
 
 node "gpio-enable" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.a5.GPIOD_PIN_ID.PIN_4;
 }
 
 node "gpio-wakeup" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.a5.GPIOT_PIN_ID.PIN_6;
 }
 

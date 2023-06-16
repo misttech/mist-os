@@ -6,7 +6,7 @@ composite vim3_sdio;
 
 using fuchsia.amlogic.platform;
 using fuchsia.amlogic.platform.a311d;
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.platform;
 using fuchsia.hardware.pwm;
 
@@ -19,7 +19,7 @@ primary node "pdev" {
 }
 
 node "gpio-wifi-power-on" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.a311d.GPIOX_PIN_ID.PIN_6;
 }
 

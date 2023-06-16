@@ -6,7 +6,7 @@ composite clover_sdio;
 
 using fuchsia.amlogic.platform;
 using fuchsia.amlogic.platform.a1;
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.platform;
 using fuchsia.amlogic.platform.meson;
 using fuchsia.hardware.clock;
@@ -20,7 +20,7 @@ primary node "pdev" {
 }
 
 node "gpio-wifi-power-on" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.a1.GPIOP_PIN_ID.PIN_4; // WL_RESETN
 }
 
@@ -30,5 +30,5 @@ node "sdio-clk-gate" {
 }
 
 node "gpio" {
-  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+  fuchsia.BIND_INIT_STEP == fuchsia.hardware.gpio.BIND_INIT_STEP.GPIO;
 }

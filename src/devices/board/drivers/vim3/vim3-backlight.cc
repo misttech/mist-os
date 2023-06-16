@@ -9,7 +9,7 @@
 
 #include <bind/fuchsia/amlogic/platform/a311d/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
-#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/pwm/cpp/bind.h>
 #include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <soc/aml-a311d/a311d-gpio.h>
@@ -27,15 +27,16 @@ zx_status_t Vim3::BacklightInit() {
   }
 
   const ddk::BindRule gpio_lcd_reset_bind_rules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                              bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
       ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               static_cast<uint32_t>(VIM3_LCD_BACKLIGHT_ENABLE)),
   };
 
   const device_bind_prop_t gpio_lcd_reset_properties[] = {
-      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
-      ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION,
-                        bind_fuchsia_gpio::FUNCTION_LCD_BACKLIGHT_ENABLE),
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+                        bind_fuchsia_hardware_gpio::FUNCTION_LCD_BACKLIGHT_ENABLE),
   };
 
   const ddk::BindRule pwm_bind_rules[] = {

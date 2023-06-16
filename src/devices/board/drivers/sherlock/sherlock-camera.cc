@@ -21,9 +21,9 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gdc/cpp/bind.h>
 #include <bind/fuchsia/ge2d/cpp/bind.h>
-#include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
 #include <bind/fuchsia/hardware/clock/cpp/bind.h>
+#include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/isp/cpp/bind.h>
 #include <bind/fuchsia/mipicsi/cpp/bind.h>
@@ -282,14 +282,16 @@ zx_status_t Sherlock::CameraInit() {
       .bind_rules =
           {
               fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                                      bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+                                      bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
               fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                                       bind_fuchsia_amlogic_platform_t931::GPIOZ_PIN_ID_PIN_0),
           },
       .properties =
           {
-              fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
-              fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_CAM_RESET),
+              fdf::MakeProperty(bind_fuchsia::PROTOCOL,
+                                bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+              fdf::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+                                bind_fuchsia_hardware_gpio::FUNCTION_CAM_RESET),
           },
   }};
 
@@ -297,15 +299,16 @@ zx_status_t Sherlock::CameraInit() {
       .bind_rules =
           {
               fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                                      bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+                                      bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
               fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                                       bind_fuchsia_amlogic_platform_t931::GPIOA_PIN_ID_PIN_6),
           },
       .properties =
           {
-              fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
-              fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION,
-                                bind_fuchsia_gpio::FUNCTION_VANA_ENABLE),
+              fdf::MakeProperty(bind_fuchsia::PROTOCOL,
+                                bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+              fdf::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+                                bind_fuchsia_hardware_gpio::FUNCTION_VANA_ENABLE),
           },
   }};
 
@@ -313,15 +316,16 @@ zx_status_t Sherlock::CameraInit() {
       .bind_rules =
           {
               fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                                      bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+                                      bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
               fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                                       bind_fuchsia_amlogic_platform_t931::GPIOZ_PIN_ID_PIN_12),
           },
       .properties =
           {
-              fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
-              fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION,
-                                bind_fuchsia_gpio::FUNCTION_VDIG_ENABLE),
+              fdf::MakeProperty(bind_fuchsia::PROTOCOL,
+                                bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+              fdf::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+                                bind_fuchsia_hardware_gpio::FUNCTION_VDIG_ENABLE),
           },
   }};
 

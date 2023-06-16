@@ -8,7 +8,7 @@ using fuchsia.platform;
 using fuchsia.amlogic.platform.a5;
 using fuchsia.codec;
 using fuchsia.dsp;
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.mailbox;
 using fuchsia.ti.platform;
 using fuchsia.amlogic.platform;
@@ -22,7 +22,7 @@ primary node "pdev" {
 }
 
 node "gpio-enable" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.a5.GPIOD_PIN_ID.PIN_9;  // RESET
 }
 
@@ -42,5 +42,5 @@ node "audio-dsp" {
 
 // Guarantee that audio pin has been set before load audio driver.
 node "gpio-init-step" {
-  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+  fuchsia.BIND_INIT_STEP == fuchsia.hardware.gpio.BIND_INIT_STEP.GPIO;
 }

@@ -7,7 +7,7 @@ composite udc;
 using fuchsia.amlogic.platform;
 using fuchsia.platform;
 using fuchsia.usb.phy;
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 
 primary node "pdev" {
   fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
@@ -26,5 +26,5 @@ node "udc-phy" {
 
 // Guarantee that |GPIOD_10| pin has been set before load udc driver.
 node "gpio-init-step" {
-  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+  fuchsia.BIND_INIT_STEP == fuchsia.hardware.gpio.BIND_INIT_STEP.GPIO;
 }

@@ -23,7 +23,7 @@
                 "expected": "match",
                 "device": {
                     "fuchsia.BIND_GPIO_PIN": "fuchsia.amlogic.platform.t931.GPIOX_PIN_ID.PIN_6",
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.gpio.BIND_PROTOCOL.DEVICE"
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE"
                 }
             }
         ]

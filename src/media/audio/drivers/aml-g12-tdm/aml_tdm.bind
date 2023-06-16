@@ -6,7 +6,7 @@ composite aml_tdm;
 
 using fuchsia.amlogic.platform;
 using fuchsia.codec;
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.platform;
 
 primary node "pdev" {
@@ -23,8 +23,8 @@ primary node "pdev" {
 }
 
 node "gpio-enable" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
-  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.SOC_AUDIO_ENABLE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.SOC_AUDIO_ENABLE;
 }
 
 node "codec-01" {

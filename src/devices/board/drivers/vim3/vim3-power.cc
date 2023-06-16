@@ -16,7 +16,7 @@
 
 #include <bind/fuchsia/amlogic/platform/a311d/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
-#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/pwm/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/power/cpp/bind.h>
@@ -146,12 +146,14 @@ const device_bind_prop_t kI2cProperties[] = {
 };
 
 const ddk::BindRule kGpioRules[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+    ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                            bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
     ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_FUSB302_INT))};
 
 const device_bind_prop_t kGpioProperties[] = {
-    ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
-    ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_USB_POWER_DELIVERY)};
+    ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+    ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+                      bind_fuchsia_hardware_gpio::FUNCTION_USB_POWER_DELIVERY)};
 
 zx_status_t AddBigCore(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
   fpbus::Node big_core_dev;

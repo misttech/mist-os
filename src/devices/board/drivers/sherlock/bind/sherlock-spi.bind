@@ -6,7 +6,7 @@ composite spi_0;
 
 using fuchsia.amlogic.platform;
 using fuchsia.amlogic.platform.t931;
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.platform;
 using fuchsia.hardware.registers;
 
@@ -19,7 +19,7 @@ primary node "pdev" {
 }
 
 node "gpio-cs-0" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.t931.GPIOC_PIN_ID.PIN_2; // GPIO_SPICC0_SS0
 }
 

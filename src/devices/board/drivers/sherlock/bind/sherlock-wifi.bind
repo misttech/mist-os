@@ -5,7 +5,7 @@
 composite wifi;
 
 using fuchsia.amlogic.platform.t931;
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.sdio;
 
 primary node "sdio-function-1" {
@@ -27,6 +27,6 @@ node "sdio-function-2" {
 }
 
 node "gpio-oob" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.t931.GPIOX_PIN_ID.PIN_7; // T931_WIFI_HOST_WAKE
 }

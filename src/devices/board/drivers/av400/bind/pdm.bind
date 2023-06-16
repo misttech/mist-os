@@ -6,7 +6,7 @@ composite pdm;
 
 using fuchsia.amlogic.platform;
 using fuchsia.platform;
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 
 primary node "pdev" {
   fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
@@ -18,5 +18,5 @@ primary node "pdev" {
 
 // Guarantee that audio pin has been set before load audio driver.
 node "gpio-init-step" {
-  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+  fuchsia.BIND_INIT_STEP == fuchsia.hardware.gpio.BIND_INIT_STEP.GPIO;
 }

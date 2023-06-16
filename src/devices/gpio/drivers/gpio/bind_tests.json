@@ -8,7 +8,7 @@
     },
     {
         "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.gpio.BIND_PROTOCOL.IMPL"
+            "fuchsia.BIND_PROTOCOL": "fuchsia.hardware.gpio.BIND_PROTOCOL.IMPL"
         },
         "expected": "match",
         "name": "Correct_Protocol"

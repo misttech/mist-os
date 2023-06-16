@@ -35,8 +35,8 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.gpio.BIND_PROTOCOL.DEVICE",
-                    "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.LCD_BACKLIGHT_ENABLE"
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.hardware.gpio.FUNCTION": "fuchsia.hardware.gpio.FUNCTION.LCD_BACKLIGHT_ENABLE"
                 }
             },
             {
@@ -44,15 +44,15 @@
                 "expected": "abort",
                 "device": {
                     "fuchsia.BIND_PROTOCOL": "fuchsia.i2c.BIND_PROTOCOL.DEVICE",
-                    "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.LCD_BACKLIGHT_ENABLE"
+                    "fuchsia.hardware.gpio.FUNCTION": "fuchsia.hardware.gpio.FUNCTION.LCD_BACKLIGHT_ENABLE"
                 }
             },
             {
                 "name": "function",
                 "expected": "abort",
                 "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.gpio.BIND_PROTOCOL.DEVICE",
-                    "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.LCD_RESET"
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.hardware.gpio.FUNCTION": "fuchsia.hardware.gpio.FUNCTION.LCD_RESET"
                 }
             }
         ]

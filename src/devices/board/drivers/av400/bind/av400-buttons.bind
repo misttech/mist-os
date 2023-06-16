@@ -5,9 +5,9 @@
 composite av400_buttons;
 
 using fuchsia.amlogic.platform.a5;
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 
 primary node "mic-mute" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.a5.GPIOD_PIN_ID.PIN_3; // GPIO_MIC_MUTE
 }

@@ -4,6 +4,6 @@
 
 import("//build/bind/bind.gni")
 
-bind_library("fuchsia.gpio") {
-  source = "fuchsia.gpio.bind"
+bind_library("fuchsia.hardware.gpio") {
+  source = "fuchsia.hardware.gpio.bind"
 }

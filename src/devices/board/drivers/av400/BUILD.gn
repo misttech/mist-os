@@ -22,8 +22,8 @@ driver_bind_rules("av400-emmc-bind") {
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.hardware.clock",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.platform",
   ]
 }
@@ -35,7 +35,7 @@ driver_bind_rules("av400-sdio-bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.platform",
   ]
 }
@@ -47,8 +47,8 @@ driver_bind_rules("pwm_init_bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.hardware.clock",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.hardware.pwm",
   ]
 }
@@ -69,7 +69,7 @@ driver_bind_rules("eth-bind") {
   bind_output = "eth-bind.bc"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
   ]
 }
 
@@ -79,7 +79,7 @@ driver_bind_rules("dwmac-bind") {
   bind_output = "dwmac-bind.bc"
   deps = [
     "//src/devices/bind/fuchsia.designware.platform",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
   ]
 }
 
@@ -110,7 +110,7 @@ driver_bind_rules("udc-phy-bind") {
   bind_output = "udc-phy-bind.bc"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.usb.phy",
   ]
@@ -122,7 +122,7 @@ driver_bind_rules("spi_1_bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.platform",
   ]
 }
@@ -133,7 +133,7 @@ driver_bind_rules("tdm-i2s-test-codec-bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
     "//src/devices/bind/fuchsia.codec",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.ti.platform",
   ]
 }
@@ -147,7 +147,7 @@ driver_bind_rules("tdm-i2s-out-dsp-bind") {
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
     "//src/devices/bind/fuchsia.codec",
     "//src/devices/bind/fuchsia.dsp",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.mailbox",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.ti.platform",
@@ -159,14 +159,14 @@ driver_bind_rules("tdm-i2s-bind") {
   header_output = "tdm-i2s-bind.h"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
   ]
 }
 
 driver_bind_rules("tdm-i2s-in-bind") {
   rules = "bind/tdm-i2s-in.bind"
   header_output = "tdm-i2s-in-bind.h"
-  deps = [ "//src/devices/bind/fuchsia.gpio" ]
+  deps = [ "//src/devices/bind/fuchsia.hardware.gpio" ]
 }
 
 driver_bind_rules("pdm-bind") {
@@ -174,7 +174,7 @@ driver_bind_rules("pdm-bind") {
   header_output = "pdm-bind.h"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.platform",
   ]
 }
@@ -187,7 +187,7 @@ driver_bind_rules("pdm-i2s-dsp-bind") {
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
     "//src/devices/bind/fuchsia.dsp",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.mailbox",
     "//src/devices/bind/fuchsia.platform",
   ]
@@ -201,7 +201,7 @@ driver_bind_rules("tdm-i2s-in-dsp-bind") {
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
     "//src/devices/bind/fuchsia.dsp",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.mailbox",
     "//src/devices/bind/fuchsia.platform",
   ]
@@ -211,7 +211,7 @@ driver_bind_rules("audio-tas5707-stereo-bind") {
   rules = "bind/audio-tas5707-stereo.bind"
   header_output = "audio-tas5707-stereo-bind.h"
   deps = [
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.i2c",
   ]
 }
@@ -261,7 +261,7 @@ driver_bind_rules("av400-buttons-bind") {
   header_output = "av400-buttons-bind.h"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.a5",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
   ]
 }
 
@@ -284,7 +284,7 @@ driver_bind_rules("av400-i2c-bind") {
   header_output = "av400-i2c-bind.h"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.platform",
   ]
 }

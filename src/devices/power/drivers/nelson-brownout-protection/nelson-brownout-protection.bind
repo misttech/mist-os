@@ -7,7 +7,7 @@ composite brownout_protection;
 using fuchsia.codec;
 using fuchsia.ti.platform;
 using fuchsia.amlogic.platform.s905d3;
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.hardware.power.sensor;
 
 primary node "codec" {
@@ -20,6 +20,6 @@ node "power-sensor" {
 }
 
 node "alert-gpio" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
-  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.GPIO_ALERT_PWR_L;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.GPIO_ALERT_PWR_L;
 }

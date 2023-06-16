@@ -5,7 +5,7 @@
 composite pwm_init;
 
 using fuchsia.amlogic.platform.a311d;
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.hardware.pwm;
 
 primary node "pwm" {
@@ -14,11 +14,11 @@ primary node "pwm" {
 }
 
 node "gpio-wifi" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.a311d.GPIOX_PIN_ID.PIN_16; // VIM3_WIFI_32K
 }
 
 node "gpio-bt" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.a311d.GPIOX_PIN_ID.PIN_17; // VIM3_BT_EN
 }

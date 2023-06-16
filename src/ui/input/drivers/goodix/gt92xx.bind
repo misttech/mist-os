@@ -4,7 +4,7 @@
 
 composite gt92xx_touch;
 
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.i2c;
 
 primary node "i2c" {
@@ -13,11 +13,11 @@ primary node "i2c" {
 }
 
 node "gpio-int" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
-  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.TOUCH_INTERRUPT;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.TOUCH_INTERRUPT;
 }
 
 node "gpio-reset" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
-  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.TOUCH_RESET;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.TOUCH_RESET;
 }

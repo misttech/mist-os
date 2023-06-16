@@ -7,7 +7,7 @@ composite display;
 using fuchsia.hardware.amlogiccanvas;
 using fuchsia.hardware.dsi;
 using fuchsia.hardware.hdmi;
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.platform;
 using fuchsia.sysmem;
 using fuchsia.amlogic.platform;
@@ -35,13 +35,13 @@ node "pdev" {
 }
 
 node "gpio-lcd-reset" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
-  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.LCD_RESET;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.LCD_RESET;
 }
 
 optional node "gpio-hdmi-hotplug-detect" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
-  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.HDMI_HOTPLUG_DETECT;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.HDMI_HOTPLUG_DETECT;
 }
 
 node "sysmem-fidl" {

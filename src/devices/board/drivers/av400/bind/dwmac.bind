@@ -5,7 +5,7 @@
 composite dwmac;
 
 using fuchsia.designware.platform;
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 
 primary node "eth-board" {
   fuchsia.BIND_PROTOCOL == 102; // ZX_PROTOCOL_ETH_BOARD
@@ -15,5 +15,5 @@ primary node "eth-board" {
 
 // Guarantee that eth pin has been set before load eth driver.
 node "gpio-init-step" {
-  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+  fuchsia.BIND_INIT_STEP == fuchsia.hardware.gpio.BIND_INIT_STEP.GPIO;
 }

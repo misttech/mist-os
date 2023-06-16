@@ -7,7 +7,7 @@ composite aml_sdio;
 using fuchsia.amlogic.platform;
 using fuchsia.amlogic.platform.s905d2;
 using fuchsia.platform;
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.hardware.pwm;
 
 primary node "pdev" {
@@ -19,7 +19,7 @@ primary node "pdev" {
 }
 
 node "gpio-wifi-power-on" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.s905d2.GPIOX_PIN_ID.PIN_6; // GPIO_SDIO_RESET
 }
 

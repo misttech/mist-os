@@ -4,7 +4,7 @@
 
 composite selina;
 
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.amlogic.platform.s905d3;
 using fuchsia.spi;
 using fuchsia.infineon.platform;
@@ -17,11 +17,11 @@ primary node "spi" {
 }
 
 node "irq-gpio" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.s905d3.GPIOH_PIN_ID.PIN_3;  // GPIO_SELINA_IRQ
 }
 
 node "reset-gpio" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.s905d3.GPIOH_PIN_ID.PIN_2;  // GPIO_SELINA_RESET
 }

@@ -16,9 +16,9 @@
 
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
-#include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
 #include <bind/fuchsia/hardware/dsi/cpp/bind.h>
+#include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/hdmi/cpp/bind.h>
 #include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <soc/aml-a311d/a311d-gpio.h>
@@ -139,24 +139,27 @@ zx_status_t Vim3::DisplayInit() {
   };
 
   std::vector<fuchsia_driver_framework::BindRule> gpio_lcd_reset_bind_rules{
-      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                              bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_LCD_RESET)),
   };
 
   std::vector<fuchsia_driver_framework::NodeProperty> gpio_lcd_reset_properties{
-      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
-      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_LCD_RESET),
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+                        bind_fuchsia_hardware_gpio::FUNCTION_LCD_RESET),
   };
 
   std::vector<fuchsia_driver_framework::BindRule> gpio_hdmi_hotplug_detect_bind_rules{
-      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                              bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_HPD_IN)),
   };
 
   std::vector<fuchsia_driver_framework::NodeProperty> gpio_hdmi_hotplug_detect_properties{
-      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
-      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION,
-                        bind_fuchsia_gpio::FUNCTION_HDMI_HOTPLUG_DETECT),
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+                        bind_fuchsia_hardware_gpio::FUNCTION_HDMI_HOTPLUG_DETECT),
   };
 
   std::vector<fuchsia_driver_framework::BindRule> sysmem_bind_rules = std::vector{

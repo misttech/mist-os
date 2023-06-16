@@ -5,14 +5,14 @@
 composite eth;
 
 using fuchsia.amlogic.platform.a5;
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 
 primary node "gpio-int" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.a5.GPIOZ_PIN_ID.PIN_14; // Ethernet MAC RESET
 }
 
 // Guarantee that eth pin has been set before load eth driver.
 node "gpio-init-step" {
-  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+  fuchsia.BIND_INIT_STEP == fuchsia.hardware.gpio.BIND_INIT_STEP.GPIO;
 }

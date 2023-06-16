@@ -5,7 +5,7 @@
 composite imx227_sensor;
 
 using fuchsia.hardware.clock;
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.i2c;
 using fuchsia.mipicsi;
 using fuchsia.platform;
@@ -27,18 +27,18 @@ node "i2c" {
 }
 
 node "gpio-reset" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
-  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.CAM_RESET;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.CAM_RESET;
 }
 
 node "gpio-vana" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
-  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.VANA_ENABLE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.VANA_ENABLE;
 }
 
 node "gpio-vdig" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
-  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.VDIG_ENABLE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.VDIG_ENABLE;
 }
 
 node "clock-sensor" {

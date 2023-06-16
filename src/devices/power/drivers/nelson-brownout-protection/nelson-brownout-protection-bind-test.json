@@ -33,8 +33,8 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.gpio.BIND_PROTOCOL.DEVICE",
-                    "fuchsia.gpio.FUNCTION": " fuchsia.gpio.FUNCTION.GPIO_ALERT_PWR_L"
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.hardware.gpio.FUNCTION": " fuchsia.hardware.gpio.FUNCTION.GPIO_ALERT_PWR_L"
                 }
             }
         ]

@@ -4,7 +4,7 @@
 
 composite audio_codec_tas27xx;
 
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.i2c;
 using fuchsia.ti.platform;
 
@@ -16,6 +16,6 @@ primary node "i2c" {
 }
 
 node "gpio" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
-  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.SOC_AUDIO_FAULT;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.SOC_AUDIO_FAULT;
 }

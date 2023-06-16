@@ -5,7 +5,7 @@
 composite nrf52840_radio;
 
 using fuchsia.amlogic.platform.t931;
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.nordic.platform;
 using fuchsia.spi;
 
@@ -17,16 +17,16 @@ primary node "spi" {
 }
 
 node "gpio-int" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.t931.GPIOA_PIN_ID.PIN_4; // GPIO_OT_RADIO_INTERRUPT
 }
 
 node "gpio-reset" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.t931.GPIOA_PIN_ID.PIN_2; // GPIO_OT_RADIO_RESET
 }
 
 node "gpio-bootloader" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.t931.GPIOA_PIN_ID.PIN_5; // GPIO_OT_RADIO_BOOTLOADER
 }

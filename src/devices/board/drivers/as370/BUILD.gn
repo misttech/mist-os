@@ -29,7 +29,7 @@ driver_bind_rules("as370-buttons-bind") {
   header_output = "as370-buttons-bind.h"
   bind_output = "as370-buttons-bind.bc"
   tests = "bind-tests/as370-buttons-bind-test.json"
-  deps = [ "//src/devices/bind/fuchsia.gpio" ]
+  deps = [ "//src/devices/bind/fuchsia.hardware.gpio" ]
 }
 
 fuchsia_driver("as370-driver") {

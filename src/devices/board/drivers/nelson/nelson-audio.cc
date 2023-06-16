@@ -15,7 +15,7 @@
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/codec/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
-#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/ti/platform/cpp/bind.h>
 #include <ddktl/metadata/audio.h>
@@ -45,12 +45,14 @@ namespace fpbus = fuchsia_hardware_platform_bus;
 
 // Audio out controller composite node specifications.
 const std::vector<fdf::BindRule> kAudioEnableGpioRules = std::vector{
-    fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                            bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
     fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(GPIO_SOC_AUDIO_EN)),
 };
 const std::vector<fdf::NodeProperty> kAudioEnableGpioProps = std::vector{
-    fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
-    fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SOC_AUDIO_ENABLE),
+    fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+    fdf::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+                      bind_fuchsia_hardware_gpio::FUNCTION_SOC_AUDIO_ENABLE),
 };
 
 const std::vector<fdf::BindRule> kOutCodecRules = std::vector{
@@ -87,12 +89,14 @@ const device_bind_prop_t kOutI2cProps[] = {
 };
 
 const ddk::BindRule kFaultGpioRules[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+    ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                            bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
     ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(GPIO_AUDIO_SOC_FAULT_L)),
 };
 const device_bind_prop_t kFaultGpioProps[] = {
-    ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
-    ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SOC_AUDIO_FAULT),
+    ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+    ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+                      bind_fuchsia_hardware_gpio::FUNCTION_SOC_AUDIO_FAULT),
 };
 
 zx_status_t Nelson::AudioInit() {

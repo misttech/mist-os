@@ -6,7 +6,7 @@ composite gpio_light;
 
 using fuchsia.amlogic.platform;
 using fuchsia.amlogic.platform.t931;
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.platform;
 using fuchsia.hardware.pwm;
 
@@ -19,7 +19,7 @@ primary node "pdev" {
 }
 
 node "gpio-amber-led" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.t931.GPIOAO_PIN_ID.PIN_11;  // GPIO_AMBER_LED
 }
 
@@ -29,7 +29,7 @@ node "pwm-amber-led" {
 }
 
 node "gpio-green-led" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.t931.GPIOH_PIN_ID.PIN_5;  // GPIO_GREEN_LED
 }
 

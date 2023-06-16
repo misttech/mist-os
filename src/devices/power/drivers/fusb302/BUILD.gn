@@ -15,7 +15,7 @@ driver_bind_rules("fusb302-bind") {
   # fragments for composite bind rules.
   disable_fragment_gen = true
   deps = [
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.i2c",
   ]
 }

@@ -44,7 +44,7 @@ driver_bind_rules("nelson_buttons_bind") {
   tests = "bind-tests/nelson_buttons-test.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
   ]
 }
 
@@ -56,7 +56,7 @@ driver_bind_rules("nelson_emmc_bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.platform",
   ]
 }
@@ -92,7 +92,7 @@ driver_bind_rules("pwm_init_bind") {
   tests = "bind-tests/pwm_init-test.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.hardware.pwm",
   ]
 }
@@ -105,7 +105,7 @@ driver_bind_rules("nelson_aml_sdio_bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.hardware.pwm",
     "//src/devices/bind/fuchsia.platform",
   ]
@@ -119,7 +119,7 @@ driver_bind_rules("nelson_wifi_bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
     "//src/devices/bind/fuchsia.broadcom.sdio",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.sdmmc",
   ]
 }
@@ -144,7 +144,7 @@ driver_bind_rules("nelson_selina_bind") {
   tests = "bind-tests/nelson_selina-test.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.infineon.platform",
     "//src/devices/bind/fuchsia.spi",
   ]
@@ -158,7 +158,7 @@ driver_bind_rules("spi_0_bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.hardware.registers",
     "//src/devices/bind/fuchsia.platform",
   ]
@@ -172,7 +172,7 @@ driver_bind_rules("spi_1_bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.hardware.registers",
     "//src/devices/bind/fuchsia.platform",
   ]
@@ -213,7 +213,7 @@ driver_bind_rules("gt6853_touch_bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
     "//src/devices/bind/fuchsia.goodix.platform",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.i2c",
     "//src/devices/bind/fuchsia.platform",
   ]
@@ -265,7 +265,7 @@ driver_bind_rules("nelson_ot_radio_bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
     "//src/devices/bind/fuchsia.google.platform",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.nordic.platform",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.spi",
@@ -354,8 +354,8 @@ fuchsia_driver("nelson-module-driver") {
     "//src/devices/bind/fuchsia.ams.platform:fuchsia.ams.platform_cpp",
     "//src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_cpp",
     "//src/devices/bind/fuchsia.codec:fuchsia.codec_cpp",
-    "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
     "//src/devices/bind/fuchsia.hardware.dsi:fuchsia.hardware.dsi_cpp",
+    "//src/devices/bind/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//src/devices/bind/fuchsia.hardware.power.sensor:fuchsia.hardware.power.sensor_cpp",
     "//src/devices/bind/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",
     "//src/devices/bind/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",

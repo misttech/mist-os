@@ -5,7 +5,7 @@
 composite audio_tas5707_stereo;
 
 using fuchsia.i2c;
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 
 primary node "i2c" {
     fuchsia.BIND_FIDL_PROTOCOL == fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE;
@@ -15,5 +15,5 @@ primary node "i2c" {
 
 // Guarantee that i2c pin has been set before load codec driver.
 node "gpio-init-step" {
-  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+  fuchsia.BIND_INIT_STEP == fuchsia.hardware.gpio.BIND_INIT_STEP.GPIO;
 }

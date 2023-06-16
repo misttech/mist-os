@@ -15,7 +15,7 @@
 #include <bind/fuchsia/amlogic/platform/s905d3/cpp/bind.h>
 #include <bind/fuchsia/ams/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
-#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/pwm/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <ddk/metadata/lights.h>
@@ -91,13 +91,15 @@ zx_status_t Nelson::LightInit() {
   };
 
   const ddk::BindRule kGpioLightInterruptRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                              bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
       ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_s905d3::GPIOAO_PIN_ID_PIN_5),
   };
   const device_bind_prop_t kGpioLightInterruptProperties[] = {
-      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
-      ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_LIGHT_INTERRUPT),
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+                        bind_fuchsia_hardware_gpio::FUNCTION_LIGHT_INTERRUPT),
   };
 
   zx_status_t status = DdkAddCompositeNodeSpec(
@@ -124,14 +126,16 @@ zx_status_t Nelson::LightInit() {
   }
 
   auto amber_led_gpio_bind_rules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                              bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_s905d3::GPIOAO_PIN_ID_PIN_11),
   };
 
   auto amber_led_gpio_properties = std::vector{
-      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
-      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_GPIO_AMBER_LED),
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_hardware_gpio::FUNCTION,
+                        bind_fuchsia_hardware_gpio::FUNCTION_GPIO_AMBER_LED),
   };
 
   auto amber_led_pwm_bind_rules = std::vector{

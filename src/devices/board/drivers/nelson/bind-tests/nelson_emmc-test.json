@@ -23,7 +23,7 @@
                 "expected": "match",
                 "device": {
                     "fuchsia.BIND_GPIO_PIN": "fuchsia.amlogic.platform.s905d3.GPIOBOOT_PIN_ID.PIN_12",
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.gpio.BIND_PROTOCOL.DEVICE"
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE"
                 }
             }
         ]

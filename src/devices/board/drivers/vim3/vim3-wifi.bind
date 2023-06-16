@@ -5,7 +5,7 @@
 composite wifi;
 
 using fuchsia.amlogic.platform.a311d;
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.sdio;
 using fuchsia.broadcom.sdio;
 
@@ -28,6 +28,6 @@ node "sdio-function-2" {
 }
 
 node "gpio-oob" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.a311d.GPIOX_PIN_ID.PIN_7; // VIM3_WIFI_WAKE_HOST
 }

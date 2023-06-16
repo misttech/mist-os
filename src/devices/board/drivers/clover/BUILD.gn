@@ -40,7 +40,7 @@ driver_bind_rules("clover-spi-0-bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a1",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.platform",
   ]
 }
@@ -65,8 +65,8 @@ driver_bind_rules("clover-sdio-bind") {
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a1",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.hardware.clock",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.platform",
   ]
 }
@@ -76,7 +76,7 @@ driver_bind_rules("clover-i2c-bind") {
   header_output = "clover-i2c-bind.h"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.platform",
   ]
 }

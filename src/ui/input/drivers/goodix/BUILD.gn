@@ -18,7 +18,7 @@ driver_bind_rules("gt92xx_bind") {
 
   tests = "bind_tests.json"
   deps = [
-    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.gpio",
     "//src/devices/bind/fuchsia.i2c",
   ]
 }

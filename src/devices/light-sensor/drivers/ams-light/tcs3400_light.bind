@@ -4,7 +4,7 @@
 
 composite tcs3400_light;
 
-using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.i2c;
 
 primary node "i2c" {
@@ -12,6 +12,6 @@ primary node "i2c" {
 }
 
 node "gpio" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
-  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.LIGHT_INTERRUPT;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.hardware.gpio.FUNCTION == fuchsia.hardware.gpio.FUNCTION.LIGHT_INTERRUPT;
 }
