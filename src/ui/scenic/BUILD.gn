@@ -320,11 +320,6 @@ fuchsia_component_manifest("scenic_manifest") {
   manifest = "bin/meta/scenic.cml"
 }
 
-fuchsia_component_manifest("scenic_with_supplied_display_provider_manifest") {
-  component_name = "scenic"
-  manifest = "bin/meta/scenic_with_supplied_display_provider.cml"
-}
-
 fuchsia_component("component_v2") {
   cm_label = ":scenic_manifest"
   deps = [ "bin" ]
@@ -338,6 +333,28 @@ fuchsia_component("component_v2") {
   if (scenic_enable_vulkan_validation) {
     deps += [ "//src/lib/vulkan:vulkan_validation_layers" ]
   }
+}
+
+fuchsia_structured_config_cpp_elf_lib("scenic_structured_config") {
+  cm_label = ":scenic_manifest"
+}
+
+fuchsia_structured_config_values("scenic_config") {
+  cm_label = ":scenic_manifest"
+  values_source = "config/default_for_test.json5"
+}
+
+fuchsia_package("scenic_pkg") {
+  package_name = "scenic"
+  deps = [
+    ":component_v2",
+    ":scenic_config",
+  ]
+}
+
+fuchsia_component_manifest("scenic_with_supplied_display_provider_manifest") {
+  component_name = "scenic"
+  manifest = "bin/meta/scenic_with_supplied_display_provider.cml"
 }
 
 # Scenic V2 component where |fuchsia.hardware.display.Provider| is a required
@@ -358,27 +375,10 @@ fuchsia_component("component_v2_with_supplied_display_provider") {
   }
 }
 
-fuchsia_structured_config_cpp_elf_lib("scenic_structured_config") {
-  cm_label = ":scenic_manifest"
-}
-
-fuchsia_structured_config_values("config_for_test") {
-  cm_label = ":scenic_manifest"
-  values_source = "config/default_for_test.json5"
-}
-
 fuchsia_structured_config_values(
     "config_with_supplied_display_provider_for_test") {
   cm_label = ":scenic_with_supplied_display_provider_manifest"
   values_source = "config/default_for_test.json5"
-}
-
-fuchsia_package("scenic_pkg") {
-  package_name = "scenic"
-  deps = [
-    ":component_v2",
-    ":config_for_test",
-  ]
 }
 
 # TODO(fxbug.dev/106573): Remove test-only target when
