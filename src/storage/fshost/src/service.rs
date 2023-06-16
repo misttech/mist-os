@@ -360,8 +360,10 @@ async fn shred_data_volume(
     } else {
         // Otherwise we need to find the Fxfs partition and shred it.
         // TODO(https://fxbug.dev/122940) Add support for fxblob.
-        let partition_controller =
-            find_data_partition(ramdisk_prefix).await.map_err(|_| zx::Status::NOT_FOUND)?;
+        let partition_controller = find_data_partition(ramdisk_prefix).await.map_err(|e| {
+            tracing::error!("shred_data_volume: unable to find partition: {e:?}");
+            zx::Status::NOT_FOUND
+        })?;
         let (block_proxy, block_server_end) =
             fidl::endpoints::create_proxy::<BlockMarker>().map_err(|_| zx::Status::INTERNAL)?;
         partition_controller
