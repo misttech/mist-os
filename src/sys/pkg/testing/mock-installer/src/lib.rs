@@ -21,6 +21,9 @@ use {
 #[derive(PartialEq, Debug)]
 pub enum CapturedUpdateInstallerRequest {
     StartUpdate { url: String, options: Options, reboot_controller_present: bool },
+    SuspendUpdate { attempt_id: Option<String> },
+    ResumeUpdate { attempt_id: Option<String> },
+    CancelUpdate { attempt_id: Option<String> },
 }
 
 // Options does not impl Eq, but it is semantically Eq.
@@ -148,12 +151,27 @@ impl MockUpdateInstallerService {
                     let response = self.start_update_response.lock();
                     responder.send(response.as_deref().map_err(|e| *e)).unwrap();
                 }
+                InstallerRequest::SuspendUpdate { attempt_id, responder } => {
+                    self.captured_args
+                        .lock()
+                        .push(CapturedUpdateInstallerRequest::SuspendUpdate { attempt_id });
+                    responder.send(Ok(())).unwrap();
+                }
+                InstallerRequest::ResumeUpdate { attempt_id, responder } => {
+                    self.captured_args
+                        .lock()
+                        .push(CapturedUpdateInstallerRequest::ResumeUpdate { attempt_id });
+                    responder.send(Ok(())).unwrap();
+                }
+                InstallerRequest::CancelUpdate { attempt_id, responder } => {
+                    self.captured_args
+                        .lock()
+                        .push(CapturedUpdateInstallerRequest::CancelUpdate { attempt_id });
+                    responder.send(Ok(())).unwrap();
+                }
                 InstallerRequest::GetLastUpdateResult { .. }
                 | InstallerRequest::GetUpdateResult { .. }
-                | InstallerRequest::MonitorUpdate { .. }
-                | InstallerRequest::SuspendUpdate { .. }
-                | InstallerRequest::ResumeUpdate { .. }
-                | InstallerRequest::CancelUpdate { .. } => {
+                | InstallerRequest::MonitorUpdate { .. } => {
                     panic!("unexpected request: {req:?}");
                 }
             }
