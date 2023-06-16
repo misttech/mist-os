@@ -334,20 +334,6 @@ template("bazel_product_bundle") {
               fastboot_flash = [ zircon_r_partition ]
             }
           },
-          {
-            name = "zircon-r"
-            cpu = current_cpu
-            type = "vbmeta"
-            label = _full_label
-            path = "${_system_r_root}/${_recovery_name}.vbmeta"
-
-            archive = true
-            bootserver_pave = [ "--vbmetar" ]
-            fastboot_flash = []
-            if (vbmeta_r_partition != "") {
-              fastboot_flash = [ vbmeta_r_partition ]
-            }
-          },
         ]
 
         if (supports_fastboot_fvm) {
@@ -381,6 +367,20 @@ template("bazel_product_bundle") {
               }
               if (vbmeta_b_partition != "") {
                 fastboot_flash += [ vbmeta_b_partition ]
+              }
+            },
+            {
+              name = "zircon-r"
+              cpu = current_cpu
+              type = "vbmeta"
+              label = _full_label
+              path = "${_system_r_root}/${_recovery_name}.vbmeta"
+
+              archive = true
+              bootserver_pave = [ "--vbmetar" ]
+              fastboot_flash = []
+              if (vbmeta_r_partition != "") {
+                fastboot_flash = [ vbmeta_r_partition ]
               }
             },
           ]
