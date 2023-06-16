@@ -6,7 +6,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/wait.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <zircon/fidl.h>
 #include <zircon/status.h>
 
@@ -24,15 +23,13 @@ class Server : public fidl::WireServer<test::TransitionMethods> {
   }
 
   void Bind(fidl::ServerEnd<test::TransitionMethods> server, async::Loop* loop) {
-    zx_status_t bind_status =
-        fidl::BindSingleInFlightOnly(loop->dispatcher(), std::move(server), this);
-    EXPECT_EQ(bind_status, ZX_OK);
+    fidl::BindServer(loop->dispatcher(), std::move(server), this);
   }
 };
 
 class TransitionalTest : public ::testing::Test {
  protected:
-  virtual void SetUp() {
+  void SetUp() override {
     loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigAttachToCurrentThread);
     ASSERT_EQ(loop_->StartThread("test_llcpp_transitional_server"), ZX_OK);
     auto endpoints = fidl::CreateEndpoints<test::TransitionMethods>();
@@ -42,7 +39,7 @@ class TransitionalTest : public ::testing::Test {
     server_->Bind(std::move(endpoints->server), loop_.get());
   }
 
-  virtual void TearDown() {
+  void TearDown() override {
     loop_->Quit();
     loop_->JoinThreads();
   }

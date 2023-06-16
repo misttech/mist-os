@@ -200,7 +200,6 @@ test("fidl_llcpp_protocol_tests_bin") {
     "//zircon/system/ulib/async-loop",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
     "//zircon/system/ulib/zxtest",
   ]
 }
@@ -246,7 +245,6 @@ test("fidl_llcpp_transitional_tests_bin") {
     "//zircon/system/ulib/async-loop",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
   ]
 }
 
@@ -270,7 +268,6 @@ test("fidl_llcpp_v2_integration_tests_bin") {
     "//zircon/system/ulib/async-loop",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
   ]
 }
 

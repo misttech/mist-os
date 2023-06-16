@@ -8,7 +8,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/wait.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/fidl/cpp/wire/vector_view.h>
 #include <lib/zx/object.h>
@@ -34,8 +33,6 @@ uint32_t GetHandleCount(zx::unowned<T> h) {
   return info.handle_count;
 }
 
-}  // namespace
-
 class ErrorServer : public fidl::WireServer<test_error_methods::ErrorMethods> {
  public:
   void NoArgsPrimitiveError(NoArgsPrimitiveErrorRequestView request,
@@ -58,7 +55,7 @@ class ErrorServer : public fidl::WireServer<test_error_methods::ErrorMethods> {
 
 class ResultTest : public ::zxtest::Test {
  protected:
-  virtual void SetUp() {
+  void SetUp() override {
     loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigAttachToCurrentThread);
     ASSERT_EQ(loop_->StartThread("test_llcpp_result_server"), ZX_OK);
 
@@ -68,10 +65,10 @@ class ResultTest : public ::zxtest::Test {
     client_end_ = std::move(client_end);
 
     server_ = std::make_unique<ErrorServer>();
-    fidl::BindSingleInFlightOnly(loop_->dispatcher(), std::move(server_end), server_.get());
+    fidl::BindServer(loop_->dispatcher(), std::move(server_end), server_.get());
   }
 
-  virtual void TearDown() {
+  void TearDown() override {
     loop_->Quit();
     loop_->JoinThreads();
   }
@@ -123,13 +120,13 @@ TEST_F(ResultTest, OwnedSuccessManyArgs) {
 
 class FrobinatorImpl : public fidl::WireServer<test::Frobinator> {
  public:
-  virtual void Frob(FrobRequestView request, FrobCompleter::Sync& completer) override {}
+  void Frob(FrobRequestView request, FrobCompleter::Sync& completer) override {}
 
-  virtual void Grob(GrobRequestView request, GrobCompleter::Sync& completer) override {
+  void Grob(GrobRequestView request, GrobCompleter::Sync& completer) override {
     completer.Reply(request->value);
   }
 
-  virtual void TwoWayEmptyArg(TwoWayEmptyArgCompleter::Sync&) override {}
+  void TwoWayEmptyArg(TwoWayEmptyArgCompleter::Sync&) override {}
 };
 
 TEST(MagicNumberTest, RequestWrite) {
@@ -190,7 +187,7 @@ TEST(MagicNumberTest, ResponseWrite) {
   std::string s = "hi";
 
   FrobinatorImpl server;
-  fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(endpoints->server), &server);
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &server);
 
   fidl::SyncClientBuffer<test::Frobinator::Grob> fidl_buffer;
   auto result = WireCall(endpoints->client)
@@ -249,7 +246,7 @@ TEST(EventSenderTest, SendEvent) {
 
   class EventHandler : public fidl::WireAsyncEventHandler<test::Frobinator> {
    public:
-    EventHandler(async::Loop& loop) : loop_(loop) {}
+    explicit EventHandler(async::Loop& loop) : loop_(loop) {}
 
     bool received() const { return received_; }
 
@@ -306,7 +303,7 @@ class HandleProviderServer : public fidl::WireServer<test::HandleProvider> {
 
 class HandleTest : public ::zxtest::Test {
  protected:
-  virtual void SetUp() {
+  void SetUp() override {
     loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigAttachToCurrentThread);
     ASSERT_EQ(loop_->StartThread("test_llcpp_handle_server"), ZX_OK);
 
@@ -314,7 +311,7 @@ class HandleTest : public ::zxtest::Test {
     ASSERT_EQ(endpoints.status_value(), ZX_OK);
     client_end_ = std::move(endpoints->client);
     server_ = std::make_unique<HandleProviderServer>();
-    fidl::BindSingleInFlightOnly(loop_->dispatcher(), std::move(endpoints->server), server_.get());
+    fidl::BindServer(loop_->dispatcher(), std::move(endpoints->server), server_.get());
   }
 
   fidl::WireSyncClient<test::HandleProvider> TakeClient() {
@@ -482,3 +479,5 @@ TEST(Endpoints, CreateFromProtocolOutParameterStyleServerRetained) {
   ASSERT_TRUE(server_end.is_valid());
   ASSERT_TRUE(client_end->is_valid());
 }
+
+}  // namespace
