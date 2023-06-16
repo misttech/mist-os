@@ -4,6 +4,7 @@
 
 use anyhow::Result;
 use errors::FfxError;
+use ffx_config::EnvironmentContext;
 use fidl::{endpoints::create_proxy, prelude::*};
 use fidl_fuchsia_developer_ffx::{
     DaemonError, DaemonProxy, TargetCollectionMarker, TargetMarker, TargetProxy, TargetQuery,
@@ -12,6 +13,8 @@ use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlPro
 use futures::{select, Future, FutureExt};
 use std::time::Duration;
 use timeout::timeout;
+
+const FASTBOOT_INLINE_TARGET: &str = "ffx.fastboot.inline_target";
 
 #[derive(Debug, Clone)]
 pub enum TargetKind {
@@ -136,4 +139,30 @@ pub fn open_target_with_fut<'a>(
     };
 
     Ok((target_proxy, fut))
+}
+
+/// Attempts to resolve the default target. Returning Some(_) if a target has been found, None
+/// otherwise.
+pub async fn resolve_default_target(
+    env_context: &EnvironmentContext,
+) -> Result<Option<TargetKind>> {
+    Ok(maybe_inline_target(env_context.get("target.default").await?, &env_context).await)
+}
+
+/// In the event that a default target is supplied and there needs to be additional Fastboot
+/// inlining, this will handle wrapping the additional information for use in the FFX injector.
+pub async fn maybe_inline_target(
+    target: Option<String>,
+    env_context: &EnvironmentContext,
+) -> Option<TargetKind> {
+    match target {
+        Some(t) => {
+            if env_context.get(FASTBOOT_INLINE_TARGET).await.unwrap_or(false) {
+                Some(TargetKind::FastbootInline(t))
+            } else {
+                Some(TargetKind::Normal(t))
+            }
+        }
+        None => None,
+    }
 }

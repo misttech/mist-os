@@ -134,12 +134,12 @@ PyObject *Context_connect_device_proxy(Context *self, PyObject *args) {
 }
 
 PyMethodDef Context_methods[] = {
-    {"connect_daemon_protocol", reinterpret_cast<PyCFunction>(Context_connect_daemon_protocol), METH_O,
-     nullptr},
-    {"connect_target_proxy", reinterpret_cast<PyCFunction>(Context_connect_target_proxy), METH_NOARGS,
-     nullptr},
-    {"connect_device_proxy", reinterpret_cast<PyCFunction>(Context_connect_device_proxy), METH_VARARGS,
-     nullptr},
+    {"connect_daemon_protocol", reinterpret_cast<PyCFunction>(Context_connect_daemon_protocol),
+     METH_O, nullptr},
+    {"connect_target_proxy", reinterpret_cast<PyCFunction>(Context_connect_target_proxy),
+     METH_NOARGS, nullptr},
+    {"connect_device_proxy", reinterpret_cast<PyCFunction>(Context_connect_device_proxy),
+     METH_VARARGS, nullptr},
     SENTINEL};
 
 DES_MIX PyTypeObject ContextType = {

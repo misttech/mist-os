@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::env_context::EnvContext;
+use crate::env_context::{EnvContext, FfxConfigEntry};
 use crate::ext_buffer::ExtBuffer;
 use crate::lib_context::LibContext;
 use crate::waker::handle_notifier_waker;
@@ -32,6 +32,7 @@ pub(crate) enum LibraryCommand {
     CreateEnvContext {
         lib: Arc<LibContext>,
         responder: Responder<CmdResult<Arc<EnvContext>>>,
+        config: Vec<FfxConfigEntry>,
     },
     OpenDaemonProtocol {
         env: Arc<EnvContext>,
@@ -93,8 +94,8 @@ impl LibraryCommand {
                     }
                 }
             }
-            Self::CreateEnvContext { lib, responder } => {
-                match EnvContext::new(Arc::downgrade(&lib)).await {
+            Self::CreateEnvContext { lib, config, responder } => {
+                match EnvContext::new(Arc::downgrade(&lib), config).await {
                     Ok(e) => {
                         responder.send(Ok(Arc::new(e))).unwrap();
                     }

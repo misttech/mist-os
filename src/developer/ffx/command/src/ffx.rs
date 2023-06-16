@@ -8,7 +8,6 @@ use argh::FromArgs;
 use errors::ffx_error;
 use ffx_config::{environment::ExecutableKind, EnvironmentContext, FfxConfigBacked};
 use ffx_daemon_proxy::Injection;
-use ffx_target::TargetKind;
 use ffx_writer::Format;
 use hoist::Hoist;
 use std::{
@@ -23,8 +22,6 @@ pub use ffx_daemon_proxy::DaemonVersionCheck;
 /// The environment variable name used for overriding the command name in help
 /// output.
 const FFX_WRAPPER_INVOKE: &'static str = "FFX_WRAPPER_INVOKE";
-
-const FASTBOOT_INLINE_TARGET: &str = "ffx.fastboot.inline_target";
 
 #[derive(Clone, Debug, PartialEq)]
 /// The relevant argument and environment variables necessary to parse or
@@ -264,18 +261,7 @@ impl Ffx {
             router_interval,
         )?)
         .context("initializing hoist")?;
-
-        let target = match self.target().await? {
-            Some(t) => {
-                if env_context.get(FASTBOOT_INLINE_TARGET).await.unwrap_or(false) {
-                    Some(TargetKind::FastbootInline(t))
-                } else {
-                    Some(TargetKind::Normal(t))
-                }
-            }
-            None => None,
-        };
-
+        let target = ffx_target::maybe_inline_target(self.target().await?, &env_context).await;
         Ok(Injection::new(env_context, daemon_check, hoist.clone(), self.machine, target))
     }
 }

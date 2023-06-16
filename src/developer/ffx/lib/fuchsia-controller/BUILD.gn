@@ -21,6 +21,7 @@ rustc_staticlib("lib") {
     "//src/developer/ffx/daemon/proxy:lib",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/rcs:lib",
+    "//src/developer/ffx/lib/target:lib",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/versioning/version-history/rust:version-history",

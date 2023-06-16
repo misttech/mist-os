@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// LINT.IfChange
-
 // Given this is exposing a C ABI, it is clear that most of the functionality is going to be
 // accessing raw pointers unsafely. This disables the individual unsafe function checks for a
 // `# Safety` section.
@@ -12,7 +10,7 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 use crate::commands::{LibraryCommand, ReadResponse};
-use crate::env_context::EnvContext;
+use crate::env_context::{EnvContext, FfxConfigEntry};
 use crate::ext_buffer::ExtBuffer;
 use crate::lib_context::LibContext;
 use fidl::HandleBased;
@@ -27,6 +25,8 @@ mod env_context;
 mod ext_buffer;
 mod lib_context;
 mod waker;
+
+// LINT.IfChange
 
 #[no_mangle]
 pub unsafe extern "C" fn create_ffx_lib_context(
@@ -43,7 +43,7 @@ pub unsafe extern "C" fn create_ffx_lib_context(
 
 #[derive(Debug)]
 #[repr(C)]
-pub struct FfxConfig {
+pub struct FfxExternalConfigEntry {
     pub key: *const i8,
     pub value: *const i8,
 }
@@ -57,12 +57,25 @@ unsafe fn get_arc<T>(ptr: *const T) -> Arc<T> {
 pub unsafe extern "C" fn create_ffx_env_context(
     env_ctx: *mut *const EnvContext,
     lib_ctx: *const LibContext,
-    _config: *mut FfxConfig,
-    _config_len: u64,
+    external_config: *const FfxExternalConfigEntry,
+    config_len: u64,
 ) -> zx_status::Status {
     let lib = unsafe { get_arc(lib_ctx) };
     let (responder, rx) = mpsc::sync_channel(1);
-    lib.run(LibraryCommand::CreateEnvContext { lib: lib.clone(), responder });
+    let mut config = Vec::new();
+    if external_config != std::ptr::null_mut() {
+        for i in 0..TryInto::<isize>::try_into(config_len).unwrap() {
+            let config_entry: &FfxExternalConfigEntry = unsafe { &*external_config.offset(i) };
+            let key = unsafe {
+                CStr::from_ptr(config_entry.key).to_str().expect("valid config string").to_owned()
+            };
+            let value = unsafe {
+                CStr::from_ptr(config_entry.value).to_str().expect("valid config string").to_owned()
+            };
+            config.push(FfxConfigEntry { key, value });
+        }
+    }
+    lib.run(LibraryCommand::CreateEnvContext { lib: lib.clone(), responder, config });
     match rx.recv().unwrap() {
         Ok(env) => {
             unsafe { *env_ctx = Arc::into_raw(env) };
@@ -285,6 +298,8 @@ pub unsafe extern "C" fn ffx_connect_handle_notifier(ctx: *const LibContext) -> 
     ctx.run(LibraryCommand::GetNotificationDescriptor { lib: ctx.clone(), responder: tx });
     rx.recv().unwrap()
 }
+
+// LINT.ThenChange(../abi/fuchsia_controller.h)
 
 #[cfg(test)]
 mod test {
@@ -676,5 +691,3 @@ mod test {
         unsafe { destroy_ffx_lib_context(lib_ctx) }
     }
 }
-
-// LINT.ThenChange(../abi/fuchsia_controller.h)

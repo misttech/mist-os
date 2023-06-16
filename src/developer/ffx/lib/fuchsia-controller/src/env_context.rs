@@ -21,6 +21,12 @@ fn fxe<E: std::fmt::Debug>(e: E) -> anyhow::Error {
     ffx_error!("{e:?}").into()
 }
 
+#[derive(Debug)]
+pub struct FfxConfigEntry {
+    pub(crate) key: String,
+    pub(crate) value: String,
+}
+
 pub struct EnvContext {
     lib_ctx: Weak<LibContext>,
     injector: Box<dyn Injector + Send + Sync>,
@@ -39,8 +45,19 @@ impl EnvContext {
         self.lib_ctx.upgrade().expect("library context instance deallocated early")
     }
 
-    pub async fn new(lib_ctx: Weak<LibContext>) -> Result<Self> {
-        let runtime_args = ffx_config::runtime::populate_runtime(&[], None)?;
+    pub async fn new(lib_ctx: Weak<LibContext>, config: Vec<FfxConfigEntry>) -> Result<Self> {
+        // TODO(fxbug.dev/129230): This is a lot of potentially unnecessary data transformation
+        // going through several layers of structured into unstructured and then back to structured
+        // again. Likely the solution here is to update the input of the config runtime population
+        // to accept structured data.
+        let formatted_config = config
+            .iter()
+            .map(|entry| format!("{}={}", entry.key, entry.value))
+            .collect::<Vec<String>>()
+            .join(",");
+        let runtime_config =
+            if formatted_config.is_empty() { None } else { Some(formatted_config) };
+        let runtime_args = ffx_config::runtime::populate_runtime(&[], runtime_config)?;
         let env_path = None;
         let context = EnvironmentContext::detect(
             ExecutableKind::Test,
@@ -53,12 +70,13 @@ impl EnvContext {
         std::fs::create_dir_all(&cache_path)?;
         let _hoist_cache_dir = tempfile::tempdir_in(&cache_path)?;
         let hoist = Hoist::with_cache_dir_maybe_router(_hoist_cache_dir.path(), None)?;
+        let target = ffx_target::resolve_default_target(&context).await?;
         let injector = Box::new(Injection::new(
             context.clone(),
             DaemonVersionCheck::CheckApiLevel(version_history::LATEST_VERSION.api_level),
             hoist.clone(),
             None,
-            None,
+            target,
         ));
         Ok(Self { context, injector, _hoist_cache_dir, lib_ctx })
     }

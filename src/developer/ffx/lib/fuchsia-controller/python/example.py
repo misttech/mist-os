@@ -10,7 +10,7 @@ import asyncio
 
 
 async def echo():
-    ctx = Context({})
+    ctx = Context({"foo": "bar"})
     ch = ctx.connect_target_proxy()
     echo_proxy = fd_ffx.Echo.Client(
         ctx.connect_daemon_protocol('fuchsia.developer.ffx.Echo'))
@@ -32,11 +32,6 @@ async def async_main():
 
 
 def main():
-    # TODO(fxbug.dev/128817): This should be handled automatically by the build
-    # system, or by some mechanism other than the user manually exporting it
-    # (locating the ffx binary should be mostly automatic).
-    os.putenv("FFX_BIN", "host_x64/ffx")
-
     print("Testing asynchronous calls.")
     asyncio.run(async_main())
     for x in range(5):
