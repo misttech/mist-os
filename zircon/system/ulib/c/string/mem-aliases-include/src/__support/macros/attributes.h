@@ -11,6 +11,7 @@
 #include_next "src/__support/macros/attributes.h"
 
 #undef LIBC_INLINE
+#undef LIBC_INLINE_VAR
 
 // If an inline function doesn't get inlined, it will go into a COMDAT group.
 // There it will be de-dup'd with any definitions from other translation units.
@@ -21,11 +22,18 @@
 // function is defined with internal linkage rather than in a COMDAT group.
 #ifdef __clang__
 #define LIBC_INLINE [[clang::internal_linkage]] inline
+#define LIBC_INLINE_VAR [[clang::internal_linkage]] inline
 #else
 // GCC doesn't have an attribute for internal linkage, so the best available is
 // to try to force inlining. (`static` can't be used here because this is also
 // applied to member functions.)
 #define LIBC_INLINE [[gnu::always_inline]] inline
+
+// For variables there's nothing better to do.  The COMDAT mismatch issue is
+// still relevant in general for variables, but the only actual difference
+// between differently-configured TUs' definitions would be in sanitizer cases
+// (e.g. red-zone padding) and we don't do sanitizer builds with GCC.
+#define LIBC_INLINE_VAR inline
 #endif
 
 #endif  // SRC___SUPPORT_MACROS_ATTRIBUTES_H_
