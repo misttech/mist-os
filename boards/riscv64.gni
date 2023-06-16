@@ -22,6 +22,9 @@ platform_enable_user_pci = true
 board_bootfs_labels += [
   "//src/devices/bus/drivers/pci:bus-pci",
   "//src/devices/board/drivers/qemu-riscv64",
+
+  # Configs
+  "//src/power/power-manager:base_config",
 ]
 board_bootfs_labels += _imports.virtio_drivers
 
