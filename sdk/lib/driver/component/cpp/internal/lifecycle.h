@@ -6,9 +6,10 @@
 #define LIB_DRIVER_COMPONENT_CPP_INTERNAL_LIFECYCLE_H_
 
 #include <lib/driver/component/cpp/internal/basic_factory.h>
-#include <lib/driver/component/cpp/internal/start_args.h>
 
 namespace fdf_internal {
+
+fdf::DriverStartArgs FromEncoded(const EncodedDriverStartArgs& encoded_start_args);
 
 // |Lifecycle| implements static |Start| and |Stop| methods which will be used by the framework.
 //
@@ -59,17 +60,9 @@ class Lifecycle {
  public:
   static void Start(EncodedDriverStartArgs encoded_start_args, fdf_dispatcher_t* dispatcher,
                     StartCompleteCallback* complete, void* complete_cookie) {
-    // Decode the incoming `msg`.
-    auto wire_format_metadata =
-        fidl::WireFormatMetadata::FromOpaque(encoded_start_args.wire_format_metadata);
-    fdf_internal::AdoptEncodedFidlMessage encoded{encoded_start_args.msg};
-    fit::result start_args = fidl::StandaloneDecode<fuchsia_driver_framework::DriverStartArgs>(
-        encoded.TakeMessage(), wire_format_metadata);
-    ZX_ASSERT_MSG(start_args.is_ok(), "Failed to decode start_args: %s",
-                  start_args.error_value().FormatDescription().c_str());
-
+    fdf::DriverStartArgs start_args = FromEncoded(encoded_start_args);
     fdf::StartCompleter completer(complete, complete_cookie);
-    Factory::CreateDriver(std::move(*start_args), fdf::UnownedSynchronizedDispatcher(dispatcher),
+    Factory::CreateDriver(std::move(start_args), fdf::UnownedSynchronizedDispatcher(dispatcher),
                           std::move(completer));
   }
 

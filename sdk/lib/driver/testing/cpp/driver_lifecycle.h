@@ -6,6 +6,7 @@
 #define LIB_DRIVER_TESTING_CPP_DRIVER_LIFECYCLE_H_
 
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/internal/lifecycle.h>
 #include <lib/driver/runtime/testing/cpp/dispatcher.h>
 #include <lib/driver/symbols/symbols.h>
 #include <lib/driver/testing/cpp/async_task.h>

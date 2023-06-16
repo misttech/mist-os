@@ -46,6 +46,7 @@ fuchsia_driver("lifecycle_driver") {
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/compat/cpp:symbols",
     "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/component/cpp:cpp_internal",
     "//sdk/lib/driver/devfs/cpp",
     "//src/devices/lib/driver:driver_runtime",
   ]
