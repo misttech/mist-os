@@ -193,14 +193,9 @@ template("_fidl_cpp_library_impl") {
       }
     }
 
-    # TODO(fxbug.dev/56257): Remove `-Wextra-semi` when the flag is on
-    # for all of Fuchsia by default.
     # TODO(fxbug.dev/120888): Remove `-Wshadow` when the flag is on
     # by default.
-    cflags_cc = [
-      "-Wextra-semi",
-      "-Wshadow",
-    ]
+    cflags_cc = [ "-Wshadow" ]
 
     if (defined(invoker.additional_configs)) {
       configs += invoker.additional_configs
