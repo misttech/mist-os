@@ -80,7 +80,7 @@ class HidInstance : public fidl::WireServer<fuchsia_hardware_input::Device>,
   fbl::Mutex readers_lock_;
   bool loop_started_ __TA_GUARDED(readers_lock_) = false;
   async::Loop loop_ __TA_GUARDED(readers_lock_);
-  std::list<std::unique_ptr<DeviceReportsReader>> readers_ __TA_GUARDED(readers_lock_);
+  std::list<DeviceReportsReader> readers_ __TA_GUARDED(readers_lock_);
 
   fidl::ServerBinding<fuchsia_hardware_input::Device> binding_;
 };

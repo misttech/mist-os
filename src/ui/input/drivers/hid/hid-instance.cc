@@ -10,7 +10,6 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/trace/event.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <stdlib.h>
 #include <string.h>
 #include <zircon/assert.h>
@@ -25,12 +24,16 @@
 
 namespace hid_driver {
 
-static constexpr uint32_t kHidFlagsDead = (1 << 0);
-static constexpr uint32_t kHidFlagsWriteFailed = (1 << 1);
+namespace {
 
-static constexpr uint64_t hid_report_trace_id(uint32_t instance_id, uint64_t report_id) {
+constexpr uint32_t kHidFlagsDead = (1 << 0);
+constexpr uint32_t kHidFlagsWriteFailed = (1 << 1);
+
+constexpr uint64_t hid_report_trace_id(uint32_t instance_id, uint64_t report_id) {
   return (report_id << 32) | instance_id;
 }
+
+}  // namespace
 
 HidInstance::HidInstance(HidDevice* base, zx::event fifo_event, async_dispatcher_t* dispatcher,
                          fidl::ServerEnd<fuchsia_hardware_input::Device> session)
@@ -226,9 +229,8 @@ void HidInstance::GetDeviceReportsReader(GetDeviceReportsReaderRequestView reque
     }
     loop_started_ = true;
   }
-  readers_.push_back(std::make_unique<DeviceReportsReader>(base_));
-  fidl::BindSingleInFlightOnly(loop_.dispatcher(), std::move(request->reader),
-                               readers_.back().get());
+
+  fidl::BindServer(loop_.dispatcher(), std::move(request->reader), &readers_.emplace_back(base_));
   completer.ReplySuccess();
 }
 
@@ -246,7 +248,7 @@ void HidInstance::WriteToFifo(const uint8_t* report, size_t report_len, zx_time_
     fbl::AutoLock lock(&readers_lock_);
     auto iter = readers_.begin();
     while (iter != readers_.end()) {
-      if ((*iter)->WriteToFifo(report, report_len, time) != ZX_OK) {
+      if ((*iter).WriteToFifo(report, report_len, time) != ZX_OK) {
         iter = readers_.erase(iter);
       } else {
         iter++;
