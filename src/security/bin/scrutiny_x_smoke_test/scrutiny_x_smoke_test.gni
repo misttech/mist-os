@@ -10,6 +10,9 @@ import("//build/compiled_action.gni")
 #
 # Parameters
 #
+#   test_binary (required)
+#     [label] The test binary target.
+#
 #   product_bundle_target (required)
 #     [label] Target that builds the product bundle.
 #
@@ -21,6 +24,8 @@ import("//build/compiled_action.gni")
 #   deps, public_deps, data_deps (optional)
 #     Usual GN meaning.
 template("scrutiny_x_smoke_test") {
+  assert(defined(invoker.test_binary),
+         "scrutiny_x_smoke_test() must specify test_binary")
   assert(defined(invoker.product_bundle_target),
          "scrutiny_x_smoke_test() must specify product_bundle_target")
 
@@ -55,7 +60,7 @@ template("scrutiny_x_smoke_test") {
     }
     deps += [ invoker.product_bundle_target ]
 
-    tool = "//src/security/bin/scrutiny_x_smoke_test"
+    tool = invoker.test_binary
     args = [
       "--depfile",
       rebase_path(_depfile, root_build_dir),

@@ -261,6 +261,7 @@ if (is_fuchsia) {
       ":assembly_inputs",
       ":fuchsia_assembly",
       ":product_bundle",
+      ":scrutiny_x_boxed_smoke_test",
       ":scrutiny_x_smoke_test",
       ":update",
     ]
@@ -438,6 +439,16 @@ if (is_fuchsia) {
 
   scrutiny_x_smoke_test("scrutiny_x_smoke_test") {
     testonly = fuchsia_zbi_testonly
+    test_binary =
+        "//src/security/bin/scrutiny_x_smoke_test:scrutiny_x_smoke_test"
+    product_bundle_target = ":${product_bundle_label}"
+    product_bundle_path = product_bundle_out_dir
+  }
+
+  scrutiny_x_smoke_test("scrutiny_x_boxed_smoke_test") {
+    testonly = fuchsia_zbi_testonly
+    test_binary =
+        "//src/security/bin/scrutiny_x_smoke_test:scrutiny_x_boxed_smoke_test"
     product_bundle_target = ":${product_bundle_label}"
     product_bundle_path = product_bundle_out_dir
   }
