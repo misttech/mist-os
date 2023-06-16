@@ -4,20 +4,16 @@
 
 use {
     crate::startup,
-    anyhow::{Context as _, Error},
+    anyhow::{anyhow, Context as _, Error},
     fidl::endpoints::ProtocolMarker,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_element as felement,
-    fidl_fuchsia_session::{
-        LaunchConfiguration, LaunchError, LauncherRequest, LauncherRequestStream, RestartError,
-        RestarterRequest, RestarterRequestStream,
-    },
-    fidl_fuchsia_web as fweb,
+    fidl_fuchsia_session as fsession, fidl_fuchsia_web as fweb,
     fuchsia_component::server::{ServiceFs, ServiceObjLocal},
     fuchsia_inspect_contrib::nodes::BoundedListNode,
     fuchsia_zircon as zx,
     futures::{lock::Mutex, StreamExt, TryFutureExt, TryStreamExt},
     std::{future::Future, sync::Arc},
-    tracing::error,
+    tracing::{error, warn},
 };
 
 /// Maximum number of concurrent connections to the protocols served by SessionManager.
@@ -37,8 +33,9 @@ const DIAGNOSTICS_TIME_PROPERTY_NAME: &str = "@time";
 pub enum IncomingRequest {
     Manager(felement::ManagerRequestStream),
     GraphicalPresenter(felement::GraphicalPresenterRequestStream),
-    Launcher(LauncherRequestStream),
-    Restarter(RestarterRequestStream),
+    Launcher(fsession::LauncherRequestStream),
+    Restarter(fsession::RestarterRequestStream),
+    Lifecycle(fsession::LifecycleRequestStream),
     WebDebug(fweb::DebugRequestStream),
 }
 
@@ -55,17 +52,24 @@ impl Diagnostics {
     }
 }
 
-struct SessionManagerState {
-    /// The URL of the most recently launched session.
-    ///
-    /// If set, the session is not guaranteed to be running.
-    session_url: Option<String>,
+/// State of a launched session.
+struct SessionState {
+    /// The component URL of the session.
+    url: String,
 
-    /// A client-end channel to the most recently launched session's `exposed_dir`.
+    /// A client-end channel to the most session's `exposed_dir`.
+    exposed_dir: zx::Channel,
+}
+
+struct SessionManagerState {
+    /// The component URL for the default session.
+    default_session_url: Option<String>,
+
+    /// State of a launched session.
     ///
-    /// If set, the session is not guaranteed to be running, and the channel is not
-    /// guaranteed to be connected.
-    session_exposed_dir_channel: Option<zx::Channel>,
+    /// If set, the component has been created and started, but is not guaranteed to be running
+    /// since it may be stopped through external means.
+    session: Option<SessionState>,
 
     /// The realm in which sessions will be launched.
     realm: fcomponent::RealmProxy,
@@ -85,31 +89,33 @@ impl SessionManager {
     ///
     /// # Parameters
     /// - `realm`: The realm in which sessions will be launched.
-    pub fn new(realm: fcomponent::RealmProxy, inspector: &fuchsia_inspect::Inspector) -> Self {
+    pub fn new(
+        realm: fcomponent::RealmProxy,
+        inspector: &fuchsia_inspect::Inspector,
+        default_session_url: Option<String>,
+    ) -> Self {
         let session_started_at = BoundedListNode::new(
             inspector.root().create_child(DIANGNOSTICS_SESSION_STARTED_AT_NAME),
             DIANGNOSTICS_SESSION_STARTED_AT_SIZE,
         );
         let diagnostics = Diagnostics { session_started_at };
-        let state = SessionManagerState {
-            session_url: None,
-            session_exposed_dir_channel: None,
-            realm,
-            diagnostics,
-        };
+        let state = SessionManagerState { default_session_url, session: None, realm, diagnostics };
         SessionManager { state: Arc::new(Mutex::new(state)) }
     }
 
-    /// Launch the session with the component URL in `session_url`.
+    /// Launch the session with the default session component URL, if any.
     ///
     /// # Errors
     ///
-    /// Returns an error if the session could not be launched.
-    pub async fn launch_startup_session(&mut self, session_url: String) -> Result<(), Error> {
+    /// Returns an error if the is no default session URL or the session could not be launched.
+    pub async fn launch_default_session(&mut self) -> Result<(), Error> {
         let mut state = self.state.lock().await;
-        state.session_exposed_dir_channel =
-            Some(startup::launch_session(&session_url, &state.realm).await?);
-        state.session_url = Some(session_url);
+        let session_url = state
+            .default_session_url
+            .as_ref()
+            .ok_or_else(|| anyhow!("no default session URL configured"))?;
+        let exposed_dir = startup::launch_session(&session_url, &state.realm).await?;
+        state.session = Some(SessionState { url: session_url.clone(), exposed_dir });
         state.diagnostics.record_session_start();
         Ok(())
     }
@@ -129,7 +135,8 @@ impl SessionManager {
             .add_fidl_service(IncomingRequest::GraphicalPresenter)
             .add_fidl_service(IncomingRequest::Launcher)
             .add_fidl_service(IncomingRequest::Restarter)
-            .add_fidl_service(IncomingRequest::WebDebug);
+            .add_fidl_service(IncomingRequest::WebDebug)
+            .add_fidl_service(IncomingRequest::Lifecycle);
         fs.take_and_serve_directory_handle()?;
 
         fs.for_each_concurrent(MAX_CONCURRENT_CONNECTIONS, |request| {
@@ -168,12 +175,10 @@ impl SessionManager {
             .with_context(|| format!("Failed to create_proxy for {}", protocol_name))?;
         {
             let state = self.state.lock().await;
-            let session_exposed_dir_channel =
-                state.session_exposed_dir_channel.as_ref().with_context(|| {
-                    format!("Failed to connect to {} because no session was started", protocol_name)
-                })?;
+            let session =
+                state.session.as_ref().ok_or_else(|| anyhow!("Session is not started"))?;
             fdio::service_connect_at(
-                session_exposed_dir_channel,
+                &session.exposed_dir,
                 protocol_name,
                 server_end.into_channel(),
             )
@@ -225,6 +230,11 @@ impl SessionManager {
                 self.handle_restarter_request_stream(request_stream)
                     .await
                     .context("Session Restarter request stream got an error.")?;
+            }
+            IncomingRequest::Lifecycle(request_stream) => {
+                self.handle_lifecycle_request_stream(request_stream)
+                    .await
+                    .context("Session Lifecycle request stream got an error.")?;
             }
         }
 
@@ -299,13 +309,13 @@ impl SessionManager {
     /// When an error is encountered reading from the request stream.
     pub async fn handle_launcher_request_stream(
         &mut self,
-        mut request_stream: LauncherRequestStream,
+        mut request_stream: fsession::LauncherRequestStream,
     ) -> Result<(), Error> {
         while let Some(request) =
             request_stream.try_next().await.context("Error handling Launcher request stream")?
         {
             match request {
-                LauncherRequest::Launch { configuration, responder } => {
+                fsession::LauncherRequest::Launch { configuration, responder } => {
                     let result = self.handle_launch_request(configuration).await;
                     let _ = responder.send(result);
                 }
@@ -323,13 +333,13 @@ impl SessionManager {
     /// When an error is encountered reading from the request stream.
     pub async fn handle_restarter_request_stream(
         &mut self,
-        mut request_stream: RestarterRequestStream,
+        mut request_stream: fsession::RestarterRequestStream,
     ) -> Result<(), Error> {
         while let Some(request) =
             request_stream.try_next().await.context("Error handling Restarter request stream")?
         {
             match request {
-                RestarterRequest::Restart { responder } => {
+                fsession::RestarterRequest::Restart { responder } => {
                     let result = self.handle_restart_request().await;
                     let _ = responder.send(result);
                 }
@@ -363,69 +373,114 @@ impl SessionManager {
         Ok(())
     }
 
+    /// Serves a specified [`LifecycleRequestStream`].
+    ///
+    /// # Parameters
+    /// - `request_stream`: the LifecycleRequestStream.
+    ///
+    /// # Errors
+    /// When an error is encountered reading from the request stream.
+    pub async fn handle_lifecycle_request_stream(
+        &mut self,
+        mut request_stream: fsession::LifecycleRequestStream,
+    ) -> Result<(), Error> {
+        while let Some(request) =
+            request_stream.try_next().await.context("Error handling Lifecycle request stream")?
+        {
+            match request {
+                fsession::LifecycleRequest::Start { payload, responder } => {
+                    let result = self.handle_lifecycle_start_request(payload.session_url).await;
+                    let _ = responder.send(result);
+                }
+                fsession::LifecycleRequest::Stop { responder } => {
+                    let result = self.handle_lifecycle_stop_request().await;
+                    let _ = responder.send(result);
+                }
+                fsession::LifecycleRequest::Restart { responder } => {
+                    let result = self.handle_lifecycle_restart_request().await;
+                    let _ = responder.send(result);
+                }
+                fsession::LifecycleRequest::_UnknownMethod { ordinal, .. } => {
+                    warn!(%ordinal, "Lifecycle received an unknown method");
+                }
+            };
+        }
+        Ok(())
+    }
+
     /// Handles calls to Launcher.Launch().
     ///
     /// # Parameters
     /// - configuration: The launch configuration for the new session.
     async fn handle_launch_request(
         &mut self,
-        configuration: LaunchConfiguration,
-    ) -> Result<(), LaunchError> {
-        if let Some(session_url) = configuration.session_url {
-            let mut state = self.state.lock().await;
-            startup::launch_session(&session_url, &state.realm)
-                .await
-                .map_err(|err| match err {
-                    startup::StartupError::NotDestroyed { .. } => {
-                        LaunchError::DestroyComponentFailed
-                    }
-                    startup::StartupError::NotCreated { err, .. } => match err {
-                        fcomponent::Error::InstanceCannotResolve => LaunchError::NotFound,
-                        _ => LaunchError::CreateComponentFailed,
-                    },
-                    startup::StartupError::ExposedDirNotOpened { .. } => {
-                        LaunchError::CreateComponentFailed
-                    }
-                    startup::StartupError::NotLaunched { .. } => LaunchError::CreateComponentFailed,
-                })
-                .map(|session_exposed_dir_channel| {
-                    state.session_url = Some(session_url);
-                    state.session_exposed_dir_channel = Some(session_exposed_dir_channel);
-                    state.diagnostics.record_session_start();
-                })
-        } else {
-            Err(LaunchError::NotFound)
-        }
+        configuration: fsession::LaunchConfiguration,
+    ) -> Result<(), fsession::LaunchError> {
+        let session_url = configuration.session_url.ok_or(fsession::LaunchError::InvalidArgs)?;
+        let mut state = self.state.lock().await;
+        startup::launch_session(&session_url, &state.realm).await.map_err(Into::into).map(
+            |exposed_dir| {
+                state.session = Some(SessionState { url: session_url, exposed_dir });
+                state.diagnostics.record_session_start();
+            },
+        )
     }
 
-    /// Handles calls to Restarter.Restart().
-    async fn handle_restart_request(&mut self) -> Result<(), RestartError> {
+    /// Handles a Restarter.Restart() request.
+    async fn handle_restart_request(&mut self) -> Result<(), fsession::RestartError> {
         let mut state = self.state.lock().await;
-        if let Some(ref session_url) = state.session_url {
-            startup::launch_session(&session_url, &state.realm)
-                .await
-                .map_err(|err| match err {
-                    startup::StartupError::NotDestroyed { .. } => {
-                        RestartError::DestroyComponentFailed
-                    }
-                    startup::StartupError::NotCreated { err, .. } => match err {
-                        fcomponent::Error::InstanceCannotResolve => RestartError::NotFound,
-                        _ => RestartError::CreateComponentFailed,
-                    },
-                    startup::StartupError::ExposedDirNotOpened { .. } => {
-                        RestartError::CreateComponentFailed
-                    }
-                    startup::StartupError::NotLaunched { .. } => {
-                        RestartError::CreateComponentFailed
-                    }
-                })
-                .map(|session_exposed_dir_channel| {
-                    state.session_exposed_dir_channel = Some(session_exposed_dir_channel);
-                    state.diagnostics.record_session_start();
-                })
-        } else {
-            Err(RestartError::NotRunning)
+        let session_url = &state.session.as_ref().ok_or(fsession::RestartError::NotRunning)?.url;
+        startup::launch_session(&session_url, &state.realm).await.map_err(Into::into).map(
+            |exposed_dir| {
+                state.session.as_mut().unwrap().exposed_dir = exposed_dir;
+                state.diagnostics.record_session_start();
+            },
+        )
+    }
+
+    /// Handles a `Lifecycle.Start()` request.
+    ///
+    /// # Parameters
+    /// - session_url: The component URL for the session to start.
+    async fn handle_lifecycle_start_request(
+        &mut self,
+        session_url: Option<String>,
+    ) -> Result<(), fsession::LifecycleError> {
+        let mut state = self.state.lock().await;
+        if state.session.is_some() {
+            return Err(fsession::LifecycleError::AlreadyStarted);
         }
+        let session_url = session_url
+            .as_ref()
+            .or(state.default_session_url.as_ref())
+            .ok_or(fsession::LifecycleError::NotFound)?
+            .to_owned();
+        startup::launch_session(&session_url, &state.realm).await.map_err(Into::into).map(
+            |exposed_dir| {
+                state.session = Some(SessionState { url: session_url, exposed_dir });
+                state.diagnostics.record_session_start();
+            },
+        )
+    }
+
+    /// Handles a `Lifecycle.Stop()` request.
+    async fn handle_lifecycle_stop_request(&mut self) -> Result<(), fsession::LifecycleError> {
+        let mut state = self.state.lock().await;
+        startup::stop_session(&state.realm).await.map_err(Into::into)?;
+        state.session = None;
+        Ok(())
+    }
+
+    /// Handles a `Lifecycle.Restart()` request.
+    async fn handle_lifecycle_restart_request(&mut self) -> Result<(), fsession::LifecycleError> {
+        let mut state = self.state.lock().await;
+        let session_url = &state.session.as_ref().ok_or(fsession::LifecycleError::NotFound)?.url;
+        startup::launch_session(&session_url, &state.realm).await.map_err(Into::into).map(
+            |exposed_dir| {
+                state.session.as_mut().unwrap().exposed_dir = exposed_dir;
+                state.diagnostics.record_session_start();
+            },
+        )
     }
 }
 
@@ -435,21 +490,17 @@ mod tests {
         super::SessionManager,
         fidl::endpoints::{create_proxy_and_stream, create_request_stream, spawn_stream_handler},
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_element as felement,
-        fidl_fuchsia_session::{
-            LaunchConfiguration, LauncherMarker, LauncherProxy, RestartError, RestarterMarker,
-            RestarterProxy,
-        },
-        fidl_fuchsia_web as fweb,
+        fidl_fuchsia_session as fsession, fidl_fuchsia_web as fweb,
         fuchsia_inspect::{self, assert_data_tree, testing::AnyProperty},
         futures::prelude::*,
+        lazy_static::lazy_static,
         session_testing::spawn_noop_directory_server,
+        test_util::Counter,
     };
 
-    fn serve_session_manager_services(
-        session_manager: SessionManager,
-    ) -> (LauncherProxy, RestarterProxy) {
+    fn serve_launcher(session_manager: SessionManager) -> fsession::LauncherProxy {
         let (launcher_proxy, launcher_stream) =
-            create_proxy_and_stream::<LauncherMarker>().unwrap();
+            create_proxy_and_stream::<fsession::LauncherMarker>().unwrap();
         {
             let mut session_manager_ = session_manager.clone();
             fuchsia_async::Task::spawn(async move {
@@ -460,9 +511,12 @@ mod tests {
             })
             .detach();
         }
+        launcher_proxy
+    }
 
+    fn serve_restarter(session_manager: SessionManager) -> fsession::RestarterProxy {
         let (restarter_proxy, restarter_stream) =
-            create_proxy_and_stream::<RestarterMarker>().unwrap();
+            create_proxy_and_stream::<fsession::RestarterMarker>().unwrap();
         {
             let mut session_manager_ = session_manager.clone();
             fuchsia_async::Task::spawn(async move {
@@ -473,8 +527,23 @@ mod tests {
             })
             .detach();
         }
+        restarter_proxy
+    }
 
-        (launcher_proxy, restarter_proxy)
+    fn serve_lifecycle(session_manager: SessionManager) -> fsession::LifecycleProxy {
+        let (lifecycle_proxy, lifecycle_stream) =
+            create_proxy_and_stream::<fsession::LifecycleMarker>().unwrap();
+        {
+            let mut session_manager_ = session_manager.clone();
+            fuchsia_async::Task::spawn(async move {
+                session_manager_
+                    .handle_lifecycle_request_stream(lifecycle_stream)
+                    .await
+                    .expect("Session lifecycle request stream got an error.");
+            })
+            .detach();
+        }
+        lifecycle_proxy
     }
 
     /// Verifies that Launcher.Launch creates a new session.
@@ -506,11 +575,11 @@ mod tests {
         .unwrap();
 
         let inspector = fuchsia_inspect::Inspector::default();
-        let session_manager = SessionManager::new(realm, &inspector);
-        let (launcher, _restarter) = serve_session_manager_services(session_manager);
+        let session_manager = SessionManager::new(realm, &inspector, None);
+        let launcher = serve_launcher(session_manager);
 
         assert!(launcher
-            .launch(&LaunchConfiguration {
+            .launch(&fsession::LaunchConfiguration {
                 session_url: Some(session_url.to_string()),
                 ..Default::default()
             })
@@ -525,9 +594,9 @@ mod tests {
         });
     }
 
-    /// Verifies that Launcher.Restart restarts an existing session.
+    /// Verifies that Restarter.Restart restarts an existing session.
     #[fuchsia::test]
-    async fn test_restart() {
+    async fn test_restarter_restart() {
         let session_url = "session";
 
         let realm = spawn_stream_handler(move |realm_request| async move {
@@ -554,11 +623,12 @@ mod tests {
         .unwrap();
 
         let inspector = fuchsia_inspect::Inspector::default();
-        let session_manager = SessionManager::new(realm, &inspector);
-        let (launcher, restarter) = serve_session_manager_services(session_manager);
+        let session_manager = SessionManager::new(realm, &inspector, None);
+        let launcher = serve_launcher(session_manager.clone());
+        let restarter = serve_restarter(session_manager);
 
         assert!(launcher
-            .launch(&LaunchConfiguration {
+            .launch(&fsession::LaunchConfiguration {
                 session_url: Some(session_url.to_string()),
                 ..Default::default()
             })
@@ -582,18 +652,18 @@ mod tests {
 
     /// Verifies that Launcher.Restart return an error if there is no running existing session.
     #[fuchsia::test]
-    async fn test_restart_error_not_running() {
+    async fn test_restarter_restart_error_not_running() {
         let realm = spawn_stream_handler(move |_realm_request| async move {
             panic!("Realm should not receive any requests as there is no session to launch")
         })
         .unwrap();
 
         let inspector = fuchsia_inspect::Inspector::default();
-        let session_manager = SessionManager::new(realm, &inspector);
-        let (_launcher, restarter) = serve_session_manager_services(session_manager);
+        let session_manager = SessionManager::new(realm, &inspector, None);
+        let restarter = serve_restarter(session_manager);
 
         assert_eq!(
-            Err(RestartError::NotRunning),
+            Err(fsession::RestartError::NotRunning),
             restarter.restart().await.expect("could not call Restart")
         );
 
@@ -689,5 +759,212 @@ mod tests {
         let _ = future::join3(enable_and_drop_fut, local_server_fut, downstream_server_fut).await;
 
         assert_eq!(listeners.len(), 1);
+    }
+
+    /// Verifies that Lifecycle.Start creates a new session.
+    #[fuchsia::test]
+    async fn test_start() {
+        let session_url = "session";
+
+        let realm = spawn_stream_handler(move |realm_request| async move {
+            match realm_request {
+                fcomponent::RealmRequest::DestroyChild { child: _, responder } => {
+                    let _ = responder.send(Ok(()));
+                }
+                fcomponent::RealmRequest::CreateChild {
+                    collection: _,
+                    decl,
+                    args: _,
+                    responder,
+                } => {
+                    assert_eq!(decl.url.unwrap(), session_url);
+                    let _ = responder.send(Ok(()));
+                }
+                fcomponent::RealmRequest::OpenExposedDir { child: _, exposed_dir, responder } => {
+                    spawn_noop_directory_server(exposed_dir);
+                    let _ = responder.send(Ok(()));
+                }
+                _ => panic!("Realm handler received an unexpected request"),
+            };
+        })
+        .unwrap();
+
+        let inspector = fuchsia_inspect::Inspector::default();
+        let session_manager = SessionManager::new(realm, &inspector, None);
+        let lifecycle = serve_lifecycle(session_manager);
+
+        assert!(lifecycle
+            .start(&fsession::LifecycleStartRequest {
+                session_url: Some(session_url.to_string()),
+                ..Default::default()
+            })
+            .await
+            .is_ok());
+        assert_data_tree!(inspector, root: {
+            session_started_at: {
+                "0": {
+                    "@time": AnyProperty
+                }
+            }
+        });
+    }
+
+    /// Verifies that Lifecycle.Start starts the default session if no URL is provided.
+    #[fuchsia::test]
+    async fn test_start_default() {
+        let default_session_url = "session";
+
+        let realm = spawn_stream_handler(move |realm_request| async move {
+            match realm_request {
+                fcomponent::RealmRequest::DestroyChild { child: _, responder } => {
+                    let _ = responder.send(Ok(()));
+                }
+                fcomponent::RealmRequest::CreateChild {
+                    collection: _,
+                    decl,
+                    args: _,
+                    responder,
+                } => {
+                    assert_eq!(decl.url.unwrap(), default_session_url);
+                    let _ = responder.send(Ok(()));
+                }
+                fcomponent::RealmRequest::OpenExposedDir { child: _, exposed_dir, responder } => {
+                    spawn_noop_directory_server(exposed_dir);
+                    let _ = responder.send(Ok(()));
+                }
+                _ => panic!("Realm handler received an unexpected request"),
+            };
+        })
+        .unwrap();
+
+        let inspector = fuchsia_inspect::Inspector::default();
+        let session_manager =
+            SessionManager::new(realm, &inspector, Some(default_session_url.to_owned()));
+        let lifecycle = serve_lifecycle(session_manager);
+
+        assert!(lifecycle
+            .start(&fsession::LifecycleStartRequest { session_url: None, ..Default::default() })
+            .await
+            .is_ok());
+        assert_data_tree!(inspector, root: {
+            session_started_at: {
+                "0": {
+                    "@time": AnyProperty
+                }
+            }
+        });
+    }
+
+    /// Verifies that Lifecycle.Stop stops an existing session by destroying its component.
+    #[fuchsia::test]
+    async fn test_stop_destroys_component() {
+        lazy_static! {
+            static ref NUM_DESTROY_CHILD_CALLS: Counter = Counter::new(0);
+        }
+
+        let session_url = "session";
+
+        let realm = spawn_stream_handler(move |realm_request| async move {
+            match realm_request {
+                fcomponent::RealmRequest::DestroyChild { child: _, responder } => {
+                    NUM_DESTROY_CHILD_CALLS.inc();
+                    let _ = responder.send(Ok(()));
+                }
+                fcomponent::RealmRequest::CreateChild {
+                    collection: _,
+                    decl,
+                    args: _,
+                    responder,
+                } => {
+                    assert_eq!(decl.url.unwrap(), session_url);
+                    let _ = responder.send(Ok(()));
+                }
+                fcomponent::RealmRequest::OpenExposedDir { child: _, exposed_dir, responder } => {
+                    spawn_noop_directory_server(exposed_dir);
+                    let _ = responder.send(Ok(()));
+                }
+                _ => panic!("Realm handler received an unexpected request"),
+            };
+        })
+        .unwrap();
+
+        let inspector = fuchsia_inspect::Inspector::default();
+        let session_manager = SessionManager::new(realm, &inspector, None);
+        let lifecycle = serve_lifecycle(session_manager);
+
+        assert!(lifecycle
+            .start(&fsession::LifecycleStartRequest {
+                session_url: Some(session_url.to_string()),
+                ..Default::default()
+            })
+            .await
+            .is_ok());
+        // Start attempts to destroy any existing session first.
+        assert_eq!(NUM_DESTROY_CHILD_CALLS.get(), 1);
+        assert_data_tree!(inspector, root: {
+            session_started_at: {
+                "0": {
+                    "@time": AnyProperty
+                }
+            }
+        });
+
+        assert!(lifecycle.stop().await.is_ok());
+        assert_eq!(NUM_DESTROY_CHILD_CALLS.get(), 2);
+    }
+
+    /// Verifies that Lifecycle.Restart restarts an existing session.
+    #[fuchsia::test]
+    async fn test_lifecycle_restart() {
+        let session_url = "session";
+
+        let realm = spawn_stream_handler(move |realm_request| async move {
+            match realm_request {
+                fcomponent::RealmRequest::DestroyChild { child: _, responder } => {
+                    let _ = responder.send(Ok(()));
+                }
+                fcomponent::RealmRequest::CreateChild {
+                    collection: _,
+                    decl,
+                    args: _,
+                    responder,
+                } => {
+                    assert_eq!(decl.url.unwrap(), session_url);
+                    let _ = responder.send(Ok(()));
+                }
+                fcomponent::RealmRequest::OpenExposedDir { child: _, exposed_dir, responder } => {
+                    spawn_noop_directory_server(exposed_dir);
+                    let _ = responder.send(Ok(()));
+                }
+                _ => panic!("Realm handler received an unexpected request"),
+            };
+        })
+        .unwrap();
+
+        let inspector = fuchsia_inspect::Inspector::default();
+        let session_manager = SessionManager::new(realm, &inspector, None);
+        let lifecycle = serve_lifecycle(session_manager.clone());
+
+        assert!(lifecycle
+            .start(&fsession::LifecycleStartRequest {
+                session_url: Some(session_url.to_string()),
+                ..Default::default()
+            })
+            .await
+            .expect("could not call Launch")
+            .is_ok());
+
+        assert!(lifecycle.restart().await.expect("could not call Restart").is_ok());
+
+        assert_data_tree!(inspector, root: {
+            session_started_at: {
+                "0": {
+                    "@time": AnyProperty
+                },
+                "1": {
+                    "@time": AnyProperty
+                }
+            }
+        });
     }
 }

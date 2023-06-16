@@ -5,8 +5,8 @@
 use {
     crate::cobalt,
     fidl::endpoints::Proxy,
-    fidl_fuchsia_component as fcomponent, fuchsia_async as fasync, fuchsia_zircon as zx,
-    realm_management,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_session as fsession,
+    fuchsia_async as fasync, fuchsia_zircon as zx, realm_management,
     thiserror::{self, Error},
     tracing::info,
 };
@@ -31,6 +31,56 @@ pub enum StartupError {
 
     #[error("Session {} not launched at \"{}/{}\": {:?}", url, collection, name, err)]
     NotLaunched { name: String, collection: String, url: String, err: fcomponent::Error },
+}
+
+impl Into<fsession::LaunchError> for StartupError {
+    fn into(self) -> fsession::LaunchError {
+        match self {
+            StartupError::NotDestroyed { .. } => fsession::LaunchError::DestroyComponentFailed,
+            StartupError::NotCreated { err, .. } => match err {
+                fcomponent::Error::InstanceCannotResolve => fsession::LaunchError::NotFound,
+                _ => fsession::LaunchError::CreateComponentFailed,
+            },
+            StartupError::ExposedDirNotOpened { .. } => {
+                fsession::LaunchError::CreateComponentFailed
+            }
+            StartupError::NotLaunched { .. } => fsession::LaunchError::CreateComponentFailed,
+        }
+    }
+}
+
+impl Into<fsession::RestartError> for StartupError {
+    fn into(self) -> fsession::RestartError {
+        match self {
+            StartupError::NotDestroyed { .. } => fsession::RestartError::DestroyComponentFailed,
+            StartupError::NotCreated { err, .. } => match err {
+                fcomponent::Error::InstanceCannotResolve => fsession::RestartError::NotFound,
+                _ => fsession::RestartError::CreateComponentFailed,
+            },
+            StartupError::ExposedDirNotOpened { .. } => {
+                fsession::RestartError::CreateComponentFailed
+            }
+            StartupError::NotLaunched { .. } => fsession::RestartError::CreateComponentFailed,
+        }
+    }
+}
+
+impl Into<fsession::LifecycleError> for StartupError {
+    fn into(self) -> fsession::LifecycleError {
+        match self {
+            StartupError::NotDestroyed { .. } => fsession::LifecycleError::DestroyComponentFailed,
+            StartupError::NotCreated { err, .. } => match err {
+                fcomponent::Error::InstanceCannotResolve => {
+                    fsession::LifecycleError::ResolveComponentFailed
+                }
+                _ => fsession::LifecycleError::CreateComponentFailed,
+            },
+            StartupError::ExposedDirNotOpened { .. } => {
+                fsession::LifecycleError::CreateComponentFailed
+            }
+            StartupError::NotLaunched { .. } => fsession::LifecycleError::CreateComponentFailed,
+        }
+    }
 }
 
 /// The name of the session child component.
@@ -72,6 +122,23 @@ pub async fn launch_session(
     .detach();
 
     Ok(exposed_dir)
+}
+
+/// Stops the current session, if any.
+///
+/// # Parameters
+/// - `realm`: The realm in which the session exists.
+///
+/// # Errors
+/// `StartupError::NotDestroyed` if the session component could not be destroyed.
+pub async fn stop_session(realm: &fcomponent::RealmProxy) -> Result<(), StartupError> {
+    realm_management::destroy_child_component(SESSION_NAME, SESSION_CHILD_COLLECTION, realm)
+        .await
+        .map_err(|err| StartupError::NotDestroyed {
+            name: SESSION_NAME.to_string(),
+            collection: SESSION_CHILD_COLLECTION.to_string(),
+            err,
+        })
 }
 
 /// Sets the currently active session.
@@ -156,7 +223,7 @@ async fn set_session(
 #[cfg(test)]
 mod tests {
     use {
-        super::{set_session, SESSION_CHILD_COLLECTION, SESSION_NAME},
+        super::{set_session, stop_session, SESSION_CHILD_COLLECTION, SESSION_NAME},
         fidl::endpoints::spawn_stream_handler,
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
         fuchsia_zircon::{self as zx, AsHandleRef},
@@ -287,5 +354,30 @@ mod tests {
         exposed_dir
             .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::Time::INFINITE_PAST)
             .expect("exposed_dir should be closed");
+    }
+
+    #[fuchsia::test]
+    async fn stop_session_calls_destroy_child() {
+        lazy_static! {
+            static ref NUM_DESTROY_CHILD_CALLS: Counter = Counter::new(0);
+        }
+
+        let realm = spawn_stream_handler(move |realm_request| async move {
+            match realm_request {
+                fcomponent::RealmRequest::DestroyChild { child, responder } => {
+                    assert_eq!(NUM_DESTROY_CHILD_CALLS.get(), 0);
+                    assert_eq!(child.collection, Some(SESSION_CHILD_COLLECTION.to_string()));
+                    assert_eq!(child.name, SESSION_NAME);
+
+                    let _ = responder.send(Ok(()));
+                }
+                _ => panic!("Realm handler received an unexpected request"),
+            };
+            NUM_DESTROY_CHILD_CALLS.inc();
+        })
+        .unwrap();
+
+        assert!(stop_session(&realm).await.is_ok());
+        assert_eq!(NUM_DESTROY_CHILD_CALLS.get(), 1);
     }
 }

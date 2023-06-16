@@ -25,10 +25,12 @@ async fn main() -> Result<(), Error> {
     let realm = connect_to_protocol::<fcomponent::RealmMarker>()?;
 
     // Start the startup session, if any, and serve services exposed by session manager.
-    let mut session_manager = SessionManager::new(realm, inspector);
     let Config { session_url, autolaunch } = Config::take_from_startup_handle();
+    let is_session_url_empty = session_url.is_empty();
+    let mut session_manager =
+        SessionManager::new(realm, inspector, (!is_session_url_empty).then_some(session_url));
 
-    if session_url.is_empty() {
+    if is_session_url_empty {
         info!("Received an empty startup session URL. Waiting for a request.");
     } else if !autolaunch {
         info!("Startup session URL set, but autolaunch config option was false. Waiting for a request.");
@@ -39,10 +41,7 @@ async fn main() -> Result<(), Error> {
         );
     } else {
         // TODO(fxbug.dev/67789): Using ? here causes errors to not be logged.
-        session_manager
-            .launch_startup_session(session_url)
-            .await
-            .expect("failed to launch session");
+        session_manager.launch_default_session().await.expect("failed to launch session");
     }
     session_manager.serve(&mut fs).await.expect("failed to serve protocols");
 
