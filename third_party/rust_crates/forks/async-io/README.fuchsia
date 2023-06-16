@@ -4,11 +4,9 @@ Description:
 
 async-io is used only on the host side to provide async usage of *nix IO primitives.
 
-This is mainline, but will soon incorporate the patch from
-https://github.com/smol-rs/async-io/pull/79/commits/71cd97d34ed8c652074b61ed4093b475e2fb4fdd
-.
+This is mainline with the patch from https://github.com/smol-rs/async-io/pull/79/commits/71cd97d34ed8c652074b61ed4093b475e2fb4fdd included.
 
-This will be async-io mainline (~1.12.0) with a patch.
+This is async-io mainline (~1.12.0) with a patch.
 
 There is nothing else special about this release the fork is cut from mainline.
 
