@@ -83,6 +83,11 @@ struct TypeMismatchData {
   TypeCheckKind TypeCheckKind;
 };
 
+struct FunctionTypeMismatchData {
+  SourceLocation Loc;
+  const TypeDescriptor& Type;
+};
+
 struct UnreachableData {
   SourceLocation Loc;
 };
@@ -222,6 +227,12 @@ void __ubsan_handle_type_mismatch_v1(TypeMismatchData* Data, ValueHandle Pointer
     printf("TypeCheck Kind: %s (0x%hhx)\n", TypeCheckKindMsg(Data->TypeCheckKind),
            Data->TypeCheckKind);
   }
+
+  PrintTypeDescriptor(Data->Type);
+}
+
+void __ubsan_handle_function_type_mismatch(FunctionTypeMismatchData* Data, ValueHandle Val) {
+  auto start = UbsanPanicStart("Function Type Mismatch", Data->Loc);
 
   PrintTypeDescriptor(Data->Type);
 }
