@@ -25,8 +25,8 @@ fidl::Status SyncEventHandler::HandleOneEventImpl_(zx::unowned_channel channel,
   if (!msg.ok()) {
     return msg;
   }
-  if (fit::nullable epitaph = msg.maybe_epitaph(); unlikely(epitaph)) {
-    return fidl::Status::PeerClosedWhileReading((*epitaph)->error);
+  if (fidl_epitaph_t* epitaph = msg.maybe_epitaph(); unlikely(epitaph)) {
+    return fidl::Status::PeerClosedWhileReading(epitaph->error);
   }
   got_transitional_ = false;
   fidl::Status dispatch_status = dispatcher.DispatchEvent(msg, &storage);

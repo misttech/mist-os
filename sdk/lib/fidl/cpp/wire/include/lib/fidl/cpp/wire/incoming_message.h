@@ -258,13 +258,7 @@ class IncomingHeaderAndMessage : public ::fidl::Status {
 
   // If the message is an epitaph, returns a pointer to the epitaph structure.
   // Otherwise, returns null.
-  fit::nullable<fidl_epitaph_t*> maybe_epitaph() const {
-    ZX_DEBUG_ASSERT(ok());
-    if (unlikely(header()->ordinal == kFidlOrdinalEpitaph)) {
-      return fit::nullable(reinterpret_cast<fidl_epitaph_t*>(bytes()));
-    }
-    return fit::nullable<fidl_epitaph_t*>{};
-  }
+  fidl_epitaph_t* maybe_epitaph() const;
 
   uint8_t* bytes() const { return bytes_.data(); }
   uint32_t byte_actual() const { return static_cast<uint32_t>(bytes_.size()); }

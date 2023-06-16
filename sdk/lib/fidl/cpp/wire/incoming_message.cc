@@ -71,6 +71,14 @@ IncomingHeaderAndMessage IncomingHeaderAndMessage::FromEncodedCMessage(
 
 IncomingHeaderAndMessage::~IncomingHeaderAndMessage() = default;
 
+fidl_epitaph_t* IncomingHeaderAndMessage::maybe_epitaph() const {
+  ZX_DEBUG_ASSERT(ok());
+  if (unlikely(header()->ordinal == kFidlOrdinalEpitaph)) {
+    return reinterpret_cast<fidl_epitaph_t*>(bytes());
+  }
+  return nullptr;
+}
+
 fidl_incoming_msg_t IncomingHeaderAndMessage::ReleaseToEncodedCMessage() && {
   ZX_DEBUG_ASSERT_MSG(status() == ZX_OK, "%s", status_string());
   fidl_incoming_msg_t msg = std::move(body_).ReleaseToEncodedCMessage();
