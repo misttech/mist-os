@@ -33,6 +33,9 @@ struct Formatted {
   const T& value;
 };
 
+template <typename T>
+Formatted(const T& v) -> Formatted<T>;
+
 template <typename T, typename = void>
 struct Formatter;
 
@@ -92,9 +95,8 @@ struct Formatter<std::optional<std::string>> {
   static std::ostream& Format(std::ostream& os, const std::optional<std::string>& value) {
     if (value.has_value()) {
       return Formatter<std::string>::Format(os, value.value());
-    } else {
-      return os << "null";
     }
+    return os << "null";
   }
 };
 
@@ -182,9 +184,8 @@ struct Formatter<std::optional<std::vector<T>>> {
   static std::ostream& Format(std::ostream& os, const std::optional<std::vector<T>>& value) {
     if (value.has_value()) {
       return Formatter<std::vector<T>>::Format(os, value.value());
-    } else {
-      return os << "null";
     }
+    return os << "null";
   }
 };
 
@@ -205,9 +206,8 @@ struct Formatter<std::optional<T>> {
   static std::ostream& Format(std::ostream& os, const std::optional<T>& value) {
     if (value.has_value()) {
       return Formatter<T>::Format(os, value.value());
-    } else {
-      return os << "null";
     }
+    return os << "null";
   }
 };
 
@@ -216,9 +216,8 @@ struct Formatter<fidl::Box<T>> {
   static std::ostream& Format(std::ostream& os, const fidl::Box<T>& value) {
     if (value) {
       return Formatter<T>::Format(os, *value);
-    } else {
-      return os << "null";
     }
+    return os << "null";
   }
 };
 

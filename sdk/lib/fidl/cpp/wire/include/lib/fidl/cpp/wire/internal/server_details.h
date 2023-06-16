@@ -387,6 +387,12 @@ struct UnboundThunk {
   std::remove_reference_t<OnUnbound> on_unbound_;
 };
 
+// This suppresses the '-Wctad-maybe-unsupported' compiler warning when CTAD is used.
+//
+// See https://github.com/llvm/llvm-project/blob/42874f6/libcxx/include/__config#L1259-L1261.
+template <class... Tag>
+UnboundThunk(typename Tag::__allow_ctad...) -> UnboundThunk<Tag...>;
+
 }  // namespace internal
 
 }  // namespace fidl

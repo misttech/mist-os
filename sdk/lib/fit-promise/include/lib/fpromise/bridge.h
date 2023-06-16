@@ -161,6 +161,12 @@ class bridge final {
   consumer_type consumer;
 };
 
+// This suppresses the '-Wctad-maybe-unsupported' compiler warning when CTAD is used.
+//
+// See https://github.com/llvm/llvm-project/blob/42874f6/libcxx/include/__config#L1259-L1261.
+template <class... Tag>
+bridge(typename Tag::__allow_ctad...) -> bridge<Tag...>;
+
 // Provides a result upon completion of an asynchronous task.
 //
 // Instances of this class have single-ownership of a unique capability for

@@ -193,9 +193,14 @@ template("_fidl_cpp_library_impl") {
       }
     }
 
-    # TODO(fxbug.dev/120888): Remove `-Wshadow` when the flag is on
-    # by default.
-    cflags_cc = [ "-Wshadow" ]
+    # chromium uses this library, and enables the following flags, so these tests should work with
+    # these flags enabled.
+    #
+    # TODO(fxbug.dev/120888): Remove this when a central definition of SDK warnings exists.
+    cflags_cc = [
+      "-Wctad-maybe-unsupported",
+      "-Wshadow",
+    ]
 
     if (defined(invoker.additional_configs)) {
       configs += invoker.additional_configs

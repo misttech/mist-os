@@ -80,7 +80,7 @@ void WireCheckPadding(WireDecoder* decoder, WirePosition position, MaskType mask
 
 template <typename T, bool IsRecursive>
 struct WireCodingTraits<T, WireCodingConstraintEmpty, IsRecursive,
-                        typename std::enable_if<IsPrimitive<T>::value>::type> {
+                        std::enable_if_t<IsPrimitive<T>::value>> {
   static constexpr size_t inline_size = sizeof(T);
   static constexpr bool is_memcpy_compatible = true;
 
@@ -104,7 +104,7 @@ struct WireCodingTraits<bool, WireCodingConstraintEmpty, IsRecursive> {
   static void Decode(WireDecoder* decoder, WirePosition position,
                      RecursionDepth<IsRecursive> recursion_depth) {
     uint8_t uintval = *position.As<uint8_t>();
-    if (unlikely(!(uintval == 0 || uintval == 1))) {
+    if (unlikely(uintval != 0 && uintval != 1)) {
       decoder->SetError(kCodingErrorInvalidBoolean);
       return;
     }
@@ -200,7 +200,7 @@ struct VectorCodingTraitHelper {
         DecodePrework(decoder, position, Constraint::is_optional, Constraint::limit)) {
       return;
     }
-    RecursionDepth inner_depth = recursion_depth.Add(decoder, 1);
+    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 1);
     if (!inner_depth.IsValid()) {
       return;
     }
@@ -341,7 +341,7 @@ struct WireCodingTraits<fidl::Array<T, N>, Constraint, IsRecursive> {
 #ifdef __Fuchsia__
 template <typename T, typename Constraint, bool IsRecursive>
 struct WireCodingTraits<T, Constraint, IsRecursive,
-                        typename std::enable_if<std::is_base_of<zx::object_base, T>::value>::type> {
+                        std::enable_if_t<std::is_base_of_v<zx::object_base, T>>> {
   static constexpr size_t inline_size = sizeof(zx_handle_t);
   static constexpr bool is_memcpy_compatible = false;
 
