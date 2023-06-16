@@ -78,6 +78,12 @@ using fit::success;
 template <typename... Ts>
 class result;
 
+// This suppresses the '-Wctad-maybe-unsupported' compiler warning when CTAD is used.
+//
+// See https://github.com/llvm/llvm-project/blob/42874f6/libcxx/include/__config#L1259-L1261.
+template <class... Tag>
+result(typename Tag::__allow_ctad...) -> result<Tag...>;
+
 // Specialization of status for returning a single value.
 template <typename T>
 class [[nodiscard]] result<T> : public ::fit::result<zx_status_t, T> {
