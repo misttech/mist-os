@@ -9,6 +9,7 @@ fidl("fuchsia.session") {
 
   sources = [
     "launcher.fidl",
+    "lifecycle.fidl",
     "overview.fidl",
     "restarter.fidl",
   ]

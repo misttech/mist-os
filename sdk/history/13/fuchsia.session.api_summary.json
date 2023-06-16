@@ -67,6 +67,150 @@
         "strictness": "strict"
     },
     {
+        "kind": "protocol/member",
+        "name": "fuchsia.session/Lifecycle.Restart",
+        "ordinal": "3601448972452829883",
+        "type": "() -> (fuchsia.session/Lifecycle_Restart_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.session/Lifecycle.Start",
+        "ordinal": "3448130162661792992",
+        "type": "(fuchsia.session/LifecycleStartRequest payload) -> (fuchsia.session/Lifecycle_Start_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.session/Lifecycle.Stop",
+        "ordinal": "311778709095953570",
+        "type": "() -> (fuchsia.session/Lifecycle_Stop_Result result)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.session/Lifecycle"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.session/LifecycleError.ALREADY_STARTED",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.session/LifecycleError.CREATE_COMPONENT_FAILED",
+        "value": "4"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.session/LifecycleError.DESTROY_COMPONENT_FAILED",
+        "value": "5"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.session/LifecycleError.NOT_FOUND",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.session/LifecycleError.RESOLVE_COMPONENT_FAILED",
+        "value": "3"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.session/LifecycleError",
+        "strictness": "flexible",
+        "type": "uint32"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.session/LifecycleStartRequest.session_url",
+        "ordinal": "1",
+        "type": "string:4096"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.session/LifecycleStartRequest"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.session/Lifecycle_Restart_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.session/Lifecycle_Restart_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.session/LifecycleError"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.session/Lifecycle_Restart_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.session/Lifecycle_Restart_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.session/Lifecycle_Restart_Result.transport_err",
+        "ordinal": "3",
+        "type": "<not_implemented:fidlgen.Type{Kind:\"internal\", ElementType:(*fidlgen.Type)(nil), ElementCount:(*int)(nil), HandleSubtype:\"\", HandleRights:0x0, RequestSubtype:\"\", PrimitiveSubtype:\"\", Identifier:\"\", InternalSubtype:\"transport_error\", Nullable:false, ProtocolTransport:\"\", ObjType:0x0, ResourceIdentifier:\"\", TypeShapeV1:fidlgen.TypeShape{InlineSize:4, Alignment:4, Depth:0, MaxHandles:0, MaxOutOfLine:0, HasPadding:false, HasEnvelope:false, HasFlexibleEnvelope:false}, TypeShapeV2:fidlgen.TypeShape{InlineSize:4, Alignment:4, Depth:0, MaxHandles:0, MaxOutOfLine:0, HasPadding:false, HasEnvelope:false, HasFlexibleEnvelope:false}, PointeeType:(*fidlgen.Type)(nil)}>"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.session/Lifecycle_Restart_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.session/Lifecycle_Start_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.session/Lifecycle_Start_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.session/LifecycleError"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.session/Lifecycle_Start_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.session/Lifecycle_Start_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.session/Lifecycle_Start_Result.transport_err",
+        "ordinal": "3",
+        "type": "<not_implemented:fidlgen.Type{Kind:\"internal\", ElementType:(*fidlgen.Type)(nil), ElementCount:(*int)(nil), HandleSubtype:\"\", HandleRights:0x0, RequestSubtype:\"\", PrimitiveSubtype:\"\", Identifier:\"\", InternalSubtype:\"transport_error\", Nullable:false, ProtocolTransport:\"\", ObjType:0x0, ResourceIdentifier:\"\", TypeShapeV1:fidlgen.TypeShape{InlineSize:4, Alignment:4, Depth:0, MaxHandles:0, MaxOutOfLine:0, HasPadding:false, HasEnvelope:false, HasFlexibleEnvelope:false}, TypeShapeV2:fidlgen.TypeShape{InlineSize:4, Alignment:4, Depth:0, MaxHandles:0, MaxOutOfLine:0, HasPadding:false, HasEnvelope:false, HasFlexibleEnvelope:false}, PointeeType:(*fidlgen.Type)(nil)}>"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.session/Lifecycle_Start_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.session/Lifecycle_Stop_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.session/Lifecycle_Stop_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.session/LifecycleError"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.session/Lifecycle_Stop_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.session/Lifecycle_Stop_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.session/Lifecycle_Stop_Result.transport_err",
+        "ordinal": "3",
+        "type": "<not_implemented:fidlgen.Type{Kind:\"internal\", ElementType:(*fidlgen.Type)(nil), ElementCount:(*int)(nil), HandleSubtype:\"\", HandleRights:0x0, RequestSubtype:\"\", PrimitiveSubtype:\"\", Identifier:\"\", InternalSubtype:\"transport_error\", Nullable:false, ProtocolTransport:\"\", ObjType:0x0, ResourceIdentifier:\"\", TypeShapeV1:fidlgen.TypeShape{InlineSize:4, Alignment:4, Depth:0, MaxHandles:0, MaxOutOfLine:0, HasPadding:false, HasEnvelope:false, HasFlexibleEnvelope:false}, TypeShapeV2:fidlgen.TypeShape{InlineSize:4, Alignment:4, Depth:0, MaxHandles:0, MaxOutOfLine:0, HasPadding:false, HasEnvelope:false, HasFlexibleEnvelope:false}, PointeeType:(*fidlgen.Type)(nil)}>"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.session/Lifecycle_Stop_Result",
+        "strictness": "strict"
+    },
+    {
         "kind": "enum/member",
         "name": "fuchsia.session/RestartError.CREATE_COMPONENT_FAILED",
         "value": "4"
