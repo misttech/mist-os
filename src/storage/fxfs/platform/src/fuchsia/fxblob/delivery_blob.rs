@@ -501,7 +501,6 @@ mod tests {
                 chunk.len() as u64
             );
         }
-        blob.close().await.expect("fidl error").unwrap();
         Ok(())
     }
 
@@ -574,7 +573,6 @@ mod tests {
                 chunk.len() as u64
             );
         }
-        blob.close().await.expect("fidl error").unwrap();
         assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
         fixture.close().await;
     }
@@ -633,7 +631,6 @@ mod tests {
             blob.write(&payload).await.expect("fidl error").map_err(Status::from_raw).unwrap_err()
         );
 
-        blob.close().await.expect("fidl error").unwrap();
         fixture.close().await;
     }
 
@@ -660,7 +657,6 @@ mod tests {
             .unwrap_err();
         assert_eq!(resize_error, Status::INVALID_ARGS);
 
-        blob.close().await.expect("fidl error").unwrap();
         fixture.close().await;
     }
 
@@ -709,7 +705,6 @@ mod tests {
             )
         );
 
-        blob.close().await.expect("fidl error").unwrap();
         fixture.close().await;
     }
 

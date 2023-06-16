@@ -31,12 +31,6 @@ struct State {
     volumes_directory: Arc<VolumesDirectory>,
 }
 
-impl From<State> for (OpenFxFilesystem, FxVolumeAndRoot, Arc<VolumesDirectory>) {
-    fn from(state: State) -> (OpenFxFilesystem, FxVolumeAndRoot, Arc<VolumesDirectory>) {
-        (state.filesystem, state.volume, state.volumes_directory)
-    }
-}
-
 pub struct TestFixture {
     state: Option<State>,
     encrypted: bool,
@@ -148,26 +142,22 @@ impl TestFixture {
     ///   * fsck passes.
     ///   * There are no dangling references to the device or the volume.
     pub async fn close(mut self) -> DeviceHolder {
-        let state = std::mem::take(&mut self.state).unwrap();
+        let State { filesystem, volume, root, volumes_directory } =
+            std::mem::take(&mut self.state).unwrap();
         // Close the root node and ensure that there's no remaining references to |vol|, which would
         // indicate a reference cycle or other leak.
-        state
-            .root
-            .close()
+        root.close()
             .await
             .expect("FIDL call failed")
             .map_err(Status::from_raw)
             .expect("close root failed");
-        let (filesystem, volume, volumes_directory) = state.into();
         volumes_directory.terminate().await;
         std::mem::drop(volumes_directory);
         let store_id = volume.volume().store().store_object_id();
 
-        // Wait for all tasks to finish running.  If we don't do this, it's possible that we haven't
+        // Wait for the volume to terminate. If we don't do this, it's possible that we haven't
         // yet noticed that a connection has closed, and so tasks can still be running and they can
         // hold references to the volume which we want to unwrap.
-        volume.volume().scope().wait().await;
-
         volume.volume().terminate().await;
 
         Arc::try_unwrap(volume.into_volume())

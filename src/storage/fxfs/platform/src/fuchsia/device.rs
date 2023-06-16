@@ -649,6 +649,7 @@ mod tests {
 
     #[fuchsia::test(threads = 10)]
     async fn test_block_server() {
+        let fixture = TestFixture::new().await;
         let (client, server) = fidl::endpoints::create_proxy::<ControllerMarker>().unwrap();
         join!(
             async {
@@ -657,7 +658,6 @@ mod tests {
                 blobfs.fsck().await.expect("fsck failed");
             },
             async {
-                let fixture = TestFixture::new().await;
                 let root = fixture.root();
 
                 let file = open_file_checked(
@@ -691,14 +691,14 @@ mod tests {
                     server.into_channel().into(),
                 )
                 .expect("open failed");
-
-                fixture.close().await;
             }
         );
+        fixture.close().await;
     }
 
     #[fuchsia::test(threads = 10)]
     async fn test_clone() {
+        let fixture = TestFixture::new().await;
         let (client_channel, server_channel) = zx::Channel::create();
         let (client_channel_copy1, server_channel_copy1) = zx::Channel::create();
         let (client_channel_copy2, server_channel_copy2) = zx::Channel::create();
@@ -758,7 +758,6 @@ mod tests {
                 assert_eq!(&read_buf, &write_buf);
             },
             async {
-                let fixture = TestFixture::new().await;
                 let root = fixture.root();
                 root.open(
                     fio::OpenFlags::CREATE
@@ -770,14 +769,14 @@ mod tests {
                     ServerEnd::new(server_channel),
                 )
                 .expect("open failed");
-
-                fixture.close().await;
             }
         );
+        fixture.close().await;
     }
 
     #[fuchsia::test(threads = 10)]
     async fn test_attach_vmo() {
+        let fixture = TestFixture::new().await;
         let (client_channel, server_channel) = zx::Channel::create();
         join!(
             async {
@@ -804,7 +803,6 @@ mod tests {
                 }
             },
             async {
-                let fixture = TestFixture::new().await;
                 let root = fixture.root();
                 root.open(
                     fio::OpenFlags::CREATE
@@ -816,14 +814,14 @@ mod tests {
                     ServerEnd::new(server_channel),
                 )
                 .expect("open failed");
-
-                fixture.close().await;
             }
         );
+        fixture.close().await;
     }
 
     #[fuchsia::test(threads = 10)]
     async fn test_detach_vmo() {
+        let fixture = TestFixture::new().await;
         let (client_channel, server_channel) = zx::Channel::create();
         join!(
             async {
@@ -841,7 +839,6 @@ mod tests {
                 remote_block_device.detach_vmo(vmo_id_copy).await.expect_err("detach succeeded");
             },
             async {
-                let fixture = TestFixture::new().await;
                 let root = fixture.root();
                 root.open(
                     fio::OpenFlags::CREATE
@@ -853,14 +850,14 @@ mod tests {
                     ServerEnd::new(server_channel),
                 )
                 .expect("open failed");
-
-                fixture.close().await;
             }
         );
+        fixture.close().await;
     }
 
     #[fuchsia::test(threads = 10)]
     async fn test_read_write_files() {
+        let fixture = TestFixture::new().await;
         let (client_channel, server_channel) = zx::Channel::create();
         join!(
             async {
@@ -904,7 +901,6 @@ mod tests {
                 remote_block_device.detach_vmo(vmo_id).await.expect("detach failed");
             },
             async {
-                let fixture = TestFixture::new().await;
                 let root = fixture.root();
                 root.open(
                     fio::OpenFlags::CREATE
@@ -916,14 +912,14 @@ mod tests {
                     ServerEnd::new(server_channel),
                 )
                 .expect("open failed");
-
-                fixture.close().await;
             }
         );
+        fixture.close().await;
     }
 
     #[fuchsia::test(threads = 10)]
     async fn test_flush_is_called() {
+        let fixture = TestFixture::new().await;
         let (client_channel, server_channel) = zx::Channel::create();
         join!(
             async {
@@ -937,7 +933,6 @@ mod tests {
                 remote_block_device.flush().await.expect("flush failed");
             },
             async {
-                let fixture = TestFixture::new().await;
                 let root = fixture.root();
                 root.open(
                     fio::OpenFlags::CREATE
@@ -949,14 +944,14 @@ mod tests {
                     ServerEnd::new(server_channel),
                 )
                 .expect("open failed");
-
-                fixture.close().await;
             }
         );
+        fixture.close().await;
     }
 
     #[fuchsia::test(threads = 10)]
     async fn test_getattr() {
+        let fixture = TestFixture::new().await;
         let (client_channel, server_channel) = zx::Channel::create();
 
         join!(
@@ -970,7 +965,6 @@ mod tests {
                 assert_eq!(attr.mode, fio::MODE_TYPE_BLOCK_DEVICE);
             },
             async {
-                let fixture = TestFixture::new().await;
                 let root = fixture.root();
                 root.open(
                     fio::OpenFlags::CREATE
@@ -982,14 +976,14 @@ mod tests {
                     ServerEnd::new(server_channel),
                 )
                 .expect("open failed");
-
-                fixture.close().await;
             }
         );
+        fixture.close().await;
     }
 
     #[fuchsia::test(threads = 10)]
     async fn test_get_info() {
+        let fixture = TestFixture::new().await;
         let (client_channel, server_channel) = zx::Channel::create();
         let file_size = 2 * 1024 * 1024;
         join!(
@@ -1006,9 +1000,7 @@ mod tests {
                 assert_eq!(info.block_count * u64::from(info.block_size), file_size);
             },
             async {
-                let fixture = TestFixture::new().await;
                 let root = fixture.root();
-
                 let file = open_file_checked(
                     &root,
                     fio::OpenFlags::CREATE
@@ -1040,14 +1032,14 @@ mod tests {
                     ServerEnd::new(server_channel),
                 )
                 .expect("open failed");
-
-                fixture.close().await;
             }
         );
+        fixture.close().await;
     }
 
     #[fuchsia::test(threads = 10)]
     async fn test_blobfs() {
+        let fixture = TestFixture::new().await;
         let (client, server) = fidl::endpoints::create_proxy::<ControllerMarker>().unwrap();
         join!(
             async {
@@ -1101,7 +1093,6 @@ mod tests {
                 serving.shutdown().await.expect("shutdown blobfs failed");
             },
             async {
-                let fixture = TestFixture::new().await;
                 let root = fixture.root();
 
                 let file = open_file_checked(
@@ -1135,9 +1126,8 @@ mod tests {
                     server.into_channel().into(),
                 )
                 .expect("open failed");
-
-                fixture.close().await;
             }
         );
+        fixture.close().await;
     }
 }
