@@ -109,7 +109,7 @@ fuchsia_unittest_package("flatland_display_compositor_pixeltests") {
   manifest = "meta/flatland_display_compositor_pixeltests.cml"
   deps = [
            "lib/flatland/engine/tests/pixeltests:pixeltests_with_real_display",
-           "//src/graphics/display/testing/coordinator-provider:display-coordinator-provider-component",
+           "//src/graphics/display/testing/coordinator-provider:display-coordinator-provider-child-component",
          ] + scenic_test_deps
   test_specs = {
     log_settings = {
@@ -132,7 +132,7 @@ fuchsia_unittest_package(
   manifest = "meta/flatland_display_compositor_pixeltests_with_fake_display.cml"
   deps = [
            "lib/flatland/engine/tests/pixeltests:pixeltests_with_fake_display",
-           "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-component",
+           "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-child-component",
          ] + scenic_test_deps
   test_specs = {
     log_settings = {
@@ -149,7 +149,7 @@ fuchsia_unittest_package("flatland_display_compositor_smoketests") {
   manifest = "meta/flatland_display_compositor_smoketests.cml"
   deps = [
            "lib/flatland/engine/tests/smoketests:smoketests_with_fake_display",
-           "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-component",
+           "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-child-component",
          ] + scenic_test_deps
   test_specs = {
     log_settings = {
@@ -165,7 +165,7 @@ fuchsia_unittest_package("flatland_engine_unittests") {
   manifest = "meta/flatland_engine_unittests.cml"
   deps = [
            "lib/flatland/engine/tests:unittests",
-           "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-component",
+           "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-child-component",
          ] + scenic_test_deps
   test_specs = {
     log_settings = {
@@ -179,7 +179,7 @@ fuchsia_unittest_package("flatland_renderer_unittests") {
   manifest = "meta/flatland_renderer_unittests.cml"
   deps = [
            "lib/flatland/renderer/tests:unittests",
-           "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-component",
+           "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-child-component",
          ] + scenic_test_deps
   test_specs = {
     log_settings = {
@@ -205,7 +205,7 @@ fuchsia_unittest_package("gfx_swapchain_tests") {
   manifest = "meta/gfx_swapchain_tests.cml"
   deps = [
            "lib/gfx/tests:swapchain_tests",
-           "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-component",
+           "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-child-component",
          ] + scenic_test_deps
   test_specs = {
     environments = vulkan_envs

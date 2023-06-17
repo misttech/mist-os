@@ -93,7 +93,7 @@ fuchsia_unittest_package(
     "get_hardware_display_controller_inject_services_test") {
   deps = [
     ":get_hardware_display_controller_inject_services_test_bin",
-    "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-component",
+    "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-child-component",
   ]
   manifest =
       "tests/meta/get_hardware_display_controller_inject_services_test.cml"

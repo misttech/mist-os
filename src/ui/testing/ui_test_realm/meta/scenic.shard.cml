@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/graphics/display/testing/coordinator-provider/meta/fake_display_coordinator_provider.shard.cml",
+
         // Defines a base set of services scenic uses and exposes.
         "//src/ui/meta/scenic_base_routes.shard.cml",
         "syslog/client.shard.cml",
@@ -26,18 +28,7 @@
         {
             protocol: "fuchsia.logger.LogSink",
             from: "parent",
-            to: [
-                "#display-coordinator-provider",
-                "#mock_cobalt",
-            ],
-        },
-        {
-            protocol: [
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.tracing.provider.Registry",
-            ],
-            from: "parent",
-            to: [ "#display-coordinator-provider" ],
+            to: [ "#mock_cobalt" ],
         },
         {
             protocol: [ "fuchsia.hardware.display.Provider" ],

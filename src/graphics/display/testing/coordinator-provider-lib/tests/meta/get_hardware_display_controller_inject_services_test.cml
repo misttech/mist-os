@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/graphics/display/testing/coordinator-provider/meta/fake_display_coordinator_provider.shard.cml",
         "//src/sys/test_runners/gtest/default.shard.cml",
         "syslog/client.shard.cml",
         "vulkan/client.shard.cml",
@@ -20,17 +21,6 @@
         {
             protocol: [ "fuchsia.hardware.display.Provider" ],
             from: "#display-coordinator-provider",
-        },
-    ],
-    offer: [
-        {
-            protocol: [
-                "fuchsia.logger.LogSink",
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.tracing.provider.Registry",
-            ],
-            from: "parent",
-            to: [ "#display-coordinator-provider" ],
         },
     ],
 }

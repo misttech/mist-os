@@ -66,7 +66,7 @@ fuchsia_component("scenic_only") {
   manifest = "meta/scenic_only.cml"
   deps = [
     "//src/cobalt/bin/testing/mock_cobalt:component_v2",
-    "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-component",
+    "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-child-component",
     "//src/ui/scenic:component_v2_with_supplied_display_provider_for_test",
   ]
 }
@@ -87,7 +87,7 @@ fuchsia_component("scene_manager_scene") {
   manifest = "meta/scene_manager_scene.cml"
   deps = [
     "//src/cobalt/bin/testing/mock_cobalt:component_v2",
-    "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-component",
+    "//src/graphics/display/testing/coordinator-provider:fake-display-coordinator-provider-child-component",
     "//src/lib/ui/input-synthesis:input-synthesis-component",
     "//src/ui/a11y/bin/a11y_manager:component_v2",
     "//src/ui/bin/scene_manager:scene_manager_component_for_test",
