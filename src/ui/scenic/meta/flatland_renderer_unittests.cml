@@ -13,7 +13,7 @@
     },
     children: [
         {
-            name: "fake_display_provider",
+            name: "display-coordinator-provider",
             url: "#meta/hdcp.cm",
         },
     ],
@@ -23,7 +23,7 @@
         },
         {
             protocol: [ "fuchsia.hardware.display.Provider" ],
-            from: "#fake_display_provider",
+            from: "#display-coordinator-provider",
         },
     ],
     offer: [
@@ -34,7 +34,7 @@
                 "fuchsia.tracing.provider.Registry",
             ],
             from: "parent",
-            to: [ "#fake_display_provider" ],
+            to: [ "#display-coordinator-provider" ],
         },
     ],
 }

@@ -14,21 +14,21 @@
     },
     children: [
         {
-            name: "display_provider",
+            name: "display-coordinator-provider",
             url: "#meta/hdcp.cm",
         },
     ],
     use: [
         {
             protocol: [ "fuchsia.hardware.display.Provider" ],
-            from: "#display_provider",
+            from: "#display-coordinator-provider",
         },
     ],
     offer: [
         {
             directory: "dev-display-coordinator",
             from: "parent",
-            to: "#display_provider",
+            to: "#display-coordinator-provider",
         },
         {
             protocol: [
@@ -37,7 +37,7 @@
                 "fuchsia.tracing.provider.Registry",
             ],
             from: "parent",
-            to: [ "#display_provider" ],
+            to: [ "#display-coordinator-provider" ],
         },
     ],
 }
