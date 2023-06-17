@@ -142,9 +142,9 @@ type RingBufferProperties = table {
     /// These data transfers mean that there is always a section of the ring buffer that is unsafe
     /// for the client to be writing/reading. This unsafe buffer region is defined on one side by
     /// the current position 'P', and on the other side by the 'safe pointer' location 'S'. Once the
-    /// ring buffer starts, these two pointers begin moving, and the region between these pointers
-    /// must not be read or written by the client at that time. The diagrams below note these
-    /// pointers as 'P' and 'S'.
+    /// ring buffer starts, these two pointers begin moving. 'P' begins moving from position 0 at
+    /// the `start_time` from `Start`. The region between these pointers must not be read or
+    /// written by the client at that time. The diagrams below note these pointers as 'P' and 'S'.
     ///
     /// During playback, client must write data BEFORE hardware transfers occur. During capture,
     /// client can read captured data only AFTER hardware transfers occur. For this reason, during
@@ -345,8 +345,11 @@ closed protocol RingBuffer {
     /// client's first `WatchClockRecoveryPositionInfo` call, but will not respond to subsequent
     /// client calls until the position information has changed from what was most recently
     /// provided to that client. The driver must not respond to a
-    /// `WatchClockRecoveryPositionInfo` until after it has replied to the `Start` command. If
-    /// `clock_recovery_notifications_per_ring` is not zero, the driver will reply with its
+    /// `WatchClockRecoveryPositionInfo` until after it has replied to the `Start` command.
+    /// At the `start_time` returned by `Start`, position is always 0. From there, it
+    /// progresses at the rate specified by the rate, sample format (and clock domain,
+    /// if the device is not in the same clock domain as`CLOCK_MONOTONIC`).
+    /// If `clock_recovery_notifications_per_ring` is not zero, the driver will reply with its
     /// estimated position to be used for clock recovery at most at
     /// `clock_recovery_notifications_per_ring` frequency.
     /// `WatchClockRecoveryPositionInfo` may only be called after `GetVmo` was called, hence a
@@ -388,8 +391,10 @@ closed protocol RingBuffer {
     }) error GetVmoError;
 
     /// Start the ring buffer. The `start_time` value (in the CLOCK_MONOTONIC timeline) indicates
-    /// when position began moving, starting at the beginning of the ring buffer.
-    /// external_delay impact should not be incorporated into 'start_time'.
+    /// when position began moving, starting at the beginning of the ring buffer,
+    /// i.e. the driver/HW has started to read or write from or to the ring buffer position 0,
+    /// subject to the buffering described in `driver_transfer_bytes`.
+    ///
     /// If `Start` is called before `SetActiveChannels`, then by default all channels are active.
     /// If `Start` is called before `GetVmo`, the channel must be closed with `ZX_ERR_BAD_STATE`.
     /// If `Start` is called while this RingBuffer is already started, the channel must be closed
