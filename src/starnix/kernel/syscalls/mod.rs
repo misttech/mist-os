@@ -16,4 +16,4 @@ pub(crate) use crate::logging::{log_trace, not_implemented};
 pub use crate::{task::CurrentTask, types::*};
 
 mod misc;
-mod time;
+pub mod time;

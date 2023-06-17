@@ -281,6 +281,7 @@ rustc_binary("starnix_kernel_bin") {
     "task/abstract_socket_namespace.rs",
     "task/interruptible_lock.rs",
     "task/iptables.rs",
+    "task/itimer.rs",
     "task/kernel.rs",
     "task/kernel_threads.rs",
     "task/mod.rs",

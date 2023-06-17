@@ -85,9 +85,7 @@ pub fn sys_clock_nanosleep(
     // if we sleep for too little time.
     // At some point we'll need to monitor changes to the realtime clock proactively and adjust
     // timers accordingly.
-    let use_monotonic_clock =
-        which_clock == CLOCK_MONOTONIC || (which_clock == CLOCK_REALTIME && !is_absolute);
-    if !use_monotonic_clock || flags & !TIMER_ABSTIME != 0 {
+    if which_clock != CLOCK_MONOTONIC && which_clock != CLOCK_REALTIME {
         not_implemented!("clock_nanosleep, clock {:?}, flags {:?}", which_clock, flags);
         return error!(EINVAL);
     }
@@ -112,6 +110,7 @@ pub fn sys_clock_nanosleep(
         current_task,
         is_absolute,
         monotonic_deadline,
+        None,
         user_remaining,
     )
 }
@@ -139,6 +138,7 @@ fn clock_nanosleep_relative_to_utc(
             current_task,
             is_absolute,
             monotonic_deadline,
+            Some(clock_deadline_absolute),
             user_remaining,
         )?;
         // Look at |clock| again and decide if we're done.
@@ -157,6 +157,7 @@ fn clock_nanosleep_monotonic_with_deadline(
     current_task: &mut CurrentTask,
     is_absolute: bool,
     deadline: zx::Time,
+    original_utc_deadline: Option<zx::Time>,
     user_remaining: UserRef<timespec>,
 ) -> Result<(), Errno> {
     match Waiter::new().wait_until(current_task, deadline) {
@@ -164,11 +165,12 @@ fn clock_nanosleep_monotonic_with_deadline(
         Err(err) if err == EINTR && is_absolute => error!(ERESTARTNOHAND),
         Err(err) if err == EINTR => {
             if !user_remaining.is_null() {
-                let now = zx::Time::get_monotonic();
-                let remaining = timespec_from_duration(std::cmp::max(
-                    zx::Duration::from_nanos(0),
-                    deadline - now,
-                ));
+                let remaining = match original_utc_deadline {
+                    Some(original_utc_deadline) => original_utc_deadline - utc_now(),
+                    None => deadline - zx::Time::get_monotonic(),
+                };
+                let remaining =
+                    timespec_from_duration(std::cmp::max(zx::Duration::from_nanos(0), remaining));
                 current_task.mm.write_object(user_remaining, &remaining)?;
             }
             current_task.set_syscall_restart_func(move |current_task| {
@@ -176,6 +178,7 @@ fn clock_nanosleep_monotonic_with_deadline(
                     current_task,
                     is_absolute,
                     deadline,
+                    original_utc_deadline,
                     user_remaining,
                 )
             });
@@ -333,9 +336,8 @@ pub fn sys_getitimer(
     which: u32,
     user_curr_value: UserRef<itimerval>,
 ) -> Result<(), Errno> {
-    let itimers = current_task.thread_group.read().itimers;
-    let timer = itimers.get(which as usize).ok_or_else(|| errno!(EINVAL))?;
-    current_task.mm.write_object(user_curr_value, timer)?;
+    let remaining = current_task.thread_group.get_itimer(which)?;
+    current_task.mm.write_object(user_curr_value, &remaining)?;
     Ok(())
 }
 
@@ -359,7 +361,7 @@ pub fn sys_setitimer(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::testing::*;
+    use crate::{mm::PAGE_SIZE, testing::*};
     use fuchsia_zircon::HandleBased;
 
     #[::fuchsia::test]
@@ -416,5 +418,69 @@ mod test {
         super::clock_nanosleep_relative_to_utc(&mut current_task, tv, false, remaining).unwrap();
         let elapsed = test_clock.read().unwrap() - before;
         assert!(elapsed >= zx::Duration::from_seconds(1));
+    }
+
+    #[::fuchsia::test]
+    async fn test_clock_nanosleep_interrupted_relative_to_fast_utc_clock() {
+        let (_kernel, mut current_task) = create_kernel_and_task();
+
+        let test_clock = zx::Clock::create(zx::ClockOpts::AUTO_START, None).unwrap();
+        let _test_clock_guard = UtcClockOverrideGuard::new(
+            test_clock.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
+        );
+
+        // Speed |test_clock| up.
+        let slow_clock_update = zx::ClockUpdate::builder().rate_adjust(1000).build();
+        test_clock.update(slow_clock_update).unwrap();
+
+        let before = test_clock.read().unwrap();
+
+        let tv = timespec { tv_sec: 2, tv_nsec: 0 };
+
+        let remaining = {
+            let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+            UserRef::new(addr)
+        };
+
+        // Interrupt the sleep roughly halfway through.
+        let thread_group = std::sync::Arc::downgrade(&current_task.thread_group);
+        let thread_join_handle = std::thread::Builder::new()
+            .name("clock_nanosleep_interruptor".to_string())
+            .spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                if let Some(thread_group) = thread_group.upgrade() {
+                    let signal_info = crate::signals::SignalInfo::default(signals::SIGALRM);
+                    let signal_target =
+                        thread_group.read().get_signal_target(&signal_info.signal.into());
+                    if let Some(task) = &signal_target {
+                        crate::signals::send_signal(task, signal_info);
+                    }
+                }
+            })
+            .unwrap();
+
+        let result =
+            super::clock_nanosleep_relative_to_utc(&mut current_task, tv, false, remaining);
+        // We can't know deterministically if our interrupter thread will be able to interrupt our sleep.
+        // If it did, result should be ERESTART_RESTARTBLOCK and |remaining| will be populated.
+        // If it didn't, the result will be OK and |remaining| will not be touched.
+        let mut remaining_written = Default::default();
+        if result.is_err() {
+            assert_eq!(result, error!(ERESTART_RESTARTBLOCK));
+            remaining_written = {
+                let mm = &current_task.mm;
+                mm.read_object(remaining).unwrap()
+            };
+        }
+        assert!(
+            duration_from_timespec(remaining_written).unwrap() <= zx::Duration::from_seconds(1)
+        );
+        let elapsed = test_clock.read().unwrap() - before;
+        thread_join_handle.join().unwrap();
+
+        assert!(
+            elapsed + duration_from_timespec(remaining_written).unwrap()
+                >= zx::Duration::from_seconds(2)
+        );
     }
 }
