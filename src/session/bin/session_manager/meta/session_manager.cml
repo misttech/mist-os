@@ -22,13 +22,25 @@
     capabilities: [
         {
             protocol: [
-                "fuchsia.element.GraphicalPresenter",
-                "fuchsia.element.Manager",
                 "fuchsia.session.Launcher",
                 "fuchsia.session.Lifecycle",
                 "fuchsia.session.Restarter",
-                "fuchsia.web.Debug",
             ],
+        },
+
+        // session_manager exposes protocols in /svc_from_session from the session.
+        // The session should expose these protocols in its manifest.
+        {
+            protocol: "fuchsia.element.Manager",
+            path: "/svc_from_session/fuchsia.element.Manager",
+        },
+        {
+            protocol: "fuchsia.element.GraphicalPresenter",
+            path: "/svc_from_session/fuchsia.element.GraphicalPresenter",
+        },
+        {
+            protocol: "fuchsia.web.Debug",
+            path: "/svc_from_session/fuchsia.web.Debug",
         },
     ],
     use: [
@@ -486,13 +498,21 @@
         },
     ],
     expose: [
+        // Served by session_manager.
+        {
+            protocol: [
+                "fuchsia.session.Launcher",
+                "fuchsia.session.Lifecycle",
+                "fuchsia.session.Restarter",
+            ],
+            from: "self",
+        },
+
+        // Exposed from the session.
         {
             protocol: [
                 "fuchsia.element.GraphicalPresenter",
                 "fuchsia.element.Manager",
-                "fuchsia.session.Launcher",
-                "fuchsia.session.Lifecycle",
-                "fuchsia.session.Restarter",
                 "fuchsia.web.Debug",
             ],
             from: "self",

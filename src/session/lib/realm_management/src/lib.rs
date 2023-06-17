@@ -104,32 +104,11 @@ mod tests {
             create_child_component, destroy_child_component, open_child_component_exposed_dir,
         },
         fidl::endpoints::{spawn_stream_handler, Proxy},
-        fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        futures::prelude::*,
+        fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
         lazy_static::lazy_static,
+        session_testing::spawn_directory_server,
         test_util::Counter,
     };
-
-    /// Spawns a local handler for the given `fidl_fuchsia_io::Directory` request stream.
-    /// The provided `request_handler` is notified when an incoming request is received.
-    ///
-    /// # Parameters
-    /// - `directory_server`: A server request stream from a Directory proxy server endpoint.
-    /// - `request_handler`: A function that is called with incoming requests to the spawned
-    ///                      `Directory` server.
-    fn spawn_directory_server<F: 'static>(
-        mut directory_server: fio::DirectoryRequestStream,
-        request_handler: F,
-    ) where
-        F: Fn(fio::DirectoryRequest) + Send,
-    {
-        fasync::Task::spawn(async move {
-            while let Some(directory_request) = directory_server.try_next().await.unwrap() {
-                request_handler(directory_request);
-            }
-        })
-        .detach();
-    }
 
     /// Tests that creating a child results in the appropriate call to the `RealmProxy`.
     #[fuchsia::test]
@@ -264,16 +243,9 @@ mod tests {
 
         let realm_proxy = spawn_stream_handler(move |realm_request| async move {
             match realm_request {
-                fcomponent::RealmRequest::OpenExposedDir {
-                    child: _,
-                    exposed_dir: exposed_dir_server,
-                    responder,
-                } => {
+                fcomponent::RealmRequest::OpenExposedDir { child: _, exposed_dir, responder } => {
                     CALL_COUNT.inc();
-                    spawn_directory_server(
-                        exposed_dir_server.into_stream().unwrap(),
-                        directory_request_handler,
-                    );
+                    spawn_directory_server(exposed_dir, directory_request_handler);
                     let _ = responder.send(Ok(()));
                 }
                 _ => panic!("Realm handler received an unexpected request"),

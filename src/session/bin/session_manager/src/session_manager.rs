@@ -5,15 +5,15 @@
 use {
     crate::startup,
     anyhow::{anyhow, Context as _, Error},
-    fidl::endpoints::ProtocolMarker,
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_element as felement,
-    fidl_fuchsia_session as fsession, fidl_fuchsia_web as fweb,
+    fidl::endpoints::ServerEnd,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fidl_fuchsia_session as fsession,
     fuchsia_component::server::{ServiceFs, ServiceObjLocal},
     fuchsia_inspect_contrib::nodes::BoundedListNode,
     fuchsia_zircon as zx,
     futures::{lock::Mutex, StreamExt, TryFutureExt, TryStreamExt},
-    std::{future::Future, sync::Arc},
+    std::sync::Arc,
     tracing::{error, warn},
+    vfs::{execution_scope::ExecutionScope, remote::remote_boxed_with_type},
 };
 
 /// Maximum number of concurrent connections to the protocols served by SessionManager.
@@ -31,12 +31,9 @@ const DIAGNOSTICS_TIME_PROPERTY_NAME: &str = "@time";
 
 /// A request to connect to a protocol exposed by SessionManager.
 pub enum IncomingRequest {
-    Manager(felement::ManagerRequestStream),
-    GraphicalPresenter(felement::GraphicalPresenterRequestStream),
     Launcher(fsession::LauncherRequestStream),
     Restarter(fsession::RestarterRequestStream),
     Lifecycle(fsession::LifecycleRequestStream),
-    WebDebug(fweb::DebugRequestStream),
 }
 
 struct Diagnostics {
@@ -57,8 +54,8 @@ struct SessionState {
     /// The component URL of the session.
     url: String,
 
-    /// A client-end channel to the most session's `exposed_dir`.
-    exposed_dir: zx::Channel,
+    /// A proxy to the session's exposed directory.
+    exposed_dir: fio::DirectoryProxy,
 }
 
 struct SessionManagerState {
@@ -131,12 +128,22 @@ impl SessionManager {
         fs: &mut ServiceFs<ServiceObjLocal<'_, IncomingRequest>>,
     ) -> Result<(), Error> {
         fs.dir("svc")
-            .add_fidl_service(IncomingRequest::Manager)
-            .add_fidl_service(IncomingRequest::GraphicalPresenter)
             .add_fidl_service(IncomingRequest::Launcher)
             .add_fidl_service(IncomingRequest::Restarter)
-            .add_fidl_service(IncomingRequest::WebDebug)
             .add_fidl_service(IncomingRequest::Lifecycle);
+
+        // Requests to /svc_from_session are forwarded to the session's exposed dir.
+        let session_manager = self.clone();
+        fs.add_entry_at(
+            "svc_from_session",
+            remote_boxed_with_type(
+                Box::new(move |scope, flags, path, server_end| {
+                    session_manager.open_svc_for_session(scope, flags, path, server_end);
+                }),
+                fio::DirentType::Directory,
+            ),
+        );
+
         fs.take_and_serve_directory_handle()?;
 
         fs.for_each_concurrent(MAX_CONCURRENT_CONNECTIONS, |request| {
@@ -153,42 +160,6 @@ impl SessionManager {
         Ok(())
     }
 
-    /// Forwards the given request stream to a service inside the `session`.
-    ///
-    /// # Parameters
-    /// - `request_stream`: The request stream being forwarded
-    /// - `handler`: The function that actually matches on each request type and calls the
-    ///    corresponding method on the given `Proxy`.
-    async fn forward_request_to_session<RS, F, Fut>(
-        &mut self,
-        request_stream: RS,
-        handler: F,
-    ) -> Result<(), Error>
-    where
-        RS: fidl::endpoints::RequestStream,
-        RS::Protocol: ProtocolMarker,
-        F: Fn(RS, <RS::Protocol as ProtocolMarker>::Proxy) -> Fut,
-        Fut: Future<Output = Result<(), Error>>,
-    {
-        let protocol_name = <RS::Protocol as ProtocolMarker>::DEBUG_NAME;
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<RS::Protocol>()
-            .with_context(|| format!("Failed to create_proxy for {}", protocol_name))?;
-        {
-            let state = self.state.lock().await;
-            let session =
-                state.session.as_ref().ok_or_else(|| anyhow!("Session is not started"))?;
-            fdio::service_connect_at(
-                &session.exposed_dir,
-                protocol_name,
-                server_end.into_channel(),
-            )
-            .with_context(|| format!("Failed to connect to {}", protocol_name))?;
-        }
-        handler(request_stream, proxy)
-            .await
-            .with_context(|| format!("{} request stream got an error", protocol_name))
-    }
-
     /// Handles an [`IncomingRequest`].
     ///
     /// This will return once the protocol connection has been closed.
@@ -197,30 +168,6 @@ impl SessionManager {
     /// Returns an error if there is an issue serving the request.
     async fn handle_incoming_request(&mut self, request: IncomingRequest) -> Result<(), Error> {
         match request {
-            IncomingRequest::Manager(request_stream) => {
-                // Connect to element.Manager served by the session.
-                self.forward_request_to_session(
-                    request_stream,
-                    SessionManager::handle_manager_request_stream,
-                )
-                .await?;
-            }
-            IncomingRequest::GraphicalPresenter(request_stream) => {
-                // Connect to GraphicalPresenter served by the session.
-                self.forward_request_to_session(
-                    request_stream,
-                    SessionManager::handle_graphical_presenter_request_stream,
-                )
-                .await?;
-            }
-            IncomingRequest::WebDebug(request_stream) => {
-                // Connect to `fuchsia.web.Debug` served by the session.
-                self.forward_request_to_session(
-                    request_stream,
-                    SessionManager::handle_web_debug_request_stream,
-                )
-                .await?;
-            }
             IncomingRequest::Launcher(request_stream) => {
                 self.handle_launcher_request_stream(request_stream)
                     .await
@@ -241,63 +188,40 @@ impl SessionManager {
         Ok(())
     }
 
-    /// Serves a specified [`ManagerRequestStream`].
+    /// Handles a fuchsia.io.Directory/Open request for the /svc_from_session directory,
+    /// forwarding the request to the session's exposed directory.
     ///
-    /// # Parameters
-    /// - `request_stream`: the ManagerRequestStream.
-    /// - `manager_proxy`: the ManagerProxy that will handle the relayed commands.
-    ///
-    /// # Errors
-    /// When an error is encountered reading from the request stream.
-    pub async fn handle_manager_request_stream(
-        mut request_stream: felement::ManagerRequestStream,
-        manager_proxy: felement::ManagerProxy,
-    ) -> Result<(), Error> {
-        while let Some(request) =
-            request_stream.try_next().await.context("Error handling Manager request stream")?
-        {
-            match request {
-                felement::ManagerRequest::ProposeElement { spec, controller, responder } => {
-                    let result = manager_proxy.propose_element(spec, controller).await?;
-                    responder.send(result)?;
+    /// If the session is not started, closes `server_end` with a PEER_CLOSED epitaph.
+    fn open_svc_for_session(
+        &self,
+        scope: ExecutionScope,
+        flags: fio::OpenFlags,
+        path: vfs::path::Path,
+        server_end: ServerEnd<fio::NodeMarker>,
+    ) {
+        let state = self.state.clone();
+        scope.spawn(async move {
+            let state = state.lock().await;
+            match state.session.as_ref() {
+                Some(session) => {
+                    let _ = session.exposed_dir.open(
+                        flags,
+                        fio::ModeType::empty(),
+                        path.as_ref(),
+                        server_end,
+                    );
                 }
-            };
-        }
-        Ok(())
-    }
-
-    /// Serves a specified [`GraphicalPresenterRequestStream`].
-    ///
-    /// # Parameters
-    /// - `request_stream`: the GraphicalPresenterRequestStream.
-    /// - `graphical_presenter_proxy`: the GraphicalPresenterProxy that will handle the relayed commands.
-    ///
-    /// # Errors
-    /// When an error is encountered reading from the request stream.
-    pub async fn handle_graphical_presenter_request_stream(
-        mut request_stream: felement::GraphicalPresenterRequestStream,
-        graphical_presenter_proxy: felement::GraphicalPresenterProxy,
-    ) -> Result<(), Error> {
-        while let Some(request) = request_stream
-            .try_next()
-            .await
-            .context("Error handling Graphical Presenter request stream")?
-        {
-            match request {
-                felement::GraphicalPresenterRequest::PresentView {
-                    view_spec,
-                    annotation_controller,
-                    view_controller_request,
-                    responder,
-                } => {
-                    let result = graphical_presenter_proxy
-                        .present_view(view_spec, annotation_controller, view_controller_request)
-                        .await?;
-                    responder.send(result)?;
+                None => {
+                    warn!(
+                        path = path.as_ref(),
+                        "Failed to open protocol exposed by session: session has not been started."
+                    );
+                    server_end
+                        .close_with_epitaph(zx::Status::PEER_CLOSED)
+                        .unwrap_or_else(|err| error!(?err, "failed to send epitaph"));
                 }
-            };
-        }
-        Ok(())
+            }
+        });
     }
 
     /// Serves a specified [`LauncherRequestStream`].
@@ -342,31 +266,6 @@ impl SessionManager {
                 fsession::RestarterRequest::Restart { responder } => {
                     let result = self.handle_restart_request().await;
                     let _ = responder.send(result);
-                }
-            };
-        }
-        Ok(())
-    }
-
-    /// Serves a specified [`DebugRequestStream`].
-    ///
-    /// # Parameters
-    /// - `request_stream`: the DebugRequestStream.
-    /// - `debug_proxy`: the DebugProxy that will handle the relayed commands.
-    ///
-    /// # Errors
-    /// When an error is encountered reading from the request stream.
-    pub async fn handle_web_debug_request_stream(
-        mut request_stream: fweb::DebugRequestStream,
-        debug_proxy: fweb::DebugProxy,
-    ) -> Result<(), Error> {
-        while let Some(request) =
-            request_stream.try_next().await.context("Error handling web.Debug request stream")?
-        {
-            match request {
-                fweb::DebugRequest::EnableDevTools { listener, responder } => {
-                    debug_proxy.enable_dev_tools(listener).await?;
-                    let _ = responder.send();
                 }
             };
         }
@@ -488,14 +387,19 @@ impl SessionManager {
 mod tests {
     use {
         super::SessionManager,
-        fidl::endpoints::{create_proxy_and_stream, create_request_stream, spawn_stream_handler},
-        fidl_fuchsia_component as fcomponent, fidl_fuchsia_element as felement,
-        fidl_fuchsia_session as fsession, fidl_fuchsia_web as fweb,
+        anyhow::{anyhow, Error},
+        fidl::endpoints::{
+            create_proxy_and_stream, spawn_stream_handler, DiscoverableProtocolMarker,
+        },
+        fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
+        fidl_fuchsia_session as fsession,
         fuchsia_inspect::{self, assert_data_tree, testing::AnyProperty},
+        futures::channel::mpsc,
         futures::prelude::*,
         lazy_static::lazy_static,
-        session_testing::spawn_noop_directory_server,
+        session_testing::{spawn_directory_server, spawn_noop_directory_server},
         test_util::Counter,
+        vfs::execution_scope::ExecutionScope,
     };
 
     fn serve_launcher(session_manager: SessionManager) -> fsession::LauncherProxy {
@@ -670,95 +574,6 @@ mod tests {
         assert_data_tree!(inspector, root: {
             session_started_at: {}
         });
-    }
-
-    #[fuchsia::test]
-    async fn handle_element_manager_request_stream_propagates_request_to_downstream_service() {
-        let (local_proxy, local_request_stream) =
-            create_proxy_and_stream::<felement::ManagerMarker>()
-                .expect("Failed to create local Manager proxy and stream");
-
-        let (downstream_proxy, mut downstream_request_stream) =
-            create_proxy_and_stream::<felement::ManagerMarker>()
-                .expect("Failed to create downstream Manager proxy and stream");
-
-        let element_url = "element_url";
-        let mut num_elements_proposed = 0;
-
-        let local_server_fut =
-            SessionManager::handle_manager_request_stream(local_request_stream, downstream_proxy);
-
-        let downstream_server_fut = async {
-            while let Some(request) = downstream_request_stream.try_next().await.unwrap() {
-                match request {
-                    felement::ManagerRequest::ProposeElement { spec, responder, .. } => {
-                        num_elements_proposed += 1;
-                        assert_eq!(Some(element_url.to_string()), spec.component_url);
-                        let _ = responder.send(Ok(()));
-                    }
-                }
-            }
-        };
-
-        let propose_and_drop_fut = async {
-            local_proxy
-                .propose_element(
-                    felement::Spec {
-                        component_url: Some(element_url.to_string()),
-                        ..Default::default()
-                    },
-                    None,
-                )
-                .await
-                .expect("Failed to call ProposeElement")
-                .expect("Failed to propose element");
-
-            std::mem::drop(local_proxy); // Drop proxy to terminate `server_fut`.
-        };
-
-        let _ = future::join3(propose_and_drop_fut, local_server_fut, downstream_server_fut).await;
-
-        assert_eq!(num_elements_proposed, 1);
-    }
-
-    #[fuchsia::test]
-    async fn handle_web_debug_request_stream_propagates_request_to_downstream_service() {
-        let (local_proxy, local_request_stream) = create_proxy_and_stream::<fweb::DebugMarker>()
-            .expect("Failed to create local web.Debug proxy and stream");
-
-        let (downstream_proxy, mut downstream_request_stream) =
-            create_proxy_and_stream::<fweb::DebugMarker>()
-                .expect("Failed to create downstream web.Debug proxy and stream");
-
-        let mut listeners = Vec::new();
-
-        let local_server_fut =
-            SessionManager::handle_web_debug_request_stream(local_request_stream, downstream_proxy);
-
-        let downstream_server_fut = async {
-            while let Some(request) = downstream_request_stream.try_next().await.unwrap() {
-                match request {
-                    fweb::DebugRequest::EnableDevTools { listener, responder, .. } => {
-                        listeners.push(listener);
-                        let _ = responder.send();
-                    }
-                }
-            }
-        };
-
-        let (listener, _listener_request_stream) =
-            create_request_stream::<fweb::DevToolsListenerMarker>()
-                .expect("Failed to create web.DevToolsListener proxy and stream");
-
-        let enable_and_drop_fut = async {
-            local_proxy.enable_dev_tools(listener).await.expect("Failed to call EnableDevTools");
-
-            std::mem::drop(local_proxy); // Drop proxy to terminate `server_fut`.
-        };
-
-        let _ = future::join3(enable_and_drop_fut, local_server_fut, downstream_server_fut).await;
-
-        assert_eq!(listeners.len(), 1);
     }
 
     /// Verifies that Lifecycle.Start creates a new session.
@@ -966,5 +781,72 @@ mod tests {
                 }
             }
         });
+    }
+
+    /// Verifies that `open_svc_for_session` connects to the session's exposed dir.
+    #[fuchsia::test]
+    async fn test_svc_from_session() -> Result<(), Error> {
+        let session_url = "session";
+        let svc_path = "foo";
+
+        let (path_sender, mut path_receiver) = mpsc::channel(1);
+
+        let session_exposed_dir_handler = move |directory_request| match directory_request {
+            fio::DirectoryRequest::Open { path, .. } => {
+                let mut path_sender = path_sender.clone();
+                path_sender.try_send(path).unwrap();
+            }
+            _ => panic!("Directory handler received an unexpected request"),
+        };
+
+        let realm = spawn_stream_handler(move |realm_request| {
+            let session_exposed_dir_handler = session_exposed_dir_handler.clone();
+            async move {
+                match realm_request {
+                    fcomponent::RealmRequest::DestroyChild { responder, .. } => {
+                        let _ = responder.send(Ok(()));
+                    }
+                    fcomponent::RealmRequest::CreateChild { responder, .. } => {
+                        let _ = responder.send(Ok(()));
+                    }
+                    fcomponent::RealmRequest::OpenExposedDir { exposed_dir, responder, .. } => {
+                        spawn_directory_server(exposed_dir, session_exposed_dir_handler);
+                        let _ = responder.send(Ok(()));
+                    }
+                    _ => panic!("Realm handler received an unexpected request"),
+                };
+            }
+        })?;
+
+        let inspector = fuchsia_inspect::Inspector::default();
+        let session_manager = SessionManager::new(realm, &inspector, None);
+        let lifecycle = serve_lifecycle(session_manager.clone());
+
+        lifecycle
+            .start(&fsession::LifecycleStartRequest {
+                session_url: Some(session_url.to_string()),
+                ..Default::default()
+            })
+            .await?
+            .map_err(|err| anyhow!("failed to start: {:?}", err))?;
+
+        // Start connects to fuchsia.component.Binder to start the component.
+        assert_eq!(path_receiver.next().await.unwrap(), fcomponent::BinderMarker::PROTOCOL_NAME);
+
+        // Open an arbitrary node in the session's exposed dir.
+        // The actual protocol does not matter because it's not being served.
+        let (_client_end, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+
+        let scope = ExecutionScope::new();
+        session_manager.open_svc_for_session(
+            scope,
+            fio::OpenFlags::empty(),
+            vfs::path::Path::validate_and_split(svc_path)?,
+            server_end,
+        );
+
+        assert_eq!(path_receiver.next().await.unwrap(), svc_path);
+
+        Ok(())
     }
 }
