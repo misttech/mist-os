@@ -13,11 +13,9 @@
 
 #include <glm/gtc/type_ptr.hpp>
 
-namespace {
+namespace scenic_impl::gfx::test {
 
-using namespace scenic_impl;
-using namespace scenic_impl::gfx;
-using namespace scenic_impl::gfx::test;
+namespace {
 
 constexpr ResourceId scene_id = 1;
 constexpr ResourceId camera_id = 2;
@@ -61,3 +59,5 @@ TEST_F(CameraTest, SetClipSpaceTransform) {
 }
 
 }  // namespace
+
+}  // namespace scenic_impl::gfx::test

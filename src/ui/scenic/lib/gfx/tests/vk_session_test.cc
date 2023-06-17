@@ -7,19 +7,15 @@
 #include "src/ui/lib/escher/impl/vulkan_utils.h"
 #include "src/ui/lib/escher/test/common/vk/vk_debug_report_collector.h"
 
-using namespace escher;
+namespace scenic_impl::gfx::test {
 
-namespace scenic_impl {
-namespace gfx {
-namespace test {
-
-VulkanDeviceQueuesPtr VkSessionTest::CreateVulkanDeviceQueues(bool use_protected_memory) {
+escher::VulkanDeviceQueuesPtr VkSessionTest::CreateVulkanDeviceQueues(bool use_protected_memory) {
   auto vulkan_instance =
       escher::test::EscherEnvironment::GetGlobalTestEnvironment()->GetVulkanInstance();
   // This extension is necessary to support exporting Vulkan memory to a VMO.
-  VulkanDeviceQueues::Params::Flags flags =
-      use_protected_memory ? VulkanDeviceQueues::Params::kAllowProtectedMemory : 0;
-  auto vulkan_queues = VulkanDeviceQueues::New(
+  escher::VulkanDeviceQueues::Params::Flags flags =
+      use_protected_memory ? escher::VulkanDeviceQueues::Params::kAllowProtectedMemory : 0;
+  auto vulkan_queues = escher::VulkanDeviceQueues::New(
       vulkan_instance,
       {{VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME, VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
         VK_FUCHSIA_BUFFER_COLLECTION_EXTENSION_NAME, VK_FUCHSIA_EXTERNAL_SEMAPHORE_EXTENSION_NAME,
@@ -59,7 +55,7 @@ VkSessionTest::VkSessionTest()
     : SessionTest(),
       vk_debug_report_callback_registry_(
           escher::test::EscherEnvironment::GetGlobalTestEnvironment()->GetVulkanInstance(),
-          std::make_optional<VulkanInstance::DebugReportCallback>(
+          std::make_optional<escher::VulkanInstance::DebugReportCallback>(
               escher::test::impl::VkDebugReportCollector::HandleDebugReport,
               &vk_debug_report_collector_),
           {}),
@@ -69,8 +65,8 @@ SessionContext VkSessionTest::CreateSessionContext() {
   auto session_context = SessionTest::CreateSessionContext();
 
   FX_DCHECK(!image_factory_);
-  image_factory_ = std::make_unique<ImageFactoryAdapter>(escher()->gpu_allocator(),
-                                                         escher()->resource_recycler());
+  image_factory_ = std::make_unique<escher::ImageFactoryAdapter>(escher()->gpu_allocator(),
+                                                                 escher()->resource_recycler());
 
   session_context.vk_device = escher()->vk_device();
   session_context.escher = escher();
@@ -87,6 +83,4 @@ CommandContext VkSessionTest::CreateCommandContext() {
   return context;
 }
 
-}  // namespace test
-}  // namespace gfx
-}  // namespace scenic_impl
+}  // namespace scenic_impl::gfx::test

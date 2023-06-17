@@ -27,8 +27,6 @@ namespace scenic_impl {
 namespace gfx {
 namespace test {
 
-using namespace escher;
-
 class ViewClippingTest : public VkSessionTest {
  public:
   // We need a rounded rect factory and a view linker which
@@ -115,19 +113,19 @@ VK_TEST_F(ViewClippingTest, ClipSettingTest) {
           const std::array<float, 3> inset_min = {0, 0, 0};
           const std::array<float, 3> inset_max = {0, 0, 0};
 
-          BoundingBox bbox(vec3(i, j, k), vec3(i + m, j + m, k + m));
+          escher::BoundingBox bbox(escher::vec3(i, j, k), escher::vec3(i + m, j + m, k + m));
 
           Apply(scenic::NewSetViewPropertiesCmd(view_holder_id, bbox_min, bbox_max, inset_min,
                                                 inset_max));
-          const std::vector<plane3>& clip_planes = view_holder->clip_planes();
+          const std::vector<escher::plane3>& clip_planes = view_holder->clip_planes();
 
-          std::vector<plane3> test_planes = bbox.CreatePlanes();
+          std::vector<escher::plane3> test_planes = bbox.CreatePlanes();
 
           EXPECT_EQ(clip_planes.size(), test_planes.size());
 
           for (uint32_t p = 0; p < clip_planes.size(); p++) {
-            plane3 test_plane = test_planes[p];
-            plane3 view_plane = clip_planes[p];
+            escher::plane3 test_plane = test_planes[p];
+            escher::plane3 view_plane = clip_planes[p];
             EXPECT_EQ(test_plane.dir(), view_plane.dir());
             EXPECT_EQ(test_plane.dist(), view_plane.dist());
           }
@@ -165,17 +163,17 @@ VK_TEST_F(ViewClippingTest, InsetsTest) {
   // Test to make sure the bounding boxes are the same.
   // inset_min and inset_max are used as hints only. They should not affect
   // View's bounding box.
-  BoundingBox test_bbox(vec3(0, 0, -100), vec3(500, 500, 0));
-  const BoundingBox view_bounding_box = view_holder->GetLocalBoundingBox();
+  escher::BoundingBox test_bbox(escher::vec3(0, 0, -100), escher::vec3(500, 500, 0));
+  const escher::BoundingBox view_bounding_box = view_holder->GetLocalBoundingBox();
   EXPECT_EQ(test_bbox, view_bounding_box);
 
   // Test to make sure the view planes are the same.
-  const std::vector<plane3>& view_planes = view_holder->clip_planes();
-  std::vector<plane3> test_planes = test_bbox.CreatePlanes();
+  const std::vector<escher::plane3>& view_planes = view_holder->clip_planes();
+  std::vector<escher::plane3> test_planes = test_bbox.CreatePlanes();
   EXPECT_EQ(view_planes.size(), test_planes.size());
   for (uint32_t p = 0; p < view_planes.size(); p++) {
-    plane3 test_plane = test_planes[p];
-    plane3 view_plane = view_planes[p];
+    escher::plane3 test_plane = test_planes[p];
+    escher::plane3 view_plane = view_planes[p];
     EXPECT_EQ(test_plane.dir(), view_plane.dir());
     EXPECT_EQ(test_plane.dist(), view_plane.dist());
   }
@@ -201,21 +199,21 @@ VK_TEST_F(ViewClippingTest, ClipSettingBeforeViewCreationTest) {
   const std::array<float, 3> bbox_max = {5, 10, 15};
   const std::array<float, 3> inset = {0, 0, 0};
 
-  BoundingBox bbox(vec3(bbox_min[0], bbox_min[1], bbox_min[2]),
-                   vec3(bbox_max[0], bbox_max[1], bbox_max[2]));
+  escher::BoundingBox bbox(escher::vec3(bbox_min[0], bbox_min[1], bbox_min[2]),
+                           escher::vec3(bbox_max[0], bbox_max[1], bbox_max[2]));
 
   Apply(scenic::NewSetViewPropertiesCmd(view_holder_id, bbox_min, bbox_max, inset, inset));
-  const std::vector<plane3>& clip_planes = view_holder->clip_planes();
+  const std::vector<escher::plane3>& clip_planes = view_holder->clip_planes();
 
   Apply(scenic::NewCreateViewCmd(view_id, std::move(view_token), "MyView"));
 
-  std::vector<plane3> test_planes = bbox.CreatePlanes();
+  std::vector<escher::plane3> test_planes = bbox.CreatePlanes();
 
   EXPECT_EQ(clip_planes.size(), test_planes.size());
 
   for (uint32_t p = 0; p < clip_planes.size(); p++) {
-    plane3 test_plane = test_planes[p];
-    plane3 view_plane = clip_planes[p];
+    escher::plane3 test_plane = test_planes[p];
+    escher::plane3 view_plane = clip_planes[p];
     EXPECT_EQ(test_plane.dir(), view_plane.dir());
     EXPECT_EQ(test_plane.dist(), view_plane.dist());
   }
@@ -268,22 +266,23 @@ VK_TEST_F(ViewClippingTest, SceneTraversal) {
   ScenePtr scene = FindResource<Scene>(scene_id);
 
   // Make default paper scene.
-  PaperScenePtr paper_scene = fxl::MakeRefCounted<PaperScene>();
-  paper_scene->bounding_box = BoundingBox(vec3(0.f, 0.f, kFar), vec3(kWidth, kHeight, kNear));
+  escher::PaperScenePtr paper_scene = fxl::MakeRefCounted<escher::PaperScene>();
+  paper_scene->bounding_box =
+      escher::BoundingBox(escher::vec3(0.f, 0.f, kFar), escher::vec3(kWidth, kHeight, kNear));
 
-  ViewingVolume volume(paper_scene->bounding_box);
+  escher::ViewingVolume volume(paper_scene->bounding_box);
 
   // Make escher camera.
   escher::Camera camera = escher::Camera::NewOrtho(volume);
 
   // Make paper renderer.
-  PaperRendererPtr paper_renderer = PaperRenderer::New(escher);
+  escher::PaperRendererPtr paper_renderer = escher::PaperRenderer::New(escher);
 
   // Make frame.
-  FramePtr frame = escher->NewFrame("ViewClippingFrame", 0);
+  escher::FramePtr frame = escher->NewFrame("ViewClippingFrame", 0);
 
   // Make output image.
-  ImageInfo info;
+  escher::ImageInfo info;
   info.format = vk::Format::eB8G8R8A8Srgb;
   info.width = kWidth;
   info.height = kHeight;
@@ -292,11 +291,11 @@ VK_TEST_F(ViewClippingTest, SceneTraversal) {
   auto image_cache = escher->image_cache();
   auto output_image = image_cache->NewImage(info);
 
-  PaperDrawCallFactory* draw_call_factory = paper_renderer->draw_call_factory();
+  escher::PaperDrawCallFactory* draw_call_factory = paper_renderer->draw_call_factory();
   draw_call_factory->set_track_cache_entries(true);
 
-  auto gpu_uploader = std::make_shared<BatchGpuUploader>(escher, frame->frame_number());
-  auto layout_updater = std::make_unique<ImageLayoutUpdater>(escher);
+  auto gpu_uploader = std::make_shared<escher::BatchGpuUploader>(escher, frame->frame_number());
+  auto layout_updater = std::make_unique<escher::ImageLayoutUpdater>(escher);
 
   // Set up output image layout.
   frame->cmds()->ImageBarrier(
@@ -311,12 +310,12 @@ VK_TEST_F(ViewClippingTest, SceneTraversal) {
   visitor.Visit(scene.get());
 
   // Get the cache entries from the PaperDrawcallFactory.
-  const std::vector<PaperShapeCacheEntry>& cache_entries =
+  const std::vector<escher::PaperShapeCacheEntry>& cache_entries =
       draw_call_factory->tracked_cache_entries();
 
   EXPECT_TRUE(cache_entries.size() == 1);
 
-  const PaperShapeCacheEntry& entry = cache_entries[0];
+  const escher::PaperShapeCacheEntry& entry = cache_entries[0];
 
   // Now we're going to manually create a cache entry using the same
   // rounded rectangle and we're going to see if it matches the entry
@@ -334,18 +333,18 @@ VK_TEST_F(ViewClippingTest, SceneTraversal) {
   auto spec = rect->spec();
 
   // These are the planes that the above view holder properties should generate.
-  std::vector<plane3> planes;
-  planes.push_back(plane3(vec3(1, 0, 0), 0));
-  planes.push_back(plane3(vec3(0, 1, 0), 0));
-  planes.push_back(plane3(vec3(0, 0, 1), -200));
-  planes.push_back(plane3(vec3(-1, 0, 0), -1024));
-  planes.push_back(plane3(vec3(0, -1, 0), -768));
-  planes.push_back(plane3(vec3(0, 0, -1), -1));
+  std::vector<escher::plane3> planes;
+  planes.push_back(escher::plane3(escher::vec3(1, 0, 0), 0));
+  planes.push_back(escher::plane3(escher::vec3(0, 1, 0), 0));
+  planes.push_back(escher::plane3(escher::vec3(0, 0, 1), -200));
+  planes.push_back(escher::plane3(escher::vec3(-1, 0, 0), -1024));
+  planes.push_back(escher::plane3(escher::vec3(0, -1, 0), -768));
+  planes.push_back(escher::plane3(escher::vec3(0, 0, -1), -1));
 
-  PaperShapeCache cache(escher, PaperRendererConfig());
+  escher::PaperShapeCache cache(escher, escher::PaperRendererConfig());
   cache.BeginFrame(gpu_uploader.get(), 0);
 
-  const PaperShapeCacheEntry& entry2 = cache.GetRoundedRectMesh(spec, planes.data(), 6);
+  const escher::PaperShapeCacheEntry& entry2 = cache.GetRoundedRectMesh(spec, planes.data(), 6);
 
   // Cache entries should be identitcal.
   EXPECT_EQ(entry.mesh->num_vertices(), entry2.mesh->num_vertices());
@@ -363,7 +362,7 @@ VK_TEST_F(ViewClippingTest, SceneTraversal) {
   paper_renderer->EndFrame({std::move(upload_semaphore), std::move(layout_update_semaphore)});
   cache.EndFrame();
 
-  auto frame_done_semaphore = Semaphore::New(escher->vk_device());
+  auto frame_done_semaphore = escher::Semaphore::New(escher->vk_device());
   frame->EndFrame(frame_done_semaphore, nullptr);
 
   output_image = nullptr;

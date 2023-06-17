@@ -40,8 +40,6 @@ using fuchsia::ui::composition::ViewportProperties;
 using fuchsia::ui::views::ViewCreationToken;
 using fuchsia::ui::views::ViewportCreationToken;
 
-using namespace scenic_impl;
-
 namespace flatland {
 namespace test {
 
@@ -149,6 +147,8 @@ class DisplayCompositorParameterizedSmokeTest
     : public DisplayCompositorSmokeTest,
       public ::testing::WithParamInterface<fuchsia::sysmem::PixelFormatType> {};
 
+namespace {
+
 // Renders a fullscreen rectangle to the provided display. This tests the engine's ability to
 // properly read in flatland uberstruct data and then pass the data along to the display-coordinator
 // interface to be composited directly in hardware. The Astro display coordinator only handles full
@@ -229,6 +229,8 @@ VK_TEST_P(DisplayCompositorParameterizedSmokeTest, FullscreenRectangleTest) {
 INSTANTIATE_TEST_SUITE_P(PixelFormats, DisplayCompositorParameterizedSmokeTest,
                          ::testing::Values(fuchsia::sysmem::PixelFormatType::BGRA32,
                                            fuchsia::sysmem::PixelFormatType::R8G8B8A8));
+
+}  // namespace
 
 }  // namespace test
 }  // namespace flatland

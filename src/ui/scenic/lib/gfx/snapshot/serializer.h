@@ -11,8 +11,6 @@
 namespace scenic_impl {
 namespace gfx {
 
-using namespace flatbuffers;
-
 // The set of |Serializer| classes in this file are used to save the scenic
 // node graph into a flatbuffer representation. They help capture the
 // hierarchical representation of the scene graph, which is needed for
@@ -27,7 +25,7 @@ class Serializer {
  public:
   virtual ~Serializer() = default;
 
-  virtual Offset<T> serialize(FlatBufferBuilder& builder) = 0;
+  virtual flatbuffers::Offset<T> serialize(flatbuffers::FlatBufferBuilder& builder) = 0;
 };
 
 class ShapeSerializer : public Serializer<void> {
@@ -38,7 +36,7 @@ class ShapeSerializer : public Serializer<void> {
 class MeshSerializer : public ShapeSerializer {
  public:
   virtual snapshot::Shape type() override { return snapshot::Shape_Mesh; }
-  virtual Offset<void> serialize(FlatBufferBuilder& builder) override {
+  virtual flatbuffers::Offset<void> serialize(flatbuffers::FlatBufferBuilder& builder) override {
     return snapshot::CreateMesh(builder).Union();
   }
 };
@@ -48,7 +46,7 @@ class CircleSerializer : public ShapeSerializer {
   float radius;
 
   virtual snapshot::Shape type() override { return snapshot::Shape_Circle; }
-  virtual Offset<void> serialize(FlatBufferBuilder& builder) override {
+  virtual flatbuffers::Offset<void> serialize(flatbuffers::FlatBufferBuilder& builder) override {
     return snapshot::CreateCircle(builder, radius).Union();
   }
 };
@@ -58,7 +56,7 @@ class RectangleSerializer : public ShapeSerializer {
   float width, height;
 
   virtual snapshot::Shape type() override { return snapshot::Shape_Rectangle; }
-  virtual Offset<void> serialize(FlatBufferBuilder& builder) override {
+  virtual flatbuffers::Offset<void> serialize(flatbuffers::FlatBufferBuilder& builder) override {
     return snapshot::CreateRectangle(builder, width, height).Union();
   }
 };
@@ -73,7 +71,7 @@ class RoundedRectangleSerializer : public ShapeSerializer {
   float bottom_left_radius;
 
   virtual snapshot::Shape type() override { return snapshot::Shape_RoundedRectangle; }
-  virtual Offset<void> serialize(FlatBufferBuilder& builder) override {
+  virtual flatbuffers::Offset<void> serialize(flatbuffers::FlatBufferBuilder& builder) override {
     return snapshot::CreateRoundedRectangle(builder, width, height, top_left_radius,
                                             top_right_radius, bottom_right_radius,
                                             bottom_left_radius)
@@ -86,7 +84,8 @@ class AttributeBufferSerializer : public Serializer<snapshot::AttributeBuffer> {
   AttributeBufferSerializer(size_t vertex_count, size_t stride, const void* host_ptr, size_t size)
       : vertex_count_(vertex_count), stride_(stride), host_ptr_(host_ptr), size_(size) {}
 
-  virtual Offset<snapshot::AttributeBuffer> serialize(FlatBufferBuilder& builder) override {
+  virtual flatbuffers::Offset<snapshot::AttributeBuffer> serialize(
+      flatbuffers::FlatBufferBuilder& builder) override {
     uint8_t* bytes = nullptr;
     auto fb_buffer = builder.CreateUninitializedVector(size_, &bytes);
     memcpy(bytes, host_ptr_, size_);
@@ -106,7 +105,8 @@ class IndexBufferSerializer : public Serializer<snapshot::IndexBuffer> {
   IndexBufferSerializer(size_t index_count, const void* host_ptr, size_t size)
       : index_count_(index_count), host_ptr_(host_ptr), size_(size) {}
 
-  virtual Offset<snapshot::IndexBuffer> serialize(FlatBufferBuilder& builder) override {
+  virtual flatbuffers::Offset<snapshot::IndexBuffer> serialize(
+      flatbuffers::FlatBufferBuilder& builder) override {
     uint8_t* bytes = nullptr;
     auto fb_buffer = builder.CreateUninitializedVector(size_, &bytes);
     memcpy(bytes, host_ptr_, size_);
@@ -127,9 +127,10 @@ class GeometrySerializer : public Serializer<snapshot::Geometry> {
   snapshot::Vec3 bbox_min;
   snapshot::Vec3 bbox_max;
 
-  virtual Offset<snapshot::Geometry> serialize(FlatBufferBuilder& builder) override {
+  virtual flatbuffers::Offset<snapshot::Geometry> serialize(
+      flatbuffers::FlatBufferBuilder& builder) override {
     auto fb_indices = indices->serialize(builder);
-    std::vector<Offset<snapshot::AttributeBuffer>> attr_vector;
+    std::vector<flatbuffers::Offset<snapshot::AttributeBuffer>> attr_vector;
     for (auto& attribute : attributes) {
       attr_vector.push_back(attribute->serialize(builder));
     }
@@ -149,7 +150,7 @@ class ColorSerializer : public MaterialSerializer {
   float red, green, blue, alpha;
 
   virtual snapshot::Material type() override { return snapshot::Material_Color; }
-  virtual Offset<void> serialize(FlatBufferBuilder& builder) override {
+  virtual flatbuffers::Offset<void> serialize(flatbuffers::FlatBufferBuilder& builder) override {
     return snapshot::CreateColor(builder, red, green, blue, alpha).Union();
   }
 };
@@ -160,7 +161,7 @@ class ImageSerializer : public MaterialSerializer {
       : format_(format), width_(width), height_(height), host_ptr_(host_ptr), size_(size) {}
 
   virtual snapshot::Material type() override { return snapshot::Material_Image; }
-  virtual Offset<void> serialize(FlatBufferBuilder& builder) override {
+  virtual flatbuffers::Offset<void> serialize(flatbuffers::FlatBufferBuilder& builder) override {
     uint8_t* bytes = nullptr;
     auto data = builder.CreateUninitializedVector(size_, &bytes);
     memcpy(bytes, host_ptr_, size_);
@@ -183,7 +184,8 @@ class TransformSerializer : public Serializer<snapshot::Transform> {
   snapshot::Quat rotation = {0.0, 0.0, 0.0, 1.0};
   snapshot::Vec3 anchor = {0.0, 0.0, 0.0};
 
-  virtual Offset<snapshot::Transform> serialize(FlatBufferBuilder& builder) override {
+  virtual flatbuffers::Offset<snapshot::Transform> serialize(
+      flatbuffers::FlatBufferBuilder& builder) override {
     return snapshot::CreateTransform(builder, &translation, &scale, &rotation, &anchor);
   }
 };
@@ -199,7 +201,8 @@ class NodeSerializer : public Serializer<snapshot::Node> {
 
   std::vector<std::shared_ptr<NodeSerializer>> children;
 
-  virtual Offset<snapshot::Node> serialize(FlatBufferBuilder& builder) override {
+  virtual flatbuffers::Offset<snapshot::Node> serialize(
+      flatbuffers::FlatBufferBuilder& builder) override {
     auto fb_name = name.length() ? builder.CreateString(name) : 0;
     auto fb_transform = transform ? transform->serialize(builder) : 0;
 
@@ -209,7 +212,7 @@ class NodeSerializer : public Serializer<snapshot::Node> {
     auto fb_material_type = material ? material->type() : snapshot::Material_NONE;
     auto fb_material = material ? material->serialize(builder).Union() : 0;
 
-    std::vector<Offset<snapshot::Node>> child_vector;
+    std::vector<flatbuffers::Offset<snapshot::Node>> child_vector;
     if (!children.empty()) {
       for (auto& child : children) {
         auto out = child->serialize(builder);
@@ -228,8 +231,9 @@ class SceneSerializer : public Serializer<snapshot::Scene> {
   snapshot::Vec3 camera;
   std::vector<std::shared_ptr<NodeSerializer>> nodes;
 
-  virtual Offset<snapshot::Scene> serialize(FlatBufferBuilder& builder) override {
-    std::vector<Offset<snapshot::Node>> nodes_vector;
+  virtual flatbuffers::Offset<snapshot::Scene> serialize(
+      flatbuffers::FlatBufferBuilder& builder) override {
+    std::vector<flatbuffers::Offset<snapshot::Node>> nodes_vector;
     for (auto& node : nodes) {
       nodes_vector.push_back(node->serialize(builder));
     }
@@ -241,8 +245,9 @@ class ScenesSerializer : public Serializer<snapshot::Scenes> {
  public:
   std::vector<std::shared_ptr<SceneSerializer>> scenes;
 
-  virtual Offset<snapshot::Scenes> serialize(FlatBufferBuilder& builder) override {
-    std::vector<Offset<snapshot::Scene>> scenes_vector;
+  virtual flatbuffers::Offset<snapshot::Scenes> serialize(
+      flatbuffers::FlatBufferBuilder& builder) override {
+    std::vector<flatbuffers::Offset<snapshot::Scene>> scenes_vector;
     for (auto& scene : scenes) {
       scenes_vector.push_back(scene->serialize(builder));
     }

@@ -14,7 +14,7 @@
 #include "src/ui/scenic/lib/gfx/tests/vk_session_test.h"
 #include "src/ui/scenic/lib/gfx/tests/vk_util.h"
 
-using namespace escher;
+namespace scenic_impl::gfx::test {
 
 namespace {
 
@@ -29,10 +29,10 @@ const uint32_t kMemoryId = 1;
 const uint32_t kImageId = 2;
 const uint32_t kImagePipeId = 3;
 
-class ImageFactoryListener : public ImageFactory {
+class ImageFactoryListener : public escher::ImageFactory {
  public:
   ImageFactoryListener(ImageFactory* factory) : factory_(factory) {}
-  ImagePtr NewImage(const ImageInfo& info, GpuMemPtr* out_ptr = nullptr) {
+  escher::ImagePtr NewImage(const escher::ImageInfo& info, escher::GpuMemPtr* out_ptr = nullptr) {
     ++images_created_;
     return factory_->NewImage(info, out_ptr);
   }
@@ -40,12 +40,6 @@ class ImageFactoryListener : public ImageFactory {
   uint32_t images_created_ = 0;
   ImageFactory* factory_;
 };
-
-}  // namespace
-
-namespace scenic_impl {
-namespace gfx {
-namespace test {
 
 class HostImageTest : public VkSessionTest {
  public:
@@ -240,6 +234,6 @@ VK_TEST_F(HostImageTest, RgbaImportFails) {
   EXPECT_EQ(0u, listener->images_created_);
 }
 
-}  // namespace test
-}  // namespace gfx
-}  // namespace scenic_impl
+}  // namespace
+
+}  // namespace scenic_impl::gfx::test

@@ -8,12 +8,9 @@
 #include "src/ui/scenic/lib/gfx/engine/hit.h"
 #include "src/ui/scenic/lib/gfx/engine/hit_accumulator.h"
 
-namespace scenic_impl {
-namespace gfx {
-namespace test {
-namespace {
+namespace scenic_impl::gfx::test {
 
-using namespace testing;
+namespace {
 
 TEST(ViewHitAccumulatorTest, Empty) {
   ViewHitAccumulator accumulator;
@@ -30,7 +27,7 @@ TEST(ViewHitAccumulatorTest, TopHitInASession) {
   accumulator.Add({.view_ref_koid = view_ref_koid, .distance = 3});
   accumulator.EndLayer();
 
-  EXPECT_THAT(accumulator.hits(), ElementsAre(Field(&ViewHit::distance, 1)));
+  EXPECT_THAT(accumulator.hits(), ElementsAre(testing::Field(&ViewHit::distance, 1)));
 }
 
 MATCHER(ViewIdEq, "view ID equals") {
@@ -58,6 +55,5 @@ TEST(ViewHitAccumulatorTest, SortedHitsPerLayer) {
 }
 
 }  // namespace
-}  // namespace test
-}  // namespace gfx
-}  // namespace scenic_impl
+
+}  // namespace scenic_impl::gfx::test

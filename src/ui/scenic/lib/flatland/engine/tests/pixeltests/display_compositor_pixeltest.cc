@@ -47,8 +47,6 @@ using fuchsia::ui::composition::ViewportProperties;
 using fuchsia::ui::views::ViewCreationToken;
 using fuchsia::ui::views::ViewportCreationToken;
 
-using namespace scenic_impl;
-
 namespace flatland {
 namespace test {
 
@@ -641,6 +639,8 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
   }
 #endif  // FAKE_DISPLAY
 };
+
+namespace {
 
 /** DIRECTIONS FOR WRITING TESTS
 ----------------------------------
@@ -1993,6 +1993,8 @@ VK_TEST_P(DisplayCompositorParameterizedTest, ImageFlipRotate180DegreesPixelTest
         EXPECT_EQ(get_bgra_pixel(vmo_host, 1, 0), kBlueColorBgra);
       });
 }
+
+}  // namespace
 
 }  // namespace test
 }  // namespace flatland

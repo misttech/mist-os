@@ -15,7 +15,7 @@
 #include "src/ui/scenic/lib/gfx/tests/vk_session_test.h"
 #include "src/ui/scenic/lib/gfx/tests/vk_util.h"
 
-using namespace escher;
+namespace scenic_impl::gfx::test {
 
 namespace {
 
@@ -36,12 +36,6 @@ vk::Image CreateSingleRowDeviceVkImageOfWidth(vk::Device device, uint32_t width,
       .is_external = true};
   return escher::image_utils::CreateVkImage(device, info, vk::ImageLayout::eUndefined);
 }
-
-}  // namespace
-
-namespace scenic_impl {
-namespace gfx {
-namespace test {
 
 using MemoryTest = SessionTest;
 using VkMemoryTest = VkSessionTest;
@@ -266,6 +260,6 @@ VK_TEST_F(VkMemoryTest, ImportMaliciousClient) {
       "scenic_impl::gfx::Memory::ImportGpuMemory(): VMO doesn't have right ZX_RIGHT_WRITE");
 }
 
-}  // namespace test
-}  // namespace gfx
-}  // namespace scenic_impl
+}  // namespace
+
+}  // namespace scenic_impl::gfx::test

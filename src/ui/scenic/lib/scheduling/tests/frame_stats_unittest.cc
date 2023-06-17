@@ -32,7 +32,6 @@ using testing::AllOf;
 using testing::IsEmpty;
 using testing::SizeIs;
 using testing::UnorderedElementsAre;
-using namespace inspect::testing;
 
 constexpr char kFrameStatsNodeName[] = "FrameStatsTest";
 

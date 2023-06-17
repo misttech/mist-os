@@ -26,7 +26,7 @@
 #include <glm/gtc/constants.hpp>
 #include <glm/gtx/matrix_transform_2d.hpp>
 
-using namespace scenic_impl;
+namespace {
 
 class DisplayTest : public gtest::RealLoopFixture {
  protected:
@@ -311,3 +311,5 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
       display_signal_fence.wait_one(ZX_EVENT_SIGNALED, zx::deadline_after(zx::msec(3000)), nullptr);
   EXPECT_EQ(status, ZX_OK);
 }
+
+}  // namespace
