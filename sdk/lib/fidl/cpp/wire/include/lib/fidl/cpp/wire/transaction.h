@@ -26,9 +26,10 @@ class OutgoingMessage;
 
 // An abstract transaction, encapsulating the logic of sending reply messages.
 // The transaction type is polymorphic, to cater to a variety of transports and usage patterns.
-// A basic transaction implementation using channels is defined in fidl-async, so most clients
-// do not have to worry about implementing |fidl::Transaction|, and the higher-level APIs from
-// fidl-async would suffice for a lot of use cases.
+//
+// Concrete implementations of this class are provided, so most clients do not have to worry about
+// implementing |fidl::Transaction|, and higher-level APIs such as |fidl::BindServer| cover most use
+// cases.
 //
 // Should greater flexibility over managing in-flight transactions and server lifecycle be desired,
 // clients usually manually dispatch the FIDL messages. This is accomplished in the C bindings by
