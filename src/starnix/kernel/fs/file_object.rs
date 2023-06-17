@@ -275,6 +275,10 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     }
 }
 
+pub fn default_eof_offset(file: &FileObject, current_task: &CurrentTask) -> Result<off_t, Errno> {
+    Ok(file.node().stat(current_task)?.st_size as off_t)
+}
+
 /// Implement the seek method for a file. The computation from the end of the file must be provided
 /// through a callback.
 ///
@@ -374,9 +378,10 @@ macro_rules! fileops_impl_seekable {
             current_offset: crate::types::off_t,
             target: crate::fs::SeekTarget,
         ) -> Result<crate::types::off_t, crate::types::Errno> {
+            use crate::types::errno::*;
             crate::fs::default_seek(current_offset, target, |offset| {
-                let file_size = file.node().stat(current_task)?.st_size as off_t;
-                offset.checked_add(file_size).ok_or_else(|| errno!(EINVAL))
+                let eof_offset = crate::fs::default_eof_offset(file, current_task)?;
+                offset.checked_add(eof_offset).ok_or_else(|| errno!(EINVAL))
             })
         }
     };
@@ -914,6 +919,9 @@ impl FileObject {
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
+        if offset >= MAX_LFS_FILESIZE {
+            return error!(EINVAL);
+        }
         self.read_internal(|| self.ops.read(self, current_task, offset, data))
     }
 
@@ -972,11 +980,24 @@ impl FileObject {
     pub fn write_raw(
         &self,
         current_task: &CurrentTask,
-        offset: usize,
+        mut offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
+        if offset >= MAX_LFS_FILESIZE {
+            return error!(EINVAL);
+        }
         self.write_internal(current_task, || {
             let _guard = self.node().append_lock.read(current_task)?;
+
+            // According to LTP test pwrite04:
+            //
+            //   POSIX requires that opening a file with the O_APPEND flag should have no effect on the
+            //   location at which pwrite() writes data. However, on Linux, if a file is opened with
+            //   O_APPEND, pwrite() appends data to the end of the file, regardless of the value of offset.
+            if self.flags().contains(OpenFlags::APPEND) && self.ops().is_seekable() {
+                offset = default_eof_offset(self, current_task)? as usize;
+            }
+
             self.ops().write(self, current_task, offset, data)
         })
     }

@@ -6,10 +6,10 @@ use crate::{
     auth::FsCred,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
-        default_seek, fileops_impl_nonseekable, fs_args, CacheMode, DirentSink, FdEvents, FdNumber,
-        FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
-        FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SymlinkTarget,
-        XattrOp,
+        default_eof_offset, default_seek, fileops_impl_nonseekable, fs_args, CacheMode, DirentSink,
+        FdEvents, FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
+        FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+        SeekTarget, SymlinkTarget, XattrOp,
     },
     lock::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard},
     logging::{log_error, log_trace, not_implemented},
@@ -389,8 +389,8 @@ impl FileOps for FuseFileObject {
         }
 
         default_seek(current_offset, target, |offset| {
-            let file_size = file.node().stat(current_task)?.st_size as off_t;
-            offset.checked_add(file_size).ok_or_else(|| errno!(EINVAL))
+            let eof_offset = default_eof_offset(file, current_task)?;
+            offset.checked_add(eof_offset).ok_or_else(|| errno!(EINVAL))
         })
     }
 

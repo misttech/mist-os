@@ -603,8 +603,6 @@
                 "pty04",
                 "pty06",
                 "pty07",
-                "pwrite04",
-                "pwrite04_64",
                 "pwritev02",
                 "pwritev02_64",
                 "pwritev03",
