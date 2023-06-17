@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//tools/cmc/build/expect_includes.gni")
 
 group("coordinator-provider") {
   testonly = true
@@ -39,4 +40,39 @@ fuchsia_component("display-coordinator-provider-component") {
 fuchsia_package("display-coordinator-provider") {
   package_name = "display-coordinator-provider"
   deps = [ ":display-coordinator-provider-component" ]
+}
+
+expect_includes("fake-display-coordinator-provider-shard-includes") {
+  includes = [ "meta/fake_display_coordinator_provider.shard.cml" ]
+}
+
+expect_includes("display-coordinator-provider-shard-includes") {
+  includes = [ "meta/display_coordinator_provider.shard.cml" ]
+}
+
+# Includes `fake-display-coordinator-provider-component` as a child component
+# and performs "includes" check for the fake display coordinator provider
+# shard in the component manifest.
+#
+# Only supports statically defined components; do not use this on realms built
+# by Realm Builder.
+group("fake-display-coordinator-provider-child-component") {
+  testonly = true
+  deps = [
+    ":fake-display-coordinator-provider-component",
+    ":fake-display-coordinator-provider-shard-includes",
+  ]
+}
+
+# Includes `display-coordinator-provider-component` as a child component
+# and performs "includes" check for the real display coordinator provider
+# shard in the component manifest.
+#
+# Only supports statically defined components; do not use this on realms built
+# by Realm Builder.
+group("display-coordinator-provider-child-component") {
+  deps = [
+    ":display-coordinator-provider-component",
+    ":display-coordinator-provider-shard-includes",
+  ]
 }

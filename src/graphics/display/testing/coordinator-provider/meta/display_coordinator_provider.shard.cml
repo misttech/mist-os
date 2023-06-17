@@ -1,0 +1,47 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// This manifest shard defines the capability routing for the **real** display
+// coordinator provider components. We use a CML shard to allow child components
+// to come from different packages.
+//
+// CML files that include it must declare a `display-coordinator-provider`
+// child component with the URL set to the appropriate package and manifest.
+// TODO(fxbug.dev/129205): Define the child component using subpackaged URLs.
+//
+// For example:
+//   include: [
+//       "//src/graphics/display/testing/coordinator-provider/meta/display_coordinator_provider.shard.cml",
+//   ],
+//   children: [
+//       {
+//           name: "display-coordinator-provider",
+//           url: "fuchsia-pkg://fuchsia.com/display-coordinator-provider#meta/hdcp.cm",
+//       },
+//   ],
+//   use: [
+//       {
+//           protocol: ["fuchsia.hardware.display.Provider"],
+//           from: "#display-coordinator-provider",
+//       },
+//   ],
+//
+{
+    include: [ "syslog/client.shard.cml" ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.logger.LogSink",
+                "fuchsia.tracing.provider.Registry",
+            ],
+            from: "parent",
+            to: [ "#display-coordinator-provider" ],
+        },
+        {
+            directory: "dev-display-coordinator",
+            from: "parent",
+            to: "#display-coordinator-provider",
+        },
+    ],
+}

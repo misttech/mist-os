@@ -1,62 +1,80 @@
-# Hardware Display Controller Provider components (fake and real)
+# Display Coordinator Provider
 
-The `BUILD.gn` in this directory generates two component packages, `hardware-display-controller-provider` and `fake-hardware-display-controller-provider`.
+The `BUILD.gn` in this directory generates two component packages,
+`display-coordinator-provider` and `fake-display-coordinator-provider`.
 
-Both of these publish the `fuchsia.hardware.display.Provider` service.  In general, the "fake" service is the one you'll want to use (see below: **Why use the "fake" service, not the "real" one?**).
+Both of these publish the `fuchsia.hardware.display.Provider` service. In
+general, the "real" one (without "fake-" prefix) is used for production
+environments which contents are displayed on the display hardware, while the
+"fake" one is used for hermetic testing without real hardware dependency.
 
+## "Real" Display Coordinator Provider
 
-## Purpose
+The goal of `display-coordinator-provider` is to let components connect to the
+`fuchsia.hardware.display.Coordinator` service, provided by the display
+coordinator driver (available in `/dev/class/display-coordinator`) so that
+components can present contents to the display hardware.
 
-The goal of `fake-hardware-display-controller-provider` is to enable hermetic tests involving Scenic, which by default serves itself an implementation of `fuchsia.hardware.display.Provider`, which acts as a proxy to the same service provided via `/dev/class/display`.
+It serves as a bridge to allow components to access the Coordinator service without
+having direct access to the `/dev/class/display-coordinator` directory.
 
-The service provided by `/dev/class/display` connects to the real hardware (allowing pixels to show up on the screen), but has an important limitation: it supports only a single client connection at any given time.  Consequently, two instances of Scenic cannot be run simultaneously, at least not if both are connected/proxied via `/dev/class/display`.
+`display-coordinator-provider` only supports a single client connection at any
+given time. Consequently, two instances of Scenic (or any other display clients)
+cannot be run simultaneously.
 
-This is where `fake-hardware-display-controller-provider` comes into play.  A hermetic test can spawn instances of both the fake service and Scenic, the latter using the fake service instead of its own default implementation; see the **Usage** section below.  Multiple such Scenic instances can coexist, because they are no longer competing for a single resource.
+An extra hop between the display client and the display coordinator occurs when
+`display-coordinator-provider` is used to access the Coordinator service.
+However, the time overhead is negligible and is constant (in the number of
+display open requests) for most of the display clients (like Scenic).
 
+## Fake Display Coordinator Provider
+
+The goal of `fake-display-coordinator-provider` is to provide a display engine
+driver (`fake-display`) and a display coordinator driver within a hermetic
+testing environment. This removes the dependency on acquiring the display
+coordinator, allowing tests to run in display-less environments hermetically and
+allowing multiple display coordinator and display driver instances to co-exist.
 
 ## Usage
 
-To use the fake service in a test, it must be included in the list of `injected-services` in the `fuchsia.test` facet of the test-packages `.cmx` file.  For example, this is what `flatland_renderer_unittests.cmx` looked like at the time this was written:
+Realms should declare a child component in its component manifest for the
+display coordinator provider. The child must be named
+`display-coordinator-provider` to make its capabilities be correctly routed.
 
-```
+They should also include the corresponding shard component manifest file
+(`display_coordinator_provider.shard.cml` for the real provider, or
+`fake_display_coordinator_provider.shard.cml` for the fake provider) to route
+required capabilities to the `display-coordinator-provider` child.
+
+They should also explicitly offer the `fuchsia.hardware.display.Provider`
+service from `display-coordinator-provider` to clients (for example, Scenic).
+
+For example, here is an excerpt of `ui_test_realm`
+(`//src/ui/testing/ui_test_realm/meta/scenic.shard.cml`) declaring a fake
+display coordinator provider from its own package, offering parent capabilities
+to the display coordinator provider, and providing the
+`fuchsia.hardware.display.Provider` service to Scenic:
+
+```json5
 {
-    "facets": {
-        "fuchsia.test": {
-            "injected-services": {
-                "fuchsia.hardware.display.Provider": "fuchsia-pkg://fuchsia.com/fake-hardware-display-controller-provider#meta/hdcp.cmx",
-                "fuchsia.tracing.provider.Registry": "fuchsia-pkg://fuchsia.com/trace_manager#meta/trace_manager.cmx"
-            },
-            "system-services": [
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.vulkan.loader.Loader"
-            ]
-        }
+  include: [
+    "//src/graphics/display/testing/coordinator-provider/meta/fake_display_coordinator_provider.shard.cml",
+  ],
+  children: [
+    {
+      name: "display-coordinator-provider",
+      url: "#meta/hdcp.cm",
     },
-    "program": {
-        "binary": "test/flatland_renderer_unittests"
+  ],
+  offer: [
+    {
+      protocol: ["fuchsia.hardware.display.Provider"],
+      from: "#display-coordinator-provider",
+      to: ["#scenic"],
     },
-    "sandbox": {
-        "features": [
-            "vulkan"
-        ],
-        "services": [
-            "fuchsia.hardware.display.Provider",
-            "fuchsia.intl.PropertyProvider",
-            "fuchsia.logger.LogSink",
-            "fuchsia.sysmem.Allocator",
-            "fuchsia.tracing.provider.Registry",
-            "fuchsia.vulkan.loader.Loader"
-        ]
-    }
+  ],
 }
 ```
 
-NOTE: `fake-hardware-display-controller` makes a connection to the same `fuchsia.sysmem.Allocator` that is made available to other components in the test environment.  This allows the fake display controller to collaborate with Scenic, Vulkan, etc. to negotiate the allocation of memory that meets everyone's requirements.
-
-## Why use the "fake" service, not the "real" one?
-
-Much like the default implementation that Scenic serves to itself, the "real" service acts as a proxy to `/dev/class/display`.  In fact, the "real" service and Scenic's default implementation share the same code: `//src/ui/lib/display:hdcp_service`.
-
-Consequently, replacing Scenic's default implementation with the "real" service is a functional no-op, except for the additional costs of running the service in a separate process.
-
-The reason that the "real" service exists is historical, to verify that Scenic's implementation of `fuchsia.hardware.display.Provider` is indeed replacable.  It could be argued that it should be deleted, although it could conceivably be used by a non-Scenic client that is denied direct access to `/dev/class/display`.
+For realms using display coordinator provider, see the `ui` component manifest
+defined in `//src/ui/meta/ui.cml` for example.
