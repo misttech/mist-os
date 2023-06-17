@@ -98,6 +98,30 @@ const __u32 _EVIOCGID = EVIOCGID;
 #undef EVIOCGID
 const __u32 EVIOCGID = _EVIOCGID;
 
+const __u32 _RWF_HIPRI = RWF_HIPRI;
+#undef RWF_HIPRI
+const __u32 RWF_HIPRI = _RWF_HIPRI;
+
+const __u32 _RWF_DSYNC = RWF_DSYNC;
+#undef RWF_DSYNC
+const __u32 RWF_DSYNC = _RWF_DSYNC;
+
+const __u32 _RWF_SYNC = RWF_SYNC;
+#undef RWF_SYNC
+const __u32 RWF_SYNC = _RWF_SYNC;
+
+const __u32 _RWF_NOWAIT = RWF_NOWAIT;
+#undef RWF_NOWAIT
+const __u32 RWF_NOWAIT = _RWF_NOWAIT;
+
+const __u32 _RWF_APPEND = RWF_APPEND;
+#undef RWF_APPEND
+const __u32 RWF_APPEND = _RWF_APPEND;
+
+const __u32 _RWF_SUPPORTED = RWF_SUPPORTED;
+#undef RWF_SUPPORTED
+const __u32 RWF_SUPPORTED = _RWF_SUPPORTED;
+
 // `EVIOCGBIT`, `EVIOCGPROP`, and `EVIOCGABS` are invoked with various paraemters to query
 // metadata about an input device. Create Rust symbols for the commonly used invocations.
 //

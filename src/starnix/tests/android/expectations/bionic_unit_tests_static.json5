@@ -40,8 +40,6 @@
                 "sys_timex.adjtimex_EFAULT",
                 "sys_timex.clock_adjtime_smoke",
                 "sys_timex.clock_adjtime_EFAULT",
-                "sys_uio.preadv2_pwritev2",
-                "sys_uio.preadv64v2_pwritev64v2",
                 "sys_uio.process_vm_writev",
             ],
         },
