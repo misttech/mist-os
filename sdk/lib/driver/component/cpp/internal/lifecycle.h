@@ -5,7 +5,7 @@
 #ifndef LIB_DRIVER_COMPONENT_CPP_INTERNAL_LIFECYCLE_H_
 #define LIB_DRIVER_COMPONENT_CPP_INTERNAL_LIFECYCLE_H_
 
-#include <lib/driver/component/cpp/internal/basic_factory.h>
+#include "basic_factory.h"
 
 namespace fdf_internal {
 

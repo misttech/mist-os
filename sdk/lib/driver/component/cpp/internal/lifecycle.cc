@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/driver/component/cpp/internal/lifecycle.h>
-#include <lib/driver/component/cpp/internal/start_args.h>
+#include "lifecycle.h"
+
+#include "start_args.h"
 
 namespace fdf_internal {
 

@@ -5,7 +5,7 @@
 #ifndef LIB_DRIVER_COMPONENT_CPP_DRIVER_EXPORT_H_
 #define LIB_DRIVER_COMPONENT_CPP_DRIVER_EXPORT_H_
 
-#include <lib/driver/component/cpp/internal/lifecycle.h>
+#include "internal/lifecycle.h"
 
 // The given |driver| needs to be a subclass of |fdf::DriverBase|.
 // It must have a constructor in the form of:
