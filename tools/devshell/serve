@@ -309,6 +309,7 @@ else
       --watch
       --package-list "all_package_manifests.list"
       --trusted-root "${repo_dir}/repository/9.root.json"
+      --ignore-missing-packages
       --time-versioning
     )
     package_tool_args=( repository publish "${repo_dir}" "${package_tool_flags[@]}" )

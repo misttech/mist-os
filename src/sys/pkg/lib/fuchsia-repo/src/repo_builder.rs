@@ -385,12 +385,16 @@ where
                 match result {
                     Ok(metadata) => {
                         if blob.size != metadata.len() {
-                            return Err(anyhow!(BlobSizeMismatchError {
-                                hash: blob.merkle,
-                                path: blob.source_path.clone(),
-                                manifest_size: blob.size,
-                                file_size: metadata.len(),
-                            }));
+                            if self.ignore_missing_packages {
+                                return Ok(false);
+                            } else {
+                                return Err(anyhow!(BlobSizeMismatchError {
+                                    hash: blob.merkle,
+                                    path: blob.source_path.clone(),
+                                    manifest_size: blob.size,
+                                    file_size: metadata.len(),
+                                }));
+                            }
                         }
 
                         blobs.push(blob);
