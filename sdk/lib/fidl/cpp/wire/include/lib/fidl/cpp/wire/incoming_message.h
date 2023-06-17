@@ -66,15 +66,6 @@ class EncodedMessage {
                           handle_actual);
   }
 
-  // Creates an |EncodedMessage| from a C |fidl_incoming_msg_t| already in
-  // encoded form. This should only be used when interfacing with C APIs. The
-  // handles in |c_msg| are owned by the returned |EncodedMessage| object.
-  //
-  // The bytes must represent a regular FIDL message instead of a transactional
-  // message. To adopt a transactional message, see
-  // |IncomingHeaderAndMessage::FromEncodedCMessage|.
-  static EncodedMessage FromEncodedCMessage(const fidl_incoming_msg_t& c_msg);
-
   // Convert the incoming message to its C API counterpart, releasing the
   // ownership of handles to the caller in the process. This consumes the
   // |EncodedMessage|.

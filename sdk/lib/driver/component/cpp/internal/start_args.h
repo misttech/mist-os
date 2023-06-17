@@ -38,13 +38,6 @@ class AdoptEncodedFidlMessage {
  public:
   explicit AdoptEncodedFidlMessage(const EncodedFidlMessage& msg) {
     metadata_.reserve(msg.num_handles);
-    fidl_incoming_msg_t c_msg{
-        .bytes = msg.bytes,
-        .handles = msg.handles,
-        .handle_metadata = reinterpret_cast<fidl_handle_metadata_t*>(metadata_.data()),
-        .num_bytes = msg.num_bytes,
-        .num_handles = msg.num_handles,
-    };
     for (size_t i = 0; i < msg.num_handles; i++) {
       // Skip handle type and rights validation since the handles are coming
       // from the driver framework.
@@ -53,7 +46,8 @@ class AdoptEncodedFidlMessage {
           .rights = ZX_RIGHT_SAME_RIGHTS,
       });
     }
-    message_.emplace(fidl::EncodedMessage::FromEncodedCMessage(c_msg));
+    message_.emplace(fidl::EncodedMessage::Create({msg.bytes, msg.num_bytes}, msg.handles,
+                                                  metadata_.data(), msg.num_handles));
   }
 
   fidl::EncodedMessage TakeMessage() {
@@ -116,7 +110,7 @@ inline zx::result<std::vector<std::string>> ProgramValueAsVector(
       std::vector<std::string> result;
       result.reserve(values.count());
       for (auto& value : values) {
-        result.emplace_back(std::string{value.data(), value.size()});
+        result.emplace_back(value.data(), value.size());
       }
       return zx::ok(result);
     }
