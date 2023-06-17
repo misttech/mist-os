@@ -117,8 +117,9 @@ pub async fn start_component(
     let mut current_task = Task::create_init_child_process(&container.kernel, &binary_path)?;
     set_rlimits(&current_task, &rlimits)?;
 
+    let cwd_path = get_program_string(&start_info, "cwd").unwrap_or(&pkg_path);
     let cwd = current_task
-        .lookup_path(&mut LookupContext::default(), current_task.fs().root(), pkg_path.as_bytes())
+        .lookup_path(&mut LookupContext::default(), current_task.fs().root(), cwd_path.as_bytes())
         .map_err(|e| anyhow!("Could not find package directory: {:?}", e))?;
     current_task
         .fs()

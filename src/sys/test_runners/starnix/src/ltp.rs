@@ -32,6 +32,7 @@ pub async fn get_cases_list_for_ltp(
             let (_ls_component_controller, std_handles) = start_command(
                 &mut start_info,
                 component_runner,
+                "/",
                 "/system/bin/ls",
                 &[base_path.as_str()],
             )?;
@@ -59,7 +60,7 @@ pub async fn run_ltp_cases(
     for test in tests {
         let test_path = format!("{}/{}", base_path, test.name.as_ref().expect("No test name"));
         let (component_controller, std_handles) =
-            start_command(&mut start_info, component_runner, test_path.as_str(), &[])?;
+            start_command(&mut start_info, component_runner, &base_path, &test_path, &[])?;
         let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
         run_listener_proxy.on_test_case_started(&test, std_handles, case_listener)?;
 
@@ -117,10 +118,15 @@ async fn read_lines_from_socket(socket: fidl::Socket) -> Result<Vec<String>, Err
 fn start_command(
     base_start_info: &mut frunner::ComponentStartInfo,
     component_runner: &frunner::ComponentRunnerProxy,
+    cwd: &str,
     binary: &str,
     args: &[&str],
 ) -> Result<(frunner::ComponentControllerProxy, ftest::StdHandles), Error> {
     let mut program_entries = vec![
+        fdata::DictionaryEntry {
+            key: "cwd".to_string(),
+            value: Some(Box::new(fdata::DictionaryValue::Str(cwd.to_string()))),
+        },
         fdata::DictionaryEntry {
             key: "binary".to_string(),
             value: Some(Box::new(fdata::DictionaryValue::Str(binary.to_string()))),
