@@ -630,6 +630,7 @@ Possible values of `test_type`:
 | ----- | ----------- |
 | `system` | [Legacy non hermetic realm][system-test-realm] with access to some system capabilities. |
 | `test_arch` | [Test Architecture Tests] |
+| `vfs-compliance` | [VFS compliance tests] |
 | `vulkan` | [Vulkan tests] |
 
 [Learn][create-test-realm] how to create your own test realm.
@@ -685,7 +686,6 @@ Possible values of `fuchsia.test.type`:
 | `media` | Media test realm |
 | `starnix` | Starnix test realm |
 | `system-validation` | system validation apps test realm |
-| `vfs-compliance` | VFS compliance test realm |
 
 ## Restricted logs
 
@@ -824,30 +824,31 @@ offer: [
   interactions between multiple components in isolation from the rest of the
   system.
 
+[caching-loader-service]: /src/sys/test_runners/src/elf/elf_component.rs
 [cf]: /docs/concepts/components/v2/
 [component-manifest]: /docs/concepts/components/v2/component_manifests.md
 [component-unit-tests]: /docs/development/components/build.md#unit-tests
+[create-test-realm]: /docs/development/testing/components/create_test_realm.md
 [CTF test realm]: /docs/development/testing/ctf/test_collection.md
-[Test Architecture Tests]: /src/sys/testing/meta/test-arch-tests.shard.cml
-[system-test-realm]: /src/sys/testing/meta/system-tests.shard.cml
 [custom-artifact-example]: /examples/tests/rust/custom_artifact_test.rs
+[ffx]: /docs/development/tools/ffx/overview.md
 [fidl-test-manager]: /sdk/fidl/fuchsia.test.manager/test_manager.fidl
 [fidl-test-suite]: /sdk/fidl/fuchsia.test/suite.fidl
-[ffx]: /docs/development/tools/ffx/overview.md
+[framework-capabilities]: /docs/concepts/components/v2/capabilities/protocol.md#framework
 [fx-test]: https://fuchsia.dev/reference/tools/fx/cmd/test
 [integration-testing]: /docs/development/testing/components/integration_testing.md
+[loader-service]: /docs/concepts/process/program_loading.md#the_loader_service
 [manifests-offer]: https://fuchsia.dev/reference/cml#offer
 [manifests-use]: https://fuchsia.dev/reference/cml#use
 [resolvers]:  /docs/concepts/components/v2/capabilities/resolvers.md
 [restricted-logs]: /docs/development/diagnostics/test_and_logs.md#restricting_log_severity
 [runners]: /docs/concepts/components/v2/capabilities/runners.md
+[subpackages]: /docs/concepts/components/v2/subpackaging.md
+[sys-migration-guide]: /docs/development/components/v2/migration/tests.md
+[system-test-realm]: /src/sys/testing/meta/system-tests.shard.cml
+[Test Architecture Tests]: /src/sys/testing/meta/test-arch-tests.shard.cml
+[test-manager-as-a-service]: /docs/contribute/governance/rfcs/0202_test_manager_as_a_service.md
 [test-suite-protocol]: /docs/concepts/components/v2/realms.md
 [unit-tests]: /docs/development/components/build.md#unit_tests_with_generated_manifests
-[loader-service]: /docs/concepts/process/program_loading.md#the_loader_service
-[caching-loader-service]: /src/sys/test_runners/src/elf/elf_component.rs
-[framework-capabilities]: /docs/concepts/components/v2/capabilities/protocol.md#framework
-[sys-migration-guide]: /docs/development/components/v2/migration/tests.md
-[subpackages]: /docs/concepts/components/v2/subpackaging.md
-[test-manager-as-a-service]: /docs/contribute/governance/rfcs/0202_test_manager_as_a_service.md
-[create-test-realm]: /docs/development/testing/components/create_test_realm.md
+[VFS compliance tests]: /src/sys/component_manager/tests/capability_provider_vfs_compliance/vfs_compliance_test_realm.shard.cml
 [Vulkan tests]: /src/lib/vulkan/vulkan_test_realm.shard.cml

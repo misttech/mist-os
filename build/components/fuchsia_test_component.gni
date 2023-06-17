@@ -7,6 +7,7 @@ import("fuchsia_component.gni")
 _type_moniker_map = {
   system = "/core/testing:system-tests"
   test_arch = "/core/testing:test-arch-tests"
+  vfs_compliance = "/core/testing:vfs-compliance-tests"
   vulkan = "/core/testing:vulkan-tests"
 }
 

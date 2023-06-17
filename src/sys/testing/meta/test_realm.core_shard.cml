@@ -36,6 +36,18 @@
             from: "parent",
             to: "#testing",
         },
+
+        // Needed for IO compliance tests for CM capabiltiies.
+        {
+            protocol: [
+                "fuchsia.boot.Arguments",
+                "fuchsia.boot.FactoryItems",
+                "fuchsia.boot.Items",
+                "fuchsia.sys2.CrashIntrospect",
+            ],
+            from: "parent",
+            to: "#testing",
+        },
         {
             event_stream: [
                 "capability_requested",

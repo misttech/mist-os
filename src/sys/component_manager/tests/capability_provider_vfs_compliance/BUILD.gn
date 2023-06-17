@@ -28,10 +28,10 @@ rustc_test("integration_test_bin") {
   sources = [ "src/integration_test.rs" ]
 }
 
-fuchsia_component("integration-test") {
-  testonly = true
+fuchsia_test_component("integration-test") {
   deps = [ ":integration_test_bin" ]
   manifest = "meta/integration_test.cml"
+  test_type = "vfs_compliance"
 }
 
 fuchsia_test_package("package") {

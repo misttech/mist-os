@@ -260,17 +260,6 @@
             to: "#test_manager",
         },
 
-        // Needed for IO compliance tests for CM capabiltiies.
-        {
-            protocol: [
-                "fuchsia.boot.Arguments",
-                "fuchsia.boot.Items",
-                "fuchsia.sys2.CrashIntrospect",
-            ],
-            from: "parent",
-            to: "#test_manager",
-        },
-
         // Needed for driver tests.
         {
             directory: [

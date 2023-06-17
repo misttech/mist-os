@@ -6,6 +6,7 @@
 {
     include: [
         "//src/lib/vulkan/vulkan_test_realm.shard.cml",
+        "//src/sys/component_manager/tests/capability_provider_vfs_compliance/vfs_compliance_test_realm.shard.cml",
 
         // Optional: Include optional runners.
         "//src/sys/testing/meta/fuzz-test-runner.shard.cml",
