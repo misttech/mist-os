@@ -52,7 +52,6 @@ class MainServiceTest : public UnitTestFixture {
                               .config{},
                               .is_first_instance = kIsFirstInstance,
                               .limit_inspect_data = false,
-                              .spawn_system_log_recorder = false,
                               .delete_previous_boot_logs_time = std::nullopt,
                           },
                       }) {
@@ -61,7 +60,6 @@ class MainServiceTest : public UnitTestFixture {
     AddHandler(main_service_.GetHandler<fuchsia::feedback::CrashReportingProductRegister>());
     AddHandler(main_service_.GetHandler<fuchsia::feedback::ComponentDataRegister>());
     AddHandler(main_service_.GetHandler<fuchsia::feedback::DataProvider>());
-    AddHandler(main_service_.GetHandler<fuchsia::feedback::DataProviderController>());
   }
 
  private:
@@ -97,7 +95,6 @@ TEST_F(MainServiceTest, LastReboot) {
                                            ProtocolMatcher("CrashReportingProductRegister", 0u, 0u),
                                            ProtocolMatcher("ComponentDataRegister", 0u, 0u),
                                            ProtocolMatcher("DataProvider", 0u, 0u),
-                                           ProtocolMatcher("DataProviderController", 0u, 0u),
                                        }))),
                              })));
 
@@ -111,7 +108,6 @@ TEST_F(MainServiceTest, LastReboot) {
                                            ProtocolMatcher("CrashReportingProductRegister", 0u, 0u),
                                            ProtocolMatcher("ComponentDataRegister", 0u, 0u),
                                            ProtocolMatcher("DataProvider", 0u, 0u),
-                                           ProtocolMatcher("DataProviderController", 0u, 0u),
                                        }))),
                              })));
 }
@@ -147,7 +143,6 @@ TEST_F(MainServiceTest, CrashReports) {
                                            ProtocolMatcher("CrashReportingProductRegister", 1u, 1u),
                                            ProtocolMatcher("ComponentDataRegister", 0u, 0u),
                                            ProtocolMatcher("DataProvider", 0u, 0u),
-                                           ProtocolMatcher("DataProviderController", 0u, 0u),
                                        }))),
                              })));
 
@@ -162,7 +157,6 @@ TEST_F(MainServiceTest, CrashReports) {
                                            ProtocolMatcher("CrashReportingProductRegister", 1u, 0u),
                                            ProtocolMatcher("ComponentDataRegister", 0u, 0u),
                                            ProtocolMatcher("DataProvider", 0u, 0u),
-                                           ProtocolMatcher("DataProviderController", 0u, 0u),
                                        }))),
                              })));
 }
@@ -173,9 +167,6 @@ TEST_F(MainServiceTest, FeedbackData) {
 
   fuchsia::feedback::DataProviderPtr data_provider_ptr_;
   services()->Connect(data_provider_ptr_.NewRequest(dispatcher()));
-
-  fuchsia::feedback::DataProviderControllerPtr data_provider_controller_ptr_;
-  services()->Connect(data_provider_controller_ptr_.NewRequest(dispatcher()));
 
   bool component_data_called = false;
   component_data_ptr_->Upsert(fuchsia::feedback::ComponentData{},
@@ -188,14 +179,9 @@ TEST_F(MainServiceTest, FeedbackData) {
       std::move(snapshot_params),
       [&data_provider_called](fuchsia::feedback::Snapshot) { data_provider_called = true; });
 
-  bool data_provider_controller_called = false;
-  data_provider_controller_ptr_->DisableAndDropPersistentLogs(
-      [&data_provider_controller_called]() { data_provider_controller_called = true; });
-
   RunLoopUntilIdle();
   EXPECT_TRUE(component_data_called);
   EXPECT_TRUE(data_provider_called);
-  EXPECT_TRUE(data_provider_controller_called);
   EXPECT_THAT(InspectTree(), ChildrenMatch(IsSupersetOf({
                                  AllOf(NodeMatches(NameMatches("fidl")),
                                        ChildrenMatch(IsSupersetOf({
@@ -204,13 +190,11 @@ TEST_F(MainServiceTest, FeedbackData) {
                                            ProtocolMatcher("CrashReportingProductRegister", 0u, 0u),
                                            ProtocolMatcher("ComponentDataRegister", 1u, 1u),
                                            ProtocolMatcher("DataProvider", 1u, 1u),
-                                           ProtocolMatcher("DataProviderController", 1u, 1u),
                                        }))),
                              })));
 
   component_data_ptr_.Unbind();
   data_provider_ptr_.Unbind();
-  data_provider_controller_ptr_.Unbind();
 
   RunLoopUntilIdle();
   EXPECT_THAT(InspectTree(), ChildrenMatch(IsSupersetOf({
@@ -221,7 +205,6 @@ TEST_F(MainServiceTest, FeedbackData) {
                                            ProtocolMatcher("CrashReportingProductRegister", 0u, 0u),
                                            ProtocolMatcher("ComponentDataRegister", 1u, 0u),
                                            ProtocolMatcher("DataProvider", 1u, 0u),
-                                           ProtocolMatcher("DataProviderController", 1u, 0u),
                                        }))),
                              })));
 }

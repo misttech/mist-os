@@ -96,10 +96,6 @@ constexpr char kPreviousBuildVersionPath[] = "/tmp/build_version.txt";
 constexpr char kCurrentBuildVersionPath[] = "/data/build_version.txt";
 constexpr char kDataRegisterPath[] = "/tmp/data_register.json";
 
-// Use this file to determine whether or not a previous instance of the component was instructed to
-// terminated system log recording.
-constexpr char kDoNotLaunchSystemLogRecorder[] = "/tmp/do_not_launch_system_log_recorder.txt";
-
 constexpr size_t kRedactionIdCacheCapacity = 1500;
 
 }  // namespace forensics::feedback

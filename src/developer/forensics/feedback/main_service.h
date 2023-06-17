@@ -76,8 +76,6 @@ class MainService {
   InstrumentedBindingSet<fuchsia::feedback::CrashReporter> crash_reporter_bindings_;
   InstrumentedBindingSet<fuchsia::feedback::CrashReportingProductRegister> crash_register_bindings_;
   InstrumentedBindingSet<fuchsia::feedback::DataProvider> data_provider_bindings_;
-  InstrumentedBindingSet<fuchsia::feedback::DataProviderController>
-      data_provider_controller_bindings_;
   InstrumentedBindingSet<fuchsia::feedback::LastRebootInfoProvider> last_reboot_info_bindings_;
 };
 

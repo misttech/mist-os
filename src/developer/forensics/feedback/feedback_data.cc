@@ -13,8 +13,6 @@
 
 #include <memory>
 
-#include "src/developer/forensics/feedback_data/data_provider_controller.h"
-
 namespace forensics::feedback {
 
 FeedbackData::FeedbackData(async_dispatcher_t* dispatcher,
@@ -33,18 +31,11 @@ FeedbackData::FeedbackData(async_dispatcher_t* dispatcher,
       data_provider_(dispatcher_, services_, clock_, redactor, options.is_first_instance,
                      options.config.annotation_allowlist, options.config.attachment_allowlist,
                      cobalt_, annotation_manager, attachment_providers_.GetAttachmentManager(),
-                     &inspect_data_budget_),
-      data_provider_controller_() {
-  if (options.spawn_system_log_recorder) {
-    SpawnSystemLogRecorder();
-  }
+                     &inspect_data_budget_) {
+  SpawnSystemLogRecorder();
 }
 
 feedback_data::DataProvider* FeedbackData::DataProvider() { return &data_provider_; }
-
-feedback_data::DataProviderController* FeedbackData::DataProviderController() {
-  return &data_provider_controller_;
-}
 
 void FeedbackData::ShutdownImminent(::fit::deferred_callback stop_respond) {
   system_log_recorder_lifecycle_.set_error_handler(
@@ -61,14 +52,6 @@ void FeedbackData::ShutdownImminent(::fit::deferred_callback stop_respond) {
 }
 
 void FeedbackData::SpawnSystemLogRecorder() {
-  zx::channel controller_client, controller_server;
-  if (const auto status = zx::channel::create(0, &controller_client, &controller_server);
-      status != ZX_OK) {
-    FX_PLOGS(ERROR, status)
-        << "Failed to create system log recorder controller channel, logs will not be persisted";
-    return;
-  }
-
   zx::channel lifecycle_client, lifecycle_server;
   if (const auto status = zx::channel::create(0, &lifecycle_client, &lifecycle_server);
       status != ZX_OK) {
@@ -87,14 +70,6 @@ void FeedbackData::SpawnSystemLogRecorder() {
           .h =
               {
                   .id = PA_HND(PA_USER0, 0),
-                  .handle = controller_server.release(),
-              },
-      },
-      fdio_spawn_action_t{
-          .action = FDIO_SPAWN_ACTION_ADD_HANDLE,
-          .h =
-              {
-                  .id = PA_HND(PA_USER1, 0),
                   .handle = lifecycle_server.release(),
               },
       },
@@ -111,8 +86,6 @@ void FeedbackData::SpawnSystemLogRecorder() {
     return;
   }
 
-  data_provider_controller_.BindSystemLogRecorderController(std::move(controller_client),
-                                                            dispatcher_);
   system_log_recorder_lifecycle_.Bind(std::move(lifecycle_client), dispatcher_);
 }
 

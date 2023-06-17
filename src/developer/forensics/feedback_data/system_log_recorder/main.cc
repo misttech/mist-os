@@ -31,17 +31,9 @@ constexpr zx::duration kWritePeriod = zx::sec(1);
 int main() {
   fuchsia_logging::SetTags({"forensics", "feedback"});
 
-  // We receive a channel that we interpret as a fuchsia.feedback.DataProviderController
-  // connection.
-  zx::channel controller_channel(zx_take_startup_handle(PA_HND(PA_USER0, 0)));
-  if (!controller_channel.is_valid()) {
-    FX_LOGS(FATAL) << "Received invalid controller channel";
-    return EXIT_FAILURE;
-  }
-
   // We receive a channel that we interpret as a fuchsia.process.lifecycle.Lifecycle
   // connection.
-  zx::channel lifecycle_channel(zx_take_startup_handle(PA_HND(PA_USER1, 0)));
+  zx::channel lifecycle_channel(zx_take_startup_handle(PA_HND(PA_USER0, 0)));
   if (!lifecycle_channel.is_valid()) {
     FX_LOGS(FATAL) << "Received invalid lifecycle channel";
     return EXIT_FAILURE;
@@ -86,9 +78,7 @@ int main() {
 
   // Set up the controller to shut down or flush the buffers of the system log recorder when it gets
   // the signal to do so.
-  Controller controller(&main_loop, &write_loop, &recorder);
-  ::fidl::Binding<fuchsia::feedback::DataProviderController> data_provider_controller_binding(
-      &controller, std::move(controller_channel), main_loop.dispatcher());
+  Controller controller;
   ::fidl::Binding<fuchsia::process::lifecycle::Lifecycle> lifecycle_binding(
       &controller, std::move(lifecycle_channel), main_loop.dispatcher());
 

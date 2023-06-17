@@ -20,7 +20,6 @@
                 "fuchsia.feedback.CrashReporter",
                 "fuchsia.feedback.CrashReportingProductRegister",
                 "fuchsia.feedback.DataProvider",
-                "fuchsia.feedback.DataProviderController",
                 "fuchsia.feedback.LastRebootInfoProvider",
             ],
             from: "#feedback",

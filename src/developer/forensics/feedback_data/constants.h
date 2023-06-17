@@ -99,10 +99,6 @@ struct SnapshotVersion {
   static constexpr const char* kString = "1";
 };
 
-// Use this file to determine whether or not a previous instance of the component was instructed to
-// terminated system log recording.
-constexpr char kDoNotLaunchSystemLogRecorder[] = "/tmp/do_not_launch_system_log_recorder.txt";
-
 // The name of the protocol to use to read Feedback data from the Archive.
 constexpr char kArchiveAccessorName[] = "fuchsia.diagnostics.FeedbackArchiveAccessor";
 

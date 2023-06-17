@@ -66,8 +66,6 @@ int main() {
   auto reboot_log = RebootLog::ParseRebootLog(
       "/boot/log/last-panic.txt", kPreviousGracefulRebootReasonFile, TestAndSetNotAFdr());
 
-  const bool spawn_system_log_recorder = !files::IsFile(kDoNotLaunchSystemLogRecorder);
-
   std::optional<std::string> local_device_id_path = kDeviceIdPath;
   if (files::IsFile(kUseRemoteDeviceIdProviderPath)) {
     local_device_id_path = std::nullopt;
@@ -105,7 +103,6 @@ int main() {
                                .config = *snapshot_config,
                                .is_first_instance = component.IsFirstInstance(),
                                .limit_inspect_data = build_type_config->enable_limit_inspect_data,
-                               .spawn_system_log_recorder = spawn_system_log_recorder,
                                .delete_previous_boot_logs_time = delete_previous_boot_logs_time,
                            }});
 
@@ -115,7 +112,6 @@ int main() {
       main_service->GetHandler<fuchsia::feedback::CrashReportingProductRegister>());
   component.AddPublicService(main_service->GetHandler<fuchsia::feedback::ComponentDataRegister>());
   component.AddPublicService(main_service->GetHandler<fuchsia::feedback::DataProvider>());
-  component.AddPublicService(main_service->GetHandler<fuchsia::feedback::DataProviderController>());
 
   component.RunLoop();
   return EXIT_SUCCESS;

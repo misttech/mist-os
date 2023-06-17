@@ -20,7 +20,6 @@
 #include "src/developer/forensics/feedback/attachment_providers.h"
 #include "src/developer/forensics/feedback/config.h"
 #include "src/developer/forensics/feedback_data/data_provider.h"
-#include "src/developer/forensics/feedback_data/data_provider_controller.h"
 #include "src/developer/forensics/feedback_data/inspect_data_budget.h"
 #include "src/developer/forensics/utils/cobalt/logger.h"
 #include "src/developer/forensics/utils/inspect_node_manager.h"
@@ -34,7 +33,6 @@ class FeedbackData {
     SnapshotConfig config;
     bool is_first_instance;
     bool limit_inspect_data;
-    bool spawn_system_log_recorder;
     std::optional<zx::duration> delete_previous_boot_logs_time;
   };
 
@@ -44,7 +42,6 @@ class FeedbackData {
                Options options);
 
   feedback_data::DataProvider* DataProvider();
-  feedback_data::DataProviderController* DataProviderController();
 
   void ShutdownImminent(::fit::deferred_callback stop_respond);
 
@@ -60,7 +57,6 @@ class FeedbackData {
   feedback_data::InspectDataBudget inspect_data_budget_;
   AttachmentProviders attachment_providers_;
   feedback_data::DataProvider data_provider_;
-  feedback_data::DataProviderController data_provider_controller_;
 
   fuchsia::process::lifecycle::LifecyclePtr system_log_recorder_lifecycle_;
 };

@@ -73,9 +73,6 @@ MainService::MainService(
                                "/fidl/fuchsia.feedback.CrashReportingProductRegister"),
       data_provider_bindings_(dispatcher_, feedback_data_.DataProvider(), &inspect_node_manager_,
                               "/fidl/fuchsia.feedback.DataProvider"),
-      data_provider_controller_bindings_(dispatcher_, feedback_data_.DataProviderController(),
-                                         &inspect_node_manager_,
-                                         "/fidl/fuchsia.feedback.DataProviderController"),
       last_reboot_info_bindings_(dispatcher_, last_reboot_.LastRebootInfoProvider(),
                                  &inspect_node_manager_,
                                  "/fidl/fuchsia.feedback.LastRebootInfoProvider") {
@@ -156,14 +153,6 @@ template <>
 ::fidl::InterfaceRequestHandler<fuchsia::feedback::DataProvider> MainService::GetHandler() {
   return [this](::fidl::InterfaceRequest<fuchsia::feedback::DataProvider> request) {
     data_provider_bindings_.AddBinding(std::move(request));
-  };
-}
-
-template <>
-::fidl::InterfaceRequestHandler<fuchsia::feedback::DataProviderController>
-MainService::GetHandler() {
-  return [this](::fidl::InterfaceRequest<fuchsia::feedback::DataProviderController> request) {
-    data_provider_controller_bindings_.AddBinding(std::move(request));
   };
 }
 
