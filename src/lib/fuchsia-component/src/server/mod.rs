@@ -191,7 +191,7 @@ macro_rules! add_functions {
             self.fs().services.push(service.into());
             let sender = self.fs().new_connection_sender.clone();
             self.add_entry_at(
-                path.into(),
+                path,
                 endpoint(move |_, channel| {
                     // It's possible for this send to fail in the case where ServiceFs has been
                     // dropped.  When that happens, ServiceFs will drop ExecutionScope which
@@ -424,16 +424,25 @@ macro_rules! add_functions {
         /// Panics if any node has already been added at the given path.
         pub fn add_vmo_file_at(&mut self, path: impl Into<String>, vmo: zx::Vmo) -> &mut Self {
             self.add_entry_at(
-                path.into(),
+                path,
                 VmoFile::new(
                     vmo, /*readable*/ true, /*writable*/ false, /*executable*/ false,
                 ),
             )
         }
 
-        fn add_entry_at(&mut self, path: String, entry: Arc<dyn DirectoryEntry>) -> &mut Self {
+        /// Adds an entry to the directory at the given path.
+        ///
+        /// The path must be a single component containing no `/` characters.
+        ///
+        /// Panics if any node has already been added at the given path.
+        pub fn add_entry_at(
+            &mut self,
+            path: impl Into<String>,
+            entry: Arc<dyn DirectoryEntry>,
+        ) -> &mut Self {
             // This will fail if the name has '/' characters or already exists.
-            self.dir.add_entry_impl(path, entry, false).expect("Unable to add entry");
+            self.dir.add_entry_impl(path.into(), entry, false).expect("Unable to add entry");
             self
         }
 
