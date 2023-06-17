@@ -23,7 +23,7 @@ use crate::{
     types::{as_any::*, *},
 };
 
-pub const MAX_LFS_FILESIZE: usize = 0x7fffffffffffffff;
+pub const MAX_LFS_FILESIZE: usize = 0x7fff_ffff_ffff_ffff;
 
 pub enum SeekTarget {
     /// Seek to the given offset relative to the start of the file.

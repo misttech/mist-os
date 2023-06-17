@@ -23,17 +23,20 @@ impl UserBuffer {
         buffers: Vec<UserBuffer>,
     ) -> Result<(Vec<UserBuffer>, usize), Errno> {
         // Linux checks all buffers for plausibility, even those past the MAX_RW_COUNT threshold.
-        if buffers
-            .iter()
-            .any(|buffer| buffer.address > max_address || buffer.length > max_address.ptr())
-        {
-            return error!(EFAULT);
+        for buffer in buffers.iter() {
+            if buffer.address > max_address
+                || buffer.address.checked_add(buffer.length).ok_or_else(|| errno!(EINVAL))?
+                    > max_address
+            {
+                return error!(EFAULT);
+            }
         }
+        let max_rw_count = *MAX_RW_COUNT;
         let mut total = 0;
         let buffers = buffers
             .into_iter()
             .map_while(|mut buffer| {
-                if total == *MAX_RW_COUNT {
+                if total == max_rw_count {
                     None
                 } else {
                     total = match total.checked_add(buffer.length).ok_or_else(|| errno!(EINVAL)) {
@@ -42,9 +45,9 @@ impl UserBuffer {
                             return Some(Err(e));
                         }
                     };
-                    if total > *MAX_RW_COUNT {
-                        buffer.length = total - *MAX_RW_COUNT;
-                        total = *MAX_RW_COUNT;
+                    if total > max_rw_count {
+                        buffer.length = total - max_rw_count;
+                        total = max_rw_count;
                     }
                     Some(Ok(buffer))
                 }
