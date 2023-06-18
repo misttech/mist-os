@@ -139,18 +139,13 @@ TEST(MagicNumberTest, RequestWrite) {
   char bytes[ZX_CHANNEL_MAX_MSG_BYTES];
   zx_handle_info_t handle_infos[ZX_CHANNEL_MAX_MSG_HANDLES];
 
-  fidl_incoming_msg_t msg = {
-      .bytes = bytes,
-      .num_bytes = 0u,
-      .num_handles = 0u,
-  };
-  auto status =
-      remote.channel().read_etc(0, bytes, handle_infos, ZX_CHANNEL_MAX_MSG_BYTES,
-                                ZX_CHANNEL_MAX_MSG_HANDLES, &msg.num_bytes, &msg.num_handles);
+  uint32_t num_bytes, num_handles;
+  auto status = remote.channel().read_etc(0, bytes, handle_infos, ZX_CHANNEL_MAX_MSG_BYTES,
+                                          ZX_CHANNEL_MAX_MSG_HANDLES, &num_bytes, &num_handles);
   ASSERT_EQ(status, ZX_OK);
-  ASSERT_GE(msg.num_bytes, sizeof(fidl_message_header_t));
+  ASSERT_GE(num_bytes, sizeof(fidl_message_header_t));
 
-  auto hdr = reinterpret_cast<fidl_message_header_t*>(msg.bytes);
+  auto hdr = reinterpret_cast<fidl_message_header_t*>(bytes);
   ASSERT_EQ(hdr->magic_number, kFidlWireFormatMagicNumberInitial);
 }
 
@@ -163,18 +158,14 @@ TEST(MagicNumberTest, EventWrite) {
   char bytes[ZX_CHANNEL_MAX_MSG_BYTES];
   zx_handle_info_t handle_infos[ZX_CHANNEL_MAX_MSG_HANDLES];
 
-  fidl_incoming_msg_t msg = {
-      .bytes = bytes,
-      .num_bytes = 0u,
-      .num_handles = 0u,
-  };
-  auto status = endpoints->client.channel().read_etc(
-      0, bytes, handle_infos, ZX_CHANNEL_MAX_MSG_BYTES, ZX_CHANNEL_MAX_MSG_HANDLES, &msg.num_bytes,
-      &msg.num_handles);
+  uint32_t num_bytes, num_handles;
+  auto status =
+      endpoints->client.channel().read_etc(0, bytes, handle_infos, ZX_CHANNEL_MAX_MSG_BYTES,
+                                           ZX_CHANNEL_MAX_MSG_HANDLES, &num_bytes, &num_handles);
   ASSERT_EQ(status, ZX_OK);
-  ASSERT_GE(msg.num_bytes, sizeof(fidl_message_header_t));
+  ASSERT_GE(num_bytes, sizeof(fidl_message_header_t));
 
-  auto hdr = reinterpret_cast<fidl_message_header_t*>(msg.bytes);
+  auto hdr = reinterpret_cast<fidl_message_header_t*>(bytes);
   ASSERT_EQ(hdr->magic_number, kFidlWireFormatMagicNumberInitial);
 }
 

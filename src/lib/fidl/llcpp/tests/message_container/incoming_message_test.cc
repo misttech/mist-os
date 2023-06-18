@@ -67,17 +67,6 @@ class IncomingMessageWithHandlesTest : public ::testing::Test {
   fidl_channel_handle_metadata_t handle_metadata_[2];
 };
 
-TEST_F(IncomingMessageWithHandlesTest, AdoptHandlesFromC) {
-  fidl_incoming_msg_t c_msg = {
-      .bytes = bytes_,
-      .handles = handles_,
-      .num_bytes = static_cast<uint32_t>(std::size(bytes_)),
-      .num_handles = static_cast<uint32_t>(std::size(handles_)),
-  };
-  auto incoming = fidl::IncomingHeaderAndMessage::FromEncodedCMessage(c_msg);
-  EXPECT_EQ(ZX_OK, incoming.status());
-}
-
 TEST_F(IncomingMessageWithHandlesTest, AdoptHandlesWithRegularConstructor) {
   auto incoming = fidl::IncomingHeaderAndMessage::Create(
       bytes_, static_cast<uint32_t>(std::size(bytes_)), handles_, handle_metadata_,
@@ -117,6 +106,7 @@ TEST_F(IncomingMessageWithHandlesTest, ReleaseHandles) {
 
   // Adopt the handles again to close them.
   auto incoming = fidl::IncomingHeaderAndMessage::FromEncodedCMessage(c_msg);
+  EXPECT_EQ(ZX_OK, incoming.status());
 }
 
 TEST_F(IncomingMessageWithHandlesTest, MoveConstructorHandleOwnership) {

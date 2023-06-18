@@ -12,6 +12,7 @@
 #include <lib/fidl/cpp/wire_format_metadata.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/fidl.h>
+#include <zircon/types.h>
 
 namespace fidl {
 
@@ -83,18 +84,16 @@ class EncodedMessage {
 
   ~EncodedMessage();
 
-  cpp20::span<uint8_t> bytes() const {
-    return {reinterpret_cast<uint8_t*>(message_.bytes), message_.num_bytes};
-  }
+  cpp20::span<uint8_t> bytes() const { return bytes_; }
 
-  fidl_handle_t* handles() const { return message_.handles; }
-  uint32_t num_handles() const { return message_.num_handles; }
-  fidl_handle_metadata_t* raw_handle_metadata() const { return message_.handle_metadata; }
+  fidl_handle_t* handles() const { return handles_; }
+  uint32_t num_handles() const { return num_handles_; }
+  fidl_handle_metadata_t* raw_handle_metadata() const { return handle_metadata_; }
 
   template <typename Transport>
   typename Transport::HandleMetadata* handle_metadata() const {
     ZX_ASSERT(Transport::VTable.type == transport_vtable_->type);
-    return reinterpret_cast<typename Transport::HandleMetadata*>(message_.handle_metadata);
+    return reinterpret_cast<typename Transport::HandleMetadata*>(handle_metadata_);
   }
 
   // Release the handle ownership after the message has been converted to its
@@ -103,7 +102,7 @@ class EncodedMessage {
   //
   // This consumes the |EncodedMessage|.
   void ReleaseHandles() && {
-    message_.num_handles = 0;
+    num_handles_ = 0;
     transport_vtable_ = nullptr;
   }
 
@@ -131,12 +130,18 @@ class EncodedMessage {
 
   void MoveImpl(EncodedMessage&& other) noexcept {
     transport_vtable_ = other.transport_vtable_;
-    message_ = other.message_;
+    bytes_ = other.bytes_;
+    handles_ = other.handles_;
+    num_handles_ = other.num_handles_;
+    handle_metadata_ = other.handle_metadata_;
     std::move(other).ReleaseHandles();
   }
 
   const internal::TransportVTable* transport_vtable_ = nullptr;
-  fidl_incoming_msg_t message_;
+  cpp20::span<uint8_t> bytes_;
+  fidl_handle_t* handles_;
+  uint32_t num_handles_;
+  fidl_handle_metadata_t* handle_metadata_;
 };
 
 // |IncomingHeaderAndMessage| represents a FIDL transactional message on the

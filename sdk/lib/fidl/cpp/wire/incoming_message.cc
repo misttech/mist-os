@@ -13,6 +13,19 @@
 
 namespace fidl {
 
+namespace {
+
+struct fidl_incoming_msg_impl {
+  cpp20::span<uint8_t> bytes;
+  fidl_handle_t* handles;
+  fidl_handle_metadata_t* handle_metadata;
+  uint32_t num_handles;
+};
+static_assert(sizeof(fidl_incoming_msg_impl) == sizeof(fidl_incoming_msg_t));
+static_assert(alignof(fidl_incoming_msg_impl) == alignof(fidl_incoming_msg_t));
+
+}  // namespace
+
 EncodedMessage EncodedMessage::Create(cpp20::span<uint8_t> bytes) {
   return EncodedMessage(nullptr, bytes, nullptr, nullptr, 0);
 }
@@ -26,8 +39,8 @@ EncodedMessage EncodedMessage::Create(cpp20::span<uint8_t> bytes, zx_handle_t* h
 
 std::pair<cpp20::span<uint8_t>, cpp20::span<fidl_handle_t>> EncodedMessage::Release() && {
   ZX_ASSERT(transport_vtable_->type == internal::fidl_transport_type::kChannel);
-  cpp20::span bytes{reinterpret_cast<uint8_t*>(message_.bytes), message_.num_bytes};
-  cpp20::span handles{message_.handles, message_.num_handles};
+  cpp20::span bytes = this->bytes();
+  cpp20::span handles{handles_, num_handles_};
   std::move(*this).ReleaseHandles();
   return {bytes, handles};
 }
@@ -45,22 +58,20 @@ EncodedMessage::EncodedMessage(const internal::TransportVTable* transport_vtable
                                cpp20::span<uint8_t> bytes, fidl_handle_t* handles,
                                fidl_handle_metadata_t* handle_metadata, uint32_t handle_actual)
     : transport_vtable_(transport_vtable),
-      message_(fidl_incoming_msg_t{
-          .bytes = bytes.data(),
-          .handles = handles,
-          .handle_metadata = handle_metadata,
-          .num_bytes = static_cast<uint32_t>(bytes.size()),
-          .num_handles = handle_actual,
-      }) {
+      bytes_(bytes),
+      handles_(handles),
+      num_handles_(handle_actual),
+      handle_metadata_(handle_metadata) {
   ZX_DEBUG_ASSERT(bytes.size() < std::numeric_limits<uint32_t>::max());
 }
 
 IncomingHeaderAndMessage IncomingHeaderAndMessage::FromEncodedCMessage(
     const fidl_incoming_msg_t& c_msg) {
-  ZX_DEBUG_ASSERT(c_msg.num_bytes >= sizeof(fidl_message_header_t));
-  return IncomingHeaderAndMessage(&internal::ChannelTransport::VTable,
-                                  reinterpret_cast<uint8_t*>(c_msg.bytes), c_msg.num_bytes,
-                                  c_msg.handles, c_msg.handle_metadata, c_msg.num_handles);
+  const auto& msg = reinterpret_cast<const fidl_incoming_msg_impl&>(c_msg);
+  ZX_DEBUG_ASSERT(msg.bytes.size() >= sizeof(fidl_message_header_t));
+  return IncomingHeaderAndMessage(&internal::ChannelTransport::VTable, msg.bytes.data(),
+                                  static_cast<uint32_t>(msg.bytes.size()), msg.handles,
+                                  msg.handle_metadata, msg.num_handles);
 }
 
 IncomingHeaderAndMessage::~IncomingHeaderAndMessage() = default;
@@ -79,13 +90,14 @@ fidl_incoming_msg_t IncomingHeaderAndMessage::ReleaseToEncodedCMessage() && {
   uint32_t num_handles = body_.num_handles();
   fidl_handle_metadata_t* handle_metadata = body_.raw_handle_metadata();
   std::move(body_).ReleaseHandles();
-  return {
-      .bytes = bytes_.data(),
+  fidl_incoming_msg_t msg;
+  reinterpret_cast<fidl_incoming_msg_impl&>(msg) = {
+      .bytes = bytes_,
       .handles = handles,
       .handle_metadata = handle_metadata,
-      .num_bytes = static_cast<uint32_t>(bytes_.size()),
       .num_handles = num_handles,
   };
+  return msg;
 }
 
 void IncomingHeaderAndMessage::CloseHandles() && { std::move(body_).CloseHandles(); }

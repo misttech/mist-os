@@ -572,33 +572,7 @@ typedef struct fidl_outgoing_msg {
 
 // An incoming FIDL message.
 typedef struct fidl_incoming_msg {
-  // The bytes of the message.
-  //
-  // The bytes of the message might be in the encoded or decoded form.
-  // Functions that take a |fidl_incoming_msg_t| as an argument should document whether
-  // the expect encoded or decoded messages.
-  //
-  // See |num_bytes| for the number of bytes in the message.
-  void* bytes;
-
-  // The handles of the message.
-  //
-  // See |num_handles| for the number of handles in the message.
-  fidl_handle_t* handles;
-
-  // Array of metadata providing additional information on the handles.
-  // fidl_handle_metadata_t is a placeholder type, cast this into the appropriate
-  // handle type when using.
-  // This is an array of fidl_channel_handle_metadata when representing C messages.
-  //
-  // See |num_handles| for the number of handles in the message.
-  fidl_handle_metadata_t* handle_metadata;
-
-  // The number of bytes in |bytes|.
-  uint32_t num_bytes;
-
-  // The number of handles in |handles|.
-  uint32_t num_handles;
+  uintptr_t opaque[5];
 } fidl_incoming_msg_t;
 
 // LINT.IfChange
