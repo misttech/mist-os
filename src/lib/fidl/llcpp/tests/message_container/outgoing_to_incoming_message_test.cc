@@ -23,15 +23,11 @@ TEST(OutgoingToEncodedMessage, IovecMessage) {
       {.buffer = bytes1, .capacity = std::size(bytes1), .reserved = 0},
       {.buffer = bytes2, .capacity = std::size(bytes2), .reserved = 0},
   };
-  fidl_outgoing_msg_t c_msg = {
-      .type = FIDL_OUTGOING_MSG_TYPE_IOVEC,
-      .iovec =
-          {
-              .iovecs = iovecs,
-              .num_iovecs = std::size(iovecs),
-          },
-  };
-  auto msg = fidl::OutgoingMessage::FromEncodedCValue(c_msg);
+  auto msg = fidl::OutgoingMessage::Create_InternalMayBreak({
+      .transport_vtable = &fidl::internal::ChannelTransport::VTable,
+      .iovecs = iovecs,
+      .num_iovecs = std::size(iovecs),
+  });
   auto result = fidl::OutgoingToEncodedMessage(msg);
   ASSERT_EQ(ZX_OK, result.status());
   ASSERT_EQ(std::size(bytes1) + std::size(bytes2), result.message().bytes().size());
@@ -46,15 +42,17 @@ TEST(OutgoingToEncodedMessage, LargeMessage) {
   for (size_t i = 0; i < kLargeMessageSize; i++) {
     bytes[i] = i % 0xFF;
   }
-  fidl_outgoing_msg_t c_msg = {
-      .type = FIDL_OUTGOING_MSG_TYPE_BYTE,
-      .byte =
-          {
-              .bytes = bytes.data(),
-              .num_bytes = kLargeMessageSize,
-          },
+  zx_channel_iovec_t iovecs[] = {
+      {
+          .buffer = bytes.data(),
+          .capacity = kLargeMessageSize,
+      },
   };
-  auto msg = fidl::OutgoingMessage::FromEncodedCValue(c_msg);
+  auto msg = fidl::OutgoingMessage::Create_InternalMayBreak({
+      .transport_vtable = &fidl::internal::ChannelTransport::VTable,
+      .iovecs = iovecs,
+      .num_iovecs = std::size(iovecs),
+  });
   auto result = fidl::OutgoingToEncodedMessage(msg);
   ASSERT_EQ(ZX_OK, result.status());
   EXPECT_EQ(bytes, std::vector(result.message().bytes().begin(), result.message().bytes().end()));
@@ -76,18 +74,14 @@ TEST(OutgoingToEncodedMessage, Handles) {
   zx_channel_iovec_t iovecs[1] = {
       {.buffer = bytes, .capacity = std::size(bytes), .reserved = 0},
   };
-  fidl_outgoing_msg_t c_msg = {
-      .type = FIDL_OUTGOING_MSG_TYPE_IOVEC,
-      .iovec =
-          {
-              .iovecs = iovecs,
-              .num_iovecs = std::size(iovecs),
-              .handles = &handle,
-              .handle_metadata = reinterpret_cast<fidl_handle_metadata_t*>(&handle_metadata),
-              .num_handles = 1,
-          },
-  };
-  auto msg = fidl::OutgoingMessage::FromEncodedCValue(c_msg);
+  auto msg = fidl::OutgoingMessage::Create_InternalMayBreak({
+      .transport_vtable = &fidl::internal::ChannelTransport::VTable,
+      .iovecs = iovecs,
+      .num_iovecs = std::size(iovecs),
+      .handles = &handle,
+      .handle_metadata = reinterpret_cast<fidl_handle_metadata_t*>(&handle_metadata),
+      .num_handles = 1,
+  });
   auto result = fidl::OutgoingToEncodedMessage(msg);
   ASSERT_EQ(ZX_OK, result.status());
   fidl::EncodedMessage& output = result.message();
@@ -115,18 +109,14 @@ TEST(OutgoingToEncodedMessage, HandlesWrongType) {
   zx_channel_iovec_t iovecs[] = {
       {.buffer = bytes, .capacity = std::size(bytes), .reserved = 0},
   };
-  fidl_outgoing_msg_t c_msg = {
-      .type = FIDL_OUTGOING_MSG_TYPE_IOVEC,
-      .iovec =
-          {
-              .iovecs = iovecs,
-              .num_iovecs = std::size(iovecs),
-              .handles = &handle,
-              .handle_metadata = reinterpret_cast<fidl_handle_metadata_t*>(&handle_metadata),
-              .num_handles = 1,
-          },
-  };
-  auto msg = fidl::OutgoingMessage::FromEncodedCValue(c_msg);
+  auto msg = fidl::OutgoingMessage::Create_InternalMayBreak({
+      .transport_vtable = &fidl::internal::ChannelTransport::VTable,
+      .iovecs = iovecs,
+      .num_iovecs = std::size(iovecs),
+      .handles = &handle,
+      .handle_metadata = reinterpret_cast<fidl_handle_metadata_t*>(&handle_metadata),
+      .num_handles = 1,
+  });
   auto result = fidl::OutgoingToEncodedMessage(msg);
   ASSERT_EQ(ZX_ERR_INVALID_ARGS, result.status());
   ASSERT_EQ(fidl::Reason::kEncodeError, result.error().reason());
@@ -146,18 +136,14 @@ TEST(OutgoingToEncodedMessage, HandlesWrongRights) {
   zx_channel_iovec_t iovecs[1] = {
       {.buffer = bytes, .capacity = std::size(bytes), .reserved = 0},
   };
-  fidl_outgoing_msg_t c_msg = {
-      .type = FIDL_OUTGOING_MSG_TYPE_IOVEC,
-      .iovec =
-          {
-              .iovecs = iovecs,
-              .num_iovecs = std::size(iovecs),
-              .handles = &handle,
-              .handle_metadata = reinterpret_cast<fidl_handle_metadata_t*>(&handle_metadata),
-              .num_handles = 1,
-          },
-  };
-  auto msg = fidl::OutgoingMessage::FromEncodedCValue(c_msg);
+  auto msg = fidl::OutgoingMessage::Create_InternalMayBreak({
+      .transport_vtable = &fidl::internal::ChannelTransport::VTable,
+      .iovecs = iovecs,
+      .num_iovecs = std::size(iovecs),
+      .handles = &handle,
+      .handle_metadata = reinterpret_cast<fidl_handle_metadata_t*>(&handle_metadata),
+      .num_handles = 1,
+  });
   auto result = fidl::OutgoingToEncodedMessage(msg);
   ASSERT_EQ(ZX_ERR_INVALID_ARGS, result.status());
   ASSERT_EQ(fidl::Reason::kEncodeError, result.error().reason());

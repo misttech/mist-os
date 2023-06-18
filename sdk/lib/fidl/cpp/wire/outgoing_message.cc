@@ -13,118 +13,19 @@
 
 namespace fidl {
 
-OutgoingMessage OutgoingMessage::FromEncodedCMessage(const fidl_outgoing_msg_t& c_msg) {
-  return OutgoingMessage(c_msg, true);
-}
-
-OutgoingMessage OutgoingMessage::FromEncodedCValue(const fidl_outgoing_msg_t& c_msg) {
-  return OutgoingMessage(c_msg, false);
-}
-
-OutgoingMessage::OutgoingMessage(const fidl_outgoing_msg_t& c_msg, bool is_transactional)
-    : fidl::Status(fidl::Status::Ok()) {
-  transport_vtable_ = &internal::ChannelTransport::VTable;
-  switch (c_msg.type) {
-    case FIDL_OUTGOING_MSG_TYPE_IOVEC: {
-      message_ = c_msg;
-      iovec_capacity_ = c_msg.iovec.num_iovecs;
-      handle_capacity_ = c_msg.iovec.num_handles;
-      break;
-    }
-    case FIDL_OUTGOING_MSG_TYPE_BYTE: {
-      backing_buffer_ = reinterpret_cast<uint8_t*>(c_msg.byte.bytes);
-      backing_buffer_capacity_ = c_msg.byte.num_bytes;
-      converted_byte_message_iovec_ = {
-          .buffer = backing_buffer_,
-          .capacity = backing_buffer_capacity_,
-          .reserved = 0,
-      };
-      message_ = {
-          .type = FIDL_OUTGOING_MSG_TYPE_IOVEC,
-          .iovec =
-              {
-                  .iovecs = &converted_byte_message_iovec_,
-                  .num_iovecs = 1,
-                  .handles = c_msg.byte.handles,
-                  .handle_metadata = c_msg.byte.handle_metadata,
-                  .num_handles = c_msg.byte.num_handles,
-              },
-      };
-      iovec_capacity_ = 1;
-      handle_capacity_ = c_msg.byte.num_handles;
-      break;
-    }
-    default:
-      ZX_PANIC("unhandled FIDL outgoing message type");
-  }
-  is_transactional_ = is_transactional;
-}
-
 OutgoingMessage::OutgoingMessage(const ::fidl::Status& failure)
-    : fidl::Status(failure),
-      message_({.type = FIDL_OUTGOING_MSG_TYPE_IOVEC,
-                .iovec = {
-                    .iovecs = nullptr,
-                    .num_iovecs = 0,
-                    .handles = nullptr,
-                    .handle_metadata = nullptr,
-                    .num_handles = 0,
-                }}) {
+    : fidl::Status(failure), message_({}) {
   ZX_DEBUG_ASSERT(failure.status() != ZX_OK);
 }
 
 OutgoingMessage::OutgoingMessage(InternalIovecConstructorArgs args)
-    : fidl::Status(fidl::Status::Ok()),
-      transport_vtable_(args.transport_vtable),
-      message_({
-          .type = FIDL_OUTGOING_MSG_TYPE_IOVEC,
-          .iovec = {.iovecs = args.iovecs,
-                    .num_iovecs = 0,
-                    .handles = args.handles,
-                    .handle_metadata = args.handle_metadata,
-                    .num_handles = 0},
-      }),
-      iovec_capacity_(args.iovec_capacity),
-      handle_capacity_(args.handle_capacity),
-      backing_buffer_capacity_(args.backing_buffer_capacity),
-      backing_buffer_(args.backing_buffer),
-      is_transactional_(args.is_transactional) {}
-
-OutgoingMessage::OutgoingMessage(InternalByteBackedConstructorArgs args)
-    : fidl::Status(fidl::Status::Ok()),
-      transport_vtable_(args.transport_vtable),
-      message_({
-          .type = FIDL_OUTGOING_MSG_TYPE_IOVEC,
-          .iovec =
-              {
-                  .iovecs = &converted_byte_message_iovec_,
-                  .num_iovecs = 1,
-                  .handles = args.handles,
-                  .handle_metadata = args.handle_metadata,
-                  .num_handles = args.num_handles,
-              },
-      }),
-      iovec_capacity_(1),
-      handle_capacity_(args.num_handles),
-      backing_buffer_capacity_(args.num_bytes),
-      backing_buffer_(args.bytes),
-      converted_byte_message_iovec_(
-          {.buffer = backing_buffer_, .capacity = backing_buffer_capacity_, .reserved = 0}),
-      is_transactional_(args.is_transactional) {}
+    : fidl::Status(fidl::Status::Ok()), message_(args) {}
 
 OutgoingMessage::~OutgoingMessage() {
   // We may not have a vtable when the |OutgoingMessage| represents an error.
-  if (transport_vtable_) {
-    transport_vtable_->encoding_configuration->close_many(handles(), handle_actual());
+  if (message_.transport_vtable) {
+    message_.transport_vtable->encoding_configuration->close_many(handles(), handle_actual());
   }
-}
-
-fidl_outgoing_msg_t OutgoingMessage::ReleaseToEncodedCMessage() && {
-  ZX_DEBUG_ASSERT(status() == ZX_OK);
-  ZX_ASSERT(transport_type() == internal::fidl_transport_type::kChannel);
-  fidl_outgoing_msg_t result = message_;
-  ReleaseHandles();
-  return result;
 }
 
 uint32_t OutgoingMessage::CountBytes() const {
@@ -176,15 +77,15 @@ void OutgoingMessage::EncodeImpl(fidl::internal::WireFormatVersion wire_format_v
   }
 
   fit::result<fidl::Error, fidl::internal::WireEncoder::Result> result = fidl::internal::WireEncode(
-      inline_size, encode_fn, transport_vtable_->encoding_configuration, data, iovecs(),
-      iovec_capacity(), handles(), message_.iovec.handle_metadata, handle_capacity(),
-      backing_buffer(), backing_buffer_capacity());
+      inline_size, encode_fn, message_.transport_vtable->encoding_configuration, data, iovecs(),
+      iovec_capacity(), handles(), message_.handle_metadata, handle_capacity(), backing_buffer(),
+      backing_buffer_capacity());
   if (unlikely(!result.is_ok())) {
     SetStatus(result.error_value());
     return;
   }
-  iovec_message().num_iovecs = static_cast<uint32_t>(result.value().iovec_actual);
-  iovec_message().num_handles = static_cast<uint32_t>(result.value().handle_actual);
+  message_.num_iovecs = static_cast<uint32_t>(result.value().iovec_actual);
+  message_.num_handles = static_cast<uint32_t>(result.value().handle_actual);
 }
 
 void OutgoingMessage::Write(internal::AnyUnownedTransport transport, WriteOptions options) {
@@ -193,12 +94,14 @@ void OutgoingMessage::Write(internal::AnyUnownedTransport transport, WriteOption
   }
   ZX_ASSERT(transport_type() == transport.type());
   ZX_ASSERT(is_transactional());
-  zx_status_t status = transport.write(
-      std::move(options), internal::WriteArgs{.data = iovecs(),
+  zx_status_t status =
+      transport.write(std::move(options), internal::WriteArgs{
+                                              .data = iovecs(),
                                               .handles = handles(),
-                                              .handle_metadata = message_.iovec.handle_metadata,
+                                              .handle_metadata = message_.handle_metadata,
                                               .data_count = iovec_actual(),
-                                              .handles_count = handle_actual()});
+                                              .handles_count = handle_actual(),
+                                          });
   ReleaseHandles();
   if (unlikely(status != ZX_OK)) {
     SetStatus(fidl::Status::TransportError(status));
@@ -224,7 +127,7 @@ IncomingHeaderAndMessage OutgoingMessage::CallImpl(internal::AnyUnownedTransport
           internal::WriteArgs{
               .data = iovecs(),
               .handles = handles(),
-              .handle_metadata = message_.iovec.handle_metadata,
+              .handle_metadata = message_.handle_metadata,
               .data_count = iovec_actual(),
               .handles_count = handle_actual(),
           },
@@ -246,8 +149,8 @@ IncomingHeaderAndMessage OutgoingMessage::CallImpl(internal::AnyUnownedTransport
     return IncomingHeaderAndMessage::Create(Status(*this));
   }
 
-  return IncomingHeaderAndMessage(transport_vtable_, result_bytes, actual_num_bytes, result_handles,
-                                  result_handle_metadata, actual_num_handles);
+  return IncomingHeaderAndMessage(message_.transport_vtable, result_bytes, actual_num_bytes,
+                                  result_handles, result_handle_metadata, actual_num_handles);
 }
 
 OutgoingMessage::CopiedBytes::CopiedBytes(const OutgoingMessage& msg) {

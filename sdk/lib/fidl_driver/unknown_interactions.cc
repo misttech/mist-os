@@ -12,19 +12,25 @@ namespace fidl::internal {
 void SendDriverUnknownMethodReply(UnknownMethodReply reply, ::fidl::Transaction* txn) {
   fdf::Arena arena('FIDL');
 
-  void* arena_bytes = arena.Allocate(sizeof(reply));
-  ::std::memcpy(arena_bytes, &reply, sizeof(reply));
+  decltype(reply)& arena_reply = *static_cast<decltype(reply)*>(arena.Allocate(sizeof(reply)));
+  arena_reply = reply;
 
-  ::fidl::OutgoingMessage msg = ::fidl::OutgoingMessage::Create_InternalMayBreak(
-      ::fidl::OutgoingMessage::InternalByteBackedConstructorArgs{
-          .transport_vtable = &DriverTransport::VTable,
-          .bytes = static_cast<uint8_t*>(arena_bytes),
-          .num_bytes = sizeof(reply),
-          .handles = nullptr,
-          .handle_metadata = nullptr,
-          .num_handles = 0,
-          .is_transactional = true,
-      });
+  zx_channel_iovec_t& iovec_on_arena =
+      *static_cast<zx_channel_iovec_t*>(arena.Allocate(sizeof(zx_channel_iovec_t)));
+  iovec_on_arena = {
+      .buffer = &arena_reply,
+      .capacity = sizeof(reply),
+  };
+
+  ::fidl::OutgoingMessage msg = ::fidl::OutgoingMessage::Create_InternalMayBreak({
+      .transport_vtable = &DriverTransport::VTable,
+      .iovecs = &iovec_on_arena,
+      .num_iovecs = 1,
+      .handles = nullptr,
+      .handle_metadata = nullptr,
+      .num_handles = 0,
+      .is_transactional = true,
+  });
 
   ::fidl::internal::OutgoingTransportContext context =
       ::fidl::internal::OutgoingTransportContext::Create<::fidl::internal::DriverTransport>(

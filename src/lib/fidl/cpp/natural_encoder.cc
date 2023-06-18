@@ -89,16 +89,19 @@ fidl::OutgoingMessage NaturalBodyEncoder::GetOutgoingMessage(MessageType type) {
 
   uint32_t num_handles = handle_actual_;
   handle_actual_ = 0;
-  return fidl::OutgoingMessage::Create_InternalMayBreak(
-      fidl::OutgoingMessage::InternalByteBackedConstructorArgs{
-          .transport_vtable = vtable_,
-          .bytes = bytes_.data(),
-          .num_bytes = static_cast<uint32_t>(bytes_.size()),
-          .handles = handles_,
-          .handle_metadata = static_cast<fidl_handle_metadata_t*>(handle_metadata_.get()),
-          .num_handles = num_handles,
-          .is_transactional = type == MessageType::kTransactional,
-      });
+  iovec_ = {
+      .buffer = bytes_.data(),
+      .capacity = static_cast<uint32_t>(bytes_.size()),
+  };
+  return fidl::OutgoingMessage::Create_InternalMayBreak({
+      .transport_vtable = vtable_,
+      .iovecs = &iovec_,
+      .num_iovecs = 1,
+      .handles = handles_,
+      .handle_metadata = static_cast<fidl_handle_metadata_t*>(handle_metadata_.get()),
+      .num_handles = num_handles,
+      .is_transactional = type == MessageType::kTransactional,
+  });
 }
 
 void NaturalBodyEncoder::Reset() {

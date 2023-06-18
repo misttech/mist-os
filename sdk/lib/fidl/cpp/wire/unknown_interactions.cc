@@ -35,16 +35,21 @@ UnknownMethodReply UnknownMethodReply::MakeReplyFor(uint64_t method_ordinal,
 }
 
 void SendChannelUnknownMethodReply(UnknownMethodReply reply, ::fidl::Transaction *txn) {
-  auto message = ::fidl::OutgoingMessage::Create_InternalMayBreak(
-      ::fidl::OutgoingMessage::InternalByteBackedConstructorArgs{
-          .transport_vtable = &ChannelTransport::VTable,
-          .bytes = reinterpret_cast<uint8_t *>(&reply),
-          .num_bytes = sizeof(reply),
-          .handles = nullptr,
-          .handle_metadata = nullptr,
-          .num_handles = 0,
-          .is_transactional = true,
-      });
+  zx_channel_iovec_t iovecs[] = {
+      {
+          .buffer = &reply,
+          .capacity = sizeof(reply),
+      },
+  };
+  auto message = ::fidl::OutgoingMessage::Create_InternalMayBreak({
+      .transport_vtable = &ChannelTransport::VTable,
+      .iovecs = iovecs,
+      .num_iovecs = std::size(iovecs),
+      .handles = nullptr,
+      .handle_metadata = nullptr,
+      .num_handles = 0,
+      .is_transactional = true,
+  });
   txn->Reply(&message, {});
 }
 

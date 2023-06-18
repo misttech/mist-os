@@ -130,18 +130,17 @@ class UnownedEncodedMessageBase {
                             uint32_t handle_capacity, bool is_transactional, void* value,
                             size_t inline_size, TopLevelEncodeFn encode_fn)
       : message_(likely(backing_buffer.is_ok())
-                     ? ::fidl::OutgoingMessage::Create_InternalMayBreak(
-                           ::fidl::OutgoingMessage::InternalIovecConstructorArgs{
-                               .transport_vtable = &Transport::VTable,
-                               .iovecs = iovecs_,
-                               .iovec_capacity = iovec_capacity,
-                               .handles = handles,
-                               .handle_metadata = handle_metadata,
-                               .handle_capacity = handle_capacity,
-                               .backing_buffer = backing_buffer->data,
-                               .backing_buffer_capacity = backing_buffer->capacity,
-                               .is_transactional = is_transactional,
-                           })
+                     ? ::fidl::OutgoingMessage::Create_InternalMayBreak({
+                           .transport_vtable = &Transport::VTable,
+                           .iovecs = iovecs_,
+                           .iovec_capacity = iovec_capacity,
+                           .handles = handles,
+                           .handle_metadata = handle_metadata,
+                           .handle_capacity = handle_capacity,
+                           .backing_buffer = backing_buffer->data,
+                           .backing_buffer_capacity = backing_buffer->capacity,
+                           .is_transactional = is_transactional,
+                       })
                      : ::fidl::OutgoingMessage{backing_buffer.error_value()}),
         wire_format_version_(wire_format_version) {
     if (likely(message_.ok())) {

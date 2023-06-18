@@ -4,7 +4,7 @@
   "pkg/fidl_cpp_base_v2/include/lib/fidl/cpp/internal/transport_err.h": "fa8ac11e3ac899ac99d8d98475a6644f",
   "pkg/fidl_cpp_base_v2/include/lib/fidl/cpp/natural_coding_traits.h": "18c843462b959b6fbb17a3dae5673b35",
   "pkg/fidl_cpp_base_v2/include/lib/fidl/cpp/natural_decoder.h": "d4107e1803efb31649bd146717db5157",
-  "pkg/fidl_cpp_base_v2/include/lib/fidl/cpp/natural_encoder.h": "5172a4055fa2ec6bbb5766480e05411c",
+  "pkg/fidl_cpp_base_v2/include/lib/fidl/cpp/natural_encoder.h": "e7bffd334fba11ca15d32af20844192e",
   "pkg/fidl_cpp_base_v2/include/lib/fidl/cpp/natural_types.h": "645710a309b54b6ae3b6d106981647bc",
   "pkg/fidl_cpp_base_v2/include/lib/fidl/cpp/wire_natural_conversions.h": "d6f5a7e27b84e2921b274607bbbdd9bc"
 }

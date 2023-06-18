@@ -21,19 +21,20 @@ class GoodMessage {
   }
 
   fidl::OutgoingMessage message() {
-    fidl_outgoing_msg_t c_msg = {
-        .type = FIDL_OUTGOING_MSG_TYPE_BYTE,
-        .byte =
-            {
-                .bytes = reinterpret_cast<uint8_t*>(&content_),
-                .num_bytes = sizeof(content_),
-            },
-    };
-    return fidl::OutgoingMessage::FromEncodedCMessage(c_msg);
+    return fidl::OutgoingMessage::Create_InternalMayBreak({
+        .transport_vtable = &fidl::internal::ChannelTransport::VTable,
+        .iovecs = &iovec_,
+        .num_iovecs = 1,
+        .is_transactional = true,
+    });
   }
 
  private:
   FIDL_ALIGNDECL fidl_message_header_t content_ = {};
+  zx_channel_iovec_t iovec_ = {
+      .buffer = &content_,
+      .capacity = sizeof(content_),
+  };
 };
 
 }  // namespace fidl_testing

@@ -7,9 +7,11 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/wait.h>
+#include <lib/fidl/cpp/wire/outgoing_message.h>
 #include <lib/zx/event.h>
 #include <zircon/fidl.h>
 #include <zircon/status.h>
+#include <zircon/types.h>
 
 #include <gtest/gtest.h>
 
@@ -43,41 +45,34 @@ static_assert(sizeof(fidl::WireResult<test::ReceiveStrictEnvelope::GetBoundedXUn
 class RewriteTransaction : public fidl::Transaction {
  public:
   std::unique_ptr<Transaction> TakeOwnership() override {
-    ZX_ASSERT_MSG(false, "Never called");
+    ADD_FAILURE() << "Never called";
     return {};
   }
 
   void Close(zx_status_t epitaph) override {
-    ZX_ASSERT_MSG(false, "Transaction::Close called with epitaph %d", epitaph);
+    ADD_FAILURE() << "Transaction::Close called with epitaph " << epitaph;
   }
 
   zx_status_t Reply(fidl::OutgoingMessage* indicator_msg,
                     fidl::WriteOptions write_options) override {
-    ZX_ASSERT(txid_ != 0);
+    EXPECT_NE(txid_, 0u);
     auto indicator_msg_bytes = indicator_msg->CopyBytes();
 
-    char real_msg_bytes[ZX_CHANNEL_MAX_MSG_BYTES] = {};
+    unsigned char real_msg_bytes[ZX_CHANNEL_MAX_MSG_BYTES] = {};
     zx_handle_t real_msg_handles[ZX_CHANNEL_MAX_MSG_HANDLES] = {};
     fidl_channel_handle_metadata_t real_msg_handle_metadata[ZX_CHANNEL_MAX_MSG_HANDLES] = {};
     // Copy from original header to get magic, flags, and ordinals.
-    ZX_ASSERT(indicator_msg_bytes.size() >= sizeof(fidl_message_header_t));
+    EXPECT_GE(indicator_msg_bytes.size(), sizeof(fidl_message_header_t));
     memcpy(real_msg_bytes, indicator_msg_bytes.data(), sizeof(fidl_message_header_t));
     fidl_message_header_t* header = reinterpret_cast<fidl_message_header_t*>(real_msg_bytes);
     header->txid = txid_;
-    fidl_outgoing_msg_t real_msg = {
-        .type = FIDL_OUTGOING_MSG_TYPE_BYTE,
-        .byte =
-            {
-                .bytes = real_msg_bytes,
-                .handles = real_msg_handles,
-                .handle_metadata =
-                    reinterpret_cast<fidl_handle_metadata_t*>(real_msg_handle_metadata),
-                .num_bytes = 0u,
-                .num_handles = 0u,
-            },
+    zx_channel_iovec_t iovec = {
+        .buffer = real_msg_bytes,
+        .capacity = 0,
     };
+    uint32_t num_handles = 0;
 
-    ZX_ASSERT(indicator_msg_bytes.size() >=
+    EXPECT_GE(indicator_msg_bytes.size(),
               sizeof(fidl::internal::TransactionalResponse<
                      test::ReceiveFlexibleEnvelope::GetUnknownXUnionMoreHandles>));
     // Determine if |indicator_msg| has a xunion or a table, by inspecting the first few bytes.
@@ -106,9 +101,8 @@ class RewriteTransaction : public fidl::Transaction {
             .num_bytes = kUnknownBytes,
             .num_handles = kUnknownHandles,
         };
-        ZX_ASSERT(real_msg.type == FIDL_OUTGOING_MSG_TYPE_BYTE);
-        real_msg.byte.num_bytes = envelope_payload_offset + kUnknownBytes;
-        real_msg.byte.num_handles = kUnknownHandles;
+        iovec.capacity = envelope_payload_offset + kUnknownBytes;
+        num_handles = kUnknownHandles;
         memset(&real_msg_bytes[envelope_payload_offset], 0xAA, kUnknownBytes);
       } else {
         // The |want_more_than_4_handles_at_ordinal_4| field was set.
@@ -116,7 +110,7 @@ class RewriteTransaction : public fidl::Transaction {
         constexpr uint32_t kUnknownBytes = 16;
         constexpr uint32_t kUnknownHandles = ZX_CHANNEL_MAX_MSG_HANDLES;
         for (uint32_t i = 0; i < kUnknownHandles; i++) {
-          ZX_ASSERT(zx_event_create(0, &real_msg_handles[i]) == ZX_OK);
+          EXPECT_EQ(zx_event_create(0, &real_msg_handles[i]), ZX_OK);
         }
         real_response->envelopes.count = 4;
         const auto envelope_header_offset =
@@ -128,9 +122,8 @@ class RewriteTransaction : public fidl::Transaction {
             .num_bytes = kUnknownBytes,
             .num_handles = kUnknownHandles,
         };
-        ZX_ASSERT(real_msg.type == FIDL_OUTGOING_MSG_TYPE_BYTE);
-        real_msg.byte.num_bytes = envelope_payload_offset + kUnknownBytes;
-        real_msg.byte.num_handles = kUnknownHandles;
+        iovec.capacity = envelope_payload_offset + kUnknownBytes;
+        num_handles = kUnknownHandles;
         memset(&real_msg_bytes[envelope_payload_offset], 0xBB, kUnknownBytes);
       }
     } else {
@@ -155,10 +148,8 @@ class RewriteTransaction : public fidl::Transaction {
               .num_bytes = kUnknownBytes,
               .num_handles = kUnknownHandles,
           };
-          ZX_ASSERT(real_msg.type == FIDL_OUTGOING_MSG_TYPE_BYTE);
-          real_msg.byte.num_bytes =
-              sizeof(fidl_message_header_t) + sizeof(fidl_xunion_v2_t) + kUnknownBytes;
-          real_msg.byte.num_handles = kUnknownHandles;
+          iovec.capacity = sizeof(fidl_message_header_t) + sizeof(fidl_xunion_v2_t) + kUnknownBytes;
+          num_handles = kUnknownHandles;
           memset(&real_msg_bytes[sizeof(fidl_message_header_t) + sizeof(fidl_xunion_v2_t)], 0xAA,
                  kUnknownBytes);
           break;
@@ -168,40 +159,35 @@ class RewriteTransaction : public fidl::Transaction {
           constexpr uint32_t kUnknownBytes = 16;
           constexpr uint32_t kUnknownHandles = ZX_CHANNEL_MAX_MSG_HANDLES;
           for (uint32_t i = 0; i < kUnknownHandles; i++) {
-            ZX_ASSERT(zx_event_create(0, &real_msg_handles[i]) == ZX_OK);
+            EXPECT_EQ(zx_event_create(0, &real_msg_handles[i]), ZX_OK);
           }
           real_response->envelope = fidl_envelope_v2_t{
               .num_bytes = kUnknownBytes,
               .num_handles = kUnknownHandles,
           };
-          ZX_ASSERT(real_msg.type == FIDL_OUTGOING_MSG_TYPE_BYTE);
-          real_msg.byte.num_bytes =
-              sizeof(fidl_message_header_t) + sizeof(fidl_xunion_v2_t) + kUnknownBytes;
-          real_msg.byte.num_handles = kUnknownHandles;
+          iovec.capacity = sizeof(fidl_message_header_t) + sizeof(fidl_xunion_v2_t) + kUnknownBytes;
+          num_handles = kUnknownHandles;
           memset(&real_msg_bytes[sizeof(fidl_message_header_t) + sizeof(fidl_xunion_v2_t)], 0xBB,
                  kUnknownBytes);
           break;
         }
         default:
-          ZX_ASSERT_MSG(false, "Cannot reach here");
+          ADD_FAILURE() << "Cannot reach here";
       }
     }
-    ZX_ASSERT(real_msg.type == FIDL_OUTGOING_MSG_TYPE_BYTE);
     zx_handle_disposition_t handle_dispositions[ZX_CHANNEL_MAX_MSG_HANDLES];
-    fidl_channel_handle_metadata_t* metadata =
-        reinterpret_cast<fidl_channel_handle_metadata_t*>(real_msg.byte.handle_metadata);
-    for (uint32_t i = 0; i < real_msg.byte.num_handles; i++) {
+    for (uint32_t i = 0; i < num_handles; i++) {
       handle_dispositions[i] = {
           .operation = ZX_HANDLE_OP_MOVE,
-          .handle = real_msg.byte.handles[i],
-          .type = metadata[i].obj_type,
-          .rights = metadata[i].rights,
+          .handle = real_msg_handles[i],
+          .type = real_msg_handle_metadata[i].obj_type,
+          .rights = real_msg_handle_metadata[i].rights,
           .result = ZX_OK,
       };
     }
-    zx_status_t status = channel_->write_etc(0, real_msg.byte.bytes, real_msg.byte.num_bytes,
-                                             handle_dispositions, real_msg.byte.num_handles);
-    ZX_ASSERT(status == ZX_OK);
+    EXPECT_EQ(
+        channel_->write_etc(0, iovec.buffer, iovec.capacity, handle_dispositions, num_handles),
+        ZX_OK);
     return ZX_OK;
   }
 
@@ -234,7 +220,7 @@ class Server : fidl::WireServer<test::ReceiveFlexibleEnvelope>, private async_wa
     auto flexible_table = test::wire::FlexibleTable::Builder(allocator)
                               .want_more_than_30_bytes_at_ordinal_3({})
                               .Build();
-    completer.Reply(std::move(flexible_table));
+    completer.Reply(flexible_table);
   }
 
   void GetUnknownTableMoreHandles(GetUnknownTableMoreHandlesCompleter::Sync& completer) override {
@@ -242,7 +228,7 @@ class Server : fidl::WireServer<test::ReceiveFlexibleEnvelope>, private async_wa
     auto flexible_table = test::wire::FlexibleTable::Builder(allocator)
                               .want_more_than_4_handles_at_ordinal_4({})
                               .Build();
-    completer.Reply(std::move(flexible_table));
+    completer.Reply(flexible_table);
   }
 
   Server(async_dispatcher_t* dispatcher, fidl::ServerEnd<test::ReceiveFlexibleEnvelope> channel)
@@ -289,7 +275,7 @@ class Server : fidl::WireServer<test::ReceiveFlexibleEnvelope>, private async_wa
       // Will only get here if every single message was handled synchronously and successfully.
       async_begin_wait(dispatcher_, this);
     } else {
-      ZX_ASSERT(signal->observed & ZX_CHANNEL_PEER_CLOSED);
+      ASSERT_TRUE(signal->observed & ZX_CHANNEL_PEER_CLOSED);
     }
   }
 
@@ -312,7 +298,7 @@ class Server : fidl::WireServer<test::ReceiveFlexibleEnvelope>, private async_wa
 
 class FlexibleEnvelopeTest : public ::testing::Test {
  protected:
-  virtual void SetUp() {
+  void SetUp() override {
     loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigAttachToCurrentThread);
     ASSERT_EQ(loop_->StartThread("test_llcpp_flexible_envelope_server"), ZX_OK);
     zx::result server_end = fidl::CreateEndpoints(&client_end_);
@@ -320,7 +306,7 @@ class FlexibleEnvelopeTest : public ::testing::Test {
     server_ = std::make_unique<Server>(loop_->dispatcher(), std::move(*server_end));
   }
 
-  virtual void TearDown() {
+  void TearDown() override {
     loop_->Quit();
     loop_->JoinThreads();
   }
@@ -443,7 +429,7 @@ struct MessageStorage {
   void AddHandles(uint32_t count) {
     for (uint32_t i = 0; i < count; i++) {
       zx::event e;
-      ZX_ASSERT(ZX_OK == zx::event::create(0, &e));
+      ASSERT_EQ(zx::event::create(0, &e), ZX_OK);
       handles_[num_handles_] = e.release();
       num_handles_++;
     }

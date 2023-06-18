@@ -12,6 +12,7 @@
 #include <lib/fidl/internal.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/fidl.h>
+#include <zircon/types.h>
 
 #include <vector>
 
@@ -72,6 +73,7 @@ class NaturalEncoder {
  protected:
   const CodingConfig* coding_config_;
   std::vector<uint8_t> bytes_;
+  zx_channel_iovec_t iovec_;
   fidl_handle_t handles_[ZX_CHANNEL_MAX_MSG_HANDLES];
   uint32_t handle_actual_ = 0;
   MallocedUniquePtr handle_metadata_ = MallocedUniquePtr(nullptr, ptr_noop);

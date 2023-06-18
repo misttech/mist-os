@@ -6,6 +6,7 @@
 #include <lib/fidl/cpp/wire/client_base.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fidl/cpp/wire/message.h>
+#include <zircon/types.h>
 
 #include <array>
 
@@ -24,27 +25,24 @@ constexpr uint64_t kTestOrdinal = 0x1234567812345678;
 // |GoodMessage| is a helper to create a valid FIDL transactional message.
 class GoodMessage {
  public:
-  GoodMessage() : message_(MakeMessage(&content_)) {
+  GoodMessage() {
     fidl::InitTxnHeader(&content_, 0, kTestOrdinal, fidl::MessageDynamicFlags::kStrictMethod);
   }
 
   fidl::OutgoingMessage& message() { return message_; }
 
  private:
-  static fidl::OutgoingMessage MakeMessage(fidl_message_header_t* content) {
-    fidl_outgoing_msg_t c_msg = {
-        .type = FIDL_OUTGOING_MSG_TYPE_BYTE,
-        .byte =
-            {
-                .bytes = reinterpret_cast<uint8_t*>(content),
-                .num_bytes = sizeof(content_),
-            },
-    };
-    return fidl::OutgoingMessage::FromEncodedCMessage(c_msg);
-  }
-
   FIDL_ALIGNDECL fidl_message_header_t content_ = {};
-  fidl::OutgoingMessage message_;
+  zx_channel_iovec_t iovec_ = {
+      .buffer = &content_,
+      .capacity = sizeof(content_),
+  };
+  fidl::OutgoingMessage message_ = fidl::OutgoingMessage::Create_InternalMayBreak({
+      .transport_vtable = &fidl::internal::ChannelTransport::VTable,
+      .iovecs = &iovec_,
+      .num_iovecs = 1,
+      .is_transactional = true,
+  });
 };
 
 }  // namespace

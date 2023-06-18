@@ -2,28 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifndef LIB_FIDL_CPP_WIRE_OUTGOING_MESSAGE_H_
+#define LIB_FIDL_CPP_WIRE_OUTGOING_MESSAGE_H_
+
 #include <lib/fidl/cpp/wire/internal/transport.h>
 #include <lib/fidl/cpp/wire/status.h>
 #include <lib/fidl/cpp/wire/wire_coding_traits.h>
 #include <lib/fidl/cpp/wire_format_metadata.h>
 #include <lib/stdcompat/version.h>
 #include <zircon/fidl.h>
+#include <zircon/types.h>
 
 #include <cstdint>
 #include <utility>
 #if defined(__cpp_lib_ranges) && __cpp_lib_ranges >= 201811L
 #include <ranges>
 #endif
-
-#ifndef LIB_FIDL_CPP_WIRE_OUTGOING_MESSAGE_H_
-#define LIB_FIDL_CPP_WIRE_OUTGOING_MESSAGE_H_
-
-namespace fidl_testing {
-
-// Forward declaration of test helpers to support friend declaration.
-class MessageChecker;
-
-}  // namespace fidl_testing
 
 namespace fidl {
 
@@ -32,7 +26,7 @@ namespace internal {
 template <typename>
 class UnownedEncodedMessageBase;
 
-}
+}  // namespace internal
 
 // |OutgoingMessage| represents a FIDL message on the write path.
 //
@@ -56,55 +50,27 @@ class OutgoingMessage : public ::fidl::Status {
   OutgoingMessage() = delete;
   ~OutgoingMessage();
 
-  // Creates an object which can manage a FIDL message. This should only be used
-  // when interfacing with C APIs. |c_msg| must contain an already-encoded
-  // message. The handles in |c_msg| are owned by the returned |OutgoingMessage|
-  // object.
-  //
-  // Only the channel transport is supported for C messages. For other transports,
-  // use other constructors of |OutgoingMessage|.
-  //
-  // The bytes must represent a transactional message.
-  static OutgoingMessage FromEncodedCMessage(const fidl_outgoing_msg_t& c_msg);
-
-  // Creates an object which can manage an encoded FIDL value.
-  // This is identical to |FromEncodedCMessage| but the |OutgoingMessage|
-  // is non-transactional instead of transactional.
-  static OutgoingMessage FromEncodedCValue(const fidl_outgoing_msg_t& c_msg);
-
   struct InternalIovecConstructorArgs {
     const internal::TransportVTable* transport_vtable;
     zx_channel_iovec_t* iovecs;
+    uint32_t num_iovecs;
     uint32_t iovec_capacity;
     fidl_handle_t* handles;
     fidl_handle_metadata_t* handle_metadata;
+    uint32_t num_handles;
     uint32_t handle_capacity;
     uint8_t* backing_buffer;
     uint32_t backing_buffer_capacity;
     bool is_transactional;
   };
+
   // Creates an object which can manage a FIDL message.
-  // |args.iovecs|, |args.handles| and |args.backing_buffer| contain undefined data that will be
-  // populated during |Encode|.
+  //
+  // |args.iovecs|, |args.handles|, and |args.handle_metadata| should contain encoded data up to
+  // |args.num_iovecs| and |args.num_handles|.
+  //
   // Internal-only function that should not be called outside of the FIDL library.
   static OutgoingMessage Create_InternalMayBreak(InternalIovecConstructorArgs args) {
-    return OutgoingMessage(args);
-  }
-
-  struct InternalByteBackedConstructorArgs {
-    const internal::TransportVTable* transport_vtable;
-    uint8_t* bytes;
-    uint32_t num_bytes;
-    fidl_handle_t* handles;
-    fidl_handle_metadata_t* handle_metadata;
-    uint32_t num_handles;
-    bool is_transactional;
-  };
-
-  // Creates an object which can manage a FIDL message or body.
-  // |args.bytes| and |args.handles| should already contain encoded data.
-  // Internal-only function that should not be called outside of the FIDL library.
-  static OutgoingMessage Create_InternalMayBreak(InternalByteBackedConstructorArgs args) {
     return OutgoingMessage(args);
   }
 
@@ -121,31 +87,24 @@ class OutgoingMessage : public ::fidl::Status {
     if (!ok()) {
       return;
     }
-    ZX_ASSERT(is_transactional_);
+    ZX_ASSERT(message_.is_transactional);
     ZX_ASSERT(iovec_actual() >= 1 && iovecs()[0].capacity >= sizeof(fidl_message_header_t));
     // The byte buffer is const because the kernel only reads the bytes.
     // const_cast is needed to populate it here.
     static_cast<fidl_message_header_t*>(const_cast<void*>(iovecs()[0].buffer))->txid = txid;
   }
 
-  zx_channel_iovec_t* iovecs() const { return iovec_message().iovecs; }
-  uint32_t iovec_actual() const { return iovec_message().num_iovecs; }
-  fidl_handle_t* handles() const { return iovec_message().handles; }
-  internal::fidl_transport_type transport_type() const { return transport_vtable_->type; }
-  uint32_t handle_actual() const { return iovec_message().num_handles; }
+  zx_channel_iovec_t* iovecs() const { return message_.iovecs; }
+  uint32_t iovec_actual() const { return message_.num_iovecs; }
+  fidl_handle_t* handles() const { return message_.handles; }
+  internal::fidl_transport_type transport_type() const { return message_.transport_vtable->type; }
+  uint32_t handle_actual() const { return message_.num_handles; }
 
   template <typename Transport>
   typename Transport::HandleMetadata* handle_metadata() const {
-    ZX_ASSERT(Transport::VTable.type == transport_vtable_->type);
-    return reinterpret_cast<typename Transport::HandleMetadata*>(iovec_message().handle_metadata);
+    ZX_ASSERT(Transport::VTable.type == message_.transport_vtable->type);
+    return reinterpret_cast<typename Transport::HandleMetadata*>(message_.handle_metadata);
   }
-
-  // Convert the outgoing message to its C API counterpart, releasing the
-  // ownership of handles to the caller in the process. This consumes the
-  // |OutgoingMessage|.
-  //
-  // This should only be called while the message is in its encoded form.
-  fidl_outgoing_msg_t ReleaseToEncodedCMessage() &&;
 
   // Returns the number of bytes in the message.
   uint32_t CountBytes() const;
@@ -191,7 +150,7 @@ class OutgoingMessage : public ::fidl::Status {
 
   // Release the handles to prevent them to be closed by CloseHandles. This method is only useful
   // when interfacing with low-level channel operations which consume the handles.
-  void ReleaseHandles() { iovec_message().num_handles = 0; }
+  void ReleaseHandles() { message_.num_handles = 0; }
 
   // Writes the message to the |transport|.
   void Write(internal::AnyUnownedTransport transport, WriteOptions options = {});
@@ -214,52 +173,26 @@ class OutgoingMessage : public ::fidl::Status {
                     static_cast<internal::MessageStorageViewBase&>(storage), std::move(options));
   }
 
-  bool is_transactional() const { return is_transactional_; }
+  bool is_transactional() const { return message_.is_transactional; }
 
  private:
-  OutgoingMessage(const fidl_outgoing_msg_t& msg, uint32_t handle_capacity)
-      : ::fidl::Status(::fidl::Status::Ok()), message_(msg), handle_capacity_(handle_capacity) {}
-
   void EncodeImpl(fidl::internal::WireFormatVersion wire_format_version, void* data,
                   size_t inline_size, fidl::internal::TopLevelEncodeFn encode_fn);
 
-  uint32_t iovec_capacity() const { return iovec_capacity_; }
-  uint32_t handle_capacity() const { return handle_capacity_; }
-  uint32_t backing_buffer_capacity() const { return backing_buffer_capacity_; }
-  uint8_t* backing_buffer() const { return backing_buffer_; }
-
-  friend ::fidl_testing::MessageChecker;
+  uint32_t iovec_capacity() const { return message_.iovec_capacity; }
+  uint32_t handle_capacity() const { return message_.handle_capacity; }
+  uint32_t backing_buffer_capacity() const { return message_.backing_buffer_capacity; }
+  uint8_t* backing_buffer() const { return message_.backing_buffer; }
 
   explicit OutgoingMessage(InternalIovecConstructorArgs args);
-  explicit OutgoingMessage(InternalByteBackedConstructorArgs args);
-  explicit OutgoingMessage(const fidl_outgoing_msg_t& msg, bool is_transactional);
 
   fidl::IncomingHeaderAndMessage CallImpl(internal::AnyUnownedTransport transport,
                                           internal::MessageStorageViewBase& storage,
                                           CallOptions options);
 
-  fidl_outgoing_msg_iovec_t& iovec_message() {
-    ZX_DEBUG_ASSERT(message_.type == FIDL_OUTGOING_MSG_TYPE_IOVEC);
-    return message_.iovec;
-  }
-  const fidl_outgoing_msg_iovec_t& iovec_message() const {
-    ZX_DEBUG_ASSERT(message_.type == FIDL_OUTGOING_MSG_TYPE_IOVEC);
-    return message_.iovec;
-  }
-
   using Status::SetStatus;
 
-  const internal::TransportVTable* transport_vtable_ = nullptr;
-  fidl_outgoing_msg_t message_ = {};
-  uint32_t iovec_capacity_ = 0;
-  uint32_t handle_capacity_ = 0;
-  uint32_t backing_buffer_capacity_ = 0;
-  uint8_t* backing_buffer_ = nullptr;
-
-  // If OutgoingMessage is constructed with a fidl_outgoing_msg_t that contains bytes
-  // rather than iovec, it is converted to a single-element iovec pointing to the bytes.
-  zx_channel_iovec_t converted_byte_message_iovec_ = {};
-  bool is_transactional_ = false;
+  InternalIovecConstructorArgs message_;
 
   template <typename>
   friend class internal::UnownedEncodedMessageBase;

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/fidl_driver/cpp/natural_messaging.h>
+#include <zircon/types.h>
 
 namespace fdf::internal {
 
@@ -13,26 +14,39 @@ fidl::OutgoingMessage MoveToArena(fidl::OutgoingMessage& message, const fdf::Are
     return fidl::OutgoingMessage(message.error());
   }
 
-  auto bytes = message.CopyBytes();
-  void* bytes_on_arena = arena.Allocate(bytes.size());
-  memcpy(bytes_on_arena, bytes.data(), bytes.size());
+  uint32_t size = message.CountBytes();
+  void* bytes_on_arena = arena.Allocate(size);
+  {
+    uint8_t* dst = static_cast<uint8_t*>(bytes_on_arena);
+    for (uint32_t i = 0; i < message.iovec_actual(); ++i) {
+      const zx_channel_iovec_t& iovec = message.iovecs()[i];
+      dst = std::copy_n(static_cast<const uint8_t*>(iovec.buffer), iovec.capacity, dst);
+    }
+  }
 
-  void* handles_on_arena = arena.Allocate(message.handle_actual() * sizeof(fidl_handle_t));
-  memcpy(handles_on_arena, message.handles(), message.handle_actual() * sizeof(fidl_handle_t));
+  zx_channel_iovec_t& iovec_on_arena =
+      *static_cast<zx_channel_iovec_t*>(arena.Allocate(sizeof(zx_channel_iovec_t)));
+  iovec_on_arena = {
+      .buffer = bytes_on_arena,
+      .capacity = size,
+  };
+
+  fidl_handle_t* handles_on_arena =
+      static_cast<fidl_handle_t*>(arena.Allocate(message.handle_actual() * sizeof(fidl_handle_t)));
+  std::copy_n(message.handles(), message.handle_actual(), handles_on_arena);
 
   uint32_t handle_actual = message.handle_actual();
   message.ReleaseHandles();
 
-  fidl::OutgoingMessage::InternalByteBackedConstructorArgs args = {
+  return fidl::OutgoingMessage::Create_InternalMayBreak({
       .transport_vtable = &fidl::internal::DriverTransport::VTable,
-      .bytes = static_cast<uint8_t*>(bytes_on_arena),
-      .num_bytes = static_cast<uint32_t>(bytes.size()),
-      .handles = static_cast<fidl_handle_t*>(handles_on_arena),
+      .iovecs = &iovec_on_arena,
+      .num_iovecs = 1,
+      .handles = handles_on_arena,
       .handle_metadata = nullptr,
       .num_handles = handle_actual,
       .is_transactional = message.is_transactional(),
-  };
-  return fidl::OutgoingMessage::Create_InternalMayBreak(args);
+  });
 }
 
 }  // namespace fdf::internal
