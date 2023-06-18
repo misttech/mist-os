@@ -25,7 +25,7 @@ EncodedMessage EncodedMessage::Create(cpp20::span<uint8_t> bytes, zx_handle_t* h
 }
 
 std::pair<cpp20::span<uint8_t>, cpp20::span<fidl_handle_t>> EncodedMessage::Release() && {
-  ZX_ASSERT(transport_vtable_->type == FIDL_TRANSPORT_TYPE_CHANNEL);
+  ZX_ASSERT(transport_vtable_->type == internal::fidl_transport_type::kChannel);
   cpp20::span bytes{reinterpret_cast<uint8_t*>(message_.bytes), message_.num_bytes};
   cpp20::span handles{message_.handles, message_.num_handles};
   std::move(*this).ReleaseHandles();

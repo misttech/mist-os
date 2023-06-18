@@ -25,7 +25,7 @@ zx_status_t channel_decode_process_handle(fidl_handle_t* handle, HandleAttribute
 }  // namespace
 
 const TransportVTable ChannelTransport::VTable = {
-    .type = FIDL_TRANSPORT_TYPE_CHANNEL,
+    .type = fidl_transport_type::kChannel,
     .encoding_configuration = &ChannelTransport::EncodingConfiguration,
 };
 

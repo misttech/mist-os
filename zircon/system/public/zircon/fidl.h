@@ -472,14 +472,6 @@ typedef struct fidl_message_header {
 
 #define FIDL_TXID_NO_RESPONSE 0ul
 
-typedef uint8_t fidl_transport_type;
-
-#define FIDL_TRANSPORT_TYPE_INVALID 0x00
-#define FIDL_TRANSPORT_TYPE_CHANNEL 0x01
-#define FIDL_TRANSPORT_TYPE_DRIVER 0x02
-// Designated transport type for use in tests.
-#define FIDL_TRANSPORT_TYPE_TEST 0xff
-
 // Transport agnostic handle representation.
 typedef uint32_t fidl_handle_t;
 static_assert(sizeof(fidl_handle_t) == sizeof(zx_handle_t), "handle type size mismatch");

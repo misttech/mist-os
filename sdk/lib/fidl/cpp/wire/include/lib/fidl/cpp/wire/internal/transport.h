@@ -209,6 +209,14 @@ using TransportWaitSuccessHandler = fit::inline_function<void(
 // Function receiving notification of failing waits on a TransportWaiter.
 using TransportWaitFailureHandler = fit::inline_function<void(UnbindInfo)>;
 
+enum class fidl_transport_type : uint8_t {
+  kInvalid = 0x00,
+  kChannel = 0x01,
+  kDriver = 0x02,
+  // Designated transport type for use in tests.
+  kTest = 0xff,
+};
+
 // An instance of TransportVTable contains function definitions to implement transport-specific
 // functionality.
 struct TransportVTable {

@@ -38,7 +38,7 @@ TEST(OutgoingMessage, CreateWithInternalIovecConstructorArgs) {
   EXPECT_EQ(iovecs, msg.iovecs());
   EXPECT_EQ(0u, msg.handle_actual());
   EXPECT_EQ(handles, msg.handles());
-  EXPECT_EQ(FIDL_TRANSPORT_TYPE_CHANNEL, msg.transport_type());
+  EXPECT_EQ(fidl::internal::fidl_transport_type::kChannel, msg.transport_type());
   EXPECT_EQ(handle_metadata, msg.handle_metadata<fidl::internal::ChannelTransport>());
 }
 
@@ -56,7 +56,7 @@ TEST(OutgoingMessage, CreateWithInternalByteBackedConstructorArgs) {
           .num_handles = std::size(handles),
       });
   // Capacities are stored but not exposed. Actual sizes are zero initialized.
-  EXPECT_EQ(FIDL_TRANSPORT_TYPE_CHANNEL, msg.transport_type());
+  EXPECT_EQ(fidl::internal::fidl_transport_type::kChannel, msg.transport_type());
   EXPECT_EQ(1u, msg.iovec_actual());
   EXPECT_NE(nullptr, msg.iovecs());
   EXPECT_EQ(2u, msg.handle_actual());
@@ -97,7 +97,7 @@ TEST(OutgoingMessage, ConstructFromCIovecMessage) {
   ASSERT_EQ(&iovec, msg.iovecs());
   ASSERT_EQ(1u, msg.iovec_actual());
   ASSERT_EQ(&handle, msg.handles());
-  ASSERT_EQ(FIDL_TRANSPORT_TYPE_CHANNEL, msg.transport_type());
+  ASSERT_EQ(fidl::internal::fidl_transport_type::kChannel, msg.transport_type());
   EXPECT_EQ(&handle_metadata, msg.handle_metadata<fidl::internal::ChannelTransport>());
   ASSERT_EQ(1u, msg.handle_actual());
 }

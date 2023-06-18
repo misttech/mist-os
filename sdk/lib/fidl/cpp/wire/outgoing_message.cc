@@ -121,7 +121,7 @@ OutgoingMessage::~OutgoingMessage() {
 
 fidl_outgoing_msg_t OutgoingMessage::ReleaseToEncodedCMessage() && {
   ZX_DEBUG_ASSERT(status() == ZX_OK);
-  ZX_ASSERT(transport_type() == FIDL_TRANSPORT_TYPE_CHANNEL);
+  ZX_ASSERT(transport_type() == internal::fidl_transport_type::kChannel);
   fidl_outgoing_msg_t result = message_;
   ReleaseHandles();
   return result;

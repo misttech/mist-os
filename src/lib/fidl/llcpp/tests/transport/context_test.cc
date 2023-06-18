@@ -9,16 +9,18 @@
 struct TestTransport1 {
   using OutgoingTransportContextType = int64_t;
   static constexpr const fidl::internal::TransportVTable VTable = {
-      .type = FIDL_TRANSPORT_TYPE_TEST,
+      .type = fidl::internal::fidl_transport_type::kTest,
   };
 };
 
 struct TestTransport2 {
   using OutgoingTransportContextType = void;
   static constexpr const fidl::internal::TransportVTable VTable = {
-      .type = FIDL_TRANSPORT_TYPE_CHANNEL,
+      .type = fidl::internal::fidl_transport_type::kChannel,
   };
 };
+
+namespace {
 
 TEST(OutgoingContext, CreateAndReceiveSameType) {
   int64_t input = 123ll;
@@ -39,21 +41,26 @@ TEST(OutgoingContext, CreateAndReceiveDifferentType) {
   ASSERT_DEATH([&]() { context.release<TestTransport2>(); });
 }
 
-void close_outgoing_transport_context(void* value) {
-  uint16_t* uintval = static_cast<uint16_t*>(value);
-  (*uintval)--;
-}
+}  // namespace
 
 struct ClosingTestTransport {
   using OutgoingTransportContextType = uint16_t;
   static constexpr const fidl::internal::TransportVTable VTable = {
-      .type = FIDL_TRANSPORT_TYPE_TEST,
-      .close_outgoing_transport_context = close_outgoing_transport_context,
+      .type = fidl::internal::fidl_transport_type::kTest,
+      .close_outgoing_transport_context =
+          [](void* value) {
+            uint16_t* uintval = static_cast<uint16_t*>(value);
+            (*uintval)--;
+          },
   };
 };
+
+namespace {
 
 TEST(OutgoingContext, Closing) {
   uint16_t input = 1;
   { auto unused = fidl::internal::OutgoingTransportContext::Create<ClosingTestTransport>(&input); }
   ASSERT_EQ(0, input);
 }
+
+}  // namespace

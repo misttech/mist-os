@@ -117,7 +117,7 @@ void driver_close_many(const fidl_handle_t* handles, size_t num_handles) {
 }  // namespace
 
 const TransportVTable DriverTransport::VTable = {
-    .type = FIDL_TRANSPORT_TYPE_DRIVER,
+    .type = fidl_transport_type::kDriver,
     .encoding_configuration = &DriverTransport::EncodingConfiguration,
     .write = driver_write,
     .read = driver_read,

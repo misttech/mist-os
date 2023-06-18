@@ -136,7 +136,7 @@ TEST(NaturalResponseWithHandle, Encode) {
       fidl_testing::ComparePayload(cpp20::span(actual.data(), actual.size()), cpp20::span(bytes)));
 
   // Check encoded handles.
-  ASSERT_EQ(FIDL_TRANSPORT_TYPE_CHANNEL, message.transport_type());
+  ASSERT_EQ(fidl::internal::fidl_transport_type::kChannel, message.transport_type());
   ASSERT_NO_FAILURES(fidl_testing::ComparePayload<zx_handle_t>(
       cpp20::span(message.handles(), message.handle_actual()), cpp20::span(handles)));
   ASSERT_NO_FAILURES(fidl_testing::ComparePayload<fidl_channel_handle_metadata_t>(

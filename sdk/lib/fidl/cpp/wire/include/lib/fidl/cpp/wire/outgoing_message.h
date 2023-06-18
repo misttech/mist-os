@@ -131,7 +131,7 @@ class OutgoingMessage : public ::fidl::Status {
   zx_channel_iovec_t* iovecs() const { return iovec_message().iovecs; }
   uint32_t iovec_actual() const { return iovec_message().num_iovecs; }
   fidl_handle_t* handles() const { return iovec_message().handles; }
-  fidl_transport_type transport_type() const { return transport_vtable_->type; }
+  internal::fidl_transport_type transport_type() const { return transport_vtable_->type; }
   uint32_t handle_actual() const { return iovec_message().num_handles; }
 
   template <typename Transport>

@@ -152,7 +152,7 @@ void channel_close_many(const fidl_handle_t* handles, size_t num_handles) {
 }  // namespace
 
 const TransportVTable ChannelTransport::VTable = {
-    .type = FIDL_TRANSPORT_TYPE_CHANNEL,
+    .type = fidl_transport_type::kChannel,
     .encoding_configuration = &ChannelTransport::EncodingConfiguration,
     .write = channel_write,
     .read = channel_read,

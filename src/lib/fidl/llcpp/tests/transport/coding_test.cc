@@ -52,7 +52,7 @@ struct TestTransport {
       .close_many = close_handle_many,
   };
   static constexpr const fidl::internal::TransportVTable VTable = {
-      .type = FIDL_TRANSPORT_TYPE_TEST,
+      .type = fidl::internal::fidl_transport_type::kTest,
       .encoding_configuration = &TestTransport::EncodingConfiguration,
   };
 };
@@ -99,6 +99,8 @@ struct fidl::IsFidlType<Input> : public std::true_type {};
 template <>
 struct fidl::IsFidlObject<Input> : public std::true_type {};
 
+namespace {
+
 TEST(Coding, EncodedDecode) {
   Input input{.h = kTestHandleValue};
   fidl::internal::OwnedEncodedMessage<Input, TestTransport> encoded(
@@ -118,3 +120,5 @@ TEST(Coding, EncodedDecode) {
   ASSERT_TRUE(decoded.is_ok());
   ASSERT_EQ(kTestHandleValue, decoded->h);
 }
+
+}  // namespace

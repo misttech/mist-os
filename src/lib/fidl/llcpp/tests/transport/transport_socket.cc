@@ -68,7 +68,7 @@ void socket_close_many(const fidl_handle_t* handles, size_t num_handles) {
 }  // namespace
 
 const TransportVTable SocketTransport::VTable = {
-    .type = FIDL_TRANSPORT_TYPE_TEST,
+    .type = fidl_transport_type::kTest,
     .encoding_configuration = &SocketTransport::EncodingConfiguration,
     .write = socket_write,
     .read = socket_read,
