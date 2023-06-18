@@ -24,11 +24,12 @@ EncodedMessage EncodedMessage::Create(cpp20::span<uint8_t> bytes, zx_handle_t* h
                         reinterpret_cast<fidl_handle_metadata_t*>(handle_metadata), handle_actual);
 }
 
-fidl_incoming_msg_t EncodedMessage::ReleaseToEncodedCMessage() && {
+std::pair<cpp20::span<uint8_t>, cpp20::span<fidl_handle_t>> EncodedMessage::Release() && {
   ZX_ASSERT(transport_vtable_->type == FIDL_TRANSPORT_TYPE_CHANNEL);
-  fidl_incoming_msg_t result = message_;
+  cpp20::span bytes{reinterpret_cast<uint8_t*>(message_.bytes), message_.num_bytes};
+  cpp20::span handles{message_.handles, message_.num_handles};
   std::move(*this).ReleaseHandles();
-  return result;
+  return {bytes, handles};
 }
 
 EncodedMessage::~EncodedMessage() { std::move(*this).CloseHandles(); }
@@ -74,10 +75,17 @@ fidl_epitaph_t* IncomingHeaderAndMessage::maybe_epitaph() const {
 
 fidl_incoming_msg_t IncomingHeaderAndMessage::ReleaseToEncodedCMessage() && {
   ZX_DEBUG_ASSERT_MSG(status() == ZX_OK, "%s", status_string());
-  fidl_incoming_msg_t msg = std::move(body_).ReleaseToEncodedCMessage();
-  msg.bytes = bytes_.data();
-  msg.num_bytes = static_cast<uint32_t>(bytes_.size());
-  return msg;
+  fidl_handle_t* handles = body_.handles();
+  uint32_t num_handles = body_.num_handles();
+  fidl_handle_metadata_t* handle_metadata = body_.raw_handle_metadata();
+  std::move(body_).ReleaseHandles();
+  return {
+      .bytes = bytes_.data(),
+      .handles = handles,
+      .handle_metadata = handle_metadata,
+      .num_bytes = static_cast<uint32_t>(bytes_.size()),
+      .num_handles = num_handles,
+  };
 }
 
 void IncomingHeaderAndMessage::CloseHandles() && { std::move(body_).CloseHandles(); }

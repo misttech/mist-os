@@ -224,12 +224,12 @@ void Driver::Start(fuchsia_driver_framework::DriverStartArgs start_args,
 
   // After calling |lifecycle_->start|, we assume it has taken ownership of
   // the handles from |start_args|, and can therefore relinquish ownership.
-  fidl_incoming_msg_t c_msg = std::move(converted_message.message()).ReleaseToEncodedCMessage();
+  auto [bytes, handles] = std::move(converted_message.message()).Release();
   EncodedFidlMessage msg{
-      .bytes = static_cast<uint8_t*>(c_msg.bytes),
-      .handles = c_msg.handles,
-      .num_bytes = c_msg.num_bytes,
-      .num_handles = c_msg.num_handles,
+      .bytes = bytes.data(),
+      .handles = handles.data(),
+      .num_bytes = static_cast<uint32_t>(bytes.size()),
+      .num_handles = static_cast<uint32_t>(handles.size()),
   };
   void* opaque = nullptr;
 

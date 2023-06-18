@@ -66,10 +66,9 @@ class EncodedMessage {
                           handle_actual);
   }
 
-  // Convert the incoming message to its C API counterpart, releasing the
-  // ownership of handles to the caller in the process. This consumes the
-  // |EncodedMessage|.
-  fidl_incoming_msg_t ReleaseToEncodedCMessage() &&;
+  // Convert the incoming message to its constituent parts, releasing the ownership of handles to
+  // the caller in the process. This consumes the |EncodedMessage|.
+  std::pair<cpp20::span<uint8_t>, cpp20::span<fidl_handle_t>> Release() &&;
 
   EncodedMessage(const EncodedMessage&) = delete;
   EncodedMessage& operator=(const EncodedMessage&) = delete;
