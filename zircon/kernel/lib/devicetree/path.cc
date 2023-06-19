@@ -20,11 +20,11 @@ CompareResult ComparePath(const NodePath& path_a, const ResolvedPath& path_b) {
 
   // They both point to the mismatching element.
   if (prefix_a_it != path_a.end() && prefix_b_it != path_b.Prefix().end()) {
-    return kIsMismatch;
+    return CompareResult::kIsMismatch;
   }
 
   if (prefix_b_it != path_b.Prefix().end()) {
-    return kIsAncestor;
+    return CompareResult::kIsAncestor;
   }
 
   auto [suffix_a_it, suffix_b_it] = internal::CompareRangesOfNodes(
@@ -32,18 +32,18 @@ CompareResult ComparePath(const NodePath& path_a, const ResolvedPath& path_b) {
 
   // Exhausted the node path components but the stem still has more elements.
   if (suffix_a_it != path_a.end() && suffix_b_it != path_b.Suffix().end()) {
-    return kIsMismatch;
+    return CompareResult::kIsMismatch;
   }
 
   if (suffix_a_it == path_a.end() && suffix_b_it != path_b.Suffix().end()) {
-    return kIsAncestor;
+    return CompareResult::kIsAncestor;
   }
 
   if (suffix_a_it != path_a.end() && suffix_b_it == path_b.Suffix().end()) {
-    return kIsDescendant;
+    return CompareResult::kIsDescendant;
   }
 
-  return kIsMatch;
+  return CompareResult::kIsMatch;
 }
 
 CompareResult ComparePath(const NodePath& path_a, std::string_view absolute_path_b) {

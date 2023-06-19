@@ -13,9 +13,9 @@
 #include <lib/memalloc/range.h>
 #include <lib/uart/all.h>
 #include <lib/zbi-format/driver-config.h>
+#include <lib/zbi-format/memory.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/item.h>
-#include <lib/zbitl/storage-traits.h>
 
 #include <array>
 #include <memory>
@@ -302,10 +302,6 @@ void CheckChosenItem(const ChosenItemType& item, const ExpectedChosen& expected)
 }
 
 TEST_F(BootstrapChosenItemTest, ParseChosen) {
-  std::array<std::byte, 512> image_buffer;
-  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
-  ASSERT_TRUE(image.clear().is_ok());
-
   auto fdt = chosen_dtb();
   boot_shim::DevicetreeBootShim<boot_shim::DevicetreeBootstrapChosenNodeItem<AllUartDrivers>> shim(
       "test", fdt);
@@ -360,6 +356,275 @@ TEST_F(BootstrapChosenItemTest, ParseQemuDtb) {
                           },
                       .uart_absolute_path = "/pl011@9000000",
                   });
+}
+
+class MemoryItemTest : public zxtest::Test {
+ public:
+  static void SetUpTestSuite() {
+    auto loaded_dtb = LoadDtb("memory.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    memory_ldtb_ = std::move(loaded_dtb).value();
+
+    loaded_dtb = LoadDtb("reserved_memory.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    reserved_memory_ldtb_ = std::move(loaded_dtb).value();
+
+    loaded_dtb = LoadDtb("memory_reservations.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    memreserve_ldtb_ = std::move(loaded_dtb).value();
+
+    loaded_dtb = LoadDtb("memory_complex.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    complex_ldtb_ = std::move(loaded_dtb).value();
+  }
+
+  static void TearDownTestSuite() {
+    memory_ldtb_ = std::nullopt;
+    reserved_memory_ldtb_ = std::nullopt;
+    memreserve_ldtb_ = std::nullopt;
+    complex_ldtb_ = std::nullopt;
+  }
+
+  devicetree::Devicetree memory_ldtb() { return memory_ldtb_->fdt(); }
+  devicetree::Devicetree reserved_memory_ldtb() { return reserved_memory_ldtb_->fdt(); }
+  devicetree::Devicetree memreserve_ldtb() { return memreserve_ldtb_->fdt(); }
+  devicetree::Devicetree complex_ldtb() { return complex_ldtb_->fdt(); }
+
+ private:
+  static std::optional<LoadedDtb> memory_ldtb_;
+  static std::optional<LoadedDtb> reserved_memory_ldtb_;
+  static std::optional<LoadedDtb> memreserve_ldtb_;
+  static std::optional<LoadedDtb> complex_ldtb_;
+};
+
+std::optional<LoadedDtb> MemoryItemTest::memory_ldtb_ = std::nullopt;
+std::optional<LoadedDtb> MemoryItemTest::reserved_memory_ldtb_ = std::nullopt;
+std::optional<LoadedDtb> MemoryItemTest::memreserve_ldtb_ = std::nullopt;
+std::optional<LoadedDtb> MemoryItemTest::complex_ldtb_ = std::nullopt;
+
+TEST_F(MemoryItemTest, ParseMemreserves) {
+  std::array<std::byte, 256> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = memreserve_ldtb();
+  boot_shim::DevicetreeBootShim<boot_shim::DevicetreeMemoryItem> shim("test", fdt);
+
+  shim.Init();
+
+  auto& mem_item = shim.Get<boot_shim::DevicetreeMemoryItem>();
+  auto ranges = mem_item.memory_ranges();
+  ASSERT_EQ(ranges.size(), 5);
+
+  // Account for the devicetree in use.
+  EXPECT_EQ(ranges[0].addr, reinterpret_cast<uintptr_t>(fdt.fdt().data()));
+  EXPECT_EQ(ranges[0].size, fdt.size_bytes());
+  EXPECT_EQ(ranges[0].type, memalloc::Type::kDevicetreeBlob);
+
+  // Each memreserve in order.
+  EXPECT_EQ(ranges[1].addr, 0x12340000);
+  EXPECT_EQ(ranges[1].size, 0x2000);
+  EXPECT_EQ(ranges[1].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[2].addr, 0x56780000);
+  EXPECT_EQ(ranges[2].size, 0x3000);
+  EXPECT_EQ(ranges[2].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[3].addr, 0x7fffffff12340000);
+  EXPECT_EQ(ranges[3].size, 0x400000000);
+  EXPECT_EQ(ranges[3].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[4].addr, 0x00ffffff56780000);
+  EXPECT_EQ(ranges[4].size, 0x500000000);
+  EXPECT_EQ(ranges[4].type, memalloc::Type::kReserved);
+}
+
+TEST_F(MemoryItemTest, ParseMemoryNodes) {
+  std::array<std::byte, 256> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = memory_ldtb();
+  boot_shim::DevicetreeBootShim<boot_shim::DevicetreeMemoryItem> shim("test", fdt);
+
+  shim.Init();
+
+  auto& mem_item = shim.Get<boot_shim::DevicetreeMemoryItem>();
+  auto ranges = mem_item.memory_ranges();
+  ASSERT_EQ(ranges.size(), 5);
+
+  // Account for the devicetree in use.
+  EXPECT_EQ(ranges[0].addr, reinterpret_cast<uintptr_t>(fdt.fdt().data()));
+  EXPECT_EQ(ranges[0].size, fdt.size_bytes());
+  EXPECT_EQ(ranges[0].type, memalloc::Type::kDevicetreeBlob);
+
+  // Each memory nodes in order.
+  EXPECT_EQ(ranges[1].addr, 0x40000000);
+  EXPECT_EQ(ranges[1].size, 0x10000000);
+  EXPECT_EQ(ranges[1].type, memalloc::Type::kFreeRam);
+
+  EXPECT_EQ(ranges[2].addr, 0x50000000);
+  EXPECT_EQ(ranges[2].size, 0x20000000);
+  EXPECT_EQ(ranges[2].type, memalloc::Type::kFreeRam);
+
+  EXPECT_EQ(ranges[3].addr, 0x60000000);
+  EXPECT_EQ(ranges[3].size, 0x30000000);
+  EXPECT_EQ(ranges[3].type, memalloc::Type::kFreeRam);
+
+  EXPECT_EQ(ranges[4].addr, 0x70000000);
+  EXPECT_EQ(ranges[4].size, 0x40000000);
+  EXPECT_EQ(ranges[4].type, memalloc::Type::kFreeRam);
+}
+
+TEST_F(MemoryItemTest, ParseReservedMemoryNodes) {
+  std::array<std::byte, 256> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = reserved_memory_ldtb();
+  boot_shim::DevicetreeBootShim<boot_shim::DevicetreeMemoryItem> shim("test", fdt);
+
+  shim.Init();
+
+  auto& mem_item = shim.Get<boot_shim::DevicetreeMemoryItem>();
+  auto ranges = mem_item.memory_ranges();
+  ASSERT_EQ(ranges.size(), 3);
+
+  // Account for the devicetree in use.
+  EXPECT_EQ(ranges[0].addr, reinterpret_cast<uintptr_t>(fdt.fdt().data()));
+  EXPECT_EQ(ranges[0].size, fdt.size_bytes());
+  EXPECT_EQ(ranges[0].type, memalloc::Type::kDevicetreeBlob);
+
+  // Each reserved memory nodes in order.
+  EXPECT_EQ(ranges[1].addr, 0x78000000);
+  EXPECT_EQ(ranges[1].size, 0x800000);
+  EXPECT_EQ(ranges[1].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[2].addr, 0x76000000);
+  EXPECT_EQ(ranges[2].size, 0x400000);
+  EXPECT_EQ(ranges[2].type, memalloc::Type::kReserved);
+}
+
+TEST_F(MemoryItemTest, ParseAllAndAppend) {
+  std::array<std::byte, 512> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = complex_ldtb();
+  boot_shim::DevicetreeBootShim<boot_shim::DevicetreeMemoryItem> shim("test", fdt);
+
+  shim.Init();
+
+  auto& mem_item = shim.Get<boot_shim::DevicetreeMemoryItem>();
+  auto ranges = mem_item.memory_ranges();
+  ASSERT_EQ(ranges.size(), 11);
+
+  // Account for the devicetree in use.
+  EXPECT_EQ(ranges[0].addr, reinterpret_cast<uintptr_t>(fdt.fdt().data()));
+  EXPECT_EQ(ranges[0].size, fdt.size_bytes());
+  EXPECT_EQ(ranges[0].type, memalloc::Type::kDevicetreeBlob);
+
+  // Each memreserve in order.
+  EXPECT_EQ(ranges[1].addr, 0x12340000);
+  EXPECT_EQ(ranges[1].size, 0x2000);
+  EXPECT_EQ(ranges[1].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[2].addr, 0x56780000);
+  EXPECT_EQ(ranges[2].size, 0x3000);
+  EXPECT_EQ(ranges[2].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[3].addr, 0x7fffffff12340000);
+  EXPECT_EQ(ranges[3].size, 0x400000000);
+  EXPECT_EQ(ranges[3].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[4].addr, 0x00ffffff56780000);
+  EXPECT_EQ(ranges[4].size, 0x500000000);
+  EXPECT_EQ(ranges[4].type, memalloc::Type::kReserved);
+
+  // Each memory nodes in order.
+  EXPECT_EQ(ranges[5].addr, 0x40000000);
+  EXPECT_EQ(ranges[5].size, 0x10000000);
+  EXPECT_EQ(ranges[5].type, memalloc::Type::kFreeRam);
+
+  EXPECT_EQ(ranges[6].addr, 0x50000000);
+  EXPECT_EQ(ranges[6].size, 0x20000000);
+  EXPECT_EQ(ranges[6].type, memalloc::Type::kFreeRam);
+
+  EXPECT_EQ(ranges[7].addr, 0x60000000);
+  EXPECT_EQ(ranges[7].size, 0x30000000);
+  EXPECT_EQ(ranges[7].type, memalloc::Type::kFreeRam);
+
+  EXPECT_EQ(ranges[8].addr, 0x70000000);
+  EXPECT_EQ(ranges[8].size, 0x40000000);
+  EXPECT_EQ(ranges[8].type, memalloc::Type::kFreeRam);
+
+  // Each reserved memory nodes in order.
+  EXPECT_EQ(ranges[9].addr, 0x78000000);
+  EXPECT_EQ(ranges[9].size, 0x800000);
+  EXPECT_EQ(ranges[9].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[10].addr, 0x76000000);
+  EXPECT_EQ(ranges[10].size, 0x400000);
+  EXPECT_EQ(ranges[10].type, memalloc::Type::kReserved);
+
+  ASSERT_TRUE(shim.AppendItems(image).is_ok());
+
+  bool present = false;
+  auto clear_err = fit::defer([&]() { image.ignore_error(); });
+  for (auto [h, p] : image) {
+    if (h->type == ZBI_TYPE_MEM_CONFIG) {
+      present = true;
+      ASSERT_EQ(p.size(), zbitl::AlignedPayloadLength(11 * sizeof(zbi_mem_range_t)));
+      cpp20::span<zbi_mem_range_t> zbi_ranges(reinterpret_cast<zbi_mem_range_t*>(p.data()), 11);
+      // Each memreserve in order.
+      EXPECT_EQ(zbi_ranges[0].paddr, reinterpret_cast<uintptr_t>(fdt.fdt().data()));
+      EXPECT_EQ(zbi_ranges[0].length, fdt.size_bytes());
+      EXPECT_EQ(zbi_ranges[0].type, ZBI_MEM_TYPE_RAM);
+
+      EXPECT_EQ(zbi_ranges[1].paddr, 0x12340000);
+      EXPECT_EQ(zbi_ranges[1].length, 0x2000);
+      EXPECT_EQ(zbi_ranges[1].type, ZBI_MEM_TYPE_RESERVED);
+
+      EXPECT_EQ(zbi_ranges[2].paddr, 0x56780000);
+      EXPECT_EQ(zbi_ranges[2].length, 0x3000);
+      EXPECT_EQ(zbi_ranges[2].type, ZBI_MEM_TYPE_RESERVED);
+
+      EXPECT_EQ(zbi_ranges[3].paddr, 0x7fffffff12340000);
+      EXPECT_EQ(zbi_ranges[3].length, 0x400000000);
+      EXPECT_EQ(zbi_ranges[3].type, ZBI_MEM_TYPE_RESERVED);
+
+      EXPECT_EQ(zbi_ranges[4].paddr, 0x00ffffff56780000);
+      EXPECT_EQ(zbi_ranges[4].length, 0x500000000);
+      EXPECT_EQ(zbi_ranges[4].type, ZBI_MEM_TYPE_RESERVED);
+
+      // Each memory nodes in order.
+      EXPECT_EQ(zbi_ranges[5].paddr, 0x40000000);
+      EXPECT_EQ(zbi_ranges[5].length, 0x10000000);
+      EXPECT_EQ(zbi_ranges[5].type, ZBI_MEM_TYPE_RAM);
+
+      EXPECT_EQ(zbi_ranges[6].paddr, 0x50000000);
+      EXPECT_EQ(zbi_ranges[6].length, 0x20000000);
+      EXPECT_EQ(zbi_ranges[6].type, ZBI_MEM_TYPE_RAM);
+
+      EXPECT_EQ(zbi_ranges[7].paddr, 0x60000000);
+      EXPECT_EQ(zbi_ranges[7].length, 0x30000000);
+      EXPECT_EQ(zbi_ranges[7].type, ZBI_MEM_TYPE_RAM);
+
+      EXPECT_EQ(zbi_ranges[8].paddr, 0x70000000);
+      EXPECT_EQ(zbi_ranges[8].length, 0x40000000);
+      EXPECT_EQ(zbi_ranges[8].type, ZBI_MEM_TYPE_RAM);
+
+      // Each reserved memory nodes in order.
+      EXPECT_EQ(zbi_ranges[9].paddr, 0x78000000);
+      EXPECT_EQ(zbi_ranges[9].length, 0x800000);
+      EXPECT_EQ(zbi_ranges[9].type, ZBI_MEM_TYPE_RESERVED);
+
+      EXPECT_EQ(zbi_ranges[10].paddr, 0x76000000);
+      EXPECT_EQ(zbi_ranges[10].length, 0x400000);
+      EXPECT_EQ(zbi_ranges[10].type, ZBI_MEM_TYPE_RESERVED);
+    }
+  }
+  ASSERT_TRUE(present);
 }
 
 }  // namespace

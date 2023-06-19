@@ -125,30 +125,28 @@ class PropEncodedArray {
 struct Node : public std::string_view,
               fbl::DoublyLinkedListable<Node*, fbl::NodeOptions::AllowCopy> {
   Node(std::string_view name) : std::string_view(name) {}
-};
 
-// See
-// https://devicetree-specification.readthedocs.io/en/v0.3/devicetree-basics.html#node-name-requirements
-// for specification and definition of name and unit address.
-struct NodeNameTokens {
-  std::string_view name;
-  std::string_view unit_addr;
-};
+  // See
+  // https://devicetree-specification.readthedocs.io/en/v0.3/devicetree-basics.html#node-name-requirements
+  // for specification and definition of name and unit address.
+  constexpr std::string_view name() const {
+    size_t ind = find_first_of('@');
+    return (ind == std::string_view::npos) ? static_cast<std::string_view>(*this) : substr(0, ind);
+  }
 
-// Splits a node's name into the tokens of interest.
-inline NodeNameTokens SplitNodeName(std::string_view node) {
-  size_t ind = node.find_first_of('@');
-  return {
-      (ind == std::string_view::npos) ? node : node.substr(0, ind),
-      (ind == std::string_view::npos || ind + 1 >= node.size()) ? std::string_view{}
-                                                                : node.substr(ind + 1),
-  };
-}
+  // See
+  // https://devicetree-specification.readthedocs.io/en/v0.3/devicetree-basics.html#node-name-requirements
+  // for specification and definition of name and unit address.
+  constexpr std::string_view address() const {
+    size_t ind = find_first_of('@');
+    return (ind == std::string_view::npos) ? std::string_view() : substr(ind + 1);
+  }
+};
 
 // Represents a rooted path of nodes in a devicetree.
 // This can be used interchangeably with `const std::list<std::string_view>`
 // to iterate over the elements in a path with implied `/` separators.
-using NodePath = fbl::DoublyLinkedList<Node*>;
+using NodePath = fbl::DoublyLinkedList<Node*, fbl::DefaultObjectTag, fbl::SizeOrder::Constant>;
 
 // Some property values encode a list of NUL-terminated strings.
 // This is also useful for separating path strings at '/' characters.

@@ -44,10 +44,10 @@ class FakeMatcher : public boot_shim::DevicetreeItemBase<FakeMatcher, 2> {
                  : devicetree::ScanState::kNeedsPathResolution;
     }
     switch (devicetree::ComparePath(path, *resolved_path)) {
-      case devicetree::kIsAncestor:
+      case devicetree::CompareResult::kIsAncestor:
         return devicetree::ScanState::kActive;
 
-      case devicetree::kIsMatch: {
+      case devicetree::CompareResult::kIsMatch: {
         count_++;
         if (count_ == max_count_) {
           value_ = cmdline_name_ + std::to_string(count_);
@@ -58,8 +58,8 @@ class FakeMatcher : public boot_shim::DevicetreeItemBase<FakeMatcher, 2> {
         return devicetree::ScanState::kDoneWithSubtree;
       }
 
-      case devicetree::kIsDescendant:
-      case devicetree::kIsMismatch:
+      case devicetree::CompareResult::kIsDescendant:
+      case devicetree::CompareResult::kIsMismatch:
         return devicetree::ScanState::kDoneWithSubtree;
     }
   }

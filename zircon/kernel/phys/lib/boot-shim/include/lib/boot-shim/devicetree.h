@@ -16,6 +16,7 @@
 #include <lib/stdcompat/array.h>
 #include <lib/uart/all.h>
 #include <lib/zbi-format/driver-config.h>
+#include <lib/zbi-format/memory.h>
 #include <lib/zbi-format/zbi.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -269,6 +270,120 @@ class DevicetreeBootstrapChosenNodeItem : public DevicetreeBootstrapChosenNodeIt
 
  private:
   std::optional<AllUartDrivers> uart_;
+};
+
+// Parses 'memory' and 'reserved_memory' device nodes and 'memranges' from the devicetree,
+// and generates a ZBI_TYPE_MEM_CONFIG.
+//
+// The memory regions are encoded in three different sources, whose layout and number of ranges
+// pero node may vary.
+//  * Each 'memory' nodes defines a collection of ranges that represent ram. Memory nodes
+//    are childs of the root node and contain an address as part of the name(E.g. "/memory@1234").
+//  * 'reserved-memory' is a container node, whose children define collections of memory ranges
+//  that should be reserved. The 'reserved-memory' node is located under the root node
+//  '/reserved-memory'.
+//  * 'memreseve' represents the memory reservation block, which encodes pairs describing base
+//  address and length of reserved memory ranges.
+//
+// For more information and examples of each source see :
+// '/memory' :
+// https://devicetree-specification.readthedocs.io/en/latest/chapter3-devicenodes.html#memory-node
+// '/reserved-memory' :
+// https://devicetree-specification.readthedocs.io/en/latest/chapter3-devicenodes.html#reserved-memory-node
+// 'memreserve' :
+// https://devicetree-specification.readthedocs.io/en/latest/chapter5-flattened-format.html#memory-reservation-block
+//
+class DevicetreeMemoryItem : public DevicetreeItemBase<DevicetreeMemoryItem, 1>, public ItemBase {
+ public:
+  // Other platforms such as Linux provide a few of preallocated buffers for storing memory ranges,
+  // |kMaxRanges| is a big enough upperbound for the combined number of ranges provided by such
+  // buffers.
+  static constexpr uint32_t kMaxRanges = 512;
+
+  // Matcher API.
+  static constexpr size_t kMaxScans = 1;
+
+  devicetree::ScanState OnNode(const devicetree::NodePath& path,
+                               const devicetree::PropertyDecoder& decoder);
+  devicetree::ScanState OnSubtree(const devicetree::NodePath& path);
+  devicetree::ScanState OnWalk() { return devicetree::ScanState::kDone; }
+
+  // Boot shim item API.
+  size_t size_bytes() const { return ItemSize(ranges_count_ * sizeof(zbi_mem_range_t)); }
+
+  fit::result<DataZbi::Error> AppendItems(DataZbi& zbi) const;
+
+  template <typename Shim>
+  void Init(const Shim& shim) {
+    ranges_count_ = 0;
+    DevicetreeItemBase<DevicetreeMemoryItem, 1>::Init(shim);
+
+    devicetree::Devicetree dt = shim.devicetree();
+
+    if (!AppendRange({
+            .addr = reinterpret_cast<uintptr_t>(dt.fdt().data()),
+            .size = dt.size_bytes(),
+            // The original DT Blob is copied into a ZBI ITEM, and the original range is discarded.
+            // It is only useful while the ZBI items are generated.
+            .type = memalloc::Type::kDevicetreeBlob,
+        })) {
+      return;
+    }
+
+    for (auto [start, size] : dt.memory_reservations()) {
+      if (!AppendRange(memalloc::Range{
+              .addr = start,
+              .size = size,
+              .type = memalloc::Type::kReserved,
+          })) {
+        return;
+      }
+    }
+  }
+
+  // Memory Item API for the bootshim to initialize the memory layout.
+  // An empty set of memory ranges indicates an error while parsing the devicetree
+  // memory ranges.
+  constexpr cpp20::span<const memalloc::Range> memory_ranges() const {
+    if (ranges_count_ <= kMaxRanges) {
+      return cpp20::span{ranges_.data(), ranges_count_};
+    }
+    return {};
+  }
+
+ private:
+  // Append special ranges to the memory regions. This will be used later for
+  // initializing the pool allocation memory.
+  constexpr bool AppendRange(const memalloc::Range& range) {
+    if (ranges_count_ >= ranges_.size()) {
+      if (ranges_count_ == ranges_.size()) {
+        OnError("Not enough preallocated ranges.");
+      }
+      ranges_count_ = kMaxRanges + 1;
+      return false;
+    }
+    ranges_[ranges_count_++] = range;
+    return true;
+  }
+
+  bool AppendRangesFromReg(const devicetree::PropertyDecoder& decoder,
+                           const std::optional<devicetree::RangesProperty>& parent_range,
+                           memalloc::Type memrange_type);
+
+  devicetree::ScanState HandleMemoryNode(const devicetree::NodePath& path,
+
+                                         const devicetree::PropertyDecoder& decoder);
+  devicetree::ScanState HandleReservedMemoryNode(const devicetree::NodePath& path,
+                                                 const devicetree::PropertyDecoder& decoder);
+
+  std::array<memalloc::Range, kMaxRanges> ranges_;
+  uint32_t ranges_count_ = 0;
+
+  const devicetree::Node* reserved_memory_root_ = nullptr;
+
+  // Used to translate child node memory ranges.
+  std::optional<devicetree::RangesProperty> root_ranges_;
+  std::optional<devicetree::RangesProperty> reserved_memory_ranges_;
 };
 
 }  // namespace boot_shim

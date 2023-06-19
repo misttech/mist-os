@@ -21,12 +21,12 @@ constexpr std::string_view kAliasNode = "/aliases";
 
 ScanState AliasMatcher::OnNode(const NodePath& path, const PropertyDecoder& decoder) {
   switch (ComparePath(path, kAliasNode)) {
-    case kIsAncestor:
+    case CompareResult::kIsAncestor:
       return ScanState::kActive;
-    case kIsMatch:
+    case CompareResult::kIsMatch:
       return ScanState::kDone;
-    case kIsMismatch:
-    case kIsDescendant:
+    case CompareResult::kIsMismatch:
+    case CompareResult::kIsDescendant:
       return ScanState::kDoneWithSubtree;
   }
   __UNREACHABLE;

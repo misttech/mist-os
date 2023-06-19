@@ -72,6 +72,9 @@ enum class Type : uint64_t {
   // Identity-mapping page tables.
   kIdentityPageTables,
 
+  // A firmware-provided devicetree blob.
+  kDevicetreeBlob,
+
   // General scratch space used by the phys kernel, but that which is free for
   // the next kernel as of hand-off.
   kPhysScratch,

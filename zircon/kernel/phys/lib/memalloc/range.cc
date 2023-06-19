@@ -45,6 +45,8 @@ std::string_view ToString(Type type) {
       return "legacy boot data";
     case Type::kIdentityPageTables:
       return "identity page tables"sv;
+    case Type::kDevicetreeBlob:
+      return "devicetree blob"sv;
     case Type::kPhysScratch:
       return "phys scratch"sv;
     case Type::kPoolTestPayload:

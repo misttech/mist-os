@@ -26,26 +26,26 @@ namespace {
 
 using devicetree::testing::LoadDtb;
 
-TEST(DevicetreeTest, SplitNodeName) {
+TEST(DevicetreeTest, NodeNameAndAddress) {
   {
-    auto [name, unit_addr] = devicetree::SplitNodeName("abc");
-    EXPECT_STREQ("abc", name);
-    EXPECT_STREQ("", unit_addr);
+    devicetree::Node node("abc");
+    EXPECT_STREQ("abc", node.name());
+    EXPECT_STREQ("", node.address());
   }
   {
-    auto [name, unit_addr] = devicetree::SplitNodeName("abc@");
-    EXPECT_STREQ("abc", name);
-    EXPECT_STREQ("", unit_addr);
+    devicetree::Node node("abc@");
+    EXPECT_STREQ("abc", node.name());
+    EXPECT_STREQ("", node.address());
   }
   {
-    auto [name, unit_addr] = devicetree::SplitNodeName("abc@def");
-    EXPECT_STREQ("abc", name);
-    EXPECT_STREQ("def", unit_addr);
+    devicetree::Node node("abc@def");
+    EXPECT_STREQ("abc", node.name());
+    EXPECT_STREQ("def", node.address());
   }
   {
-    auto [name, unit_addr] = devicetree::SplitNodeName("@def");
-    EXPECT_STREQ("", name);
-    EXPECT_STREQ("def", unit_addr);
+    devicetree::Node node("@def");
+    EXPECT_STREQ("", node.name());
+    EXPECT_STREQ("def", node.address());
   }
 }
 
@@ -57,7 +57,7 @@ TEST(DevicetreeTest, EmptyTree) {
   size_t seen = 0;
   auto walker = [&seen](const devicetree::NodePath& path, const devicetree::PropertyDecoder&) {
     if (seen++ == 0) {
-      size_t size = path.size_slow();
+      size_t size = path.size();
       EXPECT_EQ(1, size);
       if (size > 0) {
         EXPECT_TRUE(path.back().empty());  // Root node.
@@ -86,8 +86,8 @@ void DoAndVerifyWalk(devicetree::Devicetree& tree, cpp20::span<const Node> nodes
     bool prune = false;
     if (seen < nodes.size()) {
       auto node = nodes[seen];
-      size_t size = path.size_slow();
-      EXPECT_EQ(node.size, path.size_slow());
+      size_t size = path.size();
+      EXPECT_EQ(node.size, path.size());
       if (size > 0) {
         EXPECT_STREQ(node.name, path.back());
       }
@@ -108,8 +108,8 @@ void DoAndVerifyWalk(devicetree::Devicetree& tree, cpp20::span<const Node> nodes
     bool prune = false;
     if (post_seen < nodes.size()) {
       auto node = nodes[post_order[post_seen]];
-      size_t size = path.size_slow();
-      EXPECT_EQ(node.size, path.size_slow());
+      size_t size = path.size();
+      EXPECT_EQ(node.size, path.size());
       if (size > 0) {
         EXPECT_STREQ(node.name, path.back());
       }
@@ -260,7 +260,7 @@ TEST(DevicetreeTest, PropertiesAreTranslated) {
     auto& props = decoder.properties();
     switch (seen++) {
       case 0: {  // root
-        size_t size = path.size_slow();
+        size_t size = path.size();
         EXPECT_EQ(1, size);
         if (size > 0) {
           EXPECT_TRUE(path.back().empty());
@@ -273,7 +273,7 @@ TEST(DevicetreeTest, PropertiesAreTranslated) {
         break;
       }
       case 1: {  // A
-        size_t size = path.size_slow();
+        size_t size = path.size();
         EXPECT_EQ(2, size);
         if (size > 0) {
           EXPECT_STREQ("A", path.back());
@@ -289,7 +289,7 @@ TEST(DevicetreeTest, PropertiesAreTranslated) {
         break;
       }
       case 2: {  // B
-        size_t size = path.size_slow();
+        size_t size = path.size();
         EXPECT_EQ(3, size);
         if (size > 0) {
           EXPECT_STREQ("B", path.back());
@@ -308,7 +308,7 @@ TEST(DevicetreeTest, PropertiesAreTranslated) {
         break;
       }
       case 3: {  // C
-        size_t size = path.size_slow();
+        size_t size = path.size();
         EXPECT_EQ(2, size);
         if (size > 0) {
           EXPECT_STREQ("C", path.back());
@@ -324,7 +324,7 @@ TEST(DevicetreeTest, PropertiesAreTranslated) {
         break;
       }
       case 4: {  // D
-        size_t size = path.size_slow();
+        size_t size = path.size();
         EXPECT_EQ(3, size);
         if (size > 0) {
           EXPECT_STREQ("D", path.back());

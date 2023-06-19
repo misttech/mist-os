@@ -66,17 +66,17 @@ auto CompareRangesOfNodes(Iter start_1, Iter end_1, Iter2 start_2, Iter2 end_2) 
 //   path_a IsNode path_b: false
 //   path_a IsAncestor path_b: true
 //   path_a IsDescendant path_b: false
-enum CompareResult {
-  // Returns true if |path_a| references the same node as |path_b|.
+enum class CompareResult {
+  // |path_a| references the same node as |path_b|.
   kIsMatch,
 
-  // Returns true if |path_a| references a node that is an ancestor of |path_b|.
+  // |path_a| references a node that is an ancestor of |path_b|.
   kIsAncestor,
 
-  // Returns true if |path_a| references a node that is a descendant of |path_b|.
+  // |path_a| references a node that is a descendant of |path_b|.
   kIsDescendant,
 
-  // Returns true if the paths references nodes that are not in each other path's. (!IsAncestor() &&
+  // the paths references nodes that are not in each other path's. (!IsAncestor() &&
   // !IsDescendant() && !IsNode()).
   // E.g.
   //   path_a: '/A/B/C'
@@ -84,6 +84,7 @@ enum CompareResult {
   // This is a mismatch, since the paths to the nodes diverge on '/A', with '/B' and '/D' being the
   // mismatching elements.
   kIsMismatch,
+
 };
 
 // Compares |path_a| with |path_b|. |path_b| is a resolved path where the absolute

@@ -87,15 +87,15 @@ struct SingleNodeMatcher {
                  : devicetree::ScanState::kDoneWithSubtree;
     }
     switch (devicetree::ComparePath(path, *resolved_path)) {
-      case devicetree::kIsMatch:
+      case devicetree::CompareResult::kIsMatch:
         found = true;
         node(path.back(), decoder);
         return node_match_result;
-      case devicetree::kIsAncestor:
+      case devicetree::CompareResult::kIsAncestor:
         return devicetree::ScanState::kActive;
-      case devicetree::kIsMismatch:
+      case devicetree::CompareResult::kIsMismatch:
         return devicetree::ScanState::kDoneWithSubtree;
-      case devicetree::kIsDescendant:
+      case devicetree::CompareResult::kIsDescendant:
         return devicetree::ScanState::kDoneWithSubtree;
     };
   }
@@ -400,7 +400,7 @@ TEST_F(MatchTest, OnSubtreeCalledWhenActive) {
       },
       []() {},
       [&](const devicetree::NodePath& path) {
-        if (devicetree::ComparePath(path, "/A") == devicetree::kIsMatch) {
+        if (devicetree::ComparePath(path, "/A") == devicetree::CompareResult::kIsMatch) {
           root_after++;
           return devicetree::ScanState::kDone;
         }
@@ -430,7 +430,7 @@ TEST_F(MatchTest, OnSubtreeDoneWithSubtreeIsNoOp) {
       },
       []() {},
       [&](const devicetree::NodePath& path) {
-        if (devicetree::ComparePath(path, "/A") == devicetree::kIsMatch) {
+        if (devicetree::ComparePath(path, "/A") == devicetree::CompareResult::kIsMatch) {
           root_after++;
           return devicetree::ScanState::kDone;
         }
