@@ -80,7 +80,13 @@ foreach(funcs,
     visibility = [ ":*" ]
 
     cflags = []
-    defines = []
+
+    # gcc is not correctly honoring -fno-builtin-memmove, but -fno-builtin
+    # correctly suppresses the call to memmove.
+    if (funcs[0] == "memcpy" && is_gcc) {
+      cflags += [ "-fno-builtin" ]
+    }
+
     foreach(func, funcs) {
       cflags += [ "-fno-builtin-$func" ]
 
