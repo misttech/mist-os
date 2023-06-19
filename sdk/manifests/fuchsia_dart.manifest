@@ -1,7 +1,6 @@
 sdk://dart/fidl
 sdk://dart/fuchsia
 sdk://dart/fuchsia_component_test
-sdk://dart/fuchsia_inspect
 sdk://dart/fuchsia_logger
 sdk://dart/fuchsia_scenic
 sdk://dart/fuchsia_scenic_flutter

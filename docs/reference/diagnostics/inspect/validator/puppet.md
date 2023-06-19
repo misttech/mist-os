@@ -112,13 +112,8 @@ the test manager. Currently there are 4 puppets:
 
 * [Rust](/src/diagnostics/validator/inspect/lib/rust)
 * [C++](/src/diagnostics/validator/inspect/lib/cpp)
-* [Dart](/sdk/dart/fuchsia_inspect/test/validator_puppet)
 * [Go](/src/connectivity/network/netstack/inspect/validator)
 
-The puppet's CML is referred to in the `manifest` key of `fuchsia_component()` (for Rust or C++) or
-`dart_component()` (for Dart) or `fuchsia_unittest_component()` (for Go).
-
 The Validator conroller's CML is referred to in the `manifest` key of `fuchsia_unittest_package()`
-(for Rust or C++) or `fuchsia_test_component()` (for Dart) or `fuchsia_unittest_component()`
-(for Go).
+(for Rust or C++) or `fuchsia_unittest_component()` (for Go).
 

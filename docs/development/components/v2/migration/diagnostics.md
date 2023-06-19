@@ -21,7 +21,6 @@ component's `BUILD.gn`:
 
 -   `//sdk/lib/sys/inspect/cpp`
 -   `//src/lib/diagnostics/inspect/rust`
--   `dart_package_label.fuchsia_inspect`
 
 In Components v1, `appmgr` provides access to the component's `/diagnostics`
 directory, which contains Inspect data. Components v2 requires a component to
@@ -124,7 +123,7 @@ protocol directly in your test. Therefore you'll need to do the following:
     ```
 
 1.  Update your program to use the `ArchiveReader` library, which is available
-    in [C++][archive-cpp], [Rust][archive-rust], and [Dart][archive-dart]. See the
+    in [C++][archive-cpp], and [Rust][archive-rust]. See the
     [Inspect Codelab][archive-codelab] for more details on using these libraries.
 
     Note: For components in other languages, use the `ArchiveAccessor`
@@ -274,7 +273,6 @@ specific features your components may support:
 
 [archive-codelab]: /docs/development/diagnostics/inspect/codelab/codelab.md
 [archive-cpp]: /sdk/lib/inspect/contrib/cpp
-[archive-dart]: /sdk/dart/fuchsia_inspect/lib/src/reader
 [archive-fidl]: https://fuchsia.dev/reference/fidl/fuchsia.diagnostics#ArchiveAccessor
 [archive-rust]: /src/lib/diagnostics/reader/rust
 [archivist]: /docs/reference/diagnostics/inspect/tree.md#archivist
