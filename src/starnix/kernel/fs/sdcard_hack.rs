@@ -141,10 +141,10 @@ impl FsNodeOps for SdcardHackNode {
     fn truncate(
         &self,
         _node: &FsNode,
-        _current_task: &CurrentTask,
-        _length: u64,
+        current_task: &CurrentTask,
+        length: u64,
     ) -> Result<(), Errno> {
-        error!(EINVAL)
+        self.0.entry.node.truncate(current_task, length)
     }
 
     fn allocate(&self, _node: &FsNode, _offset: u64, _length: u64) -> Result<(), Errno> {
