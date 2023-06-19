@@ -309,24 +309,11 @@ The list of environment names to include in "basic_envs".
 
 From //build/testing/environments.gni:9
 
-### bazel_assembly_targets
-
-TODO(jayzhuang): Remove this arg.
-
-DEPRECATED, to be removed when all usages are migrated to bazel_* args
-below.
-
-When set, include the corresponding Bazel assembly targets in this build.
-
-**Current value (from the default):** `[]`
-
-From //build/images/args.gni:200
-
 ### bazel_product_bundle_board
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:221
+From //build/images/args.gni:213
 
 ### bazel_product_bundle_prefix
 
@@ -351,7 +338,7 @@ The actual bazel_product_bundle used for Bazel assembly is:
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:220
+From //build/images/args.gni:212
 
 ### bazel_quiet
 
@@ -3089,7 +3076,7 @@ useful for including verification and other Bazel assembly specific targets.
 
 **Current value (from the default):** `[]`
 
-From //build/images/args.gni:225
+From //build/images/args.gni:217
 
 ### extra_gn_labels_for_bazel_inputs
 
@@ -8349,8 +8336,8 @@ From //build/images/args.gni:51
 
 ### use_bazel_images_only
 
-If true, the images.json build API modules will only include images from
-`bazel_assembly_targets` and its dependencies.
+If true, the images.json build API modules will only include images
+identified by bazel_product_bundle_target and its dependencies.
 
 NOTE: This field is highly experimental, do not set it unless you know
 exactly what you are doing.
