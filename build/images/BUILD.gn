@@ -326,13 +326,7 @@ group("default-images") {
     deps += [ "//build/images/installer" ]
   }
 
-  if (bazel_assembly_targets != []) {
-    # Make `bazel_assembly_targets` take precedence to aid soft transition.
-    #
-    # TODO(jayzhuang): Remove this if block when `bazel_assembly_targets` is
-    # removed.
-    deps += bazel_assembly_targets
-  } else if (bazel_product_bundle_target != "") {
+  if (bazel_product_bundle_target != "") {
     deps += [ bazel_product_bundle_target ]
     deps += extra_bazel_assembly_targets
   }

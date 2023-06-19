@@ -25,12 +25,13 @@ if (is_fuchsia) {
 
   # Only do drivers lists comparison when both GN and Bazel assembly are done in
   # the same build.
-  if (!use_bazel_images_only && bazel_assembly_targets != [] && has_board) {
+  if (!use_bazel_images_only && bazel_product_bundle_target != "" &&
+      has_board) {
     import("//build/drivers/check_included_drivers.gni")
 
     check_included_drivers("bazel_drivers_check") {
       testonly = true
-      deps = bazel_assembly_targets
+      deps = [ bazel_product_bundle_target ]
     }
 
     action("compare_drivers_lists") {

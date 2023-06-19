@@ -19,23 +19,15 @@ labels = {
     # For now only Fuchsia images built by Bazel are useful.
     assembly_name = "fuchsia"
 
-    if (bazel_assembly_targets != []) {
-      # Make `bazel_assembly_targets` take precedence to aid soft transition.
-      #
-      # TODO(jayzhuang): Remove this if block when `bazel_assembly_targets` is
-      # removed.
-      assert(
-          bazel_assembly_targets == [ bazel_assembly_targets[0] ],
-          "bazel_assembly_targets should define exactly one element when use_bazel_images_only=true")
+    assert(
+        bazel_product_bundle_target != "",
+        "bazel_product_bundle_prefix and bazel_product_bundle_board must be set to use Bazel assembly")
 
-      images = bazel_assembly_targets[0]
-    } else {
-      assert(
-          bazel_product_bundle_target != "",
-          "bazel_product_bundle_prefix and bazel_product_bundle_board must be set to use Bazel assembly")
+    images = bazel_product_bundle_target
 
-      images = bazel_product_bundle_target
-    }
+    # images_prime target is used to provide extra metadata, for Bazel assembly
+    # we consolidate metadata on the same product bundle GN wrapper.
+    images_prime = images
 
     # Path to the `package_tool_package_manifest_list_create` target defined in
     # `bazel_product_bundle`.

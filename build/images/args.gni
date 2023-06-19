@@ -184,20 +184,12 @@ declare_args() {
   # Used as a parameter to assembled_system().
   assembly_fshost = false
 
-  # If true, the images.json build API modules will only include images from
-  # `bazel_assembly_targets` and its dependencies.
+  # If true, the images.json build API modules will only include images
+  # identified by bazel_product_bundle_target and its dependencies.
   #
   # NOTE: This field is highly experimental, do not set it unless you know
   # exactly what you are doing.
   use_bazel_images_only = false
-
-  # TODO(jayzhuang): Remove this arg.
-  #
-  # DEPRECATED, to be removed when all usages are migrated to bazel_* args
-  # below.
-  #
-  # When set, include the corresponding Bazel assembly targets in this build.
-  bazel_assembly_targets = []
 
   # bazel_product_bundle_[prefix|board] together identifies the
   # bazel_product_bundle target in GN target to use in Bazel assembly. The
@@ -257,14 +249,10 @@ assert(fxfs_partition == "" || fvm_partition == "",
 # bazel_product_bundle_{prefix,board} are defined and will point
 # to the label of a fuchsia_product_bundle() in the Bazel graph.
 if (use_bazel_images_only) {
-  if (bazel_assembly_targets == []) {
-    # TODO(jayzhuang): Remove the bazel_assembly_targets check when this arg is
-    # removed everywhere.
-    assert(
-        bazel_product_bundle_prefix != false &&
-            bazel_product_bundle_board != false,
-        "Both bazel_product_bundle_prefix and bazel_product_bundle_board must be set when use_bazel_images_only=true. Seeing bazel_product_bundle_prefix=${bazel_product_bundle_prefix}, bazel_product_bundle_board=${bazel_product_bundle_board}")
-  }
+  assert(
+      bazel_product_bundle_prefix != false &&
+          bazel_product_bundle_board != false,
+      "Both bazel_product_bundle_prefix and bazel_product_bundle_board must be set when use_bazel_images_only=true. Seeing bazel_product_bundle_prefix=${bazel_product_bundle_prefix}, bazel_product_bundle_board=${bazel_product_bundle_board}")
 }
 
 if (bazel_product_bundle_prefix != false &&
