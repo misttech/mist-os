@@ -87,7 +87,12 @@ impl FsNodeOps for VmoFileNode {
         Ok(Box::new(file_object))
     }
 
-    fn truncate(&self, node: &FsNode, length: u64) -> Result<(), Errno> {
+    fn truncate(
+        &self,
+        node: &FsNode,
+        _current_task: &CurrentTask,
+        length: u64,
+    ) -> Result<(), Errno> {
         node.update_info(|info| {
             if info.size == length as usize {
                 // The file size remains unaffected.

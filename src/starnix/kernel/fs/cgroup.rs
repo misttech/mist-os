@@ -128,7 +128,12 @@ impl FsNodeOps for ControlGroupNode {
         Ok(Box::new(ControlGroupFile::new(self.control_group.clone())))
     }
 
-    fn truncate(&self, _node: &FsNode, _length: u64) -> Result<(), Errno> {
+    fn truncate(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _length: u64,
+    ) -> Result<(), Errno> {
         Ok(())
     }
 }

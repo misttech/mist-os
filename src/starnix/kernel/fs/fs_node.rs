@@ -414,7 +414,12 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     }
 
     /// Change the length of the file.
-    fn truncate(&self, _node: &FsNode, _length: u64) -> Result<(), Errno> {
+    fn truncate(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _length: u64,
+    ) -> Result<(), Errno> {
         error!(EINVAL)
     }
 
@@ -858,7 +863,7 @@ impl FsNode {
             return error!(EFBIG);
         }
         self.clear_suid_and_sgid_bits(current_task)?;
-        self.ops().truncate(self, length)?;
+        self.ops().truncate(self, current_task, length)?;
         self.update_ctime_mtime()?;
         Ok(())
     }
@@ -894,7 +899,7 @@ impl FsNode {
             return error!(EFBIG);
         }
         self.clear_suid_and_sgid_bits(current_task)?;
-        self.ops().truncate(self, length)?;
+        self.ops().truncate(self, current_task, length)?;
         self.update_ctime_mtime()?;
         Ok(())
     }

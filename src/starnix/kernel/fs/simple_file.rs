@@ -44,7 +44,12 @@ where
         Ok(Box::new((self.create_file_ops)()?))
     }
 
-    fn truncate(&self, _node: &FsNode, _length: u64) -> Result<(), Errno> {
+    fn truncate(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _length: u64,
+    ) -> Result<(), Errno> {
         // TODO(tbodt): Is this right? This is the minimum to handle O_TRUNC
         Ok(())
     }

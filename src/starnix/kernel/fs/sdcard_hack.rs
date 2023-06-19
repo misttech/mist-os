@@ -138,7 +138,12 @@ impl FsNodeOps for SdcardHackNode {
         self.0.entry.node.unlink(current_task, name, child)
     }
 
-    fn truncate(&self, _node: &FsNode, _length: u64) -> Result<(), Errno> {
+    fn truncate(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _length: u64,
+    ) -> Result<(), Errno> {
         error!(EINVAL)
     }
 

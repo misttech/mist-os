@@ -431,7 +431,12 @@ impl FsNodeOps for RemoteNode {
         Ok(child)
     }
 
-    fn truncate(&self, _node: &FsNode, length: u64) -> Result<(), Errno> {
+    fn truncate(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        length: u64,
+    ) -> Result<(), Errno> {
         self.zxio.truncate(length).map_err(|status| from_status_like_fdio!(status))
     }
 

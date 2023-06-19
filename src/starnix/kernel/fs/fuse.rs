@@ -544,7 +544,12 @@ impl FsNodeOps for Arc<FuseNode> {
         error!(ENOTSUP)
     }
 
-    fn truncate(&self, _node: &FsNode, _length: u64) -> Result<(), Errno> {
+    fn truncate(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _length: u64,
+    ) -> Result<(), Errno> {
         not_implemented!("FsNodeOps::truncate");
         error!(ENOTSUP)
     }
