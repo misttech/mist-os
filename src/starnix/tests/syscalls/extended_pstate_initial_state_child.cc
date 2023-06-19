@@ -21,6 +21,9 @@ void exit_success() {
       "mov x8, 94\n"
       "mov x0, 0\n"
       "svc #0\n");
+#else
+  // TODO(fxbug.dev/128554): Implement RISC-V support.
+#error "unimplemented"
 #endif
 }
 
@@ -40,6 +43,9 @@ void exit_failure(int a) {
       :
       : "r"(a)
       :);
+#else
+  // TODO(fxbug.dev/128554): Implement RISC-V support.
+#error "unimplemented"
 #endif
 }
 
@@ -56,6 +62,9 @@ void write_stderr(const char* str, size_t len) {
       :
       : "r"(str), "r"(len)
       :);
+#else
+  // TODO(fxbug.dev/128554): Implement RISC-V support.
+#error "unimplemented"
 #endif
 }
 
@@ -138,6 +147,9 @@ extern "C" void _start() {
     write_stderr("fpsr\n", 5);
     exit_failure(34);
   }
+#else
+  // TODO(fxbug.dev/128554): Implement RISC-V support.
+#error "unimplemented"
 #endif
   exit_success();
 }
