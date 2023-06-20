@@ -45,7 +45,7 @@ def read_file(path: str) -> str:
 
 
 class GerritError(Exception):
-  """Exception class for errors commuicating with the gerrit-on-borg service."""
+  """Exception class for errors communicating with the gerrit-on-borg service."""
   def __init__(self, http_status: int, message: str):
     self.http_status = http_status
     self.message = '(%d) %s' % (self.http_status, message)
@@ -84,8 +84,9 @@ class Authenticator:
     assert not host.startswith('http')
     # Assume *.googlesource.com pattern.
     parts = host.split('.')
-    if not parts[0].endswith('-review'):
-      parts[0] += '-review'
+    # Remove the suffix '-review' from the host subdomain.
+    if parts[0].endswith('-review'):
+        parts[0] = parts[0][:-len('-review')]
     return 'https://%s/new-password' % ('.'.join(parts))
 
   @classmethod

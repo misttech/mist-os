@@ -81,6 +81,12 @@ class TestGerritUtil(unittest.TestCase):
             'Try generating a new authentication password' in
             context.exception.message)
 
+    def test_get_new_password_url(self) -> None:
+        self.assertEqual(
+            gerrit_util.Authenticator.get_new_password_url(
+                'fuchsia-review.googlesource.com'),
+            'https://fuchsia.googlesource.com/new-password')
+
 
 if __name__ == '__main__':
     unittest.main()
