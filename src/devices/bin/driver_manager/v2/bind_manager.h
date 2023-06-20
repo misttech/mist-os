@@ -1,4 +1,4 @@
-// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -128,6 +128,12 @@ class BindManager {
   // because no matching driver could be found, or because the matching driver
   // failed to start. Maps the node's component moniker to its weak pointer.
   std::unordered_map<std::string, std::weak_ptr<Node>> orphaned_nodes_;
+
+  // A list of composite node parents. In DFv1, a node can parent multiple composite
+  // nodes. To follow that same behavior, we store the parents in a map to bind them
+  // to other composites.
+  // TODO(fxb/122531): Support composite node specs for multibind.
+  std::unordered_map<std::string, std::weak_ptr<Node>> composite_parents_;
 
   // Manages DFv1 legacy composites.
   CompositeDeviceManager legacy_composite_manager_;

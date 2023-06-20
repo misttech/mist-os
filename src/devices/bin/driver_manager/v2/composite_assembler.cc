@@ -295,26 +295,8 @@ zx_status_t CompositeDeviceManager::AddCompositeDevice(
   }
   assemblers_.push_back(std::move(assembler.value()));
 
-  RebindNodes();
-  return ZX_OK;
-}
-
-void CompositeDeviceManager::RebindNodes() {
-  // Take our composite nodes and run them through the composite node specs again.
-  std::list<std::weak_ptr<Node>> nodes = std::move(nodes_);
-  for (auto& weak_node : nodes) {
-    auto node = weak_node.lock();
-    if (!node) {
-      continue;
-    }
-    // Try and bind our node again. If this is successful, it was already re-added
-    // to nodes_. If it is not successful, we will manually add it.
-    if (!BindNode(node)) {
-      nodes_.push_back(node);
-    }
-  }
-
   rebind_callback_();
+  return ZX_OK;
 }
 
 bool CompositeDeviceManager::BindNode(std::shared_ptr<Node> node) {
@@ -326,10 +308,6 @@ bool CompositeDeviceManager::BindNode(std::shared_ptr<Node> node) {
       // To support that, nodes can bind to multiple composite devices.
       did_match = true;
     }
-  }
-
-  if (did_match) {
-    nodes_.push_back(node->weak_from_this());
   }
   return did_match;
 }

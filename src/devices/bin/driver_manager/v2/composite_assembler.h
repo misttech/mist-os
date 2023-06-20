@@ -120,10 +120,6 @@ class CompositeDeviceManager
   std::vector<fuchsia_driver_development::wire::CompositeInfo> GetCompositeListInfo(
       fidl::AnyArena& arena) const;
 
-  // Trigger a rebind of all the nodes that are currently used in composite
-  // devices. This should only be used by tests.
-  void RebindNodes();
-
   // Exposed for testing.
   std::vector<std::unique_ptr<CompositeDeviceAssembler>>& assemblers() { return assemblers_; }
 

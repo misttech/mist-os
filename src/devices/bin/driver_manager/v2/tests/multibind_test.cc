@@ -77,3 +77,43 @@ TEST_F(MultibindTest, MultibindLegacyComposites_OverlappingBind) {
   DriverIndexReplyWithNoMatch("composite-b");
   VerifyNoOngoingBind();
 }
+
+TEST_F(MultibindTest, StoredCompositeParentsChangeDuringMultibind) {
+  AddAndOrphanNode("node-a");
+  AddAndOrphanNode("node-c");
+  AddAndOrphanNode("node-d");
+  VerifyNoOngoingBind();
+
+  // Add composite-a.
+  AddLegacyComposite("composite-a", {"node-a", "node-b", "node-d"});
+
+  // Node-a and node-d should match to composite-a.
+  VerifyBindOngoingWithRequests({{"node-c", 1}});
+  VerifyLegacyCompositeFragmentIsBound("composite-a", "node-a");
+  VerifyLegacyCompositeFragmentIsBound("composite-a", "node-d");
+
+  // Add a legacy composite that shares the node-a fragment with composite-a.
+  AddLegacyComposite_EXPECT_QUEUED("composite-b", {"node-a", "node-c"});
+  AddLegacyComposite_EXPECT_QUEUED("composite-c", {"node-a", "node-b"});
+
+  // Add node-b. It should be queued.
+  AddAndBindNode_EXPECT_QUEUED("node-b");
+
+  // Complete the ongoing bind request. This will kickstart a follow up bind process
+  // that results in all composites to be built.
+  DriverIndexReplyWithNoMatch("node-c");
+
+  VerifyLegacyCompositeFragmentIsBound("composite-b", "node-a");
+  VerifyLegacyCompositeFragmentIsBound("composite-c", "node-a");
+  VerifyLegacyCompositeBuilt("composite-a");
+  VerifyLegacyCompositeBuilt("composite-b");
+  VerifyLegacyCompositeBuilt("composite-c");
+
+  // Since there are no other nodes available for bind, another follow up bind process should
+  // start for the composites.
+  VerifyBindOngoingWithRequests({{"composite-a", 1}, {"composite-b", 1}, {"composite-c", 1}});
+  DriverIndexReplyWithNoMatch("composite-a");
+  DriverIndexReplyWithNoMatch("composite-b");
+  DriverIndexReplyWithNoMatch("composite-c");
+  VerifyNoOngoingBind();
+}

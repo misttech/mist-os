@@ -30,7 +30,7 @@ void BindManager::TryBindAllAvailable(NodeBindingInfoResultCallback result_callb
     return;
   }
 
-  if (orphaned_nodes_.empty()) {
+  if (orphaned_nodes_.empty() && composite_parents_.empty()) {
     result_callback(fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo>());
     return;
   }
@@ -73,8 +73,16 @@ void BindManager::Bind(Node& node, std::string_view driver_url_suffix,
 
 void BindManager::TryBindAllAvailableInternal(std::shared_ptr<BindResultTracker> tracker) {
   ZX_ASSERT(bind_all_ongoing_);
-  if (orphaned_nodes_.empty()) {
+  if (orphaned_nodes_.empty() && composite_parents_.empty()) {
     return;
+  }
+
+  auto cached_parents = std::move(composite_parents_);
+  for (auto& [path, node_weak] : cached_parents) {
+    if (auto node = node_weak.lock(); node) {
+      legacy_composite_manager_.BindNode(node);
+    }
+    composite_parents_.emplace(path, node_weak);
   }
 
   // Clear our stored map of orphaned nodes. It will be repopulated in BindInternal().
@@ -103,6 +111,7 @@ void BindManager::BindInternal(BindRequest request,
 
   // Check the DFv1 composites first, and don't bind to others if they match.
   if (legacy_composite_manager_.BindNode(node)) {
+    composite_parents_.emplace(node->MakeComponentMoniker(), request.node);
     if (request.tracker) {
       request.tracker->ReportSuccessfulBind(node->MakeComponentMoniker(), "");
     }
