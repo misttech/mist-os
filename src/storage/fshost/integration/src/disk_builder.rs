@@ -6,7 +6,7 @@ use {
     device_watcher::{recursive_wait_and_open, recursive_wait_and_open_directory},
     fidl::endpoints::{create_proxy, Proxy as _, ServerEnd},
     fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
-    fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose},
+    fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose, MountOptions},
     fidl_fuchsia_hardware_block::BlockMarker,
     fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger,
     fs_management::{
@@ -344,8 +344,10 @@ impl DiskBuilder {
         // Wipes the device
         fxfs.format().await.expect("format failed");
         let mut fs = fxfs.serve_multi_volume().await.expect("serve_multi_volume failed");
-        let blob_volume =
-            fs.create_volume("blob", None).await.expect("failed to create blob volume");
+        let blob_volume = fs
+            .create_volume("blob", MountOptions { crypt: None, as_blob: true })
+            .await
+            .expect("failed to create blob volume");
         let blob_volume_root = blob_volume.root();
         self.blob_hash = Some(self.write_test_blob(blob_volume_root, &BLOB_CONTENTS).await);
 
@@ -563,7 +565,10 @@ impl DiskBuilder {
         };
 
         let vol = {
-            let vol = fs.create_volume("unencrypted", None).await.expect("create_volume failed");
+            let vol = fs
+                .create_volume("unencrypted", MountOptions { crypt: None, as_blob: false })
+                .await
+                .expect("create_volume failed");
             vol.bind_to_path("/unencrypted_volume").unwrap();
             // Initialize the key-bag with the static keys.
             std::fs::create_dir("/unencrypted_volume/keys").expect("create_dir failed");
@@ -585,7 +590,9 @@ impl DiskBuilder {
                     .into_zx_channel()
                     .into(),
             );
-            fs.create_volume("data", crypt_service).await.expect("create_volume failed")
+            fs.create_volume("data", MountOptions { crypt: crypt_service, as_blob: false })
+                .await
+                .expect("create_volume failed")
         };
         self.write_test_data(&vol.root()).await;
         fs.shutdown().await.expect("shutdown failed");

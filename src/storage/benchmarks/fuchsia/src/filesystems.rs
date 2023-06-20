@@ -53,7 +53,10 @@ impl FsmFilesystem {
             let mut serving_filesystem =
                 fs.serve_multi_volume().await.expect("Failed to start the filesystem");
             let vol = serving_filesystem
-                .create_volume("default", fs.config().crypt_client().map(|c| c.into()))
+                .create_volume(
+                    "default",
+                    MountOptions { crypt: fs.config().crypt_client().map(|c| c.into()), as_blob },
+                )
                 .await
                 .expect("Failed to create volume");
             vol.bind_to_path(MOUNT_PATH).expect("Failed to bind the volume");
@@ -63,20 +66,12 @@ impl FsmFilesystem {
             serving_filesystem.bind_to_path(MOUNT_PATH).expect("Failed to bind the filesystem");
             Either::Left(serving_filesystem)
         };
-        let mut fs = Self {
+        Self {
             fs,
             serving_filesystem: Some(serving_filesystem),
             _block_device: block_device,
             as_blob,
-        };
-        if as_blob {
-            // `create_volume` returns the opened volume but doesn't allow for opening the volume as
-            // a blob volume. Calling `clear_cache` re-opens the volume in blob mode.
-            // TODO(https://fxbug.dev/126745) Create the volume in blob mode directly once it's
-            // supported.
-            fs.clear_cache().await
         }
-        fs
     }
 }
 

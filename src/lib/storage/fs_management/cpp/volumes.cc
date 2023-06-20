@@ -53,14 +53,13 @@ __EXPORT
 zx::result<> CreateVolume(fidl::UnownedClientEnd<fuchsia_io::Directory> exposed_dir,
                           std::string_view name,
                           fidl::ServerEnd<fuchsia_io::Directory> outgoing_dir,
-                          zx::channel crypt_client) {
+                          fuchsia_fxfs::wire::MountOptions options) {
   auto client = component::ConnectAt<fuchsia_fxfs::Volumes>(exposed_dir);
   if (client.is_error())
     return client.take_error();
 
-  auto crypt = fidl::ClientEnd<fuchsia_fxfs::Crypt>(std::move(crypt_client));
   auto result = fidl::WireCall(*client)->Create(fidl::StringView::FromExternal(name),
-                                                std::move(crypt), std::move(outgoing_dir));
+                                                std::move(outgoing_dir), std::move(options));
   if (!result.ok())
     return zx::error(result.error().status());
   if (result->is_error())

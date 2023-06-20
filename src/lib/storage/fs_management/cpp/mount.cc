@@ -251,8 +251,8 @@ zx::result<MountedVolume*> StartedMultiVolumeFilesystem::OpenVolume(
 }
 
 __EXPORT
-zx::result<MountedVolume*> StartedMultiVolumeFilesystem::CreateVolume(std::string_view name,
-                                                                      zx::channel crypt_client) {
+zx::result<MountedVolume*> StartedMultiVolumeFilesystem::CreateVolume(
+    std::string_view name, fuchsia_fxfs::wire::MountOptions options) {
   if (volumes_.find(name) != volumes_.end()) {
     return zx::error(ZX_ERR_ALREADY_BOUND);
   }
@@ -260,8 +260,7 @@ zx::result<MountedVolume*> StartedMultiVolumeFilesystem::CreateVolume(std::strin
   if (endpoints_or.is_error())
     return endpoints_or.take_error();
   auto [client, server] = std::move(*endpoints_or);
-  auto res =
-      fs_management::CreateVolume(exposed_dir_, name, std::move(server), std::move(crypt_client));
+  auto res = fs_management::CreateVolume(exposed_dir_, name, std::move(server), std::move(options));
   if (res.is_error()) {
     return res.take_error();
   }

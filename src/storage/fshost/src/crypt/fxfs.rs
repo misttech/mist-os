@@ -98,7 +98,9 @@ async fn unlock_or_init_data_volume<'a>(
 ) -> Result<(CryptService, String, &'a mut ServingVolume), Error> {
     // Open up the unencrypted volume so that we can access the key-bag for data.
     let root_vol = if create {
-        fs.create_volume("unencrypted", None).await.context("Failed to create unencrypted")?
+        fs.create_volume("unencrypted", MountOptions { crypt: None, as_blob: false })
+            .await
+            .context("Failed to create unencrypted")?
     } else {
         if config.check_filesystems {
             fs.check_volume("unencrypted", None).await.context("Failed to verify unencrypted")?;
@@ -145,7 +147,9 @@ async fn unlock_or_init_data_volume<'a>(
     );
 
     let volume = if create {
-        fs.create_volume("data", crypt).await.context("Failed to create data")?
+        fs.create_volume("data", MountOptions { crypt, as_blob: false })
+            .await
+            .context("Failed to create data")?
     } else {
         let crypt = if config.check_filesystems {
             fs.check_volume("data", crypt).await.context("Failed to verify data")?;

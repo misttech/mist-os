@@ -647,19 +647,20 @@ impl ServingMultiVolumeFilesystem {
         })
     }
 
-    /// Creates the volume.  Fails if the volume already exists.
-    /// If `crypt` is set, the volume will be encrypted using the provided Crypt instance.
+    /// Creates and mounts the volume.  Fails if the volume already exists.
+    /// If `options.crypt` is set, the volume will be encrypted using the provided Crypt instance.
+    /// If `options.as_blob` is set, creates a blob volume that is mounted as a blob filesystem.
     pub async fn create_volume(
         &mut self,
         volume: &str,
-        crypt: Option<ClientEnd<fidl_fuchsia_fxfs::CryptMarker>>,
+        options: MountOptions,
     ) -> Result<&mut ServingVolume, Error> {
         ensure!(!self.volumes.contains_key(volume), "Already bound");
         let (exposed_dir, server) = create_proxy::<fio::DirectoryMarker>()?;
         connect_to_protocol_at_dir_root::<fidl_fuchsia_fxfs::VolumesMarker>(
             self.exposed_dir.as_ref().unwrap(),
         )?
-        .create(volume, crypt, server)
+        .create(volume, server, options)
         .await?
         .map_err(|e| anyhow!(zx::Status::from_raw(e)))?;
         self.insert_volume(volume.to_string(), exposed_dir).await
@@ -1293,7 +1294,10 @@ mod tests {
             "Opening nonexistent volume should fail"
         );
 
-        let vol = fs.create_volume("foo", None).await.expect("Create volume failed");
+        let vol = fs
+            .create_volume("foo", MountOptions { crypt: None, as_blob: false })
+            .await
+            .expect("Create volume failed");
         vol.query().await.expect("Query volume failed");
         fs.close_volume("foo");
         // TODO(fxbug.dev/106555) Closing the volume is not synchronous. Immediately reopening the

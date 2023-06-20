@@ -177,12 +177,13 @@ class __EXPORT StartedMultiVolumeFilesystem {
   zx::result<MountedVolume*> OpenVolume(std::string_view name,
                                         fuchsia_fxfs::wire::MountOptions options);
 
-  // Creates a volume.  |crypt_client| is an optional connection to a crypt service used
+  // Creates and mounts a volume.  |options.crypt| is an optional connection to a crypt service used
   // to unlock the volume; if unset, the volume is assumed to be unencrypted.
   //
   // Returns a pointer to the volume if it was created.  The lifetime of the pointer is less than
   // this object.
-  zx::result<MountedVolume*> CreateVolume(std::string_view name, zx::channel crypt_client);
+  zx::result<MountedVolume*> CreateVolume(std::string_view name,
+                                          fuchsia_fxfs::wire::MountOptions options);
 
   // Verifies the integrity of a volume.  |crypt_client| is an optional connection to a crypt
   // service used to unlock the volume; if unset, the volume is assumed to be unencrypted.

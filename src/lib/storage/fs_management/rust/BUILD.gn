@@ -88,6 +88,7 @@ rustc_test("static-child-test") {
     "//src/lib/fuchsia",
     "//src/lib/storage/fs_management/rust:fs_management",
     "//src/lib/storage/ramdevice_client/rust:ramdevice_client",
+    "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
   ]
   sources = [ "tests/static_child_test.rs" ]
   source_root = "tests/static_child_test.rs"

@@ -85,7 +85,7 @@ impl FsTree {
         let crypt_service = Some(
             connect_to_protocol::<CryptMarker>()?.into_channel().unwrap().into_zx_channel().into(),
         );
-        fs.create_volume("default", crypt_service).await?;
+        fs.create_volume("default", MountOptions { crypt: crypt_service, as_blob: false }).await?;
         Ok(())
     }
 

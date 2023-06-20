@@ -149,7 +149,11 @@ impl StorageManagerTrait for Fxfs {
 
         let () = connect_to_protocol_at_dir_root::<VolumesMarker>(&self.filesystem_dir)
             .log_error_then("Connect to Volumes protocol failed", faccount::Error::Resource)?
-            .create(&self.volume_label, Some(cryptkeeper.crypt_client_end()?), server_end)
+            .create(
+                &self.volume_label,
+                server_end,
+                MountOptions { crypt: Some(cryptkeeper.crypt_client_end()?), as_blob: false },
+            )
             .await
             .log_warn_then("create FIDL failed", faccount::Error::Resource)?
             .log_warn_then("create failed", faccount::Error::Resource)?;

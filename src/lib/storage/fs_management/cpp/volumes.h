@@ -13,7 +13,7 @@
 
 namespace fs_management {
 
-// Adds volume |name| to the filesystem instance.  |crypt_client| is an optional channel to a Crypt
+// Adds volume |name| to the filesystem instance.  |options.crypt| is an optional channel to a Crypt
 // service, in which case the volume will be encrypted.
 //
 // On success, |outgoing_dir| will be passed to the filesystem and bound to the volume's outgoing
@@ -23,7 +23,7 @@ namespace fs_management {
 __EXPORT zx::result<> CreateVolume(fidl::UnownedClientEnd<fuchsia_io::Directory> exposed_dir,
                                    std::string_view name,
                                    fidl::ServerEnd<fuchsia_io::Directory> outgoing_dir,
-                                   zx::channel crypt_client = {});
+                                   fuchsia_fxfs::wire::MountOptions options);
 
 // Opens volume |name| in the filesystem instance.  |crypt_client| is an optional channel to
 // a Crypt service instance, in which case the volume is decrypted using that service.

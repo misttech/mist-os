@@ -10,6 +10,7 @@
 
 #include <fbl/unique_fd.h>
 
+#include "fidl/fuchsia.fxfs/cpp/wire_types.h"
 #include "src/lib/storage/fs_management/cpp/admin.h"
 #include "src/lib/storage/fs_management/cpp/mount.h"
 
@@ -37,7 +38,10 @@ zx::result<> MkfsWithDefault(const char* device_path, DiskFormat df, LaunchCallb
     std::cerr << "Could not mount to create default volume: " << fs.status_string() << std::endl;
     return fs.take_error();
   }
-  auto volume = fs->CreateVolume("default", std::move(crypt_client));
+  auto volume = fs->CreateVolume(
+      "default", fuchsia_fxfs::wire::MountOptions{
+                     .crypt = fidl::ClientEnd<fuchsia_fxfs::Crypt>(std::move(crypt_client)),
+                     .as_blob = false});
   if (volume.is_error()) {
     std::cerr << "Failed to create default volume: " << volume.status_string() << std::endl;
     return volume.take_error();

@@ -5,6 +5,7 @@
 //! Test launching filesystems as static child components in a custom environment.
 
 use {
+    fidl_fuchsia_fxfs::MountOptions,
     fidl_fuchsia_io as fio,
     fs_management::{filesystem::Filesystem, Blobfs, ComponentType, Fxfs, Minfs},
     ramdevice_client::RamdiskClient,
@@ -54,7 +55,8 @@ async fn fxfs_static_child() {
     fxfs.fsck().await.unwrap();
     let mut fs = fxfs.serve_multi_volume().await.unwrap();
 
-    let volume = fs.create_volume("test", None).await.unwrap();
+    let volume =
+        fs.create_volume("test", MountOptions { crypt: None, as_blob: false }).await.unwrap();
     let _: Box<fio::FilesystemInfo> = volume.query().await.unwrap();
 
     fs.shutdown().await.unwrap();

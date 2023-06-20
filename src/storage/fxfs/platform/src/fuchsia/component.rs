@@ -414,23 +414,19 @@ impl Component {
             };
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
-                VolumesRequest::Create { name, crypt, outgoing_directory, responder } => {
+                VolumesRequest::Create { name, outgoing_directory, mount_options, responder } => {
                     info!(
                         name = name.as_str(),
                         "Create {}volume",
-                        if crypt.is_some() { "encrypted " } else { "" }
+                        if mount_options.crypt.is_some() { "encrypted " } else { "" }
                     );
-                    // TODO(https://fxbug.dev/126745): We should NOT be relying on a string for
-                    // as_blob. Instead, we should add an as_blob option to Volume.Create.
-                    let as_blob = name == "blob";
                     responder
                         .send(
                             volumes
                                 .create_and_serve_volume(
                                     &name,
-                                    crypt,
                                     outgoing_directory.into_channel().into(),
-                                    as_blob,
+                                    mount_options,
                                 )
                                 .await
                                 .map_err(map_to_raw_status),
@@ -474,7 +470,7 @@ mod tests {
         fidl_fuchsia_fs_startup::{
             CompressionAlgorithm, EvictionPolicyOverride, StartOptions, StartupMarker,
         },
-        fidl_fuchsia_fxfs::VolumesMarker,
+        fidl_fuchsia_fxfs::{MountOptions, VolumesMarker},
         fidl_fuchsia_io as fio,
         fidl_fuchsia_process_lifecycle::{LifecycleMarker, LifecycleProxy},
         fuchsia_async as fasync,
@@ -615,7 +611,7 @@ mod tests {
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                         .expect("create_proxy failed");
                 volumes_proxy
-                    .create("test", None, server_end)
+                    .create("test", server_end, MountOptions { crypt: None, as_blob: false })
                     .await
                     .expect("fidl failed")
                     .expect("create failed");
@@ -636,7 +632,7 @@ mod tests {
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                         .expect("create_proxy failed");
                 volumes_proxy
-                    .create("test", None, server_end)
+                    .create("test", server_end, MountOptions { crypt: None, as_blob: false })
                     .await
                     .expect("fidl failed")
                     .expect_err("create succeeded");
@@ -655,7 +651,7 @@ mod tests {
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                         .expect("create_proxy failed");
                 volumes_proxy
-                    .create("test", None, server_end)
+                    .create("test", server_end, MountOptions { crypt: None, as_blob: false })
                     .await
                     .expect("fidl failed")
                     .expect("create failed");
@@ -693,7 +689,7 @@ mod tests {
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                         .expect("create_proxy failed");
                 volumes_proxy
-                    .create("test", None, server_end)
+                    .create("test", server_end, MountOptions { crypt: None, as_blob: false })
                     .await
                     .expect("fidl failed")
                     .expect("create failed");

@@ -182,7 +182,10 @@ impl<FSC: Clone + FSConfig> FsEnvironment<FSC> {
                     .into(),
             );
             let mut instance = fs.serve_multi_volume().await.unwrap();
-            let vol = instance.create_volume("default", crypt).await.unwrap();
+            let vol = instance
+                .create_volume("default", MountOptions { crypt, as_blob: false })
+                .await
+                .unwrap();
             vol.bind_to_path(MOUNT_PATH).unwrap();
             Either::Right(instance)
         } else {

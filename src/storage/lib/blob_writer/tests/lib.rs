@@ -7,7 +7,7 @@ mod tests {
     use {
         blob_writer::BlobWriter,
         fidl::endpoints::{create_proxy, ServerEnd},
-        fidl_fuchsia_fxfs,
+        fidl_fuchsia_fxfs::MountOptions,
         fidl_fuchsia_io::{self as fio, MAX_TRANSFER_SIZE},
         fs_management::{filesystem::Filesystem, Fxfs},
         fuchsia_component::client::connect_to_protocol_at_dir_svc,
@@ -26,8 +26,10 @@ mod tests {
         fs.format().await.expect("Failed to format the filesystem");
         let mut serving_filesystem =
             fs.serve_multi_volume().await.expect("Failed to start the filesystem");
-        let vol =
-            serving_filesystem.create_volume("blob", None).await.expect("Failed to create volume");
+        let vol = serving_filesystem
+            .create_volume("blob", MountOptions { crypt: None, as_blob: true })
+            .await
+            .expect("Failed to create volume");
         let blob_proxy =
             connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::WriteBlobMarker>(vol.exposed_dir())
                 .expect("failed to connect to the Blob service");
@@ -87,8 +89,10 @@ mod tests {
         fs.format().await.expect("Failed to format the filesystem");
         let mut serving_filesystem =
             fs.serve_multi_volume().await.expect("Failed to start the filesystem");
-        let vol =
-            serving_filesystem.create_volume("blob", None).await.expect("Failed to create volume");
+        let vol = serving_filesystem
+            .create_volume("blob", MountOptions { crypt: None, as_blob: true })
+            .await
+            .expect("Failed to create volume");
         let blob_proxy =
             connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::WriteBlobMarker>(vol.exposed_dir())
                 .expect("failed to connect to the Blob service");
