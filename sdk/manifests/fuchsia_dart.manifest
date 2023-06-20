@@ -6,7 +6,6 @@ sdk://dart/fuchsia_scenic
 sdk://dart/fuchsia_scenic_flutter
 sdk://dart/fuchsia_services
 sdk://dart/fuchsia_vfs
-sdk://dart/fuchsia_view
 sdk://dart/zircon
 sdk://docs/metadata_schemas
 sdk://fidl/fuchsia.auth
