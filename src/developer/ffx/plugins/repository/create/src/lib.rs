@@ -8,7 +8,7 @@ use ffx_core::ffx_plugin;
 
 pub use ffx_repository_create_args::RepoCreateCommand;
 
-#[ffx_plugin("ffx_repository")]
+#[ffx_plugin()]
 pub async fn cmd_repo_create(cmd: RepoCreateCommand) -> Result<()> {
     package_tool::cmd_repo_create(cmd)
         .await

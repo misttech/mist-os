@@ -12,7 +12,7 @@ use {
     std::{convert::TryFrom as _, io::Write},
 };
 
-#[ffx_plugin("ffx_repository", RepositoryRegistryProxy = "daemon::protocol")]
+#[ffx_plugin(RepositoryRegistryProxy = "daemon::protocol")]
 pub async fn status(
     _cmd: StatusCommand,
     repos: RepositoryRegistryProxy,
