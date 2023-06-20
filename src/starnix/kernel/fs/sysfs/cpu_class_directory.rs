@@ -48,11 +48,18 @@ impl FsNodeOps for CpuClassDirectory {
             (0..num).map(|i| format!("cpu{}", i)).collect::<Vec<String>>()
         });
 
-        let mut entries = vec![VecDirectoryEntry {
-            entry_type: DirectoryEntryType::REG,
-            name: b"online".to_vec(),
-            inode: None,
-        }];
+        let mut entries = vec![
+            VecDirectoryEntry {
+                entry_type: DirectoryEntryType::REG,
+                name: b"online".to_vec(),
+                inode: None,
+            },
+            VecDirectoryEntry {
+                entry_type: DirectoryEntryType::REG,
+                name: b"possible".to_vec(),
+                inode: None,
+            },
+        ];
 
         for cpu_name in cpus {
             entries.push(VecDirectoryEntry {
@@ -78,7 +85,11 @@ impl FsNodeOps for CpuClassDirectory {
                 FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
             )),
             b"online" => Ok(node.fs().create_node(
-                BytesFile::new_node(format!("{}\n", 1).into_bytes()),
+                BytesFile::new_node(format!("0-{}\n", zx::system_get_num_cpus() - 1).into_bytes()),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            )),
+            b"possible" => Ok(node.fs().create_node(
+                BytesFile::new_node(format!("0-{}\n", zx::system_get_num_cpus() - 1).into_bytes()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             )),
             _ => error!(ENOENT),
