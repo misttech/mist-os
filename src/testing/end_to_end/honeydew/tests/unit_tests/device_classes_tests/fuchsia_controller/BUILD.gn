@@ -7,9 +7,13 @@ import("//build/python/python_host_test.gni")
 if (is_host) {
   python_host_test("fuchsia_device_fc_test") {
     main_source = "fuchsia_device_test.py"
-    libraries = [ "//src/testing/end_to_end/honeydew" ]
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//third_party/parameterized",
+    ]
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
+    deps = [ "//src/testing/end_to_end/honeydew/tests:honeydew_test_data" ]
   }
 }
 

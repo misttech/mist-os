@@ -13,6 +13,8 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew/tests/functional_tests/device_class_tests/test_fuchsia_device:test_fuchsia_device_lib",
     ]
 
+    deps = [ "//src/testing/end_to_end/honeydew/tests:honeydew_test_data" ]
+
     params_source = "params.yaml"
     local_config_source = "../../testbeds/One-X64.yaml"
 

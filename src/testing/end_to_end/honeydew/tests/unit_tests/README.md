@@ -24,6 +24,8 @@
 
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/affordances_tests/fuchsia_controller:tracing_fc_test --host --output
 
+    fx test //src/testing/end_to_end/honeydew/tests/unit_tests/device_classes_tests:base_fuchsia_device_test --host --output
+
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/device_classes_tests/sl4f:fuchsia_device_sl4f_test --host --output
 
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/device_classes_tests/fuchsia_controller:fuchsia_device_fc_test --host --output

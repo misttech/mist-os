@@ -54,43 +54,23 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_manufacturer(self) -> None:
         """Test case for manufacturer"""
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.manufacturer
-            return
-
         asserts.assert_equal(
             self.device.manufacturer,
             self.user_params["expected_values"]["manufacturer"])
 
     def test_model(self) -> None:
         """Test case for model"""
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.model
-            return
-
         asserts.assert_equal(
             self.device.model, self.user_params["expected_values"]["model"])
 
     def test_product_name(self) -> None:
         """Test case for product_name"""
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.product_name
-            return
-
         asserts.assert_equal(
             self.device.product_name,
             self.user_params["expected_values"]["product_name"])
 
     def test_serial_number(self) -> None:
         """Test case for serial_number"""
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.serial_number
-            return
-
         # Note - Some devices such as FEmu, X64 does not have a serial_number.
         # So do not include "serial_number" in params.yml file if device does
         # not have a serial_number.
@@ -100,11 +80,6 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_firmware_version(self) -> None:
         """Test case for firmware_version"""
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.firmware_version
-            return
-
         # Note - If "firmware_version" is specified in "expected_values" in
         # params.yml then compare with it.
         if "firmware_version" in self.user_params["expected_values"]:
@@ -116,13 +91,6 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_log_message_to_device(self) -> None:
         """Test case for log_message_to_device()"""
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.log_message_to_device(
-                    message="This is a test ERROR message",
-                    level=custom_types.LEVEL.ERROR)
-            return
-
         self.device.log_message_to_device(
             message="This is a test ERROR message",
             level=custom_types.LEVEL.ERROR)
@@ -137,15 +105,11 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_reboot(self) -> None:
         """Test case for reboot()"""
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.reboot()
-            return
-
         self.device.reboot()
 
     def test_snapshot(self) -> None:
         """Test case for snapshot()"""
+        # TODO(b/286052015): Implement snapshot support.
         if self._is_fuchsia_controller_based_device(self.device):
             with asserts.assert_raises(NotImplementedError):
                 self.device.snapshot(directory="/tmp",)

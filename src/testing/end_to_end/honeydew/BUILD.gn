@@ -20,6 +20,7 @@ python_library("honeydew") {
     "affordances/sl4f/tracing.py",
     "custom_types.py",
     "device_classes/__init__.py",
+    "device_classes/base_fuchsia_device.py",
     "device_classes/fuchsia_controller/__init__.py",
     "device_classes/fuchsia_controller/fuchsia_device.py",
     "device_classes/fuchsia_controller/generic_fuchsia_device.py",
@@ -48,4 +49,6 @@ python_library("honeydew") {
     "utils/http_utils.py",
     "utils/properties.py",
   ]
+
+  library_deps = [ "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings" ]
 }

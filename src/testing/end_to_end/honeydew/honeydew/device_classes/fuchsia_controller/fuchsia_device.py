@@ -4,7 +4,17 @@
 # found in the LICENSE file.
 """FuchsiaDevice abstract base class implementation using Fuchsia-Controller."""
 
-from typing import Optional
+import asyncio
+import collections
+import logging
+from typing import Any, Dict, Optional
+
+import fidl.fuchsia_buildinfo as f_buildinfo
+import fidl.fuchsia_developer_remotecontrol as fd_remotecontrol
+import fidl.fuchsia_diagnostics as f_diagnostics
+import fidl.fuchsia_hardware_power_statecontrol as fhp_statecontrol
+import fidl.fuchsia_hwinfo as f_hwinfo
+import fuchsia_controller_py as fuchsia_controller
 
 from honeydew import custom_types
 from honeydew import errors
@@ -12,26 +22,68 @@ from honeydew.affordances.fuchsia_controller import component as component_fc
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
 from honeydew.affordances.fuchsia_controller.bluetooth import \
     bluetooth_gap as bluetooth_gap_fc
+from honeydew.device_classes import base_fuchsia_device
 from honeydew.interfaces.affordances import component
 from honeydew.interfaces.affordances import tracing
 from honeydew.interfaces.affordances.bluetooth import \
     bluetooth_gap as bluetooth_gap_interface
-from honeydew.interfaces.auxiliary_devices import \
-    power_switch as power_switch_interface
 from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.interfaces.device_classes import transports_capable
-from honeydew.transports import ffx as ffx_transport
-from honeydew.transports import ssh as ssh_transport
 from honeydew.utils import properties
 
+_FidlEndpoint = collections.namedtuple("_FidlEndpoint", ["moniker", "protocol"])
+_FC_PROXIES: Dict[str, _FidlEndpoint] = {
+    "BuildInfo":
+        _FidlEndpoint("/core/build-info", "fuchsia.buildinfo.Provider"),
+    "DeviceInfo":
+        _FidlEndpoint("/core/hwinfo", "fuchsia.hwinfo.Device"),
+    "ProductInfo":
+        _FidlEndpoint("/core/hwinfo", "fuchsia.hwinfo.Product"),
+    "PowerAdmin":
+        _FidlEndpoint(
+            "/bootstrap/shutdown_shim",
+            "fuchsia.hardware.power.statecontrol.Admin"),
+    "RemoteControl":
+        _FidlEndpoint(
+            "/core/remote-control",
+            "fuchsia.developer.remotecontrol.RemoteControl"),
+}
 
-class FuchsiaDevice(fuchsia_device.FuchsiaDevice,
+_LOG_SEVERITIES: Dict[custom_types.LEVEL, f_diagnostics.Severity] = {
+    custom_types.LEVEL.INFO: f_diagnostics.Severity.INFO,
+    custom_types.LEVEL.WARNING: f_diagnostics.Severity.WARN,
+    custom_types.LEVEL.ERROR: f_diagnostics.Severity.ERROR,
+}
+
+_LOGGER: logging.Logger = logging.getLogger(__name__)
+
+
+def _connect_device_proxy(
+        ctx: fuchsia_controller.Context,
+        proxy_name: str) -> fuchsia_controller.FidlChannel:
+    """Opens a proxy to the device, according to a lookup table of names.
+
+    Args:
+        proxy_name: Name of the lookup table entry to use for the proxy's
+        moniker and protocol name.
+
+    Raises:
+        errors.FuchsiaControllerError: On FIDL communication failure.
+
+    Returns:
+        FIDL channel to proxy.
+    """
+    try:
+        return ctx.connect_device_proxy(
+            _FC_PROXIES[proxy_name].moniker, _FC_PROXIES[proxy_name].protocol)
+    except fuchsia_controller.ZxStatus as status:
+        raise errors.FuchsiaControllerError(
+            "Fuchsia Controller FIDL Error") from status
+
+
+class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
                     affordances_capable.BluetoothGapCapableDevice,
                     affordances_capable.ComponentCapableDevice,
-                    affordances_capable.TracingCapableDevice,
-                    transports_capable.FFXCapableDevice,
-                    transports_capable.SSHCapableDevice):
+                    affordances_capable.TracingCapableDevice):
     """FuchsiaDevice abstract base class implementation using
     Fuchsia-Controller.
 
@@ -52,113 +104,12 @@ class FuchsiaDevice(fuchsia_device.FuchsiaDevice,
             device_name: str,
             ssh_private_key: Optional[str] = None,
             ssh_user: Optional[str] = None) -> None:
-        self._name: str = device_name
+        self._ctx: fuchsia_controller.Context
+        self._rcs_proxy: fd_remotecontrol.RemoteControl.Client
+        super().__init__(device_name, ssh_private_key, ssh_user)
 
-        self._ssh_private_key: Optional[str] = ssh_private_key
-        self._ssh_user: Optional[str] = ssh_user
-
-        self.health_check()
-
-    # List all the persistent properties in alphabetical order
-    @properties.PersistentProperty
-    def device_name(self) -> str:
-        """Returns the device name.
-
-        Returns:
-            Device name.
-        """
-        return self._name
-
-    @properties.PersistentProperty
-    def device_type(self) -> str:
-        """Returns the device type.
-
-        Returns:
-            Device type.
-
-        Raises:
-            errors.FfxCommandError: In case of failure.
-        """
-        return self.ffx.get_target_type()
-
-    @properties.PersistentProperty
-    def manufacturer(self) -> str:
-        """Returns the manufacturer of the device.
-
-        Returns:
-            Manufacturer of the device.
-        """
-        raise NotImplementedError
-
-    @properties.PersistentProperty
-    def model(self) -> str:
-        """Returns the model of the device.
-
-        Returns:
-            Model of the device.
-        """
-        raise NotImplementedError
-
-    @properties.PersistentProperty
-    def product_name(self) -> str:
-        """Returns the product name of the device.
-
-        Returns:
-            Product name of the device.
-        """
-        raise NotImplementedError
-
-    @properties.PersistentProperty
-    def serial_number(self) -> str:
-        """Returns the serial number of the device.
-
-        Returns:
-            Serial number of the device.
-        """
-        raise NotImplementedError
-
-    # List all the dynamic properties in alphabetical order
-    @properties.DynamicProperty
-    def firmware_version(self) -> str:
-        """Returns the firmware version of the device.
-
-        Returns:
-            Firmware version of the device.
-        """
-        raise NotImplementedError
-
-    # List all the transports in alphabetical order
-    @properties.Transport
-    def ffx(self) -> ffx_transport.FFX:
-        """Returns the FFX transport object.
-
-        Returns:
-            FFX object.
-
-        Raises:
-            errors.Sl4fError: Failed to instantiate.
-        """
-        ffx_obj: ffx_transport.FFX = ffx_transport.FFX(target=self.device_name)
-        return ffx_obj
-
-    @properties.Transport
-    def ssh(self) -> ssh_transport.SSH:
-        """Returns the SSH transport object.
-
-        Returns:
-            SSH object.
-        """
-        if not self._ssh_private_key:
-            raise errors.SSHCommandError(
-                "ssh_private_key argument need to be passed during device " \
-                "init in-order to SSH into the device"
-            )
-
-        ssh_obj: ssh_transport.SSH = ssh_transport.SSH(
-            device_name=self.device_name,
-            username=self._ssh_user,
-            private_key=self._ssh_private_key)
-        return ssh_obj
+        _LOGGER.debug("Initializing FC-based FuchsiaDevice")
+        self._context_create()
 
     # List all the affordances in alphabetical order
     @properties.Affordance
@@ -191,59 +142,159 @@ class FuchsiaDevice(fuchsia_device.FuchsiaDevice,
     # List all the public methods in alphabetical order
     def close(self) -> None:
         """Clean up method."""
-        return
+        # Explicitly destroy the context to close the fuchsia controller
+        # connection.
+        self._context_destroy()
 
-    def health_check(self) -> None:
-        """Ensure device is healthy.
-
-        Raises:
-            errors.SSHCommandError: if SSH connection check fails
-            errors.FFXCommandError: if FFX connection check fails
-        """
-        if self._ssh_private_key:
-            self.ssh.check_connection()
-        self.ffx.check_connection()
-
-    def log_message_to_device(
-            self, message: str, level: custom_types.LEVEL) -> None:
-        """Log message to fuchsia device at specified level.
-
-        Args:
-            message: Message that need to logged.
-            level: Log message level.
-        """
-        raise NotImplementedError
-
-    def power_cycle(
-            self,
-            power_switch: power_switch_interface.PowerSwitch,
-            outlet: Optional[int] = None) -> None:
-        """Power cycle (power off, wait for delay, power on) the device.
-
-        Args:
-            power_switch: Implementation of PowerSwitch interface.
-            outlet (int): If required by power switch hardware, outlet on
-                power switch hardware where this fuchsia device is connected.
-        """
-        raise NotImplementedError
-
-    def reboot(self) -> None:
-        """Soft reboot the device."""
-        raise NotImplementedError
-
-    def snapshot(
-            self, directory: str, snapshot_file: Optional[str] = None) -> str:
-        """Captures the snapshot of the device.
-
-        Args:
-            directory: Absolute path on the host where snapshot file need
-                to be saved.
-
-            snapshot_file: Name of the file to be used to save snapshot file.
-                If not provided, API will create a name using
-                "Snapshot_{device_name}_{'%Y-%m-%d-%I-%M-%S-%p'}" format.
+    # List all private properties in alphabetical order
+    @property
+    def _build_info(self) -> Dict[str, Any]:
+        """Returns the build information of the device.
 
         Returns:
-            Absolute path of the snapshot file.
+            Build info dict.
+
+        Raises:
+            errors.FuchsiaControllerError: On FIDL communication failure.
         """
+        try:
+            buildinfo_provider_proxy = f_buildinfo.Provider.Client(
+                _connect_device_proxy(self._ctx, "BuildInfo"))
+            build_info_resp = asyncio.run(
+                buildinfo_provider_proxy.get_build_info())
+            return build_info_resp.build_info
+        except fuchsia_controller.ZxStatus as status:
+            raise errors.FuchsiaControllerError(
+                "Fuchsia Controller FIDL Error") from status
+
+    @property
+    def _device_info(self) -> Dict[str, Any]:
+        """Returns the device information of the device.
+
+        Returns:
+            Device info dict.
+
+        Raises:
+            errors.FuchsiaControllerError: On FIDL communication failure.
+        """
+        try:
+            hwinfo_device_proxy = f_hwinfo.Device.Client(
+                _connect_device_proxy(self._ctx, "DeviceInfo"))
+            device_info_resp = asyncio.run(hwinfo_device_proxy.get_info())
+            return device_info_resp.info
+        except fuchsia_controller.ZxStatus as status:
+            raise errors.FuchsiaControllerError(
+                "Fuchsia Controller FIDL Error") from status
+
+    @property
+    def _product_info(self) -> Dict[str, Any]:
+        """Returns the product information of the device.
+
+        Returns:
+            Product info dict.
+
+        Raises:
+            errors.FuchsiaControllerError: On FIDL communication failure.
+        """
+        try:
+            hwinfo_product_proxy = f_hwinfo.Product.Client(
+                _connect_device_proxy(self._ctx, "ProductInfo"))
+            product_info_resp = asyncio.run(hwinfo_product_proxy.get_info())
+            return product_info_resp.info
+        except fuchsia_controller.ZxStatus as status:
+            raise errors.FuchsiaControllerError(
+                "Fuchsia Controller FIDL Error") from status
+
+    # List all private methods in alphabetical order
+    def _context_create(self) -> None:
+        """Creates the fuchsia-controller context and any long-lived proxies.
+
+        Raises:
+            fuchsia_controller.ZxStatus: On FIDL communication failure.
+        """
+        try:
+            self._ctx = fuchsia_controller.Context({})
+
+            # TODO(fxb/128575): Make connect_remote_control_proxy() work, or
+            # remove it.
+            self._rcs_proxy = fd_remotecontrol.RemoteControl.Client( \
+                    _connect_device_proxy(self._ctx, "RemoteControl"))
+        except fuchsia_controller.ZxStatus as status:
+            raise errors.FuchsiaControllerError(
+                "Fuchsia Controller FIDL Error") from status
+
+    def _context_destroy(self) -> None:
+        """Destroys the fuchsia-controller context and any long-lived proxies,
+        closing the fuchsia-controller connection.
+        """
+        self._ctx = None
+        self._rcs_proxy = None
+
+    def _on_device_boot(self) -> None:
+        """Take actions after the device is rebooted.
+
+        Raises:
+            errors.FuchsiaControllerError: On FIDL communication failure.
+        """
+        # Create a new Fuchsia controller context for new device connection.
+        self._context_create()
+
+        # If applicable, initialize bluetooth stack
+        # TODO(b/285993492): Implement fuchsia-controller bluetooth affordance
+        # if "qemu" not in self.device_type:
+        #     self.bluetooth.sys_init()
+
+    def _send_log_command(
+            self, tag: str, message: str, level: custom_types.LEVEL) -> None:
+        """Send a device command to write to the syslog.
+
+        Args:
+            tag: Tag to apply to the message in the syslog.
+            message: Message that need to logged.
+            level: Log message level.
+
+        Raises:
+            errors.FuchsiaControllerError: On FIDL communication failure.
+        """
+        try:
+            asyncio.run(
+                self._rcs_proxy.log_message(
+                    tag=tag, message=message, severity=_LOG_SEVERITIES[level]))
+        except fuchsia_controller.ZxStatus as status:
+            raise errors.FuchsiaControllerError(
+                "Fuchsia Controller FIDL Error") from status
+
+    def _send_reboot_command(self) -> None:
+        """Send a device command to trigger a soft reboot.
+
+        Raises:
+            errors.FuchsiaControllerError: On FIDL communication failure.
+        """
+        try:
+            power_proxy = fhp_statecontrol.Admin.Client(
+                _connect_device_proxy(self._ctx, "PowerAdmin"))
+            asyncio.run(
+                power_proxy.reboot(
+                    reason=fhp_statecontrol.RebootReason.USER_REQUEST))
+        except fuchsia_controller.ZxStatus as status:
+            # ZX_ERR_PEER_CLOSED is expected in this instance because the device
+            # powered off.
+            zx_status: Optional[int] = \
+                status.args[0] if len(status.args) == 0 else None
+            if zx_status != fuchsia_controller.ZxStatus.ZX_ERR_PEER_CLOSED:
+                raise errors.FuchsiaControllerError(
+                    "Fuchsia Controller FIDL Error") from status
+
+    def _send_snapshot_command(self) -> bytes:
+        """Send a device command to take a snapshot.
+
+        Raises:
+            errors.FuchsiaControllerError: On FIDL communication failure.
+
+        Returns:
+            Bytes containing snapshot data as a zip archive.
+        """
+        # TODO(b/286052015): Implement snapshot via `response_channel` field in
+        # `GetSnapshot`, and reading a `fuchsia.io.File` channel. See the
+        # implementation of the `ffx target snapshot` command.
         raise NotImplementedError

@@ -1,0 +1,102 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/fidl/toolchain.gni")
+import("//build/testing/host_test_data.gni")
+
+# TODO(fxbug.dev/129301): Make this more ergonomical; this list will continue to
+# grow more unwieldy over time.
+#
+# Individual tests will also have to add their own lists on top of this one,
+# if they use any more FIDL libraries than the list here.
+#
+# This list will also have to be changed any time a transitive dependency of any
+# FIDL library in this list is changed, which is a maintenance burden.
+host_test_data("honeydew_test_data") {
+  sources = [
+    get_label_info("//build/fidl:all_fidl_json($default_toolchain)",
+                   "root_out_dir") + "/all_fidl_json.txt",
+    get_label_info("//src/developer/ffx/lib/fuchsia-controller",
+                   "root_out_dir") + "/fuchsia_controller_py.so",
+    get_label_info("//src/developer/ffx/lib/fuchsia-controller",
+                   "root_out_dir") + "/fidl_codec.so",
+    get_label_info("//sdk/fidl/fuchsia.boot:fuchsia.boot($fidl_toolchain)",
+                   "target_gen_dir") + "/fuchsia.boot.fidl.json",
+    get_label_info(
+            "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo($fidl_toolchain)",
+            "target_gen_dir") + "/fuchsia.buildinfo.fidl.json",
+    get_label_info(
+            "//sdk/fidl/fuchsia.component:fuchsia.component($fidl_toolchain)",
+            "target_gen_dir") + "/fuchsia.component.fidl.json",
+    get_label_info(
+            "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl($fidl_toolchain)",
+            "target_gen_dir") + "/fuchsia.component.decl.fidl.json",
+    get_label_info("//sdk/fidl/fuchsia.data:fuchsia.data($fidl_toolchain)",
+                   "target_gen_dir") + "/fuchsia.data.fidl.json",
+    get_label_info(
+            "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol($fidl_toolchain)",
+            "target_gen_dir") + "/fuchsia.developer.remotecontrol.fidl.json",
+    get_label_info("//sdk/fidl/fuchsia.device:fuchsia.device($fidl_toolchain)",
+                   "target_gen_dir") + "/fuchsia.device.fidl.json",
+    get_label_info(
+            "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics($fidl_toolchain)",
+            "target_gen_dir") + "/fuchsia.diagnostics.fidl.json",
+    get_label_info(
+            "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol($fidl_toolchain)",
+            "target_gen_dir") +
+        "/fuchsia.hardware.power.statecontrol.fidl.json",
+    get_label_info("//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo($fidl_toolchain)",
+                   "target_gen_dir") + "/fuchsia.hwinfo.fidl.json",
+    get_label_info("//sdk/fidl/fuchsia.intl:fuchsia.intl($fidl_toolchain)",
+                   "target_gen_dir") + "/fuchsia.intl.fidl.json",
+    get_label_info("//sdk/fidl/fuchsia.io:fuchsia.io($fidl_toolchain)",
+                   "target_gen_dir") + "/fuchsia.io.fidl.json",
+    get_label_info("//sdk/fidl/fuchsia.kernel:fuchsia.kernel($fidl_toolchain)",
+                   "target_gen_dir") + "/fuchsia.kernel.fidl.json",
+    get_label_info("//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc($fidl_toolchain)",
+                   "target_gen_dir") + "/fuchsia.ldsvc.fidl.json",
+    get_label_info("//sdk/fidl/fuchsia.logger:fuchsia.logger($fidl_toolchain)",
+                   "target_gen_dir") + "/fuchsia.logger.fidl.json",
+    get_label_info("//sdk/fidl/fuchsia.mem:fuchsia.mem($fidl_toolchain)",
+                   "target_gen_dir") + "/fuchsia.mem.fidl.json",
+    get_label_info("//sdk/fidl/fuchsia.net:fuchsia.net($fidl_toolchain)",
+                   "target_gen_dir") + "/fuchsia.net.fidl.json",
+    get_label_info(
+            "//sdk/fidl/fuchsia.process:fuchsia.process($fidl_toolchain)",
+            "target_gen_dir") + "/fuchsia.process.fidl.json",
+    get_label_info(
+            "//sdk/fidl/fuchsia.unknown:fuchsia.unknown($fidl_toolchain)",
+            "target_gen_dir") + "/fuchsia.unknown.fidl.json",
+    get_label_info("//sdk/fidl/fuchsia.url:fuchsia.url($fidl_toolchain)",
+                   "target_gen_dir") + "/fuchsia.url.fidl.json",
+    get_label_info("//zircon/vdso/zx($fidl_toolchain)", "target_gen_dir") +
+        "/zx.fidl.json",
+  ]
+
+  deps = [
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.component:fuchsia.component($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.data:fuchsia.data($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.device:fuchsia.device($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.intl:fuchsia.intl($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.io:fuchsia.io($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.mem:fuchsia.mem($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.net:fuchsia.net($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.process:fuchsia.process($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.unknown:fuchsia.unknown($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.url:fuchsia.url($fidl_toolchain)",
+    "//src/developer/ffx/lib/fuchsia-controller:fidl_codec",
+    "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py",
+    "//zircon/vdso/zx:zx($fidl_toolchain)",
+  ]
+}

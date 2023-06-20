@@ -5,50 +5,84 @@
 """Unit tests for
 honeydew.device_classes.fuchsia_controller.fuchsia_device.py."""
 
-import tempfile
 from typing import Any, Dict
 import unittest
 from unittest import mock
 
+import fidl.fuchsia_buildinfo as f_buildinfo
+import fidl.fuchsia_developer_remotecontrol as fd_remotecontrol
+import fidl.fuchsia_hardware_power_statecontrol as fhp_statecontrol
+import fidl.fuchsia_hwinfo as f_hwinfo
+from parameterized import parameterized
+
 from honeydew import custom_types
+from honeydew.device_classes import base_fuchsia_device
 from honeydew.device_classes.fuchsia_controller import fuchsia_device
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.device_classes import \
     fuchsia_device as fuchsia_device_interface
-from honeydew.interfaces.device_classes import transports_capable
 
-_INPUT_ARGS: Dict[str, Any] = {
+_INPUT_ARGS: Dict[str, str] = {
     "device_name": "fuchsia-emulator",
     "ssh_private_key": "/tmp/.ssh/pkey",
     "ssh_user": "root",
 }
 
-_MOCK_ARGS: Dict[str, Any] = {
-    "device_type": "qemu-x64",
+_MOCK_DEVICE_PROPERTIES: Dict[str, Dict[str, Any]] = {
+    "build_info": {
+        "version": "123456",
+    },
+    "device_info": {
+        "serial_number": "123456",
+    },
+    "product_info":
+        {
+            "manufacturer": "default-manufacturer",
+            "model": "default-model",
+            "name": "default-product-name",
+        },
 }
 
 
-# pylint: disable=pointless-statement
-# pytype: disable=attribute-error
+def _custom_test_name_func(testcase_func, _, param) -> str:
+    """Custom test name function method."""
+    test_func_name: str = testcase_func.__name__
+
+    params_dict: Dict[str, Any] = param.args[0]
+    test_label: str = parameterized.to_safe_name(params_dict["label"])
+
+    return f"{test_func_name}_with_{test_label}"
+
+
 class FuchsiaDeviceFCTests(unittest.TestCase):
     """Unit tests for
     honeydew.device_classes.fuchsia_controller.fuchsia_device.py."""
 
+    def __init__(self, *args, **kwargs) -> None:
+        self.fd_obj: fuchsia_device.FuchsiaDevice
+        super().__init__(*args, **kwargs)
+
     @mock.patch.object(
-        fuchsia_device.ffx_transport.FFX, "check_connection", autospec=True)
+        base_fuchsia_device.ffx_transport.FFX,
+        "check_connection",
+        autospec=True)
     @mock.patch.object(
-        fuchsia_device.ssh_transport.SSH, "check_connection", autospec=True)
+        base_fuchsia_device.ssh_transport.SSH,
+        "check_connection",
+        autospec=True)
+    @mock.patch("fuchsia_controller_py.Context", autospec=True)
     def setUp(
-            self, mock_ssh_check_connection, mock_ffx_check_connection) -> None:
+            self, mock_fc_context, mock_ssh_check_connection,
+            mock_ffx_check_connection) -> None:
         super().setUp()
 
         self.fd_obj = fuchsia_device.FuchsiaDevice(
             device_name=_INPUT_ARGS["device_name"],
             ssh_private_key=_INPUT_ARGS["ssh_private_key"])
 
-        self.assertIsInstance(self.fd_obj, fuchsia_device.FuchsiaDevice)
-        mock_ssh_check_connection.assert_called()
-        mock_ffx_check_connection.assert_called()
+        mock_ffx_check_connection.assert_called_once_with(self.fd_obj.ffx)
+        mock_ssh_check_connection.assert_called_once_with(self.fd_obj.ssh)
+        mock_fc_context.assert_called_once_with({})
 
     def test_device_is_a_fuchsia_device(self) -> None:
         """Test case to make sure DUT is a fuchsia device"""
@@ -71,81 +105,117 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         self.assertIsInstance(
             self.fd_obj, affordances_capable.TracingCapableDevice)
 
-    # List all the tests related to transports in alphabetical order
-    def test_fuchsia_device_is_ssh_capable(self) -> None:
-        """Test case to make sure fuchsia device is SSH capable"""
-        self.assertIsInstance(self.fd_obj, transports_capable.SSHCapableDevice)
-
-    def test_fuchsia_device_is_ffx_capable(self) -> None:
-        """Test case to make sure fuchsia device is FFX capable"""
-        self.assertIsInstance(self.fd_obj, transports_capable.FFXCapableDevice)
-
-    # List all the tests related to static properties in alphabetical order
-    @mock.patch.object(
-        fuchsia_device.ffx_transport.FFX,
-        "get_target_type",
-        return_value=_MOCK_ARGS["device_type"],
-        autospec=True)
-    def test_device_type(self, mock_ffx_get_target_type) -> None:
-        """Testcase for FuchsiaDevice.device_type property"""
-        self.assertEqual(self.fd_obj.device_type, _MOCK_ARGS["device_type"])
-        mock_ffx_get_target_type.assert_called()
-
-    def test_manufacturer(self) -> None:
-        """Testcase for FuchsiaDevice.manufacturer property"""
-        with self.assertRaises(NotImplementedError):
-            self.fd_obj.manufacturer
-
-    def test_model(self) -> None:
-        """Testcase for FuchsiaDevice.model property"""
-        with self.assertRaises(NotImplementedError):
-            self.fd_obj.model
-
-    def test_product_name(self) -> None:
-        """Testcase for FuchsiaDevice.product_name property"""
-        with self.assertRaises(NotImplementedError):
-            self.fd_obj.product_name
-
-    def test_serial_number(self) -> None:
-        """Testcase for FuchsiaDevice.serial_number property"""
-        with self.assertRaises(NotImplementedError):
-            self.fd_obj.serial_number
-
-    # List all the tests related to dynamic properties in alphabetical order
-    def test_firmware_version(self) -> None:
-        """Testcase for FuchsiaDevice.firmware_version property"""
-        with self.assertRaises(NotImplementedError):
-            self.fd_obj.firmware_version
-
     # List all the tests related to public methods in alphabetical order
     def test_close(self) -> None:
         """Testcase for FuchsiaDevice.close()"""
         self.fd_obj.close()
 
-    def test_log_message_to_device(self) -> None:
-        """Testcase for FuchsiaDevice.log_message_to_device()"""
+    # List all the tests related to private methods in alphabetical order
+    @mock.patch.object(
+        f_buildinfo.Provider.Client,
+        "get_build_info",
+        new_callable=mock.AsyncMock,
+        return_value=f_buildinfo.ProviderGetBuildInfoResponse(
+            build_info=_MOCK_DEVICE_PROPERTIES["build_info"]),
+    )
+    def test_build_info(self, mock_buildinfo_provider) -> None:
+        """Testcase for FuchsiaDevice._build_info property"""
+        # pylint: disable=protected-access
+        self.assertEqual(
+            self.fd_obj._build_info, _MOCK_DEVICE_PROPERTIES["build_info"])
+        mock_buildinfo_provider.assert_called()
+
+    @mock.patch.object(
+        f_hwinfo.Device.Client,
+        "get_info",
+        new_callable=mock.AsyncMock,
+        return_value=f_hwinfo.DeviceGetInfoResponse(
+            info=_MOCK_DEVICE_PROPERTIES["device_info"]),
+    )
+    def test_device_info(self, mock_hwinfo_device) -> None:
+        """Testcase for FuchsiaDevice._device_info property"""
+        # pylint: disable=protected-access
+        self.assertEqual(
+            self.fd_obj._device_info, _MOCK_DEVICE_PROPERTIES["device_info"])
+        mock_hwinfo_device.assert_called()
+
+    @mock.patch.object(
+        f_hwinfo.Product.Client,
+        "get_info",
+        new_callable=mock.AsyncMock,
+        return_value=f_hwinfo.ProductGetInfoResponse(
+            info=_MOCK_DEVICE_PROPERTIES["product_info"]),
+    )
+    def test_product_info(self, mock_hwinfo_product) -> None:
+        """Testcase for FuchsiaDevice._product_info property"""
+        # pylint: disable=protected-access
+        self.assertEqual(
+            self.fd_obj._product_info, _MOCK_DEVICE_PROPERTIES["product_info"])
+        mock_hwinfo_product.assert_called()
+
+    @mock.patch("fuchsia_controller_py.Context", autospec=True)
+    def test_on_device_boot(self, mock_fc_context) -> None:
+        """Testcase for FuchsiaDevice._on_device_boot()"""
+        # pylint: disable=protected-access
+        self.fd_obj._on_device_boot()
+        mock_fc_context.assert_called_once_with({})
+
+    @parameterized.expand(
+        [
+            (
+                {
+                    "label": "info_level",
+                    "log_level": custom_types.LEVEL.INFO,
+                    "log_message": "info message",
+                },),
+            (
+                {
+                    "label": "warning_level",
+                    "log_level": custom_types.LEVEL.WARNING,
+                    "log_message": "warning message",
+                },),
+            (
+                {
+                    "label": "error_level",
+                    "log_level": custom_types.LEVEL.ERROR,
+                    "log_message": "error message",
+                },),
+        ],
+        name_func=_custom_test_name_func)
+    @mock.patch.object(
+        fd_remotecontrol.RemoteControl.Client,
+        "log_message",
+        new_callable=mock.AsyncMock,
+    )
+    def test_send_log_command(
+            self, parameterized_dict, mock_rcs_log_message) -> None:
+        """Testcase for FuchsiaDevice._send_log_command()"""
+        # pylint: disable=protected-access
+        self.fd_obj._send_log_command(
+            tag="test",
+            level=parameterized_dict["log_level"],
+            message=parameterized_dict["log_message"])
+
+        mock_rcs_log_message.assert_called()
+
+    @mock.patch.object(
+        fhp_statecontrol.Admin.Client,
+        "reboot",
+        new_callable=mock.AsyncMock,
+    )
+    def test_send_reboot_command(self, mock_admin_reboot) -> None:
+        """Testcase for FuchsiaDevice._send_reboot_command()"""
+        # pylint: disable=protected-access
+        self.fd_obj._send_reboot_command()
+
+        mock_admin_reboot.assert_called()
+
+    def test_send_snapshot_command(self) -> None:
+        """Testcase for FuchsiaDevice._send_snapshot_command()"""
         with self.assertRaises(NotImplementedError):
-            self.fd_obj.log_message_to_device(
-                level=custom_types.LEVEL.INFO, message="log_message")
+            # pylint: disable=protected-access
+            self.fd_obj._send_snapshot_command()
 
-    def test_power_cycle(self) -> None:
-        """Testcase for FuchsiaDevice.power_cycle()"""
-        power_switch = mock.MagicMock(
-            spec=fuchsia_device.power_switch_interface.PowerSwitch)
 
-        with self.assertRaises(NotImplementedError):
-            self.fd_obj.power_cycle(power_switch=power_switch, outlet=5)
-
-    def test_reboot(self) -> None:
-        """Testcase for FuchsiaDevice.reboot()"""
-        with self.assertRaises(NotImplementedError):
-            self.fd_obj.reboot()
-
-    def test_snapshot(self) -> None:
-        """Testcase for FuchsiaDevice.snapshot()"""
-        with self.assertRaises(NotImplementedError):
-            self.fd_obj.snapshot(directory="/tmp")
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with self.assertRaises(NotImplementedError):
-                self.fd_obj.snapshot(directory=tmpdir)
+if __name__ == "__main__":
+    unittest.main()

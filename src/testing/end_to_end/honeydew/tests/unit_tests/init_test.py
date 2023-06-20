@@ -15,6 +15,7 @@ from parameterized import parameterized
 import honeydew
 from honeydew import custom_types
 from honeydew import errors
+from honeydew.device_classes import base_fuchsia_device
 from honeydew.device_classes.fuchsia_controller import \
     generic_fuchsia_device as fc_generic_fuchsia_device
 from honeydew.device_classes.fuchsia_controller import x64 as fc_x64
@@ -53,7 +54,11 @@ class InitTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func)
     @mock.patch.object(
-        honeydew.sl4f_generic_fuchsia_device.fuchsia_device.ffx_transport.FFX,
+        base_fuchsia_device.ffx_transport.FFX,
+        "check_connection",
+        autospec=True)
+    @mock.patch.object(
+        base_fuchsia_device.ssh_transport.SSH,
         "check_connection",
         autospec=True)
     @mock.patch.object(
@@ -64,18 +69,14 @@ class InitTests(unittest.TestCase):
         honeydew.sl4f_generic_fuchsia_device.fuchsia_device.sl4f_transport.SL4F,
         "start_server",
         autospec=True)
-    @mock.patch.object(
-        honeydew.sl4f_generic_fuchsia_device.fuchsia_device.ssh_transport.SSH,
-        "check_connection",
-        autospec=True)
     @mock.patch(
         "honeydew._get_device_class",
         return_value=sl4f_generic_fuchsia_device.GenericFuchsiaDevice,
         autospec=True)
     def test_create_device_return_sl4f_default_device(
             self, parameterized_dict, mock_get_device_class,
-            mock_ssh_check_connection, mock_sl4f_start_server,
-            mock_sl4f_check_connection, mock_ffx_check_connection) -> None:
+            mock_sl4f_start_server, mock_sl4f_check_connection,
+            mock_ssh_check_connection, mock_ffx_check_connection) -> None:
         """Test case for honeydew.create_device() where it returns SL4F based
         default fuchsia device object."""
         self.assertIsInstance(
@@ -86,9 +87,9 @@ class InitTests(unittest.TestCase):
             sl4f_generic_fuchsia_device.GenericFuchsiaDevice)
 
         mock_get_device_class.assert_called()
-        mock_ssh_check_connection.assert_called()
         mock_sl4f_start_server.assert_called()
         mock_sl4f_check_connection.assert_called()
+        mock_ssh_check_connection.assert_called()
         mock_ffx_check_connection.assert_called()
 
     @parameterized.expand(
@@ -105,7 +106,11 @@ class InitTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func)
     @mock.patch.object(
-        honeydew.device_classes.sl4f.x64.fuchsia_device.ffx_transport.FFX,
+        base_fuchsia_device.ffx_transport.FFX,
+        "check_connection",
+        autospec=True)
+    @mock.patch.object(
+        base_fuchsia_device.ssh_transport.SSH,
         "check_connection",
         autospec=True)
     @mock.patch.object(
@@ -116,16 +121,12 @@ class InitTests(unittest.TestCase):
         honeydew.device_classes.sl4f.x64.fuchsia_device.sl4f_transport.SL4F,
         "start_server",
         autospec=True)
-    @mock.patch.object(
-        honeydew.device_classes.sl4f.x64.fuchsia_device.ssh_transport.SSH,
-        "check_connection",
-        autospec=True)
     @mock.patch(
         "honeydew._get_device_class", return_value=sl4f_x64.X64, autospec=True)
     def test_create_device_return_sl4f_specific_device(
             self, parameterized_dict, mock_get_device_class,
-            mock_ssh_check_connection, mock_sl4f_start_server,
-            mock_sl4f_check_connection, mock_ffx_check_connection) -> None:
+            mock_sl4f_start_server, mock_sl4f_check_connection,
+            mock_ssh_check_connection, mock_ffx_check_connection) -> None:
         """Test case for honeydew.create_device() where it returns a SL4F based
          specific fuchsia device object."""
         self.assertIsInstance(
@@ -135,26 +136,27 @@ class InitTests(unittest.TestCase):
                 transport=parameterized_dict["transport"]), sl4f_x64.X64)
 
         mock_get_device_class.assert_called()
-        mock_ssh_check_connection.assert_called()
         mock_sl4f_start_server.assert_called()
         mock_sl4f_check_connection.assert_called()
+        mock_ssh_check_connection.assert_called()
         mock_ffx_check_connection.assert_called()
 
     @mock.patch.object(
-        honeydew.fc_generic_fuchsia_device.fuchsia_device.ffx_transport.FFX,
+        base_fuchsia_device.ffx_transport.FFX,
         "check_connection",
         autospec=True)
     @mock.patch.object(
-        honeydew.fc_generic_fuchsia_device.fuchsia_device.ssh_transport.SSH,
+        base_fuchsia_device.ssh_transport.SSH,
         "check_connection",
         autospec=True)
+    @mock.patch("fuchsia_controller_py.Context", autospec=True)
     @mock.patch(
         "honeydew._get_device_class",
         return_value=fc_generic_fuchsia_device.GenericFuchsiaDevice,
         autospec=True)
     def test_create_device_return_fc_default_device(
-            self, mock_get_device_class, mock_ssh_check_connection,
-            mock_ffx_check_connection) -> None:
+            self, mock_get_device_class, mock_fc_context,
+            mock_ssh_check_connection, mock_ffx_check_connection) -> None:
         """Test case for honeydew.create_device() where it returns
         Fuchsia-Controller based default fuchsia device object."""
         self.assertIsInstance(
@@ -165,24 +167,24 @@ class InitTests(unittest.TestCase):
             fc_generic_fuchsia_device.GenericFuchsiaDevice)
 
         mock_get_device_class.assert_called()
+        mock_fc_context.assert_called_once_with({})
         mock_ssh_check_connection.assert_called()
         mock_ffx_check_connection.assert_called()
 
     @mock.patch.object(
-        honeydew.device_classes.fuchsia_controller.x64.fuchsia_device.
-        ffx_transport.FFX,
+        base_fuchsia_device.ffx_transport.FFX,
         "check_connection",
         autospec=True)
     @mock.patch.object(
-        honeydew.device_classes.fuchsia_controller.x64.fuchsia_device.
-        ssh_transport.SSH,
+        base_fuchsia_device.ssh_transport.SSH,
         "check_connection",
         autospec=True)
+    @mock.patch("fuchsia_controller_py.Context", autospec=True)
     @mock.patch(
         "honeydew._get_device_class", return_value=fc_x64.X64, autospec=True)
     def test_create_device_return_fc_specific_device(
-            self, mock_get_device_class, mock_ssh_check_connection,
-            mock_ffx_check_connection) -> None:
+            self, mock_get_device_class, mock_fc_context,
+            mock_ssh_check_connection, mock_ffx_check_connection) -> None:
         """Test case for honeydew.create_device() where it returns a
         Fuchsia-Controller based specific fuchsia device object."""
         self.assertIsInstance(
@@ -193,6 +195,7 @@ class InitTests(unittest.TestCase):
             fc_x64.X64)
 
         mock_get_device_class.assert_called()
+        mock_fc_context.assert_called_once_with({})
         mock_ssh_check_connection.assert_called()
         mock_ffx_check_connection.assert_called()
 
@@ -206,7 +209,7 @@ class InitTests(unittest.TestCase):
         "start_server",
         autospec=True)
     @mock.patch.object(
-        honeydew.device_classes.sl4f.x64.fuchsia_device.ssh_transport.SSH,
+        base_fuchsia_device.ssh_transport.SSH,
         "check_connection",
         autospec=True)
     @mock.patch(
@@ -254,7 +257,7 @@ class InitTests(unittest.TestCase):
         "start_server",
         autospec=True)
     @mock.patch.object(
-        honeydew.device_classes.sl4f.x64.fuchsia_device.ssh_transport.SSH,
+        base_fuchsia_device.ssh_transport.SSH,
         "check_connection",
         autospec=True)
     @mock.patch(
@@ -303,7 +306,7 @@ class InitTests(unittest.TestCase):
         "start_server",
         autospec=True)
     @mock.patch.object(
-        honeydew.device_classes.sl4f.x64.fuchsia_device.ssh_transport.SSH,
+        base_fuchsia_device.ssh_transport.SSH,
         "check_connection",
         autospec=True)
     @mock.patch(
@@ -351,7 +354,7 @@ class InitTests(unittest.TestCase):
         "start_server",
         autospec=True)
     @mock.patch.object(
-        honeydew.device_classes.sl4f.x64.fuchsia_device.ssh_transport.SSH,
+        base_fuchsia_device.ssh_transport.SSH,
         "check_connection",
         autospec=True)
     @mock.patch(

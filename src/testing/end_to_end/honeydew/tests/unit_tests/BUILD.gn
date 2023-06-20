@@ -13,6 +13,7 @@ if (is_host) {
     ]
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
+    deps = [ "//src/testing/end_to_end/honeydew/tests:honeydew_test_data" ]
   }
 
   python_host_test("custom_types_test") {
@@ -23,17 +24,22 @@ if (is_host) {
     ]
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
+    deps = [ "//src/testing/end_to_end/honeydew/tests:honeydew_test_data" ]
   }
 }
 
 group("tests") {
   testonly = true
-  public_deps = [
-    ":custom_types_test($host_toolchain)",
-    ":init_test($host_toolchain)",
-    "affordances_tests:tests",
-    "device_classes_tests:tests",
-    "transports_tests:tests",
-    "utils_tests:tests",
-  ]
+  public_deps = []
+
+  if (host_os != "mac") {
+    public_deps += [
+      ":custom_types_test($host_toolchain)",
+      ":init_test($host_toolchain)",
+      "affordances_tests:tests",
+      "device_classes_tests:tests",
+      "transports_tests:tests",
+      "utils_tests:tests",
+    ]
+  }
 }

@@ -10,6 +10,7 @@ if (is_host) {
     libraries = [ "//src/testing/end_to_end/honeydew" ]
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
+    deps = [ "//src/testing/end_to_end/honeydew/tests:honeydew_test_data" ]
   }
 
   python_host_test("component_fc_test") {
@@ -17,6 +18,7 @@ if (is_host) {
     libraries = [ "//src/testing/end_to_end/honeydew" ]
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
+    deps = [ "//src/testing/end_to_end/honeydew/tests:honeydew_test_data" ]
   }
 
   python_host_test("tracing_fc_test") {
@@ -24,6 +26,7 @@ if (is_host) {
     libraries = [ "//src/testing/end_to_end/honeydew" ]
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
+    deps = [ "//src/testing/end_to_end/honeydew/tests:honeydew_test_data" ]
   }
 }
 

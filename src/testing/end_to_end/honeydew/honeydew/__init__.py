@@ -156,6 +156,9 @@ def get_device_classes(
 
         # Iterate items inside imported python file
         for item in dir(module):
+            if item.startswith("_"):
+                continue
+
             value: Any = getattr(module, item)
             if not value:
                 continue

@@ -2,9 +2,25 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/python/python_host_test.gni")
+
+if (is_host) {
+  python_host_test("base_fuchsia_device_test") {
+    main_source = "base_fuchsia_device_test.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//third_party/parameterized",
+    ]
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+    deps = [ "//src/testing/end_to_end/honeydew/tests:honeydew_test_data" ]
+  }
+}
+
 group("tests") {
   testonly = true
   public_deps = [
+    ":base_fuchsia_device_test($host_toolchain)",
     "fuchsia_controller:tests",
     "sl4f:tests",
   ]

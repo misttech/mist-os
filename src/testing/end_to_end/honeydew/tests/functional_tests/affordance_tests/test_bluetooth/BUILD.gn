@@ -13,6 +13,8 @@ if (is_host) {
       "//src/testing/end_to_end/fuchsia_base_test:fuchsia_base_test",
     ]
 
+    deps = [ "//src/testing/end_to_end/honeydew/tests:honeydew_test_data" ]
+
     local_config_source = "../../testbeds/One-X64.yaml"
 
     # Used for infra Swarming bot allocation.

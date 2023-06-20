@@ -44,6 +44,10 @@ class Sl4fError(HoneyDewError):
     """Exception for errors raised by SL4F requests."""
 
 
+class FuchsiaControllerError(HoneyDewError):
+    """Exception for errors raised by Fuchsia Controller requests."""
+
+
 class FuchsiaStateError(HoneyDewError):
     """Exception for state errors."""
 

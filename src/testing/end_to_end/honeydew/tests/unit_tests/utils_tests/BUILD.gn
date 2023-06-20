@@ -13,6 +13,7 @@ if (is_host) {
     ]
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
+    deps = [ "//src/testing/end_to_end/honeydew/tests:honeydew_test_data" ]
   }
 }
 
