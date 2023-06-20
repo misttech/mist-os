@@ -1372,6 +1372,28 @@ assembly_input_bundle("fan") {
   ]
 }
 
+# Battery support
+#
+# feature_set_levels: utility, minimal
+# build-types: all
+#
+assembly_input_bundle("battery_manager") {
+  base_packages = [ "//src/power/battery-manager" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/power/battery-manager/meta/battery_manager.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
 # Example assembly input bundle for testing
 #
 # Restricted for testing assembly itself (and to provide example code)

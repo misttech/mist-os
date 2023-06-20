@@ -64,6 +64,7 @@ group("tests") {
   ]
 }
 
+# TODO(fxbug.dev/122864) Remove transitional labels
 core_shard("battery-manager-core-shard") {
   shard_file = "meta/battery_manager.core_shard.cml"
 }

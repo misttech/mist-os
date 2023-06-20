@@ -35,6 +35,7 @@ BRINGUP_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + BOOTSTRAP_ENG_P
 # The names of all of the platform's 'testonly=false' Assembly Input Bundles
 USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "audio_device_registry",
+    "battery_manager",
     "common_minimal",
     "common_minimal_userdebug",
     "core_realm",

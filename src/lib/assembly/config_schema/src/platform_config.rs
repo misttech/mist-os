@@ -4,6 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod battery_config;
 pub mod connectivity_config;
 pub mod development_support_config;
 pub mod diagnostics_config;
@@ -50,6 +51,10 @@ pub struct PlatformConfig {
     /// Appended to the list of tags defined for the platform.
     #[serde(default)]
     pub additional_serial_log_tags: Vec<String>,
+
+    /// Platform configuration options for the battery.
+    #[serde(default)]
+    pub battery: battery_config::BatteryConfig,
 
     /// Platform configuration options for the connectivity area.
     #[serde(default)]

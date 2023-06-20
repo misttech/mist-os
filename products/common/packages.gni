@@ -6,7 +6,7 @@ declare_args() {
   developer_packages = [
     "//src/intl/intl_services:pkg",
     "//src/media/audio/bundles:services",
-    "//src/power:battery",
+    "//src/power/battery-manager/battery-cli",
     "//src/ui/bin/brightness_manager",
     "//src/media/audio/consumer/bundles:services",
     "//src/session",

@@ -12,6 +12,9 @@ assert(
 
 workstation_platform_config = {
   build_type = "eng"
+  battery = {
+    enabled = true
+  }
   identity = {
     password_pinweaver = "required"
   }

@@ -116,6 +116,9 @@ user_platform_aib_names =
 
       # Thermal
       "fan",
+
+      # Battery
+      "battery_manager",
     ]
 
 if (current_cpu != "riscv64") {

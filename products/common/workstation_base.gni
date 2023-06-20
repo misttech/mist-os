@@ -16,7 +16,6 @@ core_realm_shards += [
   "//src/identity/bin/account:account-core-shard",
   "//src/intl/intl_services:intl_services_shard",
   "//src/media/audio/drivers/configurator:configurator_provider_shard",
-  "//src/power/battery-manager:battery-manager-core-shard",
   "//src/session/bin/session_manager:workstation_core_shard",
   "//src/media/audio/consumer:audio_consumer_shard",
 ]
