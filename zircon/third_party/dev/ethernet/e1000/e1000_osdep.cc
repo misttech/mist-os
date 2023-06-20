@@ -117,8 +117,9 @@ zx_status_t e1000_pci_get_device_info(const struct e1000_pci* pci, pci_device_in
 }
 
 zx_status_t e1000_pci_map_bar_buffer(const struct e1000_pci* pci, uint32_t bar_id,
-                                     uint32_t cache_policy, mmio_buffer_t* mmio) {
-  return pci->pci->MapMmio(bar_id, cache_policy, mmio);
+                                     uint32_t cache_policy, void* mmio) {
+  auto mmio_cast = reinterpret_cast<std::optional<fdf::MmioBuffer>*>(mmio);
+  return pci->pci->MapMmio(bar_id, cache_policy, mmio_cast);
 }
 
 zx_status_t e1000_pci_get_bar(const struct e1000_pci* pci, uint32_t bar_id, pci_bar_t* out_result) {

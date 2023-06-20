@@ -31,6 +31,7 @@
 #include <lib/ddk/driver.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/fit/defer.h>
+#include <lib/mmio/mmio-buffer.h>
 #include <lib/pci/hw.h>
 #include <zircon/hw/pci.h>
 #include <zircon/syscalls/pci.h>
@@ -155,8 +156,8 @@ struct adapter {
 
   std::mutex send_lock;
 
-  mmio_buffer_t bar0_mmio;
-  mmio_buffer_t flash_mmio;
+  std::optional<fdf::MmioBuffer> bar0_mmio;
+  std::optional<fdf::MmioBuffer> flash_mmio;
   struct txrx_funcs* txrx;
 
   pci_interrupt_mode_t irq_mode;
@@ -256,8 +257,6 @@ void e1000_release(void* ctx) {
   e1000_pci_set_bus_mastering(adapter->osdep.pci, false);
 
   io_buffer_release(&adapter->buffer);
-  mmio_buffer_release(&adapter->bar0_mmio);
-  mmio_buffer_release(&adapter->flash_mmio);
 
   zx_handle_close(adapter->btih);
   zx_handle_close(adapter->irqh);
@@ -572,7 +571,7 @@ static zx_status_t e1000_allocate_pci_resources(struct adapter* adapter) {
     return status;
   }
 
-  adapter->osdep.membase = (uintptr_t)adapter->bar0_mmio.vaddr;
+  adapter->osdep.membase = (uintptr_t)adapter->bar0_mmio->get();
   adapter->hw.hw_addr = (u8*)&adapter->osdep.membase;
 
   /* Only older adapters use IO mapping */
@@ -989,8 +988,8 @@ static zx_status_t e1000_bind(void* ctx, zx_device_t* dev) {
     }
     /* This is used in the shared code */
     // TODO(fxbug.dev/56253): Add MMIO_PTR to cast.
-    hw->flash_address = (uint8_t*)adapter->flash_mmio.vaddr;
-    adapter->osdep.flashbase = (uintptr_t)adapter->flash_mmio.vaddr;
+    hw->flash_address = (uint8_t*)adapter->flash_mmio->get();
+    adapter->osdep.flashbase = (uintptr_t)adapter->flash_mmio->get();
   }
   /*
   ** In the new SPT device flash is not  a

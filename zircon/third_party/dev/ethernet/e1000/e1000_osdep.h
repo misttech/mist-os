@@ -108,7 +108,7 @@ zx_status_t e1000_pci_read_config16(const struct e1000_pci* pci, uint16_t offset
                                     uint16_t* out_value);
 zx_status_t e1000_pci_get_device_info(const struct e1000_pci* pci, pci_device_info_t* out_info);
 zx_status_t e1000_pci_map_bar_buffer(const struct e1000_pci* pci, uint32_t bar_id,
-                                     uint32_t cache_policy, mmio_buffer_t* mmio);
+                                     uint32_t cache_policy, void* mmio);
 zx_status_t e1000_pci_get_bar(const struct e1000_pci* pci, uint32_t bar_id, pci_bar_t* out_result);
 zx_status_t e1000_pci_get_bti(const struct e1000_pci* pci, uint32_t index, zx_handle_t* out_bti);
 zx_status_t e1000_pci_configure_interrupt_mode(const struct e1000_pci* pci,
