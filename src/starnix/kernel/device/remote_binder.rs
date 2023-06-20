@@ -173,6 +173,10 @@ impl FileOps for RemoteBinderFileOps {
     }
 }
 
+/// The type of the responder function used in `TaskRequest` to send the result of a FIDL request
+/// directly from the handler thread.
+type SynchronousResponder = Box<dyn FnOnce(Result<(), Errno>) -> Result<(), fidl::Error> + Send>;
+
 /// Request sent from the FIDL server thread to the running tasks. The requests that require a
 /// response send a `Sender` to let the task return the response.
 #[derive(Derivative)]
@@ -189,7 +193,7 @@ enum TaskRequest {
         u64,
         // responder.
         // a synchronous function avoids thread hops.
-        #[derivative(Debug = "ignore")] Box<dyn FnOnce(Result<(), Errno>) + Send>,
+        #[derivative(Debug = "ignore")] SynchronousResponder,
     ),
     /// Execute the given ioctl. See the Ioctl method in the Binder FIDL
     /// protocol.
@@ -204,9 +208,7 @@ enum TaskRequest {
         u64,
         // responder.
         // a synchronous function avoids thread hops.
-        #[derivative(Debug = "ignore")]
-        #[allow(clippy::type_complexity)]
-        Box<dyn FnOnce(Result<(), Errno>) -> Result<(), fidl::Error> + Send>,
+        #[derivative(Debug = "ignore")] SynchronousResponder,
     ),
     /// Open the binder device driver situated at `path` in the Task filesystem namespace.
     Open(
@@ -379,6 +381,54 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         Ok(SUCCESS)
     }
 
+    /// Make a callback that can delegate to a FIDL async channel from a non-executor thread
+    /// without crashing if the executor is dropped before the callback.
+    ///
+    /// For this, this builds a pair of a `SynchronousResponder` and a future such that:
+    /// - The future resolve once the `SynchronousResponder` is called on another thread.
+    /// - The responder is passed to the `SynchronousResponder` but is guaranteed to always be
+    ///   dropped from the executor the future is bound to.
+    /// - The responder is not called if the future is dropped.
+    ///
+    /// To use this, one should use the returned responder when they want `f` to be run, and ensure
+    /// that the returned future is either waited, or dropped on the executor thread.
+    fn make_synchronous_responder<R: Send + 'static, C>(
+        responder: R,
+        f: C,
+    ) -> (SynchronousResponder, impl Future<Output = ()>)
+    where
+        C: FnOnce(R, Result<(), Errno>) -> Result<(), fidl::Error> + Send + 'static,
+    {
+        let (tx, rx) = futures::channel::oneshot::channel();
+        let responder = Arc::new(Mutex::new(Some(responder)));
+        let closure = Box::new({
+            let responder = Arc::downgrade(&responder);
+            move |e| {
+                scopeguard::defer! {
+                    let _ = tx.send(());
+                }
+                if let Some(responder) = responder.upgrade() {
+                    let mut guard = responder.lock();
+                    // Keep the guard lock when the responder is on the stack to ensure that the
+                    // executor is not dropped while the responder is still alive.
+                    if let Some(responder) = guard.take() {
+                        return f(responder, e);
+                    }
+                }
+                Ok(())
+            }
+        });
+        let waiter = async move {
+            // Drop the responder in a scopeguard to ensure the responder is dropped even if the
+            // future is cancelled.
+            scopeguard::defer! {
+                std::mem::drop(responder.lock().take());
+            }
+            let _ = rx.await;
+        };
+        (closure, waiter)
+    }
+
     async fn serve_binder_request(
         &self,
         remote_binder_connection: Arc<RemoteBinderConnection>,
@@ -386,51 +436,44 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     ) -> Result<(), Error> {
         match request {
             fbinder::BinderRequest::SetVmo { vmo, mapped_address, control_handle } => {
-                // control_handle must be owned by this thread. A weak pointer is sent to the
-                // handler thread. The mutex is used to ensure that the arc cannot be owned by
-                // the handler thread while this thread drops it.
-                let control_handle = Arc::new(control_handle);
-                let mutex = Arc::new(Mutex::new(()));
-                // Use an oneshot channel to asynchronously wait for the operation to be executed.
-                let (tx, rx) = futures::channel::oneshot::channel();
+                let (responder, waiter) =
+                    Self::make_synchronous_responder(control_handle, |control_handle, e| {
+                        if e.is_err() {
+                            control_handle.shutdown();
+                        }
+                        Ok(())
+                    });
                 self.state.lock().enqueue_taskless_request(TaskRequest::SetVmo(
                     remote_binder_connection,
                     vmo,
                     mapped_address,
-                    Box::new({
-                        let mutex = mutex.clone();
-                        let weak_handle = Arc::downgrade(&control_handle);
-                        move |e| {
-                            if e.is_err() {
-                                let _guard = mutex.lock();
-                                if let Some(control_handle) = weak_handle.upgrade() {
-                                    control_handle.shutdown();
-                                }
-                            }
-                            let _ = tx.send(());
-                        }
-                    }),
+                    responder,
                 ));
-                scopeguard::defer! {
-                    let _guard = mutex.lock();
-                    let _control_handle = Arc::into_inner(control_handle);
-                    debug_assert!(_control_handle.is_some());
-                }
-                let _ = rx.await;
+                waiter.await;
             }
             fbinder::BinderRequest::Ioctl { tid, request, parameter, responder } => {
                 trace_duration!(trace_category_starnix!(), trace_name_remote_binder_ioctl_send_work!(), "request" => request);
                 trace_flow_begin!(trace_category_starnix!(), trace_name_remote_binder_ioctl!(), tid.into(), "request" => request);
 
-                // responder must be owned by this thread. A weak pointer is sent to the
-                // handler thread. The mutex is used to ensure that the arc cannot be owned by
-                // the handler thread while this thread drops it.
-                // It is sent as a Mutex<Option<Responder>> because the send methods takes
-                // ownership of the responder, so the data must be mutable on the remote thread.
-                let responder = Arc::new(Mutex::new(Some(responder)));
-                let mutex = Arc::new(Mutex::new(()));
-                // Use an oneshot channel to asynchronously wait for the operation to be executed.
-                let (tx, rx) = futures::channel::oneshot::channel();
+                let (responder, waiter) =
+                    Self::make_synchronous_responder(responder, move |responder, e| {
+                        trace_duration!(
+                            trace_category_starnix!(),
+                            trace_name_remote_binder_ioctl_fidl_reply!()
+                        );
+                        trace_flow_end!(
+                            trace_category_starnix!(),
+                            trace_name_remote_binder_ioctl!(),
+                            tid.into()
+                        );
+
+                        let e = e.map_err(|e| {
+                            fposix::Errno::from_primitive(e.code.error_code() as i32)
+                                .unwrap_or(fposix::Errno::Einval)
+                        });
+
+                        responder.send(e)
+                    });
                 self.state.lock().enqueue_task_request(BoundTaskRequest {
                     koid: tid,
                     request: TaskRequest::Ioctl(
@@ -438,46 +481,10 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                         request,
                         parameter,
                         tid,
-                        Box::new({
-                            let mutex = mutex.clone();
-                            let weak_responder = Arc::downgrade(&responder);
-                            move |e| {
-                                trace_duration!(
-                                    trace_category_starnix!(),
-                                    trace_name_remote_binder_ioctl_fidl_reply!()
-                                );
-                                trace_flow_end!(
-                                    trace_category_starnix!(),
-                                    trace_name_remote_binder_ioctl!(),
-                                    tid.into()
-                                );
-
-                                let e = e.map_err(|e| {
-                                    fposix::Errno::from_primitive(e.code.error_code() as i32)
-                                        .unwrap_or(fposix::Errno::Einval)
-                                });
-                                let result = {
-                                    let _guard = mutex.lock();
-                                    if let Some(responder) = weak_responder.upgrade() {
-                                        // If the weak pointer is alive, the Option always contains
-                                        // the responder.
-                                        responder.lock().take().unwrap().send(e)
-                                    } else {
-                                        Ok(())
-                                    }
-                                };
-                                let _ = tx.send(());
-                                result
-                            }
-                        }),
+                        responder,
                     ),
                 });
-                scopeguard::defer! {
-                    let _guard = mutex.lock();
-                    let _responder = Arc::into_inner(responder);
-                    debug_assert!(_responder.is_some());
-                }
-                let _ = rx.await;
+                waiter.await;
             }
         }
         Ok(())
@@ -801,7 +808,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                 TaskRequest::SetVmo(remote_binder_connection, vmo, mapped_address, responder) => {
                     let result = remote_binder_connection.map_external_vmo(vmo, mapped_address);
                     let interruption = must_interrupt(&result);
-                    responder(result);
+                    responder(result).map_err(|_| errno!(EINVAL))?;
                     interruption
                 }
                 TaskRequest::Ioctl(
