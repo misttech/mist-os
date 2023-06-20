@@ -217,7 +217,13 @@ def fidl_import_to_fidl_library(name: str) -> str:
 
 def fidl_import_to_library_path(name: str) -> str:
     """Returns a fidl IR path based on the fidl import name."""
-    return get_fidl_ir_map()[fidl_import_to_fidl_library(name)]
+    try:
+        return get_fidl_ir_map()[fidl_import_to_fidl_library(name)]
+    except KeyError:
+        raise RuntimeError(
+            f"Unable to import library {name}." +
+            " Please ensure that the FIDL IR for this library has been created."
+        )
 
 
 def type_annotation(type_ir, root_ir, recurse_guard=None) -> type:
@@ -277,6 +283,14 @@ def fidl_ident_to_py_import(name: str) -> str:
     """Python import from fidl identifier: foo.bar.baz/Foo would return fidl.foo_bar_baz"""
     fidl_lib = fidl_ident_to_library(name)
     return fidl_library_to_py_module_path(fidl_lib)
+
+
+def fidl_ident_to_marker(name: str) -> str:
+    """Changes a fidl library member to a marker used for protocol lookup.
+
+    Returns: foo.bar.baz/Foo returns foo.bar.baz.Foo
+    """
+    return name.replace("/", ".")
 
 
 def fidl_ident_to_py_library_member(name: str) -> str:
@@ -479,6 +493,7 @@ def protocol_type(ir, root_ir, recurse_guard=None) -> type:
             "__doc__": docstring(ir),
             "__fidl_kind__": "protocol",
             "Client": protocol_client_type(ir, root_ir),
+            "MARKER": fidl_ident_to_marker(ir.name()),
         },
     )
 

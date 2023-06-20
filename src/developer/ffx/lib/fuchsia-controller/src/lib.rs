@@ -18,6 +18,7 @@ use fuchsia_zircon_status as zx_status;
 use fuchsia_zircon_types as zx_types;
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
+use std::path::PathBuf;
 use std::sync::{mpsc, Arc};
 
 mod commands;
@@ -59,8 +60,14 @@ pub unsafe extern "C" fn create_ffx_env_context(
     lib_ctx: *const LibContext,
     external_config: *const FfxExternalConfigEntry,
     config_len: u64,
+    isolate_dir: *const i8,
 ) -> zx_status::Status {
     let lib = unsafe { get_arc(lib_ctx) };
+    let isolate_dir = unsafe { isolate_dir.as_ref() }.map(|i| {
+        PathBuf::from(unsafe {
+            CStr::from_ptr(i).to_str().expect("value isolate dir string").to_owned()
+        })
+    });
     let (responder, rx) = mpsc::sync_channel(1);
     let mut config = Vec::new();
     if external_config != std::ptr::null_mut() {
@@ -75,7 +82,7 @@ pub unsafe extern "C" fn create_ffx_env_context(
             config.push(FfxConfigEntry { key, value });
         }
     }
-    lib.run(LibraryCommand::CreateEnvContext { lib: lib.clone(), responder, config });
+    lib.run(LibraryCommand::CreateEnvContext { lib: lib.clone(), responder, config, isolate_dir });
     match rx.recv().unwrap() {
         Ok(env) => {
             unsafe { *env_ctx = Arc::into_raw(env) };

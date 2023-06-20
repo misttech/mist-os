@@ -23,21 +23,22 @@ typedef struct _ffx_config_t {
 extern void create_ffx_lib_context(ffx_lib_context_t** ctx, char* error_scratch, uint64_t size);
 
 extern zx_status_t create_ffx_env_context(ffx_env_context_t** env_ctx, ffx_lib_context_t* lib_ctx,
-                                          ffx_config_t* config, uint64_t config_len);
+                                          ffx_config_t* config, uint64_t config_len,
+                                          const char* isolate_dir);
 
 extern void destroy_ffx_env_context(ffx_env_context_t* ctx);
 
 extern void destroy_ffx_lib_context(ffx_lib_context_t* env_ctx);
 
 extern zx_status_t ffx_connect_daemon_protocol(ffx_env_context_t* ctx, const char* protocol,
-                                            zx_handle_t* out);
+                                               zx_handle_t* out);
 
 // These three functions are for convenience, and can be done via the daemon protocol
 // if desired, albeit through more than one proxy layer.
 extern zx_status_t ffx_connect_target_proxy(ffx_env_context_t* ctx, zx_handle_t* out);
 extern zx_status_t ffx_connect_remote_control_proxy(ffx_env_context_t* ctx, zx_handle_t* out);
 extern zx_status_t ffx_connect_device_proxy(ffx_env_context_t* ctx, const char* moniker,
-                                         const char* capability_name, zx_handle_t* out);
+                                            const char* capability_name, zx_handle_t* out);
 extern void ffx_close_handle(zx_handle_t handle);
 extern zx_status_t ffx_channel_write(ffx_lib_context_t* ctx, zx_handle_t handle,
                                      const char* out_buf, uint64_t out_len, zx_handle_t* hdls,

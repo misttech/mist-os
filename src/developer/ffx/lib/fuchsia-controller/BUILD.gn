@@ -85,6 +85,8 @@ python_c_extension("fuchsia_controller_py") {
     "abi/fidl_handle.h",
     "abi/fuchsia_controller.h",
     "abi/fuchsia_controller_py.cc",
+    "abi/isolate_directory.cc",
+    "abi/isolate_directory.h",
     "abi/macros.h",
     "abi/mod.cc",
     "abi/mod.h",
@@ -142,6 +144,7 @@ group("tests") {
   # infra machines running OSX 10.15
   if (host_os != "mac") {
     deps += [
+      "tests:fuchsia_controller_e2e_test",
       "tests:fuchsia_controller_errors_test",
       "tests:fuchsia_controller_importing_test",
     ]

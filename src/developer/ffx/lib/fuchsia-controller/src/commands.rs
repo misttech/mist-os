@@ -11,6 +11,7 @@ use fuchsia_zircon_status as zx_status;
 use fuchsia_zircon_types as zx_types;
 use std::mem::ManuallyDrop;
 use std::mem::MaybeUninit;
+use std::path::PathBuf;
 use std::sync::{mpsc, Arc};
 use std::task::{Context, Poll};
 
@@ -33,6 +34,7 @@ pub(crate) enum LibraryCommand {
         lib: Arc<LibContext>,
         responder: Responder<CmdResult<Arc<EnvContext>>>,
         config: Vec<FfxConfigEntry>,
+        isolate_dir: Option<PathBuf>,
     },
     OpenDaemonProtocol {
         env: Arc<EnvContext>,
@@ -94,8 +96,8 @@ impl LibraryCommand {
                     }
                 }
             }
-            Self::CreateEnvContext { lib, config, responder } => {
-                match EnvContext::new(Arc::downgrade(&lib), config).await {
+            Self::CreateEnvContext { lib, config, responder, isolate_dir } => {
+                match EnvContext::new(Arc::downgrade(&lib), config, isolate_dir).await {
                     Ok(e) => {
                         responder.send(Ok(Arc::new(e))).unwrap();
                     }

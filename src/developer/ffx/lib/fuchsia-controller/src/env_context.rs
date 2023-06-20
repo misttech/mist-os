@@ -13,6 +13,7 @@ use fidl::endpoints::Proxy;
 use fidl::AsHandleRef;
 use fuchsia_zircon_types as zx_types;
 use hoist::Hoist;
+use std::path::PathBuf;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 use tempfile::TempDir;
@@ -45,7 +46,11 @@ impl EnvContext {
         self.lib_ctx.upgrade().expect("library context instance deallocated early")
     }
 
-    pub async fn new(lib_ctx: Weak<LibContext>, config: Vec<FfxConfigEntry>) -> Result<Self> {
+    pub async fn new(
+        lib_ctx: Weak<LibContext>,
+        config: Vec<FfxConfigEntry>,
+        isolate_dir: Option<PathBuf>,
+    ) -> Result<Self> {
         // TODO(fxbug.dev/129230): This is a lot of potentially unnecessary data transformation
         // going through several layers of structured into unstructured and then back to structured
         // again. Likely the solution here is to update the input of the config runtime population
@@ -59,13 +64,22 @@ impl EnvContext {
             if formatted_config.is_empty() { None } else { Some(formatted_config) };
         let runtime_args = ffx_config::runtime::populate_runtime(&[], runtime_config)?;
         let env_path = None;
-        let context = EnvironmentContext::detect(
-            ExecutableKind::Test,
-            runtime_args,
-            &std::env::current_dir()?,
-            env_path,
-        )
-        .map_err(fxe)?;
+        let context = match isolate_dir {
+            Some(d) => EnvironmentContext::isolated(
+                ExecutableKind::Test,
+                d,
+                std::collections::HashMap::from_iter(std::env::vars()),
+                runtime_args,
+                env_path,
+            ),
+            None => EnvironmentContext::detect(
+                ExecutableKind::Test,
+                runtime_args,
+                &std::env::current_dir()?,
+                env_path,
+            )
+            .map_err(fxe)?,
+        };
         let cache_path = context.get_cache_path()?;
         std::fs::create_dir_all(&cache_path)?;
         let _hoist_cache_dir = tempfile::tempdir_in(&cache_path)?;

@@ -17,6 +17,7 @@
 #include "error.h"
 #include "fidl_channel.h"
 #include "fuchsia_controller.h"
+#include "isolate_directory.h"
 #include "macros.h"
 #include "mod.h"
 
@@ -30,23 +31,38 @@ IGNORE_EXTRA_SC
 using Context = struct {
   PyObject_HEAD;
   ffx_env_context_t *env_context;
+  PyObject *isolate_dir;
 };
 
 void Context_dealloc(Context *self) {
   destroy_ffx_env_context(self->env_context);
+  Py_XDECREF(self->isolate_dir);
   Py_TYPE(self)->tp_free(reinterpret_cast<PyObject *>(self));
 }
 
 int Context_init(Context *self, PyObject *args, PyObject *kwds) {
   static const char TYPE_ERROR[] = "`config` must be a dictionary of string key/value pairs";
-  static const char *kwlist[] = {"config", nullptr};
+  static const char *kwlist[] = {"config", "isolate_dir", nullptr};
   PyObject *config = nullptr;
-  if (!PyArg_ParseTupleAndKeywords(args, kwds, "O", const_cast<char **>(kwlist), &config)) {
+  PyObject *isolate = nullptr;
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O", const_cast<char **>(kwlist), &config,
+                                   &isolate)) {
     return -1;
   }
   if (!config) {
     return -1;
   }
+  if (isolate &&
+      !PyObject_IsInstance(isolate, reinterpret_cast<PyObject *>(&isolate::IsolateDirType))) {
+    PyErr_SetString(PyExc_TypeError, "isolate must be a fuchsia_controller_py.IsolateDir type");
+    return -1;
+  }
+  // This temp incref/decref stuff is just derived from the tutorial:
+  // https://docs.python.org/3/extending/newtypes_tutorial.html
+  PyObject *tmp = self->isolate_dir;
+  Py_XINCREF(isolate);
+  self->isolate_dir = isolate;
+  Py_XDECREF(tmp);
   if (!PyDict_Check(config)) {
     PyErr_SetString(PyExc_TypeError, TYPE_ERROR);
     return -1;
@@ -86,8 +102,12 @@ int Context_init(Context *self, PyObject *args, PyObject *kwds) {
         .value = value,
     };
   }
+  const char *isolate_dir = nullptr;
+  if (isolate) {
+    isolate_dir = reinterpret_cast<isolate::IsolateDir *>(isolate)->dir.c_str();
+  }
   if (create_ffx_env_context(&self->env_context, mod::get_module_state()->ctx, ffx_config.get(),
-                             config_len) != ZX_OK) {
+                             config_len, isolate_dir) != ZX_OK) {
     mod::dump_python_err();
     return -1;
   }
@@ -188,6 +208,9 @@ PyMODINIT_FUNC __attribute__((visibility("default"))) PyInit_fuchsia_controller_
   if (PyType_Ready(&fidl_channel::FidlChannelType) < 0) {
     return nullptr;
   }
+  if (PyType_Ready(&isolate::IsolateDirType) < 0) {
+    return nullptr;
+  }
   PyObject *m = PyModule_Create(&fuchsia_controller_py);
   if (m == nullptr) {
     return nullptr;
@@ -197,6 +220,12 @@ PyMODINIT_FUNC __attribute__((visibility("default"))) PyInit_fuchsia_controller_
   Py_INCREF(&ContextType);
   if (PyModule_AddObject(m, "Context", reinterpret_cast<PyObject *>(&ContextType)) < 0) {
     Py_DECREF(&ContextType);
+    Py_DECREF(m);
+    return nullptr;
+  }
+  if (PyModule_AddObject(m, "IsolateDir", reinterpret_cast<PyObject *>(&isolate::IsolateDirType)) <
+      0) {
+    Py_DECREF(&isolate::IsolateDirType);
     Py_DECREF(m);
     return nullptr;
   }
