@@ -81,11 +81,8 @@ fx shell pkgctl resolve fuchsia-pkg://fuchsia.com/spinning-square-rs
 Notice the new lines added to the log output for `pkg-resolver`:
 
 ```none {:.devsite-disable-click-to-copy}
-[pkg-resolver][pkg-resolver][I] Fetching blobs for fuchsia-pkg://devhost/spinning-square-rs: [
-    6b547fb59fda56866eea01cda90add0aabc1af7c7418c7850011ec6e99a996f1,
-    7c1a9fd1c11e9b6b1d3c3184cf350cecfc91ec083b412d20c18b5187d0983d88,
-]
-[pkg-resolver][pkg-resolver][I] resolved fuchsia-pkg://fuchsia.com/spinning-square-rs as fuchsia-pkg://devhost/spinning-square-rs to 21967ecc643257800b8ca14420c7f023c1ede7a76068da5faedf328f9d9d3649 with TUF
+[pkg-resolver] INFO: attempting to resolve fuchsia-pkg://fuchsia.com/spinning-square-rs as fuchsia-pkg://default/spinning-square-rs with TUF
+[pkg-resolver] INFO: resolved fuchsia-pkg://fuchsia.com/spinning-square-rs as fuchsia-pkg://default/spinning-square-rs to 21967ecc643257800b8ca14420c7f023c1ede7a76068da5faedf328f9d9d3649 with TUF
 ```
 
 From the device shell prompt, check the package status again on the device:
@@ -95,8 +92,8 @@ fx shell pkgctl pkg-status fuchsia-pkg://fuchsia.com/spinning-square-rs
 ```
 
 ```none {:.devsite-disable-click-to-copy}
-Package in registered TUF repo: yes (merkle=ef65e2ed...)
-Package on disk: yes (path=/pkgfs/versions/ef65e2ed...)
+Package in registered TUF repo: yes (merkle=21967ecc...)
+Package on disk: yes
 ```
 
 Fuchsia resolved the package and loaded it from the local TUF repository on
