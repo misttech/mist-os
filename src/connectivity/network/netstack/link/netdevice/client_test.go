@@ -31,7 +31,7 @@ import (
 	"fidl/fuchsia/net/tun"
 
 	"github.com/google/go-cmp/cmp"
-	"gvisor.dev/gvisor/pkg/bufferv2"
+	"gvisor.dev/gvisor/pkg/buffer"
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
 	"gvisor.dev/gvisor/pkg/tcpip/link/ethernet"
@@ -495,7 +495,7 @@ func TestWritePackets(t *testing.T) {
 
 				pkt := stack.NewPacketBuffer(stack.PacketBufferOptions{
 					ReserveHeaderBytes: int(linkEndpoint.MaxHeaderLength()),
-					Payload:            bufferv2.MakeWithData([]byte(pktBody)),
+					Payload:            buffer.MakeWithData([]byte(pktBody)),
 				})
 				pkt.EgressRoute.LocalLinkAddress = tcpip.LinkAddress(tunMac.Octets[:])
 				pkt.EgressRoute.RemoteLinkAddress = tcpip.LinkAddress(otherMac.Octets[:])
@@ -659,8 +659,8 @@ func TestReceivePacket(t *testing.T) {
 			}
 			defer args.Pkt.DecRef()
 
-			vv := bufferv2.MakeWithData(wantLinkHdr)
-			vv.Append(bufferv2.NewViewWithData([]byte(pktPayload[:extra])))
+			vv := buffer.MakeWithData(wantLinkHdr)
+			vv.Append(buffer.NewViewWithData([]byte(pktPayload[:extra])))
 			pkt := stack.NewPacketBuffer(stack.PacketBufferOptions{
 				Payload: vv,
 			})
@@ -1128,7 +1128,7 @@ func TestPairExchangePackets(t *testing.T) {
 			view = append(view, byte(rng.Uint32()))
 		}
 		pkt := stack.NewPacketBuffer(stack.PacketBufferOptions{
-			Payload: bufferv2.MakeWithData(view),
+			Payload: buffer.MakeWithData(view),
 		})
 		pkt.NetworkProtocolNumber = header.IPv4ProtocolNumber
 		return pkt

@@ -20,7 +20,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 
 	"github.com/google/go-cmp/cmp"
-	"gvisor.dev/gvisor/pkg/bufferv2"
+	"gvisor.dev/gvisor/pkg/buffer"
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
 	"gvisor.dev/gvisor/pkg/tcpip/link/packetsocket"
@@ -778,7 +778,7 @@ func TestAcquisitionAfterNAK(t *testing.T) {
 				}
 				b.setOptions(opts)
 				pkt.Data().CapLength(0)
-				pkt.Data().AppendView(bufferv2.NewViewWithData(b))
+				pkt.Data().AppendView(buffer.NewViewWithData(b))
 
 				// Rewrite all the headers and IP checksum. Yes, this is all
 				// required.
@@ -1207,7 +1207,7 @@ func mustCloneWithNewMsgType(t *testing.T, pkt stack.PacketBufferPtr, msgType dh
 	header.UDP(pkt.TransportHeader().Slice()).SetChecksum(0)
 
 	pkt.Data().CapLength(0)
-	pkt.Data().AppendView(bufferv2.NewViewWithData(h))
+	pkt.Data().AppendView(buffer.NewViewWithData(h))
 	return pkt
 }
 

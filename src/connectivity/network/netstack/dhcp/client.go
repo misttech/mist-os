@@ -18,7 +18,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
 
-	"gvisor.dev/gvisor/pkg/bufferv2"
+	"gvisor.dev/gvisor/pkg/buffer"
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/checksum"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
@@ -1005,7 +1005,7 @@ func (c *Client) send(
 		writeTo.NIC,
 		linkAddress,
 		header.IPv4ProtocolNumber,
-		bufferv2.MakeWithData(bytes),
+		buffer.MakeWithData(bytes),
 	); err != nil {
 		return fmt.Errorf("failed to write packet: %s", err)
 	}

@@ -20,7 +20,6 @@ require (
 	github.com/spdx/tools-golang v0.3.1-0.20221108182156-8a01147e6342
 	github.com/spf13/pflag v1.0.5
 	github.com/theupdateframework/go-tuf v0.0.0-20211108161206-fc0190d925a5
-	github.com/ulikunitz/xz v0.5.10
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.uber.org/goleak v1.2.0
 	golang.org/x/crypto v0.0.0-20220829220503-c86fa9a7ed90
@@ -34,7 +33,7 @@ require (
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0
 	google.golang.org/protobuf v1.28.2-0.20230118093459-a9481185b34d
 	gopkg.in/yaml.v2 v2.4.0
-	gvisor.dev/gvisor v0.0.0-20230531011827-6b2c7f97c667
+	gvisor.dev/gvisor v0.0.0-20230616210434-415de16483e6
 )
 
 require (

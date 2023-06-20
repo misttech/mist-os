@@ -24,7 +24,7 @@ import (
 
 	"fidl/fuchsia/hardware/network"
 
-	"gvisor.dev/gvisor/pkg/bufferv2"
+	"gvisor.dev/gvisor/pkg/buffer"
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
 	"gvisor.dev/gvisor/pkg/tcpip/stack"
@@ -366,7 +366,7 @@ func (c *Client) processRxDescriptor(descriptorIndex uint16) {
 			if dispatcher != nil {
 				func() {
 					pkt := stack.NewPacketBuffer(stack.PacketBufferOptions{
-						Payload: bufferv2.MakeWithData(view),
+						Payload: buffer.MakeWithData(view),
 					})
 					defer pkt.DecRef()
 

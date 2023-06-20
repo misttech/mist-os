@@ -15,7 +15,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/link/bridge"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 
-	"gvisor.dev/gvisor/pkg/bufferv2"
+	"gvisor.dev/gvisor/pkg/buffer"
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
 	"gvisor.dev/gvisor/pkg/tcpip/link/ethernet"
@@ -318,7 +318,7 @@ func TestBridgeWritePackets(t *testing.T) {
 			for j := 0; j < i; j++ {
 				pkt := stack.NewPacketBuffer(stack.PacketBufferOptions{
 					ReserveHeaderBytes: int(bridgeEP.MaxHeaderLength()),
-					Payload:            bufferv2.MakeWithData(data[j]),
+					Payload:            buffer.MakeWithData(data[j]),
 				})
 				pkt.EgressRoute.LocalLinkAddress = baddr
 				pkt.EgressRoute.RemoteLinkAddress = dstAddr
@@ -437,7 +437,7 @@ func TestDeliverNetworkPacketToBridge(t *testing.T) {
 					srcAddr := linkAddr3
 					pkt := stack.NewPacketBuffer(stack.PacketBufferOptions{
 						ReserveHeaderBytes: int(bridgeEP.MaxHeaderLength()),
-						Payload:            bufferv2.MakeWithData(data),
+						Payload:            buffer.MakeWithData(data),
 					})
 					pkt.PktType = subtest.wantPktType
 					eth := header.Ethernet(pkt.LinkHeader().Push(header.EthernetMinimumSize))
@@ -584,7 +584,7 @@ func TestBridge(t *testing.T) {
 			ep2.onWritePacket = func(pkt stack.PacketBufferPtr) {
 				i := 0
 				buf := pkt.Data().ToBuffer()
-				buf.Apply(func(view *bufferv2.View) {
+				buf.Apply(func(view *buffer.View) {
 					if view := view.AsSlice(); bytes.Contains(view, []byte(payload)) {
 						t.Errorf("did not expect payload %x to be sent back to ep1 in view %d: %x", payload, i, view)
 					}
