@@ -48,6 +48,7 @@ _Consulted:_
 
 * amituttam@google.com
 * crjohns@google.com
+* dannyrosen@google.com
 * dworsham@google.com
 * fmeawad@google.com
 * guptaritu@google.com
@@ -487,7 +488,7 @@ in-tree, and type hints have been enforced in one OOT repo.
 Note that the approval of Python for OOT system testing in this RFC does not
 foreclose other languages from being used in this space. In fact, the key OOT
 system testing component that Fuchsia will be exporting in the SDK will be the
-Fuchsia Controller (RFC to follow) which is designed specifically to be
+[Fuchsia Controller][Fuchsia Controller] which is designed specifically to be
 extensible to any host-side language to support host-to-Fuchsia-device
 communication.
 
@@ -561,3 +562,4 @@ N/A
 [Bazel Go]: https://github.com/bazelbuild/rules_go
 [Bazel TS]: https://bazel.build/docs/bazel-and-javascript
 [PW GN]: https://pigweed.dev/python\_build.html#static-analysis
+[Fuchsia Controller]: /docs/contribute/governance/rfcs/0222_fuchsia_controller.md
