@@ -635,6 +635,9 @@ impl Environment for FshostEnvironment {
             exposed_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
         }
         self.blobfs = Filesystem::ServingVolumeInFxblob(None, "blob".to_string());
+        if let Err(e) = multi_vol_fs.set_byte_limit("blob", self.config.blobfs_max_bytes).await {
+            tracing::warn!("Failed to set byte limit for the blob volume: {:?}", e);
+        }
         Ok(())
     }
 
@@ -644,7 +647,9 @@ impl Environment for FshostEnvironment {
         let multi_vol_fs =
             self.fxblob.as_mut().ok_or_else(|| anyhow!("ServingMultiVolumeFilesystem is None"))?;
         let mut filesystem = self.launcher.serve_data_fxblob(multi_vol_fs).await?;
-
+        if let Err(e) = multi_vol_fs.set_byte_limit("data", self.config.data_max_bytes).await {
+            tracing::warn!("Failed to set byte limit for the data volume: {:?}", e);
+        }
         let queue = self.data.queue().unwrap();
         let exposed_dir = filesystem.exposed_dir(self.fxblob.as_mut())?;
         for server in queue.drain(..) {

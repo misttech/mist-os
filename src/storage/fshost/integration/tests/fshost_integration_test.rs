@@ -8,6 +8,7 @@ use {
     fidl::endpoints::create_proxy,
     fidl_fuchsia_fshost as fshost,
     fidl_fuchsia_fshost::AdminMarker,
+    fidl_fuchsia_fxfs::VolumeMarker as FxfsVolumeMarker,
     fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker},
     fidl_fuchsia_io as fio,
     fs_management::{
@@ -403,6 +404,34 @@ async fn partition_max_size_set() {
     }
     assert_eq!(data_slice_count, expected_slices);
 
+    fixture.tear_down().await;
+}
+
+#[fuchsia::test]
+#[cfg_attr(not(feature = "fxblob"), ignore)]
+async fn set_volume_bytes_limit() {
+    let mut builder = new_builder();
+    builder
+        .fshost()
+        .set_config_value("data_max_bytes", DATA_MAX_BYTES)
+        .set_config_value("blobfs_max_bytes", BLOBFS_MAX_BYTES);
+    builder.with_disk().format_volumes(volumes_spec());
+    let fixture = builder.build().await;
+
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    let volumes_dir = fixture.dir("volumes", fio::OpenFlags::empty());
+
+    let blob_volume_proxy =
+        connect_to_named_protocol_at_dir_root::<FxfsVolumeMarker>(&volumes_dir, "blob").unwrap();
+    let blob_volume_bytes_limit = blob_volume_proxy.get_limit().await.unwrap().unwrap();
+
+    let data_volume_proxy =
+        connect_to_named_protocol_at_dir_root::<FxfsVolumeMarker>(&volumes_dir, "data").unwrap();
+    let data_volume_bytes_limit = data_volume_proxy.get_limit().await.unwrap().unwrap();
+    assert_eq!(blob_volume_bytes_limit, BLOBFS_MAX_BYTES);
+    assert_eq!(data_volume_bytes_limit, DATA_MAX_BYTES);
     fixture.tear_down().await;
 }
 

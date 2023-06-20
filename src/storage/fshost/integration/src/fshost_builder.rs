@@ -111,6 +111,16 @@ impl FshostBuilder {
             .await
             .unwrap();
 
+        realm_builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::directory("volumes").rights(fio::RW_STAR_DIR))
+                    .from(&fshost)
+                    .to(Ref::parent()),
+            )
+            .await
+            .unwrap();
+
         fshost
     }
 }

@@ -108,6 +108,18 @@ closed protocol Volume {
     strict SetLimit(struct {
         bytes uint64;
     }) -> () error zx.Status;
+
+    /// Get the allocation limit for the volume. A return value of 0 indicates that there
+    /// is no limit and the volume can be extended as long as there is available space on the
+    /// device.
+    ///
+    /// The volume may be larger than this limit if a smaller limit was applied after the
+    /// volume had already grown to the current size.
+    ///
+    /// The volume limit persists across reboots.
+    strict GetLimit() -> (struct {
+        bytes uint64;
+    }) error zx.Status;
 };
 
 /// A token used for paging through tracked projects. One may be returned by the `ProjectId.List`

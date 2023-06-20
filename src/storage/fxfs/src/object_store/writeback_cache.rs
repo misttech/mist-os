@@ -760,6 +760,10 @@ mod tests {
             unreachable!();
         }
 
+        async fn get_bytes_limit(&self, _owner_object_id: u64) -> Option<u64> {
+            unreachable!();
+        }
+
         async fn mark_for_deletion(
             &self,
             _transaction: &mut Transaction<'_>,

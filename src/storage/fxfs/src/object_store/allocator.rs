@@ -105,6 +105,9 @@ pub trait Allocator: ReservationOwner {
         bytes: u64,
     ) -> Result<(), Error>;
 
+    /// Gets the bytes limit for an owner object.
+    async fn get_bytes_limit(&self, owner_object_id: u64) -> Option<u64>;
+
     /// Marks allocations associated with a given |owner_object_id| for deletion.
     /// Does not necessarily perform the deletion stratight away but if this is the case,
     /// implementation should be invisible to the caller.
@@ -1101,6 +1104,10 @@ impl Allocator for SimpleAllocator {
             Mutation::Allocator(AllocatorMutation::SetLimit { owner_object_id, bytes }),
         );
         Ok(())
+    }
+
+    async fn get_bytes_limit(&self, owner_object_id: u64) -> Option<u64> {
+        self.inner.lock().unwrap().info.limit_bytes.get(&owner_object_id).copied()
     }
 
     async fn deallocate(
