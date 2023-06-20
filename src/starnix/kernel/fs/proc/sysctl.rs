@@ -32,6 +32,7 @@ pub fn sysctl_directory(fs: &FileSystemHandle) -> FsNodeHandle {
                 FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
             ),
         );
+        dir.entry(b"tainted", KernelTaintedFile::new_node(), mode);
     });
     dir.subdir(b"net", 0o555, |dir| {
         dir.subdir(b"core", 0o555, |dir| {
@@ -72,4 +73,21 @@ pub fn net_directory(fs: &FileSystemHandle) -> FsNodeHandle {
         dir.entry(b"globalAlert", StubSysctl::new_node(), mode!(IFREG, 0o444));
     });
     dir.build()
+}
+
+struct KernelTaintedFile;
+
+impl KernelTaintedFile {
+    fn new_node() -> impl FsNodeOps {
+        BytesFile::new_node(Self)
+    }
+}
+
+impl BytesFileOps for KernelTaintedFile {
+    fn write(&self, _current_task: &CurrentTask, _data: Vec<u8>) -> Result<(), Errno> {
+        Ok(())
+    }
+    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        Ok(b"0\n".to_vec().into())
+    }
 }
