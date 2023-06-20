@@ -74,7 +74,9 @@ pub(crate) async fn serve(
                             })
                             .map_err(|DeviceNotFoundError| zx::Status::NOT_FOUND.into_raw())
                     };
-                    responder_send!(responder, response.as_deref().map_err(|e| *e));
+                    responder
+                        .send(response.as_deref().map_err(|e| *e))
+                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
                 }
                 psocket::ProviderRequest::InterfaceNameToIndex { name, responder } => {
                     let response = {
@@ -87,15 +89,21 @@ pub(crate) async fn serve(
                             .ok_or(zx::Status::NOT_FOUND.into_raw());
                         result
                     };
-                    responder_send!(responder, response);
+                    responder
+                        .send(response)
+                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
                 }
                 psocket::ProviderRequest::InterfaceNameToFlags { name, responder } => {
-                    responder_send!(responder, get_interface_flags(&ctx, &name));
+                    responder
+                        .send(get_interface_flags(&ctx, &name))
+                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
                 }
                 psocket::ProviderRequest::StreamSocket { domain, proto, responder } => {
                     let (client, request_stream) = create_request_stream();
                     stream::spawn_worker(domain, proto, ctx.clone(), request_stream);
-                    responder_send!(responder, Ok(client));
+                    responder
+                        .send(Ok(client))
+                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
                 }
                 psocket::ProviderRequest::DatagramSocketDeprecated { domain, proto, responder } => {
                     let response = (|| {
@@ -109,7 +117,9 @@ pub(crate) async fn serve(
                         )?;
                         Ok(client)
                     })();
-                    responder_send!(responder, response);
+                    responder
+                        .send(response)
+                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
                 }
                 psocket::ProviderRequest::DatagramSocket { domain, proto, responder } => {
                     let response = (|| {
@@ -125,10 +135,14 @@ pub(crate) async fn serve(
                             client,
                         ))
                     })();
-                    responder_send!(responder, response);
+                    responder
+                        .send(response)
+                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
                 }
                 psocket::ProviderRequest::GetInterfaceAddresses { responder } => {
-                    responder_send!(responder, &get_interface_addresses(&ctx));
+                    responder
+                        .send(&get_interface_addresses(&ctx))
+                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
                 }
             }
             Ok(ctx)

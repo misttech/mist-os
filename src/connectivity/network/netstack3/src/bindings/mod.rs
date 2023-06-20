@@ -6,9 +6,6 @@
 //!
 //! This module provides Fuchsia bindings for the [`netstack3_core`] crate.
 
-#[macro_use]
-mod macros;
-
 #[cfg(test)]
 mod integration_tests;
 

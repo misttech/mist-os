@@ -28,10 +28,9 @@ impl StackFidlWorker {
             .try_fold(Self { netstack }, |mut worker, req| async {
                 match req {
                     StackRequest::AddForwardingEntry { entry, responder } => {
-                        responder_send!(
-                            responder,
+                        responder.send(
                             worker.fidl_add_forwarding_entry(entry)
-                        );
+                        ).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
                     }
                     StackRequest::DelForwardingEntry {
                         entry:
@@ -43,10 +42,9 @@ impl StackFidlWorker {
                             },
                         responder,
                     } => {
-                        responder_send!(
-                            responder,
+                        responder.send(
                             worker.fidl_del_forwarding_entry(subnet)
-                        );
+                        ).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
                     }
                     StackRequest::SetInterfaceIpForwardingDeprecated {
                         id: _,
@@ -56,7 +54,7 @@ impl StackFidlWorker {
                     } => {
                         // TODO(https://fxbug.dev/76987): Support configuring
                         // per-NIC forwarding.
-                        responder_send!(responder, Err(fidl_net_stack::Error::NotSupported));
+                        responder.send(Err(fidl_net_stack::Error::NotSupported)).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
                     }
                     StackRequest::GetDnsServerWatcher { watcher, control_handle: _ } => {
                         let () = watcher
@@ -71,7 +69,7 @@ impl StackFidlWorker {
                         if enable {
                             error!("TODO(https://fxbug.dev/111066): Support starting DHCP client");
                         }
-                        responder_send!(responder, Ok(()));
+                        responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
                     }
                     StackRequest::BridgeInterfaces{ interfaces: _, bridge, control_handle: _ } => {
                         error!("TODO(https://fxbug.dev/86661): Support bridging in NS3, probably via a new API");

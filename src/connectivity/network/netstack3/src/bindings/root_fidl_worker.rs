@@ -32,10 +32,9 @@ pub(crate) async fn serve_interfaces(
                 handle_get_admin(&ns, id, control).await;
             }
             fnet_root::InterfacesRequest::GetMac { id, responder } => {
-                responder_send!(
-                    responder,
-                    handle_get_mac(&ns, id).as_ref().map(Option::as_deref).map_err(|e| *e)
-                );
+                responder
+                    .send(handle_get_mac(&ns, id).as_ref().map(Option::as_deref).map_err(|e| *e))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
         }
         Ok(())

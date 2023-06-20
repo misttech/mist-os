@@ -815,14 +815,18 @@ where
         Option<fposix_socket::SynchronousDatagramSocketRequestStream>,
     > {
         match request {
-            fposix_socket::SynchronousDatagramSocketRequest::Describe { responder } => {
-                responder_send!(responder, self.describe())
-            }
+            fposix_socket::SynchronousDatagramSocketRequest::Describe { responder } => responder
+                .send(self.describe())
+                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
             fposix_socket::SynchronousDatagramSocketRequest::Connect { addr, responder } => {
-                responder_send!(responder, self.connect(addr));
+                responder
+                    .send(self.connect(addr))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::Disconnect { responder } => {
-                responder_send!(responder, self.disconnect());
+                responder
+                    .send(self.disconnect())
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::Clone2 {
                 request,
@@ -838,22 +842,29 @@ where
                 return ControlFlow::Break(responder);
             }
             fposix_socket::SynchronousDatagramSocketRequest::Bind { addr, responder } => {
-                responder_send!(responder, self.bind(addr));
+                responder
+                    .send(self.bind(addr))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::Query { responder } => {
-                responder_send!(
-                    responder,
-                    fposix_socket::SYNCHRONOUS_DATAGRAM_SOCKET_PROTOCOL_NAME.as_bytes()
-                );
+                responder
+                    .send(fposix_socket::SYNCHRONOUS_DATAGRAM_SOCKET_PROTOCOL_NAME.as_bytes())
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetSockName { responder } => {
-                responder_send!(responder, self.get_sock_name().as_ref().map_err(|e| *e));
+                responder
+                    .send(self.get_sock_name().as_ref().map_err(|e| *e))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetPeerName { responder } => {
-                responder_send!(responder, self.get_peer_name().as_ref().map_err(|e| *e));
+                responder
+                    .send(self.get_peer_name().as_ref().map_err(|e| *e))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::Shutdown { mode, responder } => {
-                responder_send!(responder, self.shutdown(mode))
+                responder
+                    .send(self.shutdown(mode))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
             fposix_socket::SynchronousDatagramSocketRequest::RecvMsg {
                 want_addr,
@@ -862,14 +873,14 @@ where
                 want_control: _,
                 flags,
                 responder,
-            } => responder_send!(
-                responder,
-                match self.recv_msg(want_addr, data_len as usize, flags) {
-                    Ok((ref addr, ref data, ref control, truncated)) =>
-                        Ok((addr.as_ref(), data.as_slice(), control, truncated)),
+            } => responder
+                .send(match self.recv_msg(want_addr, data_len as usize, flags) {
+                    Ok((ref addr, ref data, ref control, truncated)) => {
+                        Ok((addr.as_ref(), data.as_slice(), control, truncated))
+                    }
                     Err(err) => Err(err),
-                }
-            ),
+                })
+                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
             fposix_socket::SynchronousDatagramSocketRequest::SendMsg {
                 addr,
                 data,
@@ -878,22 +889,30 @@ where
                 responder,
             } => {
                 // TODO(https://fxbug.dev/21106): handle control.
-                responder_send!(responder, self.send_msg(addr.map(|addr| *addr), data));
+                responder
+                    .send(self.send_msg(addr.map(|addr| *addr), data))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
-            fposix_socket::SynchronousDatagramSocketRequest::GetInfo { responder } => {
-                responder_send!(responder, self.get_sock_info())
-            }
+            fposix_socket::SynchronousDatagramSocketRequest::GetInfo { responder } => responder
+                .send(self.get_sock_info())
+                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
             fposix_socket::SynchronousDatagramSocketRequest::GetTimestamp { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetTimestamp {
                 value: _,
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetError { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetSendBuffer {
                 value_bytes: _,
@@ -903,22 +922,28 @@ where
                 //
                 // Currently, UDP sending in Netstack3 is synchronous, so it's not clear what a
                 // sensible implementation would look like.
-                responder_send!(responder, Ok(()));
+                responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetSendBuffer { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetReceiveBuffer {
                 value_bytes,
                 responder,
             } => {
-                responder_send!(responder, {
-                    self.set_max_receive_buffer_size(value_bytes);
-                    Ok(())
-                });
+                responder
+                    .send({
+                        self.set_max_receive_buffer_size(value_bytes);
+                        Ok(())
+                    })
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetReceiveBuffer { responder } => {
-                responder_send!(responder, Ok(self.get_max_receive_buffer_size()));
+                responder
+                    .send(Ok(self.get_max_receive_buffer_size()))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetReuseAddress {
                 value: _,
@@ -928,35 +953,44 @@ where
                 // Blindly return success here to unblock test coverage (possible since
                 // the network test realm is restarted before each test case).
                 // TODO(https://fxbug.dev/97823): Actually implement SetReuseAddress.
-                responder_send!(responder, Ok(()));
+                responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetReuseAddress { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetReusePort { value, responder } => {
-                responder_send!(responder, self.set_reuse_port(value));
+                responder
+                    .send(self.set_reuse_port(value))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetReusePort { responder } => {
-                responder_send!(responder, Ok(self.get_reuse_port()));
+                responder
+                    .send(Ok(self.get_reuse_port()))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetAcceptConn { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetBindToDevice {
                 value,
                 responder,
             } => {
                 let identifier = (!value.is_empty()).then_some(value.as_str());
-                responder_send!(responder, self.bind_to_device(identifier));
+                responder
+                    .send(self.bind_to_device(identifier))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetBindToDevice { responder } => {
-                responder_send!(
-                    responder,
-                    match self.get_bound_device() {
+                responder
+                    .send(match self.get_bound_device() {
                         Ok(ref d) => Ok(d.as_deref().unwrap_or("")),
                         Err(e) => Err(e),
-                    }
-                )
+                    })
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetBroadcast { value, responder } => {
                 // We allow a no-op since the core does not yet support limiting
@@ -966,100 +1000,129 @@ where
                 //
                 // TODO(https://fxbug.dev/126299): Actually implement SO_BROADCAST.
                 let response = if value { Ok(()) } else { Err(fposix::Errno::Eopnotsupp) };
-                responder_send!(responder, response);
+                responder.send(response).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetBroadcast { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetKeepAlive {
                 value: _,
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetKeepAlive { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetLinger {
                 linger: _,
                 length_secs: _,
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetLinger { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetOutOfBandInline {
                 value: _,
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetOutOfBandInline { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetNoCheck { value: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetNoCheck { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6Only { value, responder } => {
                 // TODO(https://fxbug.dev/21198): support dual-stack sockets.
-                responder_send!(
-                    responder,
-                    match I::VERSION {
-                        IpVersion::V6 => value,
-                        IpVersion::V4 => false,
-                    }
-                    .then_some(())
-                    .ok_or(fposix::Errno::Eopnotsupp)
-                );
+                responder
+                    .send(
+                        match I::VERSION {
+                            IpVersion::V6 => value,
+                            IpVersion::V4 => false,
+                        }
+                        .then_some(())
+                        .ok_or(fposix::Errno::Eopnotsupp),
+                    )
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6Only { responder } => {
                 // TODO(https://fxbug.dev/21198): support dual-stack
                 // sockets.
-                responder_send!(responder, Ok(true));
+                responder.send(Ok(true)).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6TrafficClass {
                 value: _,
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6TrafficClass { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6MulticastInterface {
                 value: _,
                 responder,
             } => {
                 warn!("TODO(https://fxbug.dev/107644): implement IPV6_MULTICAST_IF socket option");
-                responder_send!(responder, Ok(()));
+                responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6MulticastInterface {
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6UnicastHops {
                 value,
                 responder,
-            } => {
-                responder_send!(responder, self.set_unicast_hop_limit(Ipv6::VERSION, value))
-            }
+            } => responder
+                .send(self.set_unicast_hop_limit(Ipv6::VERSION, value))
+                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6UnicastHops { responder } => {
-                responder_send!(responder, self.get_unicast_hop_limit(Ipv6::VERSION))
+                responder
+                    .send(self.get_unicast_hop_limit(Ipv6::VERSION))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6MulticastHops {
                 value,
                 responder,
-            } => {
-                responder_send!(responder, self.set_multicast_hop_limit(Ipv6::VERSION, value))
-            }
+            } => responder
+                .send(self.set_multicast_hop_limit(Ipv6::VERSION, value))
+                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6MulticastHops { responder } => {
-                responder_send!(responder, self.get_multicast_hop_limit(Ipv6::VERSION))
+                responder
+                    .send(self.get_multicast_hop_limit(Ipv6::VERSION))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6MulticastLoopback {
                 value,
@@ -1067,148 +1130,197 @@ where
             } => {
                 // TODO(https://fxbug.dev/106865): add support for
                 // looping back sent packets.
-                responder_send!(
-                    responder,
-                    (!value).then_some(()).ok_or(fposix::Errno::Enoprotoopt)
-                );
+                responder
+                    .send((!value).then_some(()).ok_or(fposix::Errno::Enoprotoopt))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6MulticastLoopback {
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpTtl { value, responder } => {
-                responder_send!(responder, self.set_unicast_hop_limit(Ipv4::VERSION, value))
+                responder
+                    .send(self.set_unicast_hop_limit(Ipv4::VERSION, value))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
-            fposix_socket::SynchronousDatagramSocketRequest::GetIpTtl { responder } => {
-                responder_send!(responder, self.get_unicast_hop_limit(Ipv4::VERSION))
-            }
+            fposix_socket::SynchronousDatagramSocketRequest::GetIpTtl { responder } => responder
+                .send(self.get_unicast_hop_limit(Ipv4::VERSION))
+                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
             fposix_socket::SynchronousDatagramSocketRequest::SetIpMulticastTtl {
                 value,
                 responder,
-            } => {
-                responder_send!(responder, self.set_multicast_hop_limit(Ipv4::VERSION, value))
-            }
+            } => responder
+                .send(self.set_multicast_hop_limit(Ipv4::VERSION, value))
+                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
             fposix_socket::SynchronousDatagramSocketRequest::GetIpMulticastTtl { responder } => {
-                responder_send!(responder, self.get_multicast_hop_limit(Ipv4::VERSION))
+                responder
+                    .send(self.get_multicast_hop_limit(Ipv4::VERSION))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpMulticastInterface {
                 iface: _,
                 address: _,
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpMulticastInterface {
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpMulticastLoopback {
                 value: _,
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpMulticastLoopback {
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpTypeOfService {
                 value: _,
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpTypeOfService { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::AddIpMembership {
                 membership,
                 responder,
             } => {
-                responder_send!(responder, self.set_multicast_membership(membership, true));
+                responder
+                    .send(self.set_multicast_membership(membership, true))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::DropIpMembership {
                 membership,
                 responder,
             } => {
-                responder_send!(responder, self.set_multicast_membership(membership, false));
+                responder
+                    .send(self.set_multicast_membership(membership, false))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::AddIpv6Membership {
                 membership,
                 responder,
             } => {
-                responder_send!(responder, self.set_multicast_membership(membership, true));
+                responder
+                    .send(self.set_multicast_membership(membership, true))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::DropIpv6Membership {
                 membership,
                 responder,
             } => {
-                responder_send!(responder, self.set_multicast_membership(membership, false));
+                responder
+                    .send(self.set_multicast_membership(membership, false))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6ReceiveTrafficClass {
                 value: _,
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6ReceiveTrafficClass {
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6ReceiveHopLimit {
                 value: _,
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6ReceiveHopLimit {
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpReceiveTypeOfService {
                 value: _,
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpReceiveTypeOfService {
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6ReceivePacketInfo {
                 value: _,
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6ReceivePacketInfo {
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpReceiveTtl {
                 value: _,
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpReceiveTtl { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpPacketInfo {
                 value: _,
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpPacketInfo { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
         }
         ControlFlow::Continue(None)

@@ -166,9 +166,9 @@ impl Future for Watcher {
             let next_request = self.as_mut().stream.poll_next_unpin(cx)?;
             match ready!(next_request) {
                 Some(WatcherRequest::Watch { responder }) => match self.events.pop_front() {
-                    Some(e) => {
-                        responder_send!(responder, &e)
-                    }
+                    Some(e) => responder
+                        .send(&e)
+                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}")),
                     None => match &self.responder {
                         Some(existing) => {
                             existing

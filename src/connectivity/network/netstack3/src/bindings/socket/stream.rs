@@ -1235,10 +1235,14 @@ where
         let Self { data: BindingData { id: _, peer }, ctx: _ } = self;
         match request {
             fposix_socket::StreamSocketRequest::Bind { addr, responder } => {
-                responder_send!(responder, self.bind(addr));
+                responder
+                    .send(self.bind(addr))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::Connect { addr, responder } => {
-                responder_send!(responder, self.connect(addr).clone());
+                responder
+                    .send(self.connect(addr).clone())
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::Describe { responder } => {
                 let socket = peer
@@ -1248,25 +1252,25 @@ where
                         & !zx::Rights::DUPLICATE,
                     )
                     .expect("failed to duplicate the socket handle");
-                responder_send!(
-                    responder,
-                    fposix_socket::StreamSocketDescribeResponse {
+                responder
+                    .send(fposix_socket::StreamSocketDescribeResponse {
                         socket: Some(socket),
                         ..Default::default()
-                    }
-                );
+                    })
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::Listen { backlog, responder } => {
-                responder_send!(responder, self.listen(backlog));
+                responder
+                    .send(self.listen(backlog))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::Accept { want_addr, responder } => {
-                responder_send!(
-                    responder,
-                    match self.accept(want_addr) {
+                responder
+                    .send(match self.accept(want_addr) {
                         Ok((ref addr, client)) => Ok((addr.as_ref(), client)),
                         Err(e) => Err(e),
-                    }
-                );
+                    })
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::Close { responder } => {
                 // We don't just close the socket because this socket worker is
@@ -1283,243 +1287,378 @@ where
             }
             fposix_socket::StreamSocketRequest::SetBindToDevice { value, responder } => {
                 let identifier = (!value.is_empty()).then_some(value.as_str());
-                responder_send!(responder, self.set_bind_to_device(identifier));
+                responder
+                    .send(self.set_bind_to_device(identifier))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::Query { responder } => {
-                responder_send!(responder, fposix_socket::STREAM_SOCKET_PROTOCOL_NAME.as_bytes());
+                responder
+                    .send(fposix_socket::STREAM_SOCKET_PROTOCOL_NAME.as_bytes())
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetReuseAddress { value, responder } => {
-                responder_send!(responder, self.set_reuse_address(value));
+                responder
+                    .send(self.set_reuse_address(value))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetReuseAddress { responder } => {
-                responder_send!(responder, Ok(self.reuse_address()));
+                responder
+                    .send(Ok(self.reuse_address()))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetError { responder } => {
-                responder_send!(responder, self.get_error());
+                responder
+                    .send(self.get_error())
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetBroadcast { value: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetBroadcast { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetSendBuffer { value_bytes, responder } => {
                 self.set_send_buffer_size(value_bytes);
-                responder_send!(responder, Ok(()));
+                responder
+                    .send(Ok(()))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetSendBuffer { responder } => {
-                responder_send!(responder, Ok(self.send_buffer_size()));
+                responder
+                    .send(Ok(self.send_buffer_size()))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetReceiveBuffer { value_bytes, responder } => {
-                responder_send!(responder, Ok(self.set_receive_buffer_size(value_bytes)));
+                responder
+                    .send(Ok(self.set_receive_buffer_size(value_bytes)))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetReceiveBuffer { responder } => {
-                responder_send!(responder, Ok(self.receive_buffer_size()));
+                responder
+                    .send(Ok(self.receive_buffer_size()))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetKeepAlive { value: enabled, responder } => {
                 self.with_socket_options_mut(|so| so.keep_alive.enabled = enabled);
-                responder_send!(responder, Ok(()));
+                responder
+                    .send(Ok(()))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetKeepAlive { responder } => {
                 let enabled = self.with_socket_options(|so| so.keep_alive.enabled);
-                responder_send!(responder, Ok(enabled));
+                responder
+                    .send(Ok(enabled))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetOutOfBandInline { value: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetOutOfBandInline { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetNoCheck { value: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetNoCheck { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetLinger {
                 linger: _,
                 length_secs: _,
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetLinger { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetReusePort { value: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetReusePort { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetAcceptConn { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetBindToDevice { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetTimestamp { value: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetTimestamp { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::Disconnect { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetSockName { responder } => {
-                responder_send!(responder, self.get_sock_name().as_ref().map_err(|e| *e));
+                responder
+                    .send(self.get_sock_name().as_ref().map_err(|e| *e))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetPeerName { responder } => {
-                responder_send!(responder, self.get_peer_name().as_ref().map_err(|e| *e));
+                responder
+                    .send(self.get_peer_name().as_ref().map_err(|e| *e))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::Shutdown { mode, responder } => {
-                responder_send!(responder, self.shutdown(mode));
+                responder
+                    .send(self.shutdown(mode))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetIpTypeOfService { value: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetIpTypeOfService { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetIpTtl { value: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetIpTtl { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetIpPacketInfo { value: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetIpPacketInfo { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetIpReceiveTypeOfService {
                 value: _,
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetIpReceiveTypeOfService { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetIpReceiveTtl { value: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetIpReceiveTtl { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetIpMulticastInterface {
                 iface: _,
                 address: _,
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetIpMulticastInterface { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetIpMulticastTtl { value: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetIpMulticastTtl { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetIpMulticastLoopback { value: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetIpMulticastLoopback { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::AddIpMembership { membership: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::DropIpMembership { membership: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::AddIpv6Membership { membership: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::DropIpv6Membership { membership: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetIpv6MulticastInterface {
                 value: _,
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetIpv6MulticastInterface { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetIpv6UnicastHops { value: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetIpv6UnicastHops { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetIpv6ReceiveHopLimit { value: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetIpv6ReceiveHopLimit { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetIpv6MulticastHops { value: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetIpv6MulticastHops { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetIpv6MulticastLoopback {
                 value: _,
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetIpv6MulticastLoopback { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetIpv6Only { value, responder } => {
                 // TODO(https://fxbug.dev/21198): support dual-stack sockets.
-                responder_send!(
-                    responder,
-                    match I::VERSION {
-                        IpVersion::V6 => value,
-                        IpVersion::V4 => false,
-                    }
-                    .then_some(())
-                    .ok_or(fposix::Errno::Eopnotsupp)
-                );
+                responder
+                    .send(
+                        match I::VERSION {
+                            IpVersion::V6 => value,
+                            IpVersion::V4 => false,
+                        }
+                        .then_some(())
+                        .ok_or(fposix::Errno::Eopnotsupp),
+                    )
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetIpv6Only { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetIpv6ReceiveTrafficClass {
                 value: _,
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetIpv6ReceiveTrafficClass { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetIpv6TrafficClass { value: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetIpv6TrafficClass { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetIpv6ReceivePacketInfo {
                 value: _,
                 responder,
             } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetIpv6ReceivePacketInfo { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetInfo { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             // Note for the following two options:
             // Nagle enabled means TCP delays sending segment, thus meaning
@@ -1528,23 +1667,35 @@ where
                 self.with_socket_options_mut(|so| {
                     so.nagle_enabled = !value;
                 });
-                responder_send!(responder, Ok(()));
+                responder
+                    .send(Ok(()))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetTcpNoDelay { responder } => {
                 let nagle_enabled = self.with_socket_options(|so| so.nagle_enabled);
-                responder_send!(responder, Ok(!nagle_enabled));
+                responder
+                    .send(Ok(!nagle_enabled))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetTcpMaxSegment { value_bytes: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetTcpMaxSegment { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetTcpCork { value: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetTcpCork { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetTcpKeepAliveIdle { value_secs, responder } => {
                 match NonZeroU64::new(value_secs.into())
@@ -1554,17 +1705,23 @@ where
                         self.with_socket_options_mut(|so| {
                             so.keep_alive.idle = NonZeroDuration::from_nonzero_secs(secs)
                         });
-                        responder_send!(responder, Ok(()));
+                        responder
+                            .send(Ok(()))
+                            .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
                     }
                     None => {
-                        responder_send!(responder, Err(fposix::Errno::Einval));
+                        responder
+                            .send(Err(fposix::Errno::Einval))
+                            .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
                     }
                 }
             }
             fposix_socket::StreamSocketRequest::GetTcpKeepAliveIdle { responder } => {
                 let secs =
                     self.with_socket_options(|so| Duration::from(so.keep_alive.idle).as_secs());
-                responder_send!(responder, Ok(u32::try_from(secs).unwrap()));
+                responder
+                    .send(Ok(u32::try_from(secs).unwrap()))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetTcpKeepAliveInterval {
                 value_secs,
@@ -1577,17 +1734,23 @@ where
                         self.with_socket_options_mut(|so| {
                             so.keep_alive.interval = NonZeroDuration::from_nonzero_secs(secs)
                         });
-                        responder_send!(responder, Ok(()));
+                        responder
+                            .send(Ok(()))
+                            .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
                     }
                     None => {
-                        responder_send!(responder, Err(fposix::Errno::Einval));
+                        responder
+                            .send(Err(fposix::Errno::Einval))
+                            .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
                     }
                 }
             }
             fposix_socket::StreamSocketRequest::GetTcpKeepAliveInterval { responder } => {
                 let secs =
                     self.with_socket_options(|so| Duration::from(so.keep_alive.interval).as_secs());
-                responder_send!(responder, Ok(u32::try_from(secs).unwrap()));
+                responder
+                    .send(Ok(u32::try_from(secs).unwrap()))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetTcpKeepAliveCount { value, responder } => {
                 match u8::try_from(value)
@@ -1599,32 +1762,39 @@ where
                         self.with_socket_options_mut(|so| {
                             so.keep_alive.count = count;
                         });
-                        responder_send!(responder, Ok(()));
+                        responder
+                            .send(Ok(()))
+                            .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
                     }
                     None => {
-                        responder_send!(responder, Err(fposix::Errno::Einval));
+                        responder
+                            .send(Err(fposix::Errno::Einval))
+                            .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
                     }
                 };
             }
             fposix_socket::StreamSocketRequest::GetTcpKeepAliveCount { responder } => {
                 let count = self.with_socket_options(|so| so.keep_alive.count);
-                responder_send!(responder, Ok(u32::from(u8::from(count))));
+                responder
+                    .send(Ok(u32::from(u8::from(count))))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetTcpSynCount { value, responder } => {
-                responder_send!(
-                    responder,
-                    self.with_socket_options_mut(|so| {
+                responder
+                    .send(self.with_socket_options_mut(|so| {
                         so.max_syn_retries = u8::try_from(value)
                             .ok_checked::<TryFromIntError>()
                             .and_then(NonZeroU8::new)
                             .ok_or(fposix::Errno::Einval)?;
                         Ok(())
-                    })
-                );
+                    }))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetTcpSynCount { responder } => {
                 let syn_cnt = self.with_socket_options(|so| u32::from(so.max_syn_retries.get()));
-                responder_send!(responder, Ok(syn_cnt));
+                responder
+                    .send(Ok(syn_cnt))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetTcpLinger { value_secs, responder } => {
                 const MAX_FIN_WAIT2_TIMEOUT_SECS: u32 = 120;
@@ -1638,42 +1808,64 @@ where
                 self.with_socket_options_mut(|so| {
                     so.fin_wait2_timeout = fin_wait2_timeout;
                 });
-                responder_send!(responder, Ok(()));
+                responder
+                    .send(Ok(()))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetTcpLinger { responder } => {
                 let linger_secs =
                     self.with_socket_options(|so| so.fin_wait2_timeout.map(|d| d.as_secs()));
                 let respond_value = linger_secs.map(|x| u32::try_from(x).unwrap()).into_fidl();
-                responder_send!(responder, Ok(&respond_value));
+                responder
+                    .send(Ok(&respond_value))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetTcpDeferAccept { value_secs: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetTcpDeferAccept { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetTcpWindowClamp { value: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetTcpWindowClamp { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetTcpInfo { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetTcpQuickAck { value, responder } => {
                 self.with_socket_options_mut(|so| so.delayed_ack = !value);
-                responder_send!(responder, Ok(()));
+                responder
+                    .send(Ok(()))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetTcpQuickAck { responder } => {
                 let quick_ack = self.with_socket_options(|so| !so.delayed_ack);
-                responder_send!(responder, Ok(quick_ack));
+                responder
+                    .send(Ok(quick_ack))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetTcpCongestion { value: _, responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetTcpCongestion { responder } => {
-                responder_send!(responder, Err(fposix::Errno::Eopnotsupp));
+                responder
+                    .send(Err(fposix::Errno::Eopnotsupp))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetTcpUserTimeout { value_millis, responder } => {
                 let user_timeout =
@@ -1681,7 +1873,9 @@ where
                 self.with_socket_options_mut(|so| {
                     so.user_timeout = user_timeout;
                 });
-                responder_send!(responder, Ok(()));
+                responder
+                    .send(Ok(()))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetTcpUserTimeout { responder } => {
                 let millis = self.with_socket_options(|so| {
@@ -1689,7 +1883,9 @@ where
                 });
                 let result =
                     u32::try_from(millis).map_err(|_: TryFromIntError| fposix::Errno::Einval);
-                responder_send!(responder, result);
+                responder
+                    .send(result)
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
         }
         ControlFlow::Continue(None)

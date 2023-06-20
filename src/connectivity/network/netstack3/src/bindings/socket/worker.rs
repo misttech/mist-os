@@ -140,7 +140,9 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
                 ControlFlow::Continue(None) => {}
                 ControlFlow::Break(close_responder) => {
                     let respond_close = move || {
-                        responder_send!(close_responder, Ok(()));
+                        close_responder
+                            .send(Ok(()))
+                            .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
                         request_stream.control_handle().shutdown();
                     };
                     if futures.is_empty() {

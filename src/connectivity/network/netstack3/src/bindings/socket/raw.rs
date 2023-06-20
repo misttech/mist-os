@@ -12,7 +12,9 @@ pub(crate) async fn serve(stream: fpraw::ProviderRequestStream) -> Result<(), fi
             match req {
                 fpraw::ProviderRequest::Socket { responder, domain: _, proto: _ } => {
                     tracing::warn!("TODO(https://fxbug.dev/106736): Support raw sockets");
-                    responder_send!(responder, Err(fposix::Errno::Enoprotoopt));
+                    responder
+                        .send(Err(fposix::Errno::Enoprotoopt))
+                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
                 }
             };
             future::ok(())

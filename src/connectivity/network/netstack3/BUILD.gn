@@ -78,7 +78,6 @@ common_sources = [
   "src/bindings/integration_tests.rs",
   "src/bindings/interfaces_admin.rs",
   "src/bindings/interfaces_watcher.rs",
-  "src/bindings/macros.rs",
   "src/bindings/mod.rs",
   "src/bindings/netdevice_worker.rs",
   "src/bindings/root_fidl_worker.rs",
