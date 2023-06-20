@@ -38,6 +38,8 @@ class DeviceHost {
   // Optionally called during DetectDevices. Create virtual_audio instances (one for input, one for
   // output) using the default configurations settings (which should always pass all tests).
   void AddVirtualDevices();
+  void AddVirtualDevice(bool is_input, fuchsia::virtualaudio::DeviceType device_type,
+                        fuchsia::virtualaudio::DevicePtr& device_ptr);
 
   std::set<DeviceEntry>& device_entries() { return device_entries_; }
   std::vector<std::unique_ptr<fsl::DeviceWatcher>>& device_watchers() { return device_watchers_; }
@@ -47,8 +49,11 @@ class DeviceHost {
   std::vector<std::unique_ptr<fsl::DeviceWatcher>> device_watchers_;
 
   fuchsia::virtualaudio::ControlSyncPtr controller_ = nullptr;
-  fuchsia::virtualaudio::DevicePtr output_device_ = nullptr;
-  fuchsia::virtualaudio::DevicePtr input_device_ = nullptr;
+  fuchsia::virtualaudio::DevicePtr stream_config_output_ = nullptr;
+  fuchsia::virtualaudio::DevicePtr stream_config_input_ = nullptr;
+  fuchsia::virtualaudio::DevicePtr dai_output_ = nullptr;
+  fuchsia::virtualaudio::DevicePtr dai_input_ = nullptr;
+  fuchsia::virtualaudio::DevicePtr composite_ = nullptr;
   bool shutting_down_ = false;
 };
 

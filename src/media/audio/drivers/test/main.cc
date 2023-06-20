@@ -24,13 +24,14 @@ int main(int argc, char** argv) {
   // --devfs-only: Only test devices detected in devfs; don't add/test Bluetooth audio a2dp output.
   bool devfs_only = command_line.HasOption("devfs-only");
 
-  // --no-virtual: Unless disabled via this flag, two virtual_audio instances (1 input, 1 output)
-  //   are automatically enabled (with default settings) and tested.
+  // --no-virtual: Don't automatically create and test virtual_audio instances for StreamConfig
+  // Dai and Composite (using default settings). When this flag is enabled, any _preexisting_
+  // virtual_audio instances are allowed and tested like any other physical device.
   bool no_virtual_audio = command_line.HasOption("no-virtual");
 
-  // --admin: Validate commands that require the privileged channel, such as SetFormat.
+  // --admin: Validate commands that require exclusive access, such as SetFormat.
   //   Otherwise, omit AdminTest cases if a device/driver is exposed in the device tree.
-  //   TODO(fxbug.dev/93428): Enable tests if we see audio_core isn't connected to drivers.
+  //   TODO(fxbug.dev/93428): Enable AdminTests if no service is already connected to the driver.
   bool expect_audio_core_not_connected = command_line.HasOption("admin");
 
   // --run-position-tests: Include audio position test cases (requires realtime capable system).
