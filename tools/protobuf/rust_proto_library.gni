@@ -77,10 +77,15 @@ template("rust_proto_library") {
     expected_outputs += [ "${target_crate_root}/${package}.rs" ]
   }
 
-  out_dir = rebase_path(target_crate_root, root_build_dir)
+  rebased_out_dir = rebase_path(target_crate_root, root_build_dir)
 
   protoc_label = "//third_party/protobuf:protoc($host_toolchain)"
   protoc_path = get_label_info(protoc_label, "root_out_dir") + "/protoc"
+
+  prost_build_label =
+      "//tools/protobuf/rust_proto:prost_build_standalone($host_toolchain)"
+  prost_build_path = get_label_info(prost_build_label, "root_out_dir") +
+                     "/prost_build_standalone"
 
   include_args = []
   foreach(dir, proto_include_dirs) {
@@ -98,18 +103,36 @@ template("rust_proto_library") {
     ]
   }
 
-  compiled_action("gen_${target_name}") {
-    tool = "//tools/protobuf/rust_proto:prost_build_standalone"
-    deps = [ protoc_label ]
-    inputs = [ protoc_path ]
+  _main_target_label = get_label_info(":$target_name", "label_with_toolchain")
+
+  action("gen_${target_name}") {
+    script = "//tools/protobuf/rust_proto/prost_build_wrapper.py"
+    inputs = [
+      prost_build_path,
+      protoc_path,
+    ]
+    deps = [
+      prost_build_label,
+      protoc_label,
+    ]
     sources = invoker.sources
     outputs = [ "${target_crate_root}/lib.rs" ] + expected_outputs
-    args = [
-             "--protoc",
-             rebase_path(protoc_path, root_build_dir),
-             "--out-dir",
-             out_dir,
-           ] + include_args + proto_args
+    depfile = "$target_gen_dir/$target_name.d"
+    args =
+        [
+          "--protoc",
+          rebase_path(protoc_path, root_build_dir),
+          "--prost_build",
+          rebase_path(prost_build_path, root_build_dir),
+          "--out-dir",
+          rebased_out_dir,
+          "--gn-target",
+          _main_target_label,
+          "--depfile",
+          rebase_path(depfile, root_build_dir),
+          "--expected-outputs",
+        ] + rebase_path(outputs, root_build_dir) + [ "--expected-packages" ] +
+        proto_packages + include_args + proto_args
   }
 
   rustc_library(target_name) {
