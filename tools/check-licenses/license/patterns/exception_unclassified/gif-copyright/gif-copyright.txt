@@ -1,4 +1,0 @@
-We are also required to state that
-   "The Graphics Interchange Format(c) is the Copyright property of
-   CompuServe Incorporated. GIF(sm) is a Service Mark property of
-   CompuServe Incorporated."

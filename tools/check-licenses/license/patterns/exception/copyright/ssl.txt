@@ -1,8 +1,0 @@
-Copyright 2002 Sun Microsystems, Inc. ALL RIGHTS RESERVED.
-
-Portions of the attached software ("Contribution") are developed by
-SUN MICROSYSTEMS, INC., and are contributed to the OpenSSL project.
-
-The Contribution is licensed pursuant to the OpenSSL open source
-license provided above.
-

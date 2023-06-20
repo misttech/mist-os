@@ -1,5 +1,0 @@
-DTLS code by Eric Rescorla <ekr@rtfm.com>
-
-Copyright (C) 2006, Network Resonance, Inc.
-Copyright (C) 2011, RTFM, Inc.
-

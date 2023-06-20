@@ -1,4 +1,0 @@
-Copyright (C) 2011 Nick Bruun <nick@bruun.co>
-Copyright (C) 2013 Vlad Lazarenko <vlad@lazarenko.me>
-Copyright (C) 2014 Nicolas Pauss <nicolas.pauss@gmail.com>
-
