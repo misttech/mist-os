@@ -26,8 +26,7 @@ struct ComponentInfo {
 
 // Get component information about the thread with koid |thread_koid|.
 
-// fuchsia.sys.internal.CrashIntrospect and fuchsia.sys2.CrashIntrospect are expected to be in
-// |services|.
+// fuchsia.sys2.CrashIntrospect is expected to be in |services|.
 ::fpromise::promise<ComponentInfo> GetComponentInfo(async_dispatcher_t* dispatcher,
                                                     std::shared_ptr<sys::ServiceDirectory> services,
                                                     zx::duration timeout, zx_koid_t thread_koid);

@@ -55,14 +55,6 @@
             to: "#feedback",
         },
         {
-            // This comes from appmgr.
-            protocol: "fuchsia.sys.internal.CrashIntrospect",
-            from: "#appmgr",
-            to: "#exceptions",
-            dependency: "weak_for_migration",
-            source_availability: "unknown",
-        },
-        {
             protocol: [
                 "fuchsia.ui.activity.control.Control",
                 "fuchsia.ui.activity.Provider",

@@ -55,13 +55,9 @@ TEST(Logname, MakesLognameCorrectly) {
       {"system    ", "system"},
       // Extracts components_for_foo
       {"bin/components_for_foo", "components_for_foo"},
-      // Extracts foo_bar from the v1 URL.
-      {"fuchsia-pkg://fuchsia.com/foo-bar#meta/foo_bar.cmx", "foo_bar"},
-      // Extracts foo_bar from the v1 URL.
-      {"fuchsia.com:foo-bar#meta:foo_bar.cmx", "foo_bar"},
-      // Extracts foo_bar from the v2 URL.
+      // Extracts foo_bar from the URL.
       {"fuchsia-pkg://fuchsia.com/foo-bar#meta/foo_bar.cm", "foo_bar"},
-      // Extracts foo_bar from the v2 URL.
+      // Extracts foo_bar from the URL.
       {"fuchsia.com:foo-bar#meta:foo_bar.cm", "foo_bar"},
   };
 

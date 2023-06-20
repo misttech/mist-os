@@ -18,9 +18,7 @@ namespace handler {
 namespace {
 
 std::string Sanitize(std::string process_name) {
-  // Determine if ".cm" is present in |process_name| and use the substring that precedes it. This
-  // works for components v1 and v2 because their processes will end with ".cmx" and ".cm"
-  // respectively.
+  // Determine if ".cm" is present in |process_name| and use the substring that precedes it.
   const size_t cm_pos = process_name.find(".cm");
   if (cm_pos != std::string::npos) {
     process_name = process_name.substr(0, cm_pos);
