@@ -20,7 +20,7 @@ __BEGIN_CDECLS
 //
 // This expects sole access to the netifc timer.
 void mdns_start(uint32_t namegen, bool fastboot_tcp);
-efi_status mdns_poll(bool fastboot_tcp);
+void mdns_poll(bool fastboot_tcp);
 // Stop broadcasting mDNS information.
 void mdns_stop(bool fastboot_tcp);
 

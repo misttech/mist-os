@@ -8,8 +8,6 @@
 #include <stdint.h>
 #include <zircon/compiler.h>
 
-#include <efi/types.h>
-
 __BEGIN_CDECLS
 
 // setup networking
@@ -25,7 +23,7 @@ int netifc_active(void);
 void netifc_close(void);
 
 // set a timer to expire after ms milliseconds
-efi_status netifc_set_timer(uint32_t ms);
+void netifc_set_timer(uint32_t ms);
 
 // returns true once the timer has expired
 int netifc_timer_expired(void);

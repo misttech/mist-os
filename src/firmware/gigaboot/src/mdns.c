@@ -280,14 +280,14 @@ bool mdns_write_fastboot_packet(bool finished, bool tcp, struct mdns_buf* packet
 
 /*** fastboot mdns broadcasts ***/
 
-static efi_status mdns_broadcast_fastboot(bool finished, bool fastboot_tcp) {
+static bool mdns_broadcast_fastboot(bool finished, bool fastboot_tcp) {
   static struct mdns_buf pkt;
   if (!mdns_write_fastboot_packet(finished, fastboot_tcp, &pkt)) {
     ELOG("Failed to create fastboot mDNS packet");
-    return EFI_INVALID_PARAMETER;
+    return false;
   }
 
-  return udp6_send(pkt.data, pkt.used, &ip6_mdns_broadcast, MDNS_PORT, MDNS_PORT);
+  return udp6_send(pkt.data, pkt.used, &ip6_mdns_broadcast, MDNS_PORT, MDNS_PORT) == 0;
 }
 
 static int mdns_active = 0;
@@ -299,24 +299,13 @@ void mdns_start(uint32_t namegen, bool fastboot_tcp) {
   mdns_active = 1;
 }
 
-efi_status mdns_poll(bool fastboot_tcp) {
-  efi_status result = EFI_SUCCESS;
+void mdns_poll(bool fastboot_tcp) {
   if (!mdns_active)
-    return EFI_UNSUPPORTED;
+    return;
   if (netifc_timer_expired()) {
-    result = mdns_broadcast_fastboot(false, fastboot_tcp);
-    if (result != EFI_SUCCESS) {
-      ELOG("%s: broadcast failure: (%s)\n", __func__, xefi_strerror(result));
-      return result;
-    }
-    result = netifc_set_timer(MDNS_BROADCAST_FREQ_MS);
-    if (result != EFI_SUCCESS) {
-      ELOG("%s: set timer failure (%s)\n", __func__, xefi_strerror(result));
-      return result;
-    }
+    mdns_broadcast_fastboot(false, fastboot_tcp);
+    netifc_set_timer(MDNS_BROADCAST_FREQ_MS);
   }
-
-  return result;
 }
 
 void mdns_stop(bool fastboot_tcp) {

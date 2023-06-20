@@ -101,14 +101,6 @@ void eth_put_buffer(void* data) {
   eth_buffers = buf;
 }
 
-static void clear_tx_queue(void* marker) {
-  void* txbuf;
-  efi_status status;
-  do {
-    status = snp->GetStatus(snp, NULL, &txbuf);
-  } while (status == EFI_SUCCESS && txbuf != marker);
-}
-
 int eth_send(void* data, size_t len) {
 #if DROP_PACKETS
   txc++;
@@ -118,21 +110,13 @@ int eth_send(void* data, size_t len) {
     return 0;
   }
 #endif
-  efi_status r = snp->Transmit(snp, 0, len, data, NULL, NULL, NULL);
-  if (r == EFI_SUCCESS) {
-    clear_tx_queue(data);
-  } else if (r == EFI_NOT_READY) {
-    clear_tx_queue(NULL);
-    r = snp->Transmit(snp, 0, len, data, NULL, NULL, NULL);
-    clear_tx_queue(data);
+  efi_status r;
+  if ((r = snp->Transmit(snp, 0, len, (void*)data, NULL, NULL, NULL))) {
+    eth_put_buffer(data);
+    return -1;
+  } else {
+    return 0;
   }
-
-  if (r != EFI_SUCCESS) {
-    printf("%s: failure: (%s)\n", __func__, xefi_strerror(r));
-  }
-
-  eth_put_buffer(data);
-  return (int)r;
 }
 
 static void eth_dump_status(void) {
@@ -163,11 +147,11 @@ static efi_event net_timer = NULL;
 
 #define TIMER_MS(n) (((uint64_t)(n)) * 10000UL)
 
-efi_status netifc_set_timer(uint32_t ms) {
+void netifc_set_timer(uint32_t ms) {
   if (net_timer == 0) {
-    return EFI_UNSUPPORTED;
+    return;
   }
-  return gBS->SetTimer(net_timer, TimerRelative, TIMER_MS(ms));
+  gBS->SetTimer(net_timer, TimerRelative, TIMER_MS(ms));
 }
 
 int netifc_timer_expired(void) {
@@ -177,7 +161,6 @@ int netifc_timer_expired(void) {
   if (gBS->CheckEvent(net_timer) == EFI_SUCCESS) {
     return 1;
   }
-
   return 0;
 }
 
