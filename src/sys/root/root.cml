@@ -123,7 +123,10 @@
             to: "#core",
         },
         {
-            protocol: [ "fuchsia.sys2.SystemController" ],
+            protocol: [
+                "fuchsia.component.resolution.Resolver",
+                "fuchsia.sys2.SystemController",
+            ],
             from: "parent",
             to: "#bootstrap",
         },

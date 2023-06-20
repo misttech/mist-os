@@ -316,6 +316,29 @@
             dependency: "weak",
         },
         {
+            protocol: "fuchsia.component.resolution.Resolver",
+            from: "parent",
+            as: "fuchsia.component.resolution.Resolver-boot",
+            to: [
+                "#driver_index",
+                "#driver_manager",
+            ],
+        },
+        {
+            protocol: "fuchsia.component.resolution.Resolver",
+            from: "#base_resolver",
+            as: "fuchsia.component.resolution.Resolver-base",
+            to: [
+                "#driver_index",
+                "#driver_manager",
+            ],
+
+            // base_resolver depends on fshost for blobfs and fshost depends transitively on
+            // driver_index and driver_manager, but driver_index and driver_manager don't need base
+            // packages to provide fshost's (transitive) dependencies.
+            dependency: "weak",
+        },
+        {
             // This is only used when the #driver_index |enable_ephemeral_drivers| config
             // is set, which enables loading drivers ephemerally. This is intended for
             // eng builds only and is set through product assembly.
@@ -323,6 +346,16 @@
             from: "parent",
             as: "fuchsia.pkg.PackageResolver-full",
             to: "#driver_index",
+        },
+        {
+            // This is only used when the #driver_index |enable_ephemeral_drivers| config
+            // is set, which enables loading drivers ephemerally. This is intended for
+            // eng builds only and is set through product assembly.
+            protocol: "fuchsia.component.resolution.Resolver",
+            from: "#full_resolver",
+            as: "fuchsia.component.resolution.Resolver-full",
+            to: "#driver_index",
+            dependency: "weak",
         },
         {
             directory: "boot",
@@ -379,6 +412,12 @@
             protocol: "fuchsia.pkg.PackageResolver",
             from: "parent",
             as: "fuchsia.pkg.PackageResolver-full",
+            to: "#driver_manager",
+        },
+        {
+            protocol: "fuchsia.component.resolution.Resolver",
+            from: "parent",
+            as: "fuchsia.component.resolution.Resolver-full",
             to: "#driver_manager",
         },
         {
@@ -1161,6 +1200,11 @@
             protocol: "fuchsia.pkg.PackageResolver",
             from: "#base_resolver",
             as: "fuchsia.pkg.PackageResolver-base",
+        },
+        {
+            protocol: "fuchsia.component.resolution.Resolver",
+            from: "#base_resolver",
+            as: "fuchsia.component.resolution.Resolver-base",
         },
         {
             protocol: [

@@ -26,13 +26,20 @@
         },
         {
             protocol: [
+                "fuchsia.component.resolution.Resolver-base",
+                "fuchsia.component.resolution.Resolver-boot",
                 "fuchsia.pkg.PackageResolver-base",
-
+            ],
+        },
+        {
+            protocol: [
                 // This is only used when the |enable_ephemeral_drivers| configuration option
                 // is set, which enables loading drivers ephemerally. This is intended for
                 // eng builds only.
+                "fuchsia.component.resolution.Resolver-full",
                 "fuchsia.pkg.PackageResolver-full",
             ],
+            availability: "optional",
         },
     ],
     expose: [

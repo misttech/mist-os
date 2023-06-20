@@ -299,6 +299,16 @@
                 ],
             },
             {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.component.resolution.Resolver",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap/driver_index",
+                    "/bootstrap/driver_manager",
+                ],
+            },
+            {
                 source_moniker: "/bootstrap/fshost",
                 source: "component",
                 source_name: "blob",
@@ -470,6 +480,31 @@
                 ],
             },
             {
+                // We restrict access to component.resolution.Resolver because it gives direct
+                // access to executable package handles.
+                source_moniker: "/bootstrap/base_resolver",
+                source: "component",
+                source_name: "fuchsia.component.resolution.Resolver",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap/driver_index",
+                    "/bootstrap/driver_manager",
+                    "/core/full-resolver",
+                ],
+            },
+            {
+                // We restrict access to component.resolution.Resolver because it gives direct
+                // access to executable package handles.
+                source_moniker: "/bootstrap/full_resolver",
+                source: "component",
+                source_name: "fuchsia.component.resolution.Resolver",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap/driver_index",
+                    "/bootstrap/driver_manager",
+                ],
+            },
+            {
                 // We restrict access to PackageCache because it gives direct access to package
                 // handles which provide executability which bypass VX security policy.
                 source_moniker: "/bootstrap/pkg-cache",
@@ -596,17 +631,6 @@
                     "/core/sshd-host",
                     "/core/system-updater",
                     "/core/system-update-checker",
-                ],
-            },
-            {
-                // We restrict access to base-resolver's ComponentResolver protocol because we
-                // expect only parts of component framework to be able to access it.
-                source_moniker: "/bootstrap/base-resolver",
-                source: "component",
-                source_name: "fuchsia.component.resolution.Resolver",
-                capability: "protocol",
-                target_monikers: [
-                    "/core/full-resolver",
                 ],
             },
 

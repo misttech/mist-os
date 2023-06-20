@@ -41,6 +41,8 @@
             protocol: [
                 "fuchsia.boot.Arguments",
                 "fuchsia.boot.Items",
+                "fuchsia.component.resolution.Resolver-base",
+                "fuchsia.component.resolution.Resolver-boot",
                 "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.driver.development.DriverIndex",
                 "fuchsia.driver.index.DriverIndex",
@@ -56,6 +58,13 @@
             // is set, which enables loading drivers ephemerally. This is intended for
             // eng builds only.
             protocol: [ "fuchsia.pkg.PackageResolver-full" ],
+            availability: "optional",
+        },
+        {
+            // This is only used when the kernel commandline flag devmgr.enable-ephemeral
+            // is set, which enables loading drivers ephemerally. This is intended for
+            // eng builds only.
+            protocol: [ "fuchsia.component.resolution.Resolver-full" ],
             availability: "optional",
         },
         {

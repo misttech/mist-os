@@ -137,6 +137,9 @@
         },
         {
             protocol: [
+                "fuchsia.component.resolution.Resolver-base",
+                "fuchsia.component.resolution.Resolver-boot",
+                "fuchsia.component.resolution.Resolver-full",
                 "fuchsia.pkg.PackageResolver-base",
                 "fuchsia.pkg.PackageResolver-full",
             ],

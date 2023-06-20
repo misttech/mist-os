@@ -28,6 +28,7 @@
                 "fuchsia.kernel.InfoResource",
                 "fuchsia.kernel.IoportResource",
                 "fuchsia.kernel.IrqResource",
+                "fuchsia.component.resolution.Resolver",
                 "fuchsia.kernel.KernelStats",
                 "fuchsia.kernel.MexecResource",
                 "fuchsia.kernel.MmioResource",
