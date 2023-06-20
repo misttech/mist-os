@@ -105,7 +105,7 @@ static bool ValidateChunk(const uint8_t* src, const uint8_t* end, size_t chunk_h
     return false;
   }
   memcpy(chunk, src, sizeof(*chunk));
-  return src + chunk_hdr_size < end;
+  return src + chunk_hdr_size <= end;
 }
 
 static bool ValidateChunkSize(const sparse_header_t* header, const chunk_header_t* chunk,

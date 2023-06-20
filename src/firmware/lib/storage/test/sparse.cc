@@ -8,6 +8,7 @@
 #include <lib/storage/storage.h>
 #include <sparse_format.h>
 
+#include <algorithm>
 #include <array>
 #include <numeric>
 #include <optional>
@@ -160,7 +161,8 @@ bool FillPartition(FuchsiaFirmwareStorage &ops, const GptData *data, const char 
   }
 
   std::vector<uint32_t> fill(partition_size / sizeof(uint32_t), payload);
-  return FuchsiaFirmwareStorageGptWrite(&ops, data, name, 0, fill.size(), fill.data());
+  return FuchsiaFirmwareStorageGptWrite(&ops, data, name, 0, fill.size() * sizeof(uint32_t),
+                                        fill.data());
 }
 
 TEST(FuchsiaSparseWriterTest, TestEmptyImage) {
@@ -216,6 +218,7 @@ void RunBasicSparseTest() {
       {SparseDataDescriptor::SparseChunkType::kCrC32, 0, 0xCAB00D1E},
       {SparseDataDescriptor::SparseChunkType::kFill, 2, 0xCABBA6E5},
       {SparseDataDescriptor::SparseChunkType::kRaw, 2, 0xFEEDC0DE},
+      {SparseDataDescriptor::SparseChunkType::kDontCare, 1},
   };
   std::vector<uint8_t> sparse_image = MakeSparseImage<FileHeaderSize, ChunkHeaderSize>(chunks);
 
@@ -228,7 +231,12 @@ void RunBasicSparseTest() {
   ASSERT_TRUE(FuchsiaFirmwareStorageGptRead(&storage, gpt_data.gpt_data(), partition, 0,
                                             actual.size(), actual.data()));
 
-  ASSERT_EQ(expected, actual);
+  if (expected != actual) {
+    auto mismatch = std::mismatch(expected.begin(), expected.end(), actual.begin(), actual.end());
+    FAIL() << "Mismatch at index " << std::distance(expected.begin(), mismatch.first) << " of "
+           << expected.size() << " (wanted '" << *mismatch.first << "', got '" << *mismatch.second
+           << "')";
+  }
 }
 
 TEST(FuchsiaSparseWriterTest, TestBasic) {
