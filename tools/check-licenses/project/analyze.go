@@ -6,6 +6,7 @@ package project
 
 import (
 	"fmt"
+	"runtime"
 	"sort"
 	"sync"
 
@@ -29,21 +30,32 @@ func AnalyzeLicenses() error {
 		plusVal(NumFilteredProjects, p.Root)
 		// Analyze the license files in each project.
 		sort.Sort(file.Order(p.LicenseFiles))
-
 		if useLicenseClassifier {
 			wg.Add(1)
 
 			go func(project *Project) {
 				defer wg.Done()
+				var pwg sync.WaitGroup
 
+				// Analyze license files.
 				for _, l := range project.LicenseFiles {
 					l.Search()
 				}
-				// Analyze the copyright headers in the files in each project.
+
 				sort.Sort(file.Order(project.SearchableRegularFiles))
-				for _, f := range project.SearchableRegularFiles {
-					f.Search()
+
+				// Analyze the copyright headers in the non-license files in each project.
+				filesPerCPU := max(len(project.SearchableRegularFiles)/runtime.NumCPU(), 1)
+				for i := 0; i < len(project.SearchableRegularFiles); i = i + filesPerCPU {
+					pwg.Add(1)
+					go func(start, end int) {
+						defer pwg.Done()
+						for _, f := range project.SearchableRegularFiles[start:end] {
+							f.Search()
+						}
+					}(i, min(i+filesPerCPU, len(project.SearchableRegularFiles)))
 				}
+				pwg.Wait()
 			}(p)
 			continue
 		}
@@ -93,4 +105,18 @@ func AnalyzeLicenses() error {
 	// Perform any cleanup steps in the license package.
 	license.Finalize()
 	return nil
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func max(a, b int) int {
+	if a < b {
+		return b
+	}
+	return a
 }
