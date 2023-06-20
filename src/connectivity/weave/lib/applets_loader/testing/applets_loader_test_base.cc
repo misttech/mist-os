@@ -4,8 +4,6 @@
 
 #include "src/connectivity/weave/lib/applets_loader/testing/applets_loader_test_base.h"
 
-#include <dlfcn.h>
-
 #include "src/connectivity/weave/applets/test_applets/test_applets.h"
 #include "src/connectivity/weave/lib/applets_loader/testing/test_applets.h"
 

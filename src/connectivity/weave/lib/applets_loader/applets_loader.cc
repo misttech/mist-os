@@ -4,7 +4,6 @@
 
 #include "src/connectivity/weave/lib/applets_loader/applets_loader.h"
 
-#include <dlfcn.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <algorithm>
