@@ -60,8 +60,6 @@ group("dart_allowlist") {
     "//sdk/dart/fuchsia_component_test:*",
     "//sdk/dart/fuchsia_logger:*",
     "//sdk/dart/fuchsia_logger/test/integration:*",
-    "//sdk/dart/fuchsia_scenic:*",
-    "//sdk/dart/fuchsia_scenic_flutter:*",
     "//sdk/dart/fuchsia_services:*",
     "//sdk/dart/fuchsia_services/test_support:*",
     "//sdk/dart/fuchsia_vfs:*",

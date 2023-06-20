@@ -107,28 +107,22 @@ sdk_atom("gen_snapshot_sdk") {
 group("tests") {
   testonly = true
 
-  # TODO(fxb/41505): Temporarily disable flutter_tester tests on mac hosts.
-  _flutter_tester_tests = []
-  if (host_os != "mac") {
-    _flutter_tester_tests += [ "//sdk/dart/fuchsia_scenic_flutter:fuchsia_scenic_flutter_unittests($host_toolchain)" ]
-  }
-
   public_deps = [
-                  # TODO: This target should just aggregate the top-level directories and
-                  # most of these dependencies should be in those subdirectories.
-                  "//examples:tests",
-                  "//sdk/dart/fuchsia_component_test:tests",
-                  "//sdk/dart/fuchsia_logger:tests",
-                  "//sdk/dart/fuchsia_services:fuchsia-services-integration-tests",
-                  "//sdk/dart/fuchsia_services:fuchsia_services_package_unittests",
-                  "//sdk/dart/fuchsia_services/test_support:fuchsia-services-foo-test-server",
-                  "//sdk/dart/fuchsia_vfs:tests",
-                  "//sdk/dart/zircon:tests",
-                  "//src/fonts",
-                  "//src/ui/examples",
-                  "//src/ui/scenic:tests",
-                  "//src/ui/tools:scenic",
-                ] + _flutter_tester_tests
+    # TODO: This target should just aggregate the top-level directories and
+    # most of these dependencies should be in those subdirectories.
+    "//examples:tests",
+    "//sdk/dart/fuchsia_component_test:tests",
+    "//sdk/dart/fuchsia_logger:tests",
+    "//sdk/dart/fuchsia_services:fuchsia-services-integration-tests",
+    "//sdk/dart/fuchsia_services:fuchsia_services_package_unittests",
+    "//sdk/dart/fuchsia_services/test_support:fuchsia-services-foo-test-server",
+    "//sdk/dart/fuchsia_vfs:tests",
+    "//sdk/dart/zircon:tests",
+    "//src/fonts",
+    "//src/ui/examples",
+    "//src/ui/scenic:tests",
+    "//src/ui/tools:scenic",
+  ]
 }
 
 _gen_reference_docs_script_target = "gen_reference_docs_script"
@@ -166,8 +160,6 @@ action("dart_sdk_docs") {
     rebase_path("//sdk/dart/fuchsia"),
     rebase_path("//sdk/dart/fuchsia_component_test"),
     rebase_path("//sdk/dart/fuchsia_logger"),
-    rebase_path("//sdk/dart/fuchsia_scenic"),
-    rebase_path("//sdk/dart/fuchsia_scenic_flutter"),
     rebase_path("//sdk/dart/fuchsia_services"),
     rebase_path("//sdk/dart/fuchsia_vfs"),
     rebase_path("//sdk/dart/zircon"),
