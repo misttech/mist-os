@@ -35,7 +35,6 @@ enum MagmaMemoryPressureLevel {
 };
 
 // A batch buffer to be executed plus the resources required to execute it
-// Ensure 8 byte alignment for semaphores and resources that may follow in a stream.
 struct magma_command_buffer {
   uint32_t resource_count;
   uint32_t batch_buffer_resource_index;  // resource index of the batch buffer to execute
@@ -43,7 +42,7 @@ struct magma_command_buffer {
   uint32_t wait_semaphore_count;
   uint32_t signal_semaphore_count;
   uint64_t flags;
-} __attribute__((__aligned__(8)));
+};
 
 }  // namespace msd
 
