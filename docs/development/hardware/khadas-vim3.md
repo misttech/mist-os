@@ -343,6 +343,17 @@ Workaround 2:
 
 Always use a USB-C to USB-A cable.
 
+### Troubleshooting: Hardware mismatch {#mismatch}
+
+Problem:
+
+This error when flashing fuchsia: `Hardware mismatch! Trying to flash images
+built for vim3 but have 0`
+
+Solution:
+
+Go back to [Update the Android image](#android) step.
+
 ## Appendix: Fix a bricked VIM3 {#brickfix}
 
 Do these steps if you've [bricked] your VIM3 and need to "factory reset" it:
