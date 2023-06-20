@@ -27,7 +27,7 @@ impl ProcFs {
     /// Creates a new instance of `ProcFs` for the given `kernel`.
     pub fn new_fs(kernel: &Arc<Kernel>, options: FileSystemOptions) -> FileSystemHandle {
         let fs = FileSystem::new(kernel, CacheMode::Uncached, Arc::new(ProcFs), options);
-        fs.set_root(ProcDirectory::new(&fs, Arc::downgrade(kernel)));
+        fs.set_root(ProcDirectory::new(&fs, kernel));
         fs
     }
 }

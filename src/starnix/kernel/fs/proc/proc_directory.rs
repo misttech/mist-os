@@ -42,14 +42,14 @@ pub struct ProcDirectory {
 
 impl ProcDirectory {
     /// Returns a new `ProcDirectory` exposing information about `kernel`.
-    pub fn new(fs: &FileSystemHandle, kernel: Weak<Kernel>) -> Arc<ProcDirectory> {
+    pub fn new(fs: &FileSystemHandle, kernel: &Arc<Kernel>) -> Arc<ProcDirectory> {
         // TODO: Move somewhere where it can be shared with other consumers.
         let kernel_stats = Arc::new(KernelStatsStore::default());
 
         let nodes = btreemap! {
             &b"cpuinfo"[..] => fs.create_node(CpuinfoFile::new_node(), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
             &b"cmdline"[..] => {
-                let cmdline = kernel.upgrade().unwrap().cmdline.clone();
+                let cmdline = kernel.cmdline.clone();
                 fs.create_node(BytesFile::new_node(cmdline), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()))
             },
             &b"self"[..] => SelfSymlink::new_node(fs),
@@ -70,10 +70,10 @@ impl ProcDirectory {
             &b"uptime"[..] =>
                 fs.create_node(UptimeFile::new_node(&kernel_stats), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
             &b"loadavg"[..] =>
-                fs.create_node(LoadavgFile::new_node(&kernel), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
+                fs.create_node(LoadavgFile::new_node(kernel), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
         };
 
-        Arc::new(ProcDirectory { kernel, nodes })
+        Arc::new(ProcDirectory { kernel: Arc::downgrade(kernel), nodes })
     }
 }
 
@@ -502,8 +502,8 @@ impl DynamicFileSource for StatFile {
 #[derive(Clone)]
 struct LoadavgFile(Weak<Kernel>);
 impl LoadavgFile {
-    pub fn new_node(kernel: &Weak<Kernel>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self(kernel.clone()))
+    pub fn new_node(kernel: &Arc<Kernel>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self(Arc::downgrade(kernel)))
     }
 }
 impl DynamicFileSource for LoadavgFile {
