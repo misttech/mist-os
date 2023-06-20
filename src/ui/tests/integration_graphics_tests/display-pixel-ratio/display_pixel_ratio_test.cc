@@ -17,6 +17,7 @@
 
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/ui/testing/ui_test_manager/ui_test_manager.h"
+#include "src/ui/testing/ui_test_realm/ui_test_realm.h"
 #include "src/ui/testing/util/flatland_test_view.h"
 #include "src/ui/testing/util/gfx_test_view.h"
 
@@ -47,6 +48,7 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest(
     ui_testing::UITestRealm::Config config;
     config.use_flatland = true;
     config.use_scene_owner = true;
+    config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
     config.ui_to_client_services = protocols_required;
     config.ui_to_client_services.push_back(fuchsia::ui::composition::Flatland::Name_);
     for (auto dpr : pixel_densities) {

@@ -37,6 +37,7 @@
 #include <fbl/unique_fd.h>
 
 #include "src/lib/fxl/strings/string_printf.h"
+#include "src/ui/testing/ui_test_realm/ui_test_realm.h"
 #include "src/virtualization/tests/lib/guest_constants.h"
 #include "src/virtualization/tests/lib/logger.h"
 #include "src/virtualization/tests/lib/periodic_logger.h"
@@ -156,6 +157,7 @@ std::unique_ptr<sys::ServiceDirectory> EnclosedGuest::StartWithUITestManager(
   ui_testing::UITestRealm::Config ui_config;
   ui_config.use_scene_owner = true;
   ui_config.use_flatland = true;
+  ui_config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
 
   // These are services that we need to expose from the UITestRealm.
   ui_config.exposed_client_services = {guest_launch_info.interface_name,

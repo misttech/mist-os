@@ -9,9 +9,11 @@
 #include <fuchsia/accessibility/semantics/cpp/fidl.h>
 #include <fuchsia/input/injection/cpp/fidl.h>
 #include <fuchsia/input/virtualkeyboard/cpp/fidl.h>
+#include <fuchsia/intl/cpp/fidl.h>
 #include <fuchsia/logger/cpp/fidl.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
 #include <fuchsia/session/scene/cpp/fidl.h>
+#include <fuchsia/settings/cpp/fidl.h>
 #include <fuchsia/sys/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/ui/accessibility/view/cpp/fidl.h>
@@ -70,6 +72,9 @@ constexpr auto kFakeA11yManagerUrl = "#meta/fake-a11y-manager.cm";
 
 constexpr auto kClientSubrealmName = "client-subrealm";
 
+constexpr auto kIntlUrl = "#meta/intl_property_manager.cm";
+constexpr auto kSetUIAccessibilityUrl = "#meta/setui_accessibility.cm";
+
 // Component names.
 // NOTE: These names must match the names in meta/*.cml.
 constexpr auto kA11yManagerName = "a11y-manager";
@@ -78,6 +83,8 @@ constexpr auto kSceneManagerName = "scene_manager";
 constexpr auto kTextManagerName = "text_manager";
 constexpr auto kVirtualKeyboardManagerName = "virtual_keyboard_manager";
 constexpr auto kSceneProviderName = "scene-provider";
+constexpr auto kSetUIAccessibility = "setui";
+constexpr auto kIntl = "intl";
 
 // Contents of config file used to allow scenic to use gfx.
 constexpr auto kUseGfxScenicConfig = R"(
@@ -269,18 +276,30 @@ void UITestRealm::ConfigureClientSubrealm() {
 }
 
 void UITestRealm::ConfigureAccessibility() {
-  std::string a11y_manager_url;
-  // Add real a11y manager to the test realm, if requested.
-  // Otherwise, add fake a11y manager if it's requested, OR if the test uses
-  // `FlatlandSceneManager` (which will only render a client view if the a11y
-  // view is present).
-  if (config_.accessibility_owner == UITestRealm::AccessibilityOwnerType::REAL) {
-    a11y_manager_url = kRealA11yManagerUrl;
-  } else if (config_.accessibility_owner == UITestRealm::AccessibilityOwnerType::FAKE ||
-             config_.use_flatland) {
-    a11y_manager_url = kFakeA11yManagerUrl;
-  } else {
+  // If accessibility_owner is not set, tests do not want test realm include
+  // a11y manager.
+  if (!config_.accessibility_owner.has_value()) {
     return;
+  }
+
+  bool use_real_a11y_manager;
+  std::string a11y_manager_url;
+
+  switch (config_.accessibility_owner.value()) {
+    case UITestRealm::AccessibilityOwnerType::REAL:
+      // We can only enable real a11y manager on flatland because real a11y
+      // manager has circular dependency with gfx on
+      // `fuchsia.ui.accessibility.view.Registry` from scene_manager to real a11y
+      // manager.
+      a11y_manager_url = config_.use_flatland ? kRealA11yManagerUrl : kFakeA11yManagerUrl;
+      use_real_a11y_manager = true;
+      break;
+    case AccessibilityOwnerType::FAKE:
+      // Fake a11y manager is useful for testing and debugging so test should
+      // cover both fake and real a11y manager.
+      a11y_manager_url = kFakeA11yManagerUrl;
+      use_real_a11y_manager = false;
+      break;
   }
 
   realm_builder_.AddChild(kA11yManagerName, a11y_manager_url);
@@ -299,14 +318,32 @@ void UITestRealm::ConfigureAccessibility() {
 
   if (config_.use_scene_owner) {
     if (config_.use_flatland) {
-      RouteServices({fuchsia::accessibility::scene::Provider::Name_},
+      RouteServices({fuchsia::tracing::provider::Registry::Name_},
+                    /* source = */ ParentRef(),
+                    /* targets = */ {ChildRef{kA11yManagerName}});
+      RouteServices({fuchsia::ui::focus::FocusChainListenerRegistry::Name_},
+                    /* source = */ ChildRef{kScenicName},
+                    /* targets = */ {ChildRef{kA11yManagerName}});
+      RouteServices({fuchsia::accessibility::scene::Provider::Name_,
+                     fuchsia::accessibility::ColorTransform::Name_},
                     /* source = */ ChildRef{kA11yManagerName},
                     /* targets = */ {ChildRef{kSceneManagerName}});
+
     } else {
       RouteServices({fuchsia::accessibility::Magnifier::Name_},
                     /* source = */ ChildRef{kA11yManagerName},
                     /* targets = */ {ChildRef{kSceneManagerName}});
     }
+  }
+
+  if (use_real_a11y_manager) {
+    realm_builder_.AddChild(kSetUIAccessibility, kSetUIAccessibilityUrl);
+    RouteServices({fuchsia::settings::Accessibility::Name_},
+                  /* source = */ ChildRef{kSetUIAccessibility},
+                  /* targets = */ {ChildRef{kA11yManagerName}});
+    realm_builder_.AddChild(kIntl, kIntlUrl);
+    RouteServices({fuchsia::intl::PropertyProvider::Name_}, /* source = */ ChildRef{kIntl},
+                  /* targets = */ {ChildRef{kA11yManagerName}});
   }
 }
 

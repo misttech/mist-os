@@ -34,6 +34,7 @@
 #include "lib/sys/component/cpp/testing/realm_builder_types.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/ui/a11y/lib/view/a11y_view_semantics.h"
+#include "src/ui/testing/ui_test_realm/ui_test_realm.h"
 
 namespace accessibility_test {
 
@@ -103,6 +104,7 @@ std::vector<ui_testing::UITestRealm::Config> SemanticsIntegrationTestV2::UIConfi
     config.use_flatland = true;
     config.device_pixel_ratio = kDevicePixelRatio;
     config.use_scene_owner = true;
+    config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
     config.ui_to_client_services = {fuchsia::ui::composition::Allocator::Name_,
                                     fuchsia::ui::composition::Flatland::Name_,
                                     fuchsia::ui::scenic::Scenic::Name_};

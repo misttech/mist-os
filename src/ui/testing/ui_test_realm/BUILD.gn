@@ -14,17 +14,23 @@ source_set("ui_test_realm") {
   ]
 
   public_deps = [
-    ":a11y_deps",
     ":test_realms",
+    "//sdk/lib/sys/component/cpp/testing:cpp",
+  ]
+
+  deps = [
+    ":a11y_deps",
     "//sdk/fidl/fuchsia.accessibility:fuchsia.accessibility_hlcpp",
     "//sdk/fidl/fuchsia.accessibility.scene:fuchsia.accessibility.scene_hlcpp",
     "//sdk/fidl/fuchsia.accessibility.semantics:fuchsia.accessibility.semantics_hlcpp",
     "//sdk/fidl/fuchsia.input.injection:fuchsia.input.injection_hlcpp",
     "//sdk/fidl/fuchsia.input.virtualkeyboard:fuchsia.input.virtualkeyboard_hlcpp",
+    "//sdk/fidl/fuchsia.intl:fuchsia.intl_hlcpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
     "//sdk/fidl/fuchsia.session.scene:fuchsia.session.scene_hlcpp",
+    "//sdk/fidl/fuchsia.settings:fuchsia.settings_hlcpp",
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_hlcpp",
     "//sdk/fidl/fuchsia.ui.accessibility.view:fuchsia.ui.accessibility.view_hlcpp",
     "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_hlcpp",
@@ -41,11 +47,11 @@ source_set("ui_test_realm") {
     "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_hlcpp",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
     "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_hlcpp",
-    "//sdk/lib/sys/component/cpp/testing:cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fxl",
     "//src/lib/ui/input-synthesis:test.inputsynthesis_hlcpp",
+    "//src/testing/fidl/intl_property_manager:intl_property_manager_component",
     "//src/ui/a11y/testing/fidl:test.accessibility_hlcpp",
   ]
 }
@@ -77,6 +83,7 @@ group("a11y_deps") {
   deps = [
     "//src/ui/a11y/bin/a11y_manager:component_v2",
     "//src/ui/a11y/testing:fake-a11y-manager",
+    "//src/ui/testing/ui_test_realm/fake_services:setui_accessibility",
   ]
 }
 

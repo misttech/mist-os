@@ -11,6 +11,7 @@ executable("display-pixel-ratio-test-bin") {
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
+    "//src/ui/a11y/testing/fidl:test.accessibility_hlcpp",
     "//src/ui/testing/ui_test_manager",
     "//src/ui/testing/util",
     "//src/ui/testing/views",

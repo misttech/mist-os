@@ -18,6 +18,7 @@
 #include <virtio/gpu.h>
 
 #include "src/ui/testing/ui_test_manager/ui_test_manager.h"
+#include "src/ui/testing/ui_test_realm/ui_test_realm.h"
 #include "src/virtualization/bin/vmm/device/tests/test_with_device.h"
 #include "src/virtualization/bin/vmm/device/tests/virtio_queue_fake.h"
 
@@ -85,6 +86,7 @@ class VirtioGpuTest : public TestWithDevice,
     ui_testing::UITestRealm::Config ui_config;
     ui_config.use_scene_owner = true;
     ui_config.use_flatland = true;
+    ui_config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
     ui_config.ui_to_client_services = {fuchsia::ui::composition::Flatland::Name_,
                                        fuchsia::ui::composition::Allocator::Name_};
     ui_config.exposed_client_services = {fuchsia::virtualization::hardware::VirtioGpu::Name_};
