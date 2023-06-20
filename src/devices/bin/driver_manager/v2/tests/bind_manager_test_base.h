@@ -128,14 +128,14 @@ class BindManagerTestBase : public gtest::TestLoopFixture {
   // Creates a node and adds it to orphaned nodes by invoking bind with a failed match.
   // Should only be called when there's no ongoing bind. The node should not
   // already exist.
-  void AddAndOrphanNode(std::string name);
+  void AddAndOrphanNode(std::string name, bool enable_multibind = false);
 
   // Create a node and invoke Bind() for it.
   // If EXPECT_BIND_START, the function verifies that it started a new bind process.
   // If EXPECT_QUEUED, the function verifies that it queued new bind request.
-  void AddAndBindNode(std::string name);
-  void AddAndBindNode_EXPECT_BIND_START(std::string name);
-  void AddAndBindNode_EXPECT_QUEUED(std::string name);
+  void AddAndBindNode(std::string name, bool enable_multibind = false);
+  void AddAndBindNode_EXPECT_BIND_START(std::string name, bool enable_multibind = false);
+  void AddAndBindNode_EXPECT_QUEUED(std::string name, bool enable_multibind = false);
 
   // Adds a legacy composite.
   // If EXPECT_QUEUED, the function verifies that it queues a TryBindAllAvailable callback.
@@ -171,8 +171,9 @@ class BindManagerTestBase : public gtest::TestLoopFixture {
   // Verify that the orphaned nodes set in BindManager contains |expected_nodes|.
   void VerifyOrphanedNodes(std::vector<std::string> expected_nodes);
 
-  void VerifyLegacyCompositeFragmentIsBound(std::string composite, std::string fragment_name);
-  void VerifyLegacyCompositeBuilt(std::string composite);
+  void VerifyLegacyCompositeFragmentIsBound(bool expect_bound, std::string composite,
+                                            std::string fragment_name);
+  void VerifyLegacyCompositeBuilt(bool expect_built, std::string composite);
 
   void VerifyPendingBindRequestCount(size_t expected);
 
@@ -181,7 +182,7 @@ class BindManagerTestBase : public gtest::TestLoopFixture {
   std::unordered_map<std::string, uint32_t> instance_ids() const { return instance_ids_; }
 
  private:
-  std::shared_ptr<dfv2::Node> CreateNode(const std::string name);
+  std::shared_ptr<dfv2::Node> CreateNode(const std::string name, bool enable_multibind);
 
   // Gets the instance ID for |node_name| from |instance_ids_|. Adds a new entry with a
   // unique instance ID if it's missing.

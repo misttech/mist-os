@@ -65,7 +65,7 @@ void BindManagerTestBase::SetUp() {
   TestLoopFixture::SetUp();
 
   devfs_.emplace(root_devnode_);
-  root_ = CreateNode("root");
+  root_ = CreateNode("root", false);
   root_->AddToDevfsForTesting(root_devnode_.value());
 
   driver_index_ = std::make_unique<TestDriverIndex>(dispatcher());
@@ -104,19 +104,21 @@ void BindManagerTestBase::VerifyBindManagerData(BindManagerTestBase::BindManager
             bind_manager_->GetPendingOrphanRebindCallbacks().size());
 }
 
-std::shared_ptr<dfv2::Node> BindManagerTestBase::CreateNode(const std::string name) {
+std::shared_ptr<dfv2::Node> BindManagerTestBase::CreateNode(const std::string name,
+                                                            bool enable_multibind) {
   std::shared_ptr new_node =
       std::make_shared<dfv2::Node>(name, std::vector<dfv2::Node*>(), &node_manager_, dispatcher(),
                                    inspect_.CreateDevice(name, zx::vmo(), 0));
   new_node->AddToDevfsForTesting(root_devnode_.value());
+  new_node->set_can_multibind_composites(enable_multibind);
   return new_node;
 }
 
-void BindManagerTestBase::AddAndBindNode(std::string name) {
+void BindManagerTestBase::AddAndBindNode(std::string name, bool enable_multibind) {
   // This function should only be called for a new node.
   ASSERT_EQ(nodes_.find(name), nodes_.end());
 
-  auto node = CreateNode(name);
+  auto node = CreateNode(name, enable_multibind);
   auto instance_id = GetOrAddInstanceId(name);
   node->set_properties({fdf::MakeProperty(arena_, BIND_PLATFORM_DEV_INSTANCE_ID, instance_id)});
   nodes_.emplace(name, node);
@@ -127,13 +129,13 @@ void BindManagerTestBase::AddAndBindNode(std::string name) {
 // Adds a new node and invoke Bind(). Then complete the bind request with
 // no matches. The ongoing bind flag should reset to false and the node
 // should be added in the orphaned nodes.
-void BindManagerTestBase::AddAndOrphanNode(std::string name) {
+void BindManagerTestBase::AddAndOrphanNode(std::string name, bool enable_multibind) {
   VerifyNoOngoingBind();
 
   size_t current_orphan_count = bind_manager_->NumOrphanedNodes();
 
   // Invoke bind for a new node in the bind manager.
-  AddAndBindNode(name);
+  AddAndBindNode(name, enable_multibind);
   ASSERT_TRUE(bind_manager_->GetBindAllOngoing());
   ASSERT_EQ(current_orphan_count, bind_manager_->NumOrphanedNodes());
 
@@ -165,21 +167,22 @@ void BindManagerTestBase::InvokeBind_EXPECT_QUEUED(std::string name) {
   VerifyBindManagerData(expected_data);
 }
 
-void BindManagerTestBase::AddAndBindNode_EXPECT_BIND_START(std::string name) {
+void BindManagerTestBase::AddAndBindNode_EXPECT_BIND_START(std::string name,
+                                                           bool enable_multibind) {
   VerifyNoOngoingBind();
   // Bind process should begin and send a match request to the Driver Index.
-  AddAndBindNode(name);
+  AddAndBindNode(name, enable_multibind);
   ASSERT_TRUE(bind_manager_->GetBindAllOngoing());
 }
 
-void BindManagerTestBase::AddAndBindNode_EXPECT_QUEUED(std::string name) {
+void BindManagerTestBase::AddAndBindNode_EXPECT_QUEUED(std::string name, bool enable_multibind) {
   ASSERT_TRUE(bind_manager_->GetBindAllOngoing());
   auto expected_data = CurrentBindManagerData();
   expected_data.pending_bind_count += 1;
 
   // The bind request should be queued. There should be no new driver index MatchDriver
   // requests or orphaned nodes.
-  AddAndBindNode(name);
+  AddAndBindNode(name, enable_multibind);
   ASSERT_TRUE(bind_manager_->GetBindAllOngoing());
   VerifyBindManagerData(expected_data);
 }
@@ -282,7 +285,8 @@ void BindManagerTestBase::VerifyPendingBindRequestCount(size_t expected) {
   ASSERT_EQ(expected, bind_manager_->GetPendingRequests().size());
 }
 
-void BindManagerTestBase::VerifyLegacyCompositeFragmentIsBound(std::string composite,
+void BindManagerTestBase::VerifyLegacyCompositeFragmentIsBound(bool expect_bound,
+                                                               std::string composite,
                                                                std::string fragment_name) {
   auto& assemblers = bind_manager_->GetLegacyCompositeManager().assemblers();
   auto composite_itr =
@@ -295,16 +299,16 @@ void BindManagerTestBase::VerifyLegacyCompositeFragmentIsBound(std::string compo
       std::find_if(fragments.begin(), fragments.end(),
                    [&fragment_name](const auto& it) { return it.name() == fragment_name; });
   ASSERT_NE(fragment_itr, fragments.end());
-  EXPECT_TRUE(fragment_itr->bound_node());
+  EXPECT_EQ(expect_bound, fragment_itr->bound_node() != nullptr);
 }
 
-void BindManagerTestBase::VerifyLegacyCompositeBuilt(std::string composite) {
+void BindManagerTestBase::VerifyLegacyCompositeBuilt(bool expect_built, std::string composite) {
   auto& assemblers = bind_manager_->GetLegacyCompositeManager().assemblers();
   auto composite_itr =
       std::find_if(assemblers.begin(), assemblers.end(),
                    [&composite](const auto& it) { return it->name() == composite; });
   ASSERT_NE(composite_itr, assemblers.end());
-  EXPECT_TRUE((*composite_itr)->is_assembled());
+  EXPECT_EQ(expect_built, (*composite_itr)->is_assembled());
 }
 
 uint32_t BindManagerTestBase::GetOrAddInstanceId(std::string node_name) {

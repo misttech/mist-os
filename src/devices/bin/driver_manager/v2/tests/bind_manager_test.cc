@@ -209,13 +209,13 @@ TEST_F(BindManagerTest, AddLegacyCompositeThenBind) {
   // Add node-a and verify that it matches a fragment. Since this
   // is synchronous, we should not have an ongoing bind process.
   AddAndBindNode("node-a");
-  VerifyLegacyCompositeFragmentIsBound("composite-a", "node-a");
+  VerifyLegacyCompositeFragmentIsBound(true, "composite-a", "node-a");
   VerifyNoOngoingBind();
 
   // Add node-b and verify that it matches a fragment. Composite-a should
   // be built, kickstarting an ongoing bind process.
   AddAndBindNode("node-b");
-  VerifyLegacyCompositeFragmentIsBound("composite-a", "node-b");
+  VerifyLegacyCompositeFragmentIsBound(true, "composite-a", "node-b");
   VerifyBindOngoingWithRequests({{"composite-a", 1}});
   RunLoopUntilIdle();
 
@@ -231,13 +231,13 @@ TEST_F(BindManagerTest, AddNodesBetweenAddingLegacyComposite) {
   VerifyNoOngoingBind();
 
   AddLegacyComposite("composite-a", {"node-a", "node-b"});
-  VerifyLegacyCompositeFragmentIsBound("composite-a", "node-a");
+  VerifyLegacyCompositeFragmentIsBound(true, "composite-a", "node-a");
   VerifyNoOngoingBind();
 
   // Add node-b and verify that it matches a fragment. Composite-a should
   // be built, kickstarting an ongoing bind process.
   AddAndBindNode("node-b");
-  VerifyLegacyCompositeFragmentIsBound("composite-a", "node-b");
+  VerifyLegacyCompositeFragmentIsBound(true, "composite-a", "node-b");
   VerifyBindOngoingWithRequests({{"composite-a", 1}});
 
   DriverIndexReplyWithDriver("composite-a");
@@ -251,8 +251,8 @@ TEST_F(BindManagerTest, AddNodesThenLegacyComposite) {
   VerifyNoOngoingBind();
 
   AddLegacyComposite("composite-a", {"node-a", "node-b"});
-  VerifyLegacyCompositeFragmentIsBound("composite-a", "node-a");
-  VerifyLegacyCompositeFragmentIsBound("composite-a", "node-b");
+  VerifyLegacyCompositeFragmentIsBound(true, "composite-a", "node-a");
+  VerifyLegacyCompositeFragmentIsBound(true, "composite-a", "node-b");
   VerifyBindOngoingWithRequests({{"composite-a", 1}});
 
   DriverIndexReplyWithNoMatch("composite-a");
@@ -283,7 +283,7 @@ TEST_F(BindManagerTest, AddLegacyCompositeDuringTryAllBind) {
 
   // We should have match requests from node-b, node-c.
   VerifyBindOngoingWithRequests({{"node-b", 1}, {"node-c", 1}});
-  VerifyLegacyCompositeBuilt("composite-a");
+  VerifyLegacyCompositeBuilt(true, "composite-a");
   VerifyPendingBindRequestCount(1);
 
   // Complete the ongoing bind. This kickstart another bind process, which
@@ -311,7 +311,7 @@ TEST_F(BindManagerTest, AddLegacyCompositeDuringBind) {
   // Complete the ongoing bind. This should trigger a follow up bind process
   // that builds composite-a.
   DriverIndexReplyWithNoMatch("node-a");
-  VerifyLegacyCompositeBuilt("composite-a");
+  VerifyLegacyCompositeBuilt(true, "composite-a");
 
   // We should be binding composite-a
   VerifyBindOngoingWithRequests({{"composite-a", 1}});
@@ -341,7 +341,7 @@ TEST_F(BindManagerTest, AddMultipleLegacyCompositeDuringBind) {
   DriverIndexReplyWithNoMatch("node-a");
   DriverIndexReplyWithNoMatch("node-b");
 
-  VerifyLegacyCompositeBuilt("composite-b");
+  VerifyLegacyCompositeBuilt(true, "composite-b");
   VerifyBindOngoingWithRequests({{"composite-b", 1}});
 
   // Complete the match for composite-b. This should end the bind process.

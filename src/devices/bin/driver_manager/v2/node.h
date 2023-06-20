@@ -213,6 +213,8 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // Exposed for testing.
   NodeState node_state() const { return node_state_; }
 
+  bool can_multibind_composites() const { return can_multibind_composites_; }
+
   void set_collection(Collection collection);
   void set_offers(std::vector<fuchsia_component_decl::wire::Offer> offers) {
     offers_ = std::move(offers);
@@ -224,6 +226,10 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // Exposed for testing.
   void set_properties(std::vector<fuchsia_driver_framework::wire::NodeProperty> properties) {
     properties_ = std::move(properties);
+  }
+
+  void set_can_multibind_composites(bool can_multibind_composites) {
+    can_multibind_composites_ = can_multibind_composites;
   }
 
  private:
@@ -316,6 +322,9 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   std::list<std::shared_ptr<Node>> children_;
   fit::nullable<NodeManager*> node_manager_;
   async_dispatcher_t* const dispatcher_;
+
+  // TODO(fxb/122531): Set this flag from NodeAddArgs.
+  bool can_multibind_composites_ = true;
 
   fidl::Arena<128> arena_;
   std::vector<fuchsia_component_decl::wire::Offer> offers_;

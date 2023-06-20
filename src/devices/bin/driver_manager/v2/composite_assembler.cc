@@ -302,12 +302,16 @@ zx_status_t CompositeDeviceManager::AddCompositeDevice(
 bool CompositeDeviceManager::BindNode(std::shared_ptr<Node> node) {
   bool did_match = false;
   for (auto& assembler : assemblers_) {
-    if (assembler->BindNode(node)) {
-      // We do not break here because DFv1 composites allow for MULTIBIND.
-      // For example, the sysmem fragment can match multiple composite devices.
-      // To support that, nodes can bind to multiple composite devices.
-      did_match = true;
+    if (!assembler->BindNode(node)) {
+      continue;
     }
+
+    // If the node cannot multibind, then it should only be matched with one
+    // legacy composite.
+    if (!node->can_multibind_composites()) {
+      return true;
+    }
+    did_match = true;
   }
   return did_match;
 }
