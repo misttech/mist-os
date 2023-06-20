@@ -40,14 +40,14 @@ magma_status_t MsdMockDevice::Query(uint64_t id, zx::vmo* result_buffer_out, uin
   return MAGMA_STATUS_OK;
 }
 
-magma_status_t MsdMockDevice::GetIcdList(std::vector<msd::msd_icd_info_t>* icd_info_out) {
+magma_status_t MsdMockDevice::GetIcdList(std::vector<msd::MsdIcdInfo>* icd_info_out) {
   icd_info_out->clear();
 
   // Hardcode results.
   const char* kResults[] = {"a", "b"};
   for (uint32_t i = 0; i < std::size(kResults); i++) {
-    msd::msd_icd_info_t info{};
-    strcpy(info.component_url, kResults[i]);
+    msd::MsdIcdInfo info{};
+    info.component_url = kResults[i];
     info.support_flags = msd::ICD_SUPPORT_FLAG_VULKAN;
     icd_info_out->push_back(info);
   }

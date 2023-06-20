@@ -71,7 +71,7 @@ class Device {
   }
 
   // Outputs a list of ICD components.
-  virtual magma_status_t GetIcdList(std::vector<msd_icd_info_t>* icd_info_out) {
+  virtual magma_status_t GetIcdList(std::vector<MsdIcdInfo>* icd_info_out) {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
 

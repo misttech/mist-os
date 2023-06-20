@@ -1714,7 +1714,7 @@ magma_status_t MsdArmDevice::Query(uint64_t id, zx::vmo* result_buffer_out, uint
 
 void MsdArmDevice::DumpStatus(uint32_t dump_flags) { DumpStatusToLog(); }
 
-magma_status_t MsdArmDevice::GetIcdList(std::vector<msd::msd_icd_info_t>* icd_info_out) {
+magma_status_t MsdArmDevice::GetIcdList(std::vector<msd::MsdIcdInfo>* icd_info_out) {
   struct variant {
     const char* suffix;
     const char* url;
@@ -1725,10 +1725,9 @@ magma_status_t MsdArmDevice::GetIcdList(std::vector<msd::msd_icd_info_t>* icd_in
   icd_info.clear();
   icd_info.resize(std::size(kVariants));
   for (uint32_t i = 0; i < std::size(kVariants); i++) {
-    strcpy(icd_info[i].component_url,
-           StringPrintf("fuchsia-pkg://%s/libvulkan_arm_mali_%lx%s#meta/vulkan.cm",
-                        kVariants[i].url, GpuId(), kVariants[i].suffix)
-               .c_str());
+    icd_info[i].component_url =
+        StringPrintf("fuchsia-pkg://%s/libvulkan_arm_mali_%lx%s#meta/vulkan.cm", kVariants[i].url,
+                     GpuId(), kVariants[i].suffix);
     icd_info[i].support_flags = msd::ICD_SUPPORT_FLAG_VULKAN;
   }
   return MAGMA_STATUS_OK;

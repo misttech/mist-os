@@ -52,11 +52,11 @@ TEST(MagmaSystemDevice, GetIcdList) {
   auto msd_dev = std::make_unique<MsdMockDevice>();
   auto device = MagmaSystemDevice::Create(msd_drv.get(), std::move(msd_dev));
 
-  std::vector<msd_icd_info_t> icds;
+  std::vector<msd::MsdIcdInfo> icds;
   magma_status_t status = device->GetIcdList(&icds);
   EXPECT_EQ(MAGMA_STATUS_OK, status);
   EXPECT_EQ(2u, icds.size());
-  EXPECT_EQ(std::string(icds[0].component_url), "a");
+  EXPECT_EQ(icds[0].component_url, "a");
 }
 
 }  // namespace msd

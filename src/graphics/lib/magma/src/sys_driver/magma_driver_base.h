@@ -220,7 +220,7 @@ class MagmaDriverBase : public fdf::DriverBase,
     if (!CheckSystemDevice(completer))
       return;
     fidl::Arena allocator;
-    std::vector<msd_icd_info_t> msd_icd_infos;
+    std::vector<msd::MsdIcdInfo> msd_icd_infos;
     magma_system_device_->GetIcdList(&msd_icd_infos);
     std::vector<fuchsia_gpu_magma::wire::IcdInfo> icd_infos;
     for (auto& item : msd_icd_infos) {

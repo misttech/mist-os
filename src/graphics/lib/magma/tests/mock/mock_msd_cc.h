@@ -149,7 +149,7 @@ class MsdMockDevice : public msd::Device {
 
   void SetMemoryPressureLevel(msd::MagmaMemoryPressureLevel level) override;
   magma_status_t Query(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) override;
-  magma_status_t GetIcdList(std::vector<msd::msd_icd_info_t>* icd_info_out) override;
+  magma_status_t GetIcdList(std::vector<msd::MsdIcdInfo>* icd_info_out) override;
   std::unique_ptr<msd::Connection> Open(msd::msd_client_id_t client_id) override {
     return std::make_unique<MsdMockConnection>();
   }

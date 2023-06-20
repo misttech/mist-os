@@ -1537,16 +1537,14 @@ magma_status_t MsdVsiDevice::Query(uint64_t id, zx::vmo* result_buffer_out, uint
 
 void MsdVsiDevice::DumpStatus(uint32_t dump_type) { DumpStatusToLog(); }
 
-magma_status_t MsdVsiDevice::GetIcdList(std::vector<msd::msd_icd_info_t>* icd_info_out) {
+magma_status_t MsdVsiDevice::GetIcdList(std::vector<msd::MsdIcdInfo>* icd_info_out) {
   const char* kSuffixes[] = {"_test", ""};
   auto& icd_info = *icd_info_out;
   icd_info.clear();
   icd_info.resize(std::size(kSuffixes));
   for (uint32_t i = 0; i < std::size(kSuffixes); i++) {
-    strcpy(icd_info[i].component_url,
-           fbl::StringPrintf("fuchsia-pkg://fuchsia.com/libopencl_vsi_vip%s#meta/opencl.cm",
-                             kSuffixes[i])
-               .c_str());
+    icd_info[i].component_url = fbl::StringPrintf(
+        "fuchsia-pkg://fuchsia.com/libopencl_vsi_vip%s#meta/opencl.cm", kSuffixes[i]);
     icd_info[i].support_flags = msd::ICD_SUPPORT_FLAG_OPENCL;
   }
   return MAGMA_STATUS_OK;

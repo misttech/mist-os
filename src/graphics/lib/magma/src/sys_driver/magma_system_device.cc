@@ -105,7 +105,7 @@ magma::Status MagmaSystemDevice::Query(uint64_t id, magma_handle_t* result_buffe
   return status;
 }
 
-magma_status_t MagmaSystemDevice::GetIcdList(std::vector<msd_icd_info_t>* icd_list_out) {
+magma_status_t MagmaSystemDevice::GetIcdList(std::vector<MsdIcdInfo>* icd_list_out) {
   return msd_dev()->GetIcdList(icd_list_out);
 }
 

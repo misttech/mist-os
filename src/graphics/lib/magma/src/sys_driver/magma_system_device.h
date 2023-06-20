@@ -63,7 +63,7 @@ class MagmaSystemDevice {
 
   magma::Status Query(uint64_t id, uint64_t* value_out) { return Query(id, nullptr, value_out); }
 
-  magma_status_t GetIcdList(std::vector<msd_icd_info_t>* icd_list_out);
+  magma_status_t GetIcdList(std::vector<MsdIcdInfo>* icd_list_out);
 
   void SetMemoryPressureLevel(MagmaMemoryPressureLevel level);
 

@@ -8,6 +8,8 @@
 #include <lib/magma/magma_common_defs.h>
 #include <stdint.h>
 
+#include <string>
+
 namespace msd {
 
 #define MSD_DRIVER_CONFIG_TEST_NO_DEVICE_THREAD 1
@@ -16,17 +18,16 @@ namespace msd {
 
 typedef uint64_t msd_client_id_t;
 
-enum IcdSupportFlags {
+enum IcdSupportFlags : uint32_t {
   ICD_SUPPORT_FLAG_VULKAN = 1,
   ICD_SUPPORT_FLAG_OPENCL = 2,
   ICD_SUPPORT_FLAG_MEDIA_CODEC_FACTORY = 4,
 };
 
-typedef struct msd_icd_info_t {
-  // Same length as fuchsia.url.MAX_URL_LENGTH.
-  char component_url[4096];
-  uint32_t support_flags;
-} msd_icd_info_t;
+struct MsdIcdInfo {
+  std::string component_url;
+  IcdSupportFlags support_flags;
+};
 
 enum MagmaMemoryPressureLevel {
   MAGMA_MEMORY_PRESSURE_LEVEL_NORMAL = 1,
