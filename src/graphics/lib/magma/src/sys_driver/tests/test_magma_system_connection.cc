@@ -16,6 +16,7 @@
 #include <src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_buffer.h>
 #endif
 
+namespace msd {
 namespace {
 
 inline uint64_t page_size() { return sysconf(_SC_PAGESIZE); }
@@ -40,7 +41,7 @@ class MsdMockConnection_ContextManagement : public MsdMockConnection {
   uint32_t active_context_count_ = 0;
 };
 
-class MockPerfCountPool : public magma::PlatformPerfCountPool {
+class MockPerfCountPool : public msd::PlatformPerfCountPool {
  public:
   MockPerfCountPool(uint64_t pool_id) : pool_id_(pool_id) {}
 
@@ -369,3 +370,5 @@ TEST(MagmaSystemConnection, PerformanceCounters) {
 }
 
 }  // namespace
+
+}  // namespace msd

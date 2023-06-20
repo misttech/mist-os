@@ -13,6 +13,7 @@
 #include "sys_driver/magma_system_connection.h"
 #include "sys_driver/magma_system_device.h"
 
+namespace msd {
 namespace {
 
 class TestMsdConnection : public MsdMockConnection {
@@ -110,3 +111,5 @@ TEST(MagmaNotification, NotAfterConnectionTeardown) {
 }
 
 }  // namespace
+
+}  // namespace msd

@@ -40,7 +40,7 @@ zx_status_t magma_indriver_test(magma::PlatformPciDevice* platform_device);
 class IntelDevice;
 
 using DdkDeviceType =
-    ddk::Device<IntelDevice, magma::MagmaDeviceImpl, ddk::Unbindable, ddk::Initializable>;
+    ddk::Device<IntelDevice, msd::MagmaDeviceImpl, ddk::Unbindable, ddk::Initializable>;
 class IntelDevice : public DdkDeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_GPU> {
  public:
   explicit IntelDevice(zx_device_t* parent_device) : DdkDeviceType(parent_device) {}
@@ -97,7 +97,7 @@ zx_status_t IntelDevice::Init() {
   gpu_core_client.GetProto(&gpu_core_protocol_);
 
   std::lock_guard<std::mutex> lock(magma_mutex());
-  set_magma_driver(MagmaDriver::Create());
+  set_magma_driver(msd::MagmaDriver::Create());
 #if MAGMA_TEST_DRIVER
   DLOG("running magma indriver test");
   {

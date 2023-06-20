@@ -24,6 +24,7 @@
 #include "linux/linux_platform_connection_client.h"  // nogncheck
 #endif
 
+namespace msd {
 namespace {
 constexpr uint32_t kImmediateCommandCount = 128;
 // The total size of all commands should not be a multiple of the receive buffer size.
@@ -39,10 +40,9 @@ static inline int64_t page_size() { return sysconf(_SC_PAGESIZE); }
 // Included by TestPlatformConnection; validates that each test checks for flow control.
 // Since flow control values are written by the server (IPC) thread and read by the main
 // test thread, we lock the shared data mutex to ensure safety of memory accesses.
-namespace magma {
 class FlowControlChecker {
  public:
-  FlowControlChecker(std::shared_ptr<magma::ZirconConnection> connection,
+  FlowControlChecker(std::shared_ptr<msd::ZirconConnection> connection,
                      std::shared_ptr<magma::PlatformConnectionClient> client_connection)
       : connection_(connection), client_connection_(client_connection) {}
 
@@ -81,7 +81,7 @@ class FlowControlChecker {
     Release();
   }
 
-  std::shared_ptr<magma::ZirconConnection> connection_;
+  std::shared_ptr<msd::ZirconConnection> connection_;
   std::shared_ptr<magma::PlatformConnectionClient> client_connection_;
   bool flow_control_checked_ = false;
   bool flow_control_skipped_ = false;
@@ -92,7 +92,6 @@ class FlowControlChecker {
   uint64_t messages_inflight_start_ = 0;
   uint64_t bytes_inflight_start_ = 0;
 };
-}  // namespace magma
 
 struct SharedData {
   // This mutex is used to ensure safety of multi-threaded updates.
@@ -129,8 +128,7 @@ class TestPlatformConnection {
       std::shared_ptr<SharedData> shared_data = std::make_shared<SharedData>());
 
   TestPlatformConnection(std::shared_ptr<magma::PlatformConnectionClient> client_connection,
-                         std::thread ipc_thread,
-                         std::shared_ptr<magma::ZirconConnection> connection,
+                         std::thread ipc_thread, std::shared_ptr<msd::ZirconConnection> connection,
                          std::shared_ptr<SharedData> shared_data)
       : client_connection_(client_connection),
         ipc_thread_(std::move(ipc_thread)),
@@ -472,18 +470,18 @@ class TestPlatformConnection {
   }
 
  private:
-  static void IpcThreadFunc(std::shared_ptr<magma::ZirconConnection> connection) {
-    magma::ZirconConnection::RunLoop(std::move(connection), [](const char* role_profile) {});
+  static void IpcThreadFunc(std::shared_ptr<msd::ZirconConnection> connection) {
+    msd::ZirconConnection::RunLoop(std::move(connection), [](const char* role_profile) {});
   }
 
   std::shared_ptr<magma::PlatformConnectionClient> client_connection_;
   std::thread ipc_thread_;
-  std::shared_ptr<magma::ZirconConnection> connection_;
-  magma::FlowControlChecker flow_control_checker_;
+  std::shared_ptr<msd::ZirconConnection> connection_;
+  msd::FlowControlChecker flow_control_checker_;
   std::shared_ptr<SharedData> shared_data_;
 };
 
-class TestDelegate : public magma::ZirconConnection::Delegate {
+class TestDelegate : public msd::ZirconConnection::Delegate {
  public:
   TestDelegate(std::shared_ptr<SharedData> shared_data) : shared_data_(shared_data) {}
 
@@ -638,7 +636,7 @@ class TestDelegate : public magma::ZirconConnection::Delegate {
   }
 
   magma::Status CreatePerformanceCounterBufferPool(
-      std::unique_ptr<magma::PlatformPerfCountPool> pool) override {
+      std::unique_ptr<msd::PlatformPerfCountPool> pool) override {
     std::unique_lock<std::mutex> lock(shared_data_->mutex);
     shared_data_->pool_id = pool->pool_id();
     constexpr uint32_t kTriggerId = 1;
@@ -720,8 +718,8 @@ std::unique_ptr<TestPlatformConnection> TestPlatformConnection::Create(
     return MAGMA_DRETP(nullptr, "Failed to create notification endpoints");
 
   auto connection =
-      magma::ZirconConnection::Create(std::move(delegate), 1u, std::move(endpoints->server),
-                                      std::move(notification_endpoints->server));
+      msd::ZirconConnection::Create(std::move(delegate), 1u, std::move(endpoints->server),
+                                    std::move(notification_endpoints->server));
   if (!connection)
     return MAGMA_DRETP(nullptr, "failed to create PlatformConnection");
 
@@ -1034,3 +1032,5 @@ TEST(PlatformConnection, TestFlush) {
   ASSERT_NE(Test, nullptr);
   Test->TestFlush();
 }
+
+}  // namespace msd

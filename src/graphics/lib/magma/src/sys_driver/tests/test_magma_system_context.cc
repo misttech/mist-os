@@ -7,6 +7,7 @@
 #include "helper/command_buffer_helper_cpp.h"
 #include "mock/mock_msd_cc.h"
 
+namespace msd {
 TEST(MagmaSystemContext, ExecuteCommandBuffer_Normal) {
   auto cmd_buf = CommandBufferHelper::Create();
   EXPECT_TRUE(cmd_buf->Execute());
@@ -64,3 +65,5 @@ TEST(MagmaSystemContext, ExecuteCommandBuffer_InvalidSignalSemaphore) {
   }
   EXPECT_FALSE(cmd_buf->Execute());
 }
+
+}  // namespace msd

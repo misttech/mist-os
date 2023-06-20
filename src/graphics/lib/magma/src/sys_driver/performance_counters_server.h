@@ -11,6 +11,7 @@
 
 #include "magma_util/macros.h"
 
+namespace msd {
 class PerformanceCountersServer
     : public fidl::WireServer<fuchsia_gpu_magma::PerformanceCounterAccess> {
  public:
@@ -33,5 +34,7 @@ class PerformanceCountersServer
   fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> node_controller_;
 };
+
+}  // namespace msd
 
 #endif  // SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_PERFORMANCE_COUNTERS_SERVER_H_

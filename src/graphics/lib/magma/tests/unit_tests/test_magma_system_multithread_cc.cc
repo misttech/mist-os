@@ -15,6 +15,7 @@
 #include "sys_driver/magma_system_context.h"
 #include "sys_driver/magma_system_device.h"
 
+namespace msd {
 namespace {
 inline uint64_t page_size() { return sysconf(_SC_PAGESIZE); }
 }  // namespace
@@ -135,3 +136,5 @@ TEST(MagmaSystem, Multithread) {
 
   test->Test(2);
 }
+
+}  // namespace msd

@@ -4,6 +4,7 @@
 
 #include "dependency_injection_server.h"
 
+namespace msd {
 zx::result<> DependencyInjectionServer::Create(
     fidl::WireSyncClient<fuchsia_driver_framework::Node>& node_client) {
   fidl::Arena arena;
@@ -73,3 +74,5 @@ MagmaMemoryPressureLevel DependencyInjectionServer::GetMagmaLevel(
       return MAGMA_MEMORY_PRESSURE_LEVEL_NORMAL;
   }
 }
+
+}  // namespace msd

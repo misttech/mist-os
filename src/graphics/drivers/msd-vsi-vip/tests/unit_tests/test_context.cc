@@ -32,13 +32,13 @@ class BatchData {
 
     for (unsigned int i = 0; i < num_resources; i++) {
       auto buffer = magma::PlatformBuffer::Create(kResourceSize, "test buffer");
-      resources_.emplace_back(MagmaSystemBuffer::Create(driver.get(), std::move(buffer)));
+      resources_.emplace_back(msd::MagmaSystemBuffer::Create(driver.get(), std::move(buffer)));
     }
 
     for (unsigned int i = 0; i < kNumSignalSemaphores; i++) {
       auto semaphore = magma::PlatformSemaphore::Create();
       signal_semaphores_.emplace_back(
-          MagmaSystemSemaphore::Create(driver.get(), std::move(semaphore)));
+          msd::MagmaSystemSemaphore::Create(driver.get(), std::move(semaphore)));
     }
   }
 
@@ -70,8 +70,8 @@ class BatchData {
                                       msd_buffers.data(), nullptr, msd_signal_semaphores.data());
   }
 
-  std::vector<std::unique_ptr<MagmaSystemSemaphore>> signal_semaphores_;
-  std::vector<std::unique_ptr<MagmaSystemBuffer>> resources_;
+  std::vector<std::unique_ptr<msd::MagmaSystemSemaphore>> signal_semaphores_;
+  std::vector<std::unique_ptr<msd::MagmaSystemBuffer>> resources_;
 };
 
 class TestMsdVsiContext : public ::testing::Test {

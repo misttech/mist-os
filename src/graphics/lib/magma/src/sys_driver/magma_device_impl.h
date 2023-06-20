@@ -17,7 +17,7 @@
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
 #include "sys_driver/magma_driver.h"
 
-namespace magma {
+namespace msd {
 #if MAGMA_TEST_DRIVER
 using DeviceType = fuchsia_gpu_magma::TestDevice;
 #else
@@ -221,6 +221,6 @@ class MagmaDeviceImpl : public ddk::Messageable<DeviceType>::Mixin<D>,
 #endif
 };
 
-}  // namespace magma
+}  // namespace msd
 
 #endif  // SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_MAGMA_DEVICE_IMPL_H_

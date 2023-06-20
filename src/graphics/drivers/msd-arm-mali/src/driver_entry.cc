@@ -39,7 +39,7 @@ zx_status_t magma_indriver_test(ParentDevice* device);
 class GpuDevice;
 
 using DdkDeviceType =
-    ddk::Device<GpuDevice, magma::MagmaDeviceImpl, ddk::Unbindable, ddk::Initializable>;
+    ddk::Device<GpuDevice, msd::MagmaDeviceImpl, ddk::Unbindable, ddk::Initializable>;
 
 class GpuDevice : public DdkDeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_GPU> {
  public:
@@ -90,7 +90,7 @@ zx_status_t GpuDevice::Init() {
     MAGMA_LOG(ERROR, "Failed to create ParentDeviceDFv1");
     return ZX_ERR_INTERNAL;
   }
-  set_magma_driver(MagmaDriver::Create());
+  set_magma_driver(msd::MagmaDriver::Create());
 #if MAGMA_TEST_DRIVER
   DLOG("running magma indriver test");
   set_unit_test_status(magma_indriver_test(parent_device_.get()));

@@ -8,6 +8,7 @@
 #include "sys_driver/magma_system_connection.h"
 #include "sys_driver/magma_system_device.h"
 
+namespace msd {
 class MsdMockBufferManager_Create : public MsdMockBufferManager {
  public:
   MsdMockBufferManager_Create() : has_created_buffer_(false), has_destroyed_buffer_(false) {}
@@ -67,3 +68,5 @@ TEST(MagmaSystemBuffer, Create) {
 
   msd_drv.reset();
 }
+
+}  // namespace msd

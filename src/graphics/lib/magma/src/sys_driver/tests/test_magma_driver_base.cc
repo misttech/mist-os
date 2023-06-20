@@ -16,6 +16,7 @@
 #include "src/graphics/lib/magma/tests/mock/mock_msd_cc.h"
 #include "sys_driver/magma_driver_base.h"
 
+namespace msd {
 namespace {
 class FakeTestDriver : public MagmaTestDriverBase {
  public:
@@ -207,3 +208,5 @@ TEST_F(MagmaDriverStarted, DependencyInjection) {
 }
 
 }  // namespace
+
+}  // namespace msd

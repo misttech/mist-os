@@ -38,7 +38,7 @@ std::optional<int> GetBufferOp(fuchsia_gpu_magma::BufferOp fidl_type) {
 
 }  // namespace
 
-namespace magma {
+namespace msd {
 
 class ZirconPlatformPerfCountPool : public PlatformPerfCountPool {
  public:
@@ -483,4 +483,4 @@ std::shared_ptr<ZirconConnection> ZirconConnection::Create(
   return connection;
 }
 
-}  // namespace magma
+}  // namespace msd

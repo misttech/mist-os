@@ -13,6 +13,7 @@
 #include "magma_util/macros.h"
 #include "platform_trace.h"
 
+namespace msd {
 magma::Status MagmaSystemContext::ExecuteCommandBufferWithResources(
     std::unique_ptr<magma_command_buffer> cmd_buf, std::vector<magma_exec_resource> resources,
     std::vector<uint64_t> semaphores) {
@@ -109,3 +110,4 @@ magma::Status MagmaSystemContext::ExecuteImmediateCommands(uint64_t commands_siz
       result, "ExecuteImmediateCommands: msd_context_execute_immediate_commands failed: %d",
       result);
 }
+}  // namespace msd

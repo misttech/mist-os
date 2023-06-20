@@ -22,6 +22,8 @@
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
 #include "sys_driver/magma_driver.h"
 
+namespace msd {
+
 template <typename FidlDeviceType>
 class MagmaDriverBase : public fdf::DriverBase,
                         public fidl::WireServer<FidlDeviceType>,
@@ -348,5 +350,7 @@ class MagmaTestDriverBase : public MagmaDriverBase<fuchsia_gpu_magma::TestDevice
 };
 
 using MagmaProductionDriverBase = MagmaDriverBase<fuchsia_gpu_magma::CombinedDevice>;
+
+}  // namespace msd
 
 #endif  // SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_MAGMA_DRIVER_BASE_H_

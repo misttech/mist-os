@@ -12,6 +12,9 @@
 #include "magma_system_semaphore.h"
 #include "magma_util/status.h"
 
+class CommandBufferHelper;
+
+namespace msd {
 class MagmaSystemCommandBuffer;
 
 class MagmaSystemContext {
@@ -38,7 +41,8 @@ class MagmaSystemContext {
 
   std::unique_ptr<msd::Context> msd_ctx_;
 
-  friend class CommandBufferHelper;
+  friend class ::CommandBufferHelper;
 };
+}  // namespace msd
 
 #endif  // SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_MAGMA_SYSTEM_CONTEXT_H_

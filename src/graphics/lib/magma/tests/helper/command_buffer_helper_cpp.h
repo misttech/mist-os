@@ -27,14 +27,14 @@ class CommandBufferHelper final : public msd::NotificationHandler {
     auto msd_dev = msd_drv->CreateDevice(GetTestDeviceHandle());
     if (!msd_dev)
       return MAGMA_DRETP(nullptr, "failed to create msd device");
-    auto dev = std::shared_ptr<MagmaSystemDevice>(
-        MagmaSystemDevice::Create(msd_drv.get(), std::move(msd_dev)));
+    auto dev = std::shared_ptr<msd::MagmaSystemDevice>(
+        msd::MagmaSystemDevice::Create(msd_drv.get(), std::move(msd_dev)));
     uint32_t ctx_id = 0;
     auto msd_connection = dev->msd_dev()->Open(0);
     if (!msd_connection)
       return MAGMA_DRETP(nullptr, "msd_device_open failed");
-    auto connection = std::unique_ptr<MagmaSystemConnection>(
-        new MagmaSystemConnection(dev, std::move(msd_connection)));
+    auto connection = std::unique_ptr<msd::MagmaSystemConnection>(
+        new msd::MagmaSystemConnection(dev, std::move(msd_connection)));
     if (!connection)
       return MAGMA_DRETP(nullptr, "failed to connect to msd device");
     connection->CreateContext(ctx_id);
@@ -52,12 +52,12 @@ class CommandBufferHelper final : public msd::NotificationHandler {
   static constexpr uint32_t kWaitSemaphoreCount = 2;
   static constexpr uint32_t kSignalSemaphoreCount = 2;
 
-  std::vector<MagmaSystemBuffer*>& resources() { return resources_; }
+  std::vector<msd::MagmaSystemBuffer*>& resources() { return resources_; }
   std::vector<msd::Buffer*>& msd_resources() { return msd_resources_; }
 
   msd::Context* ctx() { return ctx_->msd_ctx(); }
-  MagmaSystemDevice* dev() { return dev_.get(); }
-  MagmaSystemConnection* connection() { return connection_.get(); }
+  msd::MagmaSystemDevice* dev() { return dev_.get(); }
+  msd::MagmaSystemConnection* connection() { return connection_.get(); }
 
   magma::PlatformBuffer* buffer() {
     MAGMA_DASSERT(buffer_);
@@ -124,8 +124,10 @@ class CommandBufferHelper final : public msd::NotificationHandler {
   async_dispatcher_t* GetAsyncDispatcher() override { return loop_.dispatcher(); }
 
  private:
-  CommandBufferHelper(std::unique_ptr<msd::Driver> msd_drv, std::shared_ptr<MagmaSystemDevice> dev,
-                      std::unique_ptr<MagmaSystemConnection> connection, MagmaSystemContext* ctx)
+  CommandBufferHelper(std::unique_ptr<msd::Driver> msd_drv,
+                      std::shared_ptr<msd::MagmaSystemDevice> dev,
+                      std::unique_ptr<msd::MagmaSystemConnection> connection,
+                      msd::MagmaSystemContext* ctx)
       : msd_drv_(std::move(msd_drv)),
         dev_(std::move(dev)),
         connection_(std::move(connection)),
@@ -152,7 +154,7 @@ class CommandBufferHelper final : public msd::NotificationHandler {
     // batch buffer
     {
       auto batch_buf = &abi_resources()[0];
-      auto buffer = MagmaSystemBuffer::Create(
+      auto buffer = msd::MagmaSystemBuffer::Create(
           dev_->driver(), magma::PlatformBuffer::Create(kBufferSize, "command-buffer-batch"));
       MAGMA_DASSERT(buffer);
       zx::handle duplicate_handle;
@@ -172,7 +174,7 @@ class CommandBufferHelper final : public msd::NotificationHandler {
     // other buffers
     for (uint32_t i = 1; i < kNumResources; i++) {
       auto resource = &abi_resources()[i];
-      auto buffer = MagmaSystemBuffer::Create(
+      auto buffer = msd::MagmaSystemBuffer::Create(
           dev_->driver(), magma::PlatformBuffer::Create(kBufferSize, "resource"));
       MAGMA_DASSERT(buffer);
       zx::handle duplicate_handle;
@@ -232,16 +234,16 @@ class CommandBufferHelper final : public msd::NotificationHandler {
   }
 
   std::unique_ptr<msd::Driver> msd_drv_;
-  std::shared_ptr<MagmaSystemDevice> dev_;
-  std::unique_ptr<MagmaSystemConnection> connection_;
-  MagmaSystemContext* ctx_;  // owned by the connection
+  std::shared_ptr<msd::MagmaSystemDevice> dev_;
+  std::unique_ptr<msd::MagmaSystemConnection> connection_;
+  msd::MagmaSystemContext* ctx_;  // owned by the connection
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 
   std::unique_ptr<magma::PlatformBuffer> buffer_;
   // mapped address of buffer_, do not free
   void* buffer_data_ = nullptr;
 
-  std::vector<MagmaSystemBuffer*> resources_;
+  std::vector<msd::MagmaSystemBuffer*> resources_;
   std::vector<msd::Buffer*> msd_resources_;
 
   std::vector<std::shared_ptr<magma::PlatformSemaphore>> wait_semaphores_;

@@ -37,7 +37,7 @@ namespace {
 class GpuDevice;
 
 using DdkDeviceType =
-    ddk::Device<GpuDevice, magma::MagmaDeviceImpl, ddk::Unbindable, ddk::Initializable>;
+    ddk::Device<GpuDevice, msd::MagmaDeviceImpl, ddk::Unbindable, ddk::Initializable>;
 
 msd::DeviceHandle* ZxDeviceToDeviceHandle(zx_device_t* device) {
   return reinterpret_cast<msd::DeviceHandle*>(device);
@@ -85,7 +85,7 @@ void GpuDevice::DdkRelease() {
 
 zx_status_t GpuDevice::Init() {
   std::lock_guard<std::mutex> lock(magma_mutex());
-  set_magma_driver(MagmaDriver::Create());
+  set_magma_driver(msd::MagmaDriver::Create());
 #if MAGMA_TEST_DRIVER
   DLOG("running magma indriver test");
   set_unit_test_status(magma_indriver_test(parent()));

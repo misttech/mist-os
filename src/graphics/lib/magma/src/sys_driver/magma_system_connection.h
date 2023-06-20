@@ -17,10 +17,11 @@
 #include "msd_cc.h"
 #include "zircon_connection.h"
 
+namespace msd {
 class MagmaSystemDevice;
 
 class MagmaSystemConnection : private MagmaSystemContext::Owner,
-                              public magma::ZirconConnection::Delegate,
+                              public msd::ZirconConnection::Delegate,
                               msd::NotificationHandler {
  public:
   MagmaSystemConnection(std::weak_ptr<MagmaSystemDevice> device,
@@ -52,7 +53,7 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
   magma::Status EnablePerformanceCounters(const uint64_t* counters,
                                           uint64_t counter_count) override;
   magma::Status CreatePerformanceCounterBufferPool(
-      std::unique_ptr<magma::PlatformPerfCountPool> pool) override;
+      std::unique_ptr<msd::PlatformPerfCountPool> pool) override;
   magma::Status ReleasePerformanceCounterBufferPool(uint64_t pool_id) override;
   magma::Status AddPerformanceCounterBufferOffsetToPool(uint64_t pool_id, uint64_t buffer_id,
                                                         uint64_t buffer_offset,
@@ -99,7 +100,7 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
   };
   struct PoolReference {
     std::unique_ptr<msd::PerfCountPool> msd_pool;
-    std::unique_ptr<magma::PlatformPerfCountPool> platform_pool;
+    std::unique_ptr<msd::PlatformPerfCountPool> platform_pool;
   };
 
   // MagmaSystemContext::Owner
@@ -130,5 +131,7 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
   std::unordered_map<uint64_t, PoolReference> pool_map_;
   bool can_access_performance_counters_ = false;
 };
+
+}  // namespace msd
 
 #endif  // SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_MAGMA_SYSTEM_CONNECTION_H_

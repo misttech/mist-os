@@ -10,6 +10,7 @@
 #include "msd_cc.h"
 #include "platform_semaphore.h"
 
+namespace msd {
 class MagmaSystemSemaphore {
  public:
   static std::unique_ptr<MagmaSystemSemaphore> Create(
@@ -25,5 +26,7 @@ class MagmaSystemSemaphore {
   std::unique_ptr<magma::PlatformSemaphore> platform_semaphore_;
   std::unique_ptr<msd::Semaphore> msd_semaphore_;
 };
+
+}  // namespace msd
 
 #endif  // SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_MAGMA_SYSTEM_SEMAPHORE_H_

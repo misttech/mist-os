@@ -7,6 +7,7 @@
 #include "helper/platform_device_helper.h"
 #include "sys_driver/magma_driver.h"
 
+namespace msd {
 class TestMagmaDriver {
  public:
   static void CreateAndDestroy() {
@@ -16,3 +17,5 @@ class TestMagmaDriver {
 };
 
 TEST(MagmaDriver, CreateAndDestroy) { TestMagmaDriver::CreateAndDestroy(); }
+
+}  // namespace msd

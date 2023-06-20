@@ -9,6 +9,7 @@
 #include "magma_system_device.h"
 #include "magma_util/macros.h"
 
+namespace msd {
 MagmaSystemConnection::MagmaSystemConnection(std::weak_ptr<MagmaSystemDevice> weak_device,
                                              std::unique_ptr<msd::Connection> msd_connection_t)
     : device_(weak_device), msd_connection_(std::move(msd_connection_t)) {
@@ -331,7 +332,7 @@ magma::Status MagmaSystemConnection::EnablePerformanceCounters(const uint64_t* c
 }
 
 magma::Status MagmaSystemConnection::CreatePerformanceCounterBufferPool(
-    std::unique_ptr<magma::PlatformPerfCountPool> pool) {
+    std::unique_ptr<msd::PlatformPerfCountPool> pool) {
   if (!can_access_performance_counters_)
     return MAGMA_DRET(MAGMA_STATUS_ACCESS_DENIED);
 
@@ -449,3 +450,5 @@ msd::PerfCountPool* MagmaSystemConnection::LookupPerfCountPool(uint64_t id) {
     return MAGMA_DRETP(nullptr, "Invalid pool id %ld", id);
   return it->second.msd_pool.get();
 }
+
+}  // namespace msd

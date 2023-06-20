@@ -19,9 +19,9 @@
 #include "sys_driver/magma_driver.h"
 
 #if MAGMA_TEST_DRIVER
-using MagmaDriverBaseType = MagmaTestDriverBase;
+using MagmaDriverBaseType = msd::MagmaTestDriverBase;
 #else
-using MagmaDriverBaseType = MagmaProductionDriverBase;
+using MagmaDriverBaseType = msd::MagmaProductionDriverBase;
 #endif
 
 class MaliDriver : public MagmaDriverBaseType {
@@ -44,7 +44,7 @@ class MaliDriver : public MagmaDriverBaseType {
 
     std::lock_guard lock(magma_mutex());
 
-    set_magma_driver(MagmaDriver::Create());
+    set_magma_driver(msd::MagmaDriver::Create());
     if (!magma_driver()) {
       DMESSAGE("Failed to create MagmaDriver");
       return zx::error(ZX_ERR_INTERNAL);

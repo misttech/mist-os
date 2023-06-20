@@ -9,6 +9,7 @@
 #include "mock/mock_msd_cc.h"
 #include "sys_driver/magma_system_device.h"
 
+namespace msd {
 class MsdMockDevice_GetDeviceId : public MsdMockDevice {
  public:
   MsdMockDevice_GetDeviceId(uint32_t device_id) : device_id_(device_id) {}
@@ -57,3 +58,5 @@ TEST(MagmaSystemDevice, GetIcdList) {
   EXPECT_EQ(2u, icds.size());
   EXPECT_EQ(std::string(icds[0].component_url), "a");
 }
+
+}  // namespace msd

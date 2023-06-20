@@ -6,6 +6,8 @@
 
 #include "magma_util/macros.h"
 
+namespace msd {
+
 MagmaSystemBuffer::MagmaSystemBuffer(std::unique_ptr<magma::PlatformBuffer> platform_buf,
                                      std::unique_ptr<msd::Buffer> msd_buf)
     : platform_buf_(std::move(platform_buf)), msd_buf_(std::move(msd_buf)) {}
@@ -27,3 +29,4 @@ std::unique_ptr<MagmaSystemBuffer> MagmaSystemBuffer::Create(
   return std::unique_ptr<MagmaSystemBuffer>(
       new MagmaSystemBuffer(std::move(platform_buffer), std::move(msd_buf)));
 }
+}  // namespace msd

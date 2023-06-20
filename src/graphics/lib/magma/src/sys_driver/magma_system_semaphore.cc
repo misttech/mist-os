@@ -6,6 +6,7 @@
 
 #include "magma_util/macros.h"
 
+namespace msd {
 MagmaSystemSemaphore::MagmaSystemSemaphore(
     std::unique_ptr<magma::PlatformSemaphore> platform_semaphore,
     std::unique_ptr<msd::Semaphore> msd_semaphore_t)
@@ -31,3 +32,5 @@ std::unique_ptr<MagmaSystemSemaphore> MagmaSystemSemaphore::Create(
   return std::unique_ptr<MagmaSystemSemaphore>(
       new MagmaSystemSemaphore(std::move(platform_semaphore), std::move(msd_semaphore)));
 }
+
+}  // namespace msd

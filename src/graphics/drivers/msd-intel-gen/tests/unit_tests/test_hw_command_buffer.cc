@@ -44,7 +44,7 @@ class TestHwCommandBuffer : public ::testing::Test {
         std::make_shared<AllocatingAddressSpace>(address_space_owner.get(), 0, 1024 * PAGE_SIZE);
 
     {
-      std::vector<MagmaSystemBuffer*>& resources = helper_->resources();
+      std::vector<msd::MagmaSystemBuffer*>& resources = helper_->resources();
       for (auto& resource : resources) {
         std::shared_ptr<GpuMapping> mapping = addr_space->MapBufferGpu(
             addr_space, static_cast<MsdIntelAbiBuffer*>(resource->msd_buf())->ptr());
@@ -89,7 +89,7 @@ class TestHwCommandBuffer : public ::testing::Test {
 
     {
       gpu_addr_t gpu_addr = 0;
-      std::vector<MagmaSystemBuffer*>& resources = helper_->resources();
+      std::vector<msd::MagmaSystemBuffer*>& resources = helper_->resources();
       for (auto& resource : resources) {
         auto buffer = static_cast<MsdIntelAbiBuffer*>(resource->msd_buf())->ptr();
         std::shared_ptr<GpuMapping> mapping;
@@ -145,7 +145,7 @@ class TestHwCommandBuffer : public ::testing::Test {
 
     gpu_addr_t gpu_addr = 0;
     {
-      std::vector<MagmaSystemBuffer*>& resources = helper_->resources();
+      std::vector<msd::MagmaSystemBuffer*>& resources = helper_->resources();
       for (auto& resource : resources) {
         auto buffer = static_cast<MsdIntelAbiBuffer*>(resource->msd_buf())->ptr();
         std::shared_ptr<GpuMapping> mapping;
@@ -211,7 +211,7 @@ class TestHwCommandBuffer : public ::testing::Test {
 
   void SetUp() override { helper_ = CommandBufferHelper::Create(); }
 
-  std::unique_ptr<MagmaSystemBuffer> buffer_;
+  std::unique_ptr<msd::MagmaSystemBuffer> buffer_;
   std::unique_ptr<CommandBuffer> cmd_buf_;
   std::unique_ptr<CommandBufferHelper> helper_;
 };

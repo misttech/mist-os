@@ -16,6 +16,7 @@
 #include "msd_cc.h"
 #include "zircon_connection.h"
 
+namespace msd {
 class MagmaSystemBuffer;
 class MagmaSystemSemaphore;
 
@@ -34,7 +35,7 @@ class MagmaSystemDevice {
 
   // Opens a connection to the device. On success, returns the connection handle
   // to be passed to the client.
-  static std::shared_ptr<magma::ZirconConnection> Open(
+  static std::shared_ptr<msd::ZirconConnection> Open(
       std::shared_ptr<MagmaSystemDevice> device, msd_client_id_t client_id,
       fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary,
       fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification);
@@ -50,7 +51,7 @@ class MagmaSystemDevice {
 
   // Called on driver thread.  |device_handle| may be used by the connection thread for
   // initialization/configuration but should not be retained.
-  void StartConnectionThread(std::shared_ptr<magma::ZirconConnection> platform_connection,
+  void StartConnectionThread(std::shared_ptr<msd::ZirconConnection> platform_connection,
                              fit::function<void(const char*)> set_thread_priority);
 
   // Called on connection thread
@@ -76,11 +77,13 @@ class MagmaSystemDevice {
 
   struct Connection {
     std::thread thread;
-    std::weak_ptr<magma::ZirconConnection> connection;
+    std::weak_ptr<msd::ZirconConnection> connection;
   };
 
   std::unique_ptr<std::unordered_map<std::thread::id, Connection>> connection_map_;
   std::mutex connection_list_mutex_;
 };
+
+}  // namespace msd
 
 #endif  // SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_MAGMA_SYSTEM_DEVICE_H_

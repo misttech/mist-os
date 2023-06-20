@@ -11,6 +11,7 @@
 #include "msd_cc.h"
 #include "platform_buffer.h"
 
+namespace msd {
 class MagmaSystemBuffer {
  public:
   static std::unique_ptr<MagmaSystemBuffer> Create(
@@ -32,4 +33,5 @@ class MagmaSystemBuffer {
   std::unique_ptr<msd::Buffer> msd_buf_;
 };
 
+}  // namespace msd
 #endif  // SRC_GRAPHICS_LIB_MAGMA_SRC_SYS_DRIVER_MAGMA_SYSTEM_BUFFER_H_

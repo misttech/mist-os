@@ -217,7 +217,7 @@ class Test {
   }
 
  private:
-  MagmaSystemContext* InitializeContext() {
+  msd::MagmaSystemContext* InitializeContext() {
     msd_drv_ = msd::Driver::Create();
     if (!msd_drv_)
       return DRETP(nullptr, "failed to create msd driver");
@@ -230,11 +230,11 @@ class Test {
     auto msd_connection_t = msd_dev->Open(0);
     if (!msd_connection_t)
       return DRETP(nullptr, "msd_device_open failed");
-    system_dev_ = std::shared_ptr<MagmaSystemDevice>(
-        MagmaSystemDevice::Create(msd_drv_.get(), std::move(msd_dev)));
+    system_dev_ = std::shared_ptr<msd::MagmaSystemDevice>(
+        msd::MagmaSystemDevice::Create(msd_drv_.get(), std::move(msd_dev)));
     uint32_t ctx_id = 0;
-    connection_ = std::unique_ptr<MagmaSystemConnection>(
-        new MagmaSystemConnection(system_dev_, std::move(msd_connection_t)));
+    connection_ = std::unique_ptr<msd::MagmaSystemConnection>(
+        new msd::MagmaSystemConnection(system_dev_, std::move(msd_connection_t)));
     if (!connection_)
       return DRETP(nullptr, "failed to connect to msd device");
     connection_->CreateContext(ctx_id);
@@ -245,8 +245,8 @@ class Test {
   }
 
   std::unique_ptr<msd::Driver> msd_drv_;
-  std::shared_ptr<MagmaSystemDevice> system_dev_;
-  std::unique_ptr<MagmaSystemConnection> connection_;
+  std::shared_ptr<msd::MagmaSystemDevice> system_dev_;
+  std::unique_ptr<msd::MagmaSystemConnection> connection_;
 };
 
 TEST(CommandBuffer, TestInvalidSemaphoreImmediate) { ::Test().TestInvalidSemaphoreImmediate(); }

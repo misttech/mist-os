@@ -12,6 +12,8 @@
 #include "magma_util/macros.h"
 #include "msd_cc.h"
 
+namespace msd {
+
 class MagmaDriver {
  public:
   explicit MagmaDriver(std::unique_ptr<msd::Driver> msd_drv) : msd_drv_(std::move(msd_drv)) {}
@@ -37,5 +39,7 @@ class MagmaDriver {
  private:
   std::unique_ptr<msd::Driver> msd_drv_;
 };
+
+}  // namespace msd
 
 #endif  // MAGMA_DRIVER_H
