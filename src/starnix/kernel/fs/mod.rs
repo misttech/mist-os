@@ -46,6 +46,7 @@ pub mod socket;
 pub mod syscalls;
 pub mod sysfs;
 pub mod tmpfs;
+pub mod tracefs;
 
 pub use anon_node::*;
 pub use dir_entry::*;

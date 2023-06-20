@@ -20,7 +20,7 @@ use super::{
 use crate::{
     bpf::BpfFs,
     device::BinderFs,
-    fs::{buffers::InputBuffer, fuse::new_fuse_fs},
+    fs::{buffers::InputBuffer, fuse::new_fuse_fs, tracefs::trace_fs},
     lock::{Mutex, RwLock},
     mutable_state::*,
     selinux::selinux_fs,
@@ -527,6 +527,7 @@ pub fn create_filesystem(
         b"selinuxfs" => selinux_fs(kernel, options).clone(),
         b"sysfs" => sys_fs(kernel, options).clone(),
         b"tmpfs" => TmpFs::new_fs_with_options(kernel, options)?,
+        b"tracefs" => trace_fs(kernel.clone(), options),
         _ => return error!(ENODEV, String::from_utf8_lossy(fs_type)),
     };
 

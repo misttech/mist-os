@@ -79,6 +79,8 @@ pub struct Kernel {
     pub sys_fs: OnceCell<FileSystemHandle>,
     // Owned by selinux.rs
     pub selinux_fs: OnceCell<FileSystemHandle>,
+    // Owned by tracefs/fs.rs
+    pub trace_fs: OnceCell<FileSystemHandle>,
 
     /// The registry of device drivers.
     pub device_registry: RwLock<DeviceRegistry>,
@@ -167,6 +169,7 @@ impl Kernel {
             socket_fs: OnceCell::new(),
             sys_fs: OnceCell::new(),
             selinux_fs: OnceCell::new(),
+            trace_fs: OnceCell::new(),
             device_registry: RwLock::new(DeviceRegistry::new_with_common_devices()),
             features: HashSet::from_iter(features.iter().cloned()),
             container_svc,

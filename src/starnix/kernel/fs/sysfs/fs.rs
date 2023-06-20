@@ -41,6 +41,9 @@ impl SysFs {
             );
             dir.subdir(b"fuse", 0o755, |dir| dir.subdir(b"connections", 0o755, |_| ()));
         });
+        dir.subdir(b"kernel", 0o755, |dir| {
+            dir.subdir(b"tracing", 0o755, |_| ());
+        });
 
         dir.entry(
             b"devices",
