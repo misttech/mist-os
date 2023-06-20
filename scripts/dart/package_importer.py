@@ -302,8 +302,7 @@ def main():
         # Use pub to load the dependencies into a local cache.
         pub_cache_dir = os.path.join(tempdir, 'pub_cache')
         os.mkdir(pub_cache_dir)
-        env = os.environ
-        env['PUB_CACHE'] = pub_cache_dir
+        env = dict(os.environ, PUB_CACHE=pub_cache_dir)
         pub_get = [args.dart, 'pub', 'get']
         if args.debug:
             pub_get.append('-v')
@@ -347,7 +346,7 @@ def main():
             if not valid_package_path(package_name, source_dir):
                 continue
             if not any(domain in source_dir
-                    for domain in ['/pub.dartlang.org/', '/pub.dev/']):
+                       for domain in ['/pub.dartlang.org/', '/pub.dev/']):
                 print(
                     'Package %s not from dartlang (%s), ignoring' %
                     (package_name, source_dir))
@@ -420,13 +419,12 @@ def main():
         # serialize package_config to JSON by using json.dumps and write to
         # //third_party/dart-pkg/pub/package_config.json.
         with open(os.path.join(args.output, 'package_config.json'), 'w',
-                encoding='utf-8') as package_config_json:
+                  encoding='utf-8') as package_config_json:
             package_config_json.write(
                 json.dumps(package_config, sort_keys=True, indent=2))
         if args.changelog:
             new_packages = read_package_versions(args.output)
             generate_package_diff(old_packages, new_packages, args.changelog)
-
 
 
 if __name__ == '__main__':

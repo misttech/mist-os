@@ -99,7 +99,8 @@ def main():
             script_args.changelog,
         ])
 
-    subprocess.check_call(args, env={'FLUTTER_ROOT': flutter_absolute_root})
+    env = dict(os.environ, FLUTTER_ROOT=flutter_absolute_root)
+    subprocess.check_call(args, env=env)
 
 
 if __name__ == '__main__':
