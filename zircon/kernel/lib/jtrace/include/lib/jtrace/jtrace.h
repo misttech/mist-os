@@ -87,10 +87,10 @@ struct Entry<UseLargeEntries::No> {
         internal::Field32 _a = 0)
       : tag(_tag), a(_a.val) {}
 
-  zx_ticks_t ts_ticks;  //  0 + 8 == 8 bytes
-  const char* tag;      //  8 + 8 == 16 bytes
-  cpu_num_t cpu_id;     // 16 + 4 == 20 bytes
-  uint32_t a;           // 24 + 4 == 24 bytes
+  zx_ticks_t ts_ticks;       //  0 + 8 == 8 bytes
+  const char* tag{nullptr};  //  8 + 8 == 16 bytes
+  cpu_num_t cpu_id;          // 16 + 4 == 20 bytes
+  uint32_t a;                // 24 + 4 == 24 bytes
 };
 
 template <>
@@ -123,24 +123,26 @@ struct Entry<UseLargeEntries::Yes> {
 
 #if JTRACE_TARGET_BUFFER_SIZE > 0
 void jtrace_init();
+void jtrace_set_after_thread_init_early();
 void jtrace_set_location(void* ptr, size_t len);
 void jtrace_invalidate();
 void jtrace_log(jtrace::Entry<kJTraceUseLargeEntries>& e);
 void jtrace_dump(jtrace::TraceBufferType which);
 #else
 inline void jtrace_init() {}
+inline void jtrace_set_after_thread_init_early() {}
 inline void jtrace_set_location(void* ptr, size_t len) {}
 inline void jtrace_invalidate() {}
 inline void jtrace_log(jtrace::Entry<kJTraceUseLargeEntries>& e) {}
 inline void jtrace_dump(jtrace::TraceBufferType which) {}
 #endif
 
-#define JTRACE(tag, ...)                                                        \
-  do {                                                                          \
-    static constexpr ::jtrace::internal::FileFuncLineInfo ffl_info = {          \
-        .file = __FILE__, .func = __FUNCTION__, .line = __LINE__};              \
-    jtrace::Entry<kJTraceUseLargeEntries> entry{tag, &ffl_info, ##__VA_ARGS__}; \
-    jtrace_log(entry);                                                          \
+#define JTRACE(tag, ...)                                                         \
+  do {                                                                           \
+    static constexpr ::jtrace::internal::FileFuncLineInfo ffl_info = {           \
+        .file = __FILE__, .func = __FUNCTION__, .line = __LINE__};               \
+    jtrace::Entry<kJTraceUseLargeEntries> _entry{tag, &ffl_info, ##__VA_ARGS__}; \
+    jtrace_log(_entry);                                                          \
   } while (false)
 
 #endif  // ZIRCON_KERNEL_LIB_JTRACE_INCLUDE_LIB_JTRACE_JTRACE_H_

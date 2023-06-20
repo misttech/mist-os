@@ -27,6 +27,8 @@
 
 namespace jtrace {
 
+static constexpr zx_koid_t kUnknownTid = ktl::numeric_limits<zx_koid_t>::max();
+
 // fwd decl of our tests structure.  This allows the JTrace class to be friends with the tests.
 struct tests;
 
@@ -94,6 +96,8 @@ class JTrace {
   JTrace& operator=(const JTrace&) = delete;
   JTrace(JTrace&&) = delete;
   JTrace& operator=(JTrace&&) = delete;
+
+  void SetAfterThreadInitEarly() { after_thread_init_early_ = true; }
 
   void SetLocation(ktl::span<uint8_t> storage) {
     // The location of the trace buffer should only ever get set once, either
@@ -183,15 +187,25 @@ class JTrace {
     //    the per-cpu slot.  Failure to do this could result in us recording CPU
     //    X in the entry, but then being moved to CPU Y before writing to the
     //    per-cpu slot for X (and setting up a potential race between us and
-    //    whoever is running on CPU X now).
+    //    whoever is running on CPU X now).  Note that we cannot disable
+    //    preemption until after thread_init_early has been called, but at that
+    //    point in boot, interrupts are disabled and the secondary CPUs are not
+    //    running yet, so that should be OK.
     //
     const uint32_t wr = opt_wr.value();
     {
-      AutoPreemptDisabler preempt_disabler;
+      if (after_thread_init_early_) {
+        Thread::Current::preemption_state().PreemptDisable();
+      }
+
       entry.ts_ticks = current_ticks();
+      if (entry.ts_ticks == 0) {
+        entry.ts_ticks = kZeroReplacement;
+      }
+
       entry.cpu_id = arch_curr_cpu_num();
       if constexpr (Config::kUseLargeEntries == UseLargeEntries::Yes) {
-        entry.tid = Thread::Current::Get()->tid();
+        entry.tid = after_thread_init_early_ ? Thread::Current::Get()->tid() : kUnknownTid;
       }
 
       hdr()->entries[wr] = entry;
@@ -200,6 +214,10 @@ class JTrace {
         if (entry.cpu_id < ktl::size(hdr()->last_cpu_entries_)) {
           hdr()->last_cpu_entries_[entry.cpu_id] = entry;
         }
+      }
+
+      if (after_thread_init_early_) {
+        Thread::Current::preemption_state().PreemptReenable();
       }
     }
 
@@ -331,9 +349,9 @@ class JTrace {
     dump_corrupted_log.cancel();
 
     // Figure out how many entries we will dump, and where to start dumping
-    // from.  We skip any initial entries which have a timestamp of zero.  Most
-    // likely, they were entries which were never written to because the trace
-    // never wrapped.
+    // from.  We skip any initial entries which have a timestamp of zero.  We
+    // never deliberately write a timestamps of zero, meaning that the entries
+    // are skipping were never written, because the trace never wrapped.
     uint32_t rd = wr;
     uint32_t todo = entry_cnt_;
     while (todo) {
@@ -345,14 +363,19 @@ class JTrace {
       --todo;
     }
 
+    auto ConvertTimestamp = [](const Entry& e) -> zx_time_t {
+      const affine::Ratio ticks_to_mono_ratio = platform_get_ticks_to_time_ratio();
+      const zx_ticks_t ts = (e.ts_ticks == kZeroReplacement) ? 0 : e.ts_ticks;
+      return ticks_to_mono_ratio.Scale(ts);
+    };
+
     if (todo) {
       hooks_.PrintInfo("JTRACE: Recovered %u/%u entries\n", todo, entry_cnt_);
-      const affine::Ratio ticks_to_mono_ratio = platform_get_ticks_to_time_ratio();
-      zx_time_t prev_ts = ticks_to_mono_ratio.Scale(entries[rd].ts_ticks);
+      zx_time_t prev_ts = ConvertTimestamp(entries[rd]);
 
       for (; todo != 0; --todo) {
         const auto& e = entries[rd];
-        const zx_time_t ts = ticks_to_mono_ratio.Scale(entries[rd].ts_ticks);
+        const zx_time_t ts = ConvertTimestamp(entries[rd]);
 
         hooks_.PrintTraceEntry(e, buf_type, ts, ts - prev_ts);
         prev_ts = ts;
@@ -374,7 +397,7 @@ class JTrace {
         }
 
         for (const Entry& e : hdr->last_cpu_entries_) {
-          zx_time_t ts = ticks_to_mono_ratio.Scale(e.ts_ticks);
+          zx_time_t ts = ConvertTimestamp(e);
           hooks_.PrintTraceEntry(e, buf_type, ts);
         }
       }
@@ -388,10 +411,20 @@ class JTrace {
     }
   }
 
+  // We never want to deliberately log a timestamp of zero.  The buffer is
+  // filled with zeros at the start, and we skip entries with zero time stamps
+  // when trying to find the read pointer during a dump operation.
+  // Unfortunately, if JTRACE entries are being created before the clock has
+  // been selected, the time they are going to get is always 0.  So, instead, we
+  // replace that value with this constant instead, and substitute back again
+  // during the dump.
+  static inline constexpr zx_ticks_t kZeroReplacement = ktl::numeric_limits<zx_ticks_t>::min();
+
   TraceHooks& hooks_;
   ktl::span<uint8_t> storage_{};
   uint32_t entry_cnt_{0};
   ktl::atomic<uint32_t> trace_ops_in_flight_{0};
+  bool after_thread_init_early_ = false;
   alignas(Header) uint8_t recovered_buf_[kRecoveryBufferSize];
 };
 

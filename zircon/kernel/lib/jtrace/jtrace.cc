@@ -121,10 +121,18 @@ class ProductionTraceHooks final : public TraceHooks {
 
       SafeString file(ffl_info->file, buf_type);
       SafeString func(ffl_info->func, buf_type);
+
+      char tid_buffer[16];
+      const char* tid_str = " Unknown";
+      if (e.tid != kUnknownTid) {
+        snprintf(tid_buffer, sizeof(tid_buffer), "%8lu", e.tid);
+        tid_str = tid_buffer;
+      }
+
       PrintInfo(
-          "[%4ld.%09ld][cpu %u tid %8lu] : %08x %08x %08x %08x %016lx %016lx : (%8ld.%03ld uSec) : "
+          "[%4ld.%09ld][cpu %u tid %s] : %08x %08x %08x %08x %016lx %016lx : (%8ld.%03ld uSec) : "
           "%s:%s:%d (%s)\n",
-          ts_sec, ts_nsec, e.cpu_id, e.tid, e.a, e.b, e.c, e.d, e.e, e.f, delta_usec, delta_nsec,
+          ts_sec, ts_nsec, e.cpu_id, tid_str, e.a, e.b, e.c, e.d, e.e, e.f, delta_usec, delta_nsec,
           TrimFilename(file.get()), func.get(), ffl_info->line, tag.get());
     }
   }
@@ -219,6 +227,8 @@ void jtrace_init() {
     g_trace->SetLocation(NonPersistentBuffer<JTraceConfig>::get());
   }
 }
+
+void jtrace_set_after_thread_init_early() { g_trace->SetAfterThreadInitEarly(); }
 
 void jtrace_set_location(void* ptr, size_t len) {
   g_trace->SetLocation({static_cast<uint8_t*>(ptr), len});

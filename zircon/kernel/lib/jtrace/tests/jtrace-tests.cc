@@ -238,12 +238,11 @@ using CfgPersistSmallEntries = jtrace::Config<1024, 0, IsPersistent::Yes, UseLar
 // similar to how the JTRACE macro does.  Used in the tests::entries test.
 static constexpr const char* EXPECTED_MAKE_ENTRY_FUNCTION = "make_entry_function()";
 #define MAKE_ENTRY(flavor, tag, ...)                                               \
-  [&]() -> auto{                                                                   \
+  [&]() -> auto {                                                                  \
     static constexpr ::jtrace::internal::FileFuncLineInfo ffl_info = {             \
         .file = __FILE__, .func = EXPECTED_MAKE_ENTRY_FUNCTION, .line = __LINE__}; \
     return ::jtrace::Entry<flavor>{tag, &ffl_info, ##__VA_ARGS__};                 \
-  }                                                                                \
-  ()
+  }()
 #define LARGE_ENTRY(tag, ...) MAKE_ENTRY(::jtrace::UseLargeEntries::Yes, tag, ##__VA_ARGS__)
 #define SMALL_ENTRY(tag, ...) MAKE_ENTRY(::jtrace::UseLargeEntries::No, tag, ##__VA_ARGS__)
 
@@ -595,6 +594,7 @@ struct tests {
     auto state = ktl::make_unique<TestState<Config>>(&ac);
     ASSERT_TRUE(ac.check());
     state->trace.SetLocation({state->trace_storage, sizeof(state->trace_storage)});
+    state->trace.SetAfterThreadInitEarly();
 
     // Turn off preemption so that we cannot migrate to a new CPU, then create a few trace entries.
     // Make sure that we take note of the CPU we were running on when we made the entries.

@@ -62,29 +62,19 @@ bool ConstructorsCalled() { return lk_global_constructors_called(); }
 
 // called from arch code
 void lk_main(paddr_t handoff_paddr) {
-  // get us into some sort of thread context so Thread::Current works.
-  thread_init_early();
-
   // Initialize debug tracing (if enabled) as early as possible. This allows
   // debug tracing to be used before the debug log comes up, and before global
   // constructors are executed.  Note that if debug tracing is configured to be
   // persistent, then trace records will be dropped until we get to the point
   // that the ZBI is processed and our NVRAM location is discovered.
-  //
-  // Note: it is actually possible to use jtrace before thread_init_early is
-  // called, but only if it has been configured to use small entries.  Large
-  // entries currently attempt to record the TID of the thread performing the
-  // init as part of creating a trace entry.  On x64, the current thread pointer
-  // before thread_init_early should be `nullptr` which would be easy to check
-  // for, but on ARM64, the current thread pointer (stored in TPIDR_EL1) is
-  // actually set (in start.S) to be a pointer to a dummy structure which is not
-  // actually a struct Thread, and cannot have it's TID queried.
-  //
-  // For now, we simply wait until after thread_init_early to initialize debug
-  // tracing.  In the future, if there is a need to trace during
-  // thread_init_early, please know that it can be done provided that the
-  // hazards listed above have been dealt with.
   jtrace_init();
+
+  // get us into some sort of thread context so Thread::Current works.
+  thread_init_early();
+
+  // Now that Thread::Current works, jtrace is allowed to capture TIDs and
+  // disable preemption while recording entries.
+  jtrace_set_after_thread_init_early();
 
   // bring the debuglog up early so we can safely printf
   dlog_init_early();
