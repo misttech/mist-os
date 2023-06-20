@@ -191,7 +191,6 @@ function main {
     if ! CGO_ENABLED=0 GOPROXY=off GO111MODULE=on fx-command-run go build -buildvcs=false -o "$exe_path" ./tools/build/fx-set/cmd; then
       if ! $dev; then # If running in dev mode, compilation failures are expected.
         fx-error "Failed to build fx set."
-        fx-error "Please file a bug using \`fx report-bug set\` with the full error copy-pasted."
       fi
       return 1
     fi
