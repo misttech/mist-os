@@ -238,6 +238,10 @@ if (current_toolchain != default_toolchain) {
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/lib/libc",
     ]
+
+    # TODO(fxbug.dev/129256): Remove if this doesn't help
+    # because that means the timeout is likely not the issue.
+    timeout = 60
   }
 
   zbi_input("decompress-test-data") {
