@@ -13,7 +13,6 @@
             type: "expect_failure",
             matchers: [
                 "accept02",
-                "access01",
                 "acct01",
                 "acct02",
                 "acl1",
@@ -136,7 +135,6 @@
                 "epoll_ctl04",
                 "epoll_pwait04",
                 "eventfd01",
-                "execve03",
                 "execve04",
                 "execve06",
                 "execveat01",

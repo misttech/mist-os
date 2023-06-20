@@ -921,10 +921,14 @@ impl FsNode {
             (info.uid, info.gid, info.mode.bits())
         };
         let creds = current_task.creds();
-        if creds.has_capability(CAP_DAC_OVERRIDE) {
-            return Ok(());
-        }
-        let mode_flags = if creds.euid == node_uid {
+        let mode_flags = if creds.has_capability(CAP_DAC_OVERRIDE) {
+            if self.is_dir() {
+                0o7
+            } else {
+                // At least one of the EXEC bits must be set to execute files.
+                0o6 | (mode & 0o100) >> 6 | (mode & 0o010) >> 3 | mode & 0o001
+            }
+        } else if creds.euid == node_uid {
             (mode & 0o700) >> 6
         } else if creds.is_in_group(node_gid) {
             (mode & 0o070) >> 3
