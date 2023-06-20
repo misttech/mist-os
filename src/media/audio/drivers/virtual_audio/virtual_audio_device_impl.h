@@ -5,7 +5,7 @@
 #define SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_DEVICE_IMPL_H_
 
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
-#include <fidl/fuchsia.virtualaudio/cpp/wire.h>
+#include <fidl/fuchsia.virtualaudio/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/device.h>
 #include <lib/fit/result.h>
@@ -26,7 +26,8 @@ class VirtualAudioDriver;
 // Each instance of this class represents a two objects:
 //
 // 1. A virtual audio device in the device tree, represented by a `VirtualAudioDriver` object.
-//    This device appears under `/dev/class/audio-{input,output}`.
+//    This device appears under `/dev/class/audio-{input,output}`, `/dev/class/dai`,
+//    `/dev/class/codec` or `/dev/class/audio-composite`.
 //
 // 2. A FIDL channel (`fuchsia.virtualaudio.Device`) which controls and monitors the device.
 //
@@ -35,33 +36,12 @@ class VirtualAudioDriver;
 class VirtualAudioDeviceImpl : public fidl::WireServer<fuchsia_virtualaudio::Device>,
                                public std::enable_shared_from_this<VirtualAudioDeviceImpl> {
  public:
-  struct Config {
-    fuchsia_virtualaudio::wire::DeviceType device_type;
-    bool is_input;
-
-    std::string device_name;
-    std::string manufacturer_name;
-    std::string product_name;
-    std::array<uint8_t, 16> unique_id;
-
-    uint32_t driver_transfer_bytes;
-    zx::duration internal_delay;
-    zx::duration external_delay;
-    std::vector<audio_stream_format_range_t> supported_formats;
-    std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_supported_formats;
-
-    fuchsia_virtualaudio::wire::ClockProperties clock;
-    fuchsia_virtualaudio::wire::RingBufferConstraints ring_buffer;
-    fuchsia_virtualaudio::wire::GainProperties gain;
-    fuchsia_virtualaudio::wire::PlugProperties plug;
-    std::optional<uint32_t> initial_notifications_per_ring;
-  };
-
   static fit::result<fuchsia_virtualaudio::Error, std::shared_ptr<VirtualAudioDeviceImpl>> Create(
-      const Config& cfg, fidl::ServerEnd<fuchsia_virtualaudio::Device> server,
-      zx_device_t* dev_node, async_dispatcher_t* fidl_dispatcher);
+      const fuchsia_virtualaudio::Configuration& cfg,
+      fidl::ServerEnd<fuchsia_virtualaudio::Device> server, zx_device_t* dev_node,
+      async_dispatcher_t* fidl_dispatcher);
 
-  bool is_input() const { return is_input_; }
+  std::optional<bool> is_input() const { return is_input_; }
   bool is_bound() const { return is_bound_; }
 
   // Executes the given task on the FIDL channel's main dispatcher thread.
@@ -109,11 +89,11 @@ class VirtualAudioDeviceImpl : public fidl::WireServer<fuchsia_virtualaudio::Dev
                        AdjustClockRateCompleter::Sync& completer) override;
 
   // Public for std::make_shared. Use Create, not this ctor.
-  VirtualAudioDeviceImpl(bool is_input, async_dispatcher_t* fidl_dispatcher);
+  VirtualAudioDeviceImpl(std::optional<bool> is_input, async_dispatcher_t* fidl_dispatcher);
   ~VirtualAudioDeviceImpl() override;
 
  private:
-  const bool is_input_;
+  const std::optional<bool> is_input_;
   async_dispatcher_t* const fidl_dispatcher_;
 
   // This is std::optional only to break a circular dependency. In practice this is set during

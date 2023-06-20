@@ -30,14 +30,11 @@ class VirtualAudioDai : public VirtualAudioDaiDeviceType,
                         public fidl::Server<fuchsia_hardware_audio::RingBuffer>,
                         public VirtualAudioDriver {
  public:
-  VirtualAudioDai(VirtualAudioDeviceImpl::Config config,
-                  std::weak_ptr<VirtualAudioDeviceImpl> owner, zx_device_t* parent)
-      : VirtualAudioDaiDeviceType(parent), parent_(std::move(owner)), config_(std::move(config)) {
-    ddk_proto_id_ = ZX_PROTOCOL_DAI;
-    sprintf(instance_name_, "virtual-audio-dai-%d", instance_count_++);
-    zx_status_t status = DdkAdd(ddk::DeviceAddArgs(instance_name_));
-    ZX_ASSERT_MSG(status == ZX_OK, "DdkAdd failed");
-  }
+  static fuchsia_virtualaudio::Configuration GetDefaultConfig(bool is_input);
+
+  VirtualAudioDai(fuchsia_virtualaudio::Configuration config,
+                  std::weak_ptr<VirtualAudioDeviceImpl> owner, zx_device_t* parent);
+
   async_dispatcher_t* dispatcher() override {
     return fdf::Dispatcher::GetCurrent()->async_dispatcher();
   }
@@ -89,6 +86,7 @@ class VirtualAudioDai : public VirtualAudioDaiDeviceType,
 
  private:
   void ResetRingBuffer();
+  fuchsia_virtualaudio::Dai& dai_config() { return config_.device_specific()->dai().value(); }
 
   // This should never be invalid: this VirtualAudioStream should always be destroyed before
   // its parent. This field is a weak_ptr to avoid a circular reference count.
@@ -108,7 +106,7 @@ class VirtualAudioDai : public VirtualAudioDaiDeviceType,
   bool ring_buffer_started_ = false;
   std::optional<fuchsia_hardware_audio::Format> ring_buffer_format_;
   std::optional<fuchsia_hardware_audio::DaiFormat> dai_format_;
-  const VirtualAudioDeviceImpl::Config config_;
+  fuchsia_virtualaudio::Configuration config_;
 };
 
 }  // namespace virtual_audio
