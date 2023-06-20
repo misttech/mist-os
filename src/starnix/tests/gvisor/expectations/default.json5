@@ -164,7 +164,6 @@
                 "Inotify.EventsGoUpAtMostOneLevel",
                 "Inotify.DuplicateWatchReturnsSameWatchDescriptor",
                 "Inotify.UnmatchedEventsAreDiscarded",
-                "Inotify.WatchSetAfterOpenReportsCloseFdEvent",
                 "Inotify.LinkGeneratesAttribAndCreateEvents",
                 "Inotify.MknodGeneratesCreateEvent",
                 "Inotify.AddWatchWithInvalidEventMaskFails",
